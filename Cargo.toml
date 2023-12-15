@@ -8,7 +8,7 @@ members = [
   "nucliadb_procs",
   "nucliadb_protos/rust",
   "nucliadb_relations",
-  "nucliadb_telemetry",
+  "nucliadb_relations2",
   "nucliadb_texts",
   "nucliadb_vectors",
   "vectors_benchmark",

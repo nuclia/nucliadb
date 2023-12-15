@@ -17,271 +17,396 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 from datetime import datetime
-from typing import List, Optional, Tuple
+from typing import Awaitable, List, Optional, Tuple
 
 from async_lru import alru_cache
-from fastapi import HTTPException
-from nucliadb_protos.nodereader_pb2 import (
-    ParagraphSearchRequest,
-    SearchRequest,
-    SuggestFeatures,
-    SuggestRequest,
-)
 from nucliadb_protos.noderesources_pb2 import Resource
-from nucliadb_protos.utils_pb2 import RelationNode
 
+from nucliadb.common.datamanagers.entities import EntitiesDataManager, EntitiesMetaCache
 from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
+from nucliadb.common.datamanagers.labels import LabelsDataManager
 from nucliadb.common.maindb.utils import get_driver
+from nucliadb.ingest.orm.synonyms import Synonyms
 from nucliadb.search import logger
 from nucliadb.search.predict import PredictVectorMissing, SendToPredictError
-from nucliadb.search.search.metrics import node_features
-from nucliadb.search.search.synonyms import apply_synonyms_to_request
+from nucliadb.search.search.filters import (
+    has_classification_label_filters,
+    record_filters_counter,
+    split_labels_by_type,
+    translate_label_filters,
+)
+from nucliadb.search.search.metrics import (
+    node_features,
+    query_parse_dependency_observer,
+)
 from nucliadb.search.utilities import get_predict
+from nucliadb_models.labels import translate_system_to_alias_label
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import (
     SearchOptions,
+    SortField,
     SortFieldMap,
     SortOptions,
     SortOrder,
     SortOrderMap,
     SuggestOptions,
 )
-from nucliadb_telemetry.metrics import Counter
-from nucliadb_utils import const
-from nucliadb_utils.utilities import has_feature
+from nucliadb_protos import knowledgebox_pb2, nodereader_pb2, utils_pb2
 
-ENTITY_FILTER_PREFIX = "/e/"
-LABEL_FILTER_PREFIX = "/l/"
+from .exceptions import InvalidQueryError
 
-
-def record_filters_counter(filters: list[str], counter: Counter) -> None:
-    counter.inc({"type": "filters"})
-    filters.sort()
-    entity_found = False
-    label_found = False
-    for fltr in filters:
-        if entity_found and label_found:
-            break
-        if fltr == "":
-            continue
-        if fltr[0] != "/":
-            break
-        if not entity_found and fltr.startswith(ENTITY_FILTER_PREFIX):
-            entity_found = True
-            counter.inc({"type": "filters_entities"})
-        elif not label_found and fltr.startswith(LABEL_FILTER_PREFIX):
-            label_found = True
-            counter.inc({"type": "filters_labels"})
+INDEX_SORTABLE_FIELDS = [
+    SortField.CREATED,
+    SortField.MODIFIED,
+]
 
 
-async def global_query_to_pb(
-    kbid: str,
-    features: List[SearchOptions],
-    query: str,
-    filters: List[str],
-    faceted: List[str],
-    page_number: int,
-    page_size: int,
-    min_score: float,
-    sort: Optional[SortOptions],
-    range_creation_start: Optional[datetime] = None,
-    range_creation_end: Optional[datetime] = None,
-    range_modification_start: Optional[datetime] = None,
-    range_modification_end: Optional[datetime] = None,
-    fields: Optional[List[str]] = None,
-    user_vector: Optional[List[float]] = None,
-    vectorset: Optional[str] = None,
-    with_duplicates: bool = False,
-    with_status: Optional[ResourceProcessingStatus] = None,
-    with_synonyms: bool = False,
-    autofilter: bool = False,
-    key_filters: Optional[List[str]] = None,
-) -> Tuple[SearchRequest, bool, List[str]]:
+class QueryParser:
     """
-    Converts the pydantic query to a protobuf query
+    Queries are getting more and more complex and different phases of the query
+    depending on different data.
 
-    :return: (request, incomplete, autofilters)
-        where:
-            - request: protobuf SearchRequest object
-            - incomplete: If the query is incomplete (missing vectors)
-            - autofilters: The autofilters that were applied
+    This class is an encapsulation of the different phases of the query and allow
+    some stateful interaction with a query and different depenedencies during
+    query parsing.
     """
-    fields = fields or []
-    autofilters = []
 
-    request = SearchRequest()
-    request.min_score = min_score
-    request.body = query
-    request.with_duplicates = with_duplicates
-    if len(filters) > 0:
-        request.filter.tags.extend(filters)
-        record_filters_counter(filters, node_features)
+    _min_score_task: Optional[asyncio.Task] = None
+    _convert_vectors_task: Optional[asyncio.Task] = None
+    _detected_entities_task: Optional[asyncio.Task] = None
+    _entities_meta_cache_task: Optional[asyncio.Task] = None
+    _deleted_entities_groups_task: Optional[asyncio.Task] = None
+    _synonyms_task: Optional[asyncio.Task] = None
+    _get_classification_labels_task: Optional[asyncio.Task] = None
 
-    request.faceted.tags.extend(faceted)
-    request.fields.extend(fields)
+    def __init__(
+        self,
+        *,
+        kbid: str,
+        features: List[SearchOptions],
+        query: str,
+        filters: List[str],
+        faceted: List[str],
+        page_number: int,
+        page_size: int,
+        min_score: Optional[float] = None,
+        sort: Optional[SortOptions] = None,
+        range_creation_start: Optional[datetime] = None,
+        range_creation_end: Optional[datetime] = None,
+        range_modification_start: Optional[datetime] = None,
+        range_modification_end: Optional[datetime] = None,
+        fields: Optional[List[str]] = None,
+        user_vector: Optional[List[float]] = None,
+        vectorset: Optional[str] = None,
+        with_duplicates: bool = False,
+        with_status: Optional[ResourceProcessingStatus] = None,
+        with_synonyms: bool = False,
+        autofilter: bool = False,
+        key_filters: Optional[List[str]] = None,
+    ):
+        self.kbid = kbid
+        self.features = features
+        self.query = query
+        self.filters = filters
+        self.faceted = faceted
+        self.page_number = page_number
+        self.page_size = page_size
+        self.min_score = min_score
+        self.sort = sort
+        self.range_creation_start = range_creation_start
+        self.range_creation_end = range_creation_end
+        self.range_modification_start = range_modification_start
+        self.range_modification_end = range_modification_end
+        self.fields = fields or []
+        self.user_vector = user_vector
+        self.vectorset = vectorset
+        self.with_duplicates = with_duplicates
+        self.with_status = with_status
+        self.with_synonyms = with_synonyms
+        self.autofilter = autofilter
+        self.key_filters = key_filters
 
-    if key_filters is not None and len(key_filters) > 0:
-        request.key_filters.extend(key_filters)
-        node_features.inc({"type": "key_filters"})
+        if len(self.filters) > 0:
+            self.filters = translate_label_filters(self.filters)
+            record_filters_counter(self.filters, node_features)
 
-    if with_status is not None:
-        request.with_status = PROCESSING_STATUS_TO_PB_MAP[with_status]
+    def _get_default_min_score(self) -> Awaitable[float]:
+        if self._min_score_task is None:  # pragma: no cover
+            self._min_score_task = asyncio.create_task(get_default_min_score(self.kbid))
+        return self._min_score_task
 
-    # We need to ask for all and cut later
-    request.page_number = 0
-    if sort and sort.limit is not None:
-        # As the index can't sort, we have to do it when merging. To
-        # have consistent results, we must limit them
-        request.result_per_page = sort.limit
-    else:
-        request.result_per_page = page_number * page_size + page_size
+    def _get_converted_vectors(self) -> Awaitable[List[float]]:
+        if self._convert_vectors_task is None:  # pragma: no cover
+            self._convert_vectors_task = asyncio.create_task(
+                convert_vectors(self.kbid, self.query)
+            )
+        return self._convert_vectors_task
 
-    if range_creation_start is not None:
-        request.timestamps.from_created.FromDatetime(range_creation_start)
+    def _get_detected_entities(self) -> Awaitable[List[utils_pb2.RelationNode]]:
+        if self._detected_entities_task is None:  # pragma: no cover
+            self._detected_entities_task = asyncio.create_task(
+                detect_entities(self.kbid, self.query)
+            )
+        return self._detected_entities_task
 
-    if range_creation_end is not None:
-        request.timestamps.to_created.FromDatetime(range_creation_end)
+    def _get_entities_meta_cache(self) -> Awaitable[EntitiesMetaCache]:
+        if self._entities_meta_cache_task is None:
+            self._entities_meta_cache_task = asyncio.create_task(
+                get_entities_meta_cache(self.kbid)
+            )
+        return self._entities_meta_cache_task
 
-    if range_modification_start is not None:
-        request.timestamps.from_modified.FromDatetime(range_modification_start)
+    def _get_deleted_entity_groups(self) -> Awaitable[list[str]]:
+        if self._deleted_entities_groups_task is None:
+            self._deleted_entities_groups_task = asyncio.create_task(
+                get_deleted_entity_groups(self.kbid)
+            )
+        return self._deleted_entities_groups_task
 
-    if range_modification_end is not None:
-        request.timestamps.to_modified.FromDatetime(range_modification_end)
+    def _get_synomyns(self) -> Awaitable[Optional[knowledgebox_pb2.Synonyms]]:
+        if self._synonyms_task is None:
+            self._synonyms_task = asyncio.create_task(get_kb_synonyms(self.kbid))
+        return self._synonyms_task
 
-    document_search = SearchOptions.DOCUMENT in features
-    paragraph_search = SearchOptions.PARAGRAPH in features
-    if document_search or paragraph_search:
-        sort_field = SortFieldMap[sort.field] if sort else None
+    def _get_classification_labels(self) -> Awaitable[knowledgebox_pb2.Labels]:
+        if self._get_classification_labels_task is None:
+            self._get_classification_labels_task = asyncio.create_task(
+                get_classification_labels(self.kbid)
+            )
+        return self._get_classification_labels_task
+
+    async def _schedule_dependency_tasks(self) -> None:
+        """
+        This will schedule concurrent tasks for different data that needs to be pulled
+        for the sake of the query being performed
+        """
+        if len(self.filters) > 0 and has_classification_label_filters(self.filters):
+            asyncio.ensure_future(self._get_classification_labels())
+        if self.min_score is None:
+            asyncio.ensure_future(self._get_default_min_score())
+        if SearchOptions.VECTOR in self.features and self.user_vector is None:
+            asyncio.ensure_future(self._get_converted_vectors())
+        if (SearchOptions.RELATIONS in self.features or self.autofilter) and len(
+            self.query
+        ) > 0:
+            asyncio.ensure_future(self._get_detected_entities())
+            asyncio.ensure_future(self._get_entities_meta_cache())
+            asyncio.ensure_future(self._get_deleted_entity_groups())
+        if self.with_synonyms and self.query:
+            asyncio.ensure_future(self._get_synomyns())
+
+    async def parse(self) -> Tuple[nodereader_pb2.SearchRequest, bool, List[str]]:
+        """
+        :return: (request, incomplete, autofilters)
+            where:
+                - request: protobuf nodereader_pb2.SearchRequest object
+                - incomplete: If the query is incomplete (missing vectors)
+                - autofilters: The autofilters that were applied
+        """
+        request = nodereader_pb2.SearchRequest()
+        request.body = self.query
+        request.with_duplicates = self.with_duplicates
+
+        await self._schedule_dependency_tasks()
+
+        await self.parse_filters(request)
+        self.parse_document_search(request)
+        self.parse_paragraph_search(request)
+        incomplete = await self.parse_vector_search(request)
+        autofilters = await self.parse_relation_search(request)
+        await self.parse_synonyms(request)
+
+        self.parse_sorting(request)
+        await self.parse_min_score(request)
+
+        return request, incomplete, autofilters
+
+    async def parse_filters(self, request: nodereader_pb2.SearchRequest) -> None:
+        if len(self.filters) > 0:
+            field_labels = self.filters
+            paragraph_labels: list[str] = []
+            if has_classification_label_filters(self.filters):
+                classification_labels = await self._get_classification_labels()
+                field_labels, paragraph_labels = split_labels_by_type(
+                    self.filters, classification_labels
+                )
+            request.filter.field_labels.extend(field_labels)
+            request.filter.paragraph_labels.extend(paragraph_labels)
+
+        request.faceted.labels.extend(translate_label_filters(self.faceted))
+        request.fields.extend(self.fields)
+
+        if self.key_filters is not None and len(self.key_filters) > 0:
+            request.key_filters.extend(self.key_filters)
+            node_features.inc({"type": "key_filters"})
+
+        if self.with_status is not None:
+            request.with_status = PROCESSING_STATUS_TO_PB_MAP[self.with_status]
+
+        if self.range_creation_start is not None:
+            request.timestamps.from_created.FromDatetime(self.range_creation_start)
+
+        if self.range_creation_end is not None:
+            request.timestamps.to_created.FromDatetime(self.range_creation_end)
+
+        if self.range_modification_start is not None:
+            request.timestamps.from_modified.FromDatetime(self.range_modification_start)
+
+        if self.range_modification_end is not None:
+            request.timestamps.to_modified.FromDatetime(self.range_modification_end)
+
+    def parse_sorting(self, request: nodereader_pb2.SearchRequest) -> None:
+        if len(self.query) == 0:
+            if self.sort is None:
+                self.sort = SortOptions(
+                    field=SortField.CREATED,
+                    order=SortOrder.DESC,
+                    limit=None,
+                )
+            elif self.sort.field not in INDEX_SORTABLE_FIELDS:
+                raise InvalidQueryError(
+                    "sort_field",
+                    f"Empty query can only be sorted by '{SortField.CREATED}' or"
+                    f" '{SortField.MODIFIED}' and sort limit won't be applied",
+                )
+        else:
+            if self.sort is None:
+                self.sort = SortOptions(
+                    field=SortField.SCORE,
+                    order=SortOrder.DESC,
+                    limit=None,
+                )
+            elif (
+                self.sort.field not in INDEX_SORTABLE_FIELDS and self.sort.limit is None
+            ):
+                raise InvalidQueryError(
+                    "sort_field",
+                    f"Sort by '{self.sort.field}' requires setting a sort limit",
+                )
+
+        # We need to ask for all and cut later
+        request.page_number = 0
+        if self.sort and self.sort.limit is not None:
+            # As the index can't sort, we have to do it when merging. To
+            # have consistent results, we must limit them
+            request.result_per_page = self.sort.limit
+        else:
+            request.result_per_page = self.page_number * self.page_size + self.page_size
+
+        sort_field = SortFieldMap[self.sort.field] if self.sort else None
         if sort_field is not None:
             request.order.sort_by = sort_field
-            request.order.type = SortOrderMap[sort.order]  # type: ignore
+            request.order.type = SortOrderMap[self.sort.order]  # type: ignore
 
-    if document_search:
-        request.document = True
-        node_features.inc({"type": "documents"})
+    async def parse_min_score(self, request: nodereader_pb2.SearchRequest) -> None:
+        if self.min_score is None:
+            self.min_score = await self._get_default_min_score()
+        request.min_score = self.min_score
 
-    if paragraph_search:
-        request.paragraph = True
-        node_features.inc({"type": "paragraphs"})
+    def parse_document_search(self, request: nodereader_pb2.SearchRequest) -> None:
+        if SearchOptions.DOCUMENT in self.features:
+            request.document = True
+            node_features.inc({"type": "documents"})
 
-    incomplete = False
-    vector_search = SearchOptions.VECTOR in features
-    if vector_search:
+    def parse_paragraph_search(self, request: nodereader_pb2.SearchRequest) -> None:
+        if SearchOptions.PARAGRAPH in self.features:
+            request.paragraph = True
+            node_features.inc({"type": "paragraphs"})
+
+    async def parse_vector_search(self, request: nodereader_pb2.SearchRequest) -> bool:
+        if SearchOptions.VECTOR not in self.features:
+            return False
+
         node_features.inc({"type": "vectors"})
-        if vectorset is not None:
+
+        incomplete = False
+        if self.vectorset is not None:
+            request.vectorset = self.vectorset
             node_features.inc({"type": "vectorset"})
-        incomplete = await _parse_vectors(
-            request, kbid, query, user_vector=user_vector, vectorset=vectorset
-        )
 
-    relations_search = SearchOptions.RELATIONS in features
-    if relations_search or autofilter:
-        detected_entities = await detect_entities(kbid, query)
-        if relations_search:
-            request.relation_subgraph.entry_points.extend(detected_entities)
-            request.relation_subgraph.depth = 1
-            node_features.inc({"type": "relations"})
-        if autofilter:
-            entity_filters = parse_entities_to_filters(request, detected_entities)
-            autofilters.extend(entity_filters)
+        if self.user_vector is None:
+            try:
+                request.vector.extend(await self._get_converted_vectors())
+            except SendToPredictError as err:
+                logger.warning(f"Errors on predict api trying to embedd query: {err}")
+                incomplete = True
+            except PredictVectorMissing:
+                logger.warning("Predict api returned an empty vector")
+                incomplete = True
+        else:
+            request.vector.extend(self.user_vector)
+        return incomplete
 
-    if with_synonyms:
-        if vector_search or relations_search:
-            raise HTTPException(
-                status_code=422,
-                detail="Search with custom synonyms is only supported on paragraph and document search",
+    async def parse_relation_search(
+        self, request: nodereader_pb2.SearchRequest
+    ) -> list[str]:
+        autofilters = []
+        relations_search = SearchOptions.RELATIONS in self.features
+        if relations_search or self.autofilter:
+            detected_entities = await self._get_detected_entities()
+            meta_cache = await self._get_entities_meta_cache()
+            detected_entities = expand_entities(meta_cache, detected_entities)
+            if relations_search:
+                request.relation_subgraph.entry_points.extend(detected_entities)
+                request.relation_subgraph.depth = 1
+                request.relation_subgraph.deleted_groups.extend(
+                    await self._get_deleted_entity_groups()
+                )
+                for group_id, deleted_entities in meta_cache.deleted_entities.items():
+                    request.relation_subgraph.deleted_entities.append(
+                        nodereader_pb2.EntitiesSubgraphRequest.DeletedEntities(
+                            node_subtype=group_id, node_values=deleted_entities
+                        )
+                    )
+                node_features.inc({"type": "relations"})
+            if self.autofilter:
+                entity_filters = parse_entities_to_filters(request, detected_entities)
+                autofilters.extend(
+                    [translate_system_to_alias_label(e) for e in entity_filters]
+                )
+        return autofilters
+
+    async def parse_synonyms(self, request: nodereader_pb2.SearchRequest) -> None:
+        if not self.with_synonyms:
+            return
+
+        if (
+            SearchOptions.VECTOR in self.features
+            or SearchOptions.RELATIONS in self.features
+        ):
+            raise InvalidQueryError(
+                "synonyms",
+                "Search with custom synonyms is only supported on paragraph and document search",
             )
-        await apply_synonyms_to_request(request, kbid)
 
-    return request, incomplete, autofilters
+        if not self.query:
+            # Nothing to do
+            return
 
+        synonyms = await self._get_synomyns()
+        if synonyms is None:
+            # No synonyms found
+            return
 
-async def _parse_vectors(
-    request: SearchRequest,
-    kbid: str,
-    query: str,
-    user_vector: Optional[List[float]],
-    vectorset: Optional[str],
-) -> bool:
-    incomplete = False
-    if vectorset is not None:
-        request.vectorset = vectorset
-    if user_vector is None:
-        predict = get_predict()
-        try:
-            predict_vector = await predict.convert_sentence_to_vector(kbid, query)
-            request.vector.extend(predict_vector)
-        except SendToPredictError as err:
-            logger.warning(f"Errors on predict api trying to embedd query: {err}")
-            incomplete = True
-        except PredictVectorMissing:
-            logger.warning("Predict api returned an empty vector")
-            incomplete = True
-    else:
-        request.vector.extend(user_vector)
-    return incomplete
+        synonyms_found: List[str] = []
+        advanced_query = []
+        for term in self.query.split(" "):
+            advanced_query.append(term)
+            term_synonyms = synonyms.terms.get(term)
+            if term_synonyms is None or len(term_synonyms.synonyms) == 0:
+                # No synonyms found for this term
+                continue
+            synonyms_found.extend(term_synonyms.synonyms)
 
-
-async def detect_entities(kbid: str, query: str) -> List[RelationNode]:
-    predict = get_predict()
-    try:
-        return await predict.detect_entities(kbid, query)
-    except SendToPredictError as ex:
-        logger.warning(f"Errors on predict api detecting entities: {ex}")
-        return []
-
-
-def parse_entities_to_filters(
-    request: SearchRequest, detected_entities: List[RelationNode]
-) -> List[str]:
-    added_filters = []
-    for entity_filter in [
-        f"/e/{entity.subtype}/{entity.value}"
-        for entity in detected_entities
-        if entity.ntype == RelationNode.NodeType.ENTITY
-    ]:
-        if entity_filter not in request.filter.tags:
-            request.filter.tags.append(entity_filter)
-            added_filters.append(entity_filter)
-    return added_filters
-
-
-def suggest_query_to_pb(
-    features: List[SuggestOptions],
-    query: str,
-    fields: List[str],
-    filters: List[str],
-    faceted: List[str],
-    range_creation_start: Optional[datetime] = None,
-    range_creation_end: Optional[datetime] = None,
-    range_modification_start: Optional[datetime] = None,
-    range_modification_end: Optional[datetime] = None,
-) -> SuggestRequest:
-    request = SuggestRequest()
-
-    request.body = query
-    if SuggestOptions.ENTITIES in features:
-        request.features.append(SuggestFeatures.ENTITIES)
-
-    if SuggestOptions.PARAGRAPH in features:
-        request.features.append(SuggestFeatures.PARAGRAPHS)
-        request.filter.tags.extend(filters)
-        request.fields.extend(fields)
-
-    if range_creation_start is not None:
-        request.timestamps.from_created.FromDatetime(range_creation_start)
-    if range_creation_end is not None:
-        request.timestamps.to_created.FromDatetime(range_creation_end)
-    if range_modification_start is not None:
-        request.timestamps.from_modified.FromDatetime(range_modification_start)
-    if range_modification_end is not None:
-        request.timestamps.to_modified.FromDatetime(range_modification_end)
-
-    return request
+        if len(synonyms_found):
+            request.advanced_query = " OR ".join(advanced_query + synonyms_found)
+            request.ClearField("body")
 
 
 async def paragraph_query_to_pb(
+    kbid: str,
     features: List[SearchOptions],
     rid: str,
     query: str,
@@ -297,8 +422,8 @@ async def paragraph_query_to_pb(
     sort: Optional[str] = None,
     sort_ord: str = SortOrder.DESC.value,
     with_duplicates: bool = False,
-) -> ParagraphSearchRequest:
-    request = ParagraphSearchRequest()
+) -> nodereader_pb2.ParagraphSearchRequest:
+    request = nodereader_pb2.ParagraphSearchRequest()
     request.with_duplicates = with_duplicates
 
     # We need to ask for all and cut later
@@ -320,12 +445,138 @@ async def paragraph_query_to_pb(
     if SearchOptions.PARAGRAPH in features:
         request.uuid = rid
         request.body = query
-        request.filter.tags.extend(filters)
-        request.faceted.tags.extend(faceted)
+        if len(filters) > 0:
+            field_labels = filters
+            paragraph_labels: list[str] = []
+            if has_classification_label_filters(filters):
+                classification_labels = await get_classification_labels(kbid)
+                field_labels, paragraph_labels = split_labels_by_type(
+                    filters, classification_labels
+                )
+            request.filter.field_labels.extend(field_labels)
+            request.filter.paragraph_labels.extend(paragraph_labels)
+
+        request.faceted.labels.extend(translate_label_filters(faceted))
         if sort:
             request.order.field = sort
             request.order.type = sort_ord  # type: ignore
         request.fields.extend(fields)
+
+    return request
+
+
+@query_parse_dependency_observer.wrap({"type": "convert_vectors"})
+async def convert_vectors(kbid: str, query: str) -> List[utils_pb2.RelationNode]:
+    predict = get_predict()
+    return await predict.convert_sentence_to_vector(kbid, query)
+
+
+@query_parse_dependency_observer.wrap({"type": "detect_entities"})
+async def detect_entities(kbid: str, query: str) -> List[utils_pb2.RelationNode]:
+    predict = get_predict()
+    try:
+        return await predict.detect_entities(kbid, query)
+    except SendToPredictError as ex:
+        logger.warning(f"Errors on predict api detecting entities: {ex}")
+        return []
+
+
+def expand_entities(
+    meta_cache: EntitiesMetaCache,
+    detected_entities: list[utils_pb2.RelationNode],
+) -> list[utils_pb2.RelationNode]:
+    """
+    Iterate through duplicated entities in a kb.
+
+    The algorithm first makes it so we can look up duplicates by source and
+    by the referenced entity and expands from both directions.
+    """
+    result_entities = {entity.value: entity for entity in detected_entities}
+    duplicated_entities = meta_cache.duplicate_entities
+    duplicated_entities_by_value = meta_cache.duplicate_entities_by_value
+
+    for entity in detected_entities[:]:
+        if entity.subtype not in duplicated_entities:
+            continue
+
+        if entity.value in duplicated_entities[entity.subtype]:
+            for duplicate in duplicated_entities[entity.subtype][entity.value]:
+                result_entities[duplicate] = utils_pb2.RelationNode(
+                    ntype=utils_pb2.RelationNode.NodeType.ENTITY,
+                    subtype=entity.subtype,
+                    value=duplicate,
+                )
+
+        if entity.value in duplicated_entities_by_value[entity.subtype]:
+            source_duplicate = duplicated_entities_by_value[entity.subtype][
+                entity.value
+            ]
+            result_entities[source_duplicate] = utils_pb2.RelationNode(
+                ntype=utils_pb2.RelationNode.NodeType.ENTITY,
+                subtype=entity.subtype,
+                value=source_duplicate,
+            )
+
+            if source_duplicate in duplicated_entities[entity.subtype]:
+                for duplicate in duplicated_entities[entity.subtype][source_duplicate]:
+                    if duplicate == entity.value:
+                        continue
+                    result_entities[duplicate] = utils_pb2.RelationNode(
+                        ntype=utils_pb2.RelationNode.NodeType.ENTITY,
+                        subtype=entity.subtype,
+                        value=duplicate,
+                    )
+
+    return list(result_entities.values())
+
+
+def parse_entities_to_filters(
+    request: nodereader_pb2.SearchRequest,
+    detected_entities: List[utils_pb2.RelationNode],
+) -> List[str]:
+    added_filters = []
+    for entity_filter in [
+        f"/e/{entity.subtype}/{entity.value}"
+        for entity in detected_entities
+        if entity.ntype == utils_pb2.RelationNode.NodeType.ENTITY
+    ]:
+        if entity_filter not in request.filter.field_labels:
+            request.filter.field_labels.append(entity_filter)
+            added_filters.append(entity_filter)
+    return added_filters
+
+
+def suggest_query_to_pb(
+    features: List[SuggestOptions],
+    query: str,
+    fields: List[str],
+    filters: List[str],
+    faceted: List[str],
+    range_creation_start: Optional[datetime] = None,
+    range_creation_end: Optional[datetime] = None,
+    range_modification_start: Optional[datetime] = None,
+    range_modification_end: Optional[datetime] = None,
+) -> nodereader_pb2.SuggestRequest:
+    request = nodereader_pb2.SuggestRequest()
+
+    request.body = query
+    if SuggestOptions.ENTITIES in features:
+        request.features.append(nodereader_pb2.SuggestFeatures.ENTITIES)
+
+    if SuggestOptions.PARAGRAPH in features:
+        request.features.append(nodereader_pb2.SuggestFeatures.PARAGRAPHS)
+        filters = translate_label_filters(filters)
+        request.filter.field_labels.extend(filters)
+        request.fields.extend(fields)
+
+    if range_creation_start is not None:
+        request.timestamps.from_created.FromDatetime(range_creation_start)
+    if range_creation_end is not None:
+        request.timestamps.to_created.FromDatetime(range_creation_end)
+    if range_modification_start is not None:
+        request.timestamps.from_modified.FromDatetime(range_modification_start)
+    if range_modification_end is not None:
+        request.timestamps.to_modified.FromDatetime(range_modification_end)
 
     return request
 
@@ -340,6 +591,7 @@ PROCESSING_STATUS_TO_PB_MAP = {
 }
 
 
+@query_parse_dependency_observer.wrap({"type": "min_score"})
 async def get_kb_model_default_min_score(kbid: str) -> Optional[float]:
     driver = get_driver()
     kbdm = KnowledgeBoxDataManager(driver)
@@ -353,13 +605,37 @@ async def get_kb_model_default_min_score(kbid: str) -> Optional[float]:
 @alru_cache(maxsize=None)
 async def get_default_min_score(kbid: str) -> float:
     fallback = 0.7
-    if not has_feature(const.Features.DEFAULT_MIN_SCORE):
-        return fallback
-
     model_min_score = await get_kb_model_default_min_score(kbid)
     if model_min_score is not None:
         return model_min_score
-    else:
-        # B/w compatible code until we figure out how to
-        # set default min score for old on-prem kbs
-        return fallback
+    return fallback
+
+
+@query_parse_dependency_observer.wrap({"type": "synonyms"})
+async def get_kb_synonyms(kbid: str) -> Optional[knowledgebox_pb2.Synonyms]:
+    driver = get_driver()
+    async with driver.transaction() as txn:
+        return await Synonyms(txn, kbid).get()
+
+
+@query_parse_dependency_observer.wrap({"type": "entities_meta_cache"})
+async def get_entities_meta_cache(kbid: str) -> EntitiesMetaCache:
+    driver = get_driver()
+    async with driver.transaction() as txn:
+        return await EntitiesDataManager.get_entities_meta_cache(kbid, txn)
+
+
+@query_parse_dependency_observer.wrap({"type": "deleted_entities_groups"})
+async def get_deleted_entity_groups(kbid: str) -> list[str]:
+    driver = get_driver()
+    async with driver.transaction() as txn:
+        return list(
+            (await EntitiesDataManager.get_deleted_groups(kbid, txn)).entities_groups
+        )
+
+
+@query_parse_dependency_observer.wrap({"type": "classification_labels"})
+async def get_classification_labels(kbid: str) -> knowledgebox_pb2.Labels:
+    driver = get_driver()
+    ldm = LabelsDataManager(driver)
+    return await ldm.get_labels(kbid)

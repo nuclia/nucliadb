@@ -21,7 +21,6 @@
 mod common;
 
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use common::{resources, NodeFixture, TestNodeReader, TestNodeWriter};
 use nucliadb_core::protos::{
@@ -46,6 +45,8 @@ async fn test_search_replicated_data() -> Result<(), Box<dyn std::error::Error>>
     let mut reader = fixture.reader_client();
     let mut secondary_reader = fixture.secondary_reader_client();
 
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
     let shard = create_shard(&mut writer).await;
 
     let mut query = create_search_request(&shard.id, "prince");
@@ -60,7 +61,8 @@ async fn test_search_replicated_data() -> Result<(), Box<dyn std::error::Error>>
 
     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
-    let repl_health_mng = ReplicationHealthManager::new(Arc::clone(&fixture.secondary_settings));
+    let health_manager_settings = fixture.secondary_settings.clone();
+    let repl_health_mng = ReplicationHealthManager::new(health_manager_settings);
     let healthy = repl_health_mng.healthy();
     assert!(healthy);
 
@@ -88,8 +90,8 @@ async fn test_search_replicated_data() -> Result<(), Box<dyn std::error::Error>>
         .await?;
 
     assert_eq!(
-        primary_shard.get_generation_id(),
-        secondary_shard.get_generation_id()
+        primary_shard.metadata.get_generation_id(),
+        secondary_shard.metadata.get_generation_id()
     );
 
     // Test deleting shard deletes it from secondary

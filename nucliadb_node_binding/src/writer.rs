@@ -19,16 +19,21 @@
 
 use std::fs;
 use std::io::Cursor;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use nucliadb_core::protos::*;
+use nucliadb_core::Channel;
+use nucliadb_node::analytics::blocking::send_analytics_event;
+use nucliadb_node::analytics::payload::AnalyticsEvent;
+use nucliadb_node::lifecycle;
+use nucliadb_node::settings::providers::env::EnvSettingsProvider;
+use nucliadb_node::settings::providers::SettingsProvider;
+use nucliadb_node::settings::Settings;
 use nucliadb_node::shards::metadata::ShardMetadata;
 use nucliadb_node::shards::providers::unbounded_cache::UnboundedShardWriterCache;
 use nucliadb_node::shards::providers::ShardWriterProvider;
 use nucliadb_node::shards::writer::ShardWriter;
-use nucliadb_node::{env, lifecycle};
-use nucliadb_telemetry::blocking::send_telemetry_event;
-use nucliadb_telemetry::payload::TelemetryEvent;
 use prost::Message;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -41,6 +46,7 @@ use crate::RawProtos;
 #[derive(Default)]
 pub struct NodeWriter {
     shards: UnboundedShardWriterCache,
+    shards_path: PathBuf,
 }
 
 impl NodeWriter {
@@ -62,22 +68,34 @@ impl NodeWriter {
 impl NodeWriter {
     #[new]
     pub fn new() -> PyResult<Self> {
-        if let Err(error) = lifecycle::initialize_writer(&env::data_path(), &env::shards_path()) {
+        let settings: Settings = EnvSettingsProvider::generate_settings().unwrap();
+
+        if let Err(error) = lifecycle::initialize_writer(settings.clone()) {
             return Err(IndexNodeException::new_err(format!(
                 "Unable to initialize writer: {error}"
             )));
         };
+        let shards_path = settings.shards_path();
         Ok(Self {
-            shards: UnboundedShardWriterCache::new(env::shards_path()),
+            shards: UnboundedShardWriterCache::new(settings),
+            shards_path,
         })
     }
 
     pub fn new_shard<'p>(&self, metadata: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        send_telemetry_event(TelemetryEvent::Create);
+        send_analytics_event(AnalyticsEvent::Create);
 
         let request =
             NewShardRequest::decode(&mut Cursor::new(metadata)).expect("Error decoding arguments");
-        let metadata = ShardMetadata::from(request);
+        let shard_id = uuid::Uuid::new_v4().to_string();
+        let similarity = VectorSimilarity::from_i32(request.similarity).unwrap();
+        let metadata = ShardMetadata::new(
+            self.shards_path.join(shard_id.clone()),
+            shard_id,
+            Some(request.kbid),
+            similarity.into(),
+            Some(Channel::from(request.release_channel)),
+        );
         let new_shard = self.shards.create(metadata);
         match new_shard {
             Ok(new_shard) => Ok(PyList::new(
@@ -96,7 +114,7 @@ impl NodeWriter {
     }
 
     pub fn delete_shard<'p>(&mut self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        send_telemetry_event(TelemetryEvent::Delete);
+        send_analytics_event(AnalyticsEvent::Delete);
         let shard_id =
             ShardId::decode(&mut Cursor::new(shard_id)).expect("Error decoding arguments");
         let deleted = self.shards.delete(shard_id.id.clone());
@@ -195,71 +213,6 @@ impl NodeWriter {
         }
     }
 
-    pub fn join_graph<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let request =
-            SetGraph::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
-        let Some(shard_id) = request.shard_id else {
-            return Err(PyValueError::new_err("Missing shard_id field"));
-        };
-        let Some(graph) = request.graph else {
-            return Err(PyValueError::new_err("Missing graph field"));
-        };
-        let shard = self.obtain_shard(shard_id.id.clone())?;
-        let status = shard
-            .join_relations_graph(&graph)
-            .and_then(|()| shard.get_opstatus());
-        match status {
-            Ok(mut status) => {
-                status.status = 0;
-                status.detail = "Success!".to_string();
-                Ok(PyList::new(py, status.encode_to_vec()))
-            }
-            Err(error) => {
-                let status = OpStatus {
-                    status: op_status::Status::Error as i32,
-                    detail: error.to_string(),
-                    field_count: 0_u64,
-                    shard_id: shard_id.id,
-                    ..Default::default()
-                };
-                Ok(PyList::new(py, status.encode_to_vec()))
-            }
-        }
-    }
-
-    pub fn delete_relation_nodes<'p>(
-        &mut self,
-        request: RawProtos,
-        py: Python<'p>,
-    ) -> PyResult<&'p PyAny> {
-        let request =
-            DeleteGraphNodes::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
-        let Some(ref shard_id) = request.shard_id else {
-            return Err(PyValueError::new_err("Missing shard_id field"));
-        };
-        let shard = self.obtain_shard(shard_id.id.clone())?;
-        let status = shard
-            .delete_relation_nodes(&request)
-            .and_then(|()| shard.get_opstatus());
-        match status {
-            Ok(mut status) => {
-                status.status = 0;
-                status.detail = "Success!".to_string();
-                Ok(PyList::new(py, status.encode_to_vec()))
-            }
-            Err(error) => {
-                let status = OpStatus {
-                    status: op_status::Status::Error as i32,
-                    detail: error.to_string(),
-                    field_count: 0_u64,
-                    shard_id: shard_id.id.clone(),
-                    ..Default::default()
-                };
-                Ok(PyList::new(py, status.encode_to_vec()))
-            }
-        }
-    }
-
     // TODO: rename to list_vectorsets
     pub fn get_vectorset<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         let shard_id =
@@ -345,13 +298,13 @@ impl NodeWriter {
     }
 
     pub fn gc<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        send_telemetry_event(TelemetryEvent::GarbageCollect);
+        send_analytics_event(AnalyticsEvent::GarbageCollect);
         let shard_id =
             ShardId::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
         let shard = self.obtain_shard(shard_id.id)?;
         let result = shard.gc();
         match result {
-            Ok(()) => {
+            Ok(_) => {
                 let response = EmptyResponse {};
                 Ok(PyList::new(py, response.encode_to_vec()))
             }

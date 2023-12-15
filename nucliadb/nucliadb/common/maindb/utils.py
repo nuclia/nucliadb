@@ -20,6 +20,7 @@ from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.settings import settings
 from nucliadb_utils.exceptions import ConfigurationError
 from nucliadb_utils.store import MAIN
+from nucliadb_utils.utilities import Utility
 
 try:
     from nucliadb.common.maindb.redis import RedisDriver
@@ -50,16 +51,14 @@ try:
 except ImportError:  # pragma: no cover
     FILES = False
 
-_DRIVER_UTIL_NAME = "driver"
-
 
 def get_driver() -> Driver:
-    return MAIN[_DRIVER_UTIL_NAME]
+    return MAIN[Utility.MAINDB_DRIVER]
 
 
 async def setup_driver() -> Driver:
-    if _DRIVER_UTIL_NAME in MAIN:
-        return MAIN[_DRIVER_UTIL_NAME]
+    if Utility.MAINDB_DRIVER in MAIN:
+        return MAIN[Utility.MAINDB_DRIVER]
 
     if settings.driver == "redis":
         if not REDIS:
@@ -68,7 +67,7 @@ async def setup_driver() -> Driver:
             raise ConfigurationError("No DRIVER_REDIS_URL env var defined.")
 
         redis_driver = RedisDriver(settings.driver_redis_url)
-        MAIN[_DRIVER_UTIL_NAME] = redis_driver
+        MAIN[Utility.MAINDB_DRIVER] = redis_driver
     elif settings.driver == "tikv":
         if not TIKV:
             raise ConfigurationError("`tikv_client` python package not installed.")
@@ -76,14 +75,17 @@ async def setup_driver() -> Driver:
             raise ConfigurationError("No DRIVER_TIKV_URL env var defined.")
 
         tikv_driver = TiKVDriver(settings.driver_tikv_url)
-        MAIN[_DRIVER_UTIL_NAME] = tikv_driver
+        MAIN[Utility.MAINDB_DRIVER] = tikv_driver
     elif settings.driver == "pg":
         if not PG:
             raise ConfigurationError("`asyncpg` python package not installed.")
         if settings.driver_pg_url is None:
             raise ConfigurationError("No DRIVER_PG_URL env var defined.")
-        pg_driver = PGDriver(settings.driver_pg_url)
-        MAIN[_DRIVER_UTIL_NAME] = pg_driver
+        pg_driver = PGDriver(
+            url=settings.driver_pg_url,
+            connection_pool_max_size=settings.driver_pg_connection_pool_max_size,
+        )
+        MAIN[Utility.MAINDB_DRIVER] = pg_driver
     elif settings.driver == "local":
         if not FILES:
             raise ConfigurationError("`aiofiles` python package not installed.")
@@ -91,21 +93,21 @@ async def setup_driver() -> Driver:
             raise ConfigurationError("No DRIVER_LOCAL_URL env var defined.")
 
         local_driver = LocalDriver(settings.driver_local_url)
-        MAIN[_DRIVER_UTIL_NAME] = local_driver
+        MAIN[Utility.MAINDB_DRIVER] = local_driver
     else:
         raise ConfigurationError(
             f"Invalid DRIVER defined configured: {settings.driver}"
         )
 
-    driver: Driver = MAIN[_DRIVER_UTIL_NAME]
+    driver: Driver = MAIN[Utility.MAINDB_DRIVER]
     if not driver.initialized:
         await driver.initialize()
     return driver
 
 
 async def teardown_driver() -> None:
-    if _DRIVER_UTIL_NAME in MAIN:
-        driver: Driver = MAIN[_DRIVER_UTIL_NAME]
+    if Utility.MAINDB_DRIVER in MAIN:
+        driver: Driver = MAIN[Utility.MAINDB_DRIVER]
         if driver.initialized:
             await driver.finalize()
-        del MAIN[_DRIVER_UTIL_NAME]
+        del MAIN[Utility.MAINDB_DRIVER]

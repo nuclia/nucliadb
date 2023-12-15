@@ -23,6 +23,64 @@ from typing import Dict, List, Optional
 
 from pydantic import BaseModel
 
+BASE_LABELS: dict[str, list[str]] = {
+    "t": [],  # doc tags
+    "l": [],  # doc labels
+    "n": [],  # type of element: i (Icon). s (Processing Status)
+    "e": [],  # entities e/type/entityid
+    "s": [],  # languages p (Principal) s (ALL)
+    "u": [],  # contributors s (Source) o (Origin)
+    "f": [],  # field keyword field (field/keyword)
+    "fg": [],  # field keyword (keywords) flat
+    "m": [],  # origin metadata in the form of (key/value). Max key/value size is 255
+}
+
+
+LABEL_QUERY_ALIASES = {
+    # aliases to make querying labels easier
+    "icon": "n/i",
+    "metadata.status": "n/s",
+    "metadata.language": "s/p",
+    "metadata.languages": "s/s",
+    "origin.tags": "t",
+    "origin.metadata": "m",
+    "classification.labels": "l",
+    "entities": "e",
+    "field": "f",
+    "field-values": "fg",
+}
+
+LABEL_QUERY_ALIASES_REVERSED = {v: k for k, v in LABEL_QUERY_ALIASES.items()}
+
+
+def translate_alias_to_system_label(label: str) -> str:
+    parts = label.split("/")
+    if parts[1] in LABEL_QUERY_ALIASES:
+        parts = [""] + [LABEL_QUERY_ALIASES[parts[1]]] + parts[2:]
+        return "/".join(parts)
+    else:
+        return label
+
+
+def translate_system_to_alias_label(label: str) -> str:
+    parts = label.split("/")
+    if parts[1] in LABEL_QUERY_ALIASES_REVERSED:
+        parts = [""] + [LABEL_QUERY_ALIASES_REVERSED[parts[1]]] + parts[2:]
+        return "/".join(parts)
+    elif "/".join(parts[1:3]) in LABEL_QUERY_ALIASES_REVERSED:
+        parts = [""] + [LABEL_QUERY_ALIASES_REVERSED["/".join(parts[1:3])]] + parts[3:]
+        return "/".join(parts)
+    else:
+        return label
+
+
+def flatten_resource_labels(tags_dict: dict[str, list[str]]) -> list[str]:
+    flat_tags = []
+    for key, values in tags_dict.items():
+        for value in values:
+            flat_tags.append(f"/{key}/{value}")
+    return flat_tags
+
 
 class LabelSetKind(str, Enum):
     RESOURCES = "RESOURCES"

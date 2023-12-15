@@ -97,7 +97,13 @@ class StorageSettings(BaseSettings):
     s3_max_pool_connections: int = 30
     s3_endpoint: Optional[str] = None
     s3_region_name: Optional[str] = None
-    s3_bucket: Optional[str] = None
+    s3_bucket: Optional[str] = Field(
+        default=None, description="KnowledgeBox S3 bucket name template"
+    )
+    s3_bucket_tags: Dict[str, str] = Field(
+        default={},
+        description="Map of tags with which S3 buckets will be tagged with: https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketTagging.html",  # noqa
+    )
 
     local_files: Optional[str] = Field(
         default=None,
@@ -109,6 +115,7 @@ class StorageSettings(BaseSettings):
     )
 
     driver_pg_url: Optional[str] = None  # match same env var for k/v storage
+    driver_pg_connection_pool_max_size: int = 20  # match same env var for k/v storage
 
 
 storage_settings = StorageSettings()
@@ -183,7 +190,13 @@ audit_settings = AuditSettings()
 class NATSConsumerSettings(BaseSettings):
     # Read about message ordering:
     #   https://docs.nats.io/nats-concepts/subject_mapping#when-is-deterministic-partitioning-needed
-    nats_max_ack_pending: int = 1  # required for strict message ordering
+
+    # NATS MaxAckPending controls how many messages can we handle simultaneously
+    # (look at the implementation for how concurrent indexing is implemented)
+    #
+    # NOTE this parameter don't actually change already existing consumers! If
+    # you want to update the value, you should use nats-cli to do so
+    nats_max_ack_pending: int = 10
     nats_max_deliver: int = 10000
     nats_ack_wait: int = 10 * 60
     nats_idle_heartbeat: float = 5.0

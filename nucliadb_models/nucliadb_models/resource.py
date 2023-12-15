@@ -36,6 +36,7 @@ from nucliadb_models.extracted import (
     FileExtractedData,
     LargeComputedMetadata,
     LinkExtractedData,
+    QuestionAnswers,
     VectorObject,
 )
 from nucliadb_models.file import FieldFile
@@ -83,6 +84,7 @@ class ExtractedDataTypeName(str, Enum):
     LINK = "link"
     FILE = "file"
     USERVECTORS = "uservectors"
+    QA = "question_answers"
 
 
 class ReleaseChannel(str, Enum):
@@ -165,6 +167,7 @@ class ExtractedData(BaseModel):
     large_metadata: Optional[LargeComputedMetadata] = None
     vectors: Optional[VectorObject] = None
     uservectors: Optional[UserVectorSet] = None
+    question_answers: Optional[QuestionAnswers] = None
 
 
 class TextFieldExtractedData(ExtractedData):

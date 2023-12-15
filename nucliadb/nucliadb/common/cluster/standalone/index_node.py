@@ -17,51 +17,17 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Any
+from typing import Any, Optional
 
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.grpc_node_dummy import (  # type: ignore
     DummyReaderStub,
-    DummySidecarStub,
     DummyWriterStub,
 )
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.cluster.standalone import grpc_node_binding
-from nucliadb_protos import (
-    nodereader_pb2,
-    noderesources_pb2,
-    nodesidecar_pb2,
-    standalone_pb2,
-    standalone_pb2_grpc,
-)
+from nucliadb_protos import standalone_pb2, standalone_pb2_grpc
 from nucliadb_utils.grpc import get_traced_grpc_channel
-
-
-class StandaloneSidecarInterface:
-    """
-    backward compatibile interface for sidecar
-    type interactions when running standalone.
-
-    Right now, side car only provides cached counters.
-
-    Long term, this should be removed and any caching
-    should be done at the node reader.
-    """
-
-    def __init__(self, reader: grpc_node_binding.StandaloneReaderWrapper):
-        self._reader = reader
-
-    async def GetCount(
-        self, shard_id: noderesources_pb2.ShardId
-    ) -> nodesidecar_pb2.Counter:
-        shard = await self._reader.GetShard(
-            nodereader_pb2.GetShardRequest(shard_id=shard_id)
-        )
-        response = nodesidecar_pb2.Counter()
-        if shard is not None:
-            response.fields = shard.fields
-            response.paragraphs = shard.paragraphs
-        return response
 
 
 class StandaloneIndexNode(AbstractIndexNode):
@@ -69,16 +35,28 @@ class StandaloneIndexNode(AbstractIndexNode):
     _reader: grpc_node_binding.StandaloneReaderWrapper
     label: str = "standalone"
 
-    def __init__(self, id: str, address: str, shard_count: int, dummy: bool = False):
-        super().__init__(id=id, address=address, shard_count=shard_count, dummy=dummy)
+    def __init__(
+        self,
+        id: str,
+        address: str,
+        shard_count: int,
+        dummy: bool = False,
+        primary_id: Optional[str] = None,
+    ):
+        super().__init__(
+            id=id,
+            address=address,
+            shard_count=shard_count,
+            dummy=dummy,
+            # standalone does not support read replicas
+            primary_id=None,
+        )
         if dummy:
             self._writer = DummyWriterStub()  # type: ignore
             self._reader = DummyReaderStub()  # type: ignore
-            self._sidecar = DummySidecarStub()
         else:
             self._writer = grpc_node_binding.StandaloneWriterWrapper()
             self._reader = grpc_node_binding.StandaloneReaderWrapper()
-            self._sidecar = StandaloneSidecarInterface(self._reader)  # type: ignore
 
     @property
     def reader(self) -> grpc_node_binding.StandaloneReaderWrapper:  # type: ignore
@@ -87,10 +65,6 @@ class StandaloneIndexNode(AbstractIndexNode):
     @property
     def writer(self) -> grpc_node_binding.StandaloneWriterWrapper:  # type: ignore
         return self._writer
-
-    @property
-    def sidecar(self) -> StandaloneSidecarInterface:  # type: ignore
-        return self._sidecar  # type: ignore
 
 
 class ProxyCallerWrapper:
@@ -142,7 +116,4 @@ class ProxyStandaloneIndexNode(StandaloneIndexNode):
         )
         self._reader = ProxyCallerWrapper(  # type: ignore
             address, "reader", grpc_node_binding.StandaloneReaderWrapper
-        )
-        self._sidecar = ProxyCallerWrapper(  # type: ignore
-            address, "sidecar", StandaloneSidecarInterface
         )

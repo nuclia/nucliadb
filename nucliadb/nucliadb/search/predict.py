@@ -21,6 +21,7 @@ import json
 import os
 from enum import Enum
 from typing import AsyncIterator, Dict, List, Optional, Tuple
+from unittest.mock import AsyncMock, Mock
 
 import aiohttp
 import backoff
@@ -37,6 +38,9 @@ from nucliadb_models.search import (
     ChatModel,
     FeedbackRequest,
     RephraseModel,
+    SummarizedResource,
+    SummarizedResponse,
+    SummarizeModel,
 )
 from nucliadb_telemetry import metrics
 from nucliadb_utils.exceptions import LimitsExceededError
@@ -46,6 +50,12 @@ from nucliadb_utils.utilities import Utility, set_utility
 
 class SendToPredictError(Exception):
     pass
+
+
+class ProxiedPredictAPIError(Exception):
+    def __init__(self, status: int, detail: str = ""):
+        self.status = status
+        self.detail = detail
 
 
 class PredictVectorMissing(Exception):
@@ -79,10 +89,13 @@ PUBLIC_PREDICT = "/api/v1/predict"
 PRIVATE_PREDICT = "/api/internal/predict"
 SENTENCE = "/sentence"
 TOKENS = "/tokens"
+SUMMARIZE = "/summarize"
 CHAT = "/chat"
 ASK_DOCUMENT = "/ask_document"
 REPHRASE = "/rephrase"
 FEEDBACK = "/feedback"
+
+NUCLIA_LEARNING_ID_HEADER = "NUCLIA-LEARNING-ID"
 
 
 predict_observer = metrics.Observer(
@@ -134,8 +147,274 @@ def convert_relations(data: Dict[str, List[Dict[str, str]]]) -> List[RelationNod
     return result
 
 
-class DummyPredictEngine:
+class PredictEngine:
+    def __init__(
+        self,
+        cluster_url: Optional[str] = None,
+        public_url: Optional[str] = None,
+        nuclia_service_account: Optional[str] = None,
+        zone: Optional[str] = None,
+        onprem: bool = False,
+        local_predict: bool = False,
+        local_predict_headers: Optional[Dict[str, str]] = None,
+    ):
+        self.nuclia_service_account = nuclia_service_account
+        self.cluster_url = cluster_url
+        if public_url is not None:
+            self.public_url: Optional[str] = public_url.format(zone=zone)
+        else:
+            self.public_url = None
+        self.zone = zone
+        self.onprem = onprem
+        self.local_predict = local_predict
+        self.local_predict_headers = local_predict_headers
+
+    async def initialize(self):
+        self.session = aiohttp.ClientSession()
+
+    async def finalize(self):
+        await self.session.close()
+
+    async def get_configuration(self, kbid: str) -> Optional[KBConfiguration]:
+        if self.onprem is False:
+            return None
+        return await self._get_configuration(kbid)
+
+    @alru_cache(maxsize=None)
+    async def _get_configuration(self, kbid: str) -> Optional[KBConfiguration]:
+        txn = await get_transaction(read_only=True)
+        config_key = KB_CONFIGURATION.format(kbid=kbid)
+        payload = await txn.get(config_key)
+        if payload is None:
+            return None
+
+        kb_pb = KBConfiguration()
+        kb_pb.ParseFromString(payload)
+        return kb_pb
+
+    def check_nua_key_is_configured_for_onprem(self):
+        if self.onprem and (
+            self.nuclia_service_account is None and self.local_predict is False
+        ):
+            raise NUAKeyMissingError()
+
+    def get_predict_url(self, endpoint: str) -> str:
+        if not endpoint.startswith("/"):
+            endpoint = "/" + endpoint
+        if self.onprem:
+            return f"{self.public_url}{PUBLIC_PREDICT}{endpoint}"
+        else:
+            return f"{self.cluster_url}{PRIVATE_PREDICT}{endpoint}"
+
+    async def get_predict_headers(self, kbid: str) -> dict[str, str]:
+        if self.onprem:
+            headers = {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
+            config = await self.get_configuration(kbid)
+            if self.local_predict_headers is not None:
+                headers.update(self.local_predict_headers)
+            if config is not None:
+                if config.anonymization_model:
+                    headers["X-STF-ANONYMIZATION-MODEL"] = config.anonymization_model
+                if config.semantic_model:
+                    headers["X-STF-SEMANTIC-MODEL"] = config.semantic_model
+                if config.ner_model:
+                    headers["X-STF-NER-MODEL"] = config.ner_model
+                if config.generative_model:
+                    headers["X-STF-GENERATIVE-MODEL"] = config.generative_model
+                if config.visual_labeling:
+                    headers["X-STF-VISUAL-LABELING"] = config.visual_labeling
+            return headers
+        else:
+            return {"X-STF-KBID": kbid}
+
+    async def check_response(
+        self, resp: aiohttp.ClientResponse, expected_status: int = 200
+    ) -> None:
+        if resp.status == expected_status:
+            return
+
+        if resp.status == 402:
+            data = await resp.json()
+            raise LimitsExceededError(402, data["detail"])
+
+        try:
+            data = await resp.json()
+            try:
+                detail = data["detail"]
+            except (KeyError, TypeError):
+                detail = data
+        except (
+            json.decoder.JSONDecodeError,
+            aiohttp.client_exceptions.ContentTypeError,
+        ):
+            detail = await resp.text()
+        logger.error(f"Predict API error at {resp.url}: {detail}")
+        raise ProxiedPredictAPIError(status=resp.status, detail=detail)
+
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=MAX_TRIES)
+    async def make_request(self, method: str, **request_args):
+        func = getattr(self.session, method.lower())
+        return await func(**request_args)
+
+    @predict_observer.wrap({"type": "feedback"})
+    async def send_feedback(
+        self,
+        kbid: str,
+        item: FeedbackRequest,
+        x_nucliadb_user: str,
+        x_ndb_client: str,
+        x_forwarded_for: str,
+    ):
+        try:
+            self.check_nua_key_is_configured_for_onprem()
+        except NUAKeyMissingError:
+            logger.warning(
+                "Nuclia Service account is not defined so could not send the feedback"
+            )
+            return
+
+        data = item.dict()
+        data["user_id"] = x_nucliadb_user
+        data["client"] = x_ndb_client
+        data["forwarded"] = x_forwarded_for
+
+        resp = await self.make_request(
+            "POST",
+            url=self.get_predict_url(FEEDBACK),
+            json=data,
+            headers=await self.get_predict_headers(kbid),
+        )
+        await self.check_response(resp, expected_status=204)
+
+    @predict_observer.wrap({"type": "rephrase"})
+    async def rephrase_query(self, kbid: str, item: RephraseModel) -> str:
+        try:
+            self.check_nua_key_is_configured_for_onprem()
+        except NUAKeyMissingError:
+            error = "Nuclia Service account is not defined so could not rephrase query"
+            logger.warning(error)
+            raise SendToPredictError(error)
+
+        resp = await self.make_request(
+            "POST",
+            url=self.get_predict_url(REPHRASE),
+            json=item.dict(),
+            headers=await self.get_predict_headers(kbid),
+        )
+        await self.check_response(resp, expected_status=200)
+        return await _parse_rephrase_response(resp)
+
+    @predict_observer.wrap({"type": "chat"})
+    async def chat_query(
+        self, kbid: str, item: ChatModel
+    ) -> Tuple[str, AsyncIterator[bytes]]:
+        try:
+            self.check_nua_key_is_configured_for_onprem()
+        except NUAKeyMissingError:
+            error = "Nuclia Service account is not defined so the chat operation could not be performed"
+            logger.warning(error)
+            raise SendToPredictError(error)
+
+        resp = await self.make_request(
+            "POST",
+            url=self.get_predict_url(CHAT),
+            json=item.dict(),
+            headers=await self.get_predict_headers(kbid),
+            timeout=None,
+        )
+        await self.check_response(resp, expected_status=200)
+        ident = resp.headers.get(NUCLIA_LEARNING_ID_HEADER)
+        return ident, get_answer_generator(resp)
+
+    @predict_observer.wrap({"type": "ask_document"})
+    async def ask_document(
+        self, kbid: str, question: str, blocks: list[list[str]], user_id: str
+    ) -> str:
+        try:
+            self.check_nua_key_is_configured_for_onprem()
+        except NUAKeyMissingError:
+            error = "Nuclia Service account is not defined so could not ask document"
+            logger.warning(error)
+            raise SendToPredictError(error)
+
+        item = AskDocumentModel(question=question, blocks=blocks, user_id=user_id)
+        resp = await self.make_request(
+            "POST",
+            url=self.get_predict_url(ASK_DOCUMENT),
+            json=item.dict(),
+            headers=await self.get_predict_headers(kbid),
+            timeout=None,
+        )
+        await self.check_response(resp, expected_status=200)
+        return await resp.text()
+
+    @predict_observer.wrap({"type": "sentence"})
+    async def convert_sentence_to_vector(self, kbid: str, sentence: str) -> List[float]:
+        try:
+            self.check_nua_key_is_configured_for_onprem()
+        except NUAKeyMissingError:
+            logger.warning(
+                "Nuclia Service account is not defined so could not retrieve vectors for the query"
+            )
+            return []
+
+        resp = await self.make_request(
+            "GET",
+            url=self.get_predict_url(SENTENCE),
+            params={"text": sentence},
+            headers=await self.get_predict_headers(kbid),
+        )
+        await self.check_response(resp, expected_status=200)
+        data = await resp.json()
+        if len(data["data"]) == 0:
+            raise PredictVectorMissing()
+        return data["data"]
+
+    @predict_observer.wrap({"type": "entities"})
+    async def detect_entities(self, kbid: str, sentence: str) -> List[RelationNode]:
+        try:
+            self.check_nua_key_is_configured_for_onprem()
+        except NUAKeyMissingError:
+            logger.warning(
+                "Nuclia Service account is not defined so could not retrieve entities from the query"
+            )
+            return []
+
+        resp = await self.make_request(
+            "GET",
+            url=self.get_predict_url(TOKENS),
+            params={"text": sentence},
+            headers=await self.get_predict_headers(kbid),
+        )
+        await self.check_response(resp, expected_status=200)
+        data = await resp.json()
+        return convert_relations(data)
+
+    @predict_observer.wrap({"type": "summarize"})
+    async def summarize(self, kbid: str, item: SummarizeModel) -> SummarizedResponse:
+        try:
+            self.check_nua_key_is_configured_for_onprem()
+        except NUAKeyMissingError:
+            error = "Nuclia Service account is not defined. Summarize operation could not be performed"
+            logger.warning(error)
+            raise SendToPredictError(error)
+        resp = await self.make_request(
+            "POST",
+            url=self.get_predict_url(SUMMARIZE),
+            json=item.dict(),
+            headers=await self.get_predict_headers(kbid),
+            timeout=None,
+        )
+        await self.check_response(resp, expected_status=200)
+        data = await resp.json()
+        return SummarizedResponse.parse_obj(data)
+
+
+class DummyPredictEngine(PredictEngine):
     def __init__(self):
+        self.onprem = True
+        self.cluster_url = "http://localhost:8000"
+        self.public_url = "http://localhost:8000"
         self.calls = []
         self.generated_answer = [
             b"valid ",
@@ -149,6 +428,16 @@ class DummyPredictEngine:
 
     async def finalize(self):
         pass
+
+    async def get_predict_headers(self, kbid: str) -> dict[str, str]:
+        return {}
+
+    async def make_request(self, method: str, **request_args):
+        self.calls.append((method, request_args))
+        response = Mock(status=200)
+        response.json = AsyncMock(return_value={"foo": "bar"})
+        response.headers = {NUCLIA_LEARNING_ID_HEADER: DUMMY_LEARNING_ID}
+        return response
 
     async def send_feedback(
         self,
@@ -200,232 +489,19 @@ class DummyPredictEngine:
         else:
             return DUMMY_RELATION_NODE
 
-
-class PredictEngine:
-    def __init__(
-        self,
-        cluster_url: Optional[str] = None,
-        public_url: Optional[str] = None,
-        nuclia_service_account: Optional[str] = None,
-        zone: Optional[str] = None,
-        onprem: bool = False,
-        local_predict: bool = False,
-        local_predict_headers: Optional[Dict[str, str]] = None,
-    ):
-        self.nuclia_service_account = nuclia_service_account
-        self.cluster_url = cluster_url
-        if public_url is not None:
-            self.public_url: Optional[str] = public_url.format(zone=zone)
-        else:
-            self.public_url = None
-        self.zone = zone
-        self.onprem = onprem
-        self.local_predict = local_predict
-        self.local_predict_headers = local_predict_headers
-
-    async def initialize(self):
-        self.session = aiohttp.ClientSession()
-
-    async def finalize(self):
-        await self.session.close()
-
-    async def get_configuration(self, kbid: str) -> Optional[KBConfiguration]:
-        if self.onprem is False:
-            return None
-        return await self._get_configuration(kbid)
-
-    @alru_cache(maxsize=None)
-    async def _get_configuration(self, kbid: str) -> Optional[KBConfiguration]:
-        txn = await get_transaction()
-        config_key = KB_CONFIGURATION.format(kbid=kbid)
-        payload = await txn.get(config_key)
-        if payload is None:
-            return None
-
-        kb_pb = KBConfiguration()
-        kb_pb.ParseFromString(payload)
-        return kb_pb
-
-    def check_nua_key_is_configured_for_onprem(self):
-        if self.onprem and (
-            self.nuclia_service_account is None and self.local_predict is False
-        ):
-            raise NUAKeyMissingError()
-
-    def get_predict_url(self, endpoint: str) -> str:
-        if self.onprem:
-            return f"{self.public_url}{PUBLIC_PREDICT}{endpoint}"
-        else:
-            return f"{self.cluster_url}{PRIVATE_PREDICT}{endpoint}"
-
-    async def get_predict_headers(self, kbid: str) -> dict[str, str]:
-        if self.onprem:
-            headers = {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
-            config = await self.get_configuration(kbid)
-            if self.local_predict_headers is not None:
-                headers.update(self.local_predict_headers)
-            if config is not None:
-                if config.anonymization_model:
-                    headers["X-STF-ANONYMIZATION-MODEL"] = config.anonymization_model
-                if config.semantic_model:
-                    headers["X-STF-SEMANTIC-MODEL"] = config.semantic_model
-                if config.ner_model:
-                    headers["X-STF-NER-MODEL"] = config.ner_model
-                if config.generative_model:
-                    headers["X-STF-GENERATIVE-MODEL"] = config.generative_model
-                if config.visual_labeling:
-                    headers["X-STF-VISUAL-LABELING"] = config.visual_labeling
-            return headers
-        else:
-            return {"X-STF-KBID": kbid}
-
-    async def check_response(self, resp, expected: int = 200) -> None:
-        if resp.status == expected:
-            return
-        if resp.status == 402:
-            data = await resp.json()
-            raise LimitsExceededError(402, data["detail"])
-        else:
-            raise SendToPredictError(f"{resp.status}: {await resp.read()}")
-
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=MAX_TRIES)
-    async def make_request(self, method: str, **request_args):
-        func = getattr(self.session, method.lower())
-        return await func(**request_args)
-
-    @predict_observer.wrap({"type": "feedback"})
-    async def send_feedback(
-        self,
-        kbid: str,
-        item: FeedbackRequest,
-        x_nucliadb_user: str,
-        x_ndb_client: str,
-        x_forwarded_for: str,
-    ):
-        try:
-            self.check_nua_key_is_configured_for_onprem()
-        except NUAKeyMissingError:
-            logger.warning(
-                "Nuclia Service account is not defined so could not send the feedback"
+    async def summarize(self, kbid: str, item: SummarizeModel) -> SummarizedResponse:
+        self.calls.append((kbid, item))
+        response = SummarizedResponse(
+            summary="global summary",
+        )
+        for rid in item.resources.keys():
+            rsummary = []
+            for field_id, field_text in item.resources[rid].fields.items():
+                rsummary.append(f"{field_id}: {field_text}")
+            response.resources[rid] = SummarizedResource(
+                summary="\n\n".join(rsummary), tokens=10
             )
-            return
-
-        data = item.dict()
-        data["user_id"] = x_nucliadb_user
-        data["client"] = x_ndb_client
-        data["forwarded"] = x_forwarded_for
-
-        resp = await self.make_request(
-            "POST",
-            url=self.get_predict_url(FEEDBACK),
-            json=data,
-            headers=await self.get_predict_headers(kbid),
-        )
-        await self.check_response(resp, expected=204)
-
-    @predict_observer.wrap({"type": "rephrase"})
-    async def rephrase_query(self, kbid: str, item: RephraseModel) -> str:
-        try:
-            self.check_nua_key_is_configured_for_onprem()
-        except NUAKeyMissingError:
-            error = "Nuclia Service account is not defined so could not rephrase query"
-            logger.warning(error)
-            raise SendToPredictError(error)
-
-        resp = await self.make_request(
-            "POST",
-            url=self.get_predict_url(REPHRASE),
-            json=item.dict(),
-            headers=await self.get_predict_headers(kbid),
-        )
-        await self.check_response(resp, expected=200)
-        return await _parse_rephrase_response(resp)
-
-    @predict_observer.wrap({"type": "chat"})
-    async def chat_query(
-        self, kbid: str, item: ChatModel
-    ) -> Tuple[str, AsyncIterator[bytes]]:
-        try:
-            self.check_nua_key_is_configured_for_onprem()
-        except NUAKeyMissingError:
-            error = "Nuclia Service account is not defined so the chat operation could not be performed"
-            logger.warning(error)
-            raise SendToPredictError(error)
-
-        resp = await self.make_request(
-            "POST",
-            url=self.get_predict_url(CHAT),
-            json=item.dict(),
-            headers=await self.get_predict_headers(kbid),
-        )
-        await self.check_response(resp, expected=200)
-        ident = resp.headers.get("NUCLIA-LEARNING-ID")
-        return ident, get_answer_generator(resp)
-
-    @predict_observer.wrap({"type": "ask_document"})
-    async def ask_document(
-        self, kbid: str, question: str, blocks: list[list[str]], user_id: str
-    ) -> str:
-        try:
-            self.check_nua_key_is_configured_for_onprem()
-        except NUAKeyMissingError:
-            error = "Nuclia Service account is not defined so could not ask document"
-            logger.warning(error)
-            raise SendToPredictError(error)
-
-        item = AskDocumentModel(question=question, blocks=blocks, user_id=user_id)
-        resp = await self.make_request(
-            "POST",
-            url=self.get_predict_url(ASK_DOCUMENT),
-            json=item.dict(),
-            headers=await self.get_predict_headers(kbid),
-            timeout=None,
-        )
-        await self.check_response(resp, expected=200)
-        return await resp.text()
-
-    @predict_observer.wrap({"type": "sentence"})
-    async def convert_sentence_to_vector(self, kbid: str, sentence: str) -> List[float]:
-        try:
-            self.check_nua_key_is_configured_for_onprem()
-        except NUAKeyMissingError:
-            logger.warning(
-                "Nuclia Service account is not defined so could not retrieve vectors for the query"
-            )
-            return []
-
-        resp = await self.make_request(
-            "GET",
-            url=self.get_predict_url(SENTENCE),
-            params={"text": sentence},
-            headers=await self.get_predict_headers(kbid),
-        )
-        await self.check_response(resp, expected=200)
-        data = await resp.json()
-        if len(data["data"]) == 0:
-            raise PredictVectorMissing()
-        return data["data"]
-
-    @predict_observer.wrap({"type": "entities"})
-    async def detect_entities(self, kbid: str, sentence: str) -> List[RelationNode]:
-        try:
-            self.check_nua_key_is_configured_for_onprem()
-        except NUAKeyMissingError:
-            logger.warning(
-                "Nuclia Service account is not defined so could not retrieve entities from the query"
-            )
-            return []
-
-        resp = await self.make_request(
-            "GET",
-            url=self.get_predict_url(TOKENS),
-            params={"text": sentence},
-            headers=await self.get_predict_headers(kbid),
-        )
-        await self.check_response(resp, expected=200)
-        data = await resp.json()
-
-        return convert_relations(data)
+        return response
 
 
 def get_answer_generator(response: aiohttp.ClientResponse):

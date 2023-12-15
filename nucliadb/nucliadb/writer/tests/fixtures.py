@@ -22,6 +22,7 @@ from typing import AsyncIterator, Callable, List, Optional
 
 import pytest
 from httpx import AsyncClient
+from pytest_lazy_fixtures import lazy_fixture
 from redis import asyncio as aioredis
 
 from nucliadb.ingest.tests.fixtures import IngestFixture
@@ -36,13 +37,16 @@ from nucliadb_utils.settings import (
     nucliadb_settings,
     storage_settings,
 )
+from nucliadb_utils.store import MAIN
+from nucliadb_utils.tests.conftest import get_testing_storage_backend
+from nucliadb_utils.utilities import Utility
 
 
 @pytest.fixture(scope="function")
 async def writer_api(
     redis,
+    storage_writer,
     grpc_servicer: IngestFixture,
-    gcs_storage_writer,
     transaction_utility,
     processing_utility,
     tus_manager,
@@ -74,7 +78,9 @@ async def writer_api(
     await driver.flushall()
 
     await application.router.startup()
+
     yield make_client_fixture
+
     await application.router.shutdown()
     clear_storage()
 
@@ -83,10 +89,52 @@ async def writer_api(
 
 
 @pytest.fixture(scope="function")
-async def gcs_storage_writer(gcs):
-    storage_settings.gcs_endpoint_url = gcs
+def gcs_storage_writer(gcs):
     storage_settings.file_backend = FileBackendConfig.GCS
+    storage_settings.gcs_endpoint_url = gcs
     storage_settings.gcs_bucket = "test_{kbid}"
+
+
+@pytest.fixture(scope="function")
+def s3_storage_writer(s3):
+    storage_settings.file_backend = FileBackendConfig.S3
+    storage_settings.s3_endpoint = s3
+    storage_settings.s3_client_id = ""
+    storage_settings.s3_client_secret = ""
+    storage_settings.s3_bucket = "test_{kbid}"
+
+
+@pytest.fixture(scope="function")
+def pg_storage_writer(pg):
+    storage_settings.file_backend = FileBackendConfig.PG
+    url = f"postgresql://postgres:postgres@{pg[0]}:{pg[1]}/postgres"
+    storage_settings.driver_pg_url = url
+
+
+def lazy_storage_writer_fixture():
+    backend = get_testing_storage_backend()
+    if backend == "gcs":
+        return [lazy_fixture.lf("gcs_storage_writer")]
+    elif backend == "s3":
+        return [lazy_fixture.lf("s3_storage_writer")]
+    elif backend == "pg":
+        return [lazy_fixture.lf("pg_storage_writer")]
+    else:
+        print(f"Unknown storage backend {backend}, using gcs")
+        return [lazy_fixture.lf("gcs_storage_writer")]
+
+
+@pytest.fixture(scope="function", params=lazy_storage_writer_fixture())
+async def storage_writer(request):
+    """
+    Generic storage fixture that allows us to run the same tests for different storage backends.
+    """
+    storage_driver = request.param
+    MAIN[Utility.STORAGE] = storage_driver
+
+    yield storage_driver
+
+    MAIN.pop(Utility.STORAGE, None)
 
 
 @pytest.fixture(scope="function")
@@ -133,3 +181,4 @@ async def processing_utility():
 async def tus_manager(redis):
     settings.dm_redis_host = redis[0]
     settings.dm_redis_port = redis[1]
+    yield

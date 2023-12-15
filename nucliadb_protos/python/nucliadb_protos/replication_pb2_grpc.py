@@ -2,6 +2,7 @@
 """Client and server classes corresponding to protobuf-defined services."""
 import grpc
 
+from nucliadb_protos import noderesources_pb2 as nucliadb__protos_dot_noderesources__pb2
 from nucliadb_protos import replication_pb2 as nucliadb__protos_dot_replication__pb2
 
 
@@ -24,6 +25,11 @@ class ReplicationServiceStub(object):
                 request_serializer=nucliadb__protos_dot_replication__pb2.ReplicateShardRequest.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_replication__pb2.ReplicateShardResponse.FromString,
                 )
+        self.GetMetadata = channel.unary_unary(
+                '/replication.ReplicationService/GetMetadata',
+                request_serializer=nucliadb__protos_dot_noderesources__pb2.EmptyQuery.SerializeToString,
+                response_deserializer=nucliadb__protos_dot_noderesources__pb2.NodeMetadata.FromString,
+                )
 
 
 class ReplicationServiceServicer(object):
@@ -42,6 +48,12 @@ class ReplicationServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetMetadata(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_ReplicationServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -54,6 +66,11 @@ def add_ReplicationServiceServicer_to_server(servicer, server):
                     servicer.ReplicateShard,
                     request_deserializer=nucliadb__protos_dot_replication__pb2.ReplicateShardRequest.FromString,
                     response_serializer=nucliadb__protos_dot_replication__pb2.ReplicateShardResponse.SerializeToString,
+            ),
+            'GetMetadata': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetMetadata,
+                    request_deserializer=nucliadb__protos_dot_noderesources__pb2.EmptyQuery.FromString,
+                    response_serializer=nucliadb__protos_dot_noderesources__pb2.NodeMetadata.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -96,5 +113,22 @@ class ReplicationService(object):
         return grpc.experimental.unary_stream(request, target, '/replication.ReplicationService/ReplicateShard',
             nucliadb__protos_dot_replication__pb2.ReplicateShardRequest.SerializeToString,
             nucliadb__protos_dot_replication__pb2.ReplicateShardResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def GetMetadata(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/replication.ReplicationService/GetMetadata',
+            nucliadb__protos_dot_noderesources__pb2.EmptyQuery.SerializeToString,
+            nucliadb__protos_dot_noderesources__pb2.NodeMetadata.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

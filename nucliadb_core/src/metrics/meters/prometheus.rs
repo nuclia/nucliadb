@@ -37,7 +37,7 @@ pub struct PrometheusMeter {
     tokio_tasks_observer: TokioTasksObserver,
     tokio_runtime_observer: TokioRuntimeObserver,
     replicated_bytes_metric: replication::ReplicatedBytesMetric,
-    replication_ops_metric: replication::ShardOpsMetric,
+    replication_ops_metric: replication::ReplicationOpsMetric,
 }
 
 impl Default for PrometheusMeter {
@@ -74,12 +74,12 @@ impl Meter for PrometheusMeter {
         Some(self.tokio_tasks_observer.get_monitor(task_id))
     }
 
-    fn record_replicated_bytes(&self, value: replication::ReplicatedBytesValue) {
+    fn record_replicated_bytes(&self, value: u64) {
         self.replicated_bytes_metric
             .get_or_create(&replication::ReplicatedBytesKey {})
-            .observe(value);
+            .inc_by(value);
     }
-    fn record_replication_op(&self, key: replication::ShardOpsKey) {
+    fn record_replication_op(&self, key: replication::ReplicationOpsKey) {
         self.replication_ops_metric.get_or_create(&key).inc();
     }
 }

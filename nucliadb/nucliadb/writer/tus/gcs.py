@@ -32,12 +32,12 @@ from typing import AsyncIterator, Dict, Optional
 from urllib.parse import quote_plus
 
 import aiohttp
-import backoff  # type: ignore
+import backoff
 from nucliadb_protos.resources_pb2 import CloudFile
 from oauth2client.service_account import ServiceAccountCredentials  # type: ignore
 
 from nucliadb.writer import logger
-from nucliadb.writer.tus.dm import FileDataMangaer
+from nucliadb.writer.tus.dm import FileDataManager
 from nucliadb.writer.tus.exceptions import (
     CloudFileNotFound,
     HTTPBadRequest,
@@ -47,6 +47,7 @@ from nucliadb.writer.tus.exceptions import (
 )
 from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
 from nucliadb.writer.tus.utils import to_str
+from nucliadb_utils.storages.gcs import CHUNK_SIZE, MIN_UPLOAD_SIZE
 
 
 class GoogleCloudException(Exception):
@@ -61,7 +62,6 @@ RETRIABLE_EXCEPTIONS = (
     GoogleCloudException,
     aiohttp.client_exceptions.ClientPayloadError,
 )
-CHUNK_SIZE = 524288
 
 
 class GCloudBlobStore(BlobStore):
@@ -168,9 +168,10 @@ class GCloudBlobStore(BlobStore):
 class GCloudFileStorageManager(FileStorageManager):
     storage: GCloudBlobStore
     chunk_size = CHUNK_SIZE
+    min_upload_size = MIN_UPLOAD_SIZE
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=4)
-    async def start(self, dm: FileDataMangaer, path: str, kbid: str):
+    async def start(self, dm: FileDataManager, path: str, kbid: str):
         """Init an upload.
 
         _uload_file_id : temporal url to image beeing uploaded
@@ -263,11 +264,11 @@ class GCloudFileStorageManager(FileStorageManager):
         else:
             raise AttributeError("No valid uri")
 
-    async def _append(self, dm: FileDataMangaer, data, offset):
+    async def _append(self, dm: FileDataManager, data, offset):
         if self.storage.session is None:
             raise AttributeError()
         if dm.size:
-            size = dm.size
+            size = str(dm.size)
         else:
             # assuming size will come eventually
             size = "*"
@@ -297,7 +298,7 @@ class GCloudFileStorageManager(FileStorageManager):
                 logger.error(text)
             return call
 
-    async def append(self, dm: FileDataMangaer, iterable, offset) -> int:
+    async def append(self, dm: FileDataManager, iterable, offset) -> int:
         count = 0
 
         async for chunk in iterable:
@@ -327,7 +328,7 @@ class GCloudFileStorageManager(FileStorageManager):
                 break
         return count
 
-    async def finish(self, dm: FileDataMangaer):
+    async def finish(self, dm: FileDataManager):
         if dm.size == 0:
             if self.storage.session is None:
                 raise AttributeError()

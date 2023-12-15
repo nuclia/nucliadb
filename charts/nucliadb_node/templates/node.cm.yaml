@@ -21,8 +21,9 @@ data:
 {{- if .Values.config.lazyloading }}
   LAZY_LOADING: "true"
 {{- end }}
-
-  INDEX_JETSTREAM_AUTH: {{ .Values.indexing.index_jetstream_auth }}
+{{- with .Values.indexing.index_jetstream_auth }}
+  INDEX_JETSTREAM_AUTH: {{ . }}
+{{- end }}  
   INDEX_JETSTREAM_SERVERS: {{ toJson .Values.indexing.index_jetstream_servers | quote }}
 
   JAEGER_ENABLED: {{ .Values.tracing.enabled | quote }}

@@ -325,6 +325,7 @@ class VectorServiceEnum(str, Enum):
 class RelationServiceEnum(str, Enum):
     RELATION_V0 = "RELATION_V0"
     RELATION_V1 = "RELATION_V1"
+    RELATION_V2 = "RELATION_V2"
 
 
 class ShardCreated(BaseModel):
@@ -490,7 +491,7 @@ class SearchParamDefaults:
         description="Controls which types of metadata are serialized on resources of search results",
     )
     extracted = ParamDefault(
-        default=list(ExtractedDataTypeName),
+        default=[],
         title="Extracted metadata",
         description="Controls which parts of the extracted metadata are serialized on search results",
     )
@@ -539,6 +540,11 @@ class SearchParamDefaults:
         default=[ChatOptions.VECTORS, ChatOptions.PARAGRAPHS, ChatOptions.RELATIONS],
         title="Chat features",
         description="Features enabled for the chat endpoint. Semantic search is done if `vectors` is included. If `paragraphs` is included, the results will include matching paragraphs from the bm25 index. If `relations` is included, a graph of entities related to the answer is returned.",  # noqa
+    )
+    prompt = ParamDefault(
+        default=None,
+        title="Prompt",
+        description="Input here your prompt with the words {context} and {question} in brackets where you want those fields to be placed, in case you want them in your prompt. Context will be the data returned by the retrieval step.",  # noqa
     )
     suggest_features = ParamDefault(
         default=[
@@ -649,20 +655,39 @@ class ChatContextMessage(BaseModel):
 Message = ChatContextMessage
 
 
+class UserPrompt(BaseModel):
+    prompt: str
+
+
 class ChatModel(BaseModel):
+    """
+    This is the model for the predict request payload on the chat endpoint
+    """
+
     question: str = Field(description="Question to ask the generative model")
     user_id: str
     retrieval: bool = True
     system: Optional[str] = None
-    query_context: List[str] = Field(
-        [], description="The information retrieval context for the current query"
+    query_context: Dict[str, str] = Field(
+        default={},
+        description="The information retrieval context for the current query",
+    )
+    query_context_order: Optional[Dict[str, int]] = Field(
+        default=None,
+        description="The order of the query context elements. This is used to sort the context elements by relevance before sending them to the generative model",  # noqa
     )
     chat_history: List[ChatContextMessage] = Field(
-        [], description="The chat conversation history"
+        default=[], description="The chat conversation history"
     )
     truncate: bool = Field(
-        True,
+        default=True,
         description="Truncate the chat context in case it doesn't fit the generative input",
+    )
+    user_prompt: Optional[UserPrompt] = Field(
+        default=None, description="Optional custom prompt input by the user"
+    )
+    citations: bool = Field(
+        default=False, description="Whether to include the citations in the answer"
     )
 
 
@@ -714,6 +739,50 @@ class ChatRequest(BaseModel):
     resource_filters: List[
         str
     ] = SearchParamDefaults.resource_filters.to_pydantic_field()
+    prompt: Optional[str] = SearchParamDefaults.prompt.to_pydantic_field()
+    citations: bool = Field(
+        default=False,
+        description="Whether to include the citations for the answer in the response",
+    )
+
+
+class SummarizeResourceModel(BaseModel):
+    fields: Dict[str, str] = {}
+
+
+class SummarizeModel(BaseModel):
+    """
+    Model for the summarize predict api request payload
+    """
+
+    resources: Dict[str, SummarizeResourceModel] = {}
+
+
+class SummarizeRequest(BaseModel):
+    """
+    Model for the request payload of the summarize endpoint
+    """
+
+    resources: List[str] = Field(
+        ...,
+        min_items=1,
+        title="Resources",
+        description="Uids of the resources to summarize",
+    )
+
+
+class SummarizedResource(BaseModel):
+    summary: str
+    tokens: int
+
+
+class SummarizedResponse(BaseModel):
+    resources: Dict[str, SummarizedResource] = Field(
+        default={}, title="Resources", description="Individual resource summaries"
+    )
+    summary: str = Field(
+        default="", title="Summary", description="Globla summary of all resources"
+    )
 
 
 class FindRequest(BaseSearchRequest):

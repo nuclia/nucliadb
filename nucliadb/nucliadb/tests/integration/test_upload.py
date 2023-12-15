@@ -39,8 +39,9 @@ async def test_upload(
             "X-Filename": base64.b64encode(b"testfile").decode("utf-8"),
             "X-Synchronous": "true",
             "Content-Type": "text/plain",
+            "Content-Length": str(len(content)),
         },
-        content=base64.b64encode(content),
+        content=content,
     )
     if resp.status_code == 500:
         print(resp.content)
@@ -64,7 +65,7 @@ async def test_upload(
 
     resp = await nucliadb_reader.get(download_uri)
     assert resp.status_code == 200
-    assert base64.b64decode(resp.content) == content
+    assert resp.content == content
 
 
 @pytest.mark.asyncio

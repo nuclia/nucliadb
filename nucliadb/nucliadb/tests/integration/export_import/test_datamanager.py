@@ -25,8 +25,8 @@ from nucliadb.export_import.datamanager import ExportImportDataManager
 
 
 @pytest.fixture(scope="function")
-def datamanager(maindb_driver, gcs_storage):
-    return ExportImportDataManager(maindb_driver, gcs_storage)
+def datamanager(maindb_driver, storage):
+    return ExportImportDataManager(maindb_driver, storage)
 
 
 EXPORT = b"some-export-bytes" * 1024 * 1024
@@ -34,15 +34,15 @@ IMPORT = b"some-import-bytes" * 1024 * 1024
 
 
 @pytest.fixture(scope="function")
-async def kbid_with_bucket(gcs_storage):
+async def kbid_with_bucket(storage):
     kbid = uuid.uuid4().hex
 
-    bucket_name = gcs_storage.get_bucket_name(kbid)
-    await gcs_storage.create_bucket(bucket_name)
+    bucket_name = storage.get_bucket_name(kbid)
+    await storage.create_bucket(bucket_name)
 
     yield kbid
 
-    await gcs_storage.delete_kb(kbid)
+    await storage.delete_kb(kbid)
 
 
 async def test_export_upload_and_download(datamanager, kbid_with_bucket):

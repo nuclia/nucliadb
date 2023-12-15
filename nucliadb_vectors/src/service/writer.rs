@@ -23,17 +23,18 @@ use std::path::PathBuf;
 use std::time::SystemTime;
 
 use nucliadb_core::metrics::request_time;
+use nucliadb_core::prelude::*;
 use nucliadb_core::protos::prost::Message;
 use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{Resource, ResourceId, VectorSetId, VectorSimilarity};
 use nucliadb_core::tracing::{self, *};
-use nucliadb_core::{metrics, Channel};
-use nucliadb_core::{prelude::*, IndexFiles};
+use nucliadb_core::{metrics, Channel, IndexFiles};
 use nucliadb_procs::measure;
 
 use crate::data_point::{DataPoint, Elem, LabelDictionary};
 use crate::data_point_provider::*;
 use crate::indexset::{IndexKeyCollector, IndexSet};
+use crate::VectorErr;
 
 impl IndexKeyCollector for Vec<String> {
     fn add_key(&mut self, key: String) {
@@ -326,7 +327,14 @@ impl WriterChild for VectorWriterService {
     fn garbage_collection(&mut self) -> NodeResult<()> {
         let time = SystemTime::now();
 
-        let lock = self.index.try_elock()?;
+        let lock = match self.index.try_elock() {
+            Ok(lock) => lock,
+            Err(VectorErr::FsError(fs_error)) => {
+                warn!("Garbage collection error: {fs_error}");
+                return Err(VectorErr::WorkDelayed.into());
+            }
+            Err(error) => return NodeResult::Err(error.into()),
+        };
         self.index.collect_garbage(&lock)?;
 
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
@@ -461,7 +469,10 @@ impl VectorWriterService {
             Err(node_error!("Shard does exist".to_string()))
         } else {
             let Some(similarity) = config.similarity.map(|i| i.into()) else {
-                return Err(node_error!("A similarity must be specified"));
+                return Err(node_error!(
+                    "A similarity must be specified, {:?}",
+                    config.similarity
+                ));
             };
             Ok(VectorWriterService {
                 index: Index::new(
@@ -574,7 +585,7 @@ mod tests {
             id: "".to_string(),
             vector_set: "4".to_string(),
             vector: vec![4.0, 6.0, 7.0],
-            tags: vec!["4/label".to_string()],
+            field_labels: vec!["4/label".to_string()],
             page_number: 0,
             result_per_page: 20,
             with_duplicates: false,
@@ -586,7 +597,7 @@ mod tests {
         assert_eq!(id, "4/key");
 
         // Same set, but no label match
-        request.tags = vec!["5/label".to_string()];
+        request.field_labels = vec!["5/label".to_string()];
         let results = reader.search(&request).unwrap();
         assert_eq!(results.documents.len(), 0);
 
@@ -609,7 +620,7 @@ mod tests {
 
         // Now vectorset 4 is no longer available
         request.vector_set = "4".to_string();
-        request.tags = vec!["4/label".to_string()];
+        request.field_labels = vec!["4/label".to_string()];
         let results = reader.search(&request).unwrap();
         assert_eq!(results.documents.len(), 0);
     }
@@ -664,7 +675,6 @@ mod tests {
             paragraphs: HashMap::from([("DOC/KEY".to_string(), paragraphs)]),
             paragraphs_to_delete: vec![],
             sentences_to_delete: vec![],
-            relations_to_delete: vec![],
             relations: vec![],
             vectors: HashMap::default(),
             vectors_to_delete: HashMap::default(),
@@ -726,7 +736,6 @@ mod tests {
             paragraphs: HashMap::from([("DOC/KEY".to_string(), paragraphs)]),
             paragraphs_to_delete: vec![],
             sentences_to_delete: vec![],
-            relations_to_delete: vec![],
             relations: vec![],
             vectors: HashMap::default(),
             vectors_to_delete: HashMap::default(),

@@ -55,7 +55,6 @@ impl AtomClause {
 /// succeed in order for the overall conjuction to be satisfied.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct CompoundClause {
-    threshold: usize,
     labels: Vec<AtomClause>,
 }
 impl CompoundClause {
@@ -65,21 +64,14 @@ impl CompoundClause {
     pub fn is_empty(&self) -> bool {
         self.labels.is_empty()
     }
-    pub fn new(threshold: usize, labels: Vec<AtomClause>) -> CompoundClause {
-        CompoundClause { threshold, labels }
+    pub fn new(labels: Vec<AtomClause>) -> CompoundClause {
+        CompoundClause { labels }
     }
     fn run<D: DataRetriever>(&self, x: Address, retriever: &D) -> bool {
         if self.is_empty() {
             return true;
         }
-        let mut threshold = self.threshold;
-        let mut i = 0;
-        while threshold > 0 && i < self.len() {
-            let is_valid = self.labels[i].run(x, retriever);
-            threshold -= is_valid as usize;
-            i += 1;
-        }
-        threshold == 0
+        self.labels.iter().any(|label| label.run(x, retriever))
     }
 }
 
@@ -217,17 +209,17 @@ mod tests {
             AtomClause::label(L1.to_string()),
             AtomClause::label(L2.to_string()),
         ];
-        formula.extend(CompoundClause::new(1, inner));
+        formula.extend(CompoundClause::new(inner));
         assert!(formula.run(ADDRESS, &retriever));
 
         let mut formula = Formula::new();
         let inner = vec![AtomClause::key_prefix("/This/is".to_string())];
-        formula.extend(CompoundClause::new(1, inner));
+        formula.extend(CompoundClause::new(inner));
         assert!(formula.run(ADDRESS, &retriever));
         let mut formula = Formula::new();
 
         let inner = vec![AtomClause::key_prefix("/This/is/not".to_string())];
-        formula.extend(CompoundClause::new(1, inner));
+        formula.extend(CompoundClause::new(inner));
         assert!(!formula.run(ADDRESS, &retriever));
     }
 }

@@ -23,7 +23,7 @@ import pytest
 
 from nucliadb.writer import tus
 from nucliadb.writer.tus.dm import (
-    FileDataMangaer,
+    FileDataManager,
     RedisFileDataManager,
     RedisFileDataManagerFactory,
 )
@@ -52,7 +52,7 @@ async def test_get_file_data_manager():
     await tus.finalize()  # make sure to clear
 
     with patch.object(tus.writer_settings, "dm_enabled", False):
-        assert isinstance(tus.get_dm(), FileDataMangaer)
+        assert isinstance(tus.get_dm(), FileDataManager)
 
 
 async def test_get_file_data_manager_redis(redis):

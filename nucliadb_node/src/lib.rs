@@ -29,6 +29,7 @@
 //! a distributed fashion. The API allows building other interfaces, as the
 //! already built PyO3 bindings.
 
+pub mod analytics;
 pub mod grpc;
 pub mod http_server;
 pub mod lifecycle;
@@ -40,6 +41,3 @@ pub mod telemetry;
 pub mod utils;
 
 mod disk_structure;
-
-// TODO: migrate missing functions and delete this module
-pub mod env;

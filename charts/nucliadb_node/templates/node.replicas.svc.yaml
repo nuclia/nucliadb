@@ -9,6 +9,7 @@ metadata:
   labels:
     app: node-replicas-{{ $i }}
     appType: node
+    readReplica: "true"
     app.kubernetes.io/name: node-replicas-{{ $i }}
     app.kubernetes.io/instance: {{ $release.Name }}
     app.kubernetes.io/managed-by: {{ $release.Service }}

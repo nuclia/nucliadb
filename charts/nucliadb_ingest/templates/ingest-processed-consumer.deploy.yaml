@@ -43,6 +43,7 @@ spec:
 {{ toYaml .Values.affinity | indent 8 }}
       tolerations:
 {{ toYaml .Values.tolerations | indent 8 }}
+      serviceAccount: {{ ((.Values.ingest_processed_consumer).serviceAccount) | default "default" }}
       dnsPolicy: ClusterFirst
       containers:
       - name: ingest-processed-consumer

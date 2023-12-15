@@ -153,7 +153,7 @@ class TransactionUtility:
             "reconnected_cb": self.reconnected_cb,
         }
 
-        if self.nats_creds is not None:
+        if self.nats_creds:
             options["user_credentials"] = self.nats_creds
 
         if len(self.nats_servers) > 0:

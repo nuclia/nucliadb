@@ -24,6 +24,7 @@ pytest_plugins = [
     "nucliadb.ingest.tests.fixtures",  # should be refactored out
     "nucliadb.search.tests.node",
     "nucliadb.search.tests.fixtures",
+    "nucliadb_utils.tests.conftest",
     "nucliadb_utils.tests.gcs",
     "nucliadb_utils.tests.s3",
     "nucliadb_utils.tests.nats",

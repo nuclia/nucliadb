@@ -76,6 +76,9 @@ class Utility(str, Enum):
     TRAIN_SERVER = "train_server"
     FEATURE_FLAGS = "feature_flags"
     NATS_MANAGER = "nats_manager"
+    LOCAL_STORAGE = "local_storage"
+    NUCLIA_STORAGE = "nuclia_storage"
+    MAINDB_DRIVER = "driver"
 
 
 def get_utility(ident: Union[Utility, str]):
@@ -87,8 +90,7 @@ def set_utility(ident: Union[Utility, str], util: Any):
 
 
 def clean_utility(ident: Union[Utility, str]):
-    if ident in MAIN:
-        del MAIN[ident]
+    MAIN.pop(ident, None)
 
 
 async def get_storage(
@@ -111,6 +113,7 @@ async def get_storage(
             region_name=storage_settings.s3_region_name,
             max_pool_connections=storage_settings.s3_max_pool_connections,
             bucket=storage_settings.s3_bucket,
+            bucket_tags=storage_settings.s3_bucket_tags,
         )
         set_utility(Utility.STORAGE, s3util)
         await s3util.initialize()
@@ -138,7 +141,10 @@ async def get_storage(
     elif storage_settings.file_backend == FileBackendConfig.PG:
         from nucliadb_utils.storages.pg import PostgresStorage
 
-        pgutil = PostgresStorage(storage_settings.driver_pg_url)  # type: ignore
+        pgutil = PostgresStorage(
+            storage_settings.driver_pg_url,  # type: ignore
+            connection_pool_max_size=storage_settings.driver_pg_connection_pool_max_size,
+        )
         set_utility(Utility.STORAGE, pgutil)
         await pgutil.initialize()
         logger.info("Configuring Postgres Storage")
@@ -163,28 +169,28 @@ async def get_storage(
 
 
 def get_local_storage() -> LocalStorage:
-    if "local_storage" not in MAIN:
+    if Utility.LOCAL_STORAGE not in MAIN:
         from nucliadb_utils.storages.local import LocalStorage
 
-        MAIN["local_storage"] = LocalStorage(
+        MAIN[Utility.LOCAL_STORAGE] = LocalStorage(
             local_testing_files=extended_storage_settings.local_testing_files
         )
         logger.info("Configuring Local Storage")
-    return MAIN.get("local_storage", None)
+    return MAIN.get(Utility.LOCAL_STORAGE, None)
 
 
 async def get_nuclia_storage() -> NucliaStorage:
-    if "nuclia_storage" not in MAIN:
+    if Utility.NUCLIA_STORAGE not in MAIN:
         from nucliadb_utils.storages.nuclia import NucliaStorage
 
-        MAIN["nuclia_storage"] = NucliaStorage(
+        MAIN[Utility.NUCLIA_STORAGE] = NucliaStorage(
             nuclia_public_url=nuclia_settings.nuclia_public_url,
             nuclia_zone=nuclia_settings.nuclia_zone,
             service_account=nuclia_settings.nuclia_service_account,
         )
         logger.info("Configuring Nuclia Storage")
-        await MAIN["nuclia_storage"].initialize()
-    return MAIN.get("nuclia_storage", None)
+        await MAIN[Utility.NUCLIA_STORAGE].initialize()
+    return MAIN.get(Utility.NUCLIA_STORAGE, None)
 
 
 async def get_pubsub() -> Optional[PubSubDriver]:

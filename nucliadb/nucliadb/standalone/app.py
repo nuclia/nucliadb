@@ -20,8 +20,9 @@
 import logging
 import os
 
-import nucliadb_contributor_assets  # type: ignore
+import nucliadb_admin_assets  # type: ignore
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
@@ -30,6 +31,7 @@ from starlette.responses import HTMLResponse
 from starlette.routing import Mount
 
 from nucliadb.common.context.fastapi import set_app_context
+from nucliadb.middleware import ProcessTimeHeaderMiddleware
 from nucliadb.reader import API_PREFIX
 from nucliadb.reader.api.v1.router import api as api_reader_v1
 from nucliadb.search.api.v1.router import api as api_search_v1
@@ -49,20 +51,24 @@ logger = logging.getLogger(__name__)
 
 
 def application_factory(settings: Settings) -> FastAPI:
+    middleware = [
+        Middleware(
+            CORSMiddleware,
+            allow_origins=http_settings.cors_origins,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        ),
+        Middleware(
+            AuthenticationMiddleware,
+            backend=get_auth_backend(settings),
+        ),
+    ]
+    if running_settings.debug:
+        middleware.append(Middleware(ProcessTimeHeaderMiddleware))
+
     fastapi_settings = dict(
         debug=running_settings.debug,
-        middleware=[
-            Middleware(
-                CORSMiddleware,
-                allow_origins=http_settings.cors_origins,
-                allow_methods=["*"],
-                allow_headers=["*"],
-            ),
-            Middleware(
-                AuthenticationMiddleware,
-                backend=get_auth_backend(settings),
-            ),
-        ],
+        middleware=middleware,
         on_startup=[initialize],
         on_shutdown=[finalize],
     )
@@ -94,14 +100,16 @@ def application_factory(settings: Settings) -> FastAPI:
     application.add_route("/", homepage)
     application.add_route("/metrics", metrics_endpoint)
 
-    # mount contributor app assets
+    # mount admin app assets
     application.mount(
-        "/contributor",
+        "/admin",
         StaticFiles(
-            directory=os.path.dirname(nucliadb_contributor_assets.__file__), html=True
+            directory=os.path.dirname(nucliadb_admin_assets.__file__), html=True
         ),
         name="static",
     )
+    # redirect /contributor -> /admin
+    application.add_route("/contributor", lambda request: RedirectResponse("/admin"))
     application.mount(
         "/widget",
         StaticFiles(directory=os.path.dirname(__file__) + "/static", html=True),

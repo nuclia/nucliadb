@@ -1,0 +1,381 @@
+{
+    "sets": {
+        "tiny": {
+            "kbs": [
+                "tiny",
+                "tiny-stable",
+                "tiny-experimental"
+            ],
+            "requests": [
+                {
+                    "endpoint": "search",
+                    "description": "Search",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/search",
+                        "method": "POST",
+                        "payload": {
+                            "query": "Some"
+                        }
+                    }
+                },
+                {
+                    "endpoint": "search",
+                    "description": "Search",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/search",
+                        "method": "POST",
+                        "payload": {
+                            "query": "Some",
+                            "min_score": 0
+                        }
+                    }
+                },
+                {
+                    "endpoint": "suggest",
+                    "description": "Suggest on titles only",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/suggest",
+                        "method": "GET",
+                        "params": {
+                            "query": "Category",
+                            "features": [
+                                "paragraph"
+                            ],
+                            "fields": [
+                                "a/title"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "endpoint": "suggest",
+                    "description": "Suggest entities and paragraphs",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/suggest",
+                        "method": "GET",
+                        "params": {
+                            "query": "ISO",
+                            "features": [
+                                "paragraph",
+                                "entities"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "endpoint": "find",
+                    "description": "Filtered hybrid search",
+                    "tags": [
+                        "filtered",
+                        "hybrid"
+                    ],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/find",
+                        "method": "POST",
+                        "payload": {
+                            "query": "The Division Bell",
+                            "filters": [
+                                "/classification.labels/resources/label1",
+                                "/metadata.language/en"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "endpoint": "find",
+                    "description": "Filtered vector search",
+                    "tags": [
+                        "filtered",
+                        "vector"
+                    ],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/find",
+                        "method": "POST",
+                        "payload": {
+                            "query": "The Royal Navy",
+                            "filters": [
+                                "/classification.labels/resources/label2"
+                            ],
+                            "features": [
+                                "vector"
+                            ],
+                            "min_score": 0.2
+                        }
+                    }
+                },
+                {
+                    "endpoint": "find",
+                    "description": "Hybrid search with date range filter",
+                    "tags": [
+                        "date_range",
+                        "hybrid"
+                    ],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/find",
+                        "method": "POST",
+                        "payload": {
+                            "query": "The Royal Navy",
+                            "range_creation_start": "2020-1-1T00:00:00",
+                            "range_creation_end": "3020-1-1T00:00:00"
+                        }
+                    }
+                }
+            ]
+        },
+        "small": {
+            "kbs": [
+                "small",
+                "small-stable",
+                "small-experimental"
+            ],
+            "requests": [
+                {
+                    "endpoint": "search",
+                    "description": "Search",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/search",
+                        "method": "POST",
+                        "payload": {
+                            "query": "Some"
+                        }
+                    }
+                },
+                {
+                    "endpoint": "search",
+                    "description": "Search",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/search",
+                        "method": "POST",
+                        "payload": {
+                            "query": "Some",
+                            "min_score": 0
+                        }
+                    }
+                },
+                {
+                    "endpoint": "suggest",
+                    "description": "Suggest on titles only",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/suggest",
+                        "method": "GET",
+                        "params": {
+                            "query": "International",
+                            "features": [
+                                "paragraph"
+                            ],
+                            "fields": [
+                                "a/title"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "endpoint": "suggest",
+                    "description": "Suggest entities and paragraphs",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/suggest",
+                        "method": "GET",
+                        "params": {
+                            "query": "International",
+                            "features": [
+                                "paragraph",
+                                "entities"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "endpoint": "find",
+                    "description": "Filtered hybrid search",
+                    "tags": [
+                        "filtered",
+                        "hybrid"
+                    ],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/find",
+                        "method": "POST",
+                        "payload": {
+                            "query": "When was Vladimir Putin's campaing?",
+                            "filters": [
+                                "/classification.labels/resources/label1"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "endpoint": "find",
+                    "description": "Filtered vector search",
+                    "tags": [
+                        "filtered",
+                        "vector"
+                    ],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/find",
+                        "method": "POST",
+                        "payload": {
+                            "query": "who won the Vice Presidential Election?",
+                            "filters": [
+                                "/classification.labels/resources/label2"
+                            ],
+                            "features": [
+                                "vector"
+                            ],
+                            "min_score": 0.5
+                        }
+                    }
+                },
+                {
+                    "endpoint": "find",
+                    "description": "Hybrid search with date range filter",
+                    "tags": [
+                        "date_range",
+                        "hybrid"
+                    ],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/find",
+                        "method": "POST",
+                        "payload": {
+                            "query": "who won the Vice Presidential Election?",
+                            "range_creation_start": "2020-1-1T00:00:00",
+                            "range_creation_end": "3020-1-1T00:00:00"
+                        }
+                    }
+                }
+            ]
+        },
+        "medium": {
+            "kbs": [
+                "medium",
+                "medium-stable",
+                "medium-experimental"
+            ],
+            "requests": [
+                {
+                    "endpoint": "search",
+                    "description": "Search",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/search",
+                        "method": "POST",
+                        "payload": {
+                            "query": "Some"
+                        }
+                    }
+                },
+                {
+                    "endpoint": "search",
+                    "description": "Search",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/search",
+                        "method": "POST",
+                        "payload": {
+                            "query": "Some",
+                            "min_score": 0
+                        }
+                    }
+                },
+                {
+                    "endpoint": "suggest",
+                    "description": "Suggest on titles only",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/suggest",
+                        "method": "GET",
+                        "params": {
+                            "query": "Celtic",
+                            "features": [
+                                "paragraph"
+                            ],
+                            "fields": [
+                                "a/title"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "endpoint": "suggest",
+                    "description": "Suggest entities and paragraphs",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/suggest",
+                        "method": "GET",
+                        "params": {
+                            "query": "Celtic",
+                            "features": [
+                                "paragraph",
+                                "entities"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "endpoint": "find",
+                    "description": "Filtered hybrid search",
+                    "tags": [
+                        "filtered",
+                        "hybrid"
+                    ],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/find",
+                        "method": "POST",
+                        "payload": {
+                            "query": "The Teaching and Learning of Mathematics at University Level",
+                            "filters": [
+                                "/classification.labels/resources/label1",
+                                "/metadata.language/en"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "endpoint": "find",
+                    "description": "Filtered vector search",
+                    "tags": [
+                        "filtered",
+                        "vector"
+                    ],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/find",
+                        "method": "POST",
+                        "payload": {
+                            "query": "Napoleonic wars",
+                            "filters": [
+                                "/classification.labels/resources/label2"
+                            ],
+                            "features": [
+                                "vector"
+                            ],
+                            "min_score": 0.2
+                        }
+                    }
+                },
+                {
+                    "endpoint": "find",
+                    "description": "Hybrid search with date range filter",
+                    "tags": [
+                        "date_range",
+                        "hybrid"
+                    ],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/find",
+                        "method": "POST",
+                        "payload": {
+                            "query": "Napoleonic wars",
+                            "range_creation_start": "2020-1-1T00:00:00",
+                            "range_creation_end": "3020-1-1T00:00:00"
+                        }
+                    }
+                }
+            ]
+        }
+    }
+}

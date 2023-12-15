@@ -19,3 +19,7 @@
 #
 class ConflictError(Exception):
     ...
+
+
+class NotFoundError(Exception):
+    ...

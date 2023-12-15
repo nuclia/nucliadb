@@ -17,12 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import contextlib
 from time import time
 from typing import Optional
 from uuid import uuid4
 
 from fastapi import HTTPException, Query, Response
-from fastapi_versioning import version  # type: ignore
+from fastapi_versioning import version
 from grpc import StatusCode as GrpcStatusCode
 from grpc.aio import AioRpcError  # type: ignore
 from nucliadb_protos.resources_pb2 import Metadata
@@ -36,10 +37,14 @@ from nucliadb_protos.writer_pb2 import (
 )
 from starlette.requests import Request
 
+from nucliadb.common.context.fastapi import get_app_context
+from nucliadb.common.datamanagers.resources import ResourcesDataManager
+from nucliadb.common.maindb.driver import Driver
+from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.processing import PushPayload, Source
-from nucliadb.writer import SERVICE_NAME
+from nucliadb.ingest.processing import ProcessingInfo, PushPayload, Source
+from nucliadb.writer import SERVICE_NAME, logger
 from nucliadb.writer.api.constants import SKIP_STORE_DEFAULT, SYNC_CALL, X_NUCLIADB_USER
 from nucliadb.writer.api.v1.router import (
     KB_PREFIX,
@@ -73,6 +78,7 @@ from nucliadb_models.writer import (
     ResourceUpdated,
     UpdateResourcePayload,
 )
+from nucliadb_telemetry.errors import capture_exception
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.utilities import (
@@ -102,7 +108,6 @@ async def create_resource(
     x_synchronous: bool = SYNC_CALL,
 ):
     transaction = get_transaction_utility()
-    processing = get_processing()
     partitioning = get_partitioning()
 
     # Create resource message
@@ -176,25 +181,17 @@ async def create_resource(
 
     set_status(writer.basic, item)
 
-    try:
-        processing_info = await processing.send_to_process(toprocess, partition)
-    except LimitsExceededError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
-    except SendToProcessError:
-        raise HTTPException(status_code=500, detail="Error while sending to process")
+    seqid = await maybe_send_to_process(writer, toprocess, partition)
 
     writer.source = BrokerMessage.MessageSource.WRITER
-    set_processing_info(writer, processing_info)
     if x_synchronous:
         t0 = time()
     await transaction.commit(writer, partition, wait=x_synchronous)
 
     if x_synchronous:
-        return ResourceCreated(
-            seqid=processing_info.seqid, uuid=uuid, elapsed=time() - t0
-        )
+        return ResourceCreated(seqid=seqid, uuid=uuid, elapsed=time() - t0)
     else:
-        return ResourceCreated(seqid=processing_info.seqid, uuid=uuid)
+        return ResourceCreated(seqid=seqid, uuid=uuid)
 
 
 @api.patch(
@@ -215,11 +212,11 @@ async def modify_resource_rslug_prefix(
     x_synchronous: bool = SYNC_CALL,
     x_nucliadb_user: str = X_NUCLIADB_USER,
 ):
-    return await _modify_resource(
+    return await modify_resource_endpoint(
         request,
         item,
         kbid,
-        rslug=rslug,
+        path_rslug=rslug,
         x_skip_store=x_skip_store,
         x_synchronous=x_synchronous,
         x_nucliadb_user=x_nucliadb_user,
@@ -244,32 +241,65 @@ async def modify_resource_rid_prefix(
     x_synchronous: bool = SYNC_CALL,
     x_nucliadb_user: str = X_NUCLIADB_USER,
 ):
-    return await _modify_resource(
+    return await modify_resource_endpoint(
         request,
         item,
         kbid,
-        rid=rid,
+        path_rid=rid,
         x_skip_store=x_skip_store,
         x_synchronous=x_synchronous,
         x_nucliadb_user=x_nucliadb_user,
     )
 
 
-async def _modify_resource(
+async def modify_resource_endpoint(
     request: Request,
     item: UpdateResourcePayload,
     kbid: str,
     x_skip_store: bool,
     x_synchronous: bool,
     x_nucliadb_user: str,
-    rid: Optional[str] = None,
-    rslug: Optional[str] = None,
+    path_rid: Optional[str] = None,
+    path_rslug: Optional[str] = None,
+):
+    resource_uuid = await get_rid_from_params_or_raise_error(kbid, path_rid, path_rslug)
+    if item.slug is None:
+        return await modify_resource(
+            request,
+            item,
+            kbid,
+            x_skip_store=x_skip_store,
+            x_synchronous=x_synchronous,
+            x_nucliadb_user=x_nucliadb_user,
+            rid=resource_uuid,
+        )
+
+    async with safe_update_resource_slug(
+        request, kbid, rid=resource_uuid, new_slug=item.slug
+    ):
+        return await modify_resource(
+            request,
+            item,
+            kbid,
+            x_skip_store=x_skip_store,
+            x_synchronous=x_synchronous,
+            x_nucliadb_user=x_nucliadb_user,
+            rid=resource_uuid,
+        )
+
+
+async def modify_resource(
+    request: Request,
+    item: UpdateResourcePayload,
+    kbid: str,
+    x_skip_store: bool,
+    x_synchronous: bool,
+    x_nucliadb_user: str,
+    *,
+    rid: str,
 ):
     transaction = get_transaction_utility()
-    processing = get_processing()
     partitioning = get_partitioning()
-
-    rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
     partition = partitioning.generate_partition(kbid, rid)
 
@@ -311,19 +341,58 @@ async def _modify_resource(
             raise HTTPException(status_code=412, detail=str("No vectorsets found"))
 
     set_status_modify(writer.basic, item)
-    try:
-        processing_info = await processing.send_to_process(toprocess, partition)
-    except LimitsExceededError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
-    except SendToProcessError:
-        raise HTTPException(status_code=500, detail="Error while sending to process")
+
+    seqid = await maybe_send_to_process(writer, toprocess, partition)
 
     writer.source = BrokerMessage.MessageSource.WRITER
-    set_processing_info(writer, processing_info)
+
+    maybe_mark_reindex(writer, item)
 
     await transaction.commit(writer, partition, wait=x_synchronous)
 
-    return ResourceUpdated(seqid=processing_info.seqid)
+    return ResourceUpdated(seqid=seqid)
+
+
+@contextlib.asynccontextmanager
+async def safe_update_resource_slug(
+    request,
+    kbid: str,
+    *,
+    rid: str,
+    new_slug: str,
+):
+    driver = get_app_context(request.app).kv_driver
+    try:
+        old_slug = await update_resource_slug(driver, kbid, rid=rid, new_slug=new_slug)
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail=f"Resource does not exist: {rid}")
+    except ConflictError:
+        raise HTTPException(status_code=409, detail=f"Slug already exists: {new_slug}")
+    try:
+        yield
+    except Exception:
+        # Rollback slug update if something goes wrong
+        try:
+            await update_resource_slug(driver, kbid, rid=rid, new_slug=old_slug)
+        except Exception as ex:
+            capture_exception(ex)
+            logger.exception("Error while rolling back slug update")
+        raise
+
+
+async def update_resource_slug(
+    driver: Driver,
+    kbid: str,
+    *,
+    rid: str,
+    new_slug: str,
+):
+    async with driver.transaction() as txn:
+        old_slug = await ResourcesDataManager.modify_slug(
+            txn, kbid, rid=rid, new_slug=new_slug
+        )
+        await txn.commit()
+        return old_slug
 
 
 @api.post(
@@ -369,7 +438,6 @@ async def _reprocess_resource(
     rslug: Optional[str] = None,
 ):
     transaction = get_transaction_utility()
-    processing = get_processing()
     partitioning = get_partitioning()
 
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
@@ -402,14 +470,7 @@ async def _reprocess_resource(
     if txn.open:
         await txn.abort()
 
-    # Send current resource to reprocess.
-
-    try:
-        processing_info = await processing.send_to_process(toprocess, partition)
-    except LimitsExceededError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
-    except SendToProcessError:
-        raise HTTPException(status_code=500, detail="Error while sending to process")
+    processing_info = await send_to_process(toprocess, partition)
 
     writer = BrokerMessage()
     writer.kbid = kbid
@@ -585,3 +646,64 @@ async def get_rid_from_params_or_raise_error(
         raise HTTPException(status_code=404, detail="Resource does not exist")
 
     return rid
+
+
+def maybe_mark_reindex(message: BrokerMessage, item: UpdateResourcePayload):
+    if needs_resource_reindex(item):
+        message.reindex = True
+
+
+def needs_resource_reindex(item: UpdateResourcePayload) -> bool:
+    # Some metadata need to be applied as tags to all fields of
+    # a resource and that means this message should force reindexing everything.
+    # XXX This is not ideal. Long term, we should handle it differently
+    # so this is not required
+    return item.usermetadata is not None or (
+        item.origin is not None
+        and (
+            item.origin.created is not None
+            or item.origin.modified is not None
+            or item.origin.metadata is not None
+        )
+    )
+
+
+async def maybe_send_to_process(
+    writer: BrokerMessage, toprocess: PushPayload, partition
+) -> Optional[int]:
+    if not needs_reprocess(toprocess):
+        return None
+
+    processing_info = await send_to_process(toprocess, partition)
+    set_processing_info(writer, processing_info)
+    return processing_info.seqid
+
+
+async def send_to_process(toprocess: PushPayload, partition) -> ProcessingInfo:
+    try:
+        processing = get_processing()
+        processing_info = await processing.send_to_process(toprocess, partition)
+        return processing_info
+    except LimitsExceededError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+    except SendToProcessError:
+        raise HTTPException(status_code=500, detail="Error while sending to process")
+
+
+def needs_reprocess(processing_payload: PushPayload) -> bool:
+    """
+    Processing only pays attention to when there are fields to process,
+    so sometimes we can skip sending to processing, for instance if a
+    resource/paragraph is being annotated.
+    """
+    for field in (
+        "genericfield",
+        "filefield",
+        "linkfield",
+        "textfield",
+        "layoutfield",
+        "conversationfield",
+    ):
+        if len(getattr(processing_payload, field)) > 0:
+            return True
+    return False

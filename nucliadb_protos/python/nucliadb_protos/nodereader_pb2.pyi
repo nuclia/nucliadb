@@ -46,8 +46,6 @@ from nucliadb_protos.utils_pb2 import (
     DOT as DOT,
     EXPERIMENTAL as EXPERIMENTAL,
     ExtractedText as ExtractedText,
-    JoinGraph as JoinGraph,
-    JoinGraphEdge as JoinGraphEdge,
     Relation as Relation,
     RelationMetadata as RelationMetadata,
     RelationNode as RelationNode,
@@ -84,15 +82,19 @@ global___SuggestFeatures = SuggestFeatures
 class Filter(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    TAGS_FIELD_NUMBER: builtins.int
+    FIELD_LABELS_FIELD_NUMBER: builtins.int
+    PARAGRAPH_LABELS_FIELD_NUMBER: builtins.int
     @property
-    def tags(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def field_labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    @property
+    def paragraph_labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     def __init__(
         self,
         *,
-        tags: collections.abc.Iterable[builtins.str] | None = ...,
+        field_labels: collections.abc.Iterable[builtins.str] | None = ...,
+        paragraph_labels: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["tags", b"tags"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["field_labels", b"field_labels", "paragraph_labels", b"paragraph_labels"]) -> None: ...
 
 global___Filter = Filter
 
@@ -116,17 +118,17 @@ class StreamFilter(google.protobuf.message.Message):
     NOT: StreamFilter.Conjunction.ValueType  # 2
 
     CONJUNCTION_FIELD_NUMBER: builtins.int
-    TAGS_FIELD_NUMBER: builtins.int
+    LABELS_FIELD_NUMBER: builtins.int
     conjunction: global___StreamFilter.Conjunction.ValueType
     @property
-    def tags(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     def __init__(
         self,
         *,
         conjunction: global___StreamFilter.Conjunction.ValueType = ...,
-        tags: collections.abc.Iterable[builtins.str] | None = ...,
+        labels: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["conjunction", b"conjunction", "tags", b"tags"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["conjunction", b"conjunction", "labels", b"labels"]) -> None: ...
 
 global___StreamFilter = StreamFilter
 
@@ -134,15 +136,15 @@ global___StreamFilter = StreamFilter
 class Faceted(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    TAGS_FIELD_NUMBER: builtins.int
+    LABELS_FIELD_NUMBER: builtins.int
     @property
-    def tags(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     def __init__(
         self,
         *,
-        tags: collections.abc.Iterable[builtins.str] | None = ...,
+        labels: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["tags", b"tags"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["labels", b"labels"]) -> None: ...
 
 global___Faceted = Faceted
 
@@ -348,7 +350,7 @@ class ParagraphSearchRequest(google.protobuf.message.Message):
     def order(self) -> global___OrderBy: ...
     @property
     def faceted(self) -> global___Faceted:
-        """Faceted{ tags: Vec<String>}"""
+        """Faceted{ labels: Vec<String>}"""
     page_number: builtins.int
     result_per_page: builtins.int
     @property
@@ -616,7 +618,8 @@ class VectorSearchRequest(google.protobuf.message.Message):
 
     ID_FIELD_NUMBER: builtins.int
     VECTOR_FIELD_NUMBER: builtins.int
-    TAGS_FIELD_NUMBER: builtins.int
+    FIELD_LABELS_FIELD_NUMBER: builtins.int
+    PARAGRAPH_LABELS_FIELD_NUMBER: builtins.int
     PAGE_NUMBER_FIELD_NUMBER: builtins.int
     RESULT_PER_PAGE_FIELD_NUMBER: builtins.int
     RELOAD_FIELD_NUMBER: builtins.int
@@ -630,8 +633,11 @@ class VectorSearchRequest(google.protobuf.message.Message):
     def vector(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.float]:
         """Embedded vector search."""
     @property
-    def tags(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
-        """tags to filter"""
+    def field_labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """labels to filter"""
+    @property
+    def paragraph_labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """paragraph labels to filter"""
     page_number: builtins.int
     """What page is the answer."""
     result_per_page: builtins.int
@@ -650,7 +656,8 @@ class VectorSearchRequest(google.protobuf.message.Message):
         *,
         id: builtins.str = ...,
         vector: collections.abc.Iterable[builtins.float] | None = ...,
-        tags: collections.abc.Iterable[builtins.str] | None = ...,
+        field_labels: collections.abc.Iterable[builtins.str] | None = ...,
+        paragraph_labels: collections.abc.Iterable[builtins.str] | None = ...,
         page_number: builtins.int = ...,
         result_per_page: builtins.int = ...,
         reload: builtins.bool = ...,
@@ -659,7 +666,7 @@ class VectorSearchRequest(google.protobuf.message.Message):
         key_filters: collections.abc.Iterable[builtins.str] | None = ...,
         min_score: builtins.float = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["id", b"id", "key_filters", b"key_filters", "min_score", b"min_score", "page_number", b"page_number", "reload", b"reload", "result_per_page", b"result_per_page", "tags", b"tags", "vector", b"vector", "vector_set", b"vector_set", "with_duplicates", b"with_duplicates"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["field_labels", b"field_labels", "id", b"id", "key_filters", b"key_filters", "min_score", b"min_score", "page_number", b"page_number", "paragraph_labels", b"paragraph_labels", "reload", b"reload", "result_per_page", b"result_per_page", "vector", b"vector", "vector_set", b"vector_set", "with_duplicates", b"with_duplicates"]) -> None: ...
 
 global___VectorSearchRequest = VectorSearchRequest
 
@@ -757,17 +764,21 @@ class RelationEdgeFilter(google.protobuf.message.Message):
 
     RELATION_TYPE_FIELD_NUMBER: builtins.int
     RELATION_SUBTYPE_FIELD_NUMBER: builtins.int
+    RELATION_VALUE_FIELD_NUMBER: builtins.int
     relation_type: nucliadb_protos.utils_pb2.Relation.RelationType.ValueType
     """Will filter the search to edges of type ntype."""
     relation_subtype: builtins.str
+    @property
+    def relation_value(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     def __init__(
         self,
         *,
         relation_type: nucliadb_protos.utils_pb2.Relation.RelationType.ValueType = ...,
         relation_subtype: builtins.str | None = ...,
+        relation_value: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["_relation_subtype", b"_relation_subtype", "relation_subtype", b"relation_subtype"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["_relation_subtype", b"_relation_subtype", "relation_subtype", b"relation_subtype", "relation_type", b"relation_type"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["_relation_subtype", b"_relation_subtype", "relation_subtype", b"relation_subtype", "relation_type", b"relation_type", "relation_value", b"relation_value"]) -> None: ...
     def WhichOneof(self, oneof_group: typing_extensions.Literal["_relation_subtype", b"_relation_subtype"]) -> typing_extensions.Literal["relation_subtype"] | None: ...
 
 global___RelationEdgeFilter = RelationEdgeFilter
@@ -811,34 +822,45 @@ global___RelationPrefixSearchResponse = RelationPrefixSearchResponse
 class EntitiesSubgraphRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
+    class DeletedEntities(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        NODE_SUBTYPE_FIELD_NUMBER: builtins.int
+        NODE_VALUES_FIELD_NUMBER: builtins.int
+        node_subtype: builtins.str
+        @property
+        def node_values(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+        def __init__(
+            self,
+            *,
+            node_subtype: builtins.str = ...,
+            node_values: collections.abc.Iterable[builtins.str] | None = ...,
+        ) -> None: ...
+        def ClearField(self, field_name: typing_extensions.Literal["node_subtype", b"node_subtype", "node_values", b"node_values"]) -> None: ...
+
     ENTRY_POINTS_FIELD_NUMBER: builtins.int
-    NODE_FILTERS_FIELD_NUMBER: builtins.int
-    EDGE_FILTERS_FIELD_NUMBER: builtins.int
     DEPTH_FIELD_NUMBER: builtins.int
+    DELETED_ENTITIES_FIELD_NUMBER: builtins.int
+    DELETED_GROUPS_FIELD_NUMBER: builtins.int
     @property
     def entry_points(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.RelationNode]:
         """List of vertices where search will trigger"""
-    @property
-    def node_filters(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___RelationNodeFilter]:
-        """Filters to apply while searching. It's an OR filtering: any
-        node (vertex) satisfying one condition will be returned
-        """
-    @property
-    def edge_filters(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___RelationEdgeFilter]:
-        """Filters to apply while searching. It's an OR filtering: any
-        edge satisfying one condition will be returned
-        """
     depth: builtins.int
+    @property
+    def deleted_entities(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___EntitiesSubgraphRequest.DeletedEntities]: ...
+    @property
+    def deleted_groups(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     def __init__(
         self,
         *,
         entry_points: collections.abc.Iterable[nucliadb_protos.utils_pb2.RelationNode] | None = ...,
-        node_filters: collections.abc.Iterable[global___RelationNodeFilter] | None = ...,
-        edge_filters: collections.abc.Iterable[global___RelationEdgeFilter] | None = ...,
         depth: builtins.int | None = ...,
+        deleted_entities: collections.abc.Iterable[global___EntitiesSubgraphRequest.DeletedEntities] | None = ...,
+        deleted_groups: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["_depth", b"_depth", "depth", b"depth"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["_depth", b"_depth", "depth", b"depth", "edge_filters", b"edge_filters", "entry_points", b"entry_points", "node_filters", b"node_filters"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["_depth", b"_depth", "deleted_entities", b"deleted_entities", "deleted_groups", b"deleted_groups", "depth", b"depth", "entry_points", b"entry_points"]) -> None: ...
     def WhichOneof(self, oneof_group: typing_extensions.Literal["_depth", b"_depth"]) -> typing_extensions.Literal["depth"] | None: ...
 
 global___EntitiesSubgraphRequest = EntitiesSubgraphRequest
@@ -861,22 +883,12 @@ global___EntitiesSubgraphResponse = EntitiesSubgraphResponse
 
 @typing_extensions.final
 class RelationSearchRequest(google.protobuf.message.Message):
-    """TODO: uncomment and implement (next iteration)
-    message RelationPathsSearchRequest {
-        message PathEndpoints {
-            utils.RelationNode origin = 1;
-            utils.RelationNode destination = 2;
-        }
-        repeated PathEndpoints paths = 1;
-    }
-
-    Query relation index to obtain different information about the
+    """Query relation index to obtain different information about the
     knowledge graph. It can be queried using the following strategies:
 
     - prefix search over vertex (node) names
     - graph search:
       - given some entry vertices, get the filtered subgraph around them
-      - (TODO) given some vertices, get paths between them
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -890,10 +902,7 @@ class RelationSearchRequest(google.protobuf.message.Message):
     @property
     def prefix(self) -> global___RelationPrefixSearchRequest: ...
     @property
-    def subgraph(self) -> global___EntitiesSubgraphRequest:
-        """TODO: uncomment and implement (next iteration)
-        RelationPathsSearchRequest paths = 13;
-        """
+    def subgraph(self) -> global___EntitiesSubgraphRequest: ...
     def __init__(
         self,
         *,
@@ -916,10 +925,7 @@ class RelationSearchResponse(google.protobuf.message.Message):
     @property
     def prefix(self) -> global___RelationPrefixSearchResponse: ...
     @property
-    def subgraph(self) -> global___EntitiesSubgraphResponse:
-        """TODO: uncomment and implement (next iteration)
-        repeated utils.RelationPath paths = 13;
-        """
+    def subgraph(self) -> global___EntitiesSubgraphResponse: ...
     def __init__(
         self,
         *,
@@ -968,8 +974,7 @@ class SearchRequest(google.protobuf.message.Message):
     @property
     def order(self) -> global___OrderBy: ...
     @property
-    def faceted(self) -> global___Faceted:
-        """Faceted{ tags: Vec<String>}"""
+    def faceted(self) -> global___Faceted: ...
     page_number: builtins.int
     result_per_page: builtins.int
     @property

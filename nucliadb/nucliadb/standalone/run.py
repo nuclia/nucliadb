@@ -17,17 +17,18 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 import logging
 import os
 import sys
 
-import pkg_resources
 import pydantic_argparse
 import uvicorn  # type: ignore
 from fastapi import FastAPI
 
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.ingest.settings import settings as ingest_settings
+from nucliadb.standalone import versions
 from nucliadb.standalone.config import config_nucliadb
 from nucliadb.standalone.settings import Settings
 from nucliadb_telemetry import errors
@@ -40,7 +41,7 @@ logger = logging.getLogger(__name__)
 
 
 def setup() -> Settings:
-    errors.setup_error_handling(pkg_resources.get_distribution("nucliadb").version)
+    errors.setup_error_handling(versions.get_installed_version("nucliadb"))
     parser = pydantic_argparse.ArgumentParser(
         model=Settings,
         prog="NucliaDB",
@@ -89,7 +90,7 @@ def run():
 
     settings_to_output = {
         "API": f"http://{settings.http_host}:{settings.http_port}/api",
-        "Contributor/management UI": f"http://{settings.http_host}:{settings.http_port}/contributor",
+        "Admin UI": f"http://{settings.http_host}:{settings.http_port}/admin",
         "Key-value backend": ingest_settings.driver,
         "Blog storage backend": storage_settings.file_backend,
         "Cluster discovery mode": cluster_settings.cluster_discovery_mode,
@@ -110,10 +111,22 @@ def run():
         ]
     )
 
+    installed_version = versions.installed_nucliadb()
+    loop = asyncio.get_event_loop()
+    latest_version = loop.run_until_complete(versions.latest_nucliadb())
+    if latest_version is None:
+        version_info_fmted = f"{installed_version} (Update check failed)"
+    elif versions.nucliadb_updates_available(installed_version, latest_version):
+        version_info_fmted = f"{installed_version} (Update available: {latest_version})"
+    else:
+        version_info_fmted = installed_version
+
     sys.stdout.write(
         f"""=================================================
 ||
 ||   NucliaDB Standalone Server Running!
+||
+||   Version: {version_info_fmted}
 ||
 ||   Configuration:
 {settings_to_output_fmted}

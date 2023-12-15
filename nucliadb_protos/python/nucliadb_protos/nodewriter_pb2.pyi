@@ -3,9 +3,7 @@
 isort:skip_file
 """
 import builtins
-import collections.abc
 import google.protobuf.descriptor
-import google.protobuf.internal.containers
 import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
 import nucliadb_protos.noderesources_pb2
@@ -58,6 +56,21 @@ class TypeMessage(_TypeMessage, metaclass=_TypeMessageEnumTypeWrapper):
 CREATION: TypeMessage.ValueType  # 0
 DELETION: TypeMessage.ValueType  # 1
 global___TypeMessage = TypeMessage
+
+class _IndexMessageSource:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _IndexMessageSourceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_IndexMessageSource.ValueType], builtins.type):
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    PROCESSOR: _IndexMessageSource.ValueType  # 0
+    WRITER: _IndexMessageSource.ValueType  # 1
+
+class IndexMessageSource(_IndexMessageSource, metaclass=_IndexMessageSourceEnumTypeWrapper): ...
+
+PROCESSOR: IndexMessageSource.ValueType  # 0
+WRITER: IndexMessageSource.ValueType  # 1
+global___IndexMessageSource = IndexMessageSource
 
 @typing_extensions.final
 class OpStatus(google.protobuf.message.Message):
@@ -117,6 +130,7 @@ class IndexMessage(google.protobuf.message.Message):
     PARTITION_FIELD_NUMBER: builtins.int
     STORAGE_KEY_FIELD_NUMBER: builtins.int
     KBID_FIELD_NUMBER: builtins.int
+    SOURCE_FIELD_NUMBER: builtins.int
     node: builtins.str
     shard: builtins.str
     """physical shard message is for"""
@@ -127,6 +141,7 @@ class IndexMessage(google.protobuf.message.Message):
     partition: builtins.str
     storage_key: builtins.str
     kbid: builtins.str
+    source: global___IndexMessageSource.ValueType
     def __init__(
         self,
         *,
@@ -139,54 +154,41 @@ class IndexMessage(google.protobuf.message.Message):
         partition: builtins.str | None = ...,
         storage_key: builtins.str = ...,
         kbid: builtins.str = ...,
+        source: global___IndexMessageSource.ValueType = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["_partition", b"_partition", "partition", b"partition"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["_partition", b"_partition", "kbid", b"kbid", "node", b"node", "partition", b"partition", "reindex_id", b"reindex_id", "resource", b"resource", "shard", b"shard", "storage_key", b"storage_key", "txid", b"txid", "typemessage", b"typemessage"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["_partition", b"_partition", "kbid", b"kbid", "node", b"node", "partition", b"partition", "reindex_id", b"reindex_id", "resource", b"resource", "shard", b"shard", "source", b"source", "storage_key", b"storage_key", "txid", b"txid", "typemessage", b"typemessage"]) -> None: ...
     def WhichOneof(self, oneof_group: typing_extensions.Literal["_partition", b"_partition"]) -> typing_extensions.Literal["partition"] | None: ...
 
 global___IndexMessage = IndexMessage
 
 @typing_extensions.final
-class SetGraph(google.protobuf.message.Message):
+class GarbageCollectorResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    SHARD_ID_FIELD_NUMBER: builtins.int
-    GRAPH_FIELD_NUMBER: builtins.int
-    @property
-    def shard_id(self) -> nucliadb_protos.noderesources_pb2.ShardId: ...
-    @property
-    def graph(self) -> nucliadb_protos.utils_pb2.JoinGraph: ...
+    class _Status:
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+
+    class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[GarbageCollectorResponse._Status.ValueType], builtins.type):  # noqa: F821
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        OK: GarbageCollectorResponse._Status.ValueType  # 0
+        TRY_LATER: GarbageCollectorResponse._Status.ValueType  # 1
+
+    class Status(_Status, metaclass=_StatusEnumTypeWrapper): ...
+    OK: GarbageCollectorResponse.Status.ValueType  # 0
+    TRY_LATER: GarbageCollectorResponse.Status.ValueType  # 1
+
+    STATUS_FIELD_NUMBER: builtins.int
+    status: global___GarbageCollectorResponse.Status.ValueType
     def __init__(
         self,
         *,
-        shard_id: nucliadb_protos.noderesources_pb2.ShardId | None = ...,
-        graph: nucliadb_protos.utils_pb2.JoinGraph | None = ...,
+        status: global___GarbageCollectorResponse.Status.ValueType = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["graph", b"graph", "shard_id", b"shard_id"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["graph", b"graph", "shard_id", b"shard_id"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["status", b"status"]) -> None: ...
 
-global___SetGraph = SetGraph
-
-@typing_extensions.final
-class DeleteGraphNodes(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    SHARD_ID_FIELD_NUMBER: builtins.int
-    NODES_FIELD_NUMBER: builtins.int
-    @property
-    def shard_id(self) -> nucliadb_protos.noderesources_pb2.ShardId: ...
-    @property
-    def nodes(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.RelationNode]: ...
-    def __init__(
-        self,
-        *,
-        shard_id: nucliadb_protos.noderesources_pb2.ShardId | None = ...,
-        nodes: collections.abc.Iterable[nucliadb_protos.utils_pb2.RelationNode] | None = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["shard_id", b"shard_id"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["nodes", b"nodes", "shard_id", b"shard_id"]) -> None: ...
-
-global___DeleteGraphNodes = DeleteGraphNodes
+global___GarbageCollectorResponse = GarbageCollectorResponse
 
 @typing_extensions.final
 class NewShardRequest(google.protobuf.message.Message):

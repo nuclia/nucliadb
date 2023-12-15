@@ -105,15 +105,18 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxObj
 from nucliadb.ingest.orm.processor import Processor, sequence_manager
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.settings import settings
-from nucliadb_protos import writer_pb2, writer_pb2_grpc
+from nucliadb_protos import utils_pb2, writer_pb2, writer_pb2_grpc
 from nucliadb_telemetry import errors
+from nucliadb_utils import const
 from nucliadb_utils.keys import KB_SHARDS
+from nucliadb_utils.settings import running_settings
 from nucliadb_utils.storages.storage import Storage, StorageField
 from nucliadb_utils.utilities import (
     get_partitioning,
     get_pubsub,
     get_storage,
     get_transaction_utility,
+    has_feature,
 )
 
 
@@ -200,12 +203,14 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request: KnowledgeBoxNew, context=None
     ) -> NewKnowledgeBoxResponse:
         try:
+            release_channel = get_release_channel(request)
+            request.config.release_channel = release_channel
             kbid = await self.proc.create_kb(
                 request.slug,
                 request.config,
                 parse_model_metadata(request),
                 forceuuid=request.forceuuid,
-                release_channel=request.release_channel,
+                release_channel=release_channel,
             )
         except KnowledgeBoxConflict:
             return NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.CONFLICT)
@@ -909,3 +914,16 @@ def parse_model_metadata(request: KnowledgeBoxNew) -> SemanticModelMetadata:
     if request.HasField("default_min_score"):
         model.default_min_score = request.default_min_score
     return model
+
+
+def get_release_channel(request: KnowledgeBoxNew) -> utils_pb2.ReleaseChannel.ValueType:
+    """
+    Set channel to Experimental if specified in the grpc request or if the requested
+    slug has the experimental_kb feature enabled in stage environment.
+    """
+    release_channel = request.release_channel
+    if running_settings.running_environment == "stage" and has_feature(
+        const.Features.EXPERIMENTAL_KB, context={"slug": request.slug}
+    ):
+        release_channel = utils_pb2.ReleaseChannel.EXPERIMENTAL
+    return release_channel

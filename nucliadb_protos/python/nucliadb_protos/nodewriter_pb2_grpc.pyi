@@ -50,18 +50,10 @@ class NodeWriterStub:
     ]
     GC: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.noderesources_pb2.ShardId,
-        nucliadb_protos.noderesources_pb2.EmptyResponse,
+        nucliadb_protos.nodewriter_pb2.GarbageCollectorResponse,
     ]
     SetResource: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.noderesources_pb2.Resource,
-        nucliadb_protos.nodewriter_pb2.OpStatus,
-    ]
-    DeleteRelationNodes: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.nodewriter_pb2.DeleteGraphNodes,
-        nucliadb_protos.nodewriter_pb2.OpStatus,
-    ]
-    JoinGraph: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.nodewriter_pb2.SetGraph,
         nucliadb_protos.nodewriter_pb2.OpStatus,
     ]
     RemoveResource: grpc.UnaryUnaryMultiCallable[
@@ -115,23 +107,11 @@ class NodeWriterServicer(metaclass=abc.ABCMeta):
         self,
         request: nucliadb_protos.noderesources_pb2.ShardId,
         context: grpc.ServicerContext,
-    ) -> nucliadb_protos.noderesources_pb2.EmptyResponse: ...
+    ) -> nucliadb_protos.nodewriter_pb2.GarbageCollectorResponse: ...
     @abc.abstractmethod
     def SetResource(
         self,
         request: nucliadb_protos.noderesources_pb2.Resource,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.nodewriter_pb2.OpStatus: ...
-    @abc.abstractmethod
-    def DeleteRelationNodes(
-        self,
-        request: nucliadb_protos.nodewriter_pb2.DeleteGraphNodes,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.nodewriter_pb2.OpStatus: ...
-    @abc.abstractmethod
-    def JoinGraph(
-        self,
-        request: nucliadb_protos.nodewriter_pb2.SetGraph,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.nodewriter_pb2.OpStatus: ...
     @abc.abstractmethod

@@ -18,8 +18,9 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import AsyncIterator
+from typing import AsyncGenerator
 
+from fastapi import HTTPException
 from nucliadb_protos.dataset_pb2 import (
     Label,
     ParagraphClassificationBatch,
@@ -29,45 +30,28 @@ from nucliadb_protos.dataset_pb2 import (
 from nucliadb_protos.nodereader_pb2 import StreamRequest
 
 from nucliadb.common.cluster.base import AbstractIndexNode
-from nucliadb.ingest.orm.resource import KB_REVERSE
-from nucliadb.train import logger
-from nucliadb.train.generators.utils import get_resource_from_cache_or_db
+from nucliadb.train.generators.utils import batchify, get_paragraph
 
 
-async def get_paragraph(kbid: str, result: str) -> str:
-    if result.count("/") == 5:
-        rid, field_type, field, split_str, start_end = result.split("/")
-        split = int(split_str)
-        start_str, end_str = start_end.split("-")
-    else:
-        rid, field_type, field, start_end = result.split("/")
-        split = None
-        start_str, end_str = start_end.split("-")
-    start = int(start_str)
-    end = int(end_str)
-
-    orm_resource = await get_resource_from_cache_or_db(kbid, rid)
-
-    if orm_resource is None:
-        logger.error(f"{rid} does not exist on DB")
-        return ""
-
-    field_type_int = KB_REVERSE[field_type]
-    field_obj = await orm_resource.get_field(field, field_type_int, load=False)
-    extracted_text = await field_obj.get_extracted_text()
-    if extracted_text is None:
-        logger.warning(
-            f"{rid} {field} {field_type_int} extracted_text does not exist on DB"
+def paragraph_classification_batch_generator(
+    kbid: str,
+    trainset: TrainSet,
+    node: AbstractIndexNode,
+    shard_replica_id: str,
+) -> AsyncGenerator[ParagraphClassificationBatch, None]:
+    if len(trainset.filter.labels) != 1:
+        raise HTTPException(
+            status_code=422,
+            detail="Paragraph Classification should be of 1 labelset",
         )
-        return ""
 
-    if split is not None:
-        text = extracted_text.split_text[split]
-        splitted_text = text[start:end]
-    else:
-        splitted_text = extracted_text.text[start:end]
-
-    return splitted_text
+    generator = generate_paragraph_classification_payloads(
+        kbid, trainset, node, shard_replica_id
+    )
+    batch_generator = batchify(
+        generator, trainset.batch_size, ParagraphClassificationBatch
+    )
+    return batch_generator
 
 
 async def generate_paragraph_classification_payloads(
@@ -75,14 +59,13 @@ async def generate_paragraph_classification_payloads(
     trainset: TrainSet,
     node: AbstractIndexNode,
     shard_replica_id: str,
-) -> AsyncIterator[ParagraphClassificationBatch]:
+) -> AsyncGenerator[TextLabel, None]:
     labelset = f"/l/{trainset.filter.labels[0]}"
 
     # Query how many paragraphs has each label
     request = StreamRequest()
     request.shard_id.id = shard_replica_id
-    request.filter.tags.append(labelset)
-    batch = ParagraphClassificationBatch()
+    request.filter.labels.append(labelset)
 
     async for paragraph_item in node.stream_get_paragraphs(request):
         text_labels = []
@@ -97,11 +80,5 @@ async def generate_paragraph_classification_payloads(
         for label in text_labels:
             _, _, label_labelset, label_title = label.split("/")
             tl.labels.append(Label(labelset=label_labelset, label=label_title))
-        batch.data.append(tl)
 
-        if len(batch.data) == trainset.batch_size:
-            yield batch
-            batch = ParagraphClassificationBatch()
-
-    if len(batch.data):
-        yield batch
+        yield tl

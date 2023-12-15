@@ -17,28 +17,28 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use std::sync::{Mutex, MutexGuard};
+use std::path::PathBuf;
+use std::sync::Arc;
 
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::shard_created::{
     DocumentService, ParagraphService, RelationService, VectorService,
 };
-use nucliadb_core::protos::{
-    DeleteGraphNodes, JoinGraph, OpStatus, Resource, ResourceId, VectorSetId, VectorSimilarity,
-};
+use nucliadb_core::protos::{OpStatus, Resource, ResourceId, VectorSetId, VectorSimilarity};
 use nucliadb_core::tracing::{self, *};
 use nucliadb_core::{thread, IndexFiles};
 use nucliadb_procs::measure;
+use nucliadb_vectors::VectorErr;
+use tokio::sync::Mutex;
 
 use crate::disk_structure::*;
-use crate::shards::metadata::{ShardMetadata, Similarity};
+use crate::shards::metadata::ShardMetadata;
 use crate::shards::versions::Versions;
 use crate::telemetry::run_with_telemetry;
 
 #[derive(Debug)]
 pub struct ShardWriter {
-    pub metadata: ShardMetadata,
+    pub metadata: Arc<ShardMetadata>,
     pub id: String,
     pub path: PathBuf,
     text_writer: TextsWriterPointer,
@@ -49,22 +49,23 @@ pub struct ShardWriter {
     paragraph_service_version: i32,
     vector_service_version: i32,
     relation_service_version: i32,
-    gc_lock: Mutex<()>,    // lock to be able to do GC or not
-    write_lock: Mutex<()>, // be able to lock writes on the shard
+    pub gc_lock: Mutex<()>, // lock to be able to do GC or not
+    write_lock: Mutex<()>,  // be able to lock writes on the shard
 }
 
 impl ShardWriter {
     #[tracing::instrument(skip_all)]
     fn initialize(
-        id: String,
-        path: &Path,
-        metadata: ShardMetadata,
+        metadata: Arc<ShardMetadata>,
         tsc: TextConfig,
         psc: ParagraphConfig,
         vsc: VectorConfig,
         rsc: RelationConfig,
     ) -> NodeResult<ShardWriter> {
-        let versions = Versions::load_or_create(&path.join(VERSION_FILE))?;
+        let versions = Versions::load_or_create(
+            &metadata.shard_path().join(VERSION_FILE),
+            metadata.channel(),
+        )?;
         let text_task = || Some(versions.get_texts_writer(&tsc));
         let paragraph_task = || Some(versions.get_paragraphs_writer(&psc));
         let vector_task = || Some(versions.get_vectors_writer(&vsc));
@@ -97,9 +98,9 @@ impl ShardWriter {
         let relations = relation_result.transpose()?;
 
         Ok(ShardWriter {
-            id,
+            id: metadata.id(),
+            path: metadata.shard_path(),
             metadata,
-            path: path.to_path_buf(),
             text_writer: fields.unwrap(),
             paragraph_writer: paragraphs.unwrap(),
             vector_writer: vectors.unwrap(),
@@ -142,37 +143,43 @@ impl ShardWriter {
         match self.relation_service_version {
             0 => RelationService::RelationV0,
             1 => RelationService::RelationV1,
+            2 => RelationService::RelationV2,
             i => panic!("Unknown relation version {i}"),
         }
     }
-    pub fn clean_and_create(id: String, path: &Path) -> NodeResult<ShardWriter> {
-        let metadata = ShardMetadata::open(&path.join(METADATA_FILE))?;
-        std::fs::remove_dir_all(path)?;
-        std::fs::create_dir(path)?;
+    pub fn clean_and_create(metadata: Arc<ShardMetadata>) -> NodeResult<ShardWriter> {
+        let path = metadata.shard_path();
+        std::fs::remove_dir_all(path.clone())?;
+        std::fs::create_dir(path.clone())?;
         let tsc = TextConfig {
-            path: path.join(TEXTS_DIR),
+            path: path.clone().join(TEXTS_DIR),
         };
 
         let psc = ParagraphConfig {
-            path: path.join(PARAGRAPHS_DIR),
+            path: path.clone().join(PARAGRAPHS_DIR),
         };
 
-        let channel = metadata.channel.unwrap_or_default();
+        let channel = metadata.channel();
 
         let vsc = VectorConfig {
             similarity: Some(metadata.similarity()),
-            path: path.join(VECTORS_DIR),
-            vectorset: path.join(VECTORSET_DIR),
+            path: path.clone().join(VECTORS_DIR),
+            vectorset: path.clone().join(VECTORSET_DIR),
             channel,
         };
         let rsc = RelationConfig {
-            path: path.join(RELATIONS_DIR),
+            path: path.clone().join(RELATIONS_DIR),
+            channel,
         };
-        ShardWriter::initialize(id, path, metadata, tsc, psc, vsc, rsc)
+        let sw = ShardWriter::initialize(Arc::clone(&metadata), tsc, psc, vsc, rsc)?;
+        metadata.new_generation_id();
+
+        Ok(sw)
     }
 
     #[measure(actor = "shard", metric = "new")]
-    pub fn new(id: String, path: &Path, metadata: ShardMetadata) -> NodeResult<ShardWriter> {
+    pub fn new(metadata: Arc<ShardMetadata>) -> NodeResult<ShardWriter> {
+        let path = metadata.shard_path();
         let tsc = TextConfig {
             path: path.join(TEXTS_DIR),
         };
@@ -181,7 +188,7 @@ impl ShardWriter {
             path: path.join(PARAGRAPHS_DIR),
         };
 
-        let channel = metadata.channel.unwrap_or_default();
+        let channel = metadata.channel();
 
         let vsc = VectorConfig {
             similarity: Some(metadata.similarity()),
@@ -191,19 +198,19 @@ impl ShardWriter {
         };
         let rsc = RelationConfig {
             path: path.join(RELATIONS_DIR),
+            channel,
         };
 
         std::fs::create_dir(path)?;
-        let metadata_path = path.join(METADATA_FILE);
-        metadata.serialize(&metadata_path)?;
 
-        ShardWriter::initialize(id, path, metadata, tsc, psc, vsc, rsc)
+        let sw = ShardWriter::initialize(Arc::clone(&metadata), tsc, psc, vsc, rsc)?;
+        metadata.serialize_metadata()?;
+        Ok(sw)
     }
 
     #[measure(actor = "shard", metric = "open")]
-    pub fn open(id: String, path: &Path) -> NodeResult<ShardWriter> {
-        let metadata_path = path.join(METADATA_FILE);
-        let metadata = ShardMetadata::open(&metadata_path)?;
+    pub fn open(metadata: Arc<ShardMetadata>) -> NodeResult<ShardWriter> {
+        let path = metadata.shard_path();
         let tsc = TextConfig {
             path: path.join(TEXTS_DIR),
         };
@@ -212,7 +219,7 @@ impl ShardWriter {
             path: path.join(PARAGRAPHS_DIR),
         };
 
-        let channel = metadata.channel.unwrap_or_default();
+        let channel = metadata.channel();
 
         let vsc = VectorConfig {
             similarity: None,
@@ -222,9 +229,10 @@ impl ShardWriter {
         };
         let rsc = RelationConfig {
             path: path.join(RELATIONS_DIR),
+            channel,
         };
 
-        ShardWriter::initialize(id, path, metadata, tsc, psc, vsc, rsc)
+        ShardWriter::initialize(metadata, tsc, psc, vsc, rsc)
     }
 
     #[measure(actor = "shard", metric = "set_resource")]
@@ -286,7 +294,7 @@ impl ShardWriter {
         let mut vector_result = Ok(());
         let mut relation_result = Ok(());
 
-        let _lock = self.write_lock.lock().unwrap();
+        let _lock = self.write_lock.blocking_lock();
         thread::scope(|s| {
             s.spawn(|_| text_result = text_task());
             s.spawn(|_| paragraph_result = paragraph_task());
@@ -298,7 +306,7 @@ impl ShardWriter {
         paragraph_result?;
         vector_result?;
         relation_result?;
-        self.new_generation_id(); // VERY NAIVE, SHOULD BE DONE AFTER MERGE AS WELL
+        self.metadata.new_generation_id(); // VERY NAIVE, SHOULD BE DONE AFTER MERGE AS WELL
         Ok(())
     }
 
@@ -346,7 +354,7 @@ impl ShardWriter {
         let mut vector_result = Ok(());
         let mut relation_result = Ok(());
 
-        let _lock = self.write_lock.lock().unwrap();
+        let _lock = self.write_lock.blocking_lock();
         thread::scope(|s| {
             s.spawn(|_| text_result = text_task());
             s.spawn(|_| paragraph_result = paragraph_task());
@@ -359,7 +367,7 @@ impl ShardWriter {
         vector_result?;
         relation_result?;
 
-        self.new_generation_id();
+        self.metadata.new_generation_id();
 
         Ok(())
     }
@@ -423,7 +431,7 @@ impl ShardWriter {
         let mut writer = vector_write(&self.vector_writer);
         writer.add_vectorset(setid, similarity)?;
 
-        self.new_generation_id();
+        self.metadata.new_generation_id();
 
         Ok(())
     }
@@ -433,22 +441,8 @@ impl ShardWriter {
         let mut writer = vector_write(&self.vector_writer);
         writer.remove_vectorset(setid)?;
 
-        self.new_generation_id();
+        self.metadata.new_generation_id();
 
-        Ok(())
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub fn delete_relation_nodes(&self, nodes: &DeleteGraphNodes) -> NodeResult<()> {
-        let mut writer = relation_write(&self.relation_writer);
-        writer.delete_nodes(nodes)?;
-        Ok(())
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub fn join_relations_graph(&self, graph: &JoinGraph) -> NodeResult<()> {
-        let mut writer = relation_write(&self.relation_writer);
-        writer.join_graph(graph)?;
         Ok(())
     }
 
@@ -468,46 +462,16 @@ impl ShardWriter {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn gc(&self) -> NodeResult<()> {
-        vector_write(&self.vector_writer).garbage_collection()
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub fn get_generation_id(&self) -> String {
-        // we can not cache this on the ShardWriter instance unless we get swap our
-        // Arc implementation for a RwLock implementation because we'd need
-        // to write the cache on modification
-
-        let filepath = self.path.join(GENERATION_FILE);
-        // check if file does not exist
-        if !filepath.exists() {
-            return self.new_generation_id();
+    pub fn gc(&self) -> NodeResult<GarbageCollectorStatus> {
+        let _lock = self.gc_lock.blocking_lock();
+        let result = vector_write(&self.vector_writer).garbage_collection();
+        match result {
+            Ok(()) => Ok(GarbageCollectorStatus::GarbageCollected),
+            Err(error) => match error.downcast_ref::<VectorErr>() {
+                Some(VectorErr::WorkDelayed) => Ok(GarbageCollectorStatus::TryLater),
+                _ => Err(error),
+            },
         }
-        std::fs::read_to_string(filepath).unwrap()
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub fn new_generation_id(&self) -> String {
-        let generation_id = uuid::Uuid::new_v4().to_string();
-        self.set_generation_id(generation_id.clone());
-        generation_id
-    }
-
-    pub fn set_generation_id(&self, generation_id: String) {
-        let filepath = self.path.join(GENERATION_FILE);
-        std::fs::write(filepath, generation_id).unwrap();
-    }
-
-    pub fn get_kbid(&self) -> String {
-        self.metadata.kbid().unwrap_or_default().to_string()
-    }
-
-    pub fn get_similarity(&self) -> Similarity {
-        self.metadata.similarity().into()
-    }
-
-    pub fn wait_for_gc_lock(&self) -> MutexGuard<()> {
-        self.gc_lock.lock().unwrap()
     }
 
     pub fn get_shard_segments(&self) -> NodeResult<HashMap<String, Vec<String>>> {
@@ -534,7 +498,7 @@ impl ShardWriter {
         ignored_segement_ids: &HashMap<String, Vec<String>>,
     ) -> NodeResult<Vec<IndexFiles>> {
         let mut files = Vec::new();
-        let _lock = self.write_lock.lock().unwrap(); // need to make sure more writes don't happen while we are reading
+        let _lock = self.write_lock.blocking_lock(); // need to make sure more writes don't happen while we are reading
 
         files.push(
             paragraph_read(&self.paragraph_writer)
@@ -548,7 +512,29 @@ impl ShardWriter {
             vector_read(&self.vector_writer)
                 .get_index_files(ignored_segement_ids.get("vector").unwrap_or(&Vec::new()))?,
         );
+        files.push(
+            relation_read(&self.relation_writer)
+                .get_index_files(ignored_segement_ids.get("relation").unwrap_or(&Vec::new()))?,
+        );
 
         Ok(files)
+    }
+}
+
+pub enum GarbageCollectorStatus {
+    GarbageCollected,
+    TryLater,
+}
+
+impl From<GarbageCollectorStatus> for nucliadb_core::protos::garbage_collector_response::Status {
+    fn from(value: GarbageCollectorStatus) -> Self {
+        match value {
+            GarbageCollectorStatus::GarbageCollected => {
+                nucliadb_core::protos::garbage_collector_response::Status::Ok
+            }
+            GarbageCollectorStatus::TryLater => {
+                nucliadb_core::protos::garbage_collector_response::Status::TryLater
+            }
+        }
     }
 }

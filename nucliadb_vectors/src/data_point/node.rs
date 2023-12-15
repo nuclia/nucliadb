@@ -20,7 +20,7 @@
 
 use std::io;
 
-use crate::data_types::key_value::Slot;
+use crate::data_types::data_store::Interpreter;
 use crate::data_types::trie;
 use crate::data_types::usize_utils::*;
 
@@ -163,11 +163,7 @@ impl Node {
         trie::has_word(&x[xlabel_ptr..], label)
     }
 }
-impl Slot for Node {
-    fn cmp_keys(&self, x: &[u8], key: &[u8]) -> std::cmp::Ordering {
-        let xkey = self.get_key(x);
-        xkey.cmp(key)
-    }
+impl Interpreter for Node {
     fn get_key<'a>(&self, x: &'a [u8]) -> &'a [u8] {
         Self::key(x)
     }
@@ -269,7 +265,6 @@ mod tests {
         assert_eq!(Node::vector(&buf[node2..]), vector2);
         assert!(Node.keep_in_merge(&buf[node1..]));
         assert!(Node.keep_in_merge(&buf[node2..]));
-        assert_eq!(Node.cmp_slot(&buf[node1..], &buf[node2..]), key1.cmp(key2));
         assert_eq!(Node::metadata(&buf[node1..]), metadata1);
         assert_eq!(Node::metadata(&buf[node2..]), metadata2);
         assert_eq!(

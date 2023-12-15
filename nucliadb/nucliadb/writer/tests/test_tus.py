@@ -48,6 +48,7 @@ async def s3_storage_tus(s3):
         ssl=False,
         region_name=None,
         bucket="test_{kbid}",
+        bucket_tags={"testTag": "test"},
     )
     yield storage
     await storage.finalize()
@@ -99,25 +100,44 @@ DROP table IF EXISTS kb_files_fileparts;
     await storage.finalize()
 
 
+async def clean_dm():
+    from nucliadb.writer.tus import REDIS_FILE_DATA_MANAGER_FACTORY
+
+    if REDIS_FILE_DATA_MANAGER_FACTORY is not None:
+        await REDIS_FILE_DATA_MANAGER_FACTORY.finalize()
+        REDIS_FILE_DATA_MANAGER_FACTORY = None
+
+
+@pytest.fixture(scope="function")
+async def redis_dm(redis):
+    prev = settings.dm_enabled
+
+    settings.dm_enabled = True
+    settings.dm_redis_host = redis[0]
+    settings.dm_redis_port = redis[1]
+
+    dm = get_dm()
+
+    yield dm
+
+    await clean_dm()
+
+    settings.dm_enabled = prev
+
+
 @pytest.mark.asyncio
-async def test_pg_driver(pg_storage_tus: PGBlobStore):
-    settings.dm_enabled = False
+async def test_pg_driver(redis_dm, pg_storage_tus: PGBlobStore):
     await storage_test(pg_storage_tus, PGFileStorageManager(pg_storage_tus))
-    settings.dm_enabled = True
 
 
 @pytest.mark.asyncio
-async def test_s3_driver(s3_storage_tus: S3BlobStore):
-    settings.dm_enabled = False
+async def test_s3_driver(redis_dm, s3_storage_tus: S3BlobStore):
     await storage_test(s3_storage_tus, S3FileStorageManager(s3_storage_tus))
-    settings.dm_enabled = True
 
 
 @pytest.mark.asyncio
-async def test_gcs_driver(gcs_storage_tus: GCloudBlobStore):
-    settings.dm_enabled = False
+async def test_gcs_driver(redis_dm, gcs_storage_tus: GCloudBlobStore):
     await storage_test(gcs_storage_tus, GCloudFileStorageManager(gcs_storage_tus))
-    settings.dm_enabled = True
 
 
 @pytest.mark.asyncio

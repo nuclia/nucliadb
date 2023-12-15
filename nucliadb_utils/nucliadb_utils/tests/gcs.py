@@ -30,6 +30,7 @@ from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 from nucliadb_utils.storages.gcs import GCSStorage
 from nucliadb_utils.store import MAIN
 from nucliadb_utils.tests import free_port
+from nucliadb_utils.utilities import Utility  # type: ignore
 
 # IMPORTANT!
 # Without this, tests running in a remote docker host won't work
@@ -64,7 +65,7 @@ class GCS(BaseImage):
                 f"http://{self.host}:{self.get_port()}/storage/v1/b"
             )
             return response.status_code == 200
-        except:  # pragma: no cover
+        except Exception:  # pragma: no cover
             return False
 
 
@@ -90,9 +91,8 @@ async def gcs_storage(gcs):
         labels={},
         url=gcs,
     )
-    MAIN["storage"] = storage
+    MAIN[Utility.STORAGE] = storage
     await storage.initialize()
     yield storage
     await storage.finalize()
-    if "storage" in MAIN:
-        del MAIN["storage"]
+    MAIN.pop(Utility.STORAGE, None)

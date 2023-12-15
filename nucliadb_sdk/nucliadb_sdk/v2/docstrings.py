@@ -138,6 +138,61 @@ LIST_RESOURCES = Docstring(
 )
 
 
+REINDEX_RESOURCE = Docstring(
+    doc="""Reindex resource""",
+    examples=[
+        Example(
+            description="Reindex resource",
+            code=""">>> from nucliadb_sdk import *
+>>> sdk = NucliaDBSDK(api_key="api-key")
+>>> sdk.reindex_resource(kbid="mykbid", rid="rid")
+""",
+        ),
+    ],
+)
+
+
+REINDEX_RESOURCE_BY_SLUG = Docstring(
+    doc="""Reindex resource by slug""",
+    examples=[
+        Example(
+            description="Reindex resource by slug instead of id",
+            code=""">>> from nucliadb_sdk import *
+>>> sdk = NucliaDBSDK(api_key="api-key")
+>>> sdk.reindex_resource_by_slug(kbid="mykbid", slug="slug")
+""",
+        ),
+    ],
+)
+
+REPROCESS_RESOURCE = Docstring(
+    doc="""Reprocess resource""",
+    examples=[
+        Example(
+            description="Send resource to processing again.",
+            code=""">>> from nucliadb_sdk import *
+>>> sdk = NucliaDBSDK(api_key="api-key")
+>>> sdk.reprocess_resource(kbid="mykbid", rid="rid")
+""",
+        ),
+    ],
+)
+
+
+REPROCESS_RESOURCE_BY_SLUG = Docstring(
+    doc="""Reindex resource by slug""",
+    examples=[
+        Example(
+            description="Send resource to processing again by slug.",
+            code=""">>> from nucliadb_sdk import *
+>>> sdk = NucliaDBSDK(api_key="api-key")
+>>> sdk.reprocess_resource_by_slug(kbid="mykbid", slug="slug")
+""",
+        ),
+    ],
+)
+
+
 SEARCH = Docstring(
     doc="""Search in your Knowledge Box""",
     examples=[

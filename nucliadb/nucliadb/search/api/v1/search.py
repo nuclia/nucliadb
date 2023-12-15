@@ -33,12 +33,10 @@ from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.requesters.utils import Method, node_query
+from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.merge import merge_results
-from nucliadb.search.search.query import get_default_min_score, global_query_to_pb
-from nucliadb.search.search.utils import (
-    parse_sort_options,
-    should_disable_vector_search,
-)
+from nucliadb.search.search.query import QueryParser
+from nucliadb.search.search.utils import should_disable_vector_search
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
@@ -63,7 +61,7 @@ SEARCH_EXAMPLES = {
         description="For a complete list of filters, visit: https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",  # noqa
         value={
             "query": "Noam Chomsky",
-            "filters": ["/n/i/application/pdf"],
+            "filters": ["/icon/application/pdf"],
             "features": [SearchOptions.DOCUMENT],
         },
     ),
@@ -205,39 +203,64 @@ async def catalog(
     with_status: Optional[ResourceProcessingStatus] = fastapi_query(
         SearchParamDefaults.with_status
     ),
-    x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
-    x_nucliadb_user: str = Header(""),
-    x_forwarded_for: str = Header(""),
 ) -> Union[KnowledgeboxSearchResults, HTTPClientError]:
+    sort_options = SortOptions(  # default
+        field=SortField.CREATED,
+        order=SortOrder.DESC,
+        limit=None,
+    )
+    if sort_field:
+        sort_options = SortOptions(field=sort_field, limit=sort_limit, order=sort_order)
     try:
-        sort = None
-        if sort_field:
-            sort = SortOptions(field=sort_field, limit=sort_limit, order=sort_order)
-        item = SearchRequest(
+        # Min score is not relevant here, as catalog endpoint
+        # only returns bm25 results on titles
+        min_score = 0.0
+
+        # We need to query all nodes
+        query_parser = QueryParser(
+            kbid=kbid,
+            features=[SearchOptions.DOCUMENT],
             query=query,
-            fields=["a/title"],
-            faceted=faceted,
             filters=filters,
-            sort=sort,
+            faceted=faceted,
+            sort=sort_options,
             page_number=page_number,
             page_size=page_size,
-            features=[SearchOptions.DOCUMENT],
-            show=[ResourceProperties.BASIC],
-            shards=shards,
+            min_score=min_score,
+            fields=["a/title"],
+            with_status=with_status,
         )
-    except ValidationError as exc:
-        detail = json.loads(exc.json())
-        return HTTPClientError(status_code=422, detail=detail)
-    return await _search_endpoint(
-        response,
-        kbid,
-        item,
-        x_ndb_client,
-        x_nucliadb_user,
-        x_forwarded_for,
-        do_audit=False,
-        with_status=with_status,
-    )
+        pb_query, _, _ = await query_parser.parse()
+
+        (results, _, _, _) = await node_query(
+            kbid,
+            Method.SEARCH,
+            pb_query,
+            target_replicas=shards,
+            # Catalog should not go to read replicas because we want it to be
+            # consistent and most up to date results
+            read_only=False,
+        )
+
+        # We need to merge
+        search_results = await merge_results(
+            results,
+            count=page_size,
+            page=page_number,
+            kbid=kbid,
+            show=[ResourceProperties.BASIC],
+            field_type_filter=[],
+            extracted=[],
+            sort=sort_options,
+            requested_relations=pb_query.relation_subgraph,
+            min_score=query_parser.min_score,
+            highlight=False,
+        )
+        return search_results
+    except KnowledgeBoxNotFound:
+        return HTTPClientError(status_code=404, detail="Knowledge Box not found")
+    except LimitsExceededError as exc:
+        return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
 
 
 @api.post(
@@ -285,6 +308,8 @@ async def _search_endpoint(
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
+    except InvalidQueryError as exc:
+        return HTTPClientError(status_code=412, detail=str(exc))
 
 
 async def search(
@@ -299,27 +324,21 @@ async def search(
     audit = get_audit()
     start_time = time()
 
-    sort_options = parse_sort_options(item)
-
     if SearchOptions.VECTOR in item.features:
         if should_disable_vector_search(item):
             item.features.remove(SearchOptions.VECTOR)
 
-    min_score = item.min_score
-    if min_score is None:
-        min_score = await get_default_min_score(kbid)
-
     # We need to query all nodes
-    pb_query, incomplete_results, autofilters = await global_query_to_pb(
-        kbid,
+    query_parser = QueryParser(
+        kbid=kbid,
         features=item.features,
         query=item.query,
         filters=item.filters,
         faceted=item.faceted,
-        sort=sort_options,
+        sort=item.sort,
         page_number=item.page_number,
         page_size=item.page_size,
-        min_score=min_score,
+        min_score=item.min_score,
         range_creation_start=item.range_creation_start,
         range_creation_end=item.range_creation_end,
         range_modification_start=item.range_modification_start,
@@ -332,9 +351,10 @@ async def search(
         with_synonyms=item.with_synonyms,
         autofilter=item.autofilter,
     )
+    pb_query, incomplete_results, autofilters = await query_parser.parse()
 
     results, query_incomplete_results, queried_nodes, queried_shards = await node_query(
-        kbid, Method.SEARCH, pb_query, item.shards
+        kbid, Method.SEARCH, pb_query, target_replicas=item.shards
     )
 
     incomplete_results = incomplete_results or query_incomplete_results
@@ -348,9 +368,9 @@ async def search(
         show=item.show,
         field_type_filter=item.field_type_filter,
         extracted=item.extracted,
-        sort=sort_options,
+        sort=query_parser.sort,
         requested_relations=pb_query.relation_subgraph,
-        min_score=min_score,
+        min_score=query_parser.min_score,
         highlight=item.highlight,
     )
     await abort_transaction()

@@ -44,13 +44,16 @@ from nucliadb_models.search import (
     Relations,
     RephraseModel,
     SearchOptions,
+    UserPrompt,
 )
 from nucliadb_protos import audit_pb2
+from nucliadb_telemetry.errors import capture_exception
 from nucliadb_utils.helpers import async_gen_lookahead
 from nucliadb_utils.utilities import get_audit
 
 NOT_ENOUGH_CONTEXT_ANSWER = "Not enough data to answer this."
 AUDIT_TEXT_RESULT_SEP = " \n\n "
+START_OF_CITATIONS = b"_CIT_"
 
 
 class FoundStatusCode:
@@ -91,7 +94,6 @@ async def rephrase_query_from_chat_history(
 async def format_generated_answer(
     answer_generator: AsyncGenerator[bytes, None], output_status_code: FoundStatusCode
 ):
-    answer = []
     status_code: Optional[AnswerStatusCode] = None
     is_last_chunk = False
     async for answer_chunk, is_last_chunk in async_gen_lookahead(answer_generator):
@@ -103,7 +105,6 @@ async def format_generated_answer(
                 # just for bw compatibility until predict
                 # is updated to the new protocol
                 status_code = AnswerStatusCode.SUCCESS
-                answer.append(answer_chunk)
                 yield answer_chunk
             else:
                 # TODO: this should be needed but, in case we receive the status
@@ -112,7 +113,6 @@ async def format_generated_answer(
                     answer_chunk = answer_chunk.rstrip(status_code.encode())
                     yield answer_chunk
             break
-        answer.append(answer_chunk)
         yield answer_chunk
     if not is_last_chunk:
         logger.warning("BUG: /chat endpoint without last chunk")
@@ -160,22 +160,32 @@ async def get_find_results(
 
 
 async def get_relations_results(
-    *, kbid: str, chat_request: ChatRequest, text_answer: bytes
+    *, kbid: str, chat_request: ChatRequest, text_answer: str
 ) -> Relations:
-    predict = get_predict()
-    detected_entities = await predict.detect_entities(kbid, text_answer.decode("utf-8"))
-    relation_request = RelationSearchRequest()
-    relation_request.subgraph.entry_points.extend(detected_entities)
-    relation_request.subgraph.depth = 1
+    try:
+        predict = get_predict()
+        detected_entities = await predict.detect_entities(kbid, text_answer)
+        relation_request = RelationSearchRequest()
+        relation_request.subgraph.entry_points.extend(detected_entities)
+        relation_request.subgraph.depth = 1
 
-    relations_results: List[RelationSearchResponse]
-    (
-        relations_results,
-        _,
-        _,
-        _,
-    ) = await node_query(kbid, Method.RELATIONS, relation_request, chat_request.shards)
-    return merge_relations_results(relations_results, relation_request.subgraph)
+        relations_results: List[RelationSearchResponse]
+        (
+            relations_results,
+            _,
+            _,
+            _,
+        ) = await node_query(
+            kbid,
+            Method.RELATIONS,
+            relation_request,
+            target_replicas=chat_request.shards,
+        )
+        return merge_relations_results(relations_results, relation_request.subgraph)
+    except Exception as exc:
+        capture_exception(exc)
+        logger.exception("Error getting relations results")
+        return Relations(entities={})
 
 
 async def not_enough_context_generator():
@@ -199,12 +209,12 @@ async def chat(
     rephrased_query = None
     if chat_request.context and len(chat_request.context) > 0:
         rephrased_query = await rephrase_query_from_chat_history(
-            kbid, chat_request.context, chat_request.query, user_id
+            kbid, chat_request.context, user_query, user_id
         )
 
     find_results: KnowledgeboxFindResults = await get_find_results(
         kbid=kbid,
-        query=user_query or rephrased_query or "",
+        query=rephrased_query or user_query or "",
         chat_request=chat_request,
         ndb_client=client_type,
         user=user_id,
@@ -218,12 +228,22 @@ async def chat(
         )
     else:
         query_context = await get_chat_prompt_context(kbid, find_results)
+        query_context_order = {
+            paragraph_id: order
+            for order, paragraph_id in enumerate(query_context.keys())
+        }
+        user_prompt = None
+        if chat_request.prompt is not None:
+            user_prompt = UserPrompt(prompt=chat_request.prompt)
         chat_model = ChatModel(
             user_id=user_id,
             query_context=query_context,
+            query_context_order=query_context_order,
             chat_history=chat_history,
             question=chat_request.query,
             truncate=True,
+            user_prompt=user_prompt,
+            citations=chat_request.citations,
         )
         predict = get_predict()
         nuclia_learning_id, predict_generator = await predict.chat_query(
@@ -273,7 +293,7 @@ def _parse_answer_status_code(chunk: bytes) -> AnswerStatusCode:
         # It may be a bug in the aiohttp.StreamResponse implementation,
         # but we haven't spotted it yet. For now, we just try to parse the status code
         # from the tail of the chunk.
-        logger.warning(
+        logger.debug(
             f"Error decoding status code from /chat's last chunk. Chunk: {chunk!r}"
         )
         if chunk == b"":
@@ -301,9 +321,7 @@ async def maybe_audit_chat(
     if audit is None:
         return
 
-    audit_answer: Optional[str] = text_answer.decode()
-    if status_code == AnswerStatusCode.NO_CONTEXT:
-        audit_answer = None
+    audit_answer = parse_audit_answer(text_answer, status_code)
 
     # Append chat history and query context
     audit_context = [
@@ -327,3 +345,18 @@ async def maybe_audit_chat(
         context=audit_context,
         answer=audit_answer,
     )
+
+
+def parse_audit_answer(
+    raw_text_answer: bytes, status_code: Optional[AnswerStatusCode]
+) -> Optional[str]:
+    if status_code == AnswerStatusCode.NO_CONTEXT:
+        # We don't want to audit "Not enough context to answer this." and instead set a None.
+        return None
+    # Split citations part from answer
+    try:
+        raw_audit_answer, _ = raw_text_answer.split(START_OF_CITATIONS)
+    except ValueError:
+        raw_audit_answer = raw_text_answer
+    audit_answer = raw_audit_answer.decode()
+    return audit_answer

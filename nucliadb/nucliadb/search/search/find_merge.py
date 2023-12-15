@@ -364,7 +364,7 @@ async def find_merge_results(
     # force getting transaction on current asyncio task
     # so all sub tasks will use the same transaction
     # this is contextvar magic that is probably not ideal
-    await get_transaction()
+    await get_transaction(read_only=True)
 
     paragraphs: List[List[ParagraphResult]] = []
     vectors: List[List[DocumentScored]] = []
@@ -406,7 +406,7 @@ async def find_merge_results(
             page_number=page,
             page_size=count,
             next_page=next_page,
-            min_score=min_score,
+            min_score=round(min_score, ndigits=3),
         )
 
         await fetch_find_metadata(

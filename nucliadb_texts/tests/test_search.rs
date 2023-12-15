@@ -100,7 +100,8 @@ fn test_filtered_search() {
         &reader,
         "",
         Filter {
-            tags: vec!["/l/mylabel".to_string()],
+            field_labels: vec!["/l/mylabel".to_string()],
+            ..Default::default()
         },
         1,
     );
@@ -108,7 +109,8 @@ fn test_filtered_search() {
         &reader,
         "",
         Filter {
-            tags: vec!["/e/myentity".to_string()],
+            field_labels: vec!["/e/myentity".to_string()],
+            ..Default::default()
         },
         1,
     );
@@ -116,7 +118,8 @@ fn test_filtered_search() {
         &reader,
         "",
         Filter {
-            tags: vec!["/l/fakelabel".to_string()],
+            field_labels: vec!["/l/fakelabel".to_string()],
+            ..Default::default()
         },
         0,
     );
@@ -171,7 +174,7 @@ fn test_faceted_search() {
         &reader,
         "",
         Faceted {
-            tags: vec!["/".to_string(), "/l".to_string(), "/t".to_string()],
+            labels: vec!["/".to_string(), "/l".to_string(), "/t".to_string()],
         },
         2,
     );

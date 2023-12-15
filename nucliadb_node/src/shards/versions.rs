@@ -21,6 +21,7 @@
 use std::path::Path;
 
 use nucliadb_core::prelude::*;
+use nucliadb_core::Channel;
 use serde::{Deserialize, Serialize};
 
 const VECTORS_VERSION: u32 = 1;
@@ -57,12 +58,16 @@ impl Versions {
             version_relations: Some(1),
         }
     }
-    fn new() -> Versions {
+    fn new(channel: Channel) -> Versions {
+        let mut rel_version = RELATIONS_VERSION;
+        if channel == Channel::EXPERIMENTAL {
+            rel_version = 2;
+        }
         Versions {
             version_paragraphs: Some(PARAGRAPHS_VERSION),
             version_vectors: Some(VECTORS_VERSION),
             version_texts: Some(TEXTS_VERSION),
-            version_relations: Some(RELATIONS_VERSION),
+            version_relations: Some(rel_version),
         }
     }
     fn fill_gaps(&mut self) -> bool {
@@ -133,6 +138,8 @@ impl Versions {
         match self.version_relations {
             Some(1) => nucliadb_relations::service::RelationsReaderService::start(config)
                 .map(|i| encapsulate_reader(i) as RelationsReaderPointer),
+            Some(2) => nucliadb_relations2::reader::RelationsReaderService::start(config)
+                .map(|i| encapsulate_reader(i) as RelationsReaderPointer),
             Some(v) => Err(node_error!("Invalid relations version {v}")),
             None => Err(node_error!("Corrupted version file")),
         }
@@ -174,6 +181,8 @@ impl Versions {
         match self.version_relations {
             Some(1) => nucliadb_relations::service::RelationsWriterService::start(config)
                 .map(|i| encapsulate_writer(i) as RelationsWriterPointer),
+            Some(2) => nucliadb_relations2::writer::RelationsWriterService::start(config)
+                .map(|i| encapsulate_writer(i) as RelationsWriterPointer),
             Some(v) => Err(node_error!("Invalid relations version {v}")),
             None => Err(node_error!("Corrupted version file")),
         }
@@ -194,7 +203,7 @@ impl Versions {
             Err(node_error!("Versions not found"))
         }
     }
-    pub fn load_or_create(versions_file: &Path) -> NodeResult<Versions> {
+    pub fn load_or_create(versions_file: &Path, channel: Channel) -> NodeResult<Versions> {
         if versions_file.exists() {
             let versions_json = std::fs::read_to_string(versions_file)?;
             let mut versions: Versions = serde_json::from_str(&versions_json)?;
@@ -211,7 +220,7 @@ impl Versions {
             std::fs::write(versions_file, serialized)?;
             Ok(versions)
         } else {
-            let versions = Versions::new();
+            let versions = Versions::new(channel);
             let serialized = serde_json::to_string(&versions)?;
             std::fs::write(versions_file, serialized)?;
             Ok(versions)

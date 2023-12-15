@@ -24,6 +24,7 @@ from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
 from nucliadb_utils.storages.s3 import S3Storage
 from nucliadb_utils.store import MAIN
+from nucliadb_utils.utilities import Utility
 
 images.settings["s3"] = {
     "image": "localstack/localstack",
@@ -43,7 +44,7 @@ class S3(BaseImage):
         try:
             response = requests.get(f"http://{self.host}:{self.get_port()}")
             return response.status_code == 404
-        except:
+        except Exception:
             return False
 
 
@@ -68,9 +69,10 @@ async def s3_storage(s3):
         use_ssl=False,
         region_name=None,
         bucket="test-{kbid}",
+        bucket_tags={"testTag": "test"},
     )
     await storage.initialize()
-    MAIN["storage"] = storage
+    MAIN[Utility.STORAGE] = storage
     yield storage
     await storage.finalize()
-    del MAIN["storage"]
+    MAIN.pop(Utility.STORAGE, None)

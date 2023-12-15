@@ -17,4 +17,5 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-CHUNK_SIZE = 524288
+MB = 1024 * 1024
+CHUNK_SIZE = 5 * MB

@@ -30,6 +30,15 @@ from nucliadb.search.predict import AnswerStatusCode
 from nucliadb.search.utilities import get_predict
 
 
+@pytest.fixture(scope="function", autouse=True)
+def audit():
+    audit_mock = mock.Mock(chat=mock.AsyncMock())
+    with mock.patch(
+        "nucliadb.search.search.chat.query.get_audit", return_value=audit_mock
+    ):
+        yield audit_mock
+
+
 @pytest.mark.asyncio()
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_chat(
@@ -86,11 +95,6 @@ async def resource(nucliadb_writer, knowledgebox):
     )
     assert resp.status_code in (200, 201)
     rid = resp.json()["uuid"]
-
-    import asyncio
-
-    await asyncio.sleep(1)
-
     yield rid
 
 
@@ -106,7 +110,7 @@ async def test_chat_handles_status_codes_in_a_different_chunk(
         f"/kb/{knowledgebox}/chat", json={"query": "title"}
     )
     assert resp.status_code == 200
-    _, answer, _ = parse_chat_response(resp.content)
+    _, answer, _, _ = parse_chat_response(resp.content)
 
     assert answer == b"some text with status."
 
@@ -123,7 +127,7 @@ async def test_chat_handles_status_codes_in_the_same_chunk(
         f"/kb/{knowledgebox}/chat", json={"query": "title"}
     )
     assert resp.status_code == 200
-    _, answer, _ = parse_chat_response(resp.content)
+    _, answer, _, _ = parse_chat_response(resp.content)
 
     assert answer == b"some text with status."
 
@@ -140,7 +144,7 @@ async def test_chat_handles_status_codes_with_last_chunk_empty(
         f"/kb/{knowledgebox}/chat", json={"query": "title"}
     )
     assert resp.status_code == 200
-    _, answer, _ = parse_chat_response(resp.content)
+    _, answer, _, _ = parse_chat_response(resp.content)
 
     assert answer == b"some text with status."
 
@@ -160,7 +164,15 @@ def parse_chat_response(content: bytes):
     relations_result = None
     if len(relations_payload) > 0:
         relations_result = json.loads(base64.b64decode(relations_payload))
-    return find_result, answer, relations_result
+    try:
+        answer, tail = answer.split(b"_CIT_")
+        citations_length = int.from_bytes(tail[:4], byteorder="big", signed=False)
+        citations_part = tail[4 : 4 + citations_length]
+        citations = json.loads(base64.b64decode(citations_part).decode())
+    except ValueError:
+        answer = answer
+        citations = {}
+    return find_result, answer, relations_result, citations
 
 
 @pytest.mark.asyncio()
@@ -172,7 +184,7 @@ async def test_chat_always_returns_relations(
         f"/kb/{knowledgebox}/chat", json={"query": "summary", "features": ["relations"]}
     )
     assert resp.status_code == 200
-    _, answer, relations_result = parse_chat_response(resp.content)
+    _, answer, relations_result, _ = parse_chat_response(resp.content)
     assert answer == b"Not enough data to answer this."
     assert "Ferran" in relations_result["entities"]
 
@@ -193,3 +205,72 @@ async def test_chat_synchronous(nucliadb_reader: AsyncClient, knowledgebox, reso
     assert resp_data.answer == "some text with status."
     assert len(resp_data.results.resources) == 1
     assert resp_data.status == AnswerStatusCode.SUCCESS
+
+
+@pytest.mark.asyncio()
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+@pytest.mark.parametrize("sync_chat", (True, False))
+async def test_chat_with_citations(
+    nucliadb_reader: AsyncClient, knowledgebox, resource, sync_chat
+):
+    citations = {"foo": [], "bar": []}  # type: ignore
+    citations_payload = base64.b64encode(json.dumps(citations).encode())
+    citations_size = len(citations_payload).to_bytes(4, byteorder="big", signed=False)
+
+    predict = get_predict()
+    predict.generated_answer = [  # type: ignore
+        b"some ",
+        b"text ",
+        b"with ",
+        b"status.",
+        b"_CIT_",
+        citations_size,
+        citations_payload,
+        b"0",
+    ]
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/chat",
+        json={"query": "title", "citations": True},
+        headers={"X-Synchronous": str(sync_chat)},
+        timeout=None,
+    )
+    assert resp.status_code == 200
+
+    if sync_chat:
+        resp_data = SyncChatResponse.parse_raw(resp.content)
+        resp_citations = resp_data.citations
+    else:
+        resp_citations = parse_chat_response(resp.content)[-1]
+    assert resp_citations == citations
+
+
+@pytest.mark.asyncio()
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+@pytest.mark.parametrize("sync_chat", (True, False))
+async def test_chat_without_citations(
+    nucliadb_reader: AsyncClient, knowledgebox, resource, sync_chat
+):
+    predict = get_predict()
+    predict.generated_answer = [  # type: ignore
+        b"some ",
+        b"text ",
+        b"with ",
+        b"status.",
+        b"0",
+    ]
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/chat",
+        json={"query": "title", "citations": False},
+        headers={"X-Synchronous": str(sync_chat)},
+        timeout=None,
+    )
+    assert resp.status_code == 200
+
+    if sync_chat:
+        resp_data = SyncChatResponse.parse_raw(resp.content)
+        resp_citations = resp_data.citations
+    else:
+        resp_citations = parse_chat_response(resp.content)[-1]
+    assert resp_citations == {}

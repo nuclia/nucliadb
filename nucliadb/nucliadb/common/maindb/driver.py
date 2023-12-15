@@ -37,7 +37,7 @@ class Transaction:
     async def commit(self):
         raise NotImplementedError()
 
-    async def batch_get(self, keys: List[str]):
+    async def batch_get(self, keys: list[str]) -> list[Optional[bytes]]:
         raise NotImplementedError()
 
     async def get(self, key: str) -> Optional[bytes]:
@@ -60,19 +60,26 @@ class Transaction:
 
 class Driver:
     initialized = False
+    _abort_tasks: List[asyncio.Task] = []
 
     async def initialize(self):
         raise NotImplementedError()
 
     async def finalize(self):
-        raise NotImplementedError()
+        while len(self._abort_tasks) > 0:
+            task = self._abort_tasks.pop()
+            if not task.done():
+                try:
+                    await task
+                except Exception:
+                    pass
 
-    async def begin(self) -> Transaction:
+    async def begin(self, read_only: bool = False) -> Transaction:
         raise NotImplementedError()
 
     @asynccontextmanager
     async def transaction(
-        self, wait_for_abort: bool = True
+        self, wait_for_abort: bool = True, read_only: bool = False
     ) -> AsyncGenerator[Transaction, None]:
         """
         Use to make sure transaction is always aborted.
@@ -84,7 +91,7 @@ class Driver:
         txn: Optional[Transaction] = None
         error: bool = False
         try:
-            txn = await self.begin()
+            txn = await self.begin(read_only=read_only)
             yield txn
         except Exception:
             error = True
@@ -94,4 +101,9 @@ class Driver:
                 if error or wait_for_abort:
                     await txn.abort()
                 else:
-                    asyncio.create_task(txn.abort())
+                    self._async_abort(txn)
+
+    def _async_abort(self, txn: Transaction):
+        task = asyncio.create_task(txn.abort())
+        task.add_done_callback(lambda task: self._abort_tasks.remove(task))
+        self._abort_tasks.append(task)

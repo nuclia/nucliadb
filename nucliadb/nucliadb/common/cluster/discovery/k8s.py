@@ -38,6 +38,7 @@ from nucliadb.common.cluster.discovery.base import (
     AbstractClusterDiscovery,
 )
 from nucliadb.common.cluster.discovery.types import IndexNodeMetadata
+from nucliadb.common.cluster.exceptions import NodeConnectionError
 from nucliadb.common.cluster.settings import Settings
 
 logger = logging.getLogger(__name__)
@@ -53,7 +54,7 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
     Load cluster members from kubernetes.
     """
 
-    cache_update_interval = 60
+    node_heartbeat_interval = 10
     cluster_task: asyncio.Task
     update_node_data_cache_task: asyncio.Task
 
@@ -63,13 +64,18 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
         self.node_id_cache: dict[str, IndexNodeMetadata] = {}
         self.update_lock = asyncio.Lock()
 
-    async def get_node_metadata(self, sts_name: str, node_ip: str) -> IndexNodeMetadata:
+    async def get_node_metadata(
+        self, pod_name: str, node_ip: str, read_replica: bool
+    ) -> IndexNodeMetadata:
         async with self.update_lock:
-            if sts_name not in self.node_id_cache:
-                self.node_id_cache[sts_name] = await self._query_node_metadata(node_ip)
+            if pod_name not in self.node_id_cache:
+                self.node_id_cache[pod_name] = await self._query_node_metadata(
+                    node_ip, read_replica
+                )
             else:
-                self.node_id_cache[sts_name].address = node_ip
-        return self.node_id_cache[sts_name]
+                self.node_id_cache[pod_name].address = node_ip
+            self.node_id_cache[pod_name].updated_at = time.time()
+        return self.node_id_cache[pod_name]
 
     async def update_node(self, event: EventType) -> None:
         """
@@ -93,14 +99,41 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
                 kubernetes_asyncio.client.models.v1_container_status.V1ContainerStatus
             ] = status.container_statuses
             for container_status in container_statuses:
-                if container_status.name not in ("reader", "writer", "sidecar"):
+                if container_status.name not in ("reader", "writer"):
                     continue
                 if not container_status.ready:
                     ready = False
                     break
 
-        sts_name = event_metadata.name
-        node_data = await self.get_node_metadata(sts_name, status.pod_ip)
+        pod_name = event_metadata.name
+        read_replica = event_metadata.labels.get("readReplica", "") == "true"
+        if not ready:
+            if pod_name not in self.node_id_cache:
+                logger.debug(
+                    "Node not ready and not in cache, ignore",
+                    extra={"pod_name": pod_name},
+                )
+                return
+            else:
+                node_data = self.node_id_cache[pod_name]
+        else:
+            try:
+                node_data = await self.get_node_metadata(
+                    pod_name,
+                    status.pod_ip,
+                    read_replica=read_replica,
+                )
+            except NodeConnectionError:  # pragma: no cover
+                logger.warning(
+                    "Error connecting to node",
+                    extra={
+                        "pod_name": pod_name,
+                        "node_ip": status.pod_ip,
+                        "read_replica": read_replica,
+                    },
+                )
+                raise
+
         if ready:
             node = manager.get_index_node(node_data.node_id)
             if node is None:
@@ -108,7 +141,7 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
                     "Adding node",
                     extra={
                         "node_id": node_data.node_id,
-                        "sts_name": sts_name,
+                        "pod_name": pod_name,
                         "address": node_data.address,
                     },
                 )
@@ -116,11 +149,12 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
                     id=node_data.node_id,
                     address=node_data.address,
                     shard_count=node_data.shard_count,
+                    primary_id=node_data.primary_id,
                 )
             else:
                 logger.debug(
                     "Update node",
-                    extra={"sts_name": sts_name, "node_id": node_data.node_id},
+                    extra={"pod_name": pod_name, "node_id": node_data.node_id},
                 )
                 node.address = node_data.address
                 node.shard_count = node_data.shard_count
@@ -131,11 +165,13 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
                     f"Remove node",
                     extra={
                         "node_id": node_data.node_id,
-                        "sts_name": sts_name,
+                        "pod_name": pod_name,
                         "address": node.address,
                     },
                 )
-                manager.remove_index_node(node_data.node_id)
+                manager.remove_index_node(node_data.node_id, node_data.primary_id)
+                if pod_name in self.node_id_cache:
+                    del self.node_id_cache[pod_name]
 
         AVAILABLE_NODES.set(len(manager.get_index_nodes()))
 
@@ -159,6 +195,8 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
                         ):
                             try:
                                 await self.update_node(event)
+                            except NodeConnectionError:  # pragma: no cover
+                                pass
                             except Exception:  # pragma: no cover
                                 logger.exception(
                                     "Error while updating node", exc_info=True
@@ -180,17 +218,54 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
                 watch.stop()
                 await watch.close()
 
+    def _maybe_remove_stale_node(self, pod_name: str) -> None:
+        """
+        This is rare but possible to reproduce under contrived API usage scenarios to
+        get in a situation where we do not remove a node from a cluster because we missed
+        a removal event.
+
+        It seems to be possible that we miss events from kubernetes.
+
+        We should view getting node metadata as a health check just in case.
+        """
+        if pod_name not in self.node_id_cache:
+            return
+
+        node_data = self.node_id_cache[pod_name]
+        if time.time() - node_data.updated_at > (self.node_heartbeat_interval * 2):
+            node = manager.get_index_node(node_data.node_id)
+            if node is not None:
+                logger.warning(
+                    f"Removing stale node {pod_name} {node_data.address}",
+                    extra={
+                        "node_id": node_data.node_id,
+                        "pod_name": pod_name,
+                        "address": node_data.address,
+                    },
+                )
+                manager.remove_index_node(node_data.node_id, node_data.primary_id)
+            del self.node_id_cache[pod_name]
+
     async def update_node_data_cache(self) -> None:
         while True:
-            await asyncio.sleep(self.cache_update_interval)
+            await asyncio.sleep(self.node_heartbeat_interval)
             try:
-                for sts_name in list(self.node_id_cache.keys()):
+                for pod_name in list(self.node_id_cache.keys()):
                     # force updating cache
                     async with self.update_lock:
-                        existing = self.node_id_cache[sts_name]
-                        self.node_id_cache[sts_name] = await self._query_node_metadata(
-                            existing.address
-                        )
+                        if pod_name not in self.node_id_cache:
+                            # could change in the meantime since we're waiting for lock
+                            continue
+                        existing = self.node_id_cache[pod_name]
+                        try:
+                            self.node_id_cache[
+                                pod_name
+                            ] = await self._query_node_metadata(
+                                existing.address,
+                                read_replica=existing.primary_id is not None,
+                            )
+                        except NodeConnectionError:  # pragma: no cover
+                            self._maybe_remove_stale_node(pod_name)
             except (
                 asyncio.CancelledError,
                 KeyboardInterrupt,

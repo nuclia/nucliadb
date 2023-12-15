@@ -29,6 +29,7 @@ on:
       - "charts/nucliadb_node/**"
       - "Dockerfile.node"
       - "Dockerfile.node_sidecar"
+      - "Dockerfile.basenode"
       - "Cargo.lock"
       - "Cargo.toml"
       - "nucliadb_paragraphs/**"
@@ -231,11 +232,12 @@ jobs:
           file: ./coverage.xml
           flags: node-sidecar
 
-  build-base-rust:
-    name: Build and push base image
+
+  dockerfile-changes:
+    name: Check if dockerfiles have changed
     runs-on: ubuntu-latest
-    needs: tests-rust
-    if: github.event_name == 'push'
+    outputs:
+      basenode: ${{ steps.changes.outputs.basenode_dockerfile }}
 
     steps:
       - name: Checkout repository
@@ -249,133 +251,45 @@ jobs:
             basenode_dockerfile:
               - 'Dockerfile.basenode'
 
-      # As base image is on a private registry, we need to authenticate 1st to
-      # be able to download that image
-      - if: steps.changes.outputs.basenode_dockerfile == 'true'
-        name: Setup gcloud CLI
-        uses: google-github-actions/auth@v1
-        with:
-          credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
 
-      - if: steps.changes.outputs.basenode_dockerfile == 'true'
-        name: "Set up Cloud SDK"
-        uses: "google-github-actions/setup-gcloud@v1"
-
-      - if: steps.changes.outputs.basenode_dockerfile == 'true'
-        name: Configure Docker
-        run: docker login -u oauth2accesstoken -p "$(gcloud auth application-default print-access-token)" https://eu.gcr.io
-
-      # We need to setup buildx to be able to cache with gha
-      - if: steps.changes.outputs.basenode_dockerfile == 'true'
-        name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - if: steps.changes.outputs.basenode_dockerfile == 'true'
-        name: Build base node docker image
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          file: Dockerfile.basenode
-          platforms: linux/amd64
-          push: true
-          cache-from: type=gha
-          # As basenode is stable and won't change ofter, we only need cache for
-          # the resulting image, not intermediate layers.
-          cache-to: type=gha,mode=min
-          tags: |
-            ${{ env.CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME_BASE_NODE}}:latest
+  build-base-rust:
+    name: Build and push base image
+    needs: [ dockerfile-changes, tests-rust ]
+    uses: ./.github/workflows/_build-img-nucliadb.yml
+    with:
+      skip: ${{ ! needs.dockerfile-changes.outputs.basenode }}
+      file: Dockerfile.basenode
+      image-name: basenode
+      cache-gha-mode: min
+    secrets:
+      inherit
+    if: github.event_name == 'push'
 
   build-rust:
     name: Build and push index node docker image
-    runs-on: ubuntu-latest
     needs: build-base-rust
+    uses: ./.github/workflows/_build-img-nucliadb.yml
+    with:
+      file: Dockerfile.node
+      image-name: node
+    secrets:
+      inherit
     if: github.event_name == 'push'
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Calculate short sha
-        id: env-vars
-        run: |-
-          HASH=`git rev-parse --short HEAD`
-          BRANCH=${GITHUB_REF##*/}
-          echo "short_sha=$HASH" >> $GITHUB_OUTPUT
-          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
-
-      # As base image is on a private registry, we need to authenticate 1st to
-      # be able to download that image
-      - name: Setup gcloud CLI
-        uses: google-github-actions/auth@v1
-        with:
-          credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
-
-      - name: "Set up Cloud SDK"
-        uses: "google-github-actions/setup-gcloud@v1"
-
-      - name: Configure Docker
-        run: docker login -u oauth2accesstoken -p "$(gcloud auth application-default print-access-token)" https://eu.gcr.io
-
-      # We need to setup buildx to be able to cache with gha
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Build docker image
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          file: Dockerfile.node
-          push: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          tags: |
-            ${{ env.CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME_NODE}}:${{ steps.env-vars.outputs.short_sha }}
-            ${{ env.CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME_NODE}}:${{steps.env-vars.outputs.branch }}
 
   build-python:
     name: Build and push sidecar docker image
-    runs-on: ubuntu-latest
     needs: tests-python
+    uses: ./.github/workflows/_build-img-nucliadb.yml
+    with:
+      context: .
+      file: Dockerfile.node_sidecar
+      image-name: node_sidecar
+      cache-gha-mode: min
+    secrets:
+      inherit
     if: github.event_name == 'push'
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Calculate short sha
-        id: env-vars
-        run: |-
-          HASH=`git rev-parse --short HEAD`
-          BRANCH=${GITHUB_REF##*/}
-          echo "short_sha=$HASH" >> $GITHUB_OUTPUT
-          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
-
-      - name: Setup gcloud CLI
-        uses: google-github-actions/auth@v1
-        with:
-          credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
-
-      - name: "Set up Cloud SDK"
-        uses: "google-github-actions/setup-gcloud@v1"
-
-      - name: Configure Docker
-        run: docker login -u oauth2accesstoken -p "$(gcloud auth application-default print-access-token)" https://eu.gcr.io
-
-      # We need to setup buildx to be able to cache with gha
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Build and push docker image
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          file: Dockerfile.node_sidecar
-          push: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=min
-          tags: |
-            ${{ env.CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME_NODE_SIDECAR }}:${{ steps.env-vars.outputs.short_sha }}
-            ${{ env.CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME_NODE_SIDECAR }}:${{ steps.env-vars.outputs.branch }}
 
   deploy:
     name: Deploy Helm chart and trigger internal CI

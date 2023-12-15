@@ -15,11 +15,12 @@ COPY nucliadb_paragraphs /nucliadb/nucliadb_paragraphs
 COPY nucliadb_procs /nucliadb/nucliadb_procs
 COPY nucliadb_protos /nucliadb/nucliadb_protos
 COPY nucliadb_relations /nucliadb/nucliadb_relations
-COPY nucliadb_telemetry /nucliadb/nucliadb_telemetry
+COPY nucliadb_relations2 /nucliadb/nucliadb_relations2
 COPY nucliadb_texts /nucliadb/nucliadb_texts
 COPY nucliadb_vectors /nucliadb/nucliadb_vectors
 COPY vectors_benchmark /nucliadb/vectors_benchmark
 
+WORKDIR /nucliadb
 RUN cargo chef prepare --recipe-path recipe.json
 
 # --------------------------------------------------------------------
@@ -55,13 +56,15 @@ COPY nucliadb_paragraphs /nucliadb/nucliadb_paragraphs
 COPY nucliadb_procs /nucliadb/nucliadb_procs
 COPY nucliadb_protos /nucliadb/nucliadb_protos
 COPY nucliadb_relations /nucliadb/nucliadb_relations
-COPY nucliadb_telemetry /nucliadb/nucliadb_telemetry
+COPY nucliadb_relations2 /nucliadb/nucliadb_relations2
 COPY nucliadb_texts /nucliadb/nucliadb_texts
 COPY nucliadb_vectors /nucliadb/nucliadb_vectors
 COPY vectors_benchmark /nucliadb/vectors_benchmark
 
 RUN mkdir -p /nucliadb/tmp
 ENV TMPDIR=/nucliadb/tmp
+
+WORKDIR /nucliadb
 
 RUN echo "Building workspace with feature(s) '$CARGO_FEATURES' and profile '$CARGO_PROFILE'" \
     && rm -rf /nucliadb/tmp/* \

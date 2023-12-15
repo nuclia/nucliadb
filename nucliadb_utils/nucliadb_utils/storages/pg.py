@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import uuid
 from typing import Any, AsyncIterator, Optional, TypedDict
 
@@ -28,6 +29,8 @@ from nucliadb_protos.resources_pb2 import CloudFile
 
 from nucliadb_utils.storages import CHUNK_SIZE
 from nucliadb_utils.storages.storage import Storage, StorageField
+
+logger = logging.getLogger(__name__)
 
 # Table design notes
 # - No foreign key constraints ON PURPOSE
@@ -497,12 +500,18 @@ class PostgresStorageField(StorageField):
                 await dl.delete_file(self.bucket, self.field.uri)
 
             if self.field.upload_uri != self.key:
-                await dl.move(
-                    origin_key=self.field.upload_uri,
-                    destination_key=self.key,
-                    origin_kb=self.field.bucket_name,
-                    destination_kb=self.bucket,
-                )
+                try:
+                    await dl.move(
+                        origin_key=self.field.upload_uri,
+                        destination_key=self.key,
+                        origin_kb=self.field.bucket_name,
+                        destination_kb=self.bucket,
+                    )
+                except Exception:
+                    logger.exception(
+                        f"Error moving file {self.field.bucket_name}://{self.field.upload_uri} -> {self.bucket}://{self.key}"  # noqa
+                    )
+                    raise
 
         self.field.uri = self.key
         self.field.ClearField("offset")
@@ -528,8 +537,9 @@ class PostgresStorage(Storage):
     chunk_size = CHUNK_SIZE
     pool: asyncpg.pool.Pool
 
-    def __init__(self, dsn: str):
+    def __init__(self, dsn: str, connection_pool_max_size: int = 10):
         self.dsn = dsn
+        self.connection_pool_max_size = connection_pool_max_size
         self.source = CloudFile.POSTGRES
         self._lock = asyncio.Lock()
         self.initialized = False
@@ -537,7 +547,10 @@ class PostgresStorage(Storage):
     async def initialize(self):
         async with self._lock:
             if self.initialized is False:
-                self.pool = await asyncpg.create_pool(self.dsn)
+                self.pool = await asyncpg.create_pool(
+                    self.dsn,
+                    max_size=self.connection_pool_max_size,
+                )
 
                 # check if table exists
                 try:

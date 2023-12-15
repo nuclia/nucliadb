@@ -36,7 +36,7 @@ from nucliadb_utils.utilities import get_indexing, get_storage
 
 @pytest.mark.asyncio
 async def test_ingest_relations_indexing(
-    fake_node, local_files, gcs_storage, knowledgebox_ingest, processor
+    fake_node, local_files, storage, knowledgebox_ingest, processor
 ):
     rid = str(uuid.uuid4())
     bm = BrokerMessage(
@@ -77,7 +77,7 @@ async def test_ingest_relations_indexing(
 
 @pytest.mark.asyncio
 async def test_ingest_label_relation_extraction(
-    fake_node, local_files, gcs_storage, knowledgebox_ingest, processor
+    fake_node, local_files, storage, knowledgebox_ingest, processor
 ):
     rid = str(uuid.uuid4())
     bm = BrokerMessage(
@@ -109,7 +109,7 @@ async def test_ingest_label_relation_extraction(
 
 @pytest.mark.asyncio
 async def test_ingest_colab_relation_extraction(
-    fake_node, local_files, gcs_storage, knowledgebox_ingest, processor
+    fake_node, local_files, storage, knowledgebox_ingest, processor
 ):
     rid = str(uuid.uuid4())
     bm = BrokerMessage(
@@ -134,7 +134,7 @@ async def test_ingest_colab_relation_extraction(
 
 @pytest.mark.asyncio
 async def test_ingest_field_metadata_relation_extraction(
-    fake_node, local_files, gcs_storage, knowledgebox_ingest, processor
+    fake_node, local_files, storage, knowledgebox_ingest, processor
 ):
     rid = str(uuid.uuid4())
     bm = BrokerMessage(
@@ -206,7 +206,7 @@ async def test_ingest_field_metadata_relation_extraction(
 
 @pytest.mark.asyncio
 async def test_ingest_field_relations_relation_extraction(
-    fake_node, local_files, gcs_storage, knowledgebox_ingest, processor
+    fake_node, local_files, storage, knowledgebox_ingest, processor
 ):
     rid = str(uuid.uuid4())
     bm = BrokerMessage(

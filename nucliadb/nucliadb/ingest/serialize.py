@@ -102,6 +102,11 @@ async def set_resource_field_extracted_data(
         if user_data_vec is not None:
             field_data.uservectors = UserVectorSet.from_message(user_data_vec)
 
+    if ExtractedDataTypeName.QA in wanted_extracted_data:
+        qa = await field.get_question_answers()
+        if qa is not None:
+            field_data.question_answers = models.QuestionAnswers.from_message(qa)
+
     if (
         isinstance(field, File)
         and isinstance(field_data, FileFieldExtractedData)
@@ -234,9 +239,12 @@ async def serialize(
                 if field.id not in resource.data.texts:
                     resource.data.texts[field.id] = TextFieldData()
                 if include_value:
-                    resource.data.texts[field.id].value = models.FieldText.from_message(
-                        value  # type: ignore
+                    serialized_value = (
+                        models.FieldText.from_message(value)
+                        if value is not None
+                        else None
                     )
+                    resource.data.texts[field.id].value = serialized_value
                 if include_errors:
                     error = await field.get_error()
                     if error is not None:

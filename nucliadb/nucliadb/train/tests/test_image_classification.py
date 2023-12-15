@@ -21,7 +21,7 @@ import asyncio
 import base64
 import json
 import os
-from typing import Any, AsyncIterator
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import aiohttp
@@ -40,6 +40,7 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb.train import API_PREFIX
 from nucliadb.train.api.v1.router import KB_PREFIX
+from nucliadb.train.tests.utils import get_batches_from_train_response_stream
 from nucliadb_utils.utilities import Utility, get_utility, set_utility
 
 _dir = os.path.dirname(__file__)
@@ -75,7 +76,9 @@ async def test_generation_image_classification(
     ) as response:
         assert response.status == 200
         batches = []
-        async for batch in get_image_classification_batch_from_response(response):
+        async for batch in get_batches_from_train_response_stream(
+            response, ImageClassificationBatch
+        ):
             batches.append(batch)
             assert len(batch.data) == 1
             selections = json.loads(batch.data[0].selections)
@@ -217,18 +220,3 @@ def generate_image_classification_broker_message(
     )
 
     return bm
-
-
-async def get_image_classification_batch_from_response(
-    response: aiohttp.ClientResponse,
-) -> AsyncIterator[ImageClassificationBatch]:
-    while True:
-        header = await response.content.read(4)
-        if header == b"":
-            break
-        payload_size = int.from_bytes(header, byteorder="big", signed=False)
-        payload = await response.content.read(payload_size)
-        icb = ImageClassificationBatch()
-        icb.ParseFromString(payload)
-        assert icb.data
-        yield icb

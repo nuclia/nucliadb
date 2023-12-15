@@ -27,7 +27,7 @@ pytestmark = pytest.mark.asyncio
 
 
 @pytest.fixture()
-async def app_context(natsd, gcs_storage, nucliadb):
+async def app_context(natsd, storage, nucliadb):
     ctx = ApplicationContext()
     await ctx.initialize()
     yield ctx
@@ -35,7 +35,7 @@ async def app_context(natsd, gcs_storage, nucliadb):
 
 
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_rollover_shards(
+async def test_rollover_kb_shards(
     app_context,
     knowledgebox,
     nucliadb_writer: AsyncClient,
@@ -58,7 +58,7 @@ async def test_rollover_shards(
     resp = await nucliadb_manager.get(f"/kb/{knowledgebox}/shards")
     shards_body1 = resp.json()
 
-    await rollover.rollover_shards(app_context, knowledgebox)
+    await rollover.rollover_kb_shards(app_context, knowledgebox)
 
     resp = await nucliadb_manager.get(f"/kb/{knowledgebox}/shards")
     shards_body2 = resp.json()

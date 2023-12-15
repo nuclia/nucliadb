@@ -52,6 +52,8 @@ pub trait ShardWriterProvider {
     fn delete(&self, id: ShardId) -> NodeResult<()>;
 
     fn upgrade(&self, id: ShardId) -> NodeResult<ShardCleaned>;
+
+    fn get_metadata(&self, id: ShardId) -> Option<Arc<ShardMetadata>>;
 }
 
 #[async_trait]
@@ -64,4 +66,6 @@ pub trait AsyncShardWriterProvider {
     async fn delete(&self, id: ShardId) -> NodeResult<()>;
 
     async fn upgrade(&self, id: ShardId) -> NodeResult<ShardCleaned>;
+
+    fn get_metadata(&self, id: ShardId) -> Option<Arc<ShardMetadata>>;
 }

@@ -17,8 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import logging
 from copy import deepcopy
-from typing import TYPE_CHECKING, Dict, List, Optional, Set, Tuple, Union
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Optional, Union
 
 from google.protobuf.internal.containers import MessageMap
 from nucliadb_protos.noderesources_pb2 import IndexParagraph as BrainParagraph
@@ -47,8 +49,8 @@ from nucliadb_protos.utils_pb2 import (
 )
 
 from nucliadb.ingest import logger
-from nucliadb.ingest.orm.labels import BASE_TAGS, flat_resource_tags
 from nucliadb.ingest.orm.utils import compute_paragraph_key
+from nucliadb_models.labels import BASE_LABELS, flatten_resource_labels
 from nucliadb_models.metadata import ResourceProcessingStatus
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -56,7 +58,7 @@ if TYPE_CHECKING:  # pragma: no cover
 else:
     StatusValue = int
 
-FilePagePositions = Dict[int, Tuple[int, int]]
+FilePagePositions = dict[int, tuple[int, int]]
 
 
 METADATA_STATUS_PB_TYPE_TO_NAME_MAP = {
@@ -68,38 +70,55 @@ METADATA_STATUS_PB_TYPE_TO_NAME_MAP = {
 }
 
 
+@dataclass
+class ParagraphClassifications:
+    valid: dict[str, list[str]]
+    denied: dict[str, list[str]]
+
+
 class ResourceBrain:
     def __init__(self, rid: str):
         self.rid = rid
         ridobj = ResourceID(uuid=rid)
         self.brain: PBBrainResource = PBBrainResource(resource=ridobj)
-        self.tags: Dict[str, List[str]] = deepcopy(BASE_TAGS)
+        self.labels: dict[str, list[str]] = deepcopy(BASE_LABELS)
 
     def apply_field_text(self, field_key: str, text: str):
         self.brain.texts[field_key].text = text
+
+    def _get_paragraph_user_classifications(
+        self, basic_user_field_metadata: Optional[UserFieldMetadata]
+    ) -> ParagraphClassifications:
+        pc = ParagraphClassifications(valid={}, denied={})
+        if basic_user_field_metadata is None:
+            return pc
+        for annotated_paragraph in basic_user_field_metadata.paragraphs:
+            for classification in annotated_paragraph.classifications:
+                paragraph_key = compute_paragraph_key(self.rid, annotated_paragraph.key)
+                classif_label = f"/l/{classification.labelset}/{classification.label}"
+                if classification.cancelled_by_user:
+                    pc.denied.setdefault(paragraph_key, []).append(classif_label)
+                else:
+                    pc.valid.setdefault(paragraph_key, []).append(classif_label)
+        return pc
 
     def apply_field_metadata(
         self,
         field_key: str,
         metadata: FieldComputedMetadata,
-        replace_field: List[str],
-        replace_splits: Dict[str, List[str]],
+        replace_field: list[str],
+        replace_splits: dict[str, list[str]],
         page_positions: Optional[FilePagePositions],
         extracted_text: Optional[ExtractedText],
         basic_user_field_metadata: Optional[UserFieldMetadata] = None,
     ):
         # To check for duplicate paragraphs
-        unique_paragraphs: Set[str] = set()
+        unique_paragraphs: set[str] = set()
 
-        # Expose also user classes
-
-        if basic_user_field_metadata is not None:
-            paragraphs = {
-                compute_paragraph_key(self.rid, paragraph.key): paragraph
-                for paragraph in basic_user_field_metadata.paragraphs
-            }
-        else:
-            paragraphs = {}
+        # Expose also user classifications
+        paragraph_classifications = self._get_paragraph_user_classifications(
+            basic_user_field_metadata
+        )
 
         # We should set paragraphs and labels
         for subfield, metadata_split in metadata.split_metadata.items():
@@ -107,13 +126,7 @@ class ResourceBrain:
             for index, paragraph in enumerate(metadata_split.paragraphs):
                 key = f"{self.rid}/{field_key}/{subfield}/{paragraph.start}-{paragraph.end}"
 
-                denied_classifications = []
-                if key in paragraphs:
-                    denied_classifications = [
-                        f"/l/{classification.labelset}/{classification.label}"
-                        for classification in paragraphs[key].classifications
-                        if classification.cancelled_by_user is True
-                    ]
+                denied_classifications = paragraph_classifications.denied.get(key, [])
                 position = TextPosition(
                     index=index,
                     start=paragraph.start,
@@ -144,18 +157,14 @@ class ResourceBrain:
                     if label not in denied_classifications:
                         p.labels.append(label)
 
+                # Add user annotated labels to paragraphs
+                extend_unique(p.labels, paragraph_classifications.valid.get(key, []))  # type: ignore
+
                 self.brain.paragraphs[field_key].paragraphs[key].CopyFrom(p)
 
         for index, paragraph in enumerate(metadata.metadata.paragraphs):
             key = f"{self.rid}/{field_key}/{paragraph.start}-{paragraph.end}"
-            denied_classifications = []
-            if key in paragraphs:
-                denied_classifications = [
-                    f"/l/{classification.labelset}/{classification.label}"
-                    for classification in paragraphs[key].classifications
-                    if classification.cancelled_by_user is True
-                ]
-
+            denied_classifications = paragraph_classifications.denied.get(key, [])
             position = TextPosition(
                 index=index,
                 start=paragraph.start,
@@ -179,6 +188,9 @@ class ResourceBrain:
                 label = f"/l/{classification.labelset}/{classification.label}"
                 if label not in denied_classifications:
                     p.labels.append(label)
+
+            # Add user annotated labels to paragraphs
+            extend_unique(p.labels, paragraph_classifications.valid.get(key, []))  # type: ignore
 
             self.brain.paragraphs[field_key].paragraphs[key].CopyFrom(p)
 
@@ -232,7 +244,7 @@ class ResourceBrain:
         field_key: str,
         vo: VectorObject,
         replace_field: bool,
-        replace_splits: List[str],
+        replace_splits: list[str],
     ):
         for subfield, vectors in vo.split_vectors.items():
             # For each split of this field
@@ -325,31 +337,39 @@ class ResourceBrain:
             return "EMPTY"
         return METADATA_STATUS_PB_TYPE_TO_NAME_MAP[metadata.status]
 
-    def set_global_tags(self, basic: Basic, uuid: str, origin: Optional[Origin]):
-        if basic.HasField("created"):
-            self.brain.metadata.created.CopyFrom(basic.created)
-        if basic.HasField("modified"):
-            self.brain.metadata.modified.CopyFrom(basic.modified)
-        elif basic.HasField("created"):
-            # if no modified field, use created field
-            self.brain.metadata.modified.CopyFrom(basic.created)
+    def set_resource_metadata(self, basic: Basic, origin: Optional[Origin]):
+        self._set_resource_dates(basic, origin)
+        self._set_resource_labels(basic, origin)
+        self._set_resource_relations(basic, origin)
 
+    def _set_resource_dates(self, basic: Basic, origin: Optional[Origin]):
+        if basic.created.seconds > 0:
+            self.brain.metadata.created.CopyFrom(basic.created)
+        else:
+            logging.warning(f"Basic metadata has no created field for {self.rid}")
+            self.brain.metadata.created.GetCurrentTime()
+        if basic.modified.seconds > 0:
+            self.brain.metadata.modified.CopyFrom(basic.modified)
+        else:
+            if basic.created.seconds > 0:
+                self.brain.metadata.modified.CopyFrom(basic.created)
+            else:
+                self.brain.metadata.modified.GetCurrentTime()
+
+        if origin is not None:
+            # overwrite created/modified if provided on origin
+            if origin.HasField("created") and origin.created.seconds > 0:
+                self.brain.metadata.created.CopyFrom(origin.created)
+            if origin.HasField("modified") and origin.modified.seconds > 0:
+                self.brain.metadata.modified.CopyFrom(origin.modified)
+
+    def _set_resource_relations(self, basic: Basic, origin: Optional[Origin]):
         relationnodedocument = RelationNode(
-            value=uuid, ntype=RelationNode.NodeType.RESOURCE
+            value=self.rid, ntype=RelationNode.NodeType.RESOURCE
         )
         if origin is not None:
-            if origin.source_id:
-                self.tags["o"] = [origin.source_id]
-            # origin tags
-            for tag in origin.tags:
-                self.tags["t"].append(tag)
-            # origin source
-            if origin.source_id != "":
-                self.tags["u"].append(f"s/{origin.source_id}")
-
             # origin contributors
             for contrib in origin.colaborators:
-                self.tags["u"].append(f"o/{contrib}")
                 relationnodeuser = RelationNode(
                     value=contrib, ntype=RelationNode.NodeType.USER
                 )
@@ -361,30 +381,8 @@ class ResourceBrain:
                     )
                 )
 
-            # overwrite created/modified if provided on origin
-            if origin.HasField("created") and origin.created.seconds > 0:
-                self.brain.metadata.created.CopyFrom(origin.created)
-            if origin.HasField("modified") and origin.modified.seconds > 0:
-                self.brain.metadata.modified.CopyFrom(origin.modified)
-
-        # icon
-        self.tags["n"].append(f"i/{basic.icon}")
-
-        # processing status
-        status_tag = self.get_processing_status_tag(basic.metadata)
-        self.tags["n"].append(f"s/{status_tag}")
-
-        # main language
-        if basic.metadata.language != "":
-            self.tags["s"].append(f"p/{basic.metadata.language}")
-
-        # all language
-        for lang in basic.metadata.languages:
-            self.tags["s"].append(f"s/{lang}")
-
         # labels
         for classification in basic.usermetadata.classifications:
-            self.tags["l"].append(f"{classification.labelset}/{classification.label}")
             relation_node_label = RelationNode(
                 value=f"{classification.labelset}/{classification.label}",
                 ntype=RelationNode.NodeType.LABEL,
@@ -400,20 +398,57 @@ class ResourceBrain:
         # relations
         self.brain.relations.extend(basic.usermetadata.relations)
 
-        self.compute_tags()
+    def _set_resource_labels(self, basic: Basic, origin: Optional[Origin]):
+        if origin is not None:
+            if origin.source_id:
+                self.labels["o"] = [origin.source_id]
+            # origin tags
+            for tag in origin.tags:
+                self.labels["t"].append(tag)
+            # origin source
+            if origin.source_id != "":
+                self.labels["u"].append(f"s/{origin.source_id}")
 
-    def process_meta(
+            # origin contributors
+            for contrib in origin.colaborators:
+                self.labels["u"].append(f"o/{contrib}")
+
+            for key, value in origin.metadata.items():
+                self.labels["m"].append(f"{key[:255]}/{value[:255]}")
+
+        # icon
+        self.labels["n"].append(f"i/{basic.icon}")
+
+        # processing status
+        status_tag = self.get_processing_status_tag(basic.metadata)
+        self.labels["n"].append(f"s/{status_tag}")
+
+        # main language
+        if basic.metadata.language:
+            self.labels["s"].append(f"p/{basic.metadata.language}")
+
+        # all language
+        for lang in basic.metadata.languages:
+            self.labels["s"].append(f"s/{lang}")
+
+        # labels
+        for classification in basic.usermetadata.classifications:
+            self.labels["l"].append(f"{classification.labelset}/{classification.label}")
+
+        self.compute_labels()
+
+    def process_field_metadata(
         self,
         field_key: str,
         metadata: FieldMetadata,
-        tags: Dict[str, List[str]],
+        labels: dict[str, list[str]],
         relation_node_document: RelationNode,
-        user_canceled_labels: List[str],
+        user_canceled_labels: list[str],
     ):
         for classification in metadata.classifications:
             label = f"{classification.labelset}/{classification.label}"
             if label not in user_canceled_labels:
-                tags["l"].append(label)
+                labels["l"].append(label)
                 relation_node_label = RelationNode(
                     value=label,
                     ntype=RelationNode.NodeType.LABEL,
@@ -427,7 +462,7 @@ class ResourceBrain:
                 )
 
         for klass_entity, _ in metadata.positions.items():
-            tags["e"].append(klass_entity)
+            labels["e"].append(klass_entity)
             entity_array = klass_entity.split("/")
             if len(entity_array) == 1:
                 raise AttributeError(f"Entity should be with type {klass_entity}")
@@ -448,10 +483,10 @@ class ResourceBrain:
         # all field keywords
         if field:
             for keyword in field.keywords:
-                self.tags["f"].append(f"{field_key}/{keyword.value}")
-                self.tags["fg"].append(keyword.value)
+                self.labels["f"].append(f"{field_key}/{keyword.value}")
+                self.labels["fg"].append(keyword.value)
 
-    def apply_field_tags_globally(
+    def apply_field_labels(
         self,
         field_key: str,
         metadata: Optional[FieldComputedMetadata],
@@ -471,16 +506,20 @@ class ResourceBrain:
         relation_node_resource = RelationNode(
             value=uuid, ntype=RelationNode.NodeType.RESOURCE
         )
-        tags: Dict[str, List[str]] = {"l": [], "e": []}
+        labels: dict[str, list[str]] = {"l": [], "e": []}
         if metadata is not None:
             for meta in metadata.split_metadata.values():
-                self.process_meta(
-                    field_key, meta, tags, relation_node_resource, user_canceled_labels
+                self.process_field_metadata(
+                    field_key,
+                    meta,
+                    labels,
+                    relation_node_resource,
+                    user_canceled_labels,
                 )
-            self.process_meta(
+            self.process_field_metadata(
                 field_key,
                 metadata.metadata,
-                tags,
+                labels,
                 relation_node_resource,
                 user_canceled_labels,
             )
@@ -488,7 +527,7 @@ class ResourceBrain:
         if basic_user_fieldmetadata is not None:
             for token in basic_user_fieldmetadata.token:
                 if token.cancelled_by_user is False:
-                    tags["e"].append(f"{token.klass}/{token.token}")
+                    labels["e"].append(f"{token.klass}/{token.token}")
                     relation_node_entity = RelationNode(
                         value=token.token,
                         ntype=RelationNode.NodeType.ENTITY,
@@ -503,15 +542,25 @@ class ResourceBrain:
             for paragraph_annotation in basic_user_fieldmetadata.paragraphs:
                 for classification in paragraph_annotation.classifications:
                     if not classification.cancelled_by_user:
-                        self.brain.paragraphs[field_key].paragraphs[
-                            paragraph_annotation.key
-                        ].labels.append(
-                            f"/l/{classification.labelset}/{classification.label}"
-                        )
-        self.brain.texts[field_key].labels.extend(flat_resource_tags(tags))
+                        label = f"/l/{classification.labelset}/{classification.label}"
+                        # FIXME: this condition avoid adding duplicate labels
+                        # while importing a kb. We shouldn't add duplicates on
+                        # the first place
+                        if (
+                            label
+                            not in self.brain.paragraphs[field_key]
+                            .paragraphs[paragraph_annotation.key]
+                            .labels
+                        ):
+                            self.brain.paragraphs[field_key].paragraphs[
+                                paragraph_annotation.key
+                            ].labels.append(label)
+        extend_unique(
+            self.brain.texts[field_key].labels, flatten_resource_labels(labels)  # type: ignore
+        )
 
-    def compute_tags(self):
-        self.brain.labels.extend(flat_resource_tags(self.tags))
+    def compute_labels(self):
+        extend_unique(self.brain.labels, flatten_resource_labels(self.labels))
 
 
 def get_paragraph_text(
@@ -527,7 +576,7 @@ def get_paragraph_text(
 def is_paragraph_repeated_in_field(
     paragraph: Paragraph,
     extracted_text: Optional[ExtractedText],
-    unique_paragraphs: Set[str],
+    unique_paragraphs: set[str],
     split: Optional[str] = None,
 ) -> bool:
     if extracted_text is None:
@@ -557,3 +606,12 @@ def get_page_number(start_index: int, page_positions: FilePagePositions) -> int:
             return int(page_number)
     logger.error("Could not found a page")
     return int(page_number)
+
+
+def extend_unique(a: list, b: list):
+    """
+    Prevents extending with duplicate elements
+    """
+    for item in b:
+        if item not in a:
+            a.append(item)

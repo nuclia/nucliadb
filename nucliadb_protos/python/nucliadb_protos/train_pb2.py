@@ -58,7 +58,6 @@ _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'nucliadb_protos.train_pb2', _globals)
 if _descriptor._USE_C_DESCRIPTORS == False:
-
   DESCRIPTOR._options = None
   _TRAINMETADATA_ENTITIESENTRY._options = None
   _TRAINMETADATA_ENTITIESENTRY._serialized_options = b'8\001'

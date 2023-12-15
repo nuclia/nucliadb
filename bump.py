@@ -30,8 +30,11 @@ def run(args):
         bug += 1
 
     version = f"{major}.{minor}.{bug}{version_post}"
+    # rust does not like `.` in post but python requires is
+    python_version = version.replace("-", ".")
+
     with open("VERSION", "w") as f:
-        f.write(version)
+        f.write(python_version)
 
     # replace node binding toml version as well
     with open("nucliadb_node_binding/Cargo.toml", "r") as f:
@@ -60,7 +63,7 @@ def run(args):
                 if line.startswith("nucliadb-") and (
                     "=" not in line and ">" not in line and "~" not in line
                 ):
-                    line = f"{line}>={version}"
+                    line = f"{line}>={python_version}"
                 req_lines.append(line)
 
         with open(req_filepath, "w") as f:

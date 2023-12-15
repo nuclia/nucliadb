@@ -38,50 +38,52 @@ logger = logging.getLogger(__name__)
 
 images.settings["nucliadb_node_reader"] = {
     "image": "eu.gcr.io/stashify-218417/node",
-    "version": "main",
+    "version": "latest",
     "env": {
         "HOST_KEY_PATH": "/data/node.key",
         "DATA_PATH": "/data",
         "READER_LISTEN_ADDRESS": "0.0.0.0:4445",
-        "NUCLIADB_DISABLE_TELEMETRY": "True",
+        "NUCLIADB_DISABLE_ANALYTICS": "True",
         "LAZY_LOADING": "true",
         "RUST_BACKTRACE": "full",
-        "RUST_LOG": "nucliadb_node=DEBUG,nucliadb_vectors=DEBUG,nucliadb_fields_tantivy=DEBUG,nucliadb_paragraphs_tantivy=DEBUG",  # noqa
+        "DEBUG": "1",
+        "RUST_LOG": "nucliadb_*=DEBUG",
     },
     "options": {
         "command": [
             "/usr/local/bin/node_reader",
         ],
         "ports": {"4445": None},
-        "mem_limit": "2g",  # default is 1g, need to override
+        "mem_limit": "3g",  # default is 1g, need to override
         "platform": "linux/amd64",
     },
 }
 
 images.settings["nucliadb_node_writer"] = {
     "image": "eu.gcr.io/stashify-218417/node",
-    "version": "main",
+    "version": "latest",
     "env": {
         "HOST_KEY_PATH": "/data/node.key",
         "DATA_PATH": "/data",
         "WRITER_LISTEN_ADDRESS": "0.0.0.0:4446",
-        "NUCLIADB_DISABLE_TELEMETRY": "True",
+        "NUCLIADB_DISABLE_ANALYTICS": "True",
         "RUST_BACKTRACE": "full",
-        "RUST_LOG": "nucliadb_node=DEBUG,nucliadb_vectors=DEBUG,nucliadb_fields_tantivy=DEBUG,nucliadb_paragraphs_tantivy=DEBUG",  # noqa
+        "DEBUG": "1",
+        "RUST_LOG": "nucliadb_*=DEBUG",
     },
     "options": {
         "command": [
             "/usr/local/bin/node_writer",
         ],
         "ports": {"4446": None},
-        "mem_limit": "2g",  # default is 1g, need to override
+        "mem_limit": "3g",  # default is 1g, need to override
         "platform": "linux/amd64",
     },
 }
 
 images.settings["nucliadb_node_sidecar"] = {
     "image": "eu.gcr.io/stashify-218417/node_sidecar",
-    "version": "main",
+    "version": "latest",
     "env": {
         "INDEX_JETSTREAM_SERVERS": "[]",
         "CACHE_PUBSUB_NATS_URL": "",
@@ -287,6 +289,14 @@ class _NodeRunner:
         return self.data
 
     def stop(self):
+        container_ids = [
+            nucliadb_node_1_reader.container_obj.id,
+            nucliadb_node_1_writer.container_obj.id,
+            nucliadb_node_1_sidecar.container_obj.id,
+            nucliadb_node_2_writer.container_obj.id,
+            nucliadb_node_2_reader.container_obj.id,
+            nucliadb_node_2_sidecar.container_obj.id,
+        ]
         nucliadb_node_1_reader.stop()
         nucliadb_node_1_writer.stop()
         nucliadb_node_1_sidecar.stop()
@@ -294,17 +304,10 @@ class _NodeRunner:
         nucliadb_node_2_reader.stop()
         nucliadb_node_2_sidecar.stop()
 
-        for container in (
-            nucliadb_node_1_reader,
-            nucliadb_node_1_writer,
-            nucliadb_node_2_reader,
-            nucliadb_node_2_writer,
-            nucliadb_node_2_sidecar,
-            nucliadb_node_2_sidecar,
-        ):
+        for container_id in container_ids:
             for i in range(5):
                 try:
-                    self.docker_client.containers.get(container.container_obj.id)  # type: ignore
+                    self.docker_client.containers.get(container_id)  # type: ignore
                 except docker.errors.NotFound:
                     break
                 time.sleep(2)
@@ -322,14 +325,9 @@ class _NodeRunner:
             self.data["writer1_internal_host"]: self.data["reader1"]["port"],
             self.data["writer2_internal_host"]: self.data["reader2"]["port"],
         }
-        cluster_settings.sidecar_port_map = {
-            self.data["writer1_internal_host"]: self.data["sidecar1"]["port"],
-            self.data["writer2_internal_host"]: self.data["sidecar2"]["port"],
-        }
 
         cluster_settings.node_writer_port = None  # type: ignore
         cluster_settings.node_reader_port = None  # type: ignore
-        cluster_settings.node_sidecar_port = None  # type: ignore
 
         cluster_settings.cluster_discovery_mode = "manual"
         cluster_settings.cluster_discovery_manual_addresses = [

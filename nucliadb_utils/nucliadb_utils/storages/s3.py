@@ -33,7 +33,8 @@ from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_utils import logger
 from nucliadb_utils.storages.storage import Storage, StorageField
 
-MIN_UPLOAD_SIZE = 5 * 1024 * 1024
+MB = 1024 * 1024
+MIN_UPLOAD_SIZE = 5 * MB
 CHUNK_SIZE = MIN_UPLOAD_SIZE
 MAX_TRIES = 3
 
@@ -113,10 +114,11 @@ class S3StorageField(StorageField):
             logger.warning("Could not abort multipart upload", exc_info=True)
 
     async def start(self, cf: CloudFile) -> CloudFile:
-        if self.field is not None and self.field.upload_uri is not None:
+        if self.field is not None and self.field.upload_uri != "":
             # Field has already a file beeing uploaded, cancel
             await self._abort_multipart()
-        elif self.field is not None and self.field.uri is not None:
+
+        if self.field is not None and self.field.uri != "":
             # If exist the file copy the old url to delete
             field = CloudFile(
                 filename=cf.filename,
@@ -167,7 +169,7 @@ class S3StorageField(StorageField):
         async for chunk in iterable:
             size += len(chunk)
             upload_chunk += chunk
-            if len(upload_chunk) >= CHUNK_SIZE:
+            if len(upload_chunk) >= MIN_UPLOAD_SIZE:
                 part = await self._upload_part(cf, upload_chunk)
                 self.field.parts.append(part["ETag"])
                 self.field.offset += 1
@@ -208,7 +210,7 @@ class S3StorageField(StorageField):
                 )
                 logger.warning("Error deleting object", exc_info=True)
 
-        if self.field.resumable_uri is not None:
+        if self.field.resumable_uri != "":
             await self._complete_multipart_upload()
 
         self.field.uri = self.key
@@ -246,10 +248,10 @@ class S3StorageField(StorageField):
 
         key = None
         bucket = None
-        if self.field is not None and self.field.uri is not None:
+        if self.field is not None and self.field.uri != "":
             key = self.field.uri
             bucket = self.field.bucket_name
-        elif self.key is not None:
+        elif self.key != "":
             key = self.key
             bucket = self.bucket
         else:
@@ -312,6 +314,7 @@ class S3Storage(Storage):
         region_name: Optional[str] = None,
         max_pool_connections: int = 30,
         bucket: Optional[str] = None,
+        bucket_tags: Optional[dict[str, str]] = None,
     ):
         self.source = CloudFile.S3
         self.deadletter_bucket = deadletter_bucket
@@ -325,6 +328,8 @@ class S3Storage(Storage):
             self._bucket_creation_options = {
                 "CreateBucketConfiguration": {"LocationConstraint": self._region_name}
             }
+
+        self._bucket_tags = bucket_tags
 
         self.opts = dict(
             aws_secret_access_key=self._aws_secret_key,
@@ -356,12 +361,23 @@ class S3Storage(Storage):
         self._s3aioclient = await self._exit_stack.enter_async_context(
             session.create_client("s3", **self.opts)
         )
+        for bucket in (self.deadletter_bucket, self.indexing_bucket):
+            if bucket is not None:
+                await self._create_bucket_if_not_exists(bucket)
+
+    async def _create_bucket_if_not_exists(self, bucket_name: str) -> bool:
+        created = False
+        bucket_exists = await self.bucket_exists(bucket_name)
+        if not bucket_exists:
+            created = True
+            await self.create_bucket(bucket_name)
+        return created
 
     async def finalize(self):
         await self._exit_stack.__aexit__(None, None, None)
 
     async def delete_upload(self, uri: str, bucket: str):
-        if uri is not None:
+        if uri:
             try:
                 await self._s3aioclient.delete_object(Bucket=bucket, Key=uri)
             except botocore.exceptions.ClientError:
@@ -380,25 +396,13 @@ class S3Storage(Storage):
 
     async def create_kb(self, kbid: str):
         bucket_name = self.get_bucket_name(kbid)
-        missing = False
-        created = False
-        try:
-            res = await self._s3aioclient.head_bucket(Bucket=bucket_name)
-            if res["ResponseMetadata"]["HTTPStatusCode"] == 404:
-                missing = True
-        except botocore.exceptions.ClientError as e:
-            error_code = int(e.response["Error"]["Code"])
-            if error_code == 404:
-                missing = True
-            else:
-                raise
+        return await self._create_bucket_if_not_exists(bucket_name)
 
-        if missing:
-            await self._s3aioclient.create_bucket(
-                Bucket=bucket_name, **self._bucket_creation_options
-            )
-            created = True
-        return created
+    async def bucket_exists(self, bucket_name: str) -> bool:
+        return await bucket_exists(self._s3aioclient, bucket_name)
+
+    async def create_bucket(self, bucket_name: str):
+        await create_bucket(self._s3aioclient, bucket_name, self._bucket_tags)
 
     async def schedule_delete_kb(self, kbid: str):
         bucket_name = self.get_bucket_name(kbid)
@@ -446,3 +450,35 @@ class S3Storage(Storage):
                 if error_code in (200, 204):
                     deleted = True
         return deleted, conflict
+
+
+async def bucket_exists(client: AioSession, bucket_name: str) -> bool:
+    exists = True
+    try:
+        res = await client.head_bucket(Bucket=bucket_name)
+        if res["ResponseMetadata"]["HTTPStatusCode"] == 404:
+            exists = False
+    except botocore.exceptions.ClientError as e:
+        error_code = int(e.response["Error"]["Code"])
+        if error_code == 404:
+            exists = False
+    return exists
+
+
+async def create_bucket(
+    client: AioSession, bucket_name: str, bucket_tags: Optional[dict[str, str]] = None
+):
+    # Create the bucket
+    await client.create_bucket(Bucket=bucket_name)
+
+    if bucket_tags is not None and len(bucket_tags) > 0:
+        # Set bucket tags
+        await client.put_bucket_tagging(
+            Bucket=bucket_name,
+            Tagging={
+                "TagSet": [
+                    {"Key": tag_key, "Value": tag_value}
+                    for tag_key, tag_value in bucket_tags.items()
+                ]
+            },
+        )

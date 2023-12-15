@@ -22,17 +22,17 @@ use std::sync::Arc;
 
 use nucliadb_core::protos::node_writer_server::NodeWriter;
 use nucliadb_core::protos::{
-    op_status, DeleteGraphNodes, EmptyQuery, EmptyResponse, NewShardRequest, NewVectorSetRequest,
-    NodeMetadata, OpStatus, Resource, ResourceId, SetGraph, ShardCleaned, ShardCreated, ShardId,
-    ShardIds, VectorSetId, VectorSetList,
+    garbage_collector_response, op_status, EmptyQuery, GarbageCollectorResponse, NewShardRequest,
+    NewVectorSetRequest, NodeMetadata, OpStatus, Resource, ResourceId, ShardCleaned, ShardCreated,
+    ShardId, ShardIds, VectorSetId, VectorSetList,
 };
 use nucliadb_core::tracing::{self, Span, *};
-use nucliadb_core::NodeResult;
-use nucliadb_telemetry::payload::TelemetryEvent;
-use nucliadb_telemetry::sync::send_telemetry_event;
+use nucliadb_core::{Channel, NodeResult};
 use tokio::sync::mpsc::UnboundedSender;
 use tonic::{Request, Response, Status};
 
+use crate::analytics::payload::AnalyticsEvent;
+use crate::analytics::sync::send_analytics_event;
 use crate::settings::Settings;
 use crate::shards::errors::ShardNotFoundError;
 use crate::shards::metadata::ShardMetadata;
@@ -45,7 +45,7 @@ use crate::utils::list_shards;
 pub struct NodeWriterGRPCDriver {
     shards: Arc<AsyncUnboundedShardWriterCache>,
     sender: Option<UnboundedSender<NodeWriterEvent>>,
-    settings: Arc<Settings>,
+    settings: Settings,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -55,7 +55,7 @@ pub enum NodeWriterEvent {
 }
 
 impl NodeWriterGRPCDriver {
-    pub fn new(settings: Arc<Settings>, shard_cache: Arc<AsyncUnboundedShardWriterCache>) -> Self {
+    pub fn new(settings: Settings, shard_cache: Arc<AsyncUnboundedShardWriterCache>) -> Self {
         Self {
             settings,
             shards: shard_cache,
@@ -108,9 +108,17 @@ impl NodeWriter for NodeWriterGRPCDriver {
         &self,
         request: Request<NewShardRequest>,
     ) -> Result<Response<ShardCreated>, Status> {
-        send_telemetry_event(TelemetryEvent::Create).await;
+        send_analytics_event(AnalyticsEvent::Create).await;
         let request = request.into_inner();
-        let metadata = ShardMetadata::from(request);
+        let kbid = request.kbid.clone();
+        let shard_id = uuid::Uuid::new_v4().to_string();
+        let metadata = ShardMetadata::new(
+            self.shards.shards_path.join(shard_id.clone()),
+            shard_id,
+            Some(kbid),
+            request.similarity().into(),
+            Some(Channel::from(request.release_channel)),
+        );
         let new_shard = self.shards.create(metadata).await;
         match new_shard {
             Ok(new_shard) => {
@@ -128,7 +136,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
     }
 
     async fn delete_shard(&self, request: Request<ShardId>) -> Result<Response<ShardId>, Status> {
-        send_telemetry_event(TelemetryEvent::Delete).await;
+        send_analytics_event(AnalyticsEvent::Delete).await;
         // Deletion does not require for the shard to be loaded.
         let shard_id = request.into_inner();
         let deleted = self.shards.delete(shard_id.id.clone()).await;
@@ -248,71 +256,6 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
     }
 
-    async fn join_graph(&self, request: Request<SetGraph>) -> Result<Response<OpStatus>, Status> {
-        let span = Span::current();
-        let request = request.into_inner();
-        let shard_id = match request.shard_id {
-            Some(ref shard_id) => &shard_id.id,
-            None => return Err(tonic::Status::invalid_argument("Shard ID must be provided")),
-        };
-        let graph = match request.graph {
-            Some(graph) => graph,
-            None => return Err(tonic::Status::invalid_argument("Shard ID must be provided")),
-        };
-        let shard = self.obtain_shard(shard_id).await?;
-        let info = info_span!(parent: &span, "join graph");
-        let task = || {
-            run_with_telemetry(info, move || {
-                shard
-                    .join_relations_graph(&graph)
-                    .and_then(|()| shard.get_opstatus())
-            })
-        };
-        let status = tokio::task::spawn_blocking(task).await.map_err(|error| {
-            tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
-        })?;
-        match status {
-            Ok(mut status) => {
-                status.status = 0;
-                status.detail = "Success!".to_string();
-                Ok(tonic::Response::new(status))
-            }
-            Err(error) => Err(tonic::Status::internal(error.to_string())),
-        }
-    }
-
-    async fn delete_relation_nodes(
-        &self,
-        request: Request<DeleteGraphNodes>,
-    ) -> Result<Response<OpStatus>, Status> {
-        let span = Span::current();
-        let request = request.into_inner();
-        let shard_id = match request.shard_id {
-            Some(ref shard_id) => &shard_id.id,
-            None => return Err(tonic::Status::invalid_argument("Shard ID must be provided")),
-        };
-        let shard = self.obtain_shard(shard_id).await?;
-        let info = info_span!(parent: &span, "delete relations nodes");
-        let task = || {
-            run_with_telemetry(info, move || {
-                shard
-                    .delete_relation_nodes(&request)
-                    .and_then(|()| shard.get_opstatus())
-            })
-        };
-        let status = tokio::task::spawn_blocking(task).await.map_err(|error| {
-            tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
-        })?;
-        match status {
-            Ok(mut status) => {
-                status.status = 0;
-                status.detail = "Success!".to_string();
-                Ok(tonic::Response::new(status))
-            }
-            Err(error) => Err(tonic::Status::internal(error.to_string())),
-        }
-    }
-
     async fn add_vector_set(
         &self,
         request: Request<NewVectorSetRequest>,
@@ -414,15 +357,19 @@ impl NodeWriter for NodeWriterGRPCDriver {
         &self,
         _request: Request<EmptyQuery>,
     ) -> Result<Response<NodeMetadata>, Status> {
-        let metadata = crate::node_metadata::NodeMetadata::new().await;
+        let metadata_settings = self.settings.clone();
+        let metadata = crate::node_metadata::NodeMetadata::new(metadata_settings).await;
         match metadata {
             Ok(metadata) => Ok(tonic::Response::new(metadata.into())),
             Err(error) => Err(tonic::Status::internal(error.to_string())),
         }
     }
 
-    async fn gc(&self, request: Request<ShardId>) -> Result<Response<EmptyResponse>, Status> {
-        send_telemetry_event(TelemetryEvent::GarbageCollect).await;
+    async fn gc(
+        &self,
+        request: Request<ShardId>,
+    ) -> Result<Response<GarbageCollectorResponse>, Status> {
+        send_analytics_event(AnalyticsEvent::GarbageCollect).await;
         let shard_id = request.into_inner();
         let shard = self.obtain_shard(&shard_id.id).await?;
         let span = Span::current();
@@ -432,7 +379,9 @@ impl NodeWriter for NodeWriterGRPCDriver {
             tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
         })?;
         match result {
-            Ok(()) => Ok(tonic::Response::new(EmptyResponse {})),
+            Ok(status) => Ok(tonic::Response::new(GarbageCollectorResponse {
+                status: garbage_collector_response::Status::from(status) as i32,
+            })),
             Err(error) => Err(tonic::Status::internal(error.to_string())),
         }
     }

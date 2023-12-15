@@ -19,7 +19,9 @@
 import asyncio
 import base64
 import enum
+import inspect
 import io
+import json
 from typing import (
     Any,
     AsyncGenerator,
@@ -90,6 +92,7 @@ class ChatResponse(BaseModel):
     answer: str
     relations: Optional[Relations]
     learning_id: Optional[str]
+    citations: dict[str, Any] = {}
 
 
 RawRequestContent = Union[str, bytes, Iterable[bytes], AsyncIterable[bytes]]
@@ -111,12 +114,19 @@ def chat_response_parser(response: httpx.Response) -> ChatResponse:
     relations_result = None
     if len(relations_payload) > 0:
         relations_result = Relations.parse_raw(base64.b64decode(relations_payload))
-
+    try:
+        answer, tail = answer.split(b"_CIT_")
+        citations_length = int.from_bytes(tail[:4], byteorder="big", signed=False)
+        citations_bytes = tail[4 : 4 + citations_length]
+        citations = json.loads(base64.b64decode(citations_bytes).decode())
+    except ValueError:
+        citations = {}
     return ChatResponse(
         result=find_result,
         answer=answer.decode("utf-8"),
         relations=relations_result,
         learning_id=learning_id,
+        citations=citations,
     )
 
 
@@ -146,7 +156,8 @@ def is_raw_request_content(content: Any) -> bool:
     return (
         isinstance(content, str)
         or isinstance(content, bytes)
-        or (isinstance(content, Iterable) and not isinstance(content, (list, tuple)))
+        or inspect.isgenerator(content)
+        or inspect.isasyncgen(content)
     )
 
 
@@ -167,7 +178,9 @@ def _request_builder(
     stream_response: bool = False,
     docstring: Optional[docstrings.Docstring] = None,
 ):
-    def _func(self: "NucliaDB", content: Optional[Any] = None, **kwargs):
+    def _func(
+        self: "NucliaDB | NucliaDBAsync", content: Optional[Any] = None, **kwargs
+    ):
         path_data = {}
         for param in path_params:
             if param not in kwargs:
@@ -213,7 +226,7 @@ def _request_builder(
 
                 return _wrapped_resp()
             else:
-                return _parse_response(response_type, resp)
+                return _parse_response(response_type, resp)  # type: ignore
         else:
             resp = self._stream_request(
                 path, method, data=data, query_params=query_params
@@ -271,6 +284,7 @@ class _NucliaDBBase:
         method: str,
         data: Optional[Union[str, bytes]] = None,
         query_params: Optional[Dict[str, str]] = None,
+        content: Optional[RawRequestContent] = None,
     ):
         raise NotImplementedError
 
@@ -416,6 +430,44 @@ class _NucliaDBBase:
         docstring=docstrings.LIST_RESOURCES,
     )
 
+    # reindex/reprocess
+    reindex_resource = _request_builder(
+        name="reindex_resource",
+        path_template="/v1/kb/{kbid}/resource/{rid}/reindex",
+        method="POST",
+        path_params=("kbid", "rid"),
+        request_type=None,
+        response_type=None,
+        docstring=docstrings.REINDEX_RESOURCE,
+    )
+    reindex_resource_by_slug = _request_builder(
+        name="reindex_resource_by_slug",
+        path_template="/v1/kb/{kbid}/slug/{slug}/reindex",
+        method="POST",
+        path_params=("kbid", "slug"),
+        request_type=None,
+        response_type=None,
+        docstring=docstrings.REINDEX_RESOURCE_BY_SLUG,
+    )
+    reprocess_resource = _request_builder(
+        name="reprocess_resource",
+        path_template="/v1/kb/{kbid}/resource/{rid}/reprocess",
+        method="POST",
+        path_params=("kbid", "rid"),
+        request_type=None,
+        response_type=None,
+        docstring=docstrings.REPROCESS_RESOURCE,
+    )
+    reprocess_resource_by_slug = _request_builder(
+        name="reprocess_resource_by_slug",
+        path_template="/v1/kb/{kbid}/slug/{slug}/reprocess",
+        method="POST",
+        path_params=("kbid", "slug"),
+        request_type=None,
+        response_type=None,
+        docstring=docstrings.REPROCESS_RESOURCE_BY_SLUG,
+    )
+
     # Conversation endpoints
     add_conversation_message = _request_builder(
         name="add_conversation_message",
@@ -430,7 +482,7 @@ class _NucliaDBBase:
     set_configuration = _request_builder(
         name="set_configuration",
         path_template="/v1/kb/{kbid}/configuration",
-        method="POST",
+        method="PATCH",
         path_params=("kbid",),
         request_type=KBConfiguration,
         response_type=None,
@@ -496,7 +548,6 @@ class _NucliaDBBase:
         request_type=CreateEntitiesGroupPayload,
         response_type=None,
     )
-
     update_entitygroup = _request_builder(
         name="update_entitygroup",
         path_template="/v1/kb/{kbid}/entitiesgroup/{group}",
@@ -542,7 +593,7 @@ class _NucliaDBBase:
     delete_vectorset = _request_builder(
         name="delete_vectorset",
         path_template="/v1/kb/{kbid}/vectorset/{vectorset}",
-        method="POST",
+        method="DELETE",
         path_params=("kbid", "vectorset"),
         request_type=None,
         response_type=None,
@@ -716,12 +767,14 @@ class NucliaDB(_NucliaDBBase):
     ):
         url = f"{self.base_url}{path}"
         opts: Dict[str, Any] = {}
+        if all([data, content]):
+            raise ValueError("Cannot provide both data and content")
         if data is not None:
-            opts["data"] = data
-        if query_params is not None:
-            opts["params"] = query_params
+            opts["content"] = data
         if content is not None:
             opts["content"] = content
+        if query_params is not None:
+            opts["params"] = query_params
         response: httpx.Response = getattr(self.session, method.lower())(url, **opts)
         return self._check_response(response)
 
@@ -740,7 +793,9 @@ class NucliaDB(_NucliaDBBase):
             opts["params"] = query_params
 
         def iter_bytes(chunk_size=None) -> Iterator[bytes]:
-            with self.session.stream(method.lower(), url=url, **opts) as response:
+            with self.session.stream(
+                method.lower(), url=url, **opts, timeout=30.0
+            ) as response:
                 self._check_response(response)
                 for chunk in response.iter_raw(chunk_size=chunk_size):
                     yield chunk
@@ -804,18 +859,22 @@ class NucliaDBAsync(_NucliaDBBase):
         method: str,
         data: Optional[Union[str, bytes]] = None,
         query_params: Optional[Dict[str, str]] = None,
+        content: Optional[RawRequestContent] = None,
     ):
         url = f"{self.base_url}{path}"
         opts: Dict[str, Any] = {}
+        if all([data, content]):
+            raise ValueError("Cannot provide both data and content")
         if data is not None:
-            opts["data"] = data
+            opts["content"] = data
+        if content is not None:
+            opts["content"] = content
         if query_params is not None:
             opts["params"] = query_params
         response: httpx.Response = await getattr(self.session, method.lower())(
             url, **opts
         )
-        self._check_response(response)
-        return response
+        return self._check_response(response)
 
     def _stream_request(
         self,

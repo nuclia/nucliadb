@@ -62,3 +62,11 @@ class SequenceOrderViolation(Exception):
 
 class EntitiesGroupNotFound(NotFound):
     pass
+
+
+class NoHealthyNodeAvailable(Exception):
+    pass
+
+
+class NodeConnectionError(Exception):
+    pass

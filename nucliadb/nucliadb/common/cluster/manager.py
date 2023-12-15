@@ -23,7 +23,9 @@ import random
 import uuid
 from typing import Any, Awaitable, Callable, Optional
 
+import backoff
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata  # type: ignore
+from nucliadb_protos.nodewriter_pb2 import IndexMessage, IndexMessageSource, TypeMessage
 
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.exceptions import (
@@ -31,6 +33,7 @@ from nucliadb.common.cluster.exceptions import (
     NodeClusterSmall,
     NodeError,
     NodesUnsync,
+    NoHealthyNodeAvailable,
     ShardNotFound,
     ShardsNotFound,
 )
@@ -57,18 +60,28 @@ from .standalone.utils import get_self, get_standalone_node_id
 logger = logging.getLogger(__name__)
 
 INDEX_NODES: dict[str, AbstractIndexNode] = {}
+READ_REPLICA_INDEX_NODES: dict[str, set[str]] = {}
 
 
 def get_index_nodes() -> list[AbstractIndexNode]:
-    return list(INDEX_NODES.values())
+    return [inode for inode in INDEX_NODES.values() if inode.primary_id is None]
 
 
 def get_index_node(node_id: str) -> Optional[AbstractIndexNode]:
     return INDEX_NODES.get(node_id)
 
 
+def get_read_replica_node_ids(node_id: str) -> list[str]:
+    return list(READ_REPLICA_INDEX_NODES.get(node_id, set()))
+
+
 def add_index_node(
-    *, id: str, address: str, shard_count: int, dummy: bool = False
+    *,
+    id: str,
+    address: str,
+    shard_count: int,
+    dummy: bool = False,
+    primary_id: Optional[str] = None,
 ) -> AbstractIndexNode:
     if settings.standalone_mode:
         if id == get_standalone_node_id():
@@ -78,13 +91,26 @@ def add_index_node(
                 id=id, address=address, shard_count=shard_count, dummy=dummy
             )
     else:
-        node = IndexNode(id=id, address=address, shard_count=shard_count, dummy=dummy)  # type: ignore
+        node = IndexNode(  # type: ignore
+            id=id,
+            address=address,
+            shard_count=shard_count,
+            dummy=dummy,
+            primary_id=primary_id,
+        )
     INDEX_NODES[id] = node
+    if primary_id is not None:
+        if primary_id not in READ_REPLICA_INDEX_NODES:
+            READ_REPLICA_INDEX_NODES[primary_id] = set()
+        READ_REPLICA_INDEX_NODES[primary_id].add(id)
     return node
 
 
-def remove_index_node(node_id: str) -> None:
+def remove_index_node(node_id: str, primary_id: Optional[str] = None) -> None:
     INDEX_NODES.pop(node_id, None)
+    if primary_id is not None and primary_id in READ_REPLICA_INDEX_NODES:
+        if node_id in READ_REPLICA_INDEX_NODES[primary_id]:
+            READ_REPLICA_INDEX_NODES[primary_id].remove(node_id)
 
 
 class KBShardManager:
@@ -251,7 +277,8 @@ class KBShardManager:
                 except Exception as rollback_error:
                     errors.capture_exception(rollback_error)
                     logger.error(
-                        f"New shard rollback error. Node: {node_id} Shard: {replica_id}"
+                        f"New shard rollback error. Node: {node_id} Shard: {replica_id}",
+                        exc_info=True,
                     )
 
     def indexing_replicas(self, shard: writer_pb2.ShardObject) -> list[tuple[str, str]]:
@@ -297,6 +324,7 @@ class KBShardManager:
         partition: str,
         kb: str,
         reindex_id: Optional[str] = None,
+        source: IndexMessageSource.ValueType = IndexMessageSource.PROCESSOR,
     ) -> None:
         if txid == -1 and reindex_id is None:
             # This means we are injecting a complete resource via ingest gRPC
@@ -306,16 +334,25 @@ class KBShardManager:
         storage = await get_storage()
         indexing = get_indexing()
 
-        indexpb: nodewriter_pb2.IndexMessage
+        indexpb = IndexMessage()
 
         if reindex_id is not None:
-            indexpb = await storage.reindexing(
+            storage_key = await storage.reindexing(
                 resource, reindex_id, partition, kb=kb, logical_shard=shard.shard
             )
+            indexpb.reindex_id = reindex_id
         else:
-            indexpb = await storage.indexing(
+            storage_key = await storage.indexing(
                 resource, txid, partition, kb=kb, logical_shard=shard.shard
             )
+            indexpb.txid = txid
+
+        indexpb.typemessage = TypeMessage.CREATION
+        indexpb.storage_key = storage_key
+        indexpb.kbid = kb
+        if partition:
+            indexpb.partition = partition
+        indexpb.source = source
 
         for replica_id, node_id in self.indexing_replicas(shard):
             indexpb.node = node_id
@@ -386,6 +423,7 @@ class StandaloneKBShardManager(KBShardManager):
             )
             await index_node.writer.GC(noderesources_pb2.ShardId(id=shard_id))  # type: ignore
 
+    @backoff.on_exception(backoff.expo, NodesUnsync, max_tries=5)
     async def delete_resource(
         self,
         shard: writer_pb2.ShardObject,
@@ -400,15 +438,18 @@ class StandaloneKBShardManager(KBShardManager):
         for shardreplica in shard.replicas:
             req.shard_id = shardreplica.shard.id
             index_node = get_index_node(shardreplica.node)
+            if index_node is None:  # pragma: no cover
+                raise NodesUnsync(
+                    f"Node {shardreplica.node} is not found or not available"
+                )
             await index_node.writer.RemoveResource(req)  # type: ignore
-
-        if index_node is not None:
             asyncio.create_task(
                 self._resource_change_event(
                     kb, shardreplica.node, shardreplica.shard.id
                 )
             )
 
+    @backoff.on_exception(backoff.expo, NodesUnsync, max_tries=5)
     async def add_resource(
         self,
         shard: writer_pb2.ShardObject,
@@ -417,6 +458,7 @@ class StandaloneKBShardManager(KBShardManager):
         partition: str,
         kb: str,
         reindex_id: Optional[str] = None,
+        source: IndexMessageSource.ValueType = IndexMessageSource.PROCESSOR,
     ) -> None:
         index_node = None
         for shardreplica in shard.replicas:
@@ -427,8 +469,6 @@ class StandaloneKBShardManager(KBShardManager):
                     f"Node {shardreplica.node} is not found or not available"
                 )
             await index_node.writer.SetResource(resource)  # type: ignore
-
-        if index_node is not None:
             asyncio.create_task(
                 self._resource_change_event(
                     kb, shardreplica.node, shardreplica.shard.id
@@ -437,31 +477,45 @@ class StandaloneKBShardManager(KBShardManager):
 
 
 def choose_node(
-    shard: writer_pb2.ShardObject, target_replicas: Optional[list[str]] = None
+    shard: writer_pb2.ShardObject,
+    target_replicas: Optional[list[str]] = None,
+    read_only: bool = False,
 ) -> tuple[AbstractIndexNode, str, str]:
     """
-    Choose an arbitrary node storing `shard`. If passed, attempt to choose only between
-    nodes containing any of `target_replicas`.
+    Choose an arbitrary node storing `shard`.
     """
-    target_replicas = target_replicas or []
+    preferred_nodes = []
+    backend_nodes = []
+    for shardreplica in shard.replicas:
+        node_id = shardreplica.node
+        replica_id = shardreplica.shard.id
 
-    shuffled_replicas = [(x.shard.id, x.node) for x in shard.replicas]
-    random.shuffle(shuffled_replicas)
-
-    head_nodes = []
-    tail_nodes = []
-    for replica_id, node_id in shuffled_replicas:
-        if replica_id in target_replicas:
-            head_nodes.append((replica_id, node_id))
-        else:
-            tail_nodes.append((replica_id, node_id))
-
-    for replica_id, node_id in head_nodes + tail_nodes:
         node = get_index_node(node_id)
         if node is not None:
-            return node, replica_id, node_id
+            if target_replicas and replica_id in target_replicas:
+                preferred_nodes.append((replica_id, node))
+            else:
+                backend_nodes.append((replica_id, node))
 
-    raise KeyError("Could not find a node to query")
+        if read_only:
+            for read_replica_node_id in get_read_replica_node_ids(node_id):
+                read_replica_node = get_index_node(read_replica_node_id)
+                if read_replica_node is None:
+                    continue
+                if target_replicas and replica_id in target_replicas:
+                    preferred_nodes.append((replica_id, read_replica_node))
+                else:
+                    backend_nodes.append((replica_id, read_replica_node))
+
+    if len(preferred_nodes) == 0 and len(backend_nodes) == 0:
+        raise NoHealthyNodeAvailable("Could not find a node to query")
+
+    selected_node: AbstractIndexNode
+    if len(preferred_nodes) > 0:
+        replica_id, selected_node = random.choice(preferred_nodes)
+    else:
+        replica_id, selected_node = random.choice(backend_nodes)
+    return selected_node, replica_id, selected_node.id
 
 
 def check_enough_nodes():

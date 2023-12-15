@@ -41,21 +41,19 @@ class Settings(BaseSettings):
 
     node_writer_port: int = 10000
     node_reader_port: int = 10001
-    node_sidecar_port: int = 10002
 
     # Only for testing purposes
     writer_port_map: dict[str, int] = {}
     reader_port_map: dict[str, int] = {}
-    sidecar_port_map: dict[str, int] = {}
 
     # Node limits
     max_shard_paragraphs: int = Field(
-        default=1_000_000,
+        default=500_000,
         title="Max shard paragraphs",
         description="Maximum number of paragraphs to target per shard",
     )
     max_shard_fields: int = Field(
-        default=500_000,
+        default=250_000,
         title="Max shard fields",
         description="Maximum number of fields to target per shard. "
         "If this is reached before max_shard_paragraphs, we will create a new shard",
@@ -76,7 +74,7 @@ class Settings(BaseSettings):
 
     cluster_discovery_mode: ClusterDiscoveryMode = ClusterDiscoveryMode.KUBERNETES
     cluster_discovery_kubernetes_namespace: str = "nucliadb"
-    cluster_discovery_kubernetes_selector: str = "app.kubernetes.io/name=node"
+    cluster_discovery_kubernetes_selector: str = "appType=node"
     cluster_discovery_manual_addresses: list[str] = []
 
 

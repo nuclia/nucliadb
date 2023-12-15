@@ -101,7 +101,6 @@ jobs:
         with:
           command: sdist
           args: -m nucliadb_node_binding/Cargo.toml --out dist
-          rust-toolchain: stable
 
       - name: build wheels
         uses: messense/maturin-action@v1
@@ -113,7 +112,6 @@ jobs:
           manylinux: ${{ matrix.manylinux || 'auto' }}
           container: ${{ matrix.container }}
           args: -m nucliadb_node_binding/Cargo.toml --release --out dist --profile release-wheel --interpreter ${{ matrix.interpreter || '3.9 3.10 3.11' }}
-          rust-toolchain: stable
 
       - run: ${{ matrix.ls || 'ls -lh' }} dist/
 

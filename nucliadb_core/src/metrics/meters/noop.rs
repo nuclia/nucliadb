@@ -32,6 +32,6 @@ impl Meter for NoOpMeter {
     fn export(&self) -> NodeResult<String> {
         Ok(Default::default())
     }
-    fn record_replicated_bytes(&self, _value: replication::ReplicatedBytesValue) {}
-    fn record_replication_op(&self, _key: replication::ShardOpsKey) {}
+    fn record_replicated_bytes(&self, _value: u64) {}
+    fn record_replication_op(&self, _key: replication::ReplicationOpsKey) {}
 }

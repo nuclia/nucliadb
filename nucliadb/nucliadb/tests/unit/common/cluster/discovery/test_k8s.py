@@ -18,7 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+import time
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import kubernetes_asyncio.client.models.v1_container_status  # type: ignore
 import kubernetes_asyncio.client.models.v1_object_meta  # type: ignore
@@ -44,14 +45,19 @@ def writer_stub():
     with patch(
         "nucliadb.common.cluster.discovery.base.nodewriter_pb2_grpc.NodeWriterStub",
         return_value=writer_stub,
-    ), patch("nucliadb.common.cluster.discovery.base.get_traced_grpc_channel"):
+    ), patch(
+        "nucliadb.common.cluster.discovery.base.replication_pb2_grpc.ReplicationServiceStub",
+        return_value=writer_stub,
+    ), patch(
+        "nucliadb.common.cluster.discovery.base.get_traced_grpc_channel"
+    ):
         yield writer_stub
 
 
 @pytest.fixture()
 def k8s_discovery(writer_stub):
     disc = KubernetesDiscovery(Settings())
-    disc.cache_update_interval = 0.1
+    disc.node_heartbeat_interval = 0.1
     manager.INDEX_NODES.clear()
     yield disc
     manager.INDEX_NODES.clear()
@@ -79,7 +85,7 @@ def create_k8s_event(
                 pod_ip="1.2.3.4",
             ),
             metadata=kubernetes_asyncio.client.models.v1_object_meta.V1ObjectMeta(
-                name=name,
+                name=name, labels={"readReplica": "false"}
             ),
         ),
     }
@@ -87,18 +93,19 @@ def create_k8s_event(
 
 async def test_get_node_metadata(k8s_discovery: KubernetesDiscovery, writer_stub):
     assert await k8s_discovery.get_node_metadata(
-        "node-0", "1.1.1.1"
+        "node-0", "1.1.1.1", read_replica=False
     ) == IndexNodeMetadata(
         node_id="node_id",
         shard_count=1,
         name="node_id",
         address="1.1.1.1",
+        updated_at=ANY,
     )
 
     writer_stub.GetMetadata.assert_awaited_once()
 
     # should be cached now
-    await k8s_discovery.get_node_metadata("node-0", "1.1.1.1")
+    await k8s_discovery.get_node_metadata("node-0", "1.1.1.1", read_replica=False)
 
     assert len(writer_stub.GetMetadata.mock_calls) == 1
 
@@ -127,8 +134,32 @@ async def test_update_node_data_cache(k8s_discovery: KubernetesDiscovery, writer
 
     task = asyncio.create_task(k8s_discovery.update_node_data_cache())
 
-    await asyncio.sleep(k8s_discovery.cache_update_interval + 0.1)
+    await asyncio.sleep(k8s_discovery.node_heartbeat_interval + 0.1)
 
     task.cancel()
 
     assert len(writer_stub.GetMetadata.mock_calls) == 2
+
+
+async def test_remove_stale_nodes(k8s_discovery: KubernetesDiscovery):
+    manager.add_index_node(
+        id="node_id",
+        address="1.1.1.1",
+        shard_count=1,
+    )
+    nmd = IndexNodeMetadata(
+        node_id="node_id",
+        shard_count=1,
+        name="node_id",
+        address="1.1.1.1",
+        updated_at=time.time() - k8s_discovery.node_heartbeat_interval * 3,
+    )
+    k8s_discovery.node_id_cache["node_id"] = nmd
+
+    assert len(k8s_discovery.node_id_cache) == 1
+    assert len(manager.get_index_nodes()) == 1
+
+    k8s_discovery._maybe_remove_stale_node("node_id")
+
+    assert len(k8s_discovery.node_id_cache) == 0
+    assert len(manager.get_index_nodes()) == 0

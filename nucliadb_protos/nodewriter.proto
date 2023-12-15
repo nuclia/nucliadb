@@ -26,6 +26,11 @@ enum TypeMessage {
     DELETION = 1;
 }
 
+enum IndexMessageSource {
+    PROCESSOR = 0;
+    WRITER = 1;
+}
+
 message IndexMessage {
     string node = 1;
     string shard = 2;  // physical shard message is for
@@ -36,18 +41,16 @@ message IndexMessage {
     optional string partition = 7;
     string storage_key = 8;
     string kbid = 9;
+    IndexMessageSource source = 10;
 }
 
-message SetGraph {
-    noderesources.ShardId shard_id = 1;
-    utils.JoinGraph graph = 2;
+message GarbageCollectorResponse {
+    enum Status {
+        OK = 0;
+        TRY_LATER = 1;
+    }
+    Status status = 1;
 }
-
-message DeleteGraphNodes {
-    noderesources.ShardId shard_id = 2;
-    repeated utils.RelationNode nodes = 1;
-}
-
 
 message NewShardRequest {
     utils.VectorSimilarity similarity = 1;
@@ -65,11 +68,9 @@ service NodeWriter {
     rpc CleanAndUpgradeShard(noderesources.ShardId) returns (noderesources.ShardCleaned) {}
     rpc DeleteShard(noderesources.ShardId) returns (noderesources.ShardId) {}
     rpc ListShards(noderesources.EmptyQuery) returns (noderesources.ShardIds) {}
-    rpc GC(noderesources.ShardId) returns (noderesources.EmptyResponse) {}
+    rpc GC(noderesources.ShardId) returns (GarbageCollectorResponse) {}
 
     rpc SetResource(noderesources.Resource) returns (OpStatus) {}
-    rpc DeleteRelationNodes(DeleteGraphNodes) returns (OpStatus) {}
-    rpc JoinGraph(SetGraph) returns (OpStatus) {}
     rpc RemoveResource(noderesources.ResourceID) returns (OpStatus) {}
 
     rpc AddVectorSet(NewVectorSetRequest) returns (OpStatus) {}  // New

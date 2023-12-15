@@ -160,6 +160,12 @@ impl WriterChild for ParagraphWriterService {
         // Should be called along with a lock at a higher level to be safe
         let mut meta_files = HashMap::new();
         let path = self.config.path.join("meta.json");
+        if !path.exists() {
+            return Ok(IndexFiles {
+                metadata_files: meta_files,
+                files: Vec::new(),
+            });
+        }
         meta_files.insert("paragraph/meta.json".to_string(), fs::read(path)?);
 
         let mut files = Vec::new();
@@ -488,7 +494,6 @@ mod tests {
             paragraphs,
             paragraphs_to_delete: vec![],
             sentences_to_delete: vec![],
-            relations_to_delete: vec![],
             relations: vec![],
             vectors: HashMap::default(),
             vectors_to_delete: HashMap::default(),

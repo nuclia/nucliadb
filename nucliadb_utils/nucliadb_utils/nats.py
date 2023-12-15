@@ -61,11 +61,12 @@ class MessageProgressUpdater:
         self.msg = msg
         self.timeout = timeout
 
-    async def __aenter__(self):
-        self._task = asyncio.create_task(self._progress())
-        return self
+    def start(self):
+        seqid = self.msg.reply.split(".")[5]
+        task_name = f"MessageProgressUpdater: {id(self)} (seqid={seqid})"
+        self._task = asyncio.create_task(self._progress(), name=task_name)
 
-    async def __aexit__(self, exc_type, exc_value, traceback):
+    async def end(self):
         self._task.cancel()
         try:
             await self._task
@@ -73,6 +74,13 @@ class MessageProgressUpdater:
             pass
         except Exception:  # pragma: no cover
             pass
+
+    async def __aenter__(self):
+        self.start()
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        await self.end()
 
     async def _progress(self):
         while True:
@@ -132,7 +140,7 @@ class NatsConnectionManager:
             "disconnected_cb": self.disconnected_cb,
         }
 
-        if self._nats_creds is not None:
+        if self._nats_creds:
             options["user_credentials"] = self._nats_creds
 
         if len(self._nats_servers) > 0:
@@ -207,6 +215,7 @@ class NatsConnectionManager:
         cb: Callable[[Msg], Awaitable[None]],
         subscription_lost_cb: Callable[[], Awaitable[None]],
         flow_control: bool = False,
+        manual_ack: bool = True,
         config: Optional[nats.js.api.ConsumerConfig] = None,
     ) -> Subscription:
         sub = await self.js.subscribe(
@@ -215,9 +224,25 @@ class NatsConnectionManager:
             stream=stream,
             cb=cb,
             flow_control=flow_control,
+            manual_ack=manual_ack,
             config=config,
         )
 
         self._subscriptions.append((sub, subscription_lost_cb))
 
         return sub
+
+    async def _remove_subscription(self, subscription: Subscription):
+        async with self._lock:
+            sub_index = None
+            for index, (sub, _) in enumerate(self._subscriptions):
+                if sub is not subscription:
+                    continue
+                sub_index = index
+                break
+            if sub_index is not None:
+                self._subscriptions.pop(sub_index)
+
+    async def unsubscribe(self, subscription: Subscription):
+        await subscription.unsubscribe()
+        await self._remove_subscription(subscription)

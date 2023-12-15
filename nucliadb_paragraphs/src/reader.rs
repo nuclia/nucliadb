@@ -159,7 +159,7 @@ impl ReaderChild for ParagraphReaderService {
             .faceted
             .as_ref()
             .iter()
-            .flat_map(|v| v.tags.iter())
+            .flat_map(|v| v.labels.iter())
             .filter(|s| ParagraphReaderService::is_valid_facet(s))
             .cloned()
             .collect();
@@ -494,30 +494,22 @@ mod tests {
     use super::*;
     use crate::writer::ParagraphWriterService;
 
-    fn create_resource(shard_id: String) -> Resource {
+    const DOC1_TI: &str = "This is the first document";
+    const DOC1_P1: &str = "This is the text of the second paragraph.";
+    const DOC1_P2: &str = "This should be enough to test the tantivy.";
+    const DOC1_P3: &str = "But I wanted to make it three anyway.";
+
+    fn create_resource(shard_id: String, timestamp: Timestamp) -> Resource {
         const UUID: &str = "f56c58ac-b4f9-4d61-a077-ffccaadd0001";
         let resource_id = ResourceId {
             shard_id: shard_id.to_string(),
             uuid: UUID.to_string(),
         };
 
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap();
-        let timestamp = Timestamp {
-            seconds: now.as_secs() as i64,
-            nanos: 0,
-        };
-
         let metadata = IndexMetadata {
             created: Some(timestamp.clone()),
             modified: Some(timestamp),
         };
-
-        const DOC1_TI: &str = "This is the first document";
-        const DOC1_P1: &str = "This is the text of the second paragraph.";
-        const DOC1_P2: &str = "This should be enough to test the tantivy.";
-        const DOC1_P3: &str = "But I wanted to make it three anyway.";
 
         let ti_title = TextInformation {
             text: DOC1_TI.to_string(),
@@ -627,7 +619,6 @@ mod tests {
             paragraphs,
             paragraphs_to_delete: vec![],
             sentences_to_delete: vec![],
-            relations_to_delete: vec![],
             relations: vec![],
             vectors: HashMap::default(),
             vectors_to_delete: HashMap::default(),
@@ -641,8 +632,14 @@ mod tests {
         let psc = ParagraphConfig {
             path: dir.path().join("paragraphs"),
         };
+        let seconds = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map(|t| t.as_secs() as i64)
+            .unwrap();
+        let timestamp = Timestamp { seconds, nanos: 0 };
+
         let mut paragraph_writer_service = ParagraphWriterService::start(&psc).unwrap();
-        let resource1 = create_resource("shard1".to_string());
+        let resource1 = create_resource("shard1".to_string(), timestamp);
         let _ = paragraph_writer_service.set_resource(&resource1);
         let paragraph_reader_service = ParagraphReaderService::start(&psc).unwrap();
 
@@ -694,8 +691,14 @@ mod tests {
         let psc = ParagraphConfig {
             path: dir.path().join("paragraphs"),
         };
+        let seconds = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map(|t| t.as_secs() as i64)
+            .unwrap();
+        let timestamp = Timestamp { seconds, nanos: 0 };
+
         let mut paragraph_writer_service = ParagraphWriterService::start(&psc).unwrap();
-        let resource1 = create_resource("shard1".to_string());
+        let resource1 = create_resource("shard1".to_string(), timestamp);
         let _ = paragraph_writer_service.set_resource(&resource1);
 
         let paragraph_reader_service = ParagraphReaderService::start(&psc).unwrap();
@@ -711,41 +714,21 @@ mod tests {
         // Testing filtering one filter from resource, one from field and one from paragraph
 
         let filter = Filter {
-            tags: vec![
+            field_labels: vec![
                 "/l/mylabel_resource".to_string(),
                 "/c/ool".to_string(),
                 "/e/mylabel".to_string(),
             ],
+            paragraph_labels: vec![],
         };
 
         let faceted = Faceted {
-            tags: vec![
+            labels: vec![
                 "".to_string(),
                 "/l".to_string(),
                 "/e".to_string(),
                 "/c".to_string(),
             ],
-        };
-
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap();
-
-        let timestamp = Timestamp {
-            seconds: now.as_secs() as i64,
-            nanos: 0,
-        };
-
-        let old_timestamp = Timestamp {
-            seconds: 0_i64,
-            nanos: 0,
-        };
-
-        let timestamps = Timestamps {
-            from_modified: Some(old_timestamp.clone()),
-            to_modified: Some(timestamp.clone()),
-            from_created: Some(old_timestamp),
-            to_created: Some(timestamp),
         };
 
         let order = OrderBy {
@@ -938,7 +921,7 @@ mod tests {
             order: Some(order),
             page_number: 0,
             result_per_page: 20,
-            timestamps: Some(timestamps.clone()),
+            timestamps: None,
             with_duplicates: false,
             only_faceted: false,
             ..Default::default()
@@ -955,7 +938,7 @@ mod tests {
             order: None, // Some(order),
             page_number: 0,
             result_per_page: 20,
-            timestamps: Some(timestamps),
+            timestamps: None,
             with_duplicates: false,
             only_faceted: false,
             ..Default::default()
@@ -990,6 +973,199 @@ mod tests {
         let iter = paragraph_reader_service.iterator(&request).unwrap();
         let count = iter.count();
         assert_eq!(count, 4);
+        Ok(())
+    }
+
+    #[test]
+    fn test_search_paragraph_with_timestamps() -> NodeResult<()> {
+        let dir = TempDir::new().unwrap();
+        let psc = ParagraphConfig {
+            path: dir.path().join("paragraphs"),
+        };
+        let time_baseline = Timestamp {
+            seconds: 2,
+            nanos: 0,
+        };
+
+        let mut paragraph_writer_service = ParagraphWriterService::start(&psc).unwrap();
+        let resource1 = create_resource("shard1".to_string(), time_baseline.clone());
+
+        let _ = paragraph_writer_service.set_resource(&resource1);
+
+        let paragraph_reader_service = ParagraphReaderService::start(&psc).unwrap();
+
+        let reader = paragraph_writer_service.index.reader()?;
+        let searcher = reader.searcher();
+
+        let (_top_docs, count) = searcher.search(&AllQuery, &(TopDocs::with_limit(10), Count))?;
+        assert_eq!(count, 4);
+
+        fn do_search(
+            paragraph_reader_service: &ParagraphReaderService,
+            timestamps: Timestamps,
+        ) -> i32 {
+            let search = ParagraphSearchRequest {
+                id: "shard1".to_string(),
+                uuid: "".to_string(),
+                body: "this is the".to_string(),
+                fields: vec![],
+                filter: None,
+                faceted: None,
+                order: None, // Some(order),
+                page_number: 0,
+                result_per_page: 20,
+                timestamps: Some(timestamps),
+                with_duplicates: false,
+                only_faceted: false,
+                ..Default::default()
+            };
+            let result = paragraph_reader_service.search(&search).unwrap();
+            result.total
+        }
+
+        let total = do_search(
+            &paragraph_reader_service,
+            Timestamps {
+                from_modified: Some(Timestamp {
+                    seconds: time_baseline.seconds - 1,
+                    nanos: time_baseline.nanos,
+                }),
+                to_modified: Some(Timestamp {
+                    seconds: time_baseline.seconds + 1,
+                    nanos: time_baseline.nanos,
+                }),
+                from_created: Some(Timestamp {
+                    seconds: time_baseline.seconds - 1,
+                    nanos: time_baseline.nanos,
+                }),
+                to_created: Some(Timestamp {
+                    seconds: time_baseline.seconds + 1,
+                    nanos: time_baseline.nanos,
+                }),
+            },
+        );
+        assert_eq!(total, 3);
+
+        // only from modified before, all matches
+        let total = do_search(
+            &paragraph_reader_service,
+            Timestamps {
+                from_modified: Some(Timestamp {
+                    seconds: time_baseline.seconds - 1,
+                    nanos: time_baseline.nanos,
+                }),
+                to_modified: None,
+                from_created: None,
+                to_created: None,
+            },
+        );
+        assert_eq!(total, 3);
+
+        // only from modified after, no matches
+        let total = do_search(
+            &paragraph_reader_service,
+            Timestamps {
+                from_modified: Some(Timestamp {
+                    seconds: time_baseline.seconds + 1,
+                    nanos: time_baseline.nanos,
+                }),
+                to_modified: None,
+                from_created: None,
+                to_created: None,
+            },
+        );
+        assert_eq!(total, 0);
+
+        // only to modified after, all matches
+        let total = do_search(
+            &paragraph_reader_service,
+            Timestamps {
+                from_modified: None,
+                to_modified: Some(Timestamp {
+                    seconds: time_baseline.seconds + 1,
+                    nanos: time_baseline.nanos,
+                }),
+                from_created: None,
+                to_created: None,
+            },
+        );
+        assert_eq!(total, 3);
+
+        // only to modified before, no matches
+        let total = do_search(
+            &paragraph_reader_service,
+            Timestamps {
+                from_modified: None,
+                to_modified: Some(Timestamp {
+                    seconds: time_baseline.seconds - 1,
+                    nanos: time_baseline.nanos,
+                }),
+                from_created: None,
+                to_created: None,
+            },
+        );
+        assert_eq!(total, 0);
+
+        // only from created before, all matches
+        let total = do_search(
+            &paragraph_reader_service,
+            Timestamps {
+                from_modified: None,
+                to_modified: None,
+                from_created: Some(Timestamp {
+                    seconds: time_baseline.seconds - 1,
+                    nanos: time_baseline.nanos,
+                }),
+                to_created: None,
+            },
+        );
+        assert_eq!(total, 3);
+
+        // only from created after, no matches
+        let total = do_search(
+            &paragraph_reader_service,
+            Timestamps {
+                from_modified: None,
+                to_modified: None,
+                from_created: Some(Timestamp {
+                    seconds: time_baseline.seconds + 1,
+                    nanos: time_baseline.nanos,
+                }),
+                to_created: None,
+            },
+        );
+        assert_eq!(total, 0);
+
+        // only to created after, all matches
+        let total = do_search(
+            &paragraph_reader_service,
+            Timestamps {
+                from_modified: None,
+                to_modified: None,
+                from_created: None,
+                to_created: Some(Timestamp {
+                    seconds: time_baseline.seconds + 1,
+                    nanos: time_baseline.nanos,
+                }),
+            },
+        );
+        assert_eq!(total, 3);
+
+        // only to created before, no matches
+        let total = do_search(
+            &paragraph_reader_service,
+            Timestamps {
+                from_modified: None,
+                to_modified: None,
+                from_created: None,
+                to_created: Some(Timestamp {
+                    seconds: time_baseline.seconds - 1,
+                    nanos: time_baseline.nanos,
+                }),
+            },
+        );
+        assert_eq!(total, 0);
+
         Ok(())
     }
 }

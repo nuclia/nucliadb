@@ -24,7 +24,7 @@ from nucliadb_protos.writer_pb2 import Shards as PBShards
 from nucliadb.common.maindb.local import LocalDriver
 from nucliadb.ingest.tests.fixtures import IngestFixture
 from nucliadb_protos import knowledgebox_pb2, utils_pb2, writer_pb2, writer_pb2_grpc
-from nucliadb_utils.keys import KB_SHARDS
+from nucliadb_utils.keys import KB_SHARDS, KB_UUID
 
 
 @pytest.mark.asyncio
@@ -68,13 +68,27 @@ async def test_create_knowledgebox(grpc_servicer: IngestFixture, maindb_driver):
     result = await stub.DeleteKnowledgeBox(pbid)  # type: ignore
 
 
-async def get_kb_similarity(txn, kbid) -> utils_pb2.VectorSimilarity.ValueType:
+async def get_kb_shards(txn, kbid) -> PBShards:
     kb_shards_key = KB_SHARDS.format(kbid=kbid)
     kb_shards_binary = await txn.get(kb_shards_key)
     assert kb_shards_binary, "Shards object not found!"
     kb_shards = PBShards()
     kb_shards.ParseFromString(kb_shards_binary)
-    return kb_shards.similarity
+    return kb_shards
+
+
+async def get_kb_config(txn, kbid) -> knowledgebox_pb2.KnowledgeBoxConfig:
+    key = KB_UUID.format(kbid=kbid)
+    binary = await txn.get(key)
+    assert binary, "Config object not found!"
+    config = knowledgebox_pb2.KnowledgeBoxConfig()
+    config.ParseFromString(binary)
+    return config
+
+
+async def get_kb_similarity(txn, kbid) -> utils_pb2.VectorSimilarity.ValueType:
+    shards = await get_kb_shards(txn, kbid)
+    return shards.similarity
 
 
 @pytest.mark.asyncio
@@ -140,3 +154,28 @@ async def test_delete_knowledgebox_handles_unexisting_kb(
     pbid = knowledgebox_pb2.KnowledgeBoxID(uuid="idonotexist", slug="meneither")
     result = await stub.DeleteKnowledgeBox(pbid)  # type: ignore
     assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "release_channel",
+    [utils_pb2.ReleaseChannel.EXPERIMENTAL, utils_pb2.ReleaseChannel.STABLE],
+)
+async def test_create_knowledgebox_release_channel(
+    grpc_servicer: IngestFixture,
+    release_channel,
+):
+    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)  # type: ignore
+    pb = knowledgebox_pb2.KnowledgeBoxNew(
+        slug="test-default", release_channel=release_channel
+    )
+    pb.config.title = "My Title"
+    result = await stub.NewKnowledgeBox(pb)  # type: ignore
+    assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
+    kbid = result.uuid
+
+    driver = grpc_servicer.servicer.driver
+    async with driver.transaction() as txn:
+        shards = await get_kb_shards(txn, kbid)
+        config = await get_kb_config(txn, kbid)
+        assert shards.release_channel == config.release_channel == release_channel

@@ -1,11 +1,12 @@
-import pytest
-import requests
+import base64
+import io
+import json
 import os
 import random
 import time
-import io
-import json
-import base64
+
+import pytest
+import requests
 
 BASE_URL = os.environ.get("NUCLIADB_URL", "http://localhost:8080")
 
@@ -19,7 +20,7 @@ def kbid():
         headers={"content-type": "application/json", "X-NUCLIADB-ROLES": "MANAGER"},
         json={"slug": slug, "zone": "local", "title": slug},
     )
-    resp.raise_for_status()
+    raise_for_status(resp)
     kbid = resp.json()["uuid"]
     print(f'Created KB with id "{kbid}", slug "{slug}"')
     return kbid
@@ -44,7 +45,7 @@ def resource_id(kbid: str):
         },
     )
 
-    resp.raise_for_status()
+    raise_for_status(resp)
     return resp.json()["uuid"]
 
 
@@ -53,7 +54,7 @@ def test_nodes_ready():
     while True:
         try:
             resp = requests.get(os.path.join(BASE_URL, "api/v1/cluster/nodes"))
-            resp.raise_for_status()
+            raise_for_status(resp)
             assert len(resp.json()) == 2
             return
         except Exception:
@@ -64,12 +65,23 @@ def test_nodes_ready():
             tries += 1
 
 
+def test_versions():
+    resp = requests.get(os.path.join(BASE_URL, "api/v1/versions"))
+    raise_for_status(resp)
+    data = resp.json()
+    print(f"Versions: {data}")
+    assert data["nucliadb"]["installed"]
+    assert "latest" in data["nucliadb"]
+    assert data["nucliadb-admin-assets"]["installed"]
+    assert "latest" in data["nucliadb-admin-assets"]
+
+
 def test_config_check(kbid: str):
     resp = requests.get(
         os.path.join(BASE_URL, f"api/v1/config-check"),
         headers={"X-NUCLIADB-ROLES": "READER"},
     )
-    resp.raise_for_status()
+    raise_for_status(resp)
     data = resp.json()
     assert data["nua_api_key"]["has_key"]
     assert data["nua_api_key"]["valid"]
@@ -87,7 +99,7 @@ def test_resource_processed(kbid: str, resource_id: str):
             },
         )
 
-        resp.raise_for_status()
+        raise_for_status(resp)
 
         if resp.json()["metadata"]["status"] == "PROCESSED":
             break
@@ -126,15 +138,118 @@ def test_search(kbid: str, resource_id: str):
         },
     )
 
-    resp.raise_for_status()
+    raise_for_status(resp)
 
-    data = io.BytesIO(resp.content)
-
-    toread_bytes = data.read(4)
-    toread = int.from_bytes(toread_bytes, byteorder="big")
-    raw_search_results = data.read(toread)
+    raw = io.BytesIO(resp.content)
+    toread_bytes = raw.read(4)
+    toread = int.from_bytes(toread_bytes, byteorder="big", signed=False)
+    print(f"toread: {toread}")
+    raw_search_results = raw.read(toread)
     search_results = json.loads(base64.b64decode(raw_search_results))
-    chat_response = data.read().decode("utf-8")
+    print(f"Search results: {search_results}")
 
-    assert "Not enough data to answer this" not in chat_response
+    data = raw.read()
+    try:
+        answer, relations_payload = data.split(b"_END_")
+    except ValueError:
+        answer = data
+        relations_payload = b""
+    if len(relations_payload) > 0:
+        decoded_relations_payload = base64.b64decode(relations_payload)
+        print(f"Relations payload: {decoded_relations_payload}")
+    try:
+        answer, tail = answer.split(b"_CIT_")
+        chat_answer = answer.decode("utf-8")
+        citations_length = int.from_bytes(tail[:4], byteorder="big", signed=False)
+        citations_bytes = tail[4: 4 + citations_length]
+        citations = json.loads(base64.b64decode(citations_bytes).decode())
+    except ValueError:
+        chat_answer = answer.decode("utf-8")
+        citations = {}
+    print(f"Answer: {chat_answer}")
+    print(f"Citations: {citations}")
+
+    assert "Not enough data to answer this" not in chat_answer
     assert len(search_results["resources"]) == 1
+
+
+def test_predict_proxy(kbid: str):
+    _test_predict_proxy_chat(kbid)
+    _test_predict_proxy_tokens(kbid)
+    _test_predict_proxy_rephrase(kbid)
+
+
+def _test_predict_proxy_chat(kbid: str):
+    resp = requests.post(
+        os.path.join(BASE_URL, f"api/v1/kb/{kbid}/predict/chat"),
+        headers={
+            "content-type": "application/json",
+            "X-NUCLIADB-ROLES": "READER",
+            "x-ndb-client": "web",
+        },
+        json={
+            "question": "Who is the best football player?",
+            "query_context": [
+                "Many football players have existed. Cristiano Ronaldo and Messi among them, but Messi is by far the greatest."
+            ],
+            "user_id": "someone@company.uk",
+        },
+    )
+    raise_for_status(resp)
+    data = io.BytesIO(resp.content)
+    answer = data.read().decode("utf-8")
+    print(f"Answer: {answer}")
+    assert "Messi" in answer
+
+
+def _test_predict_proxy_tokens(kbid: str):
+    resp = requests.get(
+        os.path.join(BASE_URL, f"api/v1/kb/{kbid}/predict/tokens"),
+        headers={
+            "content-type": "application/json",
+            "X-NUCLIADB-ROLES": "READER",
+            "x-ndb-client": "web",
+        },
+        params={
+            "text": "Barcelona",
+        },
+    )
+    raise_for_status(resp)
+    data = resp.json()
+    assert data["tokens"][0]["text"] == "Barcelona"
+
+
+def _test_predict_proxy_rephrase(kbid: str):
+    resp = requests.post(
+        os.path.join(BASE_URL, f"api/v1/kb/{kbid}/predict/rephrase"),
+        headers={
+            "content-type": "application/json",
+            "X-NUCLIADB-ROLES": "READER",
+            "x-ndb-client": "web",
+        },
+        json={
+            "question": "Who is the best one?",
+            "context": [
+                {
+                    "author": "NUCLIA",
+                    "text": "Many football players have existed. Cristiano Ronaldo and Messi among them.",
+                },
+                {"author": "USER", "text": "Tell me some football players"},
+            ],
+            "user_id": "someone@company.uk",
+        },
+    )
+    raise_for_status(resp)
+    rephrased_query = resp.json()
+    # Status code 0 means success...
+    assert rephrased_query.endswith("0")
+
+
+def raise_for_status(resp):
+    try:
+        resp.raise_for_status()
+    except Exception:
+        print("Error response")
+        print("Status code:", resp.status_code)
+        print(resp.text)
+        raise

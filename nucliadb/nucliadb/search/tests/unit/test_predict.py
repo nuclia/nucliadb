@@ -17,50 +17,39 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, Mock
 
+import aiohttp
 import pytest
+from nucliadb_protos.knowledgebox_pb2 import KBConfiguration
+from yarl import URL
 
 from nucliadb.search.predict import (
     DummyPredictEngine,
     PredictEngine,
     PredictVectorMissing,
+    ProxiedPredictAPIError,
     RephraseError,
     RephraseMissingContextError,
     SendToPredictError,
     _parse_rephrase_response,
+    get_answer_generator,
 )
+from nucliadb.tests.utils.aiohttp_session import get_mocked_session
 from nucliadb_models.search import (
     AskDocumentModel,
     ChatModel,
     FeedbackRequest,
     FeedbackTasks,
     RephraseModel,
+    SummarizedResource,
+    SummarizedResponse,
+    SummarizeModel,
+    SummarizeResourceModel,
 )
 from nucliadb_utils.exceptions import LimitsExceededError
-
-
-def get_mocked_session(
-    http_method: str, status: int, text=None, json=None, read=None, context_manager=True
-):
-    response = Mock(status=status)
-    if text is not None:
-        response.text = AsyncMock(return_value=text)
-    if json is not None:
-        response.json = AsyncMock(return_value=json)
-    if read is not None:
-        response.read = AsyncMock(return_value=read)
-    if context_manager:
-        # For when async with self.session.post() as response: is called
-        session = Mock()
-        http_method_mock = AsyncMock(__aenter__=AsyncMock(return_value=response))
-        getattr(session, http_method.lower()).return_value = http_method_mock
-    else:
-        # For when await self.session.post() is called
-        session = AsyncMock()
-        getattr(session, http_method.lower()).return_value = response
-    return session
 
 
 @pytest.mark.asyncio
@@ -73,14 +62,16 @@ async def test_dummy_predict_engine():
     assert await pe.chat_query("kbid", Mock())
     assert await pe.convert_sentence_to_vector("kbid", "some sentence")
     assert await pe.detect_entities("kbid", "some sentence")
+    assert await pe.ask_document("kbid", "query", [["footext"]], "userid")
+    assert await pe.summarize("kbid", Mock(resources={}))
 
 
 @pytest.fixture(scope="function", autouse=True)
-def get_configuration():
-    with mock.patch(
-        "nucliadb.search.predict.PredictEngine.get_configuration", return_value=None
-    ):
-        yield
+def txn():
+    txn = mock.MagicMock()
+    txn.get = AsyncMock(return_value=None)
+    with mock.patch("nucliadb.search.predict.get_transaction", return_value=txn):
+        yield txn
 
 
 @pytest.mark.asyncio
@@ -141,8 +132,8 @@ async def test_convert_sentence_error(onprem):
         "service-account",
         onprem=onprem,
     )
-    pe.session = get_mocked_session("GET", 400, read="uops!", context_manager=False)
-    with pytest.raises(SendToPredictError):
+    pe.session = get_mocked_session("GET", 400, json="uops!", context_manager=False)
+    with pytest.raises(ProxiedPredictAPIError):
         await pe.convert_sentence_to_vector("kbid", "some sentence")
 
 
@@ -209,8 +200,8 @@ async def test_detect_entities_error(onprem):
         "service-account",
         onprem=onprem,
     )
-    pe.session = get_mocked_session("GET", 500, read="error", context_manager=False)
-    with pytest.raises(SendToPredictError):
+    pe.session = get_mocked_session("GET", 500, json="error", context_manager=False)
+    with pytest.raises(ProxiedPredictAPIError):
         await pe.detect_entities("kbid", "some sentence")
 
 
@@ -269,6 +260,7 @@ async def test_predict_engine_handles_limits_exceeded_error(
         ("convert_sentence_to_vector", ["kbid", "sentence"], False, []),
         ("detect_entities", ["kbid", "sentence"], False, []),
         ("ask_document", ["kbid", "query", [["footext"]], "userid"], True, None),
+        ("summarize", ["kbid", Mock(resources={})], True, None),
     ],
 )
 async def test_onprem_nuclia_service_account_not_configured(
@@ -393,3 +385,105 @@ async def test_parse_rephrase_response(content, exception):
             await _parse_rephrase_response(resp)
     else:
         assert await _parse_rephrase_response(resp) == content.rstrip("0")
+
+
+async def test_check_response_error():
+    response = aiohttp.ClientResponse(
+        "GET",
+        URL("http://predict:8080/api/v1/chat"),
+        writer=None,
+        continue100=Mock(),
+        timer=Mock(),
+        request_info=Mock(),
+        traces=[],
+        loop=Mock(),
+        session=Mock(),
+    )
+    response.status = 503
+    response._body = b"some error"
+    response._headers = {"Content-Type": "text/plain; charset=utf-8"}
+
+    with pytest.raises(ProxiedPredictAPIError) as ex:
+        await PredictEngine().check_response(response, expected_status=200)
+    assert ex.value.status == 503
+    assert ex.value.detail == "some error"
+
+
+async def test_summarize():
+    pe = PredictEngine(
+        "cluster",
+        "public-{zone}",
+        zone="europe1",
+        onprem=False,
+    )
+
+    summarized = SummarizedResponse(
+        resources={"r1": SummarizedResource(summary="resource summary", tokens=10)}
+    )
+    pe.session = get_mocked_session(
+        "POST", 200, json=summarized.dict(), context_manager=False
+    )
+
+    item = SummarizeModel(
+        resources={"r1": SummarizeResourceModel(fields={"f1": "field extracted text"})}
+    )
+    summarize_response = await pe.summarize("kbid", item)
+
+    assert summarize_response == summarized
+
+    pe.session.post.assert_awaited_once_with(
+        url="cluster/api/internal/predict/summarize",
+        json=item.dict(),
+        headers={"X-STF-KBID": "kbid"},
+        timeout=None,
+    )
+
+
+@pytest.mark.parametrize("onprem", [True, False])
+async def test_get_predict_headers(onprem, txn):
+    kb_config = KBConfiguration(
+        semantic_model="foo",
+        generative_model="bar",
+        ner_model="baz",
+        anonymization_model="qux",
+        visual_labeling="quux",
+    )
+    txn.get.return_value = kb_config.SerializeToString()
+
+    nua_service_account = "nua-service-account"
+    pe = PredictEngine(
+        "cluster",
+        "public-{zone}",
+        zone="europe1",
+        onprem=onprem,
+        nuclia_service_account=nua_service_account,
+    )
+    predict_headers = await pe.get_predict_headers("kbid")
+    if onprem:
+        assert predict_headers["X-STF-NUAKEY"] == f"Bearer {pe.nuclia_service_account}"
+        assert predict_headers["X-STF-SEMANTIC-MODEL"] == kb_config.semantic_model
+        assert predict_headers["X-STF-GENERATIVE-MODEL"] == kb_config.generative_model
+        assert predict_headers["X-STF-NER-MODEL"] == kb_config.ner_model
+        assert (
+            predict_headers["X-STF-ANONYMIZATION-MODEL"]
+            == kb_config.anonymization_model
+        )
+        assert predict_headers["X-STF-VISUAL-LABELING"] == kb_config.visual_labeling
+    else:
+        assert predict_headers == {"X-STF-KBID": "kbid"}
+
+
+async def test_get_answer_generator():
+    async def _iter_chunks():
+        await asyncio.sleep(0.1)
+        # Chunk, end_of_chunk
+        yield b"foo", False
+        yield b"bar", True
+        yield b"baz", True
+
+    resp = Mock()
+    resp.content.iter_chunks = Mock(return_value=_iter_chunks())
+    get_answer_generator(resp)
+
+    answer_chunks = [chunk async for chunk in get_answer_generator(resp)]
+    assert answer_chunks == [b"foobar", b"baz"]

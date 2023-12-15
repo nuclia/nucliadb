@@ -21,15 +21,18 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use async_std::sync::RwLock;
 use async_trait::async_trait;
 use nucliadb_core::tracing::{debug, error};
 use nucliadb_core::{node_error, Context, NodeResult};
+use tokio::sync::RwLock;
 
+use crate::disk_structure;
+use crate::settings::Settings;
+use crate::shards::errors::ShardNotFoundError;
+use crate::shards::metadata::ShardMetadata;
 use crate::shards::providers::AsyncShardReaderProvider;
 use crate::shards::reader::ShardReader;
 use crate::shards::ShardId;
-use crate::{disk_structure, env};
 
 #[derive(Default)]
 pub struct AsyncUnboundedShardReaderCache {
@@ -38,7 +41,7 @@ pub struct AsyncUnboundedShardReaderCache {
 }
 
 impl AsyncUnboundedShardReaderCache {
-    pub fn new(shards_path: PathBuf) -> Self {
+    pub fn new(settings: Settings) -> Self {
         Self {
             // NOTE: we use max shards per node as initial capacity to avoid
             // hashmap resizing, as it would block the current thread while
@@ -46,8 +49,8 @@ impl AsyncUnboundedShardReaderCache {
             //
             // REVIEW: if resize don't take more than 10µs, it's acceptable
             // (blocking in tokio means CPU bound during 10-100µs)
-            cache: RwLock::new(HashMap::with_capacity(env::max_shards_per_node())),
-            shards_path,
+            cache: RwLock::new(HashMap::with_capacity(settings.max_shards_per_node())),
+            shards_path: settings.shards_path(),
         }
     }
 }
@@ -67,8 +70,10 @@ impl AsyncShardReaderProvider for AsyncUnboundedShardReaderCache {
         // writes to disk)
         let id_ = id.clone();
         let shard = tokio::task::spawn_blocking(move || {
-            if !shard_path.is_dir() {
-                return Err(node_error!("Shard {shard_path:?} is not on disk"));
+            if !ShardMetadata::exists(shard_path.clone()) {
+                return Err(node_error!(ShardNotFoundError(
+                    "Shard {shard_path:?} is not on disk"
+                )));
             }
             ShardReader::new(id.clone(), &shard_path).map_err(|error| {
                 node_error!("Shard {shard_path:?} could not be loaded from disk: {error:?}")
@@ -83,7 +88,7 @@ impl AsyncShardReaderProvider for AsyncUnboundedShardReaderCache {
     }
 
     async fn load_all(&self) -> NodeResult<()> {
-        let shards_path = env::shards_path();
+        let shards_path = self.shards_path.clone();
         let mut shards = tokio::task::spawn_blocking(move || -> NodeResult<_> {
             let mut shards = HashMap::new();
             for entry in std::fs::read_dir(&shards_path)? {

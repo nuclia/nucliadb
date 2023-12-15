@@ -21,6 +21,7 @@
 pub mod fs_state;
 pub mod metrics;
 pub mod paragraphs;
+pub mod query_planner;
 pub mod relations;
 pub mod texts;
 pub mod vectors;
@@ -131,6 +132,7 @@ pub fn encapsulate_writer<T>(writer: T) -> Arc<RwLock<T>> {
     Arc::new(RwLock::new(writer))
 }
 
+#[derive(Debug)]
 pub struct IndexFiles {
     pub metadata_files: HashMap<String, Vec<u8>>,
     pub files: Vec<String>,

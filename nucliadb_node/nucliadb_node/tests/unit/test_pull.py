@@ -26,7 +26,9 @@ import pytest
 from nats.aio.client import Msg
 from nucliadb_protos.nodewriter_pb2 import IndexMessage, TypeMessage
 
-from nucliadb_node.pull import IndexedPublisher, ShardManager, Worker
+from nucliadb_node.listeners import IndexedPublisher
+from nucliadb_node.listeners.gc_scheduler import ShardManager
+from nucliadb_node.pull import Worker
 from nucliadb_node.settings import settings
 from nucliadb_utils import const
 
@@ -34,7 +36,9 @@ from nucliadb_utils import const
 @pytest.fixture(autouse=True)
 def pubsub():
     pubsub = AsyncMock()
-    with mock.patch("nucliadb_node.pull.get_pubsub", return_value=pubsub):
+    with mock.patch(
+        "nucliadb_node.listeners.indexed_publisher.get_pubsub", return_value=pubsub
+    ):
         yield pubsub
 
 
@@ -145,21 +149,17 @@ class TestSubscriptionWorker:
             yield
         settings.data_path = previous
 
-    @pytest.fixture()
-    def nats_conn(self):
-        conn = MagicMock()
-        conn.jetstream.return_value = AsyncMock()
-        conn.drain = AsyncMock()
-        conn.close = AsyncMock()
-        with mock.patch("nucliadb_node.pull.nats.connect", return_value=conn):
-            yield conn
+    @pytest.fixture
+    def nats_manager(self):
+        return AsyncMock()
 
     @pytest.fixture(scope="function")
-    def worker(self, settings, nats_conn):
+    def worker(self, settings, nats_manager):
         writer = AsyncMock()
-        reader = AsyncMock()
-        with mock.patch("nucliadb_node.pull.get_storage"):
-            worker = Worker(writer, reader, "node")
+        with mock.patch("nucliadb_node.pull.get_storage"), mock.patch(
+            "nucliadb_node.indexer.get_storage"
+        ):
+            worker = Worker(writer, "node", nats_manager)
             worker.store_seqid = Mock()
             yield worker
 
@@ -169,23 +169,3 @@ class TestSubscriptionWorker:
         msg = Msg(client, "subject", reply)
         msg.ack = AsyncMock()
         return msg
-
-    @pytest.mark.asyncio
-    async def test_discards_old_messages(self, worker):
-        worker.last_seqid = 10
-        msg = self.get_msg(seqid=9)
-        await worker.subscription_worker(msg)
-
-        # The message is acked and ignored
-        msg.ack.assert_awaited_once()
-        worker.store_seqid.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_reconnected_cb(self, worker: Worker):
-        await worker.initialize()
-        try:
-            await worker.reconnected_cb()
-
-            assert worker.nc.jetstream().subscribe.call_count == 2
-        finally:
-            await worker.finalize()

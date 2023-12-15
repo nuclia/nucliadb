@@ -22,8 +22,6 @@ from nucliadb_protos.utils_pb2 import (
     DOT as DOT,
     EXPERIMENTAL as EXPERIMENTAL,
     ExtractedText as ExtractedText,
-    JoinGraph as JoinGraph,
-    JoinGraphEdge as JoinGraphEdge,
     Relation as Relation,
     RelationMetadata as RelationMetadata,
     RelationNode as RelationNode,
@@ -165,10 +163,12 @@ class ShardCreated(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         RELATION_V0: ShardCreated._RelationService.ValueType  # 0
         RELATION_V1: ShardCreated._RelationService.ValueType  # 1
+        RELATION_V2: ShardCreated._RelationService.ValueType  # 2
 
     class RelationService(_RelationService, metaclass=_RelationServiceEnumTypeWrapper): ...
     RELATION_V0: ShardCreated.RelationService.ValueType  # 0
     RELATION_V1: ShardCreated.RelationService.ValueType  # 1
+    RELATION_V2: ShardCreated.RelationService.ValueType  # 2
 
     ID_FIELD_NUMBER: builtins.int
     DOCUMENT_SERVICE_FIELD_NUMBER: builtins.int
@@ -623,7 +623,6 @@ class Resource(google.protobuf.message.Message):
     PARAGRAPHS_TO_DELETE_FIELD_NUMBER: builtins.int
     SENTENCES_TO_DELETE_FIELD_NUMBER: builtins.int
     RELATIONS_FIELD_NUMBER: builtins.int
-    RELATIONS_TO_DELETE_FIELD_NUMBER: builtins.int
     SHARD_ID_FIELD_NUMBER: builtins.int
     VECTORS_FIELD_NUMBER: builtins.int
     VECTORS_TO_DELETE_FIELD_NUMBER: builtins.int
@@ -656,8 +655,6 @@ class Resource(google.protobuf.message.Message):
     @property
     def relations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.Relation]:
         """Relations"""
-    @property
-    def relations_to_delete(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.Relation]: ...
     shard_id: builtins.str
     @property
     def vectors(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, nucliadb_protos.utils_pb2.UserVectors]:
@@ -677,13 +674,12 @@ class Resource(google.protobuf.message.Message):
         paragraphs_to_delete: collections.abc.Iterable[builtins.str] | None = ...,
         sentences_to_delete: collections.abc.Iterable[builtins.str] | None = ...,
         relations: collections.abc.Iterable[nucliadb_protos.utils_pb2.Relation] | None = ...,
-        relations_to_delete: collections.abc.Iterable[nucliadb_protos.utils_pb2.Relation] | None = ...,
         shard_id: builtins.str = ...,
         vectors: collections.abc.Mapping[builtins.str, nucliadb_protos.utils_pb2.UserVectors] | None = ...,
         vectors_to_delete: collections.abc.Mapping[builtins.str, nucliadb_protos.utils_pb2.UserVectorsList] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["metadata", b"metadata", "resource", b"resource"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["labels", b"labels", "metadata", b"metadata", "paragraphs", b"paragraphs", "paragraphs_to_delete", b"paragraphs_to_delete", "relations", b"relations", "relations_to_delete", b"relations_to_delete", "resource", b"resource", "sentences_to_delete", b"sentences_to_delete", "shard_id", b"shard_id", "status", b"status", "texts", b"texts", "vectors", b"vectors", "vectors_to_delete", b"vectors_to_delete"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["labels", b"labels", "metadata", b"metadata", "paragraphs", b"paragraphs", "paragraphs_to_delete", b"paragraphs_to_delete", "relations", b"relations", "resource", b"resource", "sentences_to_delete", b"sentences_to_delete", "shard_id", b"shard_id", "status", b"status", "texts", b"texts", "vectors", b"vectors", "vectors_to_delete", b"vectors_to_delete"]) -> None: ...
 
 global___Resource = Resource
 
@@ -747,11 +743,13 @@ class NodeMetadata(google.protobuf.message.Message):
     SHARD_COUNT_FIELD_NUMBER: builtins.int
     SHARDS_FIELD_NUMBER: builtins.int
     NODE_ID_FIELD_NUMBER: builtins.int
+    PRIMARY_NODE_ID_FIELD_NUMBER: builtins.int
     load_score: builtins.float
     shard_count: builtins.int
     @property
     def shards(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___NodeMetadata.ShardMetadata]: ...
     node_id: builtins.str
+    primary_node_id: builtins.str
     def __init__(
         self,
         *,
@@ -759,7 +757,10 @@ class NodeMetadata(google.protobuf.message.Message):
         shard_count: builtins.int = ...,
         shards: collections.abc.Mapping[builtins.str, global___NodeMetadata.ShardMetadata] | None = ...,
         node_id: builtins.str = ...,
+        primary_node_id: builtins.str | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["load_score", b"load_score", "node_id", b"node_id", "shard_count", b"shard_count", "shards", b"shards"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["_primary_node_id", b"_primary_node_id", "primary_node_id", b"primary_node_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["_primary_node_id", b"_primary_node_id", "load_score", b"load_score", "node_id", b"node_id", "primary_node_id", b"primary_node_id", "shard_count", b"shard_count", "shards", b"shards"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["_primary_node_id", b"_primary_node_id"]) -> typing_extensions.Literal["primary_node_id"] | None: ...
 
 global___NodeMetadata = NodeMetadata

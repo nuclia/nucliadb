@@ -43,6 +43,7 @@ spec:
         version: "{{ .Chart.Version | replace "+" "_" }}"
         chart: "{{ .Chart.Name }}"
     spec:
+      terminationGracePeriodSeconds: 120
       nodeSelector:
 {{ toYaml .Values.nodeSelector | indent 8 }}
       topologySpreadConstraints:
@@ -52,6 +53,7 @@ spec:
       tolerations:
 {{ toYaml .Values.tolerations | indent 8 }}
       dnsPolicy: ClusterFirst
+      serviceAccount: {{ .Values.serviceAccount | default "default" }}
 {{- if .Values.nats.secretName }}
       volumes:
       - name: nats-creds
@@ -121,7 +123,7 @@ spec:
         - configMapRef:
             name: nucliadb-config
         env:
-          - name: METRICS_HTTP_PORT
+          - name: METRICS_PORT
             value: "3032"
           {{- range $key, $value := .Values.env }}
           - name: "{{ $key }}"
@@ -160,7 +162,7 @@ spec:
         - configMapRef:
             name: nucliadb-config
         env:
-          - name: METRICS_HTTP_PORT
+          - name: METRICS_PORT
             value: "3031"
         {{- range $key, $value := .Values.env }}
           - name: "{{ $key }}"

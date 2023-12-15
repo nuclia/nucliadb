@@ -80,10 +80,13 @@ class TiKVTransaction(Transaction):
                     raise
         self.open = False
 
-    async def batch_get(self, keys: List[str]):
-        bytes_keys: List[bytes] = [x.encode() for x in keys]
+    async def batch_get(self, keys: list[str]) -> list[Optional[bytes]]:
+        bytes_keys: list[bytes] = [x.encode() for x in keys]
         with tikv_observer({"type": "batch_get"}):
-            return await self.txn.batch_get(bytes_keys)
+            output = {}
+            for key, value in await self.txn.batch_get(bytes_keys):
+                output[key.decode()] = value
+        return [output.get(key) for key in keys]
 
     @backoff.on_exception(backoff.expo, (TimeoutError,), max_tries=2)
     async def get(self, key: str) -> Optional[bytes]:
@@ -248,7 +251,7 @@ class TiKVDriver(Driver):
     async def finalize(self):
         pass
 
-    async def begin(self) -> TiKVTransaction:
+    async def begin(self, read_only: bool = False) -> TiKVTransaction:
         if self.tikv is None:
             raise AttributeError()
         with tikv_observer({"type": "begin"}):

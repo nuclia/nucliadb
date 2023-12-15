@@ -38,21 +38,11 @@ class NodeWriterStub(object):
         self.GC = channel.unary_unary(
                 '/nodewriter.NodeWriter/GC',
                 request_serializer=nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_noderesources__pb2.EmptyResponse.FromString,
+                response_deserializer=nucliadb__protos_dot_nodewriter__pb2.GarbageCollectorResponse.FromString,
                 )
         self.SetResource = channel.unary_unary(
                 '/nodewriter.NodeWriter/SetResource',
                 request_serializer=nucliadb__protos_dot_noderesources__pb2.Resource.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_nodewriter__pb2.OpStatus.FromString,
-                )
-        self.DeleteRelationNodes = channel.unary_unary(
-                '/nodewriter.NodeWriter/DeleteRelationNodes',
-                request_serializer=nucliadb__protos_dot_nodewriter__pb2.DeleteGraphNodes.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_nodewriter__pb2.OpStatus.FromString,
-                )
-        self.JoinGraph = channel.unary_unary(
-                '/nodewriter.NodeWriter/JoinGraph',
-                request_serializer=nucliadb__protos_dot_nodewriter__pb2.SetGraph.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_nodewriter__pb2.OpStatus.FromString,
                 )
         self.RemoveResource = channel.unary_unary(
@@ -121,18 +111,6 @@ class NodeWriterServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def DeleteRelationNodes(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def JoinGraph(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
     def RemoveResource(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -189,21 +167,11 @@ def add_NodeWriterServicer_to_server(servicer, server):
             'GC': grpc.unary_unary_rpc_method_handler(
                     servicer.GC,
                     request_deserializer=nucliadb__protos_dot_noderesources__pb2.ShardId.FromString,
-                    response_serializer=nucliadb__protos_dot_noderesources__pb2.EmptyResponse.SerializeToString,
+                    response_serializer=nucliadb__protos_dot_nodewriter__pb2.GarbageCollectorResponse.SerializeToString,
             ),
             'SetResource': grpc.unary_unary_rpc_method_handler(
                     servicer.SetResource,
                     request_deserializer=nucliadb__protos_dot_noderesources__pb2.Resource.FromString,
-                    response_serializer=nucliadb__protos_dot_nodewriter__pb2.OpStatus.SerializeToString,
-            ),
-            'DeleteRelationNodes': grpc.unary_unary_rpc_method_handler(
-                    servicer.DeleteRelationNodes,
-                    request_deserializer=nucliadb__protos_dot_nodewriter__pb2.DeleteGraphNodes.FromString,
-                    response_serializer=nucliadb__protos_dot_nodewriter__pb2.OpStatus.SerializeToString,
-            ),
-            'JoinGraph': grpc.unary_unary_rpc_method_handler(
-                    servicer.JoinGraph,
-                    request_deserializer=nucliadb__protos_dot_nodewriter__pb2.SetGraph.FromString,
                     response_serializer=nucliadb__protos_dot_nodewriter__pb2.OpStatus.SerializeToString,
             ),
             'RemoveResource': grpc.unary_unary_rpc_method_handler(
@@ -322,7 +290,7 @@ class NodeWriter(object):
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/nodewriter.NodeWriter/GC',
             nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
-            nucliadb__protos_dot_noderesources__pb2.EmptyResponse.FromString,
+            nucliadb__protos_dot_nodewriter__pb2.GarbageCollectorResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -339,40 +307,6 @@ class NodeWriter(object):
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/nodewriter.NodeWriter/SetResource',
             nucliadb__protos_dot_noderesources__pb2.Resource.SerializeToString,
-            nucliadb__protos_dot_nodewriter__pb2.OpStatus.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def DeleteRelationNodes(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/nodewriter.NodeWriter/DeleteRelationNodes',
-            nucliadb__protos_dot_nodewriter__pb2.DeleteGraphNodes.SerializeToString,
-            nucliadb__protos_dot_nodewriter__pb2.OpStatus.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def JoinGraph(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/nodewriter.NodeWriter/JoinGraph',
-            nucliadb__protos_dot_nodewriter__pb2.SetGraph.SerializeToString,
             nucliadb__protos_dot_nodewriter__pb2.OpStatus.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

@@ -64,16 +64,18 @@ impl Debug for VectorReaderService {
 impl VectorReader for VectorReaderService {
     #[tracing::instrument(skip_all)]
     fn count(&self, vectorset: &str) -> NodeResult<usize> {
-        let indexet_slock = self.indexset.get_slock()?;
         if vectorset.is_empty() {
             debug!("Id for the vectorset is empty");
             self.index_count(&self.index)
-        } else if let Some(index) = self.indexset.get(vectorset, &indexet_slock)? {
-            debug!("Counting nodes for {vectorset}");
-            self.index_count(&index)
         } else {
-            debug!("There was not a set called {vectorset}");
-            Ok(0)
+            let indexet_slock = self.indexset.get_slock()?;
+            if let Some(index) = self.indexset.get(vectorset, &indexet_slock)? {
+                debug!("Counting nodes for {vectorset}");
+                self.index_count(&index)
+            } else {
+                debug!("There was not a set called {vectorset}");
+                Ok(0)
+            }
         }
     }
 }
@@ -100,15 +102,24 @@ impl ReaderChild for VectorReaderService {
             .iter()
             .cloned()
             .map(AtomClause::key_prefix);
+        let paragraph_labels = request
+            .paragraph_labels
+            .iter()
+            .cloned()
+            .map(AtomClause::label);
         let mut formula = Formula::new();
         request
-            .tags
+            .field_labels
             .iter()
             .cloned()
             .map(AtomClause::label)
             .for_each(|c| formula.extend(c));
+
         if key_filters.len() > 0 {
-            formula.extend(CompoundClause::new(1, key_filters.collect()));
+            formula.extend(CompoundClause::new(key_filters.collect()));
+        }
+        for paragraph_label in paragraph_labels {
+            formula.extend(paragraph_label);
         }
 
         let search_request = (total_to_get, request, formula);
@@ -236,6 +247,87 @@ mod tests {
     use crate::service::writer::VectorWriterService;
 
     #[test]
+    fn test_key_prefix_search() {
+        let dir = TempDir::new().unwrap();
+        let vsc = VectorConfig {
+            similarity: Some(VectorSimilarity::Cosine),
+            path: dir.path().join("vectors"),
+            vectorset: dir.path().join("vectorset"),
+            channel: Channel::EXPERIMENTAL,
+        };
+        let raw_sentences = [
+            ("DOC/KEY/1/1".to_string(), vec![1.0, 3.0, 4.0]),
+            ("DOC/KEY/1/2".to_string(), vec![2.0, 4.0, 5.0]),
+            ("DOC/KEY/1/3".to_string(), vec![3.0, 5.0, 6.0]),
+            ("DOC/KEY/1/4".to_string(), vec![3.0, 5.0, 6.0]),
+        ];
+        let resource_id = ResourceId {
+            shard_id: "DOC".to_string(),
+            uuid: "DOC/KEY".to_string(),
+        };
+
+        let mut sentences = HashMap::new();
+        for (key, vector) in raw_sentences {
+            let vector = VectorSentence {
+                vector,
+                ..Default::default()
+            };
+            sentences.insert(key, vector);
+        }
+        let paragraph = IndexParagraph {
+            start: 0,
+            end: 0,
+            sentences,
+            field: "".to_string(),
+            labels: vec!["1".to_string()],
+            index: 3,
+            split: "".to_string(),
+            repeated_in_field: false,
+            metadata: None,
+        };
+        let paragraphs = IndexParagraphs {
+            paragraphs: HashMap::from([("DOC/KEY/1".to_string(), paragraph)]),
+        };
+        let resource = Resource {
+            resource: Some(resource_id),
+            metadata: None,
+            texts: HashMap::with_capacity(0),
+            status: ResourceStatus::Processed as i32,
+            labels: vec!["2".to_string()],
+            paragraphs: HashMap::from([("DOC/KEY".to_string(), paragraphs)]),
+            paragraphs_to_delete: vec![],
+            sentences_to_delete: vec![],
+            relations: vec![],
+            vectors: HashMap::default(),
+            vectors_to_delete: HashMap::default(),
+            shard_id: "DOC".to_string(),
+        };
+        // insert - delete - insert sequence
+        let mut writer = VectorWriterService::start(&vsc).unwrap();
+        let res = writer.set_resource(&resource);
+        assert!(res.is_ok());
+
+        let reader = VectorReaderService::start(&vsc).unwrap();
+        let mut request = VectorSearchRequest {
+            id: "".to_string(),
+            vector_set: "".to_string(),
+            vector: vec![4.0, 6.0, 7.0],
+            field_labels: vec!["1".to_string()],
+            key_filters: vec!["DOC/KEY/1".to_string()],
+            page_number: 0,
+            result_per_page: 20,
+            with_duplicates: true,
+            ..Default::default()
+        };
+        let result = reader.search(&request).unwrap();
+        assert_eq!(result.documents.len(), 4);
+
+        request.key_filters = vec!["DOC/KEY/0".to_string()];
+        let result = reader.search(&request).unwrap();
+        assert_eq!(result.documents.len(), 0);
+    }
+
+    #[test]
     fn test_new_vector_reader() {
         let dir = TempDir::new().unwrap();
         let vsc = VectorConfig {
@@ -286,7 +378,6 @@ mod tests {
             paragraphs: HashMap::from([("DOC/KEY".to_string(), paragraphs)]),
             paragraphs_to_delete: vec![],
             sentences_to_delete: vec![],
-            relations_to_delete: vec![],
             relations: vec![],
             vectors: HashMap::default(),
             vectors_to_delete: HashMap::default(),
@@ -301,7 +392,7 @@ mod tests {
             id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
-            tags: vec!["1".to_string()],
+            field_labels: vec!["1".to_string()],
             page_number: 0,
             result_per_page: 20,
             with_duplicates: true,
@@ -314,7 +405,7 @@ mod tests {
             id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
-            tags: vec!["1".to_string()],
+            field_labels: vec!["1".to_string()],
             page_number: 0,
             result_per_page: 20,
             with_duplicates: false,
@@ -330,7 +421,7 @@ mod tests {
             id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
-            tags: vec!["1".to_string()],
+            field_labels: vec!["1".to_string()],
             page_number: 0,
             result_per_page: 20,
             with_duplicates: false,
@@ -346,7 +437,7 @@ mod tests {
             id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0],
-            tags: vec!["1".to_string()],
+            field_labels: vec!["1".to_string()],
             page_number: 0,
             result_per_page: 20,
             with_duplicates: false,
@@ -404,7 +495,6 @@ mod tests {
             paragraphs: HashMap::from([("DOC/KEY".to_string(), paragraphs)]),
             paragraphs_to_delete: vec![],
             sentences_to_delete: vec![],
-            relations_to_delete: vec![],
             relations: vec![],
             vectors: HashMap::default(),
             vectors_to_delete: HashMap::default(),
@@ -418,7 +508,7 @@ mod tests {
             id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
-            tags: vec!["1".to_string()],
+            field_labels: vec!["1".to_string()],
             page_number: 0,
             result_per_page: 20,
             with_duplicates: true,
@@ -431,7 +521,7 @@ mod tests {
             id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
-            tags: vec!["1".to_string()],
+            field_labels: vec!["1".to_string()],
             page_number: 0,
             result_per_page: 20,
             with_duplicates: false,

@@ -28,10 +28,13 @@ use nucliadb_core::protos::{
     DocumentItem, DocumentResult, DocumentSearchRequest, DocumentSearchResponse, FacetResult,
     FacetResults, OrderBy, ResultScore, StreamRequest,
 };
+use nucliadb_core::query_planner::{
+    FieldDateType, PreFilterRequest, PreFilterResponse, ValidField, ValidFieldCollector,
+};
 use nucliadb_core::tracing::{self, *};
 use nucliadb_procs::measure;
 use tantivy::collector::{Collector, Count, DocSetCollector, FacetCollector, FacetCounts, TopDocs};
-use tantivy::query::{AllQuery, Query, QueryParser};
+use tantivy::query::{AllQuery, BooleanQuery, Occur, Query, QueryParser, TermQuery};
 use tantivy::schema::*;
 use tantivy::{DocAddress, Index, IndexReader, LeasedItem, ReloadPolicy, Searcher};
 
@@ -86,6 +89,102 @@ impl Debug for TextReaderService {
 }
 
 impl FieldReader for TextReaderService {
+    #[measure(actor = "texts", metric = "prefilter")]
+    #[tracing::instrument(skip_all)]
+    fn pre_filter(&self, request: &PreFilterRequest) -> NodeResult<PreFilterResponse> {
+        let mut created_queries = Vec::new();
+        let mut modified_queries = Vec::new();
+        let mut labels_queries: Vec<Box<dyn Query>> = Vec::new();
+
+        for timestamp_query in request.timestamp_filters.iter() {
+            let from = timestamp_query.from.as_ref();
+            let to = timestamp_query.to.as_ref();
+            let (field, add_to) = match timestamp_query.applies_to {
+                FieldDateType::Created => (self.schema.created, &mut created_queries),
+                FieldDateType::Modified => (self.schema.modified, &mut modified_queries),
+            };
+            if let Some(query) = search_query::produce_date_range_query(field, from, to) {
+                let query: Box<dyn Query> = Box::new(query);
+                add_to.push((Occur::Should, query));
+            }
+        }
+
+        for label in request.labels_filters.iter() {
+            let facet = Facet::from_text(label).unwrap();
+            let term = Term::from_facet(self.schema.facets, &facet);
+            let term_query = TermQuery::new(term, IndexRecordOption::Basic);
+            labels_queries.push(Box::new(term_query));
+        }
+
+        let pre_filter_query: Box<dyn Query> = if created_queries.is_empty()
+            && modified_queries.is_empty()
+            && labels_queries.is_empty()
+        {
+            Box::new(AllQuery)
+        } else {
+            let mut subqueries = vec![];
+            if !created_queries.is_empty() {
+                let created_query: Box<dyn Query> = Box::new(BooleanQuery::new(created_queries));
+                subqueries.push(created_query);
+            }
+            if !modified_queries.is_empty() {
+                let modified_query: Box<dyn Query> = Box::new(BooleanQuery::new(modified_queries));
+                subqueries.push(modified_query);
+            }
+            if !labels_queries.is_empty() {
+                let labels_query = Box::new(BooleanQuery::intersection(labels_queries));
+                subqueries.push(labels_query);
+            }
+            Box::new(BooleanQuery::intersection(subqueries))
+        };
+        let searcher = self.reader.searcher();
+        let docs_fulfilled = searcher.search(&pre_filter_query, &DocSetCollector)?;
+
+        // If none of the fields match the pre-filter, thats all the query planner needs to know.
+        if docs_fulfilled.is_empty() {
+            return Ok(PreFilterResponse {
+                valid_fields: ValidFieldCollector::None,
+            });
+        }
+
+        // If all the fields match the pre-filter, thats all the query planner needs to know
+        if docs_fulfilled.len() as u64 == searcher.num_docs() {
+            return Ok(PreFilterResponse {
+                valid_fields: ValidFieldCollector::All,
+            });
+        }
+
+        // The fields matching the pre-filter are a non-empty subset of all the fields, so they are
+        // brought to memory
+        let mut valid_fields = Vec::new();
+        for fulfilled_doc in docs_fulfilled {
+            let Ok(fulfilled_doc) = searcher.doc(fulfilled_doc) else {
+                error!("Could not retrieve {fulfilled_doc:?}");
+                continue;
+            };
+            let resource_id = fulfilled_doc
+                .get_first(self.schema.uuid)
+                .expect("documents must have a uuid.")
+                .as_text()
+                .expect("uuid field must be a text")
+                .to_string();
+            let field_id = fulfilled_doc
+                .get_first(self.schema.field)
+                .expect("documents must have a field.")
+                .as_facet()
+                .expect("field id must be a facet")
+                .to_path_string();
+            let fulfilled_field = ValidField {
+                resource_id,
+                field_id,
+            };
+            valid_fields.push(fulfilled_field);
+        }
+        Ok(PreFilterResponse {
+            valid_fields: ValidFieldCollector::Some(valid_fields),
+        })
+    }
+
     #[tracing::instrument(skip_all)]
     fn iterator(&self, request: &StreamRequest) -> NodeResult<DocumentIterator> {
         let producer = BatchProducer {
@@ -129,13 +228,13 @@ impl ReaderChild for TextReaderService {
         let mut keys = vec![];
         let searcher = self.reader.searcher();
         for addr in searcher.search(&AllQuery, &DocSetCollector)? {
-            let Some(key) = searcher
+            let key = searcher
                 .doc(addr)?
                 .get_first(self.schema.uuid)
-                .and_then(|i| i.as_text().map(String::from))
-            else {
-                continue;
-            };
+                .expect("documents must have a uuid.")
+                .as_text()
+                .expect("uuid field must be a text")
+                .to_string();
             keys.push(key);
         }
 
@@ -357,7 +456,7 @@ impl TextReaderService {
         let extra_result = results + 1;
         let maybe_order = request.order.clone();
         let valid_facet_iter = request.faceted.iter().flat_map(|v| {
-            v.tags
+            v.labels
                 .iter()
                 .filter(|s| TextReaderService::is_valid_facet(s))
         });

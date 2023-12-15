@@ -39,7 +39,7 @@ images.settings["nucliadb"] = {
     "version": "latest",
     "env": {
         "DRIVER": "local",
-        "NUCLIADB_DISABLE_TELEMETRY": "True",
+        "NUCLIADB_DISABLE_ANALYTICS": "True",
         "dummy_predict": "True",
         "dummy_processing": "True",
         "max_receive_message_length": "40",
@@ -111,6 +111,14 @@ def nucliadb():
 @pytest.fixture(scope="session")
 def sdk(nucliadb: NucliaFixture):
     sdk = nucliadb_sdk.NucliaDB(region=nucliadb_sdk.Region.ON_PREM, url=nucliadb.url)
+    return sdk
+
+
+@pytest.fixture(scope="function")
+def sdk_async(nucliadb: NucliaFixture):
+    sdk = nucliadb_sdk.NucliaDBAsync(
+        region=nucliadb_sdk.Region.ON_PREM, url=nucliadb.url
+    )
     return sdk
 
 

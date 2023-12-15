@@ -55,6 +55,7 @@ spec:
       tolerations:
 {{ toYaml .Values.tolerations | indent 8 }}
       dnsPolicy: ClusterFirst
+      serviceAccount: {{ ((.Values.ingest).serviceAccount) | default "default" }}
       containers:
       - name: ingest
         securityContext:

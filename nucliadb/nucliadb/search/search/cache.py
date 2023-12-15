@@ -36,7 +36,7 @@ rcache: ContextVar[Optional[Dict[str, ResourceORM]]] = ContextVar(
 )
 
 
-RESOURCE_LOCKS: Dict[str, asyncio.Lock] = LRU(1000)
+RESOURCE_LOCKS: Dict[str, asyncio.Lock] = LRU(1000)  # type: ignore
 RESOURCE_CACHE_OPS = metrics.Counter("nucliadb_resource_cache_ops", labels={"type": ""})
 
 
@@ -62,7 +62,7 @@ async def get_resource_from_cache(
         if uuid not in resource_cache:
             RESOURCE_CACHE_OPS.inc({"type": "miss"})
             if txn is None:
-                txn = await get_transaction()
+                txn = await get_transaction(read_only=True)
             storage = await get_storage(service_name=SERVICE_NAME)
             kb = KnowledgeBoxORM(txn, storage, kbid)
             orm_resource = await kb.get(uuid)

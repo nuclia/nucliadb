@@ -20,7 +20,7 @@
 import os
 import tempfile
 import time
-from typing import AsyncIterable
+from typing import AsyncIterable, Optional
 
 import docker  # type: ignore
 import pytest
@@ -28,27 +28,29 @@ from grpc import aio, insecure_channel  # type: ignore
 from grpc_health.v1 import health_pb2_grpc  # type: ignore
 from grpc_health.v1.health_pb2 import HealthCheckRequest  # type: ignore
 from nucliadb_protos.noderesources_pb2 import EmptyQuery, ShardCreated, ShardId
-from nucliadb_protos.nodesidecar_pb2_grpc import NodeSidecarStub
 from nucliadb_protos.nodewriter_pb2 import NewShardRequest
 from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
 from nucliadb_protos.utils_pb2 import ReleaseChannel
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
-from nucliadb_node.app import start_worker
+from nucliadb_node import SERVICE_NAME
+from nucliadb_node.app import start_listeners, start_worker
 from nucliadb_node.pull import Worker
-from nucliadb_node.reader import Reader
 from nucliadb_node.service import start_grpc
 from nucliadb_node.settings import indexing_settings, settings
 from nucliadb_node.writer import Writer
+from nucliadb_protos import nodereader_pb2, nodereader_pb2_grpc, noderesources_pb2
 from nucliadb_utils.cache.settings import settings as cache_settings
+from nucliadb_utils.nats import NatsConnectionManager
+from nucliadb_utils.settings import nats_consumer_settings
+from nucliadb_utils.utilities import get_storage, start_nats_manager, stop_nats_manager
 
 images.settings["nucliadb_node_reader"] = {
     "image": "eu.gcr.io/stashify-218417/node",
-    "version": "main",
-    "command": "bash -c 'node_reader & node_writer'",
+    "version": "latest",
     "env": {
-        "NUCLIADB_DISABLE_TELEMETRY": "True",
+        "NUCLIADB_DISABLE_ANALYTICS": "True",
         "DATA_PATH": "/data",
         "READER_LISTEN_ADDRESS": "0.0.0.0:4445",
         "LAZY_LOADING": "true",
@@ -60,17 +62,17 @@ images.settings["nucliadb_node_reader"] = {
         "command": [
             "/usr/local/bin/node_reader",
         ],
-        # Forces the plaform so the test works on Apple Silicon series
         "platform": "linux/amd64",
+        "mem_limit": "3g",
         "ports": {"4445": None},
     },
 }
 
 images.settings["nucliadb_node_writer"] = {
     "image": "eu.gcr.io/stashify-218417/node",
-    "version": "main",
+    "version": "latest",
     "env": {
-        "NUCLIADB_DISABLE_TELEMETRY": "True",
+        "NUCLIADB_DISABLE_ANALYTICS": "True",
         "DATA_PATH": "/data",
         "WRITER_LISTEN_ADDRESS": "0.0.0.0:4446",
         "RUST_BACKTRACE": "full",
@@ -81,8 +83,8 @@ images.settings["nucliadb_node_writer"] = {
         "command": [
             "/usr/local/bin/node_writer",
         ],
-        # Forces the plaform so the test works on Apple Silicon series
         "platform": "linux/amd64",
+        "mem_limit": "3g",
         "ports": {"4446": None},
     },
 }
@@ -155,16 +157,27 @@ def node_single():
 
     yield
 
+    print(
+        "Reader Container Logs: \n"
+        + nucliadb_node_reader.container_obj.logs().decode("utf-8")
+    )
+    print(
+        "Writer Container Logs: \n"
+        + nucliadb_node_reader.container_obj.logs().decode("utf-8")
+    )
+
+    container_ids = [
+        nucliadb_node_reader.container_obj.id,
+        nucliadb_node_writer.container_obj.id,
+    ]
+
     nucliadb_node_reader.stop()
     nucliadb_node_writer.stop()
 
-    for container in (
-        nucliadb_node_reader,
-        nucliadb_node_writer,
-    ):
+    for container_id in container_ids:
         for i in range(5):
             try:
-                docker_client.containers.get(container.container_obj.id)
+                docker_client.containers.get(container_id)
             except docker.errors.NotFound:
                 break
             time.sleep(2)  # pragma: no cover
@@ -173,10 +186,31 @@ def node_single():
 
 
 @pytest.fixture(scope="function")
-async def writer_stub(node_single):
+async def writer_stub(node_single) -> AsyncIterable[NodeWriterStub]:
     channel = aio.insecure_channel(settings.writer_listen_address)
     stub = NodeWriterStub(channel)
     yield stub
+
+
+@pytest.fixture(scope="function")
+async def writer(node_single) -> AsyncIterable[Writer]:
+    writer = Writer(settings.writer_listen_address)
+    yield writer
+    await writer.close()
+
+
+class Reader:
+    def __init__(self, grpc_reader_address: str):
+        self.channel = aio.insecure_channel(grpc_reader_address)
+        self.stub = nodereader_pb2_grpc.NodeReaderStub(self.channel)  # type: ignore
+
+    async def get_shard(self, pb: ShardId) -> Optional[noderesources_pb2.Shard]:
+        req = nodereader_pb2.GetShardRequest()
+        req.shard_id.id = pb.id
+        return await self.stub.GetShard(req)  # type: ignore
+
+    async def close(self):
+        await self.channel.close()
 
 
 @pytest.fixture(scope="function")
@@ -187,51 +221,86 @@ async def reader(node_single) -> AsyncIterable[Reader]:
 
 
 @pytest.fixture(scope="function")
-async def writer(node_single) -> AsyncIterable[Writer]:
-    writer = Writer(settings.writer_listen_address)
-    yield writer
-    await writer.close()
+async def grpc_server(writer):
+    grpc_finalizer = await start_grpc(writer=writer)
+    yield
+    await grpc_finalizer()
+
+
+# As consumers are not removed and recreated changes per test won't have effect,
+# so we set this value per session
+@pytest.fixture(scope="session", autouse=True)
+def concurrent_nats_processing():
+    original = nats_consumer_settings.nats_max_ack_pending
+    nats_consumer_settings.nats_max_ack_pending = 10
+    yield
+    nats_consumer_settings.nats_max_ack_pending = original
 
 
 @pytest.fixture(scope="function")
-async def grpc_server(reader, writer):
-    grpc_finalizer = await start_grpc(writer=writer, reader=reader)
+def nats_settings(natsd):
+    original_index_jetstream_servers = indexing_settings.index_jetstream_servers
+    original_cache_pubsub_nats_url = cache_settings.cache_pubsub_nats_url
+
+    indexing_settings.index_jetstream_servers = [natsd]
+    cache_settings.cache_pubsub_nats_url = [natsd]
+
     yield
-    await grpc_finalizer()
+
+    indexing_settings.index_jetstream_servers = original_index_jetstream_servers
+    cache_settings.cache_pubsub_nats_url = original_cache_pubsub_nats_url
+
+
+@pytest.fixture(scope="function")
+async def nats_manager(
+    natsd,
+    nats_settings,
+) -> AsyncIterable[NatsConnectionManager]:
+    nats_manager = await start_nats_manager(
+        SERVICE_NAME,
+        nats_servers=indexing_settings.index_jetstream_servers,
+        nats_creds=None,
+    )
+    yield nats_manager
+    await stop_nats_manager()
+
+
+@pytest.fixture(scope="function")
+async def listeners(writer: Writer):
+    listeners = await start_listeners(writer)
+    yield
+    for listener in listeners:
+        await listener.finalize()
 
 
 @pytest.fixture(scope="function")
 async def worker(
     node_single,
-    writer_stub: NodeWriterStub,
     gcs_storage,
-    natsd,
+    nats_manager: NatsConnectionManager,
     data_path: str,
-    reader,
-    writer,
+    writer: Writer,
+    writer_stub: NodeWriterStub,
     grpc_server,
+    listeners,
 ) -> AsyncIterable[Worker]:
     settings.force_host_id = "node1"
     settings.data_path = data_path
-    indexing_settings.index_jetstream_servers = [natsd]
-    cache_settings.cache_pubsub_nats_url = [natsd]
 
-    worker = await start_worker(writer, reader)
+    await get_storage(service_name=SERVICE_NAME)
+    worker = await start_worker(writer, nats_manager)
+
     yield worker
 
     # Cleanup all shards to be ready for following tests
-    shards = await writer_stub.ListShards(EmptyQuery())  # type: ignore
-    for shard in shards.ids:  # pragma: no cover
-        await writer_stub.DeleteShard(shard)  # type: ignore
+    try:
+        shards = await writer_stub.ListShards(EmptyQuery())  # type: ignore
+        for shard in shards.ids:  # pragma: no cover
+            await writer_stub.DeleteShard(shard)  # type: ignore
+    except Exception:  # pragma: no cover
+        pass
 
     await worker.finalize()
-
-
-@pytest.fixture(scope="function")
-async def sidecar_stub(worker):
-    channel = aio.insecure_channel(settings.sidecar_listen_address)
-    stub = NodeSidecarStub(channel)
-    yield stub
 
 
 @pytest.fixture(scope="function")
@@ -251,11 +320,36 @@ async def shard(request, writer_stub: NodeWriterStub) -> AsyncIterable[str]:
 
 
 @pytest.fixture(scope="function")
+async def bunch_of_shards(
+    request, writer_stub: NodeWriterStub
+) -> AsyncIterable[list[str]]:
+    channel = (
+        ReleaseChannel.EXPERIMENTAL
+        if request.param == "EXPERIMENTAL"
+        else ReleaseChannel.STABLE
+    )
+    request = NewShardRequest(kbid="test", release_channel=channel)
+
+    try:
+        shard_ids = []
+        for _ in range(5):
+            shard: ShardCreated = await writer_stub.NewShard(request)  # type: ignore
+            shard_ids.append(shard.id)
+
+        yield shard_ids
+
+    finally:
+        for shard_id in shard_ids:
+            await writer_stub.DeleteShard(ShardId(id=shard_id))  # type: ignore
+
+
+@pytest.fixture(scope="function")
 def data_path():
     with tempfile.TemporaryDirectory() as td:
         previous = os.environ.get("DATA_PATH")
         os.environ["DATA_PATH"] = str(td)
 
+        print("DATA_PATH set to:", str(td))
         yield str(td)
 
         if previous is None:
