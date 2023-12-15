@@ -239,9 +239,12 @@ async def serialize(
                 if field.id not in resource.data.texts:
                     resource.data.texts[field.id] = TextFieldData()
                 if include_value:
-                    resource.data.texts[field.id].value = models.FieldText.from_message(
-                        value  # type: ignore
+                    serialized_value = (
+                        models.FieldText.from_message(value)
+                        if value is not None
+                        else None
                     )
+                    resource.data.texts[field.id].value = serialized_value
                 if include_errors:
                     error = await field.get_error()
                     if error is not None:

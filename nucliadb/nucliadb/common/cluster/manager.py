@@ -23,6 +23,7 @@ import random
 import uuid
 from typing import Any, Awaitable, Callable, Optional
 
+import backoff
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata  # type: ignore
 from nucliadb_protos.nodewriter_pb2 import IndexMessage, IndexMessageSource, TypeMessage
 
@@ -422,6 +423,7 @@ class StandaloneKBShardManager(KBShardManager):
             )
             await index_node.writer.GC(noderesources_pb2.ShardId(id=shard_id))  # type: ignore
 
+    @backoff.on_exception(backoff.expo, NodesUnsync, max_tries=5)
     async def delete_resource(
         self,
         shard: writer_pb2.ShardObject,
@@ -436,15 +438,18 @@ class StandaloneKBShardManager(KBShardManager):
         for shardreplica in shard.replicas:
             req.shard_id = shardreplica.shard.id
             index_node = get_index_node(shardreplica.node)
+            if index_node is None:  # pragma: no cover
+                raise NodesUnsync(
+                    f"Node {shardreplica.node} is not found or not available"
+                )
             await index_node.writer.RemoveResource(req)  # type: ignore
-
-        if index_node is not None:
             asyncio.create_task(
                 self._resource_change_event(
                     kb, shardreplica.node, shardreplica.shard.id
                 )
             )
 
+    @backoff.on_exception(backoff.expo, NodesUnsync, max_tries=5)
     async def add_resource(
         self,
         shard: writer_pb2.ShardObject,
@@ -464,8 +469,6 @@ class StandaloneKBShardManager(KBShardManager):
                     f"Node {shardreplica.node} is not found or not available"
                 )
             await index_node.writer.SetResource(resource)  # type: ignore
-
-        if index_node is not None:
             asyncio.create_task(
                 self._resource_change_event(
                     kb, shardreplica.node, shardreplica.shard.id

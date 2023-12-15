@@ -95,6 +95,8 @@ ASK_DOCUMENT = "/ask_document"
 REPHRASE = "/rephrase"
 FEEDBACK = "/feedback"
 
+NUCLIA_LEARNING_ID_HEADER = "NUCLIA-LEARNING-ID"
+
 
 predict_observer = metrics.Observer(
     "predict_engine",
@@ -321,7 +323,7 @@ class PredictEngine:
             timeout=None,
         )
         await self.check_response(resp, expected_status=200)
-        ident = resp.headers.get("NUCLIA-LEARNING-ID")
+        ident = resp.headers.get(NUCLIA_LEARNING_ID_HEADER)
         return ident, get_answer_generator(resp)
 
     @predict_observer.wrap({"type": "ask_document"})
@@ -434,7 +436,7 @@ class DummyPredictEngine(PredictEngine):
         self.calls.append((method, request_args))
         response = Mock(status=200)
         response.json = AsyncMock(return_value={"foo": "bar"})
-        response.headers = {"NUCLIA-LEARNING-ID": DUMMY_LEARNING_ID}
+        response.headers = {NUCLIA_LEARNING_ID_HEADER: DUMMY_LEARNING_ID}
         return response
 
     async def send_feedback(

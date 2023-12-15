@@ -30,6 +30,15 @@ from nucliadb.search.predict import AnswerStatusCode
 from nucliadb.search.utilities import get_predict
 
 
+@pytest.fixture(scope="function", autouse=True)
+def audit():
+    audit_mock = mock.Mock(chat=mock.AsyncMock())
+    with mock.patch(
+        "nucliadb.search.search.chat.query.get_audit", return_value=audit_mock
+    ):
+        yield audit_mock
+
+
 @pytest.mark.asyncio()
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_chat(
@@ -86,11 +95,6 @@ async def resource(nucliadb_writer, knowledgebox):
     )
     assert resp.status_code in (200, 201)
     rid = resp.json()["uuid"]
-
-    import asyncio
-
-    await asyncio.sleep(1)
-
     yield rid
 
 

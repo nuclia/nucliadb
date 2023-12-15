@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import uuid
 from typing import Any, AsyncIterator, Optional, TypedDict
 
@@ -28,6 +29,8 @@ from nucliadb_protos.resources_pb2 import CloudFile
 
 from nucliadb_utils.storages import CHUNK_SIZE
 from nucliadb_utils.storages.storage import Storage, StorageField
+
+logger = logging.getLogger(__name__)
 
 # Table design notes
 # - No foreign key constraints ON PURPOSE
@@ -497,12 +500,18 @@ class PostgresStorageField(StorageField):
                 await dl.delete_file(self.bucket, self.field.uri)
 
             if self.field.upload_uri != self.key:
-                await dl.move(
-                    origin_key=self.field.upload_uri,
-                    destination_key=self.key,
-                    origin_kb=self.field.bucket_name,
-                    destination_kb=self.bucket,
-                )
+                try:
+                    await dl.move(
+                        origin_key=self.field.upload_uri,
+                        destination_key=self.key,
+                        origin_kb=self.field.bucket_name,
+                        destination_kb=self.bucket,
+                    )
+                except Exception:
+                    logger.exception(
+                        f"Error moving file {self.field.bucket_name}://{self.field.upload_uri} -> {self.bucket}://{self.key}"
+                    )
+                    raise
 
         self.field.uri = self.key
         self.field.ClearField("offset")

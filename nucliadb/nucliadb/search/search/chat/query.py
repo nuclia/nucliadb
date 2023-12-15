@@ -53,6 +53,7 @@ from nucliadb_utils.utilities import get_audit
 
 NOT_ENOUGH_CONTEXT_ANSWER = "Not enough data to answer this."
 AUDIT_TEXT_RESULT_SEP = " \n\n "
+START_OF_CITATIONS = b"_CIT_"
 
 
 class FoundStatusCode:
@@ -320,9 +321,7 @@ async def maybe_audit_chat(
     if audit is None:
         return
 
-    audit_answer: Optional[str] = text_answer.decode()
-    if status_code == AnswerStatusCode.NO_CONTEXT:
-        audit_answer = None
+    audit_answer = parse_audit_answer(text_answer, status_code)
 
     # Append chat history and query context
     audit_context = [
@@ -346,3 +345,18 @@ async def maybe_audit_chat(
         context=audit_context,
         answer=audit_answer,
     )
+
+
+def parse_audit_answer(
+    raw_text_answer: bytes, status_code: Optional[AnswerStatusCode]
+) -> Optional[str]:
+    if status_code == AnswerStatusCode.NO_CONTEXT:
+        # We don't want to audit "Not enough context to answer this." and instead set a None.
+        return None
+    # Split citations part from answer
+    try:
+        raw_audit_answer, _ = raw_text_answer.split(START_OF_CITATIONS)
+    except ValueError:
+        raw_audit_answer = raw_text_answer
+    audit_answer = raw_audit_answer.decode()
+    return audit_answer

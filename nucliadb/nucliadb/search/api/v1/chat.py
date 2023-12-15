@@ -31,7 +31,11 @@ from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import logger, predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.predict import AnswerStatusCode
-from nucliadb.search.search.chat.query import chat, get_relations_results
+from nucliadb.search.search.chat.query import (
+    START_OF_CITATIONS,
+    chat,
+    get_relations_results,
+)
 from nucliadb.search.search.exceptions import (
     IncompleteFindResultsError,
     InvalidQueryError,
@@ -49,7 +53,6 @@ from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
 
 END_OF_STREAM = "_END_"
-START_OF_CITATIONS = b"_CIT_"
 
 
 class SyncChatResponse(pydantic.BaseModel):
