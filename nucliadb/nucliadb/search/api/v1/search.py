@@ -375,7 +375,7 @@ async def search(
     )
     await abort_transaction()
 
-    if audit is not None and do_audit:
+    if audit is not None and do_audit and x_nucliadb_user:
         await audit.search(
             kbid,
             x_nucliadb_user,

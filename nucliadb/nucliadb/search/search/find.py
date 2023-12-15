@@ -89,7 +89,7 @@ async def find(
         highlight=item.highlight,
     )
 
-    if audit is not None:
+    if audit is not None and x_nucliadb_user:
         await audit.search(
             kbid,
             x_nucliadb_user,

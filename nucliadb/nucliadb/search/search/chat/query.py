@@ -316,6 +316,10 @@ async def maybe_audit_chat(
     chat_history: List[ChatContextMessage],
     query_context: List[str],
 ):
+    if not user_id:
+        # We don't audit when no user_id header provided
+        return
+
     audit = get_audit()
     if audit is None:
         return
