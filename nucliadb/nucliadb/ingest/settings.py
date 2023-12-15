@@ -60,7 +60,7 @@ class DriverSettings(BaseSettings):
         description="PostgreSQL DSN. The connection string to the PG server. Example: postgres://nucliadb:nucliadb@postgres:5432/nucliadb. See the complete PostgreSQL documentation: https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING",  # noqa
     )
     driver_pg_connection_pool_max_size: int = Field(
-        default=10,
+        default=20,
         description="PostgreSQL max pool size. The maximum number of connections to the PostgreSQL server.",
     )
 
