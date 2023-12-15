@@ -46,12 +46,12 @@ enum ShardCacheStatus {
     InCache(Arc<ShardWriter>),
 }
 
-/// This cache allows the user to mark shards as being  deleted (even though they may be found
-/// on disk). Being able to do so is crucial,  otherwise the only source of truth will be disk and
-/// that would not be thread-safe.
+/// This cache allows the user to block shards, ensuring that they will not be loaded from disk.
+/// Being able to do so is crucial, otherwise the only source of truth will be disk and that would
+/// not be thread-safe.
 #[derive(Default)]
 struct InnerCache {
-    being_deleted: HashSet<String>,
+    blocked_shards: HashSet<String>,
     active_shards: HashMap<ShardId, Arc<ShardWriter>>,
 }
 
@@ -61,22 +61,22 @@ impl InnerCache {
     }
     pub fn get_shard(&self, id: &ShardId) -> ShardCacheStatus {
         match self.active_shards.get(id).cloned() {
-            _ if self.being_deleted.contains(id) => ShardCacheStatus::BeingDeleted,
+            _ if self.blocked_shards.contains(id) => ShardCacheStatus::BeingDeleted,
             Some(shard) => ShardCacheStatus::InCache(shard),
             None => ShardCacheStatus::NotInCache,
         }
     }
     pub fn set_being_deleted(&mut self, id: ShardId) {
-        self.being_deleted.insert(id);
+        self.blocked_shards.insert(id);
     }
     pub fn remove(&mut self, id: &ShardId) {
-        self.being_deleted.remove(id);
+        self.blocked_shards.remove(id);
         self.active_shards.remove(id);
     }
     pub fn add_active_shard(&mut self, id: ShardId, shard: Arc<ShardWriter>) {
         // It would be a dangerous bug to have a path
         // in the system that leads to this assertion failing.
-        assert!(!self.being_deleted.contains(&id));
+        assert!(!self.blocked_shards.contains(&id));
 
         self.active_shards.insert(id, shard);
     }
@@ -202,9 +202,25 @@ impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
     }
 
     async fn delete(&self, id: ShardId) -> NodeResult<()> {
+        let mut cache_writer = self.cache.write().await;
         // First the shard must be marked as being deleted, this way
         // concurrent tasks can not make the mistake of trying to use it.
-        self.cache.write().await.set_being_deleted(id.clone());
+        cache_writer.set_being_deleted(id.clone());
+
+        // Even though the shard was marked as deleted, if it was already in the
+        // active shards list there may be operations running on it. We must ensure
+        // that all of them have finished before proceeding.
+        if let Some(shard) = cache_writer.active_shards.get(&id).cloned() {
+            let blocking_token = shard.block_shard().await;
+            // At this point we can ensure that no operations
+            // are being performed in this shard. Next operations
+            // will require using the cache, where the shard is marked
+            // as deleted.
+            std::mem::drop(blocking_token);
+        }
+
+        // Dropping the cache writer because is not needed while deleting the shard.
+        std::mem::drop(cache_writer);
 
         // No need to hold the lock while deletion happens.
         // In case of error while deleting the function will return without removing
@@ -228,8 +244,25 @@ impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
     }
 
     async fn upgrade(&self, id: ShardId) -> NodeResult<ShardCleaned> {
-        // Other tasks must know that this shard is not available.
-        self.cache.write().await.set_being_deleted(id.clone());
+        let mut cache_writer = self.cache.write().await;
+        // First the shard must be marked as being deleted, this way
+        // concurrent tasks can not make the mistake of trying to use it.
+        cache_writer.set_being_deleted(id.clone());
+
+        // Even though the shard was marked as deleted, if it was already in the
+        // active shards list there may be operations running on it. We must ensure
+        // that all of them have finished before proceeding.
+        if let Some(shard) = cache_writer.active_shards.get(&id).cloned() {
+            let blocking_token = shard.block_shard().await;
+            // At this point we can ensure that no operations
+            // are being performed in this shard. Next operations
+            // will require using the cache, where the shard is marked
+            // as deleted.
+            std::mem::drop(blocking_token);
+        }
+
+        // Dropping the cache writer because is not needed while deleting the shard.
+        std::mem::drop(cache_writer);
 
         let metadata = self.metadata_manager.get(id.clone());
         // If upgrading fails, the safe thing is to keep the being deleted flag
