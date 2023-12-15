@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 import base64
 import json
 from typing import Any, Optional, Union
@@ -184,6 +185,14 @@ async def create_chat_response(
             yield len(bytes_results).to_bytes(length=4, byteorder="big", signed=False)
             yield bytes_results
 
+            relations_results_task = None
+            if ChatOptions.RELATIONS in chat_request.features:
+                relations_results_task = asyncio.create_task(
+                    get_relations_results(
+                        kbid=kbid, chat_request=chat_request, text_answer=answer
+                    )
+                )
+
             streamed_answer = b""
             async for chunk in chat_result.answer_stream:
                 streamed_answer += chunk
@@ -192,10 +201,8 @@ async def create_chat_response(
             answer, _ = parse_streamed_answer(streamed_answer, chat_request.citations)
 
             yield END_OF_STREAM.encode()
-            if ChatOptions.RELATIONS in chat_request.features:
-                relations_results = await get_relations_results(
-                    kbid=kbid, chat_request=chat_request, text_answer=answer
-                )
+            if relations_results_task is not None:
+                relations_results = await relations_results_task
                 yield base64.b64encode(relations_results.json().encode())
 
         return StreamingResponse(
