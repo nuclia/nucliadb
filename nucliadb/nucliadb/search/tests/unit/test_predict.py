@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, Mock
 
@@ -34,6 +35,7 @@ from nucliadb.search.predict import (
     RephraseMissingContextError,
     SendToPredictError,
     _parse_rephrase_response,
+    get_answer_generator,
 )
 from nucliadb.tests.utils.aiohttp_session import get_mocked_session
 from nucliadb_models.search import (
@@ -469,3 +471,19 @@ async def test_get_predict_headers(onprem, txn):
         assert predict_headers["X-STF-VISUAL-LABELING"] == kb_config.visual_labeling
     else:
         assert predict_headers == {"X-STF-KBID": "kbid"}
+
+
+async def test_get_answer_generator():
+    async def _iter_chunks():
+        await asyncio.sleep(0.1)
+        # Chunk, end_of_chunk
+        yield b"foo", False
+        yield b"bar", True
+        yield b"baz", True
+
+    resp = Mock()
+    resp.content.iter_chunks = Mock(return_value=_iter_chunks())
+    get_answer_generator(resp)
+
+    answer_chunks = [chunk async for chunk in get_answer_generator(resp)]
+    assert answer_chunks == [b"foobar", b"baz"]
