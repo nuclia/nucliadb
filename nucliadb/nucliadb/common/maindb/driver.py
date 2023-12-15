@@ -74,12 +74,12 @@ class Driver:
                 except Exception:
                     pass
 
-    async def begin(self) -> Transaction:
+    async def begin(self, read_only: bool = False) -> Transaction:
         raise NotImplementedError()
 
     @asynccontextmanager
     async def transaction(
-        self, wait_for_abort: bool = True
+        self, wait_for_abort: bool = True, read_only: bool = False
     ) -> AsyncGenerator[Transaction, None]:
         """
         Use to make sure transaction is always aborted.
@@ -91,7 +91,7 @@ class Driver:
         txn: Optional[Transaction] = None
         error: bool = False
         try:
-            txn = await self.begin()
+            txn = await self.begin(read_only=read_only)
             yield txn
         except Exception:
             error = True

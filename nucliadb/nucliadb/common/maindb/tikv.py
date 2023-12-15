@@ -251,7 +251,7 @@ class TiKVDriver(Driver):
     async def finalize(self):
         pass
 
-    async def begin(self) -> TiKVTransaction:
+    async def begin(self, read_only: bool = False) -> TiKVTransaction:
         if self.tikv is None:
             raise AttributeError()
         with tikv_observer({"type": "begin"}):

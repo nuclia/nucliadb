@@ -141,7 +141,10 @@ async def get_storage(
     elif storage_settings.file_backend == FileBackendConfig.PG:
         from nucliadb_utils.storages.pg import PostgresStorage
 
-        pgutil = PostgresStorage(storage_settings.driver_pg_url)  # type: ignore
+        pgutil = PostgresStorage(
+            storage_settings.driver_pg_url,  # type: ignore
+            connection_pool_max_size=storage_settings.driver_pg_connection_pool_max_size,
+        )
         set_utility(Utility.STORAGE, pgutil)
         await pgutil.initialize()
         logger.info("Configuring Postgres Storage")
