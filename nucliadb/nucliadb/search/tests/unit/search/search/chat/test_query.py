@@ -25,6 +25,7 @@ from nucliadb.search.search.chat.query import (
     _parse_answer_status_code,
     chat,
     get_find_results,
+    parse_audit_answer,
 )
 from nucliadb_models.search import (
     ChatOptions,
@@ -143,3 +144,16 @@ async def test_get_find_results_vector_search_is_optional(
         )
         find_request = find_mock.call_args[0][1]
         assert set(find_request.features) == set(find_features)
+
+
+@pytest.mark.parametrize(
+    "raw_text_answer,status_code,audit_answer",
+    [
+        (b"foobar_CIT_blabla", AnswerStatusCode.NO_CONTEXT, None),
+        (b"foobar_CIT_blabla", AnswerStatusCode.SUCCESS, "foobar"),
+        (b"foobar_CIT_blabla", None, "foobar"),
+        (b"foobar", AnswerStatusCode.SUCCESS, "foobar"),
+    ],
+)
+def test_parse_audit_answer(raw_text_answer, status_code, audit_answer):
+    assert parse_audit_answer(raw_text_answer, status_code) == audit_answer
