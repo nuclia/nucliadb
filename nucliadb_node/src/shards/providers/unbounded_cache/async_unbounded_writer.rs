@@ -37,8 +37,7 @@ use crate::shards::ShardId;
 
 /// Each shard may be in one of this states
 enum ShardCacheStatus {
-    /// Not in cache and being deleted. Is important to have in mind that a shard not being
-    /// logically deleted does not ensure that it will be found on disk.
+    /// Not in cache and not being deleted, therefore if found in on disk, loading it is safe.
     NotInCache,
     /// The shard is cached, but there is a task in the process of deleting it.
     BeingDeleted,
@@ -211,16 +210,17 @@ impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
         // active shards list there may be operations running on it. We must ensure
         // that all of them have finished before proceeding.
         if let Some(shard) = cache_writer.active_shards.get(&id).cloned() {
+            std::mem::drop(cache_writer);
             let blocking_token = shard.block_shard().await;
             // At this point we can ensure that no operations
             // are being performed in this shard. Next operations
             // will require using the cache, where the shard is marked
             // as deleted.
             std::mem::drop(blocking_token);
+        } else {
+            // Dropping the cache writer because is not needed while deleting the shard.
+            std::mem::drop(cache_writer);
         }
-
-        // Dropping the cache writer because is not needed while deleting the shard.
-        std::mem::drop(cache_writer);
 
         // No need to hold the lock while deletion happens.
         // In case of error while deleting the function will return without removing
