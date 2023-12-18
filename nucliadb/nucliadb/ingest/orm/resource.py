@@ -23,7 +23,7 @@ import asyncio
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
-from typing import TYPE_CHECKING, Any, AsyncIterator, Optional, Tuple, Type
+from typing import TYPE_CHECKING, Any, AsyncIterator, Optional, Type
 
 from nucliadb_protos.resources_pb2 import AllFieldIDs as PBAllFieldIDs
 from nucliadb_protos.resources_pb2 import Basic
@@ -143,10 +143,10 @@ class Resource:
         basic: Optional[PBBasic] = None,
         disable_vectors: bool = True,
     ):
-        self.fields: dict[Tuple[FieldType.ValueType, str], Field] = {}
+        self.fields: dict[tuple[FieldType.ValueType, str], Field] = {}
         self.conversations: dict[int, PBConversation] = {}
         self.relations: Optional[PBRelations] = None
-        self.all_fields_keys: list[Tuple[FieldType.ValueType, str]] = []
+        self.all_fields_keys: list[tuple[FieldType.ValueType, str]] = []
         self.origin: Optional[PBOrigin] = None
         self.extra: Optional[PBExtra] = None
         self.modified: bool = False
@@ -589,14 +589,14 @@ class Resource:
     # Fields
     async def get_fields(
         self, force: bool = False
-    ) -> dict[Tuple[FieldType.ValueType, str], Field]:
+    ) -> dict[tuple[FieldType.ValueType, str], Field]:
         # Get all fields
         for type, field in await self.get_fields_ids(force=force):
             if (type, field) not in self.fields:
                 self.fields[(type, field)] = await self.get_field(field, type)
         return self.fields
 
-    async def _scan_fields_ids(self) -> AsyncIterator[Tuple[FieldType.ValueType, str]]:
+    async def _scan_fields_ids(self) -> AsyncIterator[tuple[FieldType.ValueType, str]]:
         # TODO: Remove this method when we are sure that all KBs have the `allfields` key set
         prefix = KB_RESOURCE_FIELDS.format(kbid=self.kb.kbid, uuid=self.uuid)
         async for key in self.txn.keys(prefix, count=-1):
@@ -608,7 +608,7 @@ class Resource:
                 raise AttributeError("Invalid field type")
             yield (type_id, field)
 
-    async def _inner_get_fields_ids(self) -> list[Tuple[FieldType.ValueType, str]]:
+    async def _inner_get_fields_ids(self) -> list[tuple[FieldType.ValueType, str]]:
         result = []
         all_fields: Optional[PBAllFieldIDs] = await self.get_all_field_ids()
         if all_fields is not None:
@@ -636,7 +636,7 @@ class Resource:
 
     async def get_fields_ids(
         self, force: bool = False
-    ) -> list[Tuple[FieldType.ValueType, str]]:
+    ) -> list[tuple[FieldType.ValueType, str]]:
         # Get all fields
         if len(self.all_fields_keys) == 0 or force:
             self.all_fields_keys = await self._inner_get_fields_ids()
@@ -1127,7 +1127,7 @@ class Resource:
             if fm is None:
                 continue
 
-            field_metadatas: list[Tuple[Optional[str], FieldMetadata]] = [
+            field_metadatas: list[tuple[Optional[str], FieldMetadata]] = [
                 (None, fm.metadata)
             ]
             for subfield_metadata, splitted_metadata in fm.split_metadata.items():
@@ -1237,7 +1237,7 @@ class Resource:
             if fm is None:
                 continue
 
-            field_metadatas: list[Tuple[Optional[str], FieldMetadata]] = [
+            field_metadatas: list[tuple[Optional[str], FieldMetadata]] = [
                 (None, fm.metadata)
             ]
             for subfield_metadata, splitted_metadata in fm.split_metadata.items():
@@ -1314,7 +1314,7 @@ class Resource:
             if fm is None:
                 continue
 
-            field_metadatas: list[Tuple[Optional[str], FieldMetadata]] = [
+            field_metadatas: list[tuple[Optional[str], FieldMetadata]] = [
                 (None, fm.metadata)
             ]
             for subfield_metadata, splitted_metadata in fm.split_metadata.items():
@@ -1370,7 +1370,7 @@ class Resource:
             if fm is None:
                 continue
 
-            field_metadatas: list[Tuple[Optional[str], FieldMetadata]] = [
+            field_metadatas: list[tuple[Optional[str], FieldMetadata]] = [
                 (None, fm.metadata)
             ]
             for subfield_metadata, splitted_metadata in fm.split_metadata.items():

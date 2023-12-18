@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import HTTPException, Request
 from fastapi_versioning import version
@@ -90,7 +90,7 @@ async def knowledgebox_counters(
     shard_manager = get_shard_manager()
 
     try:
-        shard_groups: List[PBShardObject] = await shard_manager.get_shards_by_kbid(kbid)
+        shard_groups: list[PBShardObject] = await shard_manager.get_shards_by_kbid(kbid)
     except ShardsNotFound:
         raise HTTPException(
             status_code=404,
@@ -122,7 +122,7 @@ async def knowledgebox_counters(
         )
 
     try:
-        results: Optional[List[Shard]] = await asyncio.wait_for(  # type: ignore
+        results: Optional[list[Shard]] = await asyncio.wait_for(  # type: ignore
             asyncio.gather(*ops, return_exceptions=True),  # type: ignore
             timeout=settings.search_timeout,
         )

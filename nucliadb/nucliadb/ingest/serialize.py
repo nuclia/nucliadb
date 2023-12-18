@@ -19,7 +19,7 @@
 #
 
 import asyncio
-from typing import List, Optional
+from typing import Optional
 
 import nucliadb_models as models
 from nucliadb.common.maindb.driver import Transaction
@@ -63,7 +63,7 @@ async def set_resource_field_extracted_data(
     field: Field,
     field_data: ExtractedDataType,
     field_type_name: FieldTypeName,
-    wanted_extracted_data: List[ExtractedDataTypeName],
+    wanted_extracted_data: list[ExtractedDataTypeName],
 ) -> None:
     if field_data is None:
         return
@@ -129,9 +129,9 @@ async def set_resource_field_extracted_data(
 async def serialize(
     kbid: str,
     rid: Optional[str],
-    show: List[ResourceProperties],
-    field_type_filter: List[FieldTypeName],
-    extracted: List[ExtractedDataTypeName],
+    show: list[ResourceProperties],
+    field_type_filter: list[FieldTypeName],
+    extracted: list[ExtractedDataTypeName],
     service_name: Optional[str] = None,
     slug: Optional[str] = None,
 ) -> Optional[Resource]:

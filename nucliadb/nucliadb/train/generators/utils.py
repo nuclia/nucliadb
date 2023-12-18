@@ -19,7 +19,7 @@
 #
 
 from contextvars import ContextVar
-from typing import Any, AsyncIterator, Dict, Optional
+from typing import Any, AsyncIterator, Optional
 
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import KB_REVERSE
@@ -29,13 +29,13 @@ from nucliadb.train import SERVICE_NAME, logger
 from nucliadb.train.types import TrainBatchType
 from nucliadb_utils.utilities import get_storage
 
-rcache: ContextVar[Optional[Dict[str, ResourceORM]]] = ContextVar(
+rcache: ContextVar[Optional[dict[str, ResourceORM]]] = ContextVar(
     "rcache", default=None
 )
 
 
-def get_resource_cache(clear: bool = False) -> Dict[str, ResourceORM]:
-    value: Optional[Dict[str, ResourceORM]] = rcache.get()
+def get_resource_cache(clear: bool = False) -> dict[str, ResourceORM]:
+    value: Optional[dict[str, ResourceORM]] = rcache.get()
     if value is None or clear:
         value = {}
         rcache.set(value)

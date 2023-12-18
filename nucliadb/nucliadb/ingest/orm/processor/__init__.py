@@ -19,7 +19,7 @@
 #
 import asyncio
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Optional
 
 import aiohttp.client_exceptions
 
@@ -93,7 +93,7 @@ class Processor:
     and can not use the txn id
     """
 
-    messages: Dict[str, List[writer_pb2.BrokerMessage]]
+    messages: dict[str, list[writer_pb2.BrokerMessage]]
 
     def __init__(
         self,
@@ -217,7 +217,7 @@ class Processor:
     @processor_observer.wrap({"type": "txn"})
     async def txn(
         self,
-        messages: List[writer_pb2.BrokerMessage],
+        messages: list[writer_pb2.BrokerMessage],
         seqid: int,
         partition: str,
         transaction_check: bool = True,
@@ -419,7 +419,7 @@ class Processor:
         )
 
     async def deadletter(
-        self, messages: List[writer_pb2.BrokerMessage], partition: str, seqid: int
+        self, messages: list[writer_pb2.BrokerMessage], partition: str, seqid: int
     ) -> None:
         for seq, message in enumerate(messages):
             await self.storage.deadletter(message, seq, seqid, partition)
@@ -430,7 +430,7 @@ class Processor:
         message: writer_pb2.BrokerMessage,
         kb: KnowledgeBox,
         resource: Optional[Resource] = None,
-    ) -> Optional[Tuple[Resource, bool]]:
+    ) -> Optional[tuple[Resource, bool]]:
         """
         Convert a broker message into a resource object, and apply it to the database
         """

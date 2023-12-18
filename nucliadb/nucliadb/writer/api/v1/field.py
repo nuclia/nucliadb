@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Optional
 
 from fastapi import HTTPException, Response
 from fastapi_versioning import version  # type: ignore
@@ -62,9 +62,9 @@ from nucliadb_utils.utilities import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover
-    FIELD_TYPE_NAME_TO_FIELD_TYPE_MAP: Dict[models.FieldTypeName, FieldType.V]
+    FIELD_TYPE_NAME_TO_FIELD_TYPE_MAP: dict[models.FieldTypeName, FieldType.V]
 else:
-    FIELD_TYPE_NAME_TO_FIELD_TYPE_MAP: Dict[models.FieldTypeName, int]
+    FIELD_TYPE_NAME_TO_FIELD_TYPE_MAP: dict[models.FieldTypeName, int]
 
 
 FIELD_TYPE_NAME_TO_FIELD_TYPE_MAP = {
@@ -81,7 +81,7 @@ FIELD_TYPE_NAME_TO_FIELD_TYPE_MAP = {
 
 def prepare_field_put(
     kbid: str, rid: str, request: Request
-) -> Tuple[BrokerMessage, PushPayload, int]:
+) -> tuple[BrokerMessage, PushPayload, int]:
     partitioning = get_partitioning()
     partition = partitioning.generate_partition(kbid, rid)
 
@@ -636,7 +636,7 @@ async def append_messages_to_conversation_field_rslug_prefix(
     kbid: str,
     rslug: str,
     field_id: str,
-    messages: List[models.InputMessage],
+    messages: list[models.InputMessage],
     x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
     return await _append_messages_to_conversation_field(
@@ -658,7 +658,7 @@ async def append_messages_to_conversation_field_rid_prefix(
     kbid: str,
     rid: str,
     field_id: str,
-    messages: List[models.InputMessage],
+    messages: list[models.InputMessage],
     x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
     return await _append_messages_to_conversation_field(
@@ -670,7 +670,7 @@ async def _append_messages_to_conversation_field(
     request: Request,
     kbid: str,
     field_id: str,
-    messages: List[models.InputMessage],
+    messages: list[models.InputMessage],
     x_synchronous: bool,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
@@ -732,7 +732,7 @@ async def append_blocks_to_layout_field_rslug_prefix(
     kbid: str,
     rslug: str,
     field_id: str,
-    blocks: Dict[str, models.InputBlock],
+    blocks: dict[str, models.InputBlock],
     x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
     return await _append_blocks_to_layout_field(
@@ -754,7 +754,7 @@ async def append_blocks_to_layout_field_rid_prefix(
     kbid: str,
     rid: str,
     field_id: str,
-    blocks: Dict[str, models.InputBlock],
+    blocks: dict[str, models.InputBlock],
     x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
     return await _append_blocks_to_layout_field(
@@ -766,7 +766,7 @@ async def _append_blocks_to_layout_field(
     request: Request,
     kbid: str,
     field_id: str,
-    blocks: Dict[str, models.InputBlock],
+    blocks: dict[str, models.InputBlock],
     x_synchronous: bool,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,

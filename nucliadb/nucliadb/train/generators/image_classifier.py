@@ -19,7 +19,7 @@
 #
 
 import json
-from typing import Any, AsyncGenerator, Dict, List, Tuple
+from typing import Any, AsyncGenerator
 
 from nucliadb_protos.dataset_pb2 import (
     ImageClassification,
@@ -38,7 +38,7 @@ from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or
 VISUALLY_ANNOTABLE_FIELDS = {FieldType.FILE, FieldType.LINK}
 
 # PAWLS JSON format
-PawlsPayload = Dict[str, Any]
+PawlsPayload = dict[str, Any]
 
 
 def image_classification_batch_generator(
@@ -133,8 +133,8 @@ async def generate_image_classification_payloads(
 
 async def get_page_selections(
     resource: Resource, field: Field
-) -> Dict[int, List[VisualSelection]]:
-    page_selections: Dict[int, List[VisualSelection]] = {}
+) -> dict[int, list[VisualSelection]]:
+    page_selections: dict[int, list[VisualSelection]] = {}
     basic = await resource.get_basic()
     if basic is None or basic.fieldmetadata is None:
         return page_selections
@@ -153,8 +153,8 @@ async def get_page_selections(
     return page_selections
 
 
-async def get_page_structure(field: Field) -> List[Tuple[str, PageStructure]]:
-    page_structures: List[Tuple[str, PageStructure]] = []
+async def get_page_structure(field: Field) -> list[tuple[str, PageStructure]]:
+    page_structures: list[tuple[str, PageStructure]] = []
     field_type = KB_REVERSE[field.type]
     if field_type == FieldType.FILE:
         fed = await field.get_file_extracted_data()  # type: ignore

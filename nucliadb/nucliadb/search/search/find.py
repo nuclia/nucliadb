@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from time import time
-from typing import Tuple
 
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.find_merge import find_merge_results
@@ -39,7 +38,7 @@ async def find(
     x_ndb_client: NucliaDBClientType,
     x_nucliadb_user: str,
     x_forwarded_for: str,
-) -> Tuple[KnowledgeboxFindResults, bool]:
+) -> tuple[KnowledgeboxFindResults, bool]:
     audit = get_audit()
     start_time = time()
 

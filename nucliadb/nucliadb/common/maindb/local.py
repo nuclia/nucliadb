@@ -19,7 +19,7 @@
 #
 import glob
 import os
-from typing import Dict, List, Optional
+from typing import Optional
 
 from nucliadb.common.maindb.driver import (
     DEFAULT_BATCH_SCAN_LIMIT,
@@ -37,9 +37,9 @@ except ImportError:  # pragma: no cover
 
 
 class LocalTransaction(Transaction):
-    modified_keys: Dict[str, bytes]
-    visited_keys: Dict[str, bytes]
-    deleted_keys: List[str]
+    modified_keys: dict[str, bytes]
+    visited_keys: dict[str, bytes]
+    deleted_keys: list[str]
 
     def __init__(self, url: str, driver: Driver):
         self.url = url

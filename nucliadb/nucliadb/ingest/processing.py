@@ -23,7 +23,7 @@ import uuid
 from collections import defaultdict
 from contextlib import AsyncExitStack
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, Optional, TypeVar
 
 import aiohttp
 import backoff
@@ -85,22 +85,22 @@ class PushPayload(BaseModel):
     source: Optional[Source] = None
     userid: str
 
-    genericfield: Dict[str, models.Text] = {}
+    genericfield: dict[str, models.Text] = {}
 
     # New File
-    filefield: Dict[str, str] = {}
+    filefield: dict[str, str] = {}
 
     # New Link
-    linkfield: Dict[str, models.LinkUpload] = {}
+    linkfield: dict[str, models.LinkUpload] = {}
 
     # Diff on Text Field
-    textfield: Dict[str, models.Text] = {}
+    textfield: dict[str, models.Text] = {}
 
     # Diff on a Layout Field
-    layoutfield: Dict[str, models.LayoutDiff] = {}
+    layoutfield: dict[str, models.LayoutDiff] = {}
 
     # New conversations to process
-    conversationfield: Dict[str, models.PushConversation] = {}
+    conversationfield: dict[str, models.PushConversation] = {}
 
     # Only internal
     partition: int
@@ -435,7 +435,7 @@ class ProcessingEngine:
 
 class DummyProcessingEngine(ProcessingEngine):
     def __init__(self):
-        self.calls: List[List[Any]] = []  # type: ignore
+        self.calls: list[list[Any]] = []  # type: ignore
         self.values = defaultdict(list)
         self.onprem = True
 

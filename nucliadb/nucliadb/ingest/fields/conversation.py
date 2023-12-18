@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
@@ -39,7 +39,7 @@ class PageNotFound(Exception):
 class Conversation(Field):
     pbklass = PBConversation
     type: str = "c"
-    value: Dict[int, PBConversation]
+    value: dict[int, PBConversation]
     metadata: Optional[FieldConversation]
 
     _created: bool = False
@@ -49,7 +49,7 @@ class Conversation(Field):
         id: str,
         resource: Any,
         pb: Optional[Any] = None,
-        value: Optional[Dict[int, PBConversation]] = None,
+        value: Optional[dict[int, PBConversation]] = None,
     ):
         super(Conversation, self).__init__(id, resource, pb, value)
         self.value = {}

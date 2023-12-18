@@ -19,7 +19,7 @@
 #
 import urllib.parse
 from enum import Enum
-from typing import Optional, Tuple
+from typing import Optional
 
 from fastapi import HTTPException
 from fastapi.requests import Request
@@ -370,7 +370,7 @@ async def _get_resource_uuid_from_params(
     return rid
 
 
-def parse_media_range(range_request: str, file_size: int) -> Tuple[int, int, int]:
+def parse_media_range(range_request: str, file_size: int) -> tuple[int, int, int]:
     # Implemented following this docpage: https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests
     ranges = range_request.split("bytes=")[-1].split(", ")
     if len(ranges) > 1:

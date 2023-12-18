@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from contextvars import ContextVar
-from typing import Dict, List, Optional, Tuple
+from typing import Optional
 
 from nucliadb_protos.nodereader_pb2 import DocumentResult, ParagraphResult
 from nucliadb_protos.resources_pb2 import Paragraph
@@ -33,18 +33,18 @@ from nucliadb_models.search import ResourceProperties
 
 from .cache import get_resource_from_cache
 
-rcache: ContextVar[Optional[Dict[str, ResourceORM]]] = ContextVar(
+rcache: ContextVar[Optional[dict[str, ResourceORM]]] = ContextVar(
     "rcache", default=None
 )
 
 
 async def fetch_resources(
-    resources: List[str],
+    resources: list[str],
     kbid: str,
-    show: List[ResourceProperties],
-    field_type_filter: List[FieldTypeName],
-    extracted: List[ExtractedDataTypeName],
-) -> Dict[str, Resource]:
+    show: list[ResourceProperties],
+    field_type_filter: list[FieldTypeName],
+    extracted: list[ExtractedDataTypeName],
+) -> dict[str, Resource]:
     result = {}
     for resource in resources:
         serialization = await serialize(
@@ -77,14 +77,14 @@ async def get_paragraph_from_resource(
     return paragraph
 
 
-async def get_labels_resource(result: DocumentResult, kbid: str) -> List[str]:
+async def get_labels_resource(result: DocumentResult, kbid: str) -> list[str]:
     orm_resource = await get_resource_from_cache(kbid, result.uuid)
 
     if orm_resource is None:
         logger.error(f"{result.uuid} does not exist on DB")
         return []
 
-    labels: List[str] = []
+    labels: list[str] = []
     basic = await orm_resource.get_basic()
     if basic is not None:
         for classification in basic.usermetadata.classifications:
@@ -93,14 +93,14 @@ async def get_labels_resource(result: DocumentResult, kbid: str) -> List[str]:
     return labels
 
 
-async def get_labels_paragraph(result: ParagraphResult, kbid: str) -> List[str]:
+async def get_labels_paragraph(result: ParagraphResult, kbid: str) -> list[str]:
     orm_resource = await get_resource_from_cache(kbid, result.uuid)
 
     if orm_resource is None:
         logger.error(f"{result.uuid} does not exist on DB")
         return []
 
-    labels: List[str] = []
+    labels: list[str] = []
     basic = await orm_resource.get_basic()
     if basic is not None:
         for classification in basic.usermetadata.classifications:
@@ -127,7 +127,7 @@ async def get_labels_paragraph(result: ParagraphResult, kbid: str) -> List[str]:
 
 async def get_seconds_paragraph(
     result: ParagraphResult, kbid: str
-) -> Optional[Tuple[List[int], List[int]]]:
+) -> Optional[tuple[list[int], list[int]]]:
     orm_resource = await get_resource_from_cache(kbid, result.uuid)
 
     if orm_resource is None:

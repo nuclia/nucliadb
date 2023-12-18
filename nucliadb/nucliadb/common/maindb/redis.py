@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from nucliadb.common.maindb.driver import (
     DEFAULT_BATCH_SCAN_LIMIT,
@@ -35,9 +35,9 @@ except ImportError:  # pragma: no cover
 
 
 class RedisTransaction(Transaction):
-    modified_keys: Dict[str, bytes]
-    visited_keys: Dict[str, bytes]
-    deleted_keys: List[str]
+    modified_keys: dict[str, bytes]
+    visited_keys: dict[str, bytes]
+    deleted_keys: list[str]
 
     def __init__(self, redis: Any, driver: Driver):
         self.redis = redis
@@ -84,7 +84,7 @@ class RedisTransaction(Transaction):
         if len(keys) == 0:
             return []
 
-        bytes_keys: List[bytes] = [x.encode() for x in keys]
+        bytes_keys: list[bytes] = [x.encode() for x in keys]
         results = await self.redis.mget(bytes_keys)
 
         for idx, key in enumerate(keys):

@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 import orjson
 from redis import asyncio as aioredis
@@ -33,11 +33,11 @@ class NoRedisConfigured(Exception):
     pass
 
 
-DATA: Dict[str, Any] = {}
+DATA: dict[str, Any] = {}
 
 
 class FileDataManager:
-    _data: Optional[Dict[str, Any]] = None
+    _data: Optional[dict[str, Any]] = None
     _loaded = False
     key = None
     _ttl = 60 * 50 * 5  # 5 minutes should be plenty of time between activity

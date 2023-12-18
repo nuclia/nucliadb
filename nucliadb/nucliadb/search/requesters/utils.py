@@ -19,7 +19,7 @@
 
 import asyncio
 from enum import Enum
-from typing import Any, List, Optional, Tuple, TypeVar, Union, overload
+from typing import Any, Optional, TypeVar, Union, overload
 
 from fastapi import HTTPException
 from grpc import StatusCode as GrpcStatusCode
@@ -87,7 +87,7 @@ async def node_query(
     pb_query: SuggestRequest,
     target_replicas: Optional[list[str]] = None,
     read_only: bool = True,
-) -> Tuple[List[SuggestResponse], bool, List[Tuple[str, str, str]], List[str]]:
+) -> tuple[list[SuggestResponse], bool, list[tuple[str, str, str]], list[str]]:
     ...
 
 
@@ -98,7 +98,7 @@ async def node_query(
     pb_query: ParagraphSearchRequest,
     target_replicas: Optional[list[str]] = None,
     read_only: bool = True,
-) -> Tuple[List[ParagraphSearchResponse], bool, List[Tuple[str, str, str]], List[str]]:
+) -> tuple[list[ParagraphSearchResponse], bool, list[tuple[str, str, str]], list[str]]:
     ...
 
 
@@ -109,7 +109,7 @@ async def node_query(
     pb_query: SearchRequest,
     target_replicas: Optional[list[str]] = None,
     read_only: bool = True,
-) -> Tuple[List[SearchResponse], bool, List[Tuple[str, str, str]], List[str]]:
+) -> tuple[list[SearchResponse], bool, list[tuple[str, str, str]], list[str]]:
     ...
 
 
@@ -120,7 +120,7 @@ async def node_query(
     pb_query: RelationSearchRequest,
     target_replicas: Optional[list[str]] = None,
     read_only: bool = True,
-) -> Tuple[List[RelationSearchResponse], bool, List[Tuple[str, str, str]], List[str]]:
+) -> tuple[list[RelationSearchResponse], bool, list[tuple[str, str, str]], list[str]]:
     ...
 
 
@@ -130,13 +130,13 @@ async def node_query(
     pb_query: REQUEST_TYPE,
     target_replicas: Optional[list[str]] = None,
     read_only: bool = True,
-) -> Tuple[List[T], bool, List[Tuple[str, str, str]], List[str]]:
+) -> tuple[list[T], bool, list[tuple[str, str, str]], list[str]]:
     read_only = read_only and has_feature(const.Features.READ_REPLICA_SEARCHES)
 
     shard_manager = get_shard_manager()
 
     try:
-        shard_groups: List[PBShardObject] = await shard_manager.get_shards_by_kbid(kbid)
+        shard_groups: list[PBShardObject] = await shard_manager.get_shards_by_kbid(kbid)
     except ShardsNotFound:
         raise HTTPException(
             status_code=404,

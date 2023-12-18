@@ -24,7 +24,7 @@ import uuid
 from datetime import datetime
 from hashlib import md5
 from io import BytesIO
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import HTTPException
 from fastapi.params import Header
@@ -580,10 +580,10 @@ async def upload_rslug_prefix(
     kbid: str,
     rslug: str,
     field: str,
-    x_filename: Optional[List[str]] = Header(None),  # type: ignore
-    x_password: Optional[List[str]] = Header(None),  # type: ignore
-    x_language: Optional[List[str]] = Header(None),  # type: ignore
-    x_md5: Optional[List[str]] = Header(None),  # type: ignore
+    x_filename: Optional[list[str]] = Header(None),  # type: ignore
+    x_password: Optional[list[str]] = Header(None),  # type: ignore
+    x_language: Optional[list[str]] = Header(None),  # type: ignore
+    x_md5: Optional[list[str]] = Header(None),  # type: ignore
     x_synchronous: bool = Header(False),  # type: ignore
 ) -> ResourceFileUploaded:
     return await _upload(
@@ -613,10 +613,10 @@ async def upload_rid_prefix(
     kbid: str,
     path_rid: str,
     field: str,
-    x_filename: Optional[List[str]] = Header(None),  # type: ignore
-    x_password: Optional[List[str]] = Header(None),  # type: ignore
-    x_language: Optional[List[str]] = Header(None),  # type: ignore
-    x_md5: Optional[List[str]] = Header(None),  # type: ignore
+    x_filename: Optional[list[str]] = Header(None),  # type: ignore
+    x_password: Optional[list[str]] = Header(None),  # type: ignore
+    x_language: Optional[list[str]] = Header(None),  # type: ignore
+    x_md5: Optional[list[str]] = Header(None),  # type: ignore
     x_synchronous: bool = Header(False),  # type: ignore
 ) -> ResourceFileUploaded:
     return await _upload(
@@ -644,10 +644,10 @@ async def upload_rid_prefix(
 async def upload(
     request: StarletteRequest,
     kbid: str,
-    x_filename: Optional[List[str]] = Header(None),  # type: ignore
-    x_password: Optional[List[str]] = Header(None),  # type: ignore
-    x_language: Optional[List[str]] = Header(None),  # type: ignore
-    x_md5: Optional[List[str]] = Header(None),  # type: ignore
+    x_filename: Optional[list[str]] = Header(None),  # type: ignore
+    x_password: Optional[list[str]] = Header(None),  # type: ignore
+    x_language: Optional[list[str]] = Header(None),  # type: ignore
+    x_md5: Optional[list[str]] = Header(None),  # type: ignore
     x_synchronous: bool = Header(False),  # type: ignore
 ) -> ResourceFileUploaded:
     return await _upload(
@@ -668,10 +668,10 @@ async def _upload(
     path_rid: Optional[str] = None,
     rslug: Optional[str] = None,
     field: Optional[str] = None,
-    x_filename: Optional[List[str]] = Header(None),  # type: ignore
-    x_password: Optional[List[str]] = Header(None),  # type: ignore
-    x_language: Optional[List[str]] = Header(None),  # type: ignore
-    x_md5: Optional[List[str]] = Header(None),  # type: ignore
+    x_filename: Optional[list[str]] = Header(None),  # type: ignore
+    x_password: Optional[list[str]] = Header(None),  # type: ignore
+    x_language: Optional[list[str]] = Header(None),  # type: ignore
+    x_md5: Optional[list[str]] = Header(None),  # type: ignore
     x_synchronous: bool = Header(False),  # type: ignore
 ) -> ResourceFileUploaded:
     if rslug is not None:

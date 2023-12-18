@@ -21,7 +21,7 @@ import asyncio
 import base64
 import io
 import os
-from typing import Callable, List
+from typing import Callable
 
 import pytest
 from httpx import AsyncClient
@@ -40,7 +40,7 @@ ASSETS_PATH = os.path.dirname(__file__) + "/assets"
 
 @pytest.mark.asyncio
 async def test_knowledgebox_file_tus_options(
-    writer_api: Callable[[List[NucliaDBRoles]], AsyncClient], knowledgebox_writer: str
+    writer_api: Callable[[list[NucliaDBRoles]], AsyncClient], knowledgebox_writer: str
 ):
     client: AsyncClient
     async with writer_api([NucliaDBRoles.WRITER]) as client:
@@ -169,7 +169,7 @@ async def test_knowledgebox_file_tus_upload_root(writer_api, knowledgebox_writer
 
 @pytest.mark.asyncio
 async def test_knowledgebox_file_upload_root(
-    writer_api: Callable[[List[NucliaDBRoles]], AsyncClient],
+    writer_api: Callable[[list[NucliaDBRoles]], AsyncClient],
     knowledgebox_writer: str,
 ):
     async with writer_api([NucliaDBRoles.WRITER]) as client:
@@ -225,7 +225,7 @@ async def test_knowledgebox_file_upload_root(
 
 @pytest.mark.asyncio
 async def test_knowledgebox_file_upload_root_headers(
-    writer_api: Callable[[List[NucliaDBRoles]], AsyncClient],
+    writer_api: Callable[[list[NucliaDBRoles]], AsyncClient],
     knowledgebox_writer: str,
 ):
     async with writer_api([NucliaDBRoles.WRITER]) as client:

@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 from fastapi import Header, Request, Response
 from fastapi_versioning import version
@@ -62,9 +62,9 @@ async def resource_search(
     kbid: str,
     query: str,
     rid: str,
-    fields: List[str] = fastapi_query(SearchParamDefaults.fields),
-    filters: List[str] = fastapi_query(SearchParamDefaults.filters),
-    faceted: List[str] = fastapi_query(SearchParamDefaults.faceted),
+    fields: list[str] = fastapi_query(SearchParamDefaults.fields),
+    filters: list[str] = fastapi_query(SearchParamDefaults.filters),
+    faceted: list[str] = fastapi_query(SearchParamDefaults.faceted),
     sort: Optional[SortField] = fastapi_query(
         SearchParamDefaults.sort_field, alias="sort_field"
     ),
@@ -84,18 +84,18 @@ async def resource_search(
         SearchParamDefaults.range_modification_end
     ),
     highlight: bool = fastapi_query(SearchParamDefaults.highlight),
-    show: List[ResourceProperties] = fastapi_query(
+    show: list[ResourceProperties] = fastapi_query(
         SearchParamDefaults.show, default=list(ResourceProperties)
     ),
-    field_type_filter: List[FieldTypeName] = fastapi_query(
+    field_type_filter: list[FieldTypeName] = fastapi_query(
         SearchParamDefaults.field_type_filter, alias="field_type"
     ),
-    extracted: List[ExtractedDataTypeName] = fastapi_query(
+    extracted: list[ExtractedDataTypeName] = fastapi_query(
         SearchParamDefaults.extracted
     ),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     debug: bool = fastapi_query(SearchParamDefaults.debug),
-    shards: List[str] = fastapi_query(SearchParamDefaults.shards),
+    shards: list[str] = fastapi_query(SearchParamDefaults.shards),
 ) -> Union[ResourceSearchResults, HTTPClientError]:
     # We need to query all nodes
     try:

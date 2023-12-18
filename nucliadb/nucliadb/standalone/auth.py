@@ -19,7 +19,7 @@
 import base64
 import logging
 import time
-from typing import Optional, Tuple
+from typing import Optional
 
 import orjson
 from jwcrypto import jwe, jwk  # type: ignore
@@ -51,7 +51,7 @@ def get_mapped_roles(*, settings: Settings, data: dict[str, str]) -> list[str]:
 
 async def authenticate_auth_token(
     settings: Settings, request: HTTPConnection
-) -> Optional[Tuple[AuthCredentials, BaseUser]]:
+) -> Optional[tuple[AuthCredentials, BaseUser]]:
     if "eph-token" not in request.query_params or settings.jwk_key is None:
         return None
 
@@ -83,7 +83,7 @@ class AuthHeaderAuthenticationBackend(NucliaCloudAuthenticationBackend):
 
     async def authenticate(
         self, request: HTTPConnection
-    ) -> Optional[Tuple[AuthCredentials, BaseUser]]:
+    ) -> Optional[tuple[AuthCredentials, BaseUser]]:
         token_resp = await authenticate_auth_token(self.settings, request)
         if token_resp is not None:
             return token_resp
@@ -115,7 +115,7 @@ class OAuth2AuthenticationBackend(NucliaCloudAuthenticationBackend):
 
     async def authenticate(
         self, request: HTTPConnection
-    ) -> Optional[Tuple[AuthCredentials, BaseUser]]:
+    ) -> Optional[tuple[AuthCredentials, BaseUser]]:
         token_resp = await authenticate_auth_token(self.settings, request)
         if token_resp is not None:
             return token_resp
@@ -170,7 +170,7 @@ class BasicAuthAuthenticationBackend(NucliaCloudAuthenticationBackend):
 
     async def authenticate(
         self, request: HTTPConnection
-    ) -> Optional[Tuple[AuthCredentials, BaseUser]]:
+    ) -> Optional[tuple[AuthCredentials, BaseUser]]:
         token_resp = await authenticate_auth_token(self.settings, request)
         if token_resp is not None:
             return token_resp
@@ -203,7 +203,7 @@ class UpstreamNaiveAuthenticationBackend(NucliaCloudAuthenticationBackend):
 
     async def authenticate(
         self, request: HTTPConnection
-    ) -> Optional[Tuple[AuthCredentials, BaseUser]]:
+    ) -> Optional[tuple[AuthCredentials, BaseUser]]:
         token_resp = await authenticate_auth_token(self.settings, request)
         if token_resp is not None:
             return token_resp

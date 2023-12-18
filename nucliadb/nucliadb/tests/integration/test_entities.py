@@ -32,7 +32,6 @@ for users.
 """
 
 import asyncio
-from typing import Tuple
 
 import pytest
 from httpx import AsyncClient
@@ -117,7 +116,7 @@ async def processing_entities(nucliadb_grpc: WriterStub, knowledgebox: str):
 
 @pytest.fixture
 async def annotated_entities(
-    nucliadb_writer: AsyncClient, text_field: Tuple[str, str, str], nucliadb_grpc
+    nucliadb_writer: AsyncClient, text_field: tuple[str, str, str], nucliadb_grpc
 ):
     kbid, rid, field_id = text_field
 

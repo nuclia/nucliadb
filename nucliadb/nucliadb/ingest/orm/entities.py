@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import AsyncGenerator, Dict, List, Optional, Set, Tuple
+from typing import AsyncGenerator, Optional
 
 from nucliadb_protos.knowledgebox_pb2 import (
     DeletedEntitiesGroups,
@@ -87,13 +87,13 @@ class EntitiesManager:
             return None
         return await self.get_entities_group_inner(group)
 
-    async def get_entities_groups(self) -> Dict[str, EntitiesGroup]:
+    async def get_entities_groups(self) -> dict[str, EntitiesGroup]:
         groups = {}
         async for group, eg in self.iterate_entities_groups(exclude_deleted=True):
             groups[group] = eg
         return groups
 
-    async def list_entities_groups(self) -> Dict[str, EntitiesGroupSummary]:
+    async def list_entities_groups(self) -> dict[str, EntitiesGroupSummary]:
         groups = {}
         async for group in self.iterate_entities_groups_names(exclude_deleted=True):
             stored = await self.get_stored_entities_group(group)
@@ -107,7 +107,7 @@ class EntitiesManager:
                 groups[group] = EntitiesGroupSummary()
         return groups
 
-    async def update_entities(self, group: str, entities: Dict[str, Entity]):
+    async def update_entities(self, group: str, entities: dict[str, Entity]):
         """Update entities on an entity group. New entities are appended and existing
         are overwriten. Existing entities not appearing in `entities` are left
         intact. Use `delete_entities` to delete them instead.
@@ -157,7 +157,7 @@ class EntitiesManager:
 
         await self.store_entities_group(group, entities_group)
 
-    async def delete_entities(self, group: str, delete: List[str]):
+    async def delete_entities(self, group: str, delete: list[str]):
         stored = await self.get_stored_entities_group(group)
 
         stored = stored or EntitiesGroup()
@@ -229,8 +229,8 @@ class EntitiesManager:
         eg = EntitiesGroup(entities=entities)
         return eg
 
-    async def get_deleted_entities_groups(self) -> Set[str]:
-        deleted: Set[str] = set()
+    async def get_deleted_entities_groups(self) -> set[str]:
+        deleted: set[str] = set()
         key = KB_DELETED_ENTITIES_GROUPS.format(kbid=self.kbid)
         payload = await self.txn.get(key)
         if payload:
@@ -252,7 +252,7 @@ class EntitiesManager:
 
     async def iterate_entities_groups(
         self, exclude_deleted: bool
-    ) -> AsyncGenerator[Tuple[str, EntitiesGroup], None]:
+    ) -> AsyncGenerator[tuple[str, EntitiesGroup], None]:
         async for group in self.iterate_entities_groups_names(exclude_deleted):
             eg = await self.get_entities_group_inner(group)
             if eg is None:
@@ -284,7 +284,7 @@ class EntitiesManager:
             yield group
             visited_groups.add(group)
 
-    async def get_indexed_entities_groups_names(self) -> Set[str]:
+    async def get_indexed_entities_groups_names(self) -> set[str]:
         shard_manager = get_shard_manager()
 
         async def query_indexed_entities_group_names(
@@ -367,7 +367,7 @@ class EntitiesManager:
         `indexed` share entities. That's also true for common fields.
 
         """
-        merged_entities: Dict[str, Entity] = {}
+        merged_entities: dict[str, Entity] = {}
         merged_entities.update(indexed.entities)
         merged_entities.update(stored.entities)
 
