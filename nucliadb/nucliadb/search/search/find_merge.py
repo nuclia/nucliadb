@@ -19,6 +19,7 @@
 #
 import asyncio
 from typing import Any, Dict, Iterator, List, Optional, Tuple, cast
+from nucliadb.middleware.transaction import get_transaction
 
 from nucliadb_protos.nodereader_pb2 import (
     DocumentScored,
@@ -360,6 +361,8 @@ async def find_merge_results(
     min_score: float,
     highlight: bool = False,
 ) -> KnowledgeboxFindResults:
+    await get_transaction()
+
     paragraphs: List[List[ParagraphResult]] = []
     vectors: List[List[DocumentScored]] = []
     relations = []

@@ -24,7 +24,7 @@ from typing import Any, AsyncIterator, Dict, Optional
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
-from nucliadb.ingest.txn_utils import get_transaction
+from nucliadb.middleware.transaction import get_transaction
 from nucliadb.train import SERVICE_NAME, logger
 from nucliadb.train.types import TrainBatchType
 from nucliadb_utils.utilities import get_storage
