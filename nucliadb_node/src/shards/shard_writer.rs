@@ -29,12 +29,14 @@ use nucliadb_core::tracing::{self, *};
 use nucliadb_core::{thread, IndexFiles};
 use nucliadb_procs::measure;
 use nucliadb_vectors::VectorErr;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, MutexGuard};
 
 use crate::disk_structure::*;
 use crate::shards::metadata::ShardMetadata;
 use crate::shards::versions::Versions;
 use crate::telemetry::run_with_telemetry;
+
+pub struct BlockingToken<'a>(MutexGuard<'a, ()>);
 
 #[derive(Debug)]
 pub struct ShardWriter {
@@ -171,7 +173,8 @@ impl ShardWriter {
             path: path.clone().join(RELATIONS_DIR),
             channel,
         };
-        let sw = ShardWriter::initialize(Arc::clone(&metadata), tsc, psc, vsc, rsc)?;
+        let shard_metadata = Arc::clone(&metadata);
+        let sw = ShardWriter::initialize(shard_metadata, tsc, psc, vsc, rsc)?;
         metadata.new_generation_id();
 
         Ok(sw)
@@ -472,6 +475,11 @@ impl ShardWriter {
                 _ => Err(error),
             },
         }
+    }
+
+    pub async fn block_shard(&self) -> BlockingToken {
+        let mutex_guard = self.write_lock.lock().await;
+        BlockingToken(mutex_guard)
     }
 
     pub fn get_shard_segments(&self) -> NodeResult<HashMap<String, Vec<String>>> {

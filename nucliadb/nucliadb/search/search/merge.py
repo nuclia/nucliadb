@@ -401,6 +401,7 @@ async def merge_paragraph_results(
                 extracted_text_cache=etcache,
             )
             labels = await get_labels_paragraph(result, kbid)
+            fuzzy_result = len(result.matches) > 0
             new_paragraph = Paragraph(
                 score=result.score.bm25,
                 rid=result.uuid,
@@ -414,6 +415,7 @@ async def merge_paragraph_results(
                     end=result.metadata.position.end,
                     page_number=result.metadata.position.page_number,
                 ),
+                fuzzy_result=fuzzy_result,
             )
             if len(result.metadata.position.start_seconds) or len(
                 result.metadata.position.end_seconds

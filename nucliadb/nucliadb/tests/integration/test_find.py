@@ -258,3 +258,63 @@ async def test_story_7286(
     body = resp.json()
     assert len(body["resources"]) == 0
     assert caplog.record_tuples[0][2] == f"Resource {rid} not found in {knowledgebox}"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_find_marks_fuzzy_results(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox,
+):
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/resources",
+        json={
+            "slug": "myresource",
+            "title": "My Title",
+        },
+    )
+    assert resp.status_code == 201
+
+    # Should get only one non-fuzzy result
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/find",
+        json={
+            "query": "Title",
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    check_fuzzy_paragraphs(body, fuzzy_result=False, n_expected=1)
+
+    # Should get only one fuzzy result
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/find",
+        json={
+            "query": "totle",
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    check_fuzzy_paragraphs(body, fuzzy_result=True, n_expected=1)
+
+    # Should not get any result if exact match term queried
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/find",
+        json={
+            "query": '"totle"',
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    check_fuzzy_paragraphs(body, fuzzy_result=True, n_expected=0)
+
+
+def check_fuzzy_paragraphs(find_response, *, fuzzy_result: bool, n_expected: int):
+    found = 0
+    for resource in find_response["resources"].values():
+        for field in resource["fields"].values():
+            for paragraph in field["paragraphs"].values():
+                assert paragraph["fuzzy_result"] is fuzzy_result
+                found += 1
+    assert found == n_expected
