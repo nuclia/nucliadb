@@ -589,15 +589,15 @@ async def merge_paragraphs_results(
         rcache.clear()
 
 
-async def merge_suggest_entities_results(
+def merge_suggest_entities_results(
     suggest_responses: List[SuggestResponse],
 ) -> RelatedEntities:
     merge = RelatedEntities(entities=[], total=0)
-
     for response in suggest_responses:
-        merge.entities.extend(response.entities.entities)
-        merge.total += response.entities.total
-
+        for entity in response.entities.entities:
+            if entity not in merge.entities:
+                merge.entities.append(entity)
+                merge.total += 1
     return merge
 
 
@@ -613,5 +613,5 @@ async def merge_suggest_results(
     api_results.paragraphs = await merge_suggest_paragraph_results(
         suggest_responses, kbid, highlight=highlight
     )
-    api_results.entities = await merge_suggest_entities_results(suggest_responses)
+    api_results.entities = merge_suggest_entities_results(suggest_responses)
     return api_results
