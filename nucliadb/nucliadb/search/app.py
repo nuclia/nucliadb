@@ -27,7 +27,7 @@ from starlette.requests import ClientDisconnect, Request
 from starlette.responses import HTMLResponse
 
 from nucliadb.common.cluster import manager
-from nucliadb.middleware import ProcessTimeHeaderMiddleware
+from nucliadb.middleware.server_latency import ProcessTimeHeaderMiddleware
 from nucliadb.search import API_PREFIX
 from nucliadb.search.api.v1.router import api as api_v1
 from nucliadb.search.lifecycle import finalize, initialize

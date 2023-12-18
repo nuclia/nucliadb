@@ -31,7 +31,7 @@ from starlette.responses import HTMLResponse
 from starlette.routing import Mount
 
 from nucliadb.common.context.fastapi import set_app_context
-from nucliadb.middleware import ProcessTimeHeaderMiddleware
+from nucliadb.middleware.server_latency import ProcessTimeHeaderMiddleware
 from nucliadb.reader import API_PREFIX
 from nucliadb.reader.api.v1.router import api as api_reader_v1
 from nucliadb.search.api.v1.router import api as api_search_v1
