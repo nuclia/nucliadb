@@ -39,6 +39,7 @@ from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.cluster.utils import get_shard_manager
+from nucliadb.middleware.transaction import get_transaction  # type: ignore
 from nucliadb.search import logger
 from nucliadb.search.search.shards import (
     query_paragraph_shard,
@@ -135,7 +136,10 @@ async def node_query(
     shard_manager = get_shard_manager()
 
     try:
-        shard_groups: List[PBShardObject] = await shard_manager.get_shards_by_kbid(kbid)
+        txn = await get_transaction()
+        shard_groups: List[PBShardObject] = await shard_manager.get_shards_by_kbid(
+            kbid, txn=txn
+        )
     except ShardsNotFound:
         raise HTTPException(
             status_code=404,

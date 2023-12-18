@@ -20,7 +20,7 @@
 import logging
 from typing import Optional
 
-from nucliadb.common.maindb.driver import Driver
+from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb_protos import writer_pb2
 from nucliadb_utils.keys import KB_SHARDS  # this should be defined here
 
@@ -34,9 +34,15 @@ class ClusterDataManager:
         self.driver = driver
 
     async def get_kb_shards(self, kbid: str) -> Optional[writer_pb2.Shards]:
-        key = KB_SHARDS.format(kbid=kbid)
         async with self.driver.transaction(wait_for_abort=False) as txn:
-            return await get_kv_pb(txn, key, writer_pb2.Shards)
+            return await self._get_kb_shards(txn, kbid)
+
+    @classmethod
+    async def _get_kb_shards(
+        cls, txn: Transaction, kbid: str
+    ) -> Optional[writer_pb2.Shards]:
+        key = KB_SHARDS.format(kbid=kbid)
+        return await get_kv_pb(txn, key, writer_pb2.Shards)
 
     async def update_kb_shards(self, kbid: str, kb_shards: writer_pb2.Shards) -> None:
         key = KB_SHARDS.format(kbid=kbid)

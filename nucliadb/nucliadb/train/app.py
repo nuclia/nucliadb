@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb.middleware.transaction import ReadOnlyTransactionMiddleware
 import pkg_resources
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -27,6 +26,7 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import ClientDisconnect, Request
 from starlette.responses import HTMLResponse
 
+from nucliadb.middleware.transaction import ReadOnlyTransactionMiddleware
 from nucliadb.train import API_PREFIX
 from nucliadb.train.api.v1.router import api
 from nucliadb.train.lifecycle import finalize, initialize

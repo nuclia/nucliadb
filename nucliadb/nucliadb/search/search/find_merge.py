@@ -19,7 +19,6 @@
 #
 import asyncio
 from typing import Any, Dict, Iterator, List, Optional, Tuple, cast
-from nucliadb.middleware.transaction import get_transaction
 
 from nucliadb_protos.nodereader_pb2 import (
     DocumentScored,
@@ -28,7 +27,8 @@ from nucliadb_protos.nodereader_pb2 import (
     SearchResponse,
 )
 
-from nucliadb.ingest.serialize import serialize
+from nucliadb.ingest.serialize import managed_serialize
+from nucliadb.middleware.transaction import get_transaction
 from nucliadb.search import SERVICE_NAME, logger
 from nucliadb.search.search.cache import get_resource_cache
 from nucliadb.search.search.merge import merge_relations_results
@@ -98,7 +98,9 @@ async def set_resource_metadata_value(
     await max_operations.acquire()
 
     try:
-        serialized_resource = await serialize(
+        txn = await get_transaction()
+        serialized_resource = await managed_serialize(
+            txn,
             kbid,
             resource,
             show,

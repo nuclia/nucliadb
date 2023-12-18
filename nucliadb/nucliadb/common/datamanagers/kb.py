@@ -21,7 +21,7 @@ from typing import Optional
 
 from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
-from nucliadb.common.maindb.driver import Driver
+from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb_protos import knowledgebox_pb2, writer_pb2
 from nucliadb_utils.keys import KB_SHARDS, KB_UUID
 
@@ -52,20 +52,31 @@ class KnowledgeBoxDataManager:
         return response
 
     async def get_shards_object(self, kbid: str) -> writer_pb2.Shards:
-        key = KB_SHARDS.format(kbid=kbid)
         async with self.driver.transaction() as txn:
-            payload = await txn.get(key)
-            if not payload:
-                raise ShardsNotFound(kbid)
-            pb = writer_pb2.Shards()
-            pb.ParseFromString(payload)
-            return pb
+            return await self._get_shards_object(txn, kbid)
+
+    @classmethod
+    async def _get_shards_object(cls, txn: Transaction, kbid: str) -> writer_pb2.Shards:
+        key = KB_SHARDS.format(kbid=kbid)
+        payload = await txn.get(key)
+        if not payload:
+            raise ShardsNotFound(kbid)
+        pb = writer_pb2.Shards()
+        pb.ParseFromString(payload)
+        return pb
 
     async def get_model_metadata(
         self, kbid: str
     ) -> knowledgebox_pb2.SemanticModelMetadata:
+        async with self.driver.transaction() as txn:
+            return await self._get_model_metadata(txn, kbid)
+
+    @classmethod
+    async def _get_model_metadata(
+        cls, txn: Transaction, kbid: str
+    ) -> knowledgebox_pb2.SemanticModelMetadata:
         try:
-            shards_obj = await self.get_shards_object(kbid)
+            shards_obj = await cls._get_shards_object(txn, kbid)
         except ShardsNotFound:
             raise KnowledgeBoxNotFound(kbid)
         if shards_obj.HasField("model"):
