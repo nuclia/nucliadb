@@ -61,7 +61,7 @@ impl FieldWriter for RelationsWriterService {}
 impl RelationWriter for RelationsWriterService {}
 
 impl WriterChild for RelationsWriterService {
-    #[measure(actor = "texts", metric = "count")]
+    #[measure(actor = "relations" metric = "count")]
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
         let reader = self.index.reader()?;
@@ -71,13 +71,14 @@ impl WriterChild for RelationsWriterService {
         Ok(count)
     }
 
-    #[measure(actor = "texts", metric = "set_resource")]
+    #[measure(actor = "relations", metric = "set_resource")]
     #[tracing::instrument(skip_all)]
     fn set_resource(&mut self, resource: &Resource) -> NodeResult<()> {
         let resource_id = resource.resource.as_ref().expect("Missing resource ID");
         let uuid_field = self.schema.resource_id;
         let uuid_term = Term::from_field_text(uuid_field, &resource_id.uuid);
         self.writer.delete_term(uuid_term);
+        // REVIEW: are we sure we want to index in every other ResourceStatus?
         if resource.status != ResourceStatus::Delete as i32 {
             self.index_document(resource)?;
         }
@@ -86,7 +87,7 @@ impl WriterChild for RelationsWriterService {
         Ok(())
     }
 
-    #[measure(actor = "texts", metric = "delete_resource")]
+    #[measure(actor = "relations", metric = "delete_resource")]
     #[tracing::instrument(skip_all)]
     fn delete_resource(&mut self, resource_id: &ResourceId) -> NodeResult<()> {
         let uuid_field = self.schema.resource_id;
