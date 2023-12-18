@@ -150,6 +150,7 @@ class Paragraph(BaseModel):
     start_seconds: Optional[List[int]] = None
     end_seconds: Optional[List[int]] = None
     position: Optional[TextPosition] = None
+    fuzzy_result: bool = False
 
 
 class Paragraphs(BaseModel):
@@ -825,6 +826,7 @@ class FindParagraph(BaseModel):
     id: str
     labels: Optional[List[str]] = []
     position: Optional[TextPosition] = None
+    fuzzy_result: bool = False
 
 
 @dataclass
@@ -839,6 +841,7 @@ class TempFindParagraph:
     paragraph: Optional[FindParagraph] = None
     vector_index: Optional[DocumentScored] = None
     paragraph_index: Optional[PBParagraphResult] = None
+    fuzzy_result: bool = False
 
 
 class FindField(BaseModel):

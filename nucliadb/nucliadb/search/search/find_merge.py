@@ -64,9 +64,7 @@ async def set_text_value(
     ematches: Optional[List[str]] = None,
     extracted_text_cache: Optional[paragraphs.ExtractedTextCache] = None,
 ):
-    # TODO: Improve
-    await max_operations.acquire()
-    try:
+    async with max_operations:
         assert result_paragraph.paragraph
         assert result_paragraph.paragraph.position
         result_paragraph.paragraph.text = await paragraphs.get_paragraph_text(
@@ -81,8 +79,6 @@ async def set_text_value(
             matches=[],  # TODO
             extracted_text_cache=extracted_text_cache,
         )
-    finally:
-        max_operations.release()
 
 
 @merge_observer.wrap({"type": "set_resource_metadada_value"})
@@ -95,9 +91,7 @@ async def set_resource_metadata_value(
     find_resources: Dict[str, FindResource],
     max_operations: asyncio.Semaphore,
 ):
-    await max_operations.acquire()
-
-    try:
+    async with max_operations:
         serialized_resource = await serialize(
             kbid,
             resource,
@@ -111,9 +105,6 @@ async def set_resource_metadata_value(
         else:
             logger.warning(f"Resource {resource} not found in {kbid}")
             find_resources.pop(resource, None)
-
-    finally:
-        max_operations.release()
 
 
 class Orderer:
@@ -248,6 +239,7 @@ def merge_paragraphs_vectors(
     # We assume that paragraphs_shards and vectors_shards are already ordered
     for paragraphs_shard in paragraphs_shards:
         for paragraph in paragraphs_shard:
+            fuzzy_result = len(paragraph.matches) > 0
             merged_paragrahs.append(
                 TempFindParagraph(
                     paragraph_index=paragraph,
@@ -258,6 +250,7 @@ def merge_paragraphs_vectors(
                     split=paragraph.split,
                     end=paragraph.end,
                     id=paragraph.paragraph,
+                    fuzzy_result=fuzzy_result,
                 )
             )
 
@@ -322,8 +315,10 @@ def merge_paragraphs_vectors(
                     ],
                 ),
                 id=merged_paragraph.id,
+                # Vector searches don't have fuzziness
+                fuzzy_result=False,
             )
-        if merged_paragraph.paragraph_index is not None:
+        elif merged_paragraph.paragraph_index is not None:
             merged_paragraph.paragraph = FindParagraph(
                 score=merged_paragraph.paragraph_index.score.bm25,
                 score_type=SCORE_TYPE.BM25,
@@ -344,6 +339,7 @@ def merge_paragraphs_vectors(
                     ],
                 ),
                 id=merged_paragraph.id,
+                fuzzy_result=merged_paragraph.fuzzy_result,
             )
     return merged_paragrahs, next_page
 
