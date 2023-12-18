@@ -22,7 +22,6 @@ from typing import Union
 from fastapi import Body, Header, Request, Response
 from fastapi.openapi.models import Example
 from fastapi_versioning import version
-from nucliadb.middleware.transaction import setup_request_readonly_transaction
 from nucliadb_protos.resources_pb2 import FieldComputedMetadata
 from nucliadb_protos.utils_pb2 import ExtractedText
 
@@ -96,8 +95,6 @@ async def resource_ask(
     item: AskRequest,
     user_id: str,
 ) -> AskResponse:
-    await setup_request_readonly_transaction()
-
     blocks = await get_resource_text_blocks(kbid, rid)
 
     predict = get_predict()

@@ -20,7 +20,6 @@
 from time import time
 from typing import Tuple
 
-from nucliadb.middleware.transaction import setup_request_readonly_transaction
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.find_merge import find_merge_results
 from nucliadb.search.search.query import QueryParser
@@ -41,8 +40,6 @@ async def find(
     x_nucliadb_user: str,
     x_forwarded_for: str,
 ) -> Tuple[KnowledgeboxFindResults, bool]:
-    await setup_request_readonly_transaction()
-
     audit = get_audit()
     start_time = time()
 

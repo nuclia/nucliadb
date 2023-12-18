@@ -27,8 +27,7 @@ from starlette.testclient import TestClient
 
 from nucliadb.middleware.transaction import (
     ReadOnlyTransactionMiddleware,
-    get_request_readonly_transaction,
-    setup_request_readonly_transaction,
+    get_transaction,
 )
 
 
@@ -56,8 +55,7 @@ class TestCaseProcessTimeHeaderMiddleware:
 
         @app_.route("/foo/")
         async def foo(request):
-            await setup_request_readonly_transaction()
-            txn = get_request_readonly_transaction()
+            txn = await get_transaction()
             val = await txn.get("foo")
             assert val == "bar"
             return PlainTextResponse("Foo")
@@ -75,13 +73,3 @@ class TestCaseProcessTimeHeaderMiddleware:
         driver.begin.assert_called_once_with(read_only=True)
         txn.get.assert_called_once_with("foo")
         txn.abort.assert_called_once()
-
-
-def test_get_request_readonly_transaction_raises_error_if_not_setup():
-    with pytest.raises(RuntimeError):
-        get_request_readonly_transaction()
-
-
-async def test_setup_request_readonly_transaction_raises_error_if_not_in_context():
-    with pytest.raises(RuntimeError):
-        await setup_request_readonly_transaction()

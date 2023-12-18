@@ -24,7 +24,6 @@ from typing import AsyncGenerator, AsyncIterator, List, Optional
 
 from nucliadb_protos.nodereader_pb2 import RelationSearchRequest, RelationSearchResponse
 
-from nucliadb.middleware.transaction import setup_request_readonly_transaction
 from nucliadb.search import logger
 from nucliadb.search.predict import AnswerStatusCode
 from nucliadb.search.requesters.utils import Method, node_query
@@ -202,8 +201,6 @@ async def chat(
     client_type: NucliaDBClientType,
     origin: str,
 ) -> ChatResult:
-    await setup_request_readonly_transaction()
-
     nuclia_learning_id: Optional[str] = None
     chat_history = chat_request.context or []
     start_time = time()

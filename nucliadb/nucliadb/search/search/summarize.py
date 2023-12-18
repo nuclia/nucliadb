@@ -19,7 +19,6 @@
 #
 import asyncio
 from typing import Optional
-from nucliadb.middleware.transaction import setup_request_readonly_transaction
 
 from nucliadb_protos.utils_pb2 import ExtractedText
 
@@ -43,7 +42,6 @@ MAX_GET_EXTRACTED_TEXT_OPS = 20
 
 
 async def summarize(kbid: str, request: SummarizeRequest) -> SummarizedResponse:
-    await setup_request_readonly_transaction()
     predict_request = SummarizeModel()
 
     for rid, field_id, extracted_text in await get_extracted_texts(

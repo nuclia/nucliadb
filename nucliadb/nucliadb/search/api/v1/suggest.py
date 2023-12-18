@@ -24,7 +24,6 @@ from typing import List, Optional, Union
 from fastapi import Header, Request, Response
 from fastapi_versioning import version
 
-from nucliadb.middleware.transaction import setup_request_readonly_transaction
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
@@ -133,8 +132,6 @@ async def suggest(
     debug: bool,
     highlight: bool,
 ) -> KnowledgeboxSuggestResults:
-    await setup_request_readonly_transaction()
-
     # We need the nodes/shards that are connected to the KB
     audit = get_audit()
     start_time = time()

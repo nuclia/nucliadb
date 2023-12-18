@@ -29,8 +29,13 @@ from starlette.responses import Response
 from nucliadb import logger
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import get_driver
+from nucliadb_utils import transaction
 
 request_id: ContextVar[Optional[str]] = ContextVar("request_id", default=None)
+transaction_lock: ContextVar[Optional[asyncio.Lock]] = ContextVar(
+    "transaction_lock", default=None
+)
+
 transactions: dict[str, Transaction] = {}
 
 
@@ -39,41 +44,43 @@ class ReadOnlyTransactionMiddleware(BaseHTTPMiddleware):
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
         request_id.set(str(uuid.uuid4()))
+        transaction_lock.set(asyncio.Lock())
         try:
             return await call_next(request)
         finally:
-            maybe_schedule_abort_transaction()
+            _maybe_schedule_abort_transaction()
             request_id.set(None)
+            transaction_lock.set(None)
 
 
-async def setup_request_readonly_transaction():
+async def get_transaction():
     rid = request_id.get()
     if rid is None:
-        raise RuntimeError("Request id not set")
+        raise RuntimeError("Request id not set. You need to install the middleware")
 
     txn = transactions.get(rid)
     if txn is not None:
-        logger.warning(f"There is already a transaction for request {rid}")
-        return
+        return txn
 
-    logger.debug("Begin read only transaction")
-    driver = get_driver()
-    txn = await driver.begin(read_only=True)
-    transactions[rid] = txn
-
-
-def get_request_readonly_transaction():
-    rid = request_id.get()
-    if rid not in transactions:
-        raise RuntimeError("Transaction not set or already aborted")
-    return transactions[rid]
+    async with transaction_lock.get():
+        # Check again if the transaction was created while waiting for the lock
+        txn = transactions.get(rid)
+        if txn is not None:
+            return txn
+        logger.debug("Begin read only transaction")
+        driver = get_driver()
+        txn = await driver.begin(read_only=True)
+        transactions[rid] = txn
+        return txn
 
 
-def maybe_schedule_abort_transaction():
+def _maybe_schedule_abort_transaction():
     rid = request_id.get()
     txn = transactions.pop(rid, None)
     if txn is None:
+        # No transaction to abort
         return
+
     logger.debug("Abort transaction scheduled")
     asyncio.current_task().add_done_callback(  # type: ignore
         # Automatically abort the transaction when the task is done

@@ -25,7 +25,7 @@ from lru import LRU  # type: ignore
 
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
-from nucliadb.middleware.transaction import get_request_readonly_transaction
+from nucliadb.middleware.transaction import get_transaction
 from nucliadb.search import SERVICE_NAME
 from nucliadb_telemetry import metrics
 from nucliadb_utils.utilities import get_storage
@@ -58,7 +58,7 @@ async def get_resource_from_cache(kbid: str, uuid: str) -> Optional[ResourceORM]
     async with RESOURCE_LOCKS[uuid]:
         if uuid not in resource_cache:
             RESOURCE_CACHE_OPS.inc({"type": "miss"})
-            txn = get_request_readonly_transaction()
+            txn = await get_transaction()
             storage = await get_storage(service_name=SERVICE_NAME)
             kb = KnowledgeBoxORM(txn, storage, kbid)
             orm_resource = await kb.get(uuid)

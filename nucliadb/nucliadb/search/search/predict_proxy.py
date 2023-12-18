@@ -26,7 +26,6 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb.middleware.transaction import setup_request_readonly_transaction
 from nucliadb.search.predict import PredictEngine
 from nucliadb.search.utilities import get_predict
 
@@ -48,8 +47,6 @@ async def predict_proxy(
     params: QueryParams,
     json: Optional[Any] = None,
 ) -> Union[JSONResponse, StreamingResponse]:
-    await setup_request_readonly_transaction()
-
     if not await exists_kb(kbid):
         raise KnowledgeBoxNotFound()
 

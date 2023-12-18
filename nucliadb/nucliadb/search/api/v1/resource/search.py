@@ -23,7 +23,6 @@ from typing import List, Optional, Union
 from fastapi import Header, Request, Response
 from fastapi_versioning import version
 
-from nucliadb.middleware.transaction import setup_request_readonly_transaction
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
@@ -97,8 +96,6 @@ async def resource_search(
     debug: bool = fastapi_query(SearchParamDefaults.debug),
     shards: List[str] = fastapi_query(SearchParamDefaults.shards),
 ) -> Union[ResourceSearchResults, HTTPClientError]:
-    await setup_request_readonly_transaction()
-
     # We need to query all nodes
     try:
         pb_query = await paragraph_query_to_pb(
