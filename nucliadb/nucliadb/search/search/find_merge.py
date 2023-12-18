@@ -28,7 +28,6 @@ from nucliadb_protos.nodereader_pb2 import (
 )
 
 from nucliadb.ingest.serialize import serialize
-from nucliadb.ingest.txn_utils import abort_transaction, get_transaction
 from nucliadb.search import SERVICE_NAME, logger
 from nucliadb.search.search.cache import get_resource_cache
 from nucliadb.search.search.merge import merge_relations_results
@@ -361,11 +360,6 @@ async def find_merge_results(
     min_score: float,
     highlight: bool = False,
 ) -> KnowledgeboxFindResults:
-    # force getting transaction on current asyncio task
-    # so all sub tasks will use the same transaction
-    # this is contextvar magic that is probably not ideal
-    await get_transaction(read_only=True)
-
     paragraphs: List[List[ParagraphResult]] = []
     vectors: List[List[DocumentScored]] = []
     relations = []
@@ -421,7 +415,6 @@ async def find_merge_results(
         )
         api_results.relations = merge_relations_results(relations, requested_relations)
 
-        await abort_transaction()
         return api_results
     finally:
         rcache.clear()

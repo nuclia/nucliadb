@@ -39,7 +39,6 @@ from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.cluster.utils import get_shard_manager
-from nucliadb.ingest.txn_utils import abort_transaction
 from nucliadb.search import logger
 from nucliadb.search.search.shards import (
     query_paragraph_shard,
@@ -165,7 +164,6 @@ async def node_query(
                 queried_shards.append(shard_id)
 
     if not ops:
-        await abort_transaction()
         logger.warning(f"No node found for any of this resources shards {kbid}")
         raise HTTPException(
             status_code=512,
@@ -199,7 +197,6 @@ async def node_query(
 
     error = validate_node_query_results(results or [])
     if error is not None:
-        await abort_transaction()
         raise error
 
     return results, incomplete_results, queried_nodes, queried_shards

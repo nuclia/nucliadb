@@ -152,6 +152,7 @@ async def test_find_resource_filters(
     rid2 = resp.json()["uuid"]
 
     # Should get 2 result
+    breakpoint()
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/find",
         json={

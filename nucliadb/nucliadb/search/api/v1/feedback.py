@@ -20,6 +20,7 @@
 
 from fastapi import Header, Request, Response
 from fastapi_versioning import version
+from nucliadb.middleware.transaction import setup_request_readonly_transaction
 
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.utilities import get_predict
@@ -46,6 +47,7 @@ async def feedback_knowledgebox(
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ):
+    await setup_request_readonly_transaction()
     predict = get_predict()
     await predict.send_feedback(
         kbid, item, x_nucliadb_user, x_ndb_client, x_forwarded_for

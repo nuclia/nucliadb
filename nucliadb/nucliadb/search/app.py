@@ -28,6 +28,7 @@ from starlette.responses import HTMLResponse
 
 from nucliadb.common.cluster import manager
 from nucliadb.middleware.server_latency import ProcessTimeHeaderMiddleware
+from nucliadb.middleware.transaction import ReadOnlyTransactionMiddleware
 from nucliadb.search import API_PREFIX
 from nucliadb.search.api.v1.router import api as api_v1
 from nucliadb.search.lifecycle import finalize, initialize
@@ -49,6 +50,7 @@ middleware = [
         AuthenticationMiddleware,
         backend=NucliaCloudAuthenticationBackend(),
     ),
+    Middleware(ReadOnlyTransactionMiddleware),
 ]
 if running_settings.debug:
     middleware.append(Middleware(ProcessTimeHeaderMiddleware))
