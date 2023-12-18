@@ -29,13 +29,14 @@ from starlette.responses import Response
 from nucliadb import logger
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb_utils import transaction
 
 request_id: ContextVar[Optional[str]] = ContextVar("request_id", default=None)
 transaction_lock: ContextVar[Optional[asyncio.Lock]] = ContextVar(
     "transaction_lock", default=None
 )
 
+# Global dict to store transactions for each request.
+# They are removed when the request is done
 transactions: dict[str, Transaction] = {}
 
 
