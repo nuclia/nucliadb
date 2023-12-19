@@ -25,10 +25,14 @@ def test_chat_on_kb(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
         kbid=docs_dataset,
         query="Nuclia loves Semantic Search",
         prompt="Given this context: {context}. Answer this {question} in a concise way using the provided context",
+        extra_context=[
+            "Nuclia is a powerful AI search platform",
+            "AI Search involves semantic search",
+        ],
     )
     assert result.learning_id == "00"
     assert result.answer == "valid answer  to"
-    assert len(result.result.resources) == 9
+    assert len(result.result.resources) == 7
     assert result.relations
     assert len(result.relations.entities["Nuclia"].related_to) == 18
 
