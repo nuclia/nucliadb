@@ -81,14 +81,14 @@ async def rephrase_query(
     chat_history: List[ChatContextMessage],
     query: str,
     user_id: str,
-    chat_extra_context: List[str],
+    user_context: List[str],
 ) -> str:
     predict = get_predict()
     req = RephraseModel(
         question=query,
         chat_history=chat_history,
         user_id=user_id,
-        chat_extra_context=chat_extra_context,
+        user_context=user_context,
     )
     return await predict.rephrase_query(kbid, req)
 
@@ -206,17 +206,17 @@ async def chat(
     start_time = time()
     nuclia_learning_id: Optional[str] = None
     chat_history = chat_request.context or []
-    chat_extra_context = chat_request.extra_context or []
+    user_context = chat_request.extra_context or []
     user_query = chat_request.query
     rephrased_query = None
 
-    if len(chat_history) > 0 or len(chat_extra_context) > 0:
+    if len(chat_history) > 0 or len(user_context) > 0:
         rephrased_query = await rephrase_query(
             kbid,
             chat_history=chat_history,
             query=user_query,
             user_id=user_id,
-            chat_extra_context=chat_extra_context,
+            user_context=user_context,
         )
 
     find_results: KnowledgeboxFindResults = await get_find_results(
@@ -235,7 +235,7 @@ async def chat(
         )
     else:
         query_context = await get_chat_prompt_context(
-            kbid, find_results, chat_extra_context=chat_extra_context
+            kbid, find_results, user_context=user_context
         )
         query_context_order = {
             paragraph_id: order

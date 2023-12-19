@@ -103,15 +103,21 @@ async def get_expanded_conversation_messages(
 async def get_chat_prompt_context(
     kbid: str,
     results: KnowledgeboxFindResults,
-    chat_extra_context: Optional[list[str]] = None,
+    user_context: Optional[list[str]] = None,
 ) -> dict[str, str]:
-    # ordered dict that prevents duplicates pulled in through conversation expansion.
-    # context_id -> context text. context_id is typically the paragraph id, except for the chat_extra_context.
+    """
+    - Returns an ordered dict of context_id -> context_text.
+    - context_id is typically the paragraph id, but has a special value for the
+      user context. (USER_CONTEXT_0, USER_CONTEXT_1, ...)
+    - Paragraphs are inserted in order of relevance, by increasing `order` field
+      of the find result paragraphs.
+    - User context is inserted first, in order of appearance.
+    - Using an dict prevents from duplicates pulled in through conversation expansion.
+    """
     output = {}
-
     # Chat extra context passed by the user is the most important, therefore
-    for i, context in enumerate(chat_extra_context or []):
-        output[f"USER_EXTRA_CONTEXT_{i}"] = context
+    for i, context in enumerate(user_context or []):
+        output[f"USER_CONTEXT_{i}"] = context
 
     # Sort retrieved paragraphs by decreasing order (most relevant first)
     ordered_paras = []

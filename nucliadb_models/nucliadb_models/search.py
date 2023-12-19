@@ -695,7 +695,7 @@ class RephraseModel(BaseModel):
     question: str
     chat_history: List[ChatContextMessage] = []
     user_id: str
-    chat_extra_context: List[str] = []
+    user_context: List[str] = []
 
 
 class AskDocumentModel(BaseModel):

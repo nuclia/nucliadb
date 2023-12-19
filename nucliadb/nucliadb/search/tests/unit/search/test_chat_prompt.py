@@ -190,9 +190,9 @@ async def test_get_chat_prompt_context(kb):
         # context is added at the beginning, indicating that it has the most priority
         paragraph_ids = [pid for pid in prompt_result.keys()]
         assert paragraph_ids == [
-            "USER_EXTRA_CONTEXT_0",
+            "USER_CONTEXT_0",
             "both_id/c/conv/ident",
             "bmid/c/conv/ident",
             "vecid/c/conv/ident",
         ]
-        assert prompt_result["USER_EXTRA_CONTEXT_0"] == "Some extra context"
+        assert prompt_result["USER_CONTEXT_0"] == "Some extra context"
