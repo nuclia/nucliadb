@@ -184,7 +184,7 @@ async def test_get_chat_prompt_context(kb):
                 },
                 min_score=-1,
             ),
-            chat_extra_context=["Some extra context"],
+            user_context=["Some extra context"],
         )
         # Check that the results are sorted by increasing order and that the extra
         # context is added at the beginning, indicating that it has the most priority
