@@ -536,7 +536,6 @@ class SearchParamDefaults:
         title="Chat history",
         description="Use to rephrase the new LLM query by taking into account the chat conversation history",  # noqa
     )
-
     chat_features = ParamDefault(
         default=[ChatOptions.VECTORS, ChatOptions.PARAGRAPHS, ChatOptions.RELATIONS],
         title="Chat features",
@@ -696,6 +695,7 @@ class RephraseModel(BaseModel):
     question: str
     chat_history: List[ChatContextMessage] = []
     user_id: str
+    chat_extra_context: List[str] = []
 
 
 class AskDocumentModel(BaseModel):
@@ -735,6 +735,12 @@ class ChatRequest(BaseModel):
     context: Optional[
         List[ChatContextMessage]
     ] = SearchParamDefaults.chat_context.to_pydantic_field()
+    extra_context: Optional[List[str]] = Field(
+        default=None,
+        title="Extra query context",
+        description="""Additional context that is added to the retrieval context sent to the LLM.
+        It allows extending the chat feature with content that may not be in the Knowledge Box.""",
+    )
     autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
     highlight: bool = SearchParamDefaults.highlight.to_pydantic_field()
     resource_filters: List[

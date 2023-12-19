@@ -101,20 +101,28 @@ async def get_expanded_conversation_messages(
 
 
 async def get_chat_prompt_context(
-    kbid: str, results: KnowledgeboxFindResults
+    kbid: str,
+    results: KnowledgeboxFindResults,
+    chat_extra_context: Optional[list[str]] = None,
 ) -> dict[str, str]:
+    # ordered dict that prevents duplicates pulled in through conversation expansion.
+    # context_id -> context text. context_id is typically the paragraph id, except for the chat_extra_context.
+    output = {}
+
+    # Chat extra context passed by the user is the most important, therefore
+    for i, context in enumerate(chat_extra_context or []):
+        output[f"USER_EXTRA_CONTEXT_{i}"] = context
+
+    # Sort retrieved paragraphs by decreasing order (most relevant first)
     ordered_paras = []
     for result in results.resources.values():
         for field_path, field in result.fields.items():
             for paragraph in field.paragraphs.values():
                 ordered_paras.append((field_path, paragraph))
-
     ordered_paras.sort(key=lambda x: x[1].order, reverse=False)
 
     driver = get_driver()
     storage = await get_storage()
-    # ordered dict that prevents duplicates pulled in through conversation expansion
-    output = {}
     async with driver.transaction() as txn:
         kb = KnowledgeBoxORM(txn, storage, kbid)
         for field_path, paragraph in ordered_paras:
