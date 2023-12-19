@@ -26,7 +26,7 @@ from unittest.mock import Mock
 
 import asyncpg
 import pytest
-import tikv_client
+import tikv_client  # type: ignore
 from grpc import aio  # type: ignore
 from httpx import AsyncClient
 from nucliadb_protos.train_pb2_grpc import TrainStub

@@ -296,6 +296,7 @@ class ConnectionHolder:
     _txn_connection: asynchronous.TransactionClient
 
     def __init__(self, url: list[str]):
+        self.url = url
         self.connect_lock = asyncio.Lock()
         self.connect_in_progress = False
 
