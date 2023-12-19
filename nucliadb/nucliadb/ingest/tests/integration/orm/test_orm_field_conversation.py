@@ -115,7 +115,7 @@ async def test_create_resource_orm_field_conversation_file(
 
     assert (
         convfield.value[1].messages[0].content.attachments[0].source
-        == CloudFile.Source.GCS
+        == storage.source
     )
     data = await storage.downloadbytescf(
         convfield.value[1].messages[0].content.attachments[0]

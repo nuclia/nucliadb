@@ -61,7 +61,7 @@ async def test_create_resource_orm_field_file(
     filefield: File = await r.get_field("file1", FieldType.FILE, load=True)
     assert filefield.value.file == t2.file
 
-    assert filefield.value.file.source == CloudFile.Source.GCS
+    assert filefield.value.file.source == storage.source
     data = await storage.downloadbytescf(filefield.value.file)
     with open(filename, "rb") as testfile:
         data2 = testfile.read()
