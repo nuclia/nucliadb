@@ -223,10 +223,15 @@ class TiKVTransaction(Transaction):
         self.open = True
 
     async def abort(self):
+        if not self.open:
+            return
         await self.data_layer.abort()
+        self.open = False
 
     async def commit(self):
+        assert self.open
         await self.data_layer.commit()
+        self.open = False
 
     async def batch_get(self, keys: list[str]) -> list[Optional[bytes]]:
         return await self.data_layer.batch_get(keys)
