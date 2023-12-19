@@ -142,7 +142,7 @@ async def test_get_expanded_conversation_messages_missing(kb, messages):
 
 
 def _create_find_result(
-    _id: str, result_text: str, score_type: SCORE_TYPE = SCORE_TYPE.BM25
+    _id: str, result_text: str, score_type: SCORE_TYPE = SCORE_TYPE.BM25, order=1
 ):
     return FindResource(
         id=_id.split("/")[0],
@@ -153,7 +153,7 @@ def _create_find_result(
                         id=_id,
                         score=1.0,
                         score_type=score_type,
-                        order=1,
+                        order=order,
                         text=result_text,
                     )
                 }
@@ -173,16 +173,26 @@ async def test_get_chat_prompt_context(kb):
                 facets={},
                 resources={
                     "bmid": _create_find_result(
-                        "bmid/c/conv/ident", result_text, SCORE_TYPE.BM25
+                        "bmid/c/conv/ident", result_text, SCORE_TYPE.BM25, order=1
                     ),
                     "vecid": _create_find_result(
-                        "vecid/c/conv/ident", result_text, SCORE_TYPE.VECTOR
+                        "vecid/c/conv/ident", result_text, SCORE_TYPE.VECTOR, order=2
+                    ),
+                    "both_id": _create_find_result(
+                        "both_id/c/conv/ident", result_text, SCORE_TYPE.BOTH, order=0
                     ),
                 },
                 min_score=-1,
             ),
+            user_context=["Some extra context"],
         )
-        assert prompt_result == {
-            "bmid/c/conv/ident": result_text,
-            "vecid/c/conv/ident": result_text,
-        }
+        # Check that the results are sorted by increasing order and that the extra
+        # context is added at the beginning, indicating that it has the most priority
+        paragraph_ids = [pid for pid in prompt_result.keys()]
+        assert paragraph_ids == [
+            "USER_CONTEXT_0",
+            "both_id/c/conv/ident",
+            "bmid/c/conv/ident",
+            "vecid/c/conv/ident",
+        ]
+        assert prompt_result["USER_CONTEXT_0"] == "Some extra context"
