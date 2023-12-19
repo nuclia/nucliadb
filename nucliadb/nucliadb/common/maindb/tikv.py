@@ -303,7 +303,6 @@ class ConnectionHolder:
     def __init__(self, url: list[str]):
         self.url = url
         self.connect_lock = asyncio.Lock()
-        self.connect_in_progress = False
 
     async def initialize(self) -> None:
         self._txn_connection = await asynchronous.TransactionClient.connect(self.url)
@@ -311,7 +310,7 @@ class ConnectionHolder:
     async def get_snapshot(
         self, timestamp: Optional[float] = None, retried: bool = False
     ) -> asynchronous.Snapshot:
-        if self.connect_in_progress:  # pragma: no cover
+        if self.connect_lock.locked():  # pragma: no cover
             async with self.connect_lock:
                 ...
         try:
@@ -329,7 +328,7 @@ class ConnectionHolder:
             return await self.get_snapshot(timestamp, retried=True)
 
     async def begin_transaction(self) -> asynchronous.Transaction:
-        if self.connect_in_progress:  # pragma: no cover
+        if self.connect_lock.locked():  # pragma: no cover
             async with self.connect_lock:
                 ...
         try:
@@ -344,23 +343,17 @@ class ConnectionHolder:
             return await self._txn_connection.begin(pessimistic=False)
 
     async def reinitialize(self) -> None:
-        if self.connect_in_progress:
+        if self.connect_lock.locked():
             async with self.connect_lock:
                 # wait for lock and then just continue because someone else is establishing the connection
                 return
         else:
-            self.connect_in_progress = True
-            try:
-                async with self.connect_lock:
-                    logger.warning("Reconnecting to TiKV")
-                    await self.initialize()
-            finally:
-                self.connect_in_progress = False
+            async with self.connect_lock:
+                logger.warning("Reconnecting to TiKV")
+                await self.initialize()
 
 
 class TiKVDriver(Driver):
-    tikv = None
-
     def __init__(self, url: List[str], pool_size: int = 3):
         if TiKV is False:
             raise ImportError("TiKV is not installed")

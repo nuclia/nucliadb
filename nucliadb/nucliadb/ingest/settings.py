@@ -65,7 +65,7 @@ class DriverSettings(BaseSettings):
     )
     driver_tikv_connection_pool_size: int = Field(
         default=3,
-        description="PostgreSQL max pool size. The maximum number of connections to the PostgreSQL server.",
+        description="TiKV max pool size. The maximum number of connections to the TiKV server.",
     )
 
 
