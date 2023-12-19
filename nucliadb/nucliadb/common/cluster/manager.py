@@ -119,9 +119,9 @@ class KBShardManager:
     ) -> writer_pb2.Shards:
         if txn is None:
             cdm = ClusterDataManager(get_driver())
-            result = await cdm.get_kb_shards(kbid)
         else:
-            result = await ClusterDataManager._get_kb_shards(txn, kbid)
+            cdm = ClusterDataManager(txn=txn)
+        result = await cdm.get_kb_shards(kbid)
         if result is None:
             # could be None because /shards doesn't exist, or beacause the
             # whole KB does not exist. In any case, this should not happen
@@ -131,7 +131,7 @@ class KBShardManager:
     async def get_shards_by_kbid(
         self, kbid: str, txn: Optional[Transaction] = None
     ) -> list[writer_pb2.ShardObject]:
-        shards = await self.get_shards_by_kbid_inner(kbid, txn)
+        shards = await self.get_shards_by_kbid_inner(kbid, txn=txn)
         return [x for x in shards.shards]
 
     async def apply_for_all_shards(

@@ -88,7 +88,8 @@ class KnowledgeBox:
 
     async def get_config(self) -> Optional[KnowledgeBoxConfig]:
         if self._config is None:
-            config = await KnowledgeBoxDataManager._get_config(self.txn, self.kbid)
+            kbdm = KnowledgeBoxDataManager(txn=self.txn)
+            config = await kbdm.get_config(self.kbid)
             if config is not None:
                 self._config = config
                 return config

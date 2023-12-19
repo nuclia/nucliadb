@@ -24,29 +24,29 @@ from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb_protos import writer_pb2
 from nucliadb_utils.keys import KB_SHARDS  # this should be defined here
 
-from .utils import get_kv_pb
+from .utils import get_kv_pb, upstream_txn_context_manager
 
 logger = logging.getLogger(__name__)
 
 
 class ClusterDataManager:
-    def __init__(self, driver: Driver):
-        self.driver = driver
+    def __init__(
+        self, driver: Optional[Driver] = None, txn: Optional[Transaction] = None
+    ):
+        if not driver and not txn:
+            raise ValueError("Either driver or txn_context_manager must be provided")
+        self.txn_context_manager = (  # type: ignore
+            driver.transaction if driver else upstream_txn_context_manager(txn)
+        )
 
     async def get_kb_shards(self, kbid: str) -> Optional[writer_pb2.Shards]:
-        async with self.driver.transaction(wait_for_abort=False) as txn:
-            return await self._get_kb_shards(txn, kbid)
-
-    @classmethod
-    async def _get_kb_shards(
-        cls, txn: Transaction, kbid: str
-    ) -> Optional[writer_pb2.Shards]:
-        key = KB_SHARDS.format(kbid=kbid)
-        return await get_kv_pb(txn, key, writer_pb2.Shards)
+        async with self.txn_context_manager(wait_for_abort=False) as txn:
+            key = KB_SHARDS.format(kbid=kbid)
+            return await get_kv_pb(txn, key, writer_pb2.Shards)
 
     async def update_kb_shards(self, kbid: str, kb_shards: writer_pb2.Shards) -> None:
         key = KB_SHARDS.format(kbid=kbid)
-        async with self.driver.transaction() as txn:
+        async with self.txn_context_manager() as txn:
             await txn.set(key, kb_shards.SerializeToString())
             await txn.commit()
 

@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, List, Optional
 
@@ -80,7 +81,7 @@ class Driver:
     @asynccontextmanager
     async def transaction(
         self, wait_for_abort: bool = True, read_only: bool = False
-    ) -> AsyncGenerator[Transaction, None]:
+    ) -> AsyncIterator[Transaction]:
         """
         Use to make sure transaction is always aborted.
 

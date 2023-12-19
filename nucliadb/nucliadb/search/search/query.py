@@ -594,7 +594,7 @@ PROCESSING_STATUS_TO_PB_MAP = {
 @query_parse_dependency_observer.wrap({"type": "min_score"})
 async def get_kb_model_default_min_score(kbid: str) -> Optional[float]:
     txn = await get_transaction()
-    model = await KnowledgeBoxDataManager._get_model_metadata(txn, kbid)
+    model = await KnowledgeBoxDataManager(txn=txn).get_model_metadata(kbid)
     if model.HasField("default_min_score"):
         return model.default_min_score
     else:

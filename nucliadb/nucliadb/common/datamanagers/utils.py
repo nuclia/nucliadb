@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from collections.abc import AsyncIterator
 from typing import Optional, Type, TypeVar
 
 from google.protobuf.message import Message
@@ -36,3 +37,23 @@ async def get_kv_pb(
         return kb_shards
     else:
         return None
+
+
+class UpstreamTransaction:
+    def __init__(self, txn: Transaction):
+        self.txn = txn
+
+    async def __aenter__(
+        self, wait_for_abort: bool = True, read_only: bool = False
+    ) -> Transaction:
+        return self.txn
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+
+def upstream_txn_context_manager(txn: Transaction) -> AsyncIterator[Transaction]:
+    # This is a context manager that simply yields the transaction. It is needed
+    # to keep consistency with the maindb kv driver, which uses a
+    # context manager to safely use a transaction and abort it on exit.
+    return UpstreamTransaction(txn)
