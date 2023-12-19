@@ -62,8 +62,9 @@ tmp/nucliadb
 
 ### NucliaDB specific
 
-# NucliaDB data directory (used in local standalones, for example)
+# NucliaDB data and logs directories (used in local standalone, for example)
 data
+logs
 
 # KB exports used in performance tests
 nucliadb_performance/exports
@@ -78,7 +79,6 @@ nucliadb_performance/exports
 
 ### Others. Still in use?
 
-logs
 
 nucliadb/nucliadb/static/tmp
 nucliadb_ingest/ingest.key
