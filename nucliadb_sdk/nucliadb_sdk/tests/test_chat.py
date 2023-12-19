@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import nucliadb_sdk
+from nucliadb_models.search import Author, ChatContextMessage
 
 
 def test_chat_on_kb(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
@@ -25,6 +26,11 @@ def test_chat_on_kb(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
         kbid=docs_dataset,
         query="Nuclia loves Semantic Search",
         prompt="Given this context: {context}. Answer this {question} in a concise way using the provided context",
+        chat_history=[
+            ChatContextMessage(
+                author=Author.USER, text="What is the coldest season in Sevilla?"
+            )
+        ],
     )
     assert result.learning_id == "00"
     assert result.answer == "valid answer  to"
