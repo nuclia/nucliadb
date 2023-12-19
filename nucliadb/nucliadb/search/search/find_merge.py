@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import Any, Dict, Iterator, List, Optional, Tuple, cast
+from typing import Any, Iterator, Optional, cast
 
 from nucliadb_protos.nodereader_pb2 import (
     DocumentScored,
@@ -61,7 +61,7 @@ async def set_text_value(
     result_paragraph: TempFindParagraph,
     max_operations: asyncio.Semaphore,
     highlight: bool = False,
-    ematches: Optional[List[str]] = None,
+    ematches: Optional[list[str]] = None,
     extracted_text_cache: Optional[paragraphs.ExtractedTextCache] = None,
 ):
     async with max_operations:
@@ -85,10 +85,10 @@ async def set_text_value(
 async def set_resource_metadata_value(
     kbid: str,
     resource: str,
-    show: List[ResourceProperties],
-    field_type_filter: List[FieldTypeName],
-    extracted: List[ExtractedDataTypeName],
-    find_resources: Dict[str, FindResource],
+    show: list[ResourceProperties],
+    field_type_filter: list[FieldTypeName],
+    extracted: list[ExtractedDataTypeName],
+    find_resources: dict[str, FindResource],
     max_operations: asyncio.Semaphore,
 ):
     async with max_operations:
@@ -135,14 +135,14 @@ class Orderer:
 
 @merge_observer.wrap({"type": "fetch_find_metadata"})
 async def fetch_find_metadata(
-    find_resources: Dict[str, FindResource],
-    result_paragraphs: List[TempFindParagraph],
+    find_resources: dict[str, FindResource],
+    result_paragraphs: list[TempFindParagraph],
     kbid: str,
-    show: List[ResourceProperties],
-    field_type_filter: List[FieldTypeName],
-    extracted: List[ExtractedDataTypeName],
+    show: list[ResourceProperties],
+    field_type_filter: list[FieldTypeName],
+    extracted: list[ExtractedDataTypeName],
     highlight: bool = False,
-    ematches: Optional[List[str]] = None,
+    ematches: Optional[list[str]] = None,
 ):
     resources = set()
     operations = []
@@ -228,13 +228,13 @@ async def fetch_find_metadata(
 
 @merge_observer.wrap({"type": "merge_paragraphs_vectors"})
 def merge_paragraphs_vectors(
-    paragraphs_shards: List[List[ParagraphResult]],
-    vectors_shards: List[List[DocumentScored]],
+    paragraphs_shards: list[list[ParagraphResult]],
+    vectors_shards: list[list[DocumentScored]],
     count: int,
     page: int,
     min_score: float,
-) -> Tuple[List[TempFindParagraph], bool]:
-    merged_paragrahs: List[TempFindParagraph] = []
+) -> tuple[list[TempFindParagraph], bool]:
+    merged_paragrahs: list[TempFindParagraph] = []
 
     # We assume that paragraphs_shards and vectors_shards are already ordered
     for paragraphs_shard in paragraphs_shards:
@@ -346,13 +346,13 @@ def merge_paragraphs_vectors(
 
 @merge_observer.wrap({"type": "find_merge"})
 async def find_merge_results(
-    search_responses: List[SearchResponse],
+    search_responses: list[SearchResponse],
     count: int,
     page: int,
     kbid: str,
-    show: List[ResourceProperties],
-    field_type_filter: List[FieldTypeName],
-    extracted: List[ExtractedDataTypeName],
+    show: list[ResourceProperties],
+    field_type_filter: list[FieldTypeName],
+    extracted: list[ExtractedDataTypeName],
     requested_relations: EntitiesSubgraphRequest,
     min_score: float,
     highlight: bool = False,
@@ -362,13 +362,13 @@ async def find_merge_results(
     # this is contextvar magic that is probably not ideal
     await get_transaction(read_only=True)
 
-    paragraphs: List[List[ParagraphResult]] = []
-    vectors: List[List[DocumentScored]] = []
+    paragraphs: list[list[ParagraphResult]] = []
+    vectors: list[list[DocumentScored]] = []
     relations = []
 
     # facets_counter = Counter()
     next_page = True
-    ematches: List[str] = []
+    ematches: list[str] = []
     real_query = ""
     total_paragraphs = 0
     for response in search_responses:
@@ -382,8 +382,8 @@ async def find_merge_results(
         next_page = next_page and response.paragraph.next_page
         total_paragraphs += response.paragraph.total
 
-        paragraphs.append(cast(List[ParagraphResult], response.paragraph.results))
-        vectors.append(cast(List[DocumentScored], response.vector.documents))
+        paragraphs.append(cast(list[ParagraphResult], response.paragraph.results))
+        vectors.append(cast(list[DocumentScored], response.vector.documents))
 
         relations.append(response.relation)
 

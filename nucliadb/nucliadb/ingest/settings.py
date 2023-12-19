@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from enum import Enum
-from typing import List, Optional
+from typing import Optional
 
 from pydantic import BaseSettings, Field
 
@@ -47,7 +47,7 @@ class DriverSettings(BaseSettings):
     driver_redis_url: Optional[str] = Field(
         default=None, description="Redis URL. Example: redis://localhost:6379"
     )
-    driver_tikv_url: Optional[List[str]] = Field(
+    driver_tikv_url: Optional[list[str]] = Field(
         default=None,
         description="TiKV PD (Placement Dricer) URL. The URL to the cluster manager of TiKV. Example: tikv-pd.svc:2379",
     )
@@ -68,7 +68,7 @@ class DriverSettings(BaseSettings):
 class Settings(DriverSettings):
     grpc_port: int = 8030
 
-    partitions: List[str] = ["1"]
+    partitions: list[str] = ["1"]
 
     pull_time_error_backoff: int = 100
     disable_pull_worker: bool = False

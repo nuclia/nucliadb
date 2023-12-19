@@ -20,7 +20,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, AsyncGenerator, List, Optional, Union
+from typing import Any, AsyncGenerator, Optional, Union
 
 import asyncpg
 import backoff
@@ -69,7 +69,7 @@ DO UPDATE SET value = EXCLUDED.value
         async with self.lock:
             await self.connection.execute("DELETE FROM resources WHERE key = $1", key)
 
-    async def batch_get(self, keys: List[str]) -> List[Optional[bytes]]:
+    async def batch_get(self, keys: list[str]) -> list[Optional[bytes]]:
         async with self.lock:
             records = {
                 record["key"]: record["value"]
@@ -146,7 +146,7 @@ class PGTransaction(Transaction):
                 self.open = False
                 await self.connection.close()
 
-    async def batch_get(self, keys: List[str]):
+    async def batch_get(self, keys: list[str]):
         return await self.data_layer.batch_get(keys)
 
     async def get(self, key: str) -> Optional[bytes]:
@@ -189,7 +189,7 @@ class ReadOnlyPGTransaction(Transaction):
     async def commit(self):
         ...
 
-    async def batch_get(self, keys: List[str]):
+    async def batch_get(self, keys: list[str]):
         return await DataLayer(self.pool).batch_get(keys)
 
     async def get(self, key: str) -> Optional[bytes]:

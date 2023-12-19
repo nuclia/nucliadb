@@ -19,7 +19,7 @@
 #
 import asyncio
 import base64
-from typing import List, Optional
+from typing import Optional
 
 import nats
 import nats.errors
@@ -48,7 +48,7 @@ class PullWorker:
     The processing pull endpoint is also described as the "processing proxy" at times.
     """
 
-    subscriptions: List[Subscription]
+    subscriptions: list[Subscription]
 
     def __init__(
         self,

@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import uuid
 from contextlib import AsyncExitStack
-from typing import AsyncIterator, Dict, Optional
+from typing import AsyncIterator, Optional
 
 import aiobotocore  # type: ignore
 import aiohttp
@@ -142,7 +142,7 @@ class S3FileStorageManager(FileStorageManager):
         )
 
     async def iter_data(
-        self, uri: str, kbid: str, headers: Optional[Dict[str, str]] = None
+        self, uri: str, kbid: str, headers: Optional[dict[str, str]] = None
     ):
         if headers is None:
             headers = {}

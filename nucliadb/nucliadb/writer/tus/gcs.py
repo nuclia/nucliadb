@@ -28,7 +28,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from datetime import datetime
-from typing import AsyncIterator, Dict, Optional
+from typing import AsyncIterator, Optional
 from urllib.parse import quote_plus
 
 import aiohttp
@@ -353,7 +353,7 @@ class GCloudFileStorageManager(FileStorageManager):
         await dm.finish()
         return path
 
-    async def iter_data(self, uri, kbid: str, headers: Optional[Dict[str, str]] = None):
+    async def iter_data(self, uri, kbid: str, headers: Optional[dict[str, str]] = None):
         if self.storage.session is None:
             raise AttributeError()
         if headers is None:

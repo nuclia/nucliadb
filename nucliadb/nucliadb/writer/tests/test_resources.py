@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Optional
 from unittest.mock import AsyncMock  # type: ignore
 
 import pytest
@@ -52,7 +52,7 @@ from nucliadb_utils.utilities import get_ingest
 
 @pytest.mark.asyncio
 async def test_resource_crud_min(
-    writer_api: Callable[[List[str]], AsyncClient], knowledgebox_writer: str
+    writer_api: Callable[[list[str]], AsyncClient], knowledgebox_writer: str
 ):
     knowledgebox_id = knowledgebox_writer
     async with writer_api([NucliaDBRoles.WRITER]) as client:
@@ -85,7 +85,7 @@ async def test_resource_crud_min(
 
 @pytest.mark.asyncio
 async def test_resource_crud_min_no_vectorset(
-    writer_api: Callable[[List[str]], AsyncClient], knowledgebox_writer: str
+    writer_api: Callable[[list[str]], AsyncClient], knowledgebox_writer: str
 ):
     knowledgebox_id = knowledgebox_writer
     async with writer_api([NucliaDBRoles.WRITER]) as client:
@@ -113,7 +113,7 @@ async def test_resource_crud_min_no_vectorset(
 
 @pytest.mark.asyncio
 async def test_resource_crud(
-    writer_api: Callable[[List[str]], AsyncClient], knowledgebox_writer: str
+    writer_api: Callable[[list[str]], AsyncClient], knowledgebox_writer: str
 ):
     knowledgebox_id = knowledgebox_writer
     async with writer_api([NucliaDBRoles.WRITER]) as client:
@@ -209,7 +209,7 @@ async def test_resource_crud(
 
 @pytest.mark.asyncio
 async def test_resource_crud_sync(
-    writer_api: Callable[[List[str]], AsyncClient], knowledgebox_writer: str
+    writer_api: Callable[[list[str]], AsyncClient], knowledgebox_writer: str
 ):
     knowledgebox_id = knowledgebox_writer
     async with writer_api([NucliaDBRoles.WRITER]) as client:
@@ -387,11 +387,11 @@ async def test_reprocess_resource(
     ],
 )
 async def test_resource_endpoints_by_slug(
-    writer_api: Callable[[List[str]], AsyncClient],
+    writer_api: Callable[[list[str]], AsyncClient],
     knowledgebox_ingest: str,
     method: str,
     endpoint: str,
-    payload: Optional[Dict[Any, Any]],
+    payload: Optional[dict[Any, Any]],
 ):
     async with writer_api([NucliaDBRoles.WRITER]) as client:
         slug = "my-resource"

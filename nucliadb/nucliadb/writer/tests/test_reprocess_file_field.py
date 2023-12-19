@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import AsyncIterator, Tuple
+from typing import AsyncIterator
 from unittest.mock import AsyncMock
 
 import pytest
@@ -48,7 +48,7 @@ def processing_mock(mocker):
 @pytest.mark.asyncio
 async def file_field(
     writer_api, knowledgebox_writer: str
-) -> AsyncIterator[Tuple[str, str, str]]:
+) -> AsyncIterator[tuple[str, str, str]]:
     kbid = knowledgebox_writer
     field_id = "myfile"
 
@@ -107,7 +107,7 @@ async def test_reprocess_nonexistent_file_field(
 
 @pytest.mark.asyncio
 async def test_reprocess_file_field_with_password(
-    writer_api, file_field: Tuple[str, str, str], processing_mock
+    writer_api, file_field: tuple[str, str, str], processing_mock
 ):
     kbid, rid, field_id = file_field
     password = "secret-password"
@@ -126,7 +126,7 @@ async def test_reprocess_file_field_with_password(
 
 @pytest.mark.asyncio
 async def test_reprocess_file_field_without_password(
-    writer_api, file_field: Tuple[str, str, str], processing_mock
+    writer_api, file_field: tuple[str, str, str], processing_mock
 ):
     kbid, rid, field_id = file_field
 

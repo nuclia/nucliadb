@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 import backoff
 
@@ -221,7 +221,7 @@ class TiKVTransaction(Transaction):
 class TiKVDriver(Driver):
     tikv = None
 
-    def __init__(self, url: List[str]):
+    def __init__(self, url: list[str]):
         if TiKV is False:
             raise ImportError("TiKV is not installed")
         self.url = url

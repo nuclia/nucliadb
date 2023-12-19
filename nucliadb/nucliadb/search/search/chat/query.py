@@ -20,7 +20,7 @@
 import asyncio
 from dataclasses import dataclass
 from time import monotonic as time
-from typing import AsyncGenerator, AsyncIterator, List, Optional
+from typing import AsyncGenerator, AsyncIterator, Optional
 
 from nucliadb_protos.nodereader_pb2 import RelationSearchRequest, RelationSearchResponse
 
@@ -78,7 +78,7 @@ class ChatResult:
 
 async def rephrase_query(
     kbid: str,
-    chat_history: List[ChatContextMessage],
+    chat_history: list[ChatContextMessage],
     query: str,
     user_id: str,
     user_context: List[str],
@@ -171,7 +171,7 @@ async def get_relations_results(
         relation_request.subgraph.entry_points.extend(detected_entities)
         relation_request.subgraph.depth = 1
 
-        relations_results: List[RelationSearchResponse]
+        relations_results: list[RelationSearchResponse]
         (
             relations_results,
             _,
@@ -324,8 +324,8 @@ async def maybe_audit_chat(
     rephrased_query: Optional[str],
     text_answer: bytes,
     status_code: Optional[AnswerStatusCode],
-    chat_history: List[ChatContextMessage],
-    query_context: List[str],
+    chat_history: list[ChatContextMessage],
+    query_context: list[str],
 ):
     audit = get_audit()
     if audit is None:

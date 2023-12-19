@@ -19,7 +19,7 @@
 #
 from __future__ import annotations
 
-from typing import AsyncIterator, Dict, Optional
+from typing import AsyncIterator, Optional
 
 from lru import LRU  # type: ignore
 from nucliadb_protos.resources_pb2 import CloudFile
@@ -65,7 +65,7 @@ class FileStorageManager:
         raise NotImplementedError()
 
     def iter_data(
-        self, uri: str, kbid: str, headers: Optional[Dict[str, str]] = None
+        self, uri: str, kbid: str, headers: Optional[dict[str, str]] = None
     ) -> AsyncIterator[bytes]:
         raise NotImplementedError()
 

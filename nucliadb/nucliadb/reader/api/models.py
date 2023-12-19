@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import TYPE_CHECKING, Any, Dict, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 from pydantic import BaseModel
 
@@ -62,7 +62,7 @@ class ResourceField(BaseModel):
 
 FIELD_NAMES_TO_PB_TYPE_MAP = {v: k for k, v in FIELD_TYPES_MAP.items()}
 
-FIELD_NAME_TO_EXTRACTED_DATA_FIELD_MAP: Dict[FieldTypeName, Any] = {
+FIELD_NAME_TO_EXTRACTED_DATA_FIELD_MAP: dict[FieldTypeName, Any] = {
     FieldTypeName.TEXT: TextFieldExtractedData,
     FieldTypeName.FILE: FileFieldExtractedData,
     FieldTypeName.LINK: LinkFieldExtractedData,

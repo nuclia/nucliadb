@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from typing import AsyncGenerator, AsyncIterator, Optional, Sequence, Tuple
+from typing import AsyncGenerator, AsyncIterator, Optional, Sequence
 from uuid import uuid4
 
 from grpc import StatusCode
@@ -161,7 +161,7 @@ class KnowledgeBox:
     @classmethod
     async def get_kbs(
         cls, txn: Transaction, slug: str, count: int = -1
-    ) -> AsyncIterator[Tuple[str, str]]:
+    ) -> AsyncIterator[tuple[str, str]]:
         async for key in txn.keys(KB_SLUGS.format(slug=slug), count=count):
             slug = key.replace(KB_SLUGS_BASE, "")
             uuid = await cls.get_kb_uuid(txn, slug)
@@ -179,7 +179,7 @@ class KnowledgeBox:
         uuid: Optional[str] = None,
         config: Optional[KnowledgeBoxConfig] = None,
         release_channel: ReleaseChannel.ValueType = ReleaseChannel.STABLE,
-    ) -> Tuple[str, bool]:
+    ) -> tuple[str, bool]:
         failed = False
         exist = await cls.get_kb_uuid(txn, slug)
         if exist:
@@ -272,7 +272,7 @@ class KnowledgeBox:
 
         return uuid
 
-    async def iterate_kb_nodes(self) -> AsyncIterator[Tuple[AbstractIndexNode, str]]:
+    async def iterate_kb_nodes(self) -> AsyncIterator[tuple[AbstractIndexNode, str]]:
         shards_obj = await self.data_manager.get_shards_object(self.kbid)
 
         for shard in shards_obj.shards:

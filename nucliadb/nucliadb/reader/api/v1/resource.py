@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 from fastapi import Header, HTTPException, Query, Request, Response
 from fastapi_versioning import version
@@ -76,12 +76,12 @@ async def list_resources(
     txn = await driver.begin()
 
     # Filter parameters for serializer
-    show: List[ResourceProperties] = [ResourceProperties.BASIC]
-    field_types: List[FieldTypeName] = []
-    extracted: List[ExtractedDataTypeName] = []
+    show: list[ResourceProperties] = [ResourceProperties.BASIC]
+    field_types: list[FieldTypeName] = []
+    extracted: list[ExtractedDataTypeName] = []
 
     try:
-        resources: List[Resource] = []
+        resources: list[Resource] = []
         max_items_to_iterate = (page + 1) * size
         first_wanted_item_index = (page * size) + 1  # 1-based index
         current_key_index = 0
@@ -147,11 +147,11 @@ async def get_resource_by_uuid(
     request: Request,
     kbid: str,
     rid: str,
-    show: List[ResourceProperties] = Query([ResourceProperties.BASIC]),
-    field_type_filter: List[FieldTypeName] = Query(
+    show: list[ResourceProperties] = Query([ResourceProperties.BASIC]),
+    field_type_filter: list[FieldTypeName] = Query(
         list(FieldTypeName), alias="field_type"
     ),
-    extracted: List[ExtractedDataTypeName] = Query(
+    extracted: list[ExtractedDataTypeName] = Query(
         [
             ExtractedDataTypeName.TEXT,
             ExtractedDataTypeName.METADATA,
@@ -187,11 +187,11 @@ async def get_resource_by_slug(
     request: Request,
     kbid: str,
     rslug: str,
-    show: List[ResourceProperties] = Query([ResourceProperties.BASIC]),
-    field_type_filter: List[FieldTypeName] = Query(
+    show: list[ResourceProperties] = Query([ResourceProperties.BASIC]),
+    field_type_filter: list[FieldTypeName] = Query(
         list(FieldTypeName), alias="field_type"
     ),
-    extracted: List[ExtractedDataTypeName] = Query(
+    extracted: list[ExtractedDataTypeName] = Query(
         [
             ExtractedDataTypeName.TEXT,
             ExtractedDataTypeName.METADATA,
@@ -218,9 +218,9 @@ async def _get_resource(
     rslug: Optional[str] = None,
     rid: Optional[str] = None,
     kbid: str,
-    show: List[ResourceProperties],
-    field_type_filter: List[FieldTypeName],
-    extracted: List[ExtractedDataTypeName],
+    show: list[ResourceProperties],
+    field_type_filter: list[FieldTypeName],
+    extracted: list[ExtractedDataTypeName],
     x_nucliadb_user: str,
     x_forwarded_for: str,
 ) -> Resource:
@@ -262,8 +262,8 @@ async def get_resource_field_rslug_prefix(
     rslug: str,
     field_type: FieldTypeName,
     field_id: str,
-    show: List[ResourceFieldProperties] = Query([ResourceFieldProperties.VALUE]),
-    extracted: List[ExtractedDataTypeName] = Query(
+    show: list[ResourceFieldProperties] = Query([ResourceFieldProperties.VALUE]),
+    extracted: list[ExtractedDataTypeName] = Query(
         [
             ExtractedDataTypeName.TEXT,
             ExtractedDataTypeName.METADATA,
@@ -302,8 +302,8 @@ async def get_resource_field_rid_prefix(
     rid: str,
     field_type: FieldTypeName,
     field_id: str,
-    show: List[ResourceFieldProperties] = Query([ResourceFieldProperties.VALUE]),
-    extracted: List[ExtractedDataTypeName] = Query(
+    show: list[ResourceFieldProperties] = Query([ResourceFieldProperties.VALUE]),
+    extracted: list[ExtractedDataTypeName] = Query(
         [
             ExtractedDataTypeName.TEXT,
             ExtractedDataTypeName.METADATA,
@@ -330,8 +330,8 @@ async def _get_resource_field(
     kbid: str,
     field_type: FieldTypeName,
     field_id: str,
-    show: List[ResourceFieldProperties],
-    extracted: List[ExtractedDataTypeName],
+    show: list[ResourceFieldProperties],
+    extracted: list[ExtractedDataTypeName],
     page: Union[str, int],
     rid: Optional[str] = None,
     rslug: Optional[str] = None,

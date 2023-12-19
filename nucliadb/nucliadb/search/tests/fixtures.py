@@ -20,7 +20,7 @@
 import asyncio
 from enum import Enum
 from os.path import dirname
-from typing import Dict, List, Optional
+from typing import Optional
 
 import pytest
 from httpx import AsyncClient
@@ -97,11 +97,11 @@ async def search_api(test_settings_search, transaction_utility, redis):  # type:
         count += 1
 
     def make_client_fixture(
-        roles: Optional[List[Enum]] = None,
+        roles: Optional[list[Enum]] = None,
         user: str = "",
         version: str = "1",
         root: bool = False,
-        extra_headers: Optional[Dict[str, str]] = None,
+        extra_headers: Optional[dict[str, str]] = None,
     ) -> AsyncClient:
         roles = roles or []
         client_base_url = "http://test"
@@ -186,7 +186,7 @@ async def wait_for_shard(knowledgebox_ingest: str, count: int) -> str:
         raise Exception("Could not find shard")
     await txn.abort()
 
-    checks: Dict[str, bool] = {}
+    checks: dict[str, bool] = {}
     for replica in shard.replicas:
         if replica.shard.id not in checks:
             checks[replica.shard.id] = False

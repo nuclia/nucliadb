@@ -20,7 +20,7 @@
 import json
 import os
 from enum import Enum
-from typing import AsyncIterator, Dict, List, Optional, Tuple
+from typing import AsyncIterator, Optional
 from unittest.mock import AsyncMock, Mock
 
 import aiohttp
@@ -136,7 +136,7 @@ async def start_predict_engine():
     set_utility(Utility.PREDICT, predict_util)
 
 
-def convert_relations(data: Dict[str, List[Dict[str, str]]]) -> List[RelationNode]:
+def convert_relations(data: dict[str, list[dict[str, str]]]) -> list[RelationNode]:
     result = []
     for token in data["tokens"]:
         text = token["text"]
@@ -156,7 +156,7 @@ class PredictEngine:
         zone: Optional[str] = None,
         onprem: bool = False,
         local_predict: bool = False,
-        local_predict_headers: Optional[Dict[str, str]] = None,
+        local_predict_headers: Optional[dict[str, str]] = None,
     ):
         self.nuclia_service_account = nuclia_service_account
         self.cluster_url = cluster_url
@@ -307,7 +307,7 @@ class PredictEngine:
     @predict_observer.wrap({"type": "chat"})
     async def chat_query(
         self, kbid: str, item: ChatModel
-    ) -> Tuple[str, AsyncIterator[bytes]]:
+    ) -> tuple[str, AsyncIterator[bytes]]:
         try:
             self.check_nua_key_is_configured_for_onprem()
         except NUAKeyMissingError:
@@ -349,7 +349,7 @@ class PredictEngine:
         return await resp.text()
 
     @predict_observer.wrap({"type": "sentence"})
-    async def convert_sentence_to_vector(self, kbid: str, sentence: str) -> List[float]:
+    async def convert_sentence_to_vector(self, kbid: str, sentence: str) -> list[float]:
         try:
             self.check_nua_key_is_configured_for_onprem()
         except NUAKeyMissingError:
@@ -371,7 +371,7 @@ class PredictEngine:
         return data["data"]
 
     @predict_observer.wrap({"type": "entities"})
-    async def detect_entities(self, kbid: str, sentence: str) -> List[RelationNode]:
+    async def detect_entities(self, kbid: str, sentence: str) -> list[RelationNode]:
         try:
             self.check_nua_key_is_configured_for_onprem()
         except NUAKeyMissingError:
@@ -456,7 +456,7 @@ class DummyPredictEngine(PredictEngine):
 
     async def chat_query(
         self, kbid: str, item: ChatModel
-    ) -> Tuple[str, AsyncIterator[bytes]]:
+    ) -> tuple[str, AsyncIterator[bytes]]:
         self.calls.append(item)
 
         async def generate():
@@ -472,7 +472,7 @@ class DummyPredictEngine(PredictEngine):
         answer = os.environ.get("TEST_ASK_DOCUMENT") or "Answer to your question"
         return answer
 
-    async def convert_sentence_to_vector(self, kbid: str, sentence: str) -> List[float]:
+    async def convert_sentence_to_vector(self, kbid: str, sentence: str) -> list[float]:
         self.calls.append(sentence)
         if (
             os.environ.get("TEST_SENTENCE_ENCODER") == "multilingual-2023-02-21"
@@ -481,7 +481,7 @@ class DummyPredictEngine(PredictEngine):
         else:
             return Q
 
-    async def detect_entities(self, kbid: str, sentence: str) -> List[RelationNode]:
+    async def detect_entities(self, kbid: str, sentence: str) -> list[RelationNode]:
         self.calls.append(sentence)
         dummy_data = os.environ.get("TEST_RELATIONS", None)
         if dummy_data is not None:  # pragma: no cover

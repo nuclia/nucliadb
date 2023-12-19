@@ -20,7 +20,6 @@
 import base64
 import binascii
 import re
-from typing import Dict
 
 from nucliadb.writer.tus.exceptions import InvalidTUSMetadata
 
@@ -35,7 +34,7 @@ match_ascii = re.compile(r"^[ -~]+$")
 match_b64 = re.compile(r"[^-A-Za-z0-9+/=]|=[^=]|={3,}$")
 
 
-def parse_tus_metadata(header: str) -> Dict:
+def parse_tus_metadata(header: str) -> dict:
     """
     https://tus.io/protocols/resumable-upload.html#upload-metadata
     """

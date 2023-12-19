@@ -20,7 +20,7 @@
 import argparse
 import asyncio
 from asyncio import tasks
-from typing import Callable, List
+from typing import Callable
 
 import pkg_resources
 
@@ -40,11 +40,11 @@ def arg_parse():
     parser.add_argument("-k", "--kb", dest="kb", help="Knowledge Box", required=True)
 
 
-async def main() -> List[Callable]:
+async def main() -> list[Callable]:
     parser = arg_parse()
 
     await start_upload(parser.request, parser.kb)
-    finalizers: List[Callable] = []
+    finalizers: list[Callable] = []
 
     return finalizers
 
@@ -81,7 +81,7 @@ def run() -> None:
         raise RuntimeError("cannot be called from a running event loop")
 
     loop = asyncio.new_event_loop()
-    finalizers: List[Callable] = []
+    finalizers: list[Callable] = []
     try:
         asyncio.set_event_loop(loop)
         if running_settings.debug is not None:

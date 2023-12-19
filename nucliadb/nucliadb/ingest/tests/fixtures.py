@@ -22,7 +22,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from os.path import dirname, getsize
-from typing import List, Optional
+from typing import Optional
 from unittest.mock import AsyncMock, patch
 
 import nats
@@ -655,7 +655,7 @@ async def create_resource(
     # 2.5 CONVERSATION FIELD
 
     def make_message(
-        text: str, files: Optional[List[rpb.CloudFile]] = None
+        text: str, files: Optional[list[rpb.CloudFile]] = None
     ) -> rpb.Message:
         msg = rpb.Message(
             who="myself",
