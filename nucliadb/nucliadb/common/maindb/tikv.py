@@ -55,18 +55,13 @@ class TiKVDataLayer:
         self, connection: Union[asynchronous.RawClient, asynchronous.Transaction]
     ):
         self.connection = connection
-        self.open = True
 
     async def abort(self):
-        if not self.open:
-            return
-
         with tikv_observer({"type": "rollback"}):
             try:
                 await self.connection.rollback()
             except Exception:
                 logger.exception("Error rolling back transaction")
-        self.open = False
 
     async def commit(self):
         with tikv_observer({"type": "commit"}):
@@ -78,10 +73,8 @@ class TiKVDataLayer:
                     raise ConflictError(exc_text) from exc
                 else:
                     raise
-        self.open = False
 
     async def batch_get(self, keys: list[str]) -> list[Optional[bytes]]:
-        assert self.open
         bytes_keys: list[bytes] = [x.encode() for x in keys]
         with tikv_observer({"type": "batch_get"}):
             output = {}
@@ -91,7 +84,6 @@ class TiKVDataLayer:
 
     @backoff.on_exception(backoff.expo, (TimeoutError,), max_tries=2)
     async def get(self, key: str) -> Optional[bytes]:
-        assert self.open
         try:
             with tikv_observer({"type": "get"}):
                 return await self.connection.get(key.encode())
@@ -106,12 +98,10 @@ class TiKVDataLayer:
                 raise
 
     async def set(self, key: str, value: bytes) -> None:
-        assert self.open
         with tikv_observer({"type": "put"}):
             await self.connection.put(key.encode(), value)
 
     async def delete(self, key: str) -> None:
-        assert self.open
         with tikv_observer({"type": "delete"}):
             await self.connection.delete(key.encode())
 
@@ -164,7 +154,6 @@ class TiKVDataLayer:
         Count the number of keys that match the given prefix
         as efficiently as possible with the available API.
         """
-        assert self.open
         original_match = match.encode()
         start_key = original_match
         _include_start = True
@@ -234,21 +223,26 @@ class TiKVTransaction(Transaction):
         self.open = False
 
     async def batch_get(self, keys: list[str]) -> list[Optional[bytes]]:
+        assert self.open
         return await self.data_layer.batch_get(keys)
 
     @backoff.on_exception(backoff.expo, (TimeoutError,), max_tries=2)
     async def get(self, key: str) -> Optional[bytes]:
+        assert self.open
         return await self.data_layer.get(key)
 
     async def set(self, key: str, value: bytes) -> None:
+        assert self.open
         return await self.data_layer.set(key, value)
 
     async def delete(self, key: str) -> None:
+        assert self.open
         return await self.data_layer.delete(key)
 
     async def keys(
         self, match: str, count: int = DEFAULT_SCAN_LIMIT, include_start: bool = True
     ):
+        assert self.open
         # XXX must have connection outside of current txn
         conn_holder = self.driver.get_connection_holder()
         txn = await conn_holder.get_snapshot()
@@ -258,6 +252,7 @@ class TiKVTransaction(Transaction):
             yield key
 
     async def count(self, match: str) -> int:
+        assert self.open
         return await self.data_layer.count(match)
 
 
@@ -268,17 +263,20 @@ class ReadOnlyTiKVTransaction(Transaction):
         self.connection = connection
         self.data_layer = TiKVDataLayer(connection)
         self.driver = driver
+        self.open = True
 
     async def abort(self):
-        ...
+        self.open = False
 
     async def commit(self):
         raise Exception("Cannot commit transaction in read only mode")
 
     async def batch_get(self, keys: list[str]) -> list[Optional[bytes]]:
+        assert self.open
         return await self.data_layer.batch_get(keys)
 
     async def get(self, key: str) -> Optional[bytes]:
+        assert self.open
         return await self.data_layer.get(key)
 
     async def set(self, key: str, value: bytes) -> None:
@@ -290,10 +288,12 @@ class ReadOnlyTiKVTransaction(Transaction):
     async def keys(
         self, match: str, count: int = DEFAULT_SCAN_LIMIT, include_start: bool = True
     ):
+        assert self.open
         async for key in self.data_layer.keys(match, count, include_start):
             yield key
 
     async def count(self, match: str) -> int:
+        assert self.open
         return await self.data_layer.count(match)
 
 
