@@ -81,7 +81,7 @@ async def rephrase_query(
     chat_history: list[ChatContextMessage],
     query: str,
     user_id: str,
-    user_context: List[str],
+    user_context: list[str],
 ) -> str:
     predict = get_predict()
     req = RephraseModel(
