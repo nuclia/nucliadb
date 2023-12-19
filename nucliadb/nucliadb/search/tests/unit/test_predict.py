@@ -355,7 +355,9 @@ async def test_rephrase():
         "POST", 200, json="rephrased", context_manager=False
     )
 
-    item = RephraseModel(question="question", chat_history=[], user_id="foo")
+    item = RephraseModel(
+        question="question", chat_history=[], user_id="foo", user_context=["foo"]
+    )
     rephrased_query = await pe.rephrase_query("kbid", item)
     # The rephrase query should not be wrapped in quotes, otherwise it will trigger an exact match query to the index
     assert rephrased_query.strip('"') == rephrased_query
