@@ -91,7 +91,7 @@ def find_with_limits_exceeded_error():
         yield
 
 
-@pytest.mark.flaky(reruns=5)
+# @pytest.mark.flaky(reruns=5)
 @pytest.mark.asyncio()
 async def test_find_handles_limits_exceeded_error(
     search_api, knowledgebox_ingest, find_with_limits_exceeded_error
