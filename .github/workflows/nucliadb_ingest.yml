@@ -49,10 +49,13 @@ jobs:
       max-parallel: 4
       matrix:
         python-version: ["3.11"]
-        maindb_driver: ["tikv", "pg"]
-        storage_backend: ["gcs", "s3"]
-        # TODO: add pg as storage backend to the matrix too
-        # storage_backend: ["gcs", "s3", "pg"]
+        include:
+          - maindb_driver: "tikv"
+            storage_backend: "gcs"
+          - maindb_driver: "tikv"
+            storage_backend: "s3"
+          - maindb_driver: "pg"
+            storage_backend: "gcs"
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v3
@@ -70,14 +73,9 @@ jobs:
         if: matrix.maindb_driver == 'tikv'
         run: ./scripts/run-tikv.sh
 
-      - name: Run tests for different maindb drivers
+      - name: Run tests
         env:
-          TESTING_MAINDB_DRIVERS: ${{ matrix.maindb_driver }}
-        run: |
-          make -C nucliadb/ test-cov-ingest
-
-      - name: Run tests for different storage backends
-        env:
+          TESTING_MAINDB_DRIVER: ${{ matrix.maindb_driver }}
           TESTING_STORAGE_BACKEND: ${{ matrix.storage_backend }}
         run: |
           make -C nucliadb/ test-cov-ingest
