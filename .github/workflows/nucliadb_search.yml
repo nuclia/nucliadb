@@ -72,8 +72,18 @@ jobs:
     runs-on: ubuntu-latest
 
     strategy:
+      max-parallel: 4
       matrix:
-        python-version: ['3.11']
+        include:
+          - maindb_driver: "tikv"
+            storage_backend: "gcs"
+            python-version: "3.11"
+          - maindb_driver: "tikv"
+            storage_backend: "s3"
+            python-version: "3.11"
+          - maindb_driver: "pg"
+            storage_backend: "gcs"
+            python-version: "3.11"
 
     steps:
       - name: Checkout the repository
@@ -142,6 +152,9 @@ jobs:
           make build-sidecar
 
       - name: Run tests
+        env:
+          TESTING_MAINDB_DRIVER: ${{ matrix.maindb_driver }}
+          TESTING_STORAGE_BACKEND: ${{ matrix.storage_backend }}
         run: |
           pytest -rfE --cov=nucliadb.search -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json nucliadb/nucliadb/search
 

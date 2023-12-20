@@ -106,7 +106,7 @@ async def test_create_resource_orm_field_layout_file(
     layoutfield: Layout = await r.get_field("layout1", FieldType.LAYOUT, load=True)
     assert layoutfield.value.body == l2.body
 
-    assert layoutfield.value.body.blocks["field1"].file.source == CloudFile.Source.GCS
+    assert layoutfield.value.body.blocks["field1"].file.source == storage.source
     data = await storage.downloadbytescf(layoutfield.value.body.blocks["field1"].file)
     with open(filename, "rb") as testfile:
         data2 = testfile.read()
