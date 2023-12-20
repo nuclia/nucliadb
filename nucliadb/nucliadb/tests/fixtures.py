@@ -26,6 +26,7 @@ from unittest.mock import Mock
 
 import asyncpg
 import pytest
+import tikv_client  # type: ignore
 from grpc import aio  # type: ignore
 from httpx import AsyncClient
 from nucliadb_protos.train_pb2_grpc import TrainStub
@@ -523,6 +524,17 @@ def tikv_driver_settings(tikvd):
         url = "localhost:2379"
     else:
         url = f"{tikvd[0]}:{tikvd[2]}"
+
+    # before using tikv, clear the db
+    # delete here instead of `tikv_driver` fixture because
+    # these settings are used in tests that the driver fixture
+    # is not used
+    client = tikv_client.TransactionClient.connect([url])
+    txn = client.begin(pessimistic=False)
+    for key in txn.scan_keys(start=b"", end=None, limit=99999):
+        txn.delete(key)
+    txn.commit()
+
     return DriverSettings(driver=DriverConfig.TIKV, driver_tikv_url=[url])
 
 
@@ -537,10 +549,6 @@ async def tikv_driver(tikv_driver_settings) -> AsyncIterator[Driver]:
 
     yield driver
 
-    txn = await driver.begin()
-    async for key in txn.keys(""):
-        await txn.delete(key)
-    await txn.commit()
     await driver.finalize()
     ingest_settings.driver_tikv_url = None
     MAIN.pop("driver", None)
