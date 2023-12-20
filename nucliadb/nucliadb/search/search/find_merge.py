@@ -27,7 +27,8 @@ from nucliadb_protos.nodereader_pb2 import (
     SearchResponse,
 )
 
-from nucliadb.ingest.serialize import serialize
+from nucliadb.common.maindb.driver import Transaction
+from nucliadb.ingest.serialize import managed_serialize
 from nucliadb.ingest.txn_utils import abort_transaction, get_transaction
 from nucliadb.search import SERVICE_NAME, logger
 from nucliadb.search.search.cache import get_resource_cache
@@ -83,6 +84,7 @@ async def set_text_value(
 
 @merge_observer.wrap({"type": "set_resource_metadada_value"})
 async def set_resource_metadata_value(
+    txn: Transaction,
     kbid: str,
     resource: str,
     show: list[ResourceProperties],
@@ -92,7 +94,8 @@ async def set_resource_metadata_value(
     max_operations: asyncio.Semaphore,
 ):
     async with max_operations:
-        serialized_resource = await serialize(
+        serialized_resource = await managed_serialize(
+            txn,
             kbid,
             resource,
             show,
@@ -144,6 +147,7 @@ async def fetch_find_metadata(
     highlight: bool = False,
     ematches: Optional[list[str]] = None,
 ):
+    txn = await get_transaction(read_only=True)
     resources = set()
     operations = []
     max_operations = asyncio.Semaphore(50)
@@ -207,6 +211,7 @@ async def fetch_find_metadata(
         operations.append(
             asyncio.create_task(
                 set_resource_metadata_value(
+                    txn,
                     kbid=kbid,
                     resource=resource,
                     show=show,

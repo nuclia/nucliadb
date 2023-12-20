@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import asyncio
 from typing import Optional
 
 import nucliadb_models as models
@@ -136,13 +135,33 @@ async def serialize(
     slug: Optional[str] = None,
 ) -> Optional[Resource]:
     driver = get_driver()
-    txn = await driver.begin()
+    async with driver.transaction(wait_for_abort=False, read_only=True) as txn:
+        return await managed_serialize(
+            txn,
+            kbid,
+            rid,
+            show,
+            field_type_filter,
+            extracted,
+            service_name=service_name,
+            slug=slug,
+        )
 
+
+async def managed_serialize(
+    txn: Transaction,
+    kbid: str,
+    rid: Optional[str],
+    show: list[ResourceProperties],
+    field_type_filter: list[FieldTypeName],
+    extracted: list[ExtractedDataTypeName],
+    service_name: Optional[str] = None,
+    slug: Optional[str] = None,
+) -> Optional[Resource]:
     orm_resource = await get_orm_resource(
         txn, kbid, rid=rid, slug=slug, service_name=service_name
     )
     if orm_resource is None:
-        await txn.abort()
         return None
 
     resource = Resource(id=orm_resource.uuid)
@@ -440,7 +459,6 @@ async def serialize(
                             text=resource.data.generics[field.id].value
                         )
                     )
-    asyncio.create_task(txn.abort())
     return resource
 
 
