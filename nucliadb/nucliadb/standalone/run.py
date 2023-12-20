@@ -20,6 +20,7 @@
 import asyncio
 import logging
 import os
+import pathlib
 import sys
 
 import pydantic_argparse
@@ -34,7 +35,7 @@ from nucliadb.standalone.settings import Settings
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.fastapi import instrument_app
 from nucliadb_telemetry.logs import setup_logging
-from nucliadb_telemetry.settings import LogSettings
+from nucliadb_telemetry.settings import LogOutputType, LogSettings
 from nucliadb_utils.settings import nuclia_settings, storage_settings
 
 logger = logging.getLogger(__name__)
@@ -95,11 +96,15 @@ def run():
         "Blog storage backend": storage_settings.file_backend,
         "Cluster discovery mode": cluster_settings.cluster_discovery_mode,
         "Node replicas": cluster_settings.node_replicas,
-        "Index data path": cluster_settings.data_path,
+        "Index data path": os.path.realpath(cluster_settings.data_path),
         "Node port": cluster_settings.standalone_node_port,
         "Auth policy": settings.auth_policy,
         "Log output type": settings.log_output_type,
     }
+    if settings.log_output_type == LogOutputType.FILE:
+        log_folder = pathlib.Path(os.path.realpath(LogSettings().access_log)).parent
+        settings_to_output["Log folder path"] = log_folder
+
     if nuclia_settings.nuclia_service_account:
         settings_to_output["NUA API key"] = "Configured ✔"
         settings_to_output["NUA API zone"] = nuclia_settings.nuclia_zone

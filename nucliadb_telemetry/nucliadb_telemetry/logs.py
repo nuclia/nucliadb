@@ -74,6 +74,12 @@ _BUILTIN_ATTRS = set(
 )
 
 
+ACCESS_LOG_FMT = (
+    "%(asctime)s.%(msecs)03d - %(client_addr)s - %(request_line)s %(status_code)s"
+)
+ACCESS_LOG_DATEFMT = "%Y-%m-%d,%H:%M:%S"
+
+
 def extra_from_record(record) -> Dict[str, Any]:
     return {
         attr_name: record.__dict__[attr_name]
@@ -205,11 +211,23 @@ def setup_access_logging(settings: LogSettings) -> None:
     else:
         access_handler = logging.StreamHandler()
     access_logger.addHandler(access_handler)
+
     if not settings.debug and settings.log_format_type == LogFormatType.STRUCTURED:
-        access_handler.setFormatter(UvicornAccessFormatter())
+        access_handler.setFormatter(
+            UvicornAccessFormatter(
+                fmt=ACCESS_LOG_FMT,
+                datefmt=ACCESS_LOG_DATEFMT,
+            )
+        )
     else:
         # regular stream access logs
-        access_handler.setFormatter(AccessFormatter())  # not json based
+        access_handler.setFormatter(
+            AccessFormatter(  # not json based
+                fmt=ACCESS_LOG_FMT,
+                datefmt=ACCESS_LOG_DATEFMT,
+                use_colors=True,
+            )
+        )
 
 
 def setup_logging(*, settings: Optional[LogSettings] = None) -> None:
