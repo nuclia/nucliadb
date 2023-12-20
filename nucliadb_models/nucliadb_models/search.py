@@ -268,6 +268,7 @@ class KnowledgeboxCounters(BaseModel):
     fields: int
     sentences: int
     shards: Optional[List[str]] = None
+    index_size: float = Field(default=0.0, title="Index size (bytes)")
 
 
 class SortField(str, Enum):
