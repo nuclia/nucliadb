@@ -18,25 +18,34 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+// disable clippy lint caused by rstest proc macro
+#![allow(clippy::items_after_test_module)]
+
 mod common;
 
 use std::collections::HashMap;
 
-use common::{resources, NodeFixture, TestNodeReader, TestNodeWriter};
+use common::{resources, NodeFixture, TestNodeReader};
 use itertools::Itertools;
 use nucliadb_core::protos::{
-    op_status, Filter, NewShardRequest, SuggestFeatures, SuggestRequest, SuggestResponse,
+    op_status, Filter, NewShardRequest, ReleaseChannel, SuggestFeatures, SuggestRequest,
+    SuggestResponse,
 };
+use rstest::*;
 use tonic::Request;
 
+#[rstest]
+#[awt]
 #[tokio::test]
-async fn test_suggest_paragraphs() -> Result<(), Box<dyn std::error::Error>> {
-    let mut fixture = NodeFixture::new();
-    fixture.with_writer().await?.with_reader().await?;
-    let mut writer = fixture.writer_client();
-    let mut reader = fixture.reader_client();
-
-    let shard = create_suggest_shard(&mut writer).await;
+async fn test_suggest_paragraphs(
+    #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)]
+    _release_channel: ReleaseChannel,
+    #[future]
+    #[with(_release_channel)]
+    suggest_shard: (NodeFixture, ShardDetails),
+) -> Result<(), Box<dyn std::error::Error>> {
+    let (node, shard) = suggest_shard;
+    let mut reader = node.reader_client();
 
     // exact match
     expect_paragraphs(
@@ -132,14 +141,18 @@ async fn test_suggest_paragraphs() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+#[rstest]
+#[awt]
 #[tokio::test]
-async fn test_suggest_entities() -> Result<(), Box<dyn std::error::Error>> {
-    let mut fixture = NodeFixture::new();
-    fixture.with_writer().await?.with_reader().await?;
-    let mut writer = fixture.writer_client();
-    let mut reader = fixture.reader_client();
-
-    let shard = create_suggest_shard(&mut writer).await;
+async fn test_suggest_entities(
+    #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)]
+    _release_channel: ReleaseChannel,
+    #[future]
+    #[with(_release_channel)]
+    suggest_shard: (NodeFixture, ShardDetails),
+) -> Result<(), Box<dyn std::error::Error>> {
+    let (node, shard) = suggest_shard;
+    let mut reader = node.reader_client();
 
     // basic suggests
     expect_entities(
@@ -196,20 +209,24 @@ async fn test_suggest_entities() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+#[rstest]
+#[awt]
 #[tokio::test]
-async fn test_suggest_features() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_suggest_features(
+    #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)]
+    _release_channel: ReleaseChannel,
+    #[future]
+    #[with(_release_channel)]
+    suggest_shard: (NodeFixture, ShardDetails),
+) -> Result<(), Box<dyn std::error::Error>> {
     // Test: search for "an" with paragraph and entities features and validate
     // we search only for what we request.
     //
     // "an" should match entities starting with this prefix and the "and" word
     // from the little prince text
 
-    let mut fixture = NodeFixture::new();
-    fixture.with_writer().await?.with_reader().await?;
-    let mut writer = fixture.writer_client();
-    let mut reader = fixture.reader_client();
-
-    let shard = create_suggest_shard(&mut writer).await;
+    let (node, shard) = suggest_shard;
+    let mut reader = node.reader_client();
 
     let response = suggest_paragraphs(&mut reader, &shard.id, "an").await;
     assert!(response.entities.is_none());
@@ -226,36 +243,45 @@ async fn test_suggest_features() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-struct ShardDetails<'a> {
-    id: String,
-    resources: HashMap<&'a str, String>,
+#[fixture]
+fn default_release_channel(
+    #[default(ReleaseChannel::Stable)] value: ReleaseChannel,
+) -> ReleaseChannel {
+    value
 }
 
-async fn create_suggest_shard(writer: &mut TestNodeWriter) -> ShardDetails {
-    let request = Request::new(NewShardRequest::default());
+struct ShardDetails {
+    id: String,
+    resources: HashMap<&'static str, String>,
+}
+
+#[fixture]
+async fn suggest_shard(
+    #[from(default_release_channel)] release_channel: ReleaseChannel,
+) -> (NodeFixture, ShardDetails) {
+    let mut fixture = NodeFixture::new();
+    fixture.with_writer().await.unwrap();
+    fixture.with_reader().await.unwrap();
+
+    let mut writer = fixture.writer_client();
+
+    let request = Request::new(NewShardRequest {
+        release_channel: release_channel.into(),
+        ..Default::default()
+    });
     let new_shard_response = writer
         .new_shard(request)
         .await
         .expect("Unable to create new shard");
     let shard_id = &new_shard_response.get_ref().id;
-    let resource_uuids = create_test_resources(writer, shard_id.clone()).await;
-    ShardDetails {
-        id: shard_id.to_owned(),
-        resources: resource_uuids,
-    }
-}
 
-async fn create_test_resources(
-    writer: &mut TestNodeWriter,
-    shard_id: String,
-) -> HashMap<&str, String> {
     let resources = [
-        ("little prince", resources::little_prince(&shard_id)),
-        ("zarathustra", resources::thus_spoke_zarathustra(&shard_id)),
-        ("pap", resources::people_and_places(&shard_id)),
+        ("little prince", resources::little_prince(shard_id)),
+        ("zarathustra", resources::thus_spoke_zarathustra(shard_id)),
+        ("pap", resources::people_and_places(shard_id)),
     ];
-    let mut resource_uuids = HashMap::new();
 
+    let mut resource_uuids = HashMap::new();
     for (name, resource) in resources.into_iter() {
         resource_uuids.insert(name, resource.resource.as_ref().unwrap().uuid.clone());
         let request = Request::new(resource);
@@ -263,7 +289,13 @@ async fn create_test_resources(
         assert_eq!(response.get_ref().status, op_status::Status::Ok as i32);
     }
 
-    resource_uuids
+    (
+        fixture,
+        ShardDetails {
+            id: shard_id.to_owned(),
+            resources: resource_uuids,
+        },
+    )
 }
 
 async fn suggest_paragraphs(
