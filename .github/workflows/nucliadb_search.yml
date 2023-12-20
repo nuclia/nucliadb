@@ -74,14 +74,16 @@ jobs:
     strategy:
       max-parallel: 4
       matrix:
-        python-version: ["3.11"]
         include:
           - maindb_driver: "tikv"
             storage_backend: "gcs"
+            python-version: "3.11"
           - maindb_driver: "tikv"
             storage_backend: "s3"
+            python-version: "3.11"
           - maindb_driver: "pg"
             storage_backend: "gcs"
+            python-version: "3.11"
 
     steps:
       - name: Checkout the repository
