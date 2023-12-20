@@ -62,3 +62,4 @@ async def test_counters(
     assert resp.json()["resources"] == 3
     assert resp.json()["paragraphs"] == 3
     assert resp.json()["fields"] == 3
+    assert resp.json()["index_size"] == 30_000

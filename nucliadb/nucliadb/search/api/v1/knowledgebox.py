@@ -48,6 +48,8 @@ from nucliadb_telemetry import errors
 from nucliadb_utils.authentication import requires, requires_one
 from nucliadb_utils.utilities import get_storage
 
+AVG_PARAGRAPH_SIZE_BYTES = 10_000
+
 
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/shards",
@@ -176,6 +178,7 @@ async def knowledgebox_counters(
         paragraphs=paragraph_count,
         fields=field_count,
         sentences=sentence_count,
+        index_size=paragraph_count * AVG_PARAGRAPH_SIZE_BYTES,
     )
 
     if debug:
