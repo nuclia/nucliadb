@@ -156,51 +156,53 @@ async fn test_suggest_entities(
 
     // basic suggests
     expect_entities(
-        &suggest_entities(&mut reader, &shard.id, "An").await,
+        &suggest_entities(&mut reader, &shard.id, "Ann").await,
         &["Anastasia", "Anna", "Anthony"],
     );
 
     expect_entities(
-        &suggest_entities(&mut reader, &shard.id, "ann").await,
-        // TODO: add "Anastasia" when typo correction is implemented
-        &["Anna"],
-    );
-
-    expect_entities(
-        &suggest_entities(&mut reader, &shard.id, "jo").await,
+        &suggest_entities(&mut reader, &shard.id, "joh").await,
         &["John"],
     );
 
-    expect_entities(&suggest_entities(&mut reader, &shard.id, "any").await, &[]);
+    expect_entities(
+        &suggest_entities(&mut reader, &shard.id, "anyth").await,
+        &["Anthony"],
+    );
+
+    expect_entities(
+        &suggest_entities(&mut reader, &shard.id, "anything").await,
+        &[],
+    );
 
     // validate tokenization
     expect_entities(
-        &suggest_entities(&mut reader, &shard.id, "bar").await,
+        &suggest_entities(&mut reader, &shard.id, "barc").await,
         &["Barcelona", "Bárcenas"],
     );
 
     expect_entities(
-        &suggest_entities(&mut reader, &shard.id, "Bar").await,
+        &suggest_entities(&mut reader, &shard.id, "Barc").await,
         &["Barcelona", "Bárcenas"],
     );
 
     expect_entities(
-        &suggest_entities(&mut reader, &shard.id, "BAR").await,
+        &suggest_entities(&mut reader, &shard.id, "BARC").await,
         &["Barcelona", "Bárcenas"],
     );
 
     expect_entities(
-        &suggest_entities(&mut reader, &shard.id, "BÄR").await,
+        &suggest_entities(&mut reader, &shard.id, "BÄRĈ").await,
         &["Barcelona", "Bárcenas"],
     );
 
     expect_entities(
-        &suggest_entities(&mut reader, &shard.id, "BáR").await,
+        &suggest_entities(&mut reader, &shard.id, "BáRc").await,
         &["Barcelona", "Bárcenas"],
     );
 
     // multiple words and result ordering
-    let response = suggest_entities(&mut reader, &shard.id, "Solomon Is").await;
+    let response = suggest_entities(&mut reader, &shard.id, "Solomon Isa").await;
     assert!(response.entities.is_some());
     assert_eq!(response.entities.as_ref().unwrap().total, 2);
     assert!(response.entities.as_ref().unwrap().entities[0] == *"Solomon Islands");
@@ -219,7 +221,7 @@ async fn test_suggest_features(
     #[with(_release_channel)]
     suggest_shard: (NodeFixture, ShardDetails),
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Test: search for "an" with paragraph and entities features and validate
+    // Test: search for "ann" with paragraph and entities features and validate
     // we search only for what we request.
     //
     // "an" should match entities starting with this prefix and the "and" word
@@ -228,14 +230,14 @@ async fn test_suggest_features(
     let (node, shard) = suggest_shard;
     let mut reader = node.reader_client();
 
-    let response = suggest_paragraphs(&mut reader, &shard.id, "an").await;
+    let response = suggest_paragraphs(&mut reader, &shard.id, "ann").await;
     assert!(response.entities.is_none());
     expect_paragraphs(
         &response,
         &[(&shard.resources["little prince"], "/a/summary")],
     );
 
-    let response = suggest_entities(&mut reader, &shard.id, "an").await;
+    let response = suggest_entities(&mut reader, &shard.id, "ann").await;
     assert_eq!(response.total, 0);
     assert!(response.results.is_empty());
     expect_entities(&response, &["Anastasia", "Anna", "Anthony"]);
@@ -352,7 +354,10 @@ fn expect_entities(response: &SuggestResponse, expected: &[&str]) {
     assert!(response.entities.is_some());
     assert_eq!(
         response.entities.as_ref().unwrap().total as usize,
-        expected.len()
+        expected.len(),
+        "Response entities don't match expected ones: {:?} != {:?}",
+        response.entities,
+        expected,
     );
     for entity in expected {
         assert!(response
