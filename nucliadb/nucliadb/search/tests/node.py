@@ -27,7 +27,6 @@ import backoff
 import docker  # type: ignore
 import pytest
 from grpc import insecure_channel  # type: ignore
-from grpc.aio import AioRpcError  # type: ignore
 from grpc_health.v1 import health_pb2_grpc  # type: ignore
 from grpc_health.v1.health_pb2 import HealthCheckRequest  # type: ignore
 from nucliadb_protos.nodewriter_pb2 import EmptyQuery, ShardId
@@ -439,7 +438,7 @@ def node(_node, request):
     yield _node
 
 
-@backoff.on_exception(backoff.expo, AioRpcError, max_tries=5)
+@backoff.on_exception(backoff.expo, Exception, max_tries=5)
 def cleanup_node(writer: NodeWriterStub):
     for shard in writer.ListShards(EmptyQuery()).ids:
         writer.DeleteShard(ShardId(id=shard.id))
