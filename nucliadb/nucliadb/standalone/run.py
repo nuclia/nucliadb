@@ -21,6 +21,7 @@ import asyncio
 import logging
 import os
 import sys
+from typing import Optional
 
 import pydantic_argparse
 import uvicorn  # type: ignore
@@ -116,8 +117,7 @@ def run():
     )
 
     installed_version = versions.installed_nucliadb()
-    loop = asyncio.get_event_loop()
-    latest_version = loop.run_until_complete(versions.latest_nucliadb())
+    latest_version = get_latest_nucliadb()
     if latest_version is None:
         version_info_fmted = f"{installed_version} (Update check failed)"
     elif versions.nucliadb_updates_available(installed_version, latest_version):
@@ -138,6 +138,11 @@ def run():
 """
     )
     server.run()
+
+
+def get_latest_nucliadb() -> Optional[str]:
+    loop = asyncio.get_event_loop()
+    return loop.run_until_complete(versions.latest_nucliadb())
 
 
 async def run_async_nucliadb(settings: Settings) -> uvicorn.Server:

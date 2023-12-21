@@ -19,17 +19,27 @@
 #
 from unittest import mock
 
+import pytest
+
 from nucliadb.standalone.run import run, run_async_nucliadb
 from nucliadb.standalone.settings import Settings
 
 
-def test_run():
+@pytest.fixture(scope="function", autouse=True)
+def mocked_deps():
     with mock.patch("uvicorn.Server.run"), mock.patch(
         "pydantic_argparse.ArgumentParser.parse_typed_args", return_value=Settings()
+    ), mock.patch(
+        "nucliadb.standalone.run.get_latest_nucliadb", return_value="1.0.0"
+    ), mock.patch(
+        "uvicorn.Server.startup"
     ):
-        run()
+        yield
+
+
+def test_run():
+    run()
 
 
 async def test_run_async_nucliadb():
-    with mock.patch("uvicorn.Server.startup"):
-        await run_async_nucliadb(Settings())
+    await run_async_nucliadb(Settings())
