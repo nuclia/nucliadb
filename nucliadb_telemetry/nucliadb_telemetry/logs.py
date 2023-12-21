@@ -225,7 +225,6 @@ def setup_access_logging(settings: LogSettings) -> None:
             AccessFormatter(  # not json based
                 fmt=ACCESS_LOG_FMT,
                 datefmt=ACCESS_LOG_DATEFMT,
-                use_colors=True,
             )
         )
 
