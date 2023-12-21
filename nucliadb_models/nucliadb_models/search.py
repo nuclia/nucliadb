@@ -881,7 +881,7 @@ class KnowledgeboxFindResults(JsonBaseModel):
     best_matches: List[str] = Field(
         default=[],
         title="Best matches",
-        description="List of ids of best matching paragraphs",
+        description="List of ids of best matching paragraphs. The list is sorted by decreasing relevance (most relevant first).",  # noqa
     )
 
 
