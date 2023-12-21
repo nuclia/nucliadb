@@ -878,6 +878,11 @@ class KnowledgeboxFindResults(JsonBaseModel):
     shards: Optional[List[str]] = None
     autofilters: List[str] = ModelParamDefaults.applied_autofilters.to_pydantic_field()
     min_score: float = ModelParamDefaults.min_score.to_pydantic_field()
+    best_matches: List[str] = Field(
+        default=[],
+        title="Best matches",
+        description="List of ids of best matching paragraphs. The list is sorted by decreasing relevance (most relevant first).",  # noqa
+    )
 
 
 class FeedbackTasks(str, Enum):

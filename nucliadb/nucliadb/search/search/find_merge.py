@@ -139,6 +139,7 @@ class Orderer:
 @merge_observer.wrap({"type": "fetch_find_metadata"})
 async def fetch_find_metadata(
     find_resources: dict[str, FindResource],
+    best_matches: list[str],
     result_paragraphs: list[TempFindParagraph],
     kbid: str,
     show: list[ResourceProperties],
@@ -206,6 +207,7 @@ async def fetch_find_metadata(
         orderer.sorted_by_insertion()
     ):
         find_resources[rid].fields[field_id].paragraphs[paragraph_id].order = order
+        best_matches.append(paragraph_id)
 
     for resource in resources:
         operations.append(
@@ -408,10 +410,12 @@ async def find_merge_results(
             page_size=count,
             next_page=next_page,
             min_score=round(min_score, ndigits=3),
+            best_matches=[],
         )
 
         await fetch_find_metadata(
             api_results.resources,
+            api_results.best_matches,
             result_paragraphs,
             kbid,
             show,
