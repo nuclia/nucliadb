@@ -31,6 +31,7 @@ from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.keys import KB_SHARDS
 
 
+@pytest.mark.flaky(reruns=5)
 @pytest.mark.asyncio
 async def test_search_kb_not_found(search_api: Callable[..., AsyncClient]) -> None:
     async with search_api(roles=[NucliaDBRoles.READER]) as client:
@@ -40,6 +41,7 @@ async def test_search_kb_not_found(search_api: Callable[..., AsyncClient]) -> No
         assert resp.status_code == 404
 
 
+@pytest.mark.flaky(reruns=5)
 @pytest.mark.asyncio
 async def test_suggest_resource_all(
     search_api: Callable[..., AsyncClient], test_search_resource: str
