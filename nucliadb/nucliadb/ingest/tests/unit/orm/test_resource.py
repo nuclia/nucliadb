@@ -210,8 +210,8 @@ async def test_update_all_fields_key(txn, storage, kb):
 
     await resource.update_all_field_ids(updated=[], deleted=[])
 
-    # Initial value is None
-    assert await resource.get_all_field_ids() is None
+    # Initial value is Empty
+    assert (await resource.get_all_field_ids()) == AllFieldIDs()
 
     all_fields = AllFieldIDs()
     all_fields.fields.append(FieldID(field_type=FieldType.TEXT, field="text1"))

@@ -70,16 +70,17 @@ async def test_tikv_driver_against_restarts(tikvd):
 
     # simulate server restart, patch driver tikv begin method to raise exception
     # this will get overridden when it is re-initialized
-    with patch.object(
-        driver.tikv,
-        "begin",
-        side_effect=Exception(
-            "Exception: [//client-rust]: failed to connect to [Member]"
-        ),
-    ):
-        # after server is restarted, old connection is bad and connection needs
-        # to be re-established but having many simultaneous requests should not stomp on each other
-        await asyncio.gather(*[_runtest(i) for i in range(10)])
+    for holder in driver.pool:
+        with patch.object(
+            holder._txn_connection,
+            "begin",
+            side_effect=Exception(
+                "Exception: [//client-rust]: failed to connect to [Member]"
+            ),
+        ):
+            # after server is restarted, old connection is bad and connection needs
+            # to be re-established but having many simultaneous requests should not stomp on each other
+            await asyncio.gather(*[_runtest(i) for i in range(10)])
 
 
 @pytest.mark.skipif(

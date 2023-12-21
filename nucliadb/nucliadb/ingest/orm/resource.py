@@ -78,6 +78,7 @@ from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb.ingest.orm.utils import get_basic, set_basic
 from nucliadb_models.common import CloudLink
 from nucliadb_models.writer import GENERIC_MIME_TYPE
+from nucliadb_protos import writer_pb2
 from nucliadb_utils.storages.storage import Storage
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -599,6 +600,7 @@ class Resource:
     async def _scan_fields_ids(self) -> AsyncIterator[tuple[FieldType.ValueType, str]]:
         # TODO: Remove this method when we are sure that all KBs have the `allfields` key set
         prefix = KB_RESOURCE_FIELDS.format(kbid=self.kb.kbid, uuid=self.uuid)
+        allfields = set()
         async for key in self.txn.keys(prefix, count=-1):
             # The [6:8] `slicing purpose is to match exactly the two
             # splitted parts corresponding to type and field, and nothing else!
@@ -606,7 +608,11 @@ class Resource:
             type_id = KB_REVERSE.get(type)
             if type_id is None:
                 raise AttributeError("Invalid field type")
-            yield (type_id, field)
+            result = (type_id, field)
+            if result not in allfields:
+                # fields can have errors that would return duplicates here
+                yield result
+            allfields.add(result)
 
     async def _inner_get_fields_ids(self) -> list[tuple[FieldType.ValueType, str]]:
         result = []
@@ -619,7 +625,6 @@ class Resource:
             async for (field_type, field_id) in self._scan_fields_ids():
                 result.append((field_type, field_id))
                 all_fields.fields.append(FieldID(field_type=field_type, field=field_id))
-            await self.set_all_field_ids(all_fields)
 
         # We make sure that title and summary are set to be added
         basic = await self.get_basic()
@@ -692,7 +697,7 @@ class Resource:
     async def get_all_field_ids(self) -> Optional[PBAllFieldIDs]:
         key = KB_RESOURCE_ALL_FIELDS.format(kbid=self.kb.kbid, uuid=self.uuid)
         payload = await self.txn.get(key)
-        if not payload:
+        if payload is None:
             return None
         all_fields = PBAllFieldIDs()
         all_fields.ParseFromString(payload)
@@ -707,16 +712,23 @@ class Resource:
         *,
         updated: Optional[list[FieldID]] = None,
         deleted: Optional[list[FieldID]] = None,
+        errors: Optional[list[writer_pb2.Error]] = None,
     ):
+        needs_update = False
         all_fields = await self.get_all_field_ids()
         if all_fields is None:
+            needs_update = True
             all_fields = PBAllFieldIDs()
-
-        needs_update = False
 
         for field in updated or []:
             if field not in all_fields.fields:
                 all_fields.fields.append(field)
+                needs_update = True
+
+        for error in errors or []:
+            field_id = FieldID(field_type=error.field_type, field=error.field)
+            if field_id not in all_fields.fields:
+                all_fields.fields.append(field_id)
                 needs_update = True
 
         for field in deleted or []:
@@ -768,9 +780,13 @@ class Resource:
         for fieldid in message.delete_fields:
             await self.delete_field(fieldid.field_type, fieldid.field)
 
-        if len(message_updated_fields) or len(message.delete_fields):
+        if (
+            len(message_updated_fields)
+            or len(message.delete_fields)
+            or len(message.errors)
+        ):
             await self.update_all_field_ids(
-                updated=message_updated_fields, deleted=message.delete_fields  # type: ignore
+                updated=message_updated_fields, deleted=message.delete_fields, errors=message.errors  # type: ignore
             )
 
     @processor_observer.wrap({"type": "apply_extracted"})
