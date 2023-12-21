@@ -320,3 +320,32 @@ def check_fuzzy_paragraphs(find_response, *, fuzzy_result: bool, n_expected: int
                 assert paragraph["fuzzy_result"] is fuzzy_result
                 found += 1
     assert found == n_expected
+
+
+@pytest.mark.asyncio
+async def test_find_returns_best_matches(
+    nucliadb_reader: AsyncClient,
+    philosophy_books_kb,
+):
+    kbid = philosophy_books_kb
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/find",
+        json={
+            "query": "and",
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+
+    best_matches = body["best_matches"]
+    paragraphs = []
+    for resource in body["resources"].values():
+        for field in resource["fields"].values():
+            for paragraph in field["paragraphs"].values():
+                paragraphs.append(paragraph)
+    assert len(paragraphs) == len(best_matches) > 2
+
+    # Check that best matches is sorted by the paragraph order
+    sorted_paragraphs = sorted(paragraphs, key=lambda p: p["order"])
+    assert [p["id"] for p in sorted_paragraphs] == best_matches
