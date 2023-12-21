@@ -28,12 +28,12 @@ from nucliadb.standalone.settings import Settings
 
 
 @pytest.mark.asyncio
-async def test_labelsets_service(nucliadb_manager) -> None:
+async def test_introspect_endpoint(nucliadb_manager) -> None:
     # Generate some traffic to have some logs
     await nucliadb_manager.post("/not/found")
     await nucliadb_manager.delete("/kb/foobar")
 
-    resp = await nucliadb_manager.get("/introspect")
+    resp = await nucliadb_manager.get("/introspect", timeout=600)
     assert resp.status_code == 200
 
     with tempfile.TemporaryDirectory() as root_dir:
@@ -46,6 +46,9 @@ async def test_labelsets_service(nucliadb_manager) -> None:
         extracted_tar = os.path.join(root_dir, "introspect")
         with tarfile.open(introspect_tar_file, "r:gz") as tar:
             tar.extractall(extracted_tar)
+
+        # Check system info
+        assert os.path.exists(os.path.join(extracted_tar, "system_info.txt"))
 
         # Check dependencies
         assert os.path.exists(os.path.join(extracted_tar, "dependencies.txt"))

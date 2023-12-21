@@ -20,11 +20,14 @@
 
 import asyncio
 import os
+import platform
+import sys
 import tarfile
 import tempfile
 from collections.abc import AsyncGenerator
 
 import pkg_resources
+import psutil
 from fastapi import FastAPI
 
 from nucliadb.standalone.settings import Settings
@@ -38,6 +41,7 @@ async def stream_tar(app: FastAPI) -> AsyncGenerator[bytes, None]:
     with tempfile.TemporaryDirectory() as temp_dir:
         tar_file = os.path.join(temp_dir, "introspect.tar.gz")
         with tarfile.open(tar_file, mode="w:gz") as tar:
+            await add_system_info(temp_dir, tar)
             await add_dependencies(temp_dir, tar)
             if hasattr(app, "settings"):
                 settings: Settings = app.settings.copy()
@@ -56,6 +60,49 @@ async def stream_out_tar(tar_file: str) -> AsyncGenerator[bytes, None]:
         while chunk:
             yield chunk
             chunk = await loop.run_in_executor(None, f.read, CHUNK_SIZE)
+
+
+async def add_system_info(temp_dir: str, tar: tarfile.TarFile):
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, _add_system_info_to_tar, temp_dir, tar)
+
+
+def _add_system_info_to_tar(temp_dir: str, tar: tarfile.TarFile):
+    system_info_file = os.path.join(temp_dir, "system_info.txt")
+    with open(system_info_file, "w") as f:
+        f.write("System info\n")
+        f.write("============\n")
+        f.write(f"\n")
+
+        f.write("Python\n")
+        f.write("------\n")
+        f.write(f" - Version: {sys.version}\n\n")
+        f.write(f"\n")
+
+        f.write(f"Operative system\n")
+        f.write(f"----------------\n")
+        f.write(f" - Name: {os.uname().sysname}\n")
+        f.write(f" - Release: {platform.release()}\n")
+        f.write(f" - Version: {platform.version()}\n")
+        f.write(f" - Machine: {platform.machine()}\n")
+        f.write(f" - File System Encoding: {os.sys.getfilesystemencoding()}\n")  # type: ignore
+        f.write(f"\n")
+
+        f.write(f"CPU information\n")
+        f.write(f"---------------\n")
+        f.write(f" - Number of CPUs: {psutil.cpu_count()}\n")
+        f.write(f"\n")
+
+        f.write(f"Memory information\n")
+        f.write(f"------------------\n")
+        vmem = psutil.virtual_memory()
+        f.write(f" - Total: {vmem.total / MB:.2f} MB\n")
+        f.write(f" - Available: {vmem.available / MB:.2f} MB\n")
+        f.write(f" - Used: {vmem.used / MB:.2f} MB\n")
+        f.write(f" - Used %: {vmem.percent:.2f}%\n")
+        f.write(f"\n")
+
+    tar.add(system_info_file, arcname="system_info.txt")
 
 
 async def add_dependencies(temp_dir: str, tar: tarfile.TarFile):
