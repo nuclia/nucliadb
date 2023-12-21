@@ -23,6 +23,7 @@ import os
 import time
 from typing import Union
 
+import backoff
 import docker  # type: ignore
 import pytest
 from grpc import insecure_channel  # type: ignore
@@ -421,14 +422,23 @@ def node(_node, request):
     writer2 = NodeWriterStub(channel2)
 
     logger.debug("cleaning up shards data")
-
-    for shard in writer1.ListShards(EmptyQuery()).ids:
-        writer1.DeleteShard(ShardId(id=shard.id))
-
-    for shard in writer2.ListShards(EmptyQuery()).ids:
-        writer2.DeleteShard(ShardId(id=shard.id))
-
-    channel1.close()
-    channel2.close()
+    try:
+        cleanup_node(writer1)
+        cleanup_node(writer2)
+    except Exception:
+        logger.error(
+            "Error cleaning up shards data. Maybe the node fixture could not start properly?",
+            exc_info=True,
+        )
+        raise
+    finally:
+        channel1.close()
+        channel2.close()
 
     yield _node
+
+
+@backoff.on_exception(backoff.expo, Exception, max_tries=5)
+def cleanup_node(writer: NodeWriterStub):
+    for shard in writer.ListShards(EmptyQuery()).ids:
+        writer.DeleteShard(ShardId(id=shard.id))

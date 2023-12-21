@@ -21,6 +21,7 @@ import asyncio
 import logging
 import os
 import sys
+from typing import Optional
 
 import pydantic_argparse
 import uvicorn  # type: ignore
@@ -34,7 +35,7 @@ from nucliadb.standalone.settings import Settings
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.fastapi import instrument_app
 from nucliadb_telemetry.logs import setup_logging
-from nucliadb_telemetry.settings import LogSettings
+from nucliadb_telemetry.settings import LogOutputType, LogSettings
 from nucliadb_utils.settings import nuclia_settings, storage_settings
 
 logger = logging.getLogger(__name__)
@@ -95,11 +96,15 @@ def run():
         "Blog storage backend": storage_settings.file_backend,
         "Cluster discovery mode": cluster_settings.cluster_discovery_mode,
         "Node replicas": cluster_settings.node_replicas,
-        "Index data path": cluster_settings.data_path,
+        "Index data path": os.path.realpath(cluster_settings.data_path),
         "Node port": cluster_settings.standalone_node_port,
         "Auth policy": settings.auth_policy,
         "Log output type": settings.log_output_type,
     }
+    if settings.log_output_type == LogOutputType.FILE:
+        log_folder = os.path.realpath(os.path.dirname(LogSettings().access_log))
+        settings_to_output["Log folder path"] = log_folder
+
     if nuclia_settings.nuclia_service_account:
         settings_to_output["NUA API key"] = "Configured ✔"
         settings_to_output["NUA API zone"] = nuclia_settings.nuclia_zone
@@ -112,8 +117,7 @@ def run():
     )
 
     installed_version = versions.installed_nucliadb()
-    loop = asyncio.get_event_loop()
-    latest_version = loop.run_until_complete(versions.latest_nucliadb())
+    latest_version = get_latest_nucliadb()
     if latest_version is None:
         version_info_fmted = f"{installed_version} (Update check failed)"
     elif versions.nucliadb_updates_available(installed_version, latest_version):
@@ -134,6 +138,11 @@ def run():
 """
     )
     server.run()
+
+
+def get_latest_nucliadb() -> Optional[str]:
+    loop = asyncio.get_event_loop()
+    return loop.run_until_complete(versions.latest_nucliadb())
 
 
 async def run_async_nucliadb(settings: Settings) -> uvicorn.Server:
