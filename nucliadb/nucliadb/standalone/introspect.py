@@ -40,15 +40,14 @@ async def stream_tar(app: FastAPI) -> AsyncGenerator[bytes, None]:
         tar_file = os.path.join(tmpdirname, "introspect.tar.gz")
         with tarfile.open(tar_file, mode="w:gz") as tar:
             # Add pip dependencies
-            with open(os.path.join(tmpdirname, "dependencies.txt"), "w") as f:
+            dependendies_file = os.path.join(tmpdirname, "dependencies.txt")
+            with open(dependendies_file, "w") as f:
                 installed_packages = [pkg for pkg in pkg_resources.working_set]
                 lines = []
                 for pkg in sorted(installed_packages, key=lambda p: p.key):
                     lines.append(f"{pkg.key}=={pkg.version}\n")
                 f.writelines(lines)
-            tar.add(
-                os.path.join(tmpdirname, "dependencies.txt"), arcname="dependencies.txt"
-            )
+            tar.add(dependendies_file, arcname="dependencies.txt")
 
             # Add standalone settings
             if not hasattr(app, "settings"):
@@ -60,9 +59,10 @@ async def stream_tar(app: FastAPI) -> AsyncGenerator[bytes, None]:
             settings.jwk_key = None
             settings.gcs_base64_creds = None
             settings.s3_client_secret = None
-            with open(os.path.join(tmpdirname, "settings.json"), "w") as f:
+            settings_file = os.path.join(tmpdirname, "settings.json")
+            with open(settings_file, "w") as f:
                 f.write(settings.json(indent=4))
-            tar.add(os.path.join(tmpdirname, "settings.json"), arcname="settings.json")
+            tar.add(settings_file, arcname="settings.json")
 
             # Add log files
             if settings.log_output_type == "file":
