@@ -20,7 +20,6 @@
 import asyncio
 import logging
 import os
-import pathlib
 import sys
 
 import pydantic_argparse
@@ -102,7 +101,7 @@ def run():
         "Log output type": settings.log_output_type,
     }
     if settings.log_output_type == LogOutputType.FILE:
-        log_folder = pathlib.Path(os.path.realpath(LogSettings().access_log)).parent
+        log_folder = os.path.realpath(os.path.dirname(LogSettings().access_log))
         settings_to_output["Log folder path"] = log_folder
 
     if nuclia_settings.nuclia_service_account:
