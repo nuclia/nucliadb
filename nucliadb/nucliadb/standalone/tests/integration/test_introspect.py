@@ -52,7 +52,7 @@ async def test_labelsets_service(nucliadb_manager) -> None:
         with open(os.path.join(extracted_tar, "dependencies.txt")) as f:
             dependencies = f.read()
             assert "nucliadb" in dependencies
-            assert "nucliadb_models" in dependencies
+            assert "nucliadb-models" in dependencies
 
         # Check settings
         assert os.path.exists(os.path.join(extracted_tar, "settings.json"))
