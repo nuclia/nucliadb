@@ -59,6 +59,7 @@ async def test_labelsets_service(nucliadb_manager) -> None:
         introspect_settings = Settings.parse_file(
             os.path.join(extracted_tar, "settings.json")
         )
+        # Check that sensitive data is not included
         assert introspect_settings.nua_api_key is None
         assert introspect_settings.jwk_key is None
         assert introspect_settings.gcs_base64_creds is None
