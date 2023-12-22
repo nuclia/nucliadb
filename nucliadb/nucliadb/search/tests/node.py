@@ -442,7 +442,9 @@ def node(_node, request):
             for internal_port in container.ports:
                 for host in container.ports[internal_port]:
                     port = host["HostPort"]
-                    containers_by_port.setdefault(port, []).append(container)
+                    port_containers = containers_by_port.setdefault(port, [])
+                    if container not in port_containers:
+                        port_containers.append(container)
 
         for port, containers in containers_by_port.items():
             if len(containers) > 1:
