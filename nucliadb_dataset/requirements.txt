@@ -14,6 +14,6 @@ types-google-cloud-ndb
 types-boto3
 
 # automatically bumped during release
-nucliadb-protos>=2.37.0
-nucliadb-sdk>=2.37.0
-nucliadb-models>=2.37.0
+nucliadb-protos
+nucliadb-sdk
+nucliadb-models
