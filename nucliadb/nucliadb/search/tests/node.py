@@ -446,10 +446,7 @@ def node(_node, request):
 
         for port, containers in containers_by_port.items():
             if len(containers) > 1:
-                names = ", ".join([
-                    container.name
-                    for container in containers
-                ])
+                names = ", ".join([container.name for container in containers])
                 print(f"ATENTION! Containers {names} share port {port}!")
         raise
     finally:
