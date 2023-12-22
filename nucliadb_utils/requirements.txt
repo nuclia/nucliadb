@@ -9,5 +9,5 @@ memorylru>=1.1.2
 mrflagly
 
 # automatically bumped during release
-nucliadb-protos>=2.37.0
-nucliadb-telemetry>=2.37.0
+nucliadb-protos
+nucliadb-telemetry

@@ -4,4 +4,4 @@ orjson
 pydantic>=1.10.9,<2.0
 
 # automatically bumped during release
-nucliadb-models>=2.37.0
+nucliadb-models
