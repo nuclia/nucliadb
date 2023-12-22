@@ -88,7 +88,7 @@ async def find(
         highlight=item.highlight,
     )
 
-    if audit is not None:
+    if audit is not None and x_nucliadb_user != "_INTERNAL_":
         await audit.search(
             kbid,
             x_nucliadb_user,
