@@ -430,6 +430,27 @@ def node(_node, request):
             "Error cleaning up shards data. Maybe the node fixture could not start properly?",
             exc_info=True,
         )
+
+        client = docker.client.from_env()
+        containers_by_port = {}
+        for container in client.containers.list():
+            name = container.name
+            command = container.attrs["Config"]["Cmd"]
+            ports = container.ports
+            print(f"container {name} executing {command} is using ports: {ports}")
+
+            for internal_port in container.ports:
+                for host in container.ports[internal_port]:
+                    port = host["HostPort"]
+                    containers_by_port.setdefault(port, []).append(container)
+
+        for port, containers in containers_by_port.items():
+            if len(containers) > 1:
+                names = ", ".join([
+                    container.name
+                    for container in containers
+                ])
+                print(f"ATENTION! Containers {names} share port {port}!")
         raise
     finally:
         channel1.close()
