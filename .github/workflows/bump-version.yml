@@ -31,6 +31,11 @@ jobs:
         private-key: ${{ secrets.PK_GHAPP_NUCLIABOT }}
         owner: nuclia
 
+    - uses: actions/checkout@master
+      with:
+        persist-credentials: false 
+        fetch-depth: 0 
+
     - run: python bump.py --sem=${{ inputs.semType }}
 
     - name: Commit & Push changes
