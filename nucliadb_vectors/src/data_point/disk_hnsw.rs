@@ -112,7 +112,7 @@ impl<'a> Iterator for EdgeIter<'a> {
             let edge = f32_from_le_bytes(&buf[crnt..(crnt + EDGE_LEN)]);
             crnt += EDGE_LEN;
             self.crnt = crnt;
-            Some((Address(node), Edge { dist: edge }))
+            Some((Address(node), edge))
         }
     }
 }
@@ -138,7 +138,7 @@ impl DiskHnsw {
             length += USIZE_LEN;
             for (cnx, edge) in hnsw.get_layer(layer).get_out_edges(node) {
                 buf.write_all(&cnx.0.to_le_bytes())?;
-                buf.write_all(&edge.dist.to_le_bytes())?;
+                buf.write_all(&edge.to_le_bytes())?;
                 length += CNX_LEN;
             }
         }
@@ -242,9 +242,9 @@ mod tests {
     fn hnsw_test() {
         let no_nodes = 3;
         let cnx0 = vec![
-            vec![(Address(1), Edge { dist: 1.0 })],
-            vec![(Address(2), Edge { dist: 2.0 })],
-            vec![(Address(3), Edge { dist: 3.0 })],
+            vec![(Address(1), 1.0)],
+            vec![(Address(2), 2.0)],
+            vec![(Address(3), 3.0)],
         ];
         let layer0 = RAMLayer {
             out: cnx0
@@ -253,10 +253,7 @@ mod tests {
                 .map(|(i, c)| (Address(i), c.clone()))
                 .collect(),
         };
-        let cnx1 = vec![
-            vec![(Address(1), Edge { dist: 4.0 })],
-            vec![(Address(2), Edge { dist: 5.0 })],
-        ];
+        let cnx1 = vec![vec![(Address(1), 4.0)], vec![(Address(2), 5.0)]];
         let layer1 = RAMLayer {
             out: cnx1
                 .iter()
@@ -264,7 +261,7 @@ mod tests {
                 .map(|(i, c)| (Address(i), c.clone()))
                 .collect(),
         };
-        let cnx2 = vec![vec![(Address(1), Edge { dist: 6.0 })]];
+        let cnx2 = vec![vec![(Address(1), 6.0)]];
         let layer2 = RAMLayer {
             out: cnx2
                 .iter()
