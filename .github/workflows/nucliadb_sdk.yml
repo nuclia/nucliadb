@@ -56,6 +56,7 @@ jobs:
               - 'nucliadb_paragraphs/**'
               - 'nucliadb_procs/**'
               - 'nucliadb_relations/**'
+              - 'nucliadb_relations2/**'
               - 'nucliadb_telemetry/**'
               - 'nucliadb_texts/**'
               - 'nucliadb_vectors/**'

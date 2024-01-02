@@ -19,6 +19,7 @@ on:
       - "nucliadb_paragraphs/**"
       - "nucliadb_core/**"
       - "nucliadb_relations/**"
+      - "nucliadb_relations2/**"
   push:
     branches:
       - main
@@ -37,6 +38,7 @@ on:
       - "nucliadb_paragraphs/**"
       - "nucliadb_core/**"
       - "nucliadb_relations/**"
+      - "nucliadb_relations2/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}

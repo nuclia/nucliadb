@@ -61,6 +61,7 @@ jobs:
               - 'nucliadb_paragraphs_tantivy/**'
               - 'nucliadb_vectors/**'
               - 'nucliadb_relations/**'
+              - 'nucliadb_relations2/**'
 
       - name: Calc git info
         id: git
