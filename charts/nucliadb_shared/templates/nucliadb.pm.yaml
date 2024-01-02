@@ -16,5 +16,5 @@ spec:
       metrics: "enabled"
   podMetricsEndpoints:
     - port: metrics
-      interval: 10s
+      interval: {{ ((.Values.podMonitor).interval) | default "60s" }}
       path: /metrics 

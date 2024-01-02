@@ -21,14 +21,14 @@ spec:
   endpoints:
   # node sidecar metrics
   - targetPort: {{ .Values.serving.metricsPort }}
-    interval: 10s
+    interval: {{ ((.Values.serviceMonitor).interval) | default "60s" }}
     path: /metrics
   # reader
   - targetPort: 3031
-    interval: 10s
+    interval: {{ ((.Values.serviceMonitor).interval) | default "60s" }}
     path: /metrics
   # writer
   - targetPort: 3032
-    interval: 10s
+    interval: {{ ((.Values.serviceMonitor).interval) | default "60s" }}
     path: /metrics
 {{- end }}
