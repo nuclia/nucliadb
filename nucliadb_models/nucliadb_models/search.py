@@ -890,10 +890,16 @@ class FeedbackTasks(str, Enum):
 
 
 class FeedbackRequest(BaseModel):
-    ident: str
-    good: bool
-    task: FeedbackTasks
-    feedback: Optional[str]
+    ident: str = Field(
+        title="Request identifier",
+        description="Id of the request to provide feedback for. This id is returned in the response header `Nuclia-Learning-Id` of the chat endpoint.",  # noqa
+    )
+    good: bool = Field(title="Good", description="Whether the result was good or not")
+    task: FeedbackTasks = Field(
+        title="Task",
+        description="The task the feedback is for. For now, only `CHAT` task is available",
+    )
+    feedback: Optional[str] = Field(title="Feedback", description="Feedback text")
 
 
 TextBlocks = List[List[str]]
