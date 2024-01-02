@@ -35,6 +35,32 @@ from nucliadb_telemetry.settings import LogSettings
 
 MB = 1024 * 1024
 CHUNK_SIZE = 2 * MB
+SYSTEM_INFO_TEMPLATE = """System info
+===========
+
+Python
+------
+    - Version: {python_version}
+
+Operative system
+----------------
+    - Name: {os_name}
+    - Release: {os_release}
+    - Version: {os_version}
+    - Machine: {os_machine}
+    - File System Encoding: {os_file_system_encoding}
+
+CPU information
+---------------
+    - Number of CPUs: {cpu_count}
+
+Memory information
+------------------
+    - Total: {memory_total:.2f} MB
+    - Available: {memory_available:.2f} MB
+    - Used: {memory_used:.2f} MB
+    - Used %: {memory_used_percent:.2f}%
+"""
 
 
 async def stream_tar(app: FastAPI) -> AsyncGenerator[bytes, None]:
@@ -43,11 +69,10 @@ async def stream_tar(app: FastAPI) -> AsyncGenerator[bytes, None]:
         with tarfile.open(tar_file, mode="w:gz") as tar:
             await add_system_info(temp_dir, tar)
             await add_dependencies(temp_dir, tar)
-            if hasattr(app, "settings"):
-                settings: Settings = app.settings.copy()
-                await add_settings(temp_dir, tar, settings)
-                if settings.log_output_type == "file":
-                    await add_logs(tar)
+            settings: Settings = app.settings.copy()  # type: ignore
+            await add_settings(temp_dir, tar, settings)
+            if settings.log_output_type == "file":
+                await add_logs(tar)
 
         async for chunk in stream_out_tar(tar_file):
             yield chunk
@@ -70,38 +95,22 @@ async def add_system_info(temp_dir: str, tar: tarfile.TarFile):
 def _add_system_info_to_tar(temp_dir: str, tar: tarfile.TarFile):
     system_info_file = os.path.join(temp_dir, "system_info.txt")
     with open(system_info_file, "w") as f:
-        f.write("System info\n")
-        f.write("============\n")
-        f.write(f"\n")
-
-        f.write("Python\n")
-        f.write("------\n")
-        f.write(f" - Version: {sys.version}\n\n")
-        f.write(f"\n")
-
-        f.write(f"Operative system\n")
-        f.write(f"----------------\n")
-        f.write(f" - Name: {os.uname().sysname}\n")
-        f.write(f" - Release: {platform.release()}\n")
-        f.write(f" - Version: {platform.version()}\n")
-        f.write(f" - Machine: {platform.machine()}\n")
-        f.write(f" - File System Encoding: {os.sys.getfilesystemencoding()}\n")  # type: ignore
-        f.write(f"\n")
-
-        f.write(f"CPU information\n")
-        f.write(f"---------------\n")
-        f.write(f" - Number of CPUs: {psutil.cpu_count()}\n")
-        f.write(f"\n")
-
-        f.write(f"Memory information\n")
-        f.write(f"------------------\n")
-        vmem = psutil.virtual_memory()
-        f.write(f" - Total: {vmem.total / MB:.2f} MB\n")
-        f.write(f" - Available: {vmem.available / MB:.2f} MB\n")
-        f.write(f" - Used: {vmem.used / MB:.2f} MB\n")
-        f.write(f" - Used %: {vmem.percent:.2f}%\n")
-        f.write(f"\n")
-
+        memory = psutil.virtual_memory()
+        f.write(
+            SYSTEM_INFO_TEMPLATE.format(
+                python_version=sys.version,
+                os_name=os.uname().sysname,
+                os_release=platform.release(),
+                os_version=platform.version(),
+                os_machine=platform.machine(),
+                os_file_system_encoding=os.sys.getfilesystemencoding(),  # type: ignore
+                cpu_count=psutil.cpu_count(),
+                memory_total=memory.total / MB,
+                memory_available=memory.available / MB,
+                memory_used=memory.used / MB,
+                memory_used_percent=memory.percent,
+            )
+        )
     tar.add(system_info_file, arcname="system_info.txt")
 
 
