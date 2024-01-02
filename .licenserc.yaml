@@ -60,6 +60,7 @@ header:
     - "nucliadb_dataset/**"
     - "nucliadb_protos/build.rs"
     - "nucliadb_protos/src/lib.rs"
+    - "nucliadb_performance/**"
 
   paths-ignore:
     - "**/Cargo.toml"
