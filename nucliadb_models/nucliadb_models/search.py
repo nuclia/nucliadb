@@ -890,10 +890,19 @@ class FeedbackTasks(str, Enum):
 
 
 class FeedbackRequest(BaseModel):
-    ident: str
-    good: bool
-    task: FeedbackTasks
-    feedback: Optional[str]
+    ident: str = Field(
+        title="ident", description="Id of the request the feedback is related to."
+    )
+    good: bool = Field(
+        title="good", description="Whether the feedback is positive or negative"
+    )
+    task: FeedbackTasks = Field(
+        title="task",
+        description="Type of request the feedback is related to. For now, only chat is supported.",
+    )  # noqa
+    feedback: Optional[str] = Field(
+        default=None, title="feedback", description="Feedback text"
+    )
 
 
 TextBlocks = List[List[str]]

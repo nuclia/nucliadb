@@ -28,6 +28,7 @@ from pydantic.error_wrappers import ValidationError
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.models.responses import HTTPClientError
+from nucliadb.search import predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.search.exceptions import InvalidQueryError
@@ -185,3 +186,5 @@ async def find_post_knowledgebox(
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
     except InvalidQueryError as exc:
         return HTTPClientError(status_code=412, detail=str(exc))
+    except predict.ProxiedPredictAPIError as exc:
+        return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
