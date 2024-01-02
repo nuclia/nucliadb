@@ -26,7 +26,7 @@ repos:
         name: fmt
         entry: cargo +nightly fmt --check
         language: system
-        files: (^nucliadb_vectors/)|(^nucliadb_node/)|(^nucliadb_paragraphs/)|(^nucliadb_texts/)|(^nucliadb_relations*/)
+        files: (^nucliadb_vectors*/)|(^nucliadb_node*/)|(^nucliadb_paragraphs*/)|(^nucliadb_texts*/)|(^nucliadb_relations*/)
         types: ["rust"]
         pass_filenames: false
 
@@ -34,6 +34,6 @@ repos:
         name: clippy
         entry: cargo clippy --all-features -- -D warnings
         language: system
-        files: (^nucliadb_vectors/)|(^nucliadb_node/)|(^nucliadb_paragraphs/)|(^nucliadb_texts/)|(^nucliadb_relations*/)
+        files: (^nucliadb_vectors*/)|(^nucliadb_node*/)|(^nucliadb_paragraphs*/)|(^nucliadb_texts*/)|(^nucliadb_relations*/)
         types: ["rust"]
         pass_filenames: false
