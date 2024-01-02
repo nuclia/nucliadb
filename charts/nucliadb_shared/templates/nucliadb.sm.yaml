@@ -16,5 +16,5 @@ spec:
       metrics: "enabled"
   endpoints:
   - port: metrics
-    interval: 10s
+    interval: {{ ((.Values.serviceMonitor).interval) | default "60s" }}
     path: /metrics
