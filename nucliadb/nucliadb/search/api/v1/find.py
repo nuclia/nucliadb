@@ -141,17 +141,15 @@ async def find_knowledgebox(
     except ValidationError as exc:
         detail = json.loads(exc.json())
         return HTTPClientError(status_code=422, detail=detail)
-    try:
-        results, _ = await find(
-            kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
-        )
-        return results
-    except KnowledgeBoxNotFound:
-        return HTTPClientError(status_code=404, detail="Knowledge Box not found")
-    except LimitsExceededError as exc:
-        return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
-    except InvalidQueryError as exc:
-        return HTTPClientError(status_code=412, detail=str(exc))
+    return await _find_endpoint(
+        request,
+        response,
+        kbid,
+        item,
+        x_ndb_client,
+        x_nucliadb_user,
+        x_forwarded_for,
+    )
 
 
 @api.post(
@@ -173,6 +171,26 @@ async def find_post_knowledgebox(
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
+) -> Union[KnowledgeboxFindResults, HTTPClientError]:
+    return await _find_endpoint(
+        request,
+        response,
+        kbid,
+        item,
+        x_ndb_client,
+        x_nucliadb_user,
+        x_forwarded_for,
+    )
+
+
+async def _find_endpoint(
+    request: Request,
+    response: Response,
+    kbid: str,
+    item: FindRequest,
+    x_ndb_client: NucliaDBClientType,
+    x_nucliadb_user: str,
+    x_forwarded_for: str,
 ) -> Union[KnowledgeboxFindResults, HTTPClientError]:
     try:
         results, incomplete = await find(
