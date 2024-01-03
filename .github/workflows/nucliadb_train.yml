@@ -68,10 +68,11 @@ jobs:
           filters: |
             workflows:
               - 'nucliadb_node/**'
-              - 'nucliadb_fields_tantivy/**'
-              - 'nucliadb_paragraphs_tantivy/**'
+              - 'nucliadb_texts/**'
+              - 'nucliadb_paragraphs/**'
               - 'nucliadb_vectors/**'
               - 'nucliadb_relations/**'
+              - 'nucliadb_relations2/**'
 
       -  name: Calc git info
          id: git
