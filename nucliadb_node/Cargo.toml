@@ -131,3 +131,5 @@ serial_test = "2.0.0"
 tempfile = "3.2.0"
 regex = "1.5.5"
 openssl = { version = "0.10.57", features = ["vendored"] }
+
+rstest = "0.18.2"

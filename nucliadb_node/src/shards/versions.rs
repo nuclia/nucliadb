@@ -26,7 +26,7 @@ use serde::{Deserialize, Serialize};
 
 const VECTORS_VERSION: u32 = 1;
 const PARAGRAPHS_VERSION: u32 = 1;
-const RELATIONS_VERSION: u32 = 1;
+const RELATIONS_VERSION: u32 = 2;
 const TEXTS_VERSION: u32 = 1;
 const DEPRECATED_CONFIG: &str = "config.json";
 
@@ -58,16 +58,12 @@ impl Versions {
             version_relations: Some(1),
         }
     }
-    fn new(channel: Channel) -> Versions {
-        let mut rel_version = RELATIONS_VERSION;
-        if channel == Channel::EXPERIMENTAL {
-            rel_version = 2;
-        }
+    fn new(_channel: Channel) -> Versions {
         Versions {
             version_paragraphs: Some(PARAGRAPHS_VERSION),
             version_vectors: Some(VECTORS_VERSION),
             version_texts: Some(TEXTS_VERSION),
-            version_relations: Some(rel_version),
+            version_relations: Some(RELATIONS_VERSION),
         }
     }
     fn fill_gaps(&mut self) -> bool {
