@@ -158,8 +158,8 @@ async def nucliadb(dummy_processing, analytics_disabled, driver_settings, tmpdir
         settings=LogSettings(
             log_output_type=LogOutputType.FILE,
             log_format_type=LogFormatType.PLAIN,
-            debug=True,
-            log_level=LogLevel.DEBUG,
+            debug=False,
+            log_level=LogLevel.WARNING,
         )
     )
     server = await run_async_nucliadb(settings)
