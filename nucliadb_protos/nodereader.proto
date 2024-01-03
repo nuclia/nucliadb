@@ -333,6 +333,8 @@ message SearchRequest {
     repeated string key_filters = 22;
 
     float min_score = 23;
+
+    utils.Security security = 24;
 }
 
 enum SuggestFeatures {

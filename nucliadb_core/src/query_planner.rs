@@ -19,6 +19,7 @@
 //
 
 use nucliadb_protos::prelude::Filter;
+use nucliadb_protos::utils::Security;
 
 pub use crate::protos::prost_types::Timestamp as ProtoTimestamp;
 use crate::protos::{
@@ -48,6 +49,7 @@ pub struct TimestampFilter {
 /// for the rest of the plan.
 #[derive(Debug, Clone)]
 pub struct PreFilterRequest {
+    pub security: Option<Security>,
     pub timestamp_filters: Vec<TimestampFilter>,
     pub labels_filters: Vec<String>,
 }
@@ -175,9 +177,16 @@ impl From<SearchRequest> for QueryPlan {
 
 fn compute_pre_filters(search_request: &SearchRequest) -> Option<PreFilterRequest> {
     let mut pre_filter_request = PreFilterRequest {
+        security: None,
         timestamp_filters: vec![],
         labels_filters: vec![],
     };
+
+    // Security filters
+    let request_has_security_filters = search_request.security.is_some();
+    if request_has_security_filters {
+        pre_filter_request.security = search_request.security.clone();
+    }
 
     // Timestamp filters
     let request_has_timestamp_filters = search_request.timestamps.as_ref().is_some();
@@ -200,7 +209,10 @@ fn compute_pre_filters(search_request: &SearchRequest) -> Option<PreFilterReques
         pre_filter_request.labels_filters.extend(labels);
     }
 
-    if !request_has_timestamp_filters && !request_has_labels_filters {
+    if !request_has_timestamp_filters
+        && !request_has_labels_filters
+        && !request_has_security_filters
+    {
         return None;
     }
     Some(pre_filter_request)
