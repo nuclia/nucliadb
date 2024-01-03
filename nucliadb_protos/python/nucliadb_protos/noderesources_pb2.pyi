@@ -627,6 +627,7 @@ class Resource(google.protobuf.message.Message):
     SHARD_ID_FIELD_NUMBER: builtins.int
     VECTORS_FIELD_NUMBER: builtins.int
     VECTORS_TO_DELETE_FIELD_NUMBER: builtins.int
+    SECURITY_FIELD_NUMBER: builtins.int
     @property
     def resource(self) -> global___ResourceID: ...
     @property
@@ -663,6 +664,8 @@ class Resource(google.protobuf.message.Message):
     @property
     def vectors_to_delete(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, nucliadb_protos.utils_pb2.UserVectorsList]:
         """Vectorset prefix vector id"""
+    @property
+    def security(self) -> nucliadb_protos.utils_pb2.Security: ...
     def __init__(
         self,
         *,
@@ -678,9 +681,10 @@ class Resource(google.protobuf.message.Message):
         shard_id: builtins.str = ...,
         vectors: collections.abc.Mapping[builtins.str, nucliadb_protos.utils_pb2.UserVectors] | None = ...,
         vectors_to_delete: collections.abc.Mapping[builtins.str, nucliadb_protos.utils_pb2.UserVectorsList] | None = ...,
+        security: nucliadb_protos.utils_pb2.Security | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["metadata", b"metadata", "resource", b"resource"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["labels", b"labels", "metadata", b"metadata", "paragraphs", b"paragraphs", "paragraphs_to_delete", b"paragraphs_to_delete", "relations", b"relations", "resource", b"resource", "sentences_to_delete", b"sentences_to_delete", "shard_id", b"shard_id", "status", b"status", "texts", b"texts", "vectors", b"vectors", "vectors_to_delete", b"vectors_to_delete"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["metadata", b"metadata", "resource", b"resource", "security", b"security"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["labels", b"labels", "metadata", b"metadata", "paragraphs", b"paragraphs", "paragraphs_to_delete", b"paragraphs_to_delete", "relations", b"relations", "resource", b"resource", "security", b"security", "sentences_to_delete", b"sentences_to_delete", "shard_id", b"shard_id", "status", b"status", "texts", b"texts", "vectors", b"vectors", "vectors_to_delete", b"vectors_to_delete"]) -> None: ...
 
 global___Resource = Resource
 

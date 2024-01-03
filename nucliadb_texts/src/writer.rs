@@ -296,6 +296,20 @@ impl TextWriterService {
             self.schema.status => resource.status as u64,
         );
 
+        if self.schema.schema.get_field("groups_with_access").is_some() {
+            if resource.security.is_some()
+                && !resource.security.as_ref().unwrap().access_groups.is_empty()
+            {
+                base_doc.add_u64(self.schema.groups_public, 0_u64);
+                for group_id in resource.security.as_ref().unwrap().access_groups.iter() {
+                    let facet = Facet::from(group_id.as_str());
+                    base_doc.add_facet(self.schema.groups_with_access, facet)
+                }
+            } else {
+                base_doc.add_u64(self.schema.groups_public, 1_u64);
+            }
+        }
+
         for label in resource.labels.iter() {
             let facet = Facet::from(label.as_str());
             base_doc.add_facet(self.schema.facets, facet);
