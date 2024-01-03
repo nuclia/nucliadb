@@ -50,6 +50,13 @@ from nucliadb.standalone.run import run_async_nucliadb
 from nucliadb.standalone.settings import Settings
 from nucliadb.tests.utils import inject_message
 from nucliadb.writer import API_PREFIX
+from nucliadb_telemetry.logs import setup_logging
+from nucliadb_telemetry.settings import (
+    LogFormatType,
+    LogLevel,
+    LogOutputType,
+    LogSettings,
+)
 from nucliadb_utils.storages.settings import settings as storage_settings
 from nucliadb_utils.store import MAIN
 from nucliadb_utils.tests import free_port
@@ -124,19 +131,37 @@ async def nucliadb(dummy_processing, analytics_disabled, driver_settings, tmpdir
     # we need to force DATA_PATH updates to run every test on the proper
     # temporary directory
     data_path = f"{tmpdir}/node"
+    local_files = f"{tmpdir}/blob"
     os.environ["DATA_PATH"] = data_path
+
     settings = Settings(
         file_backend="local",
-        local_files=f"{tmpdir}/blob",
+        local_files=local_files,
         data_path=data_path,
         http_port=free_port(),
         ingest_grpc_port=free_port(),
         train_grpc_port=free_port(),
         standalone_node_port=free_port(),
+        log_format_type=LogFormatType.PLAIN,
+        log_output_type=LogOutputType.FILE,
         **driver_settings.dict(),
     )
 
     config_nucliadb(settings)
+
+    # Make sure tests don't write logs outside of the tmpdir
+    os.environ["ERROR_LOG"] = f"{tmpdir}/logs/error.log"
+    os.environ["ACCESS_LOG"] = f"{tmpdir}/logs/access.log"
+    os.environ["INFO_LOG"] = f"{tmpdir}/logs/info.log"
+
+    setup_logging(
+        settings=LogSettings(
+            log_output_type=LogOutputType.FILE,
+            log_format_type=LogFormatType.PLAIN,
+            debug=False,
+            log_level=LogLevel.WARNING,
+        )
+    )
     server = await run_async_nucliadb(settings)
 
     yield settings
