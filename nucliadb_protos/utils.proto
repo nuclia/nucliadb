@@ -101,3 +101,8 @@ enum ReleaseChannel {
   STABLE = 0;
   EXPERIMENTAL = 1;
 }
+
+
+message Security {
+    repeated string access_groups = 1;
+}

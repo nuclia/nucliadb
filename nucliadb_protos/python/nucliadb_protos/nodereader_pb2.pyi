@@ -51,6 +51,7 @@ from nucliadb_protos.utils_pb2 import (
     RelationNode as RelationNode,
     ReleaseChannel as ReleaseChannel,
     STABLE as STABLE,
+    Security as Security,
     UserVector as UserVector,
     UserVectorSet as UserVectorSet,
     UserVectors as UserVectors,
