@@ -306,6 +306,7 @@ impl TextWriterService {
                     base_doc.add_facet(self.schema.groups_with_access, facet)
                 }
             } else {
+                // If no security is defined, the fields are public!
                 base_doc.add_u64(self.schema.groups_public, 1_u64);
             }
         }
