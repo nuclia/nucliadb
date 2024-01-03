@@ -24,6 +24,7 @@ import tempfile
 
 import pytest
 
+from nucliadb.standalone.introspect import ClusterInfo
 from nucliadb.standalone.settings import Settings
 
 
@@ -56,6 +57,13 @@ async def test_introspect_endpoint(nucliadb_manager) -> None:
             dependencies = f.read()
             assert "nucliadb" in dependencies
             assert "nucliadb-models" in dependencies
+
+        # Check cluster info
+        assert os.path.exists(os.path.join(extracted_tar, "cluster_info.txt"))
+        cluster_info = ClusterInfo.parse_file(
+            os.path.join(extracted_tar, "cluster_info.txt")
+        )
+        assert len(cluster_info.nodes) > 0
 
         # Check settings
         assert os.path.exists(os.path.join(extracted_tar, "settings.json"))
