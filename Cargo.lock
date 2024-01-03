@@ -1765,7 +1765,7 @@ dependencies = [
 
 [[package]]
 name = "nucliadb_node_binding"
-version = "2.26.0"
+version = "2.37.0"
 dependencies = [
  "bincode",
  "cargo-llvm-cov",

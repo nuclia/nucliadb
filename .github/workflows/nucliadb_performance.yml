@@ -17,13 +17,33 @@ jobs:
     name: Trigger Internal Performance Tests
     runs-on: ubuntu-latest
     steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Compute if node was modified
+        uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            node_modified:
+              - 'nucliadb_core/**'
+              - 'nucliadb_node/src/**'
+              - 'nucliadb_paragraphs/**'
+              - 'nucliadb_procs/**'
+              - 'nucliadb_relations/**'
+              - 'nucliadb_relations2/**'
+              - 'nucliadb_telemetry/**'
+              - 'nucliadb_texts/**'
+              - 'nucliadb_vectors/**'
+
       - name: Repository Dispatch
         uses: peter-evans/repository-dispatch@v2
         with:
           token: ${{ secrets.GH_CICD_PUBLIC }}
           repository: nuclia/nucliadb_deploy
           event-type: performance-tests
-          client-payload: '{"nucliadb_checkout_id": "${{ github.sha }}"}'
+          client-payload: '{"nucliadb_checkout_id": "${{ github.sha }}", "build_node_bindings": ${{ steps.filter.outputs.node_modified }}}'
 
   check-perf-main-nightly:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
