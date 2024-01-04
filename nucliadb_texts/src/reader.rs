@@ -101,7 +101,12 @@ impl FieldReader for TextReaderService {
             && self.schema.schema.get_field("groups_with_access").is_some()
         {
             for group_id in request.security.as_ref().unwrap().access_groups.iter() {
-                let facet = Facet::from_text(group_id).unwrap();
+                let mut group_id_key = group_id.clone();
+                if !group_id.starts_with('/') {
+                    // Slash needs to be added to be compatible with tantivy facet fields
+                    group_id_key = "/".to_string() + group_id;
+                }
+                let facet = Facet::from_text(&group_id_key).unwrap();
                 let term = Term::from_facet(self.schema.groups_with_access, &facet);
                 let term_query = TermQuery::new(term, IndexRecordOption::Basic);
                 access_groups_queries.push(Box::new(term_query));

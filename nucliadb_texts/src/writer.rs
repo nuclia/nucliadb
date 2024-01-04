@@ -302,7 +302,12 @@ impl TextWriterService {
             {
                 base_doc.add_u64(self.schema.groups_public, 0_u64);
                 for group_id in resource.security.as_ref().unwrap().access_groups.iter() {
-                    let facet = Facet::from(group_id.as_str());
+                    let mut group_id_key = group_id.clone();
+                    if !group_id.starts_with('/') {
+                        // Slash needs to be added to be compatible with tantivy facet fields
+                        group_id_key = "/".to_string() + group_id;
+                    }
+                    let facet = Facet::from(group_id_key.as_str());
                     base_doc.add_facet(self.schema.groups_with_access, facet)
                 }
             } else {
