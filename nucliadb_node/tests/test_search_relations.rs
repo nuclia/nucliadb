@@ -32,8 +32,9 @@ use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{
     EntitiesSubgraphRequest, IndexMetadata, NewShardRequest, Relation, RelationNode,
     RelationNodeFilter, RelationPrefixSearchRequest, RelationSearchRequest, RelationSearchResponse,
-    Resource, ResourceId,
+    ReleaseChannel, Resource, ResourceId,
 };
+use rstest::*;
 use tonic::Request;
 use uuid::Uuid;
 
@@ -326,15 +327,21 @@ async fn create_knowledge_graph(
     relation_nodes
 }
 
+#[rstest]
 #[tokio::test]
-async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_search_relations_prefixed(
+    #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)] release_channel: ReleaseChannel,
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut fixture = NodeFixture::new();
     fixture.with_writer().await?.with_reader().await?;
     let mut writer = fixture.writer_client();
     let mut reader = fixture.reader_client();
 
     let new_shard_response = writer
-        .new_shard(Request::new(NewShardRequest::default()))
+        .new_shard(Request::new(NewShardRequest {
+            release_channel: release_channel.into(),
+            ..Default::default()
+        }))
         .await?;
     let shard_id = &new_shard_response.get_ref().id;
 
@@ -495,15 +502,21 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
     Ok(())
 }
 
+#[rstest]
 #[tokio::test]
-async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_search_relations_neighbours(
+    #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)] release_channel: ReleaseChannel,
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut fixture = NodeFixture::new();
     fixture.with_writer().await?.with_reader().await?;
     let mut writer = fixture.writer_client();
     let mut reader = fixture.reader_client();
 
     let new_shard_response = writer
-        .new_shard(Request::new(NewShardRequest::default()))
+        .new_shard(Request::new(NewShardRequest {
+            release_channel: release_channel.into(),
+            ..Default::default()
+        }))
         .await?;
     let shard_id = &new_shard_response.get_ref().id;
 

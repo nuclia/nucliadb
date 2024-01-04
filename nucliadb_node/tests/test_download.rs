@@ -24,19 +24,23 @@ use std::collections::HashMap;
 
 use common::{resources, NodeFixture, TestNodeWriter};
 use nucliadb_core::protos::{
-    op_status, DownloadShardFileRequest, GetShardFilesRequest, NewShardRequest,
+    op_status, DownloadShardFileRequest, GetShardFilesRequest, NewShardRequest, ReleaseChannel,
 };
+use rstest::*;
 use serde_json::value::Value;
 use tonic::Request;
 
+#[rstest]
 #[tokio::test]
-async fn test_download_shard() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_download_shard(
+    #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)] release_channel: ReleaseChannel,
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut fixture = NodeFixture::new();
     fixture.with_writer().await?.with_reader().await?;
     let mut writer = fixture.writer_client();
     let mut reader = fixture.reader_client();
 
-    let shard = create_shard(&mut writer).await;
+    let shard = create_shard(&mut writer, release_channel).await;
 
     // lets download it, first we get the list of files
     let response = reader
@@ -82,8 +86,14 @@ struct ShardDetails {
     id: String,
 }
 
-async fn create_shard(writer: &mut TestNodeWriter) -> ShardDetails {
-    let request = Request::new(NewShardRequest::default());
+async fn create_shard(
+    writer: &mut TestNodeWriter,
+    release_channel: ReleaseChannel,
+) -> ShardDetails {
+    let request = Request::new(NewShardRequest {
+        release_channel: release_channel.into(),
+        ..Default::default()
+    });
     let new_shard_response = writer
         .new_shard(request)
         .await
