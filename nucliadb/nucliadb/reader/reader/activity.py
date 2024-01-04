@@ -31,15 +31,12 @@ from nucliadb_utils.cache.pubsub import Callback, PubSubDriver
 from nucliadb_utils.utilities import get_pubsub
 
 MAX_QUEUE_SIZE = 1000
-END_OF_NOTIFICATION = b"_EON_"
 
 
 async def activity_generator(kbid: str) -> AsyncGenerator[bytes, None]:
     pb_notification: writer_pb2.Notification
     async for pb_notification in kb_notifications(kbid):
-        encoded_notification = encode_streamed_notification(pb_notification)
-        yield len(encoded_notification).to_bytes(4, "big")
-        yield encoded_notification
+        yield encode_streamed_notification(pb_notification) + b"\n"
 
 
 async def kb_notifications(kbid: str) -> AsyncGenerator[writer_pb2.Notification, None]:
