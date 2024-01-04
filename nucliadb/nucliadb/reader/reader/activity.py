@@ -33,7 +33,7 @@ from nucliadb_utils.utilities import get_pubsub
 MAX_QUEUE_SIZE = 1000
 
 
-async def activity_generator(kbid: str) -> AsyncGenerator[bytes, None]:
+async def kb_activity_stream(kbid: str) -> AsyncGenerator[bytes, None]:
     pb_notification: writer_pb2.Notification
     async for pb_notification in kb_notifications(kbid):
         yield encode_streamed_notification(pb_notification) + b"\n"

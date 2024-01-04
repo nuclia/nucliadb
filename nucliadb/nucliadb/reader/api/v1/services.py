@@ -49,7 +49,7 @@ from nucliadb.common.context.fastapi import get_app_context
 from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.reader.api.v1.router import KB_PREFIX, api
-from nucliadb.reader.reader.activity import activity_generator
+from nucliadb.reader.reader.activity import kb_activity_stream
 from nucliadb_models.configuration import KBConfiguration
 from nucliadb_models.entities import EntitiesGroup, KnowledgeBoxEntities
 from nucliadb_models.labels import KnowledgeBoxLabels, LabelSet
@@ -327,7 +327,7 @@ async def activity_endpoint(
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
 
     response = StreamingResponse(
-        content=activity_generator(kbid),
+        content=kb_activity_stream(kbid),
         status_code=200,
         media_type="binary/octet-stream",
     )

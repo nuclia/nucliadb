@@ -36,9 +36,9 @@ def kb_notifications():
     async def _kb_notifications(
         kbid: str,
     ) -> AsyncGenerator[writer_pb2.Notification, None]:
-        for _ in range(10):
-            await asyncio.sleep(0.1)
-            yield writer_pb2.Notification(kbid=kbid)
+        for i in range(10):
+            await asyncio.sleep(0.001)
+            yield writer_pb2.Notification(kbid=kbid, seqid=i)
 
     with mock.patch(
         "nucliadb.reader.reader.activity.kb_notifications", new=_kb_notifications
@@ -65,9 +65,8 @@ async def test_activity(
                 notif = Notification.parse_raw(line)
                 notif.kbid == "kbid"
                 notifs.append(notif)
-                break
 
-        assert len(notifs) == 1
+        assert len(notifs) == 10
 
 
 @pytest.mark.asyncio
