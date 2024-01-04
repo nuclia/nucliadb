@@ -81,10 +81,13 @@ async def kb_notifications(kbid: str) -> AsyncGenerator[writer_pb2.Notification,
 
 @contextlib.asynccontextmanager
 async def managed_subscription(pubsub: PubSubDriver, key: str, handler: Callback):
-    subscription_id = uuid.uuid4().hex
+    # We assign a random group to the subscription so that each reader gets all notifications.
+    subscription_id = group = uuid.uuid4().hex
+
     await pubsub.subscribe(
         handler=handler,
         key=key,
+        group=group,
         subscription_id=subscription_id,
     )
     try:
