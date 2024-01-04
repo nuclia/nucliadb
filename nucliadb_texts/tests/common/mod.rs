@@ -27,7 +27,7 @@ use std::time::SystemTime;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos;
 use nucliadb_core::protos::prost_types::Timestamp;
-use nucliadb_core::protos::{Resource, ResourceId};
+use nucliadb_core::protos::{Resource, ResourceId, Security};
 use nucliadb_texts::reader::TextReaderService;
 use nucliadb_texts::writer::TextWriterService;
 use tempfile::TempDir;
@@ -96,5 +96,6 @@ pub fn create_resource(shard_id: String) -> Resource {
         vectors: HashMap::default(),
         vectors_to_delete: HashMap::default(),
         shard_id,
+        security: Some(Security::default()),
     }
 }

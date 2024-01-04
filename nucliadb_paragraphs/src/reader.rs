@@ -484,7 +484,7 @@ mod tests {
     use nucliadb_core::protos::resource::ResourceStatus;
     use nucliadb_core::protos::{
         Faceted, Filter, IndexMetadata, IndexParagraph, IndexParagraphs, OrderBy, Resource,
-        ResourceId, TextInformation, Timestamps,
+        ResourceId, Security, TextInformation, Timestamps,
     };
     use nucliadb_core::NodeResult;
     use tantivy::collector::Count;
@@ -623,6 +623,7 @@ mod tests {
             vectors: HashMap::default(),
             vectors_to_delete: HashMap::default(),
             shard_id,
+            security: Some(Security::default()),
         }
     }
     #[test]

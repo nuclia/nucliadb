@@ -238,7 +238,8 @@ mod tests {
 
     use nucliadb_core::protos::resource::ResourceStatus;
     use nucliadb_core::protos::{
-        IndexParagraph, IndexParagraphs, Resource, ResourceId, VectorSentence, VectorSimilarity,
+        IndexParagraph, IndexParagraphs, Resource, ResourceId, Security, VectorSentence,
+        VectorSimilarity,
     };
     use nucliadb_core::Channel;
     use tempfile::TempDir;
@@ -301,6 +302,7 @@ mod tests {
             vectors: HashMap::default(),
             vectors_to_delete: HashMap::default(),
             shard_id: "DOC".to_string(),
+            security: Some(Security::default()),
         };
         // insert - delete - insert sequence
         let mut writer = VectorWriterService::start(&vsc).unwrap();
@@ -382,6 +384,7 @@ mod tests {
             vectors: HashMap::default(),
             vectors_to_delete: HashMap::default(),
             shard_id: "DOC".to_string(),
+            security: Some(Security::default()),
         };
         // insert - delete - insert sequence
         let mut writer = VectorWriterService::start(&vsc).unwrap();
@@ -499,6 +502,7 @@ mod tests {
             vectors: HashMap::default(),
             vectors_to_delete: HashMap::default(),
             shard_id: "DOC".to_string(),
+            security: Some(Security::default()),
         };
         let mut writer = VectorWriterService::start(&vsc).unwrap();
         let res = writer.set_resource(&resource);

@@ -352,7 +352,8 @@ mod tests {
     use nucliadb_core::protos::prost_types::Timestamp;
     use nucliadb_core::protos::resource::ResourceStatus;
     use nucliadb_core::protos::{
-        IndexMetadata, IndexParagraph, IndexParagraphs, Resource, ResourceId, TextInformation,
+        IndexMetadata, IndexParagraph, IndexParagraphs, Resource, ResourceId, Security,
+        TextInformation,
     };
     use nucliadb_core::NodeResult;
     use tantivy::collector::{Count, TopDocs};
@@ -498,6 +499,7 @@ mod tests {
             vectors: HashMap::default(),
             vectors_to_delete: HashMap::default(),
             shard_id,
+            security: Some(Security::default()),
         }
     }
 

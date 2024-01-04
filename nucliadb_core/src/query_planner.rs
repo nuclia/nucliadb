@@ -143,7 +143,6 @@ impl IndexQueries {
             self.relations_request = None;
             return;
         }
-
         if let Some(vectors_request) = self.vectors_request.as_mut() {
             IndexQueries::apply_to_vectors(vectors_request, &pre_filtered);
         };
