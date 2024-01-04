@@ -322,8 +322,8 @@ async def test_suggestion_on_link_computed_titles_sc6088(
     assert suggested["text"] == extracted_title
 
 
-@pytest.mark.skip(reason="Bindings not released")
 @pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_suggest_features(
     nucliadb_grpc: WriterStub,
     nucliadb_reader: AsyncClient,
@@ -349,8 +349,9 @@ async def test_suggest_features(
         }
 
     def assert_expected_entities(response):
-        assert response["entities"]["total"] == 1
-        assert set(response["entities"]["entities"]) == {"Anna"}
+        expected = {"Anastasia", "Anna", "Anthony"}
+        assert response["entities"]["total"] == len(expected)
+        assert set(response["entities"]["entities"]) == expected
 
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/suggest",
