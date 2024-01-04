@@ -22,7 +22,7 @@ import asyncio
 import pytest
 from nucliadb_protos.writer_pb2 import BrokerMessage, Notification
 
-from nucliadb.reader.api.v1.services import kb_notifications
+from nucliadb.reader.reader.activity import kb_notifications
 from nucliadb_protos import writer_pb2
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
@@ -56,8 +56,8 @@ async def test_kb_notifications(pubsub):
     await asyncio.sleep(0.1)
 
     # Publish some notifications
-    await resource_notification(pubsub, kbid, uuid="resource1")
-    await resource_notification(pubsub, kbid, uuid="resource2")
+    await resource_notification(pubsub, kbid, uuid="resource1", seqid=1)
+    await resource_notification(pubsub, kbid, uuid="resource2", seqid=2)
     # This notification should not be read as it is for a different kbid
     await resource_notification(pubsub, "other-kb")
 
@@ -71,7 +71,9 @@ async def test_kb_notifications(pubsub):
     # Check that the activity was read
     assert len(activity) == 2
     assert activity[0].uuid == "resource1"
+    assert activity[0].seqid == 1
     assert activity[1].uuid == "resource2"
+    assert activity[1].seqid == 2
 
 
 async def resource_notification(pubsub: PubSubDriver, kbid: str, **notification_kwargs):

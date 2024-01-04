@@ -17,10 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
-import contextlib
-import uuid
-from collections.abc import AsyncGenerator
+
 from typing import Union
 
 from fastapi import HTTPException
@@ -43,7 +40,6 @@ from nucliadb_protos.writer_pb2 import (
     GetVectorSetsResponse,
     ListEntitiesGroupsRequest,
     ListEntitiesGroupsResponse,
-    Notification,
     OpStatusWriter,
 )
 from starlette.requests import Request
@@ -52,19 +48,16 @@ from nucliadb.common.context import ApplicationContext
 from nucliadb.common.context.fastapi import get_app_context
 from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
 from nucliadb.models.responses import HTTPClientError
-from nucliadb.reader import logger
 from nucliadb.reader.api.v1.router import KB_PREFIX, api
+from nucliadb.reader.reader.activity import activity_generator
 from nucliadb_models.configuration import KBConfiguration
 from nucliadb_models.entities import EntitiesGroup, KnowledgeBoxEntities
 from nucliadb_models.labels import KnowledgeBoxLabels, LabelSet
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.synonyms import KnowledgeBoxSynonyms
 from nucliadb_models.vectors import VectorSet, VectorSets
-from nucliadb_telemetry.errors import capture_exception
-from nucliadb_utils import const
 from nucliadb_utils.authentication import requires
-from nucliadb_utils.cache.pubsub import Callback, PubSubDriver
-from nucliadb_utils.utilities import get_ingest, get_pubsub
+from nucliadb_utils.utilities import get_ingest
 
 
 @api.get(
@@ -329,6 +322,7 @@ async def activity_endpoint(
     request: Request, kbid: str
 ) -> Union[StreamingResponse, HTTPClientError]:
     context = get_app_context(request.app)
+
     if not await exists_kb(context, kbid):
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
 
@@ -341,69 +335,6 @@ async def activity_endpoint(
     return response
 
 
-NOTIFICATION_SEPARATOR = b"__EON__"
-
-
-async def activity_generator(kbid: str) -> AsyncGenerator[bytes, None]:
-    async for notification in kb_notifications(kbid):
-        yield notification.SerializeToString() + NOTIFICATION_SEPARATOR
-
-
-async def kb_notifications(kbid: str) -> AsyncGenerator[Notification, None]:
-    """
-    Returns an async generator that yields pubsub notifications for the given kbid.
-    """
-    pubsub = await get_pubsub()
-    if pubsub is None:
-        logger.warning("PubSub is not configured")
-        return
-
-    # TODO: Use a bounded queue
-    queue: asyncio.Queue = asyncio.Queue()
-
-    subscription_key = const.PubSubChannels.RESOURCE_NOTIFY.format(kbid=kbid)
-
-    async def subscription_handler(raw_data: bytes):
-        data = pubsub.parse(raw_data)
-        notification = Notification()
-        notification.ParseFromString(data)
-        await queue.put(notification)
-
-    async with safe_subscribe(
-        pubsub, key=subscription_key, handler=subscription_handler
-    ):
-        try:
-            while True:
-                notification: Notification = await queue.get()
-                yield notification
-        except Exception as ex:
-            capture_exception(ex)
-            logger.error(
-                "Error while streaming activity", exc_info=True, extra={"kbid": kbid}
-            )
-            return
-
-
-@contextlib.asynccontextmanager
-async def safe_subscribe(pubsub: PubSubDriver, key: str, handler: Callback):
-    subscription_id = uuid.uuid4().hex
-    await pubsub.subscribe(
-        handler=handler,
-        key=key,
-        subscription_id=subscription_id,
-    )
-    try:
-        yield
-    finally:
-        try:
-            await pubsub.unsubscribe(key=key, subscription_id=subscription_id)
-        except Exception:
-            logger.warning(
-                "Error while unsubscribing from activity stream", exc_info=True
-            )
-
-
-# TODO: refactor this out into a common util?
 async def exists_kb(context: ApplicationContext, kbid: str) -> bool:
     dm = KnowledgeBoxDataManager(context.kv_driver)
     return await dm.exists_kb(kbid)
