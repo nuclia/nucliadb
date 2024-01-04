@@ -17,7 +17,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
+import contextlib
+import uuid
+from collections.abc import AsyncGenerator
+from typing import Union
+
 from fastapi import HTTPException
+from fastapi.responses import StreamingResponse
 from fastapi_versioning import version  # type: ignore
 from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxID
@@ -36,10 +43,16 @@ from nucliadb_protos.writer_pb2 import (
     GetVectorSetsResponse,
     ListEntitiesGroupsRequest,
     ListEntitiesGroupsResponse,
+    Notification,
     OpStatusWriter,
 )
 from starlette.requests import Request
 
+from nucliadb.common.context import ApplicationContext
+from nucliadb.common.context.fastapi import get_app_context
+from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
+from nucliadb.models.responses import HTTPClientError
+from nucliadb.reader import logger
 from nucliadb.reader.api.v1.router import KB_PREFIX, api
 from nucliadb_models.configuration import KBConfiguration
 from nucliadb_models.entities import EntitiesGroup, KnowledgeBoxEntities
@@ -47,8 +60,11 @@ from nucliadb_models.labels import KnowledgeBoxLabels, LabelSet
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.synonyms import KnowledgeBoxSynonyms
 from nucliadb_models.vectors import VectorSet, VectorSets
+from nucliadb_telemetry.errors import capture_exception
+from nucliadb_utils import const
 from nucliadb_utils.authentication import requires
-from nucliadb_utils.utilities import get_ingest
+from nucliadb_utils.cache.pubsub import Callback, PubSubDriver
+from nucliadb_utils.utilities import get_ingest, get_pubsub
 
 
 @api.get(
@@ -298,3 +314,91 @@ async def get_configuration(request: Request, kbid: str):
         raise HTTPException(
             status_code=500, detail="Error getting configuration of a Knowledge box"
         )
+
+
+@api.get(
+    f"/{KB_PREFIX}/{{kbid}}/activity",
+    status_code=200,
+    name="TODO",
+    tags=["Knowledge Box Services"],
+    response_model=None,
+)
+@requires(NucliaDBRoles.READER)
+@version(1)
+async def activity_endpoint(
+    request: Request, kbid: str
+) -> Union[StreamingResponse, HTTPClientError]:
+    context = get_app_context(request.app)
+    if not await exists_kb(context, kbid):
+        return HTTPClientError(status_code=404, detail="Knowledge Box not found")
+
+    response = StreamingResponse(
+        content=activity_generator(kbid),
+        status_code=200,
+        media_type="binary/octet-stream",
+    )
+
+    return response
+
+
+NOTIFICATION_SEPARATOR = b"__EON__"
+
+
+async def activity_generator(kbid: str) -> AsyncGenerator[bytes, None]:
+    async for notification in kb_notifications(kbid):
+        yield notification.SerializeToString() + NOTIFICATION_SEPARATOR
+
+
+async def kb_notifications(kbid: str) -> AsyncGenerator[Notification, None]:
+    """
+    Returns an async generator that yields pubsub notifications for the given kbid.
+    """
+    pubsub = await get_pubsub()
+    if pubsub is None:
+        logger.warning("PubSub is not configured")
+        return
+
+    # TODO: Use a bounded queue
+    queue: asyncio.Queue = asyncio.Queue()
+
+    async def handler(raw_data: bytes):
+        data = pubsub.parse(raw_data)
+        notification = Notification()
+        notification.ParseFromString(data)
+        await queue.put(notification)
+
+    async with pubsub_subscription(pubsub, kbid, handler):
+        try:
+            while True:
+                notification: Notification = await queue.get()
+                yield notification
+        except Exception as ex:
+            capture_exception(ex)
+            logger.error("Error while streaming activity", exc_info=True)
+            return
+
+
+@contextlib.asynccontextmanager
+async def pubsub_subscription(pubsub: PubSubDriver, kbid: str, handler: Callback):
+    subscription_id = uuid.uuid4().hex
+    key = const.PubSubChannels.RESOURCE_NOTIFY.format(kbid=kbid)
+    await pubsub.subscribe(
+        handler=handler,
+        key=key,
+        subscription_id=subscription_id,
+    )
+    try:
+        yield
+    finally:
+        try:
+            await pubsub.unsubscribe(key=key, subscription_id=subscription_id)
+        except Exception:
+            logger.warning(
+                "Error while unsubscribing from activity stream", exc_info=True
+            )
+
+
+# TODO: refactor this out into a common util?
+async def exists_kb(context: ApplicationContext, kbid: str) -> bool:
+    dm = KnowledgeBoxDataManager(context.kv_driver)
+    return await dm.exists_kb(kbid)
