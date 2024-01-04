@@ -361,27 +361,32 @@ async def kb_notifications(kbid: str) -> AsyncGenerator[Notification, None]:
     # TODO: Use a bounded queue
     queue: asyncio.Queue = asyncio.Queue()
 
-    async def handler(raw_data: bytes):
+    subscription_key = const.PubSubChannels.RESOURCE_NOTIFY.format(kbid=kbid)
+
+    async def subscription_handler(raw_data: bytes):
         data = pubsub.parse(raw_data)
         notification = Notification()
         notification.ParseFromString(data)
         await queue.put(notification)
 
-    async with pubsub_subscription(pubsub, kbid, handler):
+    async with safe_subscribe(
+        pubsub, key=subscription_key, handler=subscription_handler
+    ):
         try:
             while True:
                 notification: Notification = await queue.get()
                 yield notification
         except Exception as ex:
             capture_exception(ex)
-            logger.error("Error while streaming activity", exc_info=True)
+            logger.error(
+                "Error while streaming activity", exc_info=True, extra={"kbid": kbid}
+            )
             return
 
 
 @contextlib.asynccontextmanager
-async def pubsub_subscription(pubsub: PubSubDriver, kbid: str, handler: Callback):
+async def safe_subscribe(pubsub: PubSubDriver, key: str, handler: Callback):
     subscription_id = uuid.uuid4().hex
-    key = const.PubSubChannels.RESOURCE_NOTIFY.format(kbid=kbid)
     await pubsub.subscribe(
         handler=handler,
         key=key,
