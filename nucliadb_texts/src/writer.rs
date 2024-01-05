@@ -296,23 +296,20 @@ impl TextWriterService {
             self.schema.status => resource.status as u64,
         );
 
-        if self.schema.schema.get_field("groups_with_access").is_some() {
-            if resource.security.is_some()
-                && !resource.security.as_ref().unwrap().access_groups.is_empty()
-            {
-                base_doc.add_u64(self.schema.groups_public, 0_u64);
-                for group_id in resource.security.as_ref().unwrap().access_groups.iter() {
-                    let mut group_id_key = group_id.clone();
-                    if !group_id.starts_with('/') {
-                        // Slash needs to be added to be compatible with tantivy facet fields
-                        group_id_key = "/".to_string() + group_id;
-                    }
-                    let facet = Facet::from(group_id_key.as_str());
-                    base_doc.add_facet(self.schema.groups_with_access, facet)
+        let public_to_all_groups = resource.security.is_none()
+            || resource.security.as_ref().unwrap().access_groups.is_empty();
+        if public_to_all_groups {
+            base_doc.add_u64(self.schema.groups_public, 1_u64);
+        } else {
+            base_doc.add_u64(self.schema.groups_public, 0_u64);
+            for group_id in resource.security.as_ref().unwrap().access_groups.iter() {
+                let mut group_id_key = group_id.clone();
+                if !group_id.starts_with('/') {
+                    // Slash needs to be added to be compatible with tantivy facet fields
+                    group_id_key = "/".to_string() + group_id;
                 }
-            } else {
-                // If no security is defined, the fields are public!
-                base_doc.add_u64(self.schema.groups_public, 1_u64);
+                let facet = Facet::from(group_id_key.as_str());
+                base_doc.add_facet(self.schema.groups_with_access, facet)
             }
         }
 

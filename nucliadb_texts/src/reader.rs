@@ -97,9 +97,7 @@ impl FieldReader for TextReaderService {
         let mut modified_queries = Vec::new();
         let mut labels_queries: Vec<Box<dyn Query>> = Vec::new();
 
-        if request.security.is_some()
-            && self.schema.schema.get_field("groups_with_access").is_some()
-        {
+        if request.security.is_some() {
             for group_id in request.security.as_ref().unwrap().access_groups.iter() {
                 let mut group_id_key = group_id.clone();
                 if !group_id.starts_with('/') {
@@ -141,18 +139,16 @@ impl FieldReader for TextReaderService {
             Box::new(AllQuery)
         } else {
             let mut subqueries = vec![];
-            if self.schema.schema.get_field("groups_with_access").is_some() {
-                let public_fields_query = Box::new(TermQuery::new(
-                    Term::from_field_u64(self.schema.groups_public, 1_u64),
-                    IndexRecordOption::Basic,
-                ));
-                access_groups_queries.push(public_fields_query);
+            let public_fields_query = Box::new(TermQuery::new(
+                Term::from_field_u64(self.schema.groups_public, 1_u64),
+                IndexRecordOption::Basic,
+            ));
+            access_groups_queries.push(public_fields_query);
 
-                if !access_groups_queries.is_empty() {
-                    let access_groups_query: Box<dyn Query> =
-                        Box::new(BooleanQuery::union(access_groups_queries));
-                    subqueries.push(access_groups_query);
-                }
+            if !access_groups_queries.is_empty() {
+                let access_groups_query: Box<dyn Query> =
+                    Box::new(BooleanQuery::union(access_groups_queries));
+                subqueries.push(access_groups_query);
             }
 
             if !created_queries.is_empty() {
