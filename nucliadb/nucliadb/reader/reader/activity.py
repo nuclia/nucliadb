@@ -44,7 +44,7 @@ async def kb_notifications(kbid: str) -> AsyncGenerator[writer_pb2.Notification,
     Returns an async generator that yields pubsub notifications for the given kbid.
     """
     pubsub = await get_pubsub()
-    if pubsub is None:
+    if pubsub is None:  # pragma: no cover
         logger.warning("PubSub is not configured")
         return
 
@@ -61,7 +61,7 @@ async def kb_notifications(kbid: str) -> AsyncGenerator[writer_pb2.Notification,
         notification.ClearField("message")
         try:
             queue.put_nowait(notification)
-        except asyncio.QueueFull:
+        except asyncio.QueueFull:  # pragma: no cover
             logger.warning("Queue is full, dropping notification", extra={"kbid": kbid})
 
     async with managed_subscription(
@@ -95,25 +95,23 @@ async def managed_subscription(pubsub: PubSubDriver, key: str, handler: Callback
     finally:
         try:
             await pubsub.unsubscribe(key=key, subscription_id=subscription_id)
-        except Exception:
+        except Exception:  # pragma: no cover
             logger.warning(
                 "Error while unsubscribing from activity stream", exc_info=True
             )
 
 
 def serialize_notification(pb: writer_pb2.Notification) -> Notification:
-    type = NotificationType.CREATED
-    if pb.write_type == writer_pb2.Notification.WriteType.MODIFIED:
-        type = NotificationType.MODIFIED
-    elif pb.write_type == writer_pb2.Notification.WriteType.DELETED:
-        type = NotificationType.DELETED
-
-    action = NotificationAction.COMMIT
-    if pb.action == writer_pb2.Notification.Action.INDEXED:
-        action = NotificationAction.INDEXED
-    elif pb.action == writer_pb2.Notification.Action.ABORT:
-        action = NotificationAction.ABORTED
-
+    type = {
+        writer_pb2.Notification.WriteType.CREATED: NotificationType.CREATED,
+        writer_pb2.Notification.WriteType.MODIFIED: NotificationType.MODIFIED,
+        writer_pb2.Notification.WriteType.DELETED: NotificationType.DELETED,
+    }.get(pb.write_type, NotificationType.CREATED)
+    action = {
+        writer_pb2.Notification.Action.COMMIT: NotificationAction.COMMIT,
+        writer_pb2.Notification.Action.INDEXED: NotificationAction.INDEXED,
+        writer_pb2.Notification.Action.ABORT: NotificationAction.ABORTED,
+    }.get(pb.action, NotificationAction.COMMIT)
     return Notification(
         kbid=pb.kbid,
         uuid=pb.uuid,
