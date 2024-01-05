@@ -56,5 +56,5 @@ class ResourceNotification(BaseModel):
     action: NotificationAction = Field(
         ...,
         title="Action",
-        description="Action performed on the resource. Allows to distinguish between a notification of a resource being committed or indexed.",  # noqa: E501
+        description="Notification action. Allows to distinguish between a notification of a resource being committed, indexed or aborted.",  # noqa: E501
     )
