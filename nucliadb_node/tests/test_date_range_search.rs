@@ -22,7 +22,6 @@ mod common;
 
 use std::collections::HashMap;
 
-use ::nucliadb_protos::utils::Security;
 use common::{NodeFixture, TestNodeWriter};
 use nucliadb_core::protos as nucliadb_protos;
 use nucliadb_protos::prost_types::Timestamp;
@@ -95,7 +94,7 @@ async fn populate(writer: &mut TestNodeWriter, shard_id: String, metadata: Index
         relations: vec![],
         vectors: HashMap::default(),
         vectors_to_delete: HashMap::default(),
-        security: Some(Security::default()),
+        ..Default::default()
     };
 
     writer.set_resource(resource).await.unwrap();

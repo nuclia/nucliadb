@@ -124,7 +124,7 @@ fn create_empty_resource(shard_id: String) -> Resource {
         vectors: HashMap::default(),
         vectors_to_delete: HashMap::default(),
         shard_id,
-        security: Some(Security::default()),
+        ..Default::default()
     }
 }
 

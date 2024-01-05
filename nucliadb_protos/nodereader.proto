@@ -334,7 +334,7 @@ message SearchRequest {
 
     float min_score = 23;
 
-    utils.Security security = 24;
+    optional utils.Security security = 24;
 }
 
 enum SuggestFeatures {

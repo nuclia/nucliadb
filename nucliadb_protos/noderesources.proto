@@ -164,7 +164,7 @@ message Resource {
     map<string, utils.UserVectors> vectors = 12; // vectorset is the key
     map<string, utils.UserVectorsList> vectors_to_delete = 13;  // Vectorset prefix vector id
 
-    utils.Security security = 14;
+    optional utils.Security security = 14;
 }
 
 message ShardMetadata {
