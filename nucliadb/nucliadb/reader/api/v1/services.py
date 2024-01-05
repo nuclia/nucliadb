@@ -312,7 +312,8 @@ async def get_configuration(request: Request, kbid: str):
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/activity",
     status_code=200,
-    name="TODO",
+    name="Knowledge Box Activity Stream",
+    description="Provides a stream of resource's activity notifications for the given Knowledge Box",
     tags=["Knowledge Box Services"],
     response_model=None,
 )

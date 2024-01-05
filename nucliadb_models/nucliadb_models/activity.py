@@ -19,10 +19,10 @@
 #
 from enum import Enum
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
-class NotificationType(str, Enum):
+class ResourceOperationType(str, Enum):
     CREATED = "created"
     MODIFIED = "modified"
     DELETED = "deleted"
@@ -34,9 +34,27 @@ class NotificationAction(str, Enum):
     ABORTED = "aborted"
 
 
-class Notification(BaseModel):
-    kbid: str
-    uuid: str
-    seqid: int
-    type: NotificationType
-    action: NotificationAction
+class ResourceNotification(BaseModel):
+    kbid: str = Field(
+        ...,
+        title="KnowledgeBox ID",
+        description="Id of the KnowledgeBox that the resource belongs to.",
+    )
+    resource_uuid: str = Field(
+        ..., title="Resource UUID", description="UUID of the resource."
+    )
+    seqid: int = Field(
+        ...,
+        title="Sequence ID",
+        description="Sequence ID of the resource operation. This can be used to track completion of specific operations.",  # noqa: E501
+    )
+    operation_type: ResourceOperationType = Field(
+        ...,
+        title="Operation Type",
+        description="Type of operation performed on the resource.",
+    )
+    action: NotificationAction = Field(
+        ...,
+        title="Action",
+        description="Action performed on the resource. Allows to distinguish between a notification of a resource being committed or indexed.",  # noqa: E501
+    )

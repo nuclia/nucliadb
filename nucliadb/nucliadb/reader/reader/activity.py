@@ -23,7 +23,11 @@ import uuid
 from collections.abc import AsyncGenerator
 
 from nucliadb.reader import logger
-from nucliadb_models.activity import Notification, NotificationAction, NotificationType
+from nucliadb_models.activity import (
+    NotificationAction,
+    ResourceNotification,
+    ResourceOperationType,
+)
 from nucliadb_protos import writer_pb2
 from nucliadb_telemetry.errors import capture_exception
 from nucliadb_utils import const
@@ -101,22 +105,22 @@ async def managed_subscription(pubsub: PubSubDriver, key: str, handler: Callback
             )
 
 
-def serialize_notification(pb: writer_pb2.Notification) -> Notification:
-    type = {
-        writer_pb2.Notification.WriteType.CREATED: NotificationType.CREATED,
-        writer_pb2.Notification.WriteType.MODIFIED: NotificationType.MODIFIED,
-        writer_pb2.Notification.WriteType.DELETED: NotificationType.DELETED,
-    }.get(pb.write_type, NotificationType.CREATED)
+def serialize_notification(pb: writer_pb2.Notification) -> ResourceNotification:
+    operation_type = {
+        writer_pb2.Notification.WriteType.CREATED: ResourceOperationType.CREATED,
+        writer_pb2.Notification.WriteType.MODIFIED: ResourceOperationType.MODIFIED,
+        writer_pb2.Notification.WriteType.DELETED: ResourceOperationType.DELETED,
+    }.get(pb.write_type, ResourceOperationType.CREATED)
     action = {
         writer_pb2.Notification.Action.COMMIT: NotificationAction.COMMIT,
         writer_pb2.Notification.Action.INDEXED: NotificationAction.INDEXED,
         writer_pb2.Notification.Action.ABORT: NotificationAction.ABORTED,
     }.get(pb.action, NotificationAction.COMMIT)
-    return Notification(
+    return ResourceNotification(
         kbid=pb.kbid,
-        uuid=pb.uuid,
+        resource_uuid=pb.uuid,
         seqid=pb.seqid,
-        type=type,
+        operation_type=operation_type,
         action=action,
     )
 

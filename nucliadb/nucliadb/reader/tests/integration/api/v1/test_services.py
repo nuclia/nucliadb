@@ -26,7 +26,7 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb.reader.api.v1.router import KB_PREFIX
-from nucliadb_models.activity import Notification
+from nucliadb_models.activity import ResourceNotification
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_protos import writer_pb2
 
@@ -38,7 +38,7 @@ def kb_notifications():
     ) -> AsyncGenerator[writer_pb2.Notification, None]:
         for i in range(10):
             await asyncio.sleep(0.001)
-            yield writer_pb2.Notification(kbid=kbid, seqid=i)
+            yield writer_pb2.Notification(kbid=kbid, seqid=i, uuid=f"resource-{i}")
 
     with mock.patch(
         "nucliadb.reader.reader.activity.kb_notifications", new=_kb_notifications
@@ -62,8 +62,9 @@ async def test_activity(
 
             notifs = []
             async for line in resp.aiter_lines():
-                notif = Notification.parse_raw(line)
+                notif = ResourceNotification.parse_raw(line)
                 notif.kbid == "kbid"
+                assert notif.resource_uuid.startswith("resource-")
                 notifs.append(notif)
 
         assert len(notifs) == 10
