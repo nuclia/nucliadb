@@ -623,6 +623,18 @@ pub struct ParagraphAnnotation {
     pub classifications: ::prost::alloc::vec::Vec<Classification>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct QuestionAnswerAnnotation {
+    #[prost(message, optional, tag="1")]
+    pub question_answer: ::core::option::Option<QuestionAnswer>,
+    #[prost(bool, tag="2")]
+    pub cancelled_by_user: bool,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct QuestionAnswerAnnotations {
+    #[prost(message, repeated, tag="1")]
+    pub question_answer: ::prost::alloc::vec::Vec<QuestionAnswerAnnotation>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct VisualSelection {
     #[prost(string, tag="1")]
     pub label: ::prost::alloc::string::String,
@@ -653,6 +665,8 @@ pub struct UserFieldMetadata {
     pub paragraphs: ::prost::alloc::vec::Vec<ParagraphAnnotation>,
     #[prost(message, repeated, tag="4")]
     pub page_selections: ::prost::alloc::vec::Vec<PageSelections>,
+    #[prost(message, repeated, tag="5")]
+    pub question_answers: ::prost::alloc::vec::Vec<QuestionAnswerAnnotation>,
     #[prost(message, optional, tag="3")]
     pub field: ::core::option::Option<FieldId>,
 }

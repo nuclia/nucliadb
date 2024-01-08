@@ -275,6 +275,28 @@ class ParagraphAnnotation(BaseModel):
     key: str
 
 
+class Question(BaseModel):
+    text: str
+    language: str
+    ids_paragraphs: List[str]
+
+
+class Answer(BaseModel):
+    text: str
+    language: str
+    ids_paragraphs: List[str]
+
+
+class QuestionAnswer(BaseModel):
+    question: Question
+    answers: List[Answer]
+
+
+class QuestionAnswerAnnotation(BaseModel):
+    question_answer: QuestionAnswer
+    cancelled_by_user: bool = False
+
+
 class VisualSelection(BaseModel):
     label: str
     top: float
@@ -297,6 +319,7 @@ class UserFieldMetadata(BaseModel):
     token: List[TokenSplit] = []
     paragraphs: List[ParagraphAnnotation] = []
     selections: List[PageSelections] = []
+    question_answers: List[QuestionAnswerAnnotation] = []
     field: FieldID
 
     @classmethod
