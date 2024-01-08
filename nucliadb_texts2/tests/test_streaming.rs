@@ -18,25 +18,20 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-//! Set of parameters needed by the HNSW algorithm
-//! as named and used in the paper.
+mod common;
 
-/// Factor by which the layer distribution should deviate.
-pub fn level_factor() -> f64 {
-    1.0 / (m() as f64).ln()
-}
+use nucliadb_core::prelude::*;
+use nucliadb_core::protos::StreamRequest;
 
-/// Upper limit to the number of out-edges a embedding can have.
-pub const fn m_max() -> usize {
-    60
-}
-
-/// Number of bi-directional links created for every new element.
-pub const fn m() -> usize {
-    30
-}
-
-/// Number of neighbours that are searched for before adding a new embedding.
-pub const fn ef_construction() -> usize {
-    100
+#[test]
+fn test_stream_request_iterator() {
+    let reader = common::test_reader();
+    let request = StreamRequest {
+        shard_id: None,
+        filter: None,
+        ..Default::default()
+    };
+    let iter = reader.iterator(&request).unwrap();
+    let count = iter.count();
+    assert_eq!(count, 2);
 }

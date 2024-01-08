@@ -28,6 +28,7 @@ const VECTORS_VERSION: u32 = 1;
 const PARAGRAPHS_VERSION: u32 = 1;
 const RELATIONS_VERSION: u32 = 2;
 const TEXTS_VERSION: u32 = 1;
+// const TEXTS_VERSION: u32 = 2;
 const DEPRECATED_CONFIG: &str = "config.json";
 
 #[derive(Serialize, Deserialize)]
@@ -122,6 +123,8 @@ impl Versions {
         match self.version_texts {
             Some(1) => nucliadb_texts::reader::TextReaderService::start(config)
                 .map(|i| encapsulate_reader(i) as TextsReaderPointer),
+            // Some(2) => nucliadb_texts2::reader::TextReaderService::start(config)
+            //     .map(|i| encapsulate_reader(i) as TextsReaderPointer),
             Some(v) => Err(node_error!("Invalid text version {v}")),
             None => Err(node_error!("Corrupted version file")),
         }

@@ -59,6 +59,7 @@ jobs:
               - 'nucliadb_relations2/**'
               - 'nucliadb_telemetry/**'
               - 'nucliadb_texts/**'
+              - 'nucliadb_texts2/**'
               - 'nucliadb_vectors/**'
 
       - name: Build local NucliaDB for testing

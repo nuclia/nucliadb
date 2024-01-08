@@ -69,6 +69,7 @@ jobs:
             workflows:
               - 'nucliadb_node/**'
               - 'nucliadb_texts/**'
+              - 'nucliadb_texts2/**'
               - 'nucliadb_paragraphs/**'
               - 'nucliadb_vectors/**'
               - 'nucliadb_relations/**'
