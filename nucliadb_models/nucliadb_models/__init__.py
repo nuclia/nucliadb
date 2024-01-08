@@ -19,6 +19,7 @@
 #
 import logging
 
+from .activity import *  # noqa
 from .common import *  # noqa
 from .conversation import *  # noqa
 from .datetime import *  # noqa

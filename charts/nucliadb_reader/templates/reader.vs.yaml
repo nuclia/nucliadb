@@ -17,7 +17,7 @@ spec:
         - method:
             regex: "GET|OPTIONS"
           uri:
-            regex: '^/api/v\d+/kb/[^/]+/(entitiesgroup|labelset|vectorset|custom-synonyms|export|import)s?.*'
+            regex: '^/api/v\d+/kb/[^/]+/(entitiesgroup|labelset|vectorset|custom-synonyms|export|import|activity)s?.*'
         - method:
             regex: OPTIONS
           uri:
