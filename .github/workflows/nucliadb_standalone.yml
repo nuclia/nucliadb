@@ -18,6 +18,7 @@ on:
       - "nucliadb_node/**"
       - "nucliadb_vectors/**"
       - "nucliadb_texts/**"
+      - "nucliadb_texts2/**"
       - "nucliadb_paragraphs/**"
       - "nucliadb_core/**"
       - "nucliadb_relations/**"

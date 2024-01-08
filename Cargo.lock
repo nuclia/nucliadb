@@ -1729,6 +1729,7 @@ dependencies = [
  "nucliadb_relations",
  "nucliadb_relations2",
  "nucliadb_texts",
+ "nucliadb_texts2",
  "nucliadb_vectors",
  "num_cpus",
  "once_cell",
@@ -1869,6 +1870,17 @@ dependencies = [
 
 [[package]]
 name = "nucliadb_texts"
+version = "0.1.0"
+dependencies = [
+ "itertools",
+ "nucliadb_core",
+ "nucliadb_procs",
+ "tantivy 0.17.0 (git+https://github.com/nuclia/tantivy.git?branch=original-17)",
+ "tempfile",
+]
+
+[[package]]
+name = "nucliadb_texts2"
 version = "0.1.0"
 dependencies = [
  "itertools",

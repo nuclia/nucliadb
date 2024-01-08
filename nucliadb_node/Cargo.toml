@@ -66,6 +66,7 @@ rand = "0.8.4"
 nucliadb_core = { path = "../nucliadb_core" }
 nucliadb_procs = { path = "../nucliadb_procs" }
 nucliadb_texts = { path = "../nucliadb_texts" }
+nucliadb_texts2 = { path = "../nucliadb_texts2" }
 nucliadb_paragraphs = { path = "../nucliadb_paragraphs" }
 nucliadb_vectors = { path = "../nucliadb_vectors" }
 nucliadb_relations = { path = "../nucliadb_relations" }
