@@ -630,11 +630,6 @@ pub struct QuestionAnswerAnnotation {
     pub cancelled_by_user: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct QuestionAnswerAnnotations {
-    #[prost(message, repeated, tag="1")]
-    pub question_answer: ::prost::alloc::vec::Vec<QuestionAnswerAnnotation>,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct VisualSelection {
     #[prost(string, tag="1")]
     pub label: ::prost::alloc::string::String,

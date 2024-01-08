@@ -406,11 +406,6 @@ message QuestionAnswerAnnotation {
 }
 
 
-message QuestionAnswerAnnotations {
-    repeated QuestionAnswerAnnotation question_answer = 1;
-}
-
-
 message VisualSelection {
     string label = 1;
     float top = 2;

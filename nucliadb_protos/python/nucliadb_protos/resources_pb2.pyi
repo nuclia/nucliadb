@@ -1629,22 +1629,6 @@ class QuestionAnswerAnnotation(google.protobuf.message.Message):
 global___QuestionAnswerAnnotation = QuestionAnswerAnnotation
 
 @typing_extensions.final
-class QuestionAnswerAnnotations(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    QUESTION_ANSWER_FIELD_NUMBER: builtins.int
-    @property
-    def question_answer(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___QuestionAnswerAnnotation]: ...
-    def __init__(
-        self,
-        *,
-        question_answer: collections.abc.Iterable[global___QuestionAnswerAnnotation] | None = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["question_answer", b"question_answer"]) -> None: ...
-
-global___QuestionAnswerAnnotations = QuestionAnswerAnnotations
-
-@typing_extensions.final
 class VisualSelection(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

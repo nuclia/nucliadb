@@ -136,7 +136,6 @@ from nucliadb_protos.resources_pb2 import (
     Question as Question,
     QuestionAnswer as QuestionAnswer,
     QuestionAnswerAnnotation as QuestionAnswerAnnotation,
-    QuestionAnswerAnnotations as QuestionAnswerAnnotations,
     QuestionAnswers as QuestionAnswers,
     Relations as Relations,
     RowsPreview as RowsPreview,
