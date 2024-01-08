@@ -42,6 +42,7 @@ async def test_fieldmetadata_crud(
 
     fieldmetadata_0 = {
         "field": {"field": "textfield1", "field_type": "text"},
+        "question_answers": [],
         "paragraphs": [
             {
                 "key": "paragraph0",
@@ -67,6 +68,7 @@ async def test_fieldmetadata_crud(
     }
     fieldmetadata_1 = {
         "field": {"field": "textfield2", "field_type": "text"},
+        "question_answers": [],
         "paragraphs": [
             {
                 "key": "paragraph2",
@@ -94,6 +96,7 @@ async def test_fieldmetadata_crud(
                 ],
             }
         ],
+        "question_answers": [],
         "selections": [],
         "token": [
             {
