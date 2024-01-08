@@ -45,6 +45,10 @@ env:
   CONTAINER_REGISTRY: eu.gcr.io/${{ secrets.PROJECT_ID }}
   IMAGE_NAME: search
 
+permissions:
+  id-token: write # This is required for requesting the JWT
+  contents: read # This is required for actions/checkout
+
 jobs:
   # Job to run pre-checks
   pre-checks:
@@ -91,17 +95,21 @@ jobs:
       - name: Checkout the repository
         uses: actions/checkout@v3
 
-      # Setup gcloud CLI
-      - uses: google-github-actions/auth@v1
+      - name: "Authenticate to Google Cloud"
+        id: "gcp-auth"
+        uses: "google-github-actions/auth@v2"
         with:
-          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
-
-      - name: 'Set up Cloud SDK'
-        uses: 'google-github-actions/setup-gcloud@v1'
+          workload_identity_provider: "${{ secrets.GCP_REGISTRY_WORKLOAD_IDENTITY_PROVIDER }}"
+          service_account: "${{ secrets.GCP_REGISTRY_SERVICE_ACCOUNT }}"
+          token_format: access_token
 
       # setup docker, as we need to pull the node image to run the tests
-      - name: Configure Docker
-        run: docker login -u oauth2accesstoken -p "$(gcloud auth application-default print-access-token)" https://eu.gcr.io
+      - name: Login to Artifact Registry
+        uses: docker/login-action@v3
+        with:
+          registry: europe-west4-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.gcp-auth.outputs.access_token }}
 
       - name: Setup Python
         uses: actions/setup-python@v4

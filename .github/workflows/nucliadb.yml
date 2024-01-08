@@ -4,6 +4,7 @@ env:
   CONTAINER_REGISTRY: eu.gcr.io/${{ secrets.PROJECT_ID }}
   TESTING_TIKV_LOCAL: "true"
 permissions:
+  id-token: write # This is required for requesting the JWT
   contents: write
 on:
   pull_request:
@@ -183,16 +184,21 @@ jobs:
           BRANCH_NAME=`echo $GITHUB_HEAD_REF | sed 's$/$-$g'`
           echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
 
-      - name: Setup gcloud CLI
-        uses: google-github-actions/auth@v1
+      - name: "Authenticate to Google Cloud"
+        id: "gcp-auth"
+        uses: "google-github-actions/auth@v2"
         with:
-          credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
+          workload_identity_provider: "${{ secrets.GCP_REGISTRY_WORKLOAD_IDENTITY_PROVIDER }}"
+          service_account: "${{ secrets.GCP_REGISTRY_SERVICE_ACCOUNT }}"
+          token_format: access_token
 
-      - name: "Set up Cloud SDK"
-        uses: "google-github-actions/setup-gcloud@v1"
-
-      - name: Configure Docker
-        run: docker login -u oauth2accesstoken -p "$(gcloud auth application-default print-access-token)" https://eu.gcr.io
+      # setup docker, as we need to pull the node image to run the tests
+      - name: Login to Artifact Registry
+        uses: docker/login-action@v3
+        with:
+          registry: europe-west4-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.gcp-auth.outputs.access_token }}
 
       # We need to setup buildx to be able to cache with gha
       - name: Set up Docker Buildx
