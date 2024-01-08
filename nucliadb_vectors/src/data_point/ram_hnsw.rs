@@ -33,10 +33,7 @@ pub struct EntryPoint {
     pub layer: usize,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
-pub struct Edge {
-    pub dist: f32,
-}
+pub type Edge = f32;
 
 #[derive(Default, Clone)]
 pub struct RAMLayer {

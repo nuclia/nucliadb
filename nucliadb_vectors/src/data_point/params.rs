@@ -28,7 +28,7 @@ pub fn level_factor() -> f64 {
 
 /// Upper limit to the number of out-edges a embedding can have.
 pub const fn m_max() -> usize {
-    30
+    60
 }
 
 /// Number of bi-directional links created for every new element.

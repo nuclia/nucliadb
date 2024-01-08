@@ -116,7 +116,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         k_neighbours: usize,
         mut candidates: Vec<(Address, Edge)>,
     ) -> Vec<(Address, Edge)> {
-        candidates.sort_unstable_by_key(|(n, d)| std::cmp::Reverse(Cnx(*n, d.dist)));
+        candidates.sort_unstable_by_key(|(n, d)| std::cmp::Reverse(Cnx(*n, *d)));
         candidates.dedup_by_key(|(addr, _)| *addr);
         candidates.truncate(k_neighbours);
         candidates
@@ -152,7 +152,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                 }
                 Some((down, _)) => {
                     let mut sorted_out: Vec<_> = layer.get_out_edges(down).collect();
-                    sorted_out.sort_by(|a, b| b.1.dist.total_cmp(&a.1.dist));
+                    sorted_out.sort_by(|a, b| b.1.total_cmp(&a.1));
                     sorted_out.into_iter().for_each(|(new_candidate, _)| {
                         if !visited_nodes.contains(&new_candidate) {
                             candidates.push_back(new_candidate);
@@ -216,14 +216,15 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
     ) -> Vec<Address> {
         use params::*;
         let neighbours = self.layer_search::<&RAMLayer>(x, layer, ef_construction(), entry_points);
+        let neighbours = self.select_neighbours_heuristic(m_max(), neighbours);
         let mut needs_repair = HashSet::new();
         let mut result = Vec::with_capacity(neighbours.len());
         layer.add_node(x);
         for (y, dist) in neighbours.iter().copied() {
             result.push(y);
-            layer.add_edge(x, Edge { dist }, y);
-            layer.add_edge(y, Edge { dist }, x);
-            if layer.no_out_edges(y) > 2 * m_max() {
+            layer.add_edge(x, dist, y);
+            layer.add_edge(y, dist, x);
+            if layer.no_out_edges(y) > m_max() {
                 needs_repair.insert(y);
             }
         }
