@@ -67,14 +67,6 @@ pub enum Similarity {
     #[default]
     Cosine,
 }
-impl Similarity {
-    pub fn compute(&self, x: &[u8], y: &[u8]) -> f32 {
-        match self {
-            Similarity::Cosine => vector::cosine_similarity(x, y),
-            Similarity::Dot => vector::dot_similarity(x, y),
-        }
-    }
-}
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug)]
 pub struct Journal {
@@ -216,7 +208,7 @@ impl FormulaFilter<'_> {
 }
 
 pub struct Retriever<'a, Dlog> {
-    similarity: Similarity,
+    similarity_function: fn(&[u8], &[u8]) -> f32,
     no_nodes: usize,
     temp: &'a [u8],
     nodes: &'a Mmap,
@@ -231,12 +223,17 @@ impl<'a, Dlog: DeleteLog> Retriever<'a, Dlog> {
         similarity: Similarity,
         min_score: f32,
     ) -> Retriever<'a, Dlog> {
+        let no_nodes = data_store::stored_elements(nodes);
+        let similarity_function = match similarity {
+            Similarity::Cosine => vector::cosine_similarity,
+            Similarity::Dot => vector::dot_similarity,
+        };
         Retriever {
             temp,
             nodes,
             delete_log,
-            similarity,
-            no_nodes: data_store::stored_elements(nodes),
+            similarity_function,
+            no_nodes,
             min_score,
         }
     }
@@ -288,17 +285,17 @@ impl<'a, Dlog: DeleteLog> DataRetriever for Retriever<'a, Dlog> {
         if a0 == self.no_nodes {
             let y = self.find_node(y);
             let y = Node::vector(y);
-            self.similarity.compute(self.temp, y)
+            (self.similarity_function)(self.temp, y)
         } else if a1 == self.no_nodes {
             let x = self.find_node(x);
             let x = Node::vector(x);
-            self.similarity.compute(self.temp, x)
+            (self.similarity_function)(self.temp, x)
         } else {
             let x = self.find_node(x);
             let y = self.find_node(y);
             let x = Node::vector(x);
             let y = Node::vector(y);
-            self.similarity.compute(x, y)
+            (self.similarity_function)(x, y)
         }
     }
 
