@@ -20,9 +20,9 @@
 
 mod common;
 
-use ::reader::TextReaderService;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::{DocumentSearchRequest, Faceted, Filter};
+use nucliadb_texts::reader::TextReaderService;
 
 #[test]
 fn test_search_queries() {
