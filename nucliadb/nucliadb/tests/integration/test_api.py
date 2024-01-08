@@ -40,7 +40,7 @@ from nucliadb_protos.writer_pb2 import BrokerMessage, OpStatusWriter
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb.tests.utils import broker_resource, inject_message
-from nucliadb_models import metadata
+from nucliadb_models import common, metadata
 from nucliadb_models.resource import Resource
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import writer_pb2 as wpb
@@ -876,14 +876,14 @@ async def test_question_answer_annotations(
     knowledgebox,
 ):
     qa_annotation = metadata.QuestionAnswerAnnotation(
-        question_answer=metadata.QuestionAnswer(
-            question=metadata.Question(
+        question_answer=common.QuestionAnswer(
+            question=common.Question(
                 text="My question 0",
                 language="catalan",
                 ids_paragraphs=["id1/0", "id2/0"],
             ),
             answers=[
-                metadata.Answer(
+                common.Answer(
                     ids_paragraphs=["id1/00", "id2/00"],
                     language="catalan",
                     text="My answer 00",

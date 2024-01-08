@@ -242,3 +242,20 @@ FIELD_TYPES_MAP: Dict[resources_pb2.FieldType.ValueType, FieldTypeName] = {
 FIELD_TYPES_MAP_REVERSE: Dict[str, resources_pb2.FieldType.ValueType] = {
     y.value: x for x, y in FIELD_TYPES_MAP.items()  # type: ignore
 }
+
+
+class Question(BaseModel):
+    text: str
+    language: str
+    ids_paragraphs: List[str]
+
+
+class Answer(BaseModel):
+    text: str
+    language: str
+    ids_paragraphs: List[str]
+
+
+class QuestionAnswer(BaseModel):
+    question: Question
+    answers: List[Answer]

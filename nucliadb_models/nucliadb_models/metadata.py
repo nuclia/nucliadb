@@ -28,7 +28,7 @@ from pydantic.class_validators import root_validator
 from nucliadb_models.common import FIELD_TYPES_MAP
 from nucliadb_protos import resources_pb2, utils_pb2
 
-from .common import Classification, FieldID, UserClassification
+from .common import Classification, FieldID, QuestionAnswer, UserClassification
 
 _T = TypeVar("_T")
 
@@ -273,23 +273,6 @@ class TokenSplit(BaseModel):
 class ParagraphAnnotation(BaseModel):
     classifications: List[UserClassification] = []
     key: str
-
-
-class Question(BaseModel):
-    text: str
-    language: str
-    ids_paragraphs: List[str]
-
-
-class Answer(BaseModel):
-    text: str
-    language: str
-    ids_paragraphs: List[str]
-
-
-class QuestionAnswer(BaseModel):
-    question: Question
-    answers: List[Answer]
 
 
 class QuestionAnswerAnnotation(BaseModel):
