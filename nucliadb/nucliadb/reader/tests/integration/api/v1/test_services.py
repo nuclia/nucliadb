@@ -26,7 +26,7 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb.reader.api.v1.router import KB_PREFIX
-from nucliadb_models.activity import ResourceNotification
+from nucliadb_models.activity import Notification, ResourceNotification
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_protos import writer_pb2
 
@@ -49,9 +49,9 @@ def kb_notifications():
 @pytest.mark.asyncio
 async def test_activity(
     kb_notifications,
-    reader_api: Callable[..., AsyncClient],
+    reader_api,
     knowledgebox_ingest,
-) -> None:
+):
     kbid = knowledgebox_ingest
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         async with client.stream(
@@ -62,9 +62,11 @@ async def test_activity(
 
             notifs = []
             async for line in resp.aiter_lines():
+                assert Notification.parse_raw(line).type == "resource"
                 notif = ResourceNotification.parse_raw(line)
-                notif.kbid == "kbid"
-                assert notif.resource_uuid.startswith("resource-")
+                notif.type == "resource"
+                notif.data.kbid == "kbid"
+                assert notif.data.resource_uuid.startswith("resource-")
                 notifs.append(notif)
 
         assert len(notifs) == 10

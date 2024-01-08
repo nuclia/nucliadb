@@ -22,24 +22,43 @@ from enum import Enum
 from pydantic import BaseModel, Field
 
 
+class NotificationType(str, Enum):
+    RESOURCE = "resource"
+
+
+class NotificationData(BaseModel):
+    kbid: str = Field(
+        title="KnowledgeBox ID",
+        description="Id of the KnowledgeBox that the notification belongs to.",
+    )
+
+
+class Notification(BaseModel):
+    type: NotificationType = Field(
+        ...,
+        title="Notification Type",
+        description="Type of notification.",
+    )
+    data: NotificationData = Field(
+        ...,
+        title="Notification Data",
+        description="Notification data.",
+    )
+
+
 class ResourceOperationType(str, Enum):
     CREATED = "created"
     MODIFIED = "modified"
     DELETED = "deleted"
 
 
-class NotificationAction(str, Enum):
+class ResourceActionType(str, Enum):
     COMMIT = "commit"
     INDEXED = "indexed"
     ABORTED = "aborted"
 
 
-class ResourceNotification(BaseModel):
-    kbid: str = Field(
-        ...,
-        title="KnowledgeBox ID",
-        description="Id of the KnowledgeBox that the resource belongs to.",
-    )
+class ResourceNotificationData(NotificationData):
     resource_uuid: str = Field(
         ..., title="Resource UUID", description="UUID of the resource."
     )
@@ -48,13 +67,22 @@ class ResourceNotification(BaseModel):
         title="Sequence ID",
         description="Sequence ID of the resource operation. This can be used to track completion of specific operations.",  # noqa: E501
     )
-    operation_type: ResourceOperationType = Field(
+    operation: ResourceOperationType = Field(
         ...,
-        title="Operation Type",
+        title="Operation",
         description="Type of operation performed on the resource.",
     )
-    action: NotificationAction = Field(
+    action: ResourceActionType = Field(
         ...,
         title="Action",
         description="Notification action. Allows to distinguish between a notification of a resource being committed, indexed or aborted.",  # noqa: E501
+    )
+
+
+class ResourceNotification(Notification):
+    type: NotificationType = NotificationType.RESOURCE
+    data: ResourceNotificationData = Field(
+        ...,
+        title="Notification Data",
+        description="Notification data.",
     )

@@ -24,8 +24,10 @@ from collections.abc import AsyncGenerator
 
 from nucliadb.reader import logger
 from nucliadb_models.activity import (
-    NotificationAction,
-    ResourceNotification,
+    Notification,
+    NotificationType,
+    ResourceActionType,
+    ResourceNotificationData,
     ResourceOperationType,
 )
 from nucliadb_protos import writer_pb2
@@ -105,23 +107,33 @@ async def managed_subscription(pubsub: PubSubDriver, key: str, handler: Callback
             )
 
 
-def serialize_notification(pb: writer_pb2.Notification) -> ResourceNotification:
-    operation_type = {
-        writer_pb2.Notification.WriteType.CREATED: ResourceOperationType.CREATED,
-        writer_pb2.Notification.WriteType.MODIFIED: ResourceOperationType.MODIFIED,
-        writer_pb2.Notification.WriteType.DELETED: ResourceOperationType.DELETED,
-    }.get(pb.write_type, ResourceOperationType.CREATED)
-    action = {
-        writer_pb2.Notification.Action.COMMIT: NotificationAction.COMMIT,
-        writer_pb2.Notification.Action.INDEXED: NotificationAction.INDEXED,
-        writer_pb2.Notification.Action.ABORT: NotificationAction.ABORTED,
-    }.get(pb.action, NotificationAction.COMMIT)
-    return ResourceNotification(
-        kbid=pb.kbid,
-        resource_uuid=pb.uuid,
-        seqid=pb.seqid,
-        operation_type=operation_type,
-        action=action,
+RESOURCE_OP_PB_TO_MODEL = {
+    writer_pb2.Notification.WriteType.CREATED: ResourceOperationType.CREATED,
+    writer_pb2.Notification.WriteType.MODIFIED: ResourceOperationType.MODIFIED,
+    writer_pb2.Notification.WriteType.DELETED: ResourceOperationType.DELETED,
+}
+
+RESOURCE_ACTION_PB_TO_MODEL = {
+    writer_pb2.Notification.Action.COMMIT: ResourceActionType.COMMIT,
+    writer_pb2.Notification.Action.INDEXED: ResourceActionType.INDEXED,
+    writer_pb2.Notification.Action.ABORT: ResourceActionType.ABORTED,
+}
+
+
+def serialize_notification(pb: writer_pb2.Notification) -> Notification:
+    operation = RESOURCE_OP_PB_TO_MODEL.get(
+        pb.write_type, ResourceOperationType.CREATED
+    )
+    action = RESOURCE_ACTION_PB_TO_MODEL.get(pb.action, ResourceActionType.COMMIT)
+    return Notification(
+        type=NotificationType.RESOURCE,
+        data=ResourceNotificationData(
+            kbid=pb.kbid,
+            resource_uuid=pb.uuid,
+            seqid=pb.seqid,
+            operation=operation,
+            action=action,
+        ),
     )
 
 
