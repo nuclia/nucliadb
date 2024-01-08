@@ -679,6 +679,7 @@ mod tests {
             vectors: HashMap::default(),
             vectors_to_delete: HashMap::default(),
             shard_id: "DOC".to_string(),
+            ..Default::default()
         };
         // insert - delete - insert sequence
         let mut writer = VectorWriterService::start(&vsc).unwrap();
@@ -740,6 +741,7 @@ mod tests {
             vectors: HashMap::default(),
             vectors_to_delete: HashMap::default(),
             shard_id: "DOC".to_string(),
+            ..Default::default()
         };
         // insert - delete - insert sequence
         let mut writer = VectorWriterService::start(&vsc).unwrap();

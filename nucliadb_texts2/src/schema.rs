@@ -38,6 +38,10 @@ pub struct TextSchema {
     pub modified: Field,
     pub status: Field,
     pub facets: Field,
+
+    // Security
+    pub groups_public: Field,
+    pub groups_with_access: Field,
 }
 
 pub fn timestamp_to_datetime_utc(timestamp: &prost_types::Timestamp) -> DateTime<Utc> {
@@ -69,10 +73,14 @@ impl TextSchema {
         let modified = sb.add_date_field("modified", date_options);
 
         // Status
-        let status = sb.add_u64_field("status", num_options);
+        let status = sb.add_u64_field("status", num_options.clone());
 
         // Facets
-        let facets = sb.add_facet_field("facets", facet_options);
+        let facets = sb.add_facet_field("facets", facet_options.clone());
+
+        // Security
+        let groups_public = sb.add_u64_field("groups_public", num_options);
+        let groups_with_access = sb.add_facet_field("groups_with_access", facet_options);
 
         let schema = sb.build();
 
@@ -85,6 +93,8 @@ impl TextSchema {
             status,
             facets,
             field,
+            groups_public,
+            groups_with_access,
         }
     }
 }

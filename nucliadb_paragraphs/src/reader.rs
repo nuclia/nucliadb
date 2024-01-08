@@ -623,6 +623,7 @@ mod tests {
             vectors: HashMap::default(),
             vectors_to_delete: HashMap::default(),
             shard_id,
+            ..Default::default()
         }
     }
     #[test]
