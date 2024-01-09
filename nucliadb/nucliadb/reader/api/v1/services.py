@@ -319,7 +319,7 @@ async def get_configuration(request: Request, kbid: str):
     response_model=None,
     responses={
         "404": {"description": "Knowledge Box not found"},
-    }
+    },
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
