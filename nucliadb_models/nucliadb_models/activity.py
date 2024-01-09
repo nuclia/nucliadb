@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from enum import Enum
+from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -55,7 +56,12 @@ class ResourceOperationType(str, Enum):
 class ResourceActionType(str, Enum):
     COMMIT = "commit"
     INDEXED = "indexed"
-    ABORTED = "aborted"
+    ABORT = "abort"
+
+
+class ResourceNotificationSource(str, Enum):
+    WRITER = "writer"
+    PROCESSOR = "processor"
 
 
 class ResourceNotificationData(NotificationData):
@@ -67,7 +73,7 @@ class ResourceNotificationData(NotificationData):
         title="Sequence ID",
         description="Sequence ID of the resource operation. This can be used to track completion of specific operations.",  # noqa: E501
     )
-    operation: ResourceOperationType = Field(
+    operation: Optional[ResourceOperationType] = Field(
         ...,
         title="Operation",
         description="Type of operation performed on the resource.",
@@ -76,6 +82,11 @@ class ResourceNotificationData(NotificationData):
         ...,
         title="Action",
         description="Notification action. Allows to distinguish between a notification of a resource being committed, indexed or aborted.",  # noqa: E501
+    )
+    source: Optional[ResourceNotificationSource] = Field(
+        ...,
+        title="Source",
+        description="Source of the notification. Allows to distinguish between notifications coming from the writer (i.e: originated by HTTP interactions of the user) or from the processor (i.e: internal process pulling from Nuclia's processing queue).",  # noqa: E501
     )
 
 

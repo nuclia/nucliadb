@@ -353,6 +353,7 @@ class KBShardManager:
         if partition:
             indexpb.partition = partition
         indexpb.source = source
+        indexpb.resource = resource.resource.uuid
 
         for replica_id, node_id in self.indexing_replicas(shard):
             indexpb.node = node_id

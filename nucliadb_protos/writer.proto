@@ -329,6 +329,13 @@ message OpStatusWriter {
     Status status = 1;
 }
 
+enum NotificationSource {
+    UNSET = 0;
+    WRITER = 1;
+    PROCESSOR = 2;
+}
+
+
 message Notification {
     int32 partition = 1;
     string multi = 2;
@@ -350,6 +357,7 @@ message Notification {
     }
     WriteType write_type = 7;
     BrokerMessage message = 8;
+    NotificationSource source = 9;
 }
 
 

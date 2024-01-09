@@ -56,6 +56,12 @@ from nucliadb_utils.utilities import get_storage
 logger = logging.getLogger(__name__)
 
 
+MESSAGE_TO_NOTIFICATION_SOURCE = {
+    writer_pb2.BrokerMessage.MessageSource.WRITER: writer_pb2.NotificationSource.WRITER,
+    writer_pb2.BrokerMessage.MessageSource.PROCESSOR: writer_pb2.NotificationSource.PROCESSOR,
+}
+
+
 def validate_indexable_resource(resource: noderesources_pb2.Resource) -> None:
     """
     It would be more optimal to move this to another layer but it'd also make the code
@@ -187,6 +193,7 @@ class Processor:
                     multi=message.multiid,
                     kbid=message.kbid,
                     rid=message.uuid,
+                    source=message.source,
                 )
                 raise exc
         if txn.open:
@@ -291,7 +298,12 @@ class Processor:
             elif resource and resource.modified is False:
                 await txn.abort()
                 await self.notify_abort(
-                    partition=partition, seqid=seqid, multi=multi, kbid=kbid, rid=uuid
+                    partition=partition,
+                    seqid=seqid,
+                    multi=multi,
+                    kbid=kbid,
+                    rid=uuid,
+                    source=message.source,
                 )
                 logger.warning("This message did not modify the resource")
         except (
@@ -308,6 +320,7 @@ class Processor:
                 multi=multi,
                 kbid=kbid,
                 rid=uuid,
+                source=message.source,
             )
             raise
         except Exception as exc:
@@ -316,7 +329,12 @@ class Processor:
             # and then handled by the top caller, so errors can be handled in the same place.
             await self.deadletter(messages, partition, seqid)
             await self.notify_abort(
-                partition=partition, seqid=seqid, multi=multi, kbid=kbid, rid=uuid
+                partition=partition,
+                seqid=seqid,
+                multi=multi,
+                kbid=kbid,
+                rid=uuid,
+                source=message.source,
             )
             handled_exception = exc
         finally:
@@ -416,6 +434,7 @@ class Processor:
             multi=message.multiid,
             kbid=message.kbid,
             rid=message.uuid,
+            source=message.source,
         )
 
     async def deadletter(
@@ -493,7 +512,7 @@ class Processor:
         seqid: int,
         multi: str,
         message: writer_pb2.BrokerMessage,
-        write_type: writer_pb2.Notification.WriteType.Value,  # type: ignore
+        write_type: writer_pb2.Notification.WriteType.ValueType,
     ):
         notification = writer_pb2.Notification(
             partition=int(partition),
@@ -502,9 +521,10 @@ class Processor:
             uuid=message.uuid,
             kbid=message.kbid,
             action=writer_pb2.Notification.Action.COMMIT,
+            write_type=write_type,
+            source=MESSAGE_TO_NOTIFICATION_SOURCE[message.source],
             # including the message here again might feel a bit unusual but allows
             # us to react to these notifications with the original payload
-            write_type=write_type,
             message=message,
         )
 
@@ -514,7 +534,14 @@ class Processor:
         )
 
     async def notify_abort(
-        self, *, partition: str, seqid: int, multi: str, kbid: str, rid: str
+        self,
+        *,
+        partition: str,
+        seqid: int,
+        multi: str,
+        kbid: str,
+        rid: str,
+        source: writer_pb2.BrokerMessage.MessageSource.ValueType,
     ):
         message = writer_pb2.Notification(
             partition=int(partition),
@@ -523,6 +550,7 @@ class Processor:
             uuid=rid,
             kbid=kbid,
             action=writer_pb2.Notification.ABORT,
+            source=MESSAGE_TO_NOTIFICATION_SOURCE[source],
         )
         await self.notify(
             const.PubSubChannels.RESOURCE_NOTIFY.format(kbid=kbid),
