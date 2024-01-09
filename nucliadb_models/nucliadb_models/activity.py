@@ -76,7 +76,7 @@ class ResourceNotificationData(NotificationData):
     operation: Optional[ResourceOperationType] = Field(
         ...,
         title="Operation",
-        description="Type of operation performed on the resource.",
+        description="Type of CRUD operation performed on the resource.",
     )
     action: ResourceActionType = Field(
         ...,
