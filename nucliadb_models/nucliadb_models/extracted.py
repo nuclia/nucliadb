@@ -25,7 +25,14 @@ from pydantic import BaseModel
 
 from nucliadb_protos import resources_pb2
 
-from .common import Classification, CloudFile, CloudLink, FieldID, Paragraph
+from .common import (
+    Classification,
+    CloudFile,
+    CloudLink,
+    FieldID,
+    Paragraph,
+    QuestionAnswer,
+)
 from .metadata import Relation, convert_pb_relation_to_api
 
 _T = TypeVar("_T")
@@ -291,23 +298,6 @@ class FileExtractedData(BaseModel):
                 including_default_value_fields=True,
             )
         )
-
-
-class Question(BaseModel):
-    text: str
-    language: str
-    ids_paragraphs: List[str]
-
-
-class Answer(BaseModel):
-    text: str
-    language: str
-    ids_paragraphs: List[str]
-
-
-class QuestionAnswer(BaseModel):
-    question: Question
-    answers: List[Answer]
 
 
 class QuestionAnswers(BaseModel):

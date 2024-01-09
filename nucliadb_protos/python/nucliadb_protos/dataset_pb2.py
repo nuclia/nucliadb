@@ -13,17 +13,17 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1dnucliadb_protos/dataset.proto\x12\x07\x64\x61taset\"\x83\x01\n\x08TrainSet\x12\x1f\n\x04type\x18\x01 \x01(\x0e\x32\x11.dataset.TaskType\x12(\n\x06\x66ilter\x18\x02 \x01(\x0b\x32\x18.dataset.TrainSet.Filter\x12\x12\n\nbatch_size\x18\x03 \x01(\x05\x1a\x18\n\x06\x46ilter\x12\x0e\n\x06labels\x18\x01 \x03(\t\"L\n\x05Label\x12\x10\n\x08labelset\x18\x01 \x01(\t\x12\r\n\x05label\x18\x02 \x01(\t\x12\"\n\x06origin\x18\x03 \x01(\x0e\x32\x12.dataset.LabelFrom\"9\n\tTextLabel\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x1e\n\x06labels\x18\x02 \x03(\x0b\x32\x0e.dataset.Label\"F\n\x16MultipleTextSameLabels\x12\x0c\n\x04text\x18\x01 \x03(\t\x12\x1e\n\x06labels\x18\x02 \x03(\x0b\x32\x0e.dataset.Label\"<\n\x18\x46ieldClassificationBatch\x12 \n\x04\x64\x61ta\x18\x01 \x03(\x0b\x32\x12.dataset.TextLabel\"@\n\x1cParagraphClassificationBatch\x12 \n\x04\x64\x61ta\x18\x01 \x03(\x0b\x32\x12.dataset.TextLabel\"L\n\x1bSentenceClassificationBatch\x12-\n\x04\x64\x61ta\x18\x01 \x03(\x0b\x32\x1f.dataset.MultipleTextSameLabels\"4\n\x14TokensClassification\x12\r\n\x05token\x18\x01 \x03(\t\x12\r\n\x05label\x18\x02 \x03(\t\"G\n\x18TokenClassificationBatch\x12+\n\x04\x64\x61ta\x18\x01 \x03(\x0b\x32\x1d.dataset.TokensClassification\";\n\x13ImageClassification\x12\x12\n\nselections\x18\x01 \x01(\t\x12\x10\n\x08page_uri\x18\x02 \x01(\t\"F\n\x18ImageClassificationBatch\x12*\n\x04\x64\x61ta\x18\x01 \x03(\x0b\x32\x1c.dataset.ImageClassification\"/\n\x13ParagraphStreamItem\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04text\x18\x02 \x01(\t\"E\n\x17ParagraphStreamingBatch\x12*\n\x04\x64\x61ta\x18\x01 \x03(\x0b\x32\x1c.dataset.ParagraphStreamItem\"%\n\tParagraph\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04text\x18\x02 \x01(\t\"*\n\x08Question\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x10\n\x08language\x18\x02 \x01(\t\"(\n\x06\x41nswer\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x10\n\x08language\x18\x02 \x01(\t\"\x88\x01\n\x18QuestionAnswerStreamItem\x12#\n\x08question\x18\x01 \x01(\x0b\x32\x11.dataset.Question\x12\x1f\n\x06\x61nswer\x18\x02 \x01(\x0b\x32\x0f.dataset.Answer\x12&\n\nparagraphs\x18\x03 \x03(\x0b\x32\x12.dataset.Paragraph\"O\n\x1cQuestionAnswerStreamingBatch\x12/\n\x04\x64\x61ta\x18\x01 \x03(\x0b\x32!.dataset.QuestionAnswerStreamItem*\xcb\x01\n\x08TaskType\x12\x18\n\x14\x46IELD_CLASSIFICATION\x10\x00\x12\x1c\n\x18PARAGRAPH_CLASSIFICATION\x10\x01\x12\x1b\n\x17SENTENCE_CLASSIFICATION\x10\x02\x12\x18\n\x14TOKEN_CLASSIFICATION\x10\x03\x12\x18\n\x14IMAGE_CLASSIFICATION\x10\x04\x12\x17\n\x13PARAGRAPH_STREAMING\x10\x05\x12\x1d\n\x19QUESTION_ANSWER_STREAMING\x10\x06*3\n\tLabelFrom\x12\r\n\tPARAGRAPH\x10\x00\x12\t\n\x05\x46IELD\x10\x01\x12\x0c\n\x08RESOURCE\x10\x02\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1dnucliadb_protos/dataset.proto\x12\x07\x64\x61taset\"\x83\x01\n\x08TrainSet\x12\x1f\n\x04type\x18\x01 \x01(\x0e\x32\x11.dataset.TaskType\x12(\n\x06\x66ilter\x18\x02 \x01(\x0b\x32\x18.dataset.TrainSet.Filter\x12\x12\n\nbatch_size\x18\x03 \x01(\x05\x1a\x18\n\x06\x46ilter\x12\x0e\n\x06labels\x18\x01 \x03(\t\"L\n\x05Label\x12\x10\n\x08labelset\x18\x01 \x01(\t\x12\r\n\x05label\x18\x02 \x01(\t\x12\"\n\x06origin\x18\x03 \x01(\x0e\x32\x12.dataset.LabelFrom\"9\n\tTextLabel\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x1e\n\x06labels\x18\x02 \x03(\x0b\x32\x0e.dataset.Label\"F\n\x16MultipleTextSameLabels\x12\x0c\n\x04text\x18\x01 \x03(\t\x12\x1e\n\x06labels\x18\x02 \x03(\x0b\x32\x0e.dataset.Label\"<\n\x18\x46ieldClassificationBatch\x12 \n\x04\x64\x61ta\x18\x01 \x03(\x0b\x32\x12.dataset.TextLabel\"@\n\x1cParagraphClassificationBatch\x12 \n\x04\x64\x61ta\x18\x01 \x03(\x0b\x32\x12.dataset.TextLabel\"L\n\x1bSentenceClassificationBatch\x12-\n\x04\x64\x61ta\x18\x01 \x03(\x0b\x32\x1f.dataset.MultipleTextSameLabels\"4\n\x14TokensClassification\x12\r\n\x05token\x18\x01 \x03(\t\x12\r\n\x05label\x18\x02 \x03(\t\"G\n\x18TokenClassificationBatch\x12+\n\x04\x64\x61ta\x18\x01 \x03(\x0b\x32\x1d.dataset.TokensClassification\";\n\x13ImageClassification\x12\x12\n\nselections\x18\x01 \x01(\t\x12\x10\n\x08page_uri\x18\x02 \x01(\t\"F\n\x18ImageClassificationBatch\x12*\n\x04\x64\x61ta\x18\x01 \x03(\x0b\x32\x1c.dataset.ImageClassification\"/\n\x13ParagraphStreamItem\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04text\x18\x02 \x01(\t\"E\n\x17ParagraphStreamingBatch\x12*\n\x04\x64\x61ta\x18\x01 \x03(\x0b\x32\x1c.dataset.ParagraphStreamItem\"%\n\tParagraph\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04text\x18\x02 \x01(\t\"*\n\x08Question\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x10\n\x08language\x18\x02 \x01(\t\"(\n\x06\x41nswer\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x10\n\x08language\x18\x02 \x01(\t\"\xa3\x01\n\x18QuestionAnswerStreamItem\x12#\n\x08question\x18\x01 \x01(\x0b\x32\x11.dataset.Question\x12\x1f\n\x06\x61nswer\x18\x02 \x01(\x0b\x32\x0f.dataset.Answer\x12&\n\nparagraphs\x18\x03 \x03(\x0b\x32\x12.dataset.Paragraph\x12\x19\n\x11\x63\x61ncelled_by_user\x18\x04 \x01(\x08\"O\n\x1cQuestionAnswerStreamingBatch\x12/\n\x04\x64\x61ta\x18\x01 \x03(\x0b\x32!.dataset.QuestionAnswerStreamItem*\xcb\x01\n\x08TaskType\x12\x18\n\x14\x46IELD_CLASSIFICATION\x10\x00\x12\x1c\n\x18PARAGRAPH_CLASSIFICATION\x10\x01\x12\x1b\n\x17SENTENCE_CLASSIFICATION\x10\x02\x12\x18\n\x14TOKEN_CLASSIFICATION\x10\x03\x12\x18\n\x14IMAGE_CLASSIFICATION\x10\x04\x12\x17\n\x13PARAGRAPH_STREAMING\x10\x05\x12\x1d\n\x19QUESTION_ANSWER_STREAMING\x10\x06*3\n\tLabelFrom\x12\r\n\tPARAGRAPH\x10\x00\x12\t\n\x05\x46IELD\x10\x01\x12\x0c\n\x08RESOURCE\x10\x02\x62\x06proto3')
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'nucliadb_protos.dataset_pb2', globals())
 if _descriptor._USE_C_DESCRIPTORS == False:
 
   DESCRIPTOR._options = None
-  _TASKTYPE._serialized_start=1317
-  _TASKTYPE._serialized_end=1520
-  _LABELFROM._serialized_start=1522
-  _LABELFROM._serialized_end=1573
+  _TASKTYPE._serialized_start=1344
+  _TASKTYPE._serialized_end=1547
+  _LABELFROM._serialized_start=1549
+  _LABELFROM._serialized_end=1600
   _TRAINSET._serialized_start=43
   _TRAINSET._serialized_end=174
   _TRAINSET_FILTER._serialized_start=150
@@ -59,7 +59,7 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _ANSWER._serialized_start=1054
   _ANSWER._serialized_end=1094
   _QUESTIONANSWERSTREAMITEM._serialized_start=1097
-  _QUESTIONANSWERSTREAMITEM._serialized_end=1233
-  _QUESTIONANSWERSTREAMINGBATCH._serialized_start=1235
-  _QUESTIONANSWERSTREAMINGBATCH._serialized_end=1314
+  _QUESTIONANSWERSTREAMITEM._serialized_end=1260
+  _QUESTIONANSWERSTREAMINGBATCH._serialized_start=1262
+  _QUESTIONANSWERSTREAMINGBATCH._serialized_end=1341
 # @@protoc_insertion_point(module_scope)

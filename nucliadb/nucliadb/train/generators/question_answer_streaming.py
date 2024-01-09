@@ -27,9 +27,14 @@ from nucliadb_protos.dataset_pb2 import (
     TrainSet,
 )
 from nucliadb_protos.nodereader_pb2 import StreamRequest
+from nucliadb_protos.resources_pb2 import (
+    FieldID,
+    QuestionAnswer,
+    QuestionAnswerAnnotation,
+)
 
 from nucliadb.common.cluster.base import AbstractIndexNode
-from nucliadb.ingest.orm.resource import KB_REVERSE
+from nucliadb.ingest.orm.resource import FIELD_TYPE_TO_ID, KB_REVERSE
 from nucliadb.train import logger
 from nucliadb.train.generators.utils import (
     batchify,
@@ -71,23 +76,49 @@ async def generate_question_answer_streaming_payloads(
             logger.error(f"{rid} does not exist on DB")
             continue
 
+        basic = await orm_resource.get_basic()
+        if basic is not None:
+            for field_metadata in basic.fieldmetadata:
+                if not is_same_field(field_metadata.field, field, field_type):
+                    continue
+                qa_annotation_pb: QuestionAnswerAnnotation
+                for qa_annotation_pb in field_metadata.question_answers:
+                    async for item in iter_stream_items(
+                        kbid,
+                        qa_annotation_pb.question_answer,
+                    ):
+                        # QA annotations may be cancelled by user
+                        item.cancelled_by_user = qa_annotation_pb.cancelled_by_user
+                        yield item
+
         field_type_int = KB_REVERSE[field_type]
         field_obj = await orm_resource.get_field(field, field_type_int, load=False)
 
         question_answers_pb = await field_obj.get_question_answers()
         if question_answers_pb is not None:
             for question_answer_pb in question_answers_pb.question_answer:
-                question_pb = question_answer_pb.question
-                for answer_pb in question_answer_pb.answers:
-                    item = QuestionAnswerStreamItem()
-                    item.question.text = question_pb.text
-                    item.question.language = question_pb.language
-                    item.answer.text = answer_pb.text
-                    item.answer.language = answer_pb.language
-                    for paragraph_id in answer_pb.ids_paragraphs:
-                        paragraph_pb = Paragraph()
-                        paragraph_pb.id = paragraph_id
-                        paragraph_pb.text = await get_paragraph(kbid, paragraph_id)
-                        item.paragraphs.append(paragraph_pb)
+                async for item in iter_stream_items(kbid, question_answer_pb):
+                    yield item
 
-                        yield item
+
+async def iter_stream_items(
+    kbid: str,
+    question_answer_pb: QuestionAnswer,
+) -> AsyncGenerator[QuestionAnswerStreamItem, None]:
+    question_pb = question_answer_pb.question
+    for answer_pb in question_answer_pb.answers:
+        item = QuestionAnswerStreamItem()
+        item.question.text = question_pb.text
+        item.question.language = question_pb.language
+        item.answer.text = answer_pb.text
+        item.answer.language = answer_pb.language
+        for paragraph_id in answer_pb.ids_paragraphs:
+            paragraph_pb = Paragraph()
+            paragraph_pb.id = paragraph_id
+            paragraph_pb.text = await get_paragraph(kbid, paragraph_id)
+            item.paragraphs.append(paragraph_pb)
+        yield item
+
+
+def is_same_field(field: FieldID, field_id: str, field_type: str) -> bool:
+    return field.field == field_id and FIELD_TYPE_TO_ID[field.field_type] == field_type
