@@ -275,16 +275,18 @@ def build_question_answer_annotation_pb(
     pb = PBQuestionAnswerAnnotation()
     pb.cancelled_by_user = qa_annotation.cancelled_by_user
     pb.question_answer.question.text = qa_annotation.question_answer.question.text
-    pb.question_answer.question.language = (
-        qa_annotation.question_answer.question.language
-    )
+    if qa_annotation.question_answer.question.language is not None:
+        pb.question_answer.question.language = (
+            qa_annotation.question_answer.question.language
+        )
     pb.question_answer.question.ids_paragraphs.extend(
         qa_annotation.question_answer.question.ids_paragraphs
     )
     for answer_annotation in qa_annotation.question_answer.answers:
         answer = Answers()
         answer.text = answer_annotation.text
-        answer.language = answer_annotation.language
+        if answer_annotation.language is not None:
+            answer.language = answer_annotation.language
         answer.ids_paragraphs.extend(answer_annotation.ids_paragraphs)
         pb.question_answer.answers.append(answer)
     return pb

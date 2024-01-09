@@ -246,13 +246,13 @@ FIELD_TYPES_MAP_REVERSE: Dict[str, resources_pb2.FieldType.ValueType] = {
 
 class Question(BaseModel):
     text: str
-    language: str
+    language: Optional[str] = None
     ids_paragraphs: List[str]
 
 
 class Answer(BaseModel):
     text: str
-    language: str
+    language: Optional[str] = None
     ids_paragraphs: List[str]
 
 

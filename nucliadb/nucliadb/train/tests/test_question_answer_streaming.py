@@ -149,3 +149,74 @@ def smb_wonder_bm(kbid: str) -> BrokerMessage:
     bm = bmb.build()
 
     return bm
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ["STABLE", "EXPERIMENTAL"], indirect=True)
+async def test_generator_question_answer_streaming_streams_qa_annotations(
+    train_rest_api: aiohttp.ClientSession,
+    writer_rest_api: aiohttp.ClientSession,
+    knowledgebox: str,
+):
+    kbid = knowledgebox
+
+    resp = await writer_rest_api.post(
+        f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/resources",
+        json={
+            "title": "Super Mario Bros. Wonder",
+            "texts": {
+                "smb-wonder": {
+                    "body": "Super Mario Bros. Wonder (SMB Wonder) is a 2023 platform game developed and published by Nintendo.\n"  # noqa
+                },
+            },
+            "fieldmetadata": [
+                {
+                    "field": {"field_type": "text", "field": "smb-wonder"},
+                    "question_answers": [
+                        {
+                            "cancelled_by_user": True,
+                            "question_answer": {
+                                "question": {
+                                    "text": "What is SMB Wonder?",
+                                    "ids_paragraphs": [],
+                                },
+                                "answers": [
+                                    {
+                                        "ids_paragraphs": [],
+                                        "language": "english",
+                                        "text": "SMB Wonder is a Nintendo Switch game",
+                                    }
+                                ],
+                            },
+                        }
+                    ],
+                }
+            ],
+        },
+    )
+    assert resp.status == 201, resp.text
+
+    async with train_rest_api.get(
+        f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset"
+    ) as partitions:
+        assert partitions.status == 200
+        data = await partitions.json()
+        assert len(data["partitions"]) == 1
+        partition_id = data["partitions"][0]
+
+    trainset = TrainSet()
+    trainset.type = TaskType.QUESTION_ANSWER_STREAMING
+    trainset.batch_size = 5
+
+    async with train_rest_api.post(
+        f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset/{partition_id}",
+        data=trainset.SerializeToString(),
+    ) as response:
+        assert response.status == 200
+        batches = []
+        async for batch in get_batches_from_train_response_stream(
+            response, QuestionAnswerStreamingBatch
+        ):
+            batches.append(batch)
+            assert len(batch.data) == 1
+        assert len(batches) == 1

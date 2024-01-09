@@ -108,6 +108,7 @@ message QuestionAnswerStreamItem {
     Question question = 1;
     Answer answer = 2;
     repeated Paragraph paragraphs = 3;
+    bool cancelled_by_user = 4;
 }
 
 message QuestionAnswerStreamingBatch {
