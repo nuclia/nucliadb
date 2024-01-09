@@ -317,6 +317,9 @@ async def get_configuration(request: Request, kbid: str):
     tags=["Knowledge Box Services"],
     response_description="Each line of the response is a JSON object representing a notification.",
     response_model=None,
+    responses={
+        "404": {"description": "Knowledge Box not found"},
+    }
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
