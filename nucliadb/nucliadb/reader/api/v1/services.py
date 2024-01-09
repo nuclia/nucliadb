@@ -316,6 +316,7 @@ async def get_configuration(request: Request, kbid: str):
     description="Provides a stream of activity notifications for the given Knowledge Box.",
     tags=["Knowledge Box Services"],
     response_description="Each line of the response is a JSON object representing a notification.",
+    response_model=None,
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
