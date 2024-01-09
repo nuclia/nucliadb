@@ -97,8 +97,8 @@ impl FieldReader for TextReaderService {
         let mut modified_queries = Vec::new();
         let mut labels_queries: Vec<Box<dyn Query>> = Vec::new();
 
-        if request.security.is_some() {
-            for group_id in request.security.as_ref().unwrap().access_groups.iter() {
+        if let Some(security) = request.security.as_ref() {
+            for group_id in security.access_groups.iter() {
                 let mut group_id_key = group_id.clone();
                 if !group_id.starts_with('/') {
                     // Slash needs to be added to be compatible with tantivy facet fields

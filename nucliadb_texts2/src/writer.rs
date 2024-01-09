@@ -296,13 +296,10 @@ impl TextWriterService {
             self.schema.status => resource.status as u64,
         );
 
-        let public_to_all_groups = resource.security.is_none()
-            || resource.security.as_ref().unwrap().access_groups.is_empty();
-        if public_to_all_groups {
-            base_doc.add_u64(self.schema.groups_public, 1_u64);
-        } else {
+        let resource_security = resource.security.as_ref();
+        if let Some(security_groups) = resource_security.filter(|i| !i.access_groups.is_empty()) {
             base_doc.add_u64(self.schema.groups_public, 0_u64);
-            for group_id in resource.security.as_ref().unwrap().access_groups.iter() {
+            for group_id in security_groups.access_groups.iter() {
                 let mut group_id_key = group_id.clone();
                 if !group_id.starts_with('/') {
                     // Slash needs to be added to be compatible with tantivy facet fields
@@ -311,6 +308,8 @@ impl TextWriterService {
                 let facet = Facet::from(group_id_key.as_str());
                 base_doc.add_facet(self.schema.groups_with_access, facet)
             }
+        } else {
+            base_doc.add_u64(self.schema.groups_public, 1_u64);
         }
 
         for label in resource.labels.iter() {
