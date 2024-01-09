@@ -313,9 +313,13 @@ async def get_configuration(request: Request, kbid: str):
     f"/{KB_PREFIX}/{{kbid}}/activity",
     status_code=200,
     name="Knowledge Box Activity Stream",
-    description="Provides a stream of resource's activity notifications for the given Knowledge Box",
+    description="Provides a stream of activity notifications for the given Knowledge Box.",
     tags=["Knowledge Box Services"],
+    response_description="Each line of the response is a JSON object representing a notification.",
     response_model=None,
+    responses={
+        "404": {"description": "Knowledge Box not found"},
+    },
 )
 @requires(NucliaDBRoles.READER)
 @version(1)

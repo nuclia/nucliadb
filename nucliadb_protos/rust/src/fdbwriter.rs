@@ -475,6 +475,8 @@ pub struct Notification {
     pub write_type: i32,
     #[prost(message, optional, tag="8")]
     pub message: ::core::option::Option<BrokerMessage>,
+    #[prost(enumeration="NotificationSource", tag="9")]
+    pub source: i32,
 }
 /// Nested message and enum types in `Notification`.
 pub mod notification {
@@ -717,4 +719,11 @@ pub struct GetConfigurationResponse {
     pub status: ::core::option::Option<OpStatusWriter>,
     #[prost(message, optional, tag="2")]
     pub config: ::core::option::Option<super::knowledgebox::KbConfiguration>,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+#[repr(i32)]
+pub enum NotificationSource {
+    Unset = 0,
+    Writer = 1,
+    Processor = 2,
 }

@@ -28,6 +28,7 @@ from nucliadb_models.activity import (
     NotificationType,
     ResourceActionType,
     ResourceNotificationData,
+    ResourceNotificationSource,
     ResourceOperationType,
 )
 from nucliadb_protos import writer_pb2
@@ -108,6 +109,7 @@ async def managed_subscription(pubsub: PubSubDriver, key: str, handler: Callback
 
 
 RESOURCE_OP_PB_TO_MODEL = {
+    writer_pb2.Notification.WriteType.UNSET: None,
     writer_pb2.Notification.WriteType.CREATED: ResourceOperationType.CREATED,
     writer_pb2.Notification.WriteType.MODIFIED: ResourceOperationType.MODIFIED,
     writer_pb2.Notification.WriteType.DELETED: ResourceOperationType.DELETED,
@@ -116,23 +118,26 @@ RESOURCE_OP_PB_TO_MODEL = {
 RESOURCE_ACTION_PB_TO_MODEL = {
     writer_pb2.Notification.Action.COMMIT: ResourceActionType.COMMIT,
     writer_pb2.Notification.Action.INDEXED: ResourceActionType.INDEXED,
-    writer_pb2.Notification.Action.ABORT: ResourceActionType.ABORTED,
+    writer_pb2.Notification.Action.ABORT: ResourceActionType.ABORT,
+}
+
+RESOURCE_SOURCE_PB_TO_MODEL = {
+    writer_pb2.NotificationSource.UNSET: None,
+    writer_pb2.NotificationSource.WRITER: ResourceNotificationSource.WRITER,
+    writer_pb2.NotificationSource.PROCESSOR: ResourceNotificationSource.PROCESSOR,
 }
 
 
 def serialize_notification(pb: writer_pb2.Notification) -> Notification:
-    operation = RESOURCE_OP_PB_TO_MODEL.get(
-        pb.write_type, ResourceOperationType.CREATED
-    )
-    action = RESOURCE_ACTION_PB_TO_MODEL.get(pb.action, ResourceActionType.COMMIT)
     return Notification(
         type=NotificationType.RESOURCE,
         data=ResourceNotificationData(
             kbid=pb.kbid,
             resource_uuid=pb.uuid,
             seqid=pb.seqid,
-            operation=operation,
-            action=action,
+            operation=RESOURCE_OP_PB_TO_MODEL[pb.write_type],
+            action=RESOURCE_ACTION_PB_TO_MODEL[pb.action],
+            source=RESOURCE_SOURCE_PB_TO_MODEL[pb.source],
         ),
     )
 
