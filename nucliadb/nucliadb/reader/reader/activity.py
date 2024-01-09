@@ -129,19 +129,14 @@ RESOURCE_SOURCE_PB_TO_MODEL = {
 
 
 def serialize_notification(pb: writer_pb2.Notification) -> Notification:
-    kbid = pb.kbid
-    resource_uuid = pb.uuid
-    seqid = pb.seqid
-    operation = RESOURCE_OP_PB_TO_MODEL[pb.write_type]
-    action = RESOURCE_ACTION_PB_TO_MODEL[pb.action]
     return Notification(
         type=NotificationType.RESOURCE,
         data=ResourceNotificationData(
-            kbid=kbid,
-            resource_uuid=resource_uuid,
-            seqid=seqid,
-            operation=operation,
-            action=action,
+            kbid=pb.kbid,
+            resource_uuid=pb.uuid,
+            seqid=pb.seqid,
+            operation=RESOURCE_OP_PB_TO_MODEL[pb.write_type],
+            action=RESOURCE_ACTION_PB_TO_MODEL[pb.action],
             source=RESOURCE_SOURCE_PB_TO_MODEL[pb.source],
         ),
     )
