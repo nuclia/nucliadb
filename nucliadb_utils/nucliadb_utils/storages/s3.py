@@ -322,7 +322,6 @@ class S3Storage(Storage):
         self._aws_access_key = aws_client_id
         self._aws_secret_key = aws_client_secret
         self._region_name = region_name
-        self._bucket_creation_options = {}
 
         self._bucket_tags = bucket_tags
 
