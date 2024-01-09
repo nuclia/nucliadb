@@ -78,18 +78,8 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _PAGESTRUCTURETOKEN.fields_by_name['__height__deprecated']._serialized_options = b'\030\001'
   _ROWSPREVIEW_SHEETSENTRY._options = None
   _ROWSPREVIEW_SHEETSENTRY._serialized_options = b'8\001'
-<<<<<<< HEAD
-<<<<<<< HEAD
-  _FIELDTYPE._serialized_start=10794
-  _FIELDTYPE._serialized_end=10908
-=======
-  _FIELDTYPE._serialized_start=11055
-  _FIELDTYPE._serialized_end=11169
->>>>>>> 0214188d9 (Be able to have Q&A user annotations)
-=======
   _FIELDTYPE._serialized_start=10964
   _FIELDTYPE._serialized_end=11078
->>>>>>> 6b5526a77 (remove unused pb message)
   _CLOUDFILE._serialized_start=139
   _CLOUDFILE._serialized_end=507
   _CLOUDFILE_SOURCE._serialized_start=409
@@ -216,135 +206,8 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _TOKENSPLIT._serialized_end=7860
   _PARAGRAPHANNOTATION._serialized_start=7862
   _PARAGRAPHANNOTATION._serialized_end=7948
-<<<<<<< HEAD
-  _VISUALSELECTION._serialized_start=7950
-  _VISUALSELECTION._serialized_end=8059
-  _PAGESELECTIONS._serialized_start=8061
-  _PAGESELECTIONS._serialized_end=8135
-  _USERFIELDMETADATA._serialized_start=8138
-  _USERFIELDMETADATA._serialized_end=8334
-  _FIELDLINK._serialized_start=8337
-  _FIELDLINK._serialized_end=8737
-  _FIELDLINK_HEADERSENTRY._serialized_start=8590
-  _FIELDLINK_HEADERSENTRY._serialized_end=8636
-  _FIELDLINK_COOKIESENTRY._serialized_start=8638
-  _FIELDLINK_COOKIESENTRY._serialized_end=8684
-  _FIELDLINK_LOCALSTORAGEENTRY._serialized_start=8686
-  _FIELDLINK_LOCALSTORAGEENTRY._serialized_end=8737
-  _KEYWORD._serialized_start=8739
-  _KEYWORD._serialized_end=8763
-  _FIELDKEYWORDSET._serialized_start=8765
-  _FIELDKEYWORDSET._serialized_end=8820
-  _FIELDDATETIME._serialized_start=8822
-  _FIELDDATETIME._serialized_end=8880
-  _FIELDFILE._serialized_start=8883
-  _FIELDFILE._serialized_end=9222
-  _FIELDFILE_HEADERSENTRY._serialized_start=8590
-  _FIELDFILE_HEADERSENTRY._serialized_end=8636
-  _FIELDFILE_COOKIESENTRY._serialized_start=8638
-  _FIELDFILE_COOKIESENTRY._serialized_end=8684
-  _ENTITY._serialized_start=9224
-  _ENTITY._serialized_end=9275
-  _FIELDLARGEMETADATA._serialized_start=9278
-  _FIELDLARGEMETADATA._serialized_end=9441
-  _FIELDLARGEMETADATA_TOKENSENTRY._serialized_start=9396
-  _FIELDLARGEMETADATA_TOKENSENTRY._serialized_end=9441
-  _LARGECOMPUTEDMETADATA._serialized_start=9444
-  _LARGECOMPUTEDMETADATA._serialized_end=9702
-  _LARGECOMPUTEDMETADATA_SPLITMETADATAENTRY._serialized_start=9619
-  _LARGECOMPUTEDMETADATA_SPLITMETADATAENTRY._serialized_end=9702
-  _LARGECOMPUTEDMETADATAWRAPPER._serialized_start=9705
-  _LARGECOMPUTEDMETADATAWRAPPER._serialized_end=9874
-  _PAGEPOSITIONS._serialized_start=9876
-  _PAGEPOSITIONS._serialized_end=9919
-  _PAGESTRUCTUREPAGE._serialized_start=9921
-  _PAGESTRUCTUREPAGE._serialized_end=9971
-  _PAGESTRUCTURETOKEN._serialized_start=9974
-  _PAGESTRUCTURETOKEN._serialized_end=10200
-  _PAGESTRUCTURE._serialized_start=10202
-  _PAGESTRUCTURE._serialized_end=10308
-  _FILEPAGES._serialized_start=10311
-  _FILEPAGES._serialized_end=10450
-  _ROWSPREVIEW._serialized_start=10453
-  _ROWSPREVIEW._serialized_end=10673
-  _ROWSPREVIEW_SHEET._serialized_start=10520
-  _ROWSPREVIEW_SHEET._serialized_end=10596
-  _ROWSPREVIEW_SHEET_ROW._serialized_start=10577
-  _ROWSPREVIEW_SHEET_ROW._serialized_end=10596
-  _ROWSPREVIEW_SHEETSENTRY._serialized_start=10598
-  _ROWSPREVIEW_SHEETSENTRY._serialized_end=10673
-  _FIELDID._serialized_start=10675
-  _FIELDID._serialized_end=10741
-  _ALLFIELDIDS._serialized_start=10743
-  _ALLFIELDIDS._serialized_end=10792
-=======
   _QUESTIONANSWERANNOTATION._serialized_start=7950
   _QUESTIONANSWERANNOTATION._serialized_end=8055
-<<<<<<< HEAD
-  _QUESTIONANSWERANNOTATIONS._serialized_start=8057
-  _QUESTIONANSWERANNOTATIONS._serialized_end=8146
-  _VISUALSELECTION._serialized_start=8148
-  _VISUALSELECTION._serialized_end=8257
-  _PAGESELECTIONS._serialized_start=8259
-  _PAGESELECTIONS._serialized_end=8333
-  _USERFIELDMETADATA._serialized_start=8336
-  _USERFIELDMETADATA._serialized_end=8595
-  _FIELDLINK._serialized_start=8598
-  _FIELDLINK._serialized_end=8998
-  _FIELDLINK_HEADERSENTRY._serialized_start=8851
-  _FIELDLINK_HEADERSENTRY._serialized_end=8897
-  _FIELDLINK_COOKIESENTRY._serialized_start=8899
-  _FIELDLINK_COOKIESENTRY._serialized_end=8945
-  _FIELDLINK_LOCALSTORAGEENTRY._serialized_start=8947
-  _FIELDLINK_LOCALSTORAGEENTRY._serialized_end=8998
-  _KEYWORD._serialized_start=9000
-  _KEYWORD._serialized_end=9024
-  _FIELDKEYWORDSET._serialized_start=9026
-  _FIELDKEYWORDSET._serialized_end=9081
-  _FIELDDATETIME._serialized_start=9083
-  _FIELDDATETIME._serialized_end=9141
-  _FIELDFILE._serialized_start=9144
-  _FIELDFILE._serialized_end=9483
-  _FIELDFILE_HEADERSENTRY._serialized_start=8851
-  _FIELDFILE_HEADERSENTRY._serialized_end=8897
-  _FIELDFILE_COOKIESENTRY._serialized_start=8899
-  _FIELDFILE_COOKIESENTRY._serialized_end=8945
-  _ENTITY._serialized_start=9485
-  _ENTITY._serialized_end=9536
-  _FIELDLARGEMETADATA._serialized_start=9539
-  _FIELDLARGEMETADATA._serialized_end=9702
-  _FIELDLARGEMETADATA_TOKENSENTRY._serialized_start=9657
-  _FIELDLARGEMETADATA_TOKENSENTRY._serialized_end=9702
-  _LARGECOMPUTEDMETADATA._serialized_start=9705
-  _LARGECOMPUTEDMETADATA._serialized_end=9963
-  _LARGECOMPUTEDMETADATA_SPLITMETADATAENTRY._serialized_start=9880
-  _LARGECOMPUTEDMETADATA_SPLITMETADATAENTRY._serialized_end=9963
-  _LARGECOMPUTEDMETADATAWRAPPER._serialized_start=9966
-  _LARGECOMPUTEDMETADATAWRAPPER._serialized_end=10135
-  _PAGEPOSITIONS._serialized_start=10137
-  _PAGEPOSITIONS._serialized_end=10180
-  _PAGESTRUCTUREPAGE._serialized_start=10182
-  _PAGESTRUCTUREPAGE._serialized_end=10232
-  _PAGESTRUCTURETOKEN._serialized_start=10235
-  _PAGESTRUCTURETOKEN._serialized_end=10461
-  _PAGESTRUCTURE._serialized_start=10463
-  _PAGESTRUCTURE._serialized_end=10569
-  _FILEPAGES._serialized_start=10572
-  _FILEPAGES._serialized_end=10711
-  _ROWSPREVIEW._serialized_start=10714
-  _ROWSPREVIEW._serialized_end=10934
-  _ROWSPREVIEW_SHEET._serialized_start=10781
-  _ROWSPREVIEW_SHEET._serialized_end=10857
-  _ROWSPREVIEW_SHEET_ROW._serialized_start=10838
-  _ROWSPREVIEW_SHEET_ROW._serialized_end=10857
-  _ROWSPREVIEW_SHEETSENTRY._serialized_start=10859
-  _ROWSPREVIEW_SHEETSENTRY._serialized_end=10934
-  _FIELDID._serialized_start=10936
-  _FIELDID._serialized_end=11002
-  _ALLFIELDIDS._serialized_start=11004
-  _ALLFIELDIDS._serialized_end=11053
->>>>>>> 0214188d9 (Be able to have Q&A user annotations)
-=======
   _VISUALSELECTION._serialized_start=8057
   _VISUALSELECTION._serialized_end=8166
   _PAGESELECTIONS._serialized_start=8168
@@ -405,5 +268,4 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _FIELDID._serialized_end=10911
   _ALLFIELDIDS._serialized_start=10913
   _ALLFIELDIDS._serialized_end=10962
->>>>>>> 6b5526a77 (remove unused pb message)
 # @@protoc_insertion_point(module_scope)
