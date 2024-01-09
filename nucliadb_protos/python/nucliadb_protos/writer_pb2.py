@@ -77,11 +77,8 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _SHARDS_EXTRAENTRY._serialized_options = b'8\001'
   _SHARDS.fields_by_name['similarity']._options = None
   _SHARDS.fields_by_name['similarity']._serialized_options = b'\030\001'
-<<<<<<< HEAD
   _NOTIFICATIONSOURCE._serialized_start=9122
   _NOTIFICATIONSOURCE._serialized_end=9180
-=======
->>>>>>> dac0cba17 (Add security search to texts2)
   _AUDIT._serialized_start=183
   _AUDIT._serialized_end=351
   _AUDIT_SOURCE._serialized_start=305
@@ -195,7 +192,6 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _OPSTATUSWRITER_STATUS._serialized_start=6560
   _OPSTATUSWRITER_STATUS._serialized_end=6601
   _NOTIFICATION._serialized_start=6604
-<<<<<<< HEAD
   _NOTIFICATION._serialized_end=6998
   _NOTIFICATION_ACTION._serialized_start=6890
   _NOTIFICATION_ACTION._serialized_end=6934
@@ -257,67 +253,4 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _GETCONFIGURATIONRESPONSE._serialized_end=9120
   _WRITER._serialized_start=9183
   _WRITER._serialized_end=12297
-=======
-  _NOTIFICATION._serialized_end=6951
-  _NOTIFICATION_ACTION._serialized_start=6843
-  _NOTIFICATION_ACTION._serialized_end=6887
-  _NOTIFICATION_WRITETYPE._serialized_start=6889
-  _NOTIFICATION_WRITETYPE._serialized_end=6951
-  _MEMBER._serialized_start=6954
-  _MEMBER._serialized_end=7189
-  _MEMBER_TYPE._serialized_start=7127
-  _MEMBER_TYPE._serialized_end=7189
-  _LISTMEMBERSREQUEST._serialized_start=7191
-  _LISTMEMBERSREQUEST._serialized_end=7211
-  _LISTMEMBERSRESPONSE._serialized_start=7213
-  _LISTMEMBERSRESPONSE._serialized_end=7270
-  _SHARDREPLICA._serialized_start=7272
-  _SHARDREPLICA._serialized_end=7344
-  _SHARDOBJECT._serialized_start=7346
-  _SHARDOBJECT._serialized_end=7464
-  _SHARDS._serialized_start=7467
-  _SHARDS._serialized_end=7785
-  _SHARDS_EXTRAENTRY._serialized_start=7741
-  _SHARDS_EXTRAENTRY._serialized_end=7785
-  _RESOURCEFIELDID._serialized_start=7787
-  _RESOURCEFIELDID._serialized_end=7888
-  _INDEXRESOURCE._serialized_start=7890
-  _INDEXRESOURCE._serialized_end=7957
-  _INDEXSTATUS._serialized_start=7959
-  _INDEXSTATUS._serialized_end=7972
-  _RESOURCEFIELDEXISTSRESPONSE._serialized_start=7974
-  _RESOURCEFIELDEXISTSRESPONSE._serialized_end=8018
-  _RESOURCEIDREQUEST._serialized_start=8020
-  _RESOURCEIDREQUEST._serialized_end=8067
-  _RESOURCEIDRESPONSE._serialized_start=8069
-  _RESOURCEIDRESPONSE._serialized_end=8103
-  _EXPORTREQUEST._serialized_start=8105
-  _EXPORTREQUEST._serialized_end=8134
-  _SETVECTORSREQUEST._serialized_start=8136
-  _SETVECTORSREQUEST._serialized_end=8255
-  _SETVECTORSRESPONSE._serialized_start=8257
-  _SETVECTORSRESPONSE._serialized_end=8292
-  _FILEREQUEST._serialized_start=8294
-  _FILEREQUEST._serialized_end=8336
-  _BINARYDATA._serialized_start=8338
-  _BINARYDATA._serialized_end=8364
-  _BINARYMETADATA._serialized_start=8366
-  _BINARYMETADATA._serialized_end=8463
-  _UPLOADBINARYDATA._serialized_start=8465
-  _UPLOADBINARYDATA._serialized_end=8572
-  _FILEUPLOADED._serialized_start=8574
-  _FILEUPLOADED._serialized_end=8588
-  _SYNONYMSREQUEST._serialized_start=8590
-  _SYNONYMSREQUEST._serialized_end=8621
-  _SETSYNONYMSREQUEST._serialized_start=8623
-  _SETSYNONYMSREQUEST._serialized_end=8729
-  _GETSYNONYMSRESPONSE._serialized_start=8731
-  _GETSYNONYMSRESPONSE._serialized_end=8837
-  _SETKBCONFIGURATIONREQUEST._serialized_start=8839
-  _SETKBCONFIGURATIONREQUEST._serialized_end=8955
-  _GETCONFIGURATIONRESPONSE._serialized_start=8957
-  _GETCONFIGURATIONRESPONSE._serialized_end=9073
-  _WRITER._serialized_start=9076
-  _WRITER._serialized_end=12190
->>>>>>> dac0cba17 (Add security search to texts2)
 # @@protoc_insertion_point(module_scope)

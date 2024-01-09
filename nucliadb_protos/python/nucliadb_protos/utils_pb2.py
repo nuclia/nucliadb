@@ -28,17 +28,10 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _USERVECTORS_VECTORSENTRY._serialized_options = b'8\001'
   _USERVECTORSET_VECTORSENTRY._options = None
   _USERVECTORSET_VECTORSENTRY._serialized_options = b'8\001'
-<<<<<<< HEAD
-  _VECTORSIMILARITY._serialized_start=1585
-  _VECTORSIMILARITY._serialized_end=1624
-  _RELEASECHANNEL._serialized_start=1626
-  _RELEASECHANNEL._serialized_end=1672
-=======
   _VECTORSIMILARITY._serialized_start=1620
   _VECTORSIMILARITY._serialized_end=1659
   _RELEASECHANNEL._serialized_start=1661
   _RELEASECHANNEL._serialized_end=1707
->>>>>>> dac0cba17 (Add security search to texts2)
   _RELATION._serialized_start=39
   _RELATION._serialized_end=319
   _RELATION_RELATIONTYPE._serialized_start=236
@@ -73,9 +66,6 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _USERVECTORSET_VECTORSENTRY._serialized_end=1547
   _USERVECTORSLIST._serialized_start=1549
   _USERVECTORSLIST._serialized_end=1583
-<<<<<<< HEAD
-=======
   _SECURITY._serialized_start=1585
   _SECURITY._serialized_end=1618
->>>>>>> dac0cba17 (Add security search to texts2)
 # @@protoc_insertion_point(module_scope)

@@ -51,13 +51,8 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _STREAMREQUEST.fields_by_name['filter__deprecated']._serialized_options = b'\030\001'
   _STREAMREQUEST.fields_by_name['reload']._options = None
   _STREAMREQUEST.fields_by_name['reload']._serialized_options = b'\030\001'
-<<<<<<< HEAD
-  _SUGGESTFEATURES._serialized_start=6811
-  _SUGGESTFEATURES._serialized_end=6858
-=======
   _SUGGESTFEATURES._serialized_start=6864
   _SUGGESTFEATURES._serialized_end=6911
->>>>>>> dac0cba17 (Add security search to texts2)
   _FILTER._serialized_start=147
   _FILTER._serialized_end=203
   _STREAMFILTER._serialized_start=206
@@ -123,47 +118,6 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _RELATIONSEARCHRESPONSE._serialized_start=4328
   _RELATIONSEARCHRESPONSE._serialized_end=4466
   _SEARCHREQUEST._serialized_start=4469
-<<<<<<< HEAD
-  _SEARCHREQUEST._serialized_end=5226
-  _SUGGESTREQUEST._serialized_start=5229
-  _SUGGESTREQUEST._serialized_end=5417
-  _RELATEDENTITIES._serialized_start=5419
-  _RELATEDENTITIES._serialized_end=5469
-  _SUGGESTRESPONSE._serialized_start=5472
-  _SUGGESTRESPONSE._serialized_end=5630
-  _SEARCHRESPONSE._serialized_start=5633
-  _SEARCHRESPONSE._serialized_end=5863
-  _IDCOLLECTION._serialized_start=5865
-  _IDCOLLECTION._serialized_end=5892
-  _RELATIONEDGE._serialized_start=5894
-  _RELATIONEDGE._serialized_end=5975
-  _EDGELIST._serialized_start=5977
-  _EDGELIST._serialized_end=6027
-  _RELATIONTYPELISTMEMBER._serialized_start=6029
-  _RELATIONTYPELISTMEMBER._serialized_end=6124
-  _TYPELIST._serialized_start=6126
-  _TYPELIST._serialized_end=6186
-  _GETSHARDREQUEST._serialized_start=6188
-  _GETSHARDREQUEST._serialized_end=6266
-  _PARAGRAPHITEM._serialized_start=6268
-  _PARAGRAPHITEM._serialized_end=6311
-  _DOCUMENTITEM._serialized_start=6313
-  _DOCUMENTITEM._serialized_end=6372
-  _STREAMREQUEST._serialized_start=6375
-  _STREAMREQUEST._serialized_end=6546
-  _GETSHARDFILESREQUEST._serialized_start=6548
-  _GETSHARDFILESREQUEST._serialized_end=6588
-  _SHARDFILELIST._serialized_start=6590
-  _SHARDFILELIST._serialized_end=6643
-  _SHARDFILE._serialized_start=6645
-  _SHARDFILE._serialized_end=6693
-  _DOWNLOADSHARDFILEREQUEST._serialized_start=6695
-  _DOWNLOADSHARDFILEREQUEST._serialized_end=6762
-  _SHARDFILECHUNK._serialized_start=6764
-  _SHARDFILECHUNK._serialized_end=6809
-  _NODEREADER._serialized_start=6861
-  _NODEREADER._serialized_end=8146
-=======
   _SEARCHREQUEST._serialized_end=5279
   _SUGGESTREQUEST._serialized_start=5282
   _SUGGESTREQUEST._serialized_end=5470
@@ -203,5 +157,4 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _SHARDFILECHUNK._serialized_end=6862
   _NODEREADER._serialized_start=6914
   _NODEREADER._serialized_end=8199
->>>>>>> dac0cba17 (Add security search to texts2)
 # @@protoc_insertion_point(module_scope)
