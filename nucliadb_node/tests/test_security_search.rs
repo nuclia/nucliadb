@@ -120,7 +120,6 @@ async fn test_security_search() -> Result<(), Box<dyn std::error::Error>> {
             document: true,
             security: Some(Security {
                 access_groups: vec![],
-                ..Default::default()
             }),
             ..Default::default()
         })
@@ -136,7 +135,6 @@ async fn test_security_search() -> Result<(), Box<dyn std::error::Error>> {
             document: true,
             security: Some(Security {
                 access_groups: vec!["unknown".to_string()],
-                ..Default::default()
             }),
             ..Default::default()
         })
@@ -152,7 +150,6 @@ async fn test_security_search() -> Result<(), Box<dyn std::error::Error>> {
             document: true,
             security: Some(Security {
                 access_groups: vec![group_engineering.clone()],
-                ..Default::default()
             }),
             ..Default::default()
         })
@@ -169,7 +166,6 @@ async fn test_security_search() -> Result<(), Box<dyn std::error::Error>> {
             document: true,
             security: Some(Security {
                 access_groups: vec!["/unknown".to_string(), group_engineering.clone()],
-                ..Default::default()
             }),
             ..Default::default()
         })
@@ -203,7 +199,6 @@ async fn test_security_search_public_resource() -> Result<(), Box<dyn std::error
             document: true,
             security: Some(Security {
                 access_groups: vec![],
-                ..Default::default()
             }),
             ..Default::default()
         })
@@ -219,7 +214,6 @@ async fn test_security_search_public_resource() -> Result<(), Box<dyn std::error
             document: true,
             security: Some(Security {
                 access_groups: vec!["/unknown".to_string()],
-                ..Default::default()
             }),
             ..Default::default()
         })
