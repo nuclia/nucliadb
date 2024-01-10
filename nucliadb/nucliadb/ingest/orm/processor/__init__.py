@@ -261,13 +261,16 @@ class Processor:
                 created = created or _created
 
             if resource:
-                await resource.compute_global_text()
-                await resource.compute_global_tags(resource.indexer)
                 if message.reindex:
                     # when reindexing, let's just generate full new index message
-                    resource.replace_indexer(await resource.generate_index_message())
+                    brain = await resource.generate_index_message()
+                    resource.replace_indexer(brain)
+                else:
+                    await resource.compute_global_text()
+                    await resource.compute_global_tags(resource.indexer)
 
-            if resource and resource.modified:
+            should_index_resource = resource and (resource.modified or message.reindex)
+            if should_index_resource:
                 await self.index_resource(  # noqa
                     resource=resource,
                     txn=txn,
@@ -479,18 +482,18 @@ class Processor:
             )
             return None
 
-        if message.HasField("origin") and resource:
+        if resource is None:
+            return None
+
+        if message.HasField("origin"):
             await resource.set_origin(message.origin)
 
-        if message.HasField("extra") and resource:
+        if message.HasField("extra"):
             await resource.set_extra(message.extra)
 
-        if resource:
-            await resource.apply_fields(message)
-            await resource.apply_extracted(message)
-            return (resource, created)
-
-        return None
+        await resource.apply_fields(message)
+        await resource.apply_extracted(message)
+        return (resource, created)
 
     async def maybe_update_resource_basic(
         self, resource: Resource, message: writer_pb2.BrokerMessage
