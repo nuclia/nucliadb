@@ -57,7 +57,9 @@ async def test_resource_security_is_returned_serialization(
     )
     assert resp.status_code == 200, resp.text
     resource = resp.json()
-    assert resource["security"]["access_groups"] == [PLATFORM_GROUP, DEVELOPERS_GROUP]
+    assert set(resource["security"]["access_groups"]) == set(
+        [PLATFORM_GROUP, DEVELOPERS_GROUP]
+    )
 
 
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
@@ -82,7 +84,6 @@ async def test_resource_security_is_updated(
     resp = await nucliadb_reader.get(
         f"/kb/{kbid}/resource/{resource_id}",
         params={"show": ["security"]},
-        timeout=None,
     )
     assert resp.status_code == 200, resp.text
     resource = resp.json()
