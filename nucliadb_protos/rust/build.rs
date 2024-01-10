@@ -26,7 +26,6 @@ fn main() -> Result<()> {
     println!("cargo:rerun-if-changed=../noderesources.proto");
     println!("cargo:rerun-if-changed=../utils.proto");
     println!("cargo:rerun-if-changed=../writer.proto");
-    println!("cargo:rerun-if-changed=../nodesidecar.proto");
     println!("cargo:rerun-if-changed=../nodewriter.proto");
     println!("cargo:rerun-if-changed=../nodereader.proto");
     println!("cargo:rerun-if-changed=../replication.proto");
