@@ -23,7 +23,7 @@ import uuid
 from collections.abc import AsyncGenerator
 
 from nucliadb.reader import logger
-from nucliadb_models.activity import (
+from nucliadb_models.notifications import (
     Notification,
     NotificationType,
     ResourceActionType,
@@ -40,7 +40,7 @@ from nucliadb_utils.utilities import get_pubsub
 MAX_QUEUE_SIZE = 1000
 
 
-async def kb_activity_stream(kbid: str) -> AsyncGenerator[bytes, None]:
+async def kb_notifications_stream(kbid: str) -> AsyncGenerator[bytes, None]:
     pb_notification: writer_pb2.Notification
     async for pb_notification in kb_notifications(kbid):
         yield encode_streamed_notification(pb_notification) + b"\n"

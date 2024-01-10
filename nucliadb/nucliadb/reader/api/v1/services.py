@@ -49,7 +49,7 @@ from nucliadb.common.context.fastapi import get_app_context
 from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.reader.api.v1.router import KB_PREFIX, api
-from nucliadb.reader.reader.activity import kb_activity_stream
+from nucliadb.reader.reader.notifications import kb_notifications_stream
 from nucliadb_models.configuration import KBConfiguration
 from nucliadb_models.entities import EntitiesGroup, KnowledgeBoxEntities
 from nucliadb_models.labels import KnowledgeBoxLabels, LabelSet
@@ -310,9 +310,9 @@ async def get_configuration(request: Request, kbid: str):
 
 
 @api.get(
-    f"/{KB_PREFIX}/{{kbid}}/activity",
+    f"/{KB_PREFIX}/{{kbid}}/notifications",
     status_code=200,
-    name="Knowledge Box Activity Stream",
+    name="Knowledge Box Notifications Stream",
     description="Provides a stream of activity notifications for the given Knowledge Box.",
     tags=["Knowledge Box Services"],
     response_description="Each line of the response is a JSON object representing a notification.",
@@ -323,7 +323,7 @@ async def get_configuration(request: Request, kbid: str):
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def activity_endpoint(
+async def notifications_endpoint(
     request: Request, kbid: str
 ) -> Union[StreamingResponse, HTTPClientError]:
     context = get_app_context(request.app)
@@ -332,7 +332,7 @@ async def activity_endpoint(
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
 
     response = StreamingResponse(
-        content=kb_activity_stream(kbid),
+        content=kb_notifications_stream(kbid),
         status_code=200,
         media_type="binary/octet-stream",
     )

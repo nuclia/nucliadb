@@ -26,7 +26,7 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb.reader.api.v1.router import KB_PREFIX
-from nucliadb_models.activity import Notification, ResourceNotification
+from nucliadb_models.notifications import Notification, ResourceNotification
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_protos import writer_pb2
 
@@ -41,7 +41,7 @@ def kb_notifications():
             yield writer_pb2.Notification(kbid=kbid, seqid=i, uuid=f"resource-{i}")
 
     with mock.patch(
-        "nucliadb.reader.reader.activity.kb_notifications", new=_kb_notifications
+        "nucliadb.reader.reader.notifications.kb_notifications", new=_kb_notifications
     ) as mocked:
         yield mocked
 
@@ -56,7 +56,7 @@ async def test_activity(
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         async with client.stream(
             method="GET",
-            url=f"/{KB_PREFIX}/{kbid}/activity",
+            url=f"/{KB_PREFIX}/{kbid}/notifications",
         ) as resp:
             assert resp.status_code == 200
 
@@ -77,5 +77,5 @@ async def test_activity_kb_not_found(
     reader_api: Callable[..., AsyncClient],
 ):
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(f"/{KB_PREFIX}/foobar/activity")
+        resp = await client.get(f"/{KB_PREFIX}/foobar/notifications")
         assert resp.status_code == 404
