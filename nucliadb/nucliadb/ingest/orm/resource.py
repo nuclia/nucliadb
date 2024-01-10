@@ -336,7 +336,7 @@ class Resource:
             pb = utils_pb2.Security()
             key = KB_RESOURCE_SECURITY.format(kbid=self.kb.kbid, uuid=self.uuid)
             payload = await self.txn.get(key)
-            if payload is None or payload == b"":
+            if payload is None:
                 return None
             pb.ParseFromString(payload)
             self.security = pb

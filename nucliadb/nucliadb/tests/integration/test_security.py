@@ -17,6 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
+
 from typing import Optional
 
 import pytest
@@ -60,14 +62,59 @@ async def test_resource_security_is_returned_serialization(
 
 
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_resource_security_is_updated(
+    nucliadb_reader, nucliadb_writer, knowledgebox, resource_with_security
+):
+    kbid = knowledgebox
+    resource_id = resource_with_security
+
+    # Update the security of the resource: make it public for all groups
+    resp = await nucliadb_writer.patch(
+        f"/kb/{kbid}/resource/{resource_id}",
+        json={
+            "security": {
+                "access_groups": [],
+            },
+        },
+    )
+    assert resp.status_code == 200, resp.text
+
+    # Check that it was updated properly
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/resource/{resource_id}",
+        params={"show": ["security"]},
+        timeout=None,
+    )
+    assert resp.status_code == 200, resp.text
+    resource = resp.json()
+    assert resource["security"]["access_groups"] == []
+
+
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 @pytest.mark.parametrize(
     "search_endpoint", ("find_get", "find_post", "search_get", "search_post")
 )
 async def test_resource_security_search(
-    nucliadb_reader, knowledgebox, resource_with_security, search_endpoint
+    nucliadb_reader,
+    nucliadb_writer,
+    knowledgebox,
+    resource_with_security,
+    search_endpoint,
 ):
+
     kbid = knowledgebox
     resource_id = resource_with_security
+    support_group = "support"
+    # Add another group to the resource
+    resp = await nucliadb_writer.patch(
+        f"/kb/{kbid}/resource/{resource_id}",
+        json={
+            "security": {
+                "access_groups": [PLATFORM_GROUP, DEVELOPERS_GROUP, support_group],
+            },
+        },
+    )
+    assert resp.status_code == 200, resp.text
 
     # Querying without security should return the resource
     await _test_search_request_with_security(
@@ -83,6 +130,7 @@ async def test_resource_security_search(
     for access_groups in (
         [DEVELOPERS_GROUP],
         [PLATFORM_GROUP],
+        [support_group],
         [PLATFORM_GROUP, DEVELOPERS_GROUP],
         # Adding an unknown group should not affect the result, as
         # the index is returning the union of results for each group
@@ -107,6 +155,32 @@ async def test_resource_security_search(
         expected_resources=[],
     )
 
+    # Make it public now
+    resp = await nucliadb_writer.patch(
+        f"/kb/{kbid}/resource/{resource_id}",
+        json={
+            "security": {
+                "access_groups": [],
+            },
+        },
+        headers={"x-synchronous": "true"},
+    )
+    assert resp.status_code == 200, resp.text
+
+    # Wait for the tantivy index to be updated. This is expected as we are using
+    # the bindings and the tantivy reader is not notified in the same process.
+    await asyncio.sleep(1)
+
+    # Querying with an unknown security group should return the resource now, as it is public
+    await _test_search_request_with_security(
+        search_endpoint,
+        nucliadb_reader,
+        kbid,
+        query="resource",
+        security_groups=["blah-blah"],
+        expected_resources=[resource_id],
+    )
+
 
 async def _test_search_request_with_security(
     search_endpoint: str,
@@ -120,13 +194,13 @@ async def _test_search_request_with_security(
         "query": query,
     }
     if security_groups:
-        payload["security"] = {"groups": security_groups}
+        payload["security"] = {"groups": security_groups}  # type: ignore
 
     params = {
         "query": query,
     }
     if security_groups:
-        params["security_groups"] = security_groups
+        params["security_groups"] = security_groups  # type: ignore
 
     if search_endpoint == "find_post":
         resp = await nucliadb_reader.post(

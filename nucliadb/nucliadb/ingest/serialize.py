@@ -242,11 +242,10 @@ async def managed_serialize(
 
     if ResourceProperties.SECURITY in show:
         await orm_resource.get_security()
+        resource.security = ResourceSecurity(access_groups=[])
         if orm_resource.security is not None:
-            security = ResourceSecurity(
-                access_groups=[gid for gid in orm_resource.security.access_groups]
-            )
-            resource.security = security
+            for gid in orm_resource.security.access_groups:
+                resource.security.access_groups.append(gid)
 
     if field_type_filter and (include_values or include_extracted_data):
         await orm_resource.get_fields()
