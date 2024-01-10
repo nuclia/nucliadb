@@ -54,6 +54,7 @@ from nucliadb_models.resource import (
     TextFieldExtractedData,
 )
 from nucliadb_models.search import ResourceProperties
+from nucliadb_models.security import ResourceSecurity
 from nucliadb_models.vectors import UserVectorSet
 from nucliadb_utils.utilities import get_storage
 
@@ -238,6 +239,14 @@ async def managed_serialize(
             resource.extra = models.Extra.from_message(orm_resource.extra)
 
     include_errors = ResourceProperties.ERRORS in show
+
+    if ResourceProperties.SECURITY in show:
+        await orm_resource.get_security()
+        if orm_resource.security is not None:
+            security = ResourceSecurity(
+                access_groups=[gid for gid in orm_resource.security.access_groups]
+            )
+            resource.security = security
 
     if field_type_filter and (include_values or include_extracted_data):
         await orm_resource.get_fields()

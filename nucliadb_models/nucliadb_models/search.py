@@ -61,6 +61,7 @@ class ResourceProperties(str, Enum):
     VALUES = "values"
     EXTRACTED = "extracted"
     ERRORS = "errors"
+    SECURITY = "security"
 
 
 class SearchOptions(str, Enum):

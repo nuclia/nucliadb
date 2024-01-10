@@ -78,7 +78,7 @@ from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb.ingest.orm.utils import get_basic, set_basic
 from nucliadb_models.common import CloudLink
 from nucliadb_models.writer import GENERIC_MIME_TYPE
-from nucliadb_protos import writer_pb2
+from nucliadb_protos import utils_pb2, writer_pb2
 from nucliadb_utils.storages.storage import Storage
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -88,6 +88,7 @@ logger = logging.getLogger(__name__)
 
 KB_RESOURCE_ORIGIN = "/kbs/{kbid}/r/{uuid}/origin"
 KB_RESOURCE_EXTRA = "/kbs/{kbid}/r/{uuid}/extra"
+KB_RESOURCE_SECURITY = "/kbs/{kbid}/r/{uuid}/security"
 KB_RESOURCE_METADATA = "/kbs/{kbid}/r/{uuid}/metadata"
 KB_RESOURCE_RELATIONS = "/kbs/{kbid}/r/{uuid}/relations"
 KB_RESOURCE_FIELDS = "/kbs/{kbid}/r/{uuid}/f/"
@@ -150,6 +151,7 @@ class Resource:
         self.all_fields_keys: list[tuple[FieldType.ValueType, str]] = []
         self.origin: Optional[PBOrigin] = None
         self.extra: Optional[PBExtra] = None
+        self.security: Optional[utils_pb2.Security] = None
         self.modified: bool = False
         self._indexer: Optional[ResourceBrain] = None
         self._modified_extracted_text: list[FieldID] = []
@@ -327,6 +329,27 @@ class Resource:
         )
         self.modified = True
         self.extra = payload
+
+    # Security
+    async def get_security(self) -> Optional[utils_pb2.Security]:
+        if self.security is None:
+            pb = utils_pb2.Security()
+            key = KB_RESOURCE_SECURITY.format(kbid=self.kb.kbid, uuid=self.uuid)
+            payload = await self.txn.get(key)
+            if payload is None or payload == b"":
+                return None
+            pb.ParseFromString(payload)
+            self.security = pb
+        return self.security
+
+    async def set_security(self, payload: utils_pb2.Security) -> None:
+        key = KB_RESOURCE_SECURITY.format(kbid=self.kb.kbid, uuid=self.uuid)
+        await self.txn.set(
+            key,
+            payload.SerializeToString(),
+        )
+        self.modified = True
+        self.security = payload
 
     # Relations
     async def get_relations(self) -> Optional[PBRelations]:
