@@ -95,6 +95,7 @@ async fn populate(writer: &mut TestNodeWriter, shard_id: String, metadata: Index
         relations: vec![],
         vectors: HashMap::default(),
         vectors_to_delete: HashMap::default(),
+        ..Default::default()
     };
 
     writer.set_resource(resource).await.unwrap();

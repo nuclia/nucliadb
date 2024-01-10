@@ -51,6 +51,7 @@ from nucliadb_protos.utils_pb2 import (
     RelationNode as RelationNode,
     ReleaseChannel as ReleaseChannel,
     STABLE as STABLE,
+    Security as Security,
     UserVector as UserVector,
     UserVectorSet as UserVectorSet,
     UserVectors as UserVectors,
@@ -964,6 +965,7 @@ class SearchRequest(google.protobuf.message.Message):
     RELATION_SUBGRAPH_FIELD_NUMBER: builtins.int
     KEY_FILTERS_FIELD_NUMBER: builtins.int
     MIN_SCORE_FIELD_NUMBER: builtins.int
+    SECURITY_FIELD_NUMBER: builtins.int
     shard: builtins.str
     @property
     def fields(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
@@ -1002,6 +1004,8 @@ class SearchRequest(google.protobuf.message.Message):
     @property
     def key_filters(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     min_score: builtins.float
+    @property
+    def security(self) -> nucliadb_protos.utils_pb2.Security: ...
     def __init__(
         self,
         *,
@@ -1028,11 +1032,14 @@ class SearchRequest(google.protobuf.message.Message):
         relation_subgraph: global___EntitiesSubgraphRequest | None = ...,
         key_filters: collections.abc.Iterable[builtins.str] | None = ...,
         min_score: builtins.float = ...,
+        security: nucliadb_protos.utils_pb2.Security | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["_advanced_query", b"_advanced_query", "_with_status", b"_with_status", "advanced_query", b"advanced_query", "faceted", b"faceted", "filter", b"filter", "order", b"order", "relation_prefix", b"relation_prefix", "relation_subgraph", b"relation_subgraph", "relations", b"relations", "timestamps", b"timestamps", "with_status", b"with_status"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["_advanced_query", b"_advanced_query", "_with_status", b"_with_status", "advanced_query", b"advanced_query", "body", b"body", "document", b"document", "faceted", b"faceted", "fields", b"fields", "filter", b"filter", "key_filters", b"key_filters", "min_score", b"min_score", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "paragraph", b"paragraph", "relation_prefix", b"relation_prefix", "relation_subgraph", b"relation_subgraph", "relations", b"relations", "reload", b"reload", "result_per_page", b"result_per_page", "shard", b"shard", "timestamps", b"timestamps", "vector", b"vector", "vectorset", b"vectorset", "with_duplicates", b"with_duplicates", "with_status", b"with_status"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["_advanced_query", b"_advanced_query", "_security", b"_security", "_with_status", b"_with_status", "advanced_query", b"advanced_query", "faceted", b"faceted", "filter", b"filter", "order", b"order", "relation_prefix", b"relation_prefix", "relation_subgraph", b"relation_subgraph", "relations", b"relations", "security", b"security", "timestamps", b"timestamps", "with_status", b"with_status"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["_advanced_query", b"_advanced_query", "_security", b"_security", "_with_status", b"_with_status", "advanced_query", b"advanced_query", "body", b"body", "document", b"document", "faceted", b"faceted", "fields", b"fields", "filter", b"filter", "key_filters", b"key_filters", "min_score", b"min_score", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "paragraph", b"paragraph", "relation_prefix", b"relation_prefix", "relation_subgraph", b"relation_subgraph", "relations", b"relations", "reload", b"reload", "result_per_page", b"result_per_page", "security", b"security", "shard", b"shard", "timestamps", b"timestamps", "vector", b"vector", "vectorset", b"vectorset", "with_duplicates", b"with_duplicates", "with_status", b"with_status"]) -> None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing_extensions.Literal["_advanced_query", b"_advanced_query"]) -> typing_extensions.Literal["advanced_query"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["_security", b"_security"]) -> typing_extensions.Literal["security"] | None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing_extensions.Literal["_with_status", b"_with_status"]) -> typing_extensions.Literal["with_status"] | None: ...
 

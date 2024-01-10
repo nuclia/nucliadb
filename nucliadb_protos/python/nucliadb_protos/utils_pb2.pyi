@@ -434,3 +434,19 @@ class UserVectorsList(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["vectors", b"vectors"]) -> None: ...
 
 global___UserVectorsList = UserVectorsList
+
+@typing_extensions.final
+class Security(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ACCESS_GROUPS_FIELD_NUMBER: builtins.int
+    @property
+    def access_groups(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def __init__(
+        self,
+        *,
+        access_groups: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["access_groups", b"access_groups"]) -> None: ...
+
+global___Security = Security

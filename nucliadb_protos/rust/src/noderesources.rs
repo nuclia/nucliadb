@@ -44,6 +44,7 @@ pub mod shard_created {
     pub enum DocumentService {
         DocumentV0 = 0,
         DocumentV1 = 1,
+        DocumentV2 = 2,
     }
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
@@ -221,6 +222,8 @@ pub struct Resource {
     /// Vectorset prefix vector id
     #[prost(map="string, message", tag="13")]
     pub vectors_to_delete: ::std::collections::HashMap<::prost::alloc::string::String, super::utils::UserVectorsList>,
+    #[prost(message, optional, tag="14")]
+    pub security: ::core::option::Option<super::utils::Security>,
 }
 /// Nested message and enum types in `Resource`.
 pub mod resource {

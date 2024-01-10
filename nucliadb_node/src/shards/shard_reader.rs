@@ -115,6 +115,7 @@ impl ShardReader {
         match self.document_service_version {
             0 => DocumentService::DocumentV0,
             1 => DocumentService::DocumentV1,
+            2 => DocumentService::DocumentV2,
             i => panic!("Unknown document version {i}"),
         }
     }
