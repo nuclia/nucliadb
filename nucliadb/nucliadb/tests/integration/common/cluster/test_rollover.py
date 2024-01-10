@@ -56,11 +56,13 @@ async def test_rollover_kb_shards(
         assert resp.status_code == 201
 
     resp = await nucliadb_manager.get(f"/kb/{knowledgebox}/shards")
+    assert resp.status_code == 200, resp.text
     shards_body1 = resp.json()
 
     await rollover.rollover_kb_shards(app_context, knowledgebox)
 
     resp = await nucliadb_manager.get(f"/kb/{knowledgebox}/shards")
+    assert resp.status_code == 200, resp.text
     shards_body2 = resp.json()
     # check that shards have changed
     assert (
