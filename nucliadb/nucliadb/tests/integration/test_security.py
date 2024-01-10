@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-
 from typing import Optional
 
 import pytest
@@ -101,7 +100,6 @@ async def test_resource_security_search(
     resource_with_security,
     search_endpoint,
 ):
-
     kbid = knowledgebox
     resource_id = resource_with_security
     support_group = "support"
