@@ -76,6 +76,9 @@ async def test_resource_security_search(
         [DEVELOPERS_GROUP],
         [PLATFORM_GROUP],
         [PLATFORM_GROUP, DEVELOPERS_GROUP],
+        # Adding an unknown group should not affect the result, as
+        # the index is returning the union of results for each group
+        [DEVELOPERS_GROUP, "some-unknown-group"],
     ):
         resp = await nucliadb_reader.post(
             f"/kb/{kbid}/find",
