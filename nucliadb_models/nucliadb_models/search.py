@@ -34,6 +34,7 @@ from pydantic import BaseModel, Field, validator
 from nucliadb_models.common import FieldTypeName, ParamDefault
 from nucliadb_models.metadata import RelationType
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
+from nucliadb_models.security import RequestSecurity
 from nucliadb_models.vectors import SemanticModelMetadata, VectorSimilarity
 
 _T = TypeVar("_T")
@@ -556,6 +557,11 @@ class SearchParamDefaults:
         title="Suggest features",
         description="Features enabled for the suggest endpoint.",
     )
+    security = ParamDefault(
+        default=None,
+        title="Security",
+        description="Security metadata for the request. If not provided, the search request is done without the security lookup phase.",  # noqa
+    )
 
 
 class BaseSearchRequest(BaseModel):
@@ -605,6 +611,9 @@ class BaseSearchRequest(BaseModel):
     resource_filters: List[
         str
     ] = SearchParamDefaults.resource_filters.to_pydantic_field()
+    security: Optional[
+        RequestSecurity
+    ] = SearchParamDefaults.security.to_pydantic_field()
 
     @validator("faceted")
     def nested_facets_not_supported(cls, facets):
@@ -753,6 +762,9 @@ class ChatRequest(BaseModel):
         default=False,
         description="Whether to include the citations for the answer in the response",
     )
+    security: Optional[
+        RequestSecurity
+    ] = SearchParamDefaults.security.to_pydantic_field()
 
 
 class SummarizeResourceModel(BaseModel):
