@@ -31,6 +31,7 @@ use nucliadb_core::protos::{
     op_status, Filter, NewShardRequest, ReleaseChannel, SuggestFeatures, SuggestRequest,
     SuggestResponse,
 };
+use nucliadb_protos::utils::relation_node::NodeType;
 use rstest::*;
 use tonic::Request;
 
@@ -207,6 +208,22 @@ async fn test_suggest_entities(
     assert_eq!(response.entities.as_ref().unwrap().total, 2);
     assert!(response.entities.as_ref().unwrap().entities[0] == *"Solomon Islands");
     assert!(response.entities.as_ref().unwrap().entities[1] == *"Israel");
+
+    // Does not find resources by UUID prefix
+    let pap_uuid = &shard.resources["pap"];
+    expect_entities(
+        &suggest_entities(&mut reader, &shard.id, &pap_uuid[0..6]).await,
+        &[],
+    );
+
+    // This is just here to make compilation fail if adding a new NodeType and to remind you to
+    // update the filter in ShardReader::suggest so it searches for all node types except Resource
+    match NodeType::Entity {
+        NodeType::Entity => {}
+        NodeType::Label => {}
+        NodeType::Resource => {}
+        NodeType::User => {}
+    };
 
     Ok(())
 }
