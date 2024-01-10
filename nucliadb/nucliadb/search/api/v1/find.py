@@ -21,7 +21,7 @@ import json
 from datetime import datetime
 from typing import Optional, Union
 
-from fastapi import Body, Header, Query, Request, Response
+from fastapi import Body, Header, Request, Response
 from fastapi.openapi.models import Example
 from fastapi_versioning import version
 from pydantic.error_wrappers import ValidationError
@@ -111,7 +111,7 @@ async def find_knowledgebox(
     with_duplicates: bool = fastapi_query(SearchParamDefaults.with_duplicates),
     with_synonyms: bool = fastapi_query(SearchParamDefaults.with_synonyms),
     autofilter: bool = fastapi_query(SearchParamDefaults.autofilter),
-    security_groups: list[str] = Query(default=[], title="Security Groups"),
+    security_groups: list[str] = fastapi_query(SearchParamDefaults.security_groups),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),

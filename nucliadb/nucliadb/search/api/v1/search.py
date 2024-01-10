@@ -51,6 +51,7 @@ from nucliadb_models.search import (
     SortOptions,
     SortOrder,
 )
+from nucliadb_models.security import RequestSecurity
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
 from nucliadb_utils.utilities import get_audit
@@ -135,11 +136,15 @@ async def search_knowledgebox(
     with_duplicates: bool = fastapi_query(SearchParamDefaults.with_duplicates),
     with_synonyms: bool = fastapi_query(SearchParamDefaults.with_synonyms),
     autofilter: bool = fastapi_query(SearchParamDefaults.autofilter),
+    security_groups: list[str] = fastapi_query(SearchParamDefaults.security_groups),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> Union[KnowledgeboxSearchResults, HTTPClientError]:
     try:
+        security = None
+        if len(security_groups) > 0:
+            security = RequestSecurity(groups=security_groups)
         item = SearchRequest(
             query=query,
             fields=fields,
@@ -167,6 +172,7 @@ async def search_knowledgebox(
             with_duplicates=with_duplicates,
             with_synonyms=with_synonyms,
             autofilter=autofilter,
+            security=security,
         )
     except ValidationError as exc:
         detail = json.loads(exc.json())
@@ -350,6 +356,7 @@ async def search(
         with_status=with_status,
         with_synonyms=item.with_synonyms,
         autofilter=item.autofilter,
+        security=item.security,
     )
     pb_query, incomplete_results, autofilters = await query_parser.parse()
 

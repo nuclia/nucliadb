@@ -17,6 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from typing import Optional
+
 import pytest
 
 PLATFORM_GROUP = "platform"
@@ -58,18 +60,24 @@ async def test_resource_security_is_returned_serialization(
 
 
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+@pytest.mark.parametrize(
+    "search_endpoint", ("find_get", "find_post", "search_get", "search_post")
+)
 async def test_resource_security_search(
-    nucliadb_reader, knowledgebox, resource_with_security
+    nucliadb_reader, knowledgebox, resource_with_security, search_endpoint
 ):
     kbid = knowledgebox
     resource_id = resource_with_security
 
     # Querying without security should return the resource
-    resp = await nucliadb_reader.post(f"/kb/{kbid}/find", json={"query": "resource"})
-    assert resp.status_code == 200, resp.text
-    results = resp.json()
-    assert len(results["resources"]) == 1
-    assert resource_id in results["resources"]
+    await _test_search_request_with_security(
+        search_endpoint,
+        nucliadb_reader,
+        kbid,
+        query="resource",
+        security_groups=None,
+        expected_resources=[resource_id],
+    )
 
     # Querying with security groups should return the resource
     for access_groups in (
@@ -80,20 +88,70 @@ async def test_resource_security_search(
         # the index is returning the union of results for each group
         [DEVELOPERS_GROUP, "some-unknown-group"],
     ):
+        await _test_search_request_with_security(
+            search_endpoint,
+            nucliadb_reader,
+            kbid,
+            query="resource",
+            security_groups=access_groups,
+            expected_resources=[resource_id],
+        )
+
+    # Querying with an unknown security group should not return the resource
+    await _test_search_request_with_security(
+        search_endpoint,
+        nucliadb_reader,
+        kbid,
+        query="resource",
+        security_groups=["some-unknown-group"],
+        expected_resources=[],
+    )
+
+
+async def _test_search_request_with_security(
+    search_endpoint: str,
+    nucliadb_reader,
+    kbid: str,
+    query: str,
+    security_groups: Optional[list[str]],
+    expected_resources: list[str],
+):
+    payload = {
+        "query": query,
+    }
+    if security_groups:
+        payload["security"] = {"groups": security_groups}
+
+    params = {
+        "query": query,
+    }
+    if security_groups:
+        params["security_groups"] = security_groups
+
+    if search_endpoint == "find_post":
         resp = await nucliadb_reader.post(
             f"/kb/{kbid}/find",
-            json={"query": "resource", "security": {"groups": access_groups}},
+            json=payload,
         )
-        assert resp.status_code == 200, resp.text
-        results = resp.json()
-        assert len(results["resources"]) == 1
-        assert resource_id in results["resources"]
+    elif search_endpoint == "find_get":
+        resp = await nucliadb_reader.get(
+            f"/kb/{kbid}/find",
+            params=params,
+        )
+    elif search_endpoint == "search_post":
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/search",
+            json=payload,
+        )
+    elif search_endpoint == "search_get":
+        resp = await nucliadb_reader.get(
+            f"/kb/{kbid}/search",
+            params=params,
+        )
+    else:
+        raise ValueError(f"Unknown search endpoint: {search_endpoint}")
 
-    # Querying with a different security group should not return the resource
-    resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/find",
-        json={"query": "resource", "security": {"groups": ["foobar-group"]}},
-    )
     assert resp.status_code == 200, resp.text
-    results = resp.json()
-    assert len(results["resources"]) == 0
+    search_response = resp.json()
+    assert len(search_response["resources"]) == len(expected_resources)
+    assert set(search_response["resources"]) == set(expected_resources)
