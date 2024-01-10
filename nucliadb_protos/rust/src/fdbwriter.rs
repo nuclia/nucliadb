@@ -130,6 +130,8 @@ pub struct BrokerMessage {
     pub extra: ::core::option::Option<super::resources::Extra>,
     #[prost(message, repeated, tag="38")]
     pub question_answers: ::prost::alloc::vec::Vec<super::resources::FieldQuestionAnswerWrapper>,
+    #[prost(message, optional, tag="39")]
+    pub security: ::core::option::Option<super::utils::Security>,
 }
 /// Nested message and enum types in `BrokerMessage`.
 pub mod broker_message {
