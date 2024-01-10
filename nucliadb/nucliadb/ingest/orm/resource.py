@@ -382,6 +382,7 @@ class Resource:
         basic = await self.get_basic()
         if basic is not None:
             brain.set_resource_metadata(basic, origin)
+        await self.compute_security(brain)
         await self.compute_global_tags(brain)
         fields = await self.get_fields(force=True)
         for (type_id, field_id), field in fields.items():
@@ -1077,6 +1078,12 @@ class Resource:
 
     def generate_field_id(self, field: FieldID) -> str:
         return f"{FIELD_TYPE_TO_ID[field.field_type]}/{field.field}"
+
+    async def compute_security(self, brain: ResourceBrain):
+        security = await self.get_security()
+        if security is None:
+            return
+        brain.set_security(security)
 
     @processor_observer.wrap({"type": "compute_global_tags"})
     async def compute_global_tags(self, brain: ResourceBrain):

@@ -263,6 +263,7 @@ class Processor:
             if resource:
                 await resource.compute_global_text()
                 await resource.compute_global_tags(resource.indexer)
+                await resource.compute_security(resource.indexer)
                 if message.reindex:
                     # when reindexing, let's just generate full new index message
                     resource.replace_indexer(await resource.generate_index_message())
