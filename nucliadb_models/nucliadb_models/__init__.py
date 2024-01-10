@@ -19,7 +19,6 @@
 #
 import logging
 
-from .activity import *  # noqa
 from .common import *  # noqa
 from .conversation import *  # noqa
 from .datetime import *  # noqa
@@ -30,6 +29,7 @@ from .keywordset import *  # noqa
 from .layout import *  # noqa
 from .link import *  # noqa
 from .metadata import *  # noqa
+from .notifications import *  # noqa
 from .processing import *  # noqa
 from .text import *  # noqa
 from .writer import *  # noqa

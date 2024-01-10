@@ -22,7 +22,7 @@ import asyncio
 import pytest
 from nucliadb_protos.writer_pb2 import BrokerMessage, Notification
 
-from nucliadb.reader.reader.activity import kb_notifications
+from nucliadb.reader.reader.notifications import kb_notifications
 from nucliadb_protos import writer_pb2
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
