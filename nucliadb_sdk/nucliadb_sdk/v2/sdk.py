@@ -22,6 +22,7 @@ import enum
 import inspect
 import io
 import json
+import warnings
 from typing import (
     Any,
     AsyncGenerator,
@@ -82,9 +83,10 @@ from nucliadb_models.writer import (
 from nucliadb_sdk.v2 import docstrings, exceptions
 
 
-class Region(enum.Enum):
+class Region(str, enum.Enum):
     EUROPE1 = "europe-1"
     ON_PREM = "on-prem"
+    AWS_US_EAST_2_1 = "aws-us-east-2-1"
 
 
 class ChatResponse(BaseModel):
@@ -257,10 +259,16 @@ class _NucliaDBBase:
         headers: Optional[Dict[str, str]] = None,
         timeout: Optional[float] = None,
     ):
-        self.region = region
+        try:
+            self.region = Region(region).value
+        except ValueError:
+            warnings.warn(
+                f"Unknown region '{region}'. Supported regions are: {[r.value for r in Region]}"
+            )
+            self.region = region
         self.api_key = api_key
         headers = headers or {}
-        if region == Region.ON_PREM:
+        if self.region == Region.ON_PREM:
             if url is None:
                 raise ValueError("url must be provided for on-prem")
             self.base_url = url.rstrip("/")
@@ -270,7 +278,7 @@ class _NucliaDBBase:
             headers["X-NUCLIADB-ROLES"] = "MANAGER;WRITER;READER"
         else:
             if url is None:
-                self.base_url = f"https://{region.value}.nuclia.cloud/api"
+                self.base_url = f"https://{self.region}.nuclia.cloud/api"
             else:
                 self.base_url = url.rstrip("/")
             if api_key is not None:
