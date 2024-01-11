@@ -179,10 +179,11 @@ async def main_subscriber_workers():  # pragma: no cover
     )
 
 
-def setup_configuration():  # pragma: no cover
+def setup_configuration(needs_assign_partitions: bool = True):  # pragma: no cover
     setup_logging()
 
-    assign_partitions(settings)
+    if needs_assign_partitions:
+        assign_partitions(settings)
 
     errors.setup_error_handling(pkg_resources.get_distribution("nucliadb").version)
 
@@ -205,7 +206,7 @@ def run_orm_grpc() -> None:  # pragma: no cover
     Runs:
         - Ingest GRPC Service
     """
-    setup_configuration()
+    setup_configuration(needs_assign_partitions=False)
     asyncio.run(main_orm_grpc())
 
 
