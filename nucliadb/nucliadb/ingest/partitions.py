@@ -22,6 +22,7 @@ import os
 
 from nucliadb.ingest import logger
 from nucliadb.ingest.settings import Settings
+from nucliadb_telemetry import errors
 
 
 def assign_partitions(settings: Settings):
@@ -37,7 +38,8 @@ def assign_partitions(settings: Settings):
             if len(sts_values) > 0:
                 try:
                     settings.replica_number = int(sts_values[-1])
-                except Exception:
+                except Exception as ex:
+                    errors.capture_exception(ex)
                     logger.error(f"Could not extract replica number from hostname: {hostname}")
                     pass
 
