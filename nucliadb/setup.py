@@ -57,6 +57,8 @@ setup(
             # Ingest
             #   - This command runs pull workers + ingest write consumer
             "nucliadb-ingest = nucliadb.ingest.app:run_consumer",
+            #   - Run pull worker to pull results from processing api
+            "nucliadb-pull = nucliadb.ingest.app:run_v2_pull_worker",
             #   - Only runs processed resources write consumer
             "nucliadb-ingest-processed-consumer = nucliadb.ingest.app:run_processed_consumer",
             #   - Only runs GRPC Service

@@ -39,11 +39,11 @@ import nucliadb_models as models
 from nucliadb_models.configuration import KBConfiguration
 from nucliadb_models.resource import QueueType
 from nucliadb_telemetry import metrics
-from nucliadb_utils import logger
+from nucliadb_utils import const, logger
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.settings import nuclia_settings, storage_settings
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import Utility, get_ingest, set_utility
+from nucliadb_utils.utilities import Utility, get_ingest, has_feature, set_utility
 
 _T = TypeVar("_T")
 
@@ -127,6 +127,7 @@ async def start_processing_engine():
             onprem=nuclia_settings.onprem,
             nuclia_jwt_key=nuclia_settings.nuclia_jwt_key,
             nuclia_cluster_url=nuclia_settings.nuclia_cluster_url,
+            nuclia_processing_cluster_url=nuclia_settings.nuclia_processing_cluster_url,
             nuclia_public_url=nuclia_settings.nuclia_public_url,
             driver=storage_settings.file_backend,
             days_to_keep=storage_settings.upload_token_expiration,
@@ -142,6 +143,7 @@ class ProcessingEngine:
         nuclia_zone: Optional[str] = None,
         nuclia_public_url: Optional[str] = None,
         nuclia_cluster_url: Optional[str] = None,
+        nuclia_processing_cluster_url: Optional[str] = None,
         onprem: Optional[bool] = False,
         nuclia_jwt_key: Optional[str] = None,
         days_to_keep: int = 3,
@@ -172,6 +174,9 @@ class ProcessingEngine:
             )
         self.nuclia_internal_push = (
             f"{self.nuclia_cluster_url}/api/internal/processing/push"
+        )
+        self.nuclia_internal_push_v2 = (
+            f"{nuclia_processing_cluster_url}/api/internal/v2/processing/push"
         )
         self.nuclia_external_push = f"{self.nuclia_public_url}/api/v1/processing/push"
 
@@ -389,11 +394,15 @@ class ProcessingEngine:
             headers = {"CONTENT-TYPE": "application/json"}
             if self.onprem is False:
                 # Upload the payload
+                url = self.nuclia_internal_push
+                if has_feature(
+                    const.Features.PROCESSING_V2,
+                    context={"kbid": item.kbid},
+                ):
+                    url = self.nuclia_internal_push_v2
                 item.partition = partition
                 resp = await self.session.post(
-                    url=f"{self.nuclia_internal_push}",
-                    data=item.json(),
-                    headers=headers,
+                    url=url, data=item.json(), headers=headers
                 )
             else:
                 item.learning_config = await self.get_configuration(item.kbid)

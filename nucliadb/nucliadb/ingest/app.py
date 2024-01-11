@@ -128,6 +128,20 @@ async def main_consumer():  # pragma: no cover
     )
 
 
+async def main_run_v2_pull_worker():  # pragma: no cover
+    finalizers = await initialize()
+    metrics_server = await serve_metrics()
+
+    grpc_health_finalizer = await health.start_grpc_health_service(settings.grpc_port)
+
+    # pull workers could be pulled out into it's own deployment
+    pull_worker = await consumer_service.start_v2_pull_worker(SERVICE_NAME)
+
+    await run_until_exit(
+        [grpc_health_finalizer, pull_worker, metrics_server.shutdown] + finalizers
+    )
+
+
 async def main_orm_grpc():  # pragma: no cover
     finalizers = await initialize()
     grpc_finalizer = await start_grpc(SERVICE_NAME)
@@ -198,6 +212,15 @@ def run_consumer() -> None:  # pragma: no cover
     """
     setup_configuration()
     asyncio.run(main_consumer())
+
+
+def run_v2_pull_worker() -> None:  # pragma: no cover
+    """
+    Running:
+        - pull worker
+    """
+    setup_configuration()
+    asyncio.run(main_run_v2_pull_worker())
 
 
 def run_orm_grpc() -> None:  # pragma: no cover

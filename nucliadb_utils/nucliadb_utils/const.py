@@ -76,3 +76,4 @@ class Features:
     EXPERIMENTAL_KB = "nucliadb_experimental_kb"
     READ_REPLICA_SEARCHES = "nucliadb_read_replica_searches"
     SUMMARIZATION = "nuclia_summarization"
+    PROCESSING_V2 = "nuclia_processing_v2"

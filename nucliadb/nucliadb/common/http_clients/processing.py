@@ -41,6 +41,19 @@ def get_processing_api_url() -> str:
         return nuclia_settings.nuclia_cluster_url + "/api/internal/processing"
 
 
+def get_processing_api_url_v2() -> str:
+    if nuclia_settings.nuclia_service_account:
+        return (
+            nuclia_settings.nuclia_public_url.format(zone=nuclia_settings.nuclia_zone)
+            + "/api/v2/processing"
+        )
+    else:
+        return (
+            nuclia_settings.nuclia_processing_cluster_url
+            + "/api/internal/v2/processing"
+        )
+
+
 def check_status(resp: aiohttp.ClientResponse, resp_text: str) -> None:
     if resp.status < 300:
         return
@@ -125,3 +138,46 @@ class ProcessingHTTPClient:
             check_proxy_telemetry_headers(resp)
             check_status(resp, resp_text)
             return PullResponse.parse_raw(resp_text)
+
+
+class ProcessRequestResponseV2(pydantic.BaseModel):
+    payload: bytes
+    processing_id: str
+    kbid: Optional[str]
+    account_id: str
+    resource_id: str
+
+
+class PullResponseV2(pydantic.BaseModel):
+    results: list[ProcessRequestResponseV2]
+    cursor: Optional[str]
+
+
+class ProcessingV2HTTPClient:
+    def __init__(self):
+        self.session = aiohttp.ClientSession()
+        self.base_url = get_processing_api_url_v2()
+        self.headers = {}
+        if nuclia_settings.nuclia_service_account is not None:
+            self.headers[
+                "X-STF-NUAKEY"
+            ] = f"Bearer {nuclia_settings.nuclia_service_account}"
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        await self.close()
+
+    async def close(self):
+        await self.session.close()
+
+    async def pull(self, cursor: Optional[str], limit: int = 5) -> PullResponseV2:
+        url = self.base_url + "/pull"
+        async with self.session.get(
+            url, headers=self.headers, params={"cursor": cursor, "limit": limit}
+        ) as resp:
+            resp_text = await resp.text()
+            check_proxy_telemetry_headers(resp)
+            check_status(resp, resp_text)
+            return PullResponseV2.parse_raw(resp_text)

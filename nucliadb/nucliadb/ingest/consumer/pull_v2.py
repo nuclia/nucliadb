@@ -26,9 +26,9 @@ import nats.errors
 from aiohttp.client_exceptions import ClientConnectorError
 from nucliadb_protos.writer_pb2 import BrokerMessage, BrokerMessageBlobReference
 
-from nucliadb.common.http_clients.processing import ProcessingHTTPClient
+from nucliadb.common.http_clients.processing import ProcessingV2HTTPClient
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.ingest import logger, logger_activity
+from nucliadb.ingest import logger
 from nucliadb.ingest.orm.exceptions import ReallyStopPulling
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb_telemetry import errors
@@ -39,33 +39,32 @@ from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_storage, get_transaction_utility
 
 
-class PullWorker:
+class PullWorkerV2:
     """
-    The pull worker is responsible for pulling messages from the pull processing
-    http endpoint and injecting them into the processing write queue.
+    V2 of the pull worker that utilizes V2 of the pull API.
 
-    The processing pull endpoint is also described as the "processing proxy" at times.
+    Right now, this is the "simple" way to integrate that works for both on prem and SaaS.
+
+    Longer term, consider integrating with message queue.
     """
 
     def __init__(
         self,
         driver: Driver,
-        partition: str,
         storage: Storage,
         pull_time_error_backoff: int,
         pubsub: Optional[PubSubDriver] = None,
         local_subscriber: bool = False,
         pull_time_empty_backoff: float = 5.0,
     ):
-        self.partition = partition
         self.pull_time_error_backoff = pull_time_error_backoff
         self.pull_time_empty_backoff = pull_time_empty_backoff
         self.local_subscriber = local_subscriber
 
-        self.processor = Processor(driver, storage, pubsub, partition)
+        self.processor = Processor(driver, storage, pubsub)
 
     def __str__(self) -> str:
-        return f"PullWorker(partition={self.partition})"
+        return f"PullWorker V2"
 
     def __repr__(self) -> str:
         return str(self)
@@ -86,7 +85,7 @@ class PullWorker:
             try:
                 await transaction_utility.commit(
                     writer=pb,
-                    partition=int(self.partition),
+                    partition=-1,
                     # send to separate processor
                     target_subject=const.Streams.INGEST_PROCESSED.subject,
                 )
@@ -100,7 +99,7 @@ class PullWorker:
                 )
                 await transaction_utility.commit(
                     writer=referenced_pb,
-                    partition=int(self.partition),
+                    partition=-1,
                     # send to separate processor
                     target_subject=const.Streams.INGEST_PROCESSED.subject,
                     headers={"X-MESSAGE-TYPE": "PROXY"},
@@ -110,7 +109,7 @@ class PullWorker:
             await self.processor.process(
                 pb,
                 0,  # Fake sequence id as in local mode there's no transactions
-                partition=self.partition,
+                partition="-1",
                 transaction_check=False,
             )
 
@@ -135,40 +134,27 @@ class PullWorker:
         if nuclia_settings.nuclia_service_account is not None:
             headers["X-STF-NUAKEY"] = f"Bearer {nuclia_settings.nuclia_service_account}"
 
-        async with ProcessingHTTPClient() as processing_http_client:
-            logger.info(f"Collecting from NucliaDB Cloud {self.partition} partition")
+        cursor = None
+        async with ProcessingV2HTTPClient() as processing_http_client:
+            logger.info(f"Collecting from NucliaDB Cloud")
             while True:
                 try:
-                    data = await processing_http_client.pull(self.partition)
-                    if data.status == "ok":
-                        logger.info(
-                            f"Message {data.msgid} received from proxy, partition: {self.partition}"
-                        )
-                        try:
-                            await self.handle_message(data.payload)
-                        except Exception as e:
-                            errors.capture_exception(e)
-                            logger.exception(
-                                "Error while pulling and processing message"
-                            )
-                            raise e
-                    elif data.status == "empty":
-                        logger_activity.debug(
-                            f"No messages waiting in partition #{self.partition}"
-                        )
+                    data = await processing_http_client.pull(cursor=cursor, limit=3)
+
+                    if len(data.results) > 0:
+                        for result in data.results:
+                            await self.handle_message(result.payload)
+                        cursor = data.cursor
                         await asyncio.sleep(self.pull_time_empty_backoff)
                     else:
-                        logger.info(f"Proxy pull answered with error: {data}")
-                        await asyncio.sleep(self.pull_time_error_backoff)
+                        await asyncio.sleep(self.pull_time_empty_backoff)
                 except (
                     asyncio.exceptions.CancelledError,
                     RuntimeError,
                     KeyboardInterrupt,
                     SystemExit,
                 ):
-                    logger.info(
-                        f"Pull task for partition #{self.partition} was canceled, exiting"
-                    )
+                    logger.info(f"Pull task for was canceled, exiting")
                     raise ReallyStopPulling()
 
                 except ClientConnectorError:
@@ -177,16 +163,6 @@ class PullWorker:
                          {processing_http_client.base_url} verify your internet connection"
                     )
                     await asyncio.sleep(self.pull_time_error_backoff)
-
-                except nats.errors.MaxPayloadError as e:
-                    if data is not None:
-                        payload_length = 0
-                        if data.payload:
-                            payload_length = len(base64.b64decode(data.payload))
-                        logger.error(
-                            f"Message too big to transaction: {payload_length}"
-                        )
-                    raise e
 
                 except Exception:
                     logger.exception("Unhandled error pulling messages from processing")

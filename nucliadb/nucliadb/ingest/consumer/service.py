@@ -27,6 +27,7 @@ from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.consumer.consumer import IngestConsumer, IngestProcessedConsumer
 from nucliadb.ingest.consumer.pull import PullWorker
+from nucliadb.ingest.consumer.pull_v2 import PullWorkerV2
 from nucliadb.ingest.settings import settings
 from nucliadb_utils.exceptions import ConfigurationError
 from nucliadb_utils.settings import running_settings, transaction_settings
@@ -78,6 +79,26 @@ async def start_pull_workers(
         tasks.append(task)
 
     return partial(_exit_tasks, tasks)
+
+
+async def start_v2_pull_worker(
+    service_name: Optional[str] = None,
+) -> Callable[[], Awaitable[None]]:
+    driver = await setup_driver()
+    pubsub = await get_pubsub()
+    storage = await get_storage(service_name=service_name or SERVICE_NAME)
+
+    worker = PullWorkerV2(
+        driver=driver,
+        storage=storage,
+        pull_time_error_backoff=settings.pull_time_error_backoff,
+        pubsub=pubsub,
+        local_subscriber=transaction_settings.transaction_local,
+    )
+    task = asyncio.create_task(worker.loop())
+    task.add_done_callback(_handle_task_result)
+
+    return partial(_exit_tasks, [task])
 
 
 async def start_ingest_consumers(
