@@ -67,6 +67,7 @@ async def find(
         with_synonyms=item.with_synonyms,
         autofilter=item.autofilter,
         key_filters=item.resource_filters,
+        security=item.security,
     )
     pb_query, incomplete_results, autofilters = await query_parser.parse()
     results, query_incomplete_results, queried_nodes, queried_shards = await node_query(

@@ -447,6 +447,7 @@ class BrokerMessage(google.protobuf.message.Message):
     REINDEX_FIELD_NUMBER: builtins.int
     EXTRA_FIELD_NUMBER: builtins.int
     QUESTION_ANSWERS_FIELD_NUMBER: builtins.int
+    SECURITY_FIELD_NUMBER: builtins.int
     kbid: builtins.str
     uuid: builtins.str
     slug: builtins.str
@@ -519,6 +520,8 @@ class BrokerMessage(google.protobuf.message.Message):
     def extra(self) -> nucliadb_protos.resources_pb2.Extra: ...
     @property
     def question_answers(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.resources_pb2.FieldQuestionAnswerWrapper]: ...
+    @property
+    def security(self) -> nucliadb_protos.utils_pb2.Security: ...
     def __init__(
         self,
         *,
@@ -558,9 +561,10 @@ class BrokerMessage(google.protobuf.message.Message):
         reindex: builtins.bool = ...,
         extra: nucliadb_protos.resources_pb2.Extra | None = ...,
         question_answers: collections.abc.Iterable[nucliadb_protos.resources_pb2.FieldQuestionAnswerWrapper] | None = ...,
+        security: nucliadb_protos.utils_pb2.Security | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["audit", b"audit", "basic", b"basic", "done_time", b"done_time", "extra", b"extra", "origin", b"origin"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["account_seq", b"account_seq", "audit", b"audit", "basic", b"basic", "conversations", b"conversations", "datetimes", b"datetimes", "delete_fields", b"delete_fields", "done_time", b"done_time", "errors", b"errors", "extra", b"extra", "extracted_text", b"extracted_text", "field_large_metadata", b"field_large_metadata", "field_metadata", b"field_metadata", "field_vectors", b"field_vectors", "file_extracted_data", b"file_extracted_data", "files", b"files", "kbid", b"kbid", "keywordsets", b"keywordsets", "layouts", b"layouts", "link_extracted_data", b"link_extracted_data", "links", b"links", "multiid", b"multiid", "origin", b"origin", "origin_seq", b"origin_seq", "pre_processing_time", b"pre_processing_time", "processing_id", b"processing_id", "question_answers", b"question_answers", "reindex", b"reindex", "relations", b"relations", "slow_processing_time", b"slow_processing_time", "slug", b"slug", "source", b"source", "texts", b"texts", "txseqid", b"txseqid", "type", b"type", "user_vectors", b"user_vectors", "uuid", b"uuid"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["audit", b"audit", "basic", b"basic", "done_time", b"done_time", "extra", b"extra", "origin", b"origin", "security", b"security"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["account_seq", b"account_seq", "audit", b"audit", "basic", b"basic", "conversations", b"conversations", "datetimes", b"datetimes", "delete_fields", b"delete_fields", "done_time", b"done_time", "errors", b"errors", "extra", b"extra", "extracted_text", b"extracted_text", "field_large_metadata", b"field_large_metadata", "field_metadata", b"field_metadata", "field_vectors", b"field_vectors", "file_extracted_data", b"file_extracted_data", "files", b"files", "kbid", b"kbid", "keywordsets", b"keywordsets", "layouts", b"layouts", "link_extracted_data", b"link_extracted_data", "links", b"links", "multiid", b"multiid", "origin", b"origin", "origin_seq", b"origin_seq", "pre_processing_time", b"pre_processing_time", "processing_id", b"processing_id", "question_answers", b"question_answers", "reindex", b"reindex", "relations", b"relations", "security", b"security", "slow_processing_time", b"slow_processing_time", "slug", b"slug", "source", b"source", "texts", b"texts", "txseqid", b"txseqid", "type", b"type", "user_vectors", b"user_vectors", "uuid", b"uuid"]) -> None: ...
 
 global___BrokerMessage = BrokerMessage
 

@@ -53,6 +53,7 @@ from nucliadb_models.search import (
     SortOrderMap,
     SuggestOptions,
 )
+from nucliadb_models.security import RequestSecurity
 from nucliadb_protos import knowledgebox_pb2, nodereader_pb2, utils_pb2
 
 from .exceptions import InvalidQueryError
@@ -105,6 +106,7 @@ class QueryParser:
         with_synonyms: bool = False,
         autofilter: bool = False,
         key_filters: Optional[list[str]] = None,
+        security: Optional[RequestSecurity] = None,
     ):
         self.kbid = kbid
         self.features = features
@@ -127,6 +129,7 @@ class QueryParser:
         self.with_synonyms = with_synonyms
         self.autofilter = autofilter
         self.key_filters = key_filters
+        self.security = security
 
         if len(self.filters) > 0:
             self.filters = translate_label_filters(self.filters)
@@ -237,6 +240,13 @@ class QueryParser:
 
         request.faceted.labels.extend(translate_label_filters(self.faceted))
         request.fields.extend(self.fields)
+
+        if self.security is not None and len(self.security.groups) > 0:
+            security_pb = utils_pb2.Security()
+            for group_id in self.security.groups:
+                if group_id not in security_pb.access_groups:
+                    security_pb.access_groups.append(group_id)
+            request.security.CopyFrom(security_pb)
 
         if self.key_filters is not None and len(self.key_filters) > 0:
             request.key_filters.extend(self.key_filters)

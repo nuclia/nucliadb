@@ -42,6 +42,7 @@ from nucliadb_models.search import (
     SearchOptions,
     SearchParamDefaults,
 )
+from nucliadb_models.security import RequestSecurity
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
 
@@ -110,11 +111,15 @@ async def find_knowledgebox(
     with_duplicates: bool = fastapi_query(SearchParamDefaults.with_duplicates),
     with_synonyms: bool = fastapi_query(SearchParamDefaults.with_synonyms),
     autofilter: bool = fastapi_query(SearchParamDefaults.autofilter),
+    security_groups: list[str] = fastapi_query(SearchParamDefaults.security_groups),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> Union[KnowledgeboxFindResults, HTTPClientError]:
     try:
+        security = None
+        if len(security_groups) > 0:
+            security = RequestSecurity(groups=security_groups)
         item = FindRequest(
             query=query,
             fields=fields,
@@ -136,6 +141,7 @@ async def find_knowledgebox(
             with_duplicates=with_duplicates,
             with_synonyms=with_synonyms,
             autofilter=autofilter,
+            security=security,
         )
     except ValidationError as exc:
         detail = json.loads(exc.json())

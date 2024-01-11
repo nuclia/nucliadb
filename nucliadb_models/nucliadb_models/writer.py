@@ -36,6 +36,7 @@ from nucliadb_models.metadata import (
     UserMetadata,
 )
 from nucliadb_models.processing import PushProcessingOptions
+from nucliadb_models.security import ResourceSecurity
 from nucliadb_models.text import TextField
 from nucliadb_models.utils import FieldIdString, SlugString
 from nucliadb_models.vectors import UserVectorsWrapper
@@ -117,9 +118,12 @@ class CreateResourcePayload(BaseModel):
     ] = FieldDefaults.conversations
     keywordsets: Dict[FieldIdString, FieldKeywordset] = FieldDefaults.keywordsets
     datetimes: Dict[FieldIdString, FieldDatetime] = FieldDefaults.datetimes
-
-    # Processing options
     processing_options: Optional[PushProcessingOptions] = PushProcessingOptions()
+    security: Optional[ResourceSecurity] = Field(
+        default=None,
+        title="Security",
+        description="Security metadata for the resource. It can be used to have fine-grained control over who can access the resource.",  # noqa
+    )
 
     @validator("icon")
     def icon_check(cls, v):
@@ -165,9 +169,12 @@ class UpdateResourcePayload(BaseModel):
     ] = FieldDefaults.conversations
     keywordsets: Dict[FieldIdString, FieldKeywordset] = FieldDefaults.keywordsets
     datetimes: Dict[FieldIdString, FieldDatetime] = FieldDefaults.datetimes
-
-    # Processing options
     processing_options: Optional[PushProcessingOptions] = PushProcessingOptions()
+    security: Optional[ResourceSecurity] = Field(
+        default=None,
+        title="Security",
+        description="Security metadata for the resource. It can be used to have fine-grained control over who can access the resource.",  # noqa
+    )
 
 
 class ResourceCreated(BaseModel):

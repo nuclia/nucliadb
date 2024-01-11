@@ -17,22 +17,30 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import logging
+from typing import List
 
-from .common import *  # noqa
-from .conversation import *  # noqa
-from .datetime import *  # noqa
-from .export_import import *  # noqa
-from .extracted import *  # noqa
-from .file import *  # noqa
-from .keywordset import *  # noqa
-from .layout import *  # noqa
-from .link import *  # noqa
-from .metadata import *  # noqa
-from .notifications import *  # noqa
-from .processing import *  # noqa
-from .security import *  # noqa
-from .text import *  # noqa
-from .writer import *  # noqa
+from pydantic import BaseModel, Field
 
-logger = logging.getLogger("nucliadb_models")
+
+class ResourceSecurity(BaseModel):
+    """
+    Security metadata for the resource
+    """
+
+    access_groups: List[str] = Field(
+        default=[],
+        title="Access groups",
+        description="List of group ids that can access the resource.",
+    )
+
+
+class RequestSecurity(BaseModel):
+    """
+    Security metadata for the search request
+    """
+
+    groups: List[str] = Field(
+        default=[],
+        title="Groups",
+        description="List of group ids to do the request with. ",
+    )
