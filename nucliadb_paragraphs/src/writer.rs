@@ -51,10 +51,7 @@ pub struct ParagraphWriterService {
 
 impl Debug for ParagraphWriterService {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("TextService")
-            .field("index", &self.index)
-            .field("schema", &self.schema)
-            .finish()
+        f.debug_struct("TextService").field("index", &self.index).field("schema", &self.schema).finish()
     }
 }
 
@@ -148,12 +145,7 @@ impl WriterChild for ParagraphWriterService {
         Ok(())
     }
     fn get_segment_ids(&self) -> NodeResult<Vec<String>> {
-        Ok(self
-            .index
-            .searchable_segment_ids()?
-            .iter()
-            .map(|s| s.uuid_string())
-            .collect())
+        Ok(self.index.searchable_segment_ids()?.iter().map(|s| s.uuid_string()).collect())
     }
 
     fn get_index_files(&self, ignored_segment_ids: &[String]) -> NodeResult<IndexFiles> {
@@ -255,26 +247,13 @@ impl ParagraphWriterService {
     }
 
     fn index_paragraph(&mut self, resource: &Resource) -> tantivy::Result<()> {
-        let metadata = resource
-            .metadata
-            .as_ref()
-            .expect("Missing resource metadata");
-        let modified = metadata
-            .modified
-            .as_ref()
-            .expect("Missing resource modified date in metadata");
-        let created = metadata
-            .created
-            .as_ref()
-            .expect("Missing resource created date in metadata");
+        let metadata = resource.metadata.as_ref().expect("Missing resource metadata");
+        let modified = metadata.modified.as_ref().expect("Missing resource modified date in metadata");
+        let created = metadata.created.as_ref().expect("Missing resource created date in metadata");
 
         let empty_paragraph = HashMap::with_capacity(0);
-        let inspect_paragraph = |field: &str| {
-            resource
-                .paragraphs
-                .get(field)
-                .map_or_else(|| &empty_paragraph, |i| &i.paragraphs)
-        };
+        let inspect_paragraph =
+            |field: &str| resource.paragraphs.get(field).map_or_else(|| &empty_paragraph, |i| &i.paragraphs);
         let resource_facets = resource
             .labels
             .iter()
@@ -368,9 +347,7 @@ mod tests {
             uuid: UUID.to_string(),
         };
 
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap();
+        let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
         let timestamp = Timestamp {
             seconds: now.as_secs() as i64,
             nanos: 0,
@@ -418,23 +395,13 @@ mod tests {
             end: (DOC1_P1.len() + DOC1_P2.len()) as i32,
             sentences: HashMap::new(),
             field: "body".to_string(),
-            labels: vec![
-                "/tantivy".to_string(),
-                "/test".to_string(),
-                "/label1".to_string(),
-            ],
+            labels: vec!["/tantivy".to_string(), "/test".to_string(), "/label1".to_string()],
             index: 1,
             split: "".to_string(),
             repeated_in_field: false,
             metadata: None,
         };
-        let p2_uuid = format!(
-            "{}/{}/{}-{}",
-            UUID,
-            "body",
-            DOC1_P1.len(),
-            DOC1_P1.len() + DOC1_P2.len()
-        );
+        let p2_uuid = format!("{}/{}/{}-{}", UUID, "body", DOC1_P1.len(), DOC1_P1.len() + DOC1_P2.len());
 
         let p3 = IndexParagraph {
             start: (DOC1_P1.len() + DOC1_P2.len()) as i32,
@@ -456,9 +423,7 @@ mod tests {
         );
 
         let body_paragraphs = IndexParagraphs {
-            paragraphs: [(p1_uuid, p1), (p2_uuid, p2), (p3_uuid, p3)]
-                .into_iter()
-                .collect(),
+            paragraphs: [(p1_uuid, p1), (p2_uuid, p2), (p3_uuid, p3)].into_iter().collect(),
         };
 
         let p4 = IndexParagraph {
@@ -478,12 +443,8 @@ mod tests {
             paragraphs: [(p4_uuid, p4)].into_iter().collect(),
         };
 
-        let paragraphs = [
-            ("body".to_string(), body_paragraphs),
-            ("title".to_string(), title_paragraphs),
-        ]
-        .into_iter()
-        .collect();
+        let paragraphs =
+            [("body".to_string(), body_paragraphs), ("title".to_string(), title_paragraphs)].into_iter().collect();
 
         Resource {
             resource: Some(resource_id),

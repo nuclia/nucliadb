@@ -58,10 +58,7 @@ pub fn init_telemetry(settings: &Settings) -> NodeResult<Option<ClientInitGuard>
         sentry_guard = None;
     }
 
-    tracing_subscriber::registry()
-        .with(layers)
-        .try_init()
-        .with_context(|| "trying to init tracing")?;
+    tracing_subscriber::registry().with(layers).try_init().with_context(|| "trying to init tracing")?;
 
     Ok(sentry_guard)
 }
@@ -111,10 +108,8 @@ impl LogLevelsFilter {
         }
 
         // prefixes match
-        let possible_match = self
-            .prefixes
-            .iter()
-            .find(|(prefix, log_level)| log_level >= level && metadata_target.starts_with(prefix));
+        let possible_match =
+            self.prefixes.iter().find(|(prefix, log_level)| log_level >= level && metadata_target.starts_with(prefix));
 
         possible_match.is_some()
     }
@@ -143,17 +138,12 @@ impl<S> Filter<S> for LogLevelsFilter {
 /// - catch-all using `*`
 fn stdout_layer(settings: &Settings) -> Box<dyn Layer<Registry> + Send + Sync> {
     let log_levels = settings.log_levels().to_vec();
-    let layer = tracing_subscriber::fmt::layer()
-        .with_level(true)
-        .with_target(true);
+    let layer = tracing_subscriber::fmt::layer().with_level(true).with_target(true);
 
     let filter = LogLevelsFilter::new(log_levels);
 
     if settings.plain_logs() || settings.debug() {
-        layer
-            .event_format(tracing_subscriber::fmt::format().compact())
-            .with_filter(filter)
-            .boxed()
+        layer.event_format(tracing_subscriber::fmt::format().compact()).with_filter(filter).boxed()
     } else {
         layer
             .event_format(tracing_subscriber::fmt::format::Format::default().json())
@@ -179,18 +169,10 @@ fn jaeger_layer(settings: &Settings) -> NodeResult<Box<dyn Layer<Registry> + Sen
     // span level).
     let level_filter = LevelFilter::from_level(Level::INFO);
     let span_filter = FilterFn::new(|metadata| {
-        metadata.is_span()
-            && metadata
-                .file()
-                .filter(|file| file.contains("nucliadb"))
-                .is_some()
+        metadata.is_span() && metadata.file().filter(|file| file.contains("nucliadb")).is_some()
     });
 
-    Ok(tracing_opentelemetry::layer()
-        .with_tracer(tracer)
-        .with_filter(level_filter)
-        .with_filter(span_filter)
-        .boxed())
+    Ok(tracing_opentelemetry::layer().with_tracer(tracer).with_filter(level_filter).with_filter(span_filter).boxed())
 }
 
 fn setup_sentry(env: &'static str, sentry_url: String) -> ClientInitGuard {
@@ -209,7 +191,9 @@ fn sentry_layer() -> Box<dyn Layer<Registry> + Send + Sync> {
 }
 
 pub fn run_with_telemetry<F, R>(current: Span, f: F) -> R
-where F: FnOnce() -> R {
+where
+    F: FnOnce() -> R,
+{
     let tid = current.context().span().span_context().trace_id();
     sentry::with_scope(|scope| scope.set_tag(TRACE_ID, tid), || current.in_scope(f))
 }
@@ -267,10 +251,7 @@ mod tests {
     #[test]
     fn test_logs_filtering_partial_and_exact() {
         // defined logs
-        let log_levels = vec![
-            ("nucliadb_node".to_string(), Level::INFO),
-            ("some*".to_string(), Level::DEBUG),
-        ];
+        let log_levels = vec![("nucliadb_node".to_string(), Level::INFO), ("some*".to_string(), Level::DEBUG)];
 
         let filter = LogLevelsFilter::new(log_levels);
 

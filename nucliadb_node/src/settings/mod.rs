@@ -209,10 +209,7 @@ mod tests {
 
     #[test]
     fn test_settings_custom_data_path() {
-        let settings = Settings::builder()
-            .data_path("mydata")
-            .inner_build()
-            .unwrap();
+        let settings = Settings::builder().data_path("mydata").inner_build().unwrap();
 
         assert_eq!(settings.shards_path.to_str().unwrap(), "mydata/shards");
     }
@@ -230,10 +227,7 @@ mod tests {
             .unwrap();
 
         assert!(!settings.lazy_loading);
-        assert!(
-            Ok(settings.public_ip) == "127.0.0.1".parse()
-                || Ok(settings.public_ip) == "::1".parse()
-        );
+        assert!(Ok(settings.public_ip) == "127.0.0.1".parse() || Ok(settings.public_ip) == "::1".parse());
         assert!(settings.sentry_enabled);
         assert_eq!(settings.sentry_env, SENTRY_PROD);
         assert!(

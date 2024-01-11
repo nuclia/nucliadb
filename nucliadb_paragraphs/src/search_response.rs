@@ -20,9 +20,7 @@
 use std::collections::HashMap;
 
 use itertools::Itertools;
-use nucliadb_core::protos::{
-    FacetResult, FacetResults, ParagraphResult, ParagraphSearchResponse, ResultScore,
-};
+use nucliadb_core::protos::{FacetResult, FacetResults, ParagraphResult, ParagraphSearchResponse, ResultScore};
 use nucliadb_core::tracing::*;
 use tantivy::collector::FacetCounts;
 use tantivy::schema::Value;
@@ -41,16 +39,20 @@ fn facet_count(facet: &str, facets_count: &FacetCounts) -> Vec<FacetResult> {
         })
         .collect()
 }
-pub fn produce_facets(
-    facets: Vec<String>,
-    facets_count: FacetCounts,
-) -> HashMap<String, FacetResults> {
+pub fn produce_facets(facets: Vec<String>, facets_count: FacetCounts) -> HashMap<String, FacetResults> {
     facets
         .into_iter()
         .map(|facet| (&facets_count, facet))
         .map(|(facets_count, facet)| (facet_count(&facet, facets_count), facet))
         .filter(|(r, _)| !r.is_empty())
-        .map(|(facetresults, facet)| (facet, FacetResults { facetresults }))
+        .map(|(facetresults, facet)| {
+            (
+                facet,
+                FacetResults {
+                    facetresults,
+                },
+            )
+        })
         .collect()
 }
 
@@ -88,10 +90,7 @@ pub struct SearchFacetsResponse<'a> {
 
 impl<'a> From<SearchFacetsResponse<'a>> for ParagraphSearchResponse {
     fn from(response: SearchFacetsResponse) -> Self {
-        let facets = response
-            .facets_count
-            .map(|count| produce_facets(response.facets, count))
-            .unwrap_or_default();
+        let facets = response.facets_count.map(|count| produce_facets(response.facets, count)).unwrap_or_default();
         let results: Vec<ParagraphResult> = Vec::with_capacity(0);
         ParagraphSearchResponse {
             results,
@@ -155,19 +154,10 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
                         .unwrap()
                         .to_string();
 
-                    let split = doc
-                        .get_first(schema.split)
-                        .unwrap_or(&default_split)
-                        .as_text()
-                        .unwrap()
-                        .to_string();
+                    let split = doc.get_first(schema.split).unwrap_or(&default_split).as_text().unwrap().to_string();
 
                     let index = doc.get_first(schema.index).unwrap().as_u64().unwrap();
-                    let mut terms: Vec<_> = response
-                        .termc
-                        .get_fterms(doc_address.doc_id)
-                        .into_iter()
-                        .collect();
+                    let mut terms: Vec<_> = response.termc.get_fterms(doc_address.doc_id).into_iter().collect();
                     terms.sort();
                     let result = ParagraphResult {
                         uuid,
@@ -189,10 +179,7 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
             }
         }
 
-        let facets = response
-            .facets_count
-            .map(|count| produce_facets(response.facets, count))
-            .unwrap_or_default();
+        let facets = response.facets_count.map(|count| produce_facets(response.facets, count)).unwrap_or_default();
         ParagraphSearchResponse {
             results,
             facets,
@@ -261,19 +248,10 @@ impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
                         .unwrap()
                         .to_string();
 
-                    let split = doc
-                        .get_first(schema.split)
-                        .unwrap_or(&default_split)
-                        .as_text()
-                        .unwrap()
-                        .to_string();
+                    let split = doc.get_first(schema.split).unwrap_or(&default_split).as_text().unwrap().to_string();
 
                     let index = doc.get_first(schema.index).unwrap().as_u64().unwrap();
-                    let mut terms: Vec<_> = response
-                        .termc
-                        .get_fterms(doc_address.doc_id)
-                        .into_iter()
-                        .collect();
+                    let mut terms: Vec<_> = response.termc.get_fterms(doc_address.doc_id).into_iter().collect();
                     terms.sort();
                     let result = ParagraphResult {
                         uuid,
@@ -295,10 +273,7 @@ impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
             }
         }
 
-        let facets = response
-            .facets_count
-            .map(|count| produce_facets(response.facets, count))
-            .unwrap_or_default();
+        let facets = response.facets_count.map(|count| produce_facets(response.facets, count)).unwrap_or_default();
         ParagraphSearchResponse {
             results,
             facets,

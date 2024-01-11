@@ -46,9 +46,9 @@ pub mod prelude {
     pub use crate::texts::{self, *};
     pub use crate::vectors::{self, *};
     pub use crate::{
-        encapsulate_reader, encapsulate_writer, node_error, paragraph_read, paragraph_write,
-        relation_read, relation_write, text_read, text_write, vector_read, vector_write, Context,
-        NodeResult, ReaderChild, WriterChild,
+        encapsulate_reader, encapsulate_writer, node_error, paragraph_read, paragraph_write, relation_read,
+        relation_write, text_read, text_write, vector_read, vector_write, Context, NodeResult, ReaderChild,
+        WriterChild,
     };
 }
 
@@ -82,15 +82,11 @@ pub fn paragraph_write(
     x.write().unwrap_or_else(|l| l.into_inner())
 }
 
-pub fn text_write(
-    x: &texts::TextsWriterPointer,
-) -> RwLockWriteGuard<'_, dyn texts::FieldWriter + 'static> {
+pub fn text_write(x: &texts::TextsWriterPointer) -> RwLockWriteGuard<'_, dyn texts::FieldWriter + 'static> {
     x.write().unwrap_or_else(|l| l.into_inner())
 }
 
-pub fn vector_write(
-    x: &vectors::VectorsWriterPointer,
-) -> RwLockWriteGuard<'_, dyn vectors::VectorWriter + 'static> {
+pub fn vector_write(x: &vectors::VectorsWriterPointer) -> RwLockWriteGuard<'_, dyn vectors::VectorWriter + 'static> {
     x.write().unwrap_or_else(|l| l.into_inner())
 }
 
@@ -106,15 +102,11 @@ pub fn paragraph_read(
     x.read().unwrap_or_else(|l| l.into_inner())
 }
 
-pub fn text_read(
-    x: &texts::TextsWriterPointer,
-) -> RwLockReadGuard<'_, dyn texts::FieldWriter + 'static> {
+pub fn text_read(x: &texts::TextsWriterPointer) -> RwLockReadGuard<'_, dyn texts::FieldWriter + 'static> {
     x.read().unwrap_or_else(|l| l.into_inner())
 }
 
-pub fn vector_read(
-    x: &vectors::VectorsWriterPointer,
-) -> RwLockReadGuard<'_, dyn vectors::VectorWriter + 'static> {
+pub fn vector_read(x: &vectors::VectorsWriterPointer) -> RwLockReadGuard<'_, dyn vectors::VectorWriter + 'static> {
     x.read().unwrap_or_else(|l| l.into_inner())
 }
 

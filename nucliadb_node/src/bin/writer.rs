@@ -25,9 +25,7 @@ use std::time::Instant;
 use nucliadb_core::protos::node_writer_server::NodeWriterServer;
 use nucliadb_core::tracing::*;
 use nucliadb_core::{metrics, NodeResult};
-use nucliadb_node::grpc::middleware::{
-    GrpcDebugLogsLayer, GrpcInstrumentorLayer, GrpcTasksMetricsLayer,
-};
+use nucliadb_node::grpc::middleware::{GrpcDebugLogsLayer, GrpcInstrumentorLayer, GrpcTasksMetricsLayer};
 use nucliadb_node::grpc::writer::{NodeWriterEvent, NodeWriterGRPCDriver};
 use nucliadb_node::http_server::run_http_server;
 use nucliadb_node::node_metadata::NodeMetadata;
@@ -186,8 +184,7 @@ pub async fn start_grpc_service(
         .add_service(health_service);
 
     if settings.node_role() == NodeRole::Primary {
-        let grpc_driver = NodeWriterGRPCDriver::new(settings.clone(), shard_cache.clone())
-            .with_sender(metadata_sender);
+        let grpc_driver = NodeWriterGRPCDriver::new(settings.clone(), shard_cache.clone()).with_sender(metadata_sender);
         grpc_driver.initialize().await?;
         server_builder = server_builder.add_service(GrpcServer::new(grpc_driver));
     }

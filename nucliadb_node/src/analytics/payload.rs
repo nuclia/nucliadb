@@ -102,7 +102,9 @@ pub enum AnalyticsEvent {
     /// Serve command is called.
     Serve(ServeEvent),
     /// EndCommand (with the return code)
-    EndCommand { return_code: i32 },
+    EndCommand {
+        return_code: i32,
+    },
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -122,9 +124,8 @@ pub struct ClientInformation {
 }
 
 fn hashed_host_username() -> String {
-    let hostname = hostname::get()
-        .map(|hostname| hostname.to_string_lossy().to_string())
-        .unwrap_or_else(|_| "".to_string());
+    let hostname =
+        hostname::get().map(|hostname| hostname.to_string_lossy().to_string()).unwrap_or_else(|_| "".to_string());
     let username = username::get_user_name().unwrap_or_else(|_| "".to_string());
     let hashed_value = format!("{hostname}:{username}");
     let digest = md5::compute(hashed_value.as_bytes());

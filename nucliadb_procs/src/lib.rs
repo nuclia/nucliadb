@@ -58,11 +58,11 @@ use syn::{parse_macro_input, ItemFn};
 /// this will measure how much `my_function` takes to execute and automatically
 /// export `vectors/my_function` metric to the corresponding meter.
 #[proc_macro_attribute]
-pub fn measure(
-    args: proc_macro::TokenStream,
-    input: proc_macro::TokenStream,
-) -> proc_macro::TokenStream {
-    let MeasureArgs { actor, metric } = parse_macro_input!(args as MeasureArgs);
+pub fn measure(args: proc_macro::TokenStream, input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let MeasureArgs {
+        actor,
+        metric,
+    } = parse_macro_input!(args as MeasureArgs);
 
     let ItemFn {
         attrs,
@@ -100,9 +100,6 @@ pub fn measure(
 /// Useless proc macro for testing purposes. It literally does nothing to the
 /// code
 #[proc_macro_attribute]
-pub fn do_nothing(
-    _args: proc_macro::TokenStream,
-    item: proc_macro::TokenStream,
-) -> proc_macro::TokenStream {
+pub fn do_nothing(_args: proc_macro::TokenStream, item: proc_macro::TokenStream) -> proc_macro::TokenStream {
     item
 }

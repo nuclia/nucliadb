@@ -125,24 +125,20 @@ impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
         let mut cache_writer = self.cache.write().await;
         match cache_writer.get_shard(&id) {
             ShardCacheStatus::InCache(shard) => Ok(shard),
-            ShardCacheStatus::BeingDeleted => Err(node_error!(ShardNotFoundError(
-                "Shard {shard_path:?} is not on disk"
-            ))),
+            ShardCacheStatus::BeingDeleted => {
+                Err(node_error!(ShardNotFoundError("Shard {shard_path:?} is not on disk")))
+            }
             ShardCacheStatus::NotInCache => {
                 let metadata_manager = Arc::clone(&self.metadata_manager);
                 // Avoid blocking while interacting with the file system
                 let shard = tokio::task::spawn_blocking(move || {
                     if !ShardMetadata::exists(shard_path.clone()) {
-                        return Err(node_error!(ShardNotFoundError(
-                            "Shard {shard_path:?} is not on disk"
-                        )));
+                        return Err(node_error!(ShardNotFoundError("Shard {shard_path:?} is not on disk")));
                     }
-                    let metadata = metadata_manager
-                        .get(id.clone())
-                        .expect("Shard metadata not found. This should not happen");
-                    ShardWriter::open(Arc::clone(&metadata)).map_err(|error| {
-                        node_error!("Shard {shard_path:?} could not be loaded from disk: {error:?}")
-                    })
+                    let metadata =
+                        metadata_manager.get(id.clone()).expect("Shard metadata not found. This should not happen");
+                    ShardWriter::open(Arc::clone(&metadata))
+                        .map_err(|error| node_error!("Shard {shard_path:?} could not be loaded from disk: {error:?}"))
                 })
                 .await
                 .context("Blocking task panicked")??;
@@ -165,15 +161,11 @@ impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
                 let shard_id = entry.file_name().to_str().unwrap().to_string();
                 let shard_path = entry.path();
                 if !ShardMetadata::exists(shard_path.clone()) {
-                    info!(
-                        "Shard {shard_path:?} is not on disk",
-                        shard_path = shard_path
-                    );
+                    info!("Shard {shard_path:?} is not on disk", shard_path = shard_path);
                     continue;
                 }
-                let metadata = metadata_manager
-                    .get(shard_id.clone())
-                    .expect("Shard metadata not found. This should not happen");
+                let metadata =
+                    metadata_manager.get(shard_id.clone()).expect("Shard metadata not found. This should not happen");
                 match ShardWriter::open(metadata) {
                     Err(err) => error!("Loading shard {shard_path:?} from disk raised {err}"),
                     Ok(shard) => {

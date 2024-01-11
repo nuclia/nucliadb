@@ -30,30 +30,12 @@ pub type GrpcOpValue = f64;
 
 pub type GrpcOpMetric = Family<GrpcOpKey, Histogram>;
 
-const BUCKETS: [f64; 14] = [
-    0.005,
-    0.01,
-    0.025,
-    0.05,
-    0.1,
-    0.25,
-    0.5,
-    2.5,
-    5.0,
-    10.0,
-    30.0,
-    60.0,
-    2.5 * 60.0,
-    5.0 * 60.0,
-];
+const BUCKETS: [f64; 14] =
+    [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 2.5, 5.0, 10.0, 30.0, 60.0, 2.5 * 60.0, 5.0 * 60.0];
 
 pub fn register_grpc_ops(registry: &mut Registry) -> GrpcOpMetric {
     let constructor = || Histogram::new(BUCKETS.iter().copied());
     let metric = GrpcOpMetric::new_with_constructor(constructor);
-    registry.register(
-        "grpc_server_op_duration_seconds",
-        "gRPC server operations duration in seconds",
-        metric.clone(),
-    );
+    registry.register("grpc_server_op_duration_seconds", "gRPC server operations duration in seconds", metric.clone());
     metric
 }

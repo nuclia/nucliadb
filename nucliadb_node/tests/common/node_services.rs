@@ -110,12 +110,9 @@ impl NodeFixture {
         let tempdir = TempDir::new().expect("Unable to create temporary data directory");
         let secondary_tempdir = TempDir::new().expect("Unable to create temporary data directory");
 
-        let reader_addr =
-            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), find_open_port());
-        let writer_addr =
-            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), find_open_port());
-        let secondary_reader_addr =
-            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), find_open_port());
+        let reader_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), find_open_port());
+        let writer_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), find_open_port());
+        let secondary_reader_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), find_open_port());
 
         let settings = Settings::builder()
             .data_path(tempdir.path())
@@ -188,20 +185,16 @@ impl NodeFixture {
         self.primary_shard_cache = Some(Arc::clone(&shards_cache));
         let notifier = Arc::clone(&self.shutdown_notifier);
         self.writer_server_task = Some(tokio::spawn(async move {
-            lifecycle::initialize_writer(settings.clone())
-                .expect("Writer initialization has failed");
-            let writer_server = NodeWriterServer::new(NodeWriterGRPCDriver::new(
-                settings.clone(),
-                Arc::clone(&shards_cache),
-            ));
-            let replication_server =
-                replication::replication_service_server::ReplicationServiceServer::new(
-                    ReplicationServiceGRPCDriver::new(
-                        settings.clone(),
-                        Arc::clone(&shards_cache),
-                        "primary_id".to_string(),
-                    ),
-                );
+            lifecycle::initialize_writer(settings.clone()).expect("Writer initialization has failed");
+            let writer_server =
+                NodeWriterServer::new(NodeWriterGRPCDriver::new(settings.clone(), Arc::clone(&shards_cache)));
+            let replication_server = replication::replication_service_server::ReplicationServiceServer::new(
+                ReplicationServiceGRPCDriver::new(
+                    settings.clone(),
+                    Arc::clone(&shards_cache),
+                    "primary_id".to_string(),
+                ),
+            );
             Server::builder()
                 .add_service(writer_server)
                 .add_service(replication_server)
@@ -233,11 +226,8 @@ impl NodeFixture {
         self.secondary_shard_cache = Some(shards_cache.clone());
         let notified = Arc::clone(&self.shutdown_notified);
         self.secondary_writer_server_task = Some(tokio::spawn(async move {
-            lifecycle::initialize_writer(settings.clone())
-                .expect("Writer initialization has failed");
-            connect_to_primary_and_replicate(settings, shards_cache, node_id.to_string(), notified)
-                .await
-                .unwrap();
+            lifecycle::initialize_writer(settings.clone()).expect("Writer initialization has failed");
+            connect_to_primary_and_replicate(settings, shards_cache, node_id.to_string(), notified).await.unwrap();
         }));
 
         Ok(self)
@@ -255,10 +245,7 @@ impl NodeFixture {
         self.reader_server_task = Some(tokio::spawn(async move {
             lifecycle::initialize_reader(settings.clone());
             let grpc_driver = NodeReaderGRPCDriver::new(settings.clone());
-            grpc_driver
-                .initialize()
-                .await
-                .expect("Unable to initialize reader gRPC");
+            grpc_driver.initialize().await.expect("Unable to initialize reader gRPC");
             let reader_server = NodeReaderServer::new(grpc_driver);
             Server::builder()
                 .add_service(reader_server)
@@ -289,10 +276,7 @@ impl NodeFixture {
         self.reader_server_task = Some(tokio::spawn(async move {
             lifecycle::initialize_reader(settings.clone());
             let grpc_driver = NodeReaderGRPCDriver::new(settings.clone());
-            grpc_driver
-                .initialize()
-                .await
-                .expect("Unable to initialize reader gRPC");
+            grpc_driver.initialize().await.expect("Unable to initialize reader gRPC");
             let reader_server = NodeReaderServer::new(grpc_driver);
             Server::builder()
                 .add_service(reader_server)
@@ -312,38 +296,23 @@ impl NodeFixture {
     }
 
     pub fn reader_client(&self) -> TestNodeReader {
-        self.reader_client
-            .as_ref()
-            .expect("Reader client not initialized")
-            .clone()
+        self.reader_client.as_ref().expect("Reader client not initialized").clone()
     }
 
     pub fn secondary_reader_client(&self) -> TestNodeReader {
-        self.secondary_reader_client
-            .as_ref()
-            .expect("Reader client not initialized")
-            .clone()
+        self.secondary_reader_client.as_ref().expect("Reader client not initialized").clone()
     }
 
     pub fn writer_client(&self) -> TestNodeWriter {
-        self.writer_client
-            .as_ref()
-            .expect("Writer client not initialized")
-            .clone()
+        self.writer_client.as_ref().expect("Writer client not initialized").clone()
     }
 
     pub fn primary_shard_cache(&self) -> Arc<AsyncUnboundedShardWriterCache> {
-        self.primary_shard_cache
-            .as_ref()
-            .expect("Shard cache not initialized")
-            .clone()
+        self.primary_shard_cache.as_ref().expect("Shard cache not initialized").clone()
     }
 
     pub fn secondary_shard_cache(&self) -> Arc<AsyncUnboundedShardWriterCache> {
-        self.secondary_shard_cache
-            .as_ref()
-            .expect("Shard cache not initialized")
-            .clone()
+        self.secondary_shard_cache.as_ref().expect("Shard cache not initialized").clone()
     }
 }
 

@@ -20,12 +20,8 @@
 
 use super::{Logger, VectorEngine};
 
-pub fn write_benchmark<Eng, QIter, Plot>(
-    batch_size: usize,
-    mut engine: Eng,
-    mut plotw: Plot,
-    vectors: QIter,
-) where
+pub fn write_benchmark<Eng, QIter, Plot>(batch_size: usize, mut engine: Eng, mut plotw: Plot, vectors: QIter)
+where
     Eng: VectorEngine,
     QIter: Iterator<Item = Vec<f32>>,
     Plot: Logger,

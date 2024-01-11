@@ -49,10 +49,7 @@ pub struct RelationsWriterService {
 
 impl Debug for RelationsWriterService {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("FieldWriterService")
-            .field("index", &self.index)
-            .field("schema", &self.schema)
-            .finish()
+        f.debug_struct("FieldWriterService").field("index", &self.index).field("schema", &self.schema).finish()
     }
 }
 
@@ -102,12 +99,7 @@ impl WriterChild for RelationsWriterService {
     }
 
     fn get_segment_ids(&self) -> NodeResult<Vec<String>> {
-        Ok(self
-            .index
-            .searchable_segment_ids()?
-            .iter()
-            .map(|s| s.uuid_string())
-            .collect())
+        Ok(self.index.searchable_segment_ids()?.iter().map(|s| s.uuid_string()).collect())
     }
 
     fn get_index_files(&self, ignored_segment_ids: &[String]) -> NodeResult<IndexFiles> {
@@ -163,9 +155,7 @@ impl RelationsWriterService {
     pub fn open(config: &RelationConfig) -> NodeResult<Self> {
         let field_schema = Schema::new();
         let index = Index::open_in_dir(&config.path)?;
-        let writer = index
-            .writer_with_num_threads(1, TANTIVY_INDEX_ARENA_MEMORY)
-            .unwrap();
+        let writer = index.writer_with_num_threads(1, TANTIVY_INDEX_ARENA_MEMORY).unwrap();
 
         Ok(RelationsWriterService {
             index,
@@ -185,12 +175,8 @@ impl RelationsWriterService {
         let field_schema = Schema::new();
         let mut index_builder = Index::builder().schema(field_schema.schema.clone());
         index_builder = index_builder.settings(settings);
-        let index = index_builder
-            .create_in_dir(&config.path)
-            .expect("Index directory should exist");
-        let writer = index
-            .writer_with_num_threads(1, TANTIVY_INDEX_ARENA_MEMORY)
-            .unwrap();
+        let index = index_builder.create_in_dir(&config.path).expect("Index directory should exist");
+        let writer = index.writer_with_num_threads(1, TANTIVY_INDEX_ARENA_MEMORY).unwrap();
 
         Ok(RelationsWriterService {
             index,
@@ -219,16 +205,9 @@ impl RelationsWriterService {
     }
 
     fn index_document(&mut self, resource: &Resource) -> NodeResult<()> {
-        let resource_id = resource
-            .resource
-            .as_ref()
-            .map(|r| r.uuid.as_str())
-            .expect("Missing resource ID");
+        let resource_id = resource.resource.as_ref().map(|r| r.uuid.as_str()).expect("Missing resource ID");
 
-        let iter = resource
-            .relations
-            .iter()
-            .filter(|rel| rel.to.is_some() || rel.source.is_some());
+        let iter = resource.relations.iter().filter(|rel| rel.to.is_some() || rel.source.is_some());
 
         for relation in iter {
             let source = relation.source.as_ref().expect("Missing source");

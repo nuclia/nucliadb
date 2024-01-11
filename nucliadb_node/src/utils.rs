@@ -36,11 +36,7 @@ pub static ALL_TARGETS: &str = "*";
 
 /// Prepares a socket addr for a grpc endpoint to connect to
 pub fn socket_to_endpoint(grpc_addr: SocketAddr) -> NodeResult<Endpoint> {
-    let uri = Uri::builder()
-        .scheme("http")
-        .authority(grpc_addr.to_string().as_str())
-        .path_and_query("/")
-        .build()?;
+    let uri = Uri::builder().scheme("http").authority(grpc_addr.to_string().as_str()).path_and_query("/").build()?;
     // Create a channel with connect_lazy to automatically reconnect to the node.
     let channel = Endpoint::from(uri);
     Ok(channel)
@@ -64,8 +60,7 @@ pub fn reliable_lookup_host(host: &str) -> SocketAddr {
         tries -= 1;
         thread::sleep(Duration::from_secs(1))
     }
-    SocketAddr::from_str(&host)
-        .unwrap_or_else(|_| panic!("Unable to resolve IP address for {}", host))
+    SocketAddr::from_str(&host).unwrap_or_else(|_| panic!("Unable to resolve IP address for {}", host))
 }
 
 pub fn parse_log_levels(levels: &str) -> Vec<(String, Level)> {
@@ -77,8 +72,8 @@ pub fn parse_log_levels(levels: &str) -> Vec<(String, Level)> {
 }
 
 pub fn read_host_key(hk_path: PathBuf) -> NodeResult<Uuid> {
-    let host_key_contents = fs::read(hk_path.clone())
-        .with_context(|| format!("Failed to read host key from '{}'", hk_path.display()))?;
+    let host_key_contents =
+        fs::read(hk_path.clone()).with_context(|| format!("Failed to read host key from '{}'", hk_path.display()))?;
 
     let host_key = Uuid::from_slice(host_key_contents.as_slice())
         .with_context(|| format!("Invalid host key from '{}'", hk_path.display()))?;
@@ -120,19 +115,14 @@ pub fn get_primary_node_id(data_path: PathBuf) -> Option<String> {
     if read_result.is_err() {
         return None;
     }
-    read_result
-        .map(|bytes| String::from_utf8(bytes).unwrap())
-        .ok()
+    read_result.map(|bytes| String::from_utf8(bytes).unwrap()).ok()
 }
 
 pub fn parse_node_role(role: &str) -> NodeRole {
     match role {
         "primary" => NodeRole::Primary,
         "secondary" => NodeRole::Secondary,
-        _ => panic!(
-            "Invalid node role, allowed values are 'primary' and 'secondary'. Provided: '{}'",
-            role
-        ),
+        _ => panic!("Invalid node role, allowed values are 'primary' and 'secondary'. Provided: '{}'", role),
     }
 }
 

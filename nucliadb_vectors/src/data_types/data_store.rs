@@ -121,10 +121,7 @@ pub fn create_key_value<D: IntoBuffer>(recipient: &mut File, slots: Vec<D>) -> i
 }
 
 // Merge algorithm. Returns the number of elements merged into the file.
-pub fn merge<S: Interpreter + Copy>(
-    recipient: &mut File,
-    producers: &[(S, &[u8])],
-) -> io::Result<usize> {
+pub fn merge<S: Interpreter + Copy>(recipient: &mut File, producers: &[(S, &[u8])]) -> io::Result<usize> {
     // Number of elements, deleted or alive.
     let mut prologue_section_size = HEADER_LEN;
     // To know the range of valid ids per producer
@@ -266,11 +263,7 @@ mod tests {
         let v2_map = unsafe { memmap2::Mmap::map(&v2_store).unwrap() };
 
         let mut merge_store = tempfile::tempfile().unwrap();
-        let elems = vec![
-            (TElem, v0_map.as_ref()),
-            (TElem, v1_map.as_ref()),
-            (TElem, v2_map.as_ref()),
-        ];
+        let elems = vec![(TElem, v0_map.as_ref()), (TElem, v1_map.as_ref()), (TElem, v2_map.as_ref())];
 
         merge(&mut merge_store, &elems).unwrap();
         let merge_map = unsafe { memmap2::Mmap::map(&merge_store).unwrap() };
@@ -289,10 +282,7 @@ mod tests {
     fn merge_some_deleted_different_length() {
         let v0: Vec<_> = [0u32, 1, 2].iter().map(|x| x.to_be_bytes()).collect();
         let v1: Vec<_> = [3u32, 4, 5, 11].iter().map(|x| x.to_be_bytes()).collect();
-        let v2: Vec<_> = [6u32, 7, 8, 9, 10]
-            .iter()
-            .map(|x| x.to_be_bytes())
-            .collect();
+        let v2: Vec<_> = [6u32, 7, 8, 9, 10].iter().map(|x| x.to_be_bytes()).collect();
 
         let mut v0_store = tempfile::tempfile().unwrap();
         let mut v1_store = tempfile::tempfile().unwrap();

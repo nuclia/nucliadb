@@ -37,24 +37,17 @@ impl ReplicationHealthManager {
     /// We simply touch the file and see when it was last
     /// modified to decide if we're healthy and running up-to-date.
     pub fn new(settings: Settings) -> Self {
-        Self { settings }
+        Self {
+            settings,
+        }
     }
 
     fn health_filepath(&self) -> String {
-        format!(
-            "{}/{}",
-            self.settings.data_path().to_string_lossy(),
-            REPLICATION_HEALTH_FILE
-        )
+        format!("{}/{}", self.settings.data_path().to_string_lossy(), REPLICATION_HEALTH_FILE)
     }
 
     pub fn update_healthy(&self) {
-        if OpenOptions::new()
-            .write(true)
-            .create(true)
-            .open(self.health_filepath())
-            .is_err()
-        {
+        if OpenOptions::new().write(true).create(true).open(self.health_filepath()).is_err() {
             error!("Error updating replication health status");
             return;
         }
@@ -72,7 +65,6 @@ impl ReplicationHealthManager {
         }
         let metadata = metaddata.unwrap();
         metadata.modified().unwrap()
-            > std::time::SystemTime::now()
-                - std::time::Duration::from_secs(self.settings.replication_healthy_delay())
+            > std::time::SystemTime::now() - std::time::Duration::from_secs(self.settings.replication_healthy_delay())
     }
 }

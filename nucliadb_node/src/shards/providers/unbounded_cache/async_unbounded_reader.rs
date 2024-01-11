@@ -71,13 +71,10 @@ impl AsyncShardReaderProvider for AsyncUnboundedShardReaderCache {
         let id_ = id.clone();
         let shard = tokio::task::spawn_blocking(move || {
             if !ShardMetadata::exists(shard_path.clone()) {
-                return Err(node_error!(ShardNotFoundError(
-                    "Shard {shard_path:?} is not on disk"
-                )));
+                return Err(node_error!(ShardNotFoundError("Shard {shard_path:?} is not on disk")));
             }
-            ShardReader::new(id.clone(), &shard_path).map_err(|error| {
-                node_error!("Shard {shard_path:?} could not be loaded from disk: {error:?}")
-            })
+            ShardReader::new(id.clone(), &shard_path)
+                .map_err(|error| node_error!("Shard {shard_path:?} could not be loaded from disk: {error:?}"))
         })
         .await
         .context("Blocking task panicked")??;

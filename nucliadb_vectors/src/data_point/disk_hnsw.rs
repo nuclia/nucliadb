@@ -119,12 +119,7 @@ impl<'a> Iterator for EdgeIter<'a> {
 
 pub struct DiskHnsw;
 impl DiskHnsw {
-    fn serialize_node<W>(
-        mut buf: W,
-        offset: usize,
-        node: usize,
-        hnsw: &RAMHnsw,
-    ) -> io::Result<usize>
+    fn serialize_node<W>(mut buf: W, offset: usize, node: usize, hnsw: &RAMHnsw) -> io::Result<usize>
     where
         W: io::Write,
     {
@@ -165,11 +160,7 @@ impl DiskHnsw {
             buf: &node[cnx_start..cnx_end],
         }
     }
-    pub fn serialize_into<W: io::Write>(
-        mut buf: W,
-        no_nodes: usize,
-        hnsw: RAMHnsw,
-    ) -> io::Result<()> {
+    pub fn serialize_into<W: io::Write>(mut buf: W, no_nodes: usize, hnsw: RAMHnsw) -> io::Result<()> {
         if let Some(entry_point) = hnsw.entry_point {
             let mut length = 0;
             let mut nodes_end = vec![];
@@ -181,7 +172,10 @@ impl DiskHnsw {
                 buf.write_all(&ends_at.to_le_bytes())?;
                 length += USIZE_LEN;
             }
-            let EntryPoint { node, layer } = entry_point;
+            let EntryPoint {
+                node,
+                layer,
+            } = entry_point;
             buf.write_all(&layer.to_le_bytes())?;
             buf.write_all(&node.0.to_le_bytes())?;
             let _length = length + 2 * USIZE_LEN;
@@ -241,33 +235,17 @@ mod tests {
     #[test]
     fn hnsw_test() {
         let no_nodes = 3;
-        let cnx0 = vec![
-            vec![(Address(1), 1.0)],
-            vec![(Address(2), 2.0)],
-            vec![(Address(3), 3.0)],
-        ];
+        let cnx0 = vec![vec![(Address(1), 1.0)], vec![(Address(2), 2.0)], vec![(Address(3), 3.0)]];
         let layer0 = RAMLayer {
-            out: cnx0
-                .iter()
-                .enumerate()
-                .map(|(i, c)| (Address(i), c.clone()))
-                .collect(),
+            out: cnx0.iter().enumerate().map(|(i, c)| (Address(i), c.clone())).collect(),
         };
         let cnx1 = vec![vec![(Address(1), 4.0)], vec![(Address(2), 5.0)]];
         let layer1 = RAMLayer {
-            out: cnx1
-                .iter()
-                .enumerate()
-                .map(|(i, c)| (Address(i), c.clone()))
-                .collect(),
+            out: cnx1.iter().enumerate().map(|(i, c)| (Address(i), c.clone())).collect(),
         };
         let cnx2 = vec![vec![(Address(1), 6.0)]];
         let layer2 = RAMLayer {
-            out: cnx2
-                .iter()
-                .enumerate()
-                .map(|(i, c)| (Address(i), c.clone()))
-                .collect(),
+            out: cnx2.iter().enumerate().map(|(i, c)| (Address(i), c.clone())).collect(),
         };
         let entry_point = EntryPoint {
             node: Address(0),

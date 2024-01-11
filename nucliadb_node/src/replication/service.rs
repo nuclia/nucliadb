@@ -43,11 +43,7 @@ pub struct ReplicationServiceGRPCDriver {
 }
 
 impl ReplicationServiceGRPCDriver {
-    pub fn new(
-        settings: Settings,
-        shard_cache: Arc<AsyncUnboundedShardWriterCache>,
-        node_id: String,
-    ) -> Self {
+    pub fn new(settings: Settings, shard_cache: Arc<AsyncUnboundedShardWriterCache>, node_id: String) -> Self {
         Self {
             settings,
             shards: shard_cache,
@@ -73,10 +69,7 @@ async fn stream_file(
     let filepath = shard_path.join(rel_filepath);
 
     if !filepath.exists() {
-        debug!(
-            "File not found when index thought it should be: {}",
-            filepath.to_string_lossy(),
-        );
+        debug!("File not found when index thought it should be: {}", filepath.to_string_lossy(),);
         return Ok(());
     }
 
@@ -145,61 +138,34 @@ async fn replica_shard(
 
     // getting shard files can block during an active write
     let sshard = Arc::clone(&shard); // moved shard reference into blocking task
-    let shard_files =
-        tokio::task::spawn_blocking(move || sshard.get_shard_files(&ignored_segement_ids))
-            .await??;
+    let shard_files = tokio::task::spawn_blocking(move || sshard.get_shard_files(&ignored_segement_ids)).await??;
 
     for segment_files in shard_files {
         for segment_file in segment_files.files {
-            stream_file(
-                chunk_size,
-                &shard_path,
-                generation_id,
-                &PathBuf::from(segment_file),
-                &sender,
-            )
-            .await?;
+            stream_file(chunk_size, &shard_path, generation_id, &PathBuf::from(segment_file), &sender).await?;
         }
         for (metadata_file, data) in segment_files.metadata_files {
-            stream_data(
-                &shard_path,
-                generation_id,
-                &PathBuf::from(metadata_file),
-                data,
-                &sender,
-            )
-            .await?;
+            stream_data(&shard_path, generation_id, &PathBuf::from(metadata_file), data, &sender).await?;
         }
     }
 
     // top level additional files
     for filename in ["metadata.json", "versions.json"] {
-        stream_file(
-            chunk_size,
-            &shard_path,
-            generation_id,
-            &PathBuf::from(filename),
-            &sender,
-        )
-        .await?;
+        stream_file(chunk_size, &shard_path, generation_id, &PathBuf::from(filename), &sender).await?;
     }
     Ok(())
 }
 
 #[tonic::async_trait]
 impl replication::replication_service_server::ReplicationService for ReplicationServiceGRPCDriver {
-    type ReplicateShardStream =
-        ReceiverStream<Result<replication::ReplicateShardResponse, tonic::Status>>;
+    type ReplicateShardStream = ReceiverStream<Result<replication::ReplicateShardResponse, tonic::Status>>;
 
     async fn check_replication_state(
         &self,
         raw_request: tonic::Request<replication::SecondaryCheckReplicationStateRequest>,
-    ) -> Result<tonic::Response<replication::PrimaryCheckReplicationStateResponse>, tonic::Status>
-    {
+    ) -> Result<tonic::Response<replication::PrimaryCheckReplicationStateResponse>, tonic::Status> {
         if self.settings.node_role() != NodeRole::Primary {
-            return Err(tonic::Status::unavailable(
-                "This node is not a primary node",
-            ));
+            return Err(tonic::Status::unavailable("This node is not a primary node"));
         }
         let request = raw_request.into_inner();
         let mut resp_shard_states = Vec::new();
@@ -213,9 +179,7 @@ impl replication::replication_service_server::ReplicationService for Replication
 
         for shard_id in shard_ids {
             if let Some(metadata) = self.shards.get_metadata(shard_id.clone()) {
-                let gen_id = metadata
-                    .get_generation_id()
-                    .unwrap_or("UNSET_PRIMARY".to_string());
+                let gen_id = metadata.get_generation_id().unwrap_or("UNSET_PRIMARY".to_string());
                 let shard_changed_or_not_present = request_shard_states
                     .clone()
                     .into_iter()
@@ -252,16 +216,12 @@ impl replication::replication_service_server::ReplicationService for Replication
         let request = raw_request.into_inner();
 
         let receiver = tokio::sync::mpsc::channel(4);
-        let sender: tokio::sync::mpsc::Sender<
-            Result<replication::ReplicateShardResponse, tonic::Status>,
-        > = receiver.0.clone();
+        let sender: tokio::sync::mpsc::Sender<Result<replication::ReplicateShardResponse, tonic::Status>> =
+            receiver.0.clone();
 
         let shard_lookup = self.shards.load(request.shard_id.clone()).await;
         if let Err(error) = shard_lookup {
-            return Err(tonic::Status::not_found(format!(
-                "Shard {} not found, error: {}",
-                request.shard_id, error
-            )));
+            return Err(tonic::Status::not_found(format!("Shard {} not found, error: {}", request.shard_id, error)));
         }
 
         let shard = shard_lookup.unwrap();
@@ -273,22 +233,12 @@ impl replication::replication_service_server::ReplicationService for Replication
 
         let shard_path = shard.path.clone();
         let chunk_size = request.chunk_size;
-        let ignored_segement_ids: HashMap<String, Vec<String>> = request
-            .existing_segment_ids
-            .iter()
-            .map(|(k, v)| (k.clone(), v.items.clone()))
-            .collect();
+        let ignored_segement_ids: HashMap<String, Vec<String>> =
+            request.existing_segment_ids.iter().map(|(k, v)| (k.clone(), v.items.clone())).collect();
 
         tokio::spawn(async move {
-            let result = replica_shard(
-                shard,
-                ignored_segement_ids,
-                chunk_size,
-                shard_path,
-                &generation_id,
-                sender,
-            )
-            .await;
+            let result =
+                replica_shard(shard, ignored_segement_ids, chunk_size, shard_path, &generation_id, sender).await;
 
             if let Err(error) = result {
                 error!("Error replicating shard: {}", error);

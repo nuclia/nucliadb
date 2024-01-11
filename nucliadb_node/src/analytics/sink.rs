@@ -49,11 +49,7 @@ pub struct HttpClient {
 
 impl HttpClient {
     pub fn try_new() -> Option<Self> {
-        let client = Client::builder()
-            .redirect(Policy::limited(3))
-            .timeout(Duration::from_secs(10))
-            .build()
-            .ok()?;
+        let client = Client::builder().redirect(Policy::limited(3)).timeout(Duration::from_secs(10)).build().ok()?;
         Some(HttpClient {
             client,
             endpoint: analytics_push_api_url(),
@@ -86,11 +82,8 @@ pub struct BlockingHttpClient {
 }
 impl BlockingHttpClient {
     pub fn try_new() -> Option<Self> {
-        let client = BlockingClient::builder()
-            .redirect(Policy::limited(3))
-            .timeout(Duration::from_secs(10))
-            .build()
-            .ok()?;
+        let client =
+            BlockingClient::builder().redirect(Policy::limited(3)).timeout(Duration::from_secs(10)).build().ok()?;
         Some(BlockingHttpClient {
             client,
             endpoint: analytics_push_api_url(),

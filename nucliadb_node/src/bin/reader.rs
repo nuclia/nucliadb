@@ -23,9 +23,7 @@ use std::time::Instant;
 use nucliadb_core::protos::node_reader_server::NodeReaderServer;
 use nucliadb_core::tracing::*;
 use nucliadb_core::{node_error, NodeResult};
-use nucliadb_node::grpc::middleware::{
-    GrpcDebugLogsLayer, GrpcInstrumentorLayer, GrpcTasksMetricsLayer,
-};
+use nucliadb_node::grpc::middleware::{GrpcDebugLogsLayer, GrpcInstrumentorLayer, GrpcTasksMetricsLayer};
 use nucliadb_node::grpc::reader::NodeReaderGRPCDriver;
 use nucliadb_node::http_server::run_http_server;
 use nucliadb_node::lifecycle;
@@ -62,10 +60,7 @@ async fn main() -> NodeResult<()> {
 
     let shutdown_notifier = Arc::new(Notify::new());
 
-    let grpc_task = tokio::spawn(start_grpc_service(
-        settings.clone(),
-        Arc::clone(&shutdown_notifier),
-    ));
+    let grpc_task = tokio::spawn(start_grpc_service(settings.clone(), Arc::clone(&shutdown_notifier)));
     let metrics_task = tokio::spawn(run_http_server(settings.clone()));
 
     info!("Bootstrap complete in: {:?}", start_bootstrap.elapsed());
@@ -113,15 +108,9 @@ async fn health_checker(mut health_reporter: HealthReporter, settings: Settings)
     }
 }
 
-pub async fn start_grpc_service(
-    settings: Settings,
-    shutdown_notifier: Arc<Notify>,
-) -> NodeResult<()> {
+pub async fn start_grpc_service(settings: Settings, shutdown_notifier: Arc<Notify>) -> NodeResult<()> {
     let listen_address = settings.reader_listen_address();
-    eprintln!(
-        "Reader listening for gRPC requests at: {:?}",
-        listen_address
-    );
+    eprintln!("Reader listening for gRPC requests at: {:?}", listen_address);
 
     let tracing_middleware = GrpcInstrumentorLayer;
     let debug_logs_middleware = GrpcDebugLogsLayer;

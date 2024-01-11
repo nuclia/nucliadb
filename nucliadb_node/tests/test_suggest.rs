@@ -28,8 +28,7 @@ use std::collections::HashMap;
 use common::{resources, NodeFixture, TestNodeReader};
 use itertools::Itertools;
 use nucliadb_core::protos::{
-    op_status, Filter, NewShardRequest, ReleaseChannel, SuggestFeatures, SuggestRequest,
-    SuggestResponse,
+    op_status, Filter, NewShardRequest, ReleaseChannel, SuggestFeatures, SuggestRequest, SuggestResponse,
 };
 use rstest::*;
 use tonic::Request;
@@ -38,8 +37,7 @@ use tonic::Request;
 #[awt]
 #[tokio::test]
 async fn test_suggest_paragraphs(
-    #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)]
-    _release_channel: ReleaseChannel,
+    #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)] _release_channel: ReleaseChannel,
     #[future]
     #[with(_release_channel)]
     suggest_shard: (NodeFixture, ShardDetails),
@@ -60,10 +58,7 @@ async fn test_suggest_paragraphs(
     // typo tolerant search
     expect_paragraphs(
         &suggest_paragraphs(&mut reader, &shard.id, "princes").await,
-        &[
-            (&shard.resources["little prince"], "/a/title"),
-            (&shard.resources["little prince"], "/a/summary"),
-        ],
+        &[(&shard.resources["little prince"], "/a/title"), (&shard.resources["little prince"], "/a/summary")],
     );
 
     // fuzzy search with distance 1 will only match 'a' from resource 2
@@ -73,10 +68,7 @@ async fn test_suggest_paragraphs(
     );
 
     // nonexistent term
-    expect_paragraphs(
-        &suggest_paragraphs(&mut reader, &shard.id, "Hanna Adrent").await,
-        &[],
-    );
+    expect_paragraphs(&suggest_paragraphs(&mut reader, &shard.id, "Hanna Adrent").await, &[]);
 
     // filter by field
     let response = reader
@@ -90,10 +82,7 @@ async fn test_suggest_paragraphs(
         .await
         .unwrap()
         .into_inner();
-    expect_paragraphs(
-        &response,
-        &[(&shard.resources["little prince"], "/a/title")],
-    );
+    expect_paragraphs(&response, &[(&shard.resources["little prince"], "/a/title")]);
 
     // filter by language (set as a label) - "prince" appears in english sources
     // but not in german ones
@@ -118,10 +107,7 @@ async fn test_suggest_paragraphs(
 
     expect_paragraphs(
         &response,
-        &[
-            (&shard.resources["little prince"], "/a/title"),
-            (&shard.resources["little prince"], "/a/summary"),
-        ],
+        &[(&shard.resources["little prince"], "/a/title"), (&shard.resources["little prince"], "/a/summary")],
     );
 
     let response = reader
@@ -145,8 +131,7 @@ async fn test_suggest_paragraphs(
 #[awt]
 #[tokio::test]
 async fn test_suggest_entities(
-    #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)]
-    _release_channel: ReleaseChannel,
+    #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)] _release_channel: ReleaseChannel,
     #[future]
     #[with(_release_channel)]
     suggest_shard: (NodeFixture, ShardDetails),
@@ -155,51 +140,24 @@ async fn test_suggest_entities(
     let mut reader = node.reader_client();
 
     // basic suggests
-    expect_entities(
-        &suggest_entities(&mut reader, &shard.id, "Ann").await,
-        &["Anna", "Anthony"],
-    );
+    expect_entities(&suggest_entities(&mut reader, &shard.id, "Ann").await, &["Anna", "Anthony"]);
 
-    expect_entities(
-        &suggest_entities(&mut reader, &shard.id, "joh").await,
-        &["John"],
-    );
+    expect_entities(&suggest_entities(&mut reader, &shard.id, "joh").await, &["John"]);
 
-    expect_entities(
-        &suggest_entities(&mut reader, &shard.id, "anyth").await,
-        &["Anthony"],
-    );
+    expect_entities(&suggest_entities(&mut reader, &shard.id, "anyth").await, &["Anthony"]);
 
-    expect_entities(
-        &suggest_entities(&mut reader, &shard.id, "anything").await,
-        &[],
-    );
+    expect_entities(&suggest_entities(&mut reader, &shard.id, "anything").await, &[]);
 
     // validate tokenization
-    expect_entities(
-        &suggest_entities(&mut reader, &shard.id, "barc").await,
-        &["Barcelona", "Bárcenas"],
-    );
+    expect_entities(&suggest_entities(&mut reader, &shard.id, "barc").await, &["Barcelona", "Bárcenas"]);
 
-    expect_entities(
-        &suggest_entities(&mut reader, &shard.id, "Barc").await,
-        &["Barcelona", "Bárcenas"],
-    );
+    expect_entities(&suggest_entities(&mut reader, &shard.id, "Barc").await, &["Barcelona", "Bárcenas"]);
 
-    expect_entities(
-        &suggest_entities(&mut reader, &shard.id, "BARC").await,
-        &["Barcelona", "Bárcenas"],
-    );
+    expect_entities(&suggest_entities(&mut reader, &shard.id, "BARC").await, &["Barcelona", "Bárcenas"]);
 
-    expect_entities(
-        &suggest_entities(&mut reader, &shard.id, "BÄRĈ").await,
-        &["Barcelona", "Bárcenas"],
-    );
+    expect_entities(&suggest_entities(&mut reader, &shard.id, "BÄRĈ").await, &["Barcelona", "Bárcenas"]);
 
-    expect_entities(
-        &suggest_entities(&mut reader, &shard.id, "BáRc").await,
-        &["Barcelona", "Bárcenas"],
-    );
+    expect_entities(&suggest_entities(&mut reader, &shard.id, "BáRc").await, &["Barcelona", "Bárcenas"]);
 
     // multiple words and result ordering
     let response = suggest_entities(&mut reader, &shard.id, "Solomon Isa").await;
@@ -210,10 +168,7 @@ async fn test_suggest_entities(
 
     // Does not find resources by UUID prefix
     let pap_uuid = &shard.resources["pap"];
-    expect_entities(
-        &suggest_entities(&mut reader, &shard.id, &pap_uuid[0..6]).await,
-        &[],
-    );
+    expect_entities(&suggest_entities(&mut reader, &shard.id, &pap_uuid[0..6]).await, &[]);
 
     Ok(())
 }
@@ -222,8 +177,7 @@ async fn test_suggest_entities(
 #[awt]
 #[tokio::test]
 async fn test_suggest_features(
-    #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)]
-    _release_channel: ReleaseChannel,
+    #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)] _release_channel: ReleaseChannel,
     #[future]
     #[with(_release_channel)]
     suggest_shard: (NodeFixture, ShardDetails),
@@ -239,10 +193,7 @@ async fn test_suggest_features(
 
     let response = suggest_paragraphs(&mut reader, &shard.id, "ann").await;
     assert!(response.entities.is_none());
-    expect_paragraphs(
-        &response,
-        &[(&shard.resources["little prince"], "/a/summary")],
-    );
+    expect_paragraphs(&response, &[(&shard.resources["little prince"], "/a/summary")]);
 
     let response = suggest_entities(&mut reader, &shard.id, "ann").await;
     assert_eq!(response.total, 0);
@@ -253,9 +204,7 @@ async fn test_suggest_features(
 }
 
 #[fixture]
-fn default_release_channel(
-    #[default(ReleaseChannel::Stable)] value: ReleaseChannel,
-) -> ReleaseChannel {
+fn default_release_channel(#[default(ReleaseChannel::Stable)] value: ReleaseChannel) -> ReleaseChannel {
     value
 }
 
@@ -278,10 +227,7 @@ async fn suggest_shard(
         release_channel: release_channel.into(),
         ..Default::default()
     });
-    let new_shard_response = writer
-        .new_shard(request)
-        .await
-        .expect("Unable to create new shard");
+    let new_shard_response = writer.new_shard(request).await.expect("Unable to create new shard");
     let shard_id = &new_shard_response.get_ref().id;
 
     let resources = [
@@ -323,23 +269,12 @@ async fn suggest_paragraphs(
 }
 
 fn expect_paragraphs(response: &SuggestResponse, expected: &[(&str, &str)]) {
-    assert_eq!(
-        response.total as usize,
-        expected.len(),
-        "\nfailed assert for \n'{:#?}'",
-        response
-    );
+    assert_eq!(response.total as usize, expected.len(), "\nfailed assert for \n'{:#?}'", response);
 
-    let results = response
-        .results
-        .iter()
-        .map(|result| (result.uuid.as_str(), result.field.as_str()))
-        .sorted();
+    let results = response.results.iter().map(|result| (result.uuid.as_str(), result.field.as_str())).sorted();
     results
         .zip(expected.iter().sorted())
-        .for_each(|(item, expected)| {
-            assert_eq!(item, *expected, "\nfailed assert for \n'{:#?}'", response)
-        });
+        .for_each(|(item, expected)| assert_eq!(item, *expected, "\nfailed assert for \n'{:#?}'", response));
 }
 
 async fn suggest_entities(
@@ -367,11 +302,6 @@ fn expect_entities(response: &SuggestResponse, expected: &[&str]) {
         expected,
     );
     for entity in expected {
-        assert!(response
-            .entities
-            .as_ref()
-            .unwrap()
-            .entities
-            .contains(&entity.to_string()));
+        assert!(response.entities.as_ref().unwrap().entities.contains(&entity.to_string()));
     }
 }

@@ -66,9 +66,8 @@ impl ShardReaderProvider for UnboundedShardReaderCache {
             return Err(node_error!("Shard {shard_path:?} is not on disk"));
         }
 
-        let shard = ShardReader::new(id.clone(), &shard_path).map_err(|error| {
-            node_error!("Shard {shard_path:?} could not be loaded from disk: {error:?}")
-        })?;
+        let shard = ShardReader::new(id.clone(), &shard_path)
+            .map_err(|error| node_error!("Shard {shard_path:?} could not be loaded from disk: {error:?}"))?;
 
         let shard = Arc::new(shard);
         cache_writer.insert(id, Arc::clone(&shard));

@@ -32,7 +32,9 @@ impl<S> Layer<S> for GrpcDebugLogsLayer {
     type Service = GrpcDebugLogs<S>;
 
     fn layer(&self, service: S) -> Self::Service {
-        GrpcDebugLogs { inner: service }
+        GrpcDebugLogs {
+            inner: service,
+        }
     }
 }
 

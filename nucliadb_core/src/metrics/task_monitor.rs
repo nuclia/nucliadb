@@ -61,9 +61,7 @@ impl MultiTaskMonitor {
                 }
             };
 
-            maybe_intervals
-                .and_then(|mut intervals| intervals.next())
-                .map(|metrics| (task_id, metrics))
+            maybe_intervals.and_then(|mut intervals| intervals.next()).map(|metrics| (task_id, metrics))
         })
     }
 }
@@ -80,13 +78,9 @@ impl<'a> Monitor<'a> {
         if !self.monitors.contains_key(&self.task_id) {
             let monitor = TaskMonitor::new();
             let intervals = Arc::new(RwLock::new(monitor.intervals()));
-            self.monitors
-                .insert(self.task_id.clone(), (monitor, intervals));
+            self.monitors.insert(self.task_id.clone(), (monitor, intervals));
         }
-        let monitor = self
-            .monitors
-            .get(&self.task_id)
-            .expect("Task existed or just inserted");
+        let monitor = self.monitors.get(&self.task_id).expect("Task existed or just inserted");
 
         monitor.0.instrument(task)
     }

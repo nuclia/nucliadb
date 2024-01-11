@@ -48,17 +48,12 @@ impl NodeDictionary {
         deunicode::deunicode(text).to_lowercase()
     }
     fn build_query(&self, text: &str) -> String {
-        let query = text
-            .split(' ')
-            .filter(|s| !s.is_empty())
-            .map(|s| regex::escape(s.trim()))
-            .join(r"\s+");
+        let query = text.split(' ').filter(|s| !s.is_empty()).map(|s| regex::escape(s.trim())).join(r"\s+");
         format!("(?im){query}.*")
     }
     fn new(path: &Path) -> RResult<NodeDictionary> {
-        let text_options = TextOptions::default()
-            .set_indexing_options(TextFieldIndexing::default().set_tokenizer("raw"))
-            .set_stored();
+        let text_options =
+            TextOptions::default().set_indexing_options(TextFieldIndexing::default().set_tokenizer("raw")).set_stored();
         let mut schema_builder = Schema::builder();
         let node_hash = schema_builder.add_text_field(Self::NODE_HASH, STRING | STORED);
         let node_value = schema_builder.add_text_field(Self::NODE_VALUE, text_options);
@@ -72,18 +67,12 @@ impl NodeDictionary {
     }
     pub fn new_writer(path: &Path) -> RResult<(NodeDictionary, IndexWriter)> {
         let dictionary = Self::new(path)?;
-        let writer = dictionary
-            .index
-            .writer_with_num_threads(Self::NUM_THREADS, Self::MEM_LIMIT)?;
+        let writer = dictionary.index.writer_with_num_threads(Self::NUM_THREADS, Self::MEM_LIMIT)?;
         Ok((dictionary, writer))
     }
     pub fn new_reader(path: &Path) -> RResult<(NodeDictionary, IndexReader)> {
         let dictionary = Self::new(path)?;
-        let reader = dictionary
-            .index
-            .reader_builder()
-            .reload_policy(ReloadPolicy::OnCommit)
-            .try_into()?;
+        let reader = dictionary.index.reader_builder().reload_policy(ReloadPolicy::OnCommit).try_into()?;
         Ok((dictionary, reader))
     }
     pub fn search(&self, reader: &IndexReader, query: &str) -> RResult<Vec<String>> {
@@ -96,11 +85,7 @@ impl NodeDictionary {
             .search(termq.as_ref(), &collector)?
             .into_iter()
             .flat_map(|d| searcher.doc(d).ok())
-            .flat_map(|d| {
-                d.get_first(self.node_hash)
-                    .and_then(|v| v.as_text())
-                    .map(|v| v.to_string())
-            })
+            .flat_map(|d| d.get_first(self.node_hash).and_then(|v| v.as_text()).map(|v| v.to_string()))
             .collect();
         Ok(results)
     }

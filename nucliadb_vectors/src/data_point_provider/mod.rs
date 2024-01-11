@@ -268,8 +268,7 @@ impl Index {
         std::mem::drop(state);
         std::mem::drop(date);
 
-        if matches!(self.merger_status, MergerStatus::Free) && work_stack_len > ALLOWED_BEFORE_MERGE
-        {
+        if matches!(self.merger_status, MergerStatus::Free) && work_stack_len > ALLOWED_BEFORE_MERGE {
             let location = self.location.clone();
             let similarity = self.metadata.similarity;
             let (sender, receiver) = channel::unbounded();
@@ -317,14 +316,7 @@ mod test {
 
         let empty_no_entries = std::fs::read_dir(&vectors_path)?.count();
         for _ in 0..10 {
-            DataPoint::new(
-                &vectors_path,
-                vec![],
-                None,
-                Similarity::Cosine,
-                Channel::EXPERIMENTAL,
-            )
-            .unwrap();
+            DataPoint::new(&vectors_path, vec![], None, Similarity::Cosine, Channel::EXPERIMENTAL).unwrap();
         }
 
         index.collect_garbage(&lock)?;

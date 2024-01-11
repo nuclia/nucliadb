@@ -24,15 +24,13 @@ use std::path::{Path, PathBuf};
 use crossbeam_utils::thread as crossbeam_thread;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos;
-use nucliadb_core::protos::shard_created::{
-    DocumentService, ParagraphService, RelationService, VectorService,
-};
+use nucliadb_core::protos::shard_created::{DocumentService, ParagraphService, RelationService, VectorService};
 use nucliadb_core::protos::{
-    DocumentSearchRequest, DocumentSearchResponse, EdgeList, GetShardRequest,
-    ParagraphSearchRequest, ParagraphSearchResponse, RelatedEntities, RelationPrefixSearchRequest,
-    RelationSearchRequest, RelationSearchResponse, SearchRequest, SearchResponse, Shard, ShardFile,
-    ShardFileChunk, ShardFileList, StreamRequest, SuggestFeatures, SuggestRequest, SuggestResponse,
-    TypeList, VectorSearchRequest, VectorSearchResponse,
+    DocumentSearchRequest, DocumentSearchResponse, EdgeList, GetShardRequest, ParagraphSearchRequest,
+    ParagraphSearchResponse, RelatedEntities, RelationPrefixSearchRequest, RelationSearchRequest,
+    RelationSearchResponse, SearchRequest, SearchResponse, Shard, ShardFile, ShardFileChunk, ShardFileList,
+    StreamRequest, SuggestFeatures, SuggestRequest, SuggestResponse, TypeList, VectorSearchRequest,
+    VectorSearchResponse,
 };
 use nucliadb_core::query_planner::QueryPlan;
 use nucliadb_core::thread::*;
@@ -320,12 +318,8 @@ impl ShardReader {
     pub fn suggest(&self, request: SuggestRequest) -> NodeResult<SuggestResponse> {
         let span = tracing::Span::current();
 
-        let suggest_paragraphs = request
-            .features
-            .contains(&(SuggestFeatures::Paragraphs as i32));
-        let suggest_entities = request
-            .features
-            .contains(&(SuggestFeatures::Entities as i32));
+        let suggest_paragraphs = request.features.contains(&(SuggestFeatures::Paragraphs as i32));
+        let suggest_entities = request.features.contains(&(SuggestFeatures::Entities as i32));
 
         let paragraphs_reader_service = self.paragraph_reader.clone();
         let relations_reader_service = self.relation_reader.clone();
@@ -339,24 +333,21 @@ impl ShardReader {
 
         let relation_task = suggest_entities.then(|| {
             let relation_task = move || {
-                let requests = prefixes
-                    .par_iter()
-                    .filter(|prefix| prefix.len() >= MIN_VIABLE_PREFIX_SUGGEST)
-                    .cloned()
-                    .map(|prefix| RelationSearchRequest {
-                        prefix: Some(RelationPrefixSearchRequest {
-                            prefix,
-                            node_filters: vec![RelationNodeFilter {
-                                node_type: NodeType::Entity.into(),
-                                ..Default::default()
-                            }],
-                        }),
-                        ..Default::default()
-                    });
+                let requests =
+                    prefixes.par_iter().filter(|prefix| prefix.len() >= MIN_VIABLE_PREFIX_SUGGEST).cloned().map(
+                        |prefix| RelationSearchRequest {
+                            prefix: Some(RelationPrefixSearchRequest {
+                                prefix,
+                                node_filters: vec![RelationNodeFilter {
+                                    node_type: NodeType::Entity.into(),
+                                    ..Default::default()
+                                }],
+                            }),
+                            ..Default::default()
+                        },
+                    );
 
-                let responses = requests
-                    .map(|request| relations_reader_service.search(&request))
-                    .collect::<Vec<_>>();
+                let responses = requests.map(|request| relations_reader_service.search(&request)).collect::<Vec<_>>();
 
                 let entities = responses
                     .into_iter()
@@ -500,27 +491,18 @@ impl ShardReader {
     #[tracing::instrument(skip_all)]
     pub fn document_iterator(&self, request: StreamRequest) -> NodeResult<DocumentIterator> {
         let span = tracing::Span::current();
-        run_with_telemetry(info_span!(parent: &span, "field iteration"), || {
-            self.text_reader.iterator(&request)
-        })
+        run_with_telemetry(info_span!(parent: &span, "field iteration"), || self.text_reader.iterator(&request))
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn download_file_iterator(
-        &self,
-        relative_path: String,
-    ) -> NodeResult<ShardFileChunkIterator> {
+    pub fn download_file_iterator(&self, relative_path: String) -> NodeResult<ShardFileChunkIterator> {
         let span = tracing::Span::current();
         run_with_telemetry(info_span!(parent: &span, "download file iteration"), || {
             ShardFileChunkIterator::new(self.root_path.join(relative_path), CHUNK_SIZE)
         })
     }
 
-    fn visit_directories(
-        &self,
-        path: PathBuf,
-        to_visit: &mut Vec<PathBuf>,
-    ) -> NodeResult<Vec<ShardFile>> {
+    fn visit_directories(&self, path: PathBuf, to_visit: &mut Vec<PathBuf>) -> NodeResult<Vec<ShardFile>> {
         let dir = fs::read_dir(path)?;
         let mut files = Vec::new();
 
@@ -552,14 +534,13 @@ impl ShardReader {
             files.append(&mut files_found);
         }
 
-        Ok(ShardFileList { files })
+        Ok(ShardFileList {
+            files,
+        })
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn paragraph_search(
-        &self,
-        search_request: ParagraphSearchRequest,
-    ) -> NodeResult<ParagraphSearchResponse> {
+    pub fn paragraph_search(&self, search_request: ParagraphSearchRequest) -> NodeResult<ParagraphSearchResponse> {
         let span = tracing::Span::current();
         run_with_telemetry(info_span!(parent: &span, "paragraph reader search"), || {
             self.paragraph_reader.search(&search_request)
@@ -567,10 +548,7 @@ impl ShardReader {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn document_search(
-        &self,
-        search_request: DocumentSearchRequest,
-    ) -> NodeResult<DocumentSearchResponse> {
+    pub fn document_search(&self, search_request: DocumentSearchRequest) -> NodeResult<DocumentSearchResponse> {
         let span = tracing::Span::current();
 
         run_with_telemetry(info_span!(parent: &span, "field reader search"), || {
@@ -579,10 +557,7 @@ impl ShardReader {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn vector_search(
-        &self,
-        search_request: VectorSearchRequest,
-    ) -> NodeResult<VectorSearchResponse> {
+    pub fn vector_search(&self, search_request: VectorSearchRequest) -> NodeResult<VectorSearchResponse> {
         let span = tracing::Span::current();
 
         run_with_telemetry(info_span!(parent: &span, "vector reader search"), || {
@@ -590,10 +565,7 @@ impl ShardReader {
         })
     }
     #[tracing::instrument(skip_all)]
-    pub fn relation_search(
-        &self,
-        search_request: RelationSearchRequest,
-    ) -> NodeResult<RelationSearchResponse> {
+    pub fn relation_search(&self, search_request: RelationSearchRequest) -> NodeResult<RelationSearchResponse> {
         let span = tracing::Span::current();
 
         run_with_telemetry(info_span!(parent: &span, "relation reader search"), || {

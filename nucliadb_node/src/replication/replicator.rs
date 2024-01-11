@@ -42,9 +42,7 @@ use crate::utils::{list_shards, set_primary_node_id};
 
 pub async fn replicate_shard(
     shard_state: replication::PrimaryShardReplicationState,
-    mut client: replication::replication_service_client::ReplicationServiceClient<
-        tonic::transport::Channel,
-    >,
+    mut client: replication::replication_service_client::ReplicationServiceClient<tonic::transport::Channel>,
     shard: Arc<ShardWriter>,
 ) -> NodeResult<()> {
     // do not allow gc while replicating
@@ -120,10 +118,7 @@ pub async fn replicate_shard(
             }
 
             std::fs::rename(temp_filepath.clone(), dest_filepath.clone())?;
-            debug!(
-                "Finished replicating file: {:?} to shard {:?}",
-                resp.filepath, shard_state.shard_id
-            );
+            debug!("Finished replicating file: {:?} to shard {:?}", resp.filepath, shard_state.shard_id);
 
             filepath = None;
             current_read_bytes = 0;
@@ -138,10 +133,7 @@ pub async fn replicate_shard(
         // After successful sync, set the generation id
         shard.metadata.set_generation_id(gen_id);
     } else {
-        warn!(
-            "No generation id received for shard: {:?}",
-            shard_state.shard_id
-        );
+        warn!("No generation id received for shard: {:?}", shard_state.shard_id);
     }
 
     // cleanup leftovers
@@ -155,9 +147,7 @@ pub async fn replicate_shard(
     // We only do this here because GC will not be done otherwise on a secondary
     // XXX this should be removed once we refactor gc/merging
     let sshard = Arc::clone(&shard); // moved shard for gc
-    tokio::task::spawn_blocking(move || sshard.gc())
-        .await?
-        .expect("GC failed");
+    tokio::task::spawn_blocking(move || sshard.gc()).await?.expect("GC failed");
 
     Ok(())
 }
@@ -176,7 +166,9 @@ impl ReplicateWorkerPool {
     }
 
     pub async fn add<F>(&mut self, worker: F) -> NodeResult<()>
-    where F: Future<Output = NodeResult<()>> + Send + 'static {
+    where
+        F: Future<Output = NodeResult<()>> + Send + 'static,
+    {
         let work_lock = Arc::clone(&self.work_lock);
         let permit = work_lock.acquire_owned().await.unwrap();
 
@@ -210,20 +202,15 @@ pub async fn connect_to_primary_and_replicate(
         primary_address = format!("http://{}", primary_address);
     }
     eprintln!("Connecting to primary: {:?}", primary_address);
-    let mut client = replication::replication_service_client::ReplicationServiceClient::connect(
-        primary_address.clone(),
-    )
-    .await?;
+    let mut client =
+        replication::replication_service_client::ReplicationServiceClient::connect(primary_address.clone()).await?;
     // .max_decoding_message_size(256 * 1024 * 1024)
     // .max_encoding_message_size(256 * 1024 * 1024);address);
 
     let repl_health_mng = ReplicationHealthManager::new(settings.clone());
     let metrics = metrics::get_metrics();
 
-    let primary_node_metadata = client
-        .get_metadata(Request::new(EmptyQuery {}))
-        .await?
-        .into_inner();
+    let primary_node_metadata = client.get_metadata(Request::new(EmptyQuery {})).await?.into_inner();
 
     set_primary_node_id(settings.data_path(), primary_node_metadata.node_id)?;
 
@@ -235,27 +222,22 @@ pub async fn connect_to_primary_and_replicate(
 
         let existing_shards = list_shards(settings.shards_path()).await;
         let mut shard_states = Vec::new();
-        let mut worker_pool =
-            ReplicateWorkerPool::new(settings.replication_max_concurrency() as usize);
+        let mut worker_pool = ReplicateWorkerPool::new(settings.replication_max_concurrency() as usize);
         for shard_id in existing_shards.clone() {
             if let Some(metadata) = shard_cache.get_metadata(shard_id.clone()) {
                 shard_states.push(replication::SecondaryShardReplicationState {
                     shard_id: shard_id.clone(),
-                    generation_id: metadata
-                        .get_generation_id()
-                        .unwrap_or("UNSET_SECONDARY".to_string()),
+                    generation_id: metadata.get_generation_id().unwrap_or("UNSET_SECONDARY".to_string()),
                 });
             }
         }
         debug!("Sending shard states: {:?}", shard_states.clone());
 
         let replication_state: replication::PrimaryCheckReplicationStateResponse = client
-            .check_replication_state(Request::new(
-                replication::SecondaryCheckReplicationStateRequest {
-                    secondary_id: secondary_id.clone(),
-                    shard_states,
-                },
-            ))
+            .check_replication_state(Request::new(replication::SecondaryCheckReplicationStateRequest {
+                secondary_id: secondary_id.clone(),
+                shard_states,
+            }))
             .await?
             .into_inner();
 
@@ -296,9 +278,7 @@ pub async fn connect_to_primary_and_replicate(
             let shard = shard_lookup?;
             let mut current_gen_id = "UNKNOWN".to_string();
             if let Some(metadata) = shard_cache.get_metadata(shard_id.clone()) {
-                current_gen_id = metadata
-                    .get_generation_id()
-                    .unwrap_or("UNSET_SECONDARY".to_string());
+                current_gen_id = metadata.get_generation_id().unwrap_or("UNSET_SECONDARY".to_string());
             }
 
             info!(
@@ -313,9 +293,7 @@ pub async fn connect_to_primary_and_replicate(
                 std::fs::remove_dir_all(replicate_work_path)?;
             }
 
-            worker_pool
-                .add(replicate_shard(shard_state, client.clone(), shard))
-                .await?;
+            worker_pool.add(replicate_shard(shard_state, client.clone(), shard)).await?;
             metrics.record_replication_op(replication_metrics::ReplicationOpsKey {
                 operation: "shard_replicated".to_string(),
             });
@@ -342,10 +320,7 @@ pub async fn connect_to_primary_and_replicate(
         //
         // 1. If we're healthy, we'll sleep for a while and check again.
         // 2. If backed up replicating, we'll try replicating again immediately and check again.
-        let elapsed = start
-            .elapsed()
-            .map(|elapsed| elapsed.as_secs_f64())
-            .expect("Error getting elapsed time");
+        let elapsed = start.elapsed().map(|elapsed| elapsed.as_secs_f64()).expect("Error getting elapsed time");
         if elapsed < settings.replication_healthy_delay() as f64 {
             // only update healthy marker if we're up-to-date in the configured healthy time
             repl_health_mng.update_healthy();
@@ -354,10 +329,7 @@ pub async fn connect_to_primary_and_replicate(
         if no_shards_to_sync && no_shards_to_remove {
             // if we have any changes, check again immediately
             // otherwise, wait for a bit
-            tokio::time::sleep(std::time::Duration::from_secs(
-                settings.replication_delay_seconds(),
-            ))
-            .await;
+            tokio::time::sleep(std::time::Duration::from_secs(settings.replication_delay_seconds())).await;
         }
     }
 }
@@ -384,13 +356,7 @@ pub async fn connect_to_primary_and_replicate_forever(
             return Ok(());
         }
 
-        error!(
-            "Error happened during replication. Will retry: {:?}",
-            result
-        );
-        tokio::time::sleep(std::time::Duration::from_secs(
-            settings.replication_delay_seconds(),
-        ))
-        .await;
+        error!("Error happened during replication. Will retry: {:?}", result);
+        tokio::time::sleep(std::time::Duration::from_secs(settings.replication_delay_seconds())).await;
     }
 }

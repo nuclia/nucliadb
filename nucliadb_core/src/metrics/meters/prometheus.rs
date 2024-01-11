@@ -61,9 +61,7 @@ impl Meter for PrometheusMeter {
 
     fn record_request_time(&self, metric: RequestTimeKey, value: RequestTimeValue) {
         debug!("{metric:?} : {value:?}");
-        self.request_time_metric
-            .get_or_create(&metric)
-            .observe(value);
+        self.request_time_metric.get_or_create(&metric).observe(value);
     }
 
     fn record_grpc_op(&self, method: GrpcOpKey, value: GrpcOpValue) {
@@ -75,9 +73,7 @@ impl Meter for PrometheusMeter {
     }
 
     fn record_replicated_bytes(&self, value: u64) {
-        self.replicated_bytes_metric
-            .get_or_create(&replication::ReplicatedBytesKey {})
-            .inc_by(value);
+        self.replicated_bytes_metric.get_or_create(&replication::ReplicatedBytesKey {}).inc_by(value);
     }
     fn record_replication_op(&self, key: replication::ReplicationOpsKey) {
         self.replication_ops_metric.get_or_create(&key).inc();

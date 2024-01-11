@@ -99,10 +99,8 @@ fn test_old_writer_test() -> NodeResult<()> {
     let reader = field_reader_service;
     let searcher = reader.reader.searcher();
 
-    let query = TermQuery::new(
-        Term::from_field_text(field_writer_service.schema.text, "document"),
-        IndexRecordOption::Basic,
-    );
+    let query =
+        TermQuery::new(Term::from_field_text(field_writer_service.schema.text, "document"), IndexRecordOption::Basic);
 
     let (_top_docs, count) = searcher.search(&query, &(TopDocs::with_limit(2), Count))?;
     assert_eq!(count, 1);

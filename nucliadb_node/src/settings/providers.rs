@@ -56,9 +56,7 @@ pub mod env {
                 builder.without_lazy_loading();
             }
 
-            if let Ok(Ok(max_shards)) =
-                std::env::var("MAX_NODE_REPLICAS").map(|v| v.parse::<usize>())
-            {
+            if let Ok(Ok(max_shards)) = std::env::var("MAX_NODE_REPLICAS").map(|v| v.parse::<usize>()) {
                 builder.max_shards_per_node(max_shards);
             }
 

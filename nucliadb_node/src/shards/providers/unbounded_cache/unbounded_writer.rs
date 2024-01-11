@@ -81,17 +81,11 @@ impl ShardWriterProvider for UnboundedShardWriterCache {
 
         // Avoid blocking while interacting with the file system
         if !ShardMetadata::exists(shard_path.clone()) {
-            return Err(node_error!(ShardNotFoundError(
-                "Shard {shard_path:?} is not on disk"
-            )));
+            return Err(node_error!(ShardNotFoundError("Shard {shard_path:?} is not on disk")));
         }
-        let sm = self
-            .metadata_manager
-            .get(id.clone())
-            .expect("Shard metadata not found. This should not happen.");
-        let shard = ShardWriter::open(sm).map_err(|error| {
-            node_error!("Shard {shard_path:?} could not be loaded from disk: {error:?}")
-        })?;
+        let sm = self.metadata_manager.get(id.clone()).expect("Shard metadata not found. This should not happen.");
+        let shard = ShardWriter::open(sm)
+            .map_err(|error| node_error!("Shard {shard_path:?} could not be loaded from disk: {error:?}"))?;
 
         let shard = Arc::new(shard);
         cache_writer.insert(id, Arc::clone(&shard));
@@ -106,10 +100,7 @@ impl ShardWriterProvider for UnboundedShardWriterCache {
             let shard_path = entry.path();
             let metadata = self.metadata_manager.get(shard_id.clone());
             if metadata.is_none() {
-                warn!(
-                    "Shard {shard_path:?} is not on disk",
-                    shard_path = shard_path
-                );
+                warn!("Shard {shard_path:?} is not on disk", shard_path = shard_path);
                 continue;
             }
             match ShardWriter::open(metadata.unwrap()) {
@@ -144,13 +135,8 @@ impl ShardWriterProvider for UnboundedShardWriterCache {
         let shard_path = disk_structure::shard_path_by_id(&self.shards_path.clone(), &id);
         let metadata = self.metadata_manager.get(id.clone());
         if metadata.is_none() {
-            warn!(
-                "Shard {shard_path:?} is not on disk",
-                shard_path = shard_path
-            );
-            return Err(node_error!(ShardNotFoundError(
-                "Shard {shard_path:?} is not on disk"
-            )));
+            warn!("Shard {shard_path:?} is not on disk", shard_path = shard_path);
+            return Err(node_error!(ShardNotFoundError("Shard {shard_path:?} is not on disk")));
         }
         let upgraded = ShardWriter::clean_and_create(metadata.unwrap())?;
         let details = ShardCleaned {

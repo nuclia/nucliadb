@@ -21,9 +21,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use nucliadb_core::prelude::*;
-use nucliadb_core::protos::shard_created::{
-    DocumentService, ParagraphService, RelationService, VectorService,
-};
+use nucliadb_core::protos::shard_created::{DocumentService, ParagraphService, RelationService, VectorService};
 use nucliadb_core::protos::{OpStatus, Resource, ResourceId, VectorSetId, VectorSimilarity};
 use nucliadb_core::tracing::{self, *};
 use nucliadb_core::{thread, IndexFiles};
@@ -64,10 +62,7 @@ impl ShardWriter {
         vsc: VectorConfig,
         rsc: RelationConfig,
     ) -> NodeResult<ShardWriter> {
-        let versions = Versions::load_or_create(
-            &metadata.shard_path().join(VERSION_FILE),
-            metadata.channel(),
-        )?;
+        let versions = Versions::load_or_create(&metadata.shard_path().join(VERSION_FILE), metadata.channel())?;
         let text_task = || Some(versions.get_texts_writer(&tsc));
         let paragraph_task = || Some(versions.get_paragraphs_writer(&psc));
         let vector_task = || Some(versions.get_vectors_writer(&vsc));
@@ -385,21 +380,15 @@ impl ShardWriter {
         let vectors = self.vector_writer.clone();
         let texts = self.text_writer.clone();
 
-        let count_fields = || {
-            run_with_telemetry(info_span!(parent: &span, "field count"), move || {
-                text_read(&texts).count()
-            })
-        };
+        let count_fields =
+            || run_with_telemetry(info_span!(parent: &span, "field count"), move || text_read(&texts).count());
         let count_paragraphs = || {
             run_with_telemetry(info_span!(parent: &span, "paragraph count"), move || {
                 paragraph_read(&paragraphs).count()
             })
         };
-        let count_vectors = || {
-            run_with_telemetry(info_span!(parent: &span, "vector count"), move || {
-                vector_read(&vectors).count()
-            })
-        };
+        let count_vectors =
+            || run_with_telemetry(info_span!(parent: &span, "vector count"), move || vector_read(&vectors).count());
 
         let mut field_count = Ok(0);
         let mut paragraph_count = Ok(0);
@@ -427,11 +416,7 @@ impl ShardWriter {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn add_vectorset(
-        &self,
-        setid: &VectorSetId,
-        similarity: VectorSimilarity,
-    ) -> NodeResult<()> {
+    pub fn add_vectorset(&self, setid: &VectorSetId, similarity: VectorSimilarity) -> NodeResult<()> {
         let mut writer = vector_write(&self.vector_writer);
         writer.add_vectorset(setid, similarity)?;
 
@@ -486,26 +471,14 @@ impl ShardWriter {
     pub fn get_shard_segments(&self) -> NodeResult<HashMap<String, Vec<String>>> {
         let mut segments = HashMap::new();
 
-        segments.insert(
-            "paragraph".to_string(),
-            paragraph_read(&self.paragraph_writer).get_segment_ids()?,
-        );
-        segments.insert(
-            "text".to_string(),
-            text_read(&self.text_writer).get_segment_ids()?,
-        );
-        segments.insert(
-            "vector".to_string(),
-            vector_read(&self.vector_writer).get_segment_ids()?,
-        );
+        segments.insert("paragraph".to_string(), paragraph_read(&self.paragraph_writer).get_segment_ids()?);
+        segments.insert("text".to_string(), text_read(&self.text_writer).get_segment_ids()?);
+        segments.insert("vector".to_string(), vector_read(&self.vector_writer).get_segment_ids()?);
 
         Ok(segments)
     }
 
-    pub fn get_shard_files(
-        &self,
-        ignored_segement_ids: &HashMap<String, Vec<String>>,
-    ) -> NodeResult<Vec<IndexFiles>> {
+    pub fn get_shard_files(&self, ignored_segement_ids: &HashMap<String, Vec<String>>) -> NodeResult<Vec<IndexFiles>> {
         let mut files = Vec::new();
         let _lock = self.write_lock.blocking_lock(); // need to make sure more writes don't happen while we are reading
 
@@ -514,8 +487,7 @@ impl ShardWriter {
                 .get_index_files(ignored_segement_ids.get("paragraph").unwrap_or(&Vec::new()))?,
         );
         files.push(
-            text_read(&self.text_writer)
-                .get_index_files(ignored_segement_ids.get("text").unwrap_or(&Vec::new()))?,
+            text_read(&self.text_writer).get_index_files(ignored_segement_ids.get("text").unwrap_or(&Vec::new()))?,
         );
         files.push(
             vector_read(&self.vector_writer)
@@ -538,12 +510,8 @@ pub enum GarbageCollectorStatus {
 impl From<GarbageCollectorStatus> for nucliadb_core::protos::garbage_collector_response::Status {
     fn from(value: GarbageCollectorStatus) -> Self {
         match value {
-            GarbageCollectorStatus::GarbageCollected => {
-                nucliadb_core::protos::garbage_collector_response::Status::Ok
-            }
-            GarbageCollectorStatus::TryLater => {
-                nucliadb_core::protos::garbage_collector_response::Status::TryLater
-            }
+            GarbageCollectorStatus::GarbageCollected => nucliadb_core::protos::garbage_collector_response::Status::Ok,
+            GarbageCollectorStatus::TryLater => nucliadb_core::protos::garbage_collector_response::Status::TryLater,
         }
     }
 }

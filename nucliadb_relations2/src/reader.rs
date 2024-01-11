@@ -46,10 +46,7 @@ pub struct RelationsReaderService {
 
 impl Debug for RelationsReaderService {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("FieldReaderService")
-            .field("index", &self.index)
-            .field("schema", &self.schema)
-            .finish()
+        f.debug_struct("FieldReaderService").field("index", &self.index).field("schema", &self.schema).finish()
     }
 }
 
@@ -87,7 +84,9 @@ impl RelationReader for RelationsReaderService {
                 edge_type,
             })
             .collect();
-        Ok(EdgeList { list })
+        Ok(EdgeList {
+            list,
+        })
     }
 
     #[measure(actor = "relations", metric = "get_node_types")]
@@ -118,7 +117,9 @@ impl RelationReader for RelationsReaderService {
                 with_subtype: raw_type.1,
             })
             .collect();
-        Ok(TypeList { list })
+        Ok(TypeList {
+            list,
+        })
     }
 }
 
@@ -161,10 +162,7 @@ impl RelationsReaderService {
         let field_schema = Schema::new();
         let index = Index::open_in_dir(&config.path)?;
 
-        let reader = index
-            .reader_builder()
-            .reload_policy(ReloadPolicy::OnCommit)
-            .try_into()?;
+        let reader = index.reader_builder().reload_policy(ReloadPolicy::OnCommit).try_into()?;
 
         Ok(RelationsReaderService {
             index,
@@ -174,10 +172,7 @@ impl RelationsReaderService {
     }
 
     #[tracing::instrument(skip_all)]
-    fn graph_search(
-        &self,
-        request: &RelationSearchRequest,
-    ) -> NodeResult<Option<EntitiesSubgraphResponse>> {
+    fn graph_search(&self, request: &RelationSearchRequest) -> NodeResult<Option<EntitiesSubgraphResponse>> {
         let Some(bfs_request) = request.subgraph.as_ref() else {
             return Ok(None);
         };
@@ -202,10 +197,8 @@ impl RelationsReaderService {
                 Term::from_field_text(self.schema.normalized_source_value, &normalized_value),
                 IndexRecordOption::Basic,
             );
-            let source_type_term = TermQuery::new(
-                Term::from_field_u64(self.schema.source_type, node_type),
-                IndexRecordOption::Basic,
-            );
+            let source_type_term =
+                TermQuery::new(Term::from_field_u64(self.schema.source_type, node_type), IndexRecordOption::Basic);
             let source_subtype_term = TermQuery::new(
                 Term::from_field_text(self.schema.source_subtype, node_subtype),
                 IndexRecordOption::Basic,
@@ -221,10 +214,8 @@ impl RelationsReaderService {
                 Term::from_field_text(self.schema.normalized_target_value, &normalized_value),
                 IndexRecordOption::Basic,
             );
-            let target_type_term = TermQuery::new(
-                Term::from_field_u64(self.schema.target_type, node_type),
-                IndexRecordOption::Basic,
-            );
+            let target_type_term =
+                TermQuery::new(Term::from_field_u64(self.schema.target_type, node_type), IndexRecordOption::Basic);
             let target_subtype_term = TermQuery::new(
                 Term::from_field_text(self.schema.target_subtype, node_subtype),
                 IndexRecordOption::Basic,
@@ -270,16 +261,14 @@ impl RelationsReaderService {
                 target_value_subqueries.push((Occur::Should, exclude_target_value));
             }
 
-            let source_value_filter: Box<dyn Query> =
-                Box::new(BooleanQuery::new(source_value_subqueries));
+            let source_value_filter: Box<dyn Query> = Box::new(BooleanQuery::new(source_value_subqueries));
             let source_exclusion_query: Box<dyn Query> = Box::new(BooleanQuery::new(vec![
                 (Occur::Must, source_subtype_filter),
                 (Occur::Must, source_value_filter),
             ]));
             queries.push((Occur::MustNot, source_exclusion_query));
 
-            let target_value_filter: Box<dyn Query> =
-                Box::new(BooleanQuery::new(target_value_subqueries));
+            let target_value_filter: Box<dyn Query> = Box::new(BooleanQuery::new(target_value_subqueries));
             let target_exclusion_query: Box<dyn Query> = Box::new(BooleanQuery::new(vec![
                 (Occur::Must, target_subtype_filter),
                 (Occur::Must, target_value_filter),
@@ -300,8 +289,7 @@ impl RelationsReaderService {
             excluded_subtype_queries.push((Occur::Should, exclude_from_source));
             excluded_subtype_queries.push((Occur::Should, exclude_from_target));
         }
-        let excluded_subtypes: Box<dyn Query> =
-            Box::new(BooleanQuery::new(excluded_subtype_queries));
+        let excluded_subtypes: Box<dyn Query> = Box::new(BooleanQuery::new(excluded_subtype_queries));
         queries.push((Occur::MustNot, excluded_subtypes));
 
         let query = BooleanQuery::from(queries);
@@ -319,10 +307,7 @@ impl RelationsReaderService {
     }
 
     #[tracing::instrument(skip_all)]
-    fn prefix_search(
-        &self,
-        request: &RelationSearchRequest,
-    ) -> NodeResult<Option<RelationPrefixSearchResponse>> {
+    fn prefix_search(&self, request: &RelationSearchRequest) -> NodeResult<Option<RelationPrefixSearchResponse>> {
         let Some(prefix_request) = request.prefix.as_ref() else {
             return Ok(None);
         };
@@ -345,14 +330,10 @@ impl RelationsReaderService {
             let node_subtype = node_filter.node_subtype();
             let node_type = io_maps::node_type_to_u64(node_filter.node_type());
 
-            let source_type_query: Box<dyn Query> = Box::new(TermQuery::new(
-                Term::from_field_u64(schema.source_type, node_type),
-                IndexRecordOption::Basic,
-            ));
-            let target_type_query: Box<dyn Query> = Box::new(TermQuery::new(
-                Term::from_field_u64(schema.target_type, node_type),
-                IndexRecordOption::Basic,
-            ));
+            let source_type_query: Box<dyn Query> =
+                Box::new(TermQuery::new(Term::from_field_u64(schema.source_type, node_type), IndexRecordOption::Basic));
+            let target_type_query: Box<dyn Query> =
+                Box::new(TermQuery::new(Term::from_field_u64(schema.target_type, node_type), IndexRecordOption::Basic));
             source_clause.push((Occur::Must, source_type_query));
             target_clause.push((Occur::Must, target_type_query));
 
@@ -398,14 +379,10 @@ impl RelationsReaderService {
             true,
         ));
 
-        let source_prefix_query = BooleanQuery::new(vec![
-            (Occur::Must, source_value_query),
-            (Occur::Must, source_typing_query),
-        ]);
-        let target_prefix_query = BooleanQuery::new(vec![
-            (Occur::Must, target_value_query),
-            (Occur::Must, target_typing_query),
-        ]);
+        let source_prefix_query =
+            BooleanQuery::new(vec![(Occur::Must, source_value_query), (Occur::Must, source_typing_query)]);
+        let target_prefix_query =
+            BooleanQuery::new(vec![(Occur::Must, target_value_query), (Occur::Must, target_typing_query)]);
 
         let mut response = RelationPrefixSearchResponse::default();
         let mut results = HashSet::new();
