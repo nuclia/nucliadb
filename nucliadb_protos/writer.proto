@@ -121,6 +121,8 @@ message BrokerMessage {
     resources.Extra extra = 37;
 
     repeated resources.FieldQuestionAnswerWrapper question_answers = 38;
+
+    utils.Security security = 39;
 }
 
 message BrokerMessageBlobReference {

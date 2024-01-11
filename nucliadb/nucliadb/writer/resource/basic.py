@@ -201,6 +201,10 @@ def parse_basic_modify(
         bm.basic.usermetadata.ClearField("relations")
         bm.basic.usermetadata.relations.extend(relations)
 
+    if item.security is not None:
+        unique_groups = list(set(item.security.access_groups))
+        bm.security.access_groups.extend(unique_groups)
+
 
 def parse_basic(bm: BrokerMessage, item: CreateResourcePayload, toprocess: PushPayload):
     bm.basic.created.FromDatetime(datetime.now())
