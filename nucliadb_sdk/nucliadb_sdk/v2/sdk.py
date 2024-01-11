@@ -85,6 +85,7 @@ from nucliadb_sdk.v2 import docstrings, exceptions
 class Region(enum.Enum):
     EUROPE1 = "europe-1"
     ON_PREM = "on-prem"
+    AWS_US_EAST_2_1 = "aws-us-east-2-1"
 
 
 class ChatResponse(BaseModel):
