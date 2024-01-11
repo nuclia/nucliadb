@@ -1,0 +1,136 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ingest-pull
+  labels:
+    app: ingest-pull
+    version: "{{ .Chart.Version | replace "+" "_" }}"
+    chart: "{{ .Chart.Name }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+spec:
+  replicas: {{ .Values.ingest_processed_consumer_replicaCount }}
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  selector:
+    matchLabels:
+      app: ingest-pull
+      release: "{{ .Release.Name }}"
+      heritage: "{{ .Release.Service }}"
+  template:
+    metadata:
+      name: ingest-pull
+      annotations:
+        traffic.sidecar.istio.io/excludeInboundPorts: "{{ .Values.serving.metricsPort }}"
+        traffic.sidecar.istio.io/excludeOutboundPorts: "{{.Values.services.maindb }},{{.Values.services.nats }},20160,2380"
+        # do not have access to dependency chart cm this component references
+        checksum/cm: {{ include (print $.Template.BasePath "/ingest.cm.yaml") . | sha256sum }}
+        {{- if hasKey .Values "extra_pod_annotations" }}
+{{ toYaml .Values.extra_pod_annotations | indent 8 }}
+        {{- end }}
+      labels:
+        app: ingest-pull
+        metrics: "enabled"
+        version: "{{ .Chart.Version | replace "+" "_" }}"
+        chart: "{{ .Chart.Name }}"
+        release: "{{ .Release.Name }}"
+        heritage: "{{ .Release.Service }}"
+    spec:
+      replicas: 1
+      topologySpreadConstraints:
+{{ toYaml .Values.topologySpreadConstraints | indent 8 }}
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 8 }}
+      affinity:
+{{ toYaml .Values.affinity | indent 8 }}
+      tolerations:
+{{ toYaml .Values.tolerations | indent 8 }}
+      serviceAccount: {{ ((.Values.ingest_processed_consumer).serviceAccount) | default "default" }}
+      dnsPolicy: ClusterFirst
+      containers:
+      - name: ingest-pull
+        image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
+        readinessProbe:
+          exec:
+            command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.serving.grpc }}"]
+          initialDelaySeconds: 10
+          periodSeconds: 20
+          timeoutSeconds: 5
+          failureThreshold: 3
+        livenessProbe:
+          exec:
+            command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.serving.grpc }}"]
+          initialDelaySeconds: 30
+          periodSeconds: 120
+          timeoutSeconds: 5
+          failureThreshold: 5
+        command: [
+          "nucliadb-pull"
+        ]
+        envFrom:
+        - configMapRef:
+            name: nucliadb-config
+        - configMapRef:
+            name: {{ .Release.Name }}-config
+        env:
+          - name: VERSION
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.labels['version']
+        {{- range $key, $value := .Values.env }}
+          - name: "{{ $key }}"
+            value: {{ tpl $value $ | toJson }}
+        {{- end }}
+        ports:
+        - name: grpc-ingest
+          containerPort: {{ .Values.serving.grpc }}
+        - name: metrics
+          containerPort: {{ .Values.serving.metricsPort }}
+        resources:
+{{ toYaml .Values.ingest_processed_consumer_resources | indent 10 }}
+{{- if .Values.nats.secretName }}
+        volumeMounts:
+          - name: nats-creds
+            readOnly: true
+            mountPath: /appsecrets
+{{- end }}
+{{- if .Values.nats.regionalSecretName }}
+          - name: regional-nats-creds
+            readOnly: true
+            mountPath: /regioncreds
+{{- end }}
+{{- if .Values.tracing.enabled }}
+      - name: jaeger-agent
+        image: jaegertracing/jaeger-agent:{{ .Values.tracing.jaegerAgentTag }}
+        imagePullPolicy: IfNotPresent
+        ports:
+          - containerPort: 5775
+            name: zk-compact-trft
+            protocol: UDP
+          - containerPort: 5778
+            name: config-rest
+            protocol: TCP
+          - containerPort: 6831
+            name: jg-compact-trft
+            protocol: UDP
+          - containerPort: 6832
+            name: jg-binary-trft
+            protocol: UDP
+          - containerPort: 14271
+            name: admin-http
+            protocol: TCP
+        args:
+          - --reporter.grpc.host-port=dns:///{{ .Values.tracing.jaegerCollectorHost }}:{{ .Values.tracing.jaegerCollectorGrpcPort }}
+          - --reporter.type=grpc
+{{- end }}
+{{- if .Values.nats.secretName }}
+      volumes:
+      - name: nats-creds
+        secret:
+          secretName: {{ .Values.nats.secretName }}
+{{- end }}
+{{- if .Values.nats.regionalSecretName }}
+      - name: regional-nats-creds
+        secret:
+          secretName: {{ .Values.nats.regionalSecretName }}
+{{- end }}
