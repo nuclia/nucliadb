@@ -26,6 +26,8 @@ use nucliadb_core::{node_error, NodeResult};
 
 use crate::disk_structure;
 use crate::settings::Settings;
+use crate::shards::errors::ShardNotFoundError;
+use crate::shards::metadata::ShardMetadata;
 use crate::shards::providers::ShardReaderProvider;
 use crate::shards::reader::ShardReader;
 use crate::shards::ShardId;
@@ -39,7 +41,9 @@ pub struct UnboundedShardReaderCache {
 impl UnboundedShardReaderCache {
     pub fn new(settings: Settings) -> Self {
         Self {
-            cache: RwLock::new(HashMap::new()),
+            // NOTE: we use max shards per node as initial capacity to avoid
+            // hashmap resizing, as it would hold the lock while doing it.
+            cache: RwLock::new(HashMap::with_capacity(settings.max_shards_per_node())),
             shards_path: settings.shards_path(),
         }
     }
@@ -59,13 +63,15 @@ impl ShardReaderProvider for UnboundedShardReaderCache {
         let mut cache_writer = self.write();
 
         if let Some(shard) = cache_writer.get(&id) {
+            debug!("Shard {shard_path:?} is already on memory");
             return Ok(Arc::clone(shard));
         }
 
-        if !shard_path.is_dir() {
-            return Err(node_error!("Shard {shard_path:?} is not on disk"));
+        if !ShardMetadata::exists(&shard_path) {
+            return Err(node_error!(ShardNotFoundError(
+                "Shard {shard_path:?} is not on disk"
+            )));
         }
-
         let shard = ShardReader::new(id.clone(), &shard_path).map_err(|error| {
             node_error!("Shard {shard_path:?} could not be loaded from disk: {error:?}")
         })?;
@@ -79,19 +85,20 @@ impl ShardReaderProvider for UnboundedShardReaderCache {
     fn load_all(&self) -> NodeResult<()> {
         let mut cache = self.write();
         let shards_path = self.shards_path.clone();
-        debug!("Recovering shards from {shards_path:?}...");
+
         for entry in std::fs::read_dir(&shards_path)? {
             let entry = entry?;
             let file_name = entry.file_name().to_str().unwrap().to_string();
             let shard_path = entry.path();
             match ShardReader::new(file_name.clone(), &shard_path) {
-                Err(err) => error!("Loading {shard_path:?} raised {err}"),
+                Err(err) => error!("Loading shard {shard_path:?} from disk raised {err}"),
                 Ok(shard) => {
                     debug!("Shard loaded: {shard_path:?}");
                     cache.insert(file_name, Arc::new(shard));
                 }
             }
         }
+
         Ok(())
     }
 

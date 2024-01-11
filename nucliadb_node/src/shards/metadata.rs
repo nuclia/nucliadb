@@ -132,7 +132,7 @@ impl ShardMetadata {
             generation_id: RwLock::new(None),
         }
     }
-    pub fn exists(shard_path: PathBuf) -> bool {
+    pub fn exists(shard_path: &PathBuf) -> bool {
         let metadata_path = shard_path.join(disk_structure::METADATA_FILE);
         metadata_path.exists()
     }
@@ -237,7 +237,7 @@ impl ShardsMetadataManager {
             }
         }
         let shard_path = disk_structure::shard_path_by_id(&self.shards_path, &shard_id);
-        if !ShardMetadata::exists(shard_path.clone()) {
+        if !ShardMetadata::exists(&shard_path) {
             return None;
         }
         let sm = ShardMetadata::open(shard_path);
@@ -275,7 +275,7 @@ mod test {
     #[test]
     fn open_empty() {
         let dir = TempDir::new().unwrap();
-        assert!(!ShardMetadata::exists(dir.path().to_path_buf()));
+        assert!(!ShardMetadata::exists(&dir.path().to_path_buf()));
         let meta = ShardMetadata::open(dir.path().to_path_buf());
         assert!(meta.is_err());
     }

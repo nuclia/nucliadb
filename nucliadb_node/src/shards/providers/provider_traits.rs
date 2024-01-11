@@ -19,7 +19,6 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use nucliadb_core::protos::ShardCleaned;
 use nucliadb_core::NodeResult;
 
@@ -35,14 +34,6 @@ pub trait ShardReaderProvider: Send + Sync {
     fn get(&self, id: ShardId) -> Option<Arc<ShardReader>>;
 }
 
-#[async_trait]
-pub trait AsyncShardReaderProvider: Send + Sync {
-    async fn load(&self, id: ShardId) -> NodeResult<Arc<ShardReader>>;
-    async fn load_all(&self) -> NodeResult<()>;
-
-    async fn get(&self, id: ShardId) -> Option<Arc<ShardReader>>;
-}
-
 pub trait ShardWriterProvider {
     fn load(&self, id: ShardId) -> NodeResult<Arc<ShardWriter>>;
     fn load_all(&self) -> NodeResult<()>;
@@ -52,20 +43,6 @@ pub trait ShardWriterProvider {
     fn delete(&self, id: ShardId) -> NodeResult<()>;
 
     fn upgrade(&self, id: ShardId) -> NodeResult<ShardCleaned>;
-
-    fn get_metadata(&self, id: ShardId) -> Option<Arc<ShardMetadata>>;
-}
-
-#[async_trait]
-pub trait AsyncShardWriterProvider {
-    async fn load(&self, id: ShardId) -> NodeResult<Arc<ShardWriter>>;
-    async fn load_all(&self) -> NodeResult<()>;
-
-    async fn create(&self, metadata: ShardMetadata) -> NodeResult<Arc<ShardWriter>>;
-    async fn get(&self, id: ShardId) -> Option<Arc<ShardWriter>>;
-    async fn delete(&self, id: ShardId) -> NodeResult<()>;
-
-    async fn upgrade(&self, id: ShardId) -> NodeResult<ShardCleaned>;
 
     fn get_metadata(&self, id: ShardId) -> Option<Arc<ShardMetadata>>;
 }

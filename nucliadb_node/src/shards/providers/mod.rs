@@ -26,6 +26,4 @@
 mod provider_traits;
 pub mod unbounded_cache;
 
-pub use provider_traits::{
-    AsyncShardReaderProvider, AsyncShardWriterProvider, ShardReaderProvider, ShardWriterProvider,
-};
+pub use provider_traits::{ShardReaderProvider, ShardWriterProvider};
