@@ -31,7 +31,6 @@ use nucliadb_core::protos::{
     op_status, Filter, NewShardRequest, ReleaseChannel, SuggestFeatures, SuggestRequest,
     SuggestResponse,
 };
-use nucliadb_protos::utils::relation_node::NodeType;
 use rstest::*;
 use tonic::Request;
 
@@ -158,7 +157,7 @@ async fn test_suggest_entities(
     // basic suggests
     expect_entities(
         &suggest_entities(&mut reader, &shard.id, "Ann").await,
-        &["Anastasia", "Anna", "Anthony"],
+        &["Anna", "Anthony"],
     );
 
     expect_entities(
@@ -216,15 +215,6 @@ async fn test_suggest_entities(
         &[],
     );
 
-    // This is just here to make compilation fail if adding a new NodeType and to remind you to
-    // update the filter in ShardReader::suggest so it searches for all node types except Resource
-    match NodeType::Entity {
-        NodeType::Entity => {}
-        NodeType::Label => {}
-        NodeType::Resource => {}
-        NodeType::User => {}
-    };
-
     Ok(())
 }
 
@@ -257,7 +247,7 @@ async fn test_suggest_features(
     let response = suggest_entities(&mut reader, &shard.id, "ann").await;
     assert_eq!(response.total, 0);
     assert!(response.results.is_empty());
-    expect_entities(&response, &["Anastasia", "Anna", "Anthony"]);
+    expect_entities(&response, &["Anna", "Anthony"]);
 
     Ok(())
 }

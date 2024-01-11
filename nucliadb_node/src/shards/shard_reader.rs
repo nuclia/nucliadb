@@ -344,24 +344,12 @@ impl ShardReader {
                     .filter(|prefix| prefix.len() >= MIN_VIABLE_PREFIX_SUGGEST)
                     .cloned()
                     .map(|prefix| RelationSearchRequest {
-                        shard_id: String::default(), // REVIEW: really?
                         prefix: Some(RelationPrefixSearchRequest {
                             prefix,
-                            // Any type that is not Resource (avoid suggesting resource UUIDs)
-                            node_filters: vec![
-                                RelationNodeFilter {
-                                    node_type: NodeType::Entity.into(),
-                                    ..Default::default()
-                                },
-                                RelationNodeFilter {
-                                    node_type: NodeType::Label.into(),
-                                    ..Default::default()
-                                },
-                                RelationNodeFilter {
-                                    node_type: NodeType::User.into(),
-                                    ..Default::default()
-                                },
-                            ],
+                            node_filters: vec![RelationNodeFilter {
+                                node_type: NodeType::Entity.into(),
+                                ..Default::default()
+                            }],
                         }),
                         ..Default::default()
                     });
