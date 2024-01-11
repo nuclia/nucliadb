@@ -27,7 +27,7 @@ botocore<1.30.0
 google-cloud-storage
 gcloud
 oauth2client
-jwcrypto>=1.5.0
+jwcrypto>=1.5.1
 
 fastapi-versioning>=0.10.0
 # At some point FastAPI will drop support for pydantic v1
