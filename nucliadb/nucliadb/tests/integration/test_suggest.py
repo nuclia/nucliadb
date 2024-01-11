@@ -216,7 +216,7 @@ async def test_suggest_related_entities(
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=Ann")
     assert resp.status_code == 200
     body = resp.json()
-    assert set(body["entities"]["entities"]) == {"Anastasia", "Anna", "Anthony"}
+    assert set(body["entities"]["entities"]) == {"Anna", "Anthony"}
 
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=joh")
     assert resp.status_code == 200
@@ -259,7 +259,7 @@ async def test_suggest_related_entities(
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=Solomon+Is")
     assert resp.status_code == 200
     body = resp.json()
-    assert set(body["entities"]["entities"]) == {"Solomon Islands", "Israel", "Irene"}
+    assert set(body["entities"]["entities"]) == {"Solomon Islands", "Israel"}
 
 
 @pytest.mark.asyncio
@@ -349,7 +349,7 @@ async def test_suggest_features(
         }
 
     def assert_expected_entities(response):
-        expected = {"Anastasia", "Anna", "Anthony"}
+        expected = {"Anna", "Anthony"}
         assert response["entities"]["total"] == len(expected)
         assert set(response["entities"]["entities"]) == expected
 

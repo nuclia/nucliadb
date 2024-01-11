@@ -157,7 +157,7 @@ async fn test_suggest_entities(
     // basic suggests
     expect_entities(
         &suggest_entities(&mut reader, &shard.id, "Ann").await,
-        &["Anastasia", "Anna", "Anthony"],
+        &["Anna", "Anthony"],
     );
 
     expect_entities(
@@ -208,6 +208,13 @@ async fn test_suggest_entities(
     assert!(response.entities.as_ref().unwrap().entities[0] == *"Solomon Islands");
     assert!(response.entities.as_ref().unwrap().entities[1] == *"Israel");
 
+    // Does not find resources by UUID prefix
+    let pap_uuid = &shard.resources["pap"];
+    expect_entities(
+        &suggest_entities(&mut reader, &shard.id, &pap_uuid[0..6]).await,
+        &[],
+    );
+
     Ok(())
 }
 
@@ -240,7 +247,7 @@ async fn test_suggest_features(
     let response = suggest_entities(&mut reader, &shard.id, "ann").await;
     assert_eq!(response.total, 0);
     assert!(response.results.is_empty());
-    expect_entities(&response, &["Anastasia", "Anna", "Anthony"]);
+    expect_entities(&response, &["Anna", "Anthony"]);
 
     Ok(())
 }

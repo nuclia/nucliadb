@@ -38,6 +38,8 @@ use nucliadb_core::query_planner::QueryPlan;
 use nucliadb_core::thread::*;
 use nucliadb_core::tracing::{self, *};
 use nucliadb_procs::measure;
+use nucliadb_protos::nodereader::RelationNodeFilter;
+use nucliadb_protos::utils::relation_node::NodeType;
 
 use crate::disk_structure::*;
 use crate::shards::metadata::ShardMetadata;
@@ -342,10 +344,12 @@ impl ShardReader {
                     .filter(|prefix| prefix.len() >= MIN_VIABLE_PREFIX_SUGGEST)
                     .cloned()
                     .map(|prefix| RelationSearchRequest {
-                        shard_id: String::default(), // REVIEW: really?
                         prefix: Some(RelationPrefixSearchRequest {
                             prefix,
-                            ..Default::default()
+                            node_filters: vec![RelationNodeFilter {
+                                node_type: NodeType::Entity.into(),
+                                ..Default::default()
+                            }],
                         }),
                         ..Default::default()
                     });
