@@ -122,7 +122,8 @@ from nucliadb_utils.utilities import (
 
 class WriterServicer(writer_pb2_grpc.WriterServicer):
     def __init__(self):
-        self.partitions = settings.partitions
+        # Hardcoded partition as the grpc writer service is not reading from any stream
+        self.partition = "0"
 
     async def initialize(self):
         self.storage = await get_storage(service_name=SERVICE_NAME)
@@ -267,7 +268,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         async for message in request_stream:
             try:
                 await self.proc.process(
-                    message, -1, partition=self.partitions[0], transaction_check=False
+                    message, -1, partition=self.partition, transaction_check=False
                 )
             except Exception:
                 logger.exception("Error processing", stack_info=True)
