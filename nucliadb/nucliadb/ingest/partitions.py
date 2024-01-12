@@ -40,7 +40,9 @@ def assign_partitions(settings: Settings):
                     settings.replica_number = int(sts_values[-1])
                 except Exception as ex:
                     errors.capture_exception(ex)
-                    logger.error(f"Could not extract replica number from hostname: {hostname}")
+                    logger.error(
+                        f"Could not extract replica number from hostname: {hostname}"
+                    )
                     pass
 
         if settings.replica_number == -1:

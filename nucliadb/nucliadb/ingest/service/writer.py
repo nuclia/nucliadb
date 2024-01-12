@@ -817,7 +817,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                         shard,
                         brain.brain,
                         0,
-                        partition=self.partitions[0],
+                        partition=self.partition,
                         kb=request.kbid,
                         reindex_id=uuid.uuid4().hex,
                     )
