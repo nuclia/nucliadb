@@ -174,3 +174,36 @@ def test_choose_node():
         )
 
     manager.INDEX_NODES.clear()
+
+
+def test_get_index_nodes():
+    manager.INDEX_NODES.clear()
+    # Add a primary node
+    manager.add_index_node(
+        id="node-0",
+        address="nohost",
+        shard_count=0,
+        dummy=True,
+    )
+    # Add a secondary replica of node-0
+    manager.add_index_node(
+        id="node-1",
+        address="nohost",
+        shard_count=0,
+        dummy=True,
+        primary_id="node-0",
+    )
+
+    # By default, only primary nodes are returned
+    nodes = manager.get_index_nodes()
+    assert len(nodes) == 1
+    assert nodes[0].id == "node-0"
+
+    # If we ask for secondary, we get both
+    nodes = manager.get_index_nodes(include_secundary=True)
+    assert len(nodes) == 2
+    sorted(nodes, key=lambda x: x.id)
+    assert nodes[0].id == "node-0"
+    assert nodes[1].id == "node-1"
+
+    manager.INDEX_NODES.clear()

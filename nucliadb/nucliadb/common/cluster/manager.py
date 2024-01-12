@@ -63,8 +63,11 @@ INDEX_NODES: dict[str, AbstractIndexNode] = {}
 READ_REPLICA_INDEX_NODES: dict[str, set[str]] = {}
 
 
-def get_index_nodes() -> list[AbstractIndexNode]:
-    return [inode for inode in INDEX_NODES.values() if inode.primary_id is None]
+def get_index_nodes(include_secundary: bool = False) -> list[AbstractIndexNode]:
+    all_nodes = [inode for inode in INDEX_NODES.values()]
+    if not include_secundary:
+        return [inode for inode in all_nodes if inode.primary_id is None]
+    return all_nodes
 
 
 def get_index_node(node_id: str) -> Optional[AbstractIndexNode]:

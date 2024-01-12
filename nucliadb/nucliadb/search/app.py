@@ -116,8 +116,9 @@ async def node_members(request: Request) -> JSONResponse:
                 "type": node.label,
                 "shard_count": node.shard_count,
                 "dummy": node.dummy,
+                "primary_id": node.primary_id,
             }
-            for node in manager.get_index_nodes()
+            for node in manager.get_index_nodes(include_secundary=True)
         ]
     )
 
