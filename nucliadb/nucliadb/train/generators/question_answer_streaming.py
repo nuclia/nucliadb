@@ -105,10 +105,18 @@ async def iter_stream_items(
     question_answer_pb: QuestionAnswer,
 ) -> AsyncGenerator[QuestionAnswerStreamItem, None]:
     question_pb = question_answer_pb.question
-    question_paragraphs = [
-        await get_paragraph(kbid, paragraph_id)
-        for paragraph_id in question_pb.ids_paragraphs
-    ]
+    question_paragraphs = []
+    for paragraph_id in question_pb.ids_paragraphs:
+        try:
+            text = await get_paragraph(kbid, paragraph_id)
+        except Exception as exc: # pragma: nocover
+            logger.warning("Question paragraph couldn't be fetched while streaming Q&A", extra={
+                "kbid": kbid,
+                "paragraph_id": paragraph_id
+            })
+        else:
+            if text:
+                question_paragraphs.append(text)
     for answer_pb in question_answer_pb.answers:
         item = QuestionAnswerStreamItem()
         item.question.text = question_pb.text
@@ -116,12 +124,17 @@ async def iter_stream_items(
         item.question.paragraphs.extend(question_paragraphs)
         item.answer.text = answer_pb.text
         item.answer.language = answer_pb.language
-        item.answer.paragraphs.extend(
-            [
-                await get_paragraph(kbid, paragraph_id)
-                for paragraph_id in answer_pb.ids_paragraphs
-            ]
-        )
+        for paragraph_id in answer_pb.ids_paragraphs:
+            try:
+                text = await get_paragraph(kbid, paragraph_id)
+            except Exception as exc: # pragma: nocover
+                logger.warning("Answer paragraph couldn't be fetched while streaming Q&A", extra={
+                    "kbid": kbid,
+                    "paragraph_id": paragraph_id
+                })
+            else:
+                if text:
+                    item.answer.paragraphs.append(text)
         yield item
 
 
