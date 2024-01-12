@@ -113,6 +113,7 @@ async def iter_stream_items(
             logger.warning(
                 "Question paragraph couldn't be fetched while streaming Q&A",
                 extra={"kbid": kbid, "paragraph_id": paragraph_id},
+                exc_info=exc,
             )
         else:
             if text:
@@ -131,6 +132,7 @@ async def iter_stream_items(
                 logger.warning(
                     "Answer paragraph couldn't be fetched while streaming Q&A",
                     extra={"kbid": kbid, "paragraph_id": paragraph_id},
+                    exc_info=exc,
                 )
             else:
                 if text:
