@@ -178,13 +178,21 @@ def test_choose_node():
 
 
 @pytest.fixture(scope="function")
+def standalone_mode_off():
+    prev = settings.standalone_mode
+    settings.standalone_mode = False
+    yield
+    settings.standalone_mode = prev
+
+
+@pytest.fixture(scope="function")
 def index_nodes():
     index_nodes = {}
     with mock.patch.object(manager, "INDEX_NODES", new=index_nodes):
         yield index_nodes
 
 
-def test_get_index_nodes(index_nodes):
+def test_get_index_nodes(standalone_mode_off, index_nodes):
     # Add a primary node
     manager.add_index_node(
         id="node-0",
