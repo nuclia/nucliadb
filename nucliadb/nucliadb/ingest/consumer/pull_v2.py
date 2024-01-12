@@ -38,6 +38,8 @@ from nucliadb_utils.settings import nuclia_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_storage, get_transaction_utility
 
+DB_TXN_KEY = "pull/cursor"
+
 
 class PullWorkerV2:
     """
@@ -57,6 +59,7 @@ class PullWorkerV2:
         local_subscriber: bool = False,
         pull_time_empty_backoff: float = 5.0,
     ):
+        self.driver = driver
         self.pull_time_error_backoff = pull_time_error_backoff
         self.pull_time_empty_backoff = pull_time_empty_backoff
         self.local_subscriber = local_subscriber
@@ -135,6 +138,11 @@ class PullWorkerV2:
             headers["X-STF-NUAKEY"] = f"Bearer {nuclia_settings.nuclia_service_account}"
 
         cursor = None
+        async with self.driver.transaction() as txn:
+            val = await txn.get(DB_TXN_KEY)
+            if val is not None:
+                cursor = val.decode()
+
         async with ProcessingV2HTTPClient() as processing_http_client:
             logger.info(f"Collecting from NucliaDB Cloud")
             while True:
@@ -145,6 +153,8 @@ class PullWorkerV2:
                         for result in data.results:
                             await self.handle_message(result.payload)
                         cursor = data.cursor
+                        async with self.driver.transaction() as txn:
+                            await txn.set(DB_TXN_KEY, cursor.encode())
                         await asyncio.sleep(self.pull_time_empty_backoff)
                     else:
                         await asyncio.sleep(self.pull_time_empty_backoff)
