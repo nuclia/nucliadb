@@ -118,7 +118,7 @@ async def node_members(request: Request) -> JSONResponse:
                 "dummy": node.dummy,
                 "primary_id": node.primary_id,
             }
-            for node in manager.get_index_nodes(include_secundary=True)
+            for node in manager.get_index_nodes(include_secondary=True)
         ]
     )
 

@@ -200,7 +200,7 @@ def test_get_index_nodes():
     assert nodes[0].id == "node-0"
 
     # If we ask for secondary, we get both
-    nodes = manager.get_index_nodes(include_secundary=True)
+    nodes = manager.get_index_nodes(include_secondary=True)
     assert len(nodes) == 2
     sorted(nodes, key=lambda x: x.id)
     assert nodes[0].id == "node-0"
