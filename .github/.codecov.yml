@@ -6,7 +6,6 @@ coverage:
         threshold: 1%
     patch: off
 ignore:
-  - "nucliadb_client/examples/"
   - "**/setup.py"
   - "**/tests/**"
   - "**/test_*.py"
