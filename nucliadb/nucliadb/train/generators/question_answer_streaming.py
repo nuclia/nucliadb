@@ -109,11 +109,11 @@ async def iter_stream_items(
     for paragraph_id in question_pb.ids_paragraphs:
         try:
             text = await get_paragraph(kbid, paragraph_id)
-        except Exception as exc: # pragma: nocover
-            logger.warning("Question paragraph couldn't be fetched while streaming Q&A", extra={
-                "kbid": kbid,
-                "paragraph_id": paragraph_id
-            })
+        except Exception as exc:  # pragma: nocover
+            logger.warning(
+                "Question paragraph couldn't be fetched while streaming Q&A",
+                extra={"kbid": kbid, "paragraph_id": paragraph_id},
+            )
         else:
             if text:
                 question_paragraphs.append(text)
@@ -127,11 +127,11 @@ async def iter_stream_items(
         for paragraph_id in answer_pb.ids_paragraphs:
             try:
                 text = await get_paragraph(kbid, paragraph_id)
-            except Exception as exc: # pragma: nocover
-                logger.warning("Answer paragraph couldn't be fetched while streaming Q&A", extra={
-                    "kbid": kbid,
-                    "paragraph_id": paragraph_id
-                })
+            except Exception as exc:  # pragma: nocover
+                logger.warning(
+                    "Answer paragraph couldn't be fetched while streaming Q&A",
+                    extra={"kbid": kbid, "paragraph_id": paragraph_id},
+                )
             else:
                 if text:
                     item.answer.paragraphs.append(text)
