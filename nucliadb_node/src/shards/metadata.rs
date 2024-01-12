@@ -20,7 +20,7 @@
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
 use nucliadb_core::{node_error, protos, Channel, NodeResult};
@@ -132,7 +132,7 @@ impl ShardMetadata {
             generation_id: RwLock::new(None),
         }
     }
-    pub fn exists(shard_path: &PathBuf) -> bool {
+    pub fn exists(shard_path: &Path) -> bool {
         let metadata_path = shard_path.join(disk_structure::METADATA_FILE);
         metadata_path.exists()
     }
@@ -275,7 +275,7 @@ mod test {
     #[test]
     fn open_empty() {
         let dir = TempDir::new().unwrap();
-        assert!(!ShardMetadata::exists(&dir.path().to_path_buf()));
+        assert!(!ShardMetadata::exists(dir.path()));
         let meta = ShardMetadata::open(dir.path().to_path_buf());
         assert!(meta.is_err());
     }

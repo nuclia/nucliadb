@@ -67,7 +67,7 @@ impl NodeWriterGRPCDriver {
     pub async fn initialize(&self) -> NodeResult<()> {
         if !self.settings.lazy_loading() {
             // If lazy loading is disabled, load
-            let shards = self.shards.clone();
+            let shards = Arc::clone(&self.shards);
             tokio::task::spawn_blocking(move || shards.load_all()).await??
         }
         Ok(())
@@ -80,34 +80,32 @@ impl NodeWriterGRPCDriver {
         }
     }
 
-    async fn obtain_shard(&self, id: impl Into<String>) -> Result<Arc<ShardWriter>, tonic::Status> {
-        let id = id.into();
-        if let Some(shard) = self.shards.get(id.clone()) {
-            return Ok(shard);
-        }
-        let id_clone = id.clone();
-        let shards = self.shards.clone();
-        let shard = tokio::task::spawn_blocking(move || shards.load(id_clone))
-            .await
-            .map_err(|error| {
-                tonic::Status::internal(format!("Error lazy loading shard {id}: {error:?}"))
-            })?;
-        let shard = shard.map_err(|error| {
-            if error.is::<ShardNotFoundError>() {
-                tonic::Status::not_found(error.to_string())
-            } else {
-                tonic::Status::internal(format!("Error lazy loading shard {id}: {error:?}"))
-            }
-        })?;
-        Ok(shard)
-    }
-
     #[tracing::instrument(skip_all)]
     fn emit_event(&self, event: NodeWriterEvent) {
         if let Some(sender) = &self.sender {
             let _ = sender.send(event);
         }
     }
+}
+
+fn obtain_shard(
+    shards: Arc<UnboundedShardWriterCache>,
+    id: impl Into<String>,
+) -> Result<Arc<ShardWriter>, tonic::Status> {
+    let id = id.into();
+    if let Some(shard) = shards.get(id.clone()) {
+        return Ok(shard);
+    }
+    let id_clone = id.clone();
+    let shards = shards.clone();
+    let shard = shards.load(id_clone).map_err(|error| {
+        if error.is::<ShardNotFoundError>() {
+            tonic::Status::not_found(error.to_string())
+        } else {
+            tonic::Status::internal(format!("Error lazy loading shard {id}: {error:?}"))
+        }
+    })?;
+    Ok(shard)
 }
 
 #[tonic::async_trait]
@@ -128,7 +126,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
             Some(Channel::from(request.release_channel)),
         );
 
-        let shards = self.shards.clone();
+        let shards = Arc::clone(&self.shards);
         let new_shard = tokio::task::spawn_blocking(move || shards.create(metadata))
             .await
             .map_err(|error| tonic::Status::internal(format!("Error creating shard: {error:?}")))?;
@@ -153,7 +151,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         // Deletion does not require for the shard to be loaded.
         let shard_id = request.into_inner();
 
-        let shards = self.shards.clone();
+        let shards = Arc::clone(&self.shards);
         let shard_id_clone = shard_id.id.clone();
         let deleted = tokio::task::spawn_blocking(move || shards.delete(shard_id_clone))
             .await
@@ -181,7 +179,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let shard_id = request.into_inner().id;
 
         // No need to load shard to upgrade it
-        let shards = self.shards.clone();
+        let shards = Arc::clone(&self.shards);
         let shard_id_clone = shard_id.clone();
         let upgraded = tokio::task::spawn_blocking(move || shards.upgrade(shard_id_clone))
             .await
@@ -213,10 +211,12 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let span = Span::current();
         let resource = request.into_inner();
         let shard_id = resource.shard_id.clone();
-        let shard = self.obtain_shard(&shard_id).await?;
+        let shards = Arc::clone(&self.shards);
+        let shard_id_clone = shard_id.clone();
         let info = info_span!(parent: &span, "set resource");
         let write_task = || {
             run_with_telemetry(info, move || {
+                let shard = obtain_shard(shards, shard_id_clone)?;
                 shard
                     .set_resource(&resource)
                     .and_then(|()| shard.get_opstatus())
@@ -253,10 +253,12 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let span = Span::current();
         let resource = request.into_inner();
         let shard_id = resource.shard_id.clone();
-        let shard = self.obtain_shard(&shard_id).await?;
+        let shards = Arc::clone(&self.shards);
+        let shard_id_clone = shard_id.clone();
         let info = info_span!(parent: &span, "remove resource");
         let write_task = || {
             run_with_telemetry(info, move || {
+                let shard = obtain_shard(shards, shard_id_clone)?;
                 shard
                     .remove_resource(&resource)
                     .and_then(|()| shard.get_opstatus())
@@ -305,10 +307,12 @@ impl NodeWriter for NodeWriterGRPCDriver {
             None => return Err(tonic::Status::invalid_argument("Shard ID must be provided")),
         };
 
-        let shard = self.obtain_shard(shard_id).await?;
+        let shards = Arc::clone(&self.shards);
+        let shard_id_clone = shard_id.clone();
         let info = info_span!(parent: &span, "add vector set");
         let task = || {
             run_with_telemetry(info, move || {
+                let shard = obtain_shard(shards, shard_id_clone)?;
                 shard
                     .add_vectorset(&vectorset_id, request.similarity())
                     .and_then(|()| shard.get_opstatus())
@@ -337,10 +341,12 @@ impl NodeWriter for NodeWriterGRPCDriver {
             Some(ref shard_id) => &shard_id.id,
             None => return Err(tonic::Status::invalid_argument("Shard ID must be provided")),
         };
-        let shard = self.obtain_shard(shard_id).await?;
+        let shards = Arc::clone(&self.shards);
+        let shard_id_clone = shard_id.clone();
         let info = info_span!(parent: &span, "remove vector set");
         let task = || {
             run_with_telemetry(info, move || {
+                let shard = obtain_shard(shards, shard_id_clone)?;
                 shard
                     .remove_vectorset(&request)
                     .and_then(|()| shard.get_opstatus())
@@ -365,9 +371,13 @@ impl NodeWriter for NodeWriterGRPCDriver {
     ) -> Result<Response<VectorSetList>, Status> {
         let span = Span::current();
         let shard_id = request.into_inner();
-        let shard = self.obtain_shard(shard_id.id.clone()).await?;
+        let shards = Arc::clone(&self.shards);
+        let shard_id_clone = shard_id.id.clone();
         let info = info_span!(parent: &span, "list vector sets");
-        let task = || run_with_telemetry(info, move || shard.list_vectorsets());
+        let task = || {
+            let shard = obtain_shard(shards, shard_id_clone)?;
+            run_with_telemetry(info, move || shard.list_vectorsets())
+        };
         let status = tokio::task::spawn_blocking(task).await.map_err(|error| {
             tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
         })?;
@@ -401,10 +411,14 @@ impl NodeWriter for NodeWriterGRPCDriver {
     ) -> Result<Response<GarbageCollectorResponse>, Status> {
         send_analytics_event(AnalyticsEvent::GarbageCollect).await;
         let shard_id = request.into_inner();
-        let shard = self.obtain_shard(&shard_id.id).await?;
+        let shards = Arc::clone(&self.shards);
+        let shard_id_clone = shard_id.id.clone();
         let span = Span::current();
         let info = info_span!(parent: &span, "list vector sets");
-        let task = || run_with_telemetry(info, move || shard.gc());
+        let task = || {
+            let shard = obtain_shard(shards, shard_id_clone)?;
+            run_with_telemetry(info, move || shard.gc())
+        };
         let result = tokio::task::spawn_blocking(task).await.map_err(|error| {
             tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
         })?;
