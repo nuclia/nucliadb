@@ -29,7 +29,6 @@ use crate::disk_structure;
 use crate::settings::Settings;
 use crate::shards::errors::ShardNotFoundError;
 use crate::shards::metadata::{ShardMetadata, ShardsMetadataManager};
-use crate::shards::providers::ShardWriterProvider;
 use crate::shards::writer::ShardWriter;
 use crate::shards::ShardId;
 
@@ -105,10 +104,8 @@ impl UnboundedShardWriterCache {
     fn write(&self) -> RwLockWriteGuard<InnerCache> {
         self.cache.write().expect("Poisoned lock while reading")
     }
-}
 
-impl ShardWriterProvider for UnboundedShardWriterCache {
-    fn create(&self, metadata: ShardMetadata) -> NodeResult<Arc<ShardWriter>> {
+    pub fn create(&self, metadata: ShardMetadata) -> NodeResult<Arc<ShardWriter>> {
         let shard_id = metadata.id();
         let metadata = Arc::new(metadata);
         let shard = Arc::new(ShardWriter::new(metadata.clone())?);
@@ -121,7 +118,7 @@ impl ShardWriterProvider for UnboundedShardWriterCache {
         Ok(shard)
     }
 
-    fn load(&self, id: ShardId) -> NodeResult<Arc<ShardWriter>> {
+    pub fn load(&self, id: ShardId) -> NodeResult<Arc<ShardWriter>> {
         let shard_key = id.clone();
         let shard_path = disk_structure::shard_path_by_id(&self.shards_path.clone(), &id);
         let mut cache_writer = self.write();
@@ -153,7 +150,7 @@ impl ShardWriterProvider for UnboundedShardWriterCache {
         }
     }
 
-    fn load_all(&self) -> NodeResult<()> {
+    pub fn load_all(&self) -> NodeResult<()> {
         let mut cache = self.write();
         let shards_path = self.shards_path.clone();
         let metadata_manager = Arc::clone(&self.metadata_manager);
@@ -184,7 +181,7 @@ impl ShardWriterProvider for UnboundedShardWriterCache {
         Ok(())
     }
 
-    fn get(&self, id: ShardId) -> Option<Arc<ShardWriter>> {
+    pub fn get(&self, id: ShardId) -> Option<Arc<ShardWriter>> {
         let cache_reader = self.read();
         match cache_reader.get_shard(&id) {
             ShardCacheStatus::InCache(shard) => Some(shard),
@@ -192,7 +189,7 @@ impl ShardWriterProvider for UnboundedShardWriterCache {
         }
     }
 
-    fn delete(&self, id: ShardId) -> NodeResult<()> {
+    pub fn delete(&self, id: ShardId) -> NodeResult<()> {
         let mut cache_writer = self.write();
         // First the shard must be marked as being deleted, this way
         // concurrent tasks can not make the mistake of trying to use it.
@@ -230,7 +227,7 @@ impl ShardWriterProvider for UnboundedShardWriterCache {
         Ok(())
     }
 
-    fn upgrade(&self, id: ShardId) -> NodeResult<ShardCleaned> {
+    pub fn upgrade(&self, id: ShardId) -> NodeResult<ShardCleaned> {
         let mut cache_writer = self.write();
         // First the shard must be marked as being deleted, this way
         // concurrent tasks can not make the mistake of trying to use it.
@@ -273,7 +270,7 @@ impl ShardWriterProvider for UnboundedShardWriterCache {
         Ok(details)
     }
 
-    fn get_metadata(&self, id: ShardId) -> Option<Arc<ShardMetadata>> {
+    pub fn get_metadata(&self, id: ShardId) -> Option<Arc<ShardMetadata>> {
         self.metadata_manager.get(id)
     }
 }

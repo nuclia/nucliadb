@@ -23,7 +23,4 @@
 //! Providers, for example, can use cache strategies to provide faster readers
 //! and writers to the users.
 
-mod provider_traits;
 pub mod unbounded_cache;
-
-pub use provider_traits::{ShardReaderProvider, ShardWriterProvider};

@@ -28,7 +28,6 @@ use nucliadb_core::protos::{
     ShardId, UserVector, UserVectors, VectorSetId, VectorSimilarity,
 };
 use nucliadb_node::replication::health::ReplicationHealthManager;
-use nucliadb_node::shards::providers::ShardWriterProvider;
 use rstest::*;
 use tonic::Request;
 

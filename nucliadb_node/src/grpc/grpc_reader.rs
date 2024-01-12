@@ -30,7 +30,6 @@ use Shard as ShardPB;
 use crate::settings::Settings;
 use crate::shards::errors::ShardNotFoundError;
 use crate::shards::providers::unbounded_cache::UnboundedShardReaderCache;
-use crate::shards::providers::ShardReaderProvider;
 use crate::shards::reader::{ShardFileChunkIterator, ShardReader};
 use crate::telemetry::run_with_telemetry;
 
@@ -60,24 +59,14 @@ impl NodeReaderGRPCDriver {
 
     async fn obtain_shard(&self, id: impl Into<String>) -> Result<Arc<ShardReader>, tonic::Status> {
         let id = id.into();
-        if let Some(shard) = self.shards.get(id.clone()) {
-            return Ok(shard);
-        }
         let id_clone = id.clone();
         let shards = Arc::clone(&self.shards);
-        let shard = tokio::task::spawn_blocking(move || shards.load(id_clone))
+
+        tokio::task::spawn_blocking(move || obtain_shard(shards, id_clone))
             .await
             .map_err(|error| {
                 tonic::Status::internal(format!("Error lazy loading shard {id}: {error:?}"))
-            })?;
-        let shard = shard.map_err(|error| {
-            if error.is::<ShardNotFoundError>() {
-                tonic::Status::not_found(error.to_string())
-            } else {
-                tonic::Status::internal(format!("Error lazy loading shard {id}: {error:?}"))
-            }
-        })?;
-        Ok(shard)
+            })?
     }
 }
 

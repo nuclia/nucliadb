@@ -37,7 +37,6 @@ use crate::settings::Settings;
 use crate::shards::errors::ShardNotFoundError;
 use crate::shards::metadata::ShardMetadata;
 use crate::shards::providers::unbounded_cache::UnboundedShardWriterCache;
-use crate::shards::providers::ShardWriterProvider;
 use crate::shards::writer::ShardWriter;
 use crate::telemetry::run_with_telemetry;
 use crate::utils::list_shards;

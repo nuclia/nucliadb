@@ -28,7 +28,6 @@ use crate::disk_structure;
 use crate::settings::Settings;
 use crate::shards::errors::ShardNotFoundError;
 use crate::shards::metadata::ShardMetadata;
-use crate::shards::providers::ShardReaderProvider;
 use crate::shards::reader::ShardReader;
 use crate::shards::ShardId;
 
@@ -48,17 +47,15 @@ impl UnboundedShardReaderCache {
         }
     }
 
-    fn read(&self) -> RwLockReadGuard<HashMap<ShardId, Arc<ShardReader>>> {
+    pub fn read(&self) -> RwLockReadGuard<HashMap<ShardId, Arc<ShardReader>>> {
         self.cache.read().expect("Poisoned lock while reading")
     }
 
-    fn write(&self) -> RwLockWriteGuard<HashMap<ShardId, Arc<ShardReader>>> {
+    pub fn write(&self) -> RwLockWriteGuard<HashMap<ShardId, Arc<ShardReader>>> {
         self.cache.write().expect("Poisoned lock while reading")
     }
-}
 
-impl ShardReaderProvider for UnboundedShardReaderCache {
-    fn load(&self, id: ShardId) -> NodeResult<Arc<ShardReader>> {
+    pub fn load(&self, id: ShardId) -> NodeResult<Arc<ShardReader>> {
         let shard_path = disk_structure::shard_path_by_id(&self.shards_path.clone(), &id);
         let mut cache_writer = self.write();
 
@@ -82,7 +79,7 @@ impl ShardReaderProvider for UnboundedShardReaderCache {
         Ok(shard)
     }
 
-    fn load_all(&self) -> NodeResult<()> {
+    pub fn load_all(&self) -> NodeResult<()> {
         let mut cache = self.write();
         let shards_path = self.shards_path.clone();
 
@@ -102,7 +99,7 @@ impl ShardReaderProvider for UnboundedShardReaderCache {
         Ok(())
     }
 
-    fn get(&self, id: ShardId) -> Option<Arc<ShardReader>> {
+    pub fn get(&self, id: ShardId) -> Option<Arc<ShardReader>> {
         self.read().get(&id).map(Arc::clone)
     }
 }

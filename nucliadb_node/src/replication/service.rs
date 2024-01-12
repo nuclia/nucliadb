@@ -33,7 +33,6 @@ use crate::replication::NodeRole;
 use crate::settings::Settings;
 use crate::shards::metadata::Similarity;
 use crate::shards::providers::unbounded_cache::UnboundedShardWriterCache;
-use crate::shards::providers::ShardWriterProvider;
 use crate::shards::writer::ShardWriter;
 use crate::utils::list_shards;
 pub struct ReplicationServiceGRPCDriver {

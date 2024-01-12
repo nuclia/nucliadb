@@ -36,7 +36,6 @@ use crate::replication::health::ReplicationHealthManager;
 use crate::settings::Settings;
 use crate::shards::metadata::ShardMetadata;
 use crate::shards::providers::unbounded_cache::UnboundedShardWriterCache;
-use crate::shards::providers::ShardWriterProvider;
 use crate::shards::writer::ShardWriter;
 use crate::utils::{list_shards, set_primary_node_id};
 
@@ -176,7 +175,9 @@ impl ReplicateWorkerPool {
     }
 
     pub async fn add<F>(&mut self, worker: F) -> NodeResult<()>
-    where F: Future<Output = NodeResult<()>> + Send + 'static {
+    where
+        F: Future<Output = NodeResult<()>> + Send + 'static,
+    {
         let work_lock = Arc::clone(&self.work_lock);
         let permit = work_lock.acquire_owned().await.unwrap();
 
