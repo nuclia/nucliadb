@@ -1,6 +1,0 @@
-pytest-docker-fixtures
-types-python-dateutil
-docker
-grpcio-health-checking
-types-aiofiles
-numpy

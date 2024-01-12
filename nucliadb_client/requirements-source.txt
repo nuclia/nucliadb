@@ -1,3 +1,0 @@
--e ./nucliadb_protos/python
--e ./nucliadb_models
--e ./nucliadb_telemetry[all]
