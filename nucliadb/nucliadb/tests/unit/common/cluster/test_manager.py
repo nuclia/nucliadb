@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+from unittest import mock
 from unittest.mock import MagicMock
 
 import pytest
@@ -174,3 +175,48 @@ def test_choose_node():
         )
 
     manager.INDEX_NODES.clear()
+
+
+@pytest.fixture(scope="function")
+def standalone_mode_off():
+    prev = settings.standalone_mode
+    settings.standalone_mode = False
+    yield
+    settings.standalone_mode = prev
+
+
+@pytest.fixture(scope="function")
+def index_nodes():
+    index_nodes = {}
+    with mock.patch.object(manager, "INDEX_NODES", new=index_nodes):
+        yield index_nodes
+
+
+def test_get_index_nodes(standalone_mode_off, index_nodes):
+    # Add a primary node
+    manager.add_index_node(
+        id="node-0",
+        address="nohost",
+        shard_count=0,
+        dummy=True,
+    )
+    # Add a secondary replica of node-0
+    manager.add_index_node(
+        id="node-1",
+        address="nohost",
+        shard_count=0,
+        dummy=True,
+        primary_id="node-0",
+    )
+
+    # By default, only primary nodes are returned
+    nodes = manager.get_index_nodes()
+    assert len(nodes) == 1
+    assert nodes[0].id == "node-0"
+
+    # If we ask for secondary, we get both
+    nodes = manager.get_index_nodes(include_secondary=True)
+    assert len(nodes) == 2
+    sorted(nodes, key=lambda x: x.id)
+    assert nodes[0].id == "node-0"
+    assert nodes[1].id == "node-1"
