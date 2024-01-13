@@ -29,6 +29,7 @@ from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
 from nucliadb.common.datamanagers.labels import LabelsDataManager
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.synonyms import Synonyms
+from nucliadb.middleware.transaction import get_read_only_transaction
 from nucliadb.search import logger
 from nucliadb.search.predict import PredictVectorMissing, SendToPredictError
 from nucliadb.search.search.filters import (
@@ -603,8 +604,8 @@ PROCESSING_STATUS_TO_PB_MAP = {
 
 @query_parse_dependency_observer.wrap({"type": "min_score"})
 async def get_kb_model_default_min_score(kbid: str) -> Optional[float]:
-    driver = get_driver()
-    kbdm = KnowledgeBoxDataManager(driver)
+    txn = await get_read_only_transaction()
+    kbdm = KnowledgeBoxDataManager(get_driver(), read_only_txn=txn)
     model = await kbdm.get_model_metadata(kbid)
     if model.HasField("default_min_score"):
         return model.default_min_score
@@ -623,29 +624,25 @@ async def get_default_min_score(kbid: str) -> float:
 
 @query_parse_dependency_observer.wrap({"type": "synonyms"})
 async def get_kb_synonyms(kbid: str) -> Optional[knowledgebox_pb2.Synonyms]:
-    driver = get_driver()
-    async with driver.transaction() as txn:
-        return await Synonyms(txn, kbid).get()
+    txn = await get_read_only_transaction()
+    return await Synonyms(txn, kbid).get()
 
 
 @query_parse_dependency_observer.wrap({"type": "entities_meta_cache"})
 async def get_entities_meta_cache(kbid: str) -> EntitiesMetaCache:
-    driver = get_driver()
-    async with driver.transaction() as txn:
-        return await EntitiesDataManager.get_entities_meta_cache(kbid, txn)
+    txn = await get_read_only_transaction()
+    return await EntitiesDataManager.get_entities_meta_cache(kbid, txn)
 
 
 @query_parse_dependency_observer.wrap({"type": "deleted_entities_groups"})
 async def get_deleted_entity_groups(kbid: str) -> list[str]:
-    driver = get_driver()
-    async with driver.transaction() as txn:
-        return list(
-            (await EntitiesDataManager.get_deleted_groups(kbid, txn)).entities_groups
-        )
+    txn = await get_read_only_transaction()
+    return list(
+        (await EntitiesDataManager.get_deleted_groups(kbid, txn)).entities_groups
+    )
 
 
 @query_parse_dependency_observer.wrap({"type": "classification_labels"})
 async def get_classification_labels(kbid: str) -> knowledgebox_pb2.Labels:
-    driver = get_driver()
-    ldm = LabelsDataManager(driver)
-    return await ldm.get_labels(kbid)
+    txn = await get_read_only_transaction()
+    return await LabelsDataManager.inner_get_labels(kbid, txn)

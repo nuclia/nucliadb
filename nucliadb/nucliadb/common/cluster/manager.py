@@ -117,8 +117,13 @@ def remove_index_node(node_id: str, primary_id: Optional[str] = None) -> None:
 
 
 class KBShardManager:
+    read_only_txn: Optional[Transaction] = None
+
+    def set_read_only_txn(self, txn: Transaction) -> None:
+        self.read_only_txn = txn
+
     async def get_shards_by_kbid_inner(self, kbid: str) -> writer_pb2.Shards:
-        cdm = ClusterDataManager(get_driver())
+        cdm = ClusterDataManager(get_driver(), read_only_txn=self.read_only_txn)
         result = await cdm.get_kb_shards(kbid)
         if result is None:
             # could be None because /shards doesn't exist, or beacause the
@@ -380,9 +385,9 @@ class KBShardManager:
             return
 
         logger.warning({"message": "Adding shard", "kbid": kbid})
-        kbdm = KnowledgeBoxDataManager(get_driver())
-        model = await kbdm.get_model_metadata(kbid)
         driver = get_driver()
+        kbdm = KnowledgeBoxDataManager(driver)
+        model = await kbdm.get_model_metadata(kbid)
 
         async with driver.transaction() as txn:
             await self.create_shard_by_kbid(

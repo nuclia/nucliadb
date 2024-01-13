@@ -55,7 +55,7 @@ from nucliadb.ingest.orm.synonyms import Synonyms
 from nucliadb.ingest.orm.utils import compute_paragraph_key, get_basic, set_basic
 from nucliadb.migrator.utils import get_latest_version
 from nucliadb_protos import writer_pb2
-from nucliadb_utils.keys import KB_SHARDS, KB_UUID
+from nucliadb_utils.keys import KB_CONFIGURATION, KB_SHARDS, KB_UUID
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_audit, get_storage
 
@@ -64,7 +64,6 @@ KB_RESOURCE = "/kbs/{kbid}/r/{uuid}"
 KB_KEYS = "/kbs/{kbid}/"
 
 KB_VECTORSET = "/kbs/{kbid}/vectorsets"
-KB_CONFIGURATION = "/kbs/{kbid}/configuration"
 KB_RESOURCE_SHARD = "/kbs/{kbid}/r/{uuid}/shard"
 KB_SLUGS_BASE = "/kbslugs/"
 KB_SLUGS = KB_SLUGS_BASE + "{slug}"
@@ -84,11 +83,13 @@ class KnowledgeBox:
         self._config: Optional[KnowledgeBoxConfig] = None
         self.synonyms = Synonyms(self.txn, self.kbid)
         # b/w compatible, long term this class would change dramatically
-        self.data_manager = KnowledgeBoxDataManager(get_driver())
+        self.data_manager = KnowledgeBoxDataManager(
+            get_driver(), read_only_txn=self.txn
+        )
 
     async def get_config(self) -> Optional[KnowledgeBoxConfig]:
         if self._config is None:
-            config = await KnowledgeBoxDataManager._get_config(self.txn, self.kbid)
+            config = await self.data_manager.get_config(self.kbid)
             if config is not None:
                 self._config = config
                 return config

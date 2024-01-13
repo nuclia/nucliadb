@@ -19,7 +19,6 @@
 #
 from typing import Optional, Sequence
 
-from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
@@ -172,28 +171,27 @@ async def default_prompt_context(
     """
     # Sort retrieved paragraphs by decreasing order (most relevant first)
     ordered_paras = get_ordered_paragraphs(results)
-    driver = get_driver()
+    txn = await get_read_only_transaction()
     storage = await get_storage()
-    async with driver.transaction() as txn:
-        kb = KnowledgeBoxORM(txn, storage, kbid)
-        for paragraph in ordered_paras:
-            context[paragraph.id] = _clean_paragraph_text(paragraph)
+    kb = KnowledgeBoxORM(txn, storage, kbid)
+    for paragraph in ordered_paras:
+        context[paragraph.id] = _clean_paragraph_text(paragraph)
 
-            # If the paragraph is a conversation and it matches semantically, we assume we
-            # have matched with the question, therefore try to include the answer to the
-            # context by pulling the next few messages of the conversation field
-            rid, field_type, field_id, mident = paragraph.id.split("/")[:4]
-            if field_type == "c" and paragraph.score_type in (
-                SCORE_TYPE.VECTOR,
-                SCORE_TYPE.BOTH,
-            ):
-                expanded_msgs = await get_expanded_conversation_messages(
-                    kb=kb, rid=rid, field_id=field_id, mident=mident
-                )
-                for msg in expanded_msgs:
-                    text = msg.content.text.strip()
-                    pid = f"{rid}/{field_type}/{field_id}/{msg.ident}/0-{len(msg.content.text) + 1}"
-                    context[pid] = text
+        # If the paragraph is a conversation and it matches semantically, we assume we
+        # have matched with the question, therefore try to include the answer to the
+        # context by pulling the next few messages of the conversation field
+        rid, field_type, field_id, mident = paragraph.id.split("/")[:4]
+        if field_type == "c" and paragraph.score_type in (
+            SCORE_TYPE.VECTOR,
+            SCORE_TYPE.BOTH,
+        ):
+            expanded_msgs = await get_expanded_conversation_messages(
+                kb=kb, rid=rid, field_id=field_id, mident=mident
+            )
+            for msg in expanded_msgs:
+                text = msg.content.text.strip()
+                pid = f"{rid}/{field_type}/{field_id}/{msg.ident}/0-{len(msg.content.text) + 1}"
+                context[pid] = text
 
 
 async def get_field_extracted_text(field: Field) -> Optional[tuple[Field, str]]:
