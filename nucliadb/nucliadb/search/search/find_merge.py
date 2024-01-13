@@ -29,7 +29,7 @@ from nucliadb_protos.nodereader_pb2 import (
 
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.serialize import managed_serialize
-from nucliadb.middleware_transaction import get_read_only_transaction
+from nucliadb.middleware.transaction import get_read_only_transaction
 from nucliadb.search import SERVICE_NAME, logger
 from nucliadb.search.search.cache import get_resource_cache
 from nucliadb.search.search.merge import merge_relations_results

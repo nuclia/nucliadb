@@ -31,7 +31,7 @@ from nucliadb_protos.utils_pb2 import RelationNode
 
 from nucliadb.ingest.orm.knowledgebox import KB_CONFIGURATION
 from nucliadb.ingest.tests.vectors import Q, Qm2023
-from nucliadb.middleware_transaction import get_read_only_transaction
+from nucliadb.middleware.transaction import get_read_only_transaction
 from nucliadb.search import logger
 from nucliadb_models.search import (
     AskDocumentModel,
