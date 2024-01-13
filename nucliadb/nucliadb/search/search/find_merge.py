@@ -29,7 +29,7 @@ from nucliadb_protos.nodereader_pb2 import (
 
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.serialize import managed_serialize
-from nucliadb.ingest.txn_utils import abort_transaction, get_transaction
+from nucliadb.middleware_transaction import get_transaction
 from nucliadb.search import SERVICE_NAME, logger
 from nucliadb.search.search.cache import get_resource_cache
 from nucliadb.search.search.merge import merge_relations_results
@@ -426,7 +426,6 @@ async def find_merge_results(
         )
         api_results.relations = merge_relations_results(relations, requested_relations)
 
-        await abort_transaction()
         return api_results
     finally:
         rcache.clear()

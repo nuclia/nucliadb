@@ -19,6 +19,7 @@
 #
 import logging
 import os
+from nucliadb.middleware_transaction import ReadOnlyTransactionMiddleware
 
 import nucliadb_admin_assets  # type: ignore
 from fastapi import FastAPI
@@ -62,6 +63,7 @@ def application_factory(settings: Settings) -> FastAPI:
             AuthenticationMiddleware,
             backend=get_auth_backend(settings),
         ),
+        Middleware(ReadOnlyTransactionMiddleware)
     ]
     if running_settings.debug:
         middleware.append(Middleware(ProcessTimeHeaderMiddleware))

@@ -22,6 +22,7 @@ import logging
 import os
 import sys
 from typing import Optional
+from nucliadb_utils import debug
 
 import pydantic_argparse
 import uvicorn  # type: ignore
@@ -137,7 +138,8 @@ def run():
 =================================================
 """
     )
-    server.run()
+    with debug.profile_memory():
+        server.run()
 
 
 def get_latest_nucliadb() -> Optional[str]:

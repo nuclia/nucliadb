@@ -26,7 +26,7 @@ from nucliadb_protos.resources_pb2 import Paragraph
 from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.serialize import managed_serialize
-from nucliadb.ingest.txn_utils import get_transaction
+from nucliadb.middleware_transaction import get_transaction
 from nucliadb.search import SERVICE_NAME, logger
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, Resource

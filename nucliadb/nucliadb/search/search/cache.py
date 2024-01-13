@@ -26,7 +26,7 @@ from lru import LRU  # type: ignore
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
-from nucliadb.ingest.txn_utils import get_transaction
+from nucliadb.middleware_transaction import get_transaction
 from nucliadb.search import SERVICE_NAME
 from nucliadb_telemetry import metrics
 from nucliadb_utils.utilities import get_storage
