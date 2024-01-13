@@ -26,7 +26,7 @@ from lru import LRU  # type: ignore
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
-from nucliadb.middleware_transaction import get_transaction
+from nucliadb.middleware_transaction import get_read_only_transaction
 from nucliadb.search import SERVICE_NAME
 from nucliadb_telemetry import metrics
 from nucliadb_utils.utilities import get_storage
@@ -62,7 +62,7 @@ async def get_resource_from_cache(
         if uuid not in resource_cache:
             RESOURCE_CACHE_OPS.inc({"type": "miss"})
             if txn is None:
-                txn = await get_transaction(read_only=True)
+                txn = await get_read_only_transaction()
             storage = await get_storage(service_name=SERVICE_NAME)
             kb = KnowledgeBoxORM(txn, storage, kbid)
             orm_resource = await kb.get(uuid)

@@ -19,7 +19,6 @@
 #
 import logging
 import os
-from nucliadb.middleware_transaction import ReadOnlyTransactionMiddleware
 
 import nucliadb_admin_assets  # type: ignore
 from fastapi import FastAPI
@@ -33,6 +32,7 @@ from starlette.routing import Mount
 
 from nucliadb.common.context.fastapi import set_app_context
 from nucliadb.middleware import ProcessTimeHeaderMiddleware
+from nucliadb.middleware_transaction import ReadOnlyTransactionMiddleware
 from nucliadb.reader import API_PREFIX
 from nucliadb.reader.api.v1.router import api as api_reader_v1
 from nucliadb.search.api.v1.router import api as api_search_v1
@@ -63,7 +63,7 @@ def application_factory(settings: Settings) -> FastAPI:
             AuthenticationMiddleware,
             backend=get_auth_backend(settings),
         ),
-        Middleware(ReadOnlyTransactionMiddleware)
+        Middleware(ReadOnlyTransactionMiddleware),
     ]
     if running_settings.debug:
         middleware.append(Middleware(ProcessTimeHeaderMiddleware))

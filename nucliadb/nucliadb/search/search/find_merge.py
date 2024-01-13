@@ -29,7 +29,7 @@ from nucliadb_protos.nodereader_pb2 import (
 
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.serialize import managed_serialize
-from nucliadb.middleware_transaction import get_transaction
+from nucliadb.middleware_transaction import get_read_only_transaction
 from nucliadb.search import SERVICE_NAME, logger
 from nucliadb.search.search.cache import get_resource_cache
 from nucliadb.search.search.merge import merge_relations_results
@@ -148,7 +148,7 @@ async def fetch_find_metadata(
     highlight: bool = False,
     ematches: Optional[list[str]] = None,
 ):
-    txn = await get_transaction(read_only=True)
+    txn = await get_read_only_transaction()
     resources = set()
     operations = []
     max_operations = asyncio.Semaphore(50)
@@ -367,7 +367,7 @@ async def find_merge_results(
     # force getting transaction on current asyncio task
     # so all sub tasks will use the same transaction
     # this is contextvar magic that is probably not ideal
-    await get_transaction(read_only=True)
+    await get_read_only_transaction()
 
     paragraphs: list[list[ParagraphResult]] = []
     vectors: list[list[DocumentScored]] = []

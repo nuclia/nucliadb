@@ -22,7 +22,6 @@ import logging
 import os
 import sys
 from typing import Optional
-from nucliadb_utils import debug
 
 import pydantic_argparse
 import uvicorn  # type: ignore
@@ -37,6 +36,7 @@ from nucliadb_telemetry import errors
 from nucliadb_telemetry.fastapi import instrument_app
 from nucliadb_telemetry.logs import setup_logging
 from nucliadb_telemetry.settings import LogOutputType, LogSettings
+from nucliadb_utils import debug
 from nucliadb_utils.settings import nuclia_settings, storage_settings
 
 logger = logging.getLogger(__name__)
