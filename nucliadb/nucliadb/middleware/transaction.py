@@ -25,7 +25,6 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.requests import Request
 from starlette.responses import Response
 
-from nucliadb import logger
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import get_driver
 
@@ -73,16 +72,13 @@ class TransactionManager:
             raise RuntimeError("Transaction was aborted")
 
         if self._transaction is not None:
-            logger.debug("Using existing transaction")
             return self._transaction
 
         async with self._lock:
             # Check again in case it was set while waiting for the lock
             if self._transaction is not None:
-                logger.debug("Using existing transaction")
                 return self._transaction
 
-            logger.debug("Creating transaction")
             self._transaction = await self._get_transaction()
             return self._transaction
 
@@ -93,10 +89,8 @@ class TransactionManager:
 
     async def maybe_abort(self):
         if self.aborted or self._transaction is None:
-            logger.debug("No transaction to abort")
             return
 
-        logger.debug("Aborting transaction")
         await self._transaction.abort()
         self._transaction = None
         self._lock = None
