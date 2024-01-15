@@ -90,7 +90,7 @@ async def test_transaction_manager_raises_on_aborted():
     mgr = ReadOnlyTransactionManager()
     mgr.aborted = True
     with pytest.raises(RuntimeError):
-        await mgr.get_read_only_transaction()
+        await mgr.get_transaction()
 
 
 async def test_txn_manager_creates_transaction_only_once():
@@ -98,8 +98,8 @@ async def test_txn_manager_creates_transaction_only_once():
     txn = mock.Mock()
     get_txn = mock.AsyncMock(return_value=txn)
     mgr._get_transaction = get_txn
-    assert await mgr.get_read_only_transaction() is txn
-    assert await mgr.get_read_only_transaction() is txn
+    assert await mgr.get_transaction() is txn
+    assert await mgr.get_transaction() is txn
     mgr._get_transaction.assert_called_once()
 
 
