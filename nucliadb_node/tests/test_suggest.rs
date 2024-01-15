@@ -238,7 +238,7 @@ async fn test_suggest_features(
     let mut reader = node.reader_client();
 
     let response = suggest_paragraphs(&mut reader, &shard.id, "ann").await;
-    assert!(response.entities.is_none());
+    assert!(response.entity_results.is_none());
     expect_paragraphs(
         &response,
         &[(&shard.resources["little prince"], "/a/summary")],

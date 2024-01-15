@@ -29,7 +29,7 @@ use nucliadb_core::protos::shard_created::{
 };
 use nucliadb_core::protos::{
     DocumentSearchRequest, DocumentSearchResponse, EdgeList, GetShardRequest,
-    ParagraphSearchRequest, ParagraphSearchResponse, RelatedEntities, RelationPrefixSearchRequest,
+    ParagraphSearchRequest, ParagraphSearchResponse, RelationPrefixSearchRequest,
     RelationSearchRequest, RelationSearchResponse, SearchRequest, SearchResponse, Shard, ShardFile,
     ShardFileChunk, ShardFileList, StreamRequest, SuggestFeatures, SuggestRequest, SuggestResponse,
     TypeList, VectorSearchRequest, VectorSearchResponse,
@@ -403,12 +403,6 @@ impl ShardReader {
         };
 
         if let Some(entities) = entities {
-            // Deprecated, to be removed
-            response.entities = Some(RelatedEntities {
-                total: entities.len() as u32,
-                entities: entities.iter().map(|e| e.value.clone()).collect(),
-            });
-            // New version of the response, keep this
             response.entity_results = Some(RelationPrefixSearchResponse { nodes: entities });
         }
 

@@ -368,7 +368,6 @@ message SuggestResponse {
     repeated string ematches = 4;
 
     // Entities related with the query
-    RelatedEntities entities = 5; // Deprecated, to be removed
     RelationPrefixSearchResponse entity_results = 6;
 }
 
