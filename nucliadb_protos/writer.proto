@@ -393,6 +393,9 @@ message Member {
 
     /// The number of shards in the node.
     uint32 shard_count = 7;
+
+    /// The id of the primary node (if it is a secondary node).
+    string primary_id = 8;
 }
 
 message ListMembersRequest {
