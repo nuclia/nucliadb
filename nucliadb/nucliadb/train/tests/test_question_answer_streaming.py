@@ -81,12 +81,25 @@ async def test_generator_question_answer_streaming(
     ) as response:
         assert response.status == 200
         batches = []
+        questions = []
+        answers = []
+        question_paragraphs_count = 0
+        answer_paragraphs_count = 0
         async for batch in get_batches_from_train_response_stream(
             response, QuestionAnswerStreamingBatch
         ):
             batches.append(batch)
             assert len(batch.data) == 3
+            for data in batch.data:
+                questions.append(data.question.text)
+                question_paragraphs_count += len(data.question.paragraphs)
+                answers.append(data.answer.text)
+                answer_paragraphs_count += len(data.answer.paragraphs)
         assert len(batches) == 1
+        assert len(questions) == len(answers) == 3
+        assert len(set(questions)) == 2
+        assert question_paragraphs_count == 2
+        assert answer_paragraphs_count == 4
 
 
 async def inject_resources_with_question_answers(kbid: str, nucliadb_grpc: WriterStub):
@@ -120,23 +133,27 @@ def smb_wonder_bm(kbid: str) -> BrokerMessage:
     paragraph_0_id = (
         f"{rid}/{FIELD_TYPE_TO_ID[rpb.FieldType.FILE]}/smb-wonder/{start}-{end}"
     )
-    question = "What is SMB Wonder?"
-    field_builder.add_question_answer(
-        question=question,
-        answer="SMB Wonder is a Nintendo Switch game",
-        answer_paragraph_ids=[paragraph_0_id],
-    )
-    field_builder.add_question_answer(
-        question=question,
-        answer="It's the new Mario game for Nintendo Switch",
-        answer_paragraph_ids=[paragraph_0_id],
-    )
 
     start = len(paragraphs[0])
     end = len(paragraphs[0]) + len(paragraphs[1])
     paragraph_1_id = (
         f"{rid}/{FIELD_TYPE_TO_ID[rpb.FieldType.FILE]}/smb-wonder/{start}-{end}"
     )
+
+    question = "What is SMB Wonder?"
+    field_builder.add_question_answer(
+        question=question,
+        question_paragraph_ids=[paragraph_0_id],
+        answer="SMB Wonder is a side-scrolling Nintendo Switch game",
+        answer_paragraph_ids=[paragraph_0_id, paragraph_1_id],
+    )
+    field_builder.add_question_answer(
+        question=question,
+        question_paragraph_ids=[paragraph_0_id],
+        answer="It's the new Mario game for Nintendo Switch",
+        answer_paragraph_ids=[paragraph_0_id],
+    )
+
     question = "Give me an example of side-scrolling game"
     field_builder.add_question_answer(
         question=question,
