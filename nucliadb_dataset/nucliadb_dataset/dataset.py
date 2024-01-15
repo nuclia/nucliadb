@@ -353,12 +353,13 @@ class NucliaDBDataset(NucliaDataset):
     def _configure_question_answer_streaming(self):
         schema = pa.schema(
             [
-                pa.field("paragraph_id", pa.list_(pa.string())),
-                pa.field("paragraph", pa.list_(pa.string())),
                 pa.field("question", pa.string()),
-                pa.field("question_language", pa.string()),
                 pa.field("answer", pa.string()),
+                pa.field("question_paragraphs", pa.list_(pa.string())),
+                pa.field("answer_paragraphs", pa.list_(pa.string())),
+                pa.field("question_language", pa.string()),
                 pa.field("answer_language", pa.string()),
+                pa.field("cancelled_by_user", pa.bool_()),
             ]
         )
         self._set_mappings(

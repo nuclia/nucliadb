@@ -137,33 +137,35 @@ def batch_to_paragraph_streaming_arrow(schema: pa.schema):
 
 def batch_to_question_answer_streaming_arrow(schema: pa.schema):
     def func(batch: QuestionAnswerStreamingBatch):
-        PARARGAPH_ID = []
-        PARAGRAPH_TEXT = []
         QUESTION = []
-        QUESTION_LANGUAGE = []
         ANSWER = []
+        QUESTION_PARAGRAPHS = []
+        ANSWER_PARAGRAPHS = []
+        QUESTION_LANGUAGE = []
         ANSWER_LANGUAGE = []
+        CANCELLED_BY_USER = []
         for data in batch.data:
             QUESTION.append(data.question.text)
-            QUESTION_LANGUAGE.append(data.question.language)
             ANSWER.append(data.answer.text)
+            QUESTION_PARAGRAPHS.append(
+                [paragraph for paragraph in data.question.paragraphs]
+            )
+            ANSWER_PARAGRAPHS.append(
+                [paragraph for paragraph in data.answer.paragraphs]
+            )
+            QUESTION_LANGUAGE.append(data.question.language)
             ANSWER_LANGUAGE.append(data.answer.language)
-            paragraph_ids = []
-            paragraphs = []
-            for paragraph in data.paragraphs:
-                paragraph_ids.append(paragraph.id)
-                paragraphs.append(paragraph.text)
-            PARARGAPH_ID.append(paragraph_ids)
-            PARAGRAPH_TEXT.append(paragraphs)
+            CANCELLED_BY_USER.append(data.cancelled_by_user)
 
         if len(QUESTION):
             pa_data = [
-                pa.array(PARARGAPH_ID),
-                pa.array(PARAGRAPH_TEXT),
                 pa.array(QUESTION),
-                pa.array(QUESTION_LANGUAGE),
                 pa.array(ANSWER),
+                pa.array(QUESTION_PARAGRAPHS),
+                pa.array(ANSWER_PARAGRAPHS),
+                pa.array(QUESTION_LANGUAGE),
                 pa.array(ANSWER_LANGUAGE),
+                pa.array(CANCELLED_BY_USER),
             ]
             output_batch = pa.record_batch(pa_data, schema=schema)
         else:

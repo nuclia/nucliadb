@@ -60,6 +60,21 @@ def test_question_answer_streaming(qa_kb: KnowledgeBox):
     loaded_array = partitions[0]
     assert len(loaded_array) == 3
 
+    assert loaded_array["question"][0] == loaded_array["question"][1]
+    assert loaded_array["question"][0] != loaded_array["question"][2]
+
+    assert len(set(loaded_array["answer"])) == 3
+
+    assert len(loaded_array["question_paragraphs"][0]) == 1
+    assert len(loaded_array["question_paragraphs"][1]) == 1
+    assert len(loaded_array["question_paragraphs"][2]) == 0
+
+    assert len(loaded_array["answer_paragraphs"][0]) == 2
+    assert len(loaded_array["answer_paragraphs"][1]) == 1
+    assert len(loaded_array["answer_paragraphs"][2]) == 1
+
+    assert any(loaded_array["cancelled_by_user"])
+
 
 @pytest.fixture
 async def qa_kb(
@@ -202,14 +217,19 @@ def smb_wonder_bm(kbid: str) -> BrokerMessage:
     end = len(paragraphs[0])
     paragraph_0_id = f"{rid}/f/{file_field_id}/{start}-{end}"
 
+    start = len(paragraphs[0])
+    end = len(paragraphs[0]) + len(paragraphs[1])
+    paragraph_1_id = f"{rid}/f/{file_field_id}/{start}-{end}"
+
     qa1 = QuestionAnswer()
     qa1.question.text = "What is SMB Wonder?"
     qa1.question.language = "en"
+    qa1.question.ids_paragraphs.append(paragraph_0_id)
 
     qa1_a1 = Answers()
-    qa1_a1.text = "SMB Wonder is a Nintendo Switch game"
+    qa1_a1.text = "SMB Wonder is a side-scrolling Nintendo Switch game"
     qa1_a1.language = "en"
-    qa1_a1.ids_paragraphs.append(paragraph_0_id)
+    qa1_a1.ids_paragraphs.extend([paragraph_0_id, paragraph_1_id])
     qa1.answers.append(qa1_a1)
 
     qa1_a2 = Answers()
@@ -219,10 +239,6 @@ def smb_wonder_bm(kbid: str) -> BrokerMessage:
     qa1.answers.append(qa1_a2)
 
     fqaw.question_answers.question_answer.append(qa1)
-
-    start = len(paragraphs[0])
-    end = len(paragraphs[0]) + len(paragraphs[1])
-    paragraph_1_id = f"{rid}/f/{file_field_id}/{start}-{end}"
 
     qa2 = QuestionAnswer()
     qa2.question.text = "Give me an example of side-scrolling game"
