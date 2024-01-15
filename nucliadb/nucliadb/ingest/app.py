@@ -112,6 +112,13 @@ async def initialize_pull_workers() -> list[Callable[[], Awaitable[None]]]:
     return [pull_workers] + finalizers
 
 
+async def initialize_pull_worker_v2() -> list[Callable[[], Awaitable[None]]]:
+    finalizers = await initialize_grpc()
+    pull_worker = await consumer_service.start_v2_pull_worker(SERVICE_NAME)
+
+    return [pull_worker] + finalizers
+
+
 async def main_consumer():  # pragma: no cover
     finalizers = await initialize()
     metrics_server = await serve_metrics()

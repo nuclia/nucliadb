@@ -76,6 +76,7 @@ class Settings(DriverSettings):
 
     pull_time_error_backoff: int = 100
     disable_pull_worker: bool = False
+    processing_v2: bool = False
 
     # ingest consumer sts replica settings
     replica_number: int = -1

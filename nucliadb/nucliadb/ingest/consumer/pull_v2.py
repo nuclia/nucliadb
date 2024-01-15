@@ -135,7 +135,9 @@ class PullWorkerV2:
         headers = {}
         data = None
         if nuclia_settings.nuclia_service_account is not None:
-            headers["X-STF-NUAKEY"] = f"Bearer {nuclia_settings.nuclia_service_account}"
+            headers[
+                "X-Nuclia-NUAKEY"
+            ] = f"Bearer {nuclia_settings.nuclia_service_account}"
 
         cursor = None
         async with self.driver.transaction() as txn:
@@ -143,10 +145,12 @@ class PullWorkerV2:
             if val is not None:
                 cursor = val.decode()
 
+        sleep_backoff = 0.1
         async with ProcessingV2HTTPClient() as processing_http_client:
             logger.info(f"Collecting from NucliaDB Cloud")
             while True:
                 try:
+                    await asyncio.sleep(sleep_backoff)
                     data = await processing_http_client.pull(cursor=cursor, limit=3)
 
                     if len(data.results) > 0:
@@ -155,9 +159,9 @@ class PullWorkerV2:
                         cursor = data.cursor
                         async with self.driver.transaction() as txn:
                             await txn.set(DB_TXN_KEY, cursor.encode())
-                        await asyncio.sleep(self.pull_time_empty_backoff)
+                        sleep_backoff = 0.1
                     else:
-                        await asyncio.sleep(self.pull_time_empty_backoff)
+                        sleep_backoff = self.pull_time_empty_backoff
                 except (
                     asyncio.exceptions.CancelledError,
                     RuntimeError,
@@ -166,14 +170,12 @@ class PullWorkerV2:
                 ):
                     logger.info(f"Pull task for was canceled, exiting")
                     raise ReallyStopPulling()
-
                 except ClientConnectorError:
                     logger.error(
                         f"Could not connect to processing engine, \
                          {processing_http_client.base_url} verify your internet connection"
                     )
-                    await asyncio.sleep(self.pull_time_error_backoff)
-
+                    sleep_backoff = self.pull_time_error_backoff
                 except Exception:
                     logger.exception("Unhandled error pulling messages from processing")
-                    await asyncio.sleep(self.pull_time_error_backoff)
+                    sleep_backoff = self.pull_time_error_backoff

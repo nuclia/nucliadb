@@ -38,6 +38,7 @@ from pydantic import BaseModel, Field
 import nucliadb_models as models
 from nucliadb_models.configuration import KBConfiguration
 from nucliadb_models.resource import QueueType
+from nucliadb.ingest.settings import settings as ingest_settings
 from nucliadb_telemetry import metrics
 from nucliadb_utils import const, logger
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
@@ -179,6 +180,9 @@ class ProcessingEngine:
             f"{nuclia_processing_cluster_url}/api/internal/v2/processing/push"
         )
         self.nuclia_external_push = f"{self.nuclia_public_url}/api/v1/processing/push"
+        self.nuclia_external_push_v2 = (
+            f"{self.nuclia_public_url}/api/v2/processing/push"
+        )
 
         self.nuclia_jwt_key = nuclia_jwt_key
         self.days_to_keep = days_to_keep
@@ -395,25 +399,23 @@ class ProcessingEngine:
             if self.onprem is False:
                 # Upload the payload
                 url = self.nuclia_internal_push
-                if has_feature(
-                    const.Features.PROCESSING_V2,
-                    context={"kbid": item.kbid},
-                ):
+                if ingest_settings.processing_v2:
                     url = self.nuclia_internal_push_v2
                 item.partition = partition
                 resp = await self.session.post(
                     url=url, data=item.json(), headers=headers
                 )
             else:
+                url = self.nuclia_external_push + "?partition=" + str(partition)
+                if ingest_settings.processing_v2:
+                    url = self.nuclia_external_push_v2
                 item.learning_config = await self.get_configuration(item.kbid)
                 headers.update(
                     {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
                 )
                 # Upload the payload
                 resp = await self.session.post(
-                    url=self.nuclia_external_push + "?partition=" + str(partition),
-                    data=item.json(),
-                    headers=headers,
+                    url=url, data=item.json(), headers=headers
                 )
             if resp.status == 200:
                 data = await resp.json()
