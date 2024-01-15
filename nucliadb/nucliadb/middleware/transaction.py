@@ -28,7 +28,7 @@ from starlette.responses import Response
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import get_driver
 
-txn_manager: ContextVar[Optional["TransactionManager"]] = ContextVar(
+txn_manager: ContextVar[Optional["ReadOnlyTransactionManager"]] = ContextVar(
     "txn_manager", default=None
 )
 
@@ -44,15 +44,19 @@ class ReadOnlyTransactionMiddleware(BaseHTTPMiddleware):
 
     Usage:
         - Add this middleware to the FastAPI app:
+
+            app = FastAPI()
             app.add_middleware(ReadOnlyTransactionMiddleware)
+
         - Where needed, get the transaction:
+
             txn = await get_read_only_transaction()
     """
 
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
-        mgr = TransactionManager()
+        mgr = ReadOnlyTransactionManager()
         txn_manager.set(mgr)
         try:
             return await call_next(request)
@@ -61,13 +65,13 @@ class ReadOnlyTransactionMiddleware(BaseHTTPMiddleware):
             txn_manager.set(None)
 
 
-class TransactionManager:
+class ReadOnlyTransactionManager:
     def __init__(self):
         self._transaction: Optional[Transaction] = None
         self._lock = asyncio.Lock()
         self.aborted: bool = False
 
-    async def get_read_only_transaction(self) -> Transaction:
+    async def get_transaction(self) -> Transaction:
         if self.aborted:
             raise RuntimeError("Transaction was aborted")
 
@@ -98,9 +102,12 @@ class TransactionManager:
 
 
 async def get_read_only_transaction() -> Transaction:
-    mgr: Optional[TransactionManager] = txn_manager.get()
-    if mgr is None:
+    """
+    Returns the read-only transaction for the current request
+    """
+    manager: Optional[ReadOnlyTransactionManager] = txn_manager.get()
+    if manager is None:
         raise RuntimeError(
-            "Transaction manager not set. Did you forget to add the ReadOnlyTransactionMiddleware?"
+            "Context var is not set. Did you forget to add the ReadOnlyTransactionMiddleware to the app?"
         )
-    return await mgr.get_read_only_transaction()
+    return await manager.get_transaction()

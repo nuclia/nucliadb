@@ -25,8 +25,8 @@ from starlette.responses import PlainTextResponse
 from starlette.testclient import TestClient
 
 from nucliadb.middleware.transaction import (
+    ReadOnlyTransactionManager,
     ReadOnlyTransactionMiddleware,
-    TransactionManager,
     get_read_only_transaction,
 )
 
@@ -87,14 +87,14 @@ async def test_get_read_only_transaction_runtime_error_if_not_configured():
 
 
 async def test_transaction_manager_raises_on_aborted():
-    mgr = TransactionManager()
+    mgr = ReadOnlyTransactionManager()
     mgr.aborted = True
     with pytest.raises(RuntimeError):
         await mgr.get_read_only_transaction()
 
 
 async def test_txn_manager_creates_transaction_only_once():
-    mgr = TransactionManager()
+    mgr = ReadOnlyTransactionManager()
     txn = mock.Mock()
     get_txn = mock.AsyncMock(return_value=txn)
     mgr._get_transaction = get_txn
@@ -104,7 +104,7 @@ async def test_txn_manager_creates_transaction_only_once():
 
 
 async def test_txn_manager_maybe_abort():
-    mgr = TransactionManager()
+    mgr = ReadOnlyTransactionManager()
     mgr.aborted = True
     await mgr.maybe_abort()
     mgr.aborted = False
