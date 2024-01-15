@@ -17,13 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import logging
 import os
 
 # abstract advanced error handling into its own module to prevent
 # code from handling sentry integration everywhere
 from typing import Any, ContextManager, Optional
 
-import logging
 import pydantic
 
 try:
@@ -35,9 +35,9 @@ try:
     import sentry_sdk
     from sentry_sdk import Scope
     from sentry_sdk.integrations.logging import (
+        BreadcrumbHandler,
         EventHandler,
         LoggingIntegration,
-        BreadcrumbHandler,
     )
 
     SENTRY = os.environ.get("SENTRY_URL") is not None
