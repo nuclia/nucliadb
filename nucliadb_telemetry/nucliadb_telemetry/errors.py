@@ -23,6 +23,7 @@ import os
 # code from handling sentry integration everywhere
 from typing import Any, ContextManager, Optional
 
+import logging
 import pydantic
 
 try:
@@ -33,10 +34,15 @@ except ImportError:  # pragma: no cover
 try:
     import sentry_sdk
     from sentry_sdk import Scope
+    from sentry_sdk.integrations.logging import (
+        EventHandler,
+        LoggingIntegration,
+        BreadcrumbHandler,
+    )
 
     SENTRY = os.environ.get("SENTRY_URL") is not None
 except ImportError:  # pragma: no cover
-    Scope = sentry_sdk = None  # type: ignore
+    Scope = sentry_sdk = LoggingIntegration = EventHandler = BreadcrumbHandler = None  # type: ignore
     SENTRY = False
 
 
@@ -101,3 +107,33 @@ def setup_error_handling(version: str) -> None:
             default_integrations=False,
         )
         sentry_sdk.set_tag("zone", settings.zone)
+
+
+class SentryHandler(EventHandler):
+    def __init__(self, allowed_loggers: list[str], *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._allowed_loggers = allowed_loggers
+
+    def emit(self, record):
+        if record.name in self._allowed_loggers:
+            super().emit(record)
+
+
+class SentryLoggingIntegration(LoggingIntegration):
+    def __init__(
+        self, allowed_loggers: list[str], level=logging.INFO, event_level=logging.ERROR
+    ):
+        self._breadcrumb_handler = BreadcrumbHandler(level=level)
+        self._handler = SentryHandler(allowed_loggers, level=event_level)
+
+
+# Initialize Sentry with the custom logging handler
+
+
+def setup_sentry_logging_integration(for_loggers: list[str]) -> None:
+    settings = ErrorHandlingSettings()
+    if settings.sentry_url:
+        sentry_sdk.init(
+            dsn=settings.sentry_url,
+            integrations=[SentryLoggingIntegration(for_loggers)],
+        )
