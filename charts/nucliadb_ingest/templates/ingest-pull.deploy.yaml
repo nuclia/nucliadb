@@ -1,3 +1,4 @@
+{{- if .Values.processing_v2 }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -133,4 +134,6 @@ spec:
       - name: regional-nats-creds
         secret:
           secretName: {{ .Values.nats.regionalSecretName }}
+{{- end }}
+
 {{- end }}

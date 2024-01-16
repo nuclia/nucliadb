@@ -24,3 +24,7 @@ data:
   TOTAL_REPLICAS: {{ .Values.replicaCount | quote }}
 
   JAEGER_ENABLED: {{ .Values.tracing.enabled | quote }}
+
+{{- if .Values.processing_v2 }}
+  processing_v2: "true"
+{{- end }}

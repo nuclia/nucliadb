@@ -223,8 +223,7 @@ def run_consumer() -> None:  # pragma: no cover
 
 def run_v2_pull_worker() -> None:  # pragma: no cover
     """
-    Running:
-        - pull worker
+    Running only pull worker
     """
     setup_configuration()
     asyncio.run(main_run_v2_pull_worker())
