@@ -19,7 +19,7 @@
 #
 import datetime
 import math
-from typing import Any, Optional, Union
+from typing import Any, Optional, Set, Union
 
 from nucliadb_protos.nodereader_pb2 import (
     DocumentResult,
@@ -53,6 +53,7 @@ from nucliadb_models.search import (
     Paragraph,
     Paragraphs,
     RelatedEntities,
+    RelatedEntity,
     RelationDirection,
     RelationNodeTypeMap,
     Relations,
@@ -594,13 +595,15 @@ async def merge_paragraphs_results(
 async def merge_suggest_entities_results(
     suggest_responses: list[SuggestResponse],
 ) -> RelatedEntities:
-    merge = RelatedEntities(entities=[], total=0)
-
+    unique_entities: Set[RelatedEntity] = set()
     for response in suggest_responses:
-        merge.entities.extend(response.entities.entities)
-        merge.total += response.entities.total
+        response_entities = (
+            RelatedEntity(family=e.subtype, value=e.value)
+            for e in response.entity_results.nodes
+        )
+        unique_entities.update(response_entities)
 
-    return merge
+    return RelatedEntities(entities=list(unique_entities), total=len(unique_entities))
 
 
 async def merge_suggest_results(

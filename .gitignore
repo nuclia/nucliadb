@@ -23,6 +23,7 @@ target
 .egg-info
 *.so
 venv/
+.venv/
 nucliadb/.mypy_cache
 lib
 share

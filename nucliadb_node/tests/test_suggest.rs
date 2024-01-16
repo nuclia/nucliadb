@@ -203,10 +203,10 @@ async fn test_suggest_entities(
 
     // multiple words and result ordering
     let response = suggest_entities(&mut reader, &shard.id, "Solomon Isa").await;
-    assert!(response.entities.is_some());
-    assert_eq!(response.entities.as_ref().unwrap().total, 2);
-    assert!(response.entities.as_ref().unwrap().entities[0] == *"Solomon Islands");
-    assert!(response.entities.as_ref().unwrap().entities[1] == *"Israel");
+    assert!(response.entity_results.is_some());
+    assert_eq!(response.entity_results.as_ref().unwrap().nodes.len(), 2);
+    assert!(response.entity_results.as_ref().unwrap().nodes[0].value == *"Solomon Islands");
+    assert!(response.entity_results.as_ref().unwrap().nodes[1].value == *"Israel");
 
     // Does not find resources by UUID prefix
     let pap_uuid = &shard.resources["pap"];
@@ -358,20 +358,21 @@ async fn suggest_entities(
 }
 
 fn expect_entities(response: &SuggestResponse, expected: &[&str]) {
-    assert!(response.entities.is_some());
+    assert!(response.entity_results.is_some());
     assert_eq!(
-        response.entities.as_ref().unwrap().total as usize,
+        response.entity_results.as_ref().unwrap().nodes.len(),
         expected.len(),
         "Response entities don't match expected ones: {:?} != {:?}",
-        response.entities,
+        response.entity_results,
         expected,
     );
     for entity in expected {
         assert!(response
-            .entities
+            .entity_results
             .as_ref()
             .unwrap()
-            .entities
-            .contains(&entity.to_string()));
+            .nodes
+            .iter()
+            .any(|e| &e.value == entity));
     }
 }

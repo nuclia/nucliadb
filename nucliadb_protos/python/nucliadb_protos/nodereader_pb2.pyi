@@ -1108,6 +1108,7 @@ class SuggestResponse(google.protobuf.message.Message):
     QUERY_FIELD_NUMBER: builtins.int
     EMATCHES_FIELD_NUMBER: builtins.int
     ENTITIES_FIELD_NUMBER: builtins.int
+    ENTITY_RESULTS_FIELD_NUMBER: builtins.int
     total: builtins.int
     @property
     def results(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ParagraphResult]: ...
@@ -1117,7 +1118,11 @@ class SuggestResponse(google.protobuf.message.Message):
     def ematches(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     @property
     def entities(self) -> global___RelatedEntities:
-        """Entities related with the query"""
+        """Entities related with the query
+        Deprecated, to be removed
+        """
+    @property
+    def entity_results(self) -> global___RelationPrefixSearchResponse: ...
     def __init__(
         self,
         *,
@@ -1126,9 +1131,10 @@ class SuggestResponse(google.protobuf.message.Message):
         query: builtins.str = ...,
         ematches: collections.abc.Iterable[builtins.str] | None = ...,
         entities: global___RelatedEntities | None = ...,
+        entity_results: global___RelationPrefixSearchResponse | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["entities", b"entities"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["ematches", b"ematches", "entities", b"entities", "query", b"query", "results", b"results", "total", b"total"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["entities", b"entities", "entity_results", b"entity_results"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["ematches", b"ematches", "entities", b"entities", "entity_results", b"entity_results", "query", b"query", "results", b"results", "total", b"total"]) -> None: ...
 
 global___SuggestResponse = SuggestResponse
 

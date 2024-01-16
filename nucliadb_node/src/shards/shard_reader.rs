@@ -38,8 +38,9 @@ use nucliadb_core::query_planner::QueryPlan;
 use nucliadb_core::thread::*;
 use nucliadb_core::tracing::{self, *};
 use nucliadb_procs::measure;
-use nucliadb_protos::nodereader::RelationNodeFilter;
+use nucliadb_protos::nodereader::{RelationNodeFilter, RelationPrefixSearchResponse};
 use nucliadb_protos::utils::relation_node::NodeType;
+use nucliadb_relations2::reader::HashedRelationNode;
 
 use crate::disk_structure::*;
 use crate::shards::metadata::ShardMetadata;
@@ -362,13 +363,12 @@ impl ShardReader {
                     .into_iter()
                     .flatten() // unwrap errors and continue with successful results
                     .flat_map(|response| response.prefix)
-                    .flat_map(|prefix_response| prefix_response.nodes.into_iter())
-                    .map(|node| node.value);
+                    .flat_map(|prefix_response| prefix_response.nodes.into_iter());
 
                 // remove duplicate entities
-                let mut seen = HashSet::new();
+                let mut seen: HashSet<HashedRelationNode> = HashSet::new();
                 let mut ent_result = entities.collect::<Vec<_>>();
-                ent_result.retain(|e| seen.insert(e.clone()));
+                ent_result.retain(|e| seen.insert(e.clone().into()));
 
                 ent_result
             };
@@ -403,10 +403,13 @@ impl ShardReader {
         };
 
         if let Some(entities) = entities {
+            // Deprecated, to be removed
             response.entities = Some(RelatedEntities {
                 total: entities.len() as u32,
-                entities,
-            })
+                entities: entities.iter().map(|e| e.value.clone()).collect(),
+            });
+            // New version of the response, keep this
+            response.entity_results = Some(RelationPrefixSearchResponse { nodes: entities });
         }
 
         Ok(response)
