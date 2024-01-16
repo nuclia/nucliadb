@@ -26,6 +26,7 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import ClientDisconnect, Request
 from starlette.responses import HTMLResponse
 
+from nucliadb.middleware.transaction import ReadOnlyTransactionMiddleware
 from nucliadb.train import API_PREFIX
 from nucliadb.train.api.v1.router import api
 from nucliadb.train.lifecycle import finalize, initialize
@@ -46,6 +47,7 @@ middleware = [
         AuthenticationMiddleware,
         backend=NucliaCloudAuthenticationBackend(),
     ),
+    Middleware(ReadOnlyTransactionMiddleware),
 ]
 
 
