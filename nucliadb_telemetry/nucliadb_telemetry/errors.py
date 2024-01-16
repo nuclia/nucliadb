@@ -22,7 +22,7 @@ import os
 
 # abstract advanced error handling into its own module to prevent
 # code from handling sentry integration everywhere
-from typing import Any, ContextManager, Optional
+from typing import Any, ContextManager, List, Optional
 
 import pydantic
 
@@ -115,7 +115,7 @@ def setup_error_handling(version: str) -> None:
 
 
 class SentryHandler(EventHandler):
-    def __init__(self, allowed_loggers: list[str], *args, **kwargs):
+    def __init__(self, allowed_loggers: List[str], *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._allowed_loggers = allowed_loggers
 
@@ -129,7 +129,7 @@ class SentryHandler(EventHandler):
 
 class SentryLoggingIntegration(LoggingIntegration):
     def __init__(
-        self, allowed_loggers: list[str], level=logging.INFO, event_level=logging.ERROR
+        self, allowed_loggers: List[str], level=logging.INFO, event_level=logging.ERROR
     ):
         self._breadcrumb_handler = BreadcrumbHandler(level=level)
         self._handler = SentryHandler(allowed_loggers, level=event_level)
@@ -138,7 +138,7 @@ class SentryLoggingIntegration(LoggingIntegration):
 # Initialize Sentry with the custom logging handler
 
 
-def setup_sentry_logging_integration(for_loggers: list[str]) -> None:
+def setup_sentry_logging_integration(for_loggers: List[str]) -> None:
     settings = ErrorHandlingSettings()
     if settings.sentry_url:
         sentry_sdk.init(
