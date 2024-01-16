@@ -16,31 +16,17 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-#
-
-import asyncio
-from unittest.mock import AsyncMock, patch
-
-import pytest
-
-from nucliadb.ingest import txn_utils
-
-pytestmark = pytest.mark.asyncio
+import nucliadb_sdk
+from nucliadb_models.search import KnowledgeboxFindResults, SummarizeRequest
 
 
-@pytest.fixture(autouse=True)
-def driver():
-    mock = AsyncMock()
-    with patch("nucliadb.ingest.txn_utils.get_driver", return_value=mock):
-        yield mock
+def test_summarize(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
+    results: KnowledgeboxFindResults = sdk.find(kbid=docs_dataset, query="love")
+    resource_uuids = [uuid for uuid in results.resources.keys()]
 
+    response = sdk.summarize(kbid=docs_dataset, resources=[resource_uuids[0]])
+    assert response.summary == "global summary"
 
-async def test_get_transaction_auto_aborts(driver) -> None:
-    async def mytask():
-        await txn_utils.get_transaction()
-
-    await asyncio.create_task(mytask())
-
-    await asyncio.sleep(0.05)
-
-    driver.begin.return_value.abort.assert_called_once()
+    content = SummarizeRequest(resources=[resource_uuids[0]])
+    response = sdk.summarize(kbid=docs_dataset, content=content)
+    assert response.summary == "global summary"

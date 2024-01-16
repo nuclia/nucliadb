@@ -24,7 +24,7 @@ from typing import Any, AsyncIterator, Optional
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
-from nucliadb.ingest.txn_utils import get_transaction
+from nucliadb.middleware.transaction import get_read_only_transaction
 from nucliadb.train import SERVICE_NAME, logger
 from nucliadb.train.types import TrainBatchType
 from nucliadb_utils.utilities import get_storage
@@ -46,7 +46,7 @@ async def get_resource_from_cache_or_db(kbid: str, uuid: str) -> Optional[Resour
     resouce_cache = get_resource_cache()
     orm_resource: Optional[ResourceORM] = None
     if uuid not in resouce_cache:
-        transaction = await get_transaction()
+        transaction = await get_read_only_transaction()
         storage = await get_storage(service_name=SERVICE_NAME)
         kb = KnowledgeBoxORM(transaction, storage, kbid)
         orm_resource = await kb.get(uuid)

@@ -44,7 +44,6 @@ from nucliadb.train.generators.sentence_classifier import (
 from nucliadb.train.generators.token_classifier import (
     token_classification_batch_generator,
 )
-from nucliadb.train.generators.utils import get_transaction
 from nucliadb.train.types import TrainBatch
 from nucliadb.train.utils import get_shard_manager
 
@@ -99,6 +98,3 @@ async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
         payload = item.SerializeToString()
         yield len(payload).to_bytes(4, byteorder="big", signed=False)
         yield payload
-
-    txn = await get_transaction()
-    await txn.abort()

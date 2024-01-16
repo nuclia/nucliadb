@@ -431,7 +431,7 @@ async def test_entities_indexing(
     assert resp.status_code == 200
     body = resp.json()
 
-    entities = set(body["entities"]["entities"])
+    entities = set((e["value"] for e in body["entities"]["entities"]))
     # BUG? why is "domestic cat" not appearing in the results?
     assert entities == {"dog", "dolphin"}
     # assert entities == {"dog", "domestic cat", "dolphin"}

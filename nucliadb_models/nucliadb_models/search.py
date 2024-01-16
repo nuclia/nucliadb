@@ -228,9 +228,14 @@ class Relations(BaseModel):
     # graph: List[RelationPath]
 
 
+class RelatedEntity(BaseModel, frozen=True):
+    family: str
+    value: str
+
+
 class RelatedEntities(BaseModel):
     total: int = 0
-    entities: List[str] = []
+    entities: List[RelatedEntity] = []
 
 
 class ResourceSearchResults(JsonBaseModel):
@@ -808,7 +813,7 @@ class SummarizedResponse(BaseModel):
         default={}, title="Resources", description="Individual resource summaries"
     )
     summary: str = Field(
-        default="", title="Summary", description="Globla summary of all resources"
+        default="", title="Summary", description="Global summary of all resources"
     )
 
 
