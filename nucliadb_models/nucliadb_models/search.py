@@ -808,7 +808,7 @@ class SummarizedResponse(BaseModel):
         default={}, title="Resources", description="Individual resource summaries"
     )
     summary: str = Field(
-        default="", title="Summary", description="Globla summary of all resources"
+        default="", title="Summary", description="Global summary of all resources"
     )
 
 

@@ -89,3 +89,4 @@ async def test_search_endpoints(sdk_async: nucliadb_sdk.NucliaDBAsync, kb):
     await sdk_async.feedback(
         kbid=kb.uuid, ident="bar", good=True, feedback="baz", task=FeedbackTasks.CHAT
     )
+    await sdk_async.summarize(kbid=kb.uuid, resources=["foobar"])

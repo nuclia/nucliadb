@@ -276,6 +276,19 @@ RESOURCE_CHAT = Docstring(
     ],
 )
 
+SUMMARIZE = Docstring(
+    doc="""Summarize your documents""",
+    examples=[
+        Example(
+            description="Get a summary of a document or a list of documents",
+            code=""">>> summary = sdk.summarize(kbid="mykbid", resources=["uuid1"]).summary
+>>> print(summary)
+'The document talks about Seville and its temperature. It also mentions the coldest month of the year, which is January.'  # noqa
+""",
+        ),
+    ],
+)
+
 
 DELETE_LABELSET = Docstring(
     doc="Delete a specific set of labels",
