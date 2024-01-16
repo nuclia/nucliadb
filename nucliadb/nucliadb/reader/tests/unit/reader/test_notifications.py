@@ -24,7 +24,7 @@ from nucliadb.reader.reader.notifications import kb_notifications_stream
 from nucliadb_protos import writer_pb2
 
 
-async def test_kb_notifications_stream_timeout():
+async def test_kb_notifications_stream_timeout_gracefully():
     event = asyncio.Event()
 
     async def mocked_long_kb_notifications(kbid):

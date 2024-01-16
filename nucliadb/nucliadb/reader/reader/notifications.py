@@ -19,9 +19,10 @@
 #
 import asyncio
 import contextlib
-import time
 import uuid
 from collections.abc import AsyncGenerator
+
+import async_timeout
 
 from nucliadb.reader import logger
 from nucliadb_models.notifications import (
@@ -50,33 +51,13 @@ async def kb_notifications_stream(kbid: str) -> AsyncGenerator[bytes, None]:
     Returns an async generator that yields pubsub notifications for the given kbid.
     The generator will return after NOTIFICATIONS_TIMEOUT_S seconds.
     """
-    start_time = time.perf_counter()
-    queue: asyncio.Queue = asyncio.Queue()
-    producer_task = asyncio.create_task(kb_notifications_producer(kbid, queue))
-    while True:
-        elapsed = time.perf_counter() - start_time
-        if elapsed > NOTIFICATIONS_TIMEOUT_S:
-            producer_task.cancel()
-            return
-        try:
-            line = queue.get_nowait()
-            yield line
-        except asyncio.QueueEmpty:
-            pass
-        finally:
-            await asyncio.sleep(0.2)
-
-
-async def kb_notifications_producer(kbid: str, queue: asyncio.Queue):
-    """
-    Read the KB notifications and put them in the queue.
-    """
     try:
-        async for pb_notification in kb_notifications(kbid):
-            line = encode_streamed_notification(pb_notification) + b"\n"
-            queue.put_nowait(line)
-    except asyncio.CancelledError:
-        pass
+        async with async_timeout.timeout(NOTIFICATIONS_TIMEOUT_S):
+            async for pb_notification in kb_notifications(kbid):
+                line = encode_streamed_notification(pb_notification) + b"\n"
+                yield line
+    except asyncio.TimeoutError:
+        return
 
 
 async def kb_notifications(kbid: str) -> AsyncGenerator[writer_pb2.Notification, None]:
