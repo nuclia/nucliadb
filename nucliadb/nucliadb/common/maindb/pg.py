@@ -184,7 +184,7 @@ class ReadOnlyPGTransaction(Transaction):
         self.open = True
 
     async def abort(self):
-        # TODO: Figure out why is this empty?
+        # This is a no-op because we don't have a transaction to abort on read-only transactions.
         ...
 
     async def commit(self):

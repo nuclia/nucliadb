@@ -187,7 +187,7 @@ def node_single():
 @pytest.fixture(scope="function")
 async def writer_stub(node_single) -> AsyncIterable[NodeWriterStub]:
     channel = aio.insecure_channel(settings.writer_listen_address)
-    stub = NodeWriterStub(channel)
+    stub = NodeWriterStub(channel)  # type: ignore
     yield stub
 
 
