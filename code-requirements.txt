@@ -1,4 +1,4 @@
-flake8==4.0.1
+ruff==0.0.285
 black==23.3.0
 isort==5.10.1
 pre-commit==2.20.0

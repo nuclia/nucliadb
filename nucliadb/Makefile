@@ -34,42 +34,42 @@ format:
 
 .PHONY: lint
 lint:
-	flake8 nucliadb --config=setup.cfg
+	ruff nucliadb --config=pyproject.toml
 	cd .. && isort -c --profile black nucliadb
 	black --check .
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini .
 
 .PHONY: lint-standalone
 lint-standalone:
-	flake8 nucliadb/standalone --config=setup.cfg
+	ruff nucliadb/standalone --config=pyproject.toml
 	cd .. && isort -c --profile black nucliadb/nucliadb/standalone
 	black --check nucliadb/standalone
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini nucliadb/standalone
 
 .PHONY: lint-reader
 lint-reader:
-	flake8 nucliadb/reader --config=setup.cfg
+	ruff nucliadb/reader --config=pyproject.toml
 	cd .. && isort -c --profile black nucliadb/nucliadb/reader
 	black --check nucliadb/reader
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini nucliadb/reader
 
 .PHONY: lint-search
 lint-search:
-	flake8 nucliadb/search --config=setup.cfg
+	ruff nucliadb/search --config=pyproject.toml
 	cd .. && isort -c --profile black nucliadb/nucliadb/search
 	black --check nucliadb/search
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini nucliadb/search
 
 .PHONY: lint-train
 lint-train:
-	flake8 nucliadb/train --config=setup.cfg
+	ruff nucliadb/train --config=pyproject.toml
 	cd .. && isort -c --profile black nucliadb/nucliadb/train
 	black --check nucliadb/train
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini nucliadb/train
 
 .PHONY: lint-writer
 lint-writer:
-	flake8 nucliadb/writer --config=setup.cfg
+	ruff nucliadb/writer --config=pyproject.toml
 	cd .. && isort -c --profile black nucliadb/nucliadb/writer
 	black --check nucliadb/writer
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini nucliadb/writer
