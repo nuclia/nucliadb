@@ -471,8 +471,8 @@ pub struct SuggestResponse {
     #[prost(string, repeated, tag="4")]
     pub ematches: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     /// Entities related with the query
-    #[prost(message, optional, tag="5")]
-    pub entities: ::core::option::Option<RelatedEntities>,
+    #[prost(message, optional, tag="6")]
+    pub entity_results: ::core::option::Option<RelationPrefixSearchResponse>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SearchResponse {
