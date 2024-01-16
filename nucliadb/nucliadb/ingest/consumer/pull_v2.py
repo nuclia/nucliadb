@@ -155,7 +155,17 @@ class PullWorkerV2:
 
                     if len(data.results) > 0:
                         for result in data.results:
-                            await self.handle_message(result.payload)
+                            if result.payload is not None:
+                                await self.handle_message(result.payload)
+                            else:
+                                logger.warning(
+                                    "Payload has expired, skipping.",
+                                    extra={
+                                        "resource_id": result.resource_id,
+                                        "kbid": result.kbid,
+                                        "processing_id": result.processing_id,
+                                    },
+                                )
                         cursor = data.cursor
                         async with self.driver.transaction() as txn:
                             await txn.set(DB_TXN_KEY, cursor.encode())

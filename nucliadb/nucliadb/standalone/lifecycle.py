@@ -21,7 +21,7 @@ import asyncio
 
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.ingest.app import initialize_grpc as initialize_ingest_grpc
-from nucliadb.ingest.app import initialize_pull_workers, initialize_pull_worker_v2
+from nucliadb.ingest.app import initialize_pull_worker_v2, initialize_pull_workers
 from nucliadb.ingest.settings import settings as ingest_settings
 from nucliadb.reader.lifecycle import finalize as finalize_reader
 from nucliadb.reader.lifecycle import initialize as initialize_reader

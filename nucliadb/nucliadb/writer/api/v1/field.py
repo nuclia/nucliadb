@@ -108,7 +108,7 @@ async def finish_field_put(
     toprocess: PushPayload,
     partition: int,
     wait_on_commit: bool,
-) -> int:
+) -> Optional[int]:
     # Create processing message
     transaction = get_transaction_utility()
     processing = get_processing()

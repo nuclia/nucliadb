@@ -141,7 +141,7 @@ class ProcessingHTTPClient:
 
 
 class ProcessRequestResponseV2(pydantic.BaseModel):
-    payload: bytes
+    payload: Optional[str]
     processing_id: str
     kbid: Optional[str]
     account_id: str
@@ -174,7 +174,7 @@ class ProcessingV2HTTPClient:
 
     async def pull(self, cursor: Optional[str], limit: int = 5) -> PullResponseV2:
         url = self.base_url + "/pull"
-        params = {"limit": limit}
+        params: dict[str, str] = {"limit": str(limit)}
         if cursor is not None:
             params["cursor"] = cursor
         async with self.session.get(url, headers=self.headers, params=params) as resp:

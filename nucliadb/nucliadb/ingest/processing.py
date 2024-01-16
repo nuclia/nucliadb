@@ -19,6 +19,7 @@
 #
 import base64
 import datetime
+import logging
 import uuid
 from collections import defaultdict
 from contextlib import AsyncExitStack
@@ -36,15 +37,16 @@ from nucliadb_protos.writer_pb2 import GetConfigurationResponse, OpStatusWriter
 from pydantic import BaseModel, Field
 
 import nucliadb_models as models
+from nucliadb.ingest.settings import settings as ingest_settings
 from nucliadb_models.configuration import KBConfiguration
 from nucliadb_models.resource import QueueType
-from nucliadb.ingest.settings import settings as ingest_settings
 from nucliadb_telemetry import metrics
-from nucliadb_utils import const, logger
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.settings import nuclia_settings, storage_settings
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import Utility, get_ingest, has_feature, set_utility
+from nucliadb_utils.utilities import Utility, get_ingest, set_utility
+
+logger = logging.getLogger(__name__)
 
 _T = TypeVar("_T")
 
@@ -73,9 +75,9 @@ class Source(SourceValue, Enum):  # type: ignore
 
 
 class ProcessingInfo(BaseModel):
-    seqid: int
+    seqid: Optional[int]
     account_seq: Optional[int]
-    queue: QueueType
+    queue: Optional[QueueType] = None
 
 
 class PushPayload(BaseModel):
@@ -440,7 +442,9 @@ class ProcessingEngine:
         )
 
         return ProcessingInfo(
-            seqid=seqid, account_seq=account_seq, queue=QueueType(queue_type)
+            seqid=seqid,
+            account_seq=account_seq,
+            queue=QueueType(queue_type) if queue_type is not None else None,
         )
 
 
