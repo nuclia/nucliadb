@@ -28,6 +28,8 @@ pub trait SettingsProvider {
 }
 
 pub mod env {
+    use std::time::Duration;
+
     use nucliadb_core::NodeResult;
 
     use crate::settings::providers::SettingsProvider;
@@ -125,7 +127,7 @@ pub mod env {
             if let Ok(Ok(replication_delay_seconds)) =
                 std::env::var("REPLICATION_DELAY_SECONDS").map(|v| v.parse::<u64>())
             {
-                builder.replication_delay_seconds(replication_delay_seconds);
+                builder.replication_delay(Duration::from_secs(replication_delay_seconds));
             }
 
             if let Ok(Ok(replication_max_concurrency)) =
@@ -137,7 +139,7 @@ pub mod env {
             if let Ok(Ok(replication_healthy_delay)) =
                 std::env::var("REPLICATION_HEALTHY_DELAY").map(|v| v.parse::<u64>())
             {
-                builder.replication_healthy_delay(replication_healthy_delay);
+                builder.replication_healthy_delay(Duration::from_secs(replication_healthy_delay));
             }
 
             builder.build()
