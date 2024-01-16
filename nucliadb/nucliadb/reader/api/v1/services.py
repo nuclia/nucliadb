@@ -313,9 +313,9 @@ async def get_configuration(request: Request, kbid: str):
     f"/{KB_PREFIX}/{{kbid}}/notifications",
     status_code=200,
     name="Knowledge Box Notifications Stream",
-    description="Provides a stream of activity notifications for the given Knowledge Box.",
+    description="Provides a stream of activity notifications for the given Knowledge Box. The stream will be automatically closed after 2 minutes.",  # noqa: E501
     tags=["Knowledge Box Services"],
-    response_description="Each line of the response is a JSON object representing a notification.",
+    response_description="Each line of the response is a Base64-encoded JSON object representing a notification.",
     response_model=None,
     responses={
         "404": {"description": "Knowledge Box not found"},
