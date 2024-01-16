@@ -83,6 +83,11 @@ async def get_extracted_texts(
             for _, field in fields.items():
                 task = asyncio.create_task(get_extracted_text(rid, field, max_tasks))
                 tasks.append(task)
+
+        if len(tasks) == 0:
+            # No extracted text to get
+            return results
+
         done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
 
     # Parse the task results
