@@ -44,10 +44,10 @@ try:
 except ImportError:  # pragma: no cover
     Scope = sentry_sdk = None  # type: ignore
 
-    class LoggingIntegration:
+    class LoggingIntegration:  # type: ignore
         pass
 
-    EventHandler = BreadcrumbHandler = LoggingIntegration
+    EventHandler = BreadcrumbHandler = LoggingIntegration  # type: ignore
     SENTRY = False
 
 
