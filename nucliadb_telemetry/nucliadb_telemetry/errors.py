@@ -42,7 +42,12 @@ try:
 
     SENTRY = os.environ.get("SENTRY_URL") is not None
 except ImportError:  # pragma: no cover
-    Scope = sentry_sdk = LoggingIntegration = EventHandler = BreadcrumbHandler = None  # type: ignore
+    Scope = sentry_sdk = None  # type: ignore
+
+    class LoggingIntegration:
+        pass
+
+    EventHandler = BreadcrumbHandler = LoggingIntegration
     SENTRY = False
 
 
