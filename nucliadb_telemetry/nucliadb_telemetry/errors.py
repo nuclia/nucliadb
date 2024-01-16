@@ -120,7 +120,10 @@ class SentryHandler(EventHandler):
         self._allowed_loggers = allowed_loggers
 
     def emit(self, record):
-        if record.name in self._allowed_loggers:
+        if (
+            record.name in self._allowed_loggers
+            or record.name.split(".")[0] in self._allowed_loggers
+        ):
             super().emit(record)
 
 
