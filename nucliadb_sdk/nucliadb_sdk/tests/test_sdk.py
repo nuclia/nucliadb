@@ -96,3 +96,4 @@ def test_search_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
     resource = sdk.create_resource(kbid=kb.uuid, title="Resource", slug="resource")
     sdk.chat_on_resource(kbid=kb.uuid, rid=resource.uuid, query="foo")
     sdk.feedback(kbid=kb.uuid, ident="bar", good=True, feedback="baz", task="CHAT")
+    sdk.summarize(kbid=kb.uuid, resources=["foobar"])
