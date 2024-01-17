@@ -24,6 +24,7 @@ from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 from fastapi_versioning import version  # type: ignore
 from google.protobuf.json_format import MessageToDict
+from nucliadb.common.cluster.settings import in_standalone_mode
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxID
 from nucliadb_protos.writer_pb2 import (
     GetConfigurationResponse,
@@ -315,10 +316,11 @@ async def get_configuration(request: Request, kbid: str):
     name="Knowledge Box Notifications Stream",
     description="Provides a stream of activity notifications for the given Knowledge Box. The stream will be automatically closed after 2 minutes.",  # noqa: E501
     tags=["Knowledge Box Services"],
-    response_description="Each line of the response is a Base64-encoded JSON object representing a notification.",
+    response_description="Each line of the response is a Base64-encoded JSON object representing a notification. Refer to [the internal documentation](https://github.com/nuclia/nucliadb/blob/main/docs/tutorials/KB_NOTIFICATIONS.md) for a more detailed explanation of each notification type.",  # noqa: E501
     response_model=None,
     responses={
         "404": {"description": "Knowledge Box not found"},
+        "204": {"description": "Notifications not available"},
     },
 )
 @requires(NucliaDBRoles.READER)
@@ -326,6 +328,11 @@ async def get_configuration(request: Request, kbid: str):
 async def notifications_endpoint(
     request: Request, kbid: str
 ) -> Union[StreamingResponse, HTTPClientError]:
+    if in_standalone_mode():
+        return HTTPClientError(
+            status_code=204, detail="Notifications are only available in the cloud offering of NucliaDB."
+        )
+
     context = get_app_context(request.app)
 
     if not await exists_kb(context, kbid):
