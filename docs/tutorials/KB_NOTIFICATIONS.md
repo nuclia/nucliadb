@@ -10,7 +10,6 @@ Notifications, once base64-decoded, will have the following structure:
 {
     "type": "<notification-type>",
     "data": {
-        # custom notification type metadata
         "key": "value",
     }
 }
@@ -20,52 +19,32 @@ In the following sections the currently supported notifications are described:
 
 ## Resource Notifications
 
-These are notifications for operations on resources. The notification type value is `resource` and the complete model can be found at [the NucliaDB models package](https://github.com/nuclia/nucliadb/blob/main/nucliadb_models/nucliadb_models/notifications.py).
+There are three types of resource notifications:
+  - `resource_written`: notifies about an HTTP operation being written to the database.
+  - `resource_processed`: notifies about a resource being processed by nuclia and the results have been written to the database.
+  - `resource_indexed`: indicates that resource metadata has been indexed and is ready to search.
 
-Here's an example:
+the complete models for resource notifications can be found at [the NucliaDB models package](https://github.com/nuclia/nucliadb/blob/main/nucliadb_models/nucliadb_models/notifications.py).
+
+Any NucliaDB HTTP request on a resource will typically yield 3 notifications:
 ```json
-{
-    "type": "resource",
-    "data": {
-        "kbid": "be585fbc-3498-4978-a2a8-85cbc45ef519",
-        "resource_uuid": "6b4c6c3cec254beba03b13721ab7dd8b",
-        "seqid": 542,
-        "operation": "created",
-        "action": "commit",
-        "source": "processor",
-        "processing_errors": false
-    }
-}
+{"type": "resource_written", "data": {"resource_uuid": "ruuid", "seqid": 224278, "operation": "created", "error": false}}
+{"type": "resource_indexed", "data": {"resource_uuid": "ruuid", "seqid": 224278}
+{"type": "resource_indexed", "data": {"resource_uuid": "ruuid", "seqid": 224278}
 ```
-- `resource_uuid`: the unique ID of the resource.
-- `seqid`: sequence id of the operation. This is an incremental number that allows to preserve order in resource API operations.
-- `operation`: type of CRUD operation done to the resource. It can be `created` for when the resource is first created, `modified` or `deleted`.
-- `action`: indicates which step in the ingestion process the operation is. Typically it will be either `commit` when the metadata has been persisted in the KV storage and `indexed` when the indexed data has been saved in the Index Node. `abort` will show up if there were ingestion errors and operation had to be aborted.
-- `source`: indicates who originated the event. It can be either `writer` if the notification is originated from an HTTP request made by the user or `processor` if the notification relates to the ingestion of metadata coming out of Nuclia's processing engine.
-- `processing_errors`: will only be set when `source=processor` and indicates whether Nuclia processing engine encountered errors while processing the resource.
+That is, one for when the data has been written to disk and two for each index operation on different index nodes (we index twice for replication purposes).
 
-## Examples
-On a normal HTTP API operation, creating a resource with a POST request will yield the following 3 notifications:
+The `seqid` is sequence id of the operation. This is an incremental number that allows to preserve order in resource API operations.
+
+The `operation` key corresponds to the CRUD operation done to the resource. It can be `created` for when the resource is first created, `modified` or `deleted`. If the write operation was `created` or `modified`, this means that new data has been pushed to Nuclia for processing. Therefore, eventually three more notifications will pop up:
 
 ```json
-{"type": "resource", "data": {"kbid": "my-kb-id", "resource_uuid": "ruuid", "seqid": 224278, "operation": "created", "action": "commit", "source": "writer", "processing_errors": null}}
-{"type": "resource", "data": {"kbid": "my-kb-id", "resource_uuid": "ruuid", "seqid": 224278, "operation": null, "action": "indexed", "source": null, "processing_errors": null}}
-{"type": "resource", "data": {"kbid": "my-kb-id", "resource_uuid": "ruuid", "seqid": 224278, "operation": null, "action": "indexed", "source": null, "processing_errors": null}}
+{"type": "resource_processed", "data": {"resource_uuid": "ruuid", "seqid": 224278, "ingestion_succeeded": "created", "action": "commit", "source": "writer", "processing_errors": null}}
+{"type": "resource_indexed", "data": {"resource_uuid": "ruuid", "seqid": 224278}
+{"type": "resource_indexed", "data": {"resource_uuid": "ruuid", "seqid": 224278}
 ```
-The first one indicates that is a HTTP operation (`"source": "writer"`) and that the data was committed to the key-value store. Doing a GET operation on the resource before this notification is received would return a 404 status code.
+The first one indicates that the resource has been correctly processed by Nuclia and ingested by NucliaDB.
 
-The following two lines notify that the resource has been indexed. There are two notifications because the indexed data is indexed twice for replication purposes. Once both indexed notifications have been sent, it means that the indexed data is ready for search -- at this point only the basic resource metadata will show up: title, summary etc.
+Notice how now the `seqid` has been incremented compared to the previous set of notifications.
 
-Notice how all three notifications share the same sequence id, which allows to correlate them.
-
-Typically, a resource creation has also triggered a process at Nuclia's processing engine. When finished, the results will be sent to NucliaDB and the following 3 notifications will show up:
-
-```json
-{"type": "resource", "data": {"kbid": "my-kb-id", "resource_uuid": "ruuid", "seqid": 224281, "operation": "created", "action": "commit", "source": "processor", "processing_errors": false}}
-{"type": "resource", "data": {"kbid": "my-kb-id", "resource_uuid": "ruuid", "seqid": 224281, "operation": null, "action": "indexed", "source": null, "processing_errors": null}}
-{"type": "resource", "data": {"kbid": "my-kb-id", "resource_uuid": "ruuid", "seqid": 224281, "operation": null, "action": "indexed", "source": null, "processing_errors": null}}
-```
-
-Notice how now the `seqid` has been incremented, as it is a different operation, and the `processor` source that NucliaDB has ingested all the extracted metadata resulting of Nuclia's processing.
-
-After the last two indexed notifications, your unstructured data is fully available for search!
+After the last two indexed notifications, your unstructured data (extracted text, entities, classifications, etc) is fully available for search!
