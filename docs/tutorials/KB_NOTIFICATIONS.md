@@ -33,6 +33,7 @@ Here's an example:
         "operation": "created",
         "action": "commit",
         "source": "processor",
+        "processing_errors": false
     }
 }
 ```
@@ -41,14 +42,15 @@ Here's an example:
 - `operation`: type of CRUD operation done to the resource. It can be `created` for when the resource is first created, `modified` or `deleted`.
 - `action`: indicates which step in the ingestion process the operation is. Typically it will be either `commit` when the metadata has been persisted in the KV storage and `indexed` when the indexed data has been saved in the Index Node. `abort` will show up if there were ingestion errors and operation had to be aborted.
 - `source`: indicates who originated the event. It can be either `writer` if the notification is originated from an HTTP request made by the user or `processor` if the notification relates to the ingestion of metadata coming out of Nuclia's processing engine.
+- `processing_errors`: will only be set when `source=processor` and indicates whether Nuclia processing engine encountered errors while processing the resource.
 
 ## Examples
 On a normal HTTP API operation, creating a resource with a POST request will yield the following 3 notifications:
 
 ```json
-{"type": "resource", "data": {"kbid": "my-kb-id", "resource_uuid": "ruuid", "seqid": 224278, "operation": "created", "action": "commit", "source": "writer"}}
-{"type": "resource", "data": {"kbid": "my-kb-id", "resource_uuid": "ruuid", "seqid": 224278, "operation": null, "action": "indexed", "source": null}}
-{"type": "resource", "data": {"kbid": "my-kb-id", "resource_uuid": "ruuid", "seqid": 224278, "operation": null, "action": "indexed", "source": null}}
+{"type": "resource", "data": {"kbid": "my-kb-id", "resource_uuid": "ruuid", "seqid": 224278, "operation": "created", "action": "commit", "source": "writer", "processing_errors": null}}
+{"type": "resource", "data": {"kbid": "my-kb-id", "resource_uuid": "ruuid", "seqid": 224278, "operation": null, "action": "indexed", "source": null, "processing_errors": null}}
+{"type": "resource", "data": {"kbid": "my-kb-id", "resource_uuid": "ruuid", "seqid": 224278, "operation": null, "action": "indexed", "source": null, "processing_errors": null}}
 ```
 The first one indicates that is a HTTP operation (`"source": "writer"`) and that the data was committed to the key-value store. Doing a GET operation on the resource before this notification is received would return a 404 status code.
 
@@ -59,9 +61,9 @@ Notice how all three notifications share the same sequence id, which allows to c
 Typically, a resource creation has also triggered a process at Nuclia's processing engine. When finished, the results will be sent to NucliaDB and the following 3 notifications will show up:
 
 ```json
-{"type": "resource", "data": {"kbid": "my-kb-id", "resource_uuid": "ruuid", "seqid": 224281, "operation": "created", "action": "commit", "source": "processor"}}
-{"type": "resource", "data": {"kbid": "my-kb-id", "resource_uuid": "ruuid", "seqid": 224281, "operation": null, "action": "indexed", "source": null}}
-{"type": "resource", "data": {"kbid": "my-kb-id", "resource_uuid": "ruuid", "seqid": 224281, "operation": null, "action": "indexed", "source": null}}
+{"type": "resource", "data": {"kbid": "my-kb-id", "resource_uuid": "ruuid", "seqid": 224281, "operation": "created", "action": "commit", "source": "processor", "processing_errors": false}}
+{"type": "resource", "data": {"kbid": "my-kb-id", "resource_uuid": "ruuid", "seqid": 224281, "operation": null, "action": "indexed", "source": null, "processing_errors": null}}
+{"type": "resource", "data": {"kbid": "my-kb-id", "resource_uuid": "ruuid", "seqid": 224281, "operation": null, "action": "indexed", "source": null, "processing_errors": null}}
 ```
 
 Notice how now the `seqid` has been incremented, as it is a different operation, and the `processor` source that NucliaDB has ingested all the extracted metadata resulting of Nuclia's processing.
