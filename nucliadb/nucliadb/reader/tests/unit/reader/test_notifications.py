@@ -48,7 +48,6 @@ async def test_kb_notifications_stream_timeout_gracefully():
             cancelled_event.set()
 
     with mock.patch(f"{MODULE}.kb_notifications", new=mocked_kb_notifications):
-
         # Check that the generator returns gracefully after NOTIFICATIONS_TIMEOUT_S seconds
         async for _ in kb_notifications_stream("testkb"):
             assert False, "Should not be reached"
@@ -70,7 +69,6 @@ async def test_kb_notifications_stream_timeout_gracefully_while_streaming():
             cancelled_event.set()
 
     with mock.patch(f"{MODULE}.kb_notifications", new=mocked_kb_notifications):
-
         # Yield a notification first
         stream = kb_notifications_stream("testkb")
         assert await stream.__anext__()

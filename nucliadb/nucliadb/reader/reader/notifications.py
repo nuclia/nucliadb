@@ -143,6 +143,10 @@ RESOURCE_SOURCE_PB_TO_MODEL = {
 
 
 def serialize_notification(pb: writer_pb2.Notification) -> Notification:
+    processing_errors = None
+    source = RESOURCE_SOURCE_PB_TO_MODEL[pb.source]
+    if source == ResourceNotificationSource.PROCESSOR:
+        processing_errors = pb.processing_errors
     return Notification(
         type=NotificationType.RESOURCE,
         data=ResourceNotificationData(
@@ -151,7 +155,8 @@ def serialize_notification(pb: writer_pb2.Notification) -> Notification:
             seqid=pb.seqid,
             operation=RESOURCE_OP_PB_TO_MODEL[pb.write_type],
             action=RESOURCE_ACTION_PB_TO_MODEL[pb.action],
-            source=RESOURCE_SOURCE_PB_TO_MODEL[pb.source],
+            source=source,
+            processing_errors=processing_errors,
         ),
     )
 

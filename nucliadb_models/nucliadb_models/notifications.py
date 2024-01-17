@@ -88,6 +88,11 @@ class ResourceNotificationData(NotificationData):
         title="Source",
         description="Source of the notification. Allows to distinguish between notifications coming from the writer (i.e: originated by HTTP interactions of the user) or from the processor (i.e: internal process pulling from Nuclia's processing queue).",  # noqa: E501
     )
+    processing_errors: Optional[bool] = Field(
+        default=None,
+        title="Processing Errors",
+        description="Indicates whether there were errors while Nuclia was processing the resource.",
+    )
 
 
 class ResourceNotification(Notification):
