@@ -17,141 +17,241 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use nucliadb_core::protos::ShardCleaned;
-use nucliadb_core::tracing::{debug, error, warn};
+use nucliadb_core::tracing::{debug, error, info};
 use nucliadb_core::{node_error, NodeResult};
 
 use crate::disk_structure;
 use crate::settings::Settings;
 use crate::shards::errors::ShardNotFoundError;
 use crate::shards::metadata::{ShardMetadata, ShardsMetadataManager};
-use crate::shards::providers::ShardWriterProvider;
 use crate::shards::writer::ShardWriter;
 use crate::shards::ShardId;
 
+/// Each shard may be in one of this states
+enum ShardCacheStatus {
+    /// Not in cache and not being deleted, therefore if found in on disk, loading it is safe.
+    NotInCache,
+    /// The shard is cached, but there is a task in the process of deleting it.
+    BeingDeleted,
+    /// The shard is not being deleted and is cached
+    InCache(Arc<ShardWriter>),
+}
+
+/// This cache allows the user to block shards, ensuring that they will not be loaded from disk.
+/// Being able to do so is crucial, otherwise the only source of truth will be disk and that would
+/// not be thread-safe.
+#[derive(Default)]
+struct InnerCache {
+    blocked_shards: HashSet<String>,
+    active_shards: HashMap<ShardId, Arc<ShardWriter>>,
+}
+
+impl InnerCache {
+    pub fn new() -> InnerCache {
+        Self::default()
+    }
+    pub fn get_shard(&self, id: &ShardId) -> ShardCacheStatus {
+        match self.active_shards.get(id).cloned() {
+            _ if self.blocked_shards.contains(id) => ShardCacheStatus::BeingDeleted,
+            Some(shard) => ShardCacheStatus::InCache(shard),
+            None => ShardCacheStatus::NotInCache,
+        }
+    }
+    pub fn set_being_deleted(&mut self, id: ShardId) {
+        self.blocked_shards.insert(id);
+    }
+    pub fn remove(&mut self, id: &ShardId) {
+        self.blocked_shards.remove(id);
+        self.active_shards.remove(id);
+    }
+    pub fn add_active_shard(&mut self, id: ShardId, shard: Arc<ShardWriter>) {
+        // It would be a dangerous bug to have a path
+        // in the system that leads to this assertion failing.
+        assert!(!self.blocked_shards.contains(&id));
+
+        self.active_shards.insert(id, shard);
+    }
+}
+
 #[derive(Default)]
 pub struct UnboundedShardWriterCache {
-    cache: RwLock<HashMap<ShardId, Arc<ShardWriter>>>,
     pub shards_path: PathBuf,
-    metadata_manager: ShardsMetadataManager,
+    cache: RwLock<InnerCache>,
+    metadata_manager: Arc<ShardsMetadataManager>,
 }
 
 impl UnboundedShardWriterCache {
     pub fn new(settings: Settings) -> Self {
         Self {
-            cache: RwLock::new(HashMap::new()),
+            // NOTE: as it's not probable all shards will be written, we don't
+            // assign any initial capacity to the HashMap under the consideration
+            // a resize blocking is not performance critical while writing.
+            cache: RwLock::new(InnerCache::new()),
             shards_path: settings.shards_path(),
-            metadata_manager: ShardsMetadataManager::new(settings.shards_path()),
+            metadata_manager: Arc::new(ShardsMetadataManager::new(settings.shards_path())),
         }
     }
 
-    fn read(&self) -> RwLockReadGuard<HashMap<ShardId, Arc<ShardWriter>>> {
+    fn read(&self) -> RwLockReadGuard<InnerCache> {
         self.cache.read().expect("Poisoned lock while reading")
     }
 
-    fn write(&self) -> RwLockWriteGuard<HashMap<ShardId, Arc<ShardWriter>>> {
+    fn write(&self) -> RwLockWriteGuard<InnerCache> {
         self.cache.write().expect("Poisoned lock while reading")
     }
-}
 
-impl ShardWriterProvider for UnboundedShardWriterCache {
-    fn create(&self, metadata: ShardMetadata) -> NodeResult<Arc<ShardWriter>> {
-        let metadata = Arc::new(metadata);
+    pub fn create(&self, metadata: ShardMetadata) -> NodeResult<Arc<ShardWriter>> {
         let shard_id = metadata.id();
-        self.metadata_manager.add_metadata(Arc::clone(&metadata));
-        let new_shard = ShardWriter::new(metadata).map(Arc::new)?;
-        let returned_shard = Arc::clone(&new_shard);
+        let metadata = Arc::new(metadata);
+        let shard = Arc::new(ShardWriter::new(metadata.clone())?);
 
-        self.write().insert(shard_id, new_shard);
-        Ok(returned_shard)
-    }
+        let shard_cache_clone = Arc::clone(&shard);
+        self.metadata_manager.add_metadata(metadata);
 
-    fn load(&self, id: ShardId) -> NodeResult<Arc<ShardWriter>> {
-        let shard_path = disk_structure::shard_path_by_id(&self.shards_path.clone(), &id);
         let mut cache_writer = self.write();
-
-        if let Some(shard) = cache_writer.get(&id) {
-            debug!("Shard {shard_path:?} is already on memory");
-            return Ok(Arc::clone(shard));
-        }
-
-        // Avoid blocking while interacting with the file system
-        if !ShardMetadata::exists(shard_path.clone()) {
-            return Err(node_error!(ShardNotFoundError(
-                "Shard {shard_path:?} is not on disk"
-            )));
-        }
-        let sm = self
-            .metadata_manager
-            .get(id.clone())
-            .expect("Shard metadata not found. This should not happen.");
-        let shard = ShardWriter::open(sm).map_err(|error| {
-            node_error!("Shard {shard_path:?} could not be loaded from disk: {error:?}")
-        })?;
-
-        let shard = Arc::new(shard);
-        cache_writer.insert(id, Arc::clone(&shard));
+        cache_writer.add_active_shard(shard_id, shard_cache_clone);
         Ok(shard)
     }
 
-    fn load_all(&self) -> NodeResult<()> {
+    pub fn load(&self, id: ShardId) -> NodeResult<Arc<ShardWriter>> {
+        let shard_key = id.clone();
+        let shard_path = disk_structure::shard_path_by_id(&self.shards_path.clone(), &id);
+        let mut cache_writer = self.write();
+        match cache_writer.get_shard(&id) {
+            ShardCacheStatus::InCache(shard) => Ok(shard),
+            ShardCacheStatus::BeingDeleted => Err(node_error!(ShardNotFoundError(
+                "Shard {shard_path:?} is not on disk"
+            ))),
+            ShardCacheStatus::NotInCache => {
+                let metadata_manager = Arc::clone(&self.metadata_manager);
+
+                if !ShardMetadata::exists(&shard_path) {
+                    return Err(node_error!(ShardNotFoundError(
+                        "Shard {shard_path:?} is not on disk"
+                    )));
+                }
+                let metadata = metadata_manager
+                    .get(id.clone())
+                    .expect("Shard metadata not found. This should not happen");
+                let shard = ShardWriter::open(Arc::clone(&metadata)).map_err(|error| {
+                    node_error!("Shard {shard_path:?} could not be loaded from disk: {error:?}")
+                })?;
+
+                let shard = Arc::new(shard);
+                let cache_shard = Arc::clone(&shard);
+                cache_writer.add_active_shard(shard_key, cache_shard);
+                Ok(shard)
+            }
+        }
+    }
+
+    pub fn load_all(&self) -> NodeResult<()> {
         let mut cache = self.write();
-        for entry in std::fs::read_dir(&self.shards_path)? {
+        let shards_path = self.shards_path.clone();
+        let metadata_manager = Arc::clone(&self.metadata_manager);
+
+        for entry in std::fs::read_dir(&shards_path)? {
             let entry = entry?;
             let shard_id = entry.file_name().to_str().unwrap().to_string();
             let shard_path = entry.path();
-            let metadata = self.metadata_manager.get(shard_id.clone());
-            if metadata.is_none() {
-                warn!(
+            if !ShardMetadata::exists(&shard_path) {
+                info!(
                     "Shard {shard_path:?} is not on disk",
                     shard_path = shard_path
                 );
                 continue;
             }
-            match ShardWriter::open(metadata.unwrap()) {
+            let metadata = metadata_manager
+                .get(shard_id.clone())
+                .expect("Shard metadata not found. This should not happen");
+            match ShardWriter::open(metadata) {
                 Err(err) => error!("Loading shard {shard_path:?} from disk raised {err}"),
                 Ok(shard) => {
                     debug!("Shard loaded: {shard_path:?}");
-                    cache.insert(shard_id, Arc::new(shard));
+                    cache.add_active_shard(shard_id, Arc::new(shard));
                 }
             }
         }
+
         Ok(())
     }
 
-    fn get(&self, id: ShardId) -> Option<Arc<ShardWriter>> {
-        self.read().get(&id).map(Arc::clone)
+    pub fn get(&self, id: ShardId) -> Option<Arc<ShardWriter>> {
+        let cache_reader = self.read();
+        match cache_reader.get_shard(&id) {
+            ShardCacheStatus::InCache(shard) => Some(shard),
+            _ => None,
+        }
     }
 
-    fn delete(&self, id: ShardId) -> NodeResult<()> {
-        self.write().remove(&id);
+    pub fn delete(&self, id: ShardId) -> NodeResult<()> {
+        let mut cache_writer = self.write();
+        // First the shard must be marked as being deleted, this way
+        // concurrent tasks can not make the mistake of trying to use it.
+        cache_writer.set_being_deleted(id.clone());
 
+        // Even though the shard was marked as deleted, if it was already in the
+        // active shards list there may be operations running on it. We must ensure
+        // that all of them have finished before proceeding.
+        if let Some(shard) = cache_writer.active_shards.get(&id).cloned() {
+            std::mem::drop(cache_writer);
+            let blocking_token = shard.block_shard();
+            // At this point we can ensure that no operations
+            // are being performed in this shard. Next operations
+            // will require using the cache, where the shard is marked
+            // as deleted.
+            std::mem::drop(blocking_token);
+        } else {
+            // Dropping the cache writer because is not needed while deleting the shard.
+            std::mem::drop(cache_writer);
+        }
+
+        // No need to hold the lock while deletion happens.
+        // In case of error while deleting the function will return without removing
+        // The deletion flag, this is to avoid accesses to a partially deleted shard.
         let shard_path = disk_structure::shard_path_by_id(&self.shards_path.clone(), &id);
         if shard_path.exists() {
             debug!("Deleting shard {shard_path:?}");
             std::fs::remove_dir_all(shard_path)?;
         }
+
+        // If the shard was successfully deleted is safe to remove
+        // the entry from the cache.
+        self.write().remove(&id);
+
         Ok(())
     }
 
-    fn upgrade(&self, id: ShardId) -> NodeResult<ShardCleaned> {
-        self.write().remove(&id);
+    pub fn upgrade(&self, id: ShardId) -> NodeResult<ShardCleaned> {
+        let mut cache_writer = self.write();
+        // First the shard must be marked as being deleted, this way
+        // concurrent tasks can not make the mistake of trying to use it.
+        cache_writer.set_being_deleted(id.clone());
 
-        let shard_path = disk_structure::shard_path_by_id(&self.shards_path.clone(), &id);
-        let metadata = self.metadata_manager.get(id.clone());
-        if metadata.is_none() {
-            warn!(
-                "Shard {shard_path:?} is not on disk",
-                shard_path = shard_path
-            );
-            return Err(node_error!(ShardNotFoundError(
-                "Shard {shard_path:?} is not on disk"
-            )));
+        // Even though the shard was marked as deleted, if it was already in the
+        // active shards list there may be operations running on it. We must ensure
+        // that all of them have finished before proceeding.
+        if let Some(shard) = cache_writer.active_shards.get(&id).cloned() {
+            std::mem::drop(cache_writer);
+            let blocking_token = shard.block_shard();
+            // At this point we can ensure that no operations
+            // are being performed in this shard. Next operations
+            // will require using the cache, where the shard is marked
+            // as deleted.
+            std::mem::drop(blocking_token);
+        } else {
+            // Dropping the cache writer because is not needed while deleting the shard.
+            std::mem::drop(cache_writer);
         }
+
+        let metadata = self.metadata_manager.get(id.clone());
+        // If upgrading fails, the safe thing is to keep the being deleted flag
+
         let upgraded = ShardWriter::clean_and_create(metadata.unwrap())?;
         let details = ShardCleaned {
             document_service: upgraded.document_version() as i32,
@@ -160,11 +260,17 @@ impl ShardWriterProvider for UnboundedShardWriterCache {
             relation_service: upgraded.relation_version() as i32,
         };
 
-        self.write().insert(id, Arc::new(upgraded));
+        // The shard was upgraded, is safe to allow access again
+        let shard = Arc::new(upgraded);
+        let mut cache_writer = self.write();
+        // Old shard is completely removed
+        cache_writer.remove(&id);
+        // The clean and upgraded version takes its place
+        cache_writer.add_active_shard(id, shard);
         Ok(details)
     }
 
-    fn get_metadata(&self, id: ShardId) -> Option<Arc<ShardMetadata>> {
+    pub fn get_metadata(&self, id: ShardId) -> Option<Arc<ShardMetadata>> {
         self.metadata_manager.get(id)
     }
 }
