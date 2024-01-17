@@ -10,7 +10,7 @@ Notifications, once base64-decoded, will have the following structure:
 {
     "type": "<notification-type>",
     "data": {
-        "key": "value",
+        "<custom>": "<notification data>",
     }
 }
 ```

@@ -48,7 +48,7 @@ MAX_QUEUE_SIZE = 1000
 NOTIFICATIONS_TIMEOUT_S = 118
 
 RESOURCE_OP_PB_TO_MODEL = {
-    writer_pb2.Notification.WriteType.UNSET: None,
+    writer_pb2.Notification.WriteType.UNSET: ResourceOperationType.CREATED,
     writer_pb2.Notification.WriteType.CREATED: ResourceOperationType.CREATED,
     writer_pb2.Notification.WriteType.MODIFIED: ResourceOperationType.MODIFIED,
     writer_pb2.Notification.WriteType.DELETED: ResourceOperationType.DELETED,
