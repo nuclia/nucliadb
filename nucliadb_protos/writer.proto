@@ -360,6 +360,7 @@ message Notification {
     WriteType write_type = 7;
     BrokerMessage message = 8;
     NotificationSource source = 9;
+    bool processing_errors = 10;
 }
 
 
