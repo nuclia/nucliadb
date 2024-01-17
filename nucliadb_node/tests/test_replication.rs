@@ -28,7 +28,6 @@ use nucliadb_core::protos::{
     ShardId, UserVector, UserVectors, VectorSetId, VectorSimilarity,
 };
 use nucliadb_node::replication::health::ReplicationHealthManager;
-use nucliadb_node::shards::providers::AsyncShardWriterProvider;
 use rstest::*;
 use tonic::Request;
 
@@ -87,11 +86,8 @@ async fn test_search_replicated_data(
     assert_eq!(response.vector.unwrap().documents.len(), 1);
 
     // Validate generation id is the same
-    let primary_shard = fixture.primary_shard_cache().load(shard.id.clone()).await?;
-    let secondary_shard = fixture
-        .secondary_shard_cache()
-        .load(shard.id.clone())
-        .await?;
+    let primary_shard = fixture.primary_shard_cache().load(shard.id.clone())?;
+    let secondary_shard = fixture.secondary_shard_cache().load(shard.id.clone())?;
 
     assert_eq!(
         primary_shard.metadata.get_generation_id(),
