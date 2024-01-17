@@ -320,7 +320,7 @@ async def get_configuration(request: Request, kbid: str):
     response_model=None,
     responses={
         "404": {"description": "Knowledge Box not found"},
-        "204": {"description": "Notifications not available"},
+        "404": {"description": "Notifications not available"},
     },
 )
 @requires(NucliaDBRoles.READER)
@@ -330,7 +330,7 @@ async def notifications_endpoint(
 ) -> Union[StreamingResponse, HTTPClientError]:
     if in_standalone_mode():
         return HTTPClientError(
-            status_code=204,
+            status_code=404,
             detail="Notifications are only available in the cloud offering of NucliaDB.",
         )
 
