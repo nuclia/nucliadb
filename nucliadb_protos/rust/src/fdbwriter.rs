@@ -479,6 +479,8 @@ pub struct Notification {
     pub message: ::core::option::Option<BrokerMessage>,
     #[prost(enumeration="NotificationSource", tag="9")]
     pub source: i32,
+    #[prost(bool, tag="10")]
+    pub processing_errors: bool,
 }
 /// Nested message and enum types in `Notification`.
 pub mod notification {

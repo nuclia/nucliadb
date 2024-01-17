@@ -18,16 +18,22 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+from unittest import mock
 
 import pytest
 from nucliadb_protos.writer_pb2 import BrokerMessage, Notification
 
-from nucliadb.reader.reader.notifications import kb_notifications
+from nucliadb.reader.reader.notifications import (
+    kb_notifications,
+    kb_notifications_stream,
+)
 from nucliadb_protos import writer_pb2
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.cache.settings import settings as cache_settings
 from nucliadb_utils.utilities import get_pubsub
+
+MODULE = "nucliadb.reader.reader.notifications"
 
 
 @pytest.fixture(scope="function")
@@ -74,6 +80,29 @@ async def test_kb_notifications(pubsub):
     assert activity[0].seqid == 1
     assert activity[1].uuid == "resource2"
     assert activity[1].seqid == 2
+
+
+@pytest.fixture(scope="function")
+def shorter_timeout():
+    with mock.patch(f"{MODULE}.NOTIFICATIONS_TIMEOUT_S", 0.5):
+        yield
+
+
+async def test_kb_notifications_stream_is_cancelled(shorter_timeout, pubsub):
+    stream_lines = []
+
+    async def read_activity_stream(kbid):
+        async for line in kb_notifications_stream(kbid):
+            stream_lines.append(line)
+
+    # Start a task that reads the activity stream
+    read_task = asyncio.create_task(read_activity_stream("kbid"))
+
+    # Wait for the timeout to expire and cancel the task
+    await asyncio.sleep(1)
+
+    # Check that the task was finished gracefully
+    assert read_task.done()
 
 
 async def resource_notification(pubsub: PubSubDriver, kbid: str, **notification_kwargs):

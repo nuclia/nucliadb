@@ -530,6 +530,7 @@ class Processor:
             # including the message here again might feel a bit unusual but allows
             # us to react to these notifications with the original payload
             message=message,
+            processing_errors=len(message.errors) > 0,
         )
 
         await self.notify(

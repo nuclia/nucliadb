@@ -98,3 +98,8 @@ async def test_labelsets_service(
 
     resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{knowledgebox_one}/labelsets")
     assert len(resp.json()["labelsets"]) == 0
+
+
+async def test_notifications_service(nucliadb_reader):
+    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/foobar/notifications")
+    assert resp.status_code == 404

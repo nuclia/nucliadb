@@ -26,7 +26,12 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb.reader.api.v1.router import KB_PREFIX
-from nucliadb_models.notifications import Notification, ResourceNotification
+from nucliadb_models.notifications import (
+    Notification,
+    ResourceIndexedNotification,
+    ResourceProcessedNotification,
+    ResourceWrittenNotification,
+)
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_protos import writer_pb2
 
@@ -36,9 +41,34 @@ def kb_notifications():
     async def _kb_notifications(
         kbid: str,
     ) -> AsyncGenerator[writer_pb2.Notification, None]:
-        for i in range(10):
+        for notification in [
+            writer_pb2.Notification(
+                kbid=kbid,
+                seqid=1,
+                uuid="resource",
+                write_type=writer_pb2.Notification.WriteType.CREATED,
+                action=writer_pb2.Notification.Action.COMMIT,
+                source=writer_pb2.NotificationSource.WRITER,
+            ),
+            writer_pb2.Notification(
+                kbid=kbid,
+                seqid=1,
+                uuid="resource",
+                write_type=writer_pb2.Notification.WriteType.CREATED,
+                action=writer_pb2.Notification.Action.COMMIT,
+                source=writer_pb2.NotificationSource.PROCESSOR,
+                processing_errors=True,
+            ),
+            writer_pb2.Notification(
+                kbid=kbid,
+                seqid=1,
+                uuid="resource",
+                write_type=writer_pb2.Notification.WriteType.CREATED,
+                action=writer_pb2.Notification.Action.INDEXED,
+            ),
+        ]:
             await asyncio.sleep(0.001)
-            yield writer_pb2.Notification(kbid=kbid, seqid=i, uuid=f"resource-{i}")
+            yield notification
 
     with mock.patch(
         "nucliadb.reader.reader.notifications.kb_notifications", new=_kb_notifications
@@ -62,14 +92,41 @@ async def test_activity(
 
             notifs = []
             async for line in resp.aiter_lines():
-                assert Notification.parse_raw(line).type == "resource"
-                notif = ResourceNotification.parse_raw(line)
-                notif.type == "resource"
-                notif.data.kbid == "kbid"
-                assert notif.data.resource_uuid.startswith("resource-")
+                notification_type = Notification.parse_raw(line).type
+                assert notification_type in [
+                    "resource_indexed",
+                    "resource_written",
+                    "resource_processed",
+                ]
+
+                if notification_type == "resource_indexed":
+                    notif = ResourceIndexedNotification.parse_raw(line)
+                    assert notif.type == "resource_indexed"
+                    assert notif.data.resource_uuid == "resource"
+                    assert notif.data.seqid == 1
+
+                elif notification_type == "resource_written":
+                    notif = ResourceWrittenNotification.parse_raw(line)
+                    assert notif.type == "resource_written"
+                    assert notif.data.resource_uuid == "resource"
+                    assert notif.data.seqid == 1
+                    assert notif.data.operation == "created"
+                    assert notif.data.error is False
+
+                elif notification_type == "resource_processed":
+                    notif = ResourceProcessedNotification.parse_raw(line)
+                    assert notif.type == "resource_processed"
+                    assert notif.data.resource_uuid == "resource"
+                    assert notif.data.seqid == 1
+                    assert notif.data.ingestion_succeeded is True
+                    assert notif.data.processing_errors is True
+
+                else:
+                    assert False, "Unexpected notification type"
+
                 notifs.append(notif)
 
-        assert len(notifs) == 10
+        assert len(notifs) == 3
 
 
 @pytest.mark.asyncio
