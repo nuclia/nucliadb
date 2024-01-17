@@ -51,7 +51,7 @@ async def test_kb_notifications_stream_timeout_gracefully():
         # Wait longer than the timeout to yield a notification
         try:
             await asyncio.sleep(2)
-            yield writer_pb2.Notification()
+            yield writer_pb2.Notification(source=writer_pb2.NotificationSource.WRITER)
             event.set()
         except asyncio.CancelledError:
             cancelled_event.set()
@@ -71,7 +71,7 @@ async def test_kb_notifications_stream_timeout_gracefully_while_streaming():
     async def mocked_kb_notifications(kbid):
         # Only ever yield one notification
         try:
-            yield writer_pb2.Notification()
+            yield writer_pb2.Notification(source=writer_pb2.NotificationSource.WRITER)
             while True:
                 await asyncio.sleep(0.1)
         except asyncio.CancelledError:
