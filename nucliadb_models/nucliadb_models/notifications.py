@@ -103,7 +103,7 @@ class ResourceWrittenNotification(Notification):
     data: ResourceWritten = Field(
         ...,
         title="Data",
-        description="Resource pushed notification payload",
+        description="Resource written notification payload",
     )
 
 
@@ -112,7 +112,7 @@ class ResourceProcessedNotification(Notification):
     data: ResourceProcessed = Field(
         ...,
         title="Data",
-        description="Resource pushed notification payload",
+        description="Resource processed notification payload",
     )
 
 
@@ -121,5 +121,5 @@ class ResourceIndexedNotification(Notification):
     data: ResourceIndexed = Field(
         ...,
         title="Data",
-        description="Resource metadata indexed notification payload",
+        description="Resource indexed notification payload",
     )
