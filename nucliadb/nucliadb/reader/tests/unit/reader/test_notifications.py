@@ -26,6 +26,12 @@ from nucliadb.reader.reader.notifications import (
     kb_notifications_stream,
     serialize_notification,
 )
+from nucliadb_models.notifications import (
+    ResourceIndexed,
+    ResourceOperationType,
+    ResourceProcessed,
+    ResourceWritten,
+)
 from nucliadb_protos import writer_pb2
 
 MODULE = "nucliadb.reader.reader.notifications"
@@ -84,10 +90,51 @@ async def test_kb_notifications_stream_timeout_gracefully_while_streaming():
         assert cancelled_event.is_set()
 
 
-def test_serialize_notification_processing_errors():
-    notif = writer_pb2.Notification(
-        source=writer_pb2.NotificationSource.PROCESSOR,
-        processing_errors=True,
-    )
-    serialized = serialize_notification(notif)
-    assert serialized.data.processing_errors is True
+@pytest.mark.parametrize(
+    "pb,serialized_data",
+    [
+        (
+            writer_pb2.Notification(
+                uuid="rid",
+                seqid=1,
+                source=writer_pb2.NotificationSource.PROCESSOR,
+                processing_errors=True,
+            ),
+            ResourceProcessed(
+                resource_uuid="rid",
+                seqid=1,
+                ingestion_succeeded=True,
+                processing_errors=True,
+            ),
+        ),
+        (
+            writer_pb2.Notification(
+                uuid="rid",
+                seqid=1,
+                source=writer_pb2.NotificationSource.WRITER,
+                write_type=writer_pb2.Notification.WriteType.DELETED,
+                action=writer_pb2.Notification.Action.ABORT,
+            ),
+            ResourceWritten(
+                resource_uuid="rid",
+                seqid=1,
+                operation=ResourceOperationType.DELETED,
+                error=True,
+            ),
+        ),
+        (
+            writer_pb2.Notification(
+                uuid="rid",
+                seqid=1,
+                action=writer_pb2.Notification.Action.INDEXED,
+            ),
+            ResourceIndexed(
+                resource_uuid="rid",
+                seqid=1,
+            ),
+        ),
+    ],
+)
+def test_serialize_notification(pb, serialized_data):
+    serialized = serialize_notification(pb)
+    assert serialized.data == serialized_data

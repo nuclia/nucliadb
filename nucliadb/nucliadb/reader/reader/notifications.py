@@ -27,11 +27,13 @@ import async_timeout
 from nucliadb.reader import logger
 from nucliadb_models.notifications import (
     Notification,
-    NotificationType,
-    ResourceActionType,
-    ResourceNotificationData,
-    ResourceNotificationSource,
+    ResourceIndexed,
+    ResourceIndexedNotification,
     ResourceOperationType,
+    ResourceProcessed,
+    ResourceProcessedNotification,
+    ResourceWritten,
+    ResourceWrittenNotification,
 )
 from nucliadb_protos import writer_pb2
 from nucliadb_telemetry.errors import capture_exception
@@ -44,6 +46,13 @@ MAX_QUEUE_SIZE = 1000
 # We set the timeout to slightly less than the
 # configured K8S max connection timeout, which is 2 minutes
 NOTIFICATIONS_TIMEOUT_S = 118
+
+RESOURCE_OP_PB_TO_MODEL = {
+    writer_pb2.Notification.WriteType.UNSET: None,
+    writer_pb2.Notification.WriteType.CREATED: ResourceOperationType.CREATED,
+    writer_pb2.Notification.WriteType.MODIFIED: ResourceOperationType.MODIFIED,
+    writer_pb2.Notification.WriteType.DELETED: ResourceOperationType.DELETED,
+}
 
 
 async def kb_notifications_stream(kbid: str) -> AsyncGenerator[bytes, None]:
@@ -122,43 +131,42 @@ async def managed_subscription(pubsub: PubSubDriver, key: str, handler: Callback
             )
 
 
-RESOURCE_OP_PB_TO_MODEL = {
-    writer_pb2.Notification.WriteType.UNSET: None,
-    writer_pb2.Notification.WriteType.CREATED: ResourceOperationType.CREATED,
-    writer_pb2.Notification.WriteType.MODIFIED: ResourceOperationType.MODIFIED,
-    writer_pb2.Notification.WriteType.DELETED: ResourceOperationType.DELETED,
-}
-
-RESOURCE_ACTION_PB_TO_MODEL = {
-    writer_pb2.Notification.Action.COMMIT: ResourceActionType.COMMIT,
-    writer_pb2.Notification.Action.INDEXED: ResourceActionType.INDEXED,
-    writer_pb2.Notification.Action.ABORT: ResourceActionType.ABORT,
-}
-
-RESOURCE_SOURCE_PB_TO_MODEL = {
-    writer_pb2.NotificationSource.UNSET: None,
-    writer_pb2.NotificationSource.WRITER: ResourceNotificationSource.WRITER,
-    writer_pb2.NotificationSource.PROCESSOR: ResourceNotificationSource.PROCESSOR,
-}
-
-
 def serialize_notification(pb: writer_pb2.Notification) -> Notification:
-    processing_errors = None
-    source = RESOURCE_SOURCE_PB_TO_MODEL[pb.source]
-    if source == ResourceNotificationSource.PROCESSOR:
-        processing_errors = pb.processing_errors
-    return Notification(
-        type=NotificationType.RESOURCE,
-        data=ResourceNotificationData(
-            kbid=pb.kbid,
-            resource_uuid=pb.uuid,
-            seqid=pb.seqid,
-            operation=RESOURCE_OP_PB_TO_MODEL[pb.write_type],
-            action=RESOURCE_ACTION_PB_TO_MODEL[pb.action],
-            source=source,
-            processing_errors=processing_errors,
-        ),
-    )
+    resource_uuid = pb.uuid
+    seqid = pb.seqid
+
+    if pb.action == writer_pb2.Notification.Action.INDEXED:
+        return ResourceIndexedNotification(
+            data=ResourceIndexed(
+                resource_uuid=resource_uuid,
+                seqid=seqid,
+            )
+        )
+
+    has_ingestion_error = pb.action == writer_pb2.Notification.Action.ABORT
+    has_processing_error = pb.processing_errors
+
+    if pb.source == writer_pb2.NotificationSource.WRITER:
+        writer_operation = RESOURCE_OP_PB_TO_MODEL[pb.write_type]
+        return ResourceWrittenNotification(
+            data=ResourceWritten(
+                resource_uuid=resource_uuid,
+                seqid=seqid,
+                operation=writer_operation,
+                error=has_ingestion_error,
+            )
+        )
+    elif pb.source == writer_pb2.NotificationSource.PROCESSOR:
+        return ResourceProcessedNotification(
+            data=ResourceProcessed(
+                resource_uuid=resource_uuid,
+                seqid=seqid,
+                ingestion_succeeded=not has_ingestion_error,
+                processing_errors=has_processing_error,
+            )
+        )
+
+    raise ValueError(f"Unknown notification source: {pb.source}")
 
 
 def encode_streamed_notification(pb: writer_pb2.Notification) -> bytes:

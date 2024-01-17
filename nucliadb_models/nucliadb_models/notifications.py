@@ -18,20 +18,14 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
 
 class NotificationType(str, Enum):
-    RESOURCE = "resource"
-
-
-class NotificationData(BaseModel):
-    kbid: str = Field(
-        title="KnowledgeBox ID",
-        description="Id of the KnowledgeBox that the notification belongs to.",
-    )
+    RESOURCE_WRITTEN = "resource_written"
+    RESOURCE_PROCESSED = "resource_processed"
+    RESOURCE_INDEXED = "resource_indexed"
 
 
 class Notification(BaseModel):
@@ -40,7 +34,7 @@ class Notification(BaseModel):
         title="Notification Type",
         description="Type of notification.",
     )
-    data: NotificationData = Field(
+    data: BaseModel = Field(
         ...,
         title="Notification Data",
         description="Notification data.",
@@ -53,18 +47,7 @@ class ResourceOperationType(str, Enum):
     DELETED = "deleted"
 
 
-class ResourceActionType(str, Enum):
-    COMMIT = "commit"
-    INDEXED = "indexed"
-    ABORT = "abort"
-
-
-class ResourceNotificationSource(str, Enum):
-    WRITER = "writer"
-    PROCESSOR = "processor"
-
-
-class ResourceNotificationData(NotificationData):
+class ResourceIndexed(BaseModel):
     resource_uuid: str = Field(
         ..., title="Resource UUID", description="UUID of the resource."
     )
@@ -73,32 +56,70 @@ class ResourceNotificationData(NotificationData):
         title="Sequence ID",
         description="Sequence ID of the resource operation. This can be used to track completion of specific operations.",  # noqa: E501
     )
-    operation: Optional[ResourceOperationType] = Field(
-        ...,
-        title="Operation",
-        description="Type of CRUD operation performed on the resource.",
+
+
+class ResourceWritten(BaseModel):
+    resource_uuid: str = Field(
+        ..., title="Resource UUID", description="UUID of the resource."
     )
-    action: ResourceActionType = Field(
+    seqid: int = Field(
         ...,
-        title="Action",
-        description="Notification action. Allows to distinguish between a notification of a resource being committed, indexed or aborted.",  # noqa: E501
+        title="Sequence ID",
+        description="Sequence ID of the resource operation. This can be used to track completion of specific operations.",  # noqa: E501
     )
-    source: Optional[ResourceNotificationSource] = Field(
+    operation: ResourceOperationType = Field(
+        ..., title="Operation", description="Type of resource write operation."
+    )
+    error: bool = Field(
+        default=False,
+        title="Error",
+        description="Indicates whether there were errors while pushing the resource to Nuclia processing",
+    )
+
+
+class ResourceProcessed(BaseModel):
+    resource_uuid: str = Field(
+        ..., title="Resource UUID", description="UUID of the resource."
+    )
+    seqid: int = Field(
         ...,
-        title="Source",
-        description="Source of the notification. Allows to distinguish between notifications coming from the writer (i.e: originated by HTTP interactions of the user) or from the processor (i.e: internal process pulling from Nuclia's processing queue).",  # noqa: E501
+        title="Sequence ID",
+        description="Sequence ID of the resource operation. This can be used to track completion of specific operations.",  # noqa: E501
     )
-    processing_errors: Optional[bool] = Field(
-        default=None,
+    ingestion_succeeded: bool = Field(
+        default=True,
+        title="Succeeded",
+        description="Indicates whether the processing results were successfully ingested by NucliaDB.",
+    )
+    processing_errors: bool = Field(
+        default=False,
         title="Processing Errors",
         description="Indicates whether there were errors while Nuclia was processing the resource.",
     )
 
 
-class ResourceNotification(Notification):
-    type: NotificationType = NotificationType.RESOURCE
-    data: ResourceNotificationData = Field(
+class ResourceWrittenNotification(Notification):
+    type: NotificationType = NotificationType.RESOURCE_WRITTEN
+    data: ResourceWritten = Field(
         ...,
-        title="Notification Data",
-        description="Notification data.",
+        title="Data",
+        description="Resource pushed notification payload",
+    )
+
+
+class ResourceProcessedNotification(Notification):
+    type: NotificationType = NotificationType.RESOURCE_PROCESSED
+    data: ResourceProcessed = Field(
+        ...,
+        title="Data",
+        description="Resource pushed notification payload",
+    )
+
+
+class ResourceIndexedNotification(Notification):
+    type: NotificationType = NotificationType.RESOURCE_INDEXED
+    data: ResourceIndexed = Field(
+        ...,
+        title="Data",
+        description="Resource metadata indexed notification payload",
     )

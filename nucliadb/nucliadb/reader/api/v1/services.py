@@ -318,9 +318,7 @@ async def get_configuration(request: Request, kbid: str):
     tags=["Knowledge Box Services"],
     response_description="Each line of the response is a Base64-encoded JSON object representing a notification. Refer to [the internal documentation](https://github.com/nuclia/nucliadb/blob/main/docs/tutorials/KB_NOTIFICATIONS.md) for a more detailed explanation of each notification type.",  # noqa: E501
     response_model=None,
-    responses={
-        "404": {"description": "Knowledge Box not found"}
-    },
+    responses={"404": {"description": "Knowledge Box not found"}},
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
