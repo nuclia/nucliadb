@@ -92,9 +92,9 @@ def instrument_app(
     app.add_middleware(ContextInjectorMiddleware)
     app.add_middleware(
         OpenTelemetryMiddleware,
-        excluded_urls=excluded_urls_obj,
+        excluded_urls=excluded_urls_obj,  # type: ignore
         default_span_details=_get_default_span_details,
-        server_request_hook=server_request_hook,
+        server_request_hook=server_request_hook,  # type: ignore
         tracer_provider=tracer_provider,
     )
 

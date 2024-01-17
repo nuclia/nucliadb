@@ -17,11 +17,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import logging
 import os
 
 # abstract advanced error handling into its own module to prevent
 # code from handling sentry integration everywhere
-from typing import Any, ContextManager, Optional
+from typing import Any, ContextManager, List, Optional
 
 import pydantic
 
@@ -33,10 +34,20 @@ except ImportError:  # pragma: no cover
 try:
     import sentry_sdk
     from sentry_sdk import Scope
+    from sentry_sdk.integrations.logging import (
+        BreadcrumbHandler,
+        EventHandler,
+        LoggingIntegration,
+    )
 
     SENTRY = os.environ.get("SENTRY_URL") is not None
 except ImportError:  # pragma: no cover
     Scope = sentry_sdk = None  # type: ignore
+
+    class LoggingIntegration:  # type: ignore
+        pass
+
+    EventHandler = BreadcrumbHandler = LoggingIntegration  # type: ignore
     SENTRY = False
 
 
@@ -101,3 +112,36 @@ def setup_error_handling(version: str) -> None:
             default_integrations=False,
         )
         sentry_sdk.set_tag("zone", settings.zone)
+
+
+class SentryHandler(EventHandler):
+    def __init__(self, allowed_loggers: List[str], *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._allowed_loggers = allowed_loggers
+
+    def emit(self, record):
+        if (
+            record.name in self._allowed_loggers
+            or record.name.split(".")[0] in self._allowed_loggers
+        ):
+            super().emit(record)
+
+
+class SentryLoggingIntegration(LoggingIntegration):
+    def __init__(
+        self, allowed_loggers: List[str], level=logging.INFO, event_level=logging.ERROR
+    ):
+        self._breadcrumb_handler = BreadcrumbHandler(level=level)
+        self._handler = SentryHandler(allowed_loggers, level=event_level)
+
+
+# Initialize Sentry with the custom logging handler
+
+
+def setup_sentry_logging_integration(for_loggers: List[str]) -> None:
+    settings = ErrorHandlingSettings()
+    if settings.sentry_url:
+        sentry_sdk.init(
+            dsn=settings.sentry_url,
+            integrations=[SentryLoggingIntegration(for_loggers)],
+        )
