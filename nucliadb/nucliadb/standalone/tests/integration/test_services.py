@@ -102,8 +102,4 @@ async def test_labelsets_service(
 
 async def test_notifications_service(nucliadb_reader):
     resp = await nucliadb_reader.get(f"/{KB_PREFIX}/foobar/notifications")
-    assert resp.status_code == 404
-    assert (
-        resp.json()["detail"]
-        == "Notifications are only available in the cloud offering of NucliaDB."
-    )
+    assert resp.status_code == 204
