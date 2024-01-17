@@ -22,7 +22,10 @@ from unittest import mock
 
 import pytest
 
-from nucliadb.reader.reader.notifications import kb_notifications_stream
+from nucliadb.reader.reader.notifications import (
+    kb_notifications_stream,
+    serialize_notification,
+)
 from nucliadb_protos import writer_pb2
 
 MODULE = "nucliadb.reader.reader.notifications"
@@ -79,3 +82,12 @@ async def test_kb_notifications_stream_timeout_gracefully_while_streaming():
 
         # Check that the kb_notifications generator was cancelled
         assert cancelled_event.is_set()
+
+
+def test_serialize_notification_processing_errors():
+    notif = writer_pb2.Notification(
+        source=writer_pb2.NotificationSource.PROCESSOR,
+        processing_errors=True,
+    )
+    serialized = serialize_notification(notif)
+    assert serialized.data.processing_errors is True
