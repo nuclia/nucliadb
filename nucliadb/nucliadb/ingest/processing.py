@@ -88,6 +88,8 @@ class PushPayload(BaseModel):
     source: Optional[Source] = None
     userid: str
 
+    title: Optional[str] = None
+
     genericfield: dict[str, models.Text] = {}
 
     # New File
