@@ -81,7 +81,8 @@ pub struct ResourceCache<K, V> {
 }
 
 impl<K, V> ResourceCache<K, V>
-where K: Eq + Hash + Clone + std::fmt::Debug
+where
+    K: Eq + Hash + Clone + std::fmt::Debug,
 {
     #[allow(dead_code)]
     pub fn new_with_capacity(capacity: NonZeroUsize) -> Self {
@@ -128,7 +129,6 @@ where K: Eq + Hash + Clone + std::fmt::Debug
 
     pub fn loaded(&mut self, guard: ResourceLoadGuard<K>, v: &Arc<V>) {
         self.loading.remove(&guard.key);
-        println!("Stored {:?} {:?}", guard.key, std::thread::current().id());
         self.insert(&guard.key, v);
         drop(guard);
     }
@@ -192,10 +192,8 @@ mod tests {
         fn new(k: usize) -> NodeResult<Self> {
             sleep(Duration::from_millis(100));
             if rand::thread_rng().gen_ratio(1, 10) {
-                println!("Failed to load {k} {:?}", std::thread::current().id());
                 return Err(anyhow!("patata"));
             }
-            println!("Created {k} {:?}", std::thread::current().id());
             let old = OBJCOUNTER[k].fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             if old >= 1 {
                 panic!("A resource was opened more than once simultaneously");
@@ -206,7 +204,6 @@ mod tests {
 
     impl Drop for CacheItem {
         fn drop(&mut self) {
-            println!("Destroyed {} {:?}", self.0, std::thread::current().id());
             OBJCOUNTER[self.0].fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
         }
     }
