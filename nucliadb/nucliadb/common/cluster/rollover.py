@@ -445,6 +445,13 @@ async def clean_indexed_data(app_context: ApplicationContext, kbid: str) -> None
 async def clean_rollover_status(app_context: ApplicationContext, kbid: str) -> None:
     cluster_datamanager = ClusterDataManager(app_context.kv_driver)
     kb_shards = await cluster_datamanager.get_kb_shards(kbid)
+    if kb_shards is None:
+        logger.warning(
+            "No shards found for KB, skipping clean rollover status",
+            extra={"kbid": kbid},
+        )
+        return
+
     _clear_rollover_status(kb_shards)
     await cluster_datamanager.update_kb_shards(kbid, kb_shards)
 
