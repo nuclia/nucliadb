@@ -81,8 +81,7 @@ pub struct ResourceCache<K, V> {
 }
 
 impl<K, V> ResourceCache<K, V>
-where
-    K: Eq + Hash + Clone + std::fmt::Debug,
+where K: Eq + Hash + Clone + std::fmt::Debug
 {
     #[allow(dead_code)]
     pub fn new_with_capacity(capacity: NonZeroUsize) -> Self {
