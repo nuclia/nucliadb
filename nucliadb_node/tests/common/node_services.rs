@@ -33,7 +33,7 @@ use nucliadb_node::lifecycle;
 use nucliadb_node::replication::replicator::connect_to_primary_and_replicate;
 use nucliadb_node::replication::service::ReplicationServiceGRPCDriver;
 use nucliadb_node::settings::*;
-use nucliadb_node::shards::providers::unbounded_cache::UnboundedShardWriterCache;
+use nucliadb_node::shards::providers::shard_cache::ShardWriterCache;
 use nucliadb_node::utils::read_or_create_host_key;
 use nucliadb_protos::replication;
 use tempfile::TempDir;
@@ -95,10 +95,10 @@ pub struct NodeFixture {
     secondary_reader_addr: SocketAddr,
     reader_server_task: Option<tokio::task::JoinHandle<()>>,
     writer_server_task: Option<tokio::task::JoinHandle<()>>,
-    primary_shard_cache: Option<Arc<UnboundedShardWriterCache>>,
+    primary_shard_cache: Option<Arc<ShardWriterCache>>,
     secondary_reader_server_task: Option<tokio::task::JoinHandle<()>>,
     secondary_writer_server_task: Option<tokio::task::JoinHandle<()>>,
-    secondary_shard_cache: Option<Arc<UnboundedShardWriterCache>>,
+    secondary_shard_cache: Option<Arc<ShardWriterCache>>,
     tempdir: TempDir,
     secondary_tempdir: TempDir,
     shutdown_notifier: Arc<Notify>,
@@ -184,7 +184,7 @@ impl NodeFixture {
         let settings = self.settings.clone();
         let cache_settings = self.settings.clone();
         let addr = self.writer_addr;
-        let shards_cache = Arc::new(UnboundedShardWriterCache::new(cache_settings));
+        let shards_cache = Arc::new(ShardWriterCache::new(cache_settings));
         self.primary_shard_cache = Some(Arc::clone(&shards_cache));
         let notifier = Arc::clone(&self.shutdown_notifier);
         self.writer_server_task = Some(tokio::spawn(async move {
@@ -229,7 +229,7 @@ impl NodeFixture {
         let cache_settings = self.secondary_settings.clone();
         let host_key_path = settings.host_key_path();
         let node_id = read_or_create_host_key(host_key_path)?;
-        let shards_cache = Arc::new(UnboundedShardWriterCache::new(cache_settings));
+        let shards_cache = Arc::new(ShardWriterCache::new(cache_settings));
         self.secondary_shard_cache = Some(shards_cache.clone());
         let notified = Arc::clone(&self.shutdown_notified);
         self.secondary_writer_server_task = Some(tokio::spawn(async move {
@@ -332,14 +332,14 @@ impl NodeFixture {
             .clone()
     }
 
-    pub fn primary_shard_cache(&self) -> Arc<UnboundedShardWriterCache> {
+    pub fn primary_shard_cache(&self) -> Arc<ShardWriterCache> {
         self.primary_shard_cache
             .as_ref()
             .expect("Shard cache not initialized")
             .clone()
     }
 
-    pub fn secondary_shard_cache(&self) -> Arc<UnboundedShardWriterCache> {
+    pub fn secondary_shard_cache(&self) -> Arc<ShardWriterCache> {
         self.secondary_shard_cache
             .as_ref()
             .expect("Shard cache not initialized")

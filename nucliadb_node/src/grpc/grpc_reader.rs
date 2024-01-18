@@ -29,31 +29,24 @@ use Shard as ShardPB;
 
 use crate::settings::Settings;
 use crate::shards::errors::ShardNotFoundError;
-use crate::shards::providers::unbounded_cache::UnboundedShardReaderCache;
+use crate::shards::providers::shard_cache::ShardReaderCache;
 use crate::shards::reader::{ShardFileChunkIterator, ShardReader};
 use crate::telemetry::run_with_telemetry;
 
 pub struct NodeReaderGRPCDriver {
-    shards: Arc<UnboundedShardReaderCache>,
-    settings: Settings,
+    shards: Arc<ShardReaderCache>,
 }
 
 impl NodeReaderGRPCDriver {
     pub fn new(settings: Settings) -> Self {
         let cache_settings = settings.clone();
         Self {
-            settings,
-            shards: Arc::new(UnboundedShardReaderCache::new(cache_settings)),
+            shards: Arc::new(ShardReaderCache::new(cache_settings)),
         }
     }
 
     /// This function must be called before using this service
     pub async fn initialize(&self) -> NodeResult<()> {
-        if !self.settings.lazy_loading() {
-            // If lazy loading is disabled, load
-            let shards = Arc::clone(&self.shards);
-            tokio::task::spawn_blocking(move || shards.load_all()).await??
-        }
         Ok(())
     }
 
@@ -65,26 +58,21 @@ impl NodeReaderGRPCDriver {
         tokio::task::spawn_blocking(move || obtain_shard(shards, id_clone))
             .await
             .map_err(|error| {
-                tonic::Status::internal(format!("Error lazy loading shard {id}: {error:?}"))
+                tonic::Status::internal(format!("Error loading shard {id}: {error:?}"))
             })?
     }
 }
 
 fn obtain_shard(
-    shards: Arc<UnboundedShardReaderCache>,
+    shards: Arc<ShardReaderCache>,
     id: impl Into<String>,
 ) -> Result<Arc<ShardReader>, tonic::Status> {
     let id = id.into();
-    if let Some(shard) = shards.get(id.clone()) {
-        return Ok(shard);
-    }
-    let id_clone = id.clone();
-    let shards = shards.clone();
-    let shard = shards.load(id_clone).map_err(|error| {
+    let shard = shards.get(&id).map_err(|error| {
         if error.is::<ShardNotFoundError>() {
             tonic::Status::not_found(error.to_string())
         } else {
-            tonic::Status::internal(format!("Error lazy loading shard {id}: {error:?}"))
+            tonic::Status::internal(format!("Error loading shard {id}: {error:?}"))
         }
     })?;
     Ok(shard)

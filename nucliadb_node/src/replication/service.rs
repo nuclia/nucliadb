@@ -32,21 +32,17 @@ use tonic::Response;
 use crate::replication::NodeRole;
 use crate::settings::Settings;
 use crate::shards::metadata::Similarity;
-use crate::shards::providers::unbounded_cache::UnboundedShardWriterCache;
+use crate::shards::providers::shard_cache::ShardWriterCache;
 use crate::shards::writer::ShardWriter;
 use crate::utils::list_shards;
 pub struct ReplicationServiceGRPCDriver {
     settings: Settings,
-    shards: Arc<UnboundedShardWriterCache>,
+    shards: Arc<ShardWriterCache>,
     node_id: String,
 }
 
 impl ReplicationServiceGRPCDriver {
-    pub fn new(
-        settings: Settings,
-        shard_cache: Arc<UnboundedShardWriterCache>,
-        node_id: String,
-    ) -> Self {
+    pub fn new(settings: Settings, shard_cache: Arc<ShardWriterCache>, node_id: String) -> Self {
         Self {
             settings,
             shards: shard_cache,
@@ -56,9 +52,6 @@ impl ReplicationServiceGRPCDriver {
 
     /// This function must be called before using this service
     pub async fn initialize(&self) -> NodeResult<()> {
-        // should we do this?
-        let shards = self.shards.clone();
-        tokio::task::spawn_blocking(move || shards.load_all()).await??;
         Ok(())
     }
 }
@@ -259,7 +252,7 @@ impl replication::replication_service_server::ReplicationService for Replication
         let id = request.shard_id;
         let id_clone = id.clone();
         let shards = self.shards.clone();
-        let shard_lookup = tokio::task::spawn_blocking(move || shards.load(id_clone))
+        let shard_lookup = tokio::task::spawn_blocking(move || shards.get(&id_clone))
             .await
             .map_err(|error| {
                 tonic::Status::internal(format!("Error lazy loading shard {id}: {error:?}"))

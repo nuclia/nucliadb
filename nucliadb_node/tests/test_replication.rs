@@ -21,6 +21,7 @@
 mod common;
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use common::{resources, NodeFixture, TestNodeReader, TestNodeWriter};
 use nucliadb_core::protos::{
@@ -86,12 +87,20 @@ async fn test_search_replicated_data(
     assert_eq!(response.vector.unwrap().documents.len(), 1);
 
     // Validate generation id is the same
-    let primary_shard = fixture.primary_shard_cache().load(shard.id.clone())?;
-    let secondary_shard = fixture.secondary_shard_cache().load(shard.id.clone())?;
+    let primary_shard = Arc::downgrade(&fixture.primary_shard_cache().get(&shard.id)?);
+    let secondary_shard = Arc::downgrade(&fixture.secondary_shard_cache().get(&shard.id)?);
 
     assert_eq!(
-        primary_shard.metadata.get_generation_id(),
-        secondary_shard.metadata.get_generation_id()
+        primary_shard
+            .upgrade()
+            .unwrap()
+            .metadata
+            .get_generation_id(),
+        secondary_shard
+            .upgrade()
+            .unwrap()
+            .metadata
+            .get_generation_id()
     );
 
     // Test deleting shard deletes it from secondary
@@ -99,6 +108,9 @@ async fn test_search_replicated_data(
 
     // wait for the shard to be deleted
     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
+    assert!(primary_shard.upgrade().is_none());
+    assert!(secondary_shard.upgrade().is_none());
 
     let err_search_result = secondary_reader.search(query).await;
     assert!(err_search_result.is_err());

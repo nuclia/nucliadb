@@ -36,13 +36,13 @@ use crate::analytics::sync::send_analytics_event;
 use crate::settings::Settings;
 use crate::shards::errors::ShardNotFoundError;
 use crate::shards::metadata::ShardMetadata;
-use crate::shards::providers::unbounded_cache::UnboundedShardWriterCache;
+use crate::shards::providers::shard_cache::ShardWriterCache;
 use crate::shards::writer::ShardWriter;
 use crate::telemetry::run_with_telemetry;
 use crate::utils::list_shards;
 
 pub struct NodeWriterGRPCDriver {
-    shards: Arc<UnboundedShardWriterCache>,
+    shards: Arc<ShardWriterCache>,
     sender: Option<UnboundedSender<NodeWriterEvent>>,
     settings: Settings,
 }
@@ -54,7 +54,7 @@ pub enum NodeWriterEvent {
 }
 
 impl NodeWriterGRPCDriver {
-    pub fn new(settings: Settings, shard_cache: Arc<UnboundedShardWriterCache>) -> Self {
+    pub fn new(settings: Settings, shard_cache: Arc<ShardWriterCache>) -> Self {
         Self {
             settings,
             shards: shard_cache,
@@ -64,11 +64,6 @@ impl NodeWriterGRPCDriver {
 
     /// This function must be called before using this service
     pub async fn initialize(&self) -> NodeResult<()> {
-        if !self.settings.lazy_loading() {
-            // If lazy loading is disabled, load
-            let shards = Arc::clone(&self.shards);
-            tokio::task::spawn_blocking(move || shards.load_all()).await??
-        }
         Ok(())
     }
 
@@ -88,16 +83,12 @@ impl NodeWriterGRPCDriver {
 }
 
 fn obtain_shard(
-    shards: Arc<UnboundedShardWriterCache>,
+    shards: Arc<ShardWriterCache>,
     id: impl Into<String>,
 ) -> Result<Arc<ShardWriter>, tonic::Status> {
     let id = id.into();
-    if let Some(shard) = shards.get(id.clone()) {
-        return Ok(shard);
-    }
-    let id_clone = id.clone();
-    let shards = shards.clone();
-    let shard = shards.load(id_clone).map_err(|error| {
+
+    let shard = shards.get(&id).map_err(|error| {
         if error.is::<ShardNotFoundError>() {
             tonic::Status::not_found(error.to_string())
         } else {
@@ -152,7 +143,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
 
         let shards = Arc::clone(&self.shards);
         let shard_id_clone = shard_id.id.clone();
-        let deleted = tokio::task::spawn_blocking(move || shards.delete(shard_id_clone))
+        let deleted = tokio::task::spawn_blocking(move || shards.delete(&shard_id_clone))
             .await
             .map_err(|error| {
                 tonic::Status::internal(format!("Error deleted shard {}: {error:?}", shard_id.id))
@@ -180,7 +171,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         // No need to load shard to upgrade it
         let shards = Arc::clone(&self.shards);
         let shard_id_clone = shard_id.clone();
-        let upgraded = tokio::task::spawn_blocking(move || shards.upgrade(shard_id_clone))
+        let upgraded = tokio::task::spawn_blocking(move || shards.upgrade(&shard_id_clone))
             .await
             .map_err(|error| {
                 tonic::Status::internal(format!("Error deleted shard {}: {error:?}", shard_id))
