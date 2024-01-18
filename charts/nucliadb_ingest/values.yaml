@@ -127,6 +127,3 @@ ingest_subscriber_workers_autoscaling:
 # extra_pod_annotations:
 #   what: "add annotations"
 #   where: "in the pods"
-
-
-processing_v2: false
