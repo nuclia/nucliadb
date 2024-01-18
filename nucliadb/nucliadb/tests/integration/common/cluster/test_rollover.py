@@ -86,9 +86,6 @@ async def test_rollover_kb_shards(
 async def test_rollover_kb_shards_does_a_clean_cutover(
     app_context,
     knowledgebox,
-    nucliadb_writer: AsyncClient,
-    nucliadb_reader: AsyncClient,
-    nucliadb_manager: AsyncClient,
 ):
     async def get_kb_shards(kbid: str):
         driver = app_context.kv_driver
