@@ -80,12 +80,12 @@ pub fn measure(
     let expanded = quote! {
         #(#attrs)*
         #vis #sig {
-            let time = std::time::SystemTime::now();
+            let time = std::time::Instant::now();
 
             // execute function body
             let return_value = #block;
 
-            let took = time.elapsed().map(|elapsed| elapsed.as_secs_f64()).unwrap_or(f64::NAN);
+            let took = time.elapsed().as_secs_f64();
             let metrics = nucliadb_core::metrics::get_metrics();
             let metric = nucliadb_core::metrics::request_time::RequestTimeKey::#actor(#metric.to_string());
             metrics.record_request_time(metric, took);

@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::fmt::Debug;
-use std::time::SystemTime;
+use std::time::Instant;
 
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::prost::Message;
@@ -87,7 +87,7 @@ impl ReaderChild for VectorReaderService {
     #[measure(actor = "vectors", metric = "search")]
     #[tracing::instrument(skip_all)]
     fn search(&self, request: &Self::Request) -> NodeResult<Self::Response> {
-        let time = SystemTime::now();
+        let time = Instant::now();
 
         let id = Some(&request.id);
         let offset = request.result_per_page * request.page_number;
@@ -123,9 +123,9 @@ impl ReaderChild for VectorReaderService {
         }
 
         let search_request = (total_to_get, request, formula);
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Searching: starts at {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Searching: starts at {v} ms");
+
         let result = if request.vector_set.is_empty() {
             debug!("{id:?} - No vectorset specified, searching in the main index");
             self.index.search(&search_request, &index_slock)?
@@ -143,16 +143,15 @@ impl ReaderChild for VectorReaderService {
             );
             vec![]
         };
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Searching: ends at {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Searching: ends at {v} ms");
 
         std::mem::drop(indexet_slock);
         std::mem::drop(index_slock);
 
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Creating results: starts at {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Creating results: starts at {v} ms");
+
         let documents = result
             .into_iter()
             .enumerate()
@@ -160,11 +159,10 @@ impl ReaderChild for VectorReaderService {
             .map(|(_, v)| v)
             .flat_map(DocumentScored::try_from)
             .collect::<Vec<_>>();
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Creating results: ends at {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Creating results: ends at {v} ms");
 
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let took = time.elapsed().as_secs_f64();
         debug!("{id:?} - Ending at {took} ms");
 
         Ok(VectorSearchResponse {
@@ -177,12 +175,12 @@ impl ReaderChild for VectorReaderService {
     #[measure(actor = "vectors", metric = "stored_ids")]
     #[tracing::instrument(skip_all)]
     fn stored_ids(&self) -> NodeResult<Vec<String>> {
-        let time = SystemTime::now();
+        let time = Instant::now();
         let lock = self.index.get_slock().unwrap();
         let result = self.index.get_keys(&lock)?;
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("Ending at {v} ms")
-        }
+        let v = time.elapsed().as_millis();
+        debug!("Ending at {v} ms");
+
         Ok(result)
     }
 }

@@ -19,7 +19,7 @@
 //
 
 use std::collections::HashMap;
-use std::time::SystemTime;
+use std::time::Instant;
 
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::resource::ResourceStatus;
@@ -38,7 +38,7 @@ pub struct RelationsWriterService {
 impl RelationsWriterService {
     #[tracing::instrument(skip_all)]
     fn delete_node(&self, writer: &mut GraphWriter, id: Entity) -> NodeResult<()> {
-        let time = SystemTime::now();
+        let time = Instant::now();
         let affects = writer.delete_node(&self.wmode, id)?;
         for affected in affects {
             let affected_value = writer.get_node(affected)?;
@@ -48,9 +48,9 @@ impl RelationsWriterService {
                 writer.delete_node(&self.wmode, affected)?;
             }
         }
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Ending at {v} ms")
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Ending at {v} ms");
+
         Ok(())
     }
 }
@@ -67,18 +67,17 @@ impl WriterChild for RelationsWriterService {
     #[measure(actor = "relations", metric = "count")]
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
-        let time = SystemTime::now();
+        let time = Instant::now();
 
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("Count starting at {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("Count starting at {v} ms");
+
         let count = self
             .index
             .start_reading()
             .and_then(|reader| reader.no_nodes())?;
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("Ending at {v} ms")
-        }
+        let v = time.elapsed().as_millis();
+        debug!("Ending at {v} ms");
 
         Ok(count as usize)
     }
@@ -86,7 +85,7 @@ impl WriterChild for RelationsWriterService {
     #[measure(actor = "relations", metric = "delete_resource")]
     #[tracing::instrument(skip_all)]
     fn delete_resource(&mut self, x: &ResourceId) -> NodeResult<()> {
-        let time = SystemTime::now();
+        let time = Instant::now();
 
         let id = Some(&x.shard_id);
         let node = IoNode::new(x.uuid.clone(), dictionary::ENTITY.to_string(), None);
@@ -94,9 +93,8 @@ impl WriterChild for RelationsWriterService {
         if let Some(id) = writer.get_node_id(node.hash())? {
             self.delete_node(&mut writer, id)?;
         }
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Ending at {v} ms")
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Ending at {v} ms");
 
         Ok(())
     }
@@ -104,13 +102,13 @@ impl WriterChild for RelationsWriterService {
     #[measure(actor = "relations", metric = "set_resource")]
     #[tracing::instrument(skip_all)]
     fn set_resource(&mut self, resource: &Resource) -> NodeResult<()> {
-        let time = SystemTime::now();
+        let time = Instant::now();
 
         let id = Some(&resource.shard_id);
         if resource.status != ResourceStatus::Delete as i32 {
-            if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-                debug!("{id:?} - Populating the graph: starts {v} ms");
-            }
+            let v = time.elapsed().as_millis();
+            debug!("{id:?} - Populating the graph: starts {v} ms");
+
             let iter = resource
                 .relations
                 .iter()
@@ -137,13 +135,11 @@ impl WriterChild for RelationsWriterService {
                 writer.connect(&self.wmode, &from, &to, &edge, metadata.as_ref())?;
             }
             writer.commit(&mut self.wmode)?;
-            if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-                debug!("{id:?} - Populating the graph: ends {v} ms");
-            }
+            let v = time.elapsed().as_millis();
+            debug!("{id:?} - Populating the graph: ends {v} ms");
         }
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Ending at {v} ms")
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Ending at {v} ms");
 
         Ok(())
     }
