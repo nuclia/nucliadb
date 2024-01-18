@@ -101,7 +101,7 @@ def s3_storage_writer(s3):
     storage_settings.s3_endpoint = s3
     storage_settings.s3_client_id = ""
     storage_settings.s3_client_secret = ""
-    storage_settings.s3_bucket = "test_{kbid}"
+    storage_settings.s3_bucket = "test-{kbid}"
 
 
 @pytest.fixture(scope="function")
