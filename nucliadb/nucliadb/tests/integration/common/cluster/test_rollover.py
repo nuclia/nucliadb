@@ -23,7 +23,6 @@ from httpx import AsyncClient
 from nucliadb.common.cluster import rollover
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.datamanagers.cluster import ClusterDataManager
-from nucliadb.common.maindb.utils import get_driver
 
 pytestmark = pytest.mark.asyncio
 

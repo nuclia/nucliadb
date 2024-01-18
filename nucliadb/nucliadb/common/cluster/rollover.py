@@ -58,6 +58,11 @@ def _set_rollover_status(rollover_shards: writer_pb2.Shards, status: RolloverSta
     rollover_shards.extra[status.value] = "true"
 
 
+def _clear_rollover_status(rollover_shards: writer_pb2.Shards):
+    for status in RolloverStatus:
+        rollover_shards.extra.pop(status.value, None)
+
+
 class UnexpectedRolloverError(Exception):
     pass
 
@@ -312,6 +317,7 @@ async def cutover_shards(app_context: ApplicationContext, kbid: str) -> None:
     if previously_active_shards is None or rollover_shards is None:
         raise UnexpectedRolloverError("Shards for kb not found")
 
+    _clear_rollover_status(rollover_shards)
     await cluster_datamanager.update_kb_shards(kbid, rollover_shards)
     await rollover_datamanager.delete_kb_rollover_shards(kbid)
 
@@ -436,6 +442,13 @@ async def clean_indexed_data(app_context: ApplicationContext, kbid: str) -> None
         await rollover_datamanager.remove_indexed(kbid, batch)
 
 
+async def clean_rollover_status(app_context: ApplicationContext, kbid: str) -> None:
+    cluster_datamanager = ClusterDataManager(app_context.kv_driver)
+    kb_shards = await cluster_datamanager.get_kb_shards(kbid)
+    _clear_rollover_status(kb_shards)
+    await cluster_datamanager.update_kb_shards(kbid, kb_shards)
+
+
 async def rollover_kb_shards(app_context: ApplicationContext, kbid: str) -> None:
     """
     Rollover a shard is the process of creating new shard replicas for every
@@ -471,6 +484,7 @@ async def rollover_kb_shards(app_context: ApplicationContext, kbid: str) -> None
     # we need to cut over BEFORE we validate the data
     await validate_indexed_data(app_context, kbid)
     await clean_indexed_data(app_context, kbid)
+    await clean_rollover_status(app_context, kbid)
 
     logger.warning("Finished rolling over shards", extra={"kbid": kbid})
 
