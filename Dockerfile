@@ -59,4 +59,5 @@ EXPOSE 8060/tcp
 # GRPC - TRAIN
 EXPOSE 8040/tcp
 
-CMD ["nucliadb"]
+ENTRYPOINT ["nucliadb"]
+CMD ["--log-output-type=STDOUT"]
