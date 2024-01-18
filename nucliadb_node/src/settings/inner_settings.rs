@@ -59,8 +59,6 @@ pub struct InnerSettings {
     pub metadata_path: PathBuf,
     #[builder(private, default = "PathBuf::from(\"data\").join(SHARDS_DIR)")]
     pub shards_path: PathBuf,
-    #[builder(default = "true", setter(custom))]
-    pub lazy_loading: bool,
     #[builder(default = "800")]
     pub max_shards_per_node: usize,
 
@@ -152,11 +150,6 @@ impl InnerSettingsBuilder {
         self.metadata_path = Some(data_path.join(METADATA_FILE));
         self.shards_path = Some(data_path.join(SHARDS_DIR));
         self.data_path = Some(data_path);
-        self
-    }
-
-    pub fn without_lazy_loading(&mut self) -> &mut Self {
-        self.lazy_loading = Some(false);
         self
     }
 
