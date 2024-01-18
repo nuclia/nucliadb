@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+from tempfile import NamedTemporaryFile
 from uuid import uuid4
 
 import pytest
@@ -50,6 +51,28 @@ def test_export_import_kb(src_kbid, dst_kbid, sdk: nucliadb_sdk.NucliaDB):
     resp = sdk.start_import(kbid=dst_kbid, content=export_generator(chunk_size=1024))
     import_id = resp.import_id
     assert sdk.import_status(kbid=dst_kbid, import_id=import_id).status == "finished"
+
+    _check_kbs_are_equal(sdk, src_kbid, dst_kbid)
+
+
+def test_export_import_with_files(src_kbid, dst_kbid, sdk: nucliadb_sdk.NucliaDB):
+    # Export src kb
+    resp = sdk.start_export(kbid=src_kbid)
+    export_id = resp.export_id
+    assert sdk.export_status(kbid=src_kbid, export_id=export_id).status == "finished"
+    export_generator = sdk.download_export(kbid=src_kbid, export_id=export_id)
+
+    # Store in a file
+    with NamedTemporaryFile() as f:
+        for chunk in export_generator():
+            f.write(chunk)
+
+        # Import to dst kb from a file
+        resp = sdk.start_import(kbid=dst_kbid, content=open(f.name, "rb"))
+        import_id = resp.import_id
+        assert (
+            sdk.import_status(kbid=dst_kbid, import_id=import_id).status == "finished"
+        )
 
     _check_kbs_are_equal(sdk, src_kbid, dst_kbid)
 

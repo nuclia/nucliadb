@@ -165,6 +165,7 @@ def is_raw_request_content(content: Any) -> bool:
         or isinstance(content, bytes)
         or inspect.isgenerator(content)
         or inspect.isasyncgen(content)
+        or isinstance(content, io.IOBase)
     )
 
 
