@@ -22,7 +22,10 @@ import asyncio
 from typing import Optional
 
 import nats
-import pydantic
+try:
+    import pydantic.v1 as pydantic
+except ImportError:
+    import pydantic
 from nats.aio.client import Msg
 
 from nucliadb.common.context import ApplicationContext

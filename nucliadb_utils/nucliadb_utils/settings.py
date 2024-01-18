@@ -20,8 +20,12 @@
 from enum import Enum
 from typing import Dict, List, Optional
 
-from pydantic import BaseSettings, Field
-from pydantic.class_validators import root_validator
+try:
+    from pydantic.v1 import BaseSettings, Field
+    from pydantic.v1.class_validators import root_validator
+except ImportError:
+    from pydantic import BaseSettings, Field
+    from pydantic.class_validators import root_validator
 
 
 class RunningSettings(BaseSettings):

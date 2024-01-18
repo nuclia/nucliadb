@@ -22,7 +22,10 @@ from enum import Enum
 from typing import TYPE_CHECKING, List, Optional, Type, TypeVar
 
 from google.protobuf.json_format import MessageToDict
-from pydantic import BaseModel, Field
+try:
+    from pydantic.v1 import BaseModel, Field
+except ImportError:
+    from pydantic import BaseModel, Field
 
 from nucliadb_models import CloudLink, FileB64
 from nucliadb_protos import resources_pb2

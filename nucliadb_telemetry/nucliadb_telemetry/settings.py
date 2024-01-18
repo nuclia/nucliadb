@@ -20,7 +20,10 @@
 import enum
 from typing import Dict, Optional
 
-import pydantic
+try:
+    import pydantic.v1 as pydantic
+except ImportError:
+    import pydantic
 
 try:
     from pydantic import BaseSettings

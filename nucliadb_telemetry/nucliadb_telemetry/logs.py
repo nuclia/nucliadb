@@ -26,7 +26,10 @@ from logging.handlers import RotatingFileHandler
 from typing import Any, Dict, Optional
 
 import orjson
-import pydantic
+try:
+    import pydantic.v1 as pydantic
+except ImportError:
+    import pydantic
 from opentelemetry import trace
 from opentelemetry.trace import format_span_id, format_trace_id
 from opentelemetry.trace.span import INVALID_SPAN

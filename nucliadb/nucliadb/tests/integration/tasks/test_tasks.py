@@ -21,7 +21,10 @@ import asyncio
 import time
 from contextlib import contextmanager
 
-import pydantic
+try:
+    import pydantic.v1 as pydantic
+except ImportError:
+    import pydantic
 import pytest
 
 from nucliadb import tasks

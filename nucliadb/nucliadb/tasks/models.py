@@ -20,7 +20,10 @@
 from dataclasses import dataclass
 from typing import Any, Callable, Coroutine, Optional, Type
 
-import pydantic
+try:
+    import pydantic.v1 as pydantic
+except ImportError:
+    import pydantic
 
 from nucliadb.common.context import ApplicationContext
 from nucliadb_utils import const

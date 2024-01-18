@@ -20,7 +20,10 @@
 import functools
 from typing import Optional
 
-import pydantic
+try:
+    import pydantic.v1 as pydantic
+except ImportError:
+    import pydantic
 
 from nucliadb.tasks.models import RegisteredTask
 from nucliadb_utils import const

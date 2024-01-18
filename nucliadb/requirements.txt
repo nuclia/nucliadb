@@ -20,8 +20,7 @@ grpcio-testing>=1.44.0
 grpcio-reflection>=1.44.0
 orjson>=3.6.7
 types-setuptools
-# pydantic 2 need a careful migration
-pydantic>=1.9.0,<2.0
+pydantic>=2.0.0
 aiobotocore>=2.5.2
 botocore<1.30.0
 google-cloud-storage

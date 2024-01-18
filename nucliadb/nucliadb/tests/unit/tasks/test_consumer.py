@@ -19,7 +19,10 @@
 #
 from unittest.mock import AsyncMock, MagicMock
 
-import pydantic
+try:
+    import pydantic.v1 as pydantic
+except ImportError:
+    import pydantic
 import pytest
 
 from nucliadb.tasks.consumer import create_consumer

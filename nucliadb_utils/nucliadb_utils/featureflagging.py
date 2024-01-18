@@ -21,7 +21,10 @@ import json
 from typing import Any, Optional
 
 import mrflagly
-import pydantic
+try:
+    import pydantic.v1 as pydantic
+except ImportError:
+    import pydantic
 
 from nucliadb_utils import const
 

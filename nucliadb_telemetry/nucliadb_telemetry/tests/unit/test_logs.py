@@ -22,7 +22,10 @@ import logging
 from unittest.mock import MagicMock, patch
 
 import orjson
-import pydantic
+try:
+    import pydantic.v1 as pydantic
+except ImportError:
+    import pydantic
 import pytest
 from opentelemetry.trace import format_span_id, format_trace_id
 

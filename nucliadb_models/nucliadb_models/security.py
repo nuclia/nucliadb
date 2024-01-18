@@ -19,7 +19,10 @@
 #
 from typing import List
 
-from pydantic import BaseModel, Field
+try:
+    from pydantic.v1 import BaseModel, Field
+except ImportError:
+    from pydantic import BaseModel, Field
 
 
 class ResourceSecurity(BaseModel):

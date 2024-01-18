@@ -33,7 +33,11 @@ from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxID  # type: ignore
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.resources_pb2 import FieldFile as FieldFilePB
 from nucliadb_protos.writer_pb2 import GetConfigurationResponse, OpStatusWriter
-from pydantic import BaseModel, Field
+
+try:
+    from pydantic.v1 import BaseModel, Field
+except ImportError:
+    from pydantic import BaseModel, Field
 
 import nucliadb_models as models
 from nucliadb_models.configuration import KBConfiguration

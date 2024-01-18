@@ -21,7 +21,10 @@
 from enum import Enum
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel
+try:
+    from pydantic.v1 import BaseModel
+except ImportError:
+    from pydantic import BaseModel
 
 BASE_LABELS: dict[str, list[str]] = {
     "t": [],  # doc tags

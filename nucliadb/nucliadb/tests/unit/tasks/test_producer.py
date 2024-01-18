@@ -20,7 +20,10 @@
 from unittest.mock import AsyncMock, MagicMock, Mock
 
 import nats
-import pydantic
+try:
+    import pydantic.v1 as pydantic
+except ImportError:
+    import pydantic
 import pytest
 
 from nucliadb.tasks.producer import create_producer

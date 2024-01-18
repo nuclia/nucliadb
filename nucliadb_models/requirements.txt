@@ -1,4 +1,4 @@
-pydantic>=1.8.2,<2.0
+pydantic>=2.0.0
 
 # automatically bumped during release
 nucliadb-protos

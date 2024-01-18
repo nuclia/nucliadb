@@ -20,7 +20,10 @@
 from enum import Enum
 from typing import Optional
 
-import pydantic
+try:
+    import pydantic.v1 as pydantic
+except ImportError:
+    import pydantic
 
 from nucliadb.ingest.settings import DriverSettings
 from nucliadb_models.resource import NucliaDBRoles

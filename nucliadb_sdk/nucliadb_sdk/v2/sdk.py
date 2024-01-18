@@ -40,7 +40,10 @@ from typing import (
 
 import httpx
 import orjson
-from pydantic import BaseModel
+try:
+    from pydantic.v1 import BaseModel
+except ImportError:
+    from pydantic import BaseModel
 
 from nucliadb_models.configuration import KBConfiguration
 from nucliadb_models.conversation import InputMessage

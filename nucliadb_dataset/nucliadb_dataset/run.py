@@ -19,7 +19,12 @@
 #
 from pathlib import Path
 
-import pydantic_argparse
+try:
+    import pydantic.v1 as pydantic
+    import pydantic2_argparse as pydantic_argparse
+except ImportError:
+    import pydantic
+    import pydantic_argparse
 from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 
 from nucliadb_dataset import DatasetType, ExportType

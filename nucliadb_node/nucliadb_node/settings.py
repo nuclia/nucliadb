@@ -19,7 +19,10 @@
 #
 from typing import Optional
 
-from pydantic import BaseSettings
+try:
+    from pydantic.v1 import BaseSettings
+except ImportError:
+    from pydantic import BaseSettings
 
 from nucliadb_utils import settings as utils_settings
 

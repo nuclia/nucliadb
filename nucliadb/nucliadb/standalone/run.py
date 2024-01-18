@@ -23,7 +23,12 @@ import os
 import sys
 from typing import Optional
 
-import pydantic_argparse
+try:
+    import pydantic.v1 as pydantic
+    import pydantic2_argparse as pydantic_argparse
+except ImportError:
+    import pydantic
+    import pydantic_argparse
 import uvicorn  # type: ignore
 from fastapi import FastAPI
 

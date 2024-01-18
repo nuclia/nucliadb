@@ -20,7 +20,13 @@
 # Standalone purge command
 import asyncio
 
-import pydantic_argparse
+try:
+    import pydantic.v1 as pydantic
+    import pydantic2_argparse as pydantic_argparse
+except ImportError:
+    import pydantic
+    import pydantic_argparse
+
 
 from nucliadb.standalone.config import config_nucliadb
 from nucliadb.standalone.settings import Settings

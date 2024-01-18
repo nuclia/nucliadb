@@ -20,7 +20,10 @@
 import json
 import re
 
-import pydantic
+try:
+    import pydantic.v1 as pydantic
+except ImportError:
+    import pydantic
 
 
 class FieldIdString(pydantic.ConstrainedStr):

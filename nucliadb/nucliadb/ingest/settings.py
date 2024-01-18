@@ -20,7 +20,11 @@
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseSettings, Field
+try:
+    from pydantic.v1 import Field
+    from pydantic_settings import BaseSettings
+except ImportError:
+    from pydantic import BaseSettings, Field
 
 
 class DriverConfig(str, Enum):

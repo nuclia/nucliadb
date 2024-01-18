@@ -19,7 +19,10 @@
 #
 import enum
 
-from pydantic import BaseSettings, Field
+try:
+    from pydantic.v1 import BaseSettings, Field
+except ImportError:
+    from pydantic import BaseSettings, Field
 
 
 class ClusterDiscoveryMode(str, enum.Enum):

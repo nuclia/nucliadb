@@ -4,7 +4,10 @@ from typing import Dict, List, Optional, Tuple, Type, TypeVar
 from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.utils_pb2 import VectorSimilarity as PBVectorSimilarity
 from nucliadb_protos.writer_pb2 import VectorSet as PBVectorSet
-from pydantic import BaseModel, Field
+try:
+    from pydantic.v1 import BaseModel, Field
+except ImportError:
+    from pydantic import BaseModel, Field
 
 from nucliadb_models import FieldID
 from nucliadb_protos import knowledgebox_pb2, resources_pb2

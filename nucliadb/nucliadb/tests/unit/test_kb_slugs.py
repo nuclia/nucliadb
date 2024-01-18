@@ -18,7 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import pytest
-from pydantic import BaseModel, ValidationError
+try:
+    from pydantic.v1 import BaseModel, ValidationError
+except ImportError:
+    from pydantic import BaseModel, ValidationError
+
 
 from nucliadb_models.utils import SlugString
 

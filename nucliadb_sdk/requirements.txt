@@ -1,7 +1,7 @@
 httpx
 requests
 orjson
-pydantic>=1.10.9,<2.0
+pydantic>=2.0.0
 
 # automatically bumped during release
 nucliadb-models

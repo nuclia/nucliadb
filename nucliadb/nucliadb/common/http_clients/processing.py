@@ -21,7 +21,10 @@ import logging
 from typing import Any, Optional
 
 import aiohttp
-import pydantic
+try:
+    import pydantic.v1 as pydantic
+except ImportError:
+    import pydantic
 from aiohttp.web import Response
 
 from nucliadb_utils.settings import nuclia_settings

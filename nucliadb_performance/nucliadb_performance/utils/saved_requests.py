@@ -20,7 +20,10 @@
 from functools import cache
 from typing import Any, Optional, Union
 
-from pydantic import BaseModel
+try:
+    from pydantic.v1 import BaseModel
+except ImportError:
+    from pydantic import BaseModel
 
 Payload = dict[str, Any]
 Params = dict[str, Union[str, list[str]]]

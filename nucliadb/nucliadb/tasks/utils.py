@@ -21,7 +21,11 @@
 from typing import Awaitable, Callable
 
 import nats
-from pydantic import BaseModel
+
+try:
+    from pydantic.v1 import BaseModel
+except ImportError:
+    from pydantic import BaseModel
 
 from nucliadb.common.context import ApplicationContext
 

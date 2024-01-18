@@ -21,7 +21,10 @@ import typing
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Type, Union
 
 import httpx
-from pydantic import BaseModel
+try:
+    from pydantic.v1 import BaseModel
+except ImportError:
+    from pydantic import BaseModel
 
 
 class Example(BaseModel):

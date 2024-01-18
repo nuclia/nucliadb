@@ -21,7 +21,10 @@
 from typing import Dict, List, Optional, Type, TypeVar
 
 from google.protobuf.json_format import MessageToDict
-from pydantic import BaseModel, Field
+try:
+    from pydantic.v1 import BaseModel, Field
+except ImportError:
+    from pydantic import BaseModel, Field
 
 from nucliadb_protos import knowledgebox_pb2
 

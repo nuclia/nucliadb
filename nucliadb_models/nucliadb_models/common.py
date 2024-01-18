@@ -23,7 +23,10 @@ import re
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, root_validator
+try:
+    from pydantic.v1 import BaseModel, Field Validator
+except ImportError:
+    from pydantic import BaseModel, Field, validator
 
 from nucliadb_protos import resources_pb2
 

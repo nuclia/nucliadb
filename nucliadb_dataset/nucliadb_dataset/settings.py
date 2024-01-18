@@ -21,7 +21,11 @@
 from pathlib import Path
 from typing import List, Optional
 
-import pydantic
+try:
+    import pydantic.v1 as pydantic
+except ImportError:
+    import pydantic
+
 from pydantic import BaseSettings
 
 from nucliadb_dataset import DatasetType, ExportType

@@ -30,7 +30,11 @@ from typing import Optional
 import pkg_resources
 import psutil
 from fastapi import FastAPI
-from pydantic import BaseModel
+
+try:
+    from pydantic.v1 import BaseModel
+except ImportError:
+    from pydantic import BaseModel
 
 from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.standalone.settings import Settings

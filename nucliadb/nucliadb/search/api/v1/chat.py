@@ -21,7 +21,10 @@ import base64
 import json
 from typing import Any, Optional, Union
 
-import pydantic
+try:
+    import pydantic.v1 as pydantic
+except ImportError:
+    import pydantic
 from fastapi import Body, Header, Request, Response
 from fastapi.openapi.models import Example
 from fastapi_versioning import version

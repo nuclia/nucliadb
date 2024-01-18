@@ -19,7 +19,15 @@
 #
 from typing import TYPE_CHECKING, Any, Optional, Union
 
-from pydantic import BaseModel
+try:
+    import pydantic.v1 as pydantic
+except ImportError:
+    import pydantic
+
+try:
+    from pydantic.v1 import BaseModel
+except ImportError:
+    from pydantic import BaseModel
 
 import nucliadb_models as models
 from nucliadb_models.common import FIELD_TYPES_MAP, FieldTypeName

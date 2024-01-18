@@ -20,7 +20,11 @@
 import json
 from typing import Dict, List, Optional, Union
 
-from pydantic import BaseModel, Field, validator
+try:
+    from pydantic.v1 import BaseModel, Field, validator
+except ImportError:
+    from pydantic import BaseModel, Field, validator
+
 
 from nucliadb_models.conversation import InputConversationField
 from nucliadb_models.datetime import FieldDatetime
