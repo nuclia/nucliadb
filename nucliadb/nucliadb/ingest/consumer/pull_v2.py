@@ -38,7 +38,7 @@ from nucliadb_utils.settings import nuclia_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_storage, get_transaction_utility
 
-DB_TXN_KEY = "pull/cursor"
+PULL_CURSOR_KEY = "pull/cursor"
 
 
 class PullWorkerV2:
@@ -147,7 +147,7 @@ class PullWorkerV2:
 
         sleep_backoff = 0.1
         async with ProcessingV2HTTPClient() as processing_http_client:
-            logger.info(f"Collecting from NucliaDB Cloud")
+            logger.info(f"Pulling from NucliaDB Cloud")
             while True:
                 try:
                     await asyncio.sleep(sleep_backoff)
@@ -168,7 +168,7 @@ class PullWorkerV2:
                                 )
                         cursor = data.cursor
                         async with self.driver.transaction() as txn:
-                            await txn.set(DB_TXN_KEY, cursor.encode())
+                            await txn.set(PULL_CURSOR_KEY, cursor.encode())
                         sleep_backoff = 0.1
                     else:
                         sleep_backoff = self.pull_time_empty_backoff
@@ -178,7 +178,7 @@ class PullWorkerV2:
                     KeyboardInterrupt,
                     SystemExit,
                 ):
-                    logger.info(f"Pull task for was canceled, exiting")
+                    logger.info(f"Pull task was canceled, exiting")
                     raise ReallyStopPulling()
                 except ClientConnectorError:
                     logger.error(
@@ -186,6 +186,7 @@ class PullWorkerV2:
                          {processing_http_client.base_url} verify your internet connection"
                     )
                     sleep_backoff = self.pull_time_error_backoff
-                except Exception:
+                except Exception as exc:
+                    errors.capture_exception(exc)
                     logger.exception("Unhandled error pulling messages from processing")
                     sleep_backoff = self.pull_time_error_backoff
