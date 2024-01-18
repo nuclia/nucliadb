@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import Union
+from typing import Optional, Union
 
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
@@ -47,6 +47,7 @@ from starlette.requests import Request
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.context.fastapi import get_app_context
 from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
+from nucliadb.common.http_clients import processing
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.reader.api.v1.router import KB_PREFIX, api
 from nucliadb.reader.reader.notifications import kb_notifications_stream
@@ -343,3 +344,34 @@ async def notifications_endpoint(
 async def exists_kb(context: ApplicationContext, kbid: str) -> bool:
     dm = KnowledgeBoxDataManager(context.kv_driver)
     return await dm.exists_kb(kbid)
+
+
+@api.get(
+    f"/{KB_PREFIX}/{{kbid}}/processing-status",
+    status_code=200,
+    name="Knowledge Box Processing Status",
+    description="Provides the status of the processing of the given Knowledge Box.",
+    tags=["Knowledge Box Services"],
+    response_model=processing.StatusResultsV2,
+    responses={
+        "404": {"description": "Knowledge Box not found"},
+    },
+)
+@requires(NucliaDBRoles.READER)
+@version(1)
+async def processing_status(
+    request: Request,
+    kbid: str,
+    cursor: Optional[str] = None,
+    scheduled: Optional[bool] = None,
+    limit: int = 20,
+) -> Union[StreamingResponse, HTTPClientError]:
+    context = get_app_context(request.app)
+
+    if not await exists_kb(context, kbid):
+        return HTTPClientError(status_code=404, detail="Knowledge Box not found")
+
+    async with processing.ProcessingV2HTTPClient() as client:
+        return await client.status(
+            cursor=cursor, scheduled=scheduled, kbid=kbid, limit=limit
+        )

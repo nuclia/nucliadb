@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import logging
+from datetime import datetime
 from typing import Any, Optional
 
 import aiohttp
@@ -153,6 +154,27 @@ class PullResponseV2(pydantic.BaseModel):
     cursor: Optional[str]
 
 
+class StatusResultV2(pydantic.BaseModel):
+    processing_id: str
+    resource_id: Optional[str]
+    kbid: Optional[str]
+    title: Optional[str]
+    labels: list[str]
+    completed: bool
+    scheduled: bool
+    timestamp: datetime
+    completed_at: Optional[datetime]
+    scheduled_at: Optional[datetime]
+    failed: bool = False
+    retries: int = 0
+    schedule_eta: float = 0.0
+
+
+class StatusResultsV2(pydantic.BaseModel):
+    results: list[StatusResultV2]
+    cursor: Optional[str]
+
+
 class ProcessingV2HTTPClient:
     def __init__(self):
         self.session = aiohttp.ClientSession()
@@ -182,3 +204,24 @@ class ProcessingV2HTTPClient:
             check_proxy_telemetry_headers(resp)
             check_status(resp, resp_text)
             return PullResponseV2.parse_raw(resp_text)
+
+    async def status(
+        self,
+        cursor: Optional[str] = None,
+        scheduled: Optional[bool] = None,
+        kbid: Optional[str] = None,
+        limit: int = 20,
+    ) -> StatusResultsV2:
+        url = self.base_url + "/status"
+        params: dict[str, str] = {"limit": str(limit)}
+        if cursor is not None:
+            params["cursor"] = cursor
+        if scheduled is not None:
+            params["scheduled"] = str(scheduled)
+        if kbid is not None:
+            params["kbid"] = kbid
+
+        async with self.session.get(url, headers=self.headers, params=params) as resp:
+            resp_text = await resp.text()
+            check_status(resp, resp_text)
+            return StatusResultsV2.parse_raw(resp_text)

@@ -873,6 +873,8 @@ async def store_file_on_nuclia_db(
         if item.extra is not None:
             parse_extra(writer.extra, item.extra)
 
+        toprocess.title = writer.basic.title
+
         await parse_fields(
             writer=writer,
             item=item,
@@ -885,7 +887,6 @@ async def store_file_on_nuclia_db(
     if override_resource_title and filename is not None:
         set_title(writer, toprocess, filename)
 
-    toprocess.title = item.title
     writer.basic.icon = content_type
     writer.basic.created.FromDatetime(datetime.now())
 
