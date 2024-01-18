@@ -35,14 +35,6 @@ use crate::shards::metadata::{ShardMetadata, ShardsMetadataManager};
 use crate::shards::writer::ShardWriter;
 use crate::shards::ShardId;
 
-/// Each shard may be in one of this states
-enum ShardCacheStatus {
-    /// The shard is cached, but there is a task in the process of deleting it.
-    BeingDeleted,
-    /// The shard is not being deleted and is cached
-    FromCache(CacheResult<ShardId, ShardWriter>),
-}
-
 /// This cache allows the user to block shards, ensuring that they will not be loaded from disk.
 /// Being able to do so is crucial, otherwise the only source of truth will be disk and that would
 /// not be thread-safe.
@@ -59,12 +51,14 @@ impl InnerCache {
         }
     }
 
-    pub fn get(&mut self, id: &ShardId) -> ShardCacheStatus {
+    pub fn get(&mut self, id: &ShardId) -> NodeResult<CacheResult<ShardId, ShardWriter>> {
         if self.blocked_shards.contains(id) {
-            ShardCacheStatus::BeingDeleted
-        } else {
-            ShardCacheStatus::FromCache(self.active_shards.get(id))
+            return Err(node_error!(ShardNotFoundError(
+                "Shard {shard_path:?} is not on disk"
+            )));
         }
+
+        Ok(self.active_shards.get(id))
     }
 
     pub fn shard_loaded(
@@ -135,16 +129,11 @@ impl ShardWriterCache {
 
     pub fn get(&self, id: &ShardId) -> NodeResult<Arc<ShardWriter>> {
         loop {
-            let cached = { self.cache().get(id) };
+            let cached = { self.cache().get(id) }?;
             match cached {
-                ShardCacheStatus::BeingDeleted => {
-                    return Err(node_error!(ShardNotFoundError(
-                        "Shard {shard_path:?} is not on disk"
-                    )))
-                }
-                ShardCacheStatus::FromCache(CacheResult::Cached(shard)) => return Ok(shard),
-                ShardCacheStatus::FromCache(CacheResult::Wait(waiter)) => waiter.wait(),
-                ShardCacheStatus::FromCache(CacheResult::Load(guard)) => {
+                CacheResult::Cached(shard) => return Ok(shard),
+                CacheResult::Wait(waiter) => waiter.wait(),
+                CacheResult::Load(guard) => {
                     let loaded = self.load(id)?;
                     return self.cache().shard_loaded(guard, loaded);
                 }
