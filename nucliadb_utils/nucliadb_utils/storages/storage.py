@@ -42,6 +42,7 @@ from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb_utils import logger
+from nucliadb_utils.helpers import async_gen_lookahead
 from nucliadb_utils.storages import CHUNK_SIZE
 from nucliadb_utils.storages.exceptions import IndexDataNotFound, InvalidCloudFile
 from nucliadb_utils.utilities import get_local_storage, get_nuclia_storage
@@ -411,7 +412,8 @@ class Storage:
     async def uploaditerator(
         self, iterator: AsyncIterator, destination: StorageField, origin: CloudFile
     ) -> CloudFile:
-        return await destination.upload(iterator, origin)
+        safe_iterator = iterate_storage_compatible(iterator, self, origin)  # type: ignore
+        return await destination.upload(safe_iterator, origin)
 
     async def download(
         self, bucket: str, key: str, headers: Optional[Dict[str, str]] = None
@@ -538,3 +540,45 @@ class Storage:
 
     async def del_stream_message(self, key: str) -> None:
         await self.delete_upload(key, cast(str, self.indexing_bucket))
+
+
+async def iter_and_add_size(
+    stream: AsyncGenerator[bytes, None], cf: CloudFile
+) -> AsyncGenerator[bytes, None]:
+    # This is needed because some storage types like GCS or S3 require
+    # the size of the file at least at the request done for the last chunk.
+    total_size = 0
+    async for chunk, is_last in async_gen_lookahead(stream):
+        total_size += len(chunk)
+        if is_last:
+            cf.size = total_size
+        yield chunk
+
+
+async def iter_in_chunk_size(
+    iterator: AsyncGenerator[bytes, None], chunk_size: int
+) -> AsyncGenerator[bytes, None]:
+    # This is needed to make sure bytes uploaded to the blob storage complies with a particular chunk size.
+    buffer = b""
+    async for chunk in iterator:
+        buffer += chunk
+        if len(buffer) >= chunk_size:
+            yield buffer[:chunk_size]
+            buffer = buffer[chunk_size:]
+    # The last chunk can be smaller than chunk size
+    if len(buffer) > 0:
+        yield buffer
+
+
+async def iterate_storage_compatible(
+    iterator: AsyncGenerator[bytes, None], storage: Storage, cf: CloudFile
+) -> AsyncGenerator[bytes, None]:
+    """
+    Makes sure to add the size to the cloudfile and split the data in
+    chunks that are compatible with the storage type of choice
+    """
+
+    async for chunk in iter_in_chunk_size(
+        iter_and_add_size(iterator, cf), chunk_size=storage.chunk_size
+    ):
+        yield chunk

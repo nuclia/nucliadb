@@ -25,7 +25,12 @@ from nucliadb_protos.noderesources_pb2 import ResourceID
 from nucliadb_protos.nodewriter_pb2 import IndexMessage
 from nucliadb_protos.resources_pb2 import CloudFile
 
-from nucliadb_utils.storages.storage import Storage, StorageField
+from nucliadb_utils.storages.storage import (
+    Storage,
+    StorageField,
+    iter_and_add_size,
+    iter_in_chunk_size,
+)
 
 
 class TestStorageField:
@@ -164,3 +169,31 @@ class TestStorage:
                 kb="kb",
                 logical_shard="logical_shard",
             )
+
+
+async def testiter_and_add_size():
+    cf = CloudFile()
+
+    async def iter():
+        yield b"foo"
+        yield b"bar"
+
+    cf.size = 0
+    async for _ in iter_and_add_size(iter(), cf):
+        pass
+
+    assert cf.size == 6
+
+
+async def test_iter_in_chunk_size():
+    async def iterable(n):
+        for i in range(n):
+            yield str(i).encode()
+
+    chunks = [chunk async for chunk in iter_in_chunk_size(iterable(10), chunk_size=4)]
+    assert len(chunks[0]) == 4
+    assert len(chunks[1]) == 4
+    assert len(chunks[2]) == 2
+
+    chunks = [chunk async for chunk in iter_in_chunk_size(iterable(0), chunk_size=4)]
+    assert len(chunks) == 0

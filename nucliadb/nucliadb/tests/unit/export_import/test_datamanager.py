@@ -19,40 +19,7 @@
 #
 from unittest.mock import AsyncMock, Mock
 
-from nucliadb.export_import.datamanager import (
-    ExportImportDataManager,
-    iter_and_add_size,
-    iter_in_chunk_size,
-)
-from nucliadb_protos import resources_pb2
-
-
-async def testiter_and_add_size():
-    cf = resources_pb2.CloudFile()
-
-    async def iter():
-        yield b"foo"
-        yield b"bar"
-
-    cf.size = 0
-    async for _ in iter_and_add_size(iter(), cf):
-        pass
-
-    assert cf.size == 6
-
-
-async def test_iter_in_chunk_size():
-    async def iterable(n):
-        for i in range(n):
-            yield str(i).encode()
-
-    chunks = [chunk async for chunk in iter_in_chunk_size(iterable(10), chunk_size=4)]
-    assert len(chunks[0]) == 4
-    assert len(chunks[1]) == 4
-    assert len(chunks[2]) == 2
-
-    chunks = [chunk async for chunk in iter_in_chunk_size(iterable(0), chunk_size=4)]
-    assert len(chunks) == 0
+from nucliadb.export_import.datamanager import ExportImportDataManager
 
 
 async def test_try_delete_from_storage():
