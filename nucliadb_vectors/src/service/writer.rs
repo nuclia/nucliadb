@@ -20,7 +20,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fs;
 use std::path::PathBuf;
-use std::time::SystemTime;
+use std::time::Instant;
 
 use nucliadb_core::metrics::request_time;
 use nucliadb_core::prelude::*;
@@ -59,14 +59,14 @@ impl VectorWriter for VectorWriterService {
     #[measure(actor = "vectors", metric = "list_vectorsets")]
     #[tracing::instrument(skip_all)]
     fn list_vectorsets(&self) -> NodeResult<Vec<String>> {
-        let time = SystemTime::now();
+        let time = Instant::now();
 
         let id: Option<String> = None;
         let mut collector = Vec::new();
         let indexset_slock = self.indexset.get_slock()?;
         self.indexset.index_keys(&mut collector, &indexset_slock);
 
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let took = time.elapsed().as_secs_f64();
         debug!("{id:?} - Ending at {took} ms");
 
         Ok(collector)
@@ -79,7 +79,7 @@ impl VectorWriter for VectorWriterService {
         setid: &VectorSetId,
         similarity: VectorSimilarity,
     ) -> NodeResult<()> {
-        let time = SystemTime::now();
+        let time = Instant::now();
 
         let id = setid.shard.as_ref().map(|s| &s.id);
         let set = &setid.vectorset;
@@ -90,7 +90,7 @@ impl VectorWriter for VectorWriterService {
             .get_or_create(indexid, similarity, &indexset_elock)?;
         self.indexset.commit(indexset_elock)?;
 
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let took = time.elapsed().as_secs_f64();
         debug!("{id:?}/{set} - Ending at {took} ms");
 
         Ok(())
@@ -99,7 +99,7 @@ impl VectorWriter for VectorWriterService {
     #[measure(actor = "vectors", metric = "remove_vectorset")]
     #[tracing::instrument(skip_all)]
     fn remove_vectorset(&mut self, setid: &VectorSetId) -> NodeResult<()> {
-        let time = SystemTime::now();
+        let time = Instant::now();
 
         let id = setid.shard.as_ref().map(|s| &s.id);
         let set = &setid.vectorset;
@@ -108,7 +108,7 @@ impl VectorWriter for VectorWriterService {
         self.indexset.remove_index(indexid, &indexset_elock)?;
         self.indexset.commit(indexset_elock)?;
 
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let took = time.elapsed().as_secs_f64();
         debug!("{id:?}/{set} - Ending at {took} ms");
 
         Ok(())
@@ -119,14 +119,14 @@ impl WriterChild for VectorWriterService {
     #[measure(actor = "vectors", metric = "count")]
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
-        let time = SystemTime::now();
+        let time = Instant::now();
 
         let id: Option<String> = None;
         let lock = self.index.get_slock()?;
         let no_nodes = self.index.no_nodes(&lock);
         std::mem::drop(lock);
 
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let took = time.elapsed().as_secs_f64();
         debug!("{id:?} - Ending at {took} ms");
 
         Ok(no_nodes)
@@ -135,7 +135,7 @@ impl WriterChild for VectorWriterService {
     #[measure(actor = "vectors", metric = "delete_resource")]
     #[tracing::instrument(skip_all)]
     fn delete_resource(&mut self, resource_id: &ResourceId) -> NodeResult<()> {
-        let time = SystemTime::now();
+        let time = Instant::now();
 
         let id = Some(&resource_id.shard_id);
         let temporal_mark = TemporalMark::now();
@@ -143,7 +143,7 @@ impl WriterChild for VectorWriterService {
         self.index.delete(&resource_id.uuid, temporal_mark, &lock);
         self.index.commit(&lock)?;
 
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let took = time.elapsed().as_secs_f64();
         debug!("{id:?} - Ending at {took} ms");
 
         Ok(())
@@ -152,13 +152,12 @@ impl WriterChild for VectorWriterService {
     #[measure(actor = "vectors", metric = "set_resource")]
     #[tracing::instrument(skip_all)]
     fn set_resource(&mut self, resource: &Resource) -> NodeResult<()> {
-        let time = SystemTime::now();
+        let time = Instant::now();
 
         let id = resource.resource.as_ref().map(|i| &i.shard_id);
         debug!("{id:?} - Updating main index");
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Creating elements for the main index: starts {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Creating elements for the main index: starts {v} ms");
 
         let temporal_mark = TemporalMark::now();
         let mut lengths: HashMap<usize, Vec<_>> = HashMap::new();
@@ -188,13 +187,11 @@ impl WriterChild for VectorWriterService {
                 }
             }
         }
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Creating elements for the main index: ends {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Creating elements for the main index: ends {v} ms");
 
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Datapoint creation: starts {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Datapoint creation: starts {v} ms");
 
         if lengths.len() > 1 {
             return Ok(tracing::error!("{}", self.dimensions_report(lengths)));
@@ -212,38 +209,35 @@ impl WriterChild for VectorWriterService {
             None
         };
 
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Datapoint creation: ends {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Datapoint creation: ends {v} ms");
 
         let lock = self.index.get_slock()?;
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Processing Sentences to delete: starts {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Processing Sentences to delete: starts {v} ms");
+
         for to_delete in &resource.sentences_to_delete {
             self.index.delete(to_delete, temporal_mark, &lock)
         }
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Processing Sentences to delete: ends {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Processing Sentences to delete: ends {v} ms");
 
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Indexing datapoint: starts {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Indexing datapoint: starts {v} ms");
+
         match new_dp.map(|i| self.index.add(i, &lock)).unwrap_or(Ok(())) {
             Ok(_) => self.index.commit(&lock)?,
             Err(e) => tracing::error!("{id:?}/default could insert vectors: {e:?}"),
         }
         std::mem::drop(lock);
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Indexing datapoint: ends {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Indexing datapoint: ends {v} ms");
 
         // Updating existing indexes
         // Perform delete operations over the vector set
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Delete requests for indexes in the set: starts {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Delete requests for indexes in the set: starts {v} ms");
+
         let indexset_slock = self.indexset.get_slock()?;
         let index_iter = resource.vectors_to_delete.iter().flat_map(|(k, v)| {
             self.indexset
@@ -260,15 +254,14 @@ impl WriterChild for VectorWriterService {
             index.commit(&index_lock)?;
         }
         std::mem::drop(indexset_slock);
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Delete requests for indexes in the set: ends {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Delete requests for indexes in the set: ends {v} ms");
 
         // Perform add operations over the vector set
         // New indexes may be created.
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Creating and geting indexes in the set: starts {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Creating and geting indexes in the set: starts {v} ms");
+
         let indexset_elock = self.indexset.get_elock()?;
         let indexes = resource
             .vectors
@@ -309,12 +302,11 @@ impl WriterChild for VectorWriterService {
                 }
             }
         }
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Creating and geting indexes in the set: ends {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Creating and geting indexes in the set: ends {v} ms");
 
         let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let took = time.elapsed().as_secs_f64();
         let metric = request_time::RequestTimeKey::vectors("set_resource".to_string());
         metrics.record_request_time(metric, took);
         debug!("{id:?} - Ending at {took} ms");
@@ -325,7 +317,7 @@ impl WriterChild for VectorWriterService {
     #[measure(actor = "vectors", metric = "garbage_collection")]
     #[tracing::instrument(skip_all)]
     fn garbage_collection(&mut self) -> NodeResult<()> {
-        let time = SystemTime::now();
+        let time = Instant::now();
 
         let lock = match self.index.try_elock() {
             Ok(lock) => lock,
@@ -337,7 +329,7 @@ impl WriterChild for VectorWriterService {
         };
         self.index.collect_garbage(&lock)?;
 
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let took = time.elapsed().as_secs_f64();
         debug!("Garbage collection {took} ms");
 
         Ok(())

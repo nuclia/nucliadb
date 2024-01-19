@@ -20,7 +20,7 @@
 
 use std::collections::HashSet;
 use std::fmt::Debug;
-use std::time::SystemTime;
+use std::time::Instant;
 
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::*;
@@ -53,14 +53,14 @@ impl RelationsReaderService {
         };
 
         let id = Some(&request.shard_id);
-        let time = SystemTime::now();
+        let time = Instant::now();
         let reader = self.index.start_reading()?;
         let depth = bfs_request.depth.map(|v| v as usize).unwrap_or(usize::MAX);
         let mut entry_points = Vec::with_capacity(bfs_request.entry_points.len());
 
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} -  Creating entry points: starts {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} -  Creating entry points: starts {v} ms");
+
         for node in bfs_request.entry_points.iter() {
             let name = node.value.clone();
             let type_info = node_type_parsing(node.ntype(), &node.subtype);
@@ -73,20 +73,18 @@ impl RelationsReaderService {
                 Err(e) => error!("{e:?} during {node:?}"),
             }
         }
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} -  Creating entry points: ends {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} -  Creating entry points: ends {v} ms");
 
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - adding query type filters: starts {v} ms");
-        }
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - adding query type filters: ends {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - adding query type filters: starts {v} ms");
 
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - running the search: starts {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - adding query type filters: ends {v} ms");
+
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - running the search: starts {v} ms");
+
         let guide = GrpcGuide {
             node_filters: HashSet::new(),
             edge_filters: HashSet::new(),
@@ -116,13 +114,12 @@ impl RelationsReaderService {
             })?;
             subgraph.push(relation);
         }
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - running the search: ends {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - running the search: ends {v} ms");
 
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Ending at {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Ending at {v} ms");
+
         Ok(Some(EntitiesSubgraphResponse {
             relations: subgraph,
         }))
@@ -139,24 +136,22 @@ impl RelationsReaderService {
         };
 
         let id = Some(&request.shard_id);
-        let time = SystemTime::now();
+        let time = Instant::now();
         let prefix = &prefix_request.prefix;
         let reader = self.index.start_reading()?;
 
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - running prefix search: starts {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - running prefix search: starts {v} ms");
+
         let prefixes = reader
             .prefix_search(&self.rmode, prefix)?
             .into_iter()
             .flat_map(|key| reader.get_node_id(&key).ok().flatten());
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - running prefix search: ends {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - running prefix search: ends {v} ms");
 
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - generating results: starts {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - generating results: starts {v} ms");
 
         let mut node_filters = HashSet::new();
         prefix_request.node_filters.iter().for_each(|filter| {
@@ -186,13 +181,12 @@ impl RelationsReaderService {
                     ntype: string_to_node_type(node.xtype()) as i32,
                 })
             });
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - generating results: ends {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - generating results: ends {v} ms");
 
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Ending at {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Ending at {v} ms");
+
         Ok(Some(RelationPrefixSearchResponse {
             nodes: nodes.collect::<Result<Vec<_>, _>>()?,
         }))
@@ -222,7 +216,7 @@ impl RelationReader for RelationsReaderService {
     #[measure(actor = "relations", metric = "get_edges")]
     #[tracing::instrument(skip_all)]
     fn get_edges(&self) -> NodeResult<EdgeList> {
-        let time = SystemTime::now();
+        let time = Instant::now();
 
         let id: Option<String> = None;
         let reader = self.index.start_reading()?;
@@ -244,9 +238,8 @@ impl RelationReader for RelationsReaderService {
                 });
             }
         }
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Ending at {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Ending at {v} ms");
 
         Ok(EdgeList { list: edges })
     }
@@ -254,7 +247,7 @@ impl RelationReader for RelationsReaderService {
     #[measure(actor = "relations", metric = "get_node_types")]
     #[tracing::instrument(skip_all)]
     fn get_node_types(&self) -> NodeResult<TypeList> {
-        let time = SystemTime::now();
+        let time = Instant::now();
 
         let id: Option<String> = None;
         let mut found = HashSet::new();
@@ -276,9 +269,8 @@ impl RelationReader for RelationsReaderService {
                 });
             }
         }
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Ending at {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Ending at {v} ms");
 
         Ok(TypeList { list: types })
     }

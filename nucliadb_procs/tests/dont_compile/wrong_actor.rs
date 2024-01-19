@@ -18,11 +18,10 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use nucliadb_procs::{measure};
+use nucliadb_procs::measure;
 
 #[measure(actor = "wrong", metric = "my-test")]
 fn test_wrong_actor() {}
-
 
 // Make trybuild happy and avoid errors due to not having a main function
 fn main() {}
