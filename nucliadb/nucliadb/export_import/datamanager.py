@@ -26,7 +26,6 @@ from nucliadb.export_import.exceptions import MetadataNotFound
 from nucliadb.export_import.models import ExportMetadata, ImportMetadata
 from nucliadb_protos import resources_pb2
 from nucliadb_telemetry import errors
-from nucliadb_utils.helpers import async_gen_lookahead
 from nucliadb_utils.storages.storage import Storage, StorageField
 
 MAINDB_EXPORT_KEY = "/kbs/{kbid}/exports/{id}"
@@ -95,8 +94,7 @@ class ExportImportDataManager:
         cf.content_type = "binary/octet-stream"
         cf.source = resources_pb2.CloudFile.Source.EXPORT
         field: StorageField = self._get_storage_field(kbid, key, cf)
-        iterator = iterate_storage_compatible(export_bytes, self.storage, cf)
-        await self.storage.uploaditerator(iterator, field, cf)
+        await self.storage.uploaditerator(export_bytes, field, cf)
         return cf.size
 
     async def download_export(
@@ -118,8 +116,7 @@ class ExportImportDataManager:
         cf.bucket_name = self.storage.get_bucket_name(kbid)
         cf.content_type = "binary/octet-stream"
         field: StorageField = self._get_storage_field(kbid, key, cf)
-        iterator = iterate_storage_compatible(import_bytes, self.storage, cf)
-        await self.storage.uploaditerator(iterator, field, cf)
+        await self.storage.uploaditerator(import_bytes, field, cf)
         return cf.size
 
     async def download_import(self, kbid: str, import_id: str):
@@ -157,40 +154,3 @@ class ExportImportDataManager:
             logger.exception(
                 f"Could not delete {type} {id} from storage", extra={"kbid": kbid}
             )
-
-
-async def iter_and_add_size(
-    stream: AsyncGenerator[bytes, None], cf: resources_pb2.CloudFile
-) -> AsyncGenerator[bytes, None]:
-    # This is needed to upload exports to GCS because it requires the size of
-    # the file at least at the request for the last chunk.
-    total_size = 0
-    async for chunk, is_last in async_gen_lookahead(stream):
-        total_size += len(chunk)
-        if is_last:
-            cf.size = total_size
-        yield chunk
-
-
-async def iter_in_chunk_size(
-    stream: AsyncGenerator[bytes, None], chunk_size: int
-) -> AsyncGenerator[bytes, None]:
-    # This is needed to make sure bytes uploaded to the blob storage complies with a particular chunk size.
-    buffer = b""
-    async for chunk in stream:
-        buffer += chunk
-        if len(buffer) >= chunk_size:
-            yield buffer[:chunk_size]
-            buffer = buffer[chunk_size:]
-    # The last chunk can be smaller than chunk size
-    if len(buffer) > 0:
-        yield buffer
-
-
-async def iterate_storage_compatible(
-    stream: AsyncGenerator[bytes, None], storage: Storage, cf: resources_pb2.CloudFile
-) -> AsyncGenerator[bytes, None]:
-    async for chunk in iter_in_chunk_size(
-        iter_and_add_size(stream, cf), chunk_size=storage.chunk_size
-    ):
-        yield chunk

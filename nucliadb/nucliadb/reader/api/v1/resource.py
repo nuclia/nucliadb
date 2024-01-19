@@ -28,7 +28,11 @@ from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as ORMKnowledgeBox
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
 from nucliadb.ingest.orm.resource import Resource as ORMResource
-from nucliadb.ingest.serialize import serialize, set_resource_field_extracted_data
+from nucliadb.ingest.serialize import (
+    managed_serialize,
+    serialize,
+    set_resource_field_extracted_data,
+)
 from nucliadb.reader import SERVICE_NAME  # type: ignore
 from nucliadb.reader.api import DEFAULT_RESOURCE_LIST_PAGE_SIZE
 from nucliadb.reader.api.models import (
@@ -106,7 +110,8 @@ async def list_resources(
             # Fetch and Add wanted item
             rid = await txn.get(key)
             if rid:
-                result = await serialize(
+                result = await managed_serialize(
+                    txn,
                     kbid,
                     rid.decode(),
                     show,
