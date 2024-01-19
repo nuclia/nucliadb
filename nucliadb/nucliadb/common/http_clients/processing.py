@@ -141,19 +141,6 @@ class ProcessingHTTPClient:
             return PullResponse.parse_raw(resp_text)
 
 
-class ProcessRequestResponseV2(pydantic.BaseModel):
-    payload: Optional[str]
-    processing_id: str
-    kbid: Optional[str]
-    account_id: str
-    resource_id: str
-
-
-class PullResponseV2(pydantic.BaseModel):
-    results: list[ProcessRequestResponseV2]
-    cursor: Optional[str]
-
-
 class StatusResultV2(pydantic.BaseModel):
     processing_id: str
     resource_id: Optional[str]
@@ -193,17 +180,6 @@ class ProcessingV2HTTPClient:
 
     async def close(self):
         await self.session.close()
-
-    async def pull(self, cursor: Optional[str], limit: int = 5) -> PullResponseV2:
-        url = self.base_url + "/pull"
-        params: dict[str, str] = {"limit": str(limit)}
-        if cursor is not None:
-            params["cursor"] = cursor
-        async with self.session.get(url, headers=self.headers, params=params) as resp:
-            resp_text = await resp.text()
-            check_proxy_telemetry_headers(resp)
-            check_status(resp, resp_text)
-            return PullResponseV2.parse_raw(resp_text)
 
     async def status(
         self,

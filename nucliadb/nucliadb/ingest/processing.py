@@ -37,14 +37,14 @@ from nucliadb_protos.writer_pb2 import GetConfigurationResponse, OpStatusWriter
 from pydantic import BaseModel, Field
 
 import nucliadb_models as models
-from nucliadb.ingest.settings import settings as ingest_settings
 from nucliadb_models.configuration import KBConfiguration
 from nucliadb_models.resource import QueueType
 from nucliadb_telemetry import metrics
+from nucliadb_utils import const
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.settings import nuclia_settings, storage_settings
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import Utility, get_ingest, set_utility
+from nucliadb_utils.utilities import Utility, get_ingest, has_feature, set_utility
 
 logger = logging.getLogger(__name__)
 
@@ -403,7 +403,12 @@ class ProcessingEngine:
             if self.onprem is False:
                 # Upload the payload
                 url = self.nuclia_internal_push
-                if ingest_settings.processing_v2:
+                if has_feature(
+                    const.Features.PROCESSING_V2,
+                    context={
+                        "kbid": item.kbid,
+                    },
+                ):
                     url = self.nuclia_internal_push_v2
                 item.partition = partition
                 resp = await self.session.post(
@@ -411,7 +416,12 @@ class ProcessingEngine:
                 )
             else:
                 url = self.nuclia_external_push + "?partition=" + str(partition)
-                if ingest_settings.processing_v2:
+                if has_feature(
+                    const.Features.PROCESSING_V2,
+                    context={
+                        "kbid": item.kbid,
+                    },
+                ):
                     url = self.nuclia_external_push_v2
                 item.learning_config = await self.get_configuration(item.kbid)
                 headers.update(
