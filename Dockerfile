@@ -60,4 +60,4 @@ EXPOSE 8060/tcp
 # GRPC - TRAIN
 EXPOSE 8040/tcp
 
-ENTRYPOINT ["nucliadb"]
+CMD ["nucliadb"]
