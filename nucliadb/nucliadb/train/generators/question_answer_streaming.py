@@ -21,7 +21,6 @@
 from typing import AsyncGenerator
 
 from nucliadb_protos.dataset_pb2 import (
-    Paragraph,
     QuestionAnswerStreamingBatch,
     QuestionAnswerStreamItem,
     TrainSet,
@@ -106,17 +105,38 @@ async def iter_stream_items(
     question_answer_pb: QuestionAnswer,
 ) -> AsyncGenerator[QuestionAnswerStreamItem, None]:
     question_pb = question_answer_pb.question
+    question_paragraphs = []
+    for paragraph_id in question_pb.ids_paragraphs:
+        try:
+            text = await get_paragraph(kbid, paragraph_id)
+        except Exception as exc:  # pragma: nocover
+            logger.warning(
+                "Question paragraph couldn't be fetched while streaming Q&A",
+                extra={"kbid": kbid, "paragraph_id": paragraph_id},
+                exc_info=exc,
+            )
+        else:
+            if text:
+                question_paragraphs.append(text)
     for answer_pb in question_answer_pb.answers:
         item = QuestionAnswerStreamItem()
         item.question.text = question_pb.text
         item.question.language = question_pb.language
+        item.question.paragraphs.extend(question_paragraphs)
         item.answer.text = answer_pb.text
         item.answer.language = answer_pb.language
         for paragraph_id in answer_pb.ids_paragraphs:
-            paragraph_pb = Paragraph()
-            paragraph_pb.id = paragraph_id
-            paragraph_pb.text = await get_paragraph(kbid, paragraph_id)
-            item.paragraphs.append(paragraph_pb)
+            try:
+                text = await get_paragraph(kbid, paragraph_id)
+            except Exception as exc:  # pragma: nocover
+                logger.warning(
+                    "Answer paragraph couldn't be fetched while streaming Q&A",
+                    extra={"kbid": kbid, "paragraph_id": paragraph_id},
+                    exc_info=exc,
+                )
+            else:
+                if text:
+                    item.answer.paragraphs.append(text)
         yield item
 
 

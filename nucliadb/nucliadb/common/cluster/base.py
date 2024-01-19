@@ -50,7 +50,10 @@ class AbstractIndexNode(metaclass=ABCMeta):
         self.primary_id = primary_id
 
     def __str__(self):
-        return f"{self.__class__.__name__}({self.id}, {self.address})"
+        if self.primary_id is None:
+            return f"{self.__class__.__name__}({self.id}, {self.address})"
+        else:
+            return f"{self.__class__.__name__}({self.id}, {self.address}, primary_id={self.primary_id})"
 
     def __repr__(self):
         return self.__str__()

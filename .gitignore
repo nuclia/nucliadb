@@ -23,6 +23,7 @@ target
 .egg-info
 *.so
 venv/
+.venv/
 nucliadb/.mypy_cache
 lib
 share
@@ -97,7 +98,5 @@ benchmarks.json
 # debugging
 nucliadb-user.creds
 
-nucliadb_client/examples/*.nucliadb
-nucliadb_client/examples/*.export
 test.export.pb
 test.export.tar.bz2

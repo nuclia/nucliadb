@@ -35,8 +35,7 @@ use tonic::Request;
 use crate::replication::health::ReplicationHealthManager;
 use crate::settings::Settings;
 use crate::shards::metadata::ShardMetadata;
-use crate::shards::providers::unbounded_cache::AsyncUnboundedShardWriterCache;
-use crate::shards::providers::AsyncShardWriterProvider;
+use crate::shards::providers::unbounded_cache::UnboundedShardWriterCache;
 use crate::shards::writer::ShardWriter;
 use crate::utils::{list_shards, set_primary_node_id};
 
@@ -201,7 +200,7 @@ impl ReplicateWorkerPool {
 
 pub async fn connect_to_primary_and_replicate(
     settings: Settings,
-    shard_cache: Arc<AsyncUnboundedShardWriterCache>,
+    shard_cache: Arc<UnboundedShardWriterCache>,
     secondary_id: String,
     shutdown_notified: Arc<AtomicBool>,
 ) -> NodeResult<()> {
@@ -266,7 +265,7 @@ pub async fn connect_to_primary_and_replicate(
         let no_shards_to_sync = replication_state.shard_states.is_empty();
         let no_shards_to_remove = replication_state.shards_to_remove.is_empty();
 
-        let start = std::time::SystemTime::now();
+        let start = std::time::Instant::now();
         for shard_state in replication_state.shard_states {
             if shutdown_notified.load(std::sync::atomic::Ordering::Relaxed) {
                 return Ok(());
@@ -275,18 +274,23 @@ pub async fn connect_to_primary_and_replicate(
             let shard_id = shard_state.shard_id.clone();
             let shard_lookup;
             if existing_shards.contains(&shard_id) {
-                shard_lookup = shard_cache.load(shard_id.clone()).await;
+                let id_clone = shard_id.clone();
+                let shard_cache_clone = Arc::clone(&shard_cache);
+                shard_lookup =
+                    tokio::task::spawn_blocking(move || shard_cache_clone.load(id_clone)).await?;
             } else {
+                let metadata = ShardMetadata::new(
+                    shards_path.join(shard_id.clone()),
+                    shard_state.shard_id.clone(),
+                    Some(shard_state.kbid.clone()),
+                    shard_state.similarity.clone().into(),
+                    None,
+                );
+                let shard_cache_clone = Arc::clone(&shard_cache);
+
                 warn!("Creating shard to replicate: {shard_id}");
-                let shard_create = shard_cache
-                    .create(ShardMetadata::new(
-                        shards_path.join(shard_id.clone()),
-                        shard_state.shard_id.clone(),
-                        Some(shard_state.kbid.clone()),
-                        shard_state.similarity.clone().into(),
-                        None,
-                    ))
-                    .await;
+                let shard_create =
+                    tokio::task::spawn_blocking(move || shard_cache_clone.create(metadata)).await?;
                 if shard_create.is_err() {
                     warn!("Failed to create shard: {:?}", shard_create);
                     continue;
@@ -326,7 +330,10 @@ pub async fn connect_to_primary_and_replicate(
             if !existing_shards.contains(&shard_id) {
                 continue;
             }
-            let shard_lookup = shard_cache.delete(shard_id.clone()).await;
+            let id_clone = shard_id.clone();
+            let shard_cache_clone = shard_cache.clone();
+            let shard_lookup =
+                tokio::task::spawn_blocking(move || shard_cache_clone.delete(id_clone)).await?;
             if shard_lookup.is_err() {
                 warn!("Failed to delete shard: {:?}", shard_lookup);
                 continue;
@@ -342,10 +349,7 @@ pub async fn connect_to_primary_and_replicate(
         //
         // 1. If we're healthy, we'll sleep for a while and check again.
         // 2. If backed up replicating, we'll try replicating again immediately and check again.
-        let elapsed = start
-            .elapsed()
-            .map(|elapsed| elapsed.as_secs_f64())
-            .expect("Error getting elapsed time");
+        let elapsed = start.elapsed().as_secs_f64();
         if elapsed < settings.replication_healthy_delay() as f64 {
             // only update healthy marker if we're up-to-date in the configured healthy time
             repl_health_mng.update_healthy();
@@ -364,7 +368,7 @@ pub async fn connect_to_primary_and_replicate(
 
 pub async fn connect_to_primary_and_replicate_forever(
     settings: Settings,
-    shard_cache: Arc<AsyncUnboundedShardWriterCache>,
+    shard_cache: Arc<UnboundedShardWriterCache>,
     secondary_id: String,
     shutdown_notified: Arc<AtomicBool>,
 ) -> NodeResult<()> {

@@ -16,7 +16,21 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
 
-import logging
+"""Upgrade relations and texts indices to v2.
 
-logger = logging.getLogger("nucliadb_client")
+This migration is leaning up leftover junk metadata from previous rollover migration from all KB shards objects.
+
+"""
+
+from nucliadb.common.cluster.rollover import clean_rollover_status
+from nucliadb.migrator.context import ExecutionContext
+
+
+async def migrate(context: ExecutionContext) -> None:
+    ...
+
+
+async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
+    await clean_rollover_status(context, kbid)

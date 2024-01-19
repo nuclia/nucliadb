@@ -1,8 +1,0 @@
-httpx
-protobuf>=3.19.3
-types-protobuf>=3.19.5,<4.0
-grpcio>=1.44.0
-aiofiles
-nucliadb-protos>=2.24.0
-nucliadb-models>=2.24.0
-nucliadb-telemetry[all]

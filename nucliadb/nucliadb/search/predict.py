@@ -31,7 +31,7 @@ from nucliadb_protos.utils_pb2 import RelationNode
 
 from nucliadb.ingest.orm.knowledgebox import KB_CONFIGURATION
 from nucliadb.ingest.tests.vectors import Q, Qm2023
-from nucliadb.ingest.txn_utils import get_transaction
+from nucliadb.middleware.transaction import get_read_only_transaction
 from nucliadb.search import logger
 from nucliadb_models.search import (
     AskDocumentModel,
@@ -182,7 +182,7 @@ class PredictEngine:
 
     @alru_cache(maxsize=None)
     async def _get_configuration(self, kbid: str) -> Optional[KBConfiguration]:
-        txn = await get_transaction(read_only=True)
+        txn = await get_read_only_transaction()
         config_key = KB_CONFIGURATION.format(kbid=kbid)
         payload = await txn.get(config_key)
         if payload is None:

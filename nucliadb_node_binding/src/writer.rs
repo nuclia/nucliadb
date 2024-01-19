@@ -32,7 +32,6 @@ use nucliadb_node::settings::providers::SettingsProvider;
 use nucliadb_node::settings::Settings;
 use nucliadb_node::shards::metadata::ShardMetadata;
 use nucliadb_node::shards::providers::unbounded_cache::UnboundedShardWriterCache;
-use nucliadb_node::shards::providers::ShardWriterProvider;
 use nucliadb_node::shards::writer::ShardWriter;
 use prost::Message;
 use pyo3::exceptions::PyValueError;

@@ -71,6 +71,8 @@ from nucliadb_models.search import (
     KnowledgeboxSearchResults,
     Relations,
     SearchRequest,
+    SummarizedResponse,
+    SummarizeRequest,
 )
 from nucliadb_models.vectors import VectorSet, VectorSets
 from nucliadb_models.writer import (
@@ -160,6 +162,7 @@ def is_raw_request_content(content: Any) -> bool:
         or isinstance(content, bytes)
         or inspect.isgenerator(content)
         or inspect.isasyncgen(content)
+        or isinstance(content, io.IOBase)
     )
 
 
@@ -652,6 +655,16 @@ class _NucliaDBBase:
         response_type=chat_response_parser,
         docstring=docstrings.RESOURCE_CHAT,
     )
+    summarize = _request_builder(
+        name="summarize",
+        path_template="/v1/kb/{kbid}/summarize",
+        method="POST",
+        path_params=("kbid",),
+        request_type=SummarizeRequest,
+        response_type=SummarizedResponse,
+        docstring=docstrings.SUMMARIZE,
+    )
+
     feedback = _request_builder(
         name="feedback",
         path_template="/v1/kb/{kbid}/feedback",

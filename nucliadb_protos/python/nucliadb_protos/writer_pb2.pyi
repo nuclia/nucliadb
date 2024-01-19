@@ -1417,6 +1417,7 @@ class Notification(google.protobuf.message.Message):
     WRITE_TYPE_FIELD_NUMBER: builtins.int
     MESSAGE_FIELD_NUMBER: builtins.int
     SOURCE_FIELD_NUMBER: builtins.int
+    PROCESSING_ERRORS_FIELD_NUMBER: builtins.int
     partition: builtins.int
     multi: builtins.str
     uuid: builtins.str
@@ -1427,6 +1428,7 @@ class Notification(google.protobuf.message.Message):
     @property
     def message(self) -> global___BrokerMessage: ...
     source: global___NotificationSource.ValueType
+    processing_errors: builtins.bool
     def __init__(
         self,
         *,
@@ -1439,9 +1441,10 @@ class Notification(google.protobuf.message.Message):
         write_type: global___Notification.WriteType.ValueType = ...,
         message: global___BrokerMessage | None = ...,
         source: global___NotificationSource.ValueType = ...,
+        processing_errors: builtins.bool = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["message", b"message"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["action", b"action", "kbid", b"kbid", "message", b"message", "multi", b"multi", "partition", b"partition", "seqid", b"seqid", "source", b"source", "uuid", b"uuid", "write_type", b"write_type"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["action", b"action", "kbid", b"kbid", "message", b"message", "multi", b"multi", "partition", b"partition", "processing_errors", b"processing_errors", "seqid", b"seqid", "source", b"source", "uuid", b"uuid", "write_type", b"write_type"]) -> None: ...
 
 global___Notification = Notification
 
@@ -1477,6 +1480,7 @@ class Member(google.protobuf.message.Message):
     DUMMY_FIELD_NUMBER: builtins.int
     LOAD_SCORE_FIELD_NUMBER: builtins.int
     SHARD_COUNT_FIELD_NUMBER: builtins.int
+    PRIMARY_ID_FIELD_NUMBER: builtins.int
     id: builtins.str
     """/ Member ID.　A string of the UUID."""
     listen_address: builtins.str
@@ -1493,6 +1497,8 @@ class Member(google.protobuf.message.Message):
     """/ The load score of the member."""
     shard_count: builtins.int
     """/ The number of shards in the node."""
+    primary_id: builtins.str
+    """/ The id of the primary node (if it is a secondary node)."""
     def __init__(
         self,
         *,
@@ -1503,8 +1509,9 @@ class Member(google.protobuf.message.Message):
         dummy: builtins.bool = ...,
         load_score: builtins.float = ...,
         shard_count: builtins.int = ...,
+        primary_id: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["dummy", b"dummy", "id", b"id", "is_self", b"is_self", "listen_address", b"listen_address", "load_score", b"load_score", "shard_count", b"shard_count", "type", b"type"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["dummy", b"dummy", "id", b"id", "is_self", b"is_self", "listen_address", b"listen_address", "load_score", b"load_score", "primary_id", b"primary_id", "shard_count", b"shard_count", "type", b"type"]) -> None: ...
 
 global___Member = Member
 

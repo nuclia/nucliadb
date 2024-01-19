@@ -479,6 +479,8 @@ pub struct Notification {
     pub message: ::core::option::Option<BrokerMessage>,
     #[prost(enumeration="NotificationSource", tag="9")]
     pub source: i32,
+    #[prost(bool, tag="10")]
+    pub processing_errors: bool,
 }
 /// Nested message and enum types in `Notification`.
 pub mod notification {
@@ -527,6 +529,9 @@ pub struct Member {
     //// The number of shards in the node.
     #[prost(uint32, tag="7")]
     pub shard_count: u32,
+    //// The id of the primary node (if it is a secondary node).
+    #[prost(string, tag="8")]
+    pub primary_id: ::prost::alloc::string::String,
 }
 /// Nested message and enum types in `Member`.
 pub mod member {

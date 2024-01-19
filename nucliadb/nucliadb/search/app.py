@@ -28,6 +28,7 @@ from starlette.responses import HTMLResponse
 
 from nucliadb.common.cluster import manager
 from nucliadb.middleware import ProcessTimeHeaderMiddleware
+from nucliadb.middleware.transaction import ReadOnlyTransactionMiddleware
 from nucliadb.search import API_PREFIX
 from nucliadb.search.api.v1.router import api as api_v1
 from nucliadb.search.lifecycle import finalize, initialize
@@ -49,6 +50,7 @@ middleware = [
         AuthenticationMiddleware,
         backend=NucliaCloudAuthenticationBackend(),
     ),
+    Middleware(ReadOnlyTransactionMiddleware),
 ]
 if running_settings.debug:
     middleware.append(Middleware(ProcessTimeHeaderMiddleware))
@@ -116,8 +118,9 @@ async def node_members(request: Request) -> JSONResponse:
                 "type": node.label,
                 "shard_count": node.shard_count,
                 "dummy": node.dummy,
+                "primary_id": node.primary_id,
             }
-            for node in manager.get_index_nodes()
+            for node in manager.get_index_nodes(include_secondary=True)
         ]
     )
 

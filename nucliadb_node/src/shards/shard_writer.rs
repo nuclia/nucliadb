@@ -18,7 +18,7 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::shard_created::{
@@ -29,7 +29,6 @@ use nucliadb_core::tracing::{self, *};
 use nucliadb_core::{thread, IndexFiles};
 use nucliadb_procs::measure;
 use nucliadb_vectors::VectorErr;
-use tokio::sync::{Mutex, MutexGuard};
 
 use crate::disk_structure::*;
 use crate::shards::metadata::ShardMetadata;
@@ -51,8 +50,8 @@ pub struct ShardWriter {
     paragraph_service_version: i32,
     vector_service_version: i32,
     relation_service_version: i32,
-    pub gc_lock: Mutex<()>, // lock to be able to do GC or not
-    write_lock: Mutex<()>,  // be able to lock writes on the shard
+    pub gc_lock: tokio::sync::Mutex<()>, // lock to be able to do GC or not
+    write_lock: Mutex<()>,               // be able to lock writes on the shard
 }
 
 impl ShardWriter {
@@ -111,7 +110,7 @@ impl ShardWriter {
             paragraph_service_version: versions.version_paragraphs() as i32,
             vector_service_version: versions.version_vectors() as i32,
             relation_service_version: versions.version_relations() as i32,
-            gc_lock: Mutex::new(()),
+            gc_lock: tokio::sync::Mutex::new(()),
             write_lock: Mutex::new(()),
         })
     }
@@ -298,7 +297,7 @@ impl ShardWriter {
         let mut vector_result = Ok(());
         let mut relation_result = Ok(());
 
-        let _lock = self.write_lock.blocking_lock();
+        let _lock = self.write_lock.lock().expect("Poisoned write lock");
         thread::scope(|s| {
             s.spawn(|_| text_result = text_task());
             s.spawn(|_| paragraph_result = paragraph_task());
@@ -358,7 +357,7 @@ impl ShardWriter {
         let mut vector_result = Ok(());
         let mut relation_result = Ok(());
 
-        let _lock = self.write_lock.blocking_lock();
+        let _lock = self.write_lock.lock().expect("Poisoned write lock");
         thread::scope(|s| {
             s.spawn(|_| text_result = text_task());
             s.spawn(|_| paragraph_result = paragraph_task());
@@ -479,7 +478,7 @@ impl ShardWriter {
     }
 
     pub async fn block_shard(&self) -> BlockingToken {
-        let mutex_guard = self.write_lock.lock().await;
+        let mutex_guard = self.write_lock.lock().expect("Poisoned write lock");
         BlockingToken(mutex_guard)
     }
 
@@ -507,7 +506,7 @@ impl ShardWriter {
         ignored_segement_ids: &HashMap<String, Vec<String>>,
     ) -> NodeResult<Vec<IndexFiles>> {
         let mut files = Vec::new();
-        let _lock = self.write_lock.blocking_lock(); // need to make sure more writes don't happen while we are reading
+        let _lock = self.write_lock.lock().expect("Poisoned write lock"); // need to make sure more writes don't happen while we are reading
 
         files.push(
             paragraph_read(&self.paragraph_writer)

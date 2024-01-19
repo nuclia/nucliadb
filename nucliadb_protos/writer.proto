@@ -360,6 +360,7 @@ message Notification {
     WriteType write_type = 7;
     BrokerMessage message = 8;
     NotificationSource source = 9;
+    bool processing_errors = 10;
 }
 
 
@@ -393,6 +394,9 @@ message Member {
 
     /// The number of shards in the node.
     uint32 shard_count = 7;
+
+    /// The id of the primary node (if it is a secondary node).
+    string primary_id = 8;
 }
 
 message ListMembersRequest {

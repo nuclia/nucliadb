@@ -70,7 +70,9 @@ async def test_dummy_predict_engine():
 def txn():
     txn = mock.MagicMock()
     txn.get = AsyncMock(return_value=None)
-    with mock.patch("nucliadb.search.predict.get_transaction", return_value=txn):
+    with mock.patch(
+        "nucliadb.search.predict.get_read_only_transaction", return_value=txn
+    ):
         yield txn
 
 

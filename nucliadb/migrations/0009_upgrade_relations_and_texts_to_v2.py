@@ -17,4 +17,22 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-pytest_plugins = ["nucliadb_client.tests.fixtures"]
+
+"""Upgrade relations and texts indices to v2.
+
+Rollover migration to upgrade relations and texts indices to their v2. The new
+versions are configured as the default for stable and experimental, so a
+rollover will do the upgrade automatically.
+
+"""
+
+from nucliadb.common.cluster.rollover import rollover_kb_shards
+from nucliadb.migrator.context import ExecutionContext
+
+
+async def migrate(context: ExecutionContext) -> None:
+    ...
+
+
+async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
+    await rollover_kb_shards(context, kbid)
