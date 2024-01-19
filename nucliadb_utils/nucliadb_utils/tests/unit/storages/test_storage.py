@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+from math import ceil
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -186,14 +187,29 @@ async def testiter_and_add_size():
 
 
 async def test_iter_in_chunk_size():
-    async def iterable(n):
-        for i in range(n):
-            yield str(i).encode()
+    async def iterable(total_size, *, chunk_size=1):
+        data = b"0" * total_size
+        for i in range(ceil(total_size / chunk_size)):
+            chunk = data[i * chunk_size : (i + 1) * chunk_size]
+            yield chunk
 
     chunks = [chunk async for chunk in iter_in_chunk_size(iterable(10), chunk_size=4)]
+    assert len(chunks) == 3
     assert len(chunks[0]) == 4
     assert len(chunks[1]) == 4
     assert len(chunks[2]) == 2
 
     chunks = [chunk async for chunk in iter_in_chunk_size(iterable(0), chunk_size=4)]
     assert len(chunks) == 0
+
+    # Try with an iterable that yields chunks bigger than the chunk size
+    chunks = [
+        chunk
+        async for chunk in iter_in_chunk_size(
+            iterable(total_size=12, chunk_size=10), chunk_size=4
+        )
+    ]
+    assert len(chunks) == 3
+    assert len(chunks[0]) == 4
+    assert len(chunks[1]) == 4
+    assert len(chunks[2]) == 4

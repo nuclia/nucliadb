@@ -280,31 +280,44 @@ class Storage:
     async def normalize_binary(
         self, file: CloudFile, destination: StorageField
     ):  # pragma: no cover
-        # this is covered by other tests
-        # see if file is in the same Cloud in the same bucket
         if file.source == self.source and file.uri != destination.key:
+            # This MAY BE the case for NucliaDB hosted deployment (Nuclia's cloud deployment):
+            # The data has been pushed to the bucket but with a different key.
+            logger.warning(
+                f"[Nuclia hosted] Source and destination keys differ!: {file.uri} != {destination.key}"
+            )
             await self.move(file, destination)
             new_cf = CloudFile()
             new_cf.CopyFrom(file)
             new_cf.bucket_name = destination.bucket
             new_cf.uri = destination.key
         elif file.source == self.source:
+            # This is the case for NucliaDB hosted deployment (Nuclia's cloud deployment):
+            # The data is already stored in the right place by the processing
+            logger.debug(f"[Nuclia hosted]")
             return file
         elif file.source == CloudFile.EXPORT:
+            logger.info(f"[Exported file]: {file.uri}")
             new_cf = CloudFile()
             new_cf.CopyFrom(file)
             new_cf.bucket_name = destination.bucket
             new_cf.uri = destination.key
             new_cf.source = self.source  # type: ignore
         elif file.source == CloudFile.FLAPS:
+            # NucliaDB On-Prem: the data is stored in NUA, so we need to
+            # download it and upload it to NucliaDB's storage
+            logger.debug(f"[NucliaDB OnPrem]: {file.uri}")
             flaps_storage = await get_nuclia_storage()
             iterator = flaps_storage.download(file)
             new_cf = await self.uploaditerator(iterator, destination, file)
         elif file.source == CloudFile.LOCAL:
+            # For testing purposes: protobuffer is stored in a file in the local filesystem
+            logger.debug(f"[Local]: {file.uri}")
             local_storage = get_local_storage()
             iterator = local_storage.download(file.bucket_name, file.uri)
             new_cf = await self.uploaditerator(iterator, destination, file)
         elif file.source == CloudFile.EMPTY:
+            logger.warning(f"[Empty file]: {file.uri}")
             new_cf = CloudFile()
             new_cf.CopyFrom(file)
         else:
