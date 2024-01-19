@@ -21,6 +21,8 @@
 from fastapi import Header, Request, Response
 from fastapi_versioning import version
 
+from nucliadb.models.responses import HTTPClientError
+from nucliadb.search import predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.resource import NucliaDBRoles
@@ -35,7 +37,7 @@ from nucliadb_utils.authentication import requires
     description="Feedback on a Knowledge Box",
     tags=["Search"],
 )
-@requires(NucliaDBRoles.READER)
+@requires(NucliaDBRoles.WRITER)
 @version(1)
 async def feedback_knowledgebox(
     request: Request,
@@ -45,6 +47,24 @@ async def feedback_knowledgebox(
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
+):
+    try:
+        await feedback(kbid, item, x_nucliadb_user, x_ndb_client, x_forwarded_for)
+    except predict.ProxiedPredictAPIError as err:
+        return HTTPClientError(
+            status_code=503,
+            detail=f"Feedback service unavailable. {err.status}: {err.detail}",
+        )
+    except Exception:
+        return HTTPClientError(status_code=500, detail="Feedback service unavailable.")
+
+
+async def feedback(
+    kbid: str,
+    item: FeedbackRequest,
+    x_nucliadb_user: str,
+    x_ndb_client: str,
+    x_forwarded_for: str,
 ):
     predict = get_predict()
     await predict.send_feedback(

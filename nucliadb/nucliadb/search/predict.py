@@ -249,7 +249,10 @@ class PredictEngine:
         ):
             detail = await resp.text()
         logger.error(f"Predict API error at {resp.url}: {detail}")
-        raise ProxiedPredictAPIError(status=resp.status, detail=detail)
+        if resp.status >= 500:
+            raise ProxiedPredictAPIError(status=resp.status, detail=detail)
+        else:
+            raise SendToPredictError(detail)
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=MAX_TRIES)
     async def make_request(self, method: str, **request_args):
@@ -277,7 +280,6 @@ class PredictEngine:
         data["user_id"] = x_nucliadb_user
         data["client"] = x_ndb_client
         data["forwarded"] = x_forwarded_for
-
         resp = await self.make_request(
             "POST",
             url=self.get_predict_url(FEEDBACK),
