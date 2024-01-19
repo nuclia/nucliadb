@@ -248,3 +248,90 @@ impl ShardWriterCache {
         self.metadata_manager.get(id)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::sync::Arc;
+    use std::thread::sleep;
+    use std::time::Duration;
+
+    use crossbeam_utils::thread::scope;
+    use tempfile::tempdir;
+
+    use super::ShardWriterCache;
+    use crate::settings::Settings;
+    use crate::shards::metadata::{ShardMetadata, Similarity};
+    use crate::shards::ShardId;
+
+    #[test]
+    fn test_safe_deletion() {
+        let data_dir = tempdir().unwrap();
+        let settings = Settings::builder()
+            .data_path(data_dir.into_path())
+            .build()
+            .unwrap();
+        let cache = Arc::new(ShardWriterCache::new(settings.clone()));
+
+        let shard_id_0 = ShardId::from("shard_id_0");
+        let shard_0_path = settings.shards_path().join(shard_id_0.clone());
+        fs::create_dir(settings.shards_path()).unwrap();
+
+        let shard_meta = ShardMetadata::new(
+            shard_0_path.clone(),
+            shard_id_0.clone(),
+            None,
+            Similarity::Cosine,
+            None,
+        );
+        cache.create(shard_meta).unwrap();
+
+        let shard_0 = cache.get(&shard_id_0).unwrap();
+
+        scope(|scope| {
+            let cache_clone = cache.clone();
+            let shard_id_0_clone = shard_id_0.clone();
+            let delete_thread = scope.spawn(move |_| {
+                sleep(Duration::from_millis(50));
+                cache_clone.delete(&shard_id_0_clone).unwrap();
+            });
+
+            // I should still be able to get the shard before deletion starts
+            assert!(cache.get(&shard_id_0).is_ok());
+
+            // The other thread will try to delete the shard
+            // we will keep using it for a while, making sure
+            // it is not deleted until after we are done with it.
+            for _ in 0..10 {
+                assert!(ShardMetadata::exists(&shard_0_path));
+                sleep(Duration::from_millis(50));
+            }
+
+            // Shard is under deletion, I should not be able to get it
+            assert!(cache.get(&shard_id_0).is_err());
+
+            // Drop the shard Arc so it can be deleted
+            drop(shard_0);
+
+            // The other thread should finish now, and it should delete the shard
+            delete_thread.join().unwrap();
+            assert!(!ShardMetadata::exists(&shard_0_path));
+        })
+        .unwrap();
+
+        // Shard is deleted, getting it should fail to load
+        assert!(cache.get(&shard_id_0).is_err());
+
+        // Recreating the shard should work (i.e: it's not stuck in the deletion state)
+        let shard_meta = ShardMetadata::new(
+            shard_0_path.clone(),
+            shard_id_0.clone(),
+            None,
+            Similarity::Cosine,
+            None,
+        );
+        cache.create(shard_meta).unwrap();
+
+        assert!(cache.get(&shard_id_0).is_ok());
+    }
+}

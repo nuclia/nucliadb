@@ -81,8 +81,7 @@ pub struct ResourceCache<K, V> {
 }
 
 impl<K, V> ResourceCache<K, V>
-where
-    K: Eq + Hash + Clone + std::fmt::Debug,
+where K: Eq + Hash + Clone + std::fmt::Debug
 {
     #[allow(dead_code)]
     pub fn new_with_capacity(capacity: NonZeroUsize) -> Self {
@@ -164,12 +163,13 @@ where
 mod tests {
     use std::num::NonZeroUsize;
     use std::sync::atomic::AtomicU8;
+    use std::sync::mpsc::channel;
     use std::sync::{Arc, Mutex};
     use std::thread::sleep;
     use std::time::Duration;
 
     use anyhow::anyhow;
-    use crossbeam_utils::thread;
+    use crossbeam_utils::thread::{self, scope};
     use nucliadb_core::NodeResult;
     use rand::Rng;
 
@@ -209,7 +209,7 @@ mod tests {
     }
 
     #[test]
-    pub fn test_cache_rng() {
+    fn test_cache_rng() {
         let cache: ResourceCache<usize, CacheItem> =
             ResourceCache::new_with_capacity(NonZeroUsize::new(3).unwrap());
         let cache = Arc::new(Mutex::new(cache));
@@ -252,6 +252,162 @@ mod tests {
             tasks.into_iter().for_each(|t| {
                 t.join().unwrap();
             });
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn test_lru() {
+        let mut cache: ResourceCache<usize, usize> =
+            ResourceCache::new_with_capacity(NonZeroUsize::new(2).unwrap());
+
+        let items = vec![Arc::new(0), Arc::new(1), Arc::new(2), Arc::new(3)];
+
+        // Keeps the latest inserted ones
+        cache.insert(&0, &items[0]);
+        cache.insert(&1, &items[1]);
+        cache.insert(&2, &items[2]);
+        cache.insert(&3, &items[3]);
+
+        assert!(!cache.live.contains(&0));
+        assert!(!cache.live.contains(&1));
+        assert!(cache.live.contains(&2));
+        assert!(cache.live.contains(&3));
+
+        // Keeps the recently used
+        cache.get(&2);
+        cache.insert(&0, &items[0]);
+
+        assert!(cache.live.contains(&0));
+        assert!(!cache.live.contains(&1));
+        assert!(cache.live.contains(&2));
+        assert!(!cache.live.contains(&3));
+    }
+
+    #[test]
+    fn test_eviction() {
+        let mut cache: ResourceCache<usize, usize> =
+            ResourceCache::new_with_capacity(NonZeroUsize::new(1).unwrap());
+
+        let item0 = Arc::new(0);
+        let item1 = Arc::new(1);
+
+        // Fill the cache
+        cache.insert(&0, &item0);
+
+        // Insert a new one, 0 is getting evicted
+        cache.insert(&1, &item1);
+
+        assert!(!cache.live.contains(&0));
+        assert!(cache.eviction.contains_key(&0));
+
+        // 0 should be evicted, but there are still references to it
+        // from this test code. Requesting it again should reuse that
+        // instance.
+        assert!(matches!(cache.get(&0), CacheResult::Cached(_)));
+        assert!(cache.live.contains(&0));
+
+        // Currently the cache contains 0. Let's delete the last reference
+        // to 1 (from this test) and try to get it, we should be asked to
+        // load it, since it'll be out of the cache.
+        drop(item1);
+        assert!(matches!(cache.get(&1), CacheResult::Load(_)));
+    }
+
+    #[test]
+    fn test_loading() {
+        let cache: ResourceCache<usize, usize> = ResourceCache::new_unbounded();
+        let cache = Arc::new(Mutex::new(cache));
+
+        // Item not in cache, we are asked to load it
+        let CacheResult::Load(load_guard) = cache.lock().unwrap().get(&0) else {
+            panic!("Expected a CacheResult::Load")
+        };
+
+        // If we try to get it from elsewhere, we wait a waiter
+        let CacheResult::Wait(wait_guard) = cache.lock().unwrap().get(&0) else {
+            panic!("Expected a CacheResult::Wait")
+        };
+
+        // We start two threads to load and wait, we expect the wait to block
+        // until the load is complete
+        scope(|scope| {
+            let (tx, rx) = channel();
+            let tx_clone = tx.clone();
+            let cache_clone = cache.clone();
+            let wait_thread = scope.spawn(move |_| {
+                wait_guard.wait();
+                assert!(matches!(
+                    cache_clone.lock().unwrap().get(&0),
+                    CacheResult::Cached(_)
+                ));
+                tx_clone.send(1).unwrap();
+            });
+            let load_thread = scope.spawn(move |_| {
+                // Sleep a little bit to ensure the waiter actually waits
+                sleep(Duration::from_millis(5));
+                cache.lock().unwrap().loaded(load_guard, &Arc::new(0));
+                tx.send(0).unwrap();
+            });
+
+            // Both threads finished without panic/failing assert
+            wait_thread.join().unwrap();
+            load_thread.join().unwrap();
+
+            // Load thread finished earlier
+            assert_eq!(rx.recv().unwrap(), 0);
+            assert_eq!(rx.recv().unwrap(), 1);
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn test_loading_failed() {
+        let cache: ResourceCache<usize, usize> = ResourceCache::new_unbounded();
+        let cache = Arc::new(Mutex::new(cache));
+
+        // Item not in cache, we are asked to load it
+        let CacheResult::Load(load_guard) = cache.lock().unwrap().get(&0) else {
+            panic!("Expected a CacheResult::Load")
+        };
+
+        // If we try to get it from elsewhere, we wait a waiter
+        let CacheResult::Wait(wait_guard) = cache.lock().unwrap().get(&0) else {
+            panic!("Expected a CacheResult::Wait")
+        };
+
+        // We start two threads to load and wait, we expect the wait to block
+        // until the load is complete
+        scope(|scope| {
+            let (tx, rx) = channel();
+            let tx_clone = tx.clone();
+            let cache_clone = cache.clone();
+            let wait_thread = scope.spawn(move |_| {
+                wait_guard.wait();
+                // The load will fail, so we expect to be asked
+                // to load it ourselves
+                assert!(matches!(
+                    cache_clone.lock().unwrap().get(&0),
+                    CacheResult::Load(_)
+                ));
+                tx_clone.send(1).unwrap();
+            });
+            let load_thread = scope.spawn(move |_| {
+                // Sleep a little bit to ensure the waiter actually waits
+                sleep(Duration::from_millis(5));
+                // Fail to call `loaded`. This should drop the load_guard
+                // which will mark the load as failed.
+                drop(load_guard);
+                tx.send(0).unwrap();
+            });
+
+            // Both threads finished without panic/failing assert
+            wait_thread.join().unwrap();
+            load_thread.join().unwrap();
+
+            // Load thread finished earlier
+            assert_eq!(rx.recv().unwrap(), 0);
+            assert_eq!(rx.recv().unwrap(), 1);
         })
         .unwrap();
     }
