@@ -22,7 +22,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use nucliadb_core::tracing::{debug, error, info, warn};
-use nucliadb_core::NodeResult;
+use nucliadb_core::{node_error, NodeResult};
 use nucliadb_protos::{noderesources, replication};
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
@@ -73,11 +73,9 @@ async fn stream_file(
     let filepath = shard_path.join(rel_filepath);
 
     if !filepath.exists() {
-        debug!(
-            "File not found when index thought it should be: {}",
-            filepath.to_string_lossy(),
-        );
-        return Ok(());
+        return Err(node_error!(
+            "This file can not be streamed because it does not exist"
+        ));
     }
 
     debug!("Streaming file {}", filepath.to_string_lossy());
