@@ -297,7 +297,8 @@ class Storage:
             logger.debug(f"[Nuclia hosted]")
             return file
         elif file.source == CloudFile.EXPORT:
-            logger.info(f"[Exported file]: {file.uri}")
+            # This is for files coming from an export
+            logger.debug(f"[Exported file]: {file.uri}")
             new_cf = CloudFile()
             new_cf.CopyFrom(file)
             new_cf.bucket_name = destination.bucket
