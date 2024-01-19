@@ -103,9 +103,6 @@ pub struct ShardWriterCache {
 impl ShardWriterCache {
     pub fn new(settings: Settings) -> Self {
         Self {
-            // NOTE: as it's not probable all shards will be written, we don't
-            // assign any initial capacity to the HashMap under the consideration
-            // a resize blocking is not performance critical while writing.
             cache: Mutex::new(InnerCache::new()),
             shards_path: settings.shards_path(),
             metadata_manager: Arc::new(ShardsMetadataManager::new(settings.shards_path())),

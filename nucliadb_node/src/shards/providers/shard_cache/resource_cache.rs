@@ -24,6 +24,9 @@ use std::sync::{Arc, Condvar, Mutex, Weak};
 
 use lru::LruCache;
 
+// Classic implementation of a binary semaphore, used to be able to
+// block while an entry is being loaded by another thread, and get a
+// notification once it's ready.
 #[derive(Default)]
 struct Waiter {
     mutex: Mutex<bool>,
@@ -49,6 +52,9 @@ impl Waiter {
     }
 }
 
+// Used to track when an entry is being loaded. Once this is dropped,
+// we know the entry finished loading or failed to do so, and we can
+// unlock other clients waiting for it.
 pub struct ResourceLoadGuard<K> {
     waiter: Arc<Waiter>,
     key: K,
@@ -60,8 +66,9 @@ impl<K> Drop for ResourceLoadGuard<K> {
     }
 }
 
-pub struct ResourceWaitGuard(Arc<Waiter>);
-impl ResourceWaitGuard {
+// Use to wait until an entry is ready to be used
+pub struct ResourceWaiter(Arc<Waiter>);
+impl ResourceWaiter {
     pub fn wait(self) {
         self.0.wait();
     }
@@ -70,7 +77,7 @@ impl ResourceWaitGuard {
 pub enum CacheResult<K, V> {
     Cached(Arc<V>),
     Load(ResourceLoadGuard<K>),
-    Wait(ResourceWaitGuard),
+    Wait(ResourceWaiter),
 }
 
 pub struct ResourceCache<K, V> {
@@ -102,6 +109,12 @@ where K: Eq + Hash + Clone + std::fmt::Debug
         }
     }
 
+    // Try to get an entry from the cache
+    // 1. If it's present, we return Cached(entry). Consumer can use it.
+    // 2. If it's not in the cache, we return Load(guard). Consumer should load it and call
+    //    cache.loaded with the guard.
+    // 3. If it's being loaded concurrently, we return Wait(waiter). Consumer should wait using the
+    //    waiter and then retry the get.
     pub fn get(&mut self, id: &K) -> CacheResult<K, V> {
         if let Some(v) = self.get_cached(id) {
             return CacheResult::Cached(v);
@@ -114,7 +127,7 @@ where K: Eq + Hash + Clone + std::fmt::Debug
                 // This is an error loading, we can retry by returning a load object
                 self.loading.remove(id);
             } else {
-                return CacheResult::Wait(ResourceWaitGuard(Arc::clone(wait)));
+                return CacheResult::Wait(ResourceWaiter(Arc::clone(wait)));
             }
         }
 
@@ -325,7 +338,7 @@ mod tests {
         };
 
         // If we try to get it from elsewhere, we wait a waiter
-        let CacheResult::Wait(wait_guard) = cache.lock().unwrap().get(&0) else {
+        let CacheResult::Wait(waiter) = cache.lock().unwrap().get(&0) else {
             panic!("Expected a CacheResult::Wait")
         };
 
@@ -336,7 +349,7 @@ mod tests {
             let tx_clone = tx.clone();
             let cache_clone = cache.clone();
             let wait_thread = scope.spawn(move |_| {
-                wait_guard.wait();
+                waiter.wait();
                 assert!(matches!(
                     cache_clone.lock().unwrap().get(&0),
                     CacheResult::Cached(_)
@@ -372,7 +385,7 @@ mod tests {
         };
 
         // If we try to get it from elsewhere, we wait a waiter
-        let CacheResult::Wait(wait_guard) = cache.lock().unwrap().get(&0) else {
+        let CacheResult::Wait(waiter) = cache.lock().unwrap().get(&0) else {
             panic!("Expected a CacheResult::Wait")
         };
 
@@ -383,7 +396,7 @@ mod tests {
             let tx_clone = tx.clone();
             let cache_clone = cache.clone();
             let wait_thread = scope.spawn(move |_| {
-                wait_guard.wait();
+                waiter.wait();
                 // The load will fail, so we expect to be asked
                 // to load it ourselves
                 assert!(matches!(
