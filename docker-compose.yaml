@@ -70,6 +70,16 @@ services:
       - postgres
       - redis
 
+  nginx:
+    image: nginx:latest
+    ports:
+      - "8090:8090"
+    volumes:
+      - ./docs/examples/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docs/examples/htpasswd:/etc/nginx/.htpasswd:ro
+    depends_on:
+      - nucliadb
+
 volumes:
   nucliadb-data: {}
   nucliadb-maindb: {}
