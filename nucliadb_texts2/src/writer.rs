@@ -96,7 +96,7 @@ impl WriterChild for TextWriterService {
             self.index_document(resource);
         }
         let v = time.elapsed().as_millis();
-        debug!("{id:?} - Indexing document: starts at {v} ms");
+        debug!("{id:?} - Indexing document: ends at {v} ms");
 
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Commit: starts at {v} ms");
