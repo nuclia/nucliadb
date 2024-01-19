@@ -365,7 +365,7 @@ async def processing_status(
     cursor: Optional[str] = None,
     scheduled: Optional[bool] = None,
     limit: int = 20,
-) -> Union[StreamingResponse, HTTPClientError]:
+) -> Union[processing.StatusResultsV2, HTTPClientError]:
     context = get_app_context(request.app)
 
     if not await exists_kb(context, kbid):

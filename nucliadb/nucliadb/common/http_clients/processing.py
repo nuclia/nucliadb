@@ -142,24 +142,80 @@ class ProcessingHTTPClient:
 
 
 class StatusResultV2(pydantic.BaseModel):
-    processing_id: str
-    resource_id: Optional[str]
-    kbid: Optional[str]
-    title: Optional[str]
-    labels: list[str]
-    completed: bool
-    scheduled: bool
-    timestamp: datetime
-    completed_at: Optional[datetime]
-    scheduled_at: Optional[datetime]
-    failed: bool = False
-    retries: int = 0
-    schedule_eta: float = 0.0
+    processing_id: str = pydantic.Field(
+        ...,
+        title="Processing ID",
+        description="Processing ID of the resource.",
+    )
+    resource_id: str = pydantic.Field(
+        ...,
+        title="Resource ID",
+        description="Resource ID.",
+    )
+    kbid: str = pydantic.Field(..., title="KnowledgeBox ID")
+    title: Optional[str] = pydantic.Field(
+        None,
+        title="Title",
+        description="Title of the resource.",
+    )
+    labels: list[str] = pydantic.Field(
+        [],
+        title="Labels",
+        description="Labels of the resource.",
+    )
+    completed: bool = pydantic.Field(
+        ...,
+        title="Completed",
+        description="Whether the resource has been completed",
+    )
+    scheduled: bool = pydantic.Field(
+        ...,
+        title="Scheduled",
+        description="Whether the resource has been scheduled",
+    )
+    timestamp: datetime = pydantic.Field(
+        ...,
+        title="Timestamp",
+        description="Timestamp of when the resource was first scheduled.",
+    )
+    completed_at: Optional[datetime] = pydantic.Field(
+        ...,
+        title="Completed At",
+        description="Timestamp of when the resource was completed",
+    )
+    scheduled_at: Optional[datetime] = pydantic.Field(
+        ...,
+        title="Scheduled At",
+        description="Timestamp of when the resource was first scheduled.",
+    )
+    failed: bool = pydantic.Field(
+        False,
+        title="Failed",
+        description="Whether the resource has failed to process",
+    )
+    retries: int = pydantic.Field(
+        0,
+        title="Retries",
+        description="Number of retries for the resource.",
+    )
+    schedule_eta: float = pydantic.Field(
+        0.0,
+        title="Schedule ETA",
+        description="Estimated time until the resource is scheduled.",
+    )
 
 
 class StatusResultsV2(pydantic.BaseModel):
-    results: list[StatusResultV2]
-    cursor: Optional[str]
+    results: list[StatusResultV2] = pydantic.Field(
+        [],
+        title="Results",
+        description="List of results.",
+    )
+    cursor: Optional[str] = pydantic.Field(
+        None,
+        title="Cursor",
+        description="Cursor to use for the next page of results.",
+    )
 
 
 class ProcessingV2HTTPClient:
