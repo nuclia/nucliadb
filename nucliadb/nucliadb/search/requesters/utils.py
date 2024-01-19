@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+import contextlib
 from enum import Enum
 from typing import Any, Optional, TypeVar, Union, overload
 
@@ -135,8 +136,8 @@ async def node_query(
         const.Features.READ_REPLICA_SEARCHES, context={"kbid": kbid}
     )
 
+
     shard_manager = get_shard_manager()
-    txn = await get_read_only_transaction()
     shard_manager.set_read_only_txn(txn)
 
     try:
@@ -243,3 +244,11 @@ def validate_node_query_results(results: list[Any]) -> Optional[HTTPException]:
             return HTTPException(status_code=status_code, detail=reason)
 
     return None
+
+
+@contextlib.asynccontextmanager
+async def shard_manager():
+    txn = get_read_only_transaction()
+    shard_manager = get_shard_manager()
+    shard_manager.set_read_only_txn(txn)
+    return shard_manager

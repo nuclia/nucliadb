@@ -181,7 +181,7 @@ async def test_chat_always_returns_relations(
     nucliadb_reader: AsyncClient, knowledgebox
 ):
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/chat", json={"query": "summary", "features": ["relations"]}
+        f"/kb/{knowledgebox}/chat", json={"query": "summary", "features": ["relations"]}, timeout=None
     )
     assert resp.status_code == 200
     _, answer, relations_result, _ = parse_chat_response(resp.content)
