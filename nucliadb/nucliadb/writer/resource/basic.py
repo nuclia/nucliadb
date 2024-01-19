@@ -226,7 +226,7 @@ def set_status_modify(basic: Basic, item: UpdateResourcePayload):
 
 def set_processing_info(bm: BrokerMessage, processing_info: ProcessingInfo):
     """
-    Processing V2 does not have this awkward processing into data field and storage
+    Processing V2 does not have this awkward processing info data field and storage
     but keeping for b/w compatibility.
 
     Once V1 is removed, this code can be removed because status checking will be done
