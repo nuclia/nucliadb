@@ -265,7 +265,7 @@ pub async fn connect_to_primary_and_replicate(
         let no_shards_to_sync = replication_state.shard_states.is_empty();
         let no_shards_to_remove = replication_state.shards_to_remove.is_empty();
 
-        let start = std::time::SystemTime::now();
+        let start = std::time::Instant::now();
         for shard_state in replication_state.shard_states {
             if shutdown_notified.load(std::sync::atomic::Ordering::Relaxed) {
                 return Ok(());
@@ -349,10 +349,7 @@ pub async fn connect_to_primary_and_replicate(
         //
         // 1. If we're healthy, we'll sleep for a while and check again.
         // 2. If backed up replicating, we'll try replicating again immediately and check again.
-        let elapsed = start
-            .elapsed()
-            .map(|elapsed| elapsed.as_secs_f64())
-            .expect("Error getting elapsed time");
+        let elapsed = start.elapsed().as_secs_f64();
         if elapsed < settings.replication_healthy_delay() as f64 {
             // only update healthy marker if we're up-to-date in the configured healthy time
             repl_health_mng.update_healthy();
