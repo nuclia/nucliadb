@@ -57,7 +57,7 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
     },
     const.Features.PROCESSING_V2: {
         "rollout": 0,
-        "variants": {"environment": ["local"]},
+        "variants": {"environment": ["testing"]},
     },
 }
 
