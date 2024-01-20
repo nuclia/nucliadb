@@ -834,7 +834,7 @@ async def store_file_on_nuclia_db(
     md5: Optional[str] = None,
     item: Optional[CreateResourcePayload] = None,
     wait_on_commit: bool = False,
-) -> int:
+) -> Optional[int]:
     # File is on NucliaDB Storage at path
 
     partitioning = get_partitioning()
@@ -873,6 +873,8 @@ async def store_file_on_nuclia_db(
         if item.extra is not None:
             parse_extra(writer.extra, item.extra)
 
+        toprocess.title = writer.basic.title
+
         await parse_fields(
             writer=writer,
             item=item,
@@ -884,6 +886,7 @@ async def store_file_on_nuclia_db(
 
     if override_resource_title and filename is not None:
         set_title(writer, toprocess, filename)
+
     writer.basic.icon = content_type
     writer.basic.created.FromDatetime(datetime.now())
 
