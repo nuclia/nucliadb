@@ -504,27 +504,21 @@ impl ShardWriter {
     pub fn get_shard_files(
         &self,
         ignored_segement_ids: &HashMap<String, Vec<String>>,
-    ) -> NodeResult<Vec<IndexFiles>> {
+    ) -> NodeResult<Vec<(PathBuf, IndexFiles)>> {
         let mut files = Vec::new();
         let _lock = self.write_lock.lock().expect("Poisoned write lock"); // need to make sure more writes don't happen while we are reading
-
-        files.push(
-            paragraph_read(&self.paragraph_writer)
-                .get_index_files(ignored_segement_ids.get("paragraph").unwrap_or(&Vec::new()))?,
-        );
-        files.push(
-            text_read(&self.text_writer)
-                .get_index_files(ignored_segement_ids.get("text").unwrap_or(&Vec::new()))?,
-        );
-        files.push(
-            vector_read(&self.vector_writer)
-                .get_index_files(ignored_segement_ids.get("vector").unwrap_or(&Vec::new()))?,
-        );
-        files.push(
-            relation_read(&self.relation_writer)
-                .get_index_files(ignored_segement_ids.get("relation").unwrap_or(&Vec::new()))?,
-        );
-
+        let paragraph_files = paragraph_read(&self.paragraph_writer)
+            .get_index_files(ignored_segement_ids.get("paragraph").unwrap_or(&Vec::new()))?;
+        let text_files = text_read(&self.text_writer)
+            .get_index_files(ignored_segement_ids.get("text").unwrap_or(&Vec::new()))?;
+        let vector_files = vector_read(&self.vector_writer)
+            .get_index_files(ignored_segement_ids.get("vector").unwrap_or(&Vec::new()))?;
+        let relation_files = relation_read(&self.relation_writer)
+            .get_index_files(ignored_segement_ids.get("relation").unwrap_or(&Vec::new()))?;
+        files.push((PathBuf::from(PARAGRAPHS_DIR), paragraph_files));
+        files.push((PathBuf::from(TEXTS_DIR), text_files));
+        files.push((PathBuf::from(VECTORS_DIR), vector_files));
+        files.push((PathBuf::from(RELATIONS_DIR), relation_files));
         Ok(files)
     }
 }

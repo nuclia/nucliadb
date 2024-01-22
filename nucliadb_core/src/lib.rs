@@ -23,6 +23,7 @@ pub mod metrics;
 pub mod paragraphs;
 pub mod query_planner;
 pub mod relations;
+pub mod tantivy_replica;
 pub mod texts;
 pub mod vectors;
 
@@ -58,6 +59,8 @@ use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 pub use anyhow::{anyhow as node_error, Context, Error};
 use nucliadb_protos::noderesources::{Resource, ResourceId};
 use serde::{Deserialize, Serialize};
+
+use crate::tantivy_replica::TantivyReplicaState;
 pub type NodeResult<O> = anyhow::Result<O>;
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Eq, Default)]
@@ -133,9 +136,14 @@ pub fn encapsulate_writer<T>(writer: T) -> Arc<RwLock<T>> {
 }
 
 #[derive(Debug)]
-pub struct IndexFiles {
+pub struct RawReplicaState {
     pub metadata_files: HashMap<String, Vec<u8>>,
     pub files: Vec<String>,
+}
+
+pub enum IndexFiles {
+    Tantivy(TantivyReplicaState),
+    Other(RawReplicaState),
 }
 
 pub trait WriterChild: std::fmt::Debug + Send + Sync {

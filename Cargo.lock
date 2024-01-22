@@ -1696,6 +1696,8 @@ dependencies = [
  "prost-types",
  "rayon",
  "serde",
+ "serde_json",
+ "tantivy 0.17.0 (git+https://github.com/nuclia/tantivy.git?branch=original-17)",
  "tempfile",
  "thiserror",
  "tokio",

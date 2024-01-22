@@ -28,7 +28,7 @@ use nucliadb_core::protos::prost::Message;
 use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{Resource, ResourceId, VectorSetId, VectorSimilarity};
 use nucliadb_core::tracing::{self, *};
-use nucliadb_core::{metrics, Channel, IndexFiles};
+use nucliadb_core::{metrics, Channel, IndexFiles, RawReplicaState};
 use nucliadb_procs::measure;
 
 use crate::data_point::{DataPoint, Elem, LabelDictionary};
@@ -347,12 +347,12 @@ impl WriterChild for VectorWriterService {
 
     fn get_index_files(&self, ignored_segment_ids: &[String]) -> NodeResult<IndexFiles> {
         // Should be called along with a lock at a higher level to be safe
-        let mut meta_files = HashMap::new();
-        meta_files.insert(
+        let mut metadata_files = HashMap::new();
+        metadata_files.insert(
             "vectors/state.bincode".to_string(),
             fs::read(self.config.path.join("state.bincode"))?,
         );
-        meta_files.insert(
+        metadata_files.insert(
             "vectors/metadata.json".to_string(),
             fs::read(self.config.path.join("metadata.json"))?,
         );
@@ -377,7 +377,7 @@ impl WriterChild for VectorWriterService {
 
         let vectorsets = self.list_vectorsets()?;
         if !vectorsets.is_empty() {
-            meta_files.insert(
+            metadata_files.insert(
                 "vectorset/state.bincode".to_string(),
                 fs::read(self.config.vectorset.join("state.bincode"))?,
             );
@@ -399,11 +399,11 @@ impl WriterChild for VectorWriterService {
                         files.push(format!("vectors/{}/fst/labels.idx", segment_id));
                     }
                 }
-                meta_files.insert(
+                metadata_files.insert(
                     format!("vectorset/{}/state.bincode", vs),
                     fs::read(self.config.vectorset.join(format!("{}/state.bincode", vs)))?,
                 );
-                meta_files.insert(
+                metadata_files.insert(
                     format!("vectorset/{}/metadata.json", vs),
                     fs::read(self.config.vectorset.join(format!("{}/metadata.json", vs)))?,
                 );
@@ -412,16 +412,16 @@ impl WriterChild for VectorWriterService {
 
         if files.is_empty() {
             // exit with no changes
-            return Ok(IndexFiles {
+            return Ok(IndexFiles::Other(RawReplicaState {
                 metadata_files: HashMap::new(),
                 files,
-            });
+            }));
         }
 
-        Ok(IndexFiles {
-            metadata_files: meta_files,
+        Ok(IndexFiles::Other(RawReplicaState {
+            metadata_files,
             files,
-        })
+        }))
     }
 }
 

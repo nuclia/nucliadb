@@ -18,7 +18,6 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fs;
 use std::path::Path;
@@ -28,7 +27,7 @@ use nucliadb_core::prelude::*;
 use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{Resource, ResourceId};
 use nucliadb_core::tracing::{self, *};
-use nucliadb_core::IndexFiles;
+use nucliadb_core::{tantivy_replica, IndexFiles};
 use nucliadb_procs::measure;
 use tantivy::collector::Count;
 use tantivy::query::AllQuery;
@@ -152,41 +151,10 @@ impl WriterChild for TextWriterService {
             .collect())
     }
 
-    fn get_index_files(&self, ignored_segment_ids: &[String]) -> NodeResult<IndexFiles> {
-        // Should be called along with a lock at a higher level to be safe
-        let mut meta_files = HashMap::new();
-        let path = self.config.path.join("meta.json");
-        if !path.exists() {
-            return Ok(IndexFiles {
-                metadata_files: meta_files,
-                files: Vec::new(),
-            });
-        }
-        meta_files.insert("text/meta.json".to_string(), fs::read(path)?);
-
-        let mut files = Vec::new();
-
-        for segment_meta in self.index.searchable_segment_metas()? {
-            if ignored_segment_ids.contains(&segment_meta.id().uuid_string()) {
-                continue;
-            }
-            for seg_file in segment_meta.list_files() {
-                files.push(format!("text/{}", seg_file.to_string_lossy()));
-            }
-        }
-
-        if files.is_empty() {
-            // exit with no changes
-            return Ok(IndexFiles {
-                metadata_files: HashMap::new(),
-                files,
-            });
-        }
-
-        Ok(IndexFiles {
-            metadata_files: meta_files,
-            files,
-        })
+    fn get_index_files(&self, _ignored_segment_ids: &[String]) -> NodeResult<IndexFiles> {
+        let path = &self.config.path;
+        let safe_state = tantivy_replica::compute_safe_replica_state(path, &self.index)?;
+        Ok(IndexFiles::Tantivy(safe_state))
     }
 }
 

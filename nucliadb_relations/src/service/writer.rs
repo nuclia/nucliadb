@@ -25,7 +25,7 @@ use nucliadb_core::prelude::*;
 use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{Resource, ResourceId};
 use nucliadb_core::tracing::{self, *};
-use nucliadb_core::IndexFiles;
+use nucliadb_core::{IndexFiles, RawReplicaState};
 use nucliadb_procs::measure;
 
 use super::utils::*;
@@ -153,10 +153,10 @@ impl WriterChild for RelationsWriterService {
 
     fn get_index_files(&self, _ignored_segment_ids: &[String]) -> NodeResult<IndexFiles> {
         // not implemented, not supported right now
-        Ok(IndexFiles {
+        Ok(IndexFiles::Other(RawReplicaState {
             metadata_files: HashMap::new(),
             files: Vec::new(),
-        })
+        }))
     }
 }
 
