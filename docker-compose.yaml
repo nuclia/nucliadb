@@ -4,11 +4,15 @@ services:
   nucliadb:
     image: nuclia/nucliadb:latest
     environment:
-      # - NUA_API_KEY=
+      - NUA_API_KEY=eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6Im51YSJ9.eyJpc3MiOiJodHRwczovL2V1cm9wZS0xLm51Y2xpYS5jbG91ZC8iLCJpYXQiOjE3MDU2ODEzNTgsInN1YiI6Ijc0ZDg4MjcxLTZmMzUtNDNkMi1iYmI4LTRkODBhMDI1OGU3MiIsImp0aSI6IjExZjM3MzQzLTk2ZDItNDAzYy05NGIzLTE5N2NiN2VjNTE2NiIsImV4cCI6MjUzMzcwNzY0ODAwLCJrZXkiOiJmYWM5NGEzYi1kNGQ5LTRkNmMtYjNjZC05ZWI1NGU2MzM5OWIiLCJhbGxvd19rYl9tYW5hZ2VtZW50IjpmYWxzZX0.fzk8D8VtqMG93DYvoP3Mke7EuwILAz4i1rfG8a7Okvvb87jnTTnmgUGZ9UhOrPYC2oLavu_u7dO9cpBtrouD4AoBildaPGs9uqtR-5lr6oWe99t3W2nONgms1vwpsheS3FbgGv4arTNHHCgp5bRrF3OmSqvtd8OUvq5XDWlb0hhAm5br4W1O6BklRhaLhD3KqM7GyPwOhSUcFw0AY0c6vPLLNh56ZPPMW5nMe5hlCDI57NXmUFLDgYPMligkdzfcdmrUVLj33HxiMJzq0RDcU27mUgzrkYi1J7zm-CT-lhU16z_RYUWDQMr9NT0mteEamSCBGc8KrMDO-9ojAF6dBS835ovrbpuaZF1qILumFtpZZu_Gs6_H8w8jwM4TRe6JZWs95tuqwL-_1Zo5_XmLBOAl23BMYJ5oOKhbpr-7os3K9bnvfgdwv9JZYLs64tlokIp47HFpklcYW368NDTf5NpMwYRsI0FkFz0ktnf_T7HcU6jjneImtn4YTevrQcStxX8vIllo3_Nl1zsVh7-9rNSn_9CeOckD6iXRhJIAX6UQYDCFa3m1fHcPQ7dLvX92akKzFFYxYFPPNutRyzV-U6CQ0IQsVL7qkYoOvFuvgWMUWmZUpUjDAvccD4K93cpmMVylp09UmA5SuK0DxAcPWmND1rA5ndKTln9XOXrKh5o
       - NUCLIA_ZONE=europe-1
       - CORS_ORIGINS=["http://localhost:8080"]
       - DRIVER=PG
-      - FILE_BACKEND=PG
+      - FILE_BACKEND=gcs
+      - GCS_ENDPOINT_URL=http://gcs:4443
+      - GCS_BUCKET=nucliadb_{kbid}
+      - GCS_PROJECT=project
+      - GCS_LOCATION=location
       - DEBUG=true
       - DRIVER_PG_URL=postgres://nucliadb:nucliadb@postgres:5432/nucliadb
       # - auth_policy=upstream_oauth2
@@ -20,6 +24,7 @@ services:
       - INGEST_GRPC_PORT=8060
       - TRAIN_GRPC_PORT=8040
       - LOG_LEVEL=INFO
+      - LOG_OUTPUT_TYPE=stdout
       - RUST_BACKTRACE=1
       - RUST_LOG=nucliadb_node=ERROR,nucliadb_paragraphs_tantivy=ERROR,nucliadb_fields_tantivy=ERROR
     ports:
@@ -30,7 +35,7 @@ services:
       - nucliadb-data:/data
     depends_on:
       - postgres
-      - redis
+      - gcs
 
   postgres:
     image: postgres:latest
@@ -43,33 +48,52 @@ services:
     volumes:
       - nucliadb-maindb:/var/lib/postgresql/data
 
-  redis:
-    image: redis:latest
-    ports:
-      - "6379:6379"
+  # redis:
+  #   image: redis:latest
+  #   ports:
+  #     - "6379:6379"
 
-  auth-proxy:
-    image: quay.io/oauth2-proxy/oauth2-proxy
+  # auth-proxy:
+  #   image: quay.io/oauth2-proxy/oauth2-proxy
+  #   ports:
+  #     - "4180:4180"
+  #   environment:
+  #     - OAUTH2_PROXY_HTTP_ADDRESS=0.0.0.0:4180
+  #     - OAUTH2_PROXY_UPSTREAMS=http://nucliadb:8080/
+  #     - OAUTH2_PROXY_FORCE_HTTPS=false
+  #     - OAUTH2_PROXY_REDIRECT_URL=http://localhost:4180/oauth2/callback
+  #     - OAUTH2_PROXY_PROVIDER=google
+  #     - OAUTH2_PROXY_CLIENT_ID=224545243904-22tn7mrj38t9hkfbqj9gnuac0hlscs05.apps.googleusercontent.com
+  #     - OAUTH2_PROXY_CLIENT_SECRET=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
+  #     - OAUTH2_PROXY_SESSION_STORE_TYPE=redis
+  #     - OAUTH2_PROXY_REDIS_CONNECTION_URL=redis://redis:6379
+  #     - OAUTH2_PROXY_COOKIE_SECRET=vLevdGju4C766R8KypPJZ806co4-kwNS9qMuPxLXqls=
+  #     - OAUTH2_PROXY_EMAIL_DOMAINS=nuclia.com
+  #     - OAUTH2_PROXY_PASS_USER_HEADERS=true
+  #     - OAUTH2_PROXY_PASS_AUTHORIZATION_HEADER=true
+  #   depends_on:
+  #     - postgres
+  #     - redis
+
+  gcs:
+    image: fsouza/fake-gcs-server:latest
+    command: ["-scheme", "http", "-port", "4443"]
     ports:
-      - "4180:4180"
-    environment:
-      - OAUTH2_PROXY_HTTP_ADDRESS=0.0.0.0:4180
-      - OAUTH2_PROXY_UPSTREAMS=http://nucliadb:8080/
-      - OAUTH2_PROXY_FORCE_HTTPS=false
-      - OAUTH2_PROXY_REDIRECT_URL=http://localhost:4180/oauth2/callback
-      - OAUTH2_PROXY_PROVIDER=google
-      - OAUTH2_PROXY_CLIENT_ID=224545243904-22tn7mrj38t9hkfbqj9gnuac0hlscs05.apps.googleusercontent.com
-      - OAUTH2_PROXY_CLIENT_SECRET=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
-      - OAUTH2_PROXY_SESSION_STORE_TYPE=redis
-      - OAUTH2_PROXY_REDIS_CONNECTION_URL=redis://redis:6379
-      - OAUTH2_PROXY_COOKIE_SECRET=vLevdGju4C766R8KypPJZ806co4-kwNS9qMuPxLXqls=
-      - OAUTH2_PROXY_EMAIL_DOMAINS=nuclia.com
-      - OAUTH2_PROXY_PASS_USER_HEADERS=true
-      - OAUTH2_PROXY_PASS_AUTHORIZATION_HEADER=true
-    depends_on:
-      - postgres
-      - redis
+      - "4443:4443"
+    volumes:
+      - nucliadb-blob:/storage
+
+  # nginx:
+  #   image: nginx:latest
+  #   ports:
+  #     - "8090:8090"
+  #   volumes:
+  #     - ./docs/examples/nginx.conf:/etc/nginx/nginx.conf:ro
+  #     - ./docs/examples/htpasswd:/etc/nginx/.htpasswd:ro
+  #   depends_on:
+  #     - nucliadb
 
 volumes:
   nucliadb-data: {}
   nucliadb-maindb: {}
+  nucliadb-blob: {}
