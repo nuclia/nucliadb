@@ -349,8 +349,8 @@ pub async fn connect_to_primary_and_replicate(
         //
         // 1. If we're healthy, we'll sleep for a while and check again.
         // 2. If backed up replicating, we'll try replicating again immediately and check again.
-        let elapsed = start.elapsed().as_secs_f64();
-        if elapsed < settings.replication_healthy_delay() as f64 {
+        let elapsed = start.elapsed();
+        if elapsed < settings.replication_healthy_delay() {
             // only update healthy marker if we're up-to-date in the configured healthy time
             repl_health_mng.update_healthy();
         }
@@ -358,10 +358,7 @@ pub async fn connect_to_primary_and_replicate(
         if no_shards_to_sync && no_shards_to_remove {
             // if we have any changes, check again immediately
             // otherwise, wait for a bit
-            tokio::time::sleep(std::time::Duration::from_secs(
-                settings.replication_delay_seconds(),
-            ))
-            .await;
+            tokio::time::sleep(settings.replication_delay()).await;
         }
     }
 }
@@ -392,9 +389,6 @@ pub async fn connect_to_primary_and_replicate_forever(
             "Error happened during replication. Will retry: {:?}",
             result
         );
-        tokio::time::sleep(std::time::Duration::from_secs(
-            settings.replication_delay_seconds(),
-        ))
-        .await;
+        tokio::time::sleep(settings.replication_delay()).await;
     }
 }

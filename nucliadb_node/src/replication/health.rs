@@ -72,7 +72,6 @@ impl ReplicationHealthManager {
         }
         let metadata = metaddata.unwrap();
         metadata.modified().unwrap()
-            > std::time::SystemTime::now()
-                - std::time::Duration::from_secs(self.settings.replication_healthy_delay())
+            > std::time::SystemTime::now() - self.settings.replication_healthy_delay()
     }
 }
