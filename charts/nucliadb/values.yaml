@@ -3,7 +3,7 @@
 # image settings
 imagePullPolicy: IfNotPresent
 image: nuclia/nucliadb
-imageVersion: latest
+imageVersion:
 
 replicas: 2
 

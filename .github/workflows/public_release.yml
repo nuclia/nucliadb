@@ -107,10 +107,17 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Get version
+        id: version_step
+        run: |-
+          VERSION=`cat VERSION`
+          echo "version_number=$VERSION" >> $GITHUB_OUTPUT
+
       - name: Tag it
         run: |-
           docker pull nuclia/nucliadb:latest
           docker tag nuclia/nucliadb:latest nuclia/nucliadb:stable
+          docker tag nucliadb/nucliadb:latest nucliadb/nucliadb:${{ steps.version_step.outputs.version_number }}
           docker push nuclia/nucliadb:stable
 
   docs:
