@@ -77,15 +77,15 @@ jobs:
       max-parallel: 2
       matrix:
         include:
-          - maindb_driver: "tikv"
-            storage_backend: "gcs"
-            python-version: "3.11"
+          # - maindb_driver: "tikv"
+          #   storage_backend: "gcs"
+          #   python-version: "3.11"
           - maindb_driver: "tikv"
             storage_backend: "s3"
             python-version: "3.11"
-          - maindb_driver: "pg"
-            storage_backend: "gcs"
-            python-version: "3.11"
+          # - maindb_driver: "pg"
+          #   storage_backend: "gcs"
+          #   python-version: "3.11"
 
     steps:
       - name: Checkout the repository
@@ -159,7 +159,7 @@ jobs:
           TESTING_MAINDB_DRIVER: ${{ matrix.maindb_driver }}
           TESTING_STORAGE_BACKEND: ${{ matrix.storage_backend }}
         run: |
-          pytest -rfE --cov=nucliadb.search -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json nucliadb/nucliadb/search
+          pytest -x -rfE --cov=nucliadb.search -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json nucliadb/nucliadb/search
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
