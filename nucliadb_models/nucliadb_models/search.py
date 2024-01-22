@@ -795,8 +795,11 @@ class SummarizeRequest(BaseModel):
     """
     Model for the request payload of the summarize endpoint
     """
+
     user_prompt: Optional[str] = Field(
-        default=None, title="User prompt", description="Optional custom prompt input by the user"
+        default=None,
+        title="User prompt",
+        description="Optional custom prompt input by the user",
     )
 
     resources: List[str] = Field(
