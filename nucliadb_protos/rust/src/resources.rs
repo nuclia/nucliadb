@@ -117,6 +117,8 @@ pub struct Origin {
     pub filename: ::prost::alloc::string::String,
     #[prost(string, repeated, tag="10")]
     pub related: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(string, tag="11")]
+    pub path: ::prost::alloc::string::String,
 }
 /// Nested message and enum types in `Origin`.
 pub mod origin {

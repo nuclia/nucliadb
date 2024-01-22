@@ -354,6 +354,7 @@ class InputOrigin(BaseModel):
     # old field was "colaborators"
     filename: Optional[str] = None
     related: List[str] = []
+    path: Optional[str] = None
 
 
 class Origin(InputOrigin):

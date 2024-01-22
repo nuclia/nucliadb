@@ -41,6 +41,8 @@ def parse_origin(origin: Origin, origin_payload: InputOrigin):
         origin.related.extend(origin_payload.related)
     if origin_payload.metadata:
         origin.metadata.update(origin_payload.metadata)
+    if origin_payload.path:
+        origin.path = origin_payload.path
     origin.source = Origin.Source.API
 
 
