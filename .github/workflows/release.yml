@@ -175,11 +175,9 @@ jobs:
       - name: Set helm package image
         id: version_step
         run: |-
-          sed -i.bak "s#IMAGE_TO_REPLACE#$IMAGE_NAME:${{ steps.env-vars.outputs.short_sha }}#" ./charts/nucliadb_writer/values.yaml
-          sed -i.bak "s#CONTAINER_REGISTRY_TO_REPLACE#$CONTAINER_REGISTRY#" ./charts/nucliadb_writer/values.yaml
           VERSION=`cat VERSION`
           VERSION_SHA=$VERSION+${{ steps.env-vars.outputs.short_sha }}
-          sed -i.bak "s#99999.99999.99999#$VERSION_SHA#" ./charts/nucliadb_writer/Chart.yaml
+          sed -i.bak "s#99999.99999.99999#$VERSION_SHA#" ./charts/nucliadb/Chart.yaml
           echo "version_number=$VERSION_SHA" >> $GITHUB_OUTPUT
 
       - name: Configure Git
