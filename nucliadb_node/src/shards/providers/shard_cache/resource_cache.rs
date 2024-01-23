@@ -166,7 +166,6 @@ where K: Eq + Hash + Clone + std::fmt::Debug
 
     fn evict(&mut self) {
         if let Some((evicted_k, evicted_v)) = self.live.pop_lru() {
-            println!("Evict {evicted_k:?}");
             self.eviction.insert(evicted_k, Arc::downgrade(&evicted_v));
         }
     }
