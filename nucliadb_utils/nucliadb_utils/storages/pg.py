@@ -509,7 +509,7 @@ class PostgresStorageField(StorageField):
                     )
                 except Exception:
                     logger.exception(
-                        f"Error moving file {self.field.bucket_name}://{self.field.upload_uri} -> {self.bucket}://{self.key}"
+                        f"Error moving file {self.field.bucket_name}://{self.field.upload_uri} -> {self.bucket}://{self.key}"  # noqa
                     )
                     raise
 
@@ -537,8 +537,9 @@ class PostgresStorage(Storage):
     chunk_size = CHUNK_SIZE
     pool: asyncpg.pool.Pool
 
-    def __init__(self, dsn: str):
+    def __init__(self, dsn: str, connection_pool_max_size: int = 10):
         self.dsn = dsn
+        self.connection_pool_max_size = connection_pool_max_size
         self.source = CloudFile.POSTGRES
         self._lock = asyncio.Lock()
         self.initialized = False
@@ -546,7 +547,10 @@ class PostgresStorage(Storage):
     async def initialize(self):
         async with self._lock:
             if self.initialized is False:
-                self.pool = await asyncpg.create_pool(self.dsn)
+                self.pool = await asyncpg.create_pool(
+                    self.dsn,
+                    max_size=self.connection_pool_max_size,
+                )
 
                 # check if table exists
                 try:

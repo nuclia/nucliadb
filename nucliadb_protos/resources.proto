@@ -400,6 +400,12 @@ message ParagraphAnnotation {
     repeated Classification classifications = 2;
 }
 
+message QuestionAnswerAnnotation {
+    QuestionAnswer question_answer = 1;
+    bool cancelled_by_user = 2;
+}
+
+
 message VisualSelection {
     string label = 1;
     float top = 2;
@@ -420,6 +426,7 @@ message UserFieldMetadata {
     repeated TokenSplit token = 1;
     repeated ParagraphAnnotation paragraphs = 2;
     repeated PageSelections page_selections = 4;
+    repeated QuestionAnswerAnnotation question_answers = 5;
     FieldID field = 3;
 }
 

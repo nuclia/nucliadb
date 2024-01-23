@@ -19,7 +19,7 @@
 #
 import asyncio
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Optional
 
 import aiohttp.client_exceptions
 
@@ -54,6 +54,12 @@ from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_storage
 
 logger = logging.getLogger(__name__)
+
+
+MESSAGE_TO_NOTIFICATION_SOURCE = {
+    writer_pb2.BrokerMessage.MessageSource.WRITER: writer_pb2.NotificationSource.WRITER,
+    writer_pb2.BrokerMessage.MessageSource.PROCESSOR: writer_pb2.NotificationSource.PROCESSOR,
+}
 
 
 def validate_indexable_resource(resource: noderesources_pb2.Resource) -> None:
@@ -93,7 +99,7 @@ class Processor:
     and can not use the txn id
     """
 
-    messages: Dict[str, List[writer_pb2.BrokerMessage]]
+    messages: dict[str, list[writer_pb2.BrokerMessage]]
 
     def __init__(
         self,
@@ -187,6 +193,7 @@ class Processor:
                     multi=message.multiid,
                     kbid=message.kbid,
                     rid=message.uuid,
+                    source=message.source,
                 )
                 raise exc
         if txn.open:
@@ -217,7 +224,7 @@ class Processor:
     @processor_observer.wrap({"type": "txn"})
     async def txn(
         self,
-        messages: List[writer_pb2.BrokerMessage],
+        messages: list[writer_pb2.BrokerMessage],
         seqid: int,
         partition: str,
         transaction_check: bool = True,
@@ -256,6 +263,7 @@ class Processor:
             if resource:
                 await resource.compute_global_text()
                 await resource.compute_global_tags(resource.indexer)
+                await resource.compute_security(resource.indexer)
                 if message.reindex:
                     # when reindexing, let's just generate full new index message
                     resource.replace_indexer(await resource.generate_index_message())
@@ -291,7 +299,12 @@ class Processor:
             elif resource and resource.modified is False:
                 await txn.abort()
                 await self.notify_abort(
-                    partition=partition, seqid=seqid, multi=multi, kbid=kbid, rid=uuid
+                    partition=partition,
+                    seqid=seqid,
+                    multi=multi,
+                    kbid=kbid,
+                    rid=uuid,
+                    source=message.source,
                 )
                 logger.warning("This message did not modify the resource")
         except (
@@ -308,6 +321,7 @@ class Processor:
                 multi=multi,
                 kbid=kbid,
                 rid=uuid,
+                source=message.source,
             )
             raise
         except Exception as exc:
@@ -316,7 +330,12 @@ class Processor:
             # and then handled by the top caller, so errors can be handled in the same place.
             await self.deadletter(messages, partition, seqid)
             await self.notify_abort(
-                partition=partition, seqid=seqid, multi=multi, kbid=kbid, rid=uuid
+                partition=partition,
+                seqid=seqid,
+                multi=multi,
+                kbid=kbid,
+                rid=uuid,
+                source=message.source,
             )
             handled_exception = exc
         finally:
@@ -416,10 +435,11 @@ class Processor:
             multi=message.multiid,
             kbid=message.kbid,
             rid=message.uuid,
+            source=message.source,
         )
 
     async def deadletter(
-        self, messages: List[writer_pb2.BrokerMessage], partition: str, seqid: int
+        self, messages: list[writer_pb2.BrokerMessage], partition: str, seqid: int
     ) -> None:
         for seq, message in enumerate(messages):
             await self.storage.deadletter(message, seq, seqid, partition)
@@ -430,7 +450,7 @@ class Processor:
         message: writer_pb2.BrokerMessage,
         kb: KnowledgeBox,
         resource: Optional[Resource] = None,
-    ) -> Optional[Tuple[Resource, bool]]:
+    ) -> Optional[tuple[Resource, bool]]:
         """
         Convert a broker message into a resource object, and apply it to the database
         """
@@ -460,18 +480,21 @@ class Processor:
             )
             return None
 
-        if message.HasField("origin") and resource:
+        if resource is None:
+            return None
+
+        if message.HasField("origin"):
             await resource.set_origin(message.origin)
 
-        if message.HasField("extra") and resource:
+        if message.HasField("extra"):
             await resource.set_extra(message.extra)
 
-        if resource:
-            await resource.apply_fields(message)
-            await resource.apply_extracted(message)
-            return (resource, created)
+        if message.HasField("security"):
+            await resource.set_security(message.security)
 
-        return None
+        await resource.apply_fields(message)
+        await resource.apply_extracted(message)
+        return (resource, created)
 
     async def maybe_update_resource_basic(
         self, resource: Resource, message: writer_pb2.BrokerMessage
@@ -493,7 +516,7 @@ class Processor:
         seqid: int,
         multi: str,
         message: writer_pb2.BrokerMessage,
-        write_type: writer_pb2.Notification.WriteType.Value,  # type: ignore
+        write_type: writer_pb2.Notification.WriteType.ValueType,
     ):
         notification = writer_pb2.Notification(
             partition=int(partition),
@@ -502,10 +525,12 @@ class Processor:
             uuid=message.uuid,
             kbid=message.kbid,
             action=writer_pb2.Notification.Action.COMMIT,
+            write_type=write_type,
+            source=MESSAGE_TO_NOTIFICATION_SOURCE[message.source],
             # including the message here again might feel a bit unusual but allows
             # us to react to these notifications with the original payload
-            write_type=write_type,
             message=message,
+            processing_errors=len(message.errors) > 0,
         )
 
         await self.notify(
@@ -514,7 +539,14 @@ class Processor:
         )
 
     async def notify_abort(
-        self, *, partition: str, seqid: int, multi: str, kbid: str, rid: str
+        self,
+        *,
+        partition: str,
+        seqid: int,
+        multi: str,
+        kbid: str,
+        rid: str,
+        source: writer_pb2.BrokerMessage.MessageSource.ValueType,
     ):
         message = writer_pb2.Notification(
             partition=int(partition),
@@ -523,6 +555,7 @@ class Processor:
             uuid=rid,
             kbid=kbid,
             action=writer_pb2.Notification.ABORT,
+            source=MESSAGE_TO_NOTIFICATION_SOURCE[source],
         )
         await self.notify(
             const.PubSubChannels.RESOURCE_NOTIFY.format(kbid=kbid),

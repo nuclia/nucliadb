@@ -21,6 +21,7 @@ from datetime import datetime
 
 from fastapi import HTTPException
 from nucliadb_protos.resources_pb2 import (
+    Answers,
     Basic,
     Classification,
     ExtractedTextWrapper,
@@ -31,6 +32,9 @@ from nucliadb_protos.resources_pb2 import (
     Paragraph,
 )
 from nucliadb_protos.resources_pb2 import ParagraphAnnotation as PBParagraphAnnotation
+from nucliadb_protos.resources_pb2 import (
+    QuestionAnswerAnnotation as PBQuestionAnswerAnnotation,
+)
 from nucliadb_protos.resources_pb2 import TokenSplit, UserFieldMetadata, VisualSelection
 from nucliadb_protos.utils_pb2 import Relation, RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage
@@ -42,6 +46,7 @@ from nucliadb_models.file import FileField
 from nucliadb_models.link import LinkField
 from nucliadb_models.metadata import (
     ParagraphAnnotation,
+    QuestionAnswerAnnotation,
     RelationNodeTypeMap,
     RelationTypeMap,
 )
@@ -137,6 +142,10 @@ def parse_basic_modify(
                 )
                 userfieldmetadata.page_selections.append(page_selections_pb)
 
+            for qa_annotation in fieldmetadata.question_answers:
+                qa_annotation_pb = build_question_answer_annotation_pb(qa_annotation)
+                userfieldmetadata.question_answers.append(qa_annotation_pb)
+
             userfieldmetadata.field.field = fieldmetadata.field.field
             userfieldmetadata.field.field_type = FIELD_TYPES_MAP_REVERSE[  # type: ignore
                 fieldmetadata.field.field_type.value
@@ -192,6 +201,10 @@ def parse_basic_modify(
         bm.basic.usermetadata.ClearField("relations")
         bm.basic.usermetadata.relations.extend(relations)
 
+    if item.security is not None:
+        unique_groups = list(set(item.security.access_groups))
+        bm.security.access_groups.extend(unique_groups)
+
 
 def parse_basic(bm: BrokerMessage, item: CreateResourcePayload, toprocess: PushPayload):
     bm.basic.created.FromDatetime(datetime.now())
@@ -212,10 +225,19 @@ def set_status_modify(basic: Basic, item: UpdateResourcePayload):
 
 
 def set_processing_info(bm: BrokerMessage, processing_info: ProcessingInfo):
-    bm.basic.last_seqid = processing_info.seqid
+    """
+    Processing V2 does not have this awkward processing info data field and storage
+    but keeping for b/w compatibility.
+
+    Once V1 is removed, this code can be removed because status checking will be done
+    in a separate API that is not part of NucliaDB.
+    """
+    if processing_info.seqid is not None:
+        bm.basic.last_seqid = processing_info.seqid
     if processing_info.account_seq is not None:
         bm.basic.last_account_seq = processing_info.account_seq
-    bm.basic.queue = bm.basic.QueueType.Value(processing_info.queue.name)
+    if processing_info.queue is not None:
+        bm.basic.queue = bm.basic.QueueType.Value(processing_info.queue.name)
 
 
 def validate_classifications(paragraph: ParagraphAnnotation):
@@ -258,3 +280,26 @@ def parse_icon_on_create(bm: BrokerMessage, item: CreateResourcePayload):
         icon = TEXT_FORMAT_TO_MIMETYPE[format]
     item.icon = icon
     bm.basic.icon = icon
+
+
+def build_question_answer_annotation_pb(
+    qa_annotation: QuestionAnswerAnnotation,
+) -> PBQuestionAnswerAnnotation:
+    pb = PBQuestionAnswerAnnotation()
+    pb.cancelled_by_user = qa_annotation.cancelled_by_user
+    pb.question_answer.question.text = qa_annotation.question_answer.question.text
+    if qa_annotation.question_answer.question.language is not None:
+        pb.question_answer.question.language = (
+            qa_annotation.question_answer.question.language
+        )
+    pb.question_answer.question.ids_paragraphs.extend(
+        qa_annotation.question_answer.question.ids_paragraphs
+    )
+    for answer_annotation in qa_annotation.question_answer.answers:
+        answer = Answers()
+        answer.text = answer_annotation.text
+        if answer_annotation.language is not None:
+            answer.language = answer_annotation.language
+        answer.ids_paragraphs.extend(answer_annotation.ids_paragraphs)
+        pb.question_answer.answers.append(answer)
+    return pb

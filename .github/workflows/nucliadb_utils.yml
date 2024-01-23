@@ -17,7 +17,7 @@ jobs:
   pre-checks:
     strategy:
       matrix:
-        python-version: ["3.9", "3.10", "3.11"]
+        python-version: ["3.8", "3.9", "3.10", "3.11"]
     uses: ./.github/workflows/_component_prechecks.yml
     with:
       python_version: "${{ matrix.python-version }}"

@@ -74,14 +74,19 @@ async def setup_driver() -> Driver:
         if settings.driver_tikv_url is None:
             raise ConfigurationError("No DRIVER_TIKV_URL env var defined.")
 
-        tikv_driver = TiKVDriver(settings.driver_tikv_url)
+        tikv_driver = TiKVDriver(
+            settings.driver_tikv_url, settings.driver_tikv_connection_pool_size
+        )
         MAIN[Utility.MAINDB_DRIVER] = tikv_driver
     elif settings.driver == "pg":
         if not PG:
             raise ConfigurationError("`asyncpg` python package not installed.")
         if settings.driver_pg_url is None:
             raise ConfigurationError("No DRIVER_PG_URL env var defined.")
-        pg_driver = PGDriver(settings.driver_pg_url)
+        pg_driver = PGDriver(
+            url=settings.driver_pg_url,
+            connection_pool_max_size=settings.driver_pg_connection_pool_max_size,
+        )
         MAIN[Utility.MAINDB_DRIVER] = pg_driver
     elif settings.driver == "local":
         if not FILES:

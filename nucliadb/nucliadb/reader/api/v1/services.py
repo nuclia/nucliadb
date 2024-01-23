@@ -17,7 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+
+from typing import Optional, Union
+
 from fastapi import HTTPException
+from fastapi.responses import StreamingResponse
 from fastapi_versioning import version  # type: ignore
 from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxID
@@ -40,7 +44,14 @@ from nucliadb_protos.writer_pb2 import (
 )
 from starlette.requests import Request
 
+from nucliadb.common.cluster.settings import in_standalone_mode
+from nucliadb.common.context import ApplicationContext
+from nucliadb.common.context.fastapi import get_app_context
+from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
+from nucliadb.common.http_clients import processing
+from nucliadb.models.responses import HTTPClientError
 from nucliadb.reader.api.v1.router import KB_PREFIX, api
+from nucliadb.reader.reader.notifications import kb_notifications_stream
 from nucliadb_models.configuration import KBConfiguration
 from nucliadb_models.entities import EntitiesGroup, KnowledgeBoxEntities
 from nucliadb_models.labels import KnowledgeBoxLabels, LabelSet
@@ -297,4 +308,75 @@ async def get_configuration(request: Request, kbid: str):
     elif pbresponse.status.status == OpStatusWriter.Status.ERROR:
         raise HTTPException(
             status_code=500, detail="Error getting configuration of a Knowledge box"
+        )
+
+
+@api.get(
+    f"/{KB_PREFIX}/{{kbid}}/notifications",
+    status_code=200,
+    name="Knowledge Box Notifications Stream",
+    description="Provides a stream of activity notifications for the given Knowledge Box. The stream will be automatically closed after 2 minutes.",  # noqa: E501
+    tags=["Knowledge Box Services"],
+    response_description="Each line of the response is a Base64-encoded JSON object representing a notification. Refer to [the internal documentation](https://github.com/nuclia/nucliadb/blob/main/docs/tutorials/KB_NOTIFICATIONS.md) for a more detailed explanation of each notification type.",  # noqa: E501
+    response_model=None,
+    responses={"404": {"description": "Knowledge Box not found"}},
+)
+@requires(NucliaDBRoles.READER)
+@version(1)
+async def notifications_endpoint(
+    request: Request, kbid: str
+) -> Union[StreamingResponse, HTTPClientError]:
+    if in_standalone_mode():
+        return HTTPClientError(
+            status_code=404,
+            detail="Notifications are only available in the cloud offering of NucliaDB.",
+        )
+
+    context = get_app_context(request.app)
+
+    if not await exists_kb(context, kbid):
+        return HTTPClientError(status_code=404, detail="Knowledge Box not found")
+
+    response = StreamingResponse(
+        content=kb_notifications_stream(kbid),
+        status_code=200,
+        media_type="binary/octet-stream",
+    )
+
+    return response
+
+
+async def exists_kb(context: ApplicationContext, kbid: str) -> bool:
+    dm = KnowledgeBoxDataManager(context.kv_driver)
+    return await dm.exists_kb(kbid)
+
+
+@api.get(
+    f"/{KB_PREFIX}/{{kbid}}/processing-status",
+    status_code=200,
+    name="Knowledge Box Processing Status",
+    description="Provides the status of the processing of the given Knowledge Box.",
+    tags=["Knowledge Box Services"],
+    response_model=processing.StatusResultsV2,
+    responses={
+        "404": {"description": "Knowledge Box not found"},
+    },
+)
+@requires(NucliaDBRoles.READER)
+@version(1)
+async def processing_status(
+    request: Request,
+    kbid: str,
+    cursor: Optional[str] = None,
+    scheduled: Optional[bool] = None,
+    limit: int = 20,
+) -> Union[processing.StatusResultsV2, HTTPClientError]:
+    context = get_app_context(request.app)
+
+    if not await exists_kb(context, kbid):
+        return HTTPClientError(status_code=404, detail="Knowledge Box not found")
+
+    async with processing.ProcessingV2HTTPClient() as client:
+        return await client.status(
+            cursor=cursor, scheduled=scheduled, kbid=kbid, limit=limit
         )

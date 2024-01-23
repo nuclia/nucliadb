@@ -32,7 +32,6 @@ for users.
 """
 
 import asyncio
-from typing import Tuple
 
 import pytest
 from httpx import AsyncClient
@@ -117,7 +116,7 @@ async def processing_entities(nucliadb_grpc: WriterStub, knowledgebox: str):
 
 @pytest.fixture
 async def annotated_entities(
-    nucliadb_writer: AsyncClient, text_field: Tuple[str, str, str], nucliadb_grpc
+    nucliadb_writer: AsyncClient, text_field: tuple[str, str, str], nucliadb_grpc
 ):
     kbid, rid, field_id = text_field
 
@@ -432,7 +431,7 @@ async def test_entities_indexing(
     assert resp.status_code == 200
     body = resp.json()
 
-    entities = set(body["entities"]["entities"])
+    entities = set((e["value"] for e in body["entities"]["entities"]))
     # BUG? why is "domestic cat" not appearing in the results?
     assert entities == {"dog", "dolphin"}
     # assert entities == {"dog", "domestic cat", "dolphin"}

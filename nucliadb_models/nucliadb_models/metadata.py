@@ -28,7 +28,7 @@ from pydantic.class_validators import root_validator
 from nucliadb_models.common import FIELD_TYPES_MAP
 from nucliadb_protos import resources_pb2, utils_pb2
 
-from .common import Classification, FieldID, UserClassification
+from .common import Classification, FieldID, QuestionAnswer, UserClassification
 
 _T = TypeVar("_T")
 
@@ -275,6 +275,11 @@ class ParagraphAnnotation(BaseModel):
     key: str
 
 
+class QuestionAnswerAnnotation(BaseModel):
+    question_answer: QuestionAnswer
+    cancelled_by_user: bool = False
+
+
 class VisualSelection(BaseModel):
     label: str
     top: float
@@ -297,6 +302,7 @@ class UserFieldMetadata(BaseModel):
     token: List[TokenSplit] = []
     paragraphs: List[ParagraphAnnotation] = []
     selections: List[PageSelections] = []
+    question_answers: List[QuestionAnswerAnnotation] = []
     field: FieldID
 
     @classmethod

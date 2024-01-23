@@ -20,7 +20,7 @@
 import uuid
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional
+from typing import Optional
 
 import pytest
 from httpx import AsyncClient
@@ -56,7 +56,7 @@ async def reader_api(test_settings_reader: None, local_files, event_loop):  # ty
     application = create_application()
 
     def make_client_fixture(
-        roles: Optional[List[Enum]] = None,
+        roles: Optional[list[Enum]] = None,
         user: str = "",
         version: str = "1",
     ) -> AsyncClient:

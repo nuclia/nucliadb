@@ -19,7 +19,6 @@
 #
 import tempfile
 import uuid
-from typing import Dict
 
 import asyncpg
 import pytest
@@ -153,7 +152,7 @@ async def storage_test(storage: BlobStore, file_storage_manager: FileStorageMana
     rid = "myrid"
     kbid = "mykb_tus_test"
 
-    metadata: Dict[str, str] = {}
+    metadata: dict[str, str] = {}
     bucket_name = storage.get_bucket_name(kbid)
     assert bucket_name in [
         "test_mykb_tus_test",

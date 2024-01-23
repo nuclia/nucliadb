@@ -115,6 +115,7 @@ class StorageSettings(BaseSettings):
     )
 
     driver_pg_url: Optional[str] = None  # match same env var for k/v storage
+    driver_pg_connection_pool_max_size: int = 20  # match same env var for k/v storage
 
 
 storage_settings = StorageSettings()
@@ -124,6 +125,9 @@ class NucliaSettings(BaseSettings):
     nuclia_service_account: Optional[str] = None
     nuclia_public_url: str = "https://{zone}.nuclia.cloud"
     nuclia_cluster_url: str = "http://nucliadb_proxy.processing.svc.cluster.local:8080"
+    nuclia_processing_cluster_url: str = (
+        "http://processing-api.processing.svc.cluster.local:8080"
+    )
     nuclia_inner_predict_url: str = "http://predict.learning.svc.cluster.local:8080"
 
     nuclia_zone: str = "europe-1"

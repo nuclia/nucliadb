@@ -424,11 +424,17 @@ impl RelationsReaderService {
     }
 }
 
-struct HashedRelationNode(RelationNode);
+pub struct HashedRelationNode(pub RelationNode);
 
 impl From<HashedRelationNode> for RelationNode {
     fn from(val: HashedRelationNode) -> Self {
         val.0
+    }
+}
+
+impl From<RelationNode> for HashedRelationNode {
+    fn from(val: RelationNode) -> Self {
+        HashedRelationNode(val)
     }
 }
 

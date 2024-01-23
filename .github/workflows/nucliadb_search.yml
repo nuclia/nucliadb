@@ -17,9 +17,11 @@ on:
       - 'nucliadb_node/**'
       - 'nucliadb_vectors/**'
       - 'nucliadb_texts/**'
+      - 'nucliadb_texts2/**'
       - 'nucliadb_paragraphs/**'
       - 'nucliadb_core/**'
       - 'nucliadb_relations/**'
+      - 'nucliadb_relations2/**'
   push:
     branches:
       - main
@@ -72,8 +74,18 @@ jobs:
     runs-on: ubuntu-latest
 
     strategy:
+      max-parallel: 2
       matrix:
-        python-version: ['3.11']
+        include:
+          # - maindb_driver: "tikv"
+          #   storage_backend: "gcs"
+          #   python-version: "3.11"
+          - maindb_driver: "tikv"
+            storage_backend: "s3"
+            python-version: "3.11"
+          # - maindb_driver: "pg"
+          #   storage_backend: "gcs"
+          #   python-version: "3.11"
 
     steps:
       - name: Checkout the repository
@@ -110,6 +122,7 @@ jobs:
               - 'nucliadb_paragraphs/**'
               - 'nucliadb_procs/**'
               - 'nucliadb_relations/**'
+              - 'nucliadb_relations2/**'
               - 'nucliadb_telemetry/**'
               - 'nucliadb_texts/**'
               - 'nucliadb_vectors/**'
@@ -142,8 +155,11 @@ jobs:
           make build-sidecar
 
       - name: Run tests
+        env:
+          TESTING_MAINDB_DRIVER: ${{ matrix.maindb_driver }}
+          TESTING_STORAGE_BACKEND: ${{ matrix.storage_backend }}
         run: |
-          pytest -rfE --cov=nucliadb.search -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json nucliadb/nucliadb/search
+          pytest -x -rfE --cov=nucliadb.search -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json nucliadb/nucliadb/search
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3

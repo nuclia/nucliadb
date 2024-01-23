@@ -715,8 +715,9 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                     is_self=False,
                     dummy=n.dummy,
                     shard_count=n.shard_count,
+                    primary_id=n.primary_id or "",
                 )
-                for n in get_index_nodes()
+                for n in get_index_nodes(include_secondary=True)
             ]
         )
         return response

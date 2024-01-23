@@ -26,7 +26,7 @@ from typing import Dict, List, Optional, Type, TypeVar, Union
 from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig as PBKnowledgeBoxConfig
 from nucliadb_protos.utils_pb2 import ReleaseChannel as PBReleaseChannel
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, Field, validator
 
 from nucliadb_models.conversation import FieldConversation
 from nucliadb_models.datetime import FieldDatetime
@@ -52,6 +52,7 @@ from nucliadb_models.metadata import (
     UserFieldMetadata,
     UserMetadata,
 )
+from nucliadb_models.security import ResourceSecurity
 from nucliadb_models.text import FieldText
 from nucliadb_models.utils import SlugString
 from nucliadb_models.vectors import (
@@ -309,6 +310,12 @@ class Resource(BaseModel):
     relations: Optional[List[Relation]] = None
 
     data: Optional[ResourceData] = None
+
+    security: Optional[ResourceSecurity] = Field(
+        default=None,
+        title="Security",
+        description="Resource security metadata",
+    )
 
 
 class ResourcePagination(BaseModel):

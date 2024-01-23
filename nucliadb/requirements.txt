@@ -6,6 +6,8 @@ aiohttp>=3.9.0
 lru-dict>=1.1.7
 backoff
 aiofiles>=0.8.0
+psutil==5.9.7
+types-psutil==5.9.5.17
 types-aiofiles>=0.8.3
 protobuf==4.22.3
 types-protobuf>=3.19.20,<4.0
@@ -25,7 +27,7 @@ botocore<1.30.0
 google-cloud-storage
 gcloud
 oauth2client
-jwcrypto>=1.5.0
+jwcrypto>=1.5.1
 
 fastapi-versioning>=0.10.0
 # At some point FastAPI will drop support for pydantic v1
@@ -45,7 +47,7 @@ nucliadb-telemetry[all]
 nucliadb-utils[storages,fastapi,cache]
 nucliadb-protos
 nucliadb-models
-nucliadb-admin-assets~=1.0.0
+nucliadb-admin-assets>=1.0.0.post1224
 
 asyncpg>=0.27.0
 tikv-client>=0.0.3
@@ -59,6 +61,7 @@ idna>=3.3
 sniffio>=1.2.0
 
 async_lru==2.0.2
+async-timeout==4.0.3
 cachetools==5.3.2
 types-cachetools==5.3.0.5
 kubernetes_asyncio

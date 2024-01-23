@@ -22,6 +22,7 @@ from httpx import AsyncClient
 
 from nucliadb.common.cluster import rollover
 from nucliadb.common.context import ApplicationContext
+from nucliadb.common.datamanagers.cluster import ClusterDataManager
 
 pytestmark = pytest.mark.asyncio
 
@@ -56,11 +57,13 @@ async def test_rollover_kb_shards(
         assert resp.status_code == 201
 
     resp = await nucliadb_manager.get(f"/kb/{knowledgebox}/shards")
+    assert resp.status_code == 200, resp.text
     shards_body1 = resp.json()
 
     await rollover.rollover_kb_shards(app_context, knowledgebox)
 
     resp = await nucliadb_manager.get(f"/kb/{knowledgebox}/shards")
+    assert resp.status_code == 200, resp.text
     shards_body2 = resp.json()
     # check that shards have changed
     assert (
@@ -77,3 +80,22 @@ async def test_rollover_kb_shards(
     assert resp.status_code == 200
     body = resp.json()
     assert len(body["resources"]) == count
+
+
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_rollover_kb_shards_does_a_clean_cutover(
+    app_context,
+    knowledgebox,
+):
+    async def get_kb_shards(kbid: str):
+        driver = app_context.kv_driver
+        cluster_data_manager = ClusterDataManager(driver)
+        return await cluster_data_manager.get_kb_shards(kbid)
+
+    shards1 = await get_kb_shards(knowledgebox)
+    assert shards1.extra == {}
+
+    await rollover.rollover_kb_shards(app_context, knowledgebox)
+
+    shards2 = await get_kb_shards(knowledgebox)
+    assert shards2.extra == {}

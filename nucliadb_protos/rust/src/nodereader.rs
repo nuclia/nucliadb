@@ -434,6 +434,8 @@ pub struct SearchRequest {
     pub key_filters: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(float, tag="23")]
     pub min_score: f32,
+    #[prost(message, optional, tag="24")]
+    pub security: ::core::option::Option<super::utils::Security>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SuggestRequest {
@@ -469,8 +471,8 @@ pub struct SuggestResponse {
     #[prost(string, repeated, tag="4")]
     pub ematches: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     /// Entities related with the query
-    #[prost(message, optional, tag="5")]
-    pub entities: ::core::option::Option<RelatedEntities>,
+    #[prost(message, optional, tag="6")]
+    pub entity_results: ::core::option::Option<RelationPrefixSearchResponse>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SearchResponse {

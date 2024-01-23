@@ -10,6 +10,7 @@ members = [
   "nucliadb_relations",
   "nucliadb_relations2",
   "nucliadb_texts",
+  "nucliadb_texts2",
   "nucliadb_vectors",
   "vectors_benchmark",
 ]

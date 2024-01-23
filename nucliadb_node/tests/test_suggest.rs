@@ -18,25 +18,34 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+// disable clippy lint caused by rstest proc macro
+#![allow(clippy::items_after_test_module)]
+
 mod common;
 
 use std::collections::HashMap;
 
-use common::{resources, NodeFixture, TestNodeReader, TestNodeWriter};
+use common::{resources, NodeFixture, TestNodeReader};
 use itertools::Itertools;
 use nucliadb_core::protos::{
-    op_status, Filter, NewShardRequest, SuggestFeatures, SuggestRequest, SuggestResponse,
+    op_status, Filter, NewShardRequest, ReleaseChannel, SuggestFeatures, SuggestRequest,
+    SuggestResponse,
 };
+use rstest::*;
 use tonic::Request;
 
+#[rstest]
+#[awt]
 #[tokio::test]
-async fn test_suggest_paragraphs() -> Result<(), Box<dyn std::error::Error>> {
-    let mut fixture = NodeFixture::new();
-    fixture.with_writer().await?.with_reader().await?;
-    let mut writer = fixture.writer_client();
-    let mut reader = fixture.reader_client();
-
-    let shard = create_suggest_shard(&mut writer).await;
+async fn test_suggest_paragraphs(
+    #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)]
+    _release_channel: ReleaseChannel,
+    #[future]
+    #[with(_release_channel)]
+    suggest_shard: (NodeFixture, ShardDetails),
+) -> Result<(), Box<dyn std::error::Error>> {
+    let (node, shard) = suggest_shard;
+    let mut reader = node.reader_client();
 
     // exact match
     expect_paragraphs(
@@ -132,130 +141,156 @@ async fn test_suggest_paragraphs() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+#[rstest]
+#[awt]
 #[tokio::test]
-async fn test_suggest_entities() -> Result<(), Box<dyn std::error::Error>> {
-    let mut fixture = NodeFixture::new();
-    fixture.with_writer().await?.with_reader().await?;
-    let mut writer = fixture.writer_client();
-    let mut reader = fixture.reader_client();
-
-    let shard = create_suggest_shard(&mut writer).await;
+async fn test_suggest_entities(
+    #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)]
+    _release_channel: ReleaseChannel,
+    #[future]
+    #[with(_release_channel)]
+    suggest_shard: (NodeFixture, ShardDetails),
+) -> Result<(), Box<dyn std::error::Error>> {
+    let (node, shard) = suggest_shard;
+    let mut reader = node.reader_client();
 
     // basic suggests
     expect_entities(
-        &suggest_entities(&mut reader, &shard.id, "An").await,
-        &["Anastasia", "Anna", "Anthony"],
+        &suggest_entities(&mut reader, &shard.id, "Ann").await,
+        &["Anna", "Anthony"],
     );
 
     expect_entities(
-        &suggest_entities(&mut reader, &shard.id, "ann").await,
-        // TODO: add "Anastasia" when typo correction is implemented
-        &["Anna"],
-    );
-
-    expect_entities(
-        &suggest_entities(&mut reader, &shard.id, "jo").await,
+        &suggest_entities(&mut reader, &shard.id, "joh").await,
         &["John"],
     );
 
-    expect_entities(&suggest_entities(&mut reader, &shard.id, "any").await, &[]);
+    expect_entities(
+        &suggest_entities(&mut reader, &shard.id, "anyth").await,
+        &["Anthony"],
+    );
+
+    expect_entities(
+        &suggest_entities(&mut reader, &shard.id, "anything").await,
+        &[],
+    );
 
     // validate tokenization
     expect_entities(
-        &suggest_entities(&mut reader, &shard.id, "bar").await,
+        &suggest_entities(&mut reader, &shard.id, "barc").await,
         &["Barcelona", "Bárcenas"],
     );
 
     expect_entities(
-        &suggest_entities(&mut reader, &shard.id, "Bar").await,
+        &suggest_entities(&mut reader, &shard.id, "Barc").await,
         &["Barcelona", "Bárcenas"],
     );
 
     expect_entities(
-        &suggest_entities(&mut reader, &shard.id, "BAR").await,
+        &suggest_entities(&mut reader, &shard.id, "BARC").await,
         &["Barcelona", "Bárcenas"],
     );
 
     expect_entities(
-        &suggest_entities(&mut reader, &shard.id, "BÄR").await,
+        &suggest_entities(&mut reader, &shard.id, "BÄRĈ").await,
         &["Barcelona", "Bárcenas"],
     );
 
     expect_entities(
-        &suggest_entities(&mut reader, &shard.id, "BáR").await,
+        &suggest_entities(&mut reader, &shard.id, "BáRc").await,
         &["Barcelona", "Bárcenas"],
     );
 
     // multiple words and result ordering
-    let response = suggest_entities(&mut reader, &shard.id, "Solomon Is").await;
-    assert!(response.entities.is_some());
-    assert_eq!(response.entities.as_ref().unwrap().total, 2);
-    assert!(response.entities.as_ref().unwrap().entities[0] == *"Solomon Islands");
-    assert!(response.entities.as_ref().unwrap().entities[1] == *"Israel");
+    let response = suggest_entities(&mut reader, &shard.id, "Solomon Isa").await;
+    assert!(response.entity_results.is_some());
+    assert_eq!(response.entity_results.as_ref().unwrap().nodes.len(), 2);
+    assert!(response.entity_results.as_ref().unwrap().nodes[0].value == *"Solomon Islands");
+    assert!(response.entity_results.as_ref().unwrap().nodes[1].value == *"Israel");
+
+    // Does not find resources by UUID prefix
+    let pap_uuid = &shard.resources["pap"];
+    expect_entities(
+        &suggest_entities(&mut reader, &shard.id, &pap_uuid[0..6]).await,
+        &[],
+    );
 
     Ok(())
 }
 
+#[rstest]
+#[awt]
 #[tokio::test]
-async fn test_suggest_features() -> Result<(), Box<dyn std::error::Error>> {
-    // Test: search for "an" with paragraph and entities features and validate
+async fn test_suggest_features(
+    #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)]
+    _release_channel: ReleaseChannel,
+    #[future]
+    #[with(_release_channel)]
+    suggest_shard: (NodeFixture, ShardDetails),
+) -> Result<(), Box<dyn std::error::Error>> {
+    // Test: search for "ann" with paragraph and entities features and validate
     // we search only for what we request.
     //
     // "an" should match entities starting with this prefix and the "and" word
     // from the little prince text
 
-    let mut fixture = NodeFixture::new();
-    fixture.with_writer().await?.with_reader().await?;
-    let mut writer = fixture.writer_client();
-    let mut reader = fixture.reader_client();
+    let (node, shard) = suggest_shard;
+    let mut reader = node.reader_client();
 
-    let shard = create_suggest_shard(&mut writer).await;
-
-    let response = suggest_paragraphs(&mut reader, &shard.id, "an").await;
-    assert!(response.entities.is_none());
+    let response = suggest_paragraphs(&mut reader, &shard.id, "ann").await;
+    assert!(response.entity_results.is_none());
     expect_paragraphs(
         &response,
         &[(&shard.resources["little prince"], "/a/summary")],
     );
 
-    let response = suggest_entities(&mut reader, &shard.id, "an").await;
+    let response = suggest_entities(&mut reader, &shard.id, "ann").await;
     assert_eq!(response.total, 0);
     assert!(response.results.is_empty());
-    expect_entities(&response, &["Anastasia", "Anna", "Anthony"]);
+    expect_entities(&response, &["Anna", "Anthony"]);
 
     Ok(())
 }
 
-struct ShardDetails<'a> {
-    id: String,
-    resources: HashMap<&'a str, String>,
+#[fixture]
+fn default_release_channel(
+    #[default(ReleaseChannel::Stable)] value: ReleaseChannel,
+) -> ReleaseChannel {
+    value
 }
 
-async fn create_suggest_shard(writer: &mut TestNodeWriter) -> ShardDetails {
-    let request = Request::new(NewShardRequest::default());
+struct ShardDetails {
+    id: String,
+    resources: HashMap<&'static str, String>,
+}
+
+#[fixture]
+async fn suggest_shard(
+    #[from(default_release_channel)] release_channel: ReleaseChannel,
+) -> (NodeFixture, ShardDetails) {
+    let mut fixture = NodeFixture::new();
+    fixture.with_writer().await.unwrap();
+    fixture.with_reader().await.unwrap();
+
+    let mut writer = fixture.writer_client();
+
+    let request = Request::new(NewShardRequest {
+        release_channel: release_channel.into(),
+        ..Default::default()
+    });
     let new_shard_response = writer
         .new_shard(request)
         .await
         .expect("Unable to create new shard");
     let shard_id = &new_shard_response.get_ref().id;
-    let resource_uuids = create_test_resources(writer, shard_id.clone()).await;
-    ShardDetails {
-        id: shard_id.to_owned(),
-        resources: resource_uuids,
-    }
-}
 
-async fn create_test_resources(
-    writer: &mut TestNodeWriter,
-    shard_id: String,
-) -> HashMap<&str, String> {
     let resources = [
-        ("little prince", resources::little_prince(&shard_id)),
-        ("zarathustra", resources::thus_spoke_zarathustra(&shard_id)),
-        ("pap", resources::people_and_places(&shard_id)),
+        ("little prince", resources::little_prince(shard_id)),
+        ("zarathustra", resources::thus_spoke_zarathustra(shard_id)),
+        ("pap", resources::people_and_places(shard_id)),
     ];
-    let mut resource_uuids = HashMap::new();
 
+    let mut resource_uuids = HashMap::new();
     for (name, resource) in resources.into_iter() {
         resource_uuids.insert(name, resource.resource.as_ref().unwrap().uuid.clone());
         let request = Request::new(resource);
@@ -263,7 +298,13 @@ async fn create_test_resources(
         assert_eq!(response.get_ref().status, op_status::Status::Ok as i32);
     }
 
-    resource_uuids
+    (
+        fixture,
+        ShardDetails {
+            id: shard_id.to_owned(),
+            resources: resource_uuids,
+        },
+    )
 }
 
 async fn suggest_paragraphs(
@@ -317,17 +358,21 @@ async fn suggest_entities(
 }
 
 fn expect_entities(response: &SuggestResponse, expected: &[&str]) {
-    assert!(response.entities.is_some());
+    assert!(response.entity_results.is_some());
     assert_eq!(
-        response.entities.as_ref().unwrap().total as usize,
-        expected.len()
+        response.entity_results.as_ref().unwrap().nodes.len(),
+        expected.len(),
+        "Response entities don't match expected ones: {:?} != {:?}",
+        response.entity_results,
+        expected,
     );
     for entity in expected {
         assert!(response
-            .entities
+            .entity_results
             .as_ref()
             .unwrap()
-            .entities
-            .contains(&entity.to_string()));
+            .nodes
+            .iter()
+            .any(|e| &e.value == entity));
     }
 }

@@ -32,6 +32,7 @@
 
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 use std::path::PathBuf;
+use std::time::Duration;
 
 use derive_builder::Builder;
 use nucliadb_core::tracing::{error, Level};
@@ -112,15 +113,14 @@ pub struct InnerSettings {
     pub primary_address: String,
     #[builder(default = "parse_node_role(\"primary\")")]
     pub node_role: NodeRole,
-    #[builder(default = "3")]
-    pub replication_delay_seconds: u64,
+    #[builder(default = "Duration::from_secs(3)")]
+    pub replication_delay: Duration,
     #[builder(default = "3")]
     pub replication_max_concurrency: u64,
 
-    // number of seconds since last replication for
-    // node to be considered healthy
-    #[builder(default = "30")]
-    pub replication_healthy_delay: u64,
+    // time since last replication for node to be considered healthy
+    #[builder(default = "Duration::from_secs(30)")]
+    pub replication_healthy_delay: Duration,
 
     // max number of replicas per node
     #[builder(default = "800")]

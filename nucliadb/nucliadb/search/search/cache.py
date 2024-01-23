@@ -19,29 +19,29 @@
 
 import asyncio
 from contextvars import ContextVar
-from typing import Dict, Optional
+from typing import Optional
 
 from lru import LRU  # type: ignore
 
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
-from nucliadb.ingest.txn_utils import get_transaction
+from nucliadb.middleware.transaction import get_read_only_transaction
 from nucliadb.search import SERVICE_NAME
 from nucliadb_telemetry import metrics
 from nucliadb_utils.utilities import get_storage
 
-rcache: ContextVar[Optional[Dict[str, ResourceORM]]] = ContextVar(
+rcache: ContextVar[Optional[dict[str, ResourceORM]]] = ContextVar(
     "rcache", default=None
 )
 
 
-RESOURCE_LOCKS: Dict[str, asyncio.Lock] = LRU(1000)  # type: ignore
+RESOURCE_LOCKS: dict[str, asyncio.Lock] = LRU(1000)  # type: ignore
 RESOURCE_CACHE_OPS = metrics.Counter("nucliadb_resource_cache_ops", labels={"type": ""})
 
 
-def get_resource_cache(clear: bool = False) -> Dict[str, ResourceORM]:
-    value: Optional[Dict[str, ResourceORM]] = rcache.get()
+def get_resource_cache(clear: bool = False) -> dict[str, ResourceORM]:
+    value: Optional[dict[str, ResourceORM]] = rcache.get()
     if value is None or clear:
         value = {}
         rcache.set(value)
@@ -62,7 +62,7 @@ async def get_resource_from_cache(
         if uuid not in resource_cache:
             RESOURCE_CACHE_OPS.inc({"type": "miss"})
             if txn is None:
-                txn = await get_transaction()
+                txn = await get_read_only_transaction()
             storage = await get_storage(service_name=SERVICE_NAME)
             kb = KnowledgeBoxORM(txn, storage, kbid)
             orm_resource = await kb.get(uuid)

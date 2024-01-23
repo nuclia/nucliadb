@@ -13,14 +13,15 @@ on:
       - "Cargo.toml"
       - "nucliadb_paragraphs/**"
       - "nucliadb_texts/**"
+      - "nucliadb_texts2/**"
       - "nucliadb_core/**"
       - "nucliadb_telemetry/**"
       - "nucliadb_node/**"
       - "nucliadb_vectors/**"
-      - "nucliadb_texts/**"
       - "nucliadb_paragraphs/**"
       - "nucliadb_core/**"
       - "nucliadb_relations/**"
+      - 'nucliadb_relations2/**'
   push:
     branches:
       - main
@@ -34,12 +35,14 @@ on:
       - "Cargo.toml"
       - "nucliadb_paragraphs/**"
       - "nucliadb_texts/**"
+      - "nucliadb_texts2/**"
       - "nucliadb_core/**"
       - "nucliadb_telemetry/**"
       - "nucliadb_node/**"
       - "nucliadb_node_binding/**"
       - "nucliadb_vectors/**"
       - "nucliadb_relations/**"
+      - 'nucliadb_relations2/**'
       - "nucliadb_telemetry/src/**"
       - "nucliadb_utils/**"
 
@@ -209,8 +212,10 @@ jobs:
               - 'nucliadb_paragraphs/**'
               - 'nucliadb_procs/**'
               - 'nucliadb_relations/**'
+              - 'nucliadb_relations2/**'
               - 'nucliadb_telemetry/**'
               - 'nucliadb_texts/**'
+              - 'nucliadb_texts2/**'
               - 'nucliadb_vectors/**'
 
       - name: Build local Node for testing

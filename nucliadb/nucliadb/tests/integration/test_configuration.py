@@ -18,8 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import Dict
-
 import pytest
 from httpx import AsyncClient
 
@@ -43,7 +41,7 @@ async def test_kb_configuration(
 
     resp = await nucliadb_reader.get(f"/kb/{kbid}/configuration")
     assert resp.status_code == 200
-    body: Dict[str, str] = resp.json()
+    body: dict[str, str] = resp.json()
     assert len(body) == 1
     assert body.get("semantic_model") == "test1"
 

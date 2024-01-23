@@ -20,7 +20,7 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fs;
-use std::time::SystemTime;
+use std::time::Instant;
 
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::prost::Message;
@@ -64,18 +64,17 @@ impl WriterChild for ParagraphWriterService {
     #[measure(actor = "paragraphs", metric = "count")]
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
-        let time = SystemTime::now();
+        let time = Instant::now();
         let id: Option<String> = None;
 
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Count starting at {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Count starting at {v} ms");
+
         let reader = self.index.reader()?;
         let searcher = reader.searcher();
         let count = searcher.search(&AllQuery, &Count)?;
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Ending at: {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Ending at: {v} ms");
 
         Ok(count)
     }
@@ -83,36 +82,34 @@ impl WriterChild for ParagraphWriterService {
     #[measure(actor = "paragraphs", metric = "set_resource")]
     #[tracing::instrument(skip_all)]
     fn set_resource(&mut self, resource: &Resource) -> NodeResult<()> {
-        let time = SystemTime::now();
+        let time = Instant::now();
         let id = Some(&resource.shard_id);
 
         if resource.status != ResourceStatus::Delete as i32 {
-            if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-                debug!("{id:?} - Indexing paragraphs: starts at {v} ms");
-            }
+            let v = time.elapsed().as_millis();
+            debug!("{id:?} - Indexing paragraphs: starts at {v} ms");
+
             let _ = self.index_paragraph(resource);
-            if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-                debug!("{id:?} - Indexing paragraphs: ends at {v} ms");
-            }
+            let v = time.elapsed().as_millis();
+            debug!("{id:?} - Indexing paragraphs: ends at {v} ms");
         }
 
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Processing paragraphs to delete: starts at {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Processing paragraphs to delete: starts at {v} ms");
+
         for paragraph_id in &resource.paragraphs_to_delete {
             let uuid_term = Term::from_field_text(self.schema.paragraph, paragraph_id);
             self.writer.delete_term(uuid_term);
         }
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Processing paragraphs to delete: ends at {v} ms");
-        }
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Commit: starts at {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Processing paragraphs to delete: ends at {v} ms");
+
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Commit: starts at {v} ms");
+
         self.writer.commit()?;
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Commit: ends at {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Commit: ends at {v} ms");
 
         Ok(())
     }
@@ -120,25 +117,24 @@ impl WriterChild for ParagraphWriterService {
     #[measure(actor = "paragraphs", metric = "delete_resource")]
     #[tracing::instrument(skip_all)]
     fn delete_resource(&mut self, resource_id: &ResourceId) -> NodeResult<()> {
-        let time = SystemTime::now();
+        let time = Instant::now();
         let id = Some(&resource_id.shard_id);
 
         let uuid_field = self.schema.uuid;
         let uuid_term = Term::from_field_text(uuid_field, &resource_id.uuid);
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Delete term: starts at {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Delete term: starts at {v} ms");
+
         self.writer.delete_term(uuid_term);
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Delete term: ends at {v} ms");
-        }
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Commit: starts at {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Delete term: ends at {v} ms");
+
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Commit: starts at {v} ms");
+
         self.writer.commit()?;
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Commit: ends at {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Commit: ends at {v} ms");
 
         Ok(())
     }
@@ -498,6 +494,7 @@ mod tests {
             vectors: HashMap::default(),
             vectors_to_delete: HashMap::default(),
             shard_id,
+            ..Default::default()
         }
     }
 

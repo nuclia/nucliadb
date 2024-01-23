@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import HTTPException, Request
 from fastapi_versioning import version
@@ -47,6 +47,8 @@ from nucliadb_models.search import (
 from nucliadb_telemetry import errors
 from nucliadb_utils.authentication import requires, requires_one
 from nucliadb_utils.utilities import get_storage
+
+AVG_PARAGRAPH_SIZE_BYTES = 10_000
 
 
 @api.get(
@@ -90,7 +92,7 @@ async def knowledgebox_counters(
     shard_manager = get_shard_manager()
 
     try:
-        shard_groups: List[PBShardObject] = await shard_manager.get_shards_by_kbid(kbid)
+        shard_groups: list[PBShardObject] = await shard_manager.get_shards_by_kbid(kbid)
     except ShardsNotFound:
         raise HTTPException(
             status_code=404,
@@ -122,7 +124,7 @@ async def knowledgebox_counters(
         )
 
     try:
-        results: Optional[List[Shard]] = await asyncio.wait_for(  # type: ignore
+        results: Optional[list[Shard]] = await asyncio.wait_for(  # type: ignore
             asyncio.gather(*ops, return_exceptions=True),  # type: ignore
             timeout=settings.search_timeout,
         )
@@ -176,6 +178,7 @@ async def knowledgebox_counters(
         paragraphs=paragraph_count,
         fields=field_count,
         sentences=sentence_count,
+        index_size=paragraph_count * AVG_PARAGRAPH_SIZE_BYTES,
     )
 
     if debug:

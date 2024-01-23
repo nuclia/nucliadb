@@ -128,6 +128,7 @@ async def create_resource(
     writer.uuid = uuid
     toprocess.uuid = uuid
     toprocess.source = Source.HTTP
+    toprocess.title = item.title
 
     if item.slug:
         if await resource_slug_exists(kbid, item.slug):
@@ -342,6 +343,7 @@ async def modify_resource(
 
     set_status_modify(writer.basic, item)
 
+    toprocess.title = writer.basic.title
     seqid = await maybe_send_to_process(writer, toprocess, partition)
 
     writer.source = BrokerMessage.MessageSource.WRITER

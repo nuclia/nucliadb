@@ -17,14 +17,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Any, Callable, Coroutine, Dict
+from typing import Any, Callable, Coroutine
 
 from nucliadb_protos.resources_pb2 import FieldLayout
 
 import nucliadb_models as models
 from nucliadb_utils.storages.storage import Storage
 
-VERSION: Dict[
+VERSION: dict[
     int,
     Callable[
         [models.InputLayoutField, str, str, str, Storage],

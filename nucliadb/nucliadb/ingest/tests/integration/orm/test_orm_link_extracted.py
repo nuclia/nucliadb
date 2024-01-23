@@ -63,7 +63,7 @@ async def test_create_resource_orm_link_extracted(
     ex2: Optional[LinkExtractedData] = await field_obj.get_link_extracted_data()
     assert ex2 is not None
     assert ex2.title == ex1.title
-    assert ex2.link_preview.source == CloudFile.Source.GCS
+    assert ex2.link_preview.source == storage.source
     data = await storage.downloadbytescf(ex2.link_preview)
     with open(filename, "rb") as testfile:
         data2 = testfile.read()

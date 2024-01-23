@@ -212,16 +212,19 @@ async def test_suggest_related_entities(
     )
     assert resp.status_code == 201
 
+    def assert_expected_entities(body, expected):
+        assert set((e["value"] for e in body["entities"]["entities"])) == expected
+
     # Test simple suggestions
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=Ann")
     assert resp.status_code == 200
     body = resp.json()
-    assert set(body["entities"]["entities"]) == {"Anastasia", "Anna", "Anthony"}
+    assert_expected_entities(body, {"Anna", "Anthony"})
 
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=joh")
     assert resp.status_code == 200
     body = resp.json()
-    assert set(body["entities"]["entities"]) == {"John"}
+    assert_expected_entities(body, {"John"})
 
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=xxxxx")
     assert resp.status_code == 200
@@ -233,33 +236,33 @@ async def test_suggest_related_entities(
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=bar")
     assert resp.status_code == 200
     body = resp.json()
-    assert set(body["entities"]["entities"]) == {"Barcelona", "Bárcenas"}
+    assert_expected_entities(body, {"Barcelona", "Bárcenas"})
 
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=Bar")
     assert resp.status_code == 200
     body = resp.json()
-    assert set(body["entities"]["entities"]) == {"Barcelona", "Bárcenas"}
+    assert_expected_entities(body, {"Barcelona", "Bárcenas"})
 
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=BAR")
     assert resp.status_code == 200
     body = resp.json()
-    assert set(body["entities"]["entities"]) == {"Barcelona", "Bárcenas"}
+    assert_expected_entities(body, {"Barcelona", "Bárcenas"})
 
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=BÄR")
     assert resp.status_code == 200
     body = resp.json()
-    assert set(body["entities"]["entities"]) == {"Barcelona", "Bárcenas"}
+    assert_expected_entities(body, {"Barcelona", "Bárcenas"})
 
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=BáR")
     assert resp.status_code == 200
     body = resp.json()
-    assert set(body["entities"]["entities"]) == {"Barcelona", "Bárcenas"}
+    assert_expected_entities(body, {"Barcelona", "Bárcenas"})
 
     # Test multiple word suggest and ordering
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=Solomon+Is")
     assert resp.status_code == 200
     body = resp.json()
-    assert set(body["entities"]["entities"]) == {"Solomon Islands", "Israel", "Irene"}
+    assert_expected_entities(body, {"Solomon Islands", "Israel"})
 
 
 @pytest.mark.asyncio
@@ -322,8 +325,8 @@ async def test_suggestion_on_link_computed_titles_sc6088(
     assert suggested["text"] == extracted_title
 
 
-@pytest.mark.skip(reason="Bindings not released")
 @pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_suggest_features(
     nucliadb_grpc: WriterStub,
     nucliadb_reader: AsyncClient,
@@ -349,8 +352,9 @@ async def test_suggest_features(
         }
 
     def assert_expected_entities(response):
-        assert response["entities"]["total"] == 1
-        assert set(response["entities"]["entities"]) == {"Anna"}
+        expected = {"Anna", "Anthony"}
+        assert len(response["entities"]) == len(expected)
+        assert set((e["value"] for e in response["entities"]["entities"])) == expected
 
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/suggest",

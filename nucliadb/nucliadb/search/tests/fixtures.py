@@ -19,8 +19,7 @@
 
 import asyncio
 from enum import Enum
-from os.path import dirname
-from typing import Dict, List, Optional
+from typing import Optional
 
 import pytest
 from httpx import AsyncClient
@@ -38,24 +37,14 @@ from nucliadb_utils.utilities import clear_global_cache
 
 
 @pytest.fixture(scope="function")
-def test_settings_search(gcs, natsd, node, maindb_driver):  # type: ignore
+def test_settings_search(storage, natsd, node, maindb_driver):  # type: ignore
     from nucliadb.ingest.settings import settings as ingest_settings
     from nucliadb_utils.cache.settings import settings as cache_settings
     from nucliadb_utils.settings import (
-        FileBackendConfig,
         nuclia_settings,
         nucliadb_settings,
         running_settings,
-        storage_settings,
     )
-    from nucliadb_utils.storages.settings import settings as extended_storage_settings
-
-    storage_settings.gcs_endpoint_url = gcs
-    storage_settings.file_backend = FileBackendConfig.GCS
-    storage_settings.gcs_bucket = "test_{kbid}"
-
-    extended_storage_settings.gcs_indexing_bucket = "indexing"
-    extended_storage_settings.gcs_deadletter_bucket = "deadletter"
 
     cache_settings.cache_pubsub_nats_url = [natsd]
 
@@ -71,8 +60,6 @@ def test_settings_search(gcs, natsd, node, maindb_driver):  # type: ignore
     ingest_settings.grpc_port = free_port()
 
     nucliadb_settings.nucliadb_ingest = f"localhost:{ingest_settings.grpc_port}"
-
-    extended_storage_settings.local_testing_files = f"{dirname(__file__)}"
 
 
 @pytest.mark.asyncio
@@ -97,11 +84,11 @@ async def search_api(test_settings_search, transaction_utility, redis):  # type:
         count += 1
 
     def make_client_fixture(
-        roles: Optional[List[Enum]] = None,
+        roles: Optional[list[Enum]] = None,
         user: str = "",
         version: str = "1",
         root: bool = False,
-        extra_headers: Optional[Dict[str, str]] = None,
+        extra_headers: Optional[dict[str, str]] = None,
     ) -> AsyncClient:
         roles = roles or []
         client_base_url = "http://test"
@@ -186,7 +173,7 @@ async def wait_for_shard(knowledgebox_ingest: str, count: int) -> str:
         raise Exception("Could not find shard")
     await txn.abort()
 
-    checks: Dict[str, bool] = {}
+    checks: dict[str, bool] = {}
     for replica in shard.replicas:
         if replica.shard.id not in checks:
             checks[replica.shard.id] = False

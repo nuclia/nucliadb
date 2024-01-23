@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple, Type
+from typing import Any, Optional, Type
 
 from nucliadb_protos.resources_pb2 import (
     CloudFile,
@@ -285,7 +285,7 @@ class Field:
 
     async def set_vectors(
         self, payload: ExtractedVectorsWrapper
-    ) -> Tuple[Optional[VectorObject], bool, List[str]]:
+    ) -> tuple[Optional[VectorObject], bool, list[str]]:
         if self.type in SUBFIELDFIELDS:
             try:
                 actual_payload: Optional[VectorObject] = await self.get_vectors(
@@ -341,7 +341,7 @@ class Field:
 
     async def set_user_vectors(
         self, user_vectors: UserVectorsWrapper
-    ) -> Tuple[UserVectorSet, Dict[str, UserVectorsList]]:
+    ) -> tuple[UserVectorSet, dict[str, UserVectorsList]]:
         try:
             actual_payload: Optional[UserVectorSet] = await self.get_user_vectors(
                 force=True
@@ -351,7 +351,7 @@ class Field:
 
         sf = self.get_storage_field(FieldTypes.USER_FIELD_VECTORS)
 
-        vectors_to_delete: Dict[str, UserVectorsList] = {}
+        vectors_to_delete: dict[str, UserVectorsList] = {}
         if actual_payload is not None:
             for vectorset, user_vector in user_vectors.vectors.vectors.items():
                 for key, vector in user_vector.vectors.items():
@@ -392,7 +392,7 @@ class Field:
 
     async def set_field_metadata(
         self, payload: FieldComputedMetadataWrapper
-    ) -> Tuple[FieldComputedMetadata, List[str], Dict[str, List[str]]]:
+    ) -> tuple[FieldComputedMetadata, list[str], dict[str, list[str]]]:
         if self.type in SUBFIELDFIELDS:
             try:
                 actual_payload: Optional[

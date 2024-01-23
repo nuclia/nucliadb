@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import uuid
 from contextlib import AsyncExitStack
-from typing import AsyncIterator, Dict, Optional
+from typing import AsyncIterator, Optional
 
 import aiobotocore  # type: ignore
 import aiohttp
@@ -142,7 +142,7 @@ class S3FileStorageManager(FileStorageManager):
         )
 
     async def iter_data(
-        self, uri: str, kbid: str, headers: Optional[Dict[str, str]] = None
+        self, uri: str, kbid: str, headers: Optional[dict[str, str]] = None
     ):
         if headers is None:
             headers = {}
@@ -197,7 +197,9 @@ class S3BlobStore(BlobStore):
     async def create_bucket(self, bucket):
         exists = await self.check_exists(bucket)
         if not exists:
-            await create_bucket(self._s3aioclient, bucket, self.bucket_tags)
+            await create_bucket(
+                self._s3aioclient, bucket, self.bucket_tags, self.region_name
+            )
         return exists
 
     async def finalize(self):
@@ -218,6 +220,7 @@ class S3BlobStore(BlobStore):
         self.bucket = bucket
         self.bucket_tags = bucket_tags
         self.source = CloudFile.Source.S3
+        self.region_name = region_name
 
         self._exit_stack = AsyncExitStack()
 

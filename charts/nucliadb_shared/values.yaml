@@ -31,7 +31,7 @@ storage:
   s3_ssl: True
   s3_max_pool_connections: 30
   s3_region_name: XX
-  s3_bucket: nucliadb_{kbid}
+  s3_bucket: nucliadb-{kbid}
   s3_bucket_tags:
   s3_deadletter_bucket: XX
   s3_indexing_bucket: XX

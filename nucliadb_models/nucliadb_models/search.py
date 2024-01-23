@@ -34,6 +34,7 @@ from pydantic import BaseModel, Field, validator
 from nucliadb_models.common import FieldTypeName, ParamDefault
 from nucliadb_models.metadata import RelationType
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
+from nucliadb_models.security import RequestSecurity
 from nucliadb_models.vectors import SemanticModelMetadata, VectorSimilarity
 
 _T = TypeVar("_T")
@@ -60,6 +61,7 @@ class ResourceProperties(str, Enum):
     VALUES = "values"
     EXTRACTED = "extracted"
     ERRORS = "errors"
+    SECURITY = "security"
 
 
 class SearchOptions(str, Enum):
@@ -150,6 +152,7 @@ class Paragraph(BaseModel):
     start_seconds: Optional[List[int]] = None
     end_seconds: Optional[List[int]] = None
     position: Optional[TextPosition] = None
+    fuzzy_result: bool = False
 
 
 class Paragraphs(BaseModel):
@@ -225,9 +228,14 @@ class Relations(BaseModel):
     # graph: List[RelationPath]
 
 
+class RelatedEntity(BaseModel, frozen=True):
+    family: str
+    value: str
+
+
 class RelatedEntities(BaseModel):
     total: int = 0
-    entities: List[str] = []
+    entities: List[RelatedEntity] = []
 
 
 class ResourceSearchResults(JsonBaseModel):
@@ -267,6 +275,7 @@ class KnowledgeboxCounters(BaseModel):
     fields: int
     sentences: int
     shards: Optional[List[str]] = None
+    index_size: float = Field(default=0.0, title="Index size (bytes)")
 
 
 class SortField(str, Enum):
@@ -310,6 +319,7 @@ class KnowledgeBoxCount(BaseModel):
 class DocumentServiceEnum(str, Enum):
     DOCUMENT_V0 = "DOCUMENT_V0"
     DOCUMENT_V1 = "DOCUMENT_V1"
+    DOCUMENT_V2 = "DOCUMENT_V2"
 
 
 class ParagraphServiceEnum(str, Enum):
@@ -535,7 +545,6 @@ class SearchParamDefaults:
         title="Chat history",
         description="Use to rephrase the new LLM query by taking into account the chat conversation history",  # noqa
     )
-
     chat_features = ParamDefault(
         default=[ChatOptions.VECTORS, ChatOptions.PARAGRAPHS, ChatOptions.RELATIONS],
         title="Chat features",
@@ -553,6 +562,16 @@ class SearchParamDefaults:
         ],
         title="Suggest features",
         description="Features enabled for the suggest endpoint.",
+    )
+    security = ParamDefault(
+        default=None,
+        title="Security",
+        description="Security metadata for the request. If not provided, the search request is done without the security lookup phase.",  # noqa
+    )
+    security_groups = ParamDefault(
+        default=[],
+        title="Security groups",
+        description="List of security groups to filter search results for. Only resources matching the query and containing the specified security groups will be returned. If empty, all resources will be considered for the search.",  # noqa
     )
 
 
@@ -603,6 +622,9 @@ class BaseSearchRequest(BaseModel):
     resource_filters: List[
         str
     ] = SearchParamDefaults.resource_filters.to_pydantic_field()
+    security: Optional[
+        RequestSecurity
+    ] = SearchParamDefaults.security.to_pydantic_field()
 
     @validator("faceted")
     def nested_facets_not_supported(cls, facets):
@@ -695,6 +717,7 @@ class RephraseModel(BaseModel):
     question: str
     chat_history: List[ChatContextMessage] = []
     user_id: str
+    user_context: List[str] = []
 
 
 class AskDocumentModel(BaseModel):
@@ -734,6 +757,12 @@ class ChatRequest(BaseModel):
     context: Optional[
         List[ChatContextMessage]
     ] = SearchParamDefaults.chat_context.to_pydantic_field()
+    extra_context: Optional[List[str]] = Field(
+        default=None,
+        title="Extra query context",
+        description="""Additional context that is added to the retrieval context sent to the LLM.
+        It allows extending the chat feature with content that may not be in the Knowledge Box.""",
+    )
     autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
     highlight: bool = SearchParamDefaults.highlight.to_pydantic_field()
     resource_filters: List[
@@ -744,6 +773,9 @@ class ChatRequest(BaseModel):
         default=False,
         description="Whether to include the citations for the answer in the response",
     )
+    security: Optional[
+        RequestSecurity
+    ] = SearchParamDefaults.security.to_pydantic_field()
 
 
 class SummarizeResourceModel(BaseModel):
@@ -756,12 +788,19 @@ class SummarizeModel(BaseModel):
     """
 
     resources: Dict[str, SummarizeResourceModel] = {}
+    user_prompt: Optional[str] = None
 
 
 class SummarizeRequest(BaseModel):
     """
     Model for the request payload of the summarize endpoint
     """
+
+    user_prompt: Optional[str] = Field(
+        default=None,
+        title="User prompt",
+        description="Optional custom prompt input by the user",
+    )
 
     resources: List[str] = Field(
         ...,
@@ -781,7 +820,7 @@ class SummarizedResponse(BaseModel):
         default={}, title="Resources", description="Individual resource summaries"
     )
     summary: str = Field(
-        default="", title="Summary", description="Globla summary of all resources"
+        default="", title="Summary", description="Global summary of all resources"
     )
 
 
@@ -825,6 +864,7 @@ class FindParagraph(BaseModel):
     id: str
     labels: Optional[List[str]] = []
     position: Optional[TextPosition] = None
+    fuzzy_result: bool = False
 
 
 @dataclass
@@ -839,6 +879,7 @@ class TempFindParagraph:
     paragraph: Optional[FindParagraph] = None
     vector_index: Optional[DocumentScored] = None
     paragraph_index: Optional[PBParagraphResult] = None
+    fuzzy_result: bool = False
 
 
 class FindField(BaseModel):
@@ -868,6 +909,11 @@ class KnowledgeboxFindResults(JsonBaseModel):
     shards: Optional[List[str]] = None
     autofilters: List[str] = ModelParamDefaults.applied_autofilters.to_pydantic_field()
     min_score: float = ModelParamDefaults.min_score.to_pydantic_field()
+    best_matches: List[str] = Field(
+        default=[],
+        title="Best matches",
+        description="List of ids of best matching paragraphs. The list is sorted by decreasing relevance (most relevant first).",  # noqa
+    )
 
 
 class FeedbackTasks(str, Enum):
@@ -875,10 +921,16 @@ class FeedbackTasks(str, Enum):
 
 
 class FeedbackRequest(BaseModel):
-    ident: str
-    good: bool
-    task: FeedbackTasks
-    feedback: Optional[str]
+    ident: str = Field(
+        title="Request identifier",
+        description="Id of the request to provide feedback for. This id is returned in the response header `Nuclia-Learning-Id` of the chat endpoint.",  # noqa
+    )
+    good: bool = Field(title="Good", description="Whether the result was good or not")
+    task: FeedbackTasks = Field(
+        title="Task",
+        description="The task the feedback is for. For now, only `CHAT` task is available",
+    )
+    feedback: Optional[str] = Field(title="Feedback", description="Feedback text")
 
 
 TextBlocks = List[List[str]]

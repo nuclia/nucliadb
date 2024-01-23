@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
-from typing import List
 
 import aiohttp
 import pytest
@@ -64,7 +63,7 @@ async def test_generator_token_classification(
         data=trainset.SerializeToString(),
     ) as response:
         assert response.status == 200
-        batches: List[TokenClassificationBatch] = []
+        batches: list[TokenClassificationBatch] = []
         async for batch in get_batches_from_train_response_stream(
             response, TokenClassificationBatch
         ):

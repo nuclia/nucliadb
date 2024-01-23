@@ -19,11 +19,12 @@
 #
 import base64
 import datetime
+import logging
 import uuid
 from collections import defaultdict
 from contextlib import AsyncExitStack
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, Optional, TypeVar
 
 import aiohttp
 import backoff
@@ -39,11 +40,13 @@ import nucliadb_models as models
 from nucliadb_models.configuration import KBConfiguration
 from nucliadb_models.resource import QueueType
 from nucliadb_telemetry import metrics
-from nucliadb_utils import logger
+from nucliadb_utils import const
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.settings import nuclia_settings, storage_settings
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import Utility, get_ingest, set_utility
+from nucliadb_utils.utilities import Utility, get_ingest, has_feature, set_utility
+
+logger = logging.getLogger(__name__)
 
 _T = TypeVar("_T")
 
@@ -72,9 +75,9 @@ class Source(SourceValue, Enum):  # type: ignore
 
 
 class ProcessingInfo(BaseModel):
-    seqid: int
+    seqid: Optional[int]
     account_seq: Optional[int]
-    queue: QueueType
+    queue: Optional[QueueType] = None
 
 
 class PushPayload(BaseModel):
@@ -85,22 +88,24 @@ class PushPayload(BaseModel):
     source: Optional[Source] = None
     userid: str
 
-    genericfield: Dict[str, models.Text] = {}
+    title: Optional[str] = None
+
+    genericfield: dict[str, models.Text] = {}
 
     # New File
-    filefield: Dict[str, str] = {}
+    filefield: dict[str, str] = {}
 
     # New Link
-    linkfield: Dict[str, models.LinkUpload] = {}
+    linkfield: dict[str, models.LinkUpload] = {}
 
     # Diff on Text Field
-    textfield: Dict[str, models.Text] = {}
+    textfield: dict[str, models.Text] = {}
 
     # Diff on a Layout Field
-    layoutfield: Dict[str, models.LayoutDiff] = {}
+    layoutfield: dict[str, models.LayoutDiff] = {}
 
     # New conversations to process
-    conversationfield: Dict[str, models.PushConversation] = {}
+    conversationfield: dict[str, models.PushConversation] = {}
 
     # Only internal
     partition: int
@@ -127,6 +132,7 @@ async def start_processing_engine():
             onprem=nuclia_settings.onprem,
             nuclia_jwt_key=nuclia_settings.nuclia_jwt_key,
             nuclia_cluster_url=nuclia_settings.nuclia_cluster_url,
+            nuclia_processing_cluster_url=nuclia_settings.nuclia_processing_cluster_url,
             nuclia_public_url=nuclia_settings.nuclia_public_url,
             driver=storage_settings.file_backend,
             days_to_keep=storage_settings.upload_token_expiration,
@@ -142,6 +148,7 @@ class ProcessingEngine:
         nuclia_zone: Optional[str] = None,
         nuclia_public_url: Optional[str] = None,
         nuclia_cluster_url: Optional[str] = None,
+        nuclia_processing_cluster_url: Optional[str] = None,
         onprem: Optional[bool] = False,
         nuclia_jwt_key: Optional[str] = None,
         days_to_keep: int = 3,
@@ -173,7 +180,13 @@ class ProcessingEngine:
         self.nuclia_internal_push = (
             f"{self.nuclia_cluster_url}/api/internal/processing/push"
         )
+        self.nuclia_internal_push_v2 = (
+            f"{nuclia_processing_cluster_url}/api/internal/v2/processing/push"
+        )
         self.nuclia_external_push = f"{self.nuclia_public_url}/api/v1/processing/push"
+        self.nuclia_external_push_v2 = (
+            f"{self.nuclia_public_url}/api/v2/processing/push"
+        )
 
         self.nuclia_jwt_key = nuclia_jwt_key
         self.days_to_keep = days_to_keep
@@ -389,22 +402,34 @@ class ProcessingEngine:
             headers = {"CONTENT-TYPE": "application/json"}
             if self.onprem is False:
                 # Upload the payload
+                url = self.nuclia_internal_push
+                if has_feature(
+                    const.Features.PROCESSING_V2,
+                    context={
+                        "kbid": item.kbid,
+                    },
+                ):
+                    url = self.nuclia_internal_push_v2
                 item.partition = partition
                 resp = await self.session.post(
-                    url=f"{self.nuclia_internal_push}",
-                    data=item.json(),
-                    headers=headers,
+                    url=url, data=item.json(), headers=headers
                 )
             else:
+                url = self.nuclia_external_push + "?partition=" + str(partition)
+                if has_feature(
+                    const.Features.PROCESSING_V2,
+                    context={
+                        "kbid": item.kbid,
+                    },
+                ):
+                    url = self.nuclia_external_push_v2
                 item.learning_config = await self.get_configuration(item.kbid)
                 headers.update(
                     {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
                 )
                 # Upload the payload
                 resp = await self.session.post(
-                    url=self.nuclia_external_push + "?partition=" + str(partition),
-                    data=item.json(),
-                    headers=headers,
+                    url=url, data=item.json(), headers=headers
                 )
             if resp.status == 200:
                 data = await resp.json()
@@ -429,13 +454,15 @@ class ProcessingEngine:
         )
 
         return ProcessingInfo(
-            seqid=seqid, account_seq=account_seq, queue=QueueType(queue_type)
+            seqid=seqid,
+            account_seq=account_seq,
+            queue=QueueType(queue_type) if queue_type is not None else None,
         )
 
 
 class DummyProcessingEngine(ProcessingEngine):
     def __init__(self):
-        self.calls: List[List[Any]] = []  # type: ignore
+        self.calls: list[list[Any]] = []  # type: ignore
         self.values = defaultdict(list)
         self.onprem = True
 

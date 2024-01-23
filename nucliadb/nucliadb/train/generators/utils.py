@@ -19,23 +19,23 @@
 #
 
 from contextvars import ContextVar
-from typing import Any, AsyncIterator, Dict, Optional
+from typing import Any, AsyncIterator, Optional
 
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
-from nucliadb.ingest.txn_utils import get_transaction
+from nucliadb.middleware.transaction import get_read_only_transaction
 from nucliadb.train import SERVICE_NAME, logger
 from nucliadb.train.types import TrainBatchType
 from nucliadb_utils.utilities import get_storage
 
-rcache: ContextVar[Optional[Dict[str, ResourceORM]]] = ContextVar(
+rcache: ContextVar[Optional[dict[str, ResourceORM]]] = ContextVar(
     "rcache", default=None
 )
 
 
-def get_resource_cache(clear: bool = False) -> Dict[str, ResourceORM]:
-    value: Optional[Dict[str, ResourceORM]] = rcache.get()
+def get_resource_cache(clear: bool = False) -> dict[str, ResourceORM]:
+    value: Optional[dict[str, ResourceORM]] = rcache.get()
     if value is None or clear:
         value = {}
         rcache.set(value)
@@ -46,7 +46,7 @@ async def get_resource_from_cache_or_db(kbid: str, uuid: str) -> Optional[Resour
     resouce_cache = get_resource_cache()
     orm_resource: Optional[ResourceORM] = None
     if uuid not in resouce_cache:
-        transaction = await get_transaction()
+        transaction = await get_read_only_transaction()
         storage = await get_storage(service_name=SERVICE_NAME)
         kb = KnowledgeBoxORM(transaction, storage, kbid)
         orm_resource = await kb.get(uuid)

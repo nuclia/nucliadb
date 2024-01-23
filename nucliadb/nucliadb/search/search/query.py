@@ -19,7 +19,7 @@
 #
 import asyncio
 from datetime import datetime
-from typing import Awaitable, List, Optional, Tuple
+from typing import Awaitable, Optional
 
 from async_lru import alru_cache
 from nucliadb_protos.noderesources_pb2 import Resource
@@ -53,6 +53,7 @@ from nucliadb_models.search import (
     SortOrderMap,
     SuggestOptions,
 )
+from nucliadb_models.security import RequestSecurity
 from nucliadb_protos import knowledgebox_pb2, nodereader_pb2, utils_pb2
 
 from .exceptions import InvalidQueryError
@@ -85,10 +86,10 @@ class QueryParser:
         self,
         *,
         kbid: str,
-        features: List[SearchOptions],
+        features: list[SearchOptions],
         query: str,
-        filters: List[str],
-        faceted: List[str],
+        filters: list[str],
+        faceted: list[str],
         page_number: int,
         page_size: int,
         min_score: Optional[float] = None,
@@ -97,14 +98,15 @@ class QueryParser:
         range_creation_end: Optional[datetime] = None,
         range_modification_start: Optional[datetime] = None,
         range_modification_end: Optional[datetime] = None,
-        fields: Optional[List[str]] = None,
-        user_vector: Optional[List[float]] = None,
+        fields: Optional[list[str]] = None,
+        user_vector: Optional[list[float]] = None,
         vectorset: Optional[str] = None,
         with_duplicates: bool = False,
         with_status: Optional[ResourceProcessingStatus] = None,
         with_synonyms: bool = False,
         autofilter: bool = False,
-        key_filters: Optional[List[str]] = None,
+        key_filters: Optional[list[str]] = None,
+        security: Optional[RequestSecurity] = None,
     ):
         self.kbid = kbid
         self.features = features
@@ -127,6 +129,7 @@ class QueryParser:
         self.with_synonyms = with_synonyms
         self.autofilter = autofilter
         self.key_filters = key_filters
+        self.security = security
 
         if len(self.filters) > 0:
             self.filters = translate_label_filters(self.filters)
@@ -137,14 +140,14 @@ class QueryParser:
             self._min_score_task = asyncio.create_task(get_default_min_score(self.kbid))
         return self._min_score_task
 
-    def _get_converted_vectors(self) -> Awaitable[List[float]]:
+    def _get_converted_vectors(self) -> Awaitable[list[float]]:
         if self._convert_vectors_task is None:  # pragma: no cover
             self._convert_vectors_task = asyncio.create_task(
                 convert_vectors(self.kbid, self.query)
             )
         return self._convert_vectors_task
 
-    def _get_detected_entities(self) -> Awaitable[List[utils_pb2.RelationNode]]:
+    def _get_detected_entities(self) -> Awaitable[list[utils_pb2.RelationNode]]:
         if self._detected_entities_task is None:  # pragma: no cover
             self._detected_entities_task = asyncio.create_task(
                 detect_entities(self.kbid, self.query)
@@ -197,7 +200,7 @@ class QueryParser:
         if self.with_synonyms and self.query:
             asyncio.ensure_future(self._get_synomyns())
 
-    async def parse(self) -> Tuple[nodereader_pb2.SearchRequest, bool, List[str]]:
+    async def parse(self) -> tuple[nodereader_pb2.SearchRequest, bool, list[str]]:
         """
         :return: (request, incomplete, autofilters)
             where:
@@ -237,6 +240,13 @@ class QueryParser:
 
         request.faceted.labels.extend(translate_label_filters(self.faceted))
         request.fields.extend(self.fields)
+
+        if self.security is not None and len(self.security.groups) > 0:
+            security_pb = utils_pb2.Security()
+            for group_id in self.security.groups:
+                if group_id not in security_pb.access_groups:
+                    security_pb.access_groups.append(group_id)
+            request.security.CopyFrom(security_pb)
 
         if self.key_filters is not None and len(self.key_filters) > 0:
             request.key_filters.extend(self.key_filters)
@@ -390,7 +400,7 @@ class QueryParser:
             # No synonyms found
             return
 
-        synonyms_found: List[str] = []
+        synonyms_found: list[str] = []
         advanced_query = []
         for term in self.query.split(" "):
             advanced_query.append(term)
@@ -407,12 +417,12 @@ class QueryParser:
 
 async def paragraph_query_to_pb(
     kbid: str,
-    features: List[SearchOptions],
+    features: list[SearchOptions],
     rid: str,
     query: str,
-    fields: List[str],
-    filters: List[str],
-    faceted: List[str],
+    fields: list[str],
+    filters: list[str],
+    faceted: list[str],
     page_number: int,
     page_size: int,
     range_creation_start: Optional[datetime] = None,
@@ -466,13 +476,13 @@ async def paragraph_query_to_pb(
 
 
 @query_parse_dependency_observer.wrap({"type": "convert_vectors"})
-async def convert_vectors(kbid: str, query: str) -> List[utils_pb2.RelationNode]:
+async def convert_vectors(kbid: str, query: str) -> list[utils_pb2.RelationNode]:
     predict = get_predict()
     return await predict.convert_sentence_to_vector(kbid, query)
 
 
 @query_parse_dependency_observer.wrap({"type": "detect_entities"})
-async def detect_entities(kbid: str, query: str) -> List[utils_pb2.RelationNode]:
+async def detect_entities(kbid: str, query: str) -> list[utils_pb2.RelationNode]:
     predict = get_predict()
     try:
         return await predict.detect_entities(kbid, query)
@@ -532,8 +542,8 @@ def expand_entities(
 
 def parse_entities_to_filters(
     request: nodereader_pb2.SearchRequest,
-    detected_entities: List[utils_pb2.RelationNode],
-) -> List[str]:
+    detected_entities: list[utils_pb2.RelationNode],
+) -> list[str]:
     added_filters = []
     for entity_filter in [
         f"/e/{entity.subtype}/{entity.value}"
@@ -547,11 +557,11 @@ def parse_entities_to_filters(
 
 
 def suggest_query_to_pb(
-    features: List[SuggestOptions],
+    features: list[SuggestOptions],
     query: str,
-    fields: List[str],
-    filters: List[str],
-    faceted: List[str],
+    fields: list[str],
+    filters: list[str],
+    faceted: list[str],
     range_creation_start: Optional[datetime] = None,
     range_creation_end: Optional[datetime] = None,
     range_modification_start: Optional[datetime] = None,

@@ -130,6 +130,8 @@ pub struct BrokerMessage {
     pub extra: ::core::option::Option<super::resources::Extra>,
     #[prost(message, repeated, tag="38")]
     pub question_answers: ::prost::alloc::vec::Vec<super::resources::FieldQuestionAnswerWrapper>,
+    #[prost(message, optional, tag="39")]
+    pub security: ::core::option::Option<super::utils::Security>,
 }
 /// Nested message and enum types in `BrokerMessage`.
 pub mod broker_message {
@@ -475,6 +477,10 @@ pub struct Notification {
     pub write_type: i32,
     #[prost(message, optional, tag="8")]
     pub message: ::core::option::Option<BrokerMessage>,
+    #[prost(enumeration="NotificationSource", tag="9")]
+    pub source: i32,
+    #[prost(bool, tag="10")]
+    pub processing_errors: bool,
 }
 /// Nested message and enum types in `Notification`.
 pub mod notification {
@@ -523,6 +529,9 @@ pub struct Member {
     //// The number of shards in the node.
     #[prost(uint32, tag="7")]
     pub shard_count: u32,
+    //// The id of the primary node (if it is a secondary node).
+    #[prost(string, tag="8")]
+    pub primary_id: ::prost::alloc::string::String,
 }
 /// Nested message and enum types in `Member`.
 pub mod member {
@@ -717,4 +726,11 @@ pub struct GetConfigurationResponse {
     pub status: ::core::option::Option<OpStatusWriter>,
     #[prost(message, optional, tag="2")]
     pub config: ::core::option::Option<super::knowledgebox::KbConfiguration>,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+#[repr(i32)]
+pub enum NotificationSource {
+    Unset = 0,
+    Writer = 1,
+    Processor = 2,
 }

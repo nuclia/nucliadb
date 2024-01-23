@@ -32,8 +32,9 @@ use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{
     EntitiesSubgraphRequest, IndexMetadata, NewShardRequest, Relation, RelationNode,
     RelationNodeFilter, RelationPrefixSearchRequest, RelationSearchRequest, RelationSearchResponse,
-    Resource, ResourceId,
+    ReleaseChannel, Resource, ResourceId,
 };
+use rstest::*;
 use tonic::Request;
 use uuid::Uuid;
 
@@ -326,19 +327,25 @@ async fn create_knowledge_graph(
     relation_nodes
 }
 
+#[rstest]
 #[tokio::test]
-async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_search_relations_prefixed(
+    #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)] release_channel: ReleaseChannel,
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut fixture = NodeFixture::new();
     fixture.with_writer().await?.with_reader().await?;
     let mut writer = fixture.writer_client();
     let mut reader = fixture.reader_client();
 
     let new_shard_response = writer
-        .new_shard(Request::new(NewShardRequest::default()))
+        .new_shard(Request::new(NewShardRequest {
+            release_channel: release_channel.into(),
+            ..Default::default()
+        }))
         .await?;
     let shard_id = &new_shard_response.get_ref().id;
 
-    let nodes = create_knowledge_graph(&mut writer, shard_id.clone()).await;
+    let _nodes = create_knowledge_graph(&mut writer, shard_id.clone()).await;
 
     // --------------------------------------------------------------
     // Test: prefixed search with empty term. Results are limited
@@ -358,8 +365,10 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
     assert!(response.get_ref().prefix.is_some());
     let prefix_response = response.get_ref().prefix.as_ref().unwrap();
     let results = &prefix_response.nodes;
-    // TODO: get constants from RelationsReaderService (.../relations/service/reader.rs)
-    assert_eq!(results.len(), nodes.len());
+    // TODO this constants is spread between relations and paragraphs. It should
+    // be in a single place and common for everyone
+    const MAX_SUGGEST_RESULTS: usize = 10;
+    assert_eq!(results.len(), MAX_SUGGEST_RESULTS);
 
     // --------------------------------------------------------------
     // Test: prefixed search with "cat" term (some results)
@@ -376,7 +385,11 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
         })
         .await?;
 
-    let expected = HashSet::from_iter(["Cat".to_string(), "Catwoman".to_string()]);
+    let expected = HashSet::from_iter([
+        "Cat".to_string(),
+        "Catwoman".to_string(),
+        "Batman".to_string(),
+    ]);
     assert!(response.get_ref().prefix.is_some());
     let prefix_response = response.get_ref().prefix.as_ref().unwrap();
     let results = prefix_response
@@ -489,15 +502,21 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
     Ok(())
 }
 
+#[rstest]
 #[tokio::test]
-async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_search_relations_neighbours(
+    #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)] release_channel: ReleaseChannel,
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut fixture = NodeFixture::new();
     fixture.with_writer().await?.with_reader().await?;
     let mut writer = fixture.writer_client();
     let mut reader = fixture.reader_client();
 
     let new_shard_response = writer
-        .new_shard(Request::new(NewShardRequest::default()))
+        .new_shard(Request::new(NewShardRequest {
+            release_channel: release_channel.into(),
+            ..Default::default()
+        }))
         .await?;
     let shard_id = &new_shard_response.get_ref().id;
 

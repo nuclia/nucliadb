@@ -133,6 +133,11 @@ pub struct UserVectorsList {
     #[prost(string, repeated, tag="1")]
     pub vectors: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct Security {
+    #[prost(string, repeated, tag="1")]
+    pub access_groups: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
 pub enum VectorSimilarity {

@@ -17,11 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
+import dataclasses
 import logging
 import os
 import time
+from typing import Union
 
+import backoff
 import docker  # type: ignore
 import pytest
 from grpc import insecure_channel  # type: ignore
@@ -31,8 +33,10 @@ from nucliadb_protos.nodewriter_pb2 import EmptyQuery, ShardId
 from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
+from pytest_lazy_fixtures import lazy_fixture
 
 from nucliadb.common.cluster.settings import settings as cluster_settings
+from nucliadb_utils.tests.conftest import get_testing_storage_backend
 
 logger = logging.getLogger(__name__)
 
@@ -194,12 +198,45 @@ nucliadb_node_2_writer = nucliadbNodeWriter()
 nucliadb_node_2_sidecar = nucliadbNodeSidecar()
 
 
+@dataclasses.dataclass
+class NodeS3Storage:
+    server: str
+
+    def envs(self):
+        return {
+            "FILE_BACKEND": "s3",
+            "S3_CLIENT_ID": "",
+            "S3_CLIENT_SECRET": "",
+            "S3_BUCKET": "test",
+            "S3_INDEXING_BUCKET": "indexing",
+            "S3_DEADLETTER_BUCKET": "deadletter",
+            "S3_ENDPOINT": self.server,
+        }
+
+
+@dataclasses.dataclass
+class NodeGCSStorage:
+    server: str
+
+    def envs(self):
+        return {
+            "FILE_BACKEND": "gcs",
+            "GCS_BUCKET": "test",
+            "GCS_INDEXING_BUCKET": "indexing",
+            "GCS_DEADLETTER_BUCKET": "deadletter",
+            "GCS_ENDPOINT_URL": self.server,
+        }
+
+
+NodeStorage = Union[NodeGCSStorage, NodeS3Storage]
+
+
 class _NodeRunner:
-    def __init__(self, natsd, gcs):
+    def __init__(self, natsd, storage: NodeStorage):
         self.docker_client = docker.from_env(version=BaseImage.docker_version)
         self.natsd = natsd
-        self.gcs = gcs
-        self.data = {}
+        self.storage = storage
+        self.data = {}  # type: ignore
 
     def start(self):
         docker_platform_name = self.docker_client.api.version()["Platform"][
@@ -226,21 +263,18 @@ class _NodeRunner:
         reader2_host, reader2_port = nucliadb_node_2_reader.run(self.volume_node_2)
 
         natsd_server = self.natsd.replace("localhost", docker_internal_host)
-        gcs_server = self.gcs.replace("localhost", docker_internal_host)
-
         images.settings["nucliadb_node_sidecar"]["env"].update(
             {
                 "INDEX_JETSTREAM_SERVERS": f'["{natsd_server}"]',
                 "CACHE_PUBSUB_NATS_URL": f'["{natsd_server}"]',
-                "GCS_ENDPOINT_URL": gcs_server,
-                "GCS_BUCKET": "test",
-                "FILE_BACKEND": "gcs",
-                "GCS_INDEXING_BUCKET": "indexing",
-                "GCS_DEADLETTER_BUCKET": "deadletter",
                 "READER_LISTEN_ADDRESS": f"{docker_internal_host}:{reader1_port}",
                 "WRITER_LISTEN_ADDRESS": f"{docker_internal_host}:{writer1_port}",
             }
         )
+        self.storage.server = self.storage.server.replace(
+            "localhost", docker_internal_host
+        )
+        images.settings["nucliadb_node_sidecar"]["env"].update(self.storage.envs())
 
         sidecar1_host, sidecar1_port = nucliadb_node_1_sidecar.run(self.volume_node_1)
 
@@ -305,7 +339,7 @@ class _NodeRunner:
         nucliadb_node_2_sidecar.stop()
 
         for container_id in container_ids:
-            for i in range(5):
+            for _ in range(5):
                 try:
                     self.docker_client.containers.get(container_id)  # type: ignore
                 except docker.errors.NotFound:
@@ -336,9 +370,35 @@ class _NodeRunner:
         ]
 
 
+@pytest.fixture(scope="session")
+def gcs_node_storage(gcs):
+    return NodeGCSStorage(server=gcs)
+
+
+@pytest.fixture(scope="session")
+def s3_node_storage(s3):
+    return NodeS3Storage(server=s3)
+
+
+def lazy_load_storage_backend():
+    backend = get_testing_storage_backend()
+    if backend == "gcs":
+        return [lazy_fixture.lf("gcs_node_storage")]
+    elif backend == "s3":
+        return [lazy_fixture.lf("s3_node_storage")]
+    else:
+        print(f"Unknown storage backend {backend}, using gcs")
+        return [lazy_fixture.lf("gcs_node_storage")]
+
+
+@pytest.fixture(scope="session", params=lazy_load_storage_backend())
+def node_storage(request):
+    return request.param
+
+
 @pytest.fixture(scope="session", autouse=False)
-def _node(natsd: str, gcs: str):
-    nr = _NodeRunner(natsd, gcs)
+def _node(natsd: str, node_storage):
+    nr = _NodeRunner(natsd, node_storage)
     try:
         cluster_info = nr.start()
     except Exception:
@@ -362,14 +422,43 @@ def node(_node, request):
     writer2 = NodeWriterStub(channel2)
 
     logger.debug("cleaning up shards data")
+    try:
+        cleanup_node(writer1)
+        cleanup_node(writer2)
+    except Exception:
+        logger.error(
+            "Error cleaning up shards data. Maybe the node fixture could not start properly?",
+            exc_info=True,
+        )
 
-    for shard in writer1.ListShards(EmptyQuery()).ids:
-        writer1.DeleteShard(ShardId(id=shard.id))
+        client = docker.client.from_env()
+        containers_by_port = {}
+        for container in client.containers.list():
+            name = container.name
+            command = container.attrs["Config"]["Cmd"]
+            ports = container.ports
+            print(f"container {name} executing {command} is using ports: {ports}")
 
-    for shard in writer2.ListShards(EmptyQuery()).ids:
-        writer2.DeleteShard(ShardId(id=shard.id))
+            for internal_port in container.ports:
+                for host in container.ports[internal_port]:
+                    port = host["HostPort"]
+                    port_containers = containers_by_port.setdefault(port, [])
+                    if container not in port_containers:
+                        port_containers.append(container)
 
-    channel1.close()
-    channel2.close()
+        for port, containers in containers_by_port.items():
+            if len(containers) > 1:
+                names = ", ".join([container.name for container in containers])
+                print(f"ATENTION! Containers {names} share port {port}!")
+        raise
+    finally:
+        channel1.close()
+        channel2.close()
 
     yield _node
+
+
+@backoff.on_exception(backoff.expo, Exception, max_tries=5)
+def cleanup_node(writer: NodeWriterStub):
+    for shard in writer.ListShards(EmptyQuery()).ids:
+        writer.DeleteShard(ShardId(id=shard.id))

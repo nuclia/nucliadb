@@ -36,6 +36,10 @@ def run(args):
     with open("VERSION", "w") as f:
         f.write(python_version)
 
+    if args.sem:
+        # we only set other versions if we are not bumping a sem version
+        return
+
     # replace node binding toml version as well
     with open("nucliadb_node_binding/Cargo.toml", "r") as f:
         cargo = f.read()

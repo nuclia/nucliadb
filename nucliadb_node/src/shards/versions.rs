@@ -26,8 +26,8 @@ use serde::{Deserialize, Serialize};
 
 const VECTORS_VERSION: u32 = 1;
 const PARAGRAPHS_VERSION: u32 = 1;
-const RELATIONS_VERSION: u32 = 1;
-const TEXTS_VERSION: u32 = 1;
+const RELATIONS_VERSION: u32 = 2;
+const TEXTS_VERSION: u32 = 2;
 const DEPRECATED_CONFIG: &str = "config.json";
 
 #[derive(Serialize, Deserialize)]
@@ -58,16 +58,12 @@ impl Versions {
             version_relations: Some(1),
         }
     }
-    fn new(channel: Channel) -> Versions {
-        let mut rel_version = RELATIONS_VERSION;
-        if channel == Channel::EXPERIMENTAL {
-            rel_version = 2;
-        }
+    fn new(_channel: Channel) -> Versions {
         Versions {
             version_paragraphs: Some(PARAGRAPHS_VERSION),
             version_vectors: Some(VECTORS_VERSION),
             version_texts: Some(TEXTS_VERSION),
-            version_relations: Some(rel_version),
+            version_relations: Some(RELATIONS_VERSION),
         }
     }
     fn fill_gaps(&mut self) -> bool {
@@ -126,7 +122,9 @@ impl Versions {
         match self.version_texts {
             Some(1) => nucliadb_texts::reader::TextReaderService::start(config)
                 .map(|i| encapsulate_reader(i) as TextsReaderPointer),
-            Some(v) => Err(node_error!("Invalid text version {v}")),
+            Some(2) => nucliadb_texts2::reader::TextReaderService::start(config)
+                .map(|i| encapsulate_reader(i) as TextsReaderPointer),
+            Some(v) => Err(node_error!("Invalid text reader version {v}")),
             None => Err(node_error!("Corrupted version file")),
         }
     }
@@ -169,7 +167,9 @@ impl Versions {
         match self.version_texts {
             Some(1) => nucliadb_texts::writer::TextWriterService::start(config)
                 .map(|i| encapsulate_writer(i) as TextsWriterPointer),
-            Some(v) => Err(node_error!("Invalid text version {v}")),
+            Some(2) => nucliadb_texts2::writer::TextWriterService::start(config)
+                .map(|i| encapsulate_writer(i) as TextsWriterPointer),
+            Some(v) => Err(node_error!("Invalid text writer version {v}")),
             None => Err(node_error!("Corrupted version file")),
         }
     }

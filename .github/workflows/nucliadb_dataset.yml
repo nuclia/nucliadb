@@ -16,7 +16,7 @@ jobs:
   pre-checks:
     strategy:
       matrix:
-        python-version: ["3.9", "3.10", "3.11"]
+        python-version: ["3.8", "3.9", "3.10", "3.11"]
     uses: ./.github/workflows/_component_prechecks.yml
     with:
       python_version: "${{ matrix.python-version }}"
@@ -54,8 +54,10 @@ jobs:
               - 'nucliadb_paragraphs/**'
               - 'nucliadb_procs/**'
               - 'nucliadb_relations/**'
+              - 'nucliadb_relations2/**'
               - 'nucliadb_telemetry/**'
               - 'nucliadb_texts/**'
+              - 'nucliadb_texts2/**'
               - 'nucliadb_vectors/**'
             nucliadb_modified:
               - 'nucliadb/**'

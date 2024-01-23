@@ -22,7 +22,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fs;
 use std::path::Path;
-use std::time::SystemTime;
+use std::time::Instant;
 
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::resource::ResourceStatus;
@@ -61,14 +61,14 @@ impl WriterChild for TextWriterService {
     #[measure(actor = "texts", metric = "count")]
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
-        let time = SystemTime::now();
+        let time = Instant::now();
 
         let id: Option<String> = None;
         let reader = self.index.reader()?;
         let searcher = reader.searcher();
         let count = searcher.search(&AllQuery, &Count)?;
 
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let took = time.elapsed().as_secs_f64();
         debug!("{id:?} - Ending at {took}");
 
         Ok(count)
@@ -80,35 +80,35 @@ impl WriterChild for TextWriterService {
         let id = Some(&resource.shard_id);
         let resource_id = resource.resource.as_ref().expect("Missing resource ID");
 
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Delete existing uuid: starts at {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Delete existing uuid: starts at {v} ms");
+
         let uuid_field = self.schema.uuid;
         let uuid_term = Term::from_field_text(uuid_field, &resource_id.uuid);
         self.writer.delete_term(uuid_term);
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Delete existing uuid: ends at {v} ms");
-        }
 
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Indexing document: starts at {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Delete existing uuid: ends at {v} ms");
+
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Indexing document: starts at {v} ms");
+
         if resource.status != ResourceStatus::Delete as i32 {
             self.index_document(resource);
         }
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Indexing document: starts at {v} ms");
-        }
 
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Commit: starts at {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Indexing document: ends at {v} ms");
+
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Commit: starts at {v} ms");
+
         self.writer.commit()?;
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Commit: ends at {v} ms");
-        }
 
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Commit: ends at {v} ms");
+
+        let took = time.elapsed().as_secs_f64();
         debug!("{id:?} - Ending at {took}");
 
         Ok(())
@@ -117,28 +117,24 @@ impl WriterChild for TextWriterService {
     #[measure(actor = "texts", metric = "delete_resource")]
     #[tracing::instrument(skip_all)]
     fn delete_resource(&mut self, resource_id: &ResourceId) -> NodeResult<()> {
-        let time = SystemTime::now();
+        let time = Instant::now();
         let id = Some(&resource_id.shard_id);
 
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Delete existing uuid: starts at {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Delete existing uuid: starts at {v} ms");
         let uuid_field = self.schema.uuid;
         let uuid_term = Term::from_field_text(uuid_field, &resource_id.uuid);
         self.writer.delete_term(uuid_term);
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Delete existing uuid: ends at {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Delete existing uuid: ends at {v} ms");
 
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Commit: starts at {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Commit: starts at {v} ms");
         self.writer.commit()?;
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Commit: ends at {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Commit: ends at {v} ms");
 
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let took = time.elapsed().as_secs_f64();
         debug!("{id:?} - Ending at {took}");
 
         Ok(())

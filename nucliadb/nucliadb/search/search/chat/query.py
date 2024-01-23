@@ -20,7 +20,7 @@
 import asyncio
 from dataclasses import dataclass
 from time import monotonic as time
-from typing import AsyncGenerator, AsyncIterator, List, Optional
+from typing import AsyncGenerator, AsyncIterator, Optional
 
 from nucliadb_protos.nodereader_pb2 import RelationSearchRequest, RelationSearchResponse
 
@@ -76,17 +76,19 @@ class ChatResult:
     find_results: KnowledgeboxFindResults
 
 
-async def rephrase_query_from_chat_history(
+async def rephrase_query(
     kbid: str,
-    chat_history: List[ChatContextMessage],
+    chat_history: list[ChatContextMessage],
     query: str,
     user_id: str,
+    user_context: list[str],
 ) -> str:
     predict = get_predict()
     req = RephraseModel(
         question=query,
         chat_history=chat_history,
         user_id=user_id,
+        user_context=user_context,
     )
     return await predict.rephrase_query(kbid, req)
 
@@ -152,6 +154,7 @@ async def get_find_results(
     find_request.shards = chat_request.shards
     find_request.autofilter = chat_request.autofilter
     find_request.highlight = chat_request.highlight
+    find_request.security = chat_request.security
 
     find_results, incomplete = await find(kbid, find_request, ndb_client, user, origin)
     if incomplete:
@@ -169,7 +172,7 @@ async def get_relations_results(
         relation_request.subgraph.entry_points.extend(detected_entities)
         relation_request.subgraph.depth = 1
 
-        relations_results: List[RelationSearchResponse]
+        relations_results: list[RelationSearchResponse]
         (
             relations_results,
             _,
@@ -201,20 +204,25 @@ async def chat(
     client_type: NucliaDBClientType,
     origin: str,
 ) -> ChatResult:
+    start_time = time()
     nuclia_learning_id: Optional[str] = None
     chat_history = chat_request.context or []
-    start_time = time()
-
+    user_context = chat_request.extra_context or []
     user_query = chat_request.query
     rephrased_query = None
-    if chat_request.context and len(chat_request.context) > 0:
-        rephrased_query = await rephrase_query_from_chat_history(
-            kbid, chat_request.context, user_query, user_id
+
+    if len(chat_history) > 0 or len(user_context) > 0:
+        rephrased_query = await rephrase_query(
+            kbid,
+            chat_history=chat_history,
+            query=user_query,
+            user_id=user_id,
+            user_context=user_context,
         )
 
     find_results: KnowledgeboxFindResults = await get_find_results(
         kbid=kbid,
-        query=rephrased_query or user_query or "",
+        query=rephrased_query or user_query,
         chat_request=chat_request,
         ndb_client=client_type,
         user=user_id,
@@ -227,7 +235,9 @@ async def chat(
             not_enough_context_generator(), status_code
         )
     else:
-        query_context = await get_chat_prompt_context(kbid, find_results)
+        query_context = await get_chat_prompt_context(
+            kbid, find_results, user_context=user_context
+        )
         query_context_order = {
             paragraph_id: order
             for order, paragraph_id in enumerate(query_context.keys())
@@ -235,12 +245,13 @@ async def chat(
         user_prompt = None
         if chat_request.prompt is not None:
             user_prompt = UserPrompt(prompt=chat_request.prompt)
+
         chat_model = ChatModel(
             user_id=user_id,
             query_context=query_context,
             query_context_order=query_context_order,
             chat_history=chat_history,
-            question=chat_request.query,
+            question=user_query,
             truncate=True,
             user_prompt=user_prompt,
             citations=chat_request.citations,
@@ -314,8 +325,8 @@ async def maybe_audit_chat(
     rephrased_query: Optional[str],
     text_answer: bytes,
     status_code: Optional[AnswerStatusCode],
-    chat_history: List[ChatContextMessage],
-    query_context: List[str],
+    chat_history: list[ChatContextMessage],
+    query_context: list[str],
 ):
     audit = get_audit()
     if audit is None:

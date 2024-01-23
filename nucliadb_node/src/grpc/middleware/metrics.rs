@@ -18,13 +18,12 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::task::{Context, Poll};
-use std::time::SystemTime;
+use std::time::Instant;
 
 use futures::future::BoxFuture;
 use hyper::Body;
 use nucliadb_core::metrics;
 use nucliadb_core::metrics::grpc_ops::GrpcOpKey;
-use nucliadb_core::tracing::warn;
 use tonic::body::BoxBody;
 use tower::{Layer, Service};
 
@@ -71,7 +70,7 @@ where
         let mut inner = std::mem::replace(&mut self.inner, clone);
 
         Box::pin(async move {
-            let start = SystemTime::now();
+            let start = Instant::now();
             let meter = metrics::get_metrics();
 
             let grpc_method = req.uri().path().to_string();
@@ -86,16 +85,13 @@ where
                 None => call.await,
             };
 
-            if let Ok(grpc_call_duration) = start.elapsed() {
-                meter.record_grpc_op(
-                    GrpcOpKey {
-                        method: grpc_method,
-                    },
-                    grpc_call_duration.as_secs_f64(),
-                );
-            } else {
-                warn!("Failed to observe gRPC call duration for: {grpc_method}");
-            }
+            let grpc_call_duration = start.elapsed();
+            meter.record_grpc_op(
+                GrpcOpKey {
+                    method: grpc_method,
+                },
+                grpc_call_duration.as_secs_f64(),
+            );
 
             response
         })

@@ -202,12 +202,12 @@ impl FieldReader for TextReaderService {
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
         let id: Option<String> = None;
-        let time = SystemTime::now();
+        let time = Instant::now();
         let searcher = self.reader.searcher();
         let count = searcher.search(&AllQuery, &Count)?;
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Ending at: {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Ending at: {v} ms");
+
         Ok(count)
     }
 }
@@ -432,11 +432,11 @@ impl TextReaderService {
     fn do_search(&self, request: &DocumentSearchRequest) -> NodeResult<DocumentSearchResponse> {
         use crate::search_query::create_query;
         let id = Some(&request.id);
-        let time = SystemTime::now();
+        let time = Instant::now();
 
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Creating query: starts at {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Creating query: starts at {v} ms");
+
         let query_parser = {
             let mut query_parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
             query_parser.set_conjunction_by_default();
@@ -467,17 +467,16 @@ impl TextReaderService {
             facets.push(facet.clone());
             facet_collector.add_facet(Facet::from(facet));
         }
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Creating query: ends at {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Creating query: ends at {v} ms");
 
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Searching: starts at {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Searching: starts at {v} ms");
+
         let searcher = self.reader.searcher();
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Searching: ends at {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Searching: ends at {v} ms");
+
         match maybe_order {
             _ if request.only_faceted => {
                 // Just a facet search
@@ -548,7 +547,7 @@ impl BatchProducer {
 impl Iterator for BatchProducer {
     type Item = Vec<DocumentItem>;
     fn next(&mut self) -> Option<Self::Item> {
-        let time = SystemTime::now();
+        let time = Instant::now();
         if self.offset >= self.total {
             debug!("No more batches available");
             return None;
@@ -585,9 +584,9 @@ impl Iterator for BatchProducer {
             });
         }
         self.offset += Self::BATCH;
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("New batch created, took {v} ms");
-        }
+        let v = time.elapsed().as_millis();
+        debug!("New batch created, took {v} ms");
+
         Some(items)
     }
 }

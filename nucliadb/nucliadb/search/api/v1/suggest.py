@@ -19,12 +19,11 @@
 #
 from datetime import datetime
 from time import time
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 from fastapi import Header, Request, Response
 from fastapi_versioning import version
 
-from nucliadb.ingest.txn_utils import abort_transaction
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
@@ -60,9 +59,9 @@ async def suggest_knowledgebox(
     response: Response,
     kbid: str,
     query: str = fastapi_query(SearchParamDefaults.suggest_query),
-    fields: List[str] = fastapi_query(SearchParamDefaults.fields),
-    filters: List[str] = fastapi_query(SearchParamDefaults.filters),
-    faceted: List[str] = fastapi_query(SearchParamDefaults.faceted),
+    fields: list[str] = fastapi_query(SearchParamDefaults.fields),
+    filters: list[str] = fastapi_query(SearchParamDefaults.filters),
+    faceted: list[str] = fastapi_query(SearchParamDefaults.faceted),
     range_creation_start: Optional[datetime] = fastapi_query(
         SearchParamDefaults.range_creation_start
     ),
@@ -75,11 +74,11 @@ async def suggest_knowledgebox(
     range_modification_end: Optional[datetime] = fastapi_query(
         SearchParamDefaults.range_modification_end
     ),
-    features: List[SuggestOptions] = fastapi_query(
+    features: list[SuggestOptions] = fastapi_query(
         SearchParamDefaults.suggest_features
     ),
-    show: List[ResourceProperties] = fastapi_query(SearchParamDefaults.show),
-    field_type_filter: List[FieldTypeName] = fastapi_query(
+    show: list[ResourceProperties] = fastapi_query(SearchParamDefaults.show),
+    field_type_filter: list[FieldTypeName] = fastapi_query(
         SearchParamDefaults.field_type_filter, alias="field_type"
     ),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
@@ -117,16 +116,16 @@ async def suggest(
     response,
     kbid: str,
     query: str,
-    fields: List[str],
-    filters: List[str],
-    faceted: List[str],
+    fields: list[str],
+    filters: list[str],
+    faceted: list[str],
     range_creation_start: Optional[datetime],
     range_creation_end: Optional[datetime],
     range_modification_start: Optional[datetime],
     range_modification_end: Optional[datetime],
-    features: List[SuggestOptions],
-    show: List[ResourceProperties],
-    field_type_filter: List[FieldTypeName],
+    features: list[SuggestOptions],
+    show: list[ResourceProperties],
+    field_type_filter: list[FieldTypeName],
     x_ndb_client: NucliaDBClientType,
     x_nucliadb_user: str,
     x_forwarded_for: str,
@@ -161,7 +160,6 @@ async def suggest(
         field_type_filter=field_type_filter,
         highlight=highlight,
     )
-    await abort_transaction()
 
     response.status_code = 206 if incomplete_results else 200
     if debug and queried_shards:

@@ -73,10 +73,10 @@ async def test_create_resource_orm_file_extracted(
     ex2: Optional[FileExtractedData] = await field_obj.get_file_extracted_data()
     assert ex2 is not None
     assert ex2.md5 == ex1.md5
-    assert ex2.file_generated["asd"].source == CloudFile.Source.GCS
-    assert ex2.file_preview.source == CloudFile.Source.GCS
-    assert ex2.file_thumbnail.source == CloudFile.Source.GCS
-    assert ex1.file_pages_previews.pages[0].source == CloudFile.Source.GCS
+    assert ex2.file_generated["asd"].source == storage.source
+    assert ex2.file_preview.source == storage.source
+    assert ex2.file_thumbnail.source == storage.source
+    assert ex1.file_pages_previews.pages[0].source == storage.source
     data = await storage.downloadbytescf(ex1.file_pages_previews.pages[0])
     with open(filename, "rb") as testfile:
         data2 = testfile.read()

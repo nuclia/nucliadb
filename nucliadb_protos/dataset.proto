@@ -89,25 +89,22 @@ message ParagraphStreamingBatch {
 }
 
 
-message Paragraph {
-    string id = 1;
-    string text = 2;
-}
-
 message Question {
     string text = 1;
     string language = 2;
+    repeated string paragraphs = 3;
 }
 
 message Answer {
     string text = 1;
     string language = 2;
+    repeated string paragraphs = 3;
 }
 
 message QuestionAnswerStreamItem {
     Question question = 1;
     Answer answer = 2;
-    repeated Paragraph paragraphs = 3;
+    bool cancelled_by_user = 3;
 }
 
 message QuestionAnswerStreamingBatch {

@@ -23,9 +23,22 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
+    - name: Generate a token
+      id: app-token
+      uses: actions/create-github-app-token@v1
+      with:
+        app-id: ${{ secrets.GHAPP_ID_NUCLIABOT }}
+        private-key: ${{ secrets.PK_GHAPP_NUCLIABOT }}
+        owner: nuclia
+
+    - uses: actions/checkout@master
+      with:
+        persist-credentials: false 
+        fetch-depth: 0 
+
     - run: python bump.py --sem=${{ inputs.semType }}
 
     - name: Commit & Push changes
       uses: actions-js/push@master
       with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
+        github_token: ${{ steps.app-token.outputs.token }}

@@ -23,7 +23,7 @@ import asyncio
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
-from typing import TYPE_CHECKING, Any, AsyncIterator, Optional, Tuple, Type
+from typing import TYPE_CHECKING, Any, AsyncIterator, Optional, Type
 
 from nucliadb_protos.resources_pb2 import AllFieldIDs as PBAllFieldIDs
 from nucliadb_protos.resources_pb2 import Basic
@@ -78,6 +78,7 @@ from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb.ingest.orm.utils import get_basic, set_basic
 from nucliadb_models.common import CloudLink
 from nucliadb_models.writer import GENERIC_MIME_TYPE
+from nucliadb_protos import utils_pb2, writer_pb2
 from nucliadb_utils.storages.storage import Storage
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -87,6 +88,7 @@ logger = logging.getLogger(__name__)
 
 KB_RESOURCE_ORIGIN = "/kbs/{kbid}/r/{uuid}/origin"
 KB_RESOURCE_EXTRA = "/kbs/{kbid}/r/{uuid}/extra"
+KB_RESOURCE_SECURITY = "/kbs/{kbid}/r/{uuid}/security"
 KB_RESOURCE_METADATA = "/kbs/{kbid}/r/{uuid}/metadata"
 KB_RESOURCE_RELATIONS = "/kbs/{kbid}/r/{uuid}/relations"
 KB_RESOURCE_FIELDS = "/kbs/{kbid}/r/{uuid}/f/"
@@ -143,12 +145,13 @@ class Resource:
         basic: Optional[PBBasic] = None,
         disable_vectors: bool = True,
     ):
-        self.fields: dict[Tuple[FieldType.ValueType, str], Field] = {}
+        self.fields: dict[tuple[FieldType.ValueType, str], Field] = {}
         self.conversations: dict[int, PBConversation] = {}
         self.relations: Optional[PBRelations] = None
-        self.all_fields_keys: list[Tuple[FieldType.ValueType, str]] = []
+        self.all_fields_keys: list[tuple[FieldType.ValueType, str]] = []
         self.origin: Optional[PBOrigin] = None
         self.extra: Optional[PBExtra] = None
+        self.security: Optional[utils_pb2.Security] = None
         self.modified: bool = False
         self._indexer: Optional[ResourceBrain] = None
         self._modified_extracted_text: list[FieldID] = []
@@ -327,6 +330,27 @@ class Resource:
         self.modified = True
         self.extra = payload
 
+    # Security
+    async def get_security(self) -> Optional[utils_pb2.Security]:
+        if self.security is None:
+            pb = utils_pb2.Security()
+            key = KB_RESOURCE_SECURITY.format(kbid=self.kb.kbid, uuid=self.uuid)
+            payload = await self.txn.get(key)
+            if payload is None:
+                return None
+            pb.ParseFromString(payload)
+            self.security = pb
+        return self.security
+
+    async def set_security(self, payload: utils_pb2.Security) -> None:
+        key = KB_RESOURCE_SECURITY.format(kbid=self.kb.kbid, uuid=self.uuid)
+        await self.txn.set(
+            key,
+            payload.SerializeToString(),
+        )
+        self.modified = True
+        self.security = payload
+
     # Relations
     async def get_relations(self) -> Optional[PBRelations]:
         if self.relations is None:
@@ -358,6 +382,7 @@ class Resource:
         basic = await self.get_basic()
         if basic is not None:
             brain.set_resource_metadata(basic, origin)
+        await self.compute_security(brain)
         await self.compute_global_tags(brain)
         fields = await self.get_fields(force=True)
         for (type_id, field_id), field in fields.items():
@@ -589,16 +614,17 @@ class Resource:
     # Fields
     async def get_fields(
         self, force: bool = False
-    ) -> dict[Tuple[FieldType.ValueType, str], Field]:
+    ) -> dict[tuple[FieldType.ValueType, str], Field]:
         # Get all fields
         for type, field in await self.get_fields_ids(force=force):
             if (type, field) not in self.fields:
                 self.fields[(type, field)] = await self.get_field(field, type)
         return self.fields
 
-    async def _scan_fields_ids(self) -> AsyncIterator[Tuple[FieldType.ValueType, str]]:
+    async def _scan_fields_ids(self) -> AsyncIterator[tuple[FieldType.ValueType, str]]:
         # TODO: Remove this method when we are sure that all KBs have the `allfields` key set
         prefix = KB_RESOURCE_FIELDS.format(kbid=self.kb.kbid, uuid=self.uuid)
+        allfields = set()
         async for key in self.txn.keys(prefix, count=-1):
             # The [6:8] `slicing purpose is to match exactly the two
             # splitted parts corresponding to type and field, and nothing else!
@@ -606,9 +632,13 @@ class Resource:
             type_id = KB_REVERSE.get(type)
             if type_id is None:
                 raise AttributeError("Invalid field type")
-            yield (type_id, field)
+            result = (type_id, field)
+            if result not in allfields:
+                # fields can have errors that would return duplicates here
+                yield result
+            allfields.add(result)
 
-    async def _inner_get_fields_ids(self) -> list[Tuple[FieldType.ValueType, str]]:
+    async def _inner_get_fields_ids(self) -> list[tuple[FieldType.ValueType, str]]:
         result = []
         all_fields: Optional[PBAllFieldIDs] = await self.get_all_field_ids()
         if all_fields is not None:
@@ -619,7 +649,6 @@ class Resource:
             async for (field_type, field_id) in self._scan_fields_ids():
                 result.append((field_type, field_id))
                 all_fields.fields.append(FieldID(field_type=field_type, field=field_id))
-            await self.set_all_field_ids(all_fields)
 
         # We make sure that title and summary are set to be added
         basic = await self.get_basic()
@@ -636,7 +665,7 @@ class Resource:
 
     async def get_fields_ids(
         self, force: bool = False
-    ) -> list[Tuple[FieldType.ValueType, str]]:
+    ) -> list[tuple[FieldType.ValueType, str]]:
         # Get all fields
         if len(self.all_fields_keys) == 0 or force:
             self.all_fields_keys = await self._inner_get_fields_ids()
@@ -692,7 +721,7 @@ class Resource:
     async def get_all_field_ids(self) -> Optional[PBAllFieldIDs]:
         key = KB_RESOURCE_ALL_FIELDS.format(kbid=self.kb.kbid, uuid=self.uuid)
         payload = await self.txn.get(key)
-        if not payload:
+        if payload is None:
             return None
         all_fields = PBAllFieldIDs()
         all_fields.ParseFromString(payload)
@@ -707,16 +736,23 @@ class Resource:
         *,
         updated: Optional[list[FieldID]] = None,
         deleted: Optional[list[FieldID]] = None,
+        errors: Optional[list[writer_pb2.Error]] = None,
     ):
+        needs_update = False
         all_fields = await self.get_all_field_ids()
         if all_fields is None:
+            needs_update = True
             all_fields = PBAllFieldIDs()
-
-        needs_update = False
 
         for field in updated or []:
             if field not in all_fields.fields:
                 all_fields.fields.append(field)
+                needs_update = True
+
+        for error in errors or []:
+            field_id = FieldID(field_type=error.field_type, field=error.field)
+            if field_id not in all_fields.fields:
+                all_fields.fields.append(field_id)
                 needs_update = True
 
         for field in deleted or []:
@@ -768,9 +804,13 @@ class Resource:
         for fieldid in message.delete_fields:
             await self.delete_field(fieldid.field_type, fieldid.field)
 
-        if len(message_updated_fields) or len(message.delete_fields):
+        if (
+            len(message_updated_fields)
+            or len(message.delete_fields)
+            or len(message.errors)
+        ):
             await self.update_all_field_ids(
-                updated=message_updated_fields, deleted=message.delete_fields  # type: ignore
+                updated=message_updated_fields, deleted=message.delete_fields, errors=message.errors  # type: ignore
             )
 
     @processor_observer.wrap({"type": "apply_extracted"})
@@ -1039,6 +1079,12 @@ class Resource:
     def generate_field_id(self, field: FieldID) -> str:
         return f"{FIELD_TYPE_TO_ID[field.field_type]}/{field.field}"
 
+    async def compute_security(self, brain: ResourceBrain):
+        security = await self.get_security()
+        if security is None:
+            return
+        brain.set_security(security)
+
     @processor_observer.wrap({"type": "compute_global_tags"})
     async def compute_global_tags(self, brain: ResourceBrain):
         origin = await self.get_origin()
@@ -1127,7 +1173,7 @@ class Resource:
             if fm is None:
                 continue
 
-            field_metadatas: list[Tuple[Optional[str], FieldMetadata]] = [
+            field_metadatas: list[tuple[Optional[str], FieldMetadata]] = [
                 (None, fm.metadata)
             ]
             for subfield_metadata, splitted_metadata in fm.split_metadata.items():
@@ -1237,7 +1283,7 @@ class Resource:
             if fm is None:
                 continue
 
-            field_metadatas: list[Tuple[Optional[str], FieldMetadata]] = [
+            field_metadatas: list[tuple[Optional[str], FieldMetadata]] = [
                 (None, fm.metadata)
             ]
             for subfield_metadata, splitted_metadata in fm.split_metadata.items():
@@ -1314,7 +1360,7 @@ class Resource:
             if fm is None:
                 continue
 
-            field_metadatas: list[Tuple[Optional[str], FieldMetadata]] = [
+            field_metadatas: list[tuple[Optional[str], FieldMetadata]] = [
                 (None, fm.metadata)
             ]
             for subfield_metadata, splitted_metadata in fm.split_metadata.items():
@@ -1370,7 +1416,7 @@ class Resource:
             if fm is None:
                 continue
 
-            field_metadatas: list[Tuple[Optional[str], FieldMetadata]] = [
+            field_metadatas: list[tuple[Optional[str], FieldMetadata]] = [
                 (None, fm.metadata)
             ]
             for subfield_metadata, splitted_metadata in fm.split_metadata.items():

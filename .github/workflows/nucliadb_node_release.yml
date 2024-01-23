@@ -11,14 +11,15 @@ on:
       - "Cargo.toml"
       - "nucliadb_paragraphs/**"
       - "nucliadb_texts/**"
+      - "nucliadb_texts2/**"
       - "nucliadb_core/**"
       - "nucliadb_node/src/**"
       - "nucliadb_node/Cargo.toml"
       - "nucliadb_vectors/**"
-      - "nucliadb_texts/**"
       - "nucliadb_paragraphs/**"
       - "nucliadb_core/**"
       - "nucliadb_relations/**"
+      - "nucliadb_relations2/**"
   push:
     branches:
       - main
@@ -29,14 +30,15 @@ on:
       - "Cargo.toml"
       - "nucliadb_paragraphs/**"
       - "nucliadb_texts/**"
+      - "nucliadb_texts2/**"
       - "nucliadb_core/**"
       - "nucliadb_node/src/**"
       - "nucliadb_node/Cargo.toml"
       - "nucliadb_vectors/**"
-      - "nucliadb_texts/**"
       - "nucliadb_paragraphs/**"
       - "nucliadb_core/**"
       - "nucliadb_relations/**"
+      - "nucliadb_relations2/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}

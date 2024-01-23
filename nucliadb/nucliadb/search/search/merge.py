@@ -19,7 +19,7 @@
 #
 import datetime
 import math
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Optional, Set, Union
 
 from nucliadb_protos.nodereader_pb2 import (
     DocumentResult,
@@ -53,6 +53,7 @@ from nucliadb_models.search import (
     Paragraph,
     Paragraphs,
     RelatedEntities,
+    RelatedEntity,
     RelationDirection,
     RelationNodeTypeMap,
     Relations,
@@ -73,13 +74,13 @@ from .cache import get_resource_cache, get_resource_from_cache
 from .metrics import merge_observer
 from .paragraphs import ExtractedTextCache, get_paragraph_text, get_text_sentence
 
-Bm25Score = Tuple[float, float]
+Bm25Score = tuple[float, float]
 TimestampScore = datetime.datetime
 TitleScore = str
 Score = Union[Bm25Score, TimestampScore, TitleScore]
 
 
-def sort_results_by_score(results: Union[List[ParagraphResult], List[DocumentResult]]):
+def sort_results_by_score(results: Union[list[ParagraphResult], list[DocumentResult]]):
     results.sort(key=lambda x: (x.score.bm25, x.score.booster), reverse=True)
 
 
@@ -115,15 +116,15 @@ async def text_score(
 
 
 async def merge_documents_results(
-    document_responses: List[DocumentSearchResponse],
-    resources: List[str],
+    document_responses: list[DocumentSearchResponse],
+    resources: list[str],
     count: int,
     page: int,
     kbid: str,
     sort: SortOptions,
 ) -> Resources:
-    raw_resource_list: List[Tuple[DocumentResult, Score]] = []
-    facets: Dict[str, Any] = {}
+    raw_resource_list: list[tuple[DocumentResult, Score]] = []
+    facets: dict[str, Any] = {}
     query = None
     total = 0
     next_page = False
@@ -155,7 +156,7 @@ async def merge_documents_results(
     if length > end:
         next_page = True
 
-    result_resource_list: List[ResourceResult] = []
+    result_resource_list: list[ResourceResult] = []
     for result, _ in raw_resource_list[min(skip, length) : min(end, length)]:
         # /f/file
 
@@ -186,11 +187,11 @@ async def merge_documents_results(
 
 
 async def merge_suggest_paragraph_results(
-    suggest_responses: List[SuggestResponse],
+    suggest_responses: list[SuggestResponse],
     kbid: str,
     highlight: bool,
 ):
-    raw_paragraph_list: List[ParagraphResult] = []
+    raw_paragraph_list: list[ParagraphResult] = []
     query = None
     ematches = None
     for suggest_response in suggest_responses:
@@ -207,7 +208,7 @@ async def merge_suggest_paragraph_results(
     rcache = get_resource_cache(clear=True)
     etcache = ExtractedTextCache()
     try:
-        result_paragraph_list: List[Paragraph] = []
+        result_paragraph_list: list[Paragraph] = []
         for result in raw_paragraph_list[:10]:
             _, field_type, field = result.field.split("/")
             text = await get_paragraph_text(
@@ -258,15 +259,15 @@ async def merge_suggest_paragraph_results(
 
 
 async def merge_vectors_results(
-    vector_responses: List[VectorSearchResponse],
-    resources: List[str],
+    vector_responses: list[VectorSearchResponse],
+    resources: list[str],
     kbid: str,
     count: int,
     page: int,
     min_score: float,
 ):
-    facets: Dict[str, Any] = {}
-    raw_vectors_list: List[DocumentScored] = []
+    facets: dict[str, Any] = {}
+    raw_vectors_list: list[DocumentScored] = []
 
     for vector_response in vector_responses:
         for document in vector_response.documents:
@@ -283,7 +284,7 @@ async def merge_vectors_results(
     end_element = skip + count
     length = len(raw_vectors_list)
 
-    result_sentence_list: List[Sentence] = []
+    result_sentence_list: list[Sentence] = []
     for result in raw_vectors_list[min(skip, length) : min(end_element, length)]:
         id_count = result.doc_id.id.count("/")
         if id_count == 4:
@@ -339,19 +340,19 @@ async def merge_vectors_results(
 
 
 async def merge_paragraph_results(
-    paragraph_responses: List[ParagraphSearchResponse],
-    resources: List[str],
+    paragraph_responses: list[ParagraphSearchResponse],
+    resources: list[str],
     kbid: str,
     count: int,
     page: int,
     highlight: bool,
     sort: SortOptions,
 ):
-    raw_paragraph_list: List[Tuple[ParagraphResult, Score]] = []
-    facets: Dict[str, Any] = {}
+    raw_paragraph_list: list[tuple[ParagraphResult, Score]] = []
+    facets: dict[str, Any] = {}
     query = None
     next_page = False
-    ematches: Optional[List[str]] = None
+    ematches: Optional[list[str]] = None
     total = 0
     for paragraph_response in paragraph_responses:
         if ematches is None:
@@ -383,7 +384,7 @@ async def merge_paragraph_results(
     if length > end:
         next_page = True
 
-    result_paragraph_list: List[Paragraph] = []
+    result_paragraph_list: list[Paragraph] = []
     etcache = ExtractedTextCache()
     try:
         for result, _ in raw_paragraph_list[min(skip, length) : min(end, length)]:
@@ -401,6 +402,7 @@ async def merge_paragraph_results(
                 extracted_text_cache=etcache,
             )
             labels = await get_labels_paragraph(result, kbid)
+            fuzzy_result = len(result.matches) > 0
             new_paragraph = Paragraph(
                 score=result.score.bm25,
                 rid=result.uuid,
@@ -414,6 +416,7 @@ async def merge_paragraph_results(
                     end=result.metadata.position.end,
                     page_number=result.metadata.position.page_number,
                 ),
+                fuzzy_result=fuzzy_result,
             )
             if len(result.metadata.position.start_seconds) or len(
                 result.metadata.position.end_seconds
@@ -447,7 +450,7 @@ async def merge_paragraph_results(
 
 @merge_observer.wrap({"type": "merge_relations"})
 def merge_relations_results(
-    relations_responses: List[RelationSearchResponse],
+    relations_responses: list[RelationSearchResponse],
     query: EntitiesSubgraphRequest,
 ) -> Relations:
     relations = Relations(entities={})
@@ -496,13 +499,13 @@ def merge_relations_results(
 
 @merge_observer.wrap({"type": "merge"})
 async def merge_results(
-    search_responses: List[SearchResponse],
+    search_responses: list[SearchResponse],
     count: int,
     page: int,
     kbid: str,
-    show: List[ResourceProperties],
-    field_type_filter: List[FieldTypeName],
-    extracted: List[ExtractedDataTypeName],
+    show: list[ResourceProperties],
+    field_type_filter: list[FieldTypeName],
+    extracted: list[ExtractedDataTypeName],
     sort: SortOptions,
     requested_relations: EntitiesSubgraphRequest,
     min_score: float,
@@ -523,7 +526,7 @@ async def merge_results(
 
     rcache = get_resource_cache(clear=True)
     try:
-        resources: List[str] = list()
+        resources: list[str] = list()
         api_results.fulltext = await merge_documents_results(
             documents, resources, count, page, kbid, sort
         )
@@ -553,13 +556,13 @@ async def merge_results(
 
 
 async def merge_paragraphs_results(
-    paragraph_responses: List[ParagraphSearchResponse],
+    paragraph_responses: list[ParagraphSearchResponse],
     count: int,
     page: int,
     kbid: str,
-    show: List[ResourceProperties],
-    field_type_filter: List[FieldTypeName],
-    extracted: List[ExtractedDataTypeName],
+    show: list[ResourceProperties],
+    field_type_filter: list[FieldTypeName],
+    extracted: list[ExtractedDataTypeName],
     highlight_split: bool,
 ) -> ResourceSearchResults:
     paragraphs = []
@@ -570,7 +573,7 @@ async def merge_paragraphs_results(
 
     rcache = get_resource_cache(clear=True)
     try:
-        resources: List[str] = list()
+        resources: list[str] = list()
         api_results.paragraphs = await merge_paragraph_results(
             paragraphs,
             resources,
@@ -590,22 +593,24 @@ async def merge_paragraphs_results(
 
 
 async def merge_suggest_entities_results(
-    suggest_responses: List[SuggestResponse],
+    suggest_responses: list[SuggestResponse],
 ) -> RelatedEntities:
-    merge = RelatedEntities(entities=[], total=0)
-
+    unique_entities: Set[RelatedEntity] = set()
     for response in suggest_responses:
-        merge.entities.extend(response.entities.entities)
-        merge.total += response.entities.total
+        response_entities = (
+            RelatedEntity(family=e.subtype, value=e.value)
+            for e in response.entity_results.nodes
+        )
+        unique_entities.update(response_entities)
 
-    return merge
+    return RelatedEntities(entities=list(unique_entities), total=len(unique_entities))
 
 
 async def merge_suggest_results(
-    suggest_responses: List[SuggestResponse],
+    suggest_responses: list[SuggestResponse],
     kbid: str,
-    show: List[ResourceProperties],
-    field_type_filter: List[FieldTypeName],
+    show: list[ResourceProperties],
+    field_type_filter: list[FieldTypeName],
     highlight: bool = False,
 ) -> KnowledgeboxSuggestResults:
     api_results = KnowledgeboxSuggestResults()

@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Any, Dict, List
+from typing import Any
 
 from nucliadb_protos.nodereader_pb2 import (
     EdgeList,
@@ -39,7 +39,7 @@ from nucliadb_protos.utils_pb2 import Relation
 
 
 class DummyWriterStub:  # pragma: no cover
-    calls: Dict[str, List[Any]] = {}
+    calls: dict[str, list[Any]] = {}
 
     async def NewShard(self, data):  # pragma: no cover
         self.calls.setdefault("NewShard", []).append(data)
@@ -90,7 +90,7 @@ class DummyWriterStub:  # pragma: no cover
 
 
 class DummyReaderStub:  # pragma: no cover
-    calls: Dict[str, List[Any]] = {}
+    calls: dict[str, list[Any]] = {}
 
     async def GetShard(self, data):  # pragma: no cover
         self.calls.setdefault("GetShard", []).append(data)

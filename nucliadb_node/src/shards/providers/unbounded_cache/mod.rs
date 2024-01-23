@@ -26,12 +26,8 @@
 //! For faster reads at cost of slower initialization and memory consumption,
 //! all shards can be loaded at initialization time.
 
-mod async_unbounded_reader;
-mod async_unbounded_writer;
 mod unbounded_reader;
 mod unbounded_writer;
 
-pub use async_unbounded_reader::AsyncUnboundedShardReaderCache;
-pub use async_unbounded_writer::AsyncUnboundedShardWriterCache;
 pub use unbounded_reader::UnboundedShardReaderCache;
 pub use unbounded_writer::UnboundedShardWriterCache;

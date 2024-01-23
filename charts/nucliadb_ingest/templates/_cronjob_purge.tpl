@@ -38,6 +38,7 @@ spec:
 {{ toYaml .Values.extra_pod_annotations | indent 12 }}
             {{- end }}
         spec:
+          serviceAccount: {{ ((.Values.purgeCron).serviceAccount) | default "default" }}
           nodeSelector:
 {{ toYaml .Values.nodeSelector | indent 12 }}
           topologySpreadConstraints:

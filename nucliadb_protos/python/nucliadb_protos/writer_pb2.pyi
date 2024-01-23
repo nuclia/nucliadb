@@ -135,6 +135,7 @@ from nucliadb_protos.resources_pb2 import (
     Positions as Positions,
     Question as Question,
     QuestionAnswer as QuestionAnswer,
+    QuestionAnswerAnnotation as QuestionAnswerAnnotation,
     QuestionAnswers as QuestionAnswers,
     Relations as Relations,
     RowsPreview as RowsPreview,
@@ -148,6 +149,23 @@ from nucliadb_protos.resources_pb2 import (
 )
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
+
+class _NotificationSource:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _NotificationSourceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_NotificationSource.ValueType], builtins.type):
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    UNSET: _NotificationSource.ValueType  # 0
+    WRITER: _NotificationSource.ValueType  # 1
+    PROCESSOR: _NotificationSource.ValueType  # 2
+
+class NotificationSource(_NotificationSource, metaclass=_NotificationSourceEnumTypeWrapper): ...
+
+UNSET: NotificationSource.ValueType  # 0
+WRITER: NotificationSource.ValueType  # 1
+PROCESSOR: NotificationSource.ValueType  # 2
+global___NotificationSource = NotificationSource
 
 @typing_extensions.final
 class Audit(google.protobuf.message.Message):
@@ -429,6 +447,7 @@ class BrokerMessage(google.protobuf.message.Message):
     REINDEX_FIELD_NUMBER: builtins.int
     EXTRA_FIELD_NUMBER: builtins.int
     QUESTION_ANSWERS_FIELD_NUMBER: builtins.int
+    SECURITY_FIELD_NUMBER: builtins.int
     kbid: builtins.str
     uuid: builtins.str
     slug: builtins.str
@@ -501,6 +520,8 @@ class BrokerMessage(google.protobuf.message.Message):
     def extra(self) -> nucliadb_protos.resources_pb2.Extra: ...
     @property
     def question_answers(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.resources_pb2.FieldQuestionAnswerWrapper]: ...
+    @property
+    def security(self) -> nucliadb_protos.utils_pb2.Security: ...
     def __init__(
         self,
         *,
@@ -540,9 +561,10 @@ class BrokerMessage(google.protobuf.message.Message):
         reindex: builtins.bool = ...,
         extra: nucliadb_protos.resources_pb2.Extra | None = ...,
         question_answers: collections.abc.Iterable[nucliadb_protos.resources_pb2.FieldQuestionAnswerWrapper] | None = ...,
+        security: nucliadb_protos.utils_pb2.Security | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["audit", b"audit", "basic", b"basic", "done_time", b"done_time", "extra", b"extra", "origin", b"origin"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["account_seq", b"account_seq", "audit", b"audit", "basic", b"basic", "conversations", b"conversations", "datetimes", b"datetimes", "delete_fields", b"delete_fields", "done_time", b"done_time", "errors", b"errors", "extra", b"extra", "extracted_text", b"extracted_text", "field_large_metadata", b"field_large_metadata", "field_metadata", b"field_metadata", "field_vectors", b"field_vectors", "file_extracted_data", b"file_extracted_data", "files", b"files", "kbid", b"kbid", "keywordsets", b"keywordsets", "layouts", b"layouts", "link_extracted_data", b"link_extracted_data", "links", b"links", "multiid", b"multiid", "origin", b"origin", "origin_seq", b"origin_seq", "pre_processing_time", b"pre_processing_time", "processing_id", b"processing_id", "question_answers", b"question_answers", "reindex", b"reindex", "relations", b"relations", "slow_processing_time", b"slow_processing_time", "slug", b"slug", "source", b"source", "texts", b"texts", "txseqid", b"txseqid", "type", b"type", "user_vectors", b"user_vectors", "uuid", b"uuid"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["audit", b"audit", "basic", b"basic", "done_time", b"done_time", "extra", b"extra", "origin", b"origin", "security", b"security"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["account_seq", b"account_seq", "audit", b"audit", "basic", b"basic", "conversations", b"conversations", "datetimes", b"datetimes", "delete_fields", b"delete_fields", "done_time", b"done_time", "errors", b"errors", "extra", b"extra", "extracted_text", b"extracted_text", "field_large_metadata", b"field_large_metadata", "field_metadata", b"field_metadata", "field_vectors", b"field_vectors", "file_extracted_data", b"file_extracted_data", "files", b"files", "kbid", b"kbid", "keywordsets", b"keywordsets", "layouts", b"layouts", "link_extracted_data", b"link_extracted_data", "links", b"links", "multiid", b"multiid", "origin", b"origin", "origin_seq", b"origin_seq", "pre_processing_time", b"pre_processing_time", "processing_id", b"processing_id", "question_answers", b"question_answers", "reindex", b"reindex", "relations", b"relations", "security", b"security", "slow_processing_time", b"slow_processing_time", "slug", b"slug", "source", b"source", "texts", b"texts", "txseqid", b"txseqid", "type", b"type", "user_vectors", b"user_vectors", "uuid", b"uuid"]) -> None: ...
 
 global___BrokerMessage = BrokerMessage
 
@@ -1394,6 +1416,8 @@ class Notification(google.protobuf.message.Message):
     ACTION_FIELD_NUMBER: builtins.int
     WRITE_TYPE_FIELD_NUMBER: builtins.int
     MESSAGE_FIELD_NUMBER: builtins.int
+    SOURCE_FIELD_NUMBER: builtins.int
+    PROCESSING_ERRORS_FIELD_NUMBER: builtins.int
     partition: builtins.int
     multi: builtins.str
     uuid: builtins.str
@@ -1403,6 +1427,8 @@ class Notification(google.protobuf.message.Message):
     write_type: global___Notification.WriteType.ValueType
     @property
     def message(self) -> global___BrokerMessage: ...
+    source: global___NotificationSource.ValueType
+    processing_errors: builtins.bool
     def __init__(
         self,
         *,
@@ -1414,9 +1440,11 @@ class Notification(google.protobuf.message.Message):
         action: global___Notification.Action.ValueType = ...,
         write_type: global___Notification.WriteType.ValueType = ...,
         message: global___BrokerMessage | None = ...,
+        source: global___NotificationSource.ValueType = ...,
+        processing_errors: builtins.bool = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["message", b"message"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["action", b"action", "kbid", b"kbid", "message", b"message", "multi", b"multi", "partition", b"partition", "seqid", b"seqid", "uuid", b"uuid", "write_type", b"write_type"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["action", b"action", "kbid", b"kbid", "message", b"message", "multi", b"multi", "partition", b"partition", "processing_errors", b"processing_errors", "seqid", b"seqid", "source", b"source", "uuid", b"uuid", "write_type", b"write_type"]) -> None: ...
 
 global___Notification = Notification
 
@@ -1452,6 +1480,7 @@ class Member(google.protobuf.message.Message):
     DUMMY_FIELD_NUMBER: builtins.int
     LOAD_SCORE_FIELD_NUMBER: builtins.int
     SHARD_COUNT_FIELD_NUMBER: builtins.int
+    PRIMARY_ID_FIELD_NUMBER: builtins.int
     id: builtins.str
     """/ Member ID.　A string of the UUID."""
     listen_address: builtins.str
@@ -1468,6 +1497,8 @@ class Member(google.protobuf.message.Message):
     """/ The load score of the member."""
     shard_count: builtins.int
     """/ The number of shards in the node."""
+    primary_id: builtins.str
+    """/ The id of the primary node (if it is a secondary node)."""
     def __init__(
         self,
         *,
@@ -1478,8 +1509,9 @@ class Member(google.protobuf.message.Message):
         dummy: builtins.bool = ...,
         load_score: builtins.float = ...,
         shard_count: builtins.int = ...,
+        primary_id: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["dummy", b"dummy", "id", b"id", "is_self", b"is_self", "listen_address", b"listen_address", "load_score", b"load_score", "shard_count", b"shard_count", "type", b"type"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["dummy", b"dummy", "id", b"id", "is_self", b"is_self", "listen_address", b"listen_address", "load_score", b"load_score", "primary_id", b"primary_id", "shard_count", b"shard_count", "type", b"type"]) -> None: ...
 
 global___Member = Member
 

@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import Any, Dict, Iterator, List, Optional, Tuple, cast
+from typing import Any, Iterator, Optional, cast
 
 from nucliadb_protos.nodereader_pb2 import (
     DocumentScored,
@@ -27,8 +27,9 @@ from nucliadb_protos.nodereader_pb2 import (
     SearchResponse,
 )
 
-from nucliadb.ingest.serialize import serialize
-from nucliadb.ingest.txn_utils import abort_transaction, get_transaction
+from nucliadb.common.maindb.driver import Transaction
+from nucliadb.ingest.serialize import managed_serialize
+from nucliadb.middleware.transaction import get_read_only_transaction
 from nucliadb.search import SERVICE_NAME, logger
 from nucliadb.search.search.cache import get_resource_cache
 from nucliadb.search.search.merge import merge_relations_results
@@ -61,12 +62,10 @@ async def set_text_value(
     result_paragraph: TempFindParagraph,
     max_operations: asyncio.Semaphore,
     highlight: bool = False,
-    ematches: Optional[List[str]] = None,
+    ematches: Optional[list[str]] = None,
     extracted_text_cache: Optional[paragraphs.ExtractedTextCache] = None,
 ):
-    # TODO: Improve
-    await max_operations.acquire()
-    try:
+    async with max_operations:
         assert result_paragraph.paragraph
         assert result_paragraph.paragraph.position
         result_paragraph.paragraph.text = await paragraphs.get_paragraph_text(
@@ -81,24 +80,22 @@ async def set_text_value(
             matches=[],  # TODO
             extracted_text_cache=extracted_text_cache,
         )
-    finally:
-        max_operations.release()
 
 
 @merge_observer.wrap({"type": "set_resource_metadada_value"})
 async def set_resource_metadata_value(
+    txn: Transaction,
     kbid: str,
     resource: str,
-    show: List[ResourceProperties],
-    field_type_filter: List[FieldTypeName],
-    extracted: List[ExtractedDataTypeName],
-    find_resources: Dict[str, FindResource],
+    show: list[ResourceProperties],
+    field_type_filter: list[FieldTypeName],
+    extracted: list[ExtractedDataTypeName],
+    find_resources: dict[str, FindResource],
     max_operations: asyncio.Semaphore,
 ):
-    await max_operations.acquire()
-
-    try:
-        serialized_resource = await serialize(
+    async with max_operations:
+        serialized_resource = await managed_serialize(
+            txn,
             kbid,
             resource,
             show,
@@ -111,9 +108,6 @@ async def set_resource_metadata_value(
         else:
             logger.warning(f"Resource {resource} not found in {kbid}")
             find_resources.pop(resource, None)
-
-    finally:
-        max_operations.release()
 
 
 class Orderer:
@@ -144,15 +138,17 @@ class Orderer:
 
 @merge_observer.wrap({"type": "fetch_find_metadata"})
 async def fetch_find_metadata(
-    find_resources: Dict[str, FindResource],
-    result_paragraphs: List[TempFindParagraph],
+    find_resources: dict[str, FindResource],
+    best_matches: list[str],
+    result_paragraphs: list[TempFindParagraph],
     kbid: str,
-    show: List[ResourceProperties],
-    field_type_filter: List[FieldTypeName],
-    extracted: List[ExtractedDataTypeName],
+    show: list[ResourceProperties],
+    field_type_filter: list[FieldTypeName],
+    extracted: list[ExtractedDataTypeName],
     highlight: bool = False,
-    ematches: Optional[List[str]] = None,
+    ematches: Optional[list[str]] = None,
 ):
+    txn = await get_read_only_transaction()
     resources = set()
     operations = []
     max_operations = asyncio.Semaphore(50)
@@ -211,11 +207,13 @@ async def fetch_find_metadata(
         orderer.sorted_by_insertion()
     ):
         find_resources[rid].fields[field_id].paragraphs[paragraph_id].order = order
+        best_matches.append(paragraph_id)
 
     for resource in resources:
         operations.append(
             asyncio.create_task(
                 set_resource_metadata_value(
+                    txn,
                     kbid=kbid,
                     resource=resource,
                     show=show,
@@ -237,17 +235,18 @@ async def fetch_find_metadata(
 
 @merge_observer.wrap({"type": "merge_paragraphs_vectors"})
 def merge_paragraphs_vectors(
-    paragraphs_shards: List[List[ParagraphResult]],
-    vectors_shards: List[List[DocumentScored]],
+    paragraphs_shards: list[list[ParagraphResult]],
+    vectors_shards: list[list[DocumentScored]],
     count: int,
     page: int,
     min_score: float,
-) -> Tuple[List[TempFindParagraph], bool]:
-    merged_paragrahs: List[TempFindParagraph] = []
+) -> tuple[list[TempFindParagraph], bool]:
+    merged_paragrahs: list[TempFindParagraph] = []
 
     # We assume that paragraphs_shards and vectors_shards are already ordered
     for paragraphs_shard in paragraphs_shards:
         for paragraph in paragraphs_shard:
+            fuzzy_result = len(paragraph.matches) > 0
             merged_paragrahs.append(
                 TempFindParagraph(
                     paragraph_index=paragraph,
@@ -258,6 +257,7 @@ def merge_paragraphs_vectors(
                     split=paragraph.split,
                     end=paragraph.end,
                     id=paragraph.paragraph,
+                    fuzzy_result=fuzzy_result,
                 )
             )
 
@@ -322,8 +322,10 @@ def merge_paragraphs_vectors(
                     ],
                 ),
                 id=merged_paragraph.id,
+                # Vector searches don't have fuzziness
+                fuzzy_result=False,
             )
-        if merged_paragraph.paragraph_index is not None:
+        elif merged_paragraph.paragraph_index is not None:
             merged_paragraph.paragraph = FindParagraph(
                 score=merged_paragraph.paragraph_index.score.bm25,
                 score_type=SCORE_TYPE.BM25,
@@ -344,19 +346,20 @@ def merge_paragraphs_vectors(
                     ],
                 ),
                 id=merged_paragraph.id,
+                fuzzy_result=merged_paragraph.fuzzy_result,
             )
     return merged_paragrahs, next_page
 
 
 @merge_observer.wrap({"type": "find_merge"})
 async def find_merge_results(
-    search_responses: List[SearchResponse],
+    search_responses: list[SearchResponse],
     count: int,
     page: int,
     kbid: str,
-    show: List[ResourceProperties],
-    field_type_filter: List[FieldTypeName],
-    extracted: List[ExtractedDataTypeName],
+    show: list[ResourceProperties],
+    field_type_filter: list[FieldTypeName],
+    extracted: list[ExtractedDataTypeName],
     requested_relations: EntitiesSubgraphRequest,
     min_score: float,
     highlight: bool = False,
@@ -364,15 +367,15 @@ async def find_merge_results(
     # force getting transaction on current asyncio task
     # so all sub tasks will use the same transaction
     # this is contextvar magic that is probably not ideal
-    await get_transaction()
+    await get_read_only_transaction()
 
-    paragraphs: List[List[ParagraphResult]] = []
-    vectors: List[List[DocumentScored]] = []
+    paragraphs: list[list[ParagraphResult]] = []
+    vectors: list[list[DocumentScored]] = []
     relations = []
 
     # facets_counter = Counter()
     next_page = True
-    ematches: List[str] = []
+    ematches: list[str] = []
     real_query = ""
     total_paragraphs = 0
     for response in search_responses:
@@ -386,8 +389,8 @@ async def find_merge_results(
         next_page = next_page and response.paragraph.next_page
         total_paragraphs += response.paragraph.total
 
-        paragraphs.append(cast(List[ParagraphResult], response.paragraph.results))
-        vectors.append(cast(List[DocumentScored], response.vector.documents))
+        paragraphs.append(cast(list[ParagraphResult], response.paragraph.results))
+        vectors.append(cast(list[DocumentScored], response.vector.documents))
 
         relations.append(response.relation)
 
@@ -407,10 +410,12 @@ async def find_merge_results(
             page_size=count,
             next_page=next_page,
             min_score=round(min_score, ndigits=3),
+            best_matches=[],
         )
 
         await fetch_find_metadata(
             api_results.resources,
+            api_results.best_matches,
             result_paragraphs,
             kbid,
             show,
@@ -421,7 +426,6 @@ async def find_merge_results(
         )
         api_results.relations = merge_relations_results(relations, requested_relations)
 
-        await abort_transaction()
         return api_results
     finally:
         rcache.clear()

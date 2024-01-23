@@ -24,15 +24,18 @@ use std::collections::HashMap;
 
 use common::{resources, NodeFixture, TestNodeReader, TestNodeWriter};
 use nucliadb_core::protos::{
-    op_status, NewShardRequest, NewVectorSetRequest, SearchRequest, SearchResponse, ShardId,
-    UserVector, UserVectors, VectorSetId, VectorSimilarity,
+    op_status, NewShardRequest, NewVectorSetRequest, ReleaseChannel, SearchRequest, SearchResponse,
+    ShardId, UserVector, UserVectors, VectorSetId, VectorSimilarity,
 };
 use nucliadb_node::replication::health::ReplicationHealthManager;
-use nucliadb_node::shards::providers::AsyncShardWriterProvider;
+use rstest::*;
 use tonic::Request;
 
+#[rstest]
 #[tokio::test]
-async fn test_search_replicated_data() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_search_replicated_data(
+    #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)] release_channel: ReleaseChannel,
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut fixture = NodeFixture::new();
     fixture
         .with_writer()
@@ -47,7 +50,7 @@ async fn test_search_replicated_data() -> Result<(), Box<dyn std::error::Error>>
 
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
-    let shard = create_shard(&mut writer).await;
+    let shard = create_shard(&mut writer, release_channel).await;
 
     let mut query = create_search_request(&shard.id, "prince");
     query.vector = vec![1.0, 2.0, 3.0];
@@ -83,11 +86,8 @@ async fn test_search_replicated_data() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(response.vector.unwrap().documents.len(), 1);
 
     // Validate generation id is the same
-    let primary_shard = fixture.primary_shard_cache().load(shard.id.clone()).await?;
-    let secondary_shard = fixture
-        .secondary_shard_cache()
-        .load(shard.id.clone())
-        .await?;
+    let primary_shard = fixture.primary_shard_cache().load(shard.id.clone())?;
+    let secondary_shard = fixture.secondary_shard_cache().load(shard.id.clone())?;
 
     assert_eq!(
         primary_shard.metadata.get_generation_id(),
@@ -110,8 +110,14 @@ struct ShardDetails {
     id: String,
 }
 
-async fn create_shard(writer: &mut TestNodeWriter) -> ShardDetails {
-    let request = Request::new(NewShardRequest::default());
+async fn create_shard(
+    writer: &mut TestNodeWriter,
+    release_channel: ReleaseChannel,
+) -> ShardDetails {
+    let request = Request::new(NewShardRequest {
+        release_channel: release_channel.into(),
+        ..Default::default()
+    });
     let new_shard_response = writer
         .new_shard(request)
         .await

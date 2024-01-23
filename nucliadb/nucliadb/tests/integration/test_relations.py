@@ -17,8 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Tuple
-
 import pytest
 from httpx import AsyncClient
 from nucliadb_protos.resources_pb2 import (
@@ -64,7 +62,7 @@ async def resource_with_bm_relations(
 async def test_api_aliases(
     nucliadb_reader: AsyncClient,
     knowledgebox: str,
-    resource_with_bm_relations: Tuple[str, str],
+    resource_with_bm_relations: tuple[str, str],
 ):
     rid, field_id = resource_with_bm_relations
 
@@ -101,7 +99,7 @@ async def test_api_aliases(
 async def test_broker_message_relations(
     nucliadb_reader: AsyncClient,
     knowledgebox: str,
-    resource_with_bm_relations: Tuple[str, str],
+    resource_with_bm_relations: tuple[str, str],
 ):
     """
     Test description:

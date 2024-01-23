@@ -38,11 +38,14 @@ from nucliadb_models.search import (
 )
 from nucliadb_utils.utilities import get_storage
 
+ExtractedTexts = list[tuple[str, str, Optional[ExtractedText]]]
+
 MAX_GET_EXTRACTED_TEXT_OPS = 20
 
 
 async def summarize(kbid: str, request: SummarizeRequest) -> SummarizedResponse:
     predict_request = SummarizeModel()
+    predict_request.user_prompt = request.user_prompt
 
     for rid, field_id, extracted_text in await get_extracted_texts(
         kbid, request.resources
@@ -59,10 +62,8 @@ async def summarize(kbid: str, request: SummarizeRequest) -> SummarizedResponse:
     return await predict.summarize(kbid, predict_request)
 
 
-async def get_extracted_texts(
-    kbid: str, resource_uuids: list[str]
-) -> list[tuple[str, str, Optional[ExtractedText]]]:
-    results = []
+async def get_extracted_texts(kbid: str, resource_uuids: list[str]) -> ExtractedTexts:
+    results: ExtractedTexts = []
 
     driver = get_driver()
     storage = await get_storage()
@@ -83,6 +84,11 @@ async def get_extracted_texts(
             for _, field in fields.items():
                 task = asyncio.create_task(get_extracted_text(rid, field, max_tasks))
                 tasks.append(task)
+
+        if len(tasks) == 0:
+            # No extracted text to get
+            return results
+
         done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
 
     # Parse the task results

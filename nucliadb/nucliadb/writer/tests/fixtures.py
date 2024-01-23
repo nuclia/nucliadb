@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from enum import Enum
-from typing import AsyncIterator, Callable, List, Optional
+from typing import AsyncIterator, Callable, Optional
 
 import pytest
 from httpx import AsyncClient
@@ -51,14 +51,14 @@ async def writer_api(
     processing_utility,
     tus_manager,
     event_loop,
-) -> AsyncIterator[Callable[[List[Enum], str, str], AsyncClient]]:
+) -> AsyncIterator[Callable[[list[Enum], str, str], AsyncClient]]:
     nucliadb_settings.nucliadb_ingest = grpc_servicer.host
     from nucliadb.writer.app import create_application
 
     application = create_application()
 
     def make_client_fixture(
-        roles: Optional[List[Enum]] = None,
+        roles: Optional[list[Enum]] = None,
         user: str = "",
         version: str = "1",
     ) -> AsyncClient:
@@ -101,7 +101,7 @@ def s3_storage_writer(s3):
     storage_settings.s3_endpoint = s3
     storage_settings.s3_client_id = ""
     storage_settings.s3_client_secret = ""
-    storage_settings.s3_bucket = "test_{kbid}"
+    storage_settings.s3_bucket = "test-{kbid}"
 
 
 @pytest.fixture(scope="function")

@@ -19,7 +19,7 @@
 #
 import json
 from datetime import datetime
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 from fastapi import Body, Header, Request, Response
 from fastapi.openapi.models import Example
@@ -42,6 +42,7 @@ from nucliadb_models.search import (
     SearchOptions,
     SearchParamDefaults,
 )
+from nucliadb_models.security import RequestSecurity
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
 
@@ -73,9 +74,9 @@ async def find_knowledgebox(
     response: Response,
     kbid: str,
     query: str = fastapi_query(SearchParamDefaults.query),
-    fields: List[str] = fastapi_query(SearchParamDefaults.fields),
-    filters: List[str] = fastapi_query(SearchParamDefaults.filters),
-    faceted: List[str] = fastapi_query(SearchParamDefaults.faceted),
+    fields: list[str] = fastapi_query(SearchParamDefaults.fields),
+    filters: list[str] = fastapi_query(SearchParamDefaults.filters),
+    faceted: list[str] = fastapi_query(SearchParamDefaults.faceted),
     page_number: int = fastapi_query(SearchParamDefaults.page_number),
     page_size: int = fastapi_query(SearchParamDefaults.page_size),
     min_score: float = fastapi_query(SearchParamDefaults.min_score),
@@ -91,7 +92,7 @@ async def find_knowledgebox(
     range_modification_end: Optional[datetime] = fastapi_query(
         SearchParamDefaults.range_modification_end
     ),
-    features: List[SearchOptions] = fastapi_query(
+    features: list[SearchOptions] = fastapi_query(
         SearchParamDefaults.search_features,
         default=[
             SearchOptions.PARAGRAPH,
@@ -100,21 +101,25 @@ async def find_knowledgebox(
     ),
     debug: bool = fastapi_query(SearchParamDefaults.debug),
     highlight: bool = fastapi_query(SearchParamDefaults.highlight),
-    show: List[ResourceProperties] = fastapi_query(SearchParamDefaults.show),
-    field_type_filter: List[FieldTypeName] = fastapi_query(
+    show: list[ResourceProperties] = fastapi_query(SearchParamDefaults.show),
+    field_type_filter: list[FieldTypeName] = fastapi_query(
         SearchParamDefaults.field_type_filter, alias="field_type"
     ),
-    extracted: List[ExtractedDataTypeName] = fastapi_query(
+    extracted: list[ExtractedDataTypeName] = fastapi_query(
         SearchParamDefaults.extracted
     ),
     with_duplicates: bool = fastapi_query(SearchParamDefaults.with_duplicates),
     with_synonyms: bool = fastapi_query(SearchParamDefaults.with_synonyms),
     autofilter: bool = fastapi_query(SearchParamDefaults.autofilter),
+    security_groups: list[str] = fastapi_query(SearchParamDefaults.security_groups),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> Union[KnowledgeboxFindResults, HTTPClientError]:
     try:
+        security = None
+        if len(security_groups) > 0:
+            security = RequestSecurity(groups=security_groups)
         item = FindRequest(
             query=query,
             fields=fields,
@@ -136,6 +141,7 @@ async def find_knowledgebox(
             with_duplicates=with_duplicates,
             with_synonyms=with_synonyms,
             autofilter=autofilter,
+            security=security,
         )
     except ValidationError as exc:
         detail = json.loads(exc.json())

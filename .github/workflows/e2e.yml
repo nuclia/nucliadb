@@ -65,7 +65,9 @@ jobs:
             --namespace nucliadb \
             --values e2e/conf/chart.values.yaml \
             --set "env.DRIVER_PG_URL=postgresql://postgres:${{ steps.envs.outputs.PGPASSWORD }}@my-postgresql.default.svc.cluster.local:5432/postgres" \
-            --set "env.NUA_API_KEY=${{ secrets.NUA_API_KEY }}"
+            --set "env.NUA_API_KEY=${{ secrets.NUA_API_KEY }}" \
+            --set "image=localhost:32000/nucliadb" \
+            --set "imageVersion=test"
           sleep 10
           kubectl -n nucliadb wait --timeout=2m --for=condition=Ready pod -l statefulset.kubernetes.io/pod-name=nucliadb-0 || (
             kubectl get all --all-namespaces

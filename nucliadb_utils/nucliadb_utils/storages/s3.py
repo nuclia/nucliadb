@@ -47,11 +47,19 @@ RETRIABLE_EXCEPTIONS = (
 POLICY_DELETE = {
     "Rules": [
         {
-            "Expiration": {
-                "Days": 0,
-            },
+            "Expiration": {"Days": 1},
+            "ID": "FullDelete",
+            "Filter": {"Prefix": ""},
             "Status": "Enabled",
-        }
+            "NoncurrentVersionExpiration": {"NoncurrentDays": 1},
+            "AbortIncompleteMultipartUpload": {"DaysAfterInitiation": 1},
+        },
+        {
+            "Expiration": {"ExpiredObjectDeleteMarker": True},
+            "ID": "DeleteMarkers",
+            "Filter": {"Prefix": ""},
+            "Status": "Enabled",
+        },
     ]
 }
 
@@ -322,12 +330,6 @@ class S3Storage(Storage):
         self._aws_access_key = aws_client_id
         self._aws_secret_key = aws_client_secret
         self._region_name = region_name
-        self._bucket_creation_options = {}
-
-        if region_name is not None:
-            self._bucket_creation_options = {
-                "CreateBucketConfiguration": {"LocationConstraint": self._region_name}
-            }
 
         self._bucket_tags = bucket_tags
 
@@ -402,7 +404,9 @@ class S3Storage(Storage):
         return await bucket_exists(self._s3aioclient, bucket_name)
 
     async def create_bucket(self, bucket_name: str):
-        await create_bucket(self._s3aioclient, bucket_name, self._bucket_tags)
+        await create_bucket(
+            self._s3aioclient, bucket_name, self._bucket_tags, self._region_name
+        )
 
     async def schedule_delete_kb(self, kbid: str):
         bucket_name = self.get_bucket_name(kbid)
@@ -466,10 +470,18 @@ async def bucket_exists(client: AioSession, bucket_name: str) -> bool:
 
 
 async def create_bucket(
-    client: AioSession, bucket_name: str, bucket_tags: Optional[dict[str, str]] = None
+    client: AioSession,
+    bucket_name: str,
+    bucket_tags: Optional[dict[str, str]] = None,
+    region_name: Optional[str] = None,
 ):
+    bucket_creation_options = {}
+    if region_name is not None:
+        bucket_creation_options = {
+            "CreateBucketConfiguration": {"LocationConstraint": region_name}
+        }
     # Create the bucket
-    await client.create_bucket(Bucket=bucket_name)
+    await client.create_bucket(Bucket=bucket_name, **bucket_creation_options)
 
     if bucket_tags is not None and len(bucket_tags) > 0:
         # Set bucket tags

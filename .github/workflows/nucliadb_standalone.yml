@@ -18,9 +18,11 @@ on:
       - "nucliadb_node/**"
       - "nucliadb_vectors/**"
       - "nucliadb_texts/**"
+      - "nucliadb_texts2/**"
       - "nucliadb_paragraphs/**"
       - "nucliadb_core/**"
       - "nucliadb_relations/**"
+      - 'nucliadb_relations2/**'
   push:
     branches:
       - main
@@ -102,6 +104,7 @@ jobs:
               - 'nucliadb_paragraphs/**'
               - 'nucliadb_procs/**'
               - 'nucliadb_relations/**'
+              - 'nucliadb_relations2/**'
               - 'nucliadb_telemetry/**'
               - 'nucliadb_texts/**'
               - 'nucliadb_vectors/**'

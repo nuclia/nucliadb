@@ -21,7 +21,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, List, Optional
+import random
+from typing import Any, List, Optional, Union
 
 import backoff
 
@@ -35,7 +36,7 @@ from nucliadb.common.maindb.exceptions import ConflictError
 from nucliadb_telemetry import metrics
 
 try:
-    from tikv_client.asynchronous import TransactionClient  # type: ignore
+    from tikv_client import asynchronous  # type: ignore
 
     TiKV = True
 except ImportError:  # pragma: no cover
@@ -49,67 +50,60 @@ tikv_observer = metrics.Observer(
 logger = logging.getLogger(__name__)
 
 
-class TiKVTransaction(Transaction):
-    driver: TiKVDriver
-
-    def __init__(self, txn: Any, driver: TiKVDriver):
-        self.txn = txn
-        self.driver = driver
-        self.open = True
+class TiKVDataLayer:
+    def __init__(
+        self, connection: Union[asynchronous.RawClient, asynchronous.Transaction]
+    ):
+        self.connection = connection
 
     async def abort(self):
-        if not self.open:
-            return
-
         with tikv_observer({"type": "rollback"}):
             try:
-                await self.txn.rollback()
+                await self.connection.rollback()
             except Exception:
                 logger.exception("Error rolling back transaction")
-        self.open = False
 
     async def commit(self):
         with tikv_observer({"type": "commit"}):
             try:
-                await self.txn.commit()
+                await self.connection.commit()
             except Exception as exc:
                 exc_text = str(exc)
                 if "WriteConflict" in exc_text:
                     raise ConflictError(exc_text) from exc
                 else:
                     raise
-        self.open = False
 
     async def batch_get(self, keys: list[str]) -> list[Optional[bytes]]:
         bytes_keys: list[bytes] = [x.encode() for x in keys]
         with tikv_observer({"type": "batch_get"}):
             output = {}
-            for key, value in await self.txn.batch_get(bytes_keys):
+            for key, value in await self.connection.batch_get(bytes_keys):
                 output[key.decode()] = value
         return [output.get(key) for key in keys]
 
     @backoff.on_exception(backoff.expo, (TimeoutError,), max_tries=2)
     async def get(self, key: str) -> Optional[bytes]:
-        with tikv_observer({"type": "get"}):
-            try:
-                return await self.txn.get(key.encode())
-            except Exception as exc:
-                # The tikv_client library does not provide specific exceptions and simply
-                # raises generic Exception class with different error strings. That forces
-                # us to parse the error string to determine the type of error...
-                exc_text = str(exc)
-                if "4-DEADLINE_EXCEEDED" in exc_text:
-                    raise TimeoutError(exc_text) from exc
-                else:
-                    raise
+        try:
+            with tikv_observer({"type": "get"}):
+                return await self.connection.get(key.encode())
+        except Exception as exc:
+            # The tikv_client library does not provide specific exceptions and simply
+            # raises generic Exception class with different error strings. That forces
+            # us to parse the error string to determine the type of error...
+            exc_text = str(exc)
+            if "4-DEADLINE_EXCEEDED" in exc_text:
+                raise TimeoutError(exc_text) from exc
+            else:
+                raise
 
-    async def set(self, key: str, value: bytes):
+    async def set(self, key: str, value: bytes) -> None:
         with tikv_observer({"type": "put"}):
-            await self.txn.put(key.encode(), value)
+            await self.connection.put(key.encode(), value)
 
-    async def delete(self, key: str):
+    async def delete(self, key: str) -> None:
         with tikv_observer({"type": "delete"}):
-            await self.txn.delete(key.encode())
+            await self.connection.delete(key.encode())
 
     async def keys(
         self,
@@ -124,46 +118,36 @@ class TiKVTransaction(Transaction):
         until all matching keys are retrieved.
         With any other count, only up to count keys will be returned.
         """
-        assert self.driver.tikv is not None
-        with tikv_observer({"type": "begin"}):
-            # We need to create a new transaction
-            # this seems weird but is necessary with current usage of tikv_client
-            txn = await self.driver.tikv.begin(pessimistic=False)
-
         get_all_keys = count == -1
         limit = DEFAULT_BATCH_SCAN_LIMIT if get_all_keys else count
         start_key = match.encode()
         _include_start = include_start
 
-        try:
-            while True:
-                with tikv_observer({"type": "scan_keys"}):
-                    keys = await txn.scan_keys(
-                        start=start_key,
-                        end=None,
-                        limit=limit,
-                        include_start=_include_start,
-                    )
-                for key in keys:
-                    str_key = key.decode()
-                    if str_key.startswith(match):
-                        yield str_key
-                    else:
-                        break
+        while True:
+            with tikv_observer({"type": "scan_keys"}):
+                keys = await self.connection.scan_keys(
+                    start=start_key,
+                    end=None,
+                    limit=limit,
+                    include_start=_include_start,
+                )
+            for key in keys:
+                str_key = key.decode()
+                if str_key.startswith(match):
+                    yield str_key
                 else:
-                    if len(keys) == limit and get_all_keys:
-                        # If all keys were requested and it may exist
-                        # some more keys to retrieve
-                        start_key = keys[-1]
-                        _include_start = False
-                        continue
+                    break
+            else:
+                if len(keys) == limit and get_all_keys:
+                    # If all keys were requested and it may exist
+                    # some more keys to retrieve
+                    start_key = keys[-1]
+                    _include_start = False
+                    continue
 
-                # If not all keys were requested
-                # or the for loop found an unmatched key
-                break
-        finally:
-            with tikv_observer({"type": "rollback"}):
-                await txn.rollback()
+            # If not all keys were requested
+            # or the for loop found an unmatched key
+            break
 
     async def count(self, match: str) -> int:
         """
@@ -178,7 +162,7 @@ class TiKVTransaction(Transaction):
         value = 0
         while True:
             with tikv_observer({"type": "scan_keys"}):
-                keys = await self.txn.scan_keys(
+                keys = await self.connection.scan_keys(
                     start=start_key,
                     end=None,
                     limit=batch_size,
@@ -218,58 +202,181 @@ class TiKVTransaction(Transaction):
         return value
 
 
-class TiKVDriver(Driver):
-    tikv = None
+class TiKVTransaction(Transaction):
+    driver: TiKVDriver
 
-    def __init__(self, url: List[str]):
-        if TiKV is False:
-            raise ImportError("TiKV is not installed")
+    def __init__(self, txn: Any, driver: TiKVDriver):
+        self.txn = txn
+        self.driver = driver
+        self.data_layer = TiKVDataLayer(txn)
+        self.open = True
+
+    async def abort(self):
+        if not self.open:
+            return
+        await self.data_layer.abort()
+        self.open = False
+
+    async def commit(self):
+        assert self.open
+        await self.data_layer.commit()
+        self.open = False
+
+    async def batch_get(self, keys: list[str]) -> list[Optional[bytes]]:
+        assert self.open
+        return await self.data_layer.batch_get(keys)
+
+    @backoff.on_exception(backoff.expo, (TimeoutError,), max_tries=2)
+    async def get(self, key: str) -> Optional[bytes]:
+        assert self.open
+        return await self.data_layer.get(key)
+
+    async def set(self, key: str, value: bytes) -> None:
+        assert self.open
+        return await self.data_layer.set(key, value)
+
+    async def delete(self, key: str) -> None:
+        assert self.open
+        return await self.data_layer.delete(key)
+
+    async def keys(
+        self, match: str, count: int = DEFAULT_SCAN_LIMIT, include_start: bool = True
+    ):
+        assert self.open
+        # XXX must have connection outside of current txn
+        conn_holder = self.driver.get_connection_holder()
+        txn = await conn_holder.get_snapshot()
+        dl = TiKVDataLayer(txn)
+
+        async for key in dl.keys(match, count, include_start):
+            yield key
+
+    async def count(self, match: str) -> int:
+        assert self.open
+        return await self.data_layer.count(match)
+
+
+class ReadOnlyTiKVTransaction(Transaction):
+    driver: TiKVDriver
+
+    def __init__(self, connection: asynchronous.Snapshot, driver: TiKVDriver):
+        self.connection = connection
+        self.data_layer = TiKVDataLayer(connection)
+        self.driver = driver
+        self.open = True
+
+    async def abort(self):
+        self.open = False
+
+    async def commit(self):
+        raise Exception("Cannot commit transaction in read only mode")
+
+    async def batch_get(self, keys: list[str]) -> list[Optional[bytes]]:
+        assert self.open
+        return await self.data_layer.batch_get(keys)
+
+    async def get(self, key: str) -> Optional[bytes]:
+        assert self.open
+        return await self.data_layer.get(key)
+
+    async def set(self, key: str, value: bytes) -> None:
+        raise Exception("Cannot set in read only transaction")
+
+    async def delete(self, key: str) -> None:
+        raise Exception("Cannot delete in read only transaction")
+
+    async def keys(
+        self, match: str, count: int = DEFAULT_SCAN_LIMIT, include_start: bool = True
+    ):
+        assert self.open
+        async for key in self.data_layer.keys(match, count, include_start):
+            yield key
+
+    async def count(self, match: str) -> int:
+        assert self.open
+        return await self.data_layer.count(match)
+
+
+class ConnectionHolder:
+    _txn_connection: asynchronous.TransactionClient
+
+    def __init__(self, url: list[str]):
         self.url = url
         self.connect_lock = asyncio.Lock()
-        self.connect_in_progress = False
 
-    async def initialize(self):
-        async with self.connect_lock:
-            if self.initialized is False and self.tikv is None:
-                self.tikv = await TransactionClient.connect(self.url)
-            self.initialized = True
+    async def initialize(self) -> None:
+        self._txn_connection = await asynchronous.TransactionClient.connect(self.url)
+
+    async def get_snapshot(
+        self, timestamp: Optional[float] = None, retried: bool = False
+    ) -> asynchronous.Snapshot:
+        if self.connect_lock.locked():  # pragma: no cover
+            async with self.connect_lock:
+                ...
+        try:
+            if timestamp is None:
+                with tikv_observer({"type": "current_timestamp"}):
+                    timestamp = await self._txn_connection.current_timestamp()
+            return self._txn_connection.snapshot(timestamp, pessimistic=False)
+        except Exception:
+            if retried:
+                raise
+            logger.exception(
+                f"Error getting snapshot for tikv. Retrying once and then failing."
+            )
+            await self.reinitialize()
+            return await self.get_snapshot(timestamp, retried=True)
+
+    async def begin_transaction(self) -> asynchronous.Transaction:
+        if self.connect_lock.locked():  # pragma: no cover
+            async with self.connect_lock:
+                ...
+        try:
+            # pessimistic=False means faster but more conflicts
+            with tikv_observer({"type": "begin"}):
+                return await self._txn_connection.begin(pessimistic=False)
+        except Exception:
+            logger.exception(
+                f"Error getting transaction for tikv. Retrying once and then failing."
+            )
+            await self.reinitialize()
+            return await self._txn_connection.begin(pessimistic=False)
 
     async def reinitialize(self) -> None:
-        if self.connect_in_progress:
+        if self.connect_lock.locked():
             async with self.connect_lock:
                 # wait for lock and then just continue because someone else is establishing the connection
                 return
         else:
-            self.connect_in_progress = True
-            try:
-                async with self.connect_lock:
-                    logger.warning("Reconnecting to TiKV")
-                    self.tikv = await TransactionClient.connect(self.url)
-            finally:
-                self.connect_in_progress = False
+            async with self.connect_lock:
+                logger.warning("Reconnecting to TiKV")
+                await self.initialize()
+
+
+class TiKVDriver(Driver):
+    def __init__(self, url: List[str], pool_size: int = 3):
+        if TiKV is False:
+            raise ImportError("TiKV is not installed")
+        self.url = url
+        self.pool: list[ConnectionHolder] = []
+        self.pool_size = pool_size
+
+    async def initialize(self):
+        self.pool = [ConnectionHolder(self.url) for _ in range(self.pool_size)]
+        for holder in self.pool:
+            await holder.reinitialize()
 
     async def finalize(self):
-        pass
+        self.pool.clear()
 
-    async def begin(self) -> TiKVTransaction:
-        if self.tikv is None:
-            raise AttributeError()
-        with tikv_observer({"type": "begin"}):
-            try:
-                txn = await self.tikv.begin(pessimistic=False)
-            except Exception as exc:
-                if "failed to connect to" not in str(exc):
-                    # NO exception handling in client, this is ugly but the best
-                    # we have right now
-                    # Exception looks like this:
-                    # Exception: [//client-rust-5a1ccd35a54db20f/eb1d2da/tikv-client-pd/src/cluster.rs:264]:
-                    #   failed to connect to
-                    #   [Member { name: "pd", member_id: 3474484975246189105, peer_urls: ["http://127.0.0.1:2380"],
-                    #             client_urls: ["http://127.0.0.1:2379"], leader_priority: 0, deploy_path: "",
-                    #             binary_version: "", git_hash: "", dc_location: "" }]
-                    raise
-                # attempt to reconnect once per driver so we need to deal with locks
-                await self.reinitialize()
-                txn = await self.tikv.begin(pessimistic=False)
+    def get_connection_holder(self) -> ConnectionHolder:
+        return random.choice(self.pool)
 
-        return TiKVTransaction(txn, driver=self)
+    async def begin(
+        self, read_only: bool = False
+    ) -> Union[TiKVTransaction, ReadOnlyTiKVTransaction]:
+        conn = self.get_connection_holder()
+        if read_only:
+            return ReadOnlyTiKVTransaction(await conn.get_snapshot(), self)
+        else:
+            return TiKVTransaction(await conn.begin_transaction(), self)

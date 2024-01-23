@@ -311,38 +311,24 @@ class ParagraphStreamingBatch(google.protobuf.message.Message):
 global___ParagraphStreamingBatch = ParagraphStreamingBatch
 
 @typing_extensions.final
-class Paragraph(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    ID_FIELD_NUMBER: builtins.int
-    TEXT_FIELD_NUMBER: builtins.int
-    id: builtins.str
-    text: builtins.str
-    def __init__(
-        self,
-        *,
-        id: builtins.str = ...,
-        text: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["id", b"id", "text", b"text"]) -> None: ...
-
-global___Paragraph = Paragraph
-
-@typing_extensions.final
 class Question(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     TEXT_FIELD_NUMBER: builtins.int
     LANGUAGE_FIELD_NUMBER: builtins.int
+    PARAGRAPHS_FIELD_NUMBER: builtins.int
     text: builtins.str
     language: builtins.str
+    @property
+    def paragraphs(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     def __init__(
         self,
         *,
         text: builtins.str = ...,
         language: builtins.str = ...,
+        paragraphs: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["language", b"language", "text", b"text"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["language", b"language", "paragraphs", b"paragraphs", "text", b"text"]) -> None: ...
 
 global___Question = Question
 
@@ -352,15 +338,19 @@ class Answer(google.protobuf.message.Message):
 
     TEXT_FIELD_NUMBER: builtins.int
     LANGUAGE_FIELD_NUMBER: builtins.int
+    PARAGRAPHS_FIELD_NUMBER: builtins.int
     text: builtins.str
     language: builtins.str
+    @property
+    def paragraphs(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     def __init__(
         self,
         *,
         text: builtins.str = ...,
         language: builtins.str = ...,
+        paragraphs: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["language", b"language", "text", b"text"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["language", b"language", "paragraphs", b"paragraphs", "text", b"text"]) -> None: ...
 
 global___Answer = Answer
 
@@ -370,22 +360,21 @@ class QuestionAnswerStreamItem(google.protobuf.message.Message):
 
     QUESTION_FIELD_NUMBER: builtins.int
     ANSWER_FIELD_NUMBER: builtins.int
-    PARAGRAPHS_FIELD_NUMBER: builtins.int
+    CANCELLED_BY_USER_FIELD_NUMBER: builtins.int
     @property
     def question(self) -> global___Question: ...
     @property
     def answer(self) -> global___Answer: ...
-    @property
-    def paragraphs(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Paragraph]: ...
+    cancelled_by_user: builtins.bool
     def __init__(
         self,
         *,
         question: global___Question | None = ...,
         answer: global___Answer | None = ...,
-        paragraphs: collections.abc.Iterable[global___Paragraph] | None = ...,
+        cancelled_by_user: builtins.bool = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["answer", b"answer", "question", b"question"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["answer", b"answer", "paragraphs", b"paragraphs", "question", b"question"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["answer", b"answer", "cancelled_by_user", b"cancelled_by_user", "question", b"question"]) -> None: ...
 
 global___QuestionAnswerStreamItem = QuestionAnswerStreamItem
 

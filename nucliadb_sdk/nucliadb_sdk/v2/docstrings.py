@@ -264,13 +264,26 @@ RESOURCE_CHAT = Docstring(
         ),
         Example(
             description="You can use the `content` parameter to pass previous context to the query",
-            code=""">>> from nucliadb_models.search import ChatRequest, Message
+            code=""">>> from nucliadb_models.search import ChatRequest, ChatContextMessage
 >>> content = ChatRequest()
 >>> content.query = "What is the average temperature?"
->>> content.context.append(Messate(author="USER", text="What is the coldest season in Sevilla?"))
->>> content.context.append(Messate(author="NUCLIA", text="January is the coldest month."))
+>>> content.context.append(ChatContextMessage(author="USER", text="What is the coldest season in Sevilla?"))
+>>> content.context.append(ChatContextMessage(author="NUCLIA", text="January is the coldest month."))
 >>> sdk.chat(kbid="mykbid", content=content).answer
 'According to the context, the average temperature in January in Sevilla is 15.9 °C and 5.2 °C.'
+""",
+        ),
+    ],
+)
+
+SUMMARIZE = Docstring(
+    doc="""Summarize your documents""",
+    examples=[
+        Example(
+            description="Get a summary of a document or a list of documents",
+            code=""">>> summary = sdk.summarize(kbid="mykbid", resources=["uuid1"]).summary
+>>> print(summary)
+'The document talks about Seville and its temperature. It also mentions the coldest month of the year, which is January.'  # noqa
 """,
         ),
     ],

@@ -19,7 +19,7 @@
 #
 
 from collections import OrderedDict
-from typing import AsyncGenerator, Dict, List, Tuple, cast
+from typing import AsyncGenerator, cast
 
 from nucliadb_protos.dataset_pb2 import (
     TokenClassificationBatch,
@@ -33,8 +33,8 @@ from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.train import logger
 from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
 
-NERS_DICT = Dict[str, Dict[str, List[Tuple[int, int]]]]
-POSITION_DICT = OrderedDict[Tuple[int, int], Tuple[str, str]]
+NERS_DICT = dict[str, dict[str, list[tuple[int, int]]]]
+POSITION_DICT = OrderedDict[tuple[int, int], tuple[str, str]]
 MAIN = "__main__"
 
 
@@ -73,7 +73,7 @@ async def generate_token_classification_payloads(
             field_item.uuid,
             field,
             field_type,
-            cast(List[str], trainset.filter.labels),
+            cast(list[str], trainset.filter.labels),
         )
         for split, text in split_text.items():
             ners: POSITION_DICT = ordered_positions.get(split, OrderedDict())
@@ -89,8 +89,8 @@ async def generate_token_classification_payloads(
 
 
 async def get_field_text(
-    kbid: str, rid: str, field: str, field_type: str, valid_entity_groups: List[str]
-) -> Tuple[Dict[str, str], Dict[str, POSITION_DICT], Dict[str, List[Tuple[int, int]]]]:
+    kbid: str, rid: str, field: str, field_type: str, valid_entity_groups: list[str]
+) -> tuple[dict[str, str], dict[str, POSITION_DICT], dict[str, list[tuple[int, int]]]]:
     orm_resource = await get_resource_from_cache_or_db(kbid, rid)
 
     if orm_resource is None:
@@ -106,16 +106,16 @@ async def get_field_text(
         )
         return {}, {}, {}
 
-    split_text: Dict[str, str] = extracted_text.split_text
+    split_text: dict[str, str] = extracted_text.split_text
     split_text[MAIN] = extracted_text.text
 
-    split_ners: Dict[
+    split_ners: dict[
         str, NERS_DICT
     ] = {}  # Dict of entity group , with entity and list of positions in field
     split_ners[MAIN] = {}
 
     basic_data = await orm_resource.get_basic()
-    invalid_tokens_split: Dict[str, List[Tuple[str, str, int, int]]] = {}
+    invalid_tokens_split: dict[str, list[tuple[str, str, int, int]]] = {}
     # Check user definition of entities
     if basic_data is not None:
         for userfieldmetadata in basic_data.fieldmetadata:
@@ -189,9 +189,9 @@ async def get_field_text(
                         if len(split_ners[split][token.klass]) == 0:
                             del split_ners[split][token.klass]
 
-    ordered_positions: Dict[str, POSITION_DICT] = {}
+    ordered_positions: dict[str, POSITION_DICT] = {}
     for split, ners in split_ners.items():
-        split_positions: Dict[Tuple[int, int], Tuple[str, str]] = {}
+        split_positions: dict[tuple[int, int], tuple[str, str]] = {}
         for entity_group, entities in ners.items():
             for entity, positions in entities.items():
                 for position in positions:
@@ -201,7 +201,7 @@ async def get_field_text(
             sorted(split_positions.items(), key=lambda x: x[0])
         )
 
-    split_paragraphs: Dict[str, List[Tuple[int, int]]] = {}
+    split_paragraphs: dict[str, list[tuple[int, int]]] = {}
     if field_metadata is not None:
         split_paragraphs[MAIN] = sorted(
             [(p.start, p.end) for p in field_metadata.metadata.paragraphs],
@@ -249,7 +249,7 @@ def compute_segments(field_text: str, ners: POSITION_DICT, start: int, end: int)
     return segments
 
 
-def process_entities(text: str, ners: POSITION_DICT, paragraphs: List[Tuple[int, int]]):
+def process_entities(text: str, ners: POSITION_DICT, paragraphs: list[tuple[int, int]]):
     if len(paragraphs) > 0:
         for paragraph in paragraphs:
             segments = compute_segments(

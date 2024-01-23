@@ -52,6 +52,7 @@ from nucliadb.ingest import logger
 from nucliadb.ingest.orm.utils import compute_paragraph_key
 from nucliadb_models.labels import BASE_LABELS, flatten_resource_labels
 from nucliadb_models.metadata import ResourceProcessingStatus
+from nucliadb_protos import utils_pb2
 
 if TYPE_CHECKING:  # pragma: no cover
     StatusValue = Union[Metadata.Status.V, int]
@@ -331,6 +332,9 @@ class ResourceBrain:
         else:
             # Means it has just been processed
             self.brain.status = PBBrainResource.PROCESSED
+
+    def set_security(self, security: utils_pb2.Security):
+        self.brain.security.CopyFrom(security)
 
     def get_processing_status_tag(self, metadata: Metadata) -> str:
         if not metadata.useful:

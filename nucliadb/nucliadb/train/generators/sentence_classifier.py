@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import AsyncGenerator, List
+from typing import AsyncGenerator
 
 from fastapi import HTTPException
 from nucliadb_protos.dataset_pb2 import (
@@ -72,7 +72,7 @@ async def generate_sentence_classification_payloads(
         request.filter.labels.append(labelset)
 
     async for paragraph_item in node.stream_get_paragraphs(request):
-        text_labels: List[str] = []
+        text_labels: list[str] = []
         for label in paragraph_item.labels:
             for labelset in labelsets:
                 if label.startswith(labelset):
@@ -93,7 +93,7 @@ async def generate_sentence_classification_payloads(
         yield tl
 
 
-async def get_sentences(kbid: str, result: str) -> List[str]:
+async def get_sentences(kbid: str, result: str) -> list[str]:
     if result.count("/") == 4:
         rid, field_type, field, split_str, _ = result.split("/")
         split = int(split_str)

@@ -18,8 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import asyncio
-from typing import List, Optional
+from typing import Optional
 
 import nucliadb_models as models
 from nucliadb.common.maindb.driver import Transaction
@@ -55,6 +54,7 @@ from nucliadb_models.resource import (
     TextFieldExtractedData,
 )
 from nucliadb_models.search import ResourceProperties
+from nucliadb_models.security import ResourceSecurity
 from nucliadb_models.vectors import UserVectorSet
 from nucliadb_utils.utilities import get_storage
 
@@ -63,7 +63,7 @@ async def set_resource_field_extracted_data(
     field: Field,
     field_data: ExtractedDataType,
     field_type_name: FieldTypeName,
-    wanted_extracted_data: List[ExtractedDataTypeName],
+    wanted_extracted_data: list[ExtractedDataTypeName],
 ) -> None:
     if field_data is None:
         return
@@ -129,20 +129,40 @@ async def set_resource_field_extracted_data(
 async def serialize(
     kbid: str,
     rid: Optional[str],
-    show: List[ResourceProperties],
-    field_type_filter: List[FieldTypeName],
-    extracted: List[ExtractedDataTypeName],
+    show: list[ResourceProperties],
+    field_type_filter: list[FieldTypeName],
+    extracted: list[ExtractedDataTypeName],
     service_name: Optional[str] = None,
     slug: Optional[str] = None,
 ) -> Optional[Resource]:
     driver = get_driver()
-    txn = await driver.begin()
+    async with driver.transaction(wait_for_abort=False, read_only=True) as txn:
+        return await managed_serialize(
+            txn,
+            kbid,
+            rid,
+            show,
+            field_type_filter,
+            extracted,
+            service_name=service_name,
+            slug=slug,
+        )
 
+
+async def managed_serialize(
+    txn: Transaction,
+    kbid: str,
+    rid: Optional[str],
+    show: list[ResourceProperties],
+    field_type_filter: list[FieldTypeName],
+    extracted: list[ExtractedDataTypeName],
+    service_name: Optional[str] = None,
+    slug: Optional[str] = None,
+) -> Optional[Resource]:
     orm_resource = await get_orm_resource(
         txn, kbid, rid=rid, slug=slug, service_name=service_name
     )
     if orm_resource is None:
-        await txn.abort()
         return None
 
     resource = Resource(id=orm_resource.uuid)
@@ -219,6 +239,13 @@ async def serialize(
             resource.extra = models.Extra.from_message(orm_resource.extra)
 
     include_errors = ResourceProperties.ERRORS in show
+
+    if ResourceProperties.SECURITY in show:
+        await orm_resource.get_security()
+        resource.security = ResourceSecurity(access_groups=[])
+        if orm_resource.security is not None:
+            for gid in orm_resource.security.access_groups:
+                resource.security.access_groups.append(gid)
 
     if field_type_filter and (include_values or include_extracted_data):
         await orm_resource.get_fields()
@@ -440,7 +467,6 @@ async def serialize(
                             text=resource.data.generics[field.id].value
                         )
                     )
-    asyncio.create_task(txn.abort())
     return resource
 
 

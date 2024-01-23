@@ -21,7 +21,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from nucliadb.common.maindb.tikv import TiKVTransaction
+from nucliadb.common.maindb.tikv import TiKVDataLayer
 
 
 async def test_get_timeout_is_retried():
@@ -32,7 +32,7 @@ async def test_get_timeout_is_retried():
             )
         )
     )
-    tikv_txn = TiKVTransaction(inner_txn, None)
+    tikv_txn = TiKVDataLayer(inner_txn)
 
     with pytest.raises(TimeoutError):
         await tikv_txn.get("key")

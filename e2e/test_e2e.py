@@ -20,7 +20,7 @@ def kbid():
         headers={"content-type": "application/json", "X-NUCLIADB-ROLES": "MANAGER"},
         json={"slug": slug, "zone": "local", "title": slug},
     )
-    resp.raise_for_status()
+    raise_for_status(resp)
     kbid = resp.json()["uuid"]
     print(f'Created KB with id "{kbid}", slug "{slug}"')
     return kbid
@@ -45,7 +45,7 @@ def resource_id(kbid: str):
         },
     )
 
-    resp.raise_for_status()
+    raise_for_status(resp)
     return resp.json()["uuid"]
 
 
@@ -54,7 +54,7 @@ def test_nodes_ready():
     while True:
         try:
             resp = requests.get(os.path.join(BASE_URL, "api/v1/cluster/nodes"))
-            resp.raise_for_status()
+            raise_for_status(resp)
             assert len(resp.json()) == 2
             return
         except Exception:
@@ -67,7 +67,7 @@ def test_nodes_ready():
 
 def test_versions():
     resp = requests.get(os.path.join(BASE_URL, "api/v1/versions"))
-    resp.raise_for_status()
+    raise_for_status(resp)
     data = resp.json()
     print(f"Versions: {data}")
     assert data["nucliadb"]["installed"]
@@ -81,7 +81,7 @@ def test_config_check(kbid: str):
         os.path.join(BASE_URL, f"api/v1/config-check"),
         headers={"X-NUCLIADB-ROLES": "READER"},
     )
-    resp.raise_for_status()
+    raise_for_status(resp)
     data = resp.json()
     assert data["nua_api_key"]["has_key"]
     assert data["nua_api_key"]["valid"]
@@ -99,7 +99,7 @@ def test_resource_processed(kbid: str, resource_id: str):
             },
         )
 
-        resp.raise_for_status()
+        raise_for_status(resp)
 
         if resp.json()["metadata"]["status"] == "PROCESSED":
             break
@@ -138,7 +138,7 @@ def test_search(kbid: str, resource_id: str):
         },
     )
 
-    resp.raise_for_status()
+    raise_for_status(resp)
 
     raw = io.BytesIO(resp.content)
     toread_bytes = raw.read(4)
@@ -195,7 +195,7 @@ def _test_predict_proxy_chat(kbid: str):
             "user_id": "someone@company.uk",
         },
     )
-    resp.raise_for_status()
+    raise_for_status(resp)
     data = io.BytesIO(resp.content)
     answer = data.read().decode("utf-8")
     print(f"Answer: {answer}")
@@ -214,7 +214,7 @@ def _test_predict_proxy_tokens(kbid: str):
             "text": "Barcelona",
         },
     )
-    resp.raise_for_status()
+    raise_for_status(resp)
     data = resp.json()
     assert data["tokens"][0]["text"] == "Barcelona"
 
@@ -239,7 +239,17 @@ def _test_predict_proxy_rephrase(kbid: str):
             "user_id": "someone@company.uk",
         },
     )
-    resp.raise_for_status()
+    raise_for_status(resp)
     rephrased_query = resp.json()
     # Status code 0 means success...
     assert rephrased_query.endswith("0")
+
+
+def raise_for_status(resp):
+    try:
+        resp.raise_for_status()
+    except Exception:
+        print("Error response")
+        print("Status code:", resp.status_code)
+        print(resp.text)
+        raise

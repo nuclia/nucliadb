@@ -333,6 +333,8 @@ message SearchRequest {
     repeated string key_filters = 22;
 
     float min_score = 23;
+
+    optional utils.Security security = 24;
 }
 
 enum SuggestFeatures {
@@ -366,7 +368,7 @@ message SuggestResponse {
     repeated string ematches = 4;
 
     // Entities related with the query
-    RelatedEntities entities = 5;
+    RelationPrefixSearchResponse entity_results = 6;
 }
 
 message SearchResponse {

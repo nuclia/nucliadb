@@ -16,12 +16,13 @@ from nucliadb_protos import utils_pb2 as nucliadb__protos_dot_utils__pb2
 
 from nucliadb_protos.utils_pb2 import *
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n#nucliadb_protos/noderesources.proto\x12\rnoderesources\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bnucliadb_protos/utils.proto\"/\n\x0fTextInformation\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x0e\n\x06labels\x18\x02 \x03(\t\"j\n\rIndexMetadata\x12,\n\x08modified\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12+\n\x07\x63reated\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"\x15\n\x07ShardId\x12\n\n\x02id\x18\x01 \x01(\t\"/\n\x08ShardIds\x12#\n\x03ids\x18\x01 \x03(\x0b\x32\x16.noderesources.ShardId\"\x96\x04\n\x0cShardCreated\x12\n\n\x02id\x18\x01 \x01(\t\x12\x45\n\x10\x64ocument_service\x18\x02 \x01(\x0e\x32+.noderesources.ShardCreated.DocumentService\x12G\n\x11paragraph_service\x18\x03 \x01(\x0e\x32,.noderesources.ShardCreated.ParagraphService\x12\x41\n\x0evector_service\x18\x04 \x01(\x0e\x32).noderesources.ShardCreated.VectorService\x12\x45\n\x10relation_service\x18\x05 \x01(\x0e\x32+.noderesources.ShardCreated.RelationService\"3\n\x0f\x44ocumentService\x12\x0f\n\x0b\x44OCUMENT_V0\x10\x00\x12\x0f\n\x0b\x44OCUMENT_V1\x10\x01\"6\n\x10ParagraphService\x12\x10\n\x0cPARAGRAPH_V0\x10\x00\x12\x10\n\x0cPARAGRAPH_V1\x10\x01\"-\n\rVectorService\x12\r\n\tVECTOR_V0\x10\x00\x12\r\n\tVECTOR_V1\x10\x01\"D\n\x0fRelationService\x12\x0f\n\x0bRELATION_V0\x10\x00\x12\x0f\n\x0bRELATION_V1\x10\x01\x12\x0f\n\x0bRELATION_V2\x10\x02\"\xa8\x02\n\x0cShardCleaned\x12\x45\n\x10\x64ocument_service\x18\x02 \x01(\x0e\x32+.noderesources.ShardCreated.DocumentService\x12G\n\x11paragraph_service\x18\x03 \x01(\x0e\x32,.noderesources.ShardCreated.ParagraphService\x12\x41\n\x0evector_service\x18\x04 \x01(\x0e\x32).noderesources.ShardCreated.VectorService\x12\x45\n\x10relation_service\x18\x05 \x01(\x0e\x32+.noderesources.ShardCreated.RelationService\",\n\nResourceID\x12\x10\n\x08shard_id\x18\x01 \x01(\t\x12\x0c\n\x04uuid\x18\x02 \x01(\t\"\x80\x01\n\x05Shard\x12.\n\x08metadata\x18\x05 \x01(\x0b\x32\x1c.noderesources.ShardMetadata\x12\x10\n\x08shard_id\x18\x01 \x01(\t\x12\x0e\n\x06\x66ields\x18\x02 \x01(\x04\x12\x12\n\nparagraphs\x18\x03 \x01(\x04\x12\x11\n\tsentences\x18\x04 \x01(\x04\"\x0f\n\rEmptyResponse\"\x0c\n\nEmptyQuery\"v\n\x08Position\x12\r\n\x05index\x18\x01 \x01(\x04\x12\r\n\x05start\x18\x02 \x01(\x04\x12\x0b\n\x03\x65nd\x18\x03 \x01(\x04\x12\x13\n\x0bpage_number\x18\x04 \x01(\x04\x12\x15\n\rstart_seconds\x18\x05 \x03(\r\x12\x13\n\x0b\x65nd_seconds\x18\x06 \x03(\r\"=\n\x10SentenceMetadata\x12)\n\x08position\x18\x01 \x01(\x0b\x32\x17.noderesources.Position\"S\n\x0eVectorSentence\x12\x0e\n\x06vector\x18\x01 \x03(\x02\x12\x31\n\x08metadata\x18\t \x01(\x0b\x32\x1f.noderesources.SentenceMetadata\">\n\x11ParagraphMetadata\x12)\n\x08position\x18\x01 \x01(\x0b\x32\x17.noderesources.Position\"\xca\x02\n\x0eIndexParagraph\x12\r\n\x05start\x18\x01 \x01(\x05\x12\x0b\n\x03\x65nd\x18\x02 \x01(\x05\x12\x0e\n\x06labels\x18\x03 \x03(\t\x12?\n\tsentences\x18\x04 \x03(\x0b\x32,.noderesources.IndexParagraph.SentencesEntry\x12\r\n\x05\x66ield\x18\x05 \x01(\t\x12\r\n\x05split\x18\x06 \x01(\t\x12\r\n\x05index\x18\x07 \x01(\x04\x12\x19\n\x11repeated_in_field\x18\x08 \x01(\x08\x12\x32\n\x08metadata\x18\t \x01(\x0b\x32 .noderesources.ParagraphMetadata\x1aO\n\x0eSentencesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12,\n\x05value\x18\x02 \x01(\x0b\x32\x1d.noderesources.VectorSentence:\x02\x38\x01\"G\n\x0bVectorSetID\x12%\n\x05shard\x18\x01 \x01(\x0b\x32\x16.noderesources.ShardId\x12\x11\n\tvectorset\x18\x02 \x01(\t\"I\n\rVectorSetList\x12%\n\x05shard\x18\x01 \x01(\x0b\x32\x16.noderesources.ShardId\x12\x11\n\tvectorset\x18\x02 \x03(\t\"\xa7\x01\n\x0fIndexParagraphs\x12\x42\n\nparagraphs\x18\x01 \x03(\x0b\x32..noderesources.IndexParagraphs.ParagraphsEntry\x1aP\n\x0fParagraphsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12,\n\x05value\x18\x02 \x01(\x0b\x32\x1d.noderesources.IndexParagraph:\x02\x38\x01\"\xaf\x07\n\x08Resource\x12+\n\x08resource\x18\x01 \x01(\x0b\x32\x19.noderesources.ResourceID\x12.\n\x08metadata\x18\x02 \x01(\x0b\x32\x1c.noderesources.IndexMetadata\x12\x31\n\x05texts\x18\x03 \x03(\x0b\x32\".noderesources.Resource.TextsEntry\x12\x0e\n\x06labels\x18\x04 \x03(\t\x12\x36\n\x06status\x18\x05 \x01(\x0e\x32&.noderesources.Resource.ResourceStatus\x12;\n\nparagraphs\x18\x06 \x03(\x0b\x32\'.noderesources.Resource.ParagraphsEntry\x12\x1c\n\x14paragraphs_to_delete\x18\x07 \x03(\t\x12\x1b\n\x13sentences_to_delete\x18\x08 \x03(\t\x12\"\n\trelations\x18\t \x03(\x0b\x32\x0f.utils.Relation\x12\x10\n\x08shard_id\x18\x0b \x01(\t\x12\x35\n\x07vectors\x18\x0c \x03(\x0b\x32$.noderesources.Resource.VectorsEntry\x12G\n\x11vectors_to_delete\x18\r \x03(\x0b\x32,.noderesources.Resource.VectorsToDeleteEntry\x1aL\n\nTextsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12-\n\x05value\x18\x02 \x01(\x0b\x32\x1e.noderesources.TextInformation:\x02\x38\x01\x1aQ\n\x0fParagraphsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12-\n\x05value\x18\x02 \x01(\x0b\x32\x1e.noderesources.IndexParagraphs:\x02\x38\x01\x1a\x42\n\x0cVectorsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12!\n\x05value\x18\x02 \x01(\x0b\x32\x12.utils.UserVectors:\x02\x38\x01\x1aN\n\x14VectorsToDeleteEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12%\n\x05value\x18\x02 \x01(\x0b\x32\x16.utils.UserVectorsList:\x02\x38\x01\"h\n\x0eResourceStatus\x12\r\n\tPROCESSED\x10\x00\x12\t\n\x05\x45MPTY\x10\x01\x12\t\n\x05\x45RROR\x10\x02\x12\n\n\x06\x44\x45LETE\x10\x03\x12\x0b\n\x07PENDING\x10\x04\x12\x0b\n\x07\x42LOCKED\x10\x05\x12\x0b\n\x07\x45XPIRED\x10\x06\"M\n\rShardMetadata\x12\x0c\n\x04kbid\x18\x01 \x01(\t\x12.\n\x0frelease_channel\x18\x02 \x01(\x0e\x32\x15.utils.ReleaseChannel\"\xcc\x02\n\x0cNodeMetadata\x12\x16\n\nload_score\x18\x01 \x01(\x02\x42\x02\x18\x01\x12\x13\n\x0bshard_count\x18\x02 \x01(\x04\x12;\n\x06shards\x18\x03 \x03(\x0b\x32\'.noderesources.NodeMetadata.ShardsEntryB\x02\x18\x01\x12\x0f\n\x07node_id\x18\x04 \x01(\t\x12\x1c\n\x0fprimary_node_id\x18\x05 \x01(\tH\x00\x88\x01\x01\x1a\x35\n\rShardMetadata\x12\x0c\n\x04kbid\x18\x01 \x01(\t\x12\x16\n\nload_score\x18\x02 \x01(\x02\x42\x02\x18\x01\x1aX\n\x0bShardsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x38\n\x05value\x18\x02 \x01(\x0b\x32).noderesources.NodeMetadata.ShardMetadata:\x02\x38\x01\x42\x12\n\x10_primary_node_idP\x01\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n#nucliadb_protos/noderesources.proto\x12\rnoderesources\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bnucliadb_protos/utils.proto\"/\n\x0fTextInformation\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x0e\n\x06labels\x18\x02 \x03(\t\"j\n\rIndexMetadata\x12,\n\x08modified\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12+\n\x07\x63reated\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"\x15\n\x07ShardId\x12\n\n\x02id\x18\x01 \x01(\t\"/\n\x08ShardIds\x12#\n\x03ids\x18\x01 \x03(\x0b\x32\x16.noderesources.ShardId\"\xa7\x04\n\x0cShardCreated\x12\n\n\x02id\x18\x01 \x01(\t\x12\x45\n\x10\x64ocument_service\x18\x02 \x01(\x0e\x32+.noderesources.ShardCreated.DocumentService\x12G\n\x11paragraph_service\x18\x03 \x01(\x0e\x32,.noderesources.ShardCreated.ParagraphService\x12\x41\n\x0evector_service\x18\x04 \x01(\x0e\x32).noderesources.ShardCreated.VectorService\x12\x45\n\x10relation_service\x18\x05 \x01(\x0e\x32+.noderesources.ShardCreated.RelationService\"D\n\x0f\x44ocumentService\x12\x0f\n\x0b\x44OCUMENT_V0\x10\x00\x12\x0f\n\x0b\x44OCUMENT_V1\x10\x01\x12\x0f\n\x0b\x44OCUMENT_V2\x10\x02\"6\n\x10ParagraphService\x12\x10\n\x0cPARAGRAPH_V0\x10\x00\x12\x10\n\x0cPARAGRAPH_V1\x10\x01\"-\n\rVectorService\x12\r\n\tVECTOR_V0\x10\x00\x12\r\n\tVECTOR_V1\x10\x01\"D\n\x0fRelationService\x12\x0f\n\x0bRELATION_V0\x10\x00\x12\x0f\n\x0bRELATION_V1\x10\x01\x12\x0f\n\x0bRELATION_V2\x10\x02\"\xa8\x02\n\x0cShardCleaned\x12\x45\n\x10\x64ocument_service\x18\x02 \x01(\x0e\x32+.noderesources.ShardCreated.DocumentService\x12G\n\x11paragraph_service\x18\x03 \x01(\x0e\x32,.noderesources.ShardCreated.ParagraphService\x12\x41\n\x0evector_service\x18\x04 \x01(\x0e\x32).noderesources.ShardCreated.VectorService\x12\x45\n\x10relation_service\x18\x05 \x01(\x0e\x32+.noderesources.ShardCreated.RelationService\",\n\nResourceID\x12\x10\n\x08shard_id\x18\x01 \x01(\t\x12\x0c\n\x04uuid\x18\x02 \x01(\t\"\x80\x01\n\x05Shard\x12.\n\x08metadata\x18\x05 \x01(\x0b\x32\x1c.noderesources.ShardMetadata\x12\x10\n\x08shard_id\x18\x01 \x01(\t\x12\x0e\n\x06\x66ields\x18\x02 \x01(\x04\x12\x12\n\nparagraphs\x18\x03 \x01(\x04\x12\x11\n\tsentences\x18\x04 \x01(\x04\"\x0f\n\rEmptyResponse\"\x0c\n\nEmptyQuery\"v\n\x08Position\x12\r\n\x05index\x18\x01 \x01(\x04\x12\r\n\x05start\x18\x02 \x01(\x04\x12\x0b\n\x03\x65nd\x18\x03 \x01(\x04\x12\x13\n\x0bpage_number\x18\x04 \x01(\x04\x12\x15\n\rstart_seconds\x18\x05 \x03(\r\x12\x13\n\x0b\x65nd_seconds\x18\x06 \x03(\r\"=\n\x10SentenceMetadata\x12)\n\x08position\x18\x01 \x01(\x0b\x32\x17.noderesources.Position\"S\n\x0eVectorSentence\x12\x0e\n\x06vector\x18\x01 \x03(\x02\x12\x31\n\x08metadata\x18\t \x01(\x0b\x32\x1f.noderesources.SentenceMetadata\">\n\x11ParagraphMetadata\x12)\n\x08position\x18\x01 \x01(\x0b\x32\x17.noderesources.Position\"\xca\x02\n\x0eIndexParagraph\x12\r\n\x05start\x18\x01 \x01(\x05\x12\x0b\n\x03\x65nd\x18\x02 \x01(\x05\x12\x0e\n\x06labels\x18\x03 \x03(\t\x12?\n\tsentences\x18\x04 \x03(\x0b\x32,.noderesources.IndexParagraph.SentencesEntry\x12\r\n\x05\x66ield\x18\x05 \x01(\t\x12\r\n\x05split\x18\x06 \x01(\t\x12\r\n\x05index\x18\x07 \x01(\x04\x12\x19\n\x11repeated_in_field\x18\x08 \x01(\x08\x12\x32\n\x08metadata\x18\t \x01(\x0b\x32 .noderesources.ParagraphMetadata\x1aO\n\x0eSentencesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12,\n\x05value\x18\x02 \x01(\x0b\x32\x1d.noderesources.VectorSentence:\x02\x38\x01\"G\n\x0bVectorSetID\x12%\n\x05shard\x18\x01 \x01(\x0b\x32\x16.noderesources.ShardId\x12\x11\n\tvectorset\x18\x02 \x01(\t\"I\n\rVectorSetList\x12%\n\x05shard\x18\x01 \x01(\x0b\x32\x16.noderesources.ShardId\x12\x11\n\tvectorset\x18\x02 \x03(\t\"\xa7\x01\n\x0fIndexParagraphs\x12\x42\n\nparagraphs\x18\x01 \x03(\x0b\x32..noderesources.IndexParagraphs.ParagraphsEntry\x1aP\n\x0fParagraphsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12,\n\x05value\x18\x02 \x01(\x0b\x32\x1d.noderesources.IndexParagraph:\x02\x38\x01\"\xe4\x07\n\x08Resource\x12+\n\x08resource\x18\x01 \x01(\x0b\x32\x19.noderesources.ResourceID\x12.\n\x08metadata\x18\x02 \x01(\x0b\x32\x1c.noderesources.IndexMetadata\x12\x31\n\x05texts\x18\x03 \x03(\x0b\x32\".noderesources.Resource.TextsEntry\x12\x0e\n\x06labels\x18\x04 \x03(\t\x12\x36\n\x06status\x18\x05 \x01(\x0e\x32&.noderesources.Resource.ResourceStatus\x12;\n\nparagraphs\x18\x06 \x03(\x0b\x32\'.noderesources.Resource.ParagraphsEntry\x12\x1c\n\x14paragraphs_to_delete\x18\x07 \x03(\t\x12\x1b\n\x13sentences_to_delete\x18\x08 \x03(\t\x12\"\n\trelations\x18\t \x03(\x0b\x32\x0f.utils.Relation\x12\x10\n\x08shard_id\x18\x0b \x01(\t\x12\x35\n\x07vectors\x18\x0c \x03(\x0b\x32$.noderesources.Resource.VectorsEntry\x12G\n\x11vectors_to_delete\x18\r \x03(\x0b\x32,.noderesources.Resource.VectorsToDeleteEntry\x12&\n\x08security\x18\x0e \x01(\x0b\x32\x0f.utils.SecurityH\x00\x88\x01\x01\x1aL\n\nTextsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12-\n\x05value\x18\x02 \x01(\x0b\x32\x1e.noderesources.TextInformation:\x02\x38\x01\x1aQ\n\x0fParagraphsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12-\n\x05value\x18\x02 \x01(\x0b\x32\x1e.noderesources.IndexParagraphs:\x02\x38\x01\x1a\x42\n\x0cVectorsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12!\n\x05value\x18\x02 \x01(\x0b\x32\x12.utils.UserVectors:\x02\x38\x01\x1aN\n\x14VectorsToDeleteEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12%\n\x05value\x18\x02 \x01(\x0b\x32\x16.utils.UserVectorsList:\x02\x38\x01\"h\n\x0eResourceStatus\x12\r\n\tPROCESSED\x10\x00\x12\t\n\x05\x45MPTY\x10\x01\x12\t\n\x05\x45RROR\x10\x02\x12\n\n\x06\x44\x45LETE\x10\x03\x12\x0b\n\x07PENDING\x10\x04\x12\x0b\n\x07\x42LOCKED\x10\x05\x12\x0b\n\x07\x45XPIRED\x10\x06\x42\x0b\n\t_security\"M\n\rShardMetadata\x12\x0c\n\x04kbid\x18\x01 \x01(\t\x12.\n\x0frelease_channel\x18\x02 \x01(\x0e\x32\x15.utils.ReleaseChannel\"\xcc\x02\n\x0cNodeMetadata\x12\x16\n\nload_score\x18\x01 \x01(\x02\x42\x02\x18\x01\x12\x13\n\x0bshard_count\x18\x02 \x01(\x04\x12;\n\x06shards\x18\x03 \x03(\x0b\x32\'.noderesources.NodeMetadata.ShardsEntryB\x02\x18\x01\x12\x0f\n\x07node_id\x18\x04 \x01(\t\x12\x1c\n\x0fprimary_node_id\x18\x05 \x01(\tH\x00\x88\x01\x01\x1a\x35\n\rShardMetadata\x12\x0c\n\x04kbid\x18\x01 \x01(\t\x12\x16\n\nload_score\x18\x02 \x01(\x02\x42\x02\x18\x01\x1aX\n\x0bShardsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x38\n\x05value\x18\x02 \x01(\x0b\x32).noderesources.NodeMetadata.ShardMetadata:\x02\x38\x01\x42\x12\n\x10_primary_node_idP\x01\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'nucliadb_protos.noderesources_pb2', _globals)
 if _descriptor._USE_C_DESCRIPTORS == False:
+
   DESCRIPTOR._options = None
   _INDEXPARAGRAPH_SENTENCESENTRY._options = None
   _INDEXPARAGRAPH_SENTENCESENTRY._serialized_options = b'8\001'
@@ -52,63 +53,63 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _globals['_SHARDIDS']._serialized_start=296
   _globals['_SHARDIDS']._serialized_end=343
   _globals['_SHARDCREATED']._serialized_start=346
-  _globals['_SHARDCREATED']._serialized_end=880
+  _globals['_SHARDCREATED']._serialized_end=897
   _globals['_SHARDCREATED_DOCUMENTSERVICE']._serialized_start=656
-  _globals['_SHARDCREATED_DOCUMENTSERVICE']._serialized_end=707
-  _globals['_SHARDCREATED_PARAGRAPHSERVICE']._serialized_start=709
-  _globals['_SHARDCREATED_PARAGRAPHSERVICE']._serialized_end=763
-  _globals['_SHARDCREATED_VECTORSERVICE']._serialized_start=765
-  _globals['_SHARDCREATED_VECTORSERVICE']._serialized_end=810
-  _globals['_SHARDCREATED_RELATIONSERVICE']._serialized_start=812
-  _globals['_SHARDCREATED_RELATIONSERVICE']._serialized_end=880
-  _globals['_SHARDCLEANED']._serialized_start=883
-  _globals['_SHARDCLEANED']._serialized_end=1179
-  _globals['_RESOURCEID']._serialized_start=1181
-  _globals['_RESOURCEID']._serialized_end=1225
-  _globals['_SHARD']._serialized_start=1228
-  _globals['_SHARD']._serialized_end=1356
-  _globals['_EMPTYRESPONSE']._serialized_start=1358
-  _globals['_EMPTYRESPONSE']._serialized_end=1373
-  _globals['_EMPTYQUERY']._serialized_start=1375
-  _globals['_EMPTYQUERY']._serialized_end=1387
-  _globals['_POSITION']._serialized_start=1389
-  _globals['_POSITION']._serialized_end=1507
-  _globals['_SENTENCEMETADATA']._serialized_start=1509
-  _globals['_SENTENCEMETADATA']._serialized_end=1570
-  _globals['_VECTORSENTENCE']._serialized_start=1572
-  _globals['_VECTORSENTENCE']._serialized_end=1655
-  _globals['_PARAGRAPHMETADATA']._serialized_start=1657
-  _globals['_PARAGRAPHMETADATA']._serialized_end=1719
-  _globals['_INDEXPARAGRAPH']._serialized_start=1722
-  _globals['_INDEXPARAGRAPH']._serialized_end=2052
-  _globals['_INDEXPARAGRAPH_SENTENCESENTRY']._serialized_start=1973
-  _globals['_INDEXPARAGRAPH_SENTENCESENTRY']._serialized_end=2052
-  _globals['_VECTORSETID']._serialized_start=2054
-  _globals['_VECTORSETID']._serialized_end=2125
-  _globals['_VECTORSETLIST']._serialized_start=2127
-  _globals['_VECTORSETLIST']._serialized_end=2200
-  _globals['_INDEXPARAGRAPHS']._serialized_start=2203
-  _globals['_INDEXPARAGRAPHS']._serialized_end=2370
-  _globals['_INDEXPARAGRAPHS_PARAGRAPHSENTRY']._serialized_start=2290
-  _globals['_INDEXPARAGRAPHS_PARAGRAPHSENTRY']._serialized_end=2370
-  _globals['_RESOURCE']._serialized_start=2373
-  _globals['_RESOURCE']._serialized_end=3316
-  _globals['_RESOURCE_TEXTSENTRY']._serialized_start=2903
-  _globals['_RESOURCE_TEXTSENTRY']._serialized_end=2979
-  _globals['_RESOURCE_PARAGRAPHSENTRY']._serialized_start=2981
-  _globals['_RESOURCE_PARAGRAPHSENTRY']._serialized_end=3062
-  _globals['_RESOURCE_VECTORSENTRY']._serialized_start=3064
-  _globals['_RESOURCE_VECTORSENTRY']._serialized_end=3130
-  _globals['_RESOURCE_VECTORSTODELETEENTRY']._serialized_start=3132
-  _globals['_RESOURCE_VECTORSTODELETEENTRY']._serialized_end=3210
-  _globals['_RESOURCE_RESOURCESTATUS']._serialized_start=3212
-  _globals['_RESOURCE_RESOURCESTATUS']._serialized_end=3316
-  _globals['_SHARDMETADATA']._serialized_start=3318
-  _globals['_SHARDMETADATA']._serialized_end=3395
-  _globals['_NODEMETADATA']._serialized_start=3398
-  _globals['_NODEMETADATA']._serialized_end=3730
-  _globals['_NODEMETADATA_SHARDMETADATA']._serialized_start=3567
-  _globals['_NODEMETADATA_SHARDMETADATA']._serialized_end=3620
-  _globals['_NODEMETADATA_SHARDSENTRY']._serialized_start=3622
-  _globals['_NODEMETADATA_SHARDSENTRY']._serialized_end=3710
+  _globals['_SHARDCREATED_DOCUMENTSERVICE']._serialized_end=724
+  _globals['_SHARDCREATED_PARAGRAPHSERVICE']._serialized_start=726
+  _globals['_SHARDCREATED_PARAGRAPHSERVICE']._serialized_end=780
+  _globals['_SHARDCREATED_VECTORSERVICE']._serialized_start=782
+  _globals['_SHARDCREATED_VECTORSERVICE']._serialized_end=827
+  _globals['_SHARDCREATED_RELATIONSERVICE']._serialized_start=829
+  _globals['_SHARDCREATED_RELATIONSERVICE']._serialized_end=897
+  _globals['_SHARDCLEANED']._serialized_start=900
+  _globals['_SHARDCLEANED']._serialized_end=1196
+  _globals['_RESOURCEID']._serialized_start=1198
+  _globals['_RESOURCEID']._serialized_end=1242
+  _globals['_SHARD']._serialized_start=1245
+  _globals['_SHARD']._serialized_end=1373
+  _globals['_EMPTYRESPONSE']._serialized_start=1375
+  _globals['_EMPTYRESPONSE']._serialized_end=1390
+  _globals['_EMPTYQUERY']._serialized_start=1392
+  _globals['_EMPTYQUERY']._serialized_end=1404
+  _globals['_POSITION']._serialized_start=1406
+  _globals['_POSITION']._serialized_end=1524
+  _globals['_SENTENCEMETADATA']._serialized_start=1526
+  _globals['_SENTENCEMETADATA']._serialized_end=1587
+  _globals['_VECTORSENTENCE']._serialized_start=1589
+  _globals['_VECTORSENTENCE']._serialized_end=1672
+  _globals['_PARAGRAPHMETADATA']._serialized_start=1674
+  _globals['_PARAGRAPHMETADATA']._serialized_end=1736
+  _globals['_INDEXPARAGRAPH']._serialized_start=1739
+  _globals['_INDEXPARAGRAPH']._serialized_end=2069
+  _globals['_INDEXPARAGRAPH_SENTENCESENTRY']._serialized_start=1990
+  _globals['_INDEXPARAGRAPH_SENTENCESENTRY']._serialized_end=2069
+  _globals['_VECTORSETID']._serialized_start=2071
+  _globals['_VECTORSETID']._serialized_end=2142
+  _globals['_VECTORSETLIST']._serialized_start=2144
+  _globals['_VECTORSETLIST']._serialized_end=2217
+  _globals['_INDEXPARAGRAPHS']._serialized_start=2220
+  _globals['_INDEXPARAGRAPHS']._serialized_end=2387
+  _globals['_INDEXPARAGRAPHS_PARAGRAPHSENTRY']._serialized_start=2307
+  _globals['_INDEXPARAGRAPHS_PARAGRAPHSENTRY']._serialized_end=2387
+  _globals['_RESOURCE']._serialized_start=2390
+  _globals['_RESOURCE']._serialized_end=3386
+  _globals['_RESOURCE_TEXTSENTRY']._serialized_start=2960
+  _globals['_RESOURCE_TEXTSENTRY']._serialized_end=3036
+  _globals['_RESOURCE_PARAGRAPHSENTRY']._serialized_start=3038
+  _globals['_RESOURCE_PARAGRAPHSENTRY']._serialized_end=3119
+  _globals['_RESOURCE_VECTORSENTRY']._serialized_start=3121
+  _globals['_RESOURCE_VECTORSENTRY']._serialized_end=3187
+  _globals['_RESOURCE_VECTORSTODELETEENTRY']._serialized_start=3189
+  _globals['_RESOURCE_VECTORSTODELETEENTRY']._serialized_end=3267
+  _globals['_RESOURCE_RESOURCESTATUS']._serialized_start=3269
+  _globals['_RESOURCE_RESOURCESTATUS']._serialized_end=3373
+  _globals['_SHARDMETADATA']._serialized_start=3388
+  _globals['_SHARDMETADATA']._serialized_end=3465
+  _globals['_NODEMETADATA']._serialized_start=3468
+  _globals['_NODEMETADATA']._serialized_end=3800
+  _globals['_NODEMETADATA_SHARDMETADATA']._serialized_start=3637
+  _globals['_NODEMETADATA_SHARDMETADATA']._serialized_end=3690
+  _globals['_NODEMETADATA_SHARDSENTRY']._serialized_start=3692
+  _globals['_NODEMETADATA_SHARDSENTRY']._serialized_end=3780
 # @@protoc_insertion_point(module_scope)

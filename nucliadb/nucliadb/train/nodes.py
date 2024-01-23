@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import AsyncIterator, Optional, Tuple
+from typing import AsyncIterator, Optional
 
 from nucliadb_protos.train_pb2 import (
     GetFieldsRequest,
@@ -46,7 +46,7 @@ class TrainShardManager(manager.KBShardManager):
         self.driver = driver
         self.storage = storage
 
-    async def get_reader(self, kbid: str, shard: str) -> Tuple[AbstractIndexNode, str]:
+    async def get_reader(self, kbid: str, shard: str) -> tuple[AbstractIndexNode, str]:
         shards = await self.get_shards_by_kbid_inner(kbid)
         try:
             shard_object: ShardObject = next(

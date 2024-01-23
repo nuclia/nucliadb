@@ -96,5 +96,6 @@ pub fn create_resource(shard_id: String) -> Resource {
         vectors: HashMap::default(),
         vectors_to_delete: HashMap::default(),
         shard_id,
+        ..Default::default()
     }
 }

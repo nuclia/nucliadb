@@ -26,6 +26,7 @@ from unittest.mock import Mock
 
 import asyncpg
 import pytest
+import tikv_client  # type: ignore
 from grpc import aio  # type: ignore
 from httpx import AsyncClient
 from nucliadb_protos.train_pb2_grpc import TrainStub
@@ -49,6 +50,13 @@ from nucliadb.standalone.run import run_async_nucliadb
 from nucliadb.standalone.settings import Settings
 from nucliadb.tests.utils import inject_message
 from nucliadb.writer import API_PREFIX
+from nucliadb_telemetry.logs import setup_logging
+from nucliadb_telemetry.settings import (
+    LogFormatType,
+    LogLevel,
+    LogOutputType,
+    LogSettings,
+)
 from nucliadb_utils.storages.settings import settings as storage_settings
 from nucliadb_utils.store import MAIN
 from nucliadb_utils.tests import free_port
@@ -123,19 +131,37 @@ async def nucliadb(dummy_processing, analytics_disabled, driver_settings, tmpdir
     # we need to force DATA_PATH updates to run every test on the proper
     # temporary directory
     data_path = f"{tmpdir}/node"
+    local_files = f"{tmpdir}/blob"
     os.environ["DATA_PATH"] = data_path
+
     settings = Settings(
         file_backend="local",
-        local_files=f"{tmpdir}/blob",
+        local_files=local_files,
         data_path=data_path,
         http_port=free_port(),
         ingest_grpc_port=free_port(),
         train_grpc_port=free_port(),
         standalone_node_port=free_port(),
+        log_format_type=LogFormatType.PLAIN,
+        log_output_type=LogOutputType.FILE,
         **driver_settings.dict(),
     )
 
     config_nucliadb(settings)
+
+    # Make sure tests don't write logs outside of the tmpdir
+    os.environ["ERROR_LOG"] = f"{tmpdir}/logs/error.log"
+    os.environ["ACCESS_LOG"] = f"{tmpdir}/logs/access.log"
+    os.environ["INFO_LOG"] = f"{tmpdir}/logs/info.log"
+
+    setup_logging(
+        settings=LogSettings(
+            log_output_type=LogOutputType.FILE,
+            log_format_type=LogFormatType.PLAIN,
+            debug=False,
+            log_level=LogLevel.WARNING,
+        )
+    )
     server = await run_async_nucliadb(settings)
 
     yield settings
@@ -523,6 +549,17 @@ def tikv_driver_settings(tikvd):
         url = "localhost:2379"
     else:
         url = f"{tikvd[0]}:{tikvd[2]}"
+
+    # before using tikv, clear the db
+    # delete here instead of `tikv_driver` fixture because
+    # these settings are used in tests that the driver fixture
+    # is not used
+    client = tikv_client.TransactionClient.connect([url])
+    txn = client.begin(pessimistic=False)
+    for key in txn.scan_keys(start=b"", end=None, limit=99999):
+        txn.delete(key)
+    txn.commit()
+
     return DriverSettings(driver=DriverConfig.TIKV, driver_tikv_url=[url])
 
 
@@ -537,10 +574,6 @@ async def tikv_driver(tikv_driver_settings) -> AsyncIterator[Driver]:
 
     yield driver
 
-    txn = await driver.begin()
-    async for key in txn.keys(""):
-        await txn.delete(key)
-    await txn.commit()
     await driver.finalize()
     ingest_settings.driver_tikv_url = None
     MAIN.pop("driver", None)
