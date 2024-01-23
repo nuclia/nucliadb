@@ -19,6 +19,7 @@ _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'nucliadb_protos.utils_pb2', _globals)
 if _descriptor._USE_C_DESCRIPTORS == False:
+
   DESCRIPTOR._options = None
   _EXTRACTEDTEXT_SPLITTEXTENTRY._options = None
   _EXTRACTEDTEXT_SPLITTEXTENTRY._serialized_options = b'8\001'

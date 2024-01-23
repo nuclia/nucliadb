@@ -80,4 +80,5 @@ message AuditRequest {
   string trace_id = 17;
   AuditKBCounter kb_counter = 18;
   ChatAudit chat = 19;
+  bool success = 20;
 }

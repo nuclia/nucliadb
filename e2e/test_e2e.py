@@ -190,7 +190,7 @@ def _test_predict_proxy_chat(kbid: str):
         json={
             "question": "Who is the best football player?",
             "query_context": [
-                "Many football players have existed. Cristiano Ronaldo and Messi among them, but Messi is by far the greatest."
+                "Many football players have existed. Messi is by far the greatest."
             ],
             "user_id": "someone@company.uk",
         },
