@@ -18,12 +18,12 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import tempfile
-from nucliadb_models.resource import KnowledgeBoxObj
 
 import pyarrow as pa  # type: ignore
 from nucliadb_protos.dataset_pb2 import TrainSet
 
 from nucliadb_dataset.dataset import NucliaDBDataset
+from nucliadb_models.resource import KnowledgeBoxObj
 from nucliadb_sdk.v2.sdk import NucliaDB
 
 

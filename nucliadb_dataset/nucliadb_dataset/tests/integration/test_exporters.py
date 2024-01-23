@@ -21,14 +21,14 @@ import os
 import re
 import tempfile
 from uuid import uuid4
-from nucliadb_models.resource import KnowledgeBoxObj
-from nucliadb_sdk.v2.sdk import NucliaDB
 
 import pyarrow as pa  # type: ignore
 import pytest
 from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 
 from nucliadb_dataset.export import FileSystemExport, NucliaDatasetsExport
+from nucliadb_models.resource import KnowledgeBoxObj
+from nucliadb_sdk.v2.sdk import NucliaDB
 
 
 def test_filesystem_export(

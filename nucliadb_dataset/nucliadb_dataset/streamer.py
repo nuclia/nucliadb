@@ -23,7 +23,6 @@ import requests
 from nucliadb_protos.dataset_pb2 import TrainSet
 from urllib3.exceptions import ProtocolError
 
-
 SIZE_BYTES = 4
 
 

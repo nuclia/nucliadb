@@ -18,31 +18,37 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import os
-from typing import (
-    Any,
-    Callable,
-    Iterator,
-    List,
-    Optional,
-    Tuple,
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple
+
+import pyarrow as pa  # type: ignore
+from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
+
+from nucliadb_dataset.streamer import Streamer, StreamerAlreadyRunning
+from nucliadb_dataset.tasks import (
+    ACTUAL_PARTITION,
+    TASK_DEFINITIONS,
+    TASK_DEFINITIONS_REVERSE,
+    Task,
 )
-from nucliadb_dataset.tasks import TASK_DEFINITIONS, TASK_DEFINITIONS_REVERSE, Task
+from nucliadb_models.entities import KnowledgeBoxEntities
+from nucliadb_models.labels import KnowledgeBoxLabels
 from nucliadb_models.resource import KnowledgeBoxObj
+from nucliadb_models.search import (
+    KnowledgeboxSearchResults,
+    SearchOptions,
+    SearchRequest,
+)
 from nucliadb_models.trainset import TrainSetPartitions
 from nucliadb_sdk.v2.sdk import NucliaDB, Region
 
-import pyarrow as pa  # type: ignore
-from nucliadb_protos.dataset_pb2 import (
-    TaskType,
-    TrainSet,
-)
-
-from nucliadb_dataset.streamer import Streamer, StreamerAlreadyRunning
-from nucliadb_dataset.tasks import ACTUAL_PARTITION
-from nucliadb_models.entities import KnowledgeBoxEntities
-from nucliadb_models.labels import KnowledgeBoxLabels
-
 CHUNK_SIZE = 5 * 1024 * 1024
+
+
+@dataclass
+class LabelSetCount:
+    count: int
+    labels: Dict[str, int] = field(default_factory=dict)
 
 
 class NucliaDataset(object):
@@ -150,6 +156,52 @@ class NucliaDBDataset(NucliaDataset):
         elif self.trainset.type == TaskType.TOKEN_CLASSIFICATION:
             self._check_entities()
 
+    def _computed_labels(self) -> Dict[str, LabelSetCount]:
+        search_result: KnowledgeboxSearchResults = self.sdk.search(
+            kbid=self.kbid,
+            content=SearchRequest(
+                features=[SearchOptions.DOCUMENT], faceted=["/l"], page_size=0
+            ),
+        )
+
+        response: Dict[str, LabelSetCount] = {}
+        if search_result.fulltext is None or search_result.fulltext.facets is None:
+            return response
+
+        label_facets = {}
+        facet_prefix = "/l/"
+        if "/l" in search_result.fulltext.facets:
+            label_facets = search_result.fulltext.facets.get("/l", {})
+        elif "/classification.labels" in search_result.fulltext.facets:
+            facet_prefix = "/classification.labels/"
+            label_facets = search_result.fulltext.facets.get(
+                "/classification.labels", {}
+            )
+
+        for labelset, count in label_facets.items():
+            real_labelset = labelset[len(facet_prefix) :]  # removing /l/
+            response[real_labelset] = LabelSetCount(count=count)
+
+        for labelset, labelset_obj in response.items():
+            base_label = f"{facet_prefix}{labelset}"
+            fsearch_result: KnowledgeboxSearchResults = self.sdk.search(
+                kbid=self.kbid,
+                content=SearchRequest(
+                    features=[SearchOptions.DOCUMENT], faceted=[base_label], page_size=0
+                ),  # type: ignore
+            )
+            if (
+                fsearch_result.fulltext is None
+                or fsearch_result.fulltext.facets is None
+            ):
+                raise Exception("Search error")
+
+            for label, count in fsearch_result.fulltext.facets.get(
+                base_label, {}
+            ).items():
+                labelset_obj.labels[label.replace(base_label + "/", "")] = count
+        return response
+
     def _check_labels(self, type: str = "PARAGRAPHS"):
         if len(self.trainset.filter.labels) != 1:
             raise Exception("Needs to have only one labelset filter to train")
@@ -158,14 +210,16 @@ class NucliaDBDataset(NucliaDataset):
         labelset = self.trainset.filter.labels[0]
 
         if labelset not in labels.labelsets:
-            raise Exception(
-                f"Labelset is not valid {labelset} not in {labels.labelsets}"
-            )
+            computed_labels = self._computed_labels()
+            if type != "RESOURCES" or labelset not in computed_labels:
+                raise Exception(
+                    f"Labelset is not valid {labelset} not in {labels.labelsets}"
+                )
 
-        if type not in labels.labelsets[labelset].kind:
+        elif type not in labels.labelsets[labelset].kind:
             raise Exception(f"Labelset not defined for {type} classification")
 
-    def _check_entities(self):
+    def _check_entities(self) -> None:
         entities: KnowledgeBoxEntities = self.sdk.get_entitygroups(kbid=self.kbid)
         for family_group in self.trainset.filter.labels:
             if family_group not in entities.groups:
@@ -182,7 +236,7 @@ class NucliaDBDataset(NucliaDataset):
     def _set_schema(self, schema: pa.Schema):
         self.schema = schema
 
-    def get_partitions(self):
+    def get_partitions(self) -> List[str]:
         """
         Get expected number of partitions from a live NucliaDB
         """
@@ -235,7 +289,8 @@ class NucliaDBDataset(NucliaDataset):
 
 def download_all_partitions(
     task: str,  # type: ignore
-    slug: str,
+    slug: Optional[str] = None,
+    kbid: Optional[str] = None,
     nucliadb_base_url: Optional[str] = "http://localhost:8080",
     path: Optional[str] = None,
     sdk: Optional[NucliaDB] = None,
@@ -244,10 +299,15 @@ def download_all_partitions(
     if sdk is None:
         sdk = NucliaDB(region=Region.ON_PREM, url=nucliadb_base_url)
 
-    kb: KnowledgeBoxObj = sdk.get_knowledge_box_by_slug(slug=slug)
+    if kbid is None and slug is not None:
+        kb: KnowledgeBoxObj = sdk.get_knowledge_box_by_slug(slug=slug)
+        kbid = kb.uuid
+
+    if kbid is None:
+        raise KeyError("Not a valid KB")
 
     task_obj = Task(task)
     fse = NucliaDBDataset(
-        sdk=sdk, task=task_obj, labels=labels, base_path=path, kbid=kb.uuid
+        sdk=sdk, task=task_obj, labels=labels, base_path=path, kbid=kbid
     )
     return fse.read_all_partitions(path=path)

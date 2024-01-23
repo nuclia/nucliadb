@@ -17,19 +17,18 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from nucliadb_models.common import UserClassification
-from nucliadb_models.metadata import UserMetadata
-from nucliadb_models.resource import KnowledgeBoxObj
-from nucliadb_models.text import TextField
-from nucliadb_models.utils import FieldIdString, SlugString
-from nucliadb_models.writer import CreateResourcePayload
-from nucliadb_sdk.v2.sdk import NucliaDB
 import pyarrow as pa  # type: ignore
 from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 
 from nucliadb_dataset.dataset import download_all_partitions
 from nucliadb_dataset.tests.integration.utils import export_dataset
-from nucliadb_sdk.knowledgebox import KnowledgeBox
+from nucliadb_models.common import UserClassification
+from nucliadb_models.metadata import UserMetadata
+from nucliadb_models.resource import KnowledgeBoxObj
+from nucliadb_models.text import TextField
+from nucliadb_models.utils import FieldIdString
+from nucliadb_models.writer import CreateResourcePayload
+from nucliadb_sdk.v2.sdk import NucliaDB
 
 
 def test_field_classification_with_labels(
@@ -97,7 +96,7 @@ def test_datascientist(sdk: NucliaDB, temp_folder, kb: KnowledgeBoxObj):
     arrow_filenames = download_all_partitions(
         task="FIELD_CLASSIFICATION",
         sdk=sdk,
-        slug=kb.slug,
+        kbid=kb.uuid,
         path=temp_folder,
         labels=["labelset"],
     )

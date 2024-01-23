@@ -18,11 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
-from nucliadb_sdk.v2.sdk import NucliaDB
 import requests
 from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 
 from nucliadb_dataset.dataset import NucliaDBDataset
+from nucliadb_sdk.v2.sdk import NucliaDB
 
 
 class NucliaDatasetsExport:

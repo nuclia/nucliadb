@@ -21,7 +21,12 @@ import re
 import tempfile
 from typing import AsyncIterator, Iterator, Optional
 
-import docker
+import docker  # type: ignore
+import grpc  # type: ignore
+import pytest
+from grpc import aio  # type: ignore
+from nucliadb_protos.writer_pb2_grpc import WriterStub
+
 from nucliadb_models.common import FieldID, UserClassification
 from nucliadb_models.entities import CreateEntitiesGroupPayload, Entity
 from nucliadb_models.labels import Label, LabelSet, LabelSetKind
@@ -31,11 +36,6 @@ from nucliadb_models.text import TextField
 from nucliadb_models.utils import FieldIdString, SlugString
 from nucliadb_models.writer import CreateResourcePayload
 from nucliadb_sdk.v2.sdk import NucliaDB  # type: ignore
-import pytest
-import grpc
-from grpc import aio  # type: ignore
-from nucliadb_protos.writer_pb2_grpc import WriterStub
-
 
 DOCKER_ENV_GROUPS = re.search(r"//([^:]+)", docker.from_env().api.base_url)
 DOCKER_HOST: Optional[str] = DOCKER_ENV_GROUPS.group(1) if DOCKER_ENV_GROUPS else None  # type: ignore
@@ -84,7 +84,7 @@ def upload_data_field_classification(sdk: NucliaDB, kb: KnowledgeBoxObj):
             usermetadata=UserMetadata(
                 classifications=[
                     UserClassification(labelset="labelset1", label="B"),
-                    UserClassification(labelset="labelset1", label="C"),
+                    UserClassification(labelset="labelset2", label="C"),
                 ]
             ),
         ),
@@ -311,6 +311,7 @@ def text_editors_kb(sdk: NucliaDB, kb: KnowledgeBoxObj):
             },
         ),
     )
+    return kb
 
 
 @pytest.fixture(scope="function")

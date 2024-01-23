@@ -20,8 +20,6 @@
 import time
 import uuid
 from datetime import datetime
-from nucliadb_models.resource import KnowledgeBoxObj
-from nucliadb_sdk.v2.sdk import NucliaDB
 
 import pytest
 from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
@@ -45,6 +43,8 @@ from nucliadb_protos.writer_pb2 import (
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb_dataset.tests.integration.utils import export_dataset
+from nucliadb_models.resource import KnowledgeBoxObj
+from nucliadb_sdk.v2.sdk import NucliaDB
 
 
 def test_question_answer_streaming(sdk: NucliaDB, qa_kb: KnowledgeBoxObj):
@@ -256,5 +256,5 @@ def smb_wonder_bm(kbid: str) -> BrokerMessage:
 
 
 def inject_message(ingest_stub_sync: WriterStub, message: BrokerMessage):
-    resp = ingest_stub_sync.ProcessMessage([message])
+    resp = ingest_stub_sync.ProcessMessage(iter([message]))
     assert resp.status == OpStatusWriter.Status.OK

@@ -19,19 +19,18 @@
 
 import tempfile
 import time
-from nucliadb_models.common import FieldID
-from nucliadb_models.metadata import TokenSplit, UserFieldMetadata
-from nucliadb_models.resource import KnowledgeBoxObj
-from nucliadb_models.text import TextField
-from nucliadb_models.utils import FieldIdString, SlugString
-from nucliadb_models.writer import CreateResourcePayload
-from nucliadb_sdk.v2.sdk import NucliaDB
 
 import pyarrow as pa  # type: ignore
 from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 
 from nucliadb_dataset.dataset import NucliaDBDataset, download_all_partitions
-from nucliadb_sdk.entities import Entity
+from nucliadb_models.common import FieldID
+from nucliadb_models.metadata import TokenSplit, UserFieldMetadata
+from nucliadb_models.resource import KnowledgeBoxObj
+from nucliadb_models.text import TextField
+from nucliadb_models.utils import FieldIdString
+from nucliadb_models.writer import CreateResourcePayload
+from nucliadb_sdk.v2.sdk import NucliaDB
 
 
 def test_datascientist_tokens(sdk: NucliaDB, temp_folder, kb: KnowledgeBoxObj):

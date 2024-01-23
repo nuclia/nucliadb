@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from pathlib import Path
-from nucliadb_sdk.v2.sdk import NucliaDB
 
 import pydantic_argparse
 from nucliadb_protos.dataset_pb2 import TrainSet
@@ -26,6 +25,7 @@ from nucliadb_protos.dataset_pb2 import TrainSet
 from nucliadb_dataset import ExportType
 from nucliadb_dataset.dataset import TASK_DEFINITIONS
 from nucliadb_dataset.export import FileSystemExport, NucliaDatasetsExport
+from nucliadb_sdk.v2.sdk import NucliaDB
 
 
 def run():

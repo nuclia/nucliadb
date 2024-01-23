@@ -19,12 +19,7 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import (
-    TYPE_CHECKING,
-    Callable,
-    Dict,
-    List,
-)
+from typing import TYPE_CHECKING, Callable, Dict, List
 
 import pyarrow as pa  # type: ignore
 from nucliadb_protos.dataset_pb2 import (
@@ -69,7 +64,7 @@ class Task(str, Enum):
 @dataclass
 class TaskDefinition:
     schema: pa.schema
-    proto: TaskValue
+    proto: TaskType.V
     labels: bool
     mapping: List[Callable]
 
