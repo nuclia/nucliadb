@@ -24,7 +24,6 @@ from typing import Optional
 import nats
 import nats.errors
 from aiohttp.client_exceptions import ClientConnectorError
-from nats.aio.subscription import Subscription
 from nucliadb_protos.writer_pb2 import BrokerMessage, BrokerMessageBlobReference
 
 from nucliadb.common.http_clients.processing import ProcessingHTTPClient
@@ -47,8 +46,6 @@ class PullWorker:
 
     The processing pull endpoint is also described as the "processing proxy" at times.
     """
-
-    subscriptions: list[Subscription]
 
     def __init__(
         self,

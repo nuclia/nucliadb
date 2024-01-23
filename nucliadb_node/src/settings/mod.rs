@@ -36,6 +36,7 @@ pub mod providers;
 use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
 use inner_settings::InnerSettings;
 pub use inner_settings::InnerSettingsBuilder;
@@ -168,15 +169,15 @@ impl Settings {
     pub fn node_role(&self) -> NodeRole {
         self.inner.node_role
     }
-    pub fn replication_delay_seconds(&self) -> u64 {
-        self.inner.replication_delay_seconds
+    pub fn replication_delay(&self) -> Duration {
+        self.inner.replication_delay
     }
 
     pub fn replication_max_concurrency(&self) -> u64 {
         self.inner.replication_max_concurrency
     }
 
-    pub fn replication_healthy_delay(&self) -> u64 {
+    pub fn replication_healthy_delay(&self) -> Duration {
         self.inner.replication_healthy_delay
     }
 

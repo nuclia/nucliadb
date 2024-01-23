@@ -788,12 +788,19 @@ class SummarizeModel(BaseModel):
     """
 
     resources: Dict[str, SummarizeResourceModel] = {}
+    user_prompt: Optional[str] = None
 
 
 class SummarizeRequest(BaseModel):
     """
     Model for the request payload of the summarize endpoint
     """
+
+    user_prompt: Optional[str] = Field(
+        default=None,
+        title="User prompt",
+        description="Optional custom prompt input by the user",
+    )
 
     resources: List[str] = Field(
         ...,

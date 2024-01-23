@@ -42,6 +42,7 @@ from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb_utils import logger
+from nucliadb_utils.helpers import async_gen_lookahead
 from nucliadb_utils.storages import CHUNK_SIZE
 from nucliadb_utils.storages.exceptions import IndexDataNotFound, InvalidCloudFile
 from nucliadb_utils.utilities import get_local_storage, get_nuclia_storage
@@ -279,31 +280,45 @@ class Storage:
     async def normalize_binary(
         self, file: CloudFile, destination: StorageField
     ):  # pragma: no cover
-        # this is covered by other tests
-        # see if file is in the same Cloud in the same bucket
         if file.source == self.source and file.uri != destination.key:
+            # This MAY BE the case for NucliaDB hosted deployment (Nuclia's cloud deployment):
+            # The data has been pushed to the bucket but with a different key.
+            logger.warning(
+                f"[Nuclia hosted] Source and destination keys differ!: {file.uri} != {destination.key}"
+            )
             await self.move(file, destination)
             new_cf = CloudFile()
             new_cf.CopyFrom(file)
             new_cf.bucket_name = destination.bucket
             new_cf.uri = destination.key
         elif file.source == self.source:
+            # This is the case for NucliaDB hosted deployment (Nuclia's cloud deployment):
+            # The data is already stored in the right place by the processing
+            logger.debug(f"[Nuclia hosted]")
             return file
         elif file.source == CloudFile.EXPORT:
+            # This is for files coming from an export
+            logger.debug(f"[Exported file]: {file.uri}")
             new_cf = CloudFile()
             new_cf.CopyFrom(file)
             new_cf.bucket_name = destination.bucket
             new_cf.uri = destination.key
             new_cf.source = self.source  # type: ignore
         elif file.source == CloudFile.FLAPS:
+            # NucliaDB On-Prem: the data is stored in NUA, so we need to
+            # download it and upload it to NucliaDB's storage
+            logger.debug(f"[NucliaDB OnPrem]: {file.uri}")
             flaps_storage = await get_nuclia_storage()
             iterator = flaps_storage.download(file)
             new_cf = await self.uploaditerator(iterator, destination, file)
         elif file.source == CloudFile.LOCAL:
+            # For testing purposes: protobuffer is stored in a file in the local filesystem
+            logger.debug(f"[Local]: {file.uri}")
             local_storage = get_local_storage()
             iterator = local_storage.download(file.bucket_name, file.uri)
             new_cf = await self.uploaditerator(iterator, destination, file)
         elif file.source == CloudFile.EMPTY:
+            logger.warning(f"[Empty file]: {file.uri}")
             new_cf = CloudFile()
             new_cf.CopyFrom(file)
         else:
@@ -411,7 +426,8 @@ class Storage:
     async def uploaditerator(
         self, iterator: AsyncIterator, destination: StorageField, origin: CloudFile
     ) -> CloudFile:
-        return await destination.upload(iterator, origin)
+        safe_iterator = iterate_storage_compatible(iterator, self, origin)  # type: ignore
+        return await destination.upload(safe_iterator, origin)
 
     async def download(
         self, bucket: str, key: str, headers: Optional[Dict[str, str]] = None
@@ -538,3 +554,45 @@ class Storage:
 
     async def del_stream_message(self, key: str) -> None:
         await self.delete_upload(key, cast(str, self.indexing_bucket))
+
+
+async def iter_and_add_size(
+    stream: AsyncGenerator[bytes, None], cf: CloudFile
+) -> AsyncGenerator[bytes, None]:
+    # This is needed because some storage types like GCS or S3 require
+    # the size of the file at least at the request done for the last chunk.
+    total_size = 0
+    async for chunk, is_last in async_gen_lookahead(stream):
+        total_size += len(chunk)
+        if is_last:
+            cf.size = total_size
+        yield chunk
+
+
+async def iter_in_chunk_size(
+    iterator: AsyncGenerator[bytes, None], chunk_size: int
+) -> AsyncGenerator[bytes, None]:
+    # This is needed to make sure bytes uploaded to the blob storage complies with a particular chunk size.
+    buffer = b""
+    async for chunk in iterator:
+        buffer += chunk
+        if len(buffer) >= chunk_size:
+            yield buffer[:chunk_size]
+            buffer = buffer[chunk_size:]
+    # The last chunk can be smaller than chunk size
+    if len(buffer) > 0:
+        yield buffer
+
+
+async def iterate_storage_compatible(
+    iterator: AsyncGenerator[bytes, None], storage: Storage, cf: CloudFile
+) -> AsyncGenerator[bytes, None]:
+    """
+    Makes sure to add the size to the cloudfile and split the data in
+    chunks that are compatible with the storage type of choice
+    """
+
+    async for chunk in iter_in_chunk_size(
+        iter_and_add_size(iterator, cf), chunk_size=storage.chunk_size
+    ):
+        yield chunk

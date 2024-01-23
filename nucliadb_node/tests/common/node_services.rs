@@ -127,7 +127,7 @@ impl NodeFixture {
             .data_path(secondary_tempdir.path())
             .reader_listen_address(secondary_reader_addr.to_string())
             .primary_address(writer_addr.to_string())
-            .replication_delay_seconds(1_u64)
+            .replication_delay(Duration::from_secs(1))
             .build()
             .expect("Error while building test settings");
 

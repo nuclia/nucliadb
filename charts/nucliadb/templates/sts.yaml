@@ -42,7 +42,7 @@ spec:
       serviceAccount:  {{ .Values.serviceAccount | default "default" }}
       containers:
       - name: app
-        image: "{{ .Values.image }}:{{ .Values.imageVersion }}"
+        image: "{{ .Values.image }}:{{ .Values.imageVersion | default .Chart.Version }}"
         securityContext:
           privileged: false
         imagePullPolicy: {{ .Values.imagePullPolicy }}

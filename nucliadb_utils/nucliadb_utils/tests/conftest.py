@@ -18,53 +18,17 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 import os
 
-import asyncpg
 import pytest
-from pytest_docker_fixtures import images  # type: ignore
 from pytest_lazy_fixtures import lazy_fixture
-
-from nucliadb_utils.storages.pg import PostgresStorage
-from nucliadb_utils.store import MAIN
-from nucliadb_utils.utilities import Utility
 
 pytest_plugins = [
     "pytest_docker_fixtures",
     "nucliadb_utils.tests.gcs",
     "nucliadb_utils.tests.nats",
     "nucliadb_utils.tests.s3",
+    "nucliadb_utils.tests.pg",
     "nucliadb_utils.tests.local",
 ]
-
-images.settings["postgresql"].update(
-    {
-        "version": "16.1",
-        "env": {
-            "POSTGRES_PASSWORD": "postgres",
-            "POSTGRES_DB": "postgres",
-            "POSTGRES_USER": "postgres",
-        },
-    }
-)
-
-
-@pytest.fixture(scope="function")
-async def pg_storage(pg):
-    dsn = f"postgresql://postgres:postgres@{pg[0]}:{pg[1]}/postgres"
-    storage = PostgresStorage(dsn)
-    MAIN[Utility.STORAGE] = storage
-    conn = await asyncpg.connect(dsn)
-    await conn.execute(
-        """
-DROP table IF EXISTS kb_files;
-DROP table IF EXISTS kb_files_fileparts;
-"""
-    )
-    await conn.close()
-    await storage.initialize()
-    yield storage
-    await storage.finalize()
-    if Utility.STORAGE in MAIN:
-        del MAIN[Utility.STORAGE]
 
 
 def get_testing_storage_backend(default="gcs"):

@@ -41,7 +41,7 @@ The `seqid` is sequence id of the operation. This is an incremental number that 
 The `operation` key corresponds to the CRUD operation done to the resource. It can be `created` for when the resource is first created, `modified` or `deleted`. If the write operation was `created` or `modified`, this means that new data has been pushed to Nuclia for processing. Therefore, eventually three more notifications will pop up:
 
 ```json
-{"type": "resource_processed", "data": {"resource_uuid": "ruuid", "seqid": 224281, "ingestion_succeeded": "created", "action": "commit", "source": "writer", "processing_errors": null}}
+{"type": "resource_processed", "data": {"resource_uuid": "ruuid", "seqid": 224281, "ingestion_succeeded": true, "processing_errors": false}}
 {"type": "resource_indexed", "data": {"resource_uuid": "ruuid", "seqid": 224281}}
 {"type": "resource_indexed", "data": {"resource_uuid": "ruuid", "seqid": 224281}}
 ```

@@ -47,11 +47,19 @@ RETRIABLE_EXCEPTIONS = (
 POLICY_DELETE = {
     "Rules": [
         {
-            "Expiration": {
-                "Days": 0,
-            },
+            "Expiration": {"Days": 1},
+            "ID": "FullDelete",
+            "Filter": {"Prefix": ""},
             "Status": "Enabled",
-        }
+            "NoncurrentVersionExpiration": {"NoncurrentDays": 1},
+            "AbortIncompleteMultipartUpload": {"DaysAfterInitiation": 1},
+        },
+        {
+            "Expiration": {"ExpiredObjectDeleteMarker": True},
+            "ID": "DeleteMarkers",
+            "Filter": {"Prefix": ""},
+            "Status": "Enabled",
+        },
     ]
 }
 
