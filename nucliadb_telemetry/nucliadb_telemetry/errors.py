@@ -143,5 +143,7 @@ def setup_sentry_logging_integration(for_loggers: List[str]) -> None:
     if settings.sentry_url:
         sentry_sdk.init(
             dsn=settings.sentry_url,
+            environment=settings.environment,
             integrations=[SentryLoggingIntegration(for_loggers)],
         )
+        sentry_sdk.set_tag("zone", settings.zone)
