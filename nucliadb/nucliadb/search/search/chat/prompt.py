@@ -23,9 +23,12 @@ from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import KB_REVERSE
-from nucliadb_models.search import SCORE_TYPE, KnowledgeboxFindResults
+from nucliadb_models.search import SCORE_TYPE, KnowledgeboxFindResults, RAGOptions
 from nucliadb_protos import resources_pb2
 from nucliadb_utils.utilities import get_storage
+
+Context = dict[str, str]
+ContextOrder = dict[str, int]
 
 # Number of messages to pull after a match in a message
 # The hope here is it will be enough to get the answer to the question.
@@ -100,11 +103,11 @@ async def get_expanded_conversation_messages(
         )
 
 
-async def get_chat_prompt_context(
+async def default_prompt_context(
     kbid: str,
     results: KnowledgeboxFindResults,
     user_context: Optional[list[str]] = None,
-) -> dict[str, str]:
+) -> Context:
     """
     - Returns an ordered dict of context_id -> context_text.
     - context_id is typically the paragraph id, but has a special value for the
@@ -154,3 +157,26 @@ async def get_chat_prompt_context(
                     output[pid] = text
 
     return output
+
+
+class PromptContextBuilder:
+    def __init__(
+        self,
+        kbid: str,
+        find_results: KnowledgeboxFindResults,
+        user_context: Optional[list[str]] = None,
+        options: Optional[RAGOptions] = None,
+    ):
+        self.kbid = kbid
+        self.find_results = find_results
+        self.user_context = user_context
+        self.options = options
+
+    async def build(self):
+        context = await default_prompt_context(
+            self.kbid, self.find_results, user_context=self.user_context
+        )
+        order = {
+            text_block_id: order for order, text_block_id in enumerate(context.keys())
+        }
+        return context, order

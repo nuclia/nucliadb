@@ -27,7 +27,7 @@ from nucliadb_protos.nodereader_pb2 import RelationSearchRequest, RelationSearch
 from nucliadb.search import logger
 from nucliadb.search.predict import AnswerStatusCode
 from nucliadb.search.requesters.utils import Method, node_query
-from nucliadb.search.search.chat.prompt import get_chat_prompt_context
+from nucliadb.search.search.chat.prompt import PromptContextBuilder
 from nucliadb.search.search.exceptions import IncompleteFindResultsError
 from nucliadb.search.search.find import find
 from nucliadb.search.search.merge import merge_relations_results
@@ -235,13 +235,13 @@ async def chat(
             not_enough_context_generator(), status_code
         )
     else:
-        query_context = await get_chat_prompt_context(
-            kbid, find_results, user_context=user_context
+        pcb = PromptContextBuilder(
+            kbid=kbid,
+            find_results=find_results,
+            user_context=user_context,
+            options=chat_request.rag,
         )
-        query_context_order = {
-            paragraph_id: order
-            for order, paragraph_id in enumerate(query_context.keys())
-        }
+        query_context, query_context_order = await pcb.build()
         user_prompt = None
         if chat_request.prompt is not None:
             user_prompt = UserPrompt(prompt=chat_request.prompt)

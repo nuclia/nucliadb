@@ -29,7 +29,7 @@ from nucliadb_protos.nodereader_pb2 import ParagraphResult as PBParagraphResult
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb_protos.writer_pb2 import Shards as PBShards
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, root_validator, validator
 
 from nucliadb_models.common import FieldTypeName, ParamDefault
 from nucliadb_models.metadata import RelationType
@@ -728,6 +728,47 @@ class AskDocumentModel(BaseModel):
     user_id: str = Field(description="The id of the user associated to the request")
 
 
+class ContextStrategy(str, Enum):
+    FULL_RESOURCE = "full_resource"
+    EXTEND_WITH_FIELDS = "extend_with_fields"
+
+    # TODO: uncomment and implement (next iteration)
+    # EXTEND_WITH_RESOURCE_METADATA = "extend_with_resource_metadata"
+    # INCLUDE_SORROUNDING_PARAGRAPHS = "include_surrounding_paragraphs"
+
+
+class RAGOptions(BaseModel):
+    context_strategies: Optional[List[ContextStrategy]] = Field(
+        default=None,
+        title="Context strategies",
+        description="List of strategies to craft the context with.",
+        min_items=1,
+        unique_items=True,
+    )
+    extend_with_fields: Optional[List[str]] = Field(
+        default=None,
+        title="Extend with fields",
+        description="List of field ids to extend the context with. Only used if `context_strategies` contains `fields`. It will try to extend the retrieval context with the specified fields in the matching resources.",  # noqa
+        min_items=1,
+        unique_items=True,
+    )
+
+    @root_validator(pre=True)
+    def check_rag_options(cls, values):
+        chosen_strategies = values.get("context_strategies") or []
+        if ContextStrategy.FULL_RESOURCE in chosen_strategies:
+            if len(chosen_strategies) > 1:
+                raise ValueError(
+                    f"If '{ContextStrategy.FULL_RESOURCE.value}' strategy is chosen, it must be the only strategy"  # noqa
+                )
+        if ContextStrategy.EXTEND_WITH_FIELDS in chosen_strategies:
+            if not values.get("extend_with_fields"):
+                raise ValueError(
+                    f"If '{ContextStrategy.EXTEND_WITH_FIELDS.value}' strategy is chosen, 'extend_with_fields' property must be provided"  # noqa
+                )
+        return values
+
+
 class ChatRequest(BaseModel):
     query: str = SearchParamDefaults.chat_query.to_pydantic_field()
     fields: List[str] = SearchParamDefaults.fields.to_pydantic_field()
@@ -776,6 +817,11 @@ class ChatRequest(BaseModel):
     security: Optional[
         RequestSecurity
     ] = SearchParamDefaults.security.to_pydantic_field()
+    rag: Optional[RAGOptions] = Field(
+        default=None,
+        title="RAG context options",
+        description="Options for tweaking how thecontext for the LLM model is crafted",
+    )
 
 
 class SummarizeResourceModel(BaseModel):
