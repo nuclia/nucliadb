@@ -17,18 +17,30 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 from typing import Optional
 
+from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import get_driver
+from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
-from nucliadb.ingest.orm.resource import KB_REVERSE
-from nucliadb_models.search import SCORE_TYPE, KnowledgeboxFindResults, RAGOptions
+from nucliadb.ingest.orm.resource import KB_REVERSE, Resource
+from nucliadb.middleware.transaction import get_read_only_transaction
+from nucliadb.search import logger
+from nucliadb_models.search import (
+    SCORE_TYPE,
+    ContextStrategy,
+    KnowledgeboxFindResults,
+    RAGOptions,
+)
 from nucliadb_protos import resources_pb2
 from nucliadb_utils.utilities import get_storage
 
 Context = dict[str, str]
 ContextOrder = dict[str, int]
+MAX_EXTRACTED_TEXTS_TASKS = 10
+
 
 # Number of messages to pull after a match in a message
 # The hope here is it will be enough to get the answer to the question.
@@ -106,7 +118,6 @@ async def get_expanded_conversation_messages(
 async def default_prompt_context(
     kbid: str,
     results: KnowledgeboxFindResults,
-    user_context: Optional[list[str]] = None,
 ) -> Context:
     """
     - Returns an ordered dict of context_id -> context_text.
@@ -118,9 +129,6 @@ async def default_prompt_context(
     - Using an dict prevents from duplicates pulled in through conversation expansion.
     """
     output = {}
-    # Chat extra context passed by the user is the most important, therefore
-    for i, context in enumerate(user_context or []):
-        output[f"USER_CONTEXT_{i}"] = context
 
     # Sort retrieved paragraphs by decreasing order (most relevant first)
     ordered_paras = []
@@ -159,6 +167,111 @@ async def default_prompt_context(
     return output
 
 
+async def get_field_extracted_text(
+    field: Field, max_concurrent_tasks: asyncio.Semaphore
+) -> Optional[str]:
+    async with max_concurrent_tasks:
+        extracted_text_pb = await field.get_extracted_text(force=True)
+        if extracted_text_pb is None:
+            return None
+        return extracted_text_pb.text
+
+
+async def get_resource_extracted_texts(
+    txn: Transaction,
+    kbid: str,
+    resource_uuid: str,
+    max_concurrent_tasks: asyncio.Semaphore,
+) -> Optional[list[tuple[Field, str]]]:
+    result = []
+
+    kb_obj = KnowledgeBoxORM(txn, await get_storage(), kbid)
+    resource = await kb_obj.get(resource_uuid)
+    if resource is None:
+        return None
+
+    field_tasks = []
+    for field in await resource.get_fields(force=True):
+        task = asyncio.create_task(
+            get_field_extracted_text(field, max_concurrent_tasks)
+        )
+        field_tasks.append(task)
+
+    done, _ = await asyncio.wait(field_tasks)
+    done_task: asyncio.Task
+    for done_task in done:
+        if done_task.exception() is not None:
+            logger.warning(f"Error getting extracted texts: {done_task.exception()}")
+            continue
+
+        extracted_text = done_task.result()
+        result.append(extracted_text)
+
+    return result
+
+
+async def full_resource_prompt_context(
+    kbid: str,
+    results: KnowledgeboxFindResults,
+) -> Context:
+    """
+    TODO:
+        - Collect the list of resources in the results (in order of relevance)
+        - For each resource, collect the extracted text from the fields in the resource
+    """
+    output: Context = {}
+
+    ordered_paras = []
+    for result in results.resources.values():
+        for field_path, field in result.fields.items():
+            for paragraph in field.paragraphs.values():
+                ordered_paras.append((field_path, paragraph))
+    ordered_paras.sort(key=lambda x: x[1].order, reverse=False)
+
+    ordered_resources = []
+    for paragraph in ordered_paras:
+        resource_uuid = paragraph[0].split("/")[0]
+        if resource_uuid not in ordered_resources:
+            ordered_resources.append(resource_uuid)
+
+    txn = await get_read_only_transaction()
+    max_concurrent_tasks = asyncio.Semaphore(MAX_EXTRACTED_TEXTS_TASKS)
+    tasks = []
+    for resource_uuid in ordered_resources:
+        task = asyncio.create_task(
+            get_resource_extracted_texts(txn, kbid, resource_uuid, max_concurrent_tasks)
+        )
+        tasks.append(task)
+
+    done, _ = await asyncio.wait(tasks)
+    done_task: asyncio.Task
+    for index, done_task in enumerate(done):
+        if done_task.exception() is not None:
+            logger.warning(f"Error getting extracted texts: {done_task.exception()}")
+            continue
+        extracted_texts = done_task.result()
+        resource_uuid = ordered_resources[index]
+        for field, extracted_text in extracted_texts:
+            if extracted_text is None:
+                continue
+            output[field.full_id] = extracted_text
+    return output
+
+
+async def composed_prompt_context(
+    kbid: str,
+    results: KnowledgeboxFindResults,
+    extend_with_fields: list[str],
+) -> Context:
+    """
+    TODO:
+        - For each paragraph in the results, get the resource id.
+        - Try to get the specified fields from the resource. If present, add the text as yaml.
+    """
+    output: Context = {}
+    return output
+
+
 class PromptContextBuilder:
     def __init__(
         self,
@@ -172,11 +285,36 @@ class PromptContextBuilder:
         self.user_context = user_context
         self.options = options
 
+    def prepend_user_context(self, context: Context) -> Context:
+        # Chat extra context passed by the user is the most important, therefore
+        # it is added first, followed by the found text blocks in order of relevance
+        extended = {
+            f"USER_CONTEXT_{i}": text_block
+            for i, text_block in enumerate(self.user_context or [])
+        }
+        extended.update(context)
+        return extended
+
     async def build(self):
-        context = await default_prompt_context(
-            self.kbid, self.find_results, user_context=self.user_context
-        )
+        context = await self._build_context()
+        context = self.prepend_user_context(context)
         order = {
             text_block_id: order for order, text_block_id in enumerate(context.keys())
         }
         return context, order
+
+    async def _build_context(self):
+        if self.options is None or self.options.context_strategies is None:
+            return await default_prompt_context(self.kbid, self.find_results)
+
+        chosen_strategies = self.options.context_strategies
+        if ContextStrategy.FULL_RESOURCE in chosen_strategies:
+            return await full_resource_prompt_context(
+                self.kbid, self.find_results, user_context=self.user_context
+            )
+        else:
+            return await composed_prompt_context(
+                self.kbid,
+                self.find_results,
+                extend_with_fields=self.options.extend_with_fields or [],
+            )
