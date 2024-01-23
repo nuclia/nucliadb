@@ -6,6 +6,7 @@ image: nuclia/nucliadb
 imageVersion:
 
 replicas: 2
+podAnnotations: {}
 
 # app settings
 env:
