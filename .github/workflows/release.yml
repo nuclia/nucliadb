@@ -1,4 +1,4 @@
-name: PyPI Releases
+name: PyPI and Helm Releases
 
 on:
   push:
@@ -156,3 +156,53 @@ jobs:
             nuclia/nucliadb:${{ steps.version_step.outputs.hash }}
           cache-from: type=gha
           cache-to: type=gha,mode=min
+
+  deploy:
+    name: Deploy Helm chart and trigger internal CI
+    runs-on: ubuntu-latest
+    needs: push-docker
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Calculate short sha
+        id: env-vars
+        run: |-
+          HASH=`git rev-parse --short HEAD`
+          echo "short_sha=$HASH" >> $GITHUB_OUTPUT
+
+      - name: Set helm package image
+        id: version_step
+        run: |-
+          sed -i.bak "s#IMAGE_TO_REPLACE#$IMAGE_NAME:${{ steps.env-vars.outputs.short_sha }}#" ./charts/nucliadb_writer/values.yaml
+          sed -i.bak "s#CONTAINER_REGISTRY_TO_REPLACE#$CONTAINER_REGISTRY#" ./charts/nucliadb_writer/values.yaml
+          VERSION=`cat VERSION`
+          VERSION_SHA=$VERSION+${{ steps.env-vars.outputs.short_sha }}
+          sed -i.bak "s#99999.99999.99999#$VERSION_SHA#" ./charts/nucliadb_writer/Chart.yaml
+          echo "version_number=$VERSION_SHA" >> $GITHUB_OUTPUT
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Install Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: v3.4.0
+
+      - name: Push helm package
+        run: |-
+          helm lint charts/nucliadb
+          helm package charts/nucliadb
+          curl --data-binary "@nucliadb-${{ steps.version_step.outputs.version_number }}.tgz" ${{ secrets.HELM_CHART_URL }}/api/charts
+
+      # Not working yet, disabled for now
+      # - name: Repository Dispatch
+      #   uses: peter-evans/repository-dispatch@v2
+      #   with:
+      #     token: ${{ secrets.GH_CICD_PUBLIC }}
+      #     repository: nuclia/nucliadb_deploy
+      #     event-type: promote
+      #     client-payload: '{"component": "nucliadb_standalone", "chart-version": "${{ steps.version_step.outputs.version_number }}" }'
