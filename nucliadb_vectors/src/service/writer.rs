@@ -746,8 +746,10 @@ mod tests {
 
         let segments = writer.get_segment_ids().unwrap();
         assert_eq!(segments.len(), 2);
-        let existing_segs: Vec<String> = Vec::new();
-        let index_files = writer.get_index_files(&existing_segs).unwrap();
+        let existing_secs: Vec<String> = Vec::new();
+        let Ok(IndexFiles::Other(index_files)) = writer.get_index_files(&existing_secs) else {
+            panic!("Expected another outcome");
+        };
         let mut expected_files = Vec::new();
         for segment in segments {
             expected_files.push(format!("vectors/{}/index.hnsw", segment));
