@@ -39,6 +39,7 @@ from typing import (
 )
 
 import httpx
+from nucliadb_models.trainset import TrainSetPartitions
 import orjson
 from pydantic import BaseModel
 
@@ -723,6 +724,16 @@ class _NucliaDBBase:
         request_type=None,
         response_type=StatusResponse,
         docstring=docstrings.IMPORT_STATUS,
+    )
+
+    trainset = _request_builder(
+        name="trainset",
+        path_template="/v1/kb/{kbid}/trainset",
+        method="GET",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=TrainSetPartitions,
+        docstring=docstrings.TRAINSET_PARTITIONS,
     )
 
 

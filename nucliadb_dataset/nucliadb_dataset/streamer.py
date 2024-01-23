@@ -17,13 +17,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Optional
+from typing import Dict, Optional
 
 import requests
 from nucliadb_protos.dataset_pb2 import TrainSet
 from urllib3.exceptions import ProtocolError
 
-from nucliadb_sdk.client import NucliaDBClient
 
 SIZE_BYTES = 4
 
@@ -34,11 +33,12 @@ class StreamerAlreadyRunning(Exception):
 
 class Streamer:
     resp: Optional[requests.Response]
-    client: NucliaDBClient
 
-    def __init__(self, trainset: TrainSet, client: NucliaDBClient):
-        self.client = client
-        self.base_url = str(self.client.train_session.base_url).strip("/")
+    def __init__(
+        self, trainset: TrainSet, reader_headers: Dict[str, str], base_url: str
+    ):
+        self.reader_headers = reader_headers
+        self.base_url = base_url
         self.trainset = trainset
         self.resp = None
 
@@ -47,14 +47,17 @@ class Streamer:
         return self.resp is not None
 
     def initialize(self, partition_id: str):
-        self.resp = self.client.stream_session.post(
+        self.stream_session = requests.Session()
+        self.stream_session.headers.update(self.reader_headers)
+        self.resp = self.stream_session.post(
             f"{self.base_url}/trainset/{partition_id}",
             data=self.trainset.SerializeToString(),
             stream=True,
         )
 
     def finalize(self):
-        self.resp.close()
+        if self.resp is not None:
+            self.resp.close()
         self.resp = None
 
     def __iter__(self):
@@ -65,7 +68,7 @@ class Streamer:
             raise Exception("Not initialized")
         try:
             header = self.resp.raw.read(4, decode_content=True)
-            payload_size = int.from_bytes(header, byteorder="big", signed=False)
+            payload_size = int.from_bytes(header, byteorder="big", signed=False)  # noqa
             data = self.resp.raw.read(payload_size)
         except ProtocolError:
             data = None

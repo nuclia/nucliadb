@@ -18,17 +18,17 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
+from nucliadb_sdk.v2.sdk import NucliaDB
 import requests
 from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 
 from nucliadb_dataset.dataset import NucliaDBDataset
-from nucliadb_sdk.client import NucliaDBClient
 
 
 class NucliaDatasetsExport:
     def __init__(
         self,
-        client: NucliaDBClient,
+        sdk: NucliaDB,
         datasets_url: str,
         trainset: TrainSet,
         cache_path: str,
@@ -36,18 +36,17 @@ class NucliaDatasetsExport:
     ):
         self.datasets_url = datasets_url
         self.trainset = trainset
-        self.client = client
+        self.sdk = sdk
         self.nucliadb_dataset = NucliaDBDataset(
-            trainset=trainset, client=self.client, base_path=cache_path
+            trainset=trainset, client=sdk, base_path=cache_path
         )
-        self.datasets_url = datasets_url
         self.apikey = apikey
 
     def export(self):
         dataset_def = {
             "type": TaskType.Name(self.trainset.type),
             "filter": {"labels": list(self.trainset.filter.labels)},
-            "name": str(self.client.reader_session.base_url),
+            "name": str(self.sdk.base_url),
         }
         response = requests.post(
             f"{self.datasets_url}/datasets",
@@ -71,13 +70,13 @@ class NucliaDatasetsExport:
 class FileSystemExport:
     def __init__(
         self,
-        client: NucliaDBClient,
+        sdk: NucliaDB,
         trainset: TrainSet,
         store_path: str,
     ):
-        self.client = client
+        self.sdk = sdk
         self.nucliadb_dataset = NucliaDBDataset(
-            trainset=trainset, client=self.client, base_path=store_path
+            trainset=trainset, client=sdk, base_path=store_path
         )
 
     def export(self):
