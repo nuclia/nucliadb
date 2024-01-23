@@ -19,12 +19,11 @@
 
 import re
 import tempfile
-from typing import AsyncIterator, Optional
+from typing import AsyncIterator, Iterator, Optional
 
 import docker
 from nucliadb_models.common import FieldID, UserClassification
 from nucliadb_models.entities import CreateEntitiesGroupPayload, Entity
-from nucliadb_models.extracted import FieldMetadata
 from nucliadb_models.labels import Label, LabelSet, LabelSetKind
 from nucliadb_models.metadata import TokenSplit, UserFieldMetadata, UserMetadata
 from nucliadb_models.resource import KnowledgeBoxObj
@@ -33,6 +32,7 @@ from nucliadb_models.utils import FieldIdString, SlugString
 from nucliadb_models.writer import CreateResourcePayload
 from nucliadb_sdk.v2.sdk import NucliaDB  # type: ignore
 import pytest
+import grpc
 from grpc import aio  # type: ignore
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
@@ -89,6 +89,8 @@ def upload_data_field_classification(sdk: NucliaDB, kb: KnowledgeBoxObj):
             ),
         ),
     )
+
+    return kb
 
 
 @pytest.fixture(scope="function")
@@ -156,6 +158,7 @@ def upload_data_paragraph_classification(sdk: NucliaDB, kb: KnowledgeBoxObj):
             ),
         ),
     )
+    return kb
 
 
 @pytest.fixture(scope="function")
@@ -250,6 +253,8 @@ def upload_data_token_classification(sdk: NucliaDB, kb: KnowledgeBoxObj):
         ),
     )
 
+    return kb
+
 
 @pytest.fixture(scope="function")
 def text_editors_kb(sdk: NucliaDB, kb: KnowledgeBoxObj):
@@ -321,3 +326,11 @@ async def ingest_stub(nucliadb) -> AsyncIterator[WriterStub]:
     stub = WriterStub(channel)  # type: ignore
     yield stub
     await channel.close(grace=True)
+
+
+@pytest.fixture
+def ingest_stub_sync(nucliadb) -> Iterator[WriterStub]:
+    channel = grpc.insecure_channel(f"{nucliadb.host}:{nucliadb.grpc}")
+    stub = WriterStub(channel)  # type: ignore
+    yield stub
+    channel.close()

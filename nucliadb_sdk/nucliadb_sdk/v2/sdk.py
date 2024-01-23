@@ -39,7 +39,6 @@ from typing import (
 )
 
 import httpx
-from nucliadb_models.trainset import TrainSetPartitions
 import orjson
 from pydantic import BaseModel
 
@@ -75,6 +74,7 @@ from nucliadb_models.search import (
     SummarizedResponse,
     SummarizeRequest,
 )
+from nucliadb_models.trainset import TrainSetPartitions
 from nucliadb_models.vectors import VectorSet, VectorSets
 from nucliadb_models.writer import (
     CreateResourcePayload,

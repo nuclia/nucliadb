@@ -29,6 +29,7 @@ class NucliaDatasetsExport:
     def __init__(
         self,
         sdk: NucliaDB,
+        kbid: str,
         datasets_url: str,
         trainset: TrainSet,
         cache_path: str,
@@ -38,7 +39,7 @@ class NucliaDatasetsExport:
         self.trainset = trainset
         self.sdk = sdk
         self.nucliadb_dataset = NucliaDBDataset(
-            trainset=trainset, client=sdk, base_path=cache_path
+            trainset=trainset, kbid=kbid, sdk=sdk, base_path=cache_path
         )
         self.apikey = apikey
 
@@ -71,12 +72,13 @@ class FileSystemExport:
     def __init__(
         self,
         sdk: NucliaDB,
+        kbid: str,
         trainset: TrainSet,
         store_path: str,
     ):
         self.sdk = sdk
         self.nucliadb_dataset = NucliaDBDataset(
-            trainset=trainset, client=sdk, base_path=store_path
+            trainset=trainset, kbid=kbid, sdk=sdk, base_path=store_path
         )
 
     def export(self):

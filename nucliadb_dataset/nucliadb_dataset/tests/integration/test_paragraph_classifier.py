@@ -17,15 +17,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+from nucliadb_models.resource import KnowledgeBoxObj
 import pytest
 from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 
 from nucliadb_dataset.tests.integration.utils import export_dataset
-from nucliadb_sdk.knowledgebox import KnowledgeBox
+from nucliadb_sdk.v2.sdk import NucliaDB
 
 
 def test_paragraph_classification_with_labels(
-    knowledgebox: KnowledgeBox, upload_data_paragraph_classification
+    sdk: NucliaDB, upload_data_paragraph_classification: KnowledgeBoxObj
 ):
     trainset = TrainSet()
     trainset.type = TaskType.PARAGRAPH_CLASSIFICATION
@@ -39,7 +40,9 @@ def test_paragraph_classification_with_labels(
         trainset.filter.ClearField("labels")
         trainset.filter.labels.extend(labels)  # type: ignore
 
-        partitions = export_dataset(knowledgebox, trainset)
+        partitions = export_dataset(
+            sdk=sdk, trainset=trainset, kb=upload_data_paragraph_classification
+        )
         assert len(partitions) == 1
 
         loaded_array = partitions[0]
@@ -47,7 +50,7 @@ def test_paragraph_classification_with_labels(
 
 
 def test_paragraph_classification_invalid_label_type(
-    knowledgebox: KnowledgeBox, upload_data_field_classification
+    sdk: NucliaDB, upload_data_field_classification: KnowledgeBoxObj
 ):
     trainset = TrainSet()
     trainset.type = TaskType.PARAGRAPH_CLASSIFICATION
@@ -55,4 +58,6 @@ def test_paragraph_classification_invalid_label_type(
     trainset.batch_size = 2
 
     with pytest.raises(Exception):
-        export_dataset(knowledgebox, trainset)
+        export_dataset(
+            sdk=sdk, trainset=trainset, kb=upload_data_field_classification
+        )  # noqa

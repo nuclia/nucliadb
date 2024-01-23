@@ -19,6 +19,12 @@
 
 import tempfile
 import time
+from nucliadb_models.common import FieldID
+from nucliadb_models.metadata import TokenSplit, UserFieldMetadata
+from nucliadb_models.resource import KnowledgeBoxObj
+from nucliadb_models.text import TextField
+from nucliadb_models.utils import FieldIdString, SlugString
+from nucliadb_models.writer import CreateResourcePayload
 from nucliadb_sdk.v2.sdk import NucliaDB
 
 import pyarrow as pa  # type: ignore
@@ -28,25 +34,48 @@ from nucliadb_dataset.dataset import NucliaDBDataset, download_all_partitions
 from nucliadb_sdk.entities import Entity
 
 
-def test_datascientist_tokens(sdk: NucliaDB, temp_folder):
-    sdk.create_resource()
-    knowledgebox.upload(
-        text="I'm Ramon",
-        entities=[Entity(type="NAME", value="Ramon", positions=[(5, 9)])],
+def test_datascientist_tokens(sdk: NucliaDB, temp_folder, kb: KnowledgeBoxObj):
+    sdk.create_resource(
+        kbid=kb.uuid,
+        content=CreateResourcePayload(
+            texts={FieldIdString("text"): TextField(body="I'm Ramon")},
+            fieldmetadata=[
+                UserFieldMetadata(
+                    token=[TokenSplit(klass="NAME", token="Ramon", start=5, end=9)],
+                    field=FieldID(field_type=FieldID.FieldType.TEXT, field="text"),
+                )
+            ],
+        ),
+    )
+    sdk.create_resource(
+        kbid=kb.uuid,
+        content=CreateResourcePayload(
+            texts={FieldIdString("text"): TextField(body="I'm not Ramon")},
+            fieldmetadata=[
+                UserFieldMetadata(
+                    token=[TokenSplit(klass="NAME", token="Ramon", start=8, end=13)],
+                    field=FieldID(field_type=FieldID.FieldType.TEXT, field="text"),
+                )
+            ],
+        ),
     )
 
-    knowledgebox.upload(
-        text="I'm not Ramon",
-        entities=[Entity(type="NAME", value="Ramon", positions=[(8, 13)])],
-    )
-
-    knowledgebox.upload(
-        text="I'm Aleix",
-        entities=[Entity(type="NAME", value="Aleix", positions=[(5, 9)])],
+    sdk.create_resource(
+        kbid=kb.uuid,
+        content=CreateResourcePayload(
+            texts={FieldIdString("text"): TextField(body="I'm Aleix")},
+            fieldmetadata=[
+                UserFieldMetadata(
+                    token=[TokenSplit(klass="NAME", token="Aleix", start=5, end=9)],
+                    field=FieldID(field_type=FieldID.FieldType.TEXT, field="text"),
+                )
+            ],
+        ),
     )
 
     arrow_filenames = download_all_partitions(
         task="TOKEN_CLASSIFICATION",
+        slug=kb.slug,
         sdk=sdk,
         path=temp_folder,
     )
@@ -60,7 +89,9 @@ def test_datascientist_tokens(sdk: NucliaDB, temp_folder):
             assert len(loaded_array) == resource_count * fields_per_resource
 
 
-def test_live_token_classification(sdk: NucliaDB, upload_data_token_classification):
+def test_live_token_classification(
+    sdk: NucliaDB, upload_data_token_classification: KnowledgeBoxObj
+):
     trainset = TrainSet()
     trainset.type = TaskType.TOKEN_CLASSIFICATION
     trainset.filter.labels.append("PERSON")
@@ -68,7 +99,8 @@ def test_live_token_classification(sdk: NucliaDB, upload_data_token_classificati
 
     with tempfile.TemporaryDirectory() as tmpdirname:
         fse = NucliaDBDataset(
-            client=sdk,
+            sdk=sdk,
+            kbid=upload_data_token_classification.uuid,
             trainset=trainset,
             base_path=tmpdirname,
         )
@@ -90,7 +122,7 @@ def test_live_token_classification(sdk: NucliaDB, upload_data_token_classificati
 
 
 def test_token_classification_with_multiple_labels(
-    sdk: NucliaDB, upload_data_token_classification
+    sdk: NucliaDB, upload_data_token_classification: KnowledgeBoxObj
 ):
     trainset = TrainSet()
     trainset.type = TaskType.TOKEN_CLASSIFICATION
@@ -98,7 +130,8 @@ def test_token_classification_with_multiple_labels(
 
     with tempfile.TemporaryDirectory() as tmpdirname:
         dataset = NucliaDBDataset(
-            client=sdk,
+            sdk=sdk,
+            kbid=upload_data_token_classification.uuid,
             trainset=trainset,
             base_path=tmpdirname,
         )

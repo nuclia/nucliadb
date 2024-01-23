@@ -35,11 +35,16 @@ class Streamer:
     resp: Optional[requests.Response]
 
     def __init__(
-        self, trainset: TrainSet, reader_headers: Dict[str, str], base_url: str
+        self,
+        trainset: TrainSet,
+        reader_headers: Dict[str, str],
+        base_url: str,
+        kbid: str,
     ):
         self.reader_headers = reader_headers
         self.base_url = base_url
         self.trainset = trainset
+        self.kbid = kbid
         self.resp = None
 
     @property
@@ -50,7 +55,7 @@ class Streamer:
         self.stream_session = requests.Session()
         self.stream_session.headers.update(self.reader_headers)
         self.resp = self.stream_session.post(
-            f"{self.base_url}/trainset/{partition_id}",
+            f"{self.base_url}/v1/kb/{self.kbid}/trainset/{partition_id}",
             data=self.trainset.SerializeToString(),
             stream=True,
         )

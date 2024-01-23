@@ -17,20 +17,19 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+from nucliadb_models.resource import KnowledgeBoxObj
 from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 
 from nucliadb_dataset.tests.integration.utils import export_dataset
-from nucliadb_sdk.knowledgebox import KnowledgeBox
+from nucliadb_sdk.v2.sdk import NucliaDB
 
 
-def test_paragraph_streaming(text_editors_kb: KnowledgeBox):
-    knowledgebox = text_editors_kb
-
+def test_paragraph_streaming(sdk: NucliaDB, kb: KnowledgeBoxObj):
     trainset = TrainSet()
     trainset.type = TaskType.PARAGRAPH_STREAMING
     trainset.batch_size = 10
 
-    partitions = export_dataset(knowledgebox, trainset)
+    partitions = export_dataset(sdk, trainset, kb)
     assert len(partitions) == 1
 
     loaded_array = partitions[0]

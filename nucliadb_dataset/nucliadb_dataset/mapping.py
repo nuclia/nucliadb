@@ -35,7 +35,7 @@ BatchType = TypeVar("BatchType", ParagraphClassificationBatch, FieldClassificati
 
 
 def bytes_to_batch(klass: Any):
-    def func(batch: bytes, *args) -> Any:
+    def func(batch: bytes, *args, **kwargs) -> Any:
         pb = klass()
         pb.ParseFromString(batch)
         return pb

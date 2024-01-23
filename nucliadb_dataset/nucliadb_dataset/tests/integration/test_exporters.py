@@ -21,17 +21,18 @@ import os
 import re
 import tempfile
 from uuid import uuid4
+from nucliadb_models.resource import KnowledgeBoxObj
+from nucliadb_sdk.v2.sdk import NucliaDB
 
 import pyarrow as pa  # type: ignore
 import pytest
 from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 
 from nucliadb_dataset.export import FileSystemExport, NucliaDatasetsExport
-from nucliadb_sdk.knowledgebox import KnowledgeBox
 
 
 def test_filesystem_export(
-    knowledgebox: KnowledgeBox, upload_data_field_classification
+    sdk: NucliaDB, upload_data_field_classification: KnowledgeBoxObj
 ):
     trainset = TrainSet()
     trainset.type = TaskType.FIELD_CLASSIFICATION
@@ -40,7 +41,8 @@ def test_filesystem_export(
 
     with tempfile.TemporaryDirectory() as tmpdirname:
         exporter = FileSystemExport(
-            knowledgebox.client,
+            sdk=sdk,
+            kbid=upload_data_field_classification.uuid,
             trainset=trainset,
             store_path=tmpdirname,
         )
@@ -55,8 +57,8 @@ def test_filesystem_export(
 
 def test_datasets_export(
     mocked_datasets_url: str,
-    knowledgebox: KnowledgeBox,
-    upload_data_field_classification,
+    sdk: NucliaDB,
+    upload_data_field_classification: KnowledgeBoxObj,
 ):
     trainset = TrainSet()
     trainset.type = TaskType.FIELD_CLASSIFICATION
@@ -65,7 +67,8 @@ def test_datasets_export(
 
     with tempfile.TemporaryDirectory() as tmpdirname:
         exporter = NucliaDatasetsExport(
-            client=knowledgebox.client,
+            sdk=sdk,
+            kbid=upload_data_field_classification.uuid,
             datasets_url=mocked_datasets_url,
             trainset=trainset,
             cache_path=tmpdirname,

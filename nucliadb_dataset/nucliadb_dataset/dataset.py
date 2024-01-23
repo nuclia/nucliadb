@@ -136,7 +136,7 @@ class NucliaDBDataset(NucliaDataset):
         self.task_definition = task_definition
         self.sdk = sdk
         self.streamer = Streamer(
-            self.trainset, reader_headers=sdk.headers, base_url=sdk.base_url
+            self.trainset, reader_headers=sdk.headers, base_url=sdk.base_url, kbid=kbid
         )
 
         self._set_schema(self.task_definition.schema)
