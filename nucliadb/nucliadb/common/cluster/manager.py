@@ -21,6 +21,7 @@ import asyncio
 import logging
 import random
 import uuid
+from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Optional
 
 import backoff
@@ -485,40 +486,62 @@ def choose_node(
     target_replicas: Optional[list[str]] = None,
     read_only: bool = False,
 ) -> tuple[AbstractIndexNode, str, str]:
+    """Choose an arbitrary node storing `shard`. When `read_only` is enabled,
+    read replicas are preferred to primary nodes.
+
     """
-    Choose an arbitrary node storing `shard`.
-    """
-    preferred_nodes = []
-    backend_nodes = []
+    target_replicas = target_replicas or []
+
+    @dataclass
+    class NodeList:
+        primaries: list[tuple[str, AbstractIndexNode]] = field(default_factory=list)
+        secondaries: list[tuple[str, AbstractIndexNode]] = field(default_factory=list)
+
+        def __len__(self):
+            return len(self.primaries) + len(self.secondaries)
+
+    preferred_nodes = NodeList()
+    backend_nodes = NodeList()
     for shardreplica in shard.replicas:
         node_id = shardreplica.node
         replica_id = shardreplica.shard.id
 
         node = get_index_node(node_id)
         if node is not None:
-            if target_replicas and replica_id in target_replicas:
-                preferred_nodes.append((replica_id, node))
+            if replica_id in target_replicas:
+                preferred_nodes.primaries.append((replica_id, node))
             else:
-                backend_nodes.append((replica_id, node))
+                backend_nodes.primaries.append((replica_id, node))
 
         if read_only:
             for read_replica_node_id in get_read_replica_node_ids(node_id):
                 read_replica_node = get_index_node(read_replica_node_id)
                 if read_replica_node is None:
                     continue
-                if target_replicas and replica_id in target_replicas:
-                    preferred_nodes.append((replica_id, read_replica_node))
+                if replica_id in target_replicas:
+                    preferred_nodes.secondaries.append((replica_id, read_replica_node))
                 else:
-                    backend_nodes.append((replica_id, read_replica_node))
+                    backend_nodes.secondaries.append((replica_id, read_replica_node))
 
     if len(preferred_nodes) == 0 and len(backend_nodes) == 0:
         raise NoHealthyNodeAvailable("Could not find a node to query")
 
+    # Select a node with priority on secondaries when `read_only`
     selected_node: AbstractIndexNode
     if len(preferred_nodes) > 0:
-        replica_id, selected_node = random.choice(preferred_nodes)
+        if read_only and len(preferred_nodes.secondaries) > 0:
+            replica_id, selected_node = random.choice(preferred_nodes.secondaries)
+        else:
+            replica_id, selected_node = random.choice(
+                preferred_nodes.primaries + preferred_nodes.secondaries
+            )
     else:
-        replica_id, selected_node = random.choice(backend_nodes)
+        if read_only and len(backend_nodes.secondaries) > 0:
+            replica_id, selected_node = random.choice(backend_nodes.secondaries)
+        else:
+            replica_id, selected_node = random.choice(
+                backend_nodes.primaries + backend_nodes.secondaries
+            )
     return selected_node, replica_id, selected_node.id
 
 
