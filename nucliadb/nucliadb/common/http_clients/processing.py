@@ -203,6 +203,11 @@ class StatusResultV2(pydantic.BaseModel):
         title="Schedule ETA",
         description="Estimated time until the resource is scheduled.",
     )
+    schedule_order: int = pydantic.Field(
+        0,
+        title="Schedule Order",
+        description="Order of the resource in the schedule queue.",
+    )
 
 
 class StatusResultsV2(pydantic.BaseModel):
