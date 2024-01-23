@@ -49,11 +49,6 @@ impl ReplicationServiceGRPCDriver {
             node_id,
         }
     }
-
-    /// This function must be called before using this service
-    pub async fn initialize(&self) -> NodeResult<()> {
-        Ok(())
-    }
 }
 
 async fn stream_file(

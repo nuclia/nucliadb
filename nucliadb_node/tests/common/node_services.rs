@@ -255,10 +255,6 @@ impl NodeFixture {
         self.reader_server_task = Some(tokio::spawn(async move {
             lifecycle::initialize_reader(settings.clone());
             let grpc_driver = NodeReaderGRPCDriver::new(settings.clone());
-            grpc_driver
-                .initialize()
-                .await
-                .expect("Unable to initialize reader gRPC");
             let reader_server = NodeReaderServer::new(grpc_driver);
             Server::builder()
                 .add_service(reader_server)
@@ -289,10 +285,6 @@ impl NodeFixture {
         self.reader_server_task = Some(tokio::spawn(async move {
             lifecycle::initialize_reader(settings.clone());
             let grpc_driver = NodeReaderGRPCDriver::new(settings.clone());
-            grpc_driver
-                .initialize()
-                .await
-                .expect("Unable to initialize reader gRPC");
             let reader_server = NodeReaderServer::new(grpc_driver);
             Server::builder()
                 .add_service(reader_server)

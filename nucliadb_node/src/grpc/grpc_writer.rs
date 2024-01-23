@@ -62,11 +62,6 @@ impl NodeWriterGRPCDriver {
         }
     }
 
-    /// This function must be called before using this service
-    pub async fn initialize(&self) -> NodeResult<()> {
-        Ok(())
-    }
-
     pub fn with_sender(self, sender: UnboundedSender<NodeWriterEvent>) -> Self {
         Self {
             sender: Some(sender),

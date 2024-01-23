@@ -45,11 +45,6 @@ impl NodeReaderGRPCDriver {
         }
     }
 
-    /// This function must be called before using this service
-    pub async fn initialize(&self) -> NodeResult<()> {
-        Ok(())
-    }
-
     async fn obtain_shard(&self, id: impl Into<String>) -> Result<Arc<ShardReader>, tonic::Status> {
         let id = id.into();
         let id_clone = id.clone();
