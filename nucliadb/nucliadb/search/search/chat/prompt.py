@@ -20,7 +20,6 @@
 import asyncio
 from typing import Optional
 
-from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
@@ -31,6 +30,7 @@ from nucliadb.search import logger
 from nucliadb_models.search import (
     SCORE_TYPE,
     ContextStrategy,
+    FindParagraph,
     KnowledgeboxFindResults,
     RAGOptions,
 )
@@ -143,10 +143,7 @@ async def default_prompt_context(
     async with driver.transaction() as txn:
         kb = KnowledgeBoxORM(txn, storage, kbid)
         for field_path, paragraph in ordered_paras:
-            text = paragraph.text.strip()
-            # Do not send highlight marks on prompt context
-            text = text.replace("<mark>", "").replace("</mark>", "")
-            output[paragraph.id] = text
+            output[paragraph.id] = _clean_paragraph_text(paragraph)
 
             # If the paragraph is a conversation and it matches semantically, we assume we
             # have matched with the question, therefore try to include the answer to the
@@ -169,29 +166,47 @@ async def default_prompt_context(
 
 async def get_field_extracted_text(
     field: Field, max_concurrent_tasks: asyncio.Semaphore
-) -> Optional[str]:
+) -> Optional[tuple[Field, str]]:
     async with max_concurrent_tasks:
         extracted_text_pb = await field.get_extracted_text(force=True)
         if extracted_text_pb is None:
             return None
-        return extracted_text_pb.text
+        return field, extracted_text_pb.text
+
+
+async def get_resource_field_extracted_text(
+    kb_obj: KnowledgeBoxORM,
+    resource_uuid,
+    field_id: str,
+    max_concurrent_tasks: asyncio.Semaphore,
+) -> Optional[tuple[Resource, Field, str]]:
+    resource = await kb_obj.get(resource_uuid)
+    if resource is None:
+        return None
+    field_key, field_type = field_id.split("/")
+    field = await resource.get_field(field_key, KB_REVERSE[field_type], load=False)
+    if field is None:
+        return None
+    result = await get_field_extracted_text(field, max_concurrent_tasks)
+    if result is None:
+        return None
+    _, extracted_text = result
+    return resource, field, extracted_text
 
 
 async def get_resource_extracted_texts(
-    txn: Transaction,
-    kbid: str,
+    kb_obj: KnowledgeBoxORM,
     resource_uuid: str,
     max_concurrent_tasks: asyncio.Semaphore,
 ) -> Optional[list[tuple[Field, str]]]:
-    result = []
-
-    kb_obj = KnowledgeBoxORM(txn, await get_storage(), kbid)
+    result: list[tuple[Field, str]] = []
     resource = await kb_obj.get(resource_uuid)
     if resource is None:
         return None
 
     field_tasks = []
-    for field in await resource.get_fields(force=True):
+    for field_type, field_key in await resource.get_fields(force=True):
+        field = await resource.get_field(field_key, field_type, load=False)
         task = asyncio.create_task(
             get_field_extracted_text(field, max_concurrent_tasks)
         )
@@ -203,9 +218,10 @@ async def get_resource_extracted_texts(
         if done_task.exception() is not None:
             logger.warning(f"Error getting extracted texts: {done_task.exception()}")
             continue
-
-        extracted_text = done_task.result()
-        result.append(extracted_text)
+        task_result = done_task.result()
+        if task_result is None:
+            continue
+        result.append(task_result)
 
     return result
 
@@ -215,31 +231,28 @@ async def full_resource_prompt_context(
     results: KnowledgeboxFindResults,
 ) -> Context:
     """
-    TODO:
-        - Collect the list of resources in the results (in order of relevance)
-        - For each resource, collect the extracted text from the fields in the resource
+    Algorithm steps:
+        - Collect the list of resources in the results (in order of relevance).
+        - For each resource, collect the extracted text from all its fields and craft the context.
     """
     output: Context = {}
 
-    ordered_paras = []
-    for result in results.resources.values():
-        for field_path, field in result.fields.items():
-            for paragraph in field.paragraphs.values():
-                ordered_paras.append((field_path, paragraph))
-    ordered_paras.sort(key=lambda x: x[1].order, reverse=False)
-
+    # Collect the list of resources in the results (in order of relevance).
+    ordered_paras = get_ordered_paragraphs(results)
     ordered_resources = []
     for paragraph in ordered_paras:
-        resource_uuid = paragraph[0].split("/")[0]
+        resource_uuid = paragraph.id.split("/")[0]
         if resource_uuid not in ordered_resources:
             ordered_resources.append(resource_uuid)
 
+    # For each resource, collect the extracted text from all its fields.
     txn = await get_read_only_transaction()
+    kb_obj = KnowledgeBoxORM(txn, await get_storage(), kbid)
     max_concurrent_tasks = asyncio.Semaphore(MAX_EXTRACTED_TEXTS_TASKS)
     tasks = []
     for resource_uuid in ordered_resources:
         task = asyncio.create_task(
-            get_resource_extracted_texts(txn, kbid, resource_uuid, max_concurrent_tasks)
+            get_resource_extracted_texts(kb_obj, resource_uuid, max_concurrent_tasks)
         )
         tasks.append(task)
 
@@ -250,11 +263,14 @@ async def full_resource_prompt_context(
             logger.warning(f"Error getting extracted texts: {done_task.exception()}")
             continue
         extracted_texts = done_task.result()
+        if extracted_texts is None:
+            continue
         resource_uuid = ordered_resources[index]
         for field, extracted_text in extracted_texts:
             if extracted_text is None:
                 continue
-            output[field.full_id] = extracted_text
+            # Add the extracted text of each field to the beginning of the context.
+            output[field.resource_unique_id] = extracted_text
     return output
 
 
@@ -264,11 +280,51 @@ async def composed_prompt_context(
     extend_with_fields: list[str],
 ) -> Context:
     """
-    TODO:
-        - For each paragraph in the results, get the resource id.
-        - Try to get the specified fields from the resource. If present, add the text as yaml.
+    Algorithm steps:
+        - Collect the list of resources in the results (in order of relevance).
+        - For each resource, collect the extracted text from all its fields.
+        - Add the extracted text of each field to the beginning of the context.
+        - Add the extracted text of each paragraph to the end of the context.
     """
     output: Context = {}
+
+    # Collect the list of resources in the results (in order of relevance).
+    ordered_paras = get_ordered_paragraphs(results)
+    ordered_resources = []
+    for paragraph in ordered_paras:
+        resource_uuid = paragraph.id.split("/")[0]
+        if resource_uuid not in ordered_resources:
+            ordered_resources.append(resource_uuid)
+
+    # Fetch the extracted texts of the specified fields for each resource
+    txn = await get_read_only_transaction()
+    kb_obj = KnowledgeBoxORM(txn, await get_storage(), kbid)
+    max_concurrent_tasks = asyncio.Semaphore(MAX_EXTRACTED_TEXTS_TASKS)
+    tasks = []
+    for resource_uuid in ordered_resources:
+        for field_id in extend_with_fields:
+            task = asyncio.create_task(
+                get_resource_field_extracted_text(
+                    kb_obj, resource_uuid, field_id, max_concurrent_tasks
+                )
+            )
+            tasks.append(task)
+    done, _ = await asyncio.wait(tasks)
+    done_task: asyncio.Task
+    for done_task in done:
+        if done_task.exception() is not None:
+            logger.warning(f"Error getting extracted texts: {done_task.exception()}")
+            continue
+        task_result = done_task.result()
+        if task_result is None:
+            continue
+        # Add the extracted text of each field to the beginning of the context.
+        _, field, extracted_text = task_result
+        output[field.resource_unique_id] = extracted_text
+
+    # Add the extracted text of each paragraph to the end of the context.
+    for paragraph in ordered_paras:
+        output[paragraph.id] = _clean_paragraph_text(paragraph)
     return output
 
 
@@ -295,13 +351,13 @@ class PromptContextBuilder:
         extended.update(context)
         return extended
 
-    async def build(self):
+    async def build(self) -> tuple[Context, ContextOrder]:
         context = await self._build_context()
         context = self.prepend_user_context(context)
-        order = {
+        context_order = {
             text_block_id: order for order, text_block_id in enumerate(context.keys())
         }
-        return context, order
+        return context, context_order
 
     async def _build_context(self):
         if self.options is None or self.options.context_strategies is None:
@@ -312,9 +368,32 @@ class PromptContextBuilder:
             return await full_resource_prompt_context(
                 self.kbid, self.find_results, user_context=self.user_context
             )
-        else:
-            return await composed_prompt_context(
-                self.kbid,
-                self.find_results,
-                extend_with_fields=self.options.extend_with_fields or [],
-            )
+
+        return await composed_prompt_context(
+            self.kbid,
+            self.find_results,
+            extend_with_fields=self.options.extend_with_fields or [],
+        )
+
+
+def _clean_paragraph_text(paragraph: FindParagraph) -> str:
+    text = paragraph.text.strip()
+    # Do not send highlight marks on prompt context
+    text = text.replace("<mark>", "").replace("</mark>", "")
+    return text
+
+
+def get_ordered_paragraphs(results: KnowledgeboxFindResults) -> list[FindParagraph]:
+    """
+    Returns the list of paragraphs in the results, ordered by relevance.
+    """
+    return sorted(
+        [
+            paragraph
+            for resource in results.resources.values()
+            for field in resource.fields.values()
+            for paragraph in field.paragraphs.values()
+        ],
+        key=lambda paragraph: paragraph.order,
+        reverse=False,
+    )
