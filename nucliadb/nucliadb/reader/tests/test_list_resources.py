@@ -46,13 +46,13 @@ PAGINATION_TEST_SCENARIOS = [
 )
 async def test_list_resources(
     reader_api: Callable[..., AsyncClient],
-    test_pagination_resources: str,
+    test_resources: tuple[str, list[str]],
     page: Optional[int],
     size: Optional[int],
     expected_resources_count: int,
     expected_is_last_page: bool,
 ) -> None:
-    kbid = test_pagination_resources
+    kbid = test_resources[0]
 
     query_params = {}
     if page is not None:
