@@ -5,13 +5,6 @@ requests
 aiohttp
 pydantic_argparse
 pyarrow
-boto3
-google-auth
-google-cloud-storage
-boto3-stubs
-google-auth-stubs
-types-google-cloud-ndb
-types-boto3
 
 # automatically bumped during release
 nucliadb-protos

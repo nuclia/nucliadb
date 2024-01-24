@@ -20,17 +20,16 @@
 from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 
 from nucliadb_dataset.tests.integration.utils import export_dataset
-from nucliadb_sdk.knowledgebox import KnowledgeBox
+from nucliadb_models.resource import KnowledgeBoxObj
+from nucliadb_sdk.v2.sdk import NucliaDB
 
 
-def test_paragraph_streaming(text_editors_kb: KnowledgeBox):
-    knowledgebox = text_editors_kb
-
+def test_paragraph_streaming(sdk: NucliaDB, text_editors_kb: KnowledgeBoxObj):
     trainset = TrainSet()
     trainset.type = TaskType.PARAGRAPH_STREAMING
     trainset.batch_size = 10
 
-    partitions = export_dataset(knowledgebox, trainset)
+    partitions = export_dataset(sdk, trainset, text_editors_kb)
     assert len(partitions) == 1
 
     loaded_array = partitions[0]

@@ -74,6 +74,7 @@ from nucliadb_models.search import (
     SummarizedResponse,
     SummarizeRequest,
 )
+from nucliadb_models.trainset import TrainSetPartitions
 from nucliadb_models.vectors import VectorSet, VectorSets
 from nucliadb_models.writer import (
     CreateResourcePayload,
@@ -723,6 +724,16 @@ class _NucliaDBBase:
         request_type=None,
         response_type=StatusResponse,
         docstring=docstrings.IMPORT_STATUS,
+    )
+
+    trainset = _request_builder(
+        name="trainset",
+        path_template="/v1/kb/{kbid}/trainset",
+        method="GET",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=TrainSetPartitions,
+        docstring=docstrings.TRAINSET_PARTITIONS,
     )
 
 

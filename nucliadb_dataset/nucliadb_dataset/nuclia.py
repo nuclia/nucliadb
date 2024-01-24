@@ -19,7 +19,7 @@
 
 from typing import Iterator, List
 
-import grpc
+import grpc  # type: ignore
 from nucliadb_protos.train_pb2 import (
     GetFieldsRequest,
     GetInfoRequest,

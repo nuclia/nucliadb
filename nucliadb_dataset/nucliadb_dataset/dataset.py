@@ -17,74 +17,38 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import base64
-import json
 import os
-import re
-from enum import Enum
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Dict,
-    Iterator,
-    List,
-    Optional,
-    Tuple,
-    Union,
-)
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple
 
-import boto3
 import pyarrow as pa  # type: ignore
-from google.auth.credentials import AnonymousCredentials  # type: ignore
-from google.cloud import storage  # type: ignore
-from google.oauth2 import service_account  # type: ignore
-from nucliadb_protos.dataset_pb2 import (
-    FieldClassificationBatch,
-    ImageClassificationBatch,
-    ParagraphClassificationBatch,
-    ParagraphStreamingBatch,
-    QuestionAnswerStreamingBatch,
-    SentenceClassificationBatch,
-    TaskType,
-    TokenClassificationBatch,
-    TrainSet,
-)
+from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 
-from nucliadb_dataset.mapping import (
-    batch_to_image_classification_arrow,
-    batch_to_paragraph_streaming_arrow,
-    batch_to_question_answer_streaming_arrow,
-    batch_to_text_classification_arrow,
-    batch_to_text_classification_normalized_arrow,
-    batch_to_token_classification_arrow,
-    bytes_to_batch,
-)
 from nucliadb_dataset.streamer import Streamer, StreamerAlreadyRunning
+from nucliadb_dataset.tasks import (
+    ACTUAL_PARTITION,
+    TASK_DEFINITIONS,
+    TASK_DEFINITIONS_REVERSE,
+    Task,
+)
 from nucliadb_models.entities import KnowledgeBoxEntities
 from nucliadb_models.labels import KnowledgeBoxLabels
-from nucliadb_sdk.client import NucliaDBClient
-from nucliadb_sdk.knowledgebox import KnowledgeBox
-from nucliadb_sdk.utils import get_kb
+from nucliadb_models.resource import KnowledgeBoxObj
+from nucliadb_models.search import (
+    KnowledgeboxSearchResults,
+    SearchOptions,
+    SearchRequest,
+)
+from nucliadb_models.trainset import TrainSetPartitions
+from nucliadb_sdk.v2.sdk import NucliaDB, Region
 
 CHUNK_SIZE = 5 * 1024 * 1024
 
-if TYPE_CHECKING:  # pragma: no cover
-    TaskValue = TaskType.V
-else:
-    TaskValue = int
 
-ACTUAL_PARTITION = "actual_partition"
-
-
-class Task(str, Enum):
-    PARAGRAPH_CLASSIFICATION = "PARAGRAPH_CLASSIFICATION"
-    FIELD_CLASSIFICATION = "FIELD_CLASSIFICATION"
-    SENTENCE_CLASSIFICATION = "SENTENCE_CLASSIFICATION"
-    TOKEN_CLASSIFICATION = "TOKEN_CLASSIFICATION"
-    IMAGE_CLASSIFICATION = "IMAGE_CLASSIFICATION"
-    PARAGRAPH_STREAMING = "PARAGRAPH_STREAMING"
-    QUESTION_ANSWER_STREAMING = "QUESTION_ANSWER_STREAMING"
+@dataclass
+class LabelSetCount:
+    count: int
+    labels: Dict[str, int] = field(default_factory=dict)
 
 
 class NucliaDataset(object):
@@ -145,7 +109,8 @@ class NucliaDataset(object):
 class NucliaDBDataset(NucliaDataset):
     def __init__(
         self,
-        client: NucliaDBClient,
+        sdk: NucliaDB,
+        kbid: str,
         task: Optional[Task] = None,
         labels: Optional[List[str]] = None,
         trainset: Optional[TrainSet] = None,
@@ -156,223 +121,113 @@ class NucliaDBDataset(NucliaDataset):
         if labels is None:
             labels = []
 
+        task_definition = None
         if trainset is None and task is not None:
-            if Task.PARAGRAPH_CLASSIFICATION == task:
-                trainset = TrainSet(type=TaskType.PARAGRAPH_CLASSIFICATION)
-                trainset.filter.labels.extend(labels)
-            elif Task.FIELD_CLASSIFICATION == task:
-                trainset = TrainSet(type=TaskType.FIELD_CLASSIFICATION)
-                trainset.filter.labels.extend(labels)
-            elif Task.SENTENCE_CLASSIFICATION == task:
-                trainset = TrainSet(type=TaskType.SENTENCE_CLASSIFICATION)
-                trainset.filter.labels.extend(labels)
-            elif Task.TOKEN_CLASSIFICATION == task:
-                trainset = TrainSet(type=TaskType.TOKEN_CLASSIFICATION)
-                trainset.filter.labels.extend(labels)
-            elif Task.IMAGE_CLASSIFICATION == task:
-                trainset = TrainSet(type=TaskType.IMAGE_CLASSIFICATION)
-            elif Task.QUESTION_ANSWER_STREAMING == task:
-                trainset = TrainSet(type=TaskType.QUESTION_ANSWER_STREAMING)
-            else:
+            task_definition = TASK_DEFINITIONS.get(task)
+            if task_definition is None:
                 raise KeyError("Not a valid task")
+            trainset = TrainSet(type=task_definition.proto)
+            if task_definition.labels:
+                trainset.filter.labels.extend(labels)
+        elif trainset is not None:
+            task_definition = TASK_DEFINITIONS_REVERSE.get(trainset.type)
         elif trainset is None and task is None:
             raise AttributeError("Trainset or task needs to be defined")
 
-        if trainset is None:
+        if trainset is None or task_definition is None:
             raise AttributeError("Trainset could not be defined")
 
+        self.kbid = kbid
         self.trainset = trainset
-        self.client = client
-        self.knowledgebox = KnowledgeBox(self.client)
-        self.streamer = Streamer(self.trainset, self.client)
+        self.task_definition = task_definition
+        self.sdk = sdk
+        self.streamer = Streamer(
+            self.trainset, reader_headers=sdk.headers, base_url=sdk.base_url, kbid=kbid
+        )
 
+        self._set_schema(self.task_definition.schema)
+        self._set_mappings(self.task_definition.mapping)
         if self.trainset.type == TaskType.PARAGRAPH_CLASSIFICATION:
-            self._configure_paragraph_classification()
+            self._check_labels("PARAGRAPHS")
 
         elif self.trainset.type == TaskType.FIELD_CLASSIFICATION:
-            self._configure_field_classification()
+            self._check_labels("RESOURCES")
 
         elif self.trainset.type == TaskType.TOKEN_CLASSIFICATION:
-            self._configure_token_classification()
+            self._check_entities()
 
-        elif self.trainset.type == TaskType.SENTENCE_CLASSIFICATION:
-            self._configure_sentence_classification()
+    def _computed_labels(self) -> Dict[str, LabelSetCount]:
+        search_result: KnowledgeboxSearchResults = self.sdk.search(
+            kbid=self.kbid,
+            content=SearchRequest(
+                features=[SearchOptions.DOCUMENT], faceted=["/l"], page_size=0
+            ),
+        )
 
-        elif self.trainset.type == TaskType.IMAGE_CLASSIFICATION:
-            self._configure_image_classification()
+        response: Dict[str, LabelSetCount] = {}
+        if search_result.fulltext is None or search_result.fulltext.facets is None:
+            return response
 
-        elif self.trainset.type == TaskType.PARAGRAPH_STREAMING:
-            self._configure_paragraph_streaming()
-
-        elif self.trainset.type == TaskType.QUESTION_ANSWER_STREAMING:
-            self._configure_question_answer_streaming()
-
-        else:
-            raise AttributeError(
-                f"Trainset task '{TaskType.Name(self.trainset.type)}' not supported"
+        label_facets = {}
+        facet_prefix = "/l/"
+        if "/l" in search_result.fulltext.facets:
+            label_facets = search_result.fulltext.facets.get("/l", {})
+        elif "/classification.labels" in search_result.fulltext.facets:
+            facet_prefix = "/classification.labels/"
+            label_facets = search_result.fulltext.facets.get(
+                "/classification.labels", {}
             )
 
-    def _configure_sentence_classification(self):
-        self.labels = self.client.get_labels()
-        labelset = self.trainset.filter.labels[0]
-        if labelset not in self.labels.labelsets:
-            raise Exception(
-                f"Labelset is not valid {labelset} not in {self.labels.labelsets}"
+        for labelset, count in label_facets.items():
+            real_labelset = labelset[len(facet_prefix) :]  # removing /l/
+            response[real_labelset] = LabelSetCount(count=count)
+
+        for labelset, labelset_obj in response.items():
+            base_label = f"{facet_prefix}{labelset}"
+            fsearch_result: KnowledgeboxSearchResults = self.sdk.search(
+                kbid=self.kbid,
+                content=SearchRequest(
+                    features=[SearchOptions.DOCUMENT], faceted=[base_label], page_size=0
+                ),  # type: ignore
             )
+            if (
+                fsearch_result.fulltext is None
+                or fsearch_result.fulltext.facets is None
+            ):
+                raise Exception("Search error")
 
-        schema = pa.schema(
-            [
-                pa.field("text", pa.string()),
-                pa.field("labels", pa.list_(pa.string())),
-            ]
-        )
-        self._set_mappings(
-            [
-                bytes_to_batch(SentenceClassificationBatch),
-                batch_to_text_classification_normalized_arrow(schema),
-            ]
-        )
-        self._set_schema(schema)
+            for label, count in fsearch_result.fulltext.facets.get(
+                base_label, {}
+            ).items():
+                labelset_obj.labels[label.replace(base_label + "/", "")] = count
+        return response
 
-    def _configure_field_classification(self):
+    def _check_labels(self, type: str = "PARAGRAPHS"):
         if len(self.trainset.filter.labels) != 1:
             raise Exception("Needs to have only one labelset filter to train")
 
-        self.labels = self.client.get_labels()
+        labels: KnowledgeBoxLabels = self.sdk.get_labelsets(kbid=self.kbid)
         labelset = self.trainset.filter.labels[0]
-        computed_labelset = False
 
-        if labelset not in self.labels.labelsets:
-            uploaded_labels = self.knowledgebox.get_uploaded_labels()
-            if labelset in uploaded_labels:
-                computed_labelset = True
-            else:
+        if labelset not in labels.labelsets:
+            computed_labels = self._computed_labels()
+            if type != "RESOURCES" or labelset not in computed_labels:
                 raise Exception(
-                    f"Labelset is not valid {labelset} not in {uploaded_labels}"
+                    f"Labelset is not valid {labelset} not in {labels.labelsets}"
                 )
 
-        if (
-            computed_labelset is False
-            and "RESOURCES" not in self.labels.labelsets[labelset].kind
-        ):
-            raise Exception("Labelset not defined for Field Classification")
+        elif type not in labels.labelsets[labelset].kind:
+            raise Exception(f"Labelset not defined for {type} classification")
 
-        schema = pa.schema(
-            [
-                pa.field("text", pa.string()),
-                pa.field("labels", pa.list_(pa.string())),
-            ]
-        )
-        self._set_mappings(
-            [
-                bytes_to_batch(FieldClassificationBatch),
-                batch_to_text_classification_arrow(schema),
-            ]
-        )
-        self._set_schema(schema)
-
-    def _configure_token_classification(self):
-        self.entities = self.client.get_entities()
+    def _check_entities(self) -> None:
+        entities: KnowledgeBoxEntities = self.sdk.get_entitygroups(kbid=self.kbid)
         for family_group in self.trainset.filter.labels:
-            if family_group not in self.entities.groups:
+            if family_group not in entities.groups:
                 raise Exception("Family group is not valid")
-
-        schema = pa.schema(
-            [
-                pa.field("text", pa.list_(pa.string())),
-                pa.field("labels", pa.list_(pa.string())),
-            ]
-        )
-        self._set_mappings(
-            [
-                bytes_to_batch(TokenClassificationBatch),
-                batch_to_token_classification_arrow(schema),
-            ]
-        )
-        self._set_schema(schema)
-
-    def _configure_paragraph_classification(self):
-        if len(self.trainset.filter.labels) != 1:
-            raise Exception("Needs to have only one labelset filter to train")
-
-        self.labels = self.client.get_labels()
-        labelset = self.trainset.filter.labels[0]
-
-        if labelset not in self.labels.labelsets:
-            raise Exception(
-                f"Labelset is not valid {labelset} not in {self.labels.labelsets}"
-            )
-
-        if "PARAGRAPHS" not in self.labels.labelsets[labelset].kind:
-            raise Exception("Labelset not defined for Paragraphs Classification")
-
-        schema = pa.schema(
-            [
-                pa.field("text", pa.string()),
-                pa.field("labels", pa.list_(pa.string())),
-            ]
-        )
-        self._set_mappings(
-            [
-                bytes_to_batch(ParagraphClassificationBatch),
-                batch_to_text_classification_arrow(schema),
-            ]
-        )
-        self._set_schema(schema)
-
-    def _configure_image_classification(self):
-        schema = pa.schema(
-            [
-                pa.field("image", pa.string()),
-                pa.field("selection", pa.string()),
-            ]
-        )
-        self._set_mappings(
-            [
-                bytes_to_batch(ImageClassificationBatch),
-                batch_to_image_classification_arrow(schema),
-            ]
-        )
-        self._set_schema(schema)
-
-    def _configure_paragraph_streaming(self):
-        schema = pa.schema(
-            [
-                pa.field("paragraph_id", pa.string()),
-                pa.field("text", pa.string()),
-            ]
-        )
-        self._set_mappings(
-            [
-                bytes_to_batch(ParagraphStreamingBatch),
-                batch_to_paragraph_streaming_arrow(schema),
-            ]
-        )
-        self._set_schema(schema)
-
-    def _configure_question_answer_streaming(self):
-        schema = pa.schema(
-            [
-                pa.field("question", pa.string()),
-                pa.field("answer", pa.string()),
-                pa.field("question_paragraphs", pa.list_(pa.string())),
-                pa.field("answer_paragraphs", pa.list_(pa.string())),
-                pa.field("question_language", pa.string()),
-                pa.field("answer_language", pa.string()),
-                pa.field("cancelled_by_user", pa.bool_()),
-            ]
-        )
-        self._set_mappings(
-            [
-                bytes_to_batch(QuestionAnswerStreamingBatch),
-                batch_to_question_answer_streaming_arrow(schema),
-            ]
-        )
-        self._set_schema(schema)
 
     def _map(self, batch: Any):
         for func in self.mappings:
-            batch = func(batch)
+            batch = func(batch, self.schema)
         return batch
 
     def _set_mappings(self, funcs: List[Callable[[Any, Any], Tuple[Any, Any]]]):
@@ -381,15 +236,14 @@ class NucliaDBDataset(NucliaDataset):
     def _set_schema(self, schema: pa.Schema):
         self.schema = schema
 
-    def get_partitions(self):
+    def get_partitions(self) -> List[str]:
         """
         Get expected number of partitions from a live NucliaDB
         """
-        # XXX Bad pattern: using `client` attributes objects instead of methods
-        partitions = self.client.train_session.get(f"/trainset").json()
-        if len(partitions["partitions"]) == 0:
+        partitions: TrainSetPartitions = self.sdk.trainset(kbid=self.kbid)
+        if len(partitions.partitions) == 0:
             raise KeyError("There is no partitions")
-        return partitions["partitions"]
+        return partitions.partitions
 
     def read_partition(
         self,
@@ -433,134 +287,27 @@ class NucliaDBDataset(NucliaDataset):
         return filename
 
 
-class S3DatasetsClient:
-    def __init__(self, settings):
-        self.client = boto3.client(
-            "s3",
-            aws_access_key_id=settings["client_id"],
-            aws_secret_access_key=settings["client_secret"],
-            use_ssl=settings["ssl"],
-            verify=settings["verify_ssl"],
-            endpoint_url=settings["endpoint"],
-            region_name=settings["region_name"],
-        )
-
-    def list_files(self, bucket_name: str, path: str) -> List[str]:
-        objects = self.client.list_objects(Bucket=bucket_name, Prefix=path)
-        files_list = [obj["Key"] for obj in objects.get("Contents", [])]
-        return files_list
-
-    def download(self, bucket_name: str, filename: str, file_obj) -> None:
-        obj = self.client.get_object(Bucket=bucket_name, Key=filename)
-        data = obj["Body"]
-        file_obj.write(data.read())
-
-
-class GCSDatasetsClient:
-    def __init__(self, settings):
-        if settings["base64_creds"] is not None:
-            account_credentials = json.loads(base64.b64decode(settings["base64_creds"]))
-            credentials = service_account.Credentials.from_service_account_info(
-                account_credentials,
-                scopes=["https://www.googleapis.com/auth/devstorage.read_write"],
-            )
-        else:
-            credentials = AnonymousCredentials()
-        self.client = storage.Client(
-            project=settings["project"],
-            credentials=credentials,
-            client_options={"api_endpoint": settings["endpoint_url"]},
-        )
-
-    def list_files(self, bucket_name: str, path: str) -> List[str]:
-        bucket = self.client.bucket(bucket_name)
-        arrow_files = [blob.name for blob in bucket.list_blobs(prefix=path)]
-        return arrow_files
-
-    def download(self, bucket_name: str, filename: str, file_obj) -> None:
-        bucket = self.client.bucket(bucket_name)
-        blob = bucket.get_blob(filename)
-
-        if blob is None:
-            raise ValueError(f"File {filename} not found on {bucket_name}")
-
-        blob.download_to_file(file_obj)
-
-
-class NucliaCloudDataset(NucliaDataset):
-    client: Union[GCSDatasetsClient, S3DatasetsClient]
-
-    def __init__(self, base_path: str, remote_storage: Dict[str, Any]):
-        super().__init__(base_path)
-        self.bucket = remote_storage["bucket"]
-        self.key = remote_storage["key"]
-        if remote_storage["storage_type"] == "gcs":
-            self.client = GCSDatasetsClient(remote_storage["settings"])
-        elif remote_storage["storage_type"] == "s3":
-            self.client = S3DatasetsClient(remote_storage["settings"])
-
-    def get_partitions(self):
-        """
-        Count all *.arrow files on the bucket
-        """
-        arrow_files = self.client.list_files(self.bucket, self.key)
-        partitions = []
-        for file in arrow_files:
-            match = re.match(r".*\/([^\/]+).arrow", file)
-            if match:
-                partitions.append(match.groups()[0])
-        return partitions
-
-    def read_partition(
-        self,
-        partition_id: str,
-        filename: Optional[str] = None,
-        force: bool = False,
-        path: Optional[str] = None,
-    ):
-        """
-        Download an pregenerated arrow partition from a bucket and store it locally
-        """
-        if filename is None:
-            filename = partition_id
-
-        if path is not None:
-            filename = f"{path}/{filename}.arrow"
-        else:
-            filename = f"{self.base_path}/{filename}.arrow"
-
-        if os.path.exists(filename) and force is False:
-            return filename
-
-        filename_tmp = f"{filename}.tmp"
-        print(f"Downloading partition {partition_id} from {self.bucket}/{self.key}")
-        with open(filename_tmp, "wb") as downloaded_file:
-            self.client.download(
-                self.bucket, f"{self.key}/{partition_id}.arrow", downloaded_file
-            )
-            downloaded_file.flush()
-
-        print("-" * 10)
-        os.rename(filename_tmp, filename)
-        return filename
-
-
 def download_all_partitions(
     task: str,  # type: ignore
     slug: Optional[str] = None,
+    kbid: Optional[str] = None,
     nucliadb_base_url: Optional[str] = "http://localhost:8080",
     path: Optional[str] = None,
-    knowledgebox: Optional[KnowledgeBox] = None,
+    sdk: Optional[NucliaDB] = None,
     labels: Optional[List[str]] = None,
 ):
-    if knowledgebox is None and slug is not None:
-        knowledgebox = get_kb(slug, nucliadb_base_url)
+    if sdk is None:
+        sdk = NucliaDB(region=Region.ON_PREM, url=nucliadb_base_url)
 
-    if knowledgebox is None:
-        raise KeyError("KnowledgeBox not found")
+    if kbid is None and slug is not None:
+        kb: KnowledgeBoxObj = sdk.get_knowledge_box_by_slug(slug=slug)
+        kbid = kb.uuid
+
+    if kbid is None:
+        raise KeyError("Not a valid KB")
 
     task_obj = Task(task)
     fse = NucliaDBDataset(
-        client=knowledgebox.client, task=task_obj, labels=labels, base_path=path
+        sdk=sdk, task=task_obj, labels=labels, base_path=path, kbid=kbid
     )
     return fse.read_all_partitions(path=path)

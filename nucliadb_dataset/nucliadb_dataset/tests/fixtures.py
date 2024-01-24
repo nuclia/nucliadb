@@ -19,115 +19,299 @@
 
 import re
 import tempfile
-from io import BytesIO
-from typing import AsyncIterator, Optional
+from typing import AsyncIterator, Iterator, Optional
 
-import boto3
 import docker  # type: ignore
+import grpc  # type: ignore
 import pytest
-import requests
-from google.auth.credentials import AnonymousCredentials  # type: ignore
-from google.cloud import storage  # type: ignore
 from grpc import aio  # type: ignore
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from pytest_docker_fixtures import images  # type: ignore
-from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
-from nucliadb_sdk.entities import Entity
-from nucliadb_sdk.knowledgebox import KnowledgeBox
-from nucliadb_sdk.labels import LabelType
+from nucliadb_models.common import FieldID, UserClassification
+from nucliadb_models.entities import CreateEntitiesGroupPayload, Entity
+from nucliadb_models.labels import Label, LabelSet, LabelSetKind
+from nucliadb_models.metadata import TokenSplit, UserFieldMetadata, UserMetadata
+from nucliadb_models.resource import KnowledgeBoxObj
+from nucliadb_models.text import TextField
+from nucliadb_models.utils import FieldIdString, SlugString
+from nucliadb_models.writer import CreateResourcePayload
+from nucliadb_sdk.v2.sdk import NucliaDB  # type: ignore
 
 DOCKER_ENV_GROUPS = re.search(r"//([^:]+)", docker.from_env().api.base_url)
 DOCKER_HOST: Optional[str] = DOCKER_ENV_GROUPS.group(1) if DOCKER_ENV_GROUPS else None  # type: ignore
 
 
 @pytest.fixture(scope="function")
-def upload_data_field_classification(knowledgebox: KnowledgeBox):
-    knowledgebox.set_labels("labelset1", ["A", "B"], LabelType.RESOURCES)
-    knowledgebox.set_labels("labelset2", ["C"], LabelType.RESOURCES)
-    knowledgebox.upload("doc1", text="This is my lovely text", labels=["labelset1/A"])
-    knowledgebox.upload(
-        "doc2",
-        text="This is my lovely text2",
-        labels=["labelset1/B", "labelset2/C"],
+def upload_data_field_classification(sdk: NucliaDB, kb: KnowledgeBoxObj):
+    sdk.set_labelset(
+        kbid=kb.uuid,
+        labelset="labelset1",
+        content=LabelSet(
+            title="labelset1",
+            kind=[LabelSetKind.RESOURCES],
+            labels=[Label(title="A"), Label(title="B")],
+        ),
     )
+
+    sdk.set_labelset(
+        kbid=kb.uuid,
+        labelset="labelset2",
+        content=LabelSet(
+            title="labelset2",
+            kind=[LabelSetKind.RESOURCES],
+            labels=[
+                Label(title="C"),
+            ],
+        ),
+    )
+
+    sdk.create_resource(
+        kbid=kb.uuid,
+        content=CreateResourcePayload(
+            slug=SlugString("doc1"),
+            texts={FieldIdString("text"): TextField(body="This is my lovely text")},
+            usermetadata=UserMetadata(
+                classifications=[UserClassification(labelset="labelset1", label="A")]
+            ),
+        ),
+    )
+
+    sdk.create_resource(
+        kbid=kb.uuid,
+        content=CreateResourcePayload(
+            slug=SlugString("doc2"),
+            texts={FieldIdString("text"): TextField(body="This is my lovely text2")},
+            usermetadata=UserMetadata(
+                classifications=[
+                    UserClassification(labelset="labelset1", label="B"),
+                    UserClassification(labelset="labelset2", label="C"),
+                ]
+            ),
+        ),
+    )
+
+    return kb
 
 
 @pytest.fixture(scope="function")
-async def upload_data_paragraph_classification(knowledgebox: KnowledgeBox):
-    knowledgebox.set_labels("labelset1", ["label1", "label2"], LabelType.PARAGRAPHS)
-    knowledgebox.set_labels("labelset2", ["label1", "label2"], LabelType.PARAGRAPHS)
-    knowledgebox.upload(
-        "doc1", text="This is my lovely text", labels=["labelset1/label1"]
+def upload_data_paragraph_classification(sdk: NucliaDB, kb: KnowledgeBoxObj):
+    sdk.set_labelset(
+        kbid=kb.uuid,
+        labelset="labelset1",
+        content=LabelSet(
+            title="labelset1",
+            kind=[LabelSetKind.PARAGRAPHS],
+            labels=[Label(title="label1"), Label(title="label2")],
+        ),
     )
-    knowledgebox.upload(
-        "doc2",
-        text="This is my lovely text2",
-        labels=["labelset1/label1", "labelset1/label2"],
+
+    sdk.set_labelset(
+        kbid=kb.uuid,
+        labelset="labelset2",
+        content=LabelSet(
+            title="labelset2",
+            kind=[LabelSetKind.PARAGRAPHS],
+            labels=[
+                Label(title="label1"),
+                Label(title="label2"),
+            ],
+        ),
     )
-    knowledgebox.upload(
-        "doc3",
-        text="Yet another lovely text",
-        labels=["labelset1/label2", "labelset2/label1"],
+
+    sdk.create_resource(
+        kbid=kb.uuid,
+        content=CreateResourcePayload(
+            slug=SlugString("doc1"),
+            texts={FieldIdString("text"): TextField(body="This is my lovely text")},
+            usermetadata=UserMetadata(
+                classifications=[
+                    UserClassification(labelset="labelset1", label="label1"),
+                ]
+            ),
+        ),
     )
+
+    sdk.create_resource(
+        kbid=kb.uuid,
+        content=CreateResourcePayload(
+            slug=SlugString("doc2"),
+            texts={FieldIdString("text"): TextField(body="This is my lovely text2")},
+            usermetadata=UserMetadata(
+                classifications=[
+                    UserClassification(labelset="labelset1", label="label1"),
+                    UserClassification(labelset="labelset1", label="label2"),
+                ]
+            ),
+        ),
+    )
+
+    sdk.create_resource(
+        kbid=kb.uuid,
+        content=CreateResourcePayload(
+            slug=SlugString("doc3"),
+            texts={FieldIdString("text"): TextField(body="Yet another lovely text")},
+            usermetadata=UserMetadata(
+                classifications=[
+                    UserClassification(labelset="labelset1", label="label1"),
+                    UserClassification(labelset="labelset2", label="label2"),
+                ]
+            ),
+        ),
+    )
+    return kb
 
 
 @pytest.fixture(scope="function")
-def upload_data_token_classification(knowledgebox: KnowledgeBox):
-    knowledgebox.set_entities("PERSON", ["Ramon", "Carmen Iniesta", "Eudald Camprubi"])
-    knowledgebox.set_entities("ANIMAL", ["lion", "tiger", "cheetah"])
-    knowledgebox.upload(
-        "doc1",
-        text="Ramon This is my lovely text",
-        entities=[Entity(type="PERSON", value="Ramon", positions=[(0, 5)])],
+def upload_data_token_classification(sdk: NucliaDB, kb: KnowledgeBoxObj):
+    sdk.create_entitygroup(
+        kbid=kb.uuid,
+        content=CreateEntitiesGroupPayload(
+            group="PERSON",
+            entities={
+                "ramon": Entity(value="Ramon"),
+                "carmen": Entity(value="Carmen Iniesta"),
+                "eudald": Entity(value="Eudald Camprubi"),
+            },
+            title="Animals",
+            color="black",
+        ),
     )
-    knowledgebox.upload(
-        "doc2",
-        text="Carmen Iniesta shows an amazing classifier to Eudald Camprubi",
-        entities=[
-            Entity(type="PERSON", value="Carmen Iniesta", positions=[(0, 14)]),
-            Entity(type="PERSON", value="Eudald Camprubi", positions=[(46, 61)]),
-        ],
+
+    sdk.create_entitygroup(
+        kbid=kb.uuid,
+        content=CreateEntitiesGroupPayload(
+            group="ANIMAL",
+            entities={
+                "cheetah": Entity(value="cheetah"),
+                "tiger": Entity(value="tiger"),
+                "lion": Entity(value="lion"),
+            },
+            title="Animals",
+            color="black",
+        ),
     )
-    knowledgebox.upload(
-        "doc3",
-        text="Which is the fastest animal, a lion, a tiger or a cheetah?",
-        entities=[
-            Entity(type="ANIMAL", value="lion", positions=[(31, 35)]),
-            Entity(type="ANIMAL", value="tiger", positions=[(39, 44)]),
-            Entity(type="ANIMAL", value="cheetah", positions=[(50, 57)]),
-        ],
+    sdk.create_resource(
+        kbid=kb.uuid,
+        content=CreateResourcePayload(
+            slug=SlugString("doc1"),
+            texts={
+                FieldIdString("text"): TextField(body="Ramon This is my lovely text")
+            },
+            fieldmetadata=[
+                UserFieldMetadata(
+                    token=[TokenSplit(klass="PERSON", token="Ramon", start=0, end=5)],
+                    field=FieldID(field_type=FieldID.FieldType.TEXT, field="text"),
+                )
+            ],
+        ),
     )
+
+    sdk.create_resource(
+        kbid=kb.uuid,
+        content=CreateResourcePayload(
+            slug=SlugString("doc2"),
+            texts={
+                FieldIdString("text"): TextField(
+                    body="Carmen Iniesta shows an amazing classifier to Eudald Camprubi"
+                )
+            },
+            fieldmetadata=[
+                UserFieldMetadata(
+                    token=[
+                        TokenSplit(
+                            klass="PERSON", token="Carmen Iniesta", start=0, end=14
+                        ),
+                        TokenSplit(
+                            klass="PERSON", token="Eudald Camprubi", start=46, end=61
+                        ),
+                    ],
+                    field=FieldID(field_type=FieldID.FieldType.TEXT, field="text"),
+                )
+            ],
+        ),
+    )
+
+    sdk.create_resource(
+        kbid=kb.uuid,
+        content=CreateResourcePayload(
+            slug=SlugString("doc3"),
+            texts={
+                FieldIdString("text"): TextField(
+                    body="Which is the fastest animal, a lion, a tiger or a cheetah?"
+                )
+            },
+            fieldmetadata=[
+                UserFieldMetadata(
+                    token=[
+                        TokenSplit(klass="ANIMAL", token="lion", start=31, end=35),
+                        TokenSplit(klass="ANIMAL", token="tiger", start=39, end=44),
+                        TokenSplit(klass="ANIMAL", token="cheetah", start=50, end=57),
+                    ],
+                    field=FieldID(field_type=FieldID.FieldType.TEXT, field="text"),
+                )
+            ],
+        ),
+    )
+
+    return kb
 
 
 @pytest.fixture(scope="function")
-def text_editors_kb(knowledgebox: KnowledgeBox):
-    knowledgebox.upload(
-        "doc-emacs",
-        title="GNU Emacs",
-        summary="An extensible, customizable, free/libre text editor - and more",
-        text="Text won't appear as we are not mocking processing",
-    )
-    knowledgebox.upload(
-        "doc-vi",
-        title="vi",
-        summary="A screen-oriented text editor originally created for the Unix operating system",
-        text="Text won't appear as we are not mocking processing",
-    )
-    knowledgebox.upload(
-        "doc-vim",
-        title="VIM",
-        summary="Vi IMproved, a programmer's text editor",
-        text="Text won't appear as we are not mocking processing",
-    )
-    knowledgebox.upload(
-        "doc-ex",
-        title="ex",
-        summary="Line editor for Unix systems originally written by Bill Joy in 1976",
-        text="Text won't appear as we are not mocking processing",
+def text_editors_kb(sdk: NucliaDB, kb: KnowledgeBoxObj):
+    sdk.create_resource(
+        kbid=kb.uuid,
+        content=CreateResourcePayload(
+            title="GNU Emacs",
+            slug=SlugString("doc-emacs"),
+            summary="An extensible, customizable, free/libre text editor - and more",
+            texts={
+                FieldIdString("text"): TextField(
+                    body="Text won't appear as we are not mocking processing"
+                )
+            },
+        ),
     )
 
-    yield knowledgebox
+    sdk.create_resource(
+        kbid=kb.uuid,
+        content=CreateResourcePayload(
+            title="vi",
+            slug=SlugString("doc-vi"),
+            summary="A screen-oriented text editor originally created for the Unix operating system",
+            texts={
+                FieldIdString("text"): TextField(
+                    body="Text won't appear as we are not mocking processing"
+                )
+            },
+        ),
+    )
+    sdk.create_resource(
+        kbid=kb.uuid,
+        content=CreateResourcePayload(
+            title="VIM",
+            slug=SlugString("doc-vim"),
+            summary="Vi IMproved, a programmer's text editor",
+            texts={
+                FieldIdString("text"): TextField(
+                    body="Text won't appear as we are not mocking processing"
+                )
+            },
+        ),
+    )
+    sdk.create_resource(
+        kbid=kb.uuid,
+        content=CreateResourcePayload(
+            title="ex",
+            slug=SlugString("doc-ex"),
+            summary="Line editor for Unix systems originally written by Bill Joy in 1976",
+            texts={
+                FieldIdString("text"): TextField(
+                    body="Text won't appear as we are not mocking processing"
+                )
+            },
+        ),
+    )
+    return kb
 
 
 @pytest.fixture(scope="function")
@@ -145,127 +329,9 @@ async def ingest_stub(nucliadb) -> AsyncIterator[WriterStub]:
     await channel.close(grace=True)
 
 
-images.settings["gcs"] = {
-    "image": "fsouza/fake-gcs-server",
-    "version": "1.44.1",
-    "options": {
-        "command": f"-scheme http -external-url http://{DOCKER_HOST}:4443 -port 4443",
-        "ports": {"4443": "4443"},
-    },
-}
-
-images.settings["s3"] = {
-    "image": "localstack/localstack",
-    "version": "0.12.18",
-    "env": {"SERVICES": "s3"},
-    "options": {
-        "ports": {"4566": None, "4571": None},
-    },
-}
-
-
-class GCS(BaseImage):
-    name = "gcs"
-    port = 4443
-
-    def check(self):
-        try:
-            response = requests.get(
-                f"http://{self.host}:{self.get_port()}/storage/v1/b"
-            )
-            return response.status_code == 200
-        except:  # noqa
-            return False
-
-
-@pytest.fixture(scope="session")
-def gcs():
-    container = GCS()
-    host, port = container.run()
-    public_api_url = f"http://{host}:{port}"
-    yield public_api_url
-    container.stop()
-
-
-@pytest.fixture(scope="session")
-def gcs_with_partitions(gcs):
-    def upload_random_file_to_bucket(
-        client, bucket_name, destination_blob_name, file_size
-    ):
-        random_file = BytesIO()
-        random_file.write(b"1" * file_size)
-        random_file.seek(0)
-
-        bucket = client.bucket(bucket_name)
-        blob = bucket.blob(destination_blob_name)
-        blob.upload_from_file(random_file)
-
-    client = storage.Client(
-        project="project",
-        credentials=AnonymousCredentials(),
-        client_options={"api_endpoint": gcs},
-    )
-    client.create_bucket("test_cloud_datasets")
-    filesize = 10 * 1024 * 1024
-    upload_random_file_to_bucket(
-        client, "test_cloud_datasets", "datasets/123456/partition1.arrow", filesize
-    )
-    upload_random_file_to_bucket(
-        client, "test_cloud_datasets", "datasets/123456/partition2.arrow", filesize
-    )
-    yield
-
-
-class S3(BaseImage):
-    name = "s3"
-    port = 4566
-
-    def check(self):
-        try:
-            response = requests.get(f"http://{self.host}:{self.get_port()}")
-            return response.status_code == 404
-        except Exception:  # pragma: no cover
-            return False
-
-
-@pytest.fixture(scope="session")
-def s3():
-    container = S3()
-    host, port = container.run()
-    public_api_url = f"http://{host}:{port}"
-    yield public_api_url
-    container.stop()
-
-
-@pytest.fixture(scope="session")
-def s3_with_partitions(s3):
-    def upload_random_file_to_bucket(
-        client, bucket_name, destination_blob_name, file_size
-    ):
-        random_file = BytesIO()
-        random_file.write(b"1" * file_size)
-        random_file.seek(0)
-
-        client.put_object(
-            Bucket=bucket_name, Key=destination_blob_name, Body=random_file
-        )
-
-    client = boto3.client(
-        "s3",
-        aws_access_key_id="",
-        aws_secret_access_key="",
-        use_ssl=False,
-        verify=False,
-        endpoint_url=s3,
-        region_name=None,
-    )
-
-    client.create_bucket(Bucket="testclouddatasets")
-    filesize = 10 * 1024 * 1024
-    upload_random_file_to_bucket(
-        client, "testclouddatasets", "datasets/123456/partition1.arrow", filesize
-    )
-    upload_random_file_to_bucket(
-        client, "testclouddatasets", "datasets/123456/partition2.arrow", filesize
-    )
-    yield
+@pytest.fixture
+def ingest_stub_sync(nucliadb) -> Iterator[WriterStub]:
+    channel = grpc.insecure_channel(f"{nucliadb.host}:{nucliadb.grpc}")
+    stub = WriterStub(channel)  # type: ignore
+    yield stub
+    channel.close()
