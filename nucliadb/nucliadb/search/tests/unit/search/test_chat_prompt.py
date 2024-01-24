@@ -16,8 +16,6 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-import asyncio
-import time
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -198,40 +196,3 @@ async def test_default_prompt_context(kb):
             "vecid/c/conv/ident",
         ]
         assert prompt_result["USER_CONTEXT_0"] == "Some extra context"
-
-
-async def test_concurrent_runner():
-    async def mycoro(value):
-        await asyncio.sleep(0.5)
-        return value
-
-    # Test without max_tasks: execution time should be less than 1 second
-    # as both should be executed in concurrently
-    runner = chat_prompt.ConcurrentRunner()
-    runner.schedule(mycoro(1))
-    runner.schedule(mycoro(2))
-    start = time.perf_counter()
-    results = await runner.wait()
-    end = time.perf_counter()
-    assert results == [1, 2]
-    assert end - start < 1
-
-    # Test with max_tasks: execution time should be at least 1 second
-    runner = chat_prompt.ConcurrentRunner(max_tasks=asyncio.Semaphore(1))
-    runner.schedule(mycoro(1))
-    runner.schedule(mycoro(2))
-    start = time.perf_counter()
-    results = await runner.wait()
-    end = time.perf_counter()
-    assert results == [1, 2]
-    assert end - start >= 1
-
-    # Exception should be raised if any of the coroutines raises an exception
-    with pytest.raises(ValueError):
-
-        async def coro_with_exception():
-            raise ValueError("Test")
-
-        runner = chat_prompt.ConcurrentRunner()
-        runner.schedule(coro_with_exception())
-        await runner.wait()

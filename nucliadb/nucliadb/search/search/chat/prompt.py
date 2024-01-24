@@ -18,8 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from collections.abc import Coroutine
-from typing import Any, Optional
+from typing import Optional
 
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.fields.base import Field
@@ -27,7 +26,6 @@ from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.middleware.transaction import get_read_only_transaction
-from nucliadb.search import logger
 from nucliadb_models.search import (
     SCORE_TYPE,
     ContextStrategy,
@@ -36,6 +34,7 @@ from nucliadb_models.search import (
     RAGOptions,
 )
 from nucliadb_protos import resources_pb2
+from nucliadb_utils.concurrency import ConcurrentRunner, run_concurrently
 from nucliadb_utils.utilities import get_storage
 
 Context = dict[str, str]
@@ -294,60 +293,6 @@ async def composed_prompt_context(
     for paragraph in ordered_paras:
         output[paragraph.id] = _clean_paragraph_text(paragraph)
     return output
-
-
-class ConcurrentRunner:
-    """
-    Runs a list of coroutines concurrently, with a maximum number of tasks running.
-    Returns the results of the coroutines in the order they were scheduled.
-    """
-
-    def __init__(self, max_tasks: Optional[asyncio.Semaphore] = None):
-        self._tasks: list[asyncio.Task] = []
-        self.max_tasks = max_tasks
-
-    async def run_coroutine(self, coro: Coroutine):
-        if self.max_tasks is None:
-            return await coro
-        else:
-            async with self.max_tasks:
-                return await coro
-
-    def schedule(self, coro: Coroutine):
-        # Use task name as a way to sort the results
-        task_name = str(len(self._tasks))
-        task = asyncio.create_task(self.run_coroutine(coro), name=task_name)
-        self._tasks.append(task)
-
-    async def wait(self) -> list[Any]:
-        results: list[Any] = []
-        done, pending = await asyncio.wait(self._tasks)
-        if len(pending) > 0:
-            logger.warning(f"ConcurrentRunner: {len(pending)} tasks were pending")
-
-        sorted_done = sorted(done, key=lambda task: int(task.get_name()))
-        done_task: asyncio.Task
-        for done_task in sorted_done:
-            if done_task.exception() is not None:
-                raise done_task.exception()  # type: ignore
-            results.append(done_task.result())
-        return results
-
-
-async def run_concurrently(
-    tasks: list[Coroutine], max_concurrent: Optional[int] = None
-) -> list[Any]:
-    """
-    Runs a list of coroutines concurrently, with a maximum number of tasks running.
-    Returns the results of the coroutines in the order they were scheduled.
-    """
-    max_tasks = None
-    if max_concurrent is not None:
-        max_tasks = asyncio.Semaphore(max_concurrent)
-    runner = ConcurrentRunner(max_tasks=max_tasks)
-    for task in tasks:
-        runner.schedule(task)
-    return await runner.wait()
 
 
 class PromptContextBuilder:
