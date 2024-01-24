@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional
+from typing import Optional, Sequence
 
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.fields.base import Field
@@ -28,10 +28,11 @@ from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.middleware.transaction import get_read_only_transaction
 from nucliadb_models.search import (
     SCORE_TYPE,
-    ContextStrategy,
+    FieldExtensionStrategy,
     FindParagraph,
+    FullResourceStrategy,
     KnowledgeboxFindResults,
-    RAGOptions,
+    RagStrategy,
 )
 from nucliadb_protos import resources_pb2
 from nucliadb_utils.asyncio_utils import ConcurrentRunner, run_concurrently
@@ -311,12 +312,12 @@ class PromptContextBuilder:
         kbid: str,
         find_results: KnowledgeboxFindResults,
         user_context: Optional[list[str]] = None,
-        options: Optional[RAGOptions] = None,
+        strategies: Optional[Sequence[RagStrategy]] = None,
     ):
         self.kbid = kbid
         self.find_results = find_results
         self.user_context = user_context
-        self.options = options
+        self.strategies = strategies
 
     def prepend_user_context(self, context: Context) -> Context:
         # Chat extra context passed by the user is the most important, therefore
@@ -337,17 +338,24 @@ class PromptContextBuilder:
         return context, context_order
 
     async def _build_context(self):
-        if self.options is None or self.options.context_strategies is None:
+        if self.strategies is None or len(self.strategies) == 0:
             return await default_prompt_context(self.kbid, self.find_results)
 
-        chosen_strategies = self.options.context_strategies
-        if ContextStrategy.FULL_RESOURCE in chosen_strategies:
+        full_resource = False
+        extend_with_fields = []
+        for strategy in self.strategies:
+            if strategy.name == FieldExtensionStrategy.name:
+                extend_with_fields.extend(strategy.fields)
+            elif strategy.name == FullResourceStrategy.name:
+                full_resource = True
+
+        if full_resource:
             return await full_resource_prompt_context(self.kbid, self.find_results)
 
         return await composed_prompt_context(
             self.kbid,
             self.find_results,
-            extend_with_fields=self.options.extend_with_fields or [],
+            extend_with_fields=extend_with_fields,
         )
 
 

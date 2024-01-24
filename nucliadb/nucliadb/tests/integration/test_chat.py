@@ -298,7 +298,7 @@ async def resources(nucliadb_writer, knowledgebox):
 
 @pytest.mark.asyncio()
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_chat_rag_options_full_resoruce(
+async def test_chat_rag_options_full_resource(
     nucliadb_reader: AsyncClient, knowledgebox, resources
 ):
     resource1, resource2 = resources
@@ -308,7 +308,7 @@ async def test_chat_rag_options_full_resoruce(
 
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/chat",
-        json={"query": "title", "rag": {"context_strategies": ["full_resource"]}},
+        json={"query": "title", "rag_strategies": [{"name": "full_resource"}]},
         timeout=None,
     )
     assert resp.status_code == 200
@@ -342,10 +342,7 @@ async def test_chat_rag_options_extend_with_fields(
         f"/kb/{knowledgebox}/chat",
         json={
             "query": "title",
-            "rag": {
-                "context_strategies": ["extend_with_fields"],
-                "extend_with_fields": ["a/summary"],
-            },
+            "rag_strategies": [{"name": "field_extension", "fields": ["a/summary"]}],
         },
         timeout=None,
     )
@@ -375,10 +372,10 @@ async def test_chat_rag_options_validation(
         f"/kb/kbid/chat",
         json={
             "query": "title",
-            "rag": {
-                "context_strategies": ["extend_with_fields", "full_resource"],
-                "extend_with_fields": ["a/summary"],
-            },
+            "rag_strategies": [
+                {"name": "full_resource"},
+                {"name": "extend_with_fields", "fields": ["a/summary"]},
+            ],
         },
     )
     assert resp.status_code == 422
@@ -390,12 +387,7 @@ async def test_chat_rag_options_validation(
 
     resp = await nucliadb_reader.post(
         f"/kb/kbid/chat",
-        json={
-            "query": "title",
-            "rag": {
-                "context_strategies": ["extend_with_fields"],
-            },
-        },
+        json={"query": "title", "rag_strategies": [{"name": "field_extension"}]},
     )
     assert resp.status_code == 422
     detail = resp.json()["detail"]

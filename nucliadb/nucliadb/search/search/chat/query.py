@@ -239,7 +239,7 @@ async def chat(
             kbid=kbid,
             find_results=find_results,
             user_context=user_context,
-            options=chat_request.rag,
+            strategies=chat_request.rag_strategies,
         )
         query_context, query_context_order = await pcb.build()
         user_prompt = None

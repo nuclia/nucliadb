@@ -728,45 +728,29 @@ class AskDocumentModel(BaseModel):
     user_id: str = Field(description="The id of the user associated to the request")
 
 
-class ContextStrategy(str, Enum):
-    FULL_RESOURCE = "full_resource"
-    EXTEND_WITH_FIELDS = "extend_with_fields"
-
-    # TODO: uncomment and implement (next iteration)
-    # EXTEND_WITH_RESOURCE_METADATA = "extend_with_resource_metadata"
-    # INCLUDE_SORROUNDING_PARAGRAPHS = "include_surrounding_paragraphs"
+class RagStrategy(BaseModel):
+    name: str
 
 
-class RAGOptions(BaseModel):
-    context_strategies: Optional[List[ContextStrategy]] = Field(
-        default=None,
-        title="Context strategies",
-        description="List of strategies to craft the context with.",
-        min_items=1,
-        unique_items=True,
-    )
-    extend_with_fields: Optional[List[str]] = Field(
-        default=None,
-        title="Extend with fields",
-        description="List of field ids to extend the context with. Only used if `context_strategies` contains `fields`. It will try to extend the retrieval context with the specified fields in the matching resources.",  # noqa
+class SimpleStrategy(RagStrategy):
+    name: str = Field("simple", const=True)
+
+
+class FieldExtensionStrategy(RagStrategy):
+    name: str = Field("field_extension", const=True)
+    fields: list[str] = Field(
+        title="Fields",
+        description="List of field ids to extend the context with. It will try to extend the retrieval context with the specified fields in the matching resources.",  # noqa
         min_items=1,
         unique_items=True,
     )
 
-    @root_validator(pre=True)
-    def check_rag_options(cls, values):
-        chosen_strategies = values.get("context_strategies") or []
-        if ContextStrategy.FULL_RESOURCE in chosen_strategies:
-            if len(chosen_strategies) > 1:
-                raise ValueError(
-                    f"If '{ContextStrategy.FULL_RESOURCE.value}' strategy is chosen, it must be the only strategy"  # noqa
-                )
-        if ContextStrategy.EXTEND_WITH_FIELDS in chosen_strategies:
-            if not values.get("extend_with_fields"):
-                raise ValueError(
-                    f"If '{ContextStrategy.EXTEND_WITH_FIELDS.value}' strategy is chosen, 'extend_with_fields' property must be provided"  # noqa
-                )
-        return values
+
+class FullResourceStrategy(RagStrategy):
+    name: str = Field("full_resource", const=True)
+
+
+RagStrategies = Union[SimpleStrategy, FieldExtensionStrategy, FullResourceStrategy]
 
 
 class ChatRequest(BaseModel):
@@ -817,11 +801,30 @@ class ChatRequest(BaseModel):
     security: Optional[
         RequestSecurity
     ] = SearchParamDefaults.security.to_pydantic_field()
-    rag: Optional[RAGOptions] = Field(
-        default=None,
-        title="RAG context options",
+    rag_strategies: list[RagStrategies] = Field(
+        default=[],
+        title="RAG context building strategies",
         description="Options for tweaking how the context for the LLM model is crafted",
     )
+
+    @root_validator(pre=True)
+    def rag_features_validator(cls, values):
+        chosen_strategies = [s.name for s in values.get("rag_strategies") or []]
+
+        # There must be at most one strategy of each type
+        if len(chosen_strategies) > len(set(chosen_strategies)):
+            raise ValueError("There must be at most one strategy of each type")
+
+        # If full resource strategy is chosen, it must be the only strategy
+        if (
+            FullResourceStrategy.name in chosen_strategies
+            and len(chosen_strategies) > 1
+        ):
+            raise ValueError(
+                f"If '{FullResourceStrategy.name}' strategy is chosen, it must be the only strategy"
+            )
+
+        return values
 
 
 class SummarizeResourceModel(BaseModel):
