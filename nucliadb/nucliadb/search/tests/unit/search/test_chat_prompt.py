@@ -16,6 +16,7 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+from unittest import mock
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -184,15 +185,50 @@ async def test_default_prompt_context(kb):
                 },
                 min_score=-1,
             ),
-            user_context=["Some extra context"],
         )
         # Check that the results are sorted by increasing order and that the extra
         # context is added at the beginning, indicating that it has the most priority
         paragraph_ids = [pid for pid in prompt_result.keys()]
         assert paragraph_ids == [
-            "USER_CONTEXT_0",
             "both_id/c/conv/ident",
             "bmid/c/conv/ident",
             "vecid/c/conv/ident",
         ]
-        assert prompt_result["USER_CONTEXT_0"] == "Some extra context"
+
+
+@pytest.fixture(scope="function")
+def find_results():
+    return KnowledgeboxFindResults(
+        facets={},
+        resources={
+            "resource1": _create_find_result(
+                "resource1/a/title", "Resource 1", SCORE_TYPE.BOTH, order=1
+            ),
+            "resource2": _create_find_result(
+                "resource2/a/title", "Resource 2", SCORE_TYPE.VECTOR, order=2
+            ),
+        },
+        min_score=-1,
+    )
+
+
+async def test_prompt_context_builder_prepends_user_context(
+    find_results: KnowledgeboxFindResults,
+):
+    builder = chat_prompt.PromptContextBuilder(
+        kbid="kbid", find_results=find_results, user_context=["Carrots are orange"]
+    )
+    build_context = {
+        "resource1/a/title": "Resource 1",
+        "resource2/a/title": "Resource 2",
+    }
+    with mock.patch.object(builder, "_build_context", return_value=build_context):
+        context, context_order = await builder.build()
+        assert len(context) == 3
+        assert len(context_order) == 3
+        assert context["USER_CONTEXT_0"] == "Carrots are orange"
+        assert context["resource1/a/title"] == "Resource 1"
+        assert context["resource2/a/title"] == "Resource 2"
+        assert context_order["USER_CONTEXT_0"] == 0
+        assert context_order["resource1/a/title"] == 1
+        assert context_order["resource2/a/title"] == 2

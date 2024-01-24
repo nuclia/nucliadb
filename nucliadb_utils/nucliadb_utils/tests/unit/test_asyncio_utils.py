@@ -22,7 +22,7 @@ import time
 
 import pytest
 
-from nucliadb_utils.concurrency import ConcurrentRunner, run_concurrently
+from nucliadb_utils.asyncio_utils import ConcurrentRunner, run_concurrently
 
 
 async def test_run_concurrently():
@@ -51,7 +51,7 @@ async def test_concurrent_runner():
     assert end - start < 1
 
     # Test with max_tasks: execution time should be at least 1 second
-    runner = ConcurrentRunner(max_tasks=asyncio.Semaphore(1))
+    runner = ConcurrentRunner(max_tasks=1)
     runner.schedule(mycoro(1))
     runner.schedule(mycoro(2))
     start = time.perf_counter()

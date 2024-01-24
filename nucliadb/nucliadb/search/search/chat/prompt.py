@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
 from typing import Optional
 
 from nucliadb.common.maindb.utils import get_driver
@@ -25,6 +24,7 @@ from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import KB_REVERSE
+from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.middleware.transaction import get_read_only_transaction
 from nucliadb_models.search import (
     SCORE_TYPE,
@@ -34,12 +34,14 @@ from nucliadb_models.search import (
     RAGOptions,
 )
 from nucliadb_protos import resources_pb2
-from nucliadb_utils.concurrency import ConcurrentRunner, run_concurrently
+from nucliadb_utils.asyncio_utils import ConcurrentRunner, run_concurrently
 from nucliadb_utils.utilities import get_storage
 
 Context = dict[str, str]
 ContextOrder = dict[str, int]
-MAX_EXTRACTED_TEXTS_TASKS = 10
+
+MAX_RESOURCE_TASKS = 5
+MAX_RESOURCE_FIELD_TASKS = 4
 
 
 # Number of messages to pull after a match in a message
@@ -192,19 +194,26 @@ async def get_resource_field_extracted_text(
 
 
 async def get_resource_extracted_texts(
-    kb_obj: KnowledgeBoxORM,
+    kbid: str,
     resource_uuid: str,
-    max_tasks: asyncio.Semaphore,
-) -> Optional[list[tuple[Field, str]]]:
-    resource = await kb_obj.get(resource_uuid)
-    if resource is None:
-        return None
+) -> list[tuple[Field, str]]:
+    txn = await get_read_only_transaction()
+    storage = await get_storage()
+    kb = KnowledgeBoxORM(txn, storage, kbid)
+    resource = ResourceORM(
+        txn=txn,
+        storage=storage,
+        kb=kb,
+        uuid=resource_uuid,
+    )
 
-    runner = ConcurrentRunner(max_tasks=max_tasks)
+    # Schedule the extraction of the text of each field in the resource
+    runner = ConcurrentRunner(max_tasks=MAX_RESOURCE_FIELD_TASKS)
     for field_type, field_key in await resource.get_fields(force=True):
         field = await resource.get_field(field_key, field_type, load=False)
         runner.schedule(get_field_extracted_text(field))
 
+    # Wait for the results
     results = await runner.wait()
     return [result for result in results if result is not None]
 
@@ -228,15 +237,12 @@ async def full_resource_prompt_context(
             ordered_resources.append(resource_uuid)
 
     # For each resource, collect the extracted text from all its fields.
-    txn = await get_read_only_transaction()
-    kb_obj = KnowledgeBoxORM(txn, await get_storage(), kbid)
-
-    max_tasks = asyncio.Semaphore(MAX_EXTRACTED_TEXTS_TASKS)
     resource_extracted_texts = await run_concurrently(
         [
-            get_resource_extracted_texts(kb_obj, resource_uuid, max_tasks)
+            get_resource_extracted_texts(kbid, resource_uuid)
             for resource_uuid in ordered_resources
-        ]
+        ],
+        max_concurrent=MAX_RESOURCE_TASKS,
     )
 
     output: Context = {}

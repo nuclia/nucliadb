@@ -30,9 +30,9 @@ class ConcurrentRunner:
     Returns the results of the coroutines in the order they were scheduled.
     """
 
-    def __init__(self, max_tasks: Optional[asyncio.Semaphore] = None):
+    def __init__(self, max_tasks: Optional[int] = None):
         self._tasks: list[asyncio.Task] = []
-        self.max_tasks = max_tasks
+        self.max_tasks = asyncio.Semaphore(max_tasks) if max_tasks is not None else None
 
     async def run_coroutine(self, coro: Coroutine):
         if self.max_tasks is None:
@@ -69,10 +69,7 @@ async def run_concurrently(
     Runs a list of coroutines concurrently, with a maximum number of tasks running.
     Returns the results of the coroutines in the order they were scheduled.
     """
-    max_tasks = None
-    if max_concurrent is not None:
-        max_tasks = asyncio.Semaphore(max_concurrent)
-    runner = ConcurrentRunner(max_tasks=max_tasks)
+    runner = ConcurrentRunner(max_tasks=max_concurrent)
     for task in tasks:
         runner.schedule(task)
     return await runner.wait()
