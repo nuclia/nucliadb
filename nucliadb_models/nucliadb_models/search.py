@@ -820,7 +820,7 @@ class ChatRequest(BaseModel):
     rag: Optional[RAGOptions] = Field(
         default=None,
         title="RAG context options",
-        description="Options for tweaking how thecontext for the LLM model is crafted",
+        description="Options for tweaking how the context for the LLM model is crafted",
     )
 
 
