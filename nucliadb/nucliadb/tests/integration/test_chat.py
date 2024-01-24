@@ -274,3 +274,94 @@ async def test_chat_without_citations(
     else:
         resp_citations = parse_chat_response(resp.content)[-1]
     assert resp_citations == {}
+
+
+@pytest.fixture
+async def resources(nucliadb_writer, knowledgebox):
+    kbid = knowledgebox
+    rids = []
+    for i in range(2):
+        resp = await nucliadb_writer.post(
+            f"/kb/{kbid}/resources",
+            json={
+                "title": f"The title {i}",
+                "summary": f"The summary {i}",
+                "texts": {"text_field": {"body": "The body of the text field"}},
+            },
+            headers={"X-Synchronous": "True"},
+        )
+        assert resp.status_code in (200, 201)
+        rid = resp.json()["uuid"]
+        rids.append(rid)
+    yield rids
+
+
+@pytest.mark.asyncio()
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_chat_rag_options_full_resoruce(
+    nucliadb_reader: AsyncClient, knowledgebox, resources
+):
+    resource1, resource2 = resources
+
+    predict = get_predict()
+    predict.calls.clear()  # type: ignore
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/chat",
+        json={"query": "title", "rag": {"context_strategies": ["full_resource"]}},
+        timeout=None,
+    )
+    assert resp.status_code == 200
+    _ = parse_chat_response(resp.content)
+
+    # Make sure the prompt context is properly crafted
+    assert predict.calls[-2][0] == "chat_query"  # type: ignore
+    prompt_context = predict.calls[-2][1].query_context  # type: ignore
+
+    # All fields of the matching resource should be in the prompt context
+    assert len(prompt_context) == 6
+    assert prompt_context[f"{resource1}/a/title"] == "The title 0"
+    assert prompt_context[f"{resource1}/a/summary"] == "The summary 0"
+    assert prompt_context[f"{resource1}/t/text_field"] == "The body of the text field"
+    assert prompt_context[f"{resource2}/a/title"] == "The title 1"
+    assert prompt_context[f"{resource2}/a/summary"] == "The summary 1"
+    assert prompt_context[f"{resource2}/t/text_field"] == "The body of the text field"
+
+
+@pytest.mark.asyncio()
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_chat_rag_options_extend_with_fields(
+    nucliadb_reader: AsyncClient, knowledgebox, resources
+):
+    resource1, resource2 = resources
+
+    predict = get_predict()
+    predict.calls.clear()  # type: ignore
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/chat",
+        json={
+            "query": "title",
+            "rag": {
+                "context_strategies": ["extend_with_fields"],
+                "extend_with_fields": ["a/summary"],
+            },
+        },
+        timeout=None,
+    )
+    assert resp.status_code == 200
+    _ = parse_chat_response(resp.content)
+
+    # Make sure the prompt context is properly crafted
+    assert predict.calls[-2][0] == "chat_query"  # type: ignore
+    prompt_context = predict.calls[-2][1].query_context  # type: ignore
+
+    # Matching paragraphs should be in the prompt
+    # context, plus the extended field for each resource
+    assert len(prompt_context) == 4
+    # The matching paragraphs
+    assert prompt_context[f"{resource1}/a/title/0-11"] == "The title 0"
+    assert prompt_context[f"{resource2}/a/title/0-11"] == "The title 1"
+    # The extended fields
+    assert prompt_context[f"{resource1}/a/summary"] == "The summary 0"
+    assert prompt_context[f"{resource2}/a/summary"] == "The summary 1"

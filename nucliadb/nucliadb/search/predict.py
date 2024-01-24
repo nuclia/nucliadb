@@ -433,7 +433,6 @@ class DummyPredictEngine(PredictEngine):
         return {}
 
     async def make_request(self, method: str, **request_args):
-        self.calls.append((method, request_args))
         response = Mock(status=200)
         response.json = AsyncMock(return_value={"foo": "bar"})
         response.headers = {NUCLIA_LEARNING_ID_HEADER: DUMMY_LEARNING_ID}
@@ -447,17 +446,17 @@ class DummyPredictEngine(PredictEngine):
         x_ndb_client: str,
         x_forwarded_for: str,
     ):
-        self.calls.append(item)
+        self.calls.append(("send_feedback", item))
         return
 
     async def rephrase_query(self, kbid: str, item: RephraseModel) -> str:
-        self.calls.append(item)
+        self.calls.append(("rephrase_query", item))
         return DUMMY_REPHRASE_QUERY
 
     async def chat_query(
         self, kbid: str, item: ChatModel
     ) -> tuple[str, AsyncIterator[bytes]]:
-        self.calls.append(item)
+        self.calls.append(("chat_query", item))
 
         async def generate():
             for i in self.generated_answer:
@@ -468,12 +467,12 @@ class DummyPredictEngine(PredictEngine):
     async def ask_document(
         self, kbid: str, query: str, blocks: list[list[str]], user_id: str
     ) -> str:
-        self.calls.append((query, blocks, user_id))
+        self.calls.append(("ask_document", (query, blocks, user_id)))
         answer = os.environ.get("TEST_ASK_DOCUMENT") or "Answer to your question"
         return answer
 
     async def convert_sentence_to_vector(self, kbid: str, sentence: str) -> list[float]:
-        self.calls.append(sentence)
+        self.calls.append(("convert_sentence_to_vector", sentence))
         if (
             os.environ.get("TEST_SENTENCE_ENCODER") == "multilingual-2023-02-21"
         ):  # pragma: no cover
@@ -482,7 +481,7 @@ class DummyPredictEngine(PredictEngine):
             return Q
 
     async def detect_entities(self, kbid: str, sentence: str) -> list[RelationNode]:
-        self.calls.append(sentence)
+        self.calls.append(("detect_entities", sentence))
         dummy_data = os.environ.get("TEST_RELATIONS", None)
         if dummy_data is not None:  # pragma: no cover
             return convert_relations(json.loads(dummy_data))
@@ -490,7 +489,7 @@ class DummyPredictEngine(PredictEngine):
             return DUMMY_RELATION_NODE
 
     async def summarize(self, kbid: str, item: SummarizeModel) -> SummarizedResponse:
-        self.calls.append((kbid, item))
+        self.calls.append(("summarize", (kbid, item)))
         response = SummarizedResponse(
             summary="global summary",
         )

@@ -18,13 +18,14 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import Optional
+from collections.abc import Coroutine
+from typing import Any, Optional
 
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
-from nucliadb.ingest.orm.resource import KB_REVERSE, Resource
+from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.middleware.transaction import get_read_only_transaction
 from nucliadb.search import logger
 from nucliadb_models.search import (
@@ -164,66 +165,49 @@ async def default_prompt_context(
     return output
 
 
-async def get_field_extracted_text(
-    field: Field, max_concurrent_tasks: asyncio.Semaphore
-) -> Optional[tuple[Field, str]]:
-    async with max_concurrent_tasks:
-        extracted_text_pb = await field.get_extracted_text(force=True)
-        if extracted_text_pb is None:
-            return None
-        return field, extracted_text_pb.text
+async def get_field_extracted_text(field: Field) -> Optional[tuple[Field, str]]:
+    extracted_text_pb = await field.get_extracted_text(force=True)
+    if extracted_text_pb is None:
+        return None
+    return field, extracted_text_pb.text
 
 
 async def get_resource_field_extracted_text(
     kb_obj: KnowledgeBoxORM,
     resource_uuid,
     field_id: str,
-    max_concurrent_tasks: asyncio.Semaphore,
-) -> Optional[tuple[Resource, Field, str]]:
+) -> Optional[tuple[Field, str]]:
     resource = await kb_obj.get(resource_uuid)
     if resource is None:
         return None
-    field_key, field_type = field_id.split("/")
+
+    field_type, field_key = field_id.split("/")
     field = await resource.get_field(field_key, KB_REVERSE[field_type], load=False)
     if field is None:
         return None
-    result = await get_field_extracted_text(field, max_concurrent_tasks)
+    result = await get_field_extracted_text(field)
     if result is None:
         return None
     _, extracted_text = result
-    return resource, field, extracted_text
+    return field, extracted_text
 
 
 async def get_resource_extracted_texts(
     kb_obj: KnowledgeBoxORM,
     resource_uuid: str,
-    max_concurrent_tasks: asyncio.Semaphore,
+    max_tasks: asyncio.Semaphore,
 ) -> Optional[list[tuple[Field, str]]]:
-    result: list[tuple[Field, str]] = []
     resource = await kb_obj.get(resource_uuid)
     if resource is None:
         return None
 
-    field_tasks = []
+    runner = ConcurrentRunner(max_tasks=max_tasks)
     for field_type, field_key in await resource.get_fields(force=True):
         field = await resource.get_field(field_key, field_type, load=False)
-        task = asyncio.create_task(
-            get_field_extracted_text(field, max_concurrent_tasks)
-        )
-        field_tasks.append(task)
+        runner.schedule(get_field_extracted_text(field))
 
-    done, _ = await asyncio.wait(field_tasks)
-    done_task: asyncio.Task
-    for done_task in done:
-        if done_task.exception() is not None:
-            logger.warning(f"Error getting extracted texts: {done_task.exception()}")
-            continue
-        task_result = done_task.result()
-        if task_result is None:
-            continue
-        result.append(task_result)
-
-    return result
+    results = await runner.wait()
+    return [result for result in results if result is not None]
 
 
 async def full_resource_prompt_context(
@@ -235,7 +219,6 @@ async def full_resource_prompt_context(
         - Collect the list of resources in the results (in order of relevance).
         - For each resource, collect the extracted text from all its fields and craft the context.
     """
-    output: Context = {}
 
     # Collect the list of resources in the results (in order of relevance).
     ordered_paras = get_ordered_paragraphs(results)
@@ -248,29 +231,23 @@ async def full_resource_prompt_context(
     # For each resource, collect the extracted text from all its fields.
     txn = await get_read_only_transaction()
     kb_obj = KnowledgeBoxORM(txn, await get_storage(), kbid)
-    max_concurrent_tasks = asyncio.Semaphore(MAX_EXTRACTED_TEXTS_TASKS)
-    tasks = []
-    for resource_uuid in ordered_resources:
-        task = asyncio.create_task(
-            get_resource_extracted_texts(kb_obj, resource_uuid, max_concurrent_tasks)
-        )
-        tasks.append(task)
 
-    done, _ = await asyncio.wait(tasks)
-    done_task: asyncio.Task
-    for index, done_task in enumerate(done):
-        if done_task.exception() is not None:
-            logger.warning(f"Error getting extracted texts: {done_task.exception()}")
-            continue
-        extracted_texts = done_task.result()
+    max_tasks = asyncio.Semaphore(MAX_EXTRACTED_TEXTS_TASKS)
+    resource_extracted_texts = await run_concurrently(
+        [
+            get_resource_extracted_texts(kb_obj, resource_uuid, max_tasks)
+            for resource_uuid in ordered_resources
+        ]
+    )
+
+    output: Context = {}
+    for extracted_texts in resource_extracted_texts:
         if extracted_texts is None:
             continue
-        resource_uuid = ordered_resources[index]
         for field, extracted_text in extracted_texts:
-            if extracted_text is None:
-                continue
-            # Add the extracted text of each field to the beginning of the context.
+            # Add the extracted text of each field to the context.
             output[field.resource_unique_id] = extracted_text
+
     return output
 
 
@@ -286,8 +263,6 @@ async def composed_prompt_context(
         - Add the extracted text of each field to the beginning of the context.
         - Add the extracted text of each paragraph to the end of the context.
     """
-    output: Context = {}
-
     # Collect the list of resources in the results (in order of relevance).
     ordered_paras = get_ordered_paragraphs(results)
     ordered_resources = []
@@ -299,27 +274,20 @@ async def composed_prompt_context(
     # Fetch the extracted texts of the specified fields for each resource
     txn = await get_read_only_transaction()
     kb_obj = KnowledgeBoxORM(txn, await get_storage(), kbid)
-    max_concurrent_tasks = asyncio.Semaphore(MAX_EXTRACTED_TEXTS_TASKS)
-    tasks = []
-    for resource_uuid in ordered_resources:
-        for field_id in extend_with_fields:
-            task = asyncio.create_task(
-                get_resource_field_extracted_text(
-                    kb_obj, resource_uuid, field_id, max_concurrent_tasks
-                )
-            )
-            tasks.append(task)
-    done, _ = await asyncio.wait(tasks)
-    done_task: asyncio.Task
-    for done_task in done:
-        if done_task.exception() is not None:
-            logger.warning(f"Error getting extracted texts: {done_task.exception()}")
-            continue
-        task_result = done_task.result()
-        if task_result is None:
+
+    tasks = [
+        get_resource_field_extracted_text(kb_obj, resource_uuid, field_id)
+        for resource_uuid in ordered_resources
+        for field_id in extend_with_fields
+    ]
+    field_extracted_texts = await run_concurrently(tasks)
+
+    output: Context = {}
+    for result in field_extracted_texts:
+        if result is None:
             continue
         # Add the extracted text of each field to the beginning of the context.
-        _, field, extracted_text = task_result
+        field, extracted_text = result
         output[field.resource_unique_id] = extracted_text
 
     # Add the extracted text of each paragraph to the end of the context.
@@ -328,7 +296,65 @@ async def composed_prompt_context(
     return output
 
 
+class ConcurrentRunner:
+    """
+    Runs a list of coroutines concurrently, with a maximum number of tasks running.
+    Returns the results of the coroutines in the order they were scheduled.
+    """
+
+    def __init__(self, max_tasks: Optional[asyncio.Semaphore] = None):
+        self._tasks: list[asyncio.Task] = []
+        self.max_tasks = max_tasks
+
+    async def run_coroutine(self, coro: Coroutine):
+        if self.max_tasks is None:
+            return await coro
+        else:
+            async with self.max_tasks:
+                return await coro
+
+    def schedule(self, coro: Coroutine):
+        # Use task name as a way to sort the results
+        task_name = str(len(self._tasks))
+        task = asyncio.create_task(self.run_coroutine(coro), name=task_name)
+        self._tasks.append(task)
+
+    async def wait(self) -> list[Any]:
+        results: list[Any] = []
+        done, pending = await asyncio.wait(self._tasks)
+        if len(pending) > 0:
+            logger.warning(f"ConcurrentRunner: {len(pending)} tasks were pending")
+
+        sorted_done = sorted(done, key=lambda task: int(task.get_name()))
+        done_task: asyncio.Task
+        for done_task in sorted_done:
+            if done_task.exception() is not None:
+                raise done_task.exception()  # type: ignore
+            results.append(done_task.result())
+        return results
+
+
+async def run_concurrently(
+    tasks: list[Coroutine], max_concurrent: Optional[int] = None
+) -> list[Any]:
+    """
+    Runs a list of coroutines concurrently, with a maximum number of tasks running.
+    Returns the results of the coroutines in the order they were scheduled.
+    """
+    max_tasks = None
+    if max_concurrent is not None:
+        max_tasks = asyncio.Semaphore(max_concurrent)
+    runner = ConcurrentRunner(max_tasks=max_tasks)
+    for task in tasks:
+        runner.schedule(task)
+    return await runner.wait()
+
+
 class PromptContextBuilder:
+    """
+    Builds the context for the LLM prompt.
+    """
+
     def __init__(
         self,
         kbid: str,
@@ -365,9 +391,7 @@ class PromptContextBuilder:
 
         chosen_strategies = self.options.context_strategies
         if ContextStrategy.FULL_RESOURCE in chosen_strategies:
-            return await full_resource_prompt_context(
-                self.kbid, self.find_results, user_context=self.user_context
-            )
+            return await full_resource_prompt_context(self.kbid, self.find_results)
 
         return await composed_prompt_context(
             self.kbid,
