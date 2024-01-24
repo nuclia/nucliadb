@@ -21,7 +21,6 @@ import asyncio
 import logging
 import random
 import uuid
-from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Optional
 
 import backoff
