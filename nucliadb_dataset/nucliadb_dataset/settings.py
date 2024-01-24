@@ -25,7 +25,7 @@ import pydantic
 from pydantic import BaseSettings
 
 from nucliadb_dataset import ExportType
-from nucliadb_dataset.dataset import Task
+from nucliadb_dataset.tasks import Task
 from nucliadb_sdk.v2.sdk import Region
 
 
