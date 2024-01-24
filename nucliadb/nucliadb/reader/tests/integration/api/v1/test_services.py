@@ -19,12 +19,15 @@
 #
 import asyncio
 from collections.abc import AsyncGenerator
+from datetime import datetime
 from typing import Callable
 from unittest import mock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from httpx import AsyncClient
 
+from nucliadb.common.http_clients import processing
 from nucliadb.reader.api.v1.router import KB_PREFIX
 from nucliadb_models.notifications import (
     Notification,
@@ -136,3 +139,40 @@ async def test_activity_kb_not_found(
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(f"/{KB_PREFIX}/foobar/notifications")
         assert resp.status_code == 404
+
+
+async def test_processing_status(
+    reader_api,
+    test_resources: tuple[str, list[str]],
+):
+    kbid, resources = test_resources
+
+    processing_client = MagicMock()
+    processing_client.__aenter__ = AsyncMock(return_value=processing_client)
+    processing_client.__aexit__ = AsyncMock(return_value=None)
+    processing_client.status = AsyncMock(
+        return_value=processing.StatusResultsV2(
+            results=[
+                processing.StatusResultV2(
+                    processing_id="processing_id",
+                    resource_id=resource_id,
+                    kbid=kbid,
+                    completed=False,
+                    scheduled=False,
+                    timestamp=datetime.now(),
+                )
+                for resource_id in resources
+            ]
+        )
+    )
+    with patch(
+        "nucliadb.reader.api.v1.services.processing.ProcessingV2HTTPClient",
+        return_value=processing_client,
+    ):
+        async with reader_api(roles=[NucliaDBRoles.READER]) as client:
+            resp = await client.get(f"/{KB_PREFIX}/{kbid}/processing-status")
+            assert resp.status_code == 200
+
+            data = processing.StatusResultsV2.parse_obj(resp.json())
+
+            assert all([result.title is not None for result in data.results])

@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
+import asyncio
 from typing import Optional, Union
 
 from fastapi import HTTPException
@@ -49,7 +49,10 @@ from nucliadb.common.context import ApplicationContext
 from nucliadb.common.context.fastapi import get_app_context
 from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
 from nucliadb.common.http_clients import processing
+from nucliadb.common.maindb.utils import get_driver
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.models.responses import HTTPClientError
+from nucliadb.reader import SERVICE_NAME
 from nucliadb.reader.api.v1.router import KB_PREFIX, api
 from nucliadb.reader.reader.notifications import kb_notifications_stream
 from nucliadb_models.configuration import KBConfiguration
@@ -59,7 +62,7 @@ from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.synonyms import KnowledgeBoxSynonyms
 from nucliadb_models.vectors import VectorSet, VectorSets
 from nucliadb_utils.authentication import requires
-from nucliadb_utils.utilities import get_ingest
+from nucliadb_utils.utilities import get_ingest, get_storage
 
 
 @api.get(
@@ -377,6 +380,30 @@ async def processing_status(
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
 
     async with processing.ProcessingV2HTTPClient() as client:
-        return await client.status(
+        results = await client.status(
             cursor=cursor, scheduled=scheduled, kbid=kbid, limit=limit
         )
+
+    storage = await get_storage(service_name=SERVICE_NAME)
+    driver = get_driver()
+
+    async with driver.transaction(wait_for_abort=False, read_only=True) as txn:
+        kb = KnowledgeBox(txn, storage, kbid)
+
+        max_simultaneous = asyncio.Semaphore(10)
+
+        async def _composition(result: processing.StatusResultV2) -> None:
+            async with max_simultaneous:
+                resource = await kb.get(result.resource_id)
+                if resource is None:
+                    return
+
+                basic = await resource.get_basic()
+                if basic is None:
+                    return
+
+                result.title = basic.title
+
+        await asyncio.gather(*[_composition(result) for result in results.results])
+
+    return results
