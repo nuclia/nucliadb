@@ -365,3 +365,41 @@ async def test_chat_rag_options_extend_with_fields(
     # The extended fields
     assert prompt_context[f"{resource1}/a/summary"] == "The summary 0"
     assert prompt_context[f"{resource2}/a/summary"] == "The summary 1"
+
+
+@pytest.mark.asyncio()
+async def test_chat_rag_options_validation(
+    nucliadb_reader,
+):
+    resp = await nucliadb_reader.post(
+        f"/kb/kbid/chat",
+        json={
+            "query": "title",
+            "rag": {
+                "context_strategies": ["extend_with_fields", "full_resource"],
+                "extend_with_fields": ["a/summary"],
+            },
+        },
+    )
+    assert resp.status_code == 422
+    detail = resp.json()["detail"]
+    assert (
+        detail[0]["msg"]
+        == "If 'full_resource' strategy is chosen, it must be the only strategy"
+    )
+
+    resp = await nucliadb_reader.post(
+        f"/kb/kbid/chat",
+        json={
+            "query": "title",
+            "rag": {
+                "context_strategies": ["extend_with_fields"],
+            },
+        },
+    )
+    assert resp.status_code == 422
+    detail = resp.json()["detail"]
+    assert (
+        detail[0]["msg"]
+        == "If 'extend_with_fields' strategy is chosen, 'extend_with_fields' property must be provided"
+    )
