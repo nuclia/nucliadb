@@ -33,6 +33,7 @@ BASE_LABELS: dict[str, list[str]] = {
     "f": [],  # field keyword field (field/keyword)
     "fg": [],  # field keyword (keywords) flat
     "m": [],  # origin metadata in the form of (key/value). Max key/value size is 255
+    "p": [],  # origin metadata in the form of (key/value). Max key/value size is 255
 }
 
 
@@ -44,6 +45,7 @@ LABEL_QUERY_ALIASES = {
     "metadata.languages": "s/s",
     "origin.tags": "t",
     "origin.metadata": "m",
+    "origin.path": "p",
     "classification.labels": "l",
     "entities": "e",
     "field": "f",

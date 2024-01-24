@@ -828,6 +828,11 @@ class SummarizeResourceModel(BaseModel):
     fields: Dict[str, str] = {}
 
 
+class SummaryKind(str, Enum):
+    SIMPLE = "simple"
+    EXTENDED = "extended"
+
+
 class SummarizeModel(BaseModel):
     """
     Model for the summarize predict api request payload
@@ -835,6 +840,7 @@ class SummarizeModel(BaseModel):
 
     resources: Dict[str, SummarizeResourceModel] = {}
     user_prompt: Optional[str] = None
+    summary_kind: SummaryKind = SummaryKind.SIMPLE
 
 
 class SummarizeRequest(BaseModel):
@@ -853,6 +859,12 @@ class SummarizeRequest(BaseModel):
         min_items=1,
         title="Resources",
         description="Uids of the resources to summarize",
+    )
+
+    summary_kind: SummaryKind = Field(
+        default=SummaryKind.SIMPLE,
+        title="Summary kind",
+        description="Option to customize how the summary will be",
     )
 
 

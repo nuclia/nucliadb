@@ -8,6 +8,7 @@ imageVersion:
 
 # Defines the number of NucliaDB pods to run.
 replicas: 2
+podAnnotations: {}
 
 # App settings: These are the settings that are passed to the NucliaDB application via environment variables.
 # See https://docs.nuclia.dev/docs/guides/nucliadb/configuration for a complete list of settings.
