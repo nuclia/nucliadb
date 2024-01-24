@@ -130,7 +130,9 @@ async def node_query(
     target_replicas: Optional[list[str]] = None,
     read_only: bool = True,
 ) -> tuple[list[T], bool, list[tuple[str, str, str]], list[str]]:
-    read_only = read_only and has_feature(const.Features.READ_REPLICA_SEARCHES)
+    read_only = read_only and has_feature(
+        const.Features.READ_REPLICA_SEARCHES, context={"kbid": kbid}
+    )
 
     shard_manager = get_shard_manager()
 

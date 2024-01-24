@@ -436,7 +436,7 @@ async def test_catalog_can_filter_by_processing_status(
 @pytest.mark.skip(reason="Needs sc-5626")
 @pytest.mark.asyncio
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_catalog_prefix_search(
+async def test_(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     knowledgebox,
@@ -1499,3 +1499,58 @@ def check_fuzzy_paragraphs(search_response, *, fuzzy_result: bool, n_expected: i
         assert paragraph["fuzzy_result"] is fuzzy_result
         found += 1
     assert found == n_expected
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_search_by_path_filter(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox,
+):
+    paths = ["/foo", "foo/bar", "foo/bar/1", "foo/bar/2", "foo/bar/3", "foo/bar/4"]
+
+    for path in paths:
+        resp = await nucliadb_writer.post(
+            f"/kb/{knowledgebox}/resources",
+            headers={"X-Synchronous": "true"},
+            json={
+                "title": f"My resource: {path}",
+                "summary": "Some summary",
+                "origin": {
+                    "path": path,
+                },
+            },
+        )
+        assert resp.status_code == 201
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/catalog",
+        params={
+            "query": "",
+        },
+    )
+    assert resp.status_code == 200
+    assert len(resp.json()["resources"]) == len(paths)
+
+    # Get the list of all
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/search?filters=/origin.path/foo"
+    )
+    assert resp.status_code == 200
+    assert len(resp.json()["resources"]) == len(paths)
+
+    # Get the list of under foo/bar
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/search?filters=/origin.path/foo/bar"
+    )
+    assert resp.status_code == 200
+    assert len(resp.json()["resources"]) == len(paths) - 1
+
+    # Get the list of under foo/bar/4
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/search?filters=/origin.path/foo/bar/4"
+    )
+    assert resp.status_code == 200
+    assert len(resp.json()["resources"]) == 1

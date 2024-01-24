@@ -16,11 +16,25 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+import random
+import socket
 
 
-def free_port() -> int:
-    import socket
+def free_port(retries=20) -> int:
+    port_range_start = 1024  # Start of the port range (1024 is usually safe)
+    port_range_end = 65535  # End of the port range
 
+    for _ in range(retries):
+        port = random.randint(port_range_start, port_range_end)
+        try:
+            sock = socket.socket()
+            sock.bind(("", port))
+            sock.close()
+            return port
+        except OSError:
+            continue
+
+    # give up and let OS pick a free port
     sock = socket.socket()
     sock.bind(("", 0))
     port = sock.getsockname()[1]

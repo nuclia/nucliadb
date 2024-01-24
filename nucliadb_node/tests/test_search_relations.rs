@@ -379,6 +379,10 @@ async fn test_search_relations_prefixed(
             shard_id: shard_id.clone(),
             prefix: Some(RelationPrefixSearchRequest {
                 prefix: "cat".to_string(),
+                node_filters: vec![RelationNodeFilter {
+                    node_subtype: None,
+                    node_type: NodeType::Entity as i32,
+                }],
                 ..Default::default()
             }),
             ..Default::default()

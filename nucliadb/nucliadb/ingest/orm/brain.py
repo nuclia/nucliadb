@@ -413,6 +413,9 @@ class ResourceBrain:
             if origin.source_id != "":
                 self.labels["u"].append(f"s/{origin.source_id}")
 
+            if origin.path:
+                self.labels["p"].append(origin.path.lstrip("/"))
+
             # origin contributors
             for contrib in origin.colaborators:
                 self.labels["u"].append(f"o/{contrib}")

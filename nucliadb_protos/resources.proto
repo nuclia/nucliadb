@@ -88,6 +88,7 @@ message Origin {
     repeated string colaborators = 8;
     string filename = 9;
     repeated string related = 10;
+    string path = 11;
 }
 
 message Extra {
