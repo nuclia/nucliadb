@@ -124,12 +124,12 @@ class KBShardManager:
     async def read_only_transaction(self, txn: Transaction):
         self._read_only_txn = txn
         try:
-            yield
+            yield self
         finally:
             self._read_only_txn = None
 
     async def get_shards_by_kbid_inner(self, kbid: str) -> writer_pb2.Shards:
-        cdm = ClusterDataManager(get_driver(), read_only_txn=self.read_only_txn)
+        cdm = ClusterDataManager(get_driver(), read_only_txn=self._read_only_txn)
         result = await cdm.get_kb_shards(kbid)
         if result is None:
             # could be None because /shards doesn't exist, or beacause the

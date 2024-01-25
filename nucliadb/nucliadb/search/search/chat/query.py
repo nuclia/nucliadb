@@ -172,7 +172,6 @@ async def get_relations_results(
     *, kbid: str, chat_request: ChatRequest, text_answer: str
 ) -> Relations:
     try:
-        breakpoint()
         predict = get_predict()
         detected_entities = await predict.detect_entities(kbid, text_answer)
         relation_request = RelationSearchRequest()
@@ -193,7 +192,6 @@ async def get_relations_results(
         )
         return merge_relations_results(relations_results, relation_request.subgraph)
     except Exception as exc:
-        breakpoint()
         capture_exception(exc)
         logger.exception("Error getting relations results")
         return Relations(entities={})
