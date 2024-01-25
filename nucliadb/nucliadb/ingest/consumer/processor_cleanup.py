@@ -21,11 +21,10 @@
 import logging
 import uuid
 
+from nucliadb.common.http_clients.processing import ProcessingHTTPClient
 from nucliadb_protos import writer_pb2
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
-from nucliadb.common.http_clients.processing import ProcessingHTTPClient
-
 
 logger = logging.getLogger(__name__)
 

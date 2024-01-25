@@ -39,8 +39,8 @@ from nucliadb_utils.utilities import (
 
 from .auditing import IndexAuditHandler, ResourceWritesAuditHandler
 from .materializer import MaterializerHandler
-from .shard_creator import ShardCreatorHandler
 from .processor_cleanup import ProcessorCleanupHandler
+from .shard_creator import ShardCreatorHandler
 
 
 def _handle_task_result(task: asyncio.Task) -> None:
