@@ -415,3 +415,47 @@ async def test_chat_rag_options_validation(
     detail = resp.json()["detail"]
     detail[0]["loc"][-1] == "fields"
     assert detail[0]["msg"] == "field required"
+
+
+@pytest.mark.asyncio()
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_chat_capped_context(
+    nucliadb_reader: AsyncClient, knowledgebox, resources
+):
+    # By default, max size is big enough to fit all the prompt context
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/chat",
+        json={
+            "query": "title",
+            "rag_strategies": [{"name": "full_resource"}],
+            "debug": True,
+        },
+        headers={"X-Synchronous": "True"},
+        timeout=None,
+    )
+    assert resp.status_code == 200
+    resp_data = SyncChatResponse.parse_raw(resp.content)
+    assert resp_data.prompt_context is not None
+    assert len(resp_data.prompt_context) == 6
+
+    # Try now setting a smaller max size. It should be respected
+    max_size = 30
+    from nucliadb.search.settings import settings
+
+    with mock.patch.object(settings, "max_prompt_context_chars", max_size):
+        resp = await nucliadb_reader.post(
+            f"/kb/{knowledgebox}/chat",
+            json={
+                "query": "title",
+                "rag_strategies": [{"name": "full_resource"}],
+                "debug": True,
+            },
+            headers={"X-Synchronous": "True"},
+            timeout=None,
+        )
+        assert resp.status_code == 200
+        resp_data = SyncChatResponse.parse_raw(resp.content)
+        assert resp_data.prompt_context is not None
+        assert len(resp_data.prompt_context) < 6
+        total_size = sum(len(v) for v in resp_data.prompt_context.values())
+        assert total_size <= max_size
