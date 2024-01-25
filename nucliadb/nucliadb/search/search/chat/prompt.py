@@ -30,15 +30,14 @@ from nucliadb_models.search import (
     SCORE_TYPE,
     FindParagraph,
     KnowledgeboxFindResults,
+    PromptContext,
+    PromptContextOrder,
     RagStrategy,
     RagStrategyName,
 )
 from nucliadb_protos import resources_pb2
 from nucliadb_utils.asyncio_utils import ConcurrentRunner, run_concurrently
 from nucliadb_utils.utilities import get_storage
-
-Context = dict[str, str]
-ContextOrder = dict[str, int]
 
 MAX_RESOURCE_TASKS = 5
 MAX_RESOURCE_FIELD_TASKS = 4
@@ -120,7 +119,7 @@ async def get_expanded_conversation_messages(
 async def default_prompt_context(
     kbid: str,
     results: KnowledgeboxFindResults,
-) -> Context:
+) -> PromptContext:
     """
     - Returns an ordered dict of context_id -> context_text.
     - context_id is typically the paragraph id, but has a special value for the
@@ -221,7 +220,7 @@ async def get_resource_extracted_texts(
 async def full_resource_prompt_context(
     kbid: str,
     results: KnowledgeboxFindResults,
-) -> Context:
+) -> PromptContext:
     """
     Algorithm steps:
         - Collect the list of resources in the results (in order of relevance).
@@ -245,7 +244,7 @@ async def full_resource_prompt_context(
         max_concurrent=MAX_RESOURCE_TASKS,
     )
 
-    output: Context = {}
+    output: PromptContext = {}
     for extracted_texts in resource_extracted_texts:
         if extracted_texts is None:
             continue
@@ -260,7 +259,7 @@ async def composed_prompt_context(
     kbid: str,
     results: KnowledgeboxFindResults,
     extend_with_fields: list[str],
-) -> Context:
+) -> PromptContext:
     """
     Algorithm steps:
         - Collect the list of resources in the results (in order of relevance).
@@ -287,7 +286,7 @@ async def composed_prompt_context(
     ]
     field_extracted_texts = await run_concurrently(tasks)
 
-    output: Context = {}
+    output: PromptContext = {}
     for result in field_extracted_texts:
         if result is None:
             continue
@@ -318,7 +317,7 @@ class PromptContextBuilder:
         self.user_context = user_context
         self.strategies = strategies
 
-    def prepend_user_context(self, context: Context) -> Context:
+    def prepend_user_context(self, context: PromptContext) -> PromptContext:
         # Chat extra context passed by the user is the most important, therefore
         # it is added first, followed by the found text blocks in order of relevance
         extended = {
@@ -328,7 +327,7 @@ class PromptContextBuilder:
         extended.update(context)
         return extended
 
-    async def build(self) -> tuple[Context, ContextOrder]:
+    async def build(self) -> tuple[PromptContext, PromptContextOrder]:
         context = await self._build_context()
         context = self.prepend_user_context(context)
         context_order = {

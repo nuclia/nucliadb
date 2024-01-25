@@ -41,6 +41,8 @@ from nucliadb_models.search import (
     FindRequest,
     KnowledgeboxFindResults,
     NucliaDBClientType,
+    PromptContext,
+    PromptContextOrder,
     Relations,
     RephraseModel,
     SearchOptions,
@@ -74,6 +76,8 @@ class ChatResult:
     answer_stream: AsyncIterator[bytes]
     status_code: FoundStatusCode
     find_results: KnowledgeboxFindResults
+    prompt_context: PromptContext
+    prompt_context_order: PromptContextOrder
 
 
 async def rephrase_query(
@@ -210,6 +214,8 @@ async def chat(
     user_context = chat_request.extra_context or []
     user_query = chat_request.query
     rephrased_query = None
+    prompt_context: PromptContext = {}
+    prompt_context_order: PromptContextOrder = {}
 
     if len(chat_history) > 0 or len(user_context) > 0:
         rephrased_query = await rephrase_query(
@@ -235,21 +241,21 @@ async def chat(
             not_enough_context_generator(), status_code
         )
     else:
-        pcb = PromptContextBuilder(
+        prompt_context_builder = PromptContextBuilder(
             kbid=kbid,
             find_results=find_results,
             user_context=user_context,
             strategies=chat_request.rag_strategies,
         )
-        query_context, query_context_order = await pcb.build()
+        prompt_context, prompt_context_order = await prompt_context_builder.build()
         user_prompt = None
         if chat_request.prompt is not None:
             user_prompt = UserPrompt(prompt=chat_request.prompt)
 
         chat_model = ChatModel(
             user_id=user_id,
-            query_context=query_context,
-            query_context_order=query_context_order,
+            query_context=prompt_context,
+            query_context_order=prompt_context_order,
             chat_history=chat_history,
             question=user_query,
             truncate=True,
@@ -279,7 +285,7 @@ async def chat(
                 text_answer=text_answer,
                 status_code=status_code.value,
                 chat_history=chat_history,
-                query_context=query_context,
+                query_context=prompt_context,
             )
 
         answer_stream = _wrapped_stream()
@@ -289,6 +295,8 @@ async def chat(
         answer_stream=answer_stream,
         status_code=status_code,
         find_results=find_results,
+        prompt_context=prompt_context,
+        prompt_context_order=prompt_context_order,
     )
 
 

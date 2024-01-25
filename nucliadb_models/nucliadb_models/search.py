@@ -753,6 +753,9 @@ class FullResourceStrategy(RagStrategy):
 
 RagStrategies = Union[FieldExtensionStrategy, FullResourceStrategy]
 
+PromptContext = dict[str, str]
+PromptContextOrder = dict[str, int]
+
 
 class ChatRequest(BaseModel):
     query: str = SearchParamDefaults.chat_query.to_pydantic_field()
@@ -807,6 +810,7 @@ class ChatRequest(BaseModel):
         title="RAG context building strategies",
         description="Options for tweaking how the context for the LLM model is crafted",
     )
+    debug: bool = SearchParamDefaults.debug.to_pydantic_field()
 
     @root_validator(pre=True)
     def rag_features_validator(cls, values):

@@ -46,6 +46,8 @@ from nucliadb_models.search import (
     ChatRequest,
     KnowledgeboxFindResults,
     NucliaDBClientType,
+    PromptContext,
+    PromptContextOrder,
     Relations,
 )
 from nucliadb_telemetry.errors import capture_exception
@@ -61,6 +63,8 @@ class SyncChatResponse(pydantic.BaseModel):
     results: KnowledgeboxFindResults
     status: AnswerStatusCode
     citations: dict[str, Any] = {}
+    prompt_context: Optional[PromptContext] = None
+    prompt_context_order: Optional[PromptContextOrder] = None
 
 
 CHAT_EXAMPLES = {
@@ -166,14 +170,18 @@ async def create_chat_response(
                 kbid=kbid, chat_request=chat_request, text_answer=answer
             )
 
+        sync_chat_resp = SyncChatResponse(
+            answer=answer,
+            relations=relations_results,
+            results=chat_result.find_results,
+            status=chat_result.status_code.value,
+            citations=citations,
+        )
+        if chat_request.debug:
+            sync_chat_resp.prompt_context = chat_result.prompt_context
+            sync_chat_resp.prompt_context_order = chat_result.prompt_context_order
         return Response(
-            content=SyncChatResponse(
-                answer=answer,
-                relations=relations_results,
-                results=chat_result.find_results,
-                status=chat_result.status_code.value,
-                citations=citations,
-            ).json(),
+            content=sync_chat_resp.json(exclude_unset=True),
             headers={
                 "NUCLIA-LEARNING-ID": chat_result.nuclia_learning_id or "unknown",
                 "Access-Control-Expose-Headers": "NUCLIA-LEARNING-ID",
