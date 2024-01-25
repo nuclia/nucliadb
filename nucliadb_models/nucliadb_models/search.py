@@ -728,16 +728,17 @@ class AskDocumentModel(BaseModel):
     user_id: str = Field(description="The id of the user associated to the request")
 
 
+class RagStrategyName:
+    FIELD_EXTENSION = "field_extension"
+    FULL_RESOURCE = "full_resource"
+
+
 class RagStrategy(BaseModel):
     name: str
 
 
-class SimpleStrategy(RagStrategy):
-    name: str = Field("simple", const=True)
-
-
 class FieldExtensionStrategy(RagStrategy):
-    name: str = Field("field_extension", const=True)
+    name: str = Field(RagStrategyName.FIELD_EXTENSION, const=True)
     fields: list[str] = Field(
         title="Fields",
         description="List of field ids to extend the context with. It will try to extend the retrieval context with the specified fields in the matching resources.",  # noqa
@@ -747,10 +748,10 @@ class FieldExtensionStrategy(RagStrategy):
 
 
 class FullResourceStrategy(RagStrategy):
-    name: str = Field("full_resource", const=True)
+    name: str = Field(RagStrategyName.FULL_RESOURCE, const=True)
 
 
-RagStrategies = Union[SimpleStrategy, FieldExtensionStrategy, FullResourceStrategy]
+RagStrategies = Union[FieldExtensionStrategy, FullResourceStrategy]
 
 
 class ChatRequest(BaseModel):
@@ -809,7 +810,7 @@ class ChatRequest(BaseModel):
 
     @root_validator(pre=True)
     def rag_features_validator(cls, values):
-        chosen_strategies = [s.name for s in values.get("rag_strategies") or []]
+        chosen_strategies = [s.get("name") for s in values.get("rag_strategies") or []]
 
         # There must be at most one strategy of each type
         if len(chosen_strategies) > len(set(chosen_strategies)):
@@ -817,11 +818,11 @@ class ChatRequest(BaseModel):
 
         # If full resource strategy is chosen, it must be the only strategy
         if (
-            FullResourceStrategy.name in chosen_strategies
+            RagStrategyName.FULL_RESOURCE in chosen_strategies
             and len(chosen_strategies) > 1
         ):
             raise ValueError(
-                f"If '{FullResourceStrategy.name}' strategy is chosen, it must be the only strategy"
+                f"If '{RagStrategyName.FULL_RESOURCE}' strategy is chosen, it must be the only strategy"
             )
 
         return values

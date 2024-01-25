@@ -28,11 +28,10 @@ from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.middleware.transaction import get_read_only_transaction
 from nucliadb_models.search import (
     SCORE_TYPE,
-    FieldExtensionStrategy,
     FindParagraph,
-    FullResourceStrategy,
     KnowledgeboxFindResults,
     RagStrategy,
+    RagStrategyName,
 )
 from nucliadb_protos import resources_pb2
 from nucliadb_utils.asyncio_utils import ConcurrentRunner, run_concurrently
@@ -344,9 +343,9 @@ class PromptContextBuilder:
         full_resource = False
         extend_with_fields = []
         for strategy in self.strategies:
-            if strategy.name == FieldExtensionStrategy.name:
+            if strategy.name == RagStrategyName.FIELD_EXTENSION:
                 extend_with_fields.extend(strategy.fields)
-            elif strategy.name == FullResourceStrategy.name:
+            elif strategy.name == RagStrategyName.FULL_RESOURCE:
                 full_resource = True
 
         if full_resource:

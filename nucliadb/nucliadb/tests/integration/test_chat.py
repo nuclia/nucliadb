@@ -391,7 +391,5 @@ async def test_chat_rag_options_validation(
     )
     assert resp.status_code == 422
     detail = resp.json()["detail"]
-    assert (
-        detail[0]["msg"]
-        == "If 'extend_with_fields' strategy is chosen, 'extend_with_fields' property must be provided"
-    )
+    detail[0]["loc"][-1] == "fields"
+    assert detail[0]["msg"] == "field required"
