@@ -40,4 +40,6 @@ pub trait Meter: Send + Sync {
     }
     fn record_replicated_bytes(&self, value: u64);
     fn record_replication_op(&self, key: replication::ReplicationOpsKey);
+    fn set_shard_cache_gauge(&self, value: i64);
+    fn record_shard_cache_eviction(&self);
 }

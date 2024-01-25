@@ -23,6 +23,7 @@ use std::num::NonZeroUsize;
 use std::sync::{Arc, Condvar, Mutex, Weak};
 
 use lru::LruCache;
+use nucliadb_core::metrics;
 
 // Classic implementation of a binary semaphore, used to be able to
 // block while an entry is being loaded by another thread, and get a
@@ -162,11 +163,13 @@ where K: Eq + Hash + Clone + std::fmt::Debug
             self.evict();
         }
         self.live.push(k.clone(), Arc::clone(v));
+        metrics::get_metrics().set_shard_cache_gauge(self.live.len() as i64);
     }
 
     fn evict(&mut self) {
         if let Some((evicted_k, evicted_v)) = self.live.pop_lru() {
             self.eviction.insert(evicted_k, Arc::downgrade(&evicted_v));
+            metrics::get_metrics().record_shard_cache_eviction();
         }
     }
 }
