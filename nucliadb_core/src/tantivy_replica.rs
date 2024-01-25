@@ -72,9 +72,12 @@ struct SafeMetadata {
     payload: Option<String>,
 }
 
+/// Needed by [`compute_safe_replica_state`]
 #[derive(Clone, Copy)]
 pub struct ReplicationParameters<'a> {
+    /// Where the index to be replicated is located on disk
     pub path: &'a Path,
+    /// IDs of the segments already present at the replica.
     pub on_replica: &'a [String],
 }
 
