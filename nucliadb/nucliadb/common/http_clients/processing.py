@@ -148,6 +148,7 @@ class ProcessingHTTPClient:
         if resource_id is not None:
             data["resource_id"] = resource_id
         async with self.session.post(url, headers=self.headers, json=data) as resp:
+            resp_text = await resp.text()
             check_status(resp, resp_text)
 
 
