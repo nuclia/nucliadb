@@ -1,14 +1,17 @@
 # NucliaDB Settings
 
-# image settings
+# Image settings: This allows you to change the image used for the NucliaDB.
+# You can use a different image, or a different version of the same image.
 imagePullPolicy: IfNotPresent
 image: nuclia/nucliadb
 imageVersion:
 
+# Defines the number of NucliaDB pods to run.
 replicas: 2
 podAnnotations: {}
 
-# app settings
+# App settings: These are the settings that are passed to the NucliaDB application via environment variables.
+# See https://docs.nuclia.dev/docs/guides/nucliadb/configuration for a complete list of settings.
 env:
   NUCLIA_ZONE: "europe-1"
   CORS_ORIGINS: '["http://localhost:8080"]'
@@ -16,8 +19,8 @@ env:
   cluster_discovery_mode: kubernetes
   cluster_discovery_kubernetes_namespace: nucliadb
   cluster_discovery_kubernetes_selector: "app.kubernetes.io/name=node"
-  # when we're k8s, we want structured logs to stdout because we don't have
-  # so they can be scraped by log exporters
+  # when we're k8s, we want structured logs to 
+  # stdout so they can be scraped by log exporters
   log_output_type: stdout
   log_format_type: structured
 
@@ -41,5 +44,5 @@ resources: {}
 #    cpu: 1
 
 storage:
-  class: ssd
+  class: <replace-with-storage-class>
   size: 100Gi

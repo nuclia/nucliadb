@@ -29,7 +29,7 @@ from nucliadb_protos.nodereader_pb2 import ParagraphResult as PBParagraphResult
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb_protos.writer_pb2 import Shards as PBShards
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, root_validator, validator
 
 from nucliadb_models.common import FieldTypeName, ParamDefault
 from nucliadb_models.metadata import RelationType
@@ -728,6 +728,35 @@ class AskDocumentModel(BaseModel):
     user_id: str = Field(description="The id of the user associated to the request")
 
 
+class RagStrategyName:
+    FIELD_EXTENSION = "field_extension"
+    FULL_RESOURCE = "full_resource"
+
+
+class RagStrategy(BaseModel):
+    name: str
+
+
+class FieldExtensionStrategy(RagStrategy):
+    name: str = Field(RagStrategyName.FIELD_EXTENSION, const=True)
+    fields: list[str] = Field(
+        title="Fields",
+        description="List of field ids to extend the context with. It will try to extend the retrieval context with the specified fields in the matching resources.",  # noqa
+        min_items=1,
+        unique_items=True,
+    )
+
+
+class FullResourceStrategy(RagStrategy):
+    name: str = Field(RagStrategyName.FULL_RESOURCE, const=True)
+
+
+RagStrategies = Union[FieldExtensionStrategy, FullResourceStrategy]
+
+PromptContext = dict[str, str]
+PromptContextOrder = dict[str, int]
+
+
 class ChatRequest(BaseModel):
     query: str = SearchParamDefaults.chat_query.to_pydantic_field()
     fields: List[str] = SearchParamDefaults.fields.to_pydantic_field()
@@ -776,6 +805,31 @@ class ChatRequest(BaseModel):
     security: Optional[
         RequestSecurity
     ] = SearchParamDefaults.security.to_pydantic_field()
+    rag_strategies: list[RagStrategies] = Field(
+        default=[],
+        title="RAG context building strategies",
+        description="Options for tweaking how the context for the LLM model is crafted",
+    )
+    debug: bool = SearchParamDefaults.debug.to_pydantic_field()
+
+    @root_validator(pre=True)
+    def rag_features_validator(cls, values):
+        chosen_strategies = [s.get("name") for s in values.get("rag_strategies") or []]
+
+        # There must be at most one strategy of each type
+        if len(chosen_strategies) > len(set(chosen_strategies)):
+            raise ValueError("There must be at most one strategy of each type")
+
+        # If full resource strategy is chosen, it must be the only strategy
+        if (
+            RagStrategyName.FULL_RESOURCE in chosen_strategies
+            and len(chosen_strategies) > 1
+        ):
+            raise ValueError(
+                f"If '{RagStrategyName.FULL_RESOURCE}' strategy is chosen, it must be the only strategy"
+            )
+
+        return values
 
 
 class SummarizeResourceModel(BaseModel):

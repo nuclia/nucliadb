@@ -16,6 +16,7 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+from unittest import mock
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -162,12 +163,14 @@ def _create_find_result(
     )
 
 
-async def test_get_chat_prompt_context(kb):
+async def test_default_prompt_context(kb):
     result_text = " ".join(["text"] * 10)
     with patch("nucliadb.search.search.chat.prompt.get_driver"), patch(
         "nucliadb.search.search.chat.prompt.get_storage"
     ), patch("nucliadb.search.search.chat.prompt.KnowledgeBoxORM", return_value=kb):
-        prompt_result = await chat_prompt.get_chat_prompt_context(
+        context = chat_prompt.CappedPromptContext(max_size=1e6)
+        await chat_prompt.default_prompt_context(
+            context,
             "kbid",
             KnowledgeboxFindResults(
                 facets={},
@@ -184,15 +187,83 @@ async def test_get_chat_prompt_context(kb):
                 },
                 min_score=-1,
             ),
-            user_context=["Some extra context"],
         )
+        prompt_result = context.output
         # Check that the results are sorted by increasing order and that the extra
         # context is added at the beginning, indicating that it has the most priority
         paragraph_ids = [pid for pid in prompt_result.keys()]
         assert paragraph_ids == [
-            "USER_CONTEXT_0",
             "both_id/c/conv/ident",
             "bmid/c/conv/ident",
             "vecid/c/conv/ident",
         ]
-        assert prompt_result["USER_CONTEXT_0"] == "Some extra context"
+
+
+@pytest.fixture(scope="function")
+def find_results():
+    return KnowledgeboxFindResults(
+        facets={},
+        resources={
+            "resource1": _create_find_result(
+                "resource1/a/title", "Resource 1", SCORE_TYPE.BOTH, order=1
+            ),
+            "resource2": _create_find_result(
+                "resource2/a/title", "Resource 2", SCORE_TYPE.VECTOR, order=2
+            ),
+        },
+        min_score=-1,
+    )
+
+
+async def test_prompt_context_builder_prepends_user_context(
+    find_results: KnowledgeboxFindResults,
+):
+    builder = chat_prompt.PromptContextBuilder(
+        kbid="kbid", find_results=find_results, user_context=["Carrots are orange"]
+    )
+
+    async def _mock_build_context(context, *args, **kwargs):
+        context["resource1/a/title"] = "Resource 1"
+        context["resource2/a/title"] = "Resource 2"
+
+    with mock.patch.object(builder, "_build_context", new=_mock_build_context):
+        context, context_order = await builder.build()
+        assert len(context) == 3
+        assert len(context_order) == 3
+        assert context["USER_CONTEXT_0"] == "Carrots are orange"
+        assert context["resource1/a/title"] == "Resource 1"
+        assert context["resource2/a/title"] == "Resource 2"
+        assert context_order["USER_CONTEXT_0"] == 0
+        assert context_order["resource1/a/title"] == 1
+        assert context_order["resource2/a/title"] == 2
+
+
+def test_capped_prompt_context():
+    context = chat_prompt.CappedPromptContext(max_size=2)
+
+    # Check that the exception is raised
+    with pytest.raises(chat_prompt.MaxContextSizeExceeded):
+        context["key1"] = "123"
+
+    assert context.output == {}
+    assert context.size == 0
+
+    # Add a new value
+    context["key1"] = "f"
+    assert context.output == {"key1": "f"}
+    assert context.size == 1
+
+    # Update existing value
+    context["key1"] = "fo"
+    assert context.output == {"key1": "fo"}
+    assert context.size == 2
+
+    # It should not accept new values now
+    with pytest.raises(chat_prompt.MaxContextSizeExceeded):
+        context["key1"] = "foo"
+    with pytest.raises(chat_prompt.MaxContextSizeExceeded):
+        context["key2"] = "f"
+
+    # Check without limits
+    context = chat_prompt.CappedPromptContext(max_size=None)
+    context["key1"] = "foo" * int(1e6)

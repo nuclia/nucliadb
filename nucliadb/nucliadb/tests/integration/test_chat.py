@@ -274,3 +274,188 @@ async def test_chat_without_citations(
     else:
         resp_citations = parse_chat_response(resp.content)[-1]
     assert resp_citations == {}
+
+
+@pytest.mark.asyncio()
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+@pytest.mark.parametrize("debug", (True, False))
+async def test_sync_chat_returns_prompt_context(
+    nucliadb_reader: AsyncClient, knowledgebox, resource, debug
+):
+    # Make sure prompt context is returned if debug is True
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/chat",
+        json={"query": "title", "debug": debug},
+        headers={"X-Synchronous": "True"},
+    )
+    assert resp.status_code == 200
+    resp_data = SyncChatResponse.parse_raw(resp.content)
+    if debug:
+        assert resp_data.prompt_context
+        assert resp_data.prompt_context_order
+    else:
+        assert resp_data.prompt_context is None
+        assert resp_data.prompt_context_order is None
+
+
+@pytest.fixture
+async def resources(nucliadb_writer, knowledgebox):
+    kbid = knowledgebox
+    rids = []
+    for i in range(2):
+        resp = await nucliadb_writer.post(
+            f"/kb/{kbid}/resources",
+            json={
+                "title": f"The title {i}",
+                "summary": f"The summary {i}",
+                "texts": {"text_field": {"body": "The body of the text field"}},
+            },
+            headers={"X-Synchronous": "True"},
+        )
+        assert resp.status_code in (200, 201)
+        rid = resp.json()["uuid"]
+        rids.append(rid)
+    yield rids
+
+
+@pytest.mark.asyncio()
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_chat_rag_options_full_resource(
+    nucliadb_reader: AsyncClient, knowledgebox, resources
+):
+    resource1, resource2 = resources
+
+    predict = get_predict()
+    predict.calls.clear()  # type: ignore
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/chat",
+        json={"query": "title", "rag_strategies": [{"name": "full_resource"}]},
+        timeout=None,
+    )
+    assert resp.status_code == 200
+    _ = parse_chat_response(resp.content)
+
+    # Make sure the prompt context is properly crafted
+    assert predict.calls[-2][0] == "chat_query"  # type: ignore
+    prompt_context = predict.calls[-2][1].query_context  # type: ignore
+
+    # All fields of the matching resource should be in the prompt context
+    assert len(prompt_context) == 6
+    assert prompt_context[f"{resource1}/a/title"] == "The title 0"
+    assert prompt_context[f"{resource1}/a/summary"] == "The summary 0"
+    assert prompt_context[f"{resource1}/t/text_field"] == "The body of the text field"
+    assert prompt_context[f"{resource2}/a/title"] == "The title 1"
+    assert prompt_context[f"{resource2}/a/summary"] == "The summary 1"
+    assert prompt_context[f"{resource2}/t/text_field"] == "The body of the text field"
+
+
+@pytest.mark.asyncio()
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_chat_rag_options_extend_with_fields(
+    nucliadb_reader: AsyncClient, knowledgebox, resources
+):
+    resource1, resource2 = resources
+
+    predict = get_predict()
+    predict.calls.clear()  # type: ignore
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/chat",
+        json={
+            "query": "title",
+            "rag_strategies": [{"name": "field_extension", "fields": ["a/summary"]}],
+        },
+        timeout=None,
+    )
+    assert resp.status_code == 200
+    _ = parse_chat_response(resp.content)
+
+    # Make sure the prompt context is properly crafted
+    assert predict.calls[-2][0] == "chat_query"  # type: ignore
+    prompt_context = predict.calls[-2][1].query_context  # type: ignore
+
+    # Matching paragraphs should be in the prompt
+    # context, plus the extended field for each resource
+    assert len(prompt_context) == 4
+    # The matching paragraphs
+    assert prompt_context[f"{resource1}/a/title/0-11"] == "The title 0"
+    assert prompt_context[f"{resource2}/a/title/0-11"] == "The title 1"
+    # The extended fields
+    assert prompt_context[f"{resource1}/a/summary"] == "The summary 0"
+    assert prompt_context[f"{resource2}/a/summary"] == "The summary 1"
+
+
+@pytest.mark.asyncio()
+async def test_chat_rag_options_validation(
+    nucliadb_reader,
+):
+    resp = await nucliadb_reader.post(
+        f"/kb/kbid/chat",
+        json={
+            "query": "title",
+            "rag_strategies": [
+                {"name": "full_resource"},
+                {"name": "extend_with_fields", "fields": ["a/summary"]},
+            ],
+        },
+    )
+    assert resp.status_code == 422
+    detail = resp.json()["detail"]
+    assert (
+        detail[0]["msg"]
+        == "If 'full_resource' strategy is chosen, it must be the only strategy"
+    )
+
+    resp = await nucliadb_reader.post(
+        f"/kb/kbid/chat",
+        json={"query": "title", "rag_strategies": [{"name": "field_extension"}]},
+    )
+    assert resp.status_code == 422
+    detail = resp.json()["detail"]
+    detail[0]["loc"][-1] == "fields"
+    assert detail[0]["msg"] == "field required"
+
+
+@pytest.mark.asyncio()
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_chat_capped_context(
+    nucliadb_reader: AsyncClient, knowledgebox, resources
+):
+    # By default, max size is big enough to fit all the prompt context
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/chat",
+        json={
+            "query": "title",
+            "rag_strategies": [{"name": "full_resource"}],
+            "debug": True,
+        },
+        headers={"X-Synchronous": "True"},
+        timeout=None,
+    )
+    assert resp.status_code == 200
+    resp_data = SyncChatResponse.parse_raw(resp.content)
+    assert resp_data.prompt_context is not None
+    assert len(resp_data.prompt_context) == 6
+
+    # Try now setting a smaller max size. It should be respected
+    max_size = 30
+    from nucliadb.search.settings import settings
+
+    with mock.patch.object(settings, "max_prompt_context_chars", max_size):
+        resp = await nucliadb_reader.post(
+            f"/kb/{knowledgebox}/chat",
+            json={
+                "query": "title",
+                "rag_strategies": [{"name": "full_resource"}],
+                "debug": True,
+            },
+            headers={"X-Synchronous": "True"},
+            timeout=None,
+        )
+        assert resp.status_code == 200
+        resp_data = SyncChatResponse.parse_raw(resp.content)
+        assert resp_data.prompt_context is not None
+        assert len(resp_data.prompt_context) < 6
+        total_size = sum(len(v) for v in resp_data.prompt_context.values())
+        assert total_size <= max_size
