@@ -171,18 +171,12 @@ async def default_prompt_context(
     - Using an dict prevents from duplicates pulled in through conversation expansion.
     """
     # Sort retrieved paragraphs by decreasing order (most relevant first)
-    ordered_paras = []
-    for result in results.resources.values():
-        for field_path, field in result.fields.items():
-            for paragraph in field.paragraphs.values():
-                ordered_paras.append((field_path, paragraph))
-    ordered_paras.sort(key=lambda x: x[1].order, reverse=False)
-
+    ordered_paras = get_ordered_paragraphs(results)
     driver = get_driver()
     storage = await get_storage()
     async with driver.transaction() as txn:
         kb = KnowledgeBoxORM(txn, storage, kbid)
-        for field_path, paragraph in ordered_paras:
+        for paragraph in ordered_paras:
             context[paragraph.id] = _clean_paragraph_text(paragraph)
 
             # If the paragraph is a conversation and it matches semantically, we assume we
