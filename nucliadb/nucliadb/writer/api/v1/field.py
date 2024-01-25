@@ -113,7 +113,6 @@ async def finish_field_put(
     transaction = get_transaction_utility()
     processing = get_processing()
 
-    await _add_basic_data_to_processing_payload(toprocess)
     processing_info = await processing.send_to_process(toprocess, partition)
 
     writer.source = BrokerMessage.MessageSource.WRITER
@@ -704,7 +703,6 @@ async def _append_messages_to_conversation_field(
     field.messages.extend(messages)
 
     await parse_conversation_field(field_id, field, writer, toprocess, kbid, rid)
-    await _add_basic_data_to_processing_payload(toprocess)
 
     try:
         processing_info = await processing.send_to_process(toprocess, partition)
@@ -800,7 +798,6 @@ async def _append_blocks_to_layout_field(
     field = models.InputLayoutField(body=models.InputLayoutContent())
     field.body.blocks.update(blocks)
     await parse_layout_field(field_id, field, writer, toprocess, kbid, rid)
-    await _add_basic_data_to_processing_payload(toprocess)
 
     try:
         processing_info = await processing.send_to_process(toprocess, partition)
@@ -972,24 +969,3 @@ async def reprocess_file_field(
     await transaction.commit(writer, partition, wait=False)
 
     return ResourceUpdated(seqid=processing_info.seqid)
-
-
-async def _add_basic_data_to_processing_payload(toprocess: PushPayload):
-    """
-    Add basic data to processing payload like title and anything
-    else that is on the resource level.
-    """
-    storage = await get_storage(service_name=SERVICE_NAME)
-    driver = get_driver()
-    async with driver.transaction() as txn:
-        kb = KnowledgeBox(txn, storage, toprocess.kbid)
-
-        resource = await kb.get(toprocess.uuid)
-        if resource is None:
-            return
-
-        basic = await resource.get_basic()
-        if basic is None:
-            return
-
-        toprocess.title = basic.title

@@ -53,7 +53,6 @@ images.settings["nucliadb_node_reader"] = {
         "NUCLIADB_DISABLE_ANALYTICS": "True",
         "DATA_PATH": "/data",
         "READER_LISTEN_ADDRESS": "0.0.0.0:4445",
-        "LAZY_LOADING": "true",
         "RUST_BACKTRACE": "full",
         "RUST_LOG": "nucliadb_*=DEBUG",  # noqa
         "DEBUG": "1",

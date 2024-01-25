@@ -23,4 +23,4 @@
 //! Providers, for example, can use cache strategies to provide faster readers
 //! and writers to the users.
 
-pub mod unbounded_cache;
+pub mod shard_cache;

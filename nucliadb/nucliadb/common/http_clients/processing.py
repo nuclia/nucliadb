@@ -179,12 +179,12 @@ class StatusResultV2(pydantic.BaseModel):
         description="Timestamp of when the resource was first scheduled.",
     )
     completed_at: Optional[datetime] = pydantic.Field(
-        ...,
+        None,
         title="Completed At",
         description="Timestamp of when the resource was completed",
     )
     scheduled_at: Optional[datetime] = pydantic.Field(
-        ...,
+        None,
         title="Scheduled At",
         description="Timestamp of when the resource was first scheduled.",
     )

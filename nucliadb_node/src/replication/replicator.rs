@@ -35,7 +35,7 @@ use tonic::Request;
 use crate::replication::health::ReplicationHealthManager;
 use crate::settings::Settings;
 use crate::shards::metadata::ShardMetadata;
-use crate::shards::providers::unbounded_cache::UnboundedShardWriterCache;
+use crate::shards::providers::shard_cache::ShardWriterCache;
 use crate::shards::writer::ShardWriter;
 use crate::utils::{list_shards, set_primary_node_id};
 
@@ -200,7 +200,7 @@ impl ReplicateWorkerPool {
 
 pub async fn connect_to_primary_and_replicate(
     settings: Settings,
-    shard_cache: Arc<UnboundedShardWriterCache>,
+    shard_cache: Arc<ShardWriterCache>,
     secondary_id: String,
     shutdown_notified: Arc<AtomicBool>,
 ) -> NodeResult<()> {
@@ -274,10 +274,11 @@ pub async fn connect_to_primary_and_replicate(
             let shard_id = shard_state.shard_id.clone();
             let shard_lookup;
             if existing_shards.contains(&shard_id) {
-                let id_clone = shard_id.clone();
-                let shard_cache_clone = Arc::clone(&shard_cache);
+                let shard_cache_clone = shard_cache.clone();
+                let shard_id_clone = shard_id.clone();
                 shard_lookup =
-                    tokio::task::spawn_blocking(move || shard_cache_clone.load(id_clone)).await?;
+                    tokio::task::spawn_blocking(move || shard_cache_clone.get(&shard_id_clone))
+                        .await?;
             } else {
                 let metadata = ShardMetadata::new(
                     shards_path.join(shard_id.clone()),
@@ -330,10 +331,9 @@ pub async fn connect_to_primary_and_replicate(
             if !existing_shards.contains(&shard_id) {
                 continue;
             }
-            let id_clone = shard_id.clone();
             let shard_cache_clone = shard_cache.clone();
             let shard_lookup =
-                tokio::task::spawn_blocking(move || shard_cache_clone.delete(id_clone)).await?;
+                tokio::task::spawn_blocking(move || shard_cache_clone.delete(&shard_id)).await?;
             if shard_lookup.is_err() {
                 warn!("Failed to delete shard: {:?}", shard_lookup);
                 continue;
@@ -365,7 +365,7 @@ pub async fn connect_to_primary_and_replicate(
 
 pub async fn connect_to_primary_and_replicate_forever(
     settings: Settings,
-    shard_cache: Arc<UnboundedShardWriterCache>,
+    shard_cache: Arc<ShardWriterCache>,
     secondary_id: String,
     shutdown_notified: Arc<AtomicBool>,
 ) -> NodeResult<()> {

@@ -20,27 +20,12 @@
 from enum import Enum
 from typing import Dict
 
-from nucliadb_dataset.dataset import (
-    NucliaCloudDataset,
-    NucliaDBDataset,
-    Task,
-    download_all_partitions,
-)
+from nucliadb_dataset.dataset import NucliaDBDataset, Task, download_all_partitions
 from nucliadb_dataset.nuclia import NucliaDriver
 
 NUCLIA_GLOBAL: Dict[str, NucliaDriver] = {}
 
 CLIENT_ID = "CLIENT"
-
-
-class DatasetType(str, Enum):
-    FIELD_CLASSIFICATION = "FIELD_CLASSIFICATION"
-    IMAGE_CLASSIFICATION = "IMAGE_CLASSIFICATION"
-    PARAGRAPH_CLASSIFICATION = "PARAGRAPH_CLASSIFICATION"
-    PARAGRAPH_STREAMING = "PARAGRAPH_STREAMING"
-    QUESTION_ANSWER_STREAMING = "QUESTION_ANSWER_STREAMING"
-    SENTENCE_CLASSIFICATION = "SENTENCE_CLASSIFICATION"
-    TOKEN_CLASSIFICATION = "TOKEN_CLASSIFICATION"
 
 
 class ExportType(str, Enum):
@@ -50,11 +35,9 @@ class ExportType(str, Enum):
 
 __all__ = (
     "NucliaDBDataset",
-    "NucliaCloudDataset",
     "Task",
     "download_all_partitions",
     "NUCLIA_GLOBAL",
     "CLIENT_ID",
-    "DatasetType",
     "ExportType",
 )

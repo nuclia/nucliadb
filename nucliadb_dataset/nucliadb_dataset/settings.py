@@ -19,13 +19,14 @@
 #
 
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 import pydantic
 from pydantic import BaseSettings
 
-from nucliadb_dataset import DatasetType, ExportType
-from nucliadb_sdk.client import Environment
+from nucliadb_dataset import ExportType
+from nucliadb_dataset.tasks import Task
+from nucliadb_sdk.v2.sdk import Region
 
 
 class Settings(BaseSettings):
@@ -43,22 +44,22 @@ class RunningSettings(pydantic.BaseSettings):
         f"{Path.home()}/.nuclia/download", description="Download path"
     )
     url: str = pydantic.Field(description="KnowledgeBox URL")
-    type: DatasetType = pydantic.Field(description="Dataset Type")
+    type: Task = pydantic.Field(description="Dataset Type")
     labelset: Optional[str] = pydantic.Field(
-        description="For classification which labelset"
+        description="For classification which labelset or families"
     )
-    families: Optional[List[str]] = pydantic.Field(description="List of family group")
 
-    datasets_url: Optional[str] = pydantic.Field(
-        description="Base url for the Nuclia datasets component (including /api/v1)™"
+    datasets_url: str = pydantic.Field(
+        "https://europe-1.nuclia.cloud",
+        description="Base url for the Nuclia datasets component (excluding /api/v1)™",  # noqa
     )
 
     apikey: Optional[str] = pydantic.Field(
         description="API key to upload to Nuclia Datasets™"
     )
 
-    environment: Environment = pydantic.Field(
-        Environment.OSS, description="CLOUD or OSS"
+    environment: Region = pydantic.Field(
+        Region.ON_PREM, description="region or on-prem"
     )
 
     service_token: Optional[str] = pydantic.Field(
@@ -66,3 +67,5 @@ class RunningSettings(pydantic.BaseSettings):
     )
 
     batch_size: int = pydantic.Field(64, description="Batch streaming size")
+
+    kbid: str = pydantic.Field(description="Knowledge Box UUID")

@@ -131,7 +131,6 @@ pub async fn start_grpc_service(
     tokio::spawn(health_checker(health_reporter, settings.clone()));
 
     let grpc_driver = NodeReaderGRPCDriver::new(settings.clone());
-    grpc_driver.initialize().await?;
 
     Server::builder()
         .layer(tracing_middleware)

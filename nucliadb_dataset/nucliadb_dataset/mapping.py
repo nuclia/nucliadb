@@ -35,7 +35,7 @@ BatchType = TypeVar("BatchType", ParagraphClassificationBatch, FieldClassificati
 
 
 def bytes_to_batch(klass: Any):
-    def func(batch: bytes) -> Any:
+    def func(batch: bytes, *args, **kwargs) -> Any:
         pb = klass()
         pb.ParseFromString(batch)
         return pb
@@ -43,8 +43,8 @@ def bytes_to_batch(klass: Any):
     return func
 
 
-def batch_to_text_classification_arrow(schema: pa.schema):
-    def func(batch: BatchType):
+def batch_to_text_classification_arrow():
+    def func(batch: BatchType, schema: pa.schema):
         TEXT = []
         LABELS = []
         for data in batch.data:
@@ -63,8 +63,8 @@ def batch_to_text_classification_arrow(schema: pa.schema):
     return func
 
 
-def batch_to_token_classification_arrow(schema: pa.schema):
-    def func(batch: TokenClassificationBatch):
+def batch_to_token_classification_arrow():
+    def func(batch: TokenClassificationBatch, schema: pa.schema):
         X = []
         Y = []
         for data in batch.data:
@@ -80,8 +80,8 @@ def batch_to_token_classification_arrow(schema: pa.schema):
     return func
 
 
-def batch_to_text_classification_normalized_arrow(schema: pa.schema):
-    def func(batch: SentenceClassificationBatch):
+def batch_to_text_classification_normalized_arrow():
+    def func(batch: SentenceClassificationBatch, schema: pa.schema):
         TEXT = []
         LABELS = []
         for data in batch.data:
@@ -99,8 +99,8 @@ def batch_to_text_classification_normalized_arrow(schema: pa.schema):
     return func
 
 
-def batch_to_image_classification_arrow(schema: pa.schema):
-    def func(batch: ImageClassificationBatch):
+def batch_to_image_classification_arrow():
+    def func(batch: ImageClassificationBatch, schema: pa.schema):
         IMAGE = []
         SELECTION = []
         for data in batch.data:
@@ -117,8 +117,8 @@ def batch_to_image_classification_arrow(schema: pa.schema):
     return func
 
 
-def batch_to_paragraph_streaming_arrow(schema: pa.schema):
-    def func(batch: ParagraphStreamingBatch):
+def batch_to_paragraph_streaming_arrow():
+    def func(batch: ParagraphStreamingBatch, schema: pa.schema):
         PARARGAPH_ID = []
         TEXT = []
         for data in batch.data:
@@ -135,8 +135,8 @@ def batch_to_paragraph_streaming_arrow(schema: pa.schema):
     return func
 
 
-def batch_to_question_answer_streaming_arrow(schema: pa.schema):
-    def func(batch: QuestionAnswerStreamingBatch):
+def batch_to_question_answer_streaming_arrow():
+    def func(batch: QuestionAnswerStreamingBatch, schema: pa.schema):
         QUESTION = []
         ANSWER = []
         QUESTION_PARAGRAPHS = []

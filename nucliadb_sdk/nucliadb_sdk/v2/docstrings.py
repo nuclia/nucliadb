@@ -372,6 +372,20 @@ print(resp.status.value)
     ],
 )
 
+TRAINSET_PARTITIONS = Docstring(
+    doc="Check partitions available to download",
+    examples=[
+        Example(
+            description="Check partitions",
+            code=""">>> from nucliadb_sdk import *
+resp = sdk.trainset(kbid="mykbid")
+print(resp.status.value)
+'9481939a99sd9a99asda'
+""",
+        )
+    ],
+)
+
 
 def inject_documentation(
     func,

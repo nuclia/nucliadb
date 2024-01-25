@@ -23,13 +23,17 @@ import pyarrow as pa  # type: ignore
 from nucliadb_protos.dataset_pb2 import TrainSet
 
 from nucliadb_dataset.dataset import NucliaDBDataset
-from nucliadb_sdk.knowledgebox import KnowledgeBox
+from nucliadb_models.resource import KnowledgeBoxObj
+from nucliadb_sdk.v2.sdk import NucliaDB
 
 
-def export_dataset(knowledgebox: KnowledgeBox, trainset: TrainSet) -> list[pa.Table]:
+def export_dataset(
+    sdk: NucliaDB, trainset: TrainSet, kb: KnowledgeBoxObj
+) -> list[pa.Table]:
     with tempfile.TemporaryDirectory() as tmpdirname:
         dataset = NucliaDBDataset(
-            client=knowledgebox.client,
+            sdk=sdk,
+            kbid=kb.uuid,
             trainset=trainset,
             base_path=tmpdirname,
         )

@@ -18,23 +18,15 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from pathlib import Path
+from urllib.parse import urlparse
 
 import pydantic_argparse
-from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
+from nucliadb_protos.dataset_pb2 import TrainSet
 
-from nucliadb_dataset import DatasetType, ExportType
+from nucliadb_dataset import ExportType
+from nucliadb_dataset.dataset import TASK_DEFINITIONS
 from nucliadb_dataset.export import FileSystemExport, NucliaDatasetsExport
-from nucliadb_sdk.client import NucliaDBClient
-
-DATASET_TYPE_MAPPING = {
-    DatasetType.FIELD_CLASSIFICATION: TaskType.FIELD_CLASSIFICATION,
-    DatasetType.IMAGE_CLASSIFICATION: TaskType.IMAGE_CLASSIFICATION,
-    DatasetType.PARAGRAPH_CLASSIFICATION: TaskType.PARAGRAPH_CLASSIFICATION,
-    DatasetType.PARAGRAPH_STREAMING: TaskType.PARAGRAPH_STREAMING,
-    DatasetType.QUESTION_ANSWER_STREAMING: TaskType.QUESTION_ANSWER_STREAMING,
-    DatasetType.SENTENCE_CLASSIFICATION: TaskType.SENTENCE_CLASSIFICATION,
-    DatasetType.TOKEN_CLASSIFICATION: TaskType.TOKEN_CLASSIFICATION,
-}
+from nucliadb_sdk.v2.sdk import NucliaDB
 
 
 def run():
@@ -46,33 +38,30 @@ def run():
         description="Generate Arrow files from NucliaDB KBs",
     )
     nucliadb_args = parser.parse_typed_args()
-    errors = []
 
     trainset = TrainSet()
-    trainset.type = DATASET_TYPE_MAPPING[nucliadb_args.type]
+    definition = TASK_DEFINITIONS[nucliadb_args.type]
+    trainset.type = definition.proto
     trainset.batch_size = nucliadb_args.batch_size
-    if nucliadb_args.type in (
-        DatasetType.FIELD_CLASSIFICATION,
-        DatasetType.PARAGRAPH_CLASSIFICATION,
-        DatasetType.SENTENCE_CLASSIFICATION,
-    ):
+    if definition.labels:
         if nucliadb_args.labelset is not None:
             trainset.filter.labels.append(nucliadb_args.labelset)
-    elif nucliadb_args.type in (DatasetType.TOKEN_CLASSIFICATION):
-        if nucliadb_args.families is not None:
-            trainset.filter.labels.extend(nucliadb_args.families)
+
+    nuclia_url_parts = urlparse(nucliadb_args.url)
+    url = f"{nuclia_url_parts.scheme}://{nuclia_url_parts.netloc}/api"
 
     Path(nucliadb_args.download_path).mkdir(parents=True, exist_ok=True)
     if nucliadb_args.export == ExportType.DATASETS:
         if nucliadb_args.apikey is None:
-            errors.append("API key required to push to Nuclia Dataset™")
-        client = NucliaDBClient(
-            environment=nucliadb_args.environment,
-            url=nucliadb_args.url,
+            raise Exception("API key required to push to Nuclia Dataset™")
+        sdk = NucliaDB(
+            region=nucliadb_args.environment,
+            url=url,
             api_key=nucliadb_args.service_token,
         )
         fse = NucliaDatasetsExport(
-            client=client,
+            sdk=sdk,
+            kbid=nucliadb_args.kbid,
             datasets_url=nucliadb_args.datasets_url,
             trainset=trainset,
             cache_path=nucliadb_args.download_path,
@@ -80,13 +69,14 @@ def run():
         )
         fse.export()
     elif nucliadb_args.export == ExportType.FILESYSTEM:
-        client = NucliaDBClient(
-            environment=nucliadb_args.environment,
-            url=nucliadb_args.url,
+        sdk = NucliaDB(
+            region=nucliadb_args.environment,
+            url=url,
             api_key=nucliadb_args.service_token,
         )
         fse = FileSystemExport(
-            client=client,
+            sdk=sdk,
+            kbid=nucliadb_args.kbid,
             trainset=trainset,
             store_path=nucliadb_args.download_path,
         )

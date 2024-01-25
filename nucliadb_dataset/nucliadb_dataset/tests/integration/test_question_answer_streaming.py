@@ -17,10 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import asyncio
+import time
 import uuid
 from datetime import datetime
-from typing import AsyncIterator
 
 import pytest
 from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
@@ -44,17 +43,16 @@ from nucliadb_protos.writer_pb2 import (
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb_dataset.tests.integration.utils import export_dataset
-from nucliadb_sdk.knowledgebox import KnowledgeBox
+from nucliadb_models.resource import KnowledgeBoxObj
+from nucliadb_sdk.v2.sdk import NucliaDB
 
 
-def test_question_answer_streaming(qa_kb: KnowledgeBox):
-    knowledgebox = qa_kb
-
+def test_question_answer_streaming(sdk: NucliaDB, qa_kb: KnowledgeBoxObj):
     trainset = TrainSet()
     trainset.type = TaskType.QUESTION_ANSWER_STREAMING
     trainset.batch_size = 10
 
-    partitions = export_dataset(knowledgebox, trainset)
+    partitions = export_dataset(sdk, trainset, qa_kb)
     assert len(partitions) == 1
 
     loaded_array = partitions[0]
@@ -77,16 +75,16 @@ def test_question_answer_streaming(qa_kb: KnowledgeBox):
 
 
 @pytest.fixture
-async def qa_kb(
-    knowledgebox: KnowledgeBox, ingest_stub: WriterStub
-) -> AsyncIterator[KnowledgeBox]:
-    bm = smb_wonder_bm(knowledgebox.id)
+def qa_kb(
+    sdk: NucliaDB, kb: KnowledgeBoxObj, ingest_stub_sync: WriterStub
+) -> KnowledgeBoxObj:
+    bm = smb_wonder_bm(kb.uuid)
 
-    await inject_message(ingest_stub, bm)
+    inject_message(ingest_stub_sync, bm)
     # wait for processing
-    await asyncio.sleep(0.1)
+    time.sleep(0.1)
 
-    yield knowledgebox
+    return kb
 
 
 def smb_wonder_bm(kbid: str) -> BrokerMessage:
@@ -257,6 +255,6 @@ def smb_wonder_bm(kbid: str) -> BrokerMessage:
     return bm
 
 
-async def inject_message(ingest_stub: WriterStub, message: BrokerMessage):
-    resp = await ingest_stub.ProcessMessage([message])  # type: ignore
+def inject_message(ingest_stub_sync: WriterStub, message: BrokerMessage):
+    resp = ingest_stub_sync.ProcessMessage(iter([message]))
     assert resp.status == OpStatusWriter.Status.OK

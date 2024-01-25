@@ -100,17 +100,16 @@ def broker_simple_resource(knowledgebox: str, number: int) -> BrokerMessage:
 
 
 @pytest.fixture(scope="function")
-async def test_pagination_resources(
-    processor, knowledgebox_ingest, test_settings_reader
-):
+async def test_resources(processor, knowledgebox_ingest, test_settings_reader):
     """
     Create a set of resources with only basic information to test pagination
     """
-
+    resources = []
     amount = 10
     for i in range(1, 10 + 1):
         message = broker_simple_resource(knowledgebox_ingest, i)
         await processor.process(message=message, seqid=i)
+        resources.append(message.uuid)
         # Give processed data some time to reach the node
 
     from time import time
@@ -134,4 +133,4 @@ async def test_pagination_resources(
             break
         print(f"got {count}, retrying")
 
-    yield knowledgebox_ingest
+    yield knowledgebox_ingest, resources
