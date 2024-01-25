@@ -117,8 +117,9 @@ jobs:
         run: |-
           docker pull nuclia/nucliadb:latest
           docker tag nuclia/nucliadb:latest nuclia/nucliadb:stable
-          docker tag nucliadb/nucliadb:latest nucliadb/nucliadb:${{ steps.version_step.outputs.version_number }}
+          docker tag nuclia/nucliadb:latest nuclia/nucliadb:${{ steps.version_step.outputs.version_number }}
           docker push nuclia/nucliadb:stable
+          docker push nuclia/nucliadb:${{ steps.version_step.outputs.version_number }}
 
   docs:
     name: 'Upload API specs'
