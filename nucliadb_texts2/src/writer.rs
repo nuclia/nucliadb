@@ -151,9 +151,12 @@ impl WriterChild for TextWriterService {
             .collect())
     }
 
-    fn get_index_files(&self, _ignored_segment_ids: &[String]) -> NodeResult<IndexFiles> {
-        let path = &self.config.path;
-        let safe_state = tantivy_replica::compute_safe_replica_state(path, &self.index)?;
+    fn get_index_files(&self, ignored_segment_ids: &[String]) -> NodeResult<IndexFiles> {
+        let params = tantivy_replica::ReplicationParameters {
+            path: &self.config.path,
+            on_replica: ignored_segment_ids,
+        };
+        let safe_state = tantivy_replica::compute_safe_replica_state(params, &self.index)?;
         Ok(IndexFiles::Tantivy(safe_state))
     }
 }

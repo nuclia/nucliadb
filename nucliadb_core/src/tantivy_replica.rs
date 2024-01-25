@@ -72,7 +72,16 @@ struct SafeMetadata {
     payload: Option<String>,
 }
 
-pub fn compute_safe_replica_state(path: &Path, index: &Index) -> Result<TantivyReplicaState> {
+#[derive(Clone, Copy)]
+pub struct ReplicationParameters<'a> {
+    pub path: &'a Path,
+    pub on_replica: &'a [String],
+}
+
+pub fn compute_safe_replica_state(
+    params: ReplicationParameters,
+    index: &Index,
+) -> Result<TantivyReplicaState> {
     let searcher = index.reader()?.searcher();
     let index_metadata = index.load_metas()?;
     let mut segment_files = vec![];
@@ -109,26 +118,34 @@ pub fn compute_safe_replica_state(path: &Path, index: &Index) -> Result<TantivyR
         let deletes = delete_opstamp
             .map(|stamp| PathBuf::from(format!("{raw_segment_id}.{stamp}.fieldnorm")));
 
-        if path.join(&postings).exists() {
-            segment_files.push(postings);
-        }
-        if path.join(&positions).exists() {
-            segment_files.push(positions);
-        }
-        if path.join(&terms).exists() {
-            segment_files.push(terms);
-        }
-        if path.join(&store).exists() {
-            segment_files.push(store);
-        }
-        if path.join(&fast_fields).exists() {
-            segment_files.push(fast_fields);
-        }
-        if path.join(&field_norms).exists() {
-            segment_files.push(field_norms);
-        }
         if let Some(deletes) = deletes {
             segment_files.push(deletes);
+        }
+
+        if params.on_replica.contains(&raw_segment_id) {
+            // If this segment is found on the replica we just
+            // send the deletes file. The rest is immutable so its
+            // already there.
+            continue;
+        }
+
+        if params.path.join(&postings).exists() {
+            segment_files.push(postings);
+        }
+        if params.path.join(&positions).exists() {
+            segment_files.push(positions);
+        }
+        if params.path.join(&terms).exists() {
+            segment_files.push(terms);
+        }
+        if params.path.join(&store).exists() {
+            segment_files.push(store);
+        }
+        if params.path.join(&fast_fields).exists() {
+            segment_files.push(fast_fields);
+        }
+        if params.path.join(&field_norms).exists() {
+            segment_files.push(field_norms);
         }
     }
 
@@ -172,8 +189,12 @@ mod tests {
             .unwrap();
         writer.commit().unwrap();
 
+        let replica_params = ReplicationParameters {
+            path: workspace.path(),
+            on_replica: &[],
+        };
         let metadata_as_json = serde_json::to_value(index.load_metas().unwrap()).unwrap();
-        let safe_replica_state = compute_safe_replica_state(workspace.path(), &index).unwrap();
+        let safe_replica_state = compute_safe_replica_state(replica_params, &index).unwrap();
         assert_eq!(safe_replica_state.index_metadata, metadata_as_json);
     }
 
@@ -188,8 +209,13 @@ mod tests {
             .unwrap();
         writer.commit().unwrap();
 
+        let replica_params = ReplicationParameters {
+            path: workspace.path(),
+            on_replica: &[],
+        };
+        let safe_state = compute_safe_replica_state(replica_params, &index).unwrap();
+
         let replica_workspace = tempfile::tempdir().unwrap();
-        let safe_state = compute_safe_replica_state(workspace.path(), &index).unwrap();
         let mut metadata_file = File::create(replica_workspace.path().join("meta.json")).unwrap();
         serde_json::to_writer(&mut metadata_file, &safe_state.index_metadata).unwrap();
 
