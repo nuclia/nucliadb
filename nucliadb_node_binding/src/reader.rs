@@ -27,7 +27,7 @@ use nucliadb_node::lifecycle;
 use nucliadb_node::settings::providers::env::EnvSettingsProvider;
 use nucliadb_node::settings::providers::SettingsProvider;
 use nucliadb_node::settings::Settings;
-use nucliadb_node::shards::providers::unbounded_cache::UnboundedShardReaderCache;
+use nucliadb_node::shards::providers::shard_cache::ShardReaderCache;
 use nucliadb_node::shards::reader::ShardReader;
 use prost::Message;
 use pyo3::exceptions::{PyStopIteration, PyValueError};
@@ -67,23 +67,15 @@ impl PyDocumentProducer {
 }
 
 #[pyclass]
-#[derive(Default)]
 pub struct NodeReader {
-    shards: UnboundedShardReaderCache,
+    shards: ShardReaderCache,
 }
 
 impl NodeReader {
     fn obtain_shard(&self, shard_id: String) -> Result<Arc<ShardReader>, PyErr> {
-        if let Some(shard) = self.shards.get(shard_id.clone()) {
-            return Ok(shard);
-        }
-        match self.shards.load(shard_id.clone()) {
-            Ok(shard) => Ok(shard),
-            Err(error) => Err(LoadShardError::new_err(format!(
-                "Error loading shard {}: {}",
-                shard_id, error
-            ))),
-        }
+        self.shards.get(&shard_id).map_err(|error| {
+            LoadShardError::new_err(format!("Error loading shard {}: {}", shard_id, error))
+        })
     }
 }
 
@@ -94,7 +86,7 @@ impl NodeReader {
         let settings: Settings = EnvSettingsProvider::generate_settings().unwrap();
         lifecycle::initialize_reader(settings.clone());
         Self {
-            shards: UnboundedShardReaderCache::new(settings),
+            shards: ShardReaderCache::new(settings),
         }
     }
 
@@ -249,5 +241,11 @@ impl NodeReader {
             Ok(response) => Ok(PyList::new(py, response.encode_to_vec())),
             Err(error) => Err(IndexNodeException::new_err(error.to_string())),
         }
+    }
+}
+
+impl Default for NodeReader {
+    fn default() -> Self {
+        Self::new()
     }
 }

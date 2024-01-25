@@ -54,10 +54,6 @@ pub mod env {
                 builder.data_path(data_path);
             }
 
-            if let Ok(Ok(false)) = std::env::var("LAZY_LOADING").map(|v| v.parse()) {
-                builder.without_lazy_loading();
-            }
-
             if let Ok(Ok(max_shards)) =
                 std::env::var("MAX_NODE_REPLICAS").map(|v| v.parse::<usize>())
             {

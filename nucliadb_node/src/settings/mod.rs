@@ -90,12 +90,6 @@ impl Settings {
         self.inner.shards_path.clone()
     }
 
-    /// When shard lazy loading is enabled, reader and writer will try to load a
-    /// shard before using it. Otherwise, they'll load all shards at startup
-    pub fn lazy_loading(&self) -> bool {
-        self.inner.lazy_loading
-    }
-
     /// Maximum number of shards an index node will store
     pub fn max_shards_per_node(&self) -> usize {
         self.inner.max_shards_per_node
@@ -221,7 +215,6 @@ mod tests {
     #[test]
     fn test_settings_with_custom_setter() {
         let settings = Settings::builder()
-            .without_lazy_loading()
             .hostname("localhost")
             .sentry_env("prod")
             .with_jaeger_enabled()
@@ -230,7 +223,6 @@ mod tests {
             .inner_build()
             .unwrap();
 
-        assert!(!settings.lazy_loading);
         assert!(
             Ok(settings.public_ip) == "127.0.0.1".parse()
                 || Ok(settings.public_ip) == "::1".parse()

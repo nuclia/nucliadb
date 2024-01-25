@@ -31,7 +31,7 @@ use nucliadb_node::settings::providers::env::EnvSettingsProvider;
 use nucliadb_node::settings::providers::SettingsProvider;
 use nucliadb_node::settings::Settings;
 use nucliadb_node::shards::metadata::ShardMetadata;
-use nucliadb_node::shards::providers::unbounded_cache::UnboundedShardWriterCache;
+use nucliadb_node::shards::providers::shard_cache::ShardWriterCache;
 use nucliadb_node::shards::writer::ShardWriter;
 use prost::Message;
 use pyo3::exceptions::PyValueError;
@@ -42,24 +42,16 @@ use crate::errors::{IndexNodeException, LoadShardError};
 use crate::RawProtos;
 
 #[pyclass]
-#[derive(Default)]
 pub struct NodeWriter {
-    shards: UnboundedShardWriterCache,
+    shards: ShardWriterCache,
     shards_path: PathBuf,
 }
 
 impl NodeWriter {
     fn obtain_shard(&self, shard_id: String) -> Result<Arc<ShardWriter>, PyErr> {
-        if let Some(shard) = self.shards.get(shard_id.clone()) {
-            return Ok(shard);
-        }
-        match self.shards.load(shard_id.clone()) {
-            Ok(shard) => Ok(shard),
-            Err(error) => Err(LoadShardError::new_err(format!(
-                "Error loading shard {}: {}",
-                shard_id, error
-            ))),
-        }
+        self.shards.get(&shard_id).map_err(|error| {
+            LoadShardError::new_err(format!("Error loading shard {}: {}", shard_id, error))
+        })
     }
 }
 
@@ -76,7 +68,7 @@ impl NodeWriter {
         };
         let shards_path = settings.shards_path();
         Ok(Self {
-            shards: UnboundedShardWriterCache::new(settings),
+            shards: ShardWriterCache::new(settings),
             shards_path,
         })
     }
@@ -116,7 +108,7 @@ impl NodeWriter {
         send_analytics_event(AnalyticsEvent::Delete);
         let shard_id =
             ShardId::decode(&mut Cursor::new(shard_id)).expect("Error decoding arguments");
-        let deleted = self.shards.delete(shard_id.id.clone());
+        let deleted = self.shards.delete(&shard_id.id.clone());
         match deleted {
             Ok(_) => Ok(PyList::new(py, shard_id.encode_to_vec())),
             Err(error) => Err(IndexNodeException::new_err(error.to_string())),
@@ -130,7 +122,7 @@ impl NodeWriter {
     ) -> PyResult<&'p PyAny> {
         let shard_id =
             ShardId::decode(&mut Cursor::new(shard_id)).expect("Error decoding arguments");
-        let upgraded = self.shards.upgrade(shard_id.id);
+        let upgraded = self.shards.upgrade(&shard_id.id);
         match upgraded {
             Ok(upgrade_details) => Ok(PyList::new(py, upgrade_details.encode_to_vec())),
             Err(error) => Err(IndexNodeException::new_err(error.to_string())),

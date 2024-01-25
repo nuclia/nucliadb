@@ -45,7 +45,7 @@ use tokio::signal::{ctrl_c, unix};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tonic::transport::Server;
 type GrpcServer = NodeWriterServer<NodeWriterGRPCDriver>;
-use nucliadb_node::shards::providers::unbounded_cache::UnboundedShardWriterCache;
+use nucliadb_node::shards::providers::shard_cache::ShardWriterCache;
 use tokio::sync::Notify;
 
 #[derive(Debug)]
@@ -98,7 +98,7 @@ async fn main() -> NodeResult<()> {
     nucliadb_node::analytics::sync::start_analytics_loop();
 
     let (shutdown_notifier, shutdown_notified) = get_shutdown_notifier();
-    let shard_cache = Arc::new(UnboundedShardWriterCache::new(settings.clone()));
+    let shard_cache = Arc::new(ShardWriterCache::new(settings.clone()));
 
     let mut replication_task = None;
     if settings.node_role() == NodeRole::Secondary {
@@ -165,7 +165,7 @@ async fn wait_for_sigkill(shutdown_notifier: Arc<Notify>) -> NodeResult<()> {
 
 pub async fn start_grpc_service(
     settings: Settings,
-    shard_cache: Arc<UnboundedShardWriterCache>,
+    shard_cache: Arc<ShardWriterCache>,
     metadata_sender: UnboundedSender<NodeWriterEvent>,
     node_id: String,
     shutdown_notifier: Arc<Notify>,
@@ -188,7 +188,6 @@ pub async fn start_grpc_service(
     if settings.node_role() == NodeRole::Primary {
         let grpc_driver = NodeWriterGRPCDriver::new(settings.clone(), shard_cache.clone())
             .with_sender(metadata_sender);
-        grpc_driver.initialize().await?;
         server_builder = server_builder.add_service(GrpcServer::new(grpc_driver));
     }
     let replication_server = replication::replication_service_server::ReplicationServiceServer::new(
