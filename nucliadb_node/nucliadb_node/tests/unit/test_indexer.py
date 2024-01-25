@@ -310,7 +310,11 @@ class TestPriorityIndexer:
         self, indexer: PriorityIndexer, writer: AsyncMock
     ):
         writer.set_resource.side_effect = AioRpcError(
-            code=StatusCode.UNKNOWN, initial_metadata=None, trailing_metadata=None
+            code=StatusCode.UNKNOWN,
+            initial_metadata=None,  # type: ignore
+            trailing_metadata=None,  # type: ignore
+            details="node writer error",
+            debug_error_string="node writer error",
         )
         with pytest.raises(AioRpcError):
             pb = IndexMessage()
@@ -318,7 +322,11 @@ class TestPriorityIndexer:
             await indexer._index_message(pb)
 
         writer.delete_resource.side_effect = AioRpcError(
-            code=StatusCode.UNKNOWN, initial_metadata=None, trailing_metadata=None
+            code=StatusCode.UNKNOWN,
+            initial_metadata=None,  # type: ignore
+            trailing_metadata=None,  # type: ignore
+            details="node writer error",
+            debug_error_string="node writer error",
         )
         with pytest.raises(AioRpcError):
             pb = IndexMessage()

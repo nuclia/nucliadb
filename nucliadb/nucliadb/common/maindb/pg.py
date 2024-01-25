@@ -184,10 +184,11 @@ class ReadOnlyPGTransaction(Transaction):
         self.open = True
 
     async def abort(self):
+        # This is a no-op because we don't have a transaction to abort on read-only transactions.
         ...
 
     async def commit(self):
-        ...
+        raise Exception("Cannot commit transaction in read only mode")
 
     async def batch_get(self, keys: list[str]):
         return await DataLayer(self.pool).batch_get(keys)
@@ -196,10 +197,10 @@ class ReadOnlyPGTransaction(Transaction):
         return await DataLayer(self.pool).get(key)
 
     async def set(self, key: str, value: bytes):
-        await DataLayer(self.pool).set(key, value)
+        raise Exception("Cannot set in read only transaction")
 
     async def delete(self, key: str):
-        await DataLayer(self.pool).delete(key)
+        raise Exception("Cannot delete in read only transaction")
 
     async def keys(
         self,

@@ -135,7 +135,6 @@ async def node_query(
     )
 
     shard_manager = get_shard_manager()
-
     try:
         shard_groups: list[PBShardObject] = await shard_manager.get_shards_by_kbid(kbid)
     except ShardsNotFound:

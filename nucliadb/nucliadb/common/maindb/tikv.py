@@ -267,6 +267,8 @@ class ReadOnlyTiKVTransaction(Transaction):
 
     async def abort(self):
         self.open = False
+        # Read only transactions are implemented as snapshots, which
+        # are read only and isolated, and they don't need to be aborted.
 
     async def commit(self):
         raise Exception("Cannot commit transaction in read only mode")

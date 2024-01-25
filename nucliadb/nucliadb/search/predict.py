@@ -29,9 +29,9 @@ from async_lru import alru_cache
 from nucliadb_protos.knowledgebox_pb2 import KBConfiguration
 from nucliadb_protos.utils_pb2 import RelationNode
 
-from nucliadb.ingest.orm.knowledgebox import KB_CONFIGURATION
+from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
+from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.tests.vectors import Q, Qm2023
-from nucliadb.middleware.transaction import get_read_only_transaction
 from nucliadb.search import logger
 from nucliadb_models.search import (
     AskDocumentModel,
@@ -182,15 +182,8 @@ class PredictEngine:
 
     @alru_cache(maxsize=None)
     async def _get_configuration(self, kbid: str) -> Optional[KBConfiguration]:
-        txn = await get_read_only_transaction()
-        config_key = KB_CONFIGURATION.format(kbid=kbid)
-        payload = await txn.get(config_key)
-        if payload is None:
-            return None
-
-        kb_pb = KBConfiguration()
-        kb_pb.ParseFromString(payload)
-        return kb_pb
+        dm = KnowledgeBoxDataManager(get_driver())
+        return await dm.get_ml_configuration(kbid)
 
     def check_nua_key_is_configured_for_onprem(self):
         if self.onprem and (

@@ -67,13 +67,12 @@ async def test_dummy_predict_engine():
 
 
 @pytest.fixture(scope="function", autouse=True)
-def txn():
-    txn = mock.MagicMock()
-    txn.get = AsyncMock(return_value=None)
+def get_ml_configuration():
     with mock.patch(
-        "nucliadb.search.predict.get_read_only_transaction", return_value=txn
-    ):
-        yield txn
+        "nucliadb.search.predict.KnowledgeBoxDataManager.get_ml_configuration",
+        return_value=None,
+    ) as get_ml_configuration:
+        yield get_ml_configuration
 
 
 @pytest.mark.asyncio
@@ -444,7 +443,7 @@ async def test_summarize():
 
 
 @pytest.mark.parametrize("onprem", [True, False])
-async def test_get_predict_headers(onprem, txn):
+async def test_get_predict_headers(onprem, get_ml_configuration):
     kb_config = KBConfiguration(
         semantic_model="foo",
         generative_model="bar",
@@ -452,7 +451,7 @@ async def test_get_predict_headers(onprem, txn):
         anonymization_model="qux",
         visual_labeling="quux",
     )
-    txn.get.return_value = kb_config.SerializeToString()
+    get_ml_configuration.return_value = kb_config.SerializeToString()
 
     nua_service_account = "nua-service-account"
     pe = PredictEngine(

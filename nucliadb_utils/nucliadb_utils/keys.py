@@ -17,5 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+
 KB_SHARDS = "/kbs/{kbid}/shards"
 KB_UUID = "/kbs/{kbid}/config"
+KB_CONFIGURATION = "/kbs/{kbid}/configuration"

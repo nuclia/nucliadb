@@ -380,9 +380,9 @@ class KBShardManager:
             return
 
         logger.warning({"message": "Adding shard", "kbid": kbid})
-        kbdm = KnowledgeBoxDataManager(get_driver())
-        model = await kbdm.get_model_metadata(kbid)
         driver = get_driver()
+        kbdm = KnowledgeBoxDataManager(driver)
+        model = await kbdm.get_model_metadata(kbid)
 
         async with driver.transaction() as txn:
             await self.create_shard_by_kbid(
