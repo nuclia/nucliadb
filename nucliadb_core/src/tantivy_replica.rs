@@ -112,8 +112,8 @@ pub fn compute_safe_replica_state(
             segment_id,
         });
 
-        let deletes = delete_opstamp
-            .map(|stamp| PathBuf::from(format!("{raw_segment_id}.{stamp}.fieldnorm")));
+        let deletes =
+            delete_opstamp.map(|stamp| PathBuf::from(format!("{raw_segment_id}.{stamp}.del")));
 
         if let Some(deletes) = deletes {
             segment_files.push(deletes);
