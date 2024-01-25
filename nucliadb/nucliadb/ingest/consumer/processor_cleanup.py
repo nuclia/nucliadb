@@ -60,7 +60,8 @@ class ProcessorCleanupHandler:
         notification = writer_pb2.Notification()
         notification.ParseFromString(data)
 
-        if notification.write_type != writer_pb2.Notification.WriteType.MODIFIED:
+        if notification.write_type != writer_pb2.Notification.WriteType.DELETED:
+            # only handle deletes
             return
 
         await self.client.delete_requests(
