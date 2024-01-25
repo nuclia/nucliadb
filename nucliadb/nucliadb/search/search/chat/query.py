@@ -31,6 +31,7 @@ from nucliadb.search.search.chat.prompt import PromptContextBuilder
 from nucliadb.search.search.exceptions import IncompleteFindResultsError
 from nucliadb.search.search.find import find
 from nucliadb.search.search.merge import merge_relations_results
+from nucliadb.search.settings import settings
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import (
     Author,
@@ -247,6 +248,7 @@ async def chat(
             find_results=find_results,
             user_context=user_context,
             strategies=chat_request.rag_strategies,
+            max_context_size=settings.max_prompt_context_chars,
         )
         prompt_context, prompt_context_order = await prompt_context_builder.build()
         user_prompt = None

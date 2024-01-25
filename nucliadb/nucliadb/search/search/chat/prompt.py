@@ -26,6 +26,7 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.middleware.transaction import get_read_only_transaction
+from nucliadb.search import logger
 from nucliadb_models.search import (
     SCORE_TYPE,
     FindParagraph,
@@ -46,6 +47,45 @@ MAX_RESOURCE_FIELD_TASKS = 4
 # Number of messages to pull after a match in a message
 # The hope here is it will be enough to get the answer to the question.
 CONVERSATION_MESSAGE_CONTEXT_EXPANSION = 15
+
+
+class MaxContextSizeExceeded(Exception):
+    pass
+
+
+class CappedPromptContext:
+    """
+    Class to keep track of the size of the prompt context and raise an exception if it exceeds the configured limit.
+    """
+
+    def __init__(self, max_size: Optional[int]):
+        self.output: PromptContext = {}
+        self.max_size = max_size
+        self._size = 0
+
+    def _check_size(self, size_delta: int = 0):
+        if self.max_size is None:
+            # No limit on the size of the context
+            return
+        if self._size + size_delta > self.max_size:
+            raise MaxContextSizeExceeded(
+                f"Prompt context size exceeded: {self.max_size}"
+            )
+
+    def __setitem__(self, key, value):
+        try:
+            # Existing key
+            size_delta = len(value) - len(self.output[key])
+        except KeyError:
+            # New key
+            size_delta = len(value)
+        self._check_size(size_delta)
+        self._size += size_delta
+        self.output[key] = value
+
+    @property
+    def size(self):
+        return self._size
 
 
 async def get_next_conversation_messages(
@@ -117,20 +157,19 @@ async def get_expanded_conversation_messages(
 
 
 async def default_prompt_context(
+    context: CappedPromptContext,
     kbid: str,
     results: KnowledgeboxFindResults,
-) -> PromptContext:
+) -> None:
     """
-    - Returns an ordered dict of context_id -> context_text.
-    - context_id is typically the paragraph id, but has a special value for the
+    - Updates context (which is an ordered dict of text_block_id -> context_text).
+    - text_block_id is typically the paragraph id, but has a special value for the
       user context. (USER_CONTEXT_0, USER_CONTEXT_1, ...)
     - Paragraphs are inserted in order of relevance, by increasing `order` field
       of the find result paragraphs.
     - User context is inserted first, in order of appearance.
     - Using an dict prevents from duplicates pulled in through conversation expansion.
     """
-    output = {}
-
     # Sort retrieved paragraphs by decreasing order (most relevant first)
     ordered_paras = []
     for result in results.resources.values():
@@ -144,7 +183,7 @@ async def default_prompt_context(
     async with driver.transaction() as txn:
         kb = KnowledgeBoxORM(txn, storage, kbid)
         for field_path, paragraph in ordered_paras:
-            output[paragraph.id] = _clean_paragraph_text(paragraph)
+            context[paragraph.id] = _clean_paragraph_text(paragraph)
 
             # If the paragraph is a conversation and it matches semantically, we assume we
             # have matched with the question, therefore try to include the answer to the
@@ -160,9 +199,7 @@ async def default_prompt_context(
                 for msg in expanded_msgs:
                     text = msg.content.text.strip()
                     pid = f"{rid}/{field_type}/{field_id}/{msg.ident}/0-{len(msg.content.text) + 1}"
-                    output[pid] = text
-
-    return output
+                    context[pid] = text
 
 
 async def get_field_extracted_text(field: Field) -> Optional[tuple[Field, str]]:
@@ -218,9 +255,10 @@ async def get_resource_extracted_texts(
 
 
 async def full_resource_prompt_context(
+    context: CappedPromptContext,
     kbid: str,
     results: KnowledgeboxFindResults,
-) -> PromptContext:
+) -> None:
     """
     Algorithm steps:
         - Collect the list of resources in the results (in order of relevance).
@@ -244,22 +282,20 @@ async def full_resource_prompt_context(
         max_concurrent=MAX_RESOURCE_TASKS,
     )
 
-    output: PromptContext = {}
     for extracted_texts in resource_extracted_texts:
         if extracted_texts is None:
             continue
         for field, extracted_text in extracted_texts:
             # Add the extracted text of each field to the context.
-            output[field.resource_unique_id] = extracted_text
-
-    return output
+            context[field.resource_unique_id] = extracted_text
 
 
 async def composed_prompt_context(
+    context: CappedPromptContext,
     kbid: str,
     results: KnowledgeboxFindResults,
     extend_with_fields: list[str],
-) -> PromptContext:
+) -> None:
     """
     Algorithm steps:
         - Collect the list of resources in the results (in order of relevance).
@@ -286,18 +322,16 @@ async def composed_prompt_context(
     ]
     field_extracted_texts = await run_concurrently(tasks)
 
-    output: PromptContext = {}
     for result in field_extracted_texts:
         if result is None:
             continue
         # Add the extracted text of each field to the beginning of the context.
         field, extracted_text = result
-        output[field.resource_unique_id] = extracted_text
+        context[field.resource_unique_id] = extracted_text
 
     # Add the extracted text of each paragraph to the end of the context.
     for paragraph in ordered_paras:
-        output[paragraph.id] = _clean_paragraph_text(paragraph)
-    return output
+        context[paragraph.id] = _clean_paragraph_text(paragraph)
 
 
 class PromptContextBuilder:
@@ -311,50 +345,60 @@ class PromptContextBuilder:
         find_results: KnowledgeboxFindResults,
         user_context: Optional[list[str]] = None,
         strategies: Optional[Sequence[RagStrategy]] = None,
+        max_context_size: Optional[int] = None,
     ):
         self.kbid = kbid
         self.find_results = find_results
         self.user_context = user_context
         self.strategies = strategies
+        self.max_context_size = max_context_size
 
-    def prepend_user_context(self, context: PromptContext) -> PromptContext:
+    def prepend_user_context(self, context: CappedPromptContext):
         # Chat extra context passed by the user is the most important, therefore
         # it is added first, followed by the found text blocks in order of relevance
-        extended = {
-            f"USER_CONTEXT_{i}": text_block
-            for i, text_block in enumerate(self.user_context or [])
-        }
-        extended.update(context)
-        return extended
+        for i, text_block in enumerate(self.user_context or []):
+            context[f"USER_CONTEXT_{i}"] = text_block
 
     async def build(self) -> tuple[PromptContext, PromptContextOrder]:
-        context = await self._build_context()
-        context = self.prepend_user_context(context)
+        ccontext = CappedPromptContext(max_size=self.max_context_size)
+        try:
+            self.prepend_user_context(ccontext)
+            await self._build_context(ccontext)
+        except MaxContextSizeExceeded:
+            logger.warning(
+                f"Prompt context size exceeded: {ccontext.size}."
+                f"The context will be truncated to the maximum size: {self.max_context_size}."
+            )
+        context = ccontext.output
         context_order = {
             text_block_id: order for order, text_block_id in enumerate(context.keys())
         }
         return context, context_order
 
-    async def _build_context(self):
+    async def _build_context(self, context: CappedPromptContext) -> None:
         if self.strategies is None or len(self.strategies) == 0:
-            return await default_prompt_context(self.kbid, self.find_results)
+            await default_prompt_context(context, self.kbid, self.find_results)
+            return
 
         full_resource = False
         extend_with_fields = []
         for strategy in self.strategies:
             if strategy.name == RagStrategyName.FIELD_EXTENSION:
-                extend_with_fields.extend(strategy.fields)
+                extend_with_fields.extend(strategy.fields)  # type: ignore
             elif strategy.name == RagStrategyName.FULL_RESOURCE:
                 full_resource = True
 
         if full_resource:
-            return await full_resource_prompt_context(self.kbid, self.find_results)
+            await full_resource_prompt_context(context, self.kbid, self.find_results)
+            return
 
-        return await composed_prompt_context(
+        await composed_prompt_context(
+            context,
             self.kbid,
             self.find_results,
             extend_with_fields=extend_with_fields,
         )
+        return
 
 
 def _clean_paragraph_text(paragraph: FindParagraph) -> str:
