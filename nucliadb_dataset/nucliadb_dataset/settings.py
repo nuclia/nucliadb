@@ -50,8 +50,8 @@ class RunningSettings(pydantic.BaseSettings):
     )
 
     datasets_url: str = pydantic.Field(
-        "https://europe-1.nuclia.cloud/api/v1",
-        description="Base url for the Nuclia datasets component (including /api/v1)™",  # noqa
+        "https://europe-1.nuclia.cloud",
+        description="Base url for the Nuclia datasets component (excluding /api/v1)™",  # noqa
     )
 
     apikey: Optional[str] = pydantic.Field(
@@ -67,3 +67,5 @@ class RunningSettings(pydantic.BaseSettings):
     )
 
     batch_size: int = pydantic.Field(64, description="Batch streaming size")
+
+    kbid: str = pydantic.Field(description="Knowledge Box UUID")

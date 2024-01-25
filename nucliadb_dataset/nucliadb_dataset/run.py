@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from pathlib import Path
+from urllib.parse import urlparse
 
 import pydantic_argparse
 from nucliadb_protos.dataset_pb2 import TrainSet
@@ -40,11 +41,14 @@ def run():
 
     trainset = TrainSet()
     definition = TASK_DEFINITIONS[nucliadb_args.type]
-    trainset.type = definition.schema
+    trainset.type = definition.proto
     trainset.batch_size = nucliadb_args.batch_size
     if definition.labels:
         if nucliadb_args.labelset is not None:
             trainset.filter.labels.append(nucliadb_args.labelset)
+
+    nuclia_url_parts = urlparse(nucliadb_args.url)
+    url = f"{nuclia_url_parts.scheme}://{nuclia_url_parts.netloc}/api"
 
     Path(nucliadb_args.download_path).mkdir(parents=True, exist_ok=True)
     if nucliadb_args.export == ExportType.DATASETS:
@@ -52,11 +56,12 @@ def run():
             raise Exception("API key required to push to Nuclia Dataset™")
         sdk = NucliaDB(
             region=nucliadb_args.environment,
-            url=nucliadb_args.url,
+            url=url,
             api_key=nucliadb_args.service_token,
         )
         fse = NucliaDatasetsExport(
             sdk=sdk,
+            kbid=nucliadb_args.kbid,
             datasets_url=nucliadb_args.datasets_url,
             trainset=trainset,
             cache_path=nucliadb_args.download_path,
@@ -66,11 +71,12 @@ def run():
     elif nucliadb_args.export == ExportType.FILESYSTEM:
         sdk = NucliaDB(
             region=nucliadb_args.environment,
-            url=nucliadb_args.url,
+            url=url,
             api_key=nucliadb_args.service_token,
         )
         fse = FileSystemExport(
             sdk=sdk,
+            kbid=nucliadb_args.kbid,
             trainset=trainset,
             store_path=nucliadb_args.download_path,
         )
