@@ -112,12 +112,6 @@ pub fn compute_safe_replica_state(
             segment_id,
         });
 
-        let postings = PathBuf::from(format!("{raw_segment_id}.idx"));
-        let positions = PathBuf::from(format!("{raw_segment_id}.pos"));
-        let terms = PathBuf::from(format!("{raw_segment_id}.term"));
-        let store = PathBuf::from(format!("{raw_segment_id}.store"));
-        let fast_fields = PathBuf::from(format!("{raw_segment_id}.fast"));
-        let field_norms = PathBuf::from(format!("{raw_segment_id}.fieldnorm"));
         let deletes = delete_opstamp
             .map(|stamp| PathBuf::from(format!("{raw_segment_id}.{stamp}.fieldnorm")));
 
@@ -131,6 +125,13 @@ pub fn compute_safe_replica_state(
             // already there.
             continue;
         }
+
+        let postings = PathBuf::from(format!("{raw_segment_id}.idx"));
+        let positions = PathBuf::from(format!("{raw_segment_id}.pos"));
+        let terms = PathBuf::from(format!("{raw_segment_id}.term"));
+        let store = PathBuf::from(format!("{raw_segment_id}.store"));
+        let fast_fields = PathBuf::from(format!("{raw_segment_id}.fast"));
+        let field_norms = PathBuf::from(format!("{raw_segment_id}.fieldnorm"));
 
         if params.path.join(&postings).exists() {
             segment_files.push(postings);
