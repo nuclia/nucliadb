@@ -159,6 +159,7 @@ async def get_find_results(
     find_request.autofilter = chat_request.autofilter
     find_request.highlight = chat_request.highlight
     find_request.security = chat_request.security
+    find_request.debug = chat_request.debug
 
     find_results, incomplete = await find(kbid, find_request, ndb_client, user, origin)
     if incomplete:

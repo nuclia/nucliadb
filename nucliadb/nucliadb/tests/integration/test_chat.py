@@ -276,6 +276,28 @@ async def test_chat_without_citations(
     assert resp_citations == {}
 
 
+@pytest.mark.asyncio()
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+@pytest.mark.parametrize("debug", (True, False))
+async def test_sync_chat_returns_prompt_context(
+    nucliadb_reader: AsyncClient, knowledgebox, resource, debug
+):
+    # Make sure prompt context is returned if debug is True
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/chat",
+        json={"query": "title", "debug": debug},
+        headers={"X-Synchronous": "True"},
+    )
+    assert resp.status_code == 200
+    resp_data = SyncChatResponse.parse_raw(resp.content)
+    if debug:
+        assert resp_data.prompt_context
+        assert resp_data.prompt_context_order
+    else:
+        assert resp_data.prompt_context is None
+        assert resp_data.prompt_context_order is None
+
+
 @pytest.fixture
 async def resources(nucliadb_writer, knowledgebox):
     kbid = knowledgebox
