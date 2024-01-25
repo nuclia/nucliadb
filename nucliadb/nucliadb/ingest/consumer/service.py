@@ -40,6 +40,7 @@ from nucliadb_utils.utilities import (
 from .auditing import IndexAuditHandler, ResourceWritesAuditHandler
 from .materializer import MaterializerHandler
 from .shard_creator import ShardCreatorHandler
+from .processor_cleanup import ProcessorCleanupHandler
 
 
 def _handle_task_result(task: asyncio.Task) -> None:
@@ -195,6 +196,15 @@ async def start_materializer() -> Callable[[], Awaitable[None]]:
     assert pubsub is not None, "Pubsub is not configured"
     storage = await get_storage(service_name=SERVICE_NAME)
     materializer = MaterializerHandler(driver=driver, storage=storage, pubsub=pubsub)
+    await materializer.initialize()
+
+    return materializer.finalize
+
+
+async def start_processor_cleanup() -> Callable[[], Awaitable[None]]:
+    pubsub = await get_pubsub()
+    assert pubsub is not None, "Pubsub is not configured"
+    materializer = ProcessorCleanupHandler(pubsub=pubsub)
     await materializer.initialize()
 
     return materializer.finalize

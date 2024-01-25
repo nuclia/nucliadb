@@ -140,6 +140,16 @@ class ProcessingHTTPClient:
             check_status(resp, resp_text)
             return PullResponse.parse_raw(resp_text)
 
+    async def delete_requests(
+        self, *, kbid: str, resource_id: Optional[str] = None
+    ) -> None:
+        url = self.base_url + "/delete-requests"
+        data = {"kbid": kbid}
+        if resource_id is not None:
+            data["resource_id"] = resource_id
+        async with self.session.post(url, headers=self.headers, json=data) as resp:
+            check_status(resp, resp_text)
+
 
 class StatusResultV2(pydantic.BaseModel):
     processing_id: str = pydantic.Field(
