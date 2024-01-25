@@ -39,7 +39,6 @@ from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.cluster.utils import get_shard_manager
-from nucliadb.middleware.transaction import get_read_only_transaction
 from nucliadb.search import logger
 from nucliadb.search.search.shards import (
     query_paragraph_shard,

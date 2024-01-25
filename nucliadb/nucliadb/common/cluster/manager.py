@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-import contextlib
 import logging
 import random
 import uuid
@@ -118,18 +117,8 @@ def remove_index_node(node_id: str, primary_id: Optional[str] = None) -> None:
 
 
 class KBShardManager:
-    _read_only_txn: Optional[Transaction] = None
-
-    @contextlib.asynccontextmanager
-    async def read_only_transaction(self, txn: Transaction):
-        self._read_only_txn = txn
-        try:
-            yield self
-        finally:
-            self._read_only_txn = None
-
     async def get_shards_by_kbid_inner(self, kbid: str) -> writer_pb2.Shards:
-        cdm = ClusterDataManager(get_driver(), read_only_txn=self._read_only_txn)
+        cdm = ClusterDataManager(get_driver())
         result = await cdm.get_kb_shards(kbid)
         if result is None:
             # could be None because /shards doesn't exist, or beacause the
