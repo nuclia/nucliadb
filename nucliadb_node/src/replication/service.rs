@@ -21,8 +21,9 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use nucliadb_core::tantivy_replica::TantivyReplicaState;
 use nucliadb_core::tracing::{debug, error, info, warn};
-use nucliadb_core::{node_error, NodeResult};
+use nucliadb_core::{node_error, IndexFiles, NodeResult, RawReplicaState};
 use nucliadb_protos::{noderesources, replication};
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
@@ -117,6 +118,67 @@ async fn stream_data(
     Ok(())
 }
 
+async fn replicate_from_raw(
+    replica_state: RawReplicaState,
+    chunk_size: u64,
+    shard_path: &Path,
+    generation_id: &str,
+    _index_prefix: PathBuf,
+    sender: &tokio::sync::mpsc::Sender<Result<replication::ReplicateShardResponse, tonic::Status>>,
+) -> NodeResult<()> {
+    for segment_file in replica_state.files {
+        stream_file(
+            chunk_size,
+            shard_path,
+            generation_id,
+            &PathBuf::from(segment_file),
+            sender,
+        )
+        .await?;
+    }
+    for (metadata_file, data) in replica_state.metadata_files {
+        stream_data(
+            shard_path,
+            generation_id,
+            &PathBuf::from(metadata_file),
+            data,
+            sender,
+        )
+        .await?;
+    }
+    Ok(())
+}
+
+async fn replicate_from_tantivy(
+    replica_state: TantivyReplicaState,
+    chunk_size: u64,
+    shard_path: &Path,
+    generation_id: &str,
+    index_prefix: PathBuf,
+    sender: &tokio::sync::mpsc::Sender<Result<replication::ReplicateShardResponse, tonic::Status>>,
+) -> NodeResult<()> {
+    for segment_file in &replica_state.files {
+        stream_file(
+            chunk_size,
+            shard_path,
+            generation_id,
+            &index_prefix.join(segment_file),
+            sender,
+        )
+        .await?;
+    }
+
+    stream_data(
+        shard_path,
+        generation_id,
+        &index_prefix.join(&replica_state.metadata_path),
+        replica_state.metadata_as_bytes(),
+        sender,
+    )
+    .await?;
+    Ok(())
+}
+
 async fn replica_shard(
     shard: Arc<ShardWriter>,
     ignored_segement_ids: HashMap<String, Vec<String>>,
@@ -135,27 +197,31 @@ async fn replica_shard(
         tokio::task::spawn_blocking(move || sshard.get_shard_files(&ignored_segement_ids))
             .await??;
 
-    for segment_files in shard_files {
-        for segment_file in segment_files.files {
-            stream_file(
-                chunk_size,
-                &shard_path,
-                generation_id,
-                &PathBuf::from(segment_file),
-                &sender,
-            )
-            .await?;
-        }
-        for (metadata_file, data) in segment_files.metadata_files {
-            stream_data(
-                &shard_path,
-                generation_id,
-                &PathBuf::from(metadata_file),
-                data,
-                &sender,
-            )
-            .await?;
-        }
+    for (prefix, segment_files) in shard_files {
+        match segment_files {
+            IndexFiles::Other(raw_replica) => {
+                replicate_from_raw(
+                    raw_replica,
+                    chunk_size,
+                    &shard_path,
+                    generation_id,
+                    prefix,
+                    &sender,
+                )
+                .await?
+            }
+            IndexFiles::Tantivy(tantivy_replica) => {
+                replicate_from_tantivy(
+                    tantivy_replica,
+                    chunk_size,
+                    &shard_path,
+                    generation_id,
+                    prefix,
+                    &sender,
+                )
+                .await?
+            }
+        };
     }
 
     // top level additional files
