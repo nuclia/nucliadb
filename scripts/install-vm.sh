@@ -37,8 +37,7 @@ if [ -f /etc/debian_version ]; then
       libsqlite3-dev wget libbz2-dev liblzma-dev tk8.6-dev
 fi
 
-
-
+# Install Python
 $SUDO mkdir -p /opt/python
 cd /opt/python
 $SUDO wget https://www.python.org/ftp/python/$PYTHON_VERSION/Python-$PYTHON_VERSION.tgz
@@ -48,9 +47,45 @@ $SUDO ./configure --enable-optimizations
 $SUDO make -j 2
 $SUDO make install
 
+# Install NucliaDB
 $SUDO /opt/python/Python-$PYTHON_VERSION/python -m venv $INSTALL_DIR
 cd $INSTALL_DIR
 $SUDO $INSTALL_DIR/bin/python -m pip install --upgrade pip
 $SUDO $INSTALL_DIR/bin/pip install nucliadb
 
 $SUDO ln -s $INSTALL_DIR/bin/nucliadb /bin/nucliadb
+
+# Install systemd unit
+cat << EOF | $SUDO tee /usr/lib/systemd/system/nucliadb.service > /dev/null
+[Unit]
+Description=NucliaDB
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=nucliadb
+Group=nucliadb
+EnvironmentFile=-/etc/default/nucliadb
+ExecStart=/usr/bin/nucliadb
+WorkingDirectory=/var/lib/nucliadb
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Install config
+cat << EOF | $SUDO tee /etc/default/nucliadb > /dev/null
+LOG_OUTPUT_TYPE=STDOUT
+
+DRIVER=pg
+DRIVER_PG_URL=
+
+NUA_API_KEY=
+EOF
+
+# Create user and working directory
+$SUDO groupadd -r nucliadb
+$SUDO useradd -M -r -g nucliadb nucliadb
+$SUDO mkdir /var/lib/nucliadb
+$SUDO chown nucliadb:nucliadb /var/lib/nucliadb
