@@ -27,7 +27,7 @@ use nucliadb_core::protos::{
     ShardId, ShardIds, VectorSetId, VectorSetList,
 };
 use nucliadb_core::tracing::{self, Span, *};
-use nucliadb_core::{Channel, NodeResult};
+use nucliadb_core::Channel;
 use tokio::sync::mpsc::UnboundedSender;
 use tonic::{Request, Response, Status};
 

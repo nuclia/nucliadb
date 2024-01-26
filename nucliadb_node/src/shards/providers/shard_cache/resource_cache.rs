@@ -23,6 +23,7 @@ use std::num::NonZeroUsize;
 use std::sync::{Arc, Condvar, Mutex, Weak};
 
 use lru::LruCache;
+use nucliadb_core::metrics;
 
 // Classic implementation of a binary semaphore, used to be able to
 // block while an entry is being loaded by another thread, and get a
@@ -162,11 +163,13 @@ where K: Eq + Hash + Clone + std::fmt::Debug
             self.evict();
         }
         self.live.push(k.clone(), Arc::clone(v));
+        metrics::get_metrics().set_shard_cache_gauge(self.live.len() as i64);
     }
 
     fn evict(&mut self) {
         if let Some((evicted_k, evicted_v)) = self.live.pop_lru() {
             self.eviction.insert(evicted_k, Arc::downgrade(&evicted_v));
+            metrics::get_metrics().record_shard_cache_eviction();
         }
     }
 }
@@ -358,15 +361,16 @@ mod tests {
             let load_thread = scope.spawn(move |_| {
                 // Sleep a little bit to ensure the waiter actually waits
                 sleep(Duration::from_millis(5));
-                cache.lock().unwrap().loaded(load_guard, &Arc::new(0));
+                let mut unlocked_cache = cache.lock().unwrap();
                 tx.send(0).unwrap();
+                unlocked_cache.loaded(load_guard, &Arc::new(0));
             });
 
             // Both threads finished without panic/failing assert
             wait_thread.join().unwrap();
             load_thread.join().unwrap();
 
-            // Load thread finished earlier
+            // Load thread stores before wait thread waken up
             assert_eq!(rx.recv().unwrap(), 0);
             assert_eq!(rx.recv().unwrap(), 1);
         })
@@ -409,8 +413,8 @@ mod tests {
                 sleep(Duration::from_millis(5));
                 // Fail to call `loaded`. This should drop the load_guard
                 // which will mark the load as failed.
-                drop(load_guard);
                 tx.send(0).unwrap();
+                drop(load_guard);
             });
 
             // Both threads finished without panic/failing assert
