@@ -44,16 +44,6 @@ RUNNING_IN_GH_ACTIONS = os.environ.get("CI", "").lower() == "true"
 
 @pytest.mark.flaky(reruns=5)
 @pytest.mark.asyncio
-async def test_search_kb_not_found(search_api: Callable[..., AsyncClient]) -> None:
-    async with search_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(
-            f"/{KB_PREFIX}/00000000000000/search?query=own+text",
-        )
-        assert resp.status_code == 404
-
-
-@pytest.mark.flaky(reruns=5)
-@pytest.mark.asyncio
 async def test_multiple_fuzzy_search_resource_all(
     search_api: Callable[..., AsyncClient], multiple_search_resource: str
 ) -> None:

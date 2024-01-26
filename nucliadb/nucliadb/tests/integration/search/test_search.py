@@ -1554,3 +1554,11 @@ async def test_search_by_path_filter(
     )
     assert resp.status_code == 200
     assert len(resp.json()["resources"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_search_kb_not_found(nucliadb_reader: AsyncClient):
+    resp = await nucliadb_reader.get(
+        "/kb/00000000000000/search?query=own+text",
+    )
+    assert resp.status_code == 404
