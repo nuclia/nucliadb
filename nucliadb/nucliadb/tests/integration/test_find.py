@@ -18,11 +18,14 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+from unittest import mock
 from unittest.mock import patch
 
 import pytest
 from httpx import AsyncClient
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+
+from nucliadb_utils.exceptions import LimitsExceededError
 
 
 @pytest.mark.asyncio
@@ -349,3 +352,27 @@ async def test_find_returns_best_matches(
     # Check that best matches is sorted by the paragraph order
     sorted_paragraphs = sorted(paragraphs, key=lambda p: p["order"])
     assert [p["id"] for p in sorted_paragraphs] == best_matches
+
+
+@pytest.fixture(scope="function")
+def find_with_limits_exceeded_error():
+    with mock.patch(
+        "nucliadb.search.api.v1.find.find",
+        side_effect=LimitsExceededError(402, "over the quota"),
+    ):
+        yield
+
+
+@pytest.mark.asyncio()
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_find_handles_limits_exceeded_error(
+    nucliadb_reader, knowledgebox, find_with_limits_exceeded_error
+):
+    kb = knowledgebox
+    resp = await nucliadb_reader.get(f"/kb/{kb}/find")
+    assert resp.status_code == 402
+    assert resp.json() == {"detail": "over the quota"}
+
+    resp = await nucliadb_reader.post(f"/kb/{kb}/find", json={})
+    assert resp.status_code == 402
+    assert resp.json() == {"detail": "over the quota"}

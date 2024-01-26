@@ -46,7 +46,7 @@ async def test_vector_result_metadata(
         sort=SortOptions(
             field=SortField.SCORE,
             order=SortOrder.DESC,
-            limit=None,
+            limit=1000,
         ),
     ).parse()
 

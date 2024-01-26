@@ -20,6 +20,7 @@
 import asyncio
 import math
 from datetime import datetime
+from unittest import mock
 from unittest.mock import AsyncMock, Mock, patch
 
 import nats
@@ -40,6 +41,7 @@ from nucliadb.search.predict import PredictVectorMissing, SendToPredictError
 from nucliadb.tests.utils import broker_resource, inject_message
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_utils.audit.stream import StreamAuditStorage
+from nucliadb_utils.exceptions import LimitsExceededError
 from nucliadb_utils.utilities import (
     Utility,
     clean_utility,
@@ -1554,3 +1556,60 @@ async def test_search_by_path_filter(
     )
     assert resp.status_code == 200
     assert len(resp.json()["resources"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_search_kb_not_found(nucliadb_reader: AsyncClient):
+    resp = await nucliadb_reader.get(
+        "/kb/00000000000000/search?query=own+text",
+    )
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio()
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_resource_search_query_param_is_optional(nucliadb_reader, knowledgebox):
+    kb = knowledgebox
+    # If query is not present, should not fail
+    resp = await nucliadb_reader.get(f"/kb/{kb}/search")
+    assert resp.status_code == 200
+
+    # Less than 3 characters should not fail either
+    for query in ("f", "fo"):
+        resp = await nucliadb_reader.get(f"/kb/{kb}/search?query={query}")
+        assert resp.status_code == 200
+
+
+@pytest.mark.asyncio()
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_search_with_duplicates(nucliadb_reader, knowledgebox):
+    kb = knowledgebox
+    resp = await nucliadb_reader.get(f"/kb/{kb}/search?with_duplicates=True")
+    assert resp.status_code == 200
+
+    resp = await nucliadb_reader.get(f"/kb/{kb}/search?with_duplicates=False")
+    assert resp.status_code == 200
+
+
+@pytest.fixture(scope="function")
+def search_with_limits_exceeded_error():
+    with mock.patch(
+        "nucliadb.search.api.v1.search.search",
+        side_effect=LimitsExceededError(402, "over the quota"),
+    ):
+        yield
+
+
+@pytest.mark.asyncio()
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_search_handles_limits_exceeded_error(
+    nucliadb_reader, knowledgebox, search_with_limits_exceeded_error
+):
+    kb = knowledgebox
+    resp = await nucliadb_reader.get(f"/kb/{kb}/search")
+    assert resp.status_code == 402
+    assert resp.json() == {"detail": "over the quota"}
+
+    resp = await nucliadb_reader.post(f"/kb/{kb}/search", json={})
+    assert resp.status_code == 402
+    assert resp.json() == {"detail": "over the quota"}
