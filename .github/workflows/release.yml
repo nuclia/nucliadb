@@ -175,8 +175,7 @@ jobs:
       - name: Set helm package image
         id: version_step
         run: |-
-          VERSION=`cat VERSION`
-          HELM_PACKAGE_VERSION=$VERSION+${{ steps.env-vars.outputs.short_sha }}
+          HELM_PACKAGE_VERSION=`cat VERSION`
           NUCLIADB_IMAGE_VERSION=${{ steps.env-vars.outputs.short_sha }}
           sed -i.bak "s#99999.99999.99999#$NUCLIADB_IMAGE_VERSION#" ./charts/nucliadb/Chart.yaml
           echo "helm_package_version=$HELM_PACKAGE_VERSION" >> $GITHUB_OUTPUT
