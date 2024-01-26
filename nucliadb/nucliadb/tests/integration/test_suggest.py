@@ -486,3 +486,11 @@ async def entities(nucliadb_writer: AsyncClient, knowledgebox: str):
         },
     )
     assert resp.status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_search_kb_not_found(nucliadb_reader) -> None:
+    resp = await nucliadb_reader.get(
+        f"/kb/00000000000000/suggest?query=own+text",
+    )
+    assert resp.status_code == 404

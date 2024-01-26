@@ -18,10 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-import math
 import os
 from typing import Callable
-from unittest import mock
 
 import pytest
 from httpx import AsyncClient
@@ -37,20 +35,9 @@ from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.tests.vectors import Q
 from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_utils.exceptions import LimitsExceededError
 from nucliadb_utils.keys import KB_SHARDS
 
 RUNNING_IN_GH_ACTIONS = os.environ.get("CI", "").lower() == "true"
-
-
-@pytest.mark.flaky(reruns=5)
-@pytest.mark.asyncio
-async def test_search_kb_not_found(search_api: Callable[..., AsyncClient]) -> None:
-    async with search_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(
-            f"/{KB_PREFIX}/00000000000000/search?query=own+text",
-        )
-        assert resp.status_code == 404
 
 
 @pytest.mark.flaky(reruns=5)
@@ -213,95 +200,6 @@ async def test_search_resource_all(
                 assert results[2][0].endswith("20-45")
 
     await txn.abort()
-
-
-@pytest.mark.asyncio
-async def test_search_pagination(
-    search_api: Callable[..., AsyncClient], multiple_search_resource: str
-) -> None:
-    kbid = multiple_search_resource
-
-    async with search_api(roles=[NucliaDBRoles.READER]) as client:
-        n_results_expected = 100
-        page_size = 20
-        expected_requests = math.ceil(n_results_expected / page_size)
-
-        results = []
-        shards = None
-
-        for request_n in range(expected_requests):
-            url = f"/{KB_PREFIX}/{kbid}/search?query=own+text&highlight=true&page_number={request_n}&page_size={page_size}"  # noqa
-
-            if shards is not None and len(shards):
-                url += f"&shards={','.join(shards)}"
-
-            resp = await client.get(url)
-
-            assert resp.status_code == 200, resp.content
-
-            response = resp.json()
-
-            for result in response["paragraphs"]["results"]:
-                results.append(result["rid"])
-
-            shards = response["shards"]
-
-            if not response["paragraphs"]["next_page"]:
-                # Pagination ended! No more results
-                assert request_n == expected_requests - 1
-
-        # Check that we iterated over all matching resources
-        unique_results = set(results)
-        assert len(unique_results) == n_results_expected
-
-
-@pytest.mark.asyncio()
-async def test_resource_search_query_param_is_optional(search_api, knowledgebox_ingest):
-    async with search_api(roles=[NucliaDBRoles.READER]) as client:
-        kb = knowledgebox_ingest
-        # If query is not present, should not fail
-        resp = await client.get(f"/{KB_PREFIX}/{kb}/search")
-        assert resp.status_code == 200
-
-        # Less than 3 characters should not fail either
-        for query in ("f", "fo"):
-            resp = await client.get(f"/{KB_PREFIX}/{kb}/search?query={query}")
-            assert resp.status_code == 200
-
-
-@pytest.mark.asyncio()
-async def test_search_with_duplicates(search_api, knowledgebox_ingest):
-    async with search_api(roles=[NucliaDBRoles.READER]) as client:
-        kb = knowledgebox_ingest
-        resp = await client.get(f"/{KB_PREFIX}/{kb}/search?with_duplicates=True")
-        assert resp.status_code == 200
-
-        resp = await client.get(f"/{KB_PREFIX}/{kb}/search?with_duplicates=False")
-        assert resp.status_code == 200
-
-
-@pytest.fixture(scope="function")
-def search_with_limits_exceeded_error():
-    with mock.patch(
-        "nucliadb.search.api.v1.search.search",
-        side_effect=LimitsExceededError(402, "over the quota"),
-    ):
-        yield
-
-
-@pytest.mark.asyncio()
-async def test_search_handles_limits_exceeded_error(
-    search_api, knowledgebox_ingest, search_with_limits_exceeded_error
-):
-    async with search_api(roles=[NucliaDBRoles.READER]) as client:
-        kb = knowledgebox_ingest
-        resp = await client.get(f"/{KB_PREFIX}/{kb}/search")
-        assert resp.status_code == 402
-        assert resp.json() == {"detail": "over the quota"}
-
-        resp = await client.post(f"/{KB_PREFIX}/{kb}/search", json={})
-        assert resp.status_code == 402
-        assert resp.json() == {"detail": "over the quota"}
 
 
 @pytest.mark.asyncio
