@@ -102,7 +102,9 @@ spec:
         - name: ndb-pv
           mountPath: /data
   volumeClaimTemplates:
-  - metadata:
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
       name: ndb-pv
     spec:
       accessModes: [ "ReadWriteOnce" ]
