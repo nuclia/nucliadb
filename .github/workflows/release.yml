@@ -176,9 +176,10 @@ jobs:
         id: version_step
         run: |-
           VERSION=`cat VERSION`
-          VERSION_SHA=$VERSION+${{ steps.env-vars.outputs.short_sha }}
-          sed -i.bak "s#99999.99999.99999#$VERSION_SHA#" ./charts/nucliadb/Chart.yaml
-          echo "version_number=$VERSION_SHA" >> $GITHUB_OUTPUT
+          HELM_PACKAGE_VERSION=$VERSION+${{ steps.env-vars.outputs.short_sha }}
+          NUCLIADB_IMAGE_VERSION=${{ steps.env-vars.outputs.short_sha }}
+          sed -i.bak "s#99999.99999.99999#$NUCLIADB_IMAGE_VERSION#" ./charts/nucliadb/Chart.yaml
+          echo "helm_package_version=$HELM_PACKAGE_VERSION" >> $GITHUB_OUTPUT
 
       - name: Configure Git
         run: |
@@ -194,7 +195,7 @@ jobs:
         run: |-
           helm lint charts/nucliadb
           helm package charts/nucliadb
-          curl --data-binary "@nucliadb-${{ steps.version_step.outputs.version_number }}.tgz" ${{ secrets.HELM_CHART_URL }}/api/charts
+          curl --data-binary "@nucliadb-${{ steps.version_step.outputs.helm_package_version }}.tgz" ${{ secrets.HELM_CHART_URL }}/api/charts
 
       # Not working yet, disabled for now
       # - name: Repository Dispatch
