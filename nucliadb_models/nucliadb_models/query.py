@@ -19,18 +19,17 @@
 #
 
 """
-Proposal:
+Proposal: Generic filtering syntax for queries
 
-- Only support for advanced filtering.
-- Filters field in query model supports more complex queries: FiltersV2
-- Old filters are supported
-- Both filters are mutually exclusive
-- FiltersV1 will be translated to FiltersV2 expressions internally
+Requirements:
+- Old filters should be supported: simply an AND of the input filter terms
+
+Draft API: (see below)
 
 Rollout plan:
 - Add support for advanced filtering in the IndexNode
-- Make current filters work with advanced filtering
-- Extend the API to support advanced filtering
+- Make current filters work with IndexNode's advanced filtering
+- Extend the HTTP API to support advanced filtering
 """
 from typing import List, Optional, Union
 
