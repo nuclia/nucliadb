@@ -165,7 +165,7 @@ def _create_find_result(
 
 async def test_default_prompt_context(kb):
     result_text = " ".join(["text"] * 10)
-    with patch("nucliadb.search.search.chat.prompt.get_driver"), patch(
+    with patch("nucliadb.search.search.chat.prompt.get_read_only_transaction"), patch(
         "nucliadb.search.search.chat.prompt.get_storage"
     ), patch("nucliadb.search.search.chat.prompt.KnowledgeBoxORM", return_value=kb):
         context = chat_prompt.CappedPromptContext(max_size=1e6)

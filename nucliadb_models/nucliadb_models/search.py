@@ -737,14 +737,52 @@ class RagStrategy(BaseModel):
     name: str
 
 
+ALLOWED_FIELD_TYPES: dict[str, str] = {
+    "l": "layout",
+    "t": "text",
+    "f": "file",
+    "u": "link",
+    "d": "datetime",
+    "k": "keywordset",
+    "a": "generic",
+    "c": "conversation",
+}
+
+
 class FieldExtensionStrategy(RagStrategy):
     name: str = Field(RagStrategyName.FIELD_EXTENSION, const=True)
     fields: list[str] = Field(
         title="Fields",
-        description="List of field ids to extend the context with. It will try to extend the retrieval context with the specified fields in the matching resources.",  # noqa
+        description="List of field ids to extend the context with. It will try to extend the retrieval context with the specified fields in the matching resources. The field ids have to be in the format `{field_type}/{field_name}`, like 'a/title', 'a/summary' for title and summary fields or 't/amend' for a text field named 'amend'.",  # noqa
         min_items=1,
         unique_items=True,
     )
+
+    @root_validator(pre=True)
+    def fields_validator(cls, values):
+        if values.get("fields") is None:
+            return values
+
+        # Check that the fields are in the format {field_type}/{field_name}
+        for field in values.get("fields"):
+            try:
+                field_type, _ = field.strip("/").split("/")
+            except ValueError:
+                raise ValueError(
+                    f"Field '{field}' is not in the format {{field_type}}/{{field_name}}"
+                )
+            if field_type not in ALLOWED_FIELD_TYPES:
+                allowed_field_types_part = ", ".join(
+                    [
+                        f"'{fid}' for '{fname}' fields"
+                        for fid, fname in ALLOWED_FIELD_TYPES.items()
+                    ]
+                )
+                raise ValueError(
+                    f"Field '{field}' does not have a valid field type. Valid field types are: {allowed_field_types_part}."
+                )
+
+        return values
 
 
 class FullResourceStrategy(RagStrategy):
@@ -808,7 +846,7 @@ class ChatRequest(BaseModel):
     rag_strategies: list[RagStrategies] = Field(
         default=[],
         title="RAG context building strategies",
-        description="Options for tweaking how the context for the LLM model is crafted",
+        description="Options for tweaking how the context for the LLM model is crafted. `full_resource` will add the full text of the matching resources to the context. `field_extension` will add the text of the matching resource's specified fields to the context. If empty, the default strategy is used.",  # noqa
     )
     debug: bool = SearchParamDefaults.debug.to_pydantic_field()
 

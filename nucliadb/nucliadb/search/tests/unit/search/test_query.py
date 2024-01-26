@@ -83,21 +83,24 @@ async def test_get_default_min_score_is_cached(get_kb_model_default_min_score_mo
 
 
 @pytest.fixture()
-def txn():
+def read_only_txn():
     txn = unittest.mock.AsyncMock()
-    yield txn
+    with unittest.mock.patch(
+        f"{QUERY_MODULE}.get_read_only_transaction", return_value=txn
+    ):
+        yield txn
 
 
 @pytest.fixture()
-def driver(txn):
+def driver(read_only_txn):
     driver = unittest.mock.MagicMock()
-    driver.transaction.return_value.__aenter__.return_value = txn
+    driver.transaction.return_value.__aenter__.return_value = read_only_txn
     with unittest.mock.patch(f"{QUERY_MODULE}.get_driver", return_value=driver):
         yield driver
 
 
 @pytest.fixture()
-def kbdm(driver):
+def kbdm(read_only_txn, driver):
     kbdm = unittest.mock.AsyncMock()
     with unittest.mock.patch(
         f"{QUERY_MODULE}.KnowledgeBoxDataManager", return_value=kbdm
