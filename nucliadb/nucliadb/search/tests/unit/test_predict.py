@@ -108,6 +108,7 @@ async def test_convert_sentence_ok(
     kbid = "kbid"
     sentence = "some sentence"
 
+    pe.get_configuration = AsyncMock(return_value=None)  # type: ignore
     assert await pe.convert_sentence_to_vector(kbid, sentence) == [0.0, 0.1]
 
     path = expected_url.format(public_url=pe.public_url, cluster=pe.cluster_url)
