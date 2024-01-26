@@ -27,6 +27,7 @@ from fastapi.openapi.models import Example
 from fastapi_versioning import version
 from starlette.responses import StreamingResponse
 
+from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import logger, predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
@@ -113,6 +114,11 @@ async def chat_knowledgebox_endpoint(
     try:
         return await create_chat_response(
             kbid, item, x_nucliadb_user, x_ndb_client, x_forwarded_for, x_synchronous
+        )
+    except KnowledgeBoxNotFound:
+        return HTTPClientError(
+            status_code=404,
+            detail=f"Knowledge Box '{kbid}' not found.",
         )
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
