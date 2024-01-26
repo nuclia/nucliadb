@@ -392,6 +392,7 @@ async def test_chat_rag_options_extend_with_fields(
 async def test_chat_rag_options_validation(
     nucliadb_reader,
 ):
+    # full_resource cannot be combined with other strategies
     resp = await nucliadb_reader.post(
         f"/kb/kbid/chat",
         json={
@@ -409,6 +410,7 @@ async def test_chat_rag_options_validation(
         == "If 'full_resource' strategy is chosen, it must be the only strategy"
     )
 
+    # field_extension requires fields
     resp = await nucliadb_reader.post(
         f"/kb/kbid/chat",
         json={"query": "title", "rag_strategies": [{"name": "field_extension"}]},
@@ -417,6 +419,37 @@ async def test_chat_rag_options_validation(
     detail = resp.json()["detail"]
     detail[0]["loc"][-1] == "fields"
     assert detail[0]["msg"] == "field required"
+
+    # fields must be in the right format: field_type/field_name
+    resp = await nucliadb_reader.post(
+        f"/kb/kbid/chat",
+        json={
+            "query": "title",
+            "rag_strategies": [{"name": "field_extension", "fields": ["foo/t/text"]}],
+        },
+    )
+    assert resp.status_code == 422
+    detail = resp.json()["detail"]
+    detail[0]["loc"][-1] == "fields"
+    assert (
+        detail[0]["msg"]
+        == "Field 'foo/t/text' is not in the format {field_type}/{field_name}"
+    )
+
+    # fields must have a valid field type
+    resp = await nucliadb_reader.post(
+        f"/kb/kbid/chat",
+        json={
+            "query": "title",
+            "rag_strategies": [{"name": "field_extension", "fields": ["X/fieldname"]}],
+        },
+    )
+    assert resp.status_code == 422
+    detail = resp.json()["detail"]
+    detail[0]["loc"][-1] == "fields"
+    assert detail[0]["msg"].startswith(
+        "Field 'X/fieldname' does not have a valid field type. Valid field types are"
+    )
 
 
 @pytest.mark.asyncio()
