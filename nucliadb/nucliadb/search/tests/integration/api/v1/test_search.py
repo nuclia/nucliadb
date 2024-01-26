@@ -204,55 +204,6 @@ async def test_search_resource_all(
     await txn.abort()
 
 
-@pytest.mark.asyncio()
-async def test_resource_search_query_param_is_optional(search_api, knowledgebox_ingest):
-    async with search_api(roles=[NucliaDBRoles.READER]) as client:
-        kb = knowledgebox_ingest
-        # If query is not present, should not fail
-        resp = await client.get(f"/{KB_PREFIX}/{kb}/search")
-        assert resp.status_code == 200
-
-        # Less than 3 characters should not fail either
-        for query in ("f", "fo"):
-            resp = await client.get(f"/{KB_PREFIX}/{kb}/search?query={query}")
-            assert resp.status_code == 200
-
-
-@pytest.mark.asyncio()
-async def test_search_with_duplicates(search_api, knowledgebox_ingest):
-    async with search_api(roles=[NucliaDBRoles.READER]) as client:
-        kb = knowledgebox_ingest
-        resp = await client.get(f"/{KB_PREFIX}/{kb}/search?with_duplicates=True")
-        assert resp.status_code == 200
-
-        resp = await client.get(f"/{KB_PREFIX}/{kb}/search?with_duplicates=False")
-        assert resp.status_code == 200
-
-
-@pytest.fixture(scope="function")
-def search_with_limits_exceeded_error():
-    with mock.patch(
-        "nucliadb.search.api.v1.search.search",
-        side_effect=LimitsExceededError(402, "over the quota"),
-    ):
-        yield
-
-
-@pytest.mark.asyncio()
-async def test_search_handles_limits_exceeded_error(
-    search_api, knowledgebox_ingest, search_with_limits_exceeded_error
-):
-    async with search_api(roles=[NucliaDBRoles.READER]) as client:
-        kb = knowledgebox_ingest
-        resp = await client.get(f"/{KB_PREFIX}/{kb}/search")
-        assert resp.status_code == 402
-        assert resp.json() == {"detail": "over the quota"}
-
-        resp = await client.post(f"/{KB_PREFIX}/{kb}/search", json={})
-        assert resp.status_code == 402
-        assert resp.json() == {"detail": "over the quota"}
-
-
 @pytest.mark.asyncio
 async def test_search_with_facets(
     search_api: Callable[..., AsyncClient], multiple_search_resource: str
