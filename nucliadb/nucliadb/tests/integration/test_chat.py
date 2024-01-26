@@ -389,9 +389,7 @@ async def test_chat_rag_options_extend_with_fields(
 
 
 @pytest.mark.asyncio()
-async def test_chat_rag_options_validation(
-    nucliadb_reader,
-):
+async def test_chat_rag_options_validation(nucliadb_reader):
     # full_resource cannot be combined with other strategies
     resp = await nucliadb_reader.post(
         f"/kb/kbid/chat",
@@ -435,6 +433,16 @@ async def test_chat_rag_options_validation(
         detail[0]["msg"]
         == "Field 'foo/t/text' is not in the format {field_type}/{field_name}"
     )
+
+    # But fields can have leading and trailing slashes and they will be ignored
+    resp = await nucliadb_reader.post(
+        f"/kb/foo/chat",
+        json={
+            "query": "title",
+            "rag_strategies": [{"name": "field_extension", "fields": ["/a/text/"]}],
+        },
+    )
+    assert resp.status_code != 422
 
     # fields must have a valid field type
     resp = await nucliadb_reader.post(
@@ -494,3 +502,10 @@ async def test_chat_capped_context(
         assert len(resp_data.prompt_context) < 6
         total_size = sum(len(v) for v in resp_data.prompt_context.values())
         assert total_size <= max_size
+
+
+@pytest.mark.asyncio()
+async def test_chat_on_a_kb_not_found(nucliadb_reader):
+    resp = await nucliadb_reader.post("/kb/unknown_kb_id/chat", json={"query": "title"})
+    assert resp.status_code == 404
+    assert resp.json() == {"detail": "Knowledge Box 'unknown_kb_id' not found."}
