@@ -361,15 +361,16 @@ mod tests {
             let load_thread = scope.spawn(move |_| {
                 // Sleep a little bit to ensure the waiter actually waits
                 sleep(Duration::from_millis(5));
-                cache.lock().unwrap().loaded(load_guard, &Arc::new(0));
+                let mut unlocked_cache = cache.lock().unwrap();
                 tx.send(0).unwrap();
+                unlocked_cache.loaded(load_guard, &Arc::new(0));
             });
 
             // Both threads finished without panic/failing assert
             wait_thread.join().unwrap();
             load_thread.join().unwrap();
 
-            // Load thread finished earlier
+            // Load thread stores before wait thread waken up
             assert_eq!(rx.recv().unwrap(), 0);
             assert_eq!(rx.recv().unwrap(), 1);
         })
@@ -412,8 +413,8 @@ mod tests {
                 sleep(Duration::from_millis(5));
                 // Fail to call `loaded`. This should drop the load_guard
                 // which will mark the load as failed.
-                drop(load_guard);
                 tx.send(0).unwrap();
+                drop(load_guard);
             });
 
             // Both threads finished without panic/failing assert
