@@ -31,43 +31,102 @@ Rollout plan:
 - Make current filters work with IndexNode's advanced filtering
 - Extend the HTTP API to support advanced filtering
 """
-from typing import List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel
+import jsonschema
+from pydantic import BaseModel, Field, validator
 
+EXPRESSION_JSON_SCHEMA = {
+    "$ref": "#/definitions/Expression",
+    "definitions": {
+        "Expression": {
+            "title": "Expression",
+            "type": "object",
+            "examples": [
+                {"and": ["/metadata.language/es", "/entity/GPE/Sevilla"]},
+                {"and": ["/metadata.language/es", {"not": "/entity/GPE/Sevilla"}]},
+                {"or": ["/entity/GPE/Barcelona", "/entity/GPE/Madrid"]},
+                {"not": "/icon/application/pdf"},
+                {"not": {"and": ["/entity/GPE/Sevilla", "/entity/GPE/Madrid"]}},
+            ],
+            "additionalProperties": False,
+            "properties": {
+                "and": {
+                    "title": "And",
+                    "type": "array",
+                    "items": {
+                        "anyOf": [
+                            {"type": "string"},
+                            {"$ref": "#/definitions/Expression"},
+                        ]
+                    },
+                },
+                "or": {
+                    "title": "Or",
+                    "type": "array",
+                    "items": {
+                        "anyOf": [
+                            {"type": "string"},
+                            {"$ref": "#/definitions/Expression"},
+                        ]
+                    },
+                },
+                "not": {
+                    "title": "Not",
+                    "anyOf": [{"type": "string"}, {"$ref": "#/definitions/Expression"}],
+                },
+            },
+        }
+    },
+}
 
-class Expression(BaseModel):
-    must: Optional[List[Union[str, "Expression"]]] = None
-    should: Optional[List[Union[str, "Expression"]]] = None
-    must_not: Optional[List[Union[str, "Expression"]]] = None
-
-
-Expression.update_forward_refs()
 
 ## Helper functions that make it nicer to create expressions
 
-
-def Must(args):
-    return Expression(must=args)
-
-
-def Should(args):
-    return Expression(should=args)
+Value = str
+Expression = Dict[str, Any]
+Term = Union[Value, Expression]
+Terms = List[Term]
+TermsV1 = List[Value]
 
 
-def MustNot(args):
-    return Expression(must_not=args)
+def AND(*terms) -> Expression:
+    """
+    >>> AND("foo", "bar")
+    {'and': ['foo', 'bar']}
+    >>> AND(["foo", "bar"])
+    {'and': ['foo', 'bar']}
+    """
+    if isinstance(terms, tuple) and len(terms) == 1:
+        terms = terms[0]
+    elif not isinstance(terms, list):
+        terms = list(terms)
+    return {"and": terms}
 
 
-def Bool(must=None, should=None, must_not=None):
-    return Expression(must=must, should=should, must_not=must_not)
+def OR(*terms) -> Expression:
+    """
+    >>> OR("foo", "bar")
+    {'or': ['foo', 'bar']}
+    >>> OR(["foo", "bar"])
+    {'or': ['foo', 'bar']}
+    """
+    if isinstance(terms, tuple) and len(terms) == 1:
+        terms = terms[0]
+    elif not isinstance(terms, list):
+        terms = list(terms)
+    return {"or": terms}
 
 
-def convert_to_v2(filters: List[str]) -> Expression:
+def NOT(term: Term) -> Expression:
+    return {"not": term}
+
+
+def convert_to_v2(terms_v1: TermsV1) -> Expression:
     """
     Convert v1 filters to v2 filters
     """
-    return Must(filters)
+    return AND(terms_v1)
 
 
 #######################
@@ -75,81 +134,89 @@ def convert_to_v2(filters: List[str]) -> Expression:
 
 class SearchRequest(BaseModel):
     query: str
-    # Filters query should support both v1 and v2
-    filters: Optional[Union[list[str], Expression]] = None
+    # Supports either v1 (list of terms) and v2 (expression)
+    filters: Optional[Union[TermsV1, Expression]] = Field(
+        default=None,
+        title="Filters",
+        description="Filters to apply to the query. It can be either a list of terms or an expression. Expressions are more powerful and allow to combine terms with 'and', 'or' and 'not' operators. See the documentation for more details.",
+    )
+
+    @validator("filters", pre=True)
+    def validate_expression(cls, v):
+        if isinstance(v, list):
+            v = convert_to_v2(v)
+        jsonschema.validate(v, EXPRESSION_JSON_SCHEMA)
+        return v
 
 
 def main():
+    # V1 filters
     # label/DOC/Article AND entity/GPE/Sevilla
     req1 = SearchRequest(
         query="temperature",
         filters=["/entity/GPE/Sevilla", "/label/DOC/Article"],
     )
+    assert req1.filters == AND("/entity/GPE/Sevilla", "/label/DOC/Article")
 
+    # V2 filters
     # label/DOC/Article AND entity/GPE/Sevilla
     req2 = SearchRequest(
         query="temperature",
-        filters=Expression(
-            must=["/entity/GPE/Sevilla", "/label/DOC/Article"],
-        ),
+        filters=AND("/entity/GPE/Sevilla", "/label/DOC/Article"),
     )
 
     # entity/GPE/Sevilla OR entity/GPE/Madrid
     req3 = SearchRequest(
         query="temperature",
-        filters=Should(["/entity/GPE/Sevilla", "/entity/GPE/Madrid"]),
+        filters=OR("/entity/GPE/Sevilla", "/entity/GPE/Madrid"),
     )
 
     # NOT entity/GPE/Sevilla
     req4 = SearchRequest(
         query="temperature",
-        filters=MustNot(["/entity/GPE/Sevilla"]),
+        filters=NOT("/entity/GPE/Sevilla"),
     )
 
     #  5. (v2) NOT (entity/GPE/Sevilla AND entity/GPE/Madrid)
     req5 = SearchRequest(
         query="temperature",
-        filters=MustNot(["/entity/GPE/Sevilla", "/entity/GPE/Madrid"]),
+        filters=NOT(AND("/entity/GPE/Sevilla", "/entity/GPE/Madrid")),
     )
 
     # 6. (v2) NOT (entity/GPE/Sevilla OR entity/GPE/Madrid)
     req6 = SearchRequest(
         query="temperature",
-        filters=MustNot([Should(["/entity/GPE/Sevilla", "/entity/GPE/Madrid"])]),
+        filters=NOT(OR("/entity/GPE/Sevilla", "/entity/GPE/Madrid")),
     )
 
     # 7. (v2) label/DOC/Article AND (entity/GPE/Sevilla OR entity/GPE/Madrid)
     req7 = SearchRequest(
         query="temperature",
-        filters=Bool(
-            should=["/entity/GPE/Sevilla", "/entity/GPE/Madrid"],
-            must=["/label/DOC/Article"],
+        filters=AND(
+            "/label/DOC/Article",
+            OR("/entity/GPE/Sevilla", "/entity/GPE/Madrid"),
         ),
     )
 
     # 8. (v2) label/DOC/Article AND (entity/GPE/Sevilla OR entity/GPE/Madrid) AND NOT entity/Company/Apple
     req8 = SearchRequest(
         query="temperature",
-        filters=Bool(
-            should=["/entity/GPE/Sevilla", "/entity/GPE/Madrid"],
-            must=["/label/DOC/Article"],
-            must_not=["/entity/Company/Apple"],
+        filters=AND(
+            "/label/DOC/Article",
+            OR("/entity/GPE/Sevilla", "/entity/GPE/Madrid"),
+            NOT("/entity/Company/Apple"),
         ),
     )
 
     # 9. (v2) label/DOC/Article OR (entity/GPE/Sevilla AND entity/GPE/Madrid) OR NOT (entity/Company/Apple AND entity/Company/Google)
     req9 = SearchRequest(
         query="temperature",
-        filters=Should(
-            [
-                "/label/DOC/Article",
-                Must(["/entity/GPE/Sevilla", "/entity/GPE/Madrid"]),
-                MustNot(["/entity/Company/Apple", "/entity/Company/Google"]),
-            ]
+        filters=OR(
+            "/label/DOC/Article",
+            AND("/entity/GPE/Sevilla", "/entity/GPE/Madrid"),
+            NOT(AND("/entity/Company/Apple", "/entity/Company/Google")),
         ),
     )
-
-    from pprint import pprint
 
     for expr, req in [
         ("/label/DOC/Article AND /entity/GPE/Sevilla", req1),
