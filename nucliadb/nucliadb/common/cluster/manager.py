@@ -515,14 +515,14 @@ def choose_node(
 ) -> tuple[AbstractIndexNode, str, str]:
     """Choose an arbitrary node storing `shard` following these rules:
     - nodes containing a shard replica from `target_replicas` are the preferred
-    - if `read_only`, read_replicas are preferred over primaries
+    - when enabled, read replica nodes are preferred over primaries
     - if there's more than one option with the same score, a random choice will
-      be made
+      be made between them.
 
-    According to these rules and considering `read_only == True`, a secondary
-    node containing a shard replica from `target_replicas` is the most
-    preferent, while a primary node with a shard not in `target_replicas` is the
-    least preferent.
+    According to these rules and considering we use read replica nodes, a read
+    replica node containing a shard replica from `target_shard_replicas` is the
+    most preferent, while a primary node with a shard not in
+    `target_shard_replicas` is the least preferent.
 
     """
     target_shard_replicas = target_shard_replicas or []
