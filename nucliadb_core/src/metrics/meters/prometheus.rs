@@ -25,7 +25,7 @@ use crate::metrics::metric::grpc_ops::{GrpcOpKey, GrpcOpMetric, GrpcOpValue};
 use crate::metrics::metric::request_time::{RequestTimeKey, RequestTimeMetric, RequestTimeValue};
 use crate::metrics::metric::tokio_runtime::TokioRuntimeObserver;
 use crate::metrics::metric::tokio_tasks::TokioTasksObserver;
-use crate::metrics::metric::{grpc_ops, replication, request_time};
+use crate::metrics::metric::{grpc_ops, replication, request_time, shard_cache};
 use crate::metrics::task_monitor::{Monitor, TaskId};
 use crate::tracing::{debug, error};
 use crate::NodeResult;
@@ -38,6 +38,8 @@ pub struct PrometheusMeter {
     tokio_runtime_observer: TokioRuntimeObserver,
     replicated_bytes_metric: replication::ReplicatedBytesMetric,
     replication_ops_metric: replication::ReplicationOpsMetric,
+    open_shards_metric: shard_cache::OpenShardsMetric,
+    evicted_shards_metric: shard_cache::EvictedShardsMetric,
 }
 
 impl Default for PrometheusMeter {
@@ -82,6 +84,14 @@ impl Meter for PrometheusMeter {
     fn record_replication_op(&self, key: replication::ReplicationOpsKey) {
         self.replication_ops_metric.get_or_create(&key).inc();
     }
+
+    fn set_shard_cache_gauge(&self, value: i64) {
+        self.open_shards_metric.get_or_create(&()).set(value);
+    }
+
+    fn record_shard_cache_eviction(&self) {
+        self.evicted_shards_metric.get_or_create(&()).inc();
+    }
 }
 
 impl PrometheusMeter {
@@ -92,6 +102,8 @@ impl PrometheusMeter {
         let grpc_op_metric = grpc_ops::register_grpc_ops(&mut registry);
         let replicated_bytes_metric = replication::register_replicated_bytes_ops(&mut registry);
         let replication_ops_metric = replication::register_replication_operations(&mut registry);
+        let open_shards_metric = shard_cache::register_open_shards_metric(&mut registry);
+        let evicted_shards_metric = shard_cache::register_evicted_shards_metric(&mut registry);
 
         let prefixed_subregistry = registry.sub_registry_with_prefix("nucliadb_node");
         let tokio_tasks_observer = TokioTasksObserver::new(prefixed_subregistry);
@@ -105,6 +117,8 @@ impl PrometheusMeter {
             tokio_runtime_observer,
             replicated_bytes_metric,
             replication_ops_metric,
+            open_shards_metric,
+            evicted_shards_metric,
         }
     }
 }

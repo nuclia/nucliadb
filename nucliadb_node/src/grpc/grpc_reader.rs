@@ -24,7 +24,6 @@ use nucliadb_core::prelude::{DocumentIterator, ParagraphIterator};
 use nucliadb_core::protos::node_reader_server::NodeReader;
 use nucliadb_core::protos::*;
 use nucliadb_core::tracing::{info_span, Span};
-use nucliadb_core::NodeResult;
 use Shard as ShardPB;
 
 use crate::settings::Settings;

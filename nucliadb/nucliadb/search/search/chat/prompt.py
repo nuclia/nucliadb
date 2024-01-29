@@ -210,7 +210,11 @@ async def get_resource_field_extracted_text(
     if resource is None:
         return None
 
-    field_type, field_key = field_id.split("/")
+    try:
+        field_type, field_key = field_id.strip("/").split("/")
+    except ValueError:
+        logger.error(f"Invalid field id: {field_id}. Skipping getting extracted text.")
+        return None
     field = await resource.get_field(field_key, KB_REVERSE[field_type], load=False)
     if field is None:
         return None

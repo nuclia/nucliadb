@@ -175,10 +175,19 @@ jobs:
       - name: Set helm package image
         id: version_step
         run: |-
-          VERSION=`cat VERSION`
-          VERSION_SHA=$VERSION+${{ steps.env-vars.outputs.short_sha }}
-          sed -i.bak "s#99999.99999.99999#$VERSION_SHA#" ./charts/nucliadb/Chart.yaml
-          echo "version_number=$VERSION_SHA" >> $GITHUB_OUTPUT
+          python bump.py --build=${{github.run_number}}
+          DOCKER_VERSION=`cat VERSION`
+
+          # Helm package versioning does not support '.postX'. Convert to '+postX'
+          HELM_VERSION=`echo $DOCKER_VERSION | sed 's/.post/+post/'`
+
+          # Update chart with versions
+          echo "HELM_VERSION=$HELM_VERSION"
+          echo "DOCKER_VERSION=$DOCKER_VERSION"
+          sed -i.bak "s#99999.99999.99999#$HELM_VERSION#" ./charts/nucliadb/Chart.yaml
+          sed -i.bak "s#88888.88888.88888#$DOCKER_VERSION#" ./charts/nucliadb/Chart.yaml
+
+          echo "helm_version=$HELM_VERSION" >> $GITHUB_OUTPUT
 
       - name: Configure Git
         run: |
@@ -194,7 +203,7 @@ jobs:
         run: |-
           helm lint charts/nucliadb
           helm package charts/nucliadb
-          curl --data-binary "@nucliadb-${{ steps.version_step.outputs.version_number }}.tgz" ${{ secrets.HELM_CHART_URL }}/api/charts
+          curl --data-binary "@nucliadb-${{ steps.version_step.outputs.helm_version }}.tgz" ${{ secrets.HELM_CHART_URL }}/api/charts
 
       # Not working yet, disabled for now
       # - name: Repository Dispatch

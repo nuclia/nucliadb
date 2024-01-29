@@ -17,24 +17,31 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use crate::metrics::meters::Meter;
-use crate::metrics::metric::grpc_ops::{GrpcOpKey, GrpcOpValue};
-use crate::metrics::metric::replication;
-use crate::metrics::metric::request_time::{RequestTimeKey, RequestTimeValue};
-use crate::NodeResult;
+use prometheus_client::metrics::counter::Counter;
+use prometheus_client::metrics::family::Family;
+use prometheus_client::metrics::gauge::Gauge;
+use prometheus_client::registry::Registry;
 
-pub struct NoOpMeter;
-impl Meter for NoOpMeter {
-    fn record_request_time(&self, _metric: RequestTimeKey, _value: RequestTimeValue) {}
+pub type OpenShardsMetric = Family<(), Gauge>;
 
-    fn record_grpc_op(&self, _method: GrpcOpKey, _value: GrpcOpValue) {}
+pub fn register_open_shards_metric(registry: &mut Registry) -> OpenShardsMetric {
+    let open_shards = OpenShardsMetric::default();
+    registry.register(
+        "nucliadb_shard_cache_open",
+        "Open shards",
+        open_shards.clone(),
+    );
+    open_shards
+}
 
-    fn export(&self) -> NodeResult<String> {
-        Ok(Default::default())
-    }
-    fn record_replicated_bytes(&self, _value: u64) {}
-    fn record_replication_op(&self, _key: replication::ReplicationOpsKey) {}
+pub type EvictedShardsMetric = Family<(), Counter>;
 
-    fn set_shard_cache_gauge(&self, _value: i64) {}
-    fn record_shard_cache_eviction(&self) {}
+pub fn register_evicted_shards_metric(registry: &mut Registry) -> EvictedShardsMetric {
+    let evicted_shards = EvictedShardsMetric::default();
+    registry.register(
+        "nucliadb_shard_cache_evicted",
+        "Evicted shards",
+        evicted_shards.clone(),
+    );
+    evicted_shards
 }

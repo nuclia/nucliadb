@@ -46,7 +46,7 @@ spec:
       serviceAccount:  {{ .Values.serviceAccount | default "default" }}
       containers:
       - name: app
-        image: "{{ .Values.image }}:{{ .Values.imageVersion | default .Chart.Version }}"
+        image: "{{ .Values.image }}:{{ .Values.imageVersion | default .Chart.AppVersion }}"
         securityContext:
           privileged: false
         imagePullPolicy: {{ .Values.imagePullPolicy }}
@@ -102,7 +102,9 @@ spec:
         - name: ndb-pv
           mountPath: /data
   volumeClaimTemplates:
-  - metadata:
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
       name: ndb-pv
     spec:
       accessModes: [ "ReadWriteOnce" ]

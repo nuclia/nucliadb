@@ -66,10 +66,10 @@ async def test_dummy_predict_engine():
     assert await pe.summarize("kbid", Mock(resources={}))
 
 
-@pytest.fixture(scope="function", autouse=True)
-def get_ml_configuration():
+@pytest.fixture(scope="function")
+def get_configuration():
     with mock.patch(
-        "nucliadb.search.predict.KnowledgeBoxDataManager.get_ml_configuration",
+        "nucliadb.search.predict.PredictEngine.get_configuration",
         return_value=None,
     ) as get_ml_configuration:
         yield get_ml_configuration
@@ -89,7 +89,7 @@ def get_ml_configuration():
     ],
 )
 async def test_convert_sentence_ok(
-    onprem, expected_url, expected_header, expected_header_value
+    onprem, expected_url, expected_header, expected_header_value, get_configuration
 ):
     service_account = "service-account"
 
@@ -126,7 +126,7 @@ async def test_convert_sentence_ok(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("onprem", [True, False])
-async def test_convert_sentence_error(onprem):
+async def test_convert_sentence_error(onprem, get_configuration):
     pe = PredictEngine(
         "cluster",
         "public-{zone}",
@@ -152,7 +152,7 @@ async def test_convert_sentence_error(onprem):
     ],
 )
 async def test_detect_entities_ok(
-    onprem, expected_url, expected_header, expected_header_value
+    onprem, expected_url, expected_header, expected_header_value, get_configuration
 ):
     cluster_url = "cluster"
     public_url = "public-{zone}"
@@ -175,7 +175,6 @@ async def test_detect_entities_ok(
 
     kbid = "kbid"
     sentence = "some sentence"
-
     assert len(await pe.detect_entities(kbid, sentence)) > 0
 
     path = expected_url.format(public_url=pe.public_url, cluster=pe.cluster_url)
@@ -194,7 +193,7 @@ async def test_detect_entities_ok(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("onprem", [True, False])
-async def test_detect_entities_error(onprem):
+async def test_detect_entities_error(onprem, get_configuration):
     pe = PredictEngine(
         "cluster",
         "public-{zone}",
@@ -239,7 +238,7 @@ def session_limits_exceeded():
     ],
 )
 async def test_predict_engine_handles_limits_exceeded_error(
-    session_limits_exceeded, method, args
+    session_limits_exceeded, method, args, get_configuration
 ):
     pe = PredictEngine(
         "cluster",
@@ -280,7 +279,7 @@ async def test_onprem_nuclia_service_account_not_configured(
         assert await getattr(pe, method)(*args) == output
 
 
-async def test_convert_sentence_to_vector_empty_vectors():
+async def test_convert_sentence_to_vector_empty_vectors(get_configuration):
     pe = PredictEngine(
         "cluster",
         "public-{zone}",
@@ -294,7 +293,7 @@ async def test_convert_sentence_to_vector_empty_vectors():
         await pe.convert_sentence_to_vector("kbid", "sentence")
 
 
-async def test_ask_document_onprem():
+async def test_ask_document_onprem(get_configuration):
     pe = PredictEngine(
         "cluster",
         "public-{zone}",
@@ -320,7 +319,7 @@ async def test_ask_document_onprem():
     )
 
 
-async def test_ask_document_cloud():
+async def test_ask_document_cloud(get_configuration):
     pe = PredictEngine(
         "cluster",
         "public-{zone}",
@@ -345,7 +344,7 @@ async def test_ask_document_cloud():
     )
 
 
-async def test_rephrase():
+async def test_rephrase(get_configuration):
     pe = PredictEngine(
         "cluster",
         "public-{zone}",
@@ -380,7 +379,7 @@ async def test_rephrase():
         ("foobar-2", RephraseMissingContextError),
     ],
 )
-async def test_parse_rephrase_response(content, exception):
+async def test_parse_rephrase_response(content, exception, get_configuration):
     resp = Mock()
     resp.json = AsyncMock(return_value=content)
     if exception:
@@ -412,7 +411,7 @@ async def test_check_response_error():
     assert ex.value.detail == "some error"
 
 
-async def test_summarize():
+async def test_summarize(get_configuration):
     pe = PredictEngine(
         "cluster",
         "public-{zone}",
@@ -443,7 +442,7 @@ async def test_summarize():
 
 
 @pytest.mark.parametrize("onprem", [True, False])
-async def test_get_predict_headers(onprem, get_ml_configuration):
+async def test_get_predict_headers(onprem, get_configuration):
     kb_config = KBConfiguration(
         semantic_model="foo",
         generative_model="bar",
@@ -451,7 +450,7 @@ async def test_get_predict_headers(onprem, get_ml_configuration):
         anonymization_model="qux",
         visual_labeling="quux",
     )
-    get_ml_configuration.return_value = kb_config.SerializeToString()
+    get_configuration.return_value = kb_config
 
     nua_service_account = "nua-service-account"
     pe = PredictEngine(

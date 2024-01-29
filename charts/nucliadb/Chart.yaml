@@ -2,7 +2,7 @@ apiVersion: v1
 description: NucliaDB Chart for standalone deployment
 name: nucliadb
 version: 99999.99999.99999
-appVersion: 99999.99999.99999
+appVersion: 88888.88888.88888
 keywords:
   - nucliadb
   - nuclia
