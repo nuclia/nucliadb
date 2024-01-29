@@ -27,7 +27,6 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.cors import CORSMiddleware
-from starlette.responses import HTMLResponse
 from starlette.routing import Mount
 
 from nucliadb.common.context.fastapi import set_app_context
@@ -96,7 +95,7 @@ def application_factory(settings: Settings) -> FastAPI:
             extend_openapi(route)
 
     async def homepage(request):
-        return HTMLResponse("NucliaDB Standalone Server")
+        return RedirectResponse("/admin")
 
     # Use raw starlette routes to avoid unnecessary overhead
     application.add_route("/", homepage)
