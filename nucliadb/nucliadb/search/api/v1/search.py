@@ -241,10 +241,10 @@ async def catalog(
             kbid,
             Method.SEARCH,
             pb_query,
-            target_replicas=shards,
+            target_shard_replicas=shards,
             # Catalog should not go to read replicas because we want it to be
             # consistent and most up to date results
-            read_only=False,
+            use_read_replica_nodes=False,
         )
 
         # We need to merge
@@ -360,7 +360,7 @@ async def search(
     pb_query, incomplete_results, autofilters = await query_parser.parse()
 
     results, query_incomplete_results, queried_nodes, queried_shards = await node_query(
-        kbid, Method.SEARCH, pb_query, target_replicas=item.shards
+        kbid, Method.SEARCH, pb_query, target_shard_replicas=item.shards
     )
 
     incomplete_results = incomplete_results or query_incomplete_results

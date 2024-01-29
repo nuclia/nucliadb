@@ -482,6 +482,7 @@ class StandaloneKBShardManager(KBShardManager):
 
 def get_all_shard_nodes(
     shard: writer_pb2.ShardObject,
+    *,
     use_read_replicas: bool,
 ) -> list[tuple[AbstractIndexNode, str]]:
     """Return a list of all nodes containing `shard` with the shard replica id.
@@ -489,27 +490,28 @@ def get_all_shard_nodes(
 
     """
     nodes = []
-    for shardreplica in shard.replicas:
-        node_id = shardreplica.node
-        replica_id = shardreplica.shard.id
+    for shard_replica_pb in shard.replicas:
+        node_id = shard_replica_pb.node
+        shard_replica_id = shard_replica_pb.shard.id
 
         node = get_index_node(node_id)
         if node is not None:
-            nodes.append((node, replica_id))
+            nodes.append((node, shard_replica_id))
 
         if use_read_replicas:
             for read_replica_node_id in get_read_replica_node_ids(node_id):
                 read_replica_node = get_index_node(read_replica_node_id)
                 if read_replica_node is not None:
-                    nodes.append((read_replica_node, replica_id))
+                    nodes.append((read_replica_node, shard_replica_id))
 
     return nodes
 
 
 def choose_node(
     shard: writer_pb2.ShardObject,
-    target_replicas: Optional[list[str]] = None,
-    read_only: bool = False,
+    *,
+    target_shard_replicas: Optional[list[str]] = None,
+    use_read_replica_nodes: bool = False,
 ) -> tuple[AbstractIndexNode, str, str]:
     """Choose an arbitrary node storing `shard` following these rules:
     - nodes containing a shard replica from `target_replicas` are the preferred
@@ -523,30 +525,30 @@ def choose_node(
     least preferent.
 
     """
-    target_replicas = target_replicas or []
+    target_shard_replicas = target_shard_replicas or []
 
-    shard_nodes = get_all_shard_nodes(shard, use_read_replicas=read_only)
+    shard_nodes = get_all_shard_nodes(shard, use_read_replicas=use_read_replica_nodes)
 
     if len(shard_nodes) == 0:
         raise NoHealthyNodeAvailable("Could not find a node to query")
 
     # Ranking values
-    IN_TARGET_REPLICAS = 0b10
-    IS_READ_REPLICA = 0b01
+    IN_TARGET_SHARD_REPLICAS = 0b10
+    IS_READ_REPLICA_NODE = 0b01
 
     ranked_nodes: dict[int, list[tuple[AbstractIndexNode, str]]] = {}
-    for node, replica_id in shard_nodes:
+    for node, shard_replica_id in shard_nodes:
         score = 0
-        if replica_id in target_replicas:
-            score |= IN_TARGET_REPLICAS
+        if shard_replica_id in target_shard_replicas:
+            score |= IN_TARGET_SHARD_REPLICAS
         if node.is_read_replica():
-            score |= IS_READ_REPLICA
+            score |= IS_READ_REPLICA_NODE
 
-        ranked_nodes.setdefault(score, []).append((node, replica_id))
+        ranked_nodes.setdefault(score, []).append((node, shard_replica_id))
 
     top = ranked_nodes[max(ranked_nodes)]
-    selected_node, replica_id = random.choice(top)
-    return selected_node, replica_id, selected_node.id
+    selected_node, shard_replica_id = random.choice(top)
+    return selected_node, shard_replica_id, selected_node.id
 
 
 def check_enough_nodes():
