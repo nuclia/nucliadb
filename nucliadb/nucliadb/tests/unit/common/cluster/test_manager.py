@@ -208,7 +208,7 @@ def repeated_choose_node(
     return shard_ids, node_ids
 
 
-def test_choose_node_with_nodes_and_replicas():
+def test_choose_node_with_nodes_and_replicas(standalone_mode_off):
     """Validate how choose node selects between different options depending on
     configuration.
 
