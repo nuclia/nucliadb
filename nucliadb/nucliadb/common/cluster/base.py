@@ -58,6 +58,9 @@ class AbstractIndexNode(metaclass=ABCMeta):
     def __repr__(self):
         return self.__str__()
 
+    def is_read_replica(self) -> bool:
+        return self.primary_id is not None
+
     @property
     @abstractmethod
     def reader(self) -> NodeReaderStub:  # pragma: no cover

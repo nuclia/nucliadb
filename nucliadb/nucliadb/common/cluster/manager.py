@@ -480,46 +480,75 @@ class StandaloneKBShardManager(KBShardManager):
             )
 
 
-def choose_node(
+def get_all_shard_nodes(
     shard: writer_pb2.ShardObject,
-    target_replicas: Optional[list[str]] = None,
-    read_only: bool = False,
-) -> tuple[AbstractIndexNode, str, str]:
+    *,
+    use_read_replicas: bool,
+) -> list[tuple[AbstractIndexNode, str]]:
+    """Return a list of all nodes containing `shard` with the shard replica id.
+    If `use_read_replicas`, read replica nodes will be returned too.
+
     """
-    Choose an arbitrary node storing `shard`.
-    """
-    preferred_nodes = []
-    backend_nodes = []
-    for shardreplica in shard.replicas:
-        node_id = shardreplica.node
-        replica_id = shardreplica.shard.id
+    nodes = []
+    for shard_replica_pb in shard.replicas:
+        node_id = shard_replica_pb.node
+        shard_replica_id = shard_replica_pb.shard.id
 
         node = get_index_node(node_id)
         if node is not None:
-            if target_replicas and replica_id in target_replicas:
-                preferred_nodes.append((replica_id, node))
-            else:
-                backend_nodes.append((replica_id, node))
+            nodes.append((node, shard_replica_id))
 
-        if read_only:
+        if use_read_replicas:
             for read_replica_node_id in get_read_replica_node_ids(node_id):
                 read_replica_node = get_index_node(read_replica_node_id)
-                if read_replica_node is None:
-                    continue
-                if target_replicas and replica_id in target_replicas:
-                    preferred_nodes.append((replica_id, read_replica_node))
-                else:
-                    backend_nodes.append((replica_id, read_replica_node))
+                if read_replica_node is not None:
+                    nodes.append((read_replica_node, shard_replica_id))
 
-    if len(preferred_nodes) == 0 and len(backend_nodes) == 0:
+    return nodes
+
+
+def choose_node(
+    shard: writer_pb2.ShardObject,
+    *,
+    target_shard_replicas: Optional[list[str]] = None,
+    use_read_replica_nodes: bool = False,
+) -> tuple[AbstractIndexNode, str, str]:
+    """Choose an arbitrary node storing `shard` following these rules:
+    - nodes containing a shard replica from `target_replicas` are the preferred
+    - when enabled, read replica nodes are preferred over primaries
+    - if there's more than one option with the same score, a random choice will
+      be made between them.
+
+    According to these rules and considering we use read replica nodes, a read
+    replica node containing a shard replica from `target_shard_replicas` is the
+    most preferent, while a primary node with a shard not in
+    `target_shard_replicas` is the least preferent.
+
+    """
+    target_shard_replicas = target_shard_replicas or []
+
+    shard_nodes = get_all_shard_nodes(shard, use_read_replicas=use_read_replica_nodes)
+
+    if len(shard_nodes) == 0:
         raise NoHealthyNodeAvailable("Could not find a node to query")
 
-    selected_node: AbstractIndexNode
-    if len(preferred_nodes) > 0:
-        replica_id, selected_node = random.choice(preferred_nodes)
-    else:
-        replica_id, selected_node = random.choice(backend_nodes)
-    return selected_node, replica_id, selected_node.id
+    # Ranking values
+    IN_TARGET_SHARD_REPLICAS = 0b10
+    IS_READ_REPLICA_NODE = 0b01
+
+    ranked_nodes: dict[int, list[tuple[AbstractIndexNode, str]]] = {}
+    for node, shard_replica_id in shard_nodes:
+        score = 0
+        if shard_replica_id in target_shard_replicas:
+            score |= IN_TARGET_SHARD_REPLICAS
+        if node.is_read_replica():
+            score |= IS_READ_REPLICA_NODE
+
+        ranked_nodes.setdefault(score, []).append((node, shard_replica_id))
+
+    top = ranked_nodes[max(ranked_nodes)]
+    selected_node, shard_replica_id = random.choice(top)
+    return selected_node, shard_replica_id, selected_node.id
 
 
 def check_enough_nodes():
