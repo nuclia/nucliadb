@@ -152,14 +152,14 @@ async def test_choose_node_attempts_target_replicas_but_is_not_imperative(shards
     r1 = shard.replicas[1].shard.id
     n1 = shard.replicas[1].node
 
-    _, replica_id, node_id = manager.choose_node(shard, target_replicas=[r0])
+    _, replica_id, node_id = manager.choose_node(shard, target_shard_replicas=[r0])
     assert replica_id == r0
     assert node_id == n0
 
     # Change the node-0 to a non-existent node id in order to
-    # test the target_replicas logic is not imperative
+    # test the target_shard_replicas logic is not imperative
     shard.replicas[0].node = "I-do-not-exist"
-    _, replica_id, node_id = manager.choose_node(shard, target_replicas=[r0])
+    _, replica_id, node_id = manager.choose_node(shard, target_shard_replicas=[r0])
     assert replica_id == r1
     assert node_id == n1
 

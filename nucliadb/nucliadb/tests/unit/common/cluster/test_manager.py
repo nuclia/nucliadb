@@ -152,7 +152,7 @@ def test_choose_node_with_two_read_replicas():
                 )
             ]
         ),
-        read_only=True,
+        use_read_replica_nodes=True,
     )
     assert node_id == "node-replica-0"
     _, _, node_id = manager.choose_node(
@@ -163,7 +163,7 @@ def test_choose_node_with_two_read_replicas():
                 )
             ]
         ),
-        read_only=True,
+        use_read_replica_nodes=True,
     )
     assert node_id == "node-replica-1"
 
@@ -188,7 +188,7 @@ def test_choose_node_no_healthy_node_available():
                     )
                 ]
             ),
-            read_only=True,
+            use_read_replica_nodes=True,
         )
 
     manager.INDEX_NODES.clear()
@@ -239,24 +239,34 @@ def test_choose_node_with_nodes_and_replicas():
     add_read_replica_node("node-replica-1", primary_id="node-1")
 
     # Without read replicas, we only choose primaries
-    shard_ids, node_ids = repeated_choose_node(TRIES_PER_ASSERT, shard, read_only=False)
+    shard_ids, node_ids = repeated_choose_node(
+        TRIES_PER_ASSERT, shard, use_read_replica_nodes=False
+    )
     assert set(shard_ids) == {"123", "456"}
     assert set(node_ids) == {"node-0", "node-1"}
 
     # Secondaries are preferred
-    shard_ids, node_ids = repeated_choose_node(TRIES_PER_ASSERT, shard, read_only=True)
+    shard_ids, node_ids = repeated_choose_node(
+        TRIES_PER_ASSERT, shard, use_read_replica_nodes=True
+    )
     assert set(shard_ids) == {"123", "456"}
     assert set(node_ids) == {"node-replica-0", "node-replica-1"}
 
     # Target replicas take more preference
     shard_ids, node_ids = repeated_choose_node(
-        TRIES_PER_ASSERT, shard, read_only=False, target_replicas=["456"]
+        TRIES_PER_ASSERT,
+        shard,
+        use_read_replica_nodes=False,
+        target_shard_replicas=["456"],
     )
     assert set(shard_ids) == {"456"}
     assert set(node_ids) == {"node-1"}
 
     shard_ids, node_ids = repeated_choose_node(
-        TRIES_PER_ASSERT, shard, read_only=True, target_replicas=["456"]
+        TRIES_PER_ASSERT,
+        shard,
+        use_read_replica_nodes=True,
+        target_shard_replicas=["456"],
     )
     assert set(shard_ids) == {"456"}
     assert set(node_ids) == {"node-replica-1"}
@@ -267,23 +277,33 @@ def test_choose_node_with_nodes_and_replicas():
     add_read_replica_node("node-replica-0", primary_id="node-0")
     add_read_replica_node("node-replica-1", primary_id="node-1")
 
-    shard_ids, node_ids = repeated_choose_node(TRIES_PER_ASSERT, shard, read_only=False)
-    assert set(shard_ids) == {"123"}
-    assert set(node_ids) == {"node-0"}
-
-    shard_ids, node_ids = repeated_choose_node(TRIES_PER_ASSERT, shard, read_only=True)
-    assert set(shard_ids) == {"123", "456"}
-    assert set(node_ids) == {"node-replica-0", "node-replica-1"}
-
-    # target replicas is ignored but only primaries are used
     shard_ids, node_ids = repeated_choose_node(
-        TRIES_PER_ASSERT, shard, read_only=False, target_replicas=["456"]
+        TRIES_PER_ASSERT, shard, use_read_replica_nodes=False
     )
     assert set(shard_ids) == {"123"}
     assert set(node_ids) == {"node-0"}
 
     shard_ids, node_ids = repeated_choose_node(
-        TRIES_PER_ASSERT, shard, read_only=True, target_replicas=["456"]
+        TRIES_PER_ASSERT, shard, use_read_replica_nodes=True
+    )
+    assert set(shard_ids) == {"123", "456"}
+    assert set(node_ids) == {"node-replica-0", "node-replica-1"}
+
+    # target replicas is ignored but only primaries are used
+    shard_ids, node_ids = repeated_choose_node(
+        TRIES_PER_ASSERT,
+        shard,
+        use_read_replica_nodes=False,
+        target_shard_replicas=["456"],
+    )
+    assert set(shard_ids) == {"123"}
+    assert set(node_ids) == {"node-0"}
+
+    shard_ids, node_ids = repeated_choose_node(
+        TRIES_PER_ASSERT,
+        shard,
+        use_read_replica_nodes=True,
+        target_shard_replicas=["456"],
     )
     assert set(shard_ids) == {"456"}
     assert set(node_ids) == {"node-replica-1"}
@@ -294,22 +314,32 @@ def test_choose_node_with_nodes_and_replicas():
     add_index_node("node-1")
     add_read_replica_node("node-replica-0", primary_id="node-0")
 
-    shard_ids, node_ids = repeated_choose_node(TRIES_PER_ASSERT, shard, read_only=False)
+    shard_ids, node_ids = repeated_choose_node(
+        TRIES_PER_ASSERT, shard, use_read_replica_nodes=False
+    )
     assert set(shard_ids) == {"123", "456"}
     assert set(node_ids) == {"node-0", "node-1"}
 
-    shard_ids, node_ids = repeated_choose_node(TRIES_PER_ASSERT, shard, read_only=True)
+    shard_ids, node_ids = repeated_choose_node(
+        TRIES_PER_ASSERT, shard, use_read_replica_nodes=True
+    )
     assert set(shard_ids) == {"123"}
     assert set(node_ids) == {"node-replica-0"}
 
     shard_ids, node_ids = repeated_choose_node(
-        TRIES_PER_ASSERT, shard, read_only=False, target_replicas=["456"]
+        TRIES_PER_ASSERT,
+        shard,
+        use_read_replica_nodes=False,
+        target_shard_replicas=["456"],
     )
     assert set(shard_ids) == {"456"}
     assert set(node_ids) == {"node-1"}
 
     shard_ids, node_ids = repeated_choose_node(
-        TRIES_PER_ASSERT, shard, read_only=True, target_replicas=["456"]
+        TRIES_PER_ASSERT,
+        shard,
+        use_read_replica_nodes=True,
+        target_shard_replicas=["456"],
     )
     assert set(shard_ids) == {"456"}
     assert set(node_ids) == {"node-1"}
