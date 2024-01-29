@@ -87,7 +87,7 @@ def push_scope(**kwargs: Any) -> ContextManager[Scope]:
 
 
 class ErrorHandlingSettings(BaseSettings):
-    zone: str = pydantic.Field(default="local", env=["NUCLIA_ZONE"])
+    zone: str = pydantic.Field(default="local", env=["NUCLIA_ZONE", "ZONE"])
     sentry_url: Optional[str] = None
     environment: str = pydantic.Field(
         default="local", env=["environment", "running_environment"]
