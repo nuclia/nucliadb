@@ -30,7 +30,12 @@ Rollout plan:
 - Add support for advanced filtering in the IndexNode
 - Make current filters work with IndexNode's advanced filtering
 - Extend the HTTP API to support advanced filtering
+
+Doubts:
+- Can we make it work with paragraph-level classifiction label filters? :(
+
 """
+import functools
 from typing import Any, Dict, List, Optional, Union
 
 import jsonschema
@@ -50,6 +55,8 @@ EXPRESSION_JSON_SCHEMA = {
                 {"not": {"and": ["/entity/GPE/Sevilla", "/entity/GPE/Madrid"]}},
             ],
             "additionalProperties": False,
+            "maxProperties": 1,
+            "minProperties": 1,
             "properties": {
                 "and": {
                     "title": "And",
@@ -58,7 +65,8 @@ EXPRESSION_JSON_SCHEMA = {
                         "anyOf": [
                             {"type": "string"},
                             {"$ref": "#/definitions/Expression"},
-                        ]
+                        ],
+                        "minItems": 2,
                     },
                 },
                 "or": {
@@ -70,6 +78,7 @@ EXPRESSION_JSON_SCHEMA = {
                             {"$ref": "#/definitions/Expression"},
                         ]
                     },
+                    "minItems": 2,
                 },
                 "not": {
                     "title": "Not",
@@ -81,7 +90,7 @@ EXPRESSION_JSON_SCHEMA = {
 }
 
 
-## Helper functions that make it nicer to create expressions
+## Helper functions that make it easier to create expressions
 
 Value = str
 Expression = Dict[str, Any]
@@ -122,11 +131,43 @@ def NOT(term: Term) -> Expression:
     return {"not": term}
 
 
+# For those who prefer to use the Lucene syntax
+Must = AND
+Should = OR
+
+
+def MustNot(*terms):
+    return NOT(Must(*terms))
+
+
 def convert_to_v2(terms_v1: TermsV1) -> Expression:
     """
     Convert v1 filters to v2 filters
     """
     return AND(terms_v1)
+
+
+def andify(expression: Expression) -> Expression:
+    """
+    Convert an expression to a canonical form where all the 'or' operators
+    are replaced by 'and' operators with 'not' operators inside.
+
+    >>> andify({"or": ["/entity/GPE/Sevilla", "/entity/GPE/Madrid"]})
+    {'and': [{'not': '/entity/GPE/Sevilla'}, {'not': '/entity/GPE/Madrid'}]}
+
+    >>> andify({"or": ["/entity/GPE/Sevilla", {"not": "/entity/GPE/Madrid"}]})
+    {'and': [{'not': '/entity/GPE/Sevilla'}, {'not': {'not': '/entity/GPE/Madrid'}}]}
+    """
+    if isinstance(expression, str):
+        return expression
+    if "or" in expression:
+        return {"and": [{"not": andify(subexpr)} for subexpr in expression["or"]]}
+    elif "and" in expression:
+        return {"and": [andify(subexpr) for subexpr in expression["and"]]}
+    elif "not" in expression:
+        return {"not": andify(expression["not"])}
+    else:
+        return expression
 
 
 #######################
@@ -252,10 +293,12 @@ Expression: /label/DOC/Article AND /entity/GPE/Sevilla
 Search query (json):
 {
   "query": "temperature",
-  "filters": [
-    "/entity/GPE/Sevilla",
-    "/label/DOC/Article"
-  ]
+  "filters": {
+    "and": [
+      "/entity/GPE/Sevilla",
+      "/label/DOC/Article"
+    ]
+  }
 }
 ------------------
 Expression: /label/DOC/Article AND /entity/GPE/Sevilla
@@ -263,7 +306,7 @@ Search query (json):
 {
   "query": "temperature",
   "filters": {
-    "must": [
+    "and": [
       "/entity/GPE/Sevilla",
       "/label/DOC/Article"
     ]
@@ -275,7 +318,7 @@ Search query (json):
 {
   "query": "temperature",
   "filters": {
-    "should": [
+    "or": [
       "/entity/GPE/Sevilla",
       "/entity/GPE/Madrid"
     ]
@@ -287,9 +330,7 @@ Search query (json):
 {
   "query": "temperature",
   "filters": {
-    "must_not": [
-      "/entity/GPE/Sevilla"
-    ]
+    "not": "/entity/GPE/Sevilla"
   }
 }
 ------------------
@@ -298,10 +339,12 @@ Search query (json):
 {
   "query": "temperature",
   "filters": {
-    "must_not": [
-      "/entity/GPE/Sevilla",
-      "/entity/GPE/Madrid"
-    ]
+    "not": {
+      "and": [
+        "/entity/GPE/Sevilla",
+        "/entity/GPE/Madrid"
+      ]
+    }
   }
 }
 ------------------
@@ -310,14 +353,12 @@ Search query (json):
 {
   "query": "temperature",
   "filters": {
-    "must_not": [
-      {
-        "should": [
-          "/entity/GPE/Sevilla",
-          "/entity/GPE/Madrid"
-        ]
-      }
-    ]
+    "not": {
+      "or": [
+        "/entity/GPE/Sevilla",
+        "/entity/GPE/Madrid"
+      ]
+    }
   }
 }
 ------------------
@@ -326,14 +367,15 @@ Search query (json):
 {
   "query": "temperature",
   "filters": {
-    "must": [
-      "/label/DOC/Article"
-    ],
-    "should": [
-      "/entity/GPE/Sevilla",
-      "/entity/GPE/Madrid"
-    ],
-    "must_not": null
+    "and": [
+      "/label/DOC/Article",
+      {
+        "or": [
+          "/entity/GPE/Sevilla",
+          "/entity/GPE/Madrid"
+        ]
+      }
+    ]
   }
 }
 ------------------
@@ -342,15 +384,17 @@ Search query (json):
 {
   "query": "temperature",
   "filters": {
-    "must": [
-      "/label/DOC/Article"
-    ],
-    "should": [
-      "/entity/GPE/Sevilla",
-      "/entity/GPE/Madrid"
-    ],
-    "must_not": [
-      "/entity/Company/Apple"
+    "and": [
+      "/label/DOC/Article",
+      {
+        "or": [
+          "/entity/GPE/Sevilla",
+          "/entity/GPE/Madrid"
+        ]
+      },
+      {
+        "not": "/entity/Company/Apple"
+      }
     ]
   }
 }
@@ -360,19 +404,21 @@ Search query (json):
 {
   "query": "temperature",
   "filters": {
-    "should": [
+    "or": [
       "/label/DOC/Article",
       {
-        "must": [
+        "and": [
           "/entity/GPE/Sevilla",
           "/entity/GPE/Madrid"
         ]
       },
       {
-        "must_not": [
-          "/entity/Company/Apple",
-          "/entity/Company/Google"
-        ]
+        "not": {
+          "and": [
+            "/entity/Company/Apple",
+            "/entity/Company/Google"
+          ]
+        }
       }
     ]
   }
