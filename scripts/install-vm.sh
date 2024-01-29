@@ -105,8 +105,18 @@ if (($EUID != 0)); then
   SUDO='sudo'
 fi
 
+PACKAGE=nucliadb
+if [ -n "$1" ]
+then
+  PACKAGE="nucliadb==$1"
+  echo "Upgrading to version $1"
+else
+  echo "Upgrading to latest version"
+fi
+sleep 1
+
 $SUDO systemctl stop nucliadb
-$SUDO $INSTALL_DIR/bin/pip install --upgrade nucliadb
+$SUDO $INSTALL_DIR/bin/pip install --upgrade "$PACKAGE"
 $SUDO systemctl start nucliadb
 EOF
 
