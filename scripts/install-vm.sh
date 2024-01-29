@@ -23,7 +23,7 @@ if [ -f /etc/redhat-release ]; then
     echo "Detected Red Hat or Fedora"
     $SUDO dnf update -y
     $SUDO dnf install -y gcc make zlib-devel \
-      ncurses-devel gdbm-devel nss-devel openssl-devel \
+      ncurses-devel nss-devel openssl-devel \
       readline-devel libffi-devel sqlite-devel wget \
       bzip2-devel xz-devel tk-devel
 fi
@@ -89,3 +89,45 @@ $SUDO groupadd -r nucliadb
 $SUDO useradd -M -r -g nucliadb nucliadb
 $SUDO mkdir /var/lib/nucliadb
 $SUDO chown nucliadb:nucliadb /var/lib/nucliadb
+
+# Install upgrade script
+cat << EOF | $SUDO tee /usr/bin/upgrade-nucliadb > /dev/null
+#!/bin/bash
+#
+# The purpose of this script is to be used to upgrade NucliaDB to the latest
+# version. Works if it has been installed using the install-vm.sh script.
+#
+set -e
+INSTALL_DIR=/opt/nucliadb
+
+SUDO=''
+if (($EUID != 0)); then
+  SUDO='sudo'
+fi
+
+PACKAGE=nucliadb
+if [ -n "$1" ]
+then
+  PACKAGE="nucliadb==$1"
+  echo "Upgrading to version $1"
+else
+  echo "Upgrading to latest version"
+fi
+sleep 1
+
+$SUDO systemctl stop nucliadb
+$SUDO $INSTALL_DIR/bin/pip install --upgrade "$PACKAGE"
+$SUDO systemctl start nucliadb
+EOF
+
+$SUDO chmod +x /usr/bin/upgrade-nucliadb
+
+# Install config
+cat << EOF | $SUDO tee /etc/default/nucliadb > /dev/null
+LOG_OUTPUT_TYPE=STDOUT
+
+DRIVER=pg
+DRIVER_PG_URL=
+
+NUA_API_KEY=
+EOF
