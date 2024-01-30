@@ -228,13 +228,14 @@ class QueryParser:
 
     async def parse_filters(self, request: nodereader_pb2.SearchRequest) -> None:
         if len(self.filters) > 0:
-            field_labels = self.filters
+            field_labels: list[str] = []
             paragraph_labels: list[str] = []
             if has_classification_label_filters(self.filters):
                 classification_labels = await self._get_classification_labels()
                 field_labels, paragraph_labels = split_labels_by_type(
                     self.filters, classification_labels
                 )
+            request.filters = translate_to_node_internal_filter(self.filters)
             request.filter.field_labels.extend(field_labels)
             request.filter.paragraph_labels.extend(paragraph_labels)
 

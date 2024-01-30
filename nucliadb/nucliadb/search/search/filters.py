@@ -20,7 +20,9 @@
 from collections.abc import Iterable
 from typing import Optional
 
-from nucliadb_models.filtering import FilterExpression
+from numpy import isin
+
+from nucliadb_models.filtering import AND, FilterExpression
 from nucliadb_models.labels import translate_alias_to_system_label
 from nucliadb_protos import knowledgebox_pb2
 
@@ -153,3 +155,43 @@ def has_classification_label_filters(expression: FilterExpression) -> bool:
         label.startswith(CLASSIFICATION_LABEL_PREFIX)
         for label in iter_labels(expression)
     )
+
+
+def translate_to_node_internal_filter(expression: FilterExpression) -> FilterExpression:
+    """
+    Flattens the expression and translates the labels to the node internal format.
+    >>> expression = {"and": ["/metadata.language/es", "/entity/GPE/Sevilla"], "not": "/entity/GPE/Barcelona"}
+    >>> translate_to_node_internal_filter(expression)
+    {'and': [{"and": ['/e/GPE/Barcelona', '/n/i/pdf']}, '/e/GPE/Sevilla']}
+    """
+    global_terms = []
+    if "and" in expression:
+        and_terms = []
+        for term in expression["and"]:
+            if isinstance(term, str):
+                and_terms.append(term)
+            else:
+                and_terms.append(translate_to_node_internal_filter(term))
+        global_terms.append(and_terms)
+
+    if "or" in expression:
+        or_terms = []
+        for term in expression["or"]:
+            if isinstance(term, str):
+                or_terms.append(term)
+            else:
+                or_terms.append(translate_to_node_internal_filter(term))
+        global_terms.append(or_terms)
+
+    if "not" in expression:
+        not_terms = []
+        if isinstance(term, str):
+            not_terms.append(term)
+        elif isinstance(term, list):
+            for term in expression["not"]:
+                not_terms.append(translate_to_node_internal_filter(term))
+        else:
+            not_terms.append(translate_to_node_internal_filter(term))
+        global_terms.append(not_terms)
+
+    return AND(global_terms)

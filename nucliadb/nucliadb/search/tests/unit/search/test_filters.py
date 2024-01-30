@@ -28,3 +28,28 @@ def is_paragraph_labelset_kind_mock():
         "nucliadb.search.search.filters.is_paragraph_labelset_kind"
     ) as mocked:
         yield mocked
+
+
+
+def test_translate_to_node_internal_filter():
+    pass
+
+
+def test_has_classification_label_filters():
+    pass
+
+
+def test_split_labels_by_type():
+    pass
+
+
+def test_iter_labels():
+    pass
+
+
+def test_translate_expression_labels():
+    pass
+
+
+def test_translate_filter():
+    pass
