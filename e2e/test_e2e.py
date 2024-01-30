@@ -104,17 +104,14 @@ def test_resource_processed(kbid: str, resource_id: str):
         if resp.json()["metadata"]["status"] == "PROCESSED":
             break
 
-        # takes too long to process, skip for now
-        return
+        waited = time.time() - start
+        if waited > (60 * 10):
+            raise Exception("Resource took too long to process")
 
-        # waited = time.time() - start
-        # if waited > (60 * 10):
-        #     raise Exception("Resource took too long to process")
+        if int(waited) % 10 == 0 and int(waited) > 0:
+            print(f"Waiting for resource to process: {int(waited)}s")
 
-        # if int(waited) % 10 == 0 and int(waited) > 0:
-        #     print(f"Waiting for resource to process: {int(waited)}s")
-
-        # time.sleep(1)
+        time.sleep(1)
 
 
 def test_search(kbid: str, resource_id: str):
@@ -161,7 +158,7 @@ def test_search(kbid: str, resource_id: str):
         answer, tail = answer.split(b"_CIT_")
         chat_answer = answer.decode("utf-8")
         citations_length = int.from_bytes(tail[:4], byteorder="big", signed=False)
-        citations_bytes = tail[4: 4 + citations_length]
+        citations_bytes = tail[4 : 4 + citations_length]
         citations = json.loads(base64.b64decode(citations_bytes).decode())
     except ValueError:
         chat_answer = answer.decode("utf-8")
