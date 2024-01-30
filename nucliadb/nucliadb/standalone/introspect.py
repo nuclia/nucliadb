@@ -174,15 +174,23 @@ async def add_settings(temp_dir: str, tar: tarfile.TarFile, settings: Settings):
 
 
 def _add_settings_to_tar(temp_dir: str, tar: tarfile.TarFile, settings: Settings):
-    # Remove sensitive data from settings
-    settings.nua_api_key = None
-    settings.jwk_key = None
-    settings.gcs_base64_creds = None
-    settings.s3_client_secret = None
+    remove_sensitive_settings(settings)
     settings_file = os.path.join(temp_dir, "settings.json")
     with open(settings_file, "w") as f:
         f.write(settings.json(indent=4))
     tar.add(settings_file, arcname="settings.json")
+
+
+def remove_sensitive_settings(settings: Settings):
+    for sensitive_setting in [
+        "nua_api_key",
+        "jwk_key",
+        "gcs_base64_creds",
+        "s3_client_secret",
+        "driver_pg_url",
+    ]:
+        if hasattr(settings, sensitive_setting):
+            setattr(settings, sensitive_setting, "********")
 
 
 async def add_logs(tar):

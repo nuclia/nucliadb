@@ -71,10 +71,15 @@ async def test_introspect_endpoint(nucliadb_manager) -> None:
             os.path.join(extracted_tar, "settings.json")
         )
         # Check that sensitive data is not included
-        assert introspect_settings.nua_api_key is None
-        assert introspect_settings.jwk_key is None
-        assert introspect_settings.gcs_base64_creds is None
-        assert introspect_settings.s3_client_secret is None
+        for sensitive_key in [
+            "nua_api_key",
+            "jwk_key",
+            "gcs_base64_creds",
+            "s3_client_secret",
+            "driver_pg_url",
+        ]:
+            if hasattr(introspect_settings, sensitive_key):
+                assert getattr(introspect_settings, sensitive_key) == "********"
 
         # Check logs
         assert os.path.exists(os.path.join(extracted_tar, "logs/info.log"))

@@ -205,11 +205,10 @@ jobs:
           helm package charts/nucliadb
           curl --data-binary "@nucliadb-${{ steps.version_step.outputs.helm_version }}.tgz" ${{ secrets.HELM_CHART_URL }}/api/charts
 
-      # Not working yet, disabled for now
-      # - name: Repository Dispatch
-      #   uses: peter-evans/repository-dispatch@v2
-      #   with:
-      #     token: ${{ secrets.GH_CICD_PUBLIC }}
-      #     repository: nuclia/nucliadb_deploy
-      #     event-type: promote
-      #     client-payload: '{"component": "nucliadb_standalone", "chart-version": "${{ steps.version_step.outputs.version_number }}" }'
+      - name: Repository Dispatch
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.GH_CICD_PUBLIC }}
+          repository: nuclia/nucliadb_deploy
+          event-type: promote
+          client-payload: '{"component": "nucliadb_standalone", "chart-version": "${{ steps.version_step.outputs.helm_version }}" }'

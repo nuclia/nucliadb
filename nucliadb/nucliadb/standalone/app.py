@@ -51,6 +51,32 @@ from .settings import Settings
 logger = logging.getLogger(__name__)
 
 
+HOMEPAGE_HTML = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NucliaDB Standalone Server</title>
+</head>
+<body>
+    <h1>Welcome to NucliaDB Standalone Server</h1>
+    <p> The NucliaDB API is exposed at /api/v1. </p>
+    <br>
+    <h2>Quick Links</h2>
+    <ul>
+        <li><a href="/admin">Admin UI</a></li>
+        <li><a href="https://docs.nuclia.dev/docs/guides/nucliadb/deploy/basics">NucliaDB Deployment Documentation</a></li>
+        <li><a href="https://docs.nuclia.dev/docs/api">API Reference</a></li>
+        <li><a href="/api/v1/docs">API Explorer</a></li>
+        <li><a href="/metrics">Metrics</a></li>
+        <li><a href="https://docs.nuclia.dev/docs/">Nuclia Documentation</a></li>
+    </ul>
+</body>
+</html>
+"""  # noqa: E501
+
+
 def application_factory(settings: Settings) -> FastAPI:
     middleware = [
         Middleware(
@@ -96,7 +122,7 @@ def application_factory(settings: Settings) -> FastAPI:
             extend_openapi(route)
 
     async def homepage(request):
-        return HTMLResponse("NucliaDB Standalone Server")
+        return HTMLResponse(HOMEPAGE_HTML)
 
     # Use raw starlette routes to avoid unnecessary overhead
     application.add_route("/", homepage)
