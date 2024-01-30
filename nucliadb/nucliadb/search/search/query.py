@@ -36,6 +36,7 @@ from nucliadb.search.search.filters import (
     has_classification_label_filters,
     split_labels_by_type,
     translate_label_filters,
+    translate_to_node_internal_filter,
 )
 from nucliadb.search.search.metrics import (
     node_features,
