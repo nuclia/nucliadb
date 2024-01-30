@@ -48,6 +48,6 @@ storage:
   size: 100Gi
 
 # Service settings
-# service:
+service:
 #   # Tune this to have the service expose a different port. By default is 8080
 #   http_port: 80
