@@ -29,7 +29,7 @@ from fastapi_versioning import version
 from jwcrypto import jwe, jwk  # type: ignore
 
 from nucliadb.common.cluster import manager
-from nucliadb.common.http_clients.processing import ProcessingHTTPClient
+from nucliadb.common.http_clients.auth import NucliaAuthHTTPClient
 from nucliadb.standalone import introspect, versions
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires
@@ -49,10 +49,14 @@ async def api_config_check(request: Request):
     valid_nua_key = False
     nua_key_check_error = None
     if nuclia_settings.nuclia_service_account is not None:
-        async with ProcessingHTTPClient() as processing_client:
+        async with NucliaAuthHTTPClient() as auth_client:
             try:
-                await processing_client.status()
-                valid_nua_key = True
+                resp = await auth_client.status()
+                if resp.auth != "nua_key":
+                    logger.warning(f"Invalid nua key type: {resp}")
+                    nua_key_check_error = f"Invalid nua key type: {resp.auth}"
+                else:
+                    valid_nua_key = True
             except Exception as exc:
                 logger.warning(f"Error validating nua key", exc_info=exc)
                 nua_key_check_error = f"Error checking NUA key: {str(exc)}"
