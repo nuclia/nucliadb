@@ -21,9 +21,13 @@ import asyncio
 import contextlib
 import uuid
 from collections.abc import AsyncGenerator
+from typing import Optional
 
 import async_timeout
 
+from nucliadb.common.context import ApplicationContext
+from nucliadb.common.datamanagers.resources import ResourcesDataManager
+from nucliadb.common.maindb.driver import Driver
 from nucliadb.reader import logger
 from nucliadb_models.notifications import (
     Notification,
@@ -55,18 +59,26 @@ RESOURCE_OP_PB_TO_MODEL = {
 }
 
 
-async def kb_notifications_stream(kbid: str) -> AsyncGenerator[bytes, None]:
+async def kb_notifications_stream(
+    context: ApplicationContext, kbid: str
+) -> AsyncGenerator[bytes, None]:
     """
     Returns an async generator that yields pubsub notifications for the given kbid.
     The generator will return after NOTIFICATIONS_TIMEOUT_S seconds.
     """
     try:
+        resource_cache: dict[str, str] = {}
         async with async_timeout.timeout(NOTIFICATIONS_TIMEOUT_S):
             async for pb_notification in kb_notifications(kbid):
-                line = encode_streamed_notification(pb_notification) + b"\n"
+                notification = await serialize_notification(
+                    context, pb_notification, resource_cache
+                )
+                line = encode_streamed_notification(notification) + b"\n"
                 yield line
     except asyncio.TimeoutError:
         return
+    finally:  # pragma: no cover
+        resource_cache.clear()
 
 
 async def kb_notifications(kbid: str) -> AsyncGenerator[writer_pb2.Notification, None]:
@@ -131,14 +143,21 @@ async def managed_subscription(pubsub: PubSubDriver, key: str, handler: Callback
             )
 
 
-def serialize_notification(pb: writer_pb2.Notification) -> Notification:
+async def serialize_notification(
+    context: ApplicationContext, pb: writer_pb2.Notification, cache: dict[str, str]
+) -> Notification:
+    kbid = pb.kbid
     resource_uuid = pb.uuid
     seqid = pb.seqid
 
+    resource_title = await get_resource_title_cached(
+        context.kv_driver, kbid, resource_uuid, cache
+    )
     if pb.action == writer_pb2.Notification.Action.INDEXED:
         return ResourceIndexedNotification(
             data=ResourceIndexed(
                 resource_uuid=resource_uuid,
+                resource_title=resource_title,
                 seqid=seqid,
             )
         )
@@ -151,6 +170,7 @@ def serialize_notification(pb: writer_pb2.Notification) -> Notification:
         return ResourceWrittenNotification(
             data=ResourceWritten(
                 resource_uuid=resource_uuid,
+                resource_title=resource_title,
                 seqid=seqid,
                 operation=writer_operation,
                 error=has_ingestion_error,
@@ -160,6 +180,7 @@ def serialize_notification(pb: writer_pb2.Notification) -> Notification:
         return ResourceProcessedNotification(
             data=ResourceProcessed(
                 resource_uuid=resource_uuid,
+                resource_title=resource_title,
                 seqid=seqid,
                 ingestion_succeeded=not has_ingestion_error,
                 processing_errors=has_processing_error,
@@ -169,7 +190,33 @@ def serialize_notification(pb: writer_pb2.Notification) -> Notification:
     raise ValueError(f"Unknown notification source: {pb.source}")
 
 
-def encode_streamed_notification(pb: writer_pb2.Notification) -> bytes:
-    notification = serialize_notification(pb)
+async def get_resource_title_cached(
+    kv_driver: Driver,
+    kbid: str,
+    resource_uuid: str,
+    cache: dict[str, str],
+):
+    if resource_uuid in cache:
+        # Cache hit
+        return cache[resource_uuid]
+    # Cache miss
+    resource_title = await get_resource_title(kv_driver, kbid, resource_uuid)
+    if resource_title is None:
+        return ""
+    cache[resource_uuid] = resource_title
+    return resource_title
+
+
+async def get_resource_title(
+    kv_driver: Driver, kbid: str, resource_uuid: str
+) -> Optional[str]:
+    async with kv_driver.transaction(read_only=True) as txn:
+        basic = await ResourcesDataManager.get_resource_basic(txn, kbid, resource_uuid)
+        if basic is None:
+            return None
+        return basic.title
+
+
+def encode_streamed_notification(notification: Notification) -> bytes:
     encoded_nofication = notification.json().encode("utf-8")
     return encoded_nofication

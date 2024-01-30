@@ -84,8 +84,8 @@ async def node_query(
     kbid: str,
     method: Method,
     pb_query: SuggestRequest,
-    target_replicas: Optional[list[str]] = None,
-    read_only: bool = True,
+    target_shard_replicas: Optional[list[str]] = None,
+    use_read_replica_nodes: bool = True,
 ) -> tuple[list[SuggestResponse], bool, list[tuple[str, str, str]], list[str]]:
     ...
 
@@ -95,8 +95,8 @@ async def node_query(
     kbid: str,
     method: Method,
     pb_query: ParagraphSearchRequest,
-    target_replicas: Optional[list[str]] = None,
-    read_only: bool = True,
+    target_shard_replicas: Optional[list[str]] = None,
+    use_read_replica_nodes: bool = True,
 ) -> tuple[list[ParagraphSearchResponse], bool, list[tuple[str, str, str]], list[str]]:
     ...
 
@@ -106,8 +106,8 @@ async def node_query(
     kbid: str,
     method: Method,
     pb_query: SearchRequest,
-    target_replicas: Optional[list[str]] = None,
-    read_only: bool = True,
+    target_shard_replicas: Optional[list[str]] = None,
+    use_read_replica_nodes: bool = True,
 ) -> tuple[list[SearchResponse], bool, list[tuple[str, str, str]], list[str]]:
     ...
 
@@ -117,8 +117,8 @@ async def node_query(
     kbid: str,
     method: Method,
     pb_query: RelationSearchRequest,
-    target_replicas: Optional[list[str]] = None,
-    read_only: bool = True,
+    target_shard_replicas: Optional[list[str]] = None,
+    use_read_replica_nodes: bool = True,
 ) -> tuple[list[RelationSearchResponse], bool, list[tuple[str, str, str]], list[str]]:
     ...
 
@@ -127,10 +127,10 @@ async def node_query(
     kbid: str,
     method: Method,
     pb_query: REQUEST_TYPE,
-    target_replicas: Optional[list[str]] = None,
-    read_only: bool = True,
+    target_shard_replicas: Optional[list[str]] = None,
+    use_read_replica_nodes: bool = True,
 ) -> tuple[list[T], bool, list[tuple[str, str, str]], list[str]]:
-    read_only = read_only and has_feature(
+    use_read_replica_nodes = use_read_replica_nodes and has_feature(
         const.Features.READ_REPLICA_SEARCHES, context={"kbid": kbid}
     )
 
@@ -151,7 +151,9 @@ async def node_query(
     for shard_obj in shard_groups:
         try:
             node, shard_id, node_id = cluster_manager.choose_node(
-                shard_obj, read_only=read_only, target_replicas=target_replicas
+                shard_obj,
+                use_read_replica_nodes=use_read_replica_nodes,
+                target_shard_replicas=target_shard_replicas,
             )
         except KeyError:
             incomplete_results = True

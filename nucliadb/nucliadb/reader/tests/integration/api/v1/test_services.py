@@ -39,6 +39,15 @@ from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_protos import writer_pb2
 
 
+@pytest.fixture(scope="function", autouse=True)
+def get_resource_title():
+    with mock.patch(
+        "nucliadb.reader.reader.notifications.get_resource_title",
+        return_value="Resource",
+    ) as m:
+        yield m
+
+
 @pytest.fixture(scope="function")
 def kb_notifications():
     async def _kb_notifications(
@@ -106,12 +115,14 @@ async def test_activity(
                     notif = ResourceIndexedNotification.parse_raw(line)
                     assert notif.type == "resource_indexed"
                     assert notif.data.resource_uuid == "resource"
+                    assert notif.data.resource_title == "Resource"
                     assert notif.data.seqid == 1
 
                 elif notification_type == "resource_written":
                     notif = ResourceWrittenNotification.parse_raw(line)
                     assert notif.type == "resource_written"
                     assert notif.data.resource_uuid == "resource"
+                    assert notif.data.resource_title == "Resource"
                     assert notif.data.seqid == 1
                     assert notif.data.operation == "created"
                     assert notif.data.error is False
@@ -120,6 +131,7 @@ async def test_activity(
                     notif = ResourceProcessedNotification.parse_raw(line)
                     assert notif.type == "resource_processed"
                     assert notif.data.resource_uuid == "resource"
+                    assert notif.data.resource_title == "Resource"
                     assert notif.data.seqid == 1
                     assert notif.data.ingestion_succeeded is True
                     assert notif.data.processing_errors is True
