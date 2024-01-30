@@ -46,3 +46,8 @@ resources: {}
 storage:
   class: <replace-with-storage-class>
   size: 100Gi
+
+# Service settings
+# service:
+#   # Tune this to have the service expose a different port. By default is 8080
+#   http_port: 80
