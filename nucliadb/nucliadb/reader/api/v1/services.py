@@ -341,7 +341,7 @@ async def notifications_endpoint(
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
 
     response = StreamingResponse(
-        content=kb_notifications_stream(kbid),
+        content=kb_notifications_stream(context, kbid),
         status_code=200,
         media_type="binary/octet-stream",
     )
