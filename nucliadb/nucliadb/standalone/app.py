@@ -61,12 +61,16 @@ HOMEPAGE_HTML = """
 </head>
 <body>
     <h1>Welcome to NucliaDB Standalone Server</h1>
+    <p> The NucliaDB API is exposed at /api/v1. </p>
+    <br>
     <h2>Quick Links</h2>
     <ul>
         <li><a href="/admin">Admin UI</a></li>
-        <li><a href="https://docs.nuclia.dev/docs/">Nuclia Documentation</a></li>
+        <li><a href="https://docs.nuclia.dev/docs/guides/nucliadb/deploy/basics">NucliaDB Deployment Documentation</a></li>
         <li><a href="https://docs.nuclia.dev/docs/api">API Reference</a></li>
+        <li><a href="/api/v1/docs">API Explorer</a></li>
         <li><a href="/metrics">Metrics</a></li>
+        <li><a href="https://docs.nuclia.dev/docs/">Nuclia Documentation</a></li>
     </ul>
 </body>
 </html>
