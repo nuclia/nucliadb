@@ -44,6 +44,34 @@ import pytest
                 "user_id": "bar",
             },
         ),
+        (
+            "GET",
+            "configuration",
+            None,
+            None,
+        ),
+        (
+            "GET",
+            "models",
+            None,
+            None,
+        ),
+        (
+            "GET",
+            "model/1",
+            None,
+            None,
+        ),
+        (
+            "GET",
+            "schema",
+            None,
+            None,
+        ),
+        (
+            "GET",
+            "models/1/foo",
+        )
     ],
 )
 async def test_predict_proxy(

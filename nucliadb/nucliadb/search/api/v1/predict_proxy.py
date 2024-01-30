@@ -67,6 +67,11 @@ async def predict_proxy_endpoint(
         return await predict_proxy(
             kbid, endpoint, request.method, params=request.query_params, json=payload
         )
+    except NotImplementedError:
+        return HTTPClientError(
+            status_code=404,
+            detail=f"Proxy for endpoint {endpoint} is not implemented"
+        )
     except KnowledgeBoxNotFound:
         return HTTPClientError(status_code=404, detail="Knowledge box not found")
     except LimitsExceededError as exc:

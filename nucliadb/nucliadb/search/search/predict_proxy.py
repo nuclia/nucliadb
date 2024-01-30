@@ -38,6 +38,38 @@ class PredictProxiedEndpoints(str, Enum):
     TOKENS = "tokens"
     CHAT = "chat"
     REPHRASE = "rephrase"
+    CONFIGURATION = "configuration"
+    DOWNLOAD_MODEL = "models/{{model_id}}/{{filename:path}}"
+    MODELS = "models"
+    MODEL = "model/{{model_id}}"
+    SCHEMA = "schema"
+
+
+def mapped_predict_api_url(base_url: str, endpoint: PredictProxiedEndpoints, kbid: str) -> str:
+    """
+    Returns the URL for the Predict API endpoint
+    """
+    # These are mapped directly to the Predict API
+    # ndb/api/v1/{kbid}/predict/{endpoint} -> predict/api/v1/{endpoint}
+    if endpoint in [
+        PredictProxiedEndpoints.TOKENS,
+        PredictProxiedEndpoints.CHAT,
+        PredictProxiedEndpoints.REPHRASE,
+    ]:
+        return f"{base_url}/{endpoint.value}"
+    # These rest of the endpoints need some tweaking to match the Predict API urls
+    if endpoint == PredictProxiedEndpoints.DOWNLOAD_MODEL:
+        return f"{base_url}/download/{kbid}/model/{{model_id}}/{{filename:path}}"
+    if endpoint == PredictProxiedEndpoints.CONFIGURATION:
+        return f"{base_url}/configuration/{kbid}"
+    if endpoint == PredictProxiedEndpoints.MODELS:
+        return f"{base_url}/models/{kbid}"
+    if endpoint == PredictProxiedEndpoints.MODEL:
+        return f"{base_url}/models/{kbid}/model/{{model_id}}"
+    if endpoint == PredictProxiedEndpoints.SCHEMA:
+        return f"{base_url}/schema/{kbid}"
+    # pragma: no cover
+    raise NotImplementedError(f"Support for endpoint {endpoint} not implemented")
 
 
 async def predict_proxy(
@@ -55,10 +87,12 @@ async def predict_proxy(
     # Add KB configuration headers
     headers = await predict.get_predict_headers(kbid)
 
+    predict_url = mapped_predict_api_url(predict.base_url, endpoint, kbid)
+
     # Proxy the request to predict API
     predict_response = await predict.make_request(
         method=method,
-        url=predict.get_predict_url(endpoint),
+        url=predict_url,
         json=json,
         params=params,
         headers=headers,

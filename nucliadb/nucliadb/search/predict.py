@@ -191,13 +191,17 @@ class PredictEngine:
         ):
             raise NUAKeyMissingError()
 
+    @property
+    def base_url(self) -> str:
+        if self.onprem:
+            return f"{self.public_url}{PUBLIC_PREDICT}"
+        else:
+            return f"{self.cluster_url}{PRIVATE_PREDICT}"
+
     def get_predict_url(self, endpoint: str) -> str:
         if not endpoint.startswith("/"):
             endpoint = "/" + endpoint
-        if self.onprem:
-            return f"{self.public_url}{PUBLIC_PREDICT}{endpoint}"
-        else:
-            return f"{self.cluster_url}{PRIVATE_PREDICT}{endpoint}"
+        return f"{self.base_url}{endpoint}"
 
     async def get_predict_headers(self, kbid: str) -> dict[str, str]:
         if self.onprem:
