@@ -34,7 +34,6 @@ from nucliadb.search import logger
 from nucliadb.search.predict import PredictVectorMissing, SendToPredictError
 from nucliadb.search.search.filters import (
     has_classification_label_filters,
-    record_filters_counter,
     split_labels_by_type,
     translate_label_filters,
 )
@@ -43,6 +42,7 @@ from nucliadb.search.search.metrics import (
     query_parse_dependency_observer,
 )
 from nucliadb.search.utilities import get_predict
+from nucliadb_models.filtering import FilterExpression
 from nucliadb_models.labels import translate_system_to_alias_label
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import (
@@ -89,7 +89,7 @@ class QueryParser:
         kbid: str,
         features: list[SearchOptions],
         query: str,
-        filters: list[str],
+        filters: FilterExpression,
         faceted: list[str],
         page_number: int,
         page_size: int,
@@ -134,7 +134,6 @@ class QueryParser:
 
         if len(self.filters) > 0:
             self.filters = translate_label_filters(self.filters)
-            record_filters_counter(self.filters, node_features)
 
     def _get_default_min_score(self) -> Awaitable[float]:
         if self._min_score_task is None:  # pragma: no cover

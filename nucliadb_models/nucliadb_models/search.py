@@ -31,6 +31,7 @@ from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 from pydantic import BaseModel, Field, root_validator, validator
 
+from nucliadb_models import filtering
 from nucliadb_models.common import FieldTypeName, ParamDefault
 from nucliadb_models.metadata import RelationType
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
@@ -578,7 +579,11 @@ class SearchParamDefaults:
 class BaseSearchRequest(BaseModel):
     query: str = SearchParamDefaults.query.to_pydantic_field()
     fields: List[str] = SearchParamDefaults.fields.to_pydantic_field()
-    filters: List[str] = SearchParamDefaults.filters.to_pydantic_field()
+    filters: Optional[Union[List[str], filtering.Expression]] = Field(
+        default=None,
+        title="Filters",
+        description="Filters to apply to the query. It can be either a list of terms or an expression. A list of terms will be considered as an 'and' filter for each term. Expressions are more powerful and allow to combine terms with 'and', 'or' and 'not' operators. Filtering examples can be found here: https://docs.nuclia.dev/docs/docs/using/search/#filters",  # noqa
+    )
     faceted: List[str] = SearchParamDefaults.faceted.to_pydantic_field()
     page_number: int = SearchParamDefaults.page_number.to_pydantic_field()
     page_size: int = SearchParamDefaults.page_size.to_pydantic_field()
@@ -625,6 +630,13 @@ class BaseSearchRequest(BaseModel):
     security: Optional[
         RequestSecurity
     ] = SearchParamDefaults.security.to_pydantic_field()
+
+    @validator("filters", pre=True)
+    def validate_filters(cls, v):
+        if isinstance(v, list):
+            v = filtering.convert_to_v2(v)
+        filtering.validate(v)
+        return v
 
     @validator("faceted")
     def nested_facets_not_supported(cls, facets):
@@ -798,7 +810,11 @@ PromptContextOrder = dict[str, int]
 class ChatRequest(BaseModel):
     query: str = SearchParamDefaults.chat_query.to_pydantic_field()
     fields: List[str] = SearchParamDefaults.fields.to_pydantic_field()
-    filters: List[str] = SearchParamDefaults.filters.to_pydantic_field()
+    filters: Optional[Union[List[str], filtering.Expression]] = Field(
+        default=None,
+        title="Filters",
+        description="Filters to apply to the query. It can be either a list of terms or an expression. A list of terms will be considered as an 'and' filter for each term. Expressions are more powerful and allow to combine terms with 'and', 'or' and 'not' operators. Filtering examples can be found here: https://docs.nuclia.dev/docs/docs/using/search/#filters",  # noqa
+    )
     min_score: Optional[float] = SearchParamDefaults.min_score.to_pydantic_field()
     features: List[ChatOptions] = SearchParamDefaults.chat_features.to_pydantic_field()
     range_creation_start: Optional[
@@ -849,6 +865,13 @@ class ChatRequest(BaseModel):
         description="Options for tweaking how the context for the LLM model is crafted. `full_resource` will add the full text of the matching resources to the context. `field_extension` will add the text of the matching resource's specified fields to the context. If empty, the default strategy is used.",  # noqa
     )
     debug: bool = SearchParamDefaults.debug.to_pydantic_field()
+
+    @validator("filters", pre=True)
+    def validate_filters(cls, v):
+        if isinstance(v, list):
+            v = filtering.convert_to_v2(v)
+        filtering.validate(v)
+        return v
 
     @root_validator(pre=True)
     def rag_features_validator(cls, values):

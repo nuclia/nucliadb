@@ -21,22 +21,6 @@ from unittest.mock import Mock, call
 
 import pytest
 
-from nucliadb.search.search.filters import record_filters_counter
-
-
-def test_record_filters_counter():
-    counter = Mock()
-
-    record_filters_counter(["", "/l/ls/l1", "/e/ORG/Nuclia"], counter)
-
-    counter.inc.assert_has_calls(
-        [
-            call({"type": "filters"}),
-            call({"type": "filters_entities"}),
-            call({"type": "filters_labels"}),
-        ]
-    )
-
 
 @pytest.fixture(scope="function")
 def is_paragraph_labelset_kind_mock():
