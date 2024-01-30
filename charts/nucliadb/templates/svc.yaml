@@ -14,7 +14,13 @@ spec:
     app: nucliadb
   ports:
     - name: http
-      port: "{{ .Values.service.http_port | default 8080 }}"
+{{ if .Values.service }}
+  {{ if .Values.service.http_port }}
+      port: {{ .Values.service.http_port }}
+  {{ else }}
+      port: 8080
+  {{ end }}
+{{ end }}
       targetPort: 8080
       protocol: TCP
       appProtocol: http
