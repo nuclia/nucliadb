@@ -91,7 +91,7 @@ $SUDO mkdir /var/lib/nucliadb
 $SUDO chown nucliadb:nucliadb /var/lib/nucliadb
 
 # Install upgrade script
-cat << EOF | $SUDO tee /usr/bin/upgrade-nucliadb > /dev/null
+cat << 'EOF' | $SUDO tee /usr/bin/upgrade-nucliadb > /dev/null
 #!/bin/bash
 #
 # The purpose of this script is to be used to upgrade NucliaDB to the latest
@@ -121,13 +121,3 @@ $SUDO systemctl start nucliadb
 EOF
 
 $SUDO chmod +x /usr/bin/upgrade-nucliadb
-
-# Install config
-cat << EOF | $SUDO tee /etc/default/nucliadb > /dev/null
-LOG_OUTPUT_TYPE=STDOUT
-
-DRIVER=pg
-DRIVER_PG_URL=
-
-NUA_API_KEY=
-EOF
