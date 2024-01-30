@@ -378,7 +378,7 @@ class TiKVDriver(Driver):
         self, read_only: bool = False
     ) -> Union[TiKVTransaction, ReadOnlyTiKVTransaction]:
         conn = self.get_connection_holder()
-        if read_only:
-            return ReadOnlyTiKVTransaction(await conn.get_snapshot(), self)
-        else:
-            return TiKVTransaction(await conn.begin_transaction(), self)
+        # if read_only:
+        #     return ReadOnlyTiKVTransaction(await conn.get_snapshot(), self)
+        # else:
+        return TiKVTransaction(await conn.begin_transaction(), self)
