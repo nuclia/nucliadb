@@ -161,7 +161,7 @@ def test_search(kbid: str, resource_id: str):
         answer, tail = answer.split(b"_CIT_")
         chat_answer = answer.decode("utf-8")
         citations_length = int.from_bytes(tail[:4], byteorder="big", signed=False)
-        citations_bytes = tail[4: 4 + citations_length]
+        citations_bytes = tail[4 : 4 + citations_length]
         citations = json.loads(base64.b64decode(citations_bytes).decode())
     except ValueError:
         chat_answer = answer.decode("utf-8")

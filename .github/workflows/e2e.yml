@@ -156,4 +156,6 @@ jobs:
           DEBUG: "1"
           NUA_API_KEY: ${{ secrets.NUA_API_KEY }}
           NUCLIADB_DISABLE_ANALYTICS: "True"
+          ENVIRONMENT: "stage"
+          FLAG_SETTINGS_URL: https://raw.githubusercontent.com/nuclia/status/main/features-v2.json
         run: bash e2e/run-e2e-tests.sh
