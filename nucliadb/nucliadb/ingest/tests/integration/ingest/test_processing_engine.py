@@ -73,3 +73,33 @@ async def test_send_to_process(onprem, mock_payload, ingest_util):
     await processing_engine.send_to_process(payload, partition=0)
 
     await processing_engine.finalize()
+
+
+@pytest.mark.parametrize("onprem", [True, False])
+@pytest.mark.asyncio
+async def test_delete_from_processing(onprem, ingest_util):
+    """
+    Test that send_to_process does not fail
+    """
+
+    from nucliadb.ingest.processing import ProcessingEngine
+
+    fake_nuclia_proxy_url = "http://fake_proxy"
+    processing_engine = ProcessingEngine(
+        onprem=onprem,
+        nuclia_cluster_url=fake_nuclia_proxy_url,
+        nuclia_public_url=fake_nuclia_proxy_url,
+    )
+    await processing_engine.initialize()
+
+    processing_engine.session = get_mocked_session(
+        "POST",
+        200,
+        json={"kbid": "kbid", "resource_id": "resource_id"},
+        context_manager=False,
+    )
+    await processing_engine.delete_from_processing(
+        kbid="kbid", resource_id="resource_id"
+    )
+
+    await processing_engine.finalize()
