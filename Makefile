@@ -96,6 +96,8 @@ install: ## Install dependencies (on the active environment)
 base-node-image:
 	docker buildx build --platform=linux/amd64 -t eu.gcr.io/stashify-218417/basenode:latest . -f Dockerfile.basenode
 	docker push eu.gcr.io/stashify-218417/basenode:latest
+	docker tag eu.gcr.io/stashify-218417/basenode:latest europe-west4-docker.pkg.dev/nuclia-internal/private/basenode:latest
+	docker push europe-west4-docker.pkg.dev/nuclia-internal/private/basenode:latest
 	docker tag eu.gcr.io/stashify-218417/basenode:latest 042252809363.dkr.ecr.us-east-2.amazonaws.com/basenode:latest
 	docker push 042252809363.dkr.ecr.us-east-2.amazonaws.com/basenode:latest
 
