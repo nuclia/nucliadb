@@ -183,9 +183,13 @@ class ProcessingEngine:
         self.nuclia_internal_push_v2 = (
             f"{nuclia_processing_cluster_url}/api/internal/v2/processing/push"
         )
+        self.nuclia_internal_delete = f"{nuclia_processing_cluster_url}/api/internal/v2/processing/delete-requests"
         self.nuclia_external_push = f"{self.nuclia_public_url}/api/v1/processing/push"
         self.nuclia_external_push_v2 = (
             f"{self.nuclia_public_url}/api/v2/processing/push"
+        )
+        self.nuclia_external_delete = (
+            f"{self.nuclia_public_url}/api/v2/processing/delete-requests"
         )
 
         self.nuclia_jwt_key = nuclia_jwt_key
@@ -459,6 +463,24 @@ class ProcessingEngine:
             queue=QueueType(queue_type) if queue_type is not None else None,
         )
 
+    async def delete_from_processing(
+        self, *, kbid: str, resource_id: Optional[str] = None
+    ) -> None:
+        headers = {"CONTENT-TYPE": "application/json"}
+        data = {"kbid": kbid, "resource_id": resource_id}
+        if self.onprem is False:
+            # Upload the payload
+            url = self.nuclia_internal_delete
+        else:
+            url = self.nuclia_external_delete
+            headers.update({"X-NUCLIA-NUAKEY": f"Bearer {self.nuclia_service_account}"})
+
+        resp = await self.session.post(url=url, data=data, headers=headers)
+        if resp.status != 200:
+            logger.warning(
+                "Error deleting from processing", extra={"status": resp.status}
+            )
+
 
 class DummyProcessingEngine(ProcessingEngine):
     def __init__(self):
@@ -508,3 +530,8 @@ class DummyProcessingEngine(ProcessingEngine):
         return ProcessingInfo(
             seqid=len(self.calls), account_seq=0, queue=QueueType.SHARED
         )
+
+    async def delete_from_processing(
+        self, *, kbid: str, resource_id: Optional[str] = None
+    ) -> None:
+        self.calls.append([kbid, resource_id])
