@@ -186,6 +186,28 @@ async def node_query(
 
     error = validate_node_query_results(results or [])
     if error is not None:
+        if (
+            error.status_code >= 500
+            and use_read_replica_nodes
+            and any([node.is_read_replica() for node, _ in queried_nodes])
+        ):
+            # We had an error querying a secondary node, instead of raising an
+            # error directly, retry query to primaries and hope it works
+            logger.warning(
+                "Query to read replica failed. Trying again with primary",
+                extra={"nodes": debug_nodes_info(queried_nodes)},
+            )
+
+            results, incomplete_results, primary_queried_nodes = await node_query(  # type: ignore
+                kbid,
+                method,
+                pb_query,
+                target_shard_replicas,
+                use_read_replica_nodes=False,
+            )
+            queried_nodes.extend(primary_queried_nodes)
+            return results, incomplete_results, queried_nodes
+
         raise error
 
     return results, incomplete_results, queried_nodes

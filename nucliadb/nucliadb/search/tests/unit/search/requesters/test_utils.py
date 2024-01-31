@@ -17,13 +17,125 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
+import pytest
 from fastapi import HTTPException
 from grpc import StatusCode
 from grpc.aio import AioRpcError  # type: ignore
 
+from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.search.requesters import utils
+from nucliadb_protos import nodereader_pb2, writer_pb2
+from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
+
+
+@pytest.fixture
+def fake_nodes():
+    from nucliadb.common.cluster import manager
+
+    original = manager.INDEX_NODES
+    manager.INDEX_NODES.clear()
+
+    manager.add_index_node(
+        id="node-0",
+        address="nohost",
+        shard_count=0,
+        dummy=True,
+    )
+    manager.add_index_node(
+        id="node-replica-0",
+        address="nohost",
+        shard_count=0,
+        dummy=True,
+        primary_id="node-0",
+    )
+
+    yield
+
+    manager.INDEX_NODES = original
+
+
+@pytest.fixture
+def shard_manager():
+    original = get_utility(Utility.SHARD_MANAGER)
+
+    manager = AsyncMock()
+    manager.get_shards_by_kbid = AsyncMock(
+        return_value=[
+            writer_pb2.ShardObject(
+                shard="shard-id",
+                replicas=[
+                    writer_pb2.ShardReplica(
+                        shard=writer_pb2.ShardCreated(id="shard-id"), node="node-0"
+                    )
+                ],
+            )
+        ]
+    )
+
+    set_utility(Utility.SHARD_MANAGER, manager)
+
+    yield manager
+
+    if original is None:
+        clean_utility(Utility.SHARD_MANAGER)
+    else:
+        set_utility(Utility.SHARD_MANAGER, original)
+
+
+@pytest.fixture()
+def search_methods():
+    def fake_search(
+        node: AbstractIndexNode, shard: str, query: nodereader_pb2.SearchRequest
+    ):
+        if node.is_read_replica():
+            raise Exception()
+        return nodereader_pb2.SearchResponse()
+
+    original = utils.METHODS
+    utils.METHODS = {
+        utils.Method.SEARCH: AsyncMock(side_effect=fake_search),
+        utils.Method.PARAGRAPH: AsyncMock(),
+    }
+
+    yield utils.METHODS
+
+    utils.METHODS = original
+
+
+@pytest.mark.asyncio
+async def test_node_query_retries_primary_if_secondary_fails(
+    fake_nodes,
+    shard_manager,
+    search_methods,
+):
+    """Setting up a node and a faulty replica, validate primary is queried if
+    secondary fails.
+
+    """
+    results, incomplete_results, queried_nodes = await utils.node_query(
+        kbid="my-kbid",
+        method=utils.Method.SEARCH,
+        pb_query=Mock(),
+        use_read_replica_nodes=True,
+    )
+    # secondary fails, primary is called
+    assert search_methods[utils.Method.SEARCH].await_count == 2
+    assert len(queried_nodes) == 2
+    assert queried_nodes[0][0].is_read_replica()
+    assert not queried_nodes[1][0].is_read_replica()
+
+    results, incomplete_results, queried_nodes = await utils.node_query(
+        kbid="my-kbid",
+        method=utils.Method.PARAGRAPH,
+        pb_query=Mock(),
+        use_read_replica_nodes=True,
+    )
+    # secondary succeeds, no fallback call to primary
+    assert search_methods[utils.Method.PARAGRAPH].await_count == 1
+    assert len(queried_nodes) == 2
+    assert queried_nodes[0][0].is_read_replica()
 
 
 def test_validate_node_query_results():
