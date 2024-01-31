@@ -51,7 +51,7 @@ class DriverSettings(BaseSettings):
         default=None,
         description=(
             "TiKV PD (Placement Driver) URLs. The URL to the cluster manager of"
-            "TiKV. Example: tikv-pd.svc:2379"
+            "TiKV. Example: '[\"tikv-pd.svc:2379\"]'"
         ),
     )
     driver_local_url: Optional[str] = Field(
