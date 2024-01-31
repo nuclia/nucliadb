@@ -49,7 +49,10 @@ class DriverSettings(BaseSettings):
     )
     driver_tikv_url: Optional[list[str]] = Field(
         default=None,
-        description="TiKV PD (Placement Dricer) URL. The URL to the cluster manager of TiKV. Example: tikv-pd.svc:2379",
+        description=(
+            "TiKV PD (Placement Driver) URLs. The URL to the cluster manager of"
+            "TiKV. Example: tikv-pd.svc:2379"
+        ),
     )
     driver_local_url: Optional[str] = Field(
         default=None,
