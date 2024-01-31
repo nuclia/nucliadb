@@ -140,8 +140,8 @@ async def test_choose_node(shards, shard_index: int, nodes: set):
     shard = shards.shards[shard_index]
     node_ids = set()
     for i in range(100):
-        _, _, node_id = manager.choose_node(shard)
-        node_ids.add(node_id)
+        node, _ = manager.choose_node(shard)
+        node_ids.add(node.id)
     assert node_ids == nodes, "Random numbers have defeat this test"
 
 
@@ -152,16 +152,16 @@ async def test_choose_node_attempts_target_replicas_but_is_not_imperative(shards
     r1 = shard.replicas[1].shard.id
     n1 = shard.replicas[1].node
 
-    _, replica_id, node_id = manager.choose_node(shard, target_shard_replicas=[r0])
+    node, replica_id = manager.choose_node(shard, target_shard_replicas=[r0])
     assert replica_id == r0
-    assert node_id == n0
+    assert node.id == n0
 
     # Change the node-0 to a non-existent node id in order to
     # test the target_shard_replicas logic is not imperative
     shard.replicas[0].node = "I-do-not-exist"
-    _, replica_id, node_id = manager.choose_node(shard, target_shard_replicas=[r0])
+    node, replica_id = manager.choose_node(shard, target_shard_replicas=[r0])
     assert replica_id == r1
-    assert node_id == n1
+    assert node.id == n1
 
 
 async def test_choose_node_raises_if_no_nodes(shards):
@@ -182,8 +182,8 @@ async def test_apply_for_all_shards(fake_kbid: str, shards, maindb_driver: Drive
 
     nodes = []
 
-    async def fun(node: AbstractIndexNode, shard_id: str, node_id: str):
-        nodes.append((shard_id, node_id))
+    async def fun(node: AbstractIndexNode, shard_id: str):
+        nodes.append((shard_id, node.id))
 
     await shard_manager.apply_for_all_shards(kbid, fun, timeout=10)
 

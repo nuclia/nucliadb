@@ -50,6 +50,6 @@ async def test_vector_result_metadata(
         ),
     ).parse()
 
-    results, _, _, _ = await node_query(kbid, Method.SEARCH, pb_query)
+    results, _, _ = await node_query(kbid, Method.SEARCH, pb_query)
     assert len(results[0].vector.documents) > 0
     assert results[0].vector.documents[0].HasField("metadata")

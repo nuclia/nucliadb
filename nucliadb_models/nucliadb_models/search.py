@@ -244,7 +244,7 @@ class ResourceSearchResults(JsonBaseModel):
     sentences: Optional[Sentences] = None
     paragraphs: Optional[Paragraphs] = None
     relations: Optional[Relations] = None
-    nodes: Optional[List[Tuple[str, str, str]]] = None
+    nodes: Optional[List[Dict[str, str]]] = None
     shards: Optional[List[str]] = None
 
 
@@ -779,7 +779,8 @@ class FieldExtensionStrategy(RagStrategy):
                     ]
                 )
                 raise ValueError(
-                    f"Field '{field}' does not have a valid field type. Valid field types are: {allowed_field_types_part}."
+                    f"Field '{field}' does not have a valid field type. "
+                    f"Valid field types are: {allowed_field_types_part}."
                 )
 
         return values

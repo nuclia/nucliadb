@@ -111,7 +111,7 @@ def test_choose_node_with_two_primary_nodes():
     add_index_node("node-0")
     add_index_node("node-1")
 
-    _, _, node_id = manager.choose_node(
+    node, _ = manager.choose_node(
         writer_pb2.ShardObject(
             replicas=[
                 writer_pb2.ShardReplica(
@@ -120,8 +120,8 @@ def test_choose_node_with_two_primary_nodes():
             ]
         )
     )
-    assert node_id == "node-0"
-    _, _, node_id = manager.choose_node(
+    assert node.id == "node-0"
+    node, _ = manager.choose_node(
         writer_pb2.ShardObject(
             replicas=[
                 writer_pb2.ShardReplica(
@@ -130,7 +130,7 @@ def test_choose_node_with_two_primary_nodes():
             ]
         )
     )
-    assert node_id == "node-1"
+    assert node.id == "node-1"
 
     manager.INDEX_NODES.clear()
 
@@ -144,7 +144,7 @@ def test_choose_node_with_two_read_replicas():
     add_read_replica_node("node-replica-0", primary_id="node-0")
     add_read_replica_node("node-replica-1", primary_id="node-1")
 
-    _, _, node_id = manager.choose_node(
+    node, _ = manager.choose_node(
         writer_pb2.ShardObject(
             replicas=[
                 writer_pb2.ShardReplica(
@@ -154,8 +154,8 @@ def test_choose_node_with_two_read_replicas():
         ),
         use_read_replica_nodes=True,
     )
-    assert node_id == "node-replica-0"
-    _, _, node_id = manager.choose_node(
+    assert node.id == "node-replica-0"
+    node, _ = manager.choose_node(
         writer_pb2.ShardObject(
             replicas=[
                 writer_pb2.ShardReplica(
@@ -165,7 +165,7 @@ def test_choose_node_with_two_read_replicas():
         ),
         use_read_replica_nodes=True,
     )
-    assert node_id == "node-replica-1"
+    assert node.id == "node-replica-1"
 
     manager.INDEX_NODES.clear()
 
@@ -201,9 +201,9 @@ def repeated_choose_node(
     node_ids = []
 
     for _ in range(count):
-        _, shard_id, node_id = manager.choose_node(shard, **kwargs)
+        node, shard_id = manager.choose_node(shard, **kwargs)
         shard_ids.append(shard_id)
-        node_ids.append(node_id)
+        node_ids.append(node.id)
 
     return shard_ids, node_ids
 
