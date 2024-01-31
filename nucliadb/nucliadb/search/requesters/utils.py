@@ -179,22 +179,9 @@ async def node_query(
             timeout=settings.search_timeout,
         )
     except asyncio.TimeoutError as exc:  # pragma: no cover
-        queried_nodes_details = []
-        for _, shard_id, node_id in queried_nodes:
-            queried_node = cluster_manager.get_index_node(node_id)
-            if queried_node is None:
-                node_address = "unknown"
-            else:
-                node_address = node.address
-            queried_nodes_details.append(
-                {
-                    "id": node_id,
-                    "shard_id": shard_id,
-                    "address": node_address,
-                }
-            )
         logger.warning(
-            "Timeout while querying nodes", extra={"nodes": queried_nodes_details}
+            "Timeout while querying nodes",
+            extra={"nodes": debug_nodes_info(queried_nodes)},
         )
         results = [exc]
 
@@ -241,3 +228,18 @@ def validate_node_query_results(results: list[Any]) -> Optional[HTTPException]:
             return HTTPException(status_code=status_code, detail=reason)
 
     return None
+
+
+def debug_nodes_info(
+    nodes: list[tuple[AbstractIndexNode, str]]
+) -> list[dict[str, str]]:
+    details: list[dict[str, str]] = []
+    for node, shard_id in nodes:
+        info = {
+            "id": node.id,
+            "shard_id": shard_id,
+            "address": node.address,
+        }
+        if node.primary_id:
+            info["primary_id"] = node.primary_id
+    return details
