@@ -76,6 +76,7 @@ def kb(field_obj):
     mock.get.return_value.get_field.return_value = field_obj
     yield mock
 
+
 @pytest.mark.asyncio
 async def test_get_next_conversation_messages(field_obj, messages):
     assert (
