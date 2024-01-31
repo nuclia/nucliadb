@@ -134,7 +134,7 @@ async def test_node_query_retries_primary_if_secondary_fails(
     )
     # secondary succeeds, no fallback call to primary
     assert search_methods[utils.Method.PARAGRAPH].await_count == 1
-    assert len(queried_nodes) == 2
+    assert len(queried_nodes) == 1
     assert queried_nodes[0][0].is_read_replica()
 
 
