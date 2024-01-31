@@ -466,6 +466,16 @@ class ProcessingEngine:
     async def delete_from_processing(
         self, *, kbid: str, resource_id: Optional[str] = None
     ) -> None:
+        """
+        Delete a resource from processing. This prevents inflight resources from being processed
+        and wasting resources.
+
+        Ideally, this is done by publishing an event to NATS; however, since we also need to work
+        for hybrid on-prem installations, this is a simple way to handle it.
+
+        Long term, if we want to publish object events out to a NATS stream, we can implement
+        that instead of this method.
+        """
         headers = {"CONTENT-TYPE": "application/json"}
         data = {"kbid": kbid, "resource_id": resource_id}
         if self.onprem is False:
