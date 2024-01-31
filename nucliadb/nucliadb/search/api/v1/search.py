@@ -36,6 +36,7 @@ from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.merge import merge_results
 from nucliadb.search.search.query import QueryParser
 from nucliadb.search.search.utils import should_disable_vector_search
+from nucliadb_models import filtering
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
@@ -147,7 +148,7 @@ async def search_knowledgebox(
         item = SearchRequest(
             query=query,
             fields=fields,
-            filters=filters,
+            filters=filtering.convert_to_v2(filters),
             faceted=faceted,
             sort=(
                 SortOptions(field=sort_field, limit=sort_limit, order=sort_order)
@@ -226,7 +227,7 @@ async def catalog(
             kbid=kbid,
             features=[SearchOptions.DOCUMENT],
             query=query,
-            filters=filters,
+            filters=filtering.convert_to_v2(filters),
             faceted=faceted,
             sort=sort_options,
             page_number=page_number,

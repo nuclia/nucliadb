@@ -32,6 +32,7 @@ from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.find import find
+from nucliadb_models import filtering
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
@@ -123,7 +124,7 @@ async def find_knowledgebox(
         item = FindRequest(
             query=query,
             fields=fields,
-            filters=filters,
+            filters=filtering.convert_to_v2(filters),
             faceted=faceted,
             page_number=page_number,
             page_size=page_size,

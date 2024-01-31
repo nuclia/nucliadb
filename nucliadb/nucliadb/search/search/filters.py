@@ -18,11 +18,9 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from collections.abc import Iterable
-from typing import Optional
+from typing import Any, Optional, Union, cast
 
-from numpy import isin
-
-from nucliadb_models.filtering import AND, FilterExpression
+from nucliadb_models.filtering import FilterExpression, Terms
 from nucliadb_models.labels import translate_alias_to_system_label
 from nucliadb_protos import knowledgebox_pb2
 
@@ -32,17 +30,21 @@ ENTITY_PREFIX = "/e/"
 CLASSIFICATION_LABEL_PREFIX = "/l/"
 
 
-def translate_filter(fltr: str) -> str:
+def translate_label(label: str) -> str:
     """
-    Translate friendly filter names to the shortened filter names.
+    Translate friendly filter label names to the shortened filter label names.
+    >>> translate_label("/metadata.language/es")
+    '/s/p/es'
+    >>> translate_label("/entity/GPE/Sevilla")
+    '/e/GPE/Sevilla'
     """
-    if len(fltr) == 0:
+    if len(label) == 0:
         raise InvalidQueryError("filters", f"Invalid empty label")
-    if fltr[0] != "/":
+    if label[0] != "/":
         raise InvalidQueryError(
-            "filters", f"Invalid label. It must start with a `/`: {fltr}"
+            "filters", f"Invalid label. It must start with a `/`: {label}"
         )
-    return translate_alias_to_system_label(fltr)
+    return translate_alias_to_system_label(label)
 
 
 def translate_expression_labels(filters: FilterExpression) -> FilterExpression:
@@ -53,85 +55,105 @@ def translate_expression_labels(filters: FilterExpression) -> FilterExpression:
     >>> translate_expression_labels(expression)
     {'and': ['/e/GPE/Barcelona', '/n/i/pdf']}
     """
-    output = {}
+    output: dict[str, Any] = {}
     if "and" in filters:
-        terms = []
+        and_terms: Terms = []
         for term in filters["and"]:
             if isinstance(term, str):
-                terms.append(translate_filter(term))
+                term = cast(str, term)
+                and_terms.append(translate_label(term))
             else:
-                terms.append(translate_expression_labels(term))
-        output["and"] = terms
+                term = cast(FilterExpression, term)
+                and_terms.append(translate_expression_labels(term))
+        output["and"] = and_terms
 
     if "or" in filters:
-        terms = []
+        or_terms: Terms = []
         for term in filters["or"]:
             if isinstance(term, str):
-                terms.append(translate_filter(term))
+                term = cast(str, term)
+                or_terms.append(translate_label(term))
             else:
-                terms.append(translate_expression_labels(term))
-        output["or"] = terms
+                term = cast(FilterExpression, term)
+                or_terms.append(translate_expression_labels(term))
+        output["or"] = or_terms
 
     if "not" in filters:
-        term = filters["not"]
-        if isinstance(term, str):
-            output["not"] = translate_filter(term)
+        not_term = filters["not"]
+        if isinstance(not_term, str):
+            not_term = cast(str, not_term)
+            output["not"] = translate_label(not_term)
+        elif isinstance(not_term, list):
+            not_term = cast(Terms, not_term)
+            not_terms: Terms = []
+            for inner_term in not_term:
+                if isinstance(inner_term, str):
+                    not_terms.append(translate_label(inner_term))
+                else:
+                    not_terms.append(translate_expression_labels(inner_term))
+            output["not"] = not_terms
         else:
-            output["not"] = translate_expression_labels(term)
+            not_term = cast(FilterExpression, not_term)
+            output["not"] = translate_expression_labels(not_term)
     return output
 
 
-def iter_labels(expression: FilterExpression) -> Iterable[str]:
+def iter_labels(expression: Union[str, list[str], dict[str, Any]]) -> Iterable[str]:
     """
     Iterate over all the labels in the expression.
+    >>> list(iter_labels("/foo/bar"))
+    ['/foo/bar']
+    >>> list(iter_labels(["foo", "bar"]))
+    ['foo', 'bar']
     >>> list(iter_labels({"and": ["foo", "bar"]}))
     ['foo', 'bar']
     """
-    for term in expression.get("and", []):
-        if isinstance(term, str):
-            yield term
-        else:
-            for label in iter_labels(term):
-                yield label
-    for term in expression.get("or", []):
-        if isinstance(term, str):
-            yield term
-        else:
-            for label in iter_labels(term):
-                yield label
-    not_terms = expression.get("not")
-    if not_terms is not None:
-        if isinstance(not_terms, str):
-            yield not_terms
-        else:
-            for label in iter_labels(not_terms):
-                yield label
+    if isinstance(expression, str):
+        yield expression
+
+    elif isinstance(expression, list):
+        for term in expression:
+            for inner_term in iter_labels(term):
+                yield inner_term
+
+    elif isinstance(expression, dict):
+        for term in expression.get("and", []):
+            for inner_term in iter_labels(term):
+                yield inner_term
+        for term in expression.get("or", []):
+            for inner_term in iter_labels(term):
+                yield inner_term
+        not_terms = expression.get("not")
+        if not_terms is not None:
+            for term in iter_labels(not_terms):
+                yield term
 
 
 def split_labels_by_type(
-    filters: FilterExpression, classification_labels: knowledgebox_pb2.Labels
+    filters: Union[list[str], dict[str, Any]],
+    classification_labels: knowledgebox_pb2.Labels,
 ) -> tuple[list[str], list[str]]:
     """
     Split the labels into field labels and paragraph labels.
     """
     field_labels = []
     paragraph_labels = []
-    for fltr in iter_labels(filters):
-        if len(fltr) == 0 or fltr[0] != "/":
+    for label in iter_labels(filters):
+        if len(label) == 0 or label[0] != "/":
             continue
-        if not fltr.startswith(CLASSIFICATION_LABEL_PREFIX):
-            field_labels.append(fltr)
+        if not label.startswith(CLASSIFICATION_LABEL_PREFIX):
+            field_labels.append(label)
             continue
         # Classification labels should have the form /l/labelset/label
-        parts = fltr.split("/")
+        parts = label.split("/")
         if len(parts) < 4:
-            field_labels.append(fltr)
+            field_labels.append(label)
             continue
         labelset_id = parts[2]
         if is_paragraph_labelset_kind(labelset_id, classification_labels):
-            paragraph_labels.append(fltr)
+            paragraph_labels.append(label)
         else:
-            field_labels.append(fltr)
+            field_labels.append(label)
     return field_labels, paragraph_labels
 
 
@@ -150,48 +172,8 @@ def is_paragraph_labelset_kind(
         return False
 
 
-def has_classification_label_filters(expression: FilterExpression) -> bool:
+def has_classification_label_filters(filters: Union[list[str], dict[str, Any]]) -> bool:
     return any(
-        label.startswith(CLASSIFICATION_LABEL_PREFIX)
-        for label in iter_labels(expression)
+        filter.startswith(CLASSIFICATION_LABEL_PREFIX)
+        for filter in iter_labels(filters)
     )
-
-
-def translate_to_node_internal_filter(expression: FilterExpression) -> FilterExpression:
-    """
-    Flattens the expression and translates the labels to the node internal format.
-    >>> expression = {"and": ["/metadata.language/es", "/entity/GPE/Sevilla"], "not": "/entity/GPE/Barcelona"}
-    >>> translate_to_node_internal_filter(expression)
-    {'and': [{"and": ['/e/GPE/Barcelona', '/n/i/pdf']}, '/e/GPE/Sevilla']}
-    """
-    global_terms = []
-    if "and" in expression:
-        and_terms = []
-        for term in expression["and"]:
-            if isinstance(term, str):
-                and_terms.append(term)
-            else:
-                and_terms.append(translate_to_node_internal_filter(term))
-        global_terms.append(and_terms)
-
-    if "or" in expression:
-        or_terms = []
-        for term in expression["or"]:
-            if isinstance(term, str):
-                or_terms.append(term)
-            else:
-                or_terms.append(translate_to_node_internal_filter(term))
-        global_terms.append(or_terms)
-
-    if "not" in expression:
-        not_terms = []
-        if isinstance(term, str):
-            not_terms.append(term)
-        elif isinstance(term, list):
-            for term in expression["not"]:
-                not_terms.append(translate_to_node_internal_filter(term))
-        else:
-            not_terms.append(translate_to_node_internal_filter(term))
-        global_terms.append(not_terms)
-
-    return AND(global_terms)

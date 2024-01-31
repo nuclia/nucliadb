@@ -38,7 +38,6 @@ _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'nucliadb_protos.audit_pb2', _globals)
 if _descriptor._USE_C_DESCRIPTORS == False:
-
   DESCRIPTOR._options = None
   _AUDITFIELD.fields_by_name['size_delta']._options = None
   _AUDITFIELD.fields_by_name['size_delta']._serialized_options = b'\030\001'

@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+import json
 from datetime import datetime
 from typing import Awaitable, Optional
 
@@ -35,8 +36,8 @@ from nucliadb.search.predict import PredictVectorMissing, SendToPredictError
 from nucliadb.search.search.filters import (
     has_classification_label_filters,
     split_labels_by_type,
-    translate_label_filters,
-    translate_to_node_internal_filter,
+    translate_expression_labels,
+    translate_label,
 )
 from nucliadb.search.search.metrics import (
     node_features,
@@ -134,7 +135,7 @@ class QueryParser:
         self.security = security
 
         if len(self.filters) > 0:
-            self.filters = translate_label_filters(self.filters)
+            self.filters = translate_expression_labels(self.filters)
 
     def _get_default_min_score(self) -> Awaitable[float]:
         if self._min_score_task is None:  # pragma: no cover
@@ -236,11 +237,13 @@ class QueryParser:
                 field_labels, paragraph_labels = split_labels_by_type(
                     self.filters, classification_labels
                 )
-            request.filters = translate_to_node_internal_filter(self.filters)
+            request.filter.expression = json.dumps(self.filters)
             request.filter.field_labels.extend(field_labels)
             request.filter.paragraph_labels.extend(paragraph_labels)
 
-        request.faceted.labels.extend(translate_label_filters(self.faceted))
+        request.faceted.labels.extend(
+            [translate_label(label) for label in self.faceted]
+        )
         request.fields.extend(self.fields)
 
         if self.security is not None and len(self.security.groups) > 0:
@@ -468,7 +471,7 @@ async def paragraph_query_to_pb(
             request.filter.field_labels.extend(field_labels)
             request.filter.paragraph_labels.extend(paragraph_labels)
 
-        request.faceted.labels.extend(translate_label_filters(faceted))
+        request.faceted.labels.extend([translate_label(label) for label in faceted])
         if sort:
             request.order.field = sort
             request.order.type = sort_ord  # type: ignore
@@ -577,7 +580,7 @@ def suggest_query_to_pb(
 
     if SuggestOptions.PARAGRAPH in features:
         request.features.append(nodereader_pb2.SuggestFeatures.PARAGRAPHS)
-        filters = translate_label_filters(filters)
+        filters = [translate_label(label) for label in filters]
         request.filter.field_labels.extend(filters)
         request.fields.extend(fields)
 
