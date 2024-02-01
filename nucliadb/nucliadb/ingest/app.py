@@ -158,6 +158,7 @@ async def main_subscriber_workers():  # pragma: no cover
     auditor_closer = await consumer_service.start_auditor()
     shard_creator_closer = await consumer_service.start_shard_creator()
     materializer_closer = await consumer_service.start_materializer()
+    processor_cleanup_closer = await consumer_service.start_processor_cleanup()
 
     exports_consumer = get_exports_consumer()
     await exports_consumer.initialize(context)
@@ -171,6 +172,7 @@ async def main_subscriber_workers():  # pragma: no cover
             auditor_closer,
             shard_creator_closer,
             materializer_closer,
+            processor_cleanup_closer,
             metrics_server.shutdown,
             grpc_health_finalizer,
             context.finalize,
