@@ -51,7 +51,7 @@ def fake_nodes():
         primary_id="node-0",
     )
 
-    yield
+    yield (["node-0"], ["node-replica-0"])
 
     manager.INDEX_NODES = original
 
@@ -136,6 +136,27 @@ async def test_node_query_retries_primary_if_secondary_fails(
     assert search_methods[utils.Method.PARAGRAPH].await_count == 1
     assert len(queried_nodes) == 1
     assert queried_nodes[0][0].is_read_replica()
+
+
+def test_debug_nodes_info(fake_nodes: tuple[list[str], list[str]]):
+    from nucliadb.common.cluster import manager
+
+    primary = manager.get_index_node(fake_nodes[0][0])
+    assert primary is not None
+    secondary = manager.get_index_node(fake_nodes[1][0])
+    assert secondary is not None
+
+    info = utils.debug_nodes_info([(primary, "shard-a"), (secondary, "shard-b")])
+    assert len(info) == 2
+
+    primary_keys = ["id", "shard_id", "address"]
+    secondary_keys = primary_keys + ["primary_id"]
+
+    for key in primary_keys:
+        assert key in info[0]
+
+    for key in secondary_keys:
+        assert key in info[1]
 
 
 def test_validate_node_query_results():

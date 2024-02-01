@@ -263,4 +263,5 @@ def debug_nodes_info(
         }
         if node.primary_id:
             info["primary_id"] = node.primary_id
+        details.append(info)
     return details
