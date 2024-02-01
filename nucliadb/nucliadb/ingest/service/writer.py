@@ -218,7 +218,9 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             return NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.CONFLICT)
         except Exception as exc:
             errors.capture_exception(exc)
-            logger.exception("Could not create KB", exc_info=True, extra={"slug": request.slug})
+            logger.exception(
+                "Could not create KB", exc_info=True, extra={"slug": request.slug}
+            )
             return NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.ERROR)
         return NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.OK, uuid=kbid)
 
