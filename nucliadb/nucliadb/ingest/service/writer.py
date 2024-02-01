@@ -214,12 +214,14 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             )
             logger.info("KB created successfully", extra={"kbid": kbid})
         except KnowledgeBoxConflict:
-            logger.warning(f"KB with slug already exists", extra={"slug": request.slug})
+            logger.warning("KB already exists", extra={"slug": request.slug})
             return NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.CONFLICT)
         except Exception as exc:
             errors.capture_exception(exc)
             logger.exception(
-                "Could not create KB", exc_info=True, extra={"slug": request.slug}
+                "Unexpected error creating KB",
+                exc_info=True,
+                extra={"slug": request.slug},
             )
             return NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.ERROR)
         return NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.OK, uuid=kbid)
