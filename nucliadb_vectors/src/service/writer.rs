@@ -140,8 +140,10 @@ impl WriterChild for VectorWriterService {
         let id = Some(&resource_id.shard_id);
         let temporal_mark = TemporalMark::now();
         let lock = self.index.get_slock()?;
-        self.index.delete(&resource_id.uuid, temporal_mark, &lock);
-        self.index.commit(&lock)?;
+
+        let mut tx = self.index.transaction();
+        tx.delete_entry(resource_id.uuid.clone());
+        self.index.commit(tx)?;
 
         let took = time.elapsed().as_secs_f64();
         debug!("{id:?} - Ending at {took} ms");
@@ -216,8 +218,9 @@ impl WriterChild for VectorWriterService {
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Processing Sentences to delete: starts {v} ms");
 
+        let mut tx = self.index.transaction();
         for to_delete in &resource.sentences_to_delete {
-            self.index.delete(to_delete, temporal_mark, &lock)
+            tx.delete_entry(to_delete.to_string())
         }
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Processing Sentences to delete: ends {v} ms");
@@ -225,10 +228,11 @@ impl WriterChild for VectorWriterService {
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Indexing datapoint: starts {v} ms");
 
-        match new_dp.map(|i| self.index.add(i, &lock)).unwrap_or(Ok(())) {
-            Ok(_) => self.index.commit(&lock)?,
-            Err(e) => tracing::error!("{id:?}/default could insert vectors: {e:?}"),
+        if let Some(dp) = new_dp {
+            tx.add_segment(dp.journal());
         }
+        self.index.commit(tx);
+
         std::mem::drop(lock);
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Indexing datapoint: ends {v} ms");
@@ -246,12 +250,13 @@ impl WriterChild for VectorWriterService {
                 .map(|i| (v, i))
         });
         for (vectorlist, index) in index_iter {
+            let mut tx = self.index.transaction();
             let mut index = index?;
             let index_lock = index.get_slock()?;
             vectorlist.vectors.iter().for_each(|vector| {
-                index.delete(vector, temporal_mark, &index_lock);
+                tx.delete_entry(vector.to_string());
             });
-            index.commit(&index_lock)?;
+            index.commit(tx)?;
         }
         std::mem::drop(indexset_slock);
         let v = time.elapsed().as_millis();
@@ -296,10 +301,9 @@ impl WriterChild for VectorWriterService {
                     self.channel,
                 )?;
                 let lock = index.get_slock()?;
-                match index.add(new_dp, &lock) {
-                    Ok(_) => index.commit(&lock)?,
-                    Err(e) => tracing::error!("Could not insert at {id:?}/{index_key}: {e:?}"),
-                }
+                let mut tx = self.index.transaction();
+                tx.add_segment(new_dp.journal());
+                index.commit(tx)?;
             }
         }
         let v = time.elapsed().as_millis();
@@ -515,6 +519,8 @@ impl VectorWriterService {
 #[cfg(test)]
 mod tests {
     use std::collections::{HashMap, HashSet};
+    use std::thread;
+    use std::time::Duration;
 
     use nucliadb_core::protos::resource::ResourceStatus;
     use nucliadb_core::protos::{

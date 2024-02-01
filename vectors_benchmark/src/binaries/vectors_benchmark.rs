@@ -24,7 +24,7 @@ use std::sync::Arc;
 use std::{fs, thread};
 
 use byte_unit::Byte;
-use nucliadb_vectors::data_point_provider::{Index, IndexMetadata, Merger};
+use nucliadb_vectors::data_point_provider::{Index, IndexMetadata};
 use serde_json::json;
 use vectors_benchmark::cli_interface::*;
 use vectors_benchmark::json_writer::write_json;
@@ -61,7 +61,8 @@ fn dir_size(path: &Path) -> Result<Byte, Box<dyn Error>> {
 }
 
 fn main() -> std::io::Result<()> {
-    let _ = Merger::install_global().map(std::thread::spawn);
+    // TODO Merger
+    // let _ = Merger::install_global().map(std::thread::spawn);
     let args = Args::new();
     let stop_point = Arc::new(AtomicBool::new(false));
     let at = tempfile::TempDir::new().unwrap();

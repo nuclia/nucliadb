@@ -24,13 +24,13 @@ use nucliadb_core::tracing::*;
 use nucliadb_core::{fs_state, Channel};
 
 use super::merger::{MergeQuery, MergeRequest};
-use super::State;
-use crate::data_point::{DataPoint, Journal, Similarity};
+use crate::data_point::{DataPoint, Similarity};
+use crate::segment_manager::{SegmentManager, Transaction};
 use crate::VectorR;
 
 pub(crate) struct Worker {
     location: PathBuf,
-    sender: Sender<Journal>,
+    sender: Sender<Transaction>,
     similarity: Similarity,
     channel: Channel,
 }
@@ -42,7 +42,7 @@ impl MergeQuery for Worker {
 impl Worker {
     pub(crate) fn request(
         location: PathBuf,
-        sender: Sender<Journal>,
+        sender: Sender<Transaction>,
         similarity: Similarity,
         channel: Channel,
     ) -> MergeRequest {
@@ -57,18 +57,19 @@ impl Worker {
         let subscriber = self.location.as_path();
         let _lock = fs_state::shared_lock(subscriber)?;
         info!("{subscriber:?} is ready to perform a merge");
-        let state: State = fs_state::load_state(subscriber)?;
-        let Some(work) = state.current_work_unit().map(|work| {
-            work.iter()
-                .rev()
-                .map(|journal| (state.delete_log(*journal), journal.id()))
-                .collect::<Vec<_>>()
-        }) else {
-            return Ok(());
-        };
+        let sm = SegmentManager::open(subscriber.to_path_buf())?;
+        let work = sm
+            .segment_iterator()
+            .map(|(id, dlog)| (dlog, *id))
+            .collect::<Vec<_>>();
+
         let new_dp = DataPoint::merge(subscriber, &work, self.similarity, self.channel)?;
         let new_dp_id = new_dp.get_id();
-        if self.sender.send(new_dp.journal()).is_err() {
+
+        let mut transaction = Transaction::default();
+        transaction.replace_segments(work.iter().map(|(_, id)| *id).collect(), new_dp.get_id());
+
+        if self.sender.send(transaction).is_err() {
             // If the sender has been deallocated this data point becomes garbage,
             // therefore is removed.
             DataPoint::delete(subscriber, new_dp.get_id())?;

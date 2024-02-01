@@ -448,7 +448,7 @@ impl DataPoint {
         let data_iterator = (0..length).map(|i| data_store::get_value(Node, node_storage, i));
         let mut keys = Vec::new();
         for data in data_iterator {
-            if !delete_log.is_deleted(data) {
+            if !delete_log.is_deleted(Node.get_key(data)) {
                 let raw_key = Node.get_key(data);
                 let string_key = String::from_utf8_lossy(raw_key).to_string();
                 keys.push(string_key);

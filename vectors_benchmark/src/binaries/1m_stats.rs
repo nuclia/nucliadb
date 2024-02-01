@@ -156,8 +156,9 @@ fn add_batch(
     )
     .unwrap();
     let lock = writer.get_slock().unwrap();
-    writer.add(new_dp, &lock).unwrap();
-    writer.commit(&lock).unwrap();
+    let mut tx = writer.transaction();
+    tx.add_segment(new_dp.journal());
+    writer.commit(tx).unwrap();
 }
 
 fn vector_random_subset<T: Clone>(vector: Vec<T>) -> Vec<T> {
@@ -238,7 +239,8 @@ fn test_datapoint(
     filtered_requests: &[Request],
     vecs: &[RandomVectors],
 ) -> Stats {
-    let _ = Merger::install_global().map(std::thread::spawn);
+    // TODO Merger
+    // let _ = Merger::install_global().map(std::thread::spawn);
     let mut stats = Stats {
         writing_time: 0,
         read_time: 0,
