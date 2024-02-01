@@ -307,7 +307,7 @@ mod test {
     use nucliadb_core::NodeResult;
 
     use super::*;
-    use crate::data_point::Similarity;
+    use crate::data_point::{Elem, LabelDictionary, Similarity};
     #[test]
     fn garbage_collection_test() -> NodeResult<()> {
         let dir = tempfile::tempdir()?;
@@ -330,6 +330,51 @@ mod test {
         index.collect_garbage(&lock)?;
         let no_entries = std::fs::read_dir(&vectors_path)?.count();
         assert_eq!(no_entries, empty_no_entries);
+        Ok(())
+    }
+
+    #[test]
+    fn test_delete_get_keys() -> NodeResult<()> {
+        let dir = tempfile::tempdir()?;
+        let vectors_path = dir.path().join("vectors");
+        let mut index = Index::new(&vectors_path, IndexMetadata::default())?;
+        let lock = index.get_slock().unwrap();
+
+        let data_point = DataPoint::new(
+            &vectors_path,
+            vec![
+                Elem::new(
+                    "key_0".to_string(),
+                    vec![1.0],
+                    LabelDictionary::default(),
+                    None,
+                ),
+                Elem::new(
+                    "key_1".to_string(),
+                    vec![1.0],
+                    LabelDictionary::default(),
+                    None,
+                ),
+            ],
+            None,
+            Similarity::Cosine,
+            Channel::EXPERIMENTAL,
+        )
+        .unwrap();
+        index.add(data_point, &lock).unwrap();
+        index.commit(&lock).unwrap();
+
+        assert_eq!(
+            index.get_keys(&lock).unwrap(),
+            vec!["key_0".to_string(), "key_1".to_string()]
+        );
+
+        index.delete("key_0", SystemTime::now(), &lock);
+        assert_eq!(index.get_keys(&lock).unwrap(), vec!["key_1".to_string()]);
+
+        index.delete("key", SystemTime::now(), &lock);
+        assert!(index.get_keys(&lock).unwrap().is_empty());
+
         Ok(())
     }
 }
