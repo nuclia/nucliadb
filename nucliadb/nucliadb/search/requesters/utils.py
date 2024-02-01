@@ -37,6 +37,7 @@ from nucliadb_protos.nodereader_pb2 import (
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 
 from nucliadb.common.cluster import manager as cluster_manager
+from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.search import logger
@@ -86,7 +87,7 @@ async def node_query(
     pb_query: SuggestRequest,
     target_shard_replicas: Optional[list[str]] = None,
     use_read_replica_nodes: bool = True,
-) -> tuple[list[SuggestResponse], bool, list[tuple[str, str, str]], list[str]]:
+) -> tuple[list[SuggestResponse], bool, list[tuple[AbstractIndexNode, str]]]:
     ...
 
 
@@ -97,7 +98,7 @@ async def node_query(
     pb_query: ParagraphSearchRequest,
     target_shard_replicas: Optional[list[str]] = None,
     use_read_replica_nodes: bool = True,
-) -> tuple[list[ParagraphSearchResponse], bool, list[tuple[str, str, str]], list[str]]:
+) -> tuple[list[ParagraphSearchResponse], bool, list[tuple[AbstractIndexNode, str]]]:
     ...
 
 
@@ -108,7 +109,7 @@ async def node_query(
     pb_query: SearchRequest,
     target_shard_replicas: Optional[list[str]] = None,
     use_read_replica_nodes: bool = True,
-) -> tuple[list[SearchResponse], bool, list[tuple[str, str, str]], list[str]]:
+) -> tuple[list[SearchResponse], bool, list[tuple[AbstractIndexNode, str]]]:
     ...
 
 
@@ -119,7 +120,7 @@ async def node_query(
     pb_query: RelationSearchRequest,
     target_shard_replicas: Optional[list[str]] = None,
     use_read_replica_nodes: bool = True,
-) -> tuple[list[RelationSearchResponse], bool, list[tuple[str, str, str]], list[str]]:
+) -> tuple[list[RelationSearchResponse], bool, list[tuple[AbstractIndexNode, str]]]:
     ...
 
 
@@ -129,7 +130,7 @@ async def node_query(
     pb_query: REQUEST_TYPE,
     target_shard_replicas: Optional[list[str]] = None,
     use_read_replica_nodes: bool = True,
-) -> tuple[list[T], bool, list[tuple[str, str, str]], list[str]]:
+) -> tuple[list[T], bool, list[tuple[AbstractIndexNode, str]]]:
     use_read_replica_nodes = use_read_replica_nodes and has_feature(
         const.Features.READ_REPLICA_SEARCHES, context={"kbid": kbid}
     )
@@ -144,13 +145,12 @@ async def node_query(
         )
 
     ops = []
-    queried_shards = []
     queried_nodes = []
     incomplete_results = False
 
     for shard_obj in shard_groups:
         try:
-            node, shard_id, node_id = cluster_manager.choose_node(
+            node, shard_id = cluster_manager.choose_node(
                 shard_obj,
                 use_read_replica_nodes=use_read_replica_nodes,
                 target_shard_replicas=target_shard_replicas,
@@ -163,8 +163,7 @@ async def node_query(
                 # let's add it ot the query list if has a valid value
                 func = METHODS[method]
                 ops.append(func(node, shard_id, pb_query))  # type: ignore
-                queried_nodes.append((node.label, shard_id, node_id))
-                queried_shards.append(shard_id)
+                queried_nodes.append((node, shard_id))
 
     if not ops:
         logger.warning(f"No node found for any of this resources shards {kbid}")
@@ -179,30 +178,39 @@ async def node_query(
             timeout=settings.search_timeout,
         )
     except asyncio.TimeoutError as exc:  # pragma: no cover
-        queried_nodes_details = []
-        for _, shard_id, node_id in queried_nodes:
-            queried_node = cluster_manager.get_index_node(node_id)
-            if queried_node is None:
-                node_address = "unknown"
-            else:
-                node_address = node.address
-            queried_nodes_details.append(
-                {
-                    "id": node_id,
-                    "shard_id": shard_id,
-                    "address": node_address,
-                }
-            )
         logger.warning(
-            "Timeout while querying nodes", extra={"nodes": queried_nodes_details}
+            "Timeout while querying nodes",
+            extra={"nodes": debug_nodes_info(queried_nodes)},
         )
         results = [exc]
 
     error = validate_node_query_results(results or [])
     if error is not None:
+        if (
+            error.status_code >= 500
+            and use_read_replica_nodes
+            and any([node.is_read_replica() for node, _ in queried_nodes])
+        ):
+            # We had an error querying a secondary node, instead of raising an
+            # error directly, retry query to primaries and hope it works
+            logger.warning(
+                "Query to read replica failed. Trying again with primary",
+                extra={"nodes": debug_nodes_info(queried_nodes)},
+            )
+
+            results, incomplete_results, primary_queried_nodes = await node_query(  # type: ignore
+                kbid,
+                method,
+                pb_query,
+                target_shard_replicas,
+                use_read_replica_nodes=False,
+            )
+            queried_nodes.extend(primary_queried_nodes)
+            return results, incomplete_results, queried_nodes
+
         raise error
 
-    return results, incomplete_results, queried_nodes, queried_shards
+    return results, incomplete_results, queried_nodes
 
 
 def validate_node_query_results(results: list[Any]) -> Optional[HTTPException]:
@@ -241,3 +249,19 @@ def validate_node_query_results(results: list[Any]) -> Optional[HTTPException]:
             return HTTPException(status_code=status_code, detail=reason)
 
     return None
+
+
+def debug_nodes_info(
+    nodes: list[tuple[AbstractIndexNode, str]]
+) -> list[dict[str, str]]:
+    details: list[dict[str, str]] = []
+    for node, shard_id in nodes:
+        info = {
+            "id": node.id,
+            "shard_id": shard_id,
+            "address": node.address,
+        }
+        if node.primary_id:
+            info["primary_id"] = node.primary_id
+        details.append(info)
+    return details

@@ -19,7 +19,7 @@
 #
 from time import time
 
-from nucliadb.search.requesters.utils import Method, node_query
+from nucliadb.search.requesters.utils import Method, debug_nodes_info, node_query
 from nucliadb.search.search.find_merge import find_merge_results
 from nucliadb.search.search.query import QueryParser
 from nucliadb.search.search.utils import should_disable_vector_search
@@ -70,7 +70,7 @@ async def find(
         security=item.security,
     )
     pb_query, incomplete_results, autofilters = await query_parser.parse()
-    results, query_incomplete_results, queried_nodes, queried_shards = await node_query(
+    results, query_incomplete_results, queried_nodes = await node_query(
         kbid, Method.SEARCH, pb_query, target_shard_replicas=item.shards
     )
     incomplete_results = incomplete_results or query_incomplete_results
@@ -100,8 +100,9 @@ async def find(
             len(search_results.resources),
         )
     if item.debug:
-        search_results.nodes = queried_nodes
+        search_results.nodes = debug_nodes_info(queried_nodes)
 
+    queried_shards = [shard_id for _, shard_id in queried_nodes]
     search_results.shards = queried_shards
     search_results.autofilters = autofilters
     return search_results, incomplete_results

@@ -183,7 +183,6 @@ async def get_relations_results(
             relations_results,
             _,
             _,
-            _,
         ) = await node_query(
             kbid,
             Method.RELATIONS,

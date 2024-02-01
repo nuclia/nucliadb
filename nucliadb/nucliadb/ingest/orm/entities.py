@@ -195,7 +195,7 @@ class EntitiesManager:
         shard_manager = get_shard_manager()
 
         async def do_entities_search(
-            node: AbstractIndexNode, shard_id: str, node_id: str
+            node: AbstractIndexNode, shard_id: str
         ) -> RelationSearchResponse:
             request = RelationSearchRequest(
                 shard_id=shard_id,
@@ -288,7 +288,7 @@ class EntitiesManager:
         shard_manager = get_shard_manager()
 
         async def query_indexed_entities_group_names(
-            node: AbstractIndexNode, shard_id: str, node_id: str
+            node: AbstractIndexNode, shard_id: str
         ) -> TypeList:
             return await node.reader.RelationTypes(ShardId(id=shard_id))  # type: ignore
 
