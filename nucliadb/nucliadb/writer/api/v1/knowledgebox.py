@@ -17,6 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
+
 from fastapi import HTTPException, Response
 from fastapi_versioning import version  # type: ignore
 from nucliadb_protos.knowledgebox_pb2 import (
@@ -31,6 +33,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
 from starlette.requests import Request
 
 from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX, api
+from nucliadb.writer.utilities import get_processing
 from nucliadb_models.resource import (
     KnowledgeBoxConfig,
     KnowledgeBoxObj,
@@ -138,5 +141,8 @@ async def delete_kb(request: Request, kbid: str):
         raise HTTPException(status_code=404, detail="Knowledge Box does not exists")
     elif kbobj.status == KnowledgeBoxResponseStatus.ERROR:
         raise HTTPException(status_code=500, detail="Error on deleting knowledge box")
+
+    processing = get_processing()
+    asyncio.create_task(processing.delete_from_processing(kbid=kbid))
 
     return Response(status_code=204)
