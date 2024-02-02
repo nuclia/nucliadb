@@ -92,6 +92,10 @@ impl Transaction {
     pub fn delete_entry(&mut self, prefix: String) {
         self.deleted_entries.push(prefix);
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.operations.is_empty() && self.deleted_entries.is_empty()
+    }
 }
 
 const STATE_FILE_EXTENSION: &str = "segstate";
@@ -166,7 +170,8 @@ impl SegmentManager {
             self.state.delete_log.insert(prefix.as_bytes(), next_txid)
         }
 
-        if !transaction.operations.is_empty() {
+        let has_operations = !transaction.operations.is_empty();
+        if has_operations {
             self.state.no_nodes += transaction.no_nodes;
             self.state.journal.push(JournalTransaction {
                 txid: next_txid,
@@ -179,12 +184,14 @@ impl SegmentManager {
 
         match self.save() {
             Ok(_) => {
-                // Apply the changes to the segment view
-                for op in &self.state.journal.last().unwrap().operations {
-                    match op {
-                        Operation::AddSegment(dpid) => self.segments.insert(*dpid, next_txid),
-                        Operation::DeleteSegment(dpid) => self.segments.remove(dpid),
-                    };
+                if has_operations {
+                    // Apply the changes to the segment view
+                    for op in &self.state.journal.last().unwrap().operations {
+                        match op {
+                            Operation::AddSegment(dpid) => self.segments.insert(*dpid, next_txid),
+                            Operation::DeleteSegment(dpid) => self.segments.remove(dpid),
+                        };
+                    }
                 }
                 Ok(())
             }
@@ -322,9 +329,6 @@ impl SegmentManager {
     }
 
     pub fn refresh(&mut self) -> VectorR<()> {
-        if !self.needs_refresh()? {
-            return Ok(());
-        }
         let txid = self.txid();
         self.state = fs_state::load_state(&self.path)?;
 

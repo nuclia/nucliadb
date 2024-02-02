@@ -326,6 +326,10 @@ impl Index {
         // A merge may be waiting to be recorded.
         self.apply_pending_merge()?;
 
+        if transaction.is_empty() {
+            return Ok(());
+        }
+
         self.write_state().commit(transaction)?;
 
         if self.get_dimension().is_none() {

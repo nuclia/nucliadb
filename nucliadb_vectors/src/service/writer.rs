@@ -101,6 +101,7 @@ impl VectorWriter for VectorWriterService {
         let set = &setid.vectorset;
         let indexid = &setid.vectorset;
         self.indexset.remove_index(indexid)?;
+        self.indexset.commit()?;
 
         let took = time.elapsed().as_secs_f64();
         debug!("{id:?}/{set} - Ending at {took} ms");
