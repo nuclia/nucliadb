@@ -29,6 +29,7 @@ from pydantic.error_wrappers import ValidationError
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.models.responses import HTTPClientError
+from nucliadb.search import predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.requesters.utils import Method, debug_nodes_info, node_query
@@ -315,6 +316,11 @@ async def _search_endpoint(
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
     except InvalidQueryError as exc:
         return HTTPClientError(status_code=412, detail=str(exc))
+    except predict.ProxiedPredictAPIError as err:
+        return HTTPClientError(
+            status_code=503,
+            detail=f"Inference service unavailable. {err.status}: {err.detail}",
+        )
 
 
 async def search(
