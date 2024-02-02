@@ -10,6 +10,8 @@ import public "nucliadb_protos/utils.proto";
 message Filter {
     repeated string field_labels = 1;
     repeated string paragraph_labels = 2;
+    // JSON string with the filter expression
+    string expression = 3;
 }
 
 

@@ -4,6 +4,9 @@ pub struct Filter {
     pub field_labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(string, repeated, tag="2")]
     pub paragraph_labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    /// JSON string with the filter expression
+    #[prost(string, tag="3")]
+    pub expression: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct StreamFilter {
