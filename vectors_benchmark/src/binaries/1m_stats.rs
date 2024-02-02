@@ -236,8 +236,7 @@ fn test_datapoint(
     filtered_requests: &[Request],
     vecs: &[RandomVectors],
 ) -> Stats {
-    // TODO Merger
-    // let _ = Merger::install_global().map(std::thread::spawn);
+    let _ = Merger::install_global().map(std::thread::spawn);
     let mut stats = Stats {
         writing_time: 0,
         read_time: 0,
