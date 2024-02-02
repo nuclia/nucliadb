@@ -79,6 +79,20 @@ async def test_filtering_expression(nucliadb_reader, nucliadb_writer, knowledgeb
             [{"not_all": ["/origin.path/folder1", "/origin.tags/news"]}],
             ["resource2", "resource3"],
         ),
+        # combined expressions
+        (
+            [
+                {
+                    "any": [
+                        "/origin.path/folder1",
+                        "/origin.path/folder2",
+                        "/origin.path/folder3",
+                    ]
+                },
+                {"none": ["/origin.tags/news"]},
+            ],
+            ["resource2", "resource3"],
+        ),
     ]:
         resp = await nucliadb_reader.post(
             f"/kb/{kbid}/find", json={"query": "", "filters": filters}
