@@ -29,7 +29,7 @@ from nucliadb_protos.nodereader_pb2 import ParagraphResult as PBParagraphResult
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb_protos.writer_pb2 import Shards as PBShards
-from pydantic import BaseModel, Field, root_validator, validator
+from pydantic import BaseModel, Field, ValidationError, root_validator, validator
 
 from nucliadb_models.common import FieldTypeName, ParamDefault
 from nucliadb_models.metadata import RelationType
@@ -575,10 +575,26 @@ class SearchParamDefaults:
     )
 
 
+class Filter(BaseModel):
+    def __init__(self, **data):
+        super().__init__(**data)
+        if len(data) != 1:
+            raise ValidationError("Use either 'all', 'any', 'none' or 'not_all'")
+
+    all: Optional[List[str]] = None
+    any: Optional[List[str]] = None
+    none: Optional[List[str]] = None
+    not_all: Optional[List[str]] = None
+
+
 class BaseSearchRequest(BaseModel):
     query: str = SearchParamDefaults.query.to_pydantic_field()
     fields: List[str] = SearchParamDefaults.fields.to_pydantic_field()
-    filters: List[str] = SearchParamDefaults.filters.to_pydantic_field()
+    filters: Union[List[str], List[Filter]] = Field(
+        default=[],
+        title="Filters",
+        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/docs/using/search/#filters",  # noqa: E501
+    )
     faceted: List[str] = SearchParamDefaults.faceted.to_pydantic_field()
     page_number: int = SearchParamDefaults.page_number.to_pydantic_field()
     page_size: int = SearchParamDefaults.page_size.to_pydantic_field()
@@ -799,7 +815,11 @@ PromptContextOrder = dict[str, int]
 class ChatRequest(BaseModel):
     query: str = SearchParamDefaults.chat_query.to_pydantic_field()
     fields: List[str] = SearchParamDefaults.fields.to_pydantic_field()
-    filters: List[str] = SearchParamDefaults.filters.to_pydantic_field()
+    filters: Union[List[str], List[Filter]] = Field(
+        default=[],
+        title="Filters",
+        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/docs/using/search/#filters",  # noqa: E501
+    )
     min_score: Optional[float] = SearchParamDefaults.min_score.to_pydantic_field()
     features: List[ChatOptions] = SearchParamDefaults.chat_features.to_pydantic_field()
     range_creation_start: Optional[
