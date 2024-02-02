@@ -57,10 +57,7 @@ impl Worker {
         let subscriber = self.location.as_path();
         info!("{subscriber:?} is ready to perform a merge");
         let sm = SegmentManager::open(subscriber.to_path_buf())?;
-        let work = sm
-            .segment_iterator()
-            .map(|(id, dlog)| (dlog, *id))
-            .collect::<Vec<_>>();
+        let work = sm.segment_iterator().collect::<Vec<_>>();
 
         let new_dp = DataPoint::merge(subscriber, &work, self.similarity, self.channel)?;
         let new_dp_id = new_dp.get_id();

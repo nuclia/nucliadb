@@ -349,14 +349,14 @@ impl SegmentManager {
     }
 
     // Returns active segments
-    pub fn segment_iterator(&self) -> impl Iterator<Item = (&SegmentId, impl DeleteLog + '_)> {
+    pub fn segment_iterator(&self) -> impl Iterator<Item = (impl DeleteLog + '_, SegmentId)> {
         self.segments.iter().map(|(id, time)| {
             (
-                id,
                 TimeSensitiveDLog {
                     time: *time,
                     dlog: &self.state.delete_log,
                 },
+                *id,
             )
         })
     }

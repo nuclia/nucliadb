@@ -214,8 +214,8 @@ impl Index {
     pub fn get_keys(&self) -> VectorR<Vec<String>> {
         self.update()?;
         let mut keys = vec![];
-        for (dpid, delete_log) in self.read_state().segment_iterator() {
-            let dp = DataPoint::open(&self.location, *dpid)?;
+        for (delete_log, dpid) in self.read_state().segment_iterator() {
+            let dp = DataPoint::open(&self.location, dpid)?;
             keys.append(&mut dp.get_keys(&delete_log));
         }
 
@@ -239,8 +239,8 @@ impl Index {
         let no_results = request.no_results();
         let min_score = request.min_score();
         let mut ffsv = Fssc::new(request.no_results(), with_duplicates);
-        for (dpid, delete_log) in self.read_state().segment_iterator() {
-            let data_point = DataPoint::open(&self.location, *dpid)?;
+        for (delete_log, dpid) in self.read_state().segment_iterator() {
+            let data_point = DataPoint::open(&self.location, dpid)?;
             let partial_solution = data_point.search(
                 &delete_log,
                 query,
@@ -301,7 +301,7 @@ impl Index {
     }
 
     fn stored_dimension(&self) -> VectorR<Option<u64>> {
-        let Some((&dpid, _)) = self.read_state().segment_iterator().next() else {
+        let Some((_, dpid)) = self.read_state().segment_iterator().next() else {
             return Ok(None);
         };
         let data_point = DataPoint::open(&self.location, dpid)?;
