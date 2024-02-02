@@ -21,7 +21,7 @@ mod state;
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 
-use nucliadb_core::fs_state::{self, ELock, Lock, SLock, Version};
+use nucliadb_core::fs_state::{self, Version};
 use state::State;
 
 use crate::data_point::Similarity;
@@ -51,23 +51,16 @@ impl IndexSet {
         };
         Ok(index)
     }
-    pub fn remove_index(&mut self, index: &str, _: &ELock) -> VectorR<()> {
+    pub fn remove_index(&mut self, index: &str) -> VectorR<()> {
         let mut write = self.state.write().unwrap();
         write.remove_index(index)
     }
-    pub fn get_or_create<'a, S>(
-        &'a mut self,
-        index: S,
-        similarity: Similarity,
-        _: &ELock,
-    ) -> VectorR<Index>
-    where
-        S: Into<std::borrow::Cow<'a, str>>,
-    {
+    pub fn get_or_create<'a, S>(&'a mut self, index: S, similarity: Similarity) -> VectorR<Index>
+    where S: Into<std::borrow::Cow<'a, str>> {
         let mut write = self.state.write().unwrap();
         write.get_or_create(index, similarity)
     }
-    fn update(&self, _lock: &fs_state::Lock) -> VectorR<()> {
+    fn update(&self) -> VectorR<()> {
         let disk_v = fs_state::crnt_version(&self.location)?;
         let new_state = fs_state::load_state(&self.location)?;
         let mut state = self.state.write().unwrap();
@@ -76,28 +69,19 @@ impl IndexSet {
         *date = disk_v;
         Ok(())
     }
-    pub fn index_keys<C: IndexKeyCollector>(&self, c: &mut C, _: &Lock) {
+    pub fn index_keys<C: IndexKeyCollector>(&self, c: &mut C) {
         let read = self.state.read().unwrap();
         read.index_keys(c);
     }
-    pub fn get(&self, index: &str, _: &Lock) -> VectorR<Option<Index>> {
+    pub fn get(&self, index: &str) -> VectorR<Option<Index>> {
+        self.update()?;
         let read = self.state.read().unwrap();
         read.get(index)
-    }
-    pub fn get_elock(&self) -> VectorR<ELock> {
-        let lock = fs_state::exclusive_lock(&self.location)?;
-        self.update(&lock)?;
-        Ok(lock)
-    }
-    pub fn get_slock(&self) -> VectorR<SLock> {
-        let lock = fs_state::shared_lock(&self.location)?;
-        self.update(&lock)?;
-        Ok(lock)
     }
     pub fn get_location(&self) -> &Path {
         &self.location
     }
-    pub fn commit(&self, _: ELock) -> VectorR<()> {
+    pub fn commit(&self) -> VectorR<()> {
         let state = self.state.read().unwrap();
         let mut date = self.date.write().unwrap();
         fs_state::persist_state::<State>(&self.location, &state)?;

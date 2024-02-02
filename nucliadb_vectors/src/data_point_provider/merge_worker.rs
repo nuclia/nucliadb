@@ -21,11 +21,11 @@ use std::path::PathBuf;
 
 use crossbeam::channel::Sender;
 use nucliadb_core::tracing::*;
-use nucliadb_core::{fs_state, Channel};
+use nucliadb_core::Channel;
 
 use super::merger::{MergeQuery, MergeRequest};
+use super::segment_manager::{SegmentManager, Transaction};
 use crate::data_point::{DataPoint, Similarity};
-use crate::segment_manager::{SegmentManager, Transaction};
 use crate::VectorR;
 
 pub(crate) struct Worker {
@@ -55,7 +55,6 @@ impl Worker {
     }
     fn work(&self) -> VectorR<()> {
         let subscriber = self.location.as_path();
-        let _lock = fs_state::shared_lock(subscriber)?;
         info!("{subscriber:?} is ready to perform a merge");
         let sm = SegmentManager::open(subscriber.to_path_buf())?;
         let work = sm

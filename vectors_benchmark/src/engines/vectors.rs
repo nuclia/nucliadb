@@ -66,7 +66,6 @@ impl VectorEngine for Index {
             Channel::EXPERIMENTAL,
         )
         .unwrap();
-        let lock = self.get_slock().unwrap();
         let mut tx = self.transaction();
         tx.add_segment(new_dp.journal());
         tx.delete_entry(batch_id);
@@ -74,7 +73,6 @@ impl VectorEngine for Index {
     }
 
     fn search(&self, no_results: usize, query: &[f32]) {
-        let lock = self.get_slock().unwrap();
-        self.search(&Request(no_results, query), &lock).unwrap();
+        self.search(&Request(no_results, query)).unwrap();
     }
 }

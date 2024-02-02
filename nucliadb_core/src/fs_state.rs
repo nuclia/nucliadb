@@ -18,13 +18,11 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::fs::{File, OpenOptions};
-use std::io;
+use std::fs::OpenOptions;
 use std::io::{BufReader, BufWriter, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::SystemTime;
 
-use fs2::FileExt;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use thiserror::Error;
@@ -40,7 +38,6 @@ pub enum FsError {
 }
 
 mod names {
-    pub const LOCK: &str = "lk.lock";
     pub const STATE: &str = "state.bincode";
     pub const TEMP: &str = "temp_state.bincode";
 }
@@ -57,16 +54,6 @@ where
         persist_state(path, &with())?;
     }
     Ok(())
-}
-
-pub fn try_exclusive_lock(path: &Path) -> FsResult<ELock> {
-    Ok(ELock::try_new(path)?)
-}
-pub fn exclusive_lock(path: &Path) -> FsResult<ELock> {
-    Ok(ELock::new(path)?)
-}
-pub fn shared_lock(path: &Path) -> FsResult<SLock> {
-    Ok(SLock::new(path)?)
 }
 
 pub fn persist_state<S>(path: &Path, state: &S) -> FsResult<()>
@@ -100,88 +87,6 @@ pub fn crnt_version(path: &Path) -> FsResult<Version> {
     Ok(Version(meta.modified()?))
 }
 
-/// A Lock that may be exclusive or shared
-/// Useful when the code would work in either case.
-pub struct Lock {
-    path: PathBuf,
-    #[allow(unused)]
-    lock: File,
-}
-impl Lock {
-    fn open_lock(path: &Path) -> io::Result<File> {
-        let file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(path.join(names::LOCK))?;
-        Ok(file)
-    }
-    fn try_exclusive(path: &Path) -> io::Result<Lock> {
-        let path = path.to_path_buf();
-        let lock = Lock::open_lock(&path)?;
-        lock.try_lock_exclusive()?;
-        Ok(Lock { lock, path })
-    }
-    fn exclusive(path: &Path) -> io::Result<Lock> {
-        let path = path.to_path_buf();
-        let lock = Lock::open_lock(&path)?;
-        lock.lock_exclusive()?;
-        Ok(Lock { lock, path })
-    }
-    fn shared(path: &Path) -> io::Result<Lock> {
-        let path = path.to_path_buf();
-        let lock = Lock::open_lock(&path)?;
-        lock.lock_shared()?;
-        Ok(Lock { lock, path })
-    }
-}
-impl AsRef<Path> for Lock {
-    fn as_ref(&self) -> &Path {
-        &self.path
-    }
-}
-
-/// A exclusive lock
-pub struct ELock(Lock);
-impl ELock {
-    pub(super) fn try_new(path: &Path) -> io::Result<ELock> {
-        Lock::try_exclusive(path).map(ELock)
-    }
-    pub(super) fn new(path: &Path) -> io::Result<ELock> {
-        Lock::exclusive(path).map(ELock)
-    }
-}
-impl std::ops::Deref for ELock {
-    type Target = Lock;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-impl AsRef<Path> for ELock {
-    fn as_ref(&self) -> &Path {
-        self.0.as_ref()
-    }
-}
-
-/// A shared lock
-pub struct SLock(Lock);
-impl SLock {
-    pub fn new(path: &Path) -> io::Result<SLock> {
-        Lock::shared(path).map(SLock)
-    }
-}
-impl std::ops::Deref for SLock {
-    type Target = Lock;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-impl AsRef<Path> for SLock {
-    fn as_ref(&self) -> &Path {
-        self.0.as_ref()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use tempfile::TempDir;
@@ -197,13 +102,9 @@ mod tests {
     fn test() {
         let dir = TempDir::new().unwrap();
         initialize_disk(dir.path(), State::default).unwrap();
-        let lock = exclusive_lock(dir.path()).unwrap();
         assert!(dir.path().join(names::STATE).is_file());
-        assert!(dir.path().join(names::LOCK).is_file());
         let v0 = crnt_version(dir.path()).unwrap();
-        std::mem::drop(lock);
         assert!(dir.path().join(names::STATE).is_file());
-        assert!(dir.path().join(names::LOCK).is_file());
         assert_eq!(v0, crnt_version(dir.path()).unwrap());
         std::thread::sleep(std::time::Duration::from_millis(100));
         persist_state(dir.path(), &State::default()).unwrap();

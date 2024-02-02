@@ -155,7 +155,6 @@ fn add_batch(
         Channel::EXPERIMENTAL,
     )
     .unwrap();
-    let lock = writer.get_slock().unwrap();
     let mut tx = writer.transaction();
     tx.add_segment(new_dp.journal());
     writer.commit(tx).unwrap();
@@ -207,9 +206,7 @@ fn create_db(
         let _ = std::io::stdout().flush();
     }
     println!("\nCleaning garbage..");
-    let exclusive = writer.get_elock().unwrap();
-    writer.collect_garbage(&exclusive).unwrap();
-    std::mem::drop(exclusive);
+    writer.collect_garbage().unwrap();
     println!("Garbage cleaned");
     writing_time
 }
@@ -253,7 +250,6 @@ fn test_datapoint(
     stats.writing_time = create_db(&db_location, index_size, batch_size, vecs) as u128;
 
     let reader = Index::open(&db_location).unwrap();
-    let lock = reader.get_slock().unwrap();
 
     for cycle in 0..cycles {
         print!(
@@ -264,7 +260,7 @@ fn test_datapoint(
         let _ = std::io::stdout().flush();
 
         let (_, elapsed_time) = measure_time!(microseconds {
-            reader.search(unfiltered_request, &lock).unwrap();
+            reader.search(unfiltered_request).unwrap();
         });
         stats.read_time += elapsed_time as u128;
     }
@@ -281,14 +277,13 @@ fn test_datapoint(
         let _ = std::io::stdout().flush();
 
         let (_, elapsed_time) = measure_time!(microseconds {
-            reader.search(filtered_request, &lock).unwrap();
+            reader.search(filtered_request).unwrap();
         });
         stats.tagged_time += elapsed_time as u128;
     }
 
     println!();
     stats.tagged_time /= cycles as u128;
-    std::mem::drop(lock);
     stats
 }
 

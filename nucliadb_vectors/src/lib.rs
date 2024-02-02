@@ -24,7 +24,6 @@ mod data_types;
 pub mod formula;
 pub mod fst_index;
 pub mod indexset;
-mod segment_manager;
 pub mod service;
 
 use thiserror::Error;
