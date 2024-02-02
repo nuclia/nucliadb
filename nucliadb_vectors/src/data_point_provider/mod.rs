@@ -36,7 +36,6 @@ use nucliadb_core::Channel;
 use serde::{Deserialize, Serialize};
 
 use self::merge_worker::Worker;
-// use crate::data_point_provider::merge_worker::Worker;
 use self::segment_manager::{SegmentManager, Transaction};
 pub use crate::data_point::Neighbour;
 use crate::data_point::{DataPoint, DpId, Similarity};
@@ -268,15 +267,16 @@ impl Index {
 
         // First compact the segment log, to remove all references
         // to segments that are no longer in use by any reader
-        self.write_state().compact()?;
+        let mut state = self.write_state();
+        state.compact()?;
 
         // We iterate all segments in the log including those who have been
         // deleted, but might still be in use in a long-running reader.
         // This is often the same as live segments, except when a merge
         // operation has just finished and some readers are still working
         // with the old segments
-        let state = self.read_state();
-        let in_use_dp: HashSet<_> = state.all_segments_iterator().collect();
+        let in_use_dp: HashSet<_> = state.all_segments_iterator().copied().collect();
+        drop(state);
         for dir_entry in std::fs::read_dir(&self.location)? {
             let entry = dir_entry?;
             let path = entry.path();
