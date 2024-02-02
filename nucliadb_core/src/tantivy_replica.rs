@@ -81,10 +81,7 @@ pub struct ReplicationParameters<'a> {
     pub on_replica: &'a [String],
 }
 
-pub fn compute_safe_replica_state(
-    params: ReplicationParameters,
-    index: &Index,
-) -> Result<TantivyReplicaState> {
+pub fn compute_safe_replica_state(params: ReplicationParameters, index: &Index) -> Result<TantivyReplicaState> {
     let searcher = index.reader()?.searcher();
     let index_metadata = index.load_metas()?;
     let mut segment_files = vec![];
@@ -112,8 +109,7 @@ pub fn compute_safe_replica_state(
             segment_id,
         });
 
-        let deletes =
-            delete_opstamp.map(|stamp| PathBuf::from(format!("{raw_segment_id}.{stamp}.del")));
+        let deletes = delete_opstamp.map(|stamp| PathBuf::from(format!("{raw_segment_id}.{stamp}.del")));
 
         if let Some(deletes) = deletes {
             segment_files.push(deletes);
@@ -179,7 +175,10 @@ mod tests {
         let mut schema_builder = Schema::builder();
         let text_field = schema_builder.add_text_field("text", TEXT | STORED);
         let schema = schema_builder.build();
-        TestingSchema { text_field, schema }
+        TestingSchema {
+            text_field,
+            schema,
+        }
     }
 
     #[test]
@@ -188,9 +187,7 @@ mod tests {
         let testing_schema = define_schema();
         let index = Index::create_in_dir(workspace.path(), testing_schema.schema).unwrap();
         let mut writer = index.writer_with_num_threads(1, 6_000_000).unwrap();
-        writer
-            .add_document(doc!(testing_schema.text_field => "HI IM TEXT"))
-            .unwrap();
+        writer.add_document(doc!(testing_schema.text_field => "HI IM TEXT")).unwrap();
         writer.commit().unwrap();
 
         let replica_params = ReplicationParameters {
@@ -208,9 +205,7 @@ mod tests {
         let testing_schema = define_schema();
         let index = Index::create_in_dir(&workspace, testing_schema.schema).unwrap();
         let mut writer = index.writer_with_num_threads(1, 6_000_000).unwrap();
-        writer
-            .add_document(doc!(testing_schema.text_field => "ONE"))
-            .unwrap();
+        writer.add_document(doc!(testing_schema.text_field => "ONE")).unwrap();
         writer.commit().unwrap();
 
         let replica_params = ReplicationParameters {
@@ -233,9 +228,7 @@ mod tests {
         let reader = replica_index.reader().unwrap();
         let searcher = reader.searcher();
         let collector = tantivy::collector::DocSetCollector;
-        let docs = searcher
-            .search(&tantivy::query::AllQuery, &collector)
-            .unwrap();
+        let docs = searcher.search(&tantivy::query::AllQuery, &collector).unwrap();
 
         assert_eq!(docs.len(), 1);
     }

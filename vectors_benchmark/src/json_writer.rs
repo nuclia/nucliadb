@@ -23,11 +23,7 @@ use std::path::Path;
 
 use serde_json::Value;
 
-pub fn write_json(
-    filename: String,
-    values: Vec<Value>,
-    merge: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub fn write_json(filename: String, values: Vec<Value>, merge: bool) -> Result<(), Box<dyn std::error::Error>> {
     // Check if the file exists and merging is enabled
     if merge && Path::new(&filename).exists() {
         // Load existing JSON data from the file
@@ -48,11 +44,7 @@ pub fn write_json(
         writer.flush()?;
     } else {
         // Create or overwrite the file with new values
-        let file = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(&filename)?;
+        let file = OpenOptions::new().write(true).create(true).truncate(true).open(&filename)?;
         let mut writer = BufWriter::new(file);
         serde_json::to_writer(&mut writer, &values)?;
         writer.flush()?;

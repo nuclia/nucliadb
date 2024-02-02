@@ -52,8 +52,7 @@ impl Index {
         self.dictionary.add_node(dict_writer, to)?;
         let from = self.graphdb.add_node(graph_txn, from)?;
         let to = self.graphdb.add_node(graph_txn, to)?;
-        self.graphdb
-            .connect(graph_txn, from, edge, to, edge_metadata)
+        self.graphdb.connect(graph_txn, from, edge, to, edge_metadata)
     }
     fn graph_search<G: BfsGuide>(
         &self,
@@ -72,12 +71,7 @@ impl Index {
             .unwrap()
             .search()
     }
-    fn delete_node(
-        &self,
-        graph_txn: &mut RwToken,
-        dict_writer: &DWriter,
-        node_id: Entity,
-    ) -> RResult<HashSet<Entity>> {
+    fn delete_node(&self, graph_txn: &mut RwToken, dict_writer: &DWriter, node_id: Entity) -> RResult<HashSet<Entity>> {
         let value = self.graphdb.get_node(graph_txn, node_id)?;
         self.dictionary.delete_node(dict_writer, &value);
         self.graphdb.delete_node(graph_txn, node_id)
@@ -85,16 +79,10 @@ impl Index {
     fn no_nodes(&self, txn: &RoToken) -> RResult<u64> {
         self.graphdb.no_nodes(txn)
     }
-    fn iter_node_ids<'a>(
-        &self,
-        txn: &'a RoToken,
-    ) -> RResult<impl Iterator<Item = RResult<Entity>> + 'a> {
+    fn iter_node_ids<'a>(&self, txn: &'a RoToken) -> RResult<impl Iterator<Item = RResult<Entity>> + 'a> {
         self.graphdb.iter_node_ids(txn)
     }
-    fn iter_edge_ids<'a>(
-        &self,
-        txn: &'a RoToken,
-    ) -> RResult<impl Iterator<Item = RResult<Entity>> + 'a> {
+    fn iter_edge_ids<'a>(&self, txn: &'a RoToken) -> RResult<impl Iterator<Item = RResult<Entity>> + 'a> {
         self.graphdb.iter_edge_ids(txn)
     }
     pub fn get_outedges<'a>(
@@ -119,11 +107,7 @@ impl Index {
     fn prefix_search(&self, dict_reader: &DReader, prefix: &str) -> RResult<Vec<String>> {
         self.dictionary.search(dict_reader, prefix)
     }
-    fn get_inedges<'a>(
-        &self,
-        txn: &'a RoToken,
-        to: Entity,
-    ) -> RResult<impl Iterator<Item = RResult<GCnx>> + 'a> {
+    fn get_inedges<'a>(&self, txn: &'a RoToken, to: Entity) -> RResult<impl Iterator<Item = RResult<GCnx>> + 'a> {
         self.graphdb.get_inedges(txn, to)
     }
     pub fn new_writer(location: &Path) -> RResult<(Index, WMode)> {
@@ -182,10 +166,7 @@ impl<'a> GraphReader<'a> {
     pub fn reload(&self, RMode(reader): &RMode) -> RResult<()> {
         Ok(reader.reload()?)
     }
-    pub fn get_outedges(
-        &'a self,
-        from: Entity,
-    ) -> RResult<impl Iterator<Item = RResult<GCnx>> + 'a> {
+    pub fn get_outedges(&'a self, from: Entity) -> RResult<impl Iterator<Item = RResult<GCnx>> + 'a> {
         self.index.get_outedges(&self.graph_txn, from)
     }
     pub fn get_inedges(&'a self, to: Entity) -> RResult<impl Iterator<Item = RResult<GCnx>> + 'a> {
@@ -218,8 +199,7 @@ impl<'a> GraphReader<'a> {
         max_depth: usize,
         entry_points: Vec<Entity>,
     ) -> RResult<impl Iterator<Item = GCnx>> {
-        self.index
-            .graph_search(&self.graph_txn, guide, max_depth, entry_points)
+        self.index.graph_search(&self.graph_txn, guide, max_depth, entry_points)
     }
     pub fn no_nodes(&self) -> RResult<u64> {
         self.index.no_nodes(&self.graph_txn)
@@ -236,10 +216,7 @@ impl<'a> GraphWriter<'a> {
         self.graph_txn.commit()?;
         Ok(())
     }
-    pub fn get_outedges(
-        &'a self,
-        from: Entity,
-    ) -> RResult<impl Iterator<Item = RResult<GCnx>> + 'a> {
+    pub fn get_outedges(&'a self, from: Entity) -> RResult<impl Iterator<Item = RResult<GCnx>> + 'a> {
         self.index.get_outedges(&self.graph_txn, from)
     }
     pub fn get_inedges(&'a self, to: Entity) -> RResult<impl Iterator<Item = RResult<GCnx>> + 'a> {
@@ -274,14 +251,9 @@ impl<'a> GraphWriter<'a> {
         edge: &IoEdge,
         edge_metadata: Option<&IoEdgeMetadata>,
     ) -> RResult<bool> {
-        self.index
-            .connect(&mut self.graph_txn, writer, from, to, edge, edge_metadata)
+        self.index.connect(&mut self.graph_txn, writer, from, to, edge, edge_metadata)
     }
-    pub fn delete_node(
-        &mut self,
-        WMode(writer): &WMode,
-        node_id: Entity,
-    ) -> RResult<HashSet<Entity>> {
+    pub fn delete_node(&mut self, WMode(writer): &WMode, node_id: Entity) -> RResult<HashSet<Entity>> {
         self.index.delete_node(&mut self.graph_txn, writer, node_id)
     }
 }

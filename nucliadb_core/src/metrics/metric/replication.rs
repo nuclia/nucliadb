@@ -29,11 +29,7 @@ pub type ReplicatedBytesMetric = Family<ReplicatedBytesKey, Counter>;
 
 pub fn register_replicated_bytes_ops(registry: &mut Registry) -> ReplicatedBytesMetric {
     let bytes_count = ReplicatedBytesMetric::default();
-    registry.register(
-        "nucliadb_replication_replicated_bytes_processed",
-        "Replicated bytes",
-        bytes_count.clone(),
-    );
+    registry.register("nucliadb_replication_replicated_bytes_processed", "Replicated bytes", bytes_count.clone());
     bytes_count
 }
 
@@ -46,10 +42,6 @@ pub type ReplicationOpsMetric = Family<ReplicationOpsKey, Counter>;
 
 pub fn register_replication_operations(registry: &mut Registry) -> ReplicationOpsMetric {
     let operation_count = ReplicationOpsMetric::default();
-    registry.register(
-        "replication_operations",
-        "Replication operations",
-        operation_count.clone(),
-    );
+    registry.register("replication_operations", "Replication operations", operation_count.clone());
     operation_count
 }

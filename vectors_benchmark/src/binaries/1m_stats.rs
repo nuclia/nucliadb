@@ -127,34 +127,16 @@ fn random_labels(batch_no: usize, key: String, index_size: usize) -> LabelDictio
     LabelDictionary::new(labels)
 }
 
-fn add_batch(
-    batch_no: usize,
-    writer: &mut Index,
-    elems: Vec<(String, Vec<f32>)>,
-    index_size: usize,
-) {
+fn add_batch(batch_no: usize, writer: &mut Index, elems: Vec<(String, Vec<f32>)>, index_size: usize) {
     let temporal_mark = TemporalMark::now();
     let similarity = Similarity::Cosine;
     let elems = elems
         .into_iter()
-        .map(|(key, vector)| {
-            Elem::new(
-                key.clone(),
-                vector,
-                random_labels(batch_no, key.clone(), index_size),
-                None,
-            )
-        })
+        .map(|(key, vector)| Elem::new(key.clone(), vector, random_labels(batch_no, key.clone(), index_size), None))
         .collect();
 
-    let new_dp = DataPoint::new(
-        writer.location(),
-        elems,
-        Some(temporal_mark),
-        similarity,
-        Channel::EXPERIMENTAL,
-    )
-    .unwrap();
+    let new_dp =
+        DataPoint::new(writer.location(), elems, Some(temporal_mark), similarity, Channel::EXPERIMENTAL).unwrap();
     let mut tx = writer.transaction();
     tx.add_segment(new_dp.journal());
     writer.commit(tx).unwrap();
@@ -167,10 +149,7 @@ fn vector_random_subset<T: Clone>(vector: Vec<T>) -> Vec<T> {
     let mut random_indices: Vec<usize> = (0..size).collect();
     random_indices.shuffle(&mut rng);
     random_indices.truncate(subset_size);
-    random_indices
-        .iter()
-        .map(|&index| vector[index].clone())
-        .collect()
+    random_indices.iter().map(|&index| vector[index].clone()).collect()
 }
 
 fn generate_vecs(count: usize) -> Vec<RandomVectors> {
@@ -181,21 +160,12 @@ fn generate_vecs(count: usize) -> Vec<RandomVectors> {
     res
 }
 
-fn create_db(
-    db_location: &Path,
-    index_size: usize,
-    batch_size: usize,
-    vecs: &[RandomVectors],
-) -> f64 {
+fn create_db(db_location: &Path, index_size: usize, batch_size: usize, vecs: &[RandomVectors]) -> f64 {
     println!("Writing starts..");
     let mut writer = Index::new(db_location, IndexMetadata::default()).unwrap();
     let mut writing_time: f64 = 0.0;
     for (i, vec) in vecs.iter().enumerate().take(index_size / batch_size) {
-        let elems = vec
-            .take(batch_size)
-            .enumerate()
-            .map(|(i, q)| (i.to_string(), q))
-            .collect();
+        let elems = vec.take(batch_size).enumerate().map(|(i, q)| (i.to_string(), q)).collect();
 
         let (_, elapsed_time) = measure_time!(milliseconds {
             add_batch(i, &mut writer, elems, index_size);
@@ -214,13 +184,10 @@ fn create_db(
 fn create_filtered_request() -> Request {
     let random_subset = vector_random_subset(LABELS.to_vec().clone());
 
-    let formula = random_subset
-        .clone()
-        .into_iter()
-        .fold(Formula::new(), |mut acc, i| {
-            acc.extend(AtomClause::label(i.to_string()));
-            acc
-        });
+    let formula = random_subset.clone().into_iter().fold(Formula::new(), |mut acc, i| {
+        acc.extend(AtomClause::label(i.to_string()));
+        acc
+    });
 
     Request {
         filter: formula,
@@ -251,11 +218,7 @@ fn test_datapoint(
     let reader = Index::open(&db_location).unwrap();
 
     for cycle in 0..cycles {
-        print!(
-            "Unfiltered Search => cycle {} of {}      \r",
-            (cycle + 1),
-            cycles
-        );
+        print!("Unfiltered Search => cycle {} of {}      \r", (cycle + 1), cycles);
         let _ = std::io::stdout().flush();
 
         let (_, elapsed_time) = measure_time!(microseconds {
@@ -268,11 +231,7 @@ fn test_datapoint(
     println!();
 
     for (cycle, filtered_request) in filtered_requests.iter().enumerate().take(cycles) {
-        print!(
-            "Filtered Search => cycle {} of {}      \r",
-            (cycle + 1),
-            cycles
-        );
+        print!("Filtered Search => cycle {} of {}      \r", (cycle + 1), cycles);
         let _ = std::io::stdout().flush();
 
         let (_, elapsed_time) = measure_time!(microseconds {
@@ -301,14 +260,8 @@ fn main() {
     }
     let vecs = generate_vecs(args.index_size / args.batch_size);
 
-    let stats = test_datapoint(
-        args.index_size,
-        args.batch_size,
-        args.cycles,
-        &unfiltered_request,
-        &filtered_requests,
-        &vecs,
-    );
+    let stats =
+        test_datapoint(args.index_size, args.batch_size, args.cycles, &unfiltered_request, &filtered_requests, &vecs);
 
     json_results.extend(vec![
         json!({

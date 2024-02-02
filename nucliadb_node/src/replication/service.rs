@@ -62,9 +62,7 @@ async fn stream_file(
     let filepath = shard_path.join(rel_filepath);
 
     if !filepath.exists() {
-        return Err(node_error!(
-            "This file can not be streamed because it does not exist"
-        ));
+        return Err(node_error!("This file can not be streamed because it does not exist"));
     }
 
     debug!("Streaming file {}", filepath.to_string_lossy());
@@ -127,24 +125,10 @@ async fn replicate_from_raw(
     sender: &tokio::sync::mpsc::Sender<Result<replication::ReplicateShardResponse, tonic::Status>>,
 ) -> NodeResult<()> {
     for segment_file in replica_state.files {
-        stream_file(
-            chunk_size,
-            shard_path,
-            generation_id,
-            &PathBuf::from(segment_file),
-            sender,
-        )
-        .await?;
+        stream_file(chunk_size, shard_path, generation_id, &PathBuf::from(segment_file), sender).await?;
     }
     for (metadata_file, data) in replica_state.metadata_files {
-        stream_data(
-            shard_path,
-            generation_id,
-            &PathBuf::from(metadata_file),
-            data,
-            sender,
-        )
-        .await?;
+        stream_data(shard_path, generation_id, &PathBuf::from(metadata_file), data, sender).await?;
     }
     Ok(())
 }
@@ -158,14 +142,7 @@ async fn replicate_from_tantivy(
     sender: &tokio::sync::mpsc::Sender<Result<replication::ReplicateShardResponse, tonic::Status>>,
 ) -> NodeResult<()> {
     for segment_file in &replica_state.files {
-        stream_file(
-            chunk_size,
-            shard_path,
-            generation_id,
-            &index_prefix.join(segment_file),
-            sender,
-        )
-        .await?;
+        stream_file(chunk_size, shard_path, generation_id, &index_prefix.join(segment_file), sender).await?;
     }
 
     stream_data(
@@ -193,65 +170,36 @@ async fn replica_shard(
 
     // getting shard files can block during an active write
     let sshard = Arc::clone(&shard); // moved shard reference into blocking task
-    let shard_files =
-        tokio::task::spawn_blocking(move || sshard.get_shard_files(&ignored_segement_ids))
-            .await??;
+    let shard_files = tokio::task::spawn_blocking(move || sshard.get_shard_files(&ignored_segement_ids)).await??;
 
     for (prefix, segment_files) in shard_files {
         match segment_files {
             IndexFiles::Other(raw_replica) => {
-                replicate_from_raw(
-                    raw_replica,
-                    chunk_size,
-                    &shard_path,
-                    generation_id,
-                    prefix,
-                    &sender,
-                )
-                .await?
+                replicate_from_raw(raw_replica, chunk_size, &shard_path, generation_id, prefix, &sender).await?
             }
             IndexFiles::Tantivy(tantivy_replica) => {
-                replicate_from_tantivy(
-                    tantivy_replica,
-                    chunk_size,
-                    &shard_path,
-                    generation_id,
-                    prefix,
-                    &sender,
-                )
-                .await?
+                replicate_from_tantivy(tantivy_replica, chunk_size, &shard_path, generation_id, prefix, &sender).await?
             }
         };
     }
 
     // top level additional files
     for filename in ["metadata.json", "versions.json"] {
-        stream_file(
-            chunk_size,
-            &shard_path,
-            generation_id,
-            &PathBuf::from(filename),
-            &sender,
-        )
-        .await?;
+        stream_file(chunk_size, &shard_path, generation_id, &PathBuf::from(filename), &sender).await?;
     }
     Ok(())
 }
 
 #[tonic::async_trait]
 impl replication::replication_service_server::ReplicationService for ReplicationServiceGRPCDriver {
-    type ReplicateShardStream =
-        ReceiverStream<Result<replication::ReplicateShardResponse, tonic::Status>>;
+    type ReplicateShardStream = ReceiverStream<Result<replication::ReplicateShardResponse, tonic::Status>>;
 
     async fn check_replication_state(
         &self,
         raw_request: tonic::Request<replication::SecondaryCheckReplicationStateRequest>,
-    ) -> Result<tonic::Response<replication::PrimaryCheckReplicationStateResponse>, tonic::Status>
-    {
+    ) -> Result<tonic::Response<replication::PrimaryCheckReplicationStateResponse>, tonic::Status> {
         if self.settings.node_role() != NodeRole::Primary {
-            return Err(tonic::Status::unavailable(
-                "This node is not a primary node",
-            ));
+            return Err(tonic::Status::unavailable("This node is not a primary node"));
         }
         let request = raw_request.into_inner();
         let mut resp_shard_states = Vec::new();
@@ -265,9 +213,7 @@ impl replication::replication_service_server::ReplicationService for Replication
 
         for shard_id in shard_ids {
             if let Some(metadata) = self.shards.get_metadata(shard_id.clone()) {
-                let gen_id = metadata
-                    .get_generation_id()
-                    .unwrap_or("UNSET_PRIMARY".to_string());
+                let gen_id = metadata.get_generation_id().unwrap_or("UNSET_PRIMARY".to_string());
                 let shard_changed_or_not_present = request_shard_states
                     .clone()
                     .into_iter()
@@ -304,24 +250,18 @@ impl replication::replication_service_server::ReplicationService for Replication
         let request = raw_request.into_inner();
 
         let receiver = tokio::sync::mpsc::channel(4);
-        let sender: tokio::sync::mpsc::Sender<
-            Result<replication::ReplicateShardResponse, tonic::Status>,
-        > = receiver.0.clone();
+        let sender: tokio::sync::mpsc::Sender<Result<replication::ReplicateShardResponse, tonic::Status>> =
+            receiver.0.clone();
 
         let id = request.shard_id;
         let id_clone = id.clone();
         let shards = self.shards.clone();
         let shard_lookup = tokio::task::spawn_blocking(move || shards.get(&id_clone))
             .await
-            .map_err(|error| {
-                tonic::Status::internal(format!("Error lazy loading shard {id}: {error:?}"))
-            })?;
+            .map_err(|error| tonic::Status::internal(format!("Error lazy loading shard {id}: {error:?}")))?;
 
         if let Err(error) = shard_lookup {
-            return Err(tonic::Status::not_found(format!(
-                "Shard {} not found, error: {}",
-                id, error
-            )));
+            return Err(tonic::Status::not_found(format!("Shard {} not found, error: {}", id, error)));
         }
 
         let shard = shard_lookup.unwrap();
@@ -333,22 +273,12 @@ impl replication::replication_service_server::ReplicationService for Replication
 
         let shard_path = shard.path.clone();
         let chunk_size = request.chunk_size;
-        let ignored_segement_ids: HashMap<String, Vec<String>> = request
-            .existing_segment_ids
-            .iter()
-            .map(|(k, v)| (k.clone(), v.items.clone()))
-            .collect();
+        let ignored_segement_ids: HashMap<String, Vec<String>> =
+            request.existing_segment_ids.iter().map(|(k, v)| (k.clone(), v.items.clone())).collect();
 
         tokio::spawn(async move {
-            let result = replica_shard(
-                shard,
-                ignored_segement_ids,
-                chunk_size,
-                shard_path,
-                &generation_id,
-                sender,
-            )
-            .await;
+            let result =
+                replica_shard(shard, ignored_segement_ids, chunk_size, shard_path, &generation_id, sender).await;
 
             if let Err(error) = result {
                 error!("Error replicating shard: {}", error);

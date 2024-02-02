@@ -337,8 +337,7 @@ impl Index {
         }
 
         let segment_count = self.read_state().segment_iterator().count();
-        if matches!(self.merger_status, MergerStatus::Free) && segment_count > ALLOWED_BEFORE_MERGE
-        {
+        if matches!(self.merger_status, MergerStatus::Free) && segment_count > ALLOWED_BEFORE_MERGE {
             self.start_merge();
         }
         Ok(())
@@ -389,14 +388,7 @@ mod test {
 
         let empty_no_entries = std::fs::read_dir(&vectors_path)?.count();
         for _ in 0..10 {
-            DataPoint::new(
-                &vectors_path,
-                vec![],
-                None,
-                Similarity::Cosine,
-                Channel::EXPERIMENTAL,
-            )
-            .unwrap();
+            DataPoint::new(&vectors_path, vec![], None, Similarity::Cosine, Channel::EXPERIMENTAL).unwrap();
         }
 
         index.collect_garbage()?;
@@ -406,20 +398,8 @@ mod test {
     }
 
     fn insert_resource(index: &mut Index, i: u32) {
-        let e = Elem::new(
-            format!("key_{i}"),
-            vec![2.0 + (i as f32 * 0.1)],
-            LabelDictionary::new(vec![]),
-            None,
-        );
-        let dp = DataPoint::new(
-            index.location(),
-            vec![e],
-            None,
-            Similarity::Cosine,
-            Channel::EXPERIMENTAL,
-        )
-        .unwrap();
+        let e = Elem::new(format!("key_{i}"), vec![2.0 + (i as f32 * 0.1)], LabelDictionary::new(vec![]), None);
+        let dp = DataPoint::new(index.location(), vec![e], None, Similarity::Cosine, Channel::EXPERIMENTAL).unwrap();
         let mut tx = index.transaction();
         tx.add_segment(dp.journal());
         index.commit(tx).unwrap();

@@ -28,9 +28,7 @@ use nucliadb_core::protos as nucliadb_protos;
 use nucliadb_protos::op_status::Status;
 use nucliadb_protos::prost_types::Timestamp;
 use nucliadb_protos::resource::ResourceStatus;
-use nucliadb_protos::{
-    IndexMetadata, NewShardRequest, ReleaseChannel, Resource, ResourceId, SearchRequest,
-};
+use nucliadb_protos::{IndexMetadata, NewShardRequest, ReleaseChannel, Resource, ResourceId, SearchRequest};
 use rstest::*;
 use tonic::Request;
 use uuid::Uuid;
@@ -40,9 +38,7 @@ async fn create_dummy_resources(total: u8, writer: &mut TestNodeWriter, shard_id
         let rid = Uuid::new_v4();
         let field = format!("dummy-{i:0>3}");
 
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap();
+        let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
         let timestamp = Timestamp {
             seconds: now.as_secs() as i64 - (total - i) as i64,
             nanos: 0,

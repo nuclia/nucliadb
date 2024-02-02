@@ -28,10 +28,7 @@ use crate::formula::{AtomClause, Formula};
 const SIMILARITY: Similarity = Similarity::Cosine;
 
 fn create_query() -> Vec<f32> {
-    vec![rand::random::<f32>; 178]
-        .into_iter()
-        .map(|f| f())
-        .collect()
+    vec![rand::random::<f32>; 178].into_iter().map(|f| f()).collect()
 }
 
 impl DeleteLog for HashSet<String> {
@@ -60,14 +57,7 @@ fn simple_flow() {
         elems.push(Elem::new(key.clone(), vector, labels, None));
         expected_keys.push(key);
     }
-    let reader = DataPoint::new(
-        temp_dir.path(),
-        elems,
-        None,
-        SIMILARITY,
-        Channel::EXPERIMENTAL,
-    )
-    .unwrap();
+    let reader = DataPoint::new(temp_dir.path(), elems, None, SIMILARITY, Channel::EXPERIMENTAL).unwrap();
     let id = reader.get_id();
     let reader = DataPoint::open(temp_dir.path(), id).unwrap();
     let query = vec![rand::random::<f32>(); 8];
@@ -76,15 +66,7 @@ fn simple_flow() {
         acc.extend(i.clone());
         acc
     });
-    let result = reader.search(
-        &HashSet::new(),
-        &query,
-        &formula,
-        true,
-        no_results,
-        Similarity::Cosine,
-        -1.0,
-    );
+    let result = reader.search(&HashSet::new(), &query, &formula, true, no_results, Similarity::Cosine, -1.0);
     let got_keys = reader.get_keys(&HashSet::new());
     assert!(got_keys.iter().all(|k| expected_keys.contains(k)));
     assert_eq!(got_keys.len(), expected_keys.len());
@@ -108,14 +90,7 @@ fn accuracy_test() {
         let labels = labels_dictionary.clone();
         elems.push(Elem::new(key, vector, labels, None));
     }
-    let reader = DataPoint::new(
-        temp_dir.path(),
-        elems,
-        None,
-        SIMILARITY,
-        Channel::EXPERIMENTAL,
-    )
-    .unwrap();
+    let reader = DataPoint::new(temp_dir.path(), elems, None, SIMILARITY, Channel::EXPERIMENTAL).unwrap();
     let query = create_query();
     let no_results = 10;
     let formula = queries[..20].iter().fold(Formula::new(), |mut acc, i| {
@@ -123,29 +98,13 @@ fn accuracy_test() {
         acc
     });
     let mut result_0 = reader
-        .search(
-            &HashSet::new(),
-            &query,
-            &formula,
-            true,
-            no_results,
-            Similarity::Cosine,
-            -1.0,
-        )
+        .search(&HashSet::new(), &query, &formula, true, no_results, Similarity::Cosine, -1.0)
         .collect::<Vec<_>>();
     result_0.sort_by(|i, j| i.id().cmp(j.id()));
     let query: Vec<_> = query.into_iter().map(|v| v + 1.0).collect();
     let no_results = 10;
     let mut result_1 = reader
-        .search(
-            &HashSet::new(),
-            &query,
-            &formula,
-            true,
-            no_results,
-            Similarity::Cosine,
-            -1.0,
-        )
+        .search(&HashSet::new(), &query, &formula, true, no_results, Similarity::Cosine, -1.0)
         .collect::<Vec<_>>();
     result_1.sort_by(|i, j| i.id().cmp(j.id()));
     assert_ne!(result_0, result_1)
@@ -157,51 +116,15 @@ fn single_graph() {
     let key = "KEY_0".to_string();
     let vector = create_query();
 
-    let elems = vec![Elem::new(
-        key.clone(),
-        vector.clone(),
-        LabelDictionary::default(),
-        None,
-    )];
-    let reader = DataPoint::new(
-        temp_dir.path(),
-        elems.clone(),
-        None,
-        SIMILARITY,
-        Channel::EXPERIMENTAL,
-    )
-    .unwrap();
+    let elems = vec![Elem::new(key.clone(), vector.clone(), LabelDictionary::default(), None)];
+    let reader = DataPoint::new(temp_dir.path(), elems.clone(), None, SIMILARITY, Channel::EXPERIMENTAL).unwrap();
     let formula = Formula::new();
-    let result = reader.search(
-        &HashSet::from([key.clone()]),
-        &vector,
-        &formula,
-        true,
-        5,
-        Similarity::Cosine,
-        -1.0,
-    );
+    let result = reader.search(&HashSet::from([key.clone()]), &vector, &formula, true, 5, Similarity::Cosine, -1.0);
     assert_eq!(result.count(), 0);
 
-    let reader = DataPoint::new(
-        temp_dir.path(),
-        elems,
-        None,
-        SIMILARITY,
-        Channel::EXPERIMENTAL,
-    )
-    .unwrap();
-    let result = reader
-        .search(
-            &HashSet::new(),
-            &vector,
-            &formula,
-            true,
-            5,
-            Similarity::Cosine,
-            -1.0,
-        )
-        .collect::<Vec<_>>();
+    let reader = DataPoint::new(temp_dir.path(), elems, None, SIMILARITY, Channel::EXPERIMENTAL).unwrap();
+    let result =
+        reader.search(&HashSet::new(), &vector, &formula, true, 5, Similarity::Cosine, -1.0).collect::<Vec<_>>();
     assert_eq!(result.len(), 1);
     assert!(result[0].score() >= 0.9);
     assert!(result[0].id() == key.as_bytes());
@@ -213,72 +136,25 @@ fn data_merge() {
 
     let key0 = "KEY_0".to_string();
     let vector0 = create_query();
-    let elems0 = vec![Elem::new(
-        key0.clone(),
-        vector0.clone(),
-        LabelDictionary::default(),
-        None,
-    )];
+    let elems0 = vec![Elem::new(key0.clone(), vector0.clone(), LabelDictionary::default(), None)];
     let key1 = "KEY_1".to_string();
     let vector1 = create_query();
-    let elems1 = vec![Elem::new(
-        key1.clone(),
-        vector1.clone(),
-        LabelDictionary::default(),
-        None,
-    )];
-    let dp_0 = DataPoint::new(
-        temp_dir.path(),
-        elems0,
-        None,
-        SIMILARITY,
-        Channel::EXPERIMENTAL,
-    )
-    .unwrap();
-    let dp_1 = DataPoint::new(
-        temp_dir.path(),
-        elems1,
-        None,
-        SIMILARITY,
-        Channel::EXPERIMENTAL,
-    )
-    .unwrap();
+    let elems1 = vec![Elem::new(key1.clone(), vector1.clone(), LabelDictionary::default(), None)];
+    let dp_0 = DataPoint::new(temp_dir.path(), elems0, None, SIMILARITY, Channel::EXPERIMENTAL).unwrap();
+    let dp_1 = DataPoint::new(temp_dir.path(), elems1, None, SIMILARITY, Channel::EXPERIMENTAL).unwrap();
     let dp = DataPoint::merge(
         temp_dir.path(),
-        &[
-            (HashSet::default(), dp_1.get_id()),
-            (HashSet::default(), dp_0.get_id()),
-        ],
+        &[(HashSet::default(), dp_1.get_id()), (HashSet::default(), dp_0.get_id())],
         Similarity::Cosine,
         Channel::EXPERIMENTAL,
     )
     .unwrap();
     let formula = Formula::new();
-    let result: Vec<_> = dp
-        .search(
-            &HashSet::new(),
-            &vector1,
-            &formula,
-            true,
-            1,
-            Similarity::Cosine,
-            -1.0,
-        )
-        .collect();
+    let result: Vec<_> = dp.search(&HashSet::new(), &vector1, &formula, true, 1, Similarity::Cosine, -1.0).collect();
     assert_eq!(result.len(), 1);
     assert!(result[0].score() >= 0.9);
     assert!(result[0].id() == key1.as_bytes());
-    let result: Vec<_> = dp
-        .search(
-            &HashSet::new(),
-            &vector0,
-            &formula,
-            true,
-            1,
-            Similarity::Cosine,
-            -1.0,
-        )
-        .collect();
+    let result: Vec<_> = dp.search(&HashSet::new(), &vector0, &formula, true, 1, Similarity::Cosine, -1.0).collect();
     assert_eq!(result.len(), 1);
     assert!(result[0].score() >= 0.9);
     assert!(result[0].id() == key0.as_bytes());
@@ -312,14 +188,7 @@ fn prefiltering_test() {
         let labels = LabelDictionary::new(vec![format!("LABEL_{}", i)]);
         elems.push(Elem::new(key, vector, labels, None));
     }
-    let reader = DataPoint::new(
-        temp_dir.path(),
-        elems,
-        None,
-        SIMILARITY,
-        Channel::EXPERIMENTAL,
-    )
-    .unwrap();
+    let reader = DataPoint::new(temp_dir.path(), elems, None, SIMILARITY, Channel::EXPERIMENTAL).unwrap();
     let query = create_query();
     let no_results = 10;
 
@@ -329,32 +198,14 @@ fn prefiltering_test() {
             acc
         });
         let result_0 = reader
-            .search(
-                &HashSet::new(),
-                &query,
-                &formula,
-                true,
-                no_results,
-                Similarity::Cosine,
-                -1.0,
-            )
+            .search(&HashSet::new(), &query, &formula, true, no_results, Similarity::Cosine, -1.0)
             .collect::<Vec<_>>();
         assert_eq!(result_0.len(), 1);
 
-        let delete_log: HashSet<_> = result_0
-            .into_iter()
-            .map(|n| String::from_utf8_lossy(n.id()).to_string())
-            .collect();
+        let delete_log: HashSet<_> =
+            result_0.into_iter().map(|n| String::from_utf8_lossy(n.id()).to_string()).collect();
         let result_with_deleted = reader
-            .search(
-                &delete_log,
-                &query,
-                &formula,
-                true,
-                no_results,
-                Similarity::Cosine,
-                -1.0,
-            )
+            .search(&delete_log, &query, &formula, true, no_results, Similarity::Cosine, -1.0)
             .collect::<Vec<_>>();
         assert_eq!(result_with_deleted.len(), 0);
     }

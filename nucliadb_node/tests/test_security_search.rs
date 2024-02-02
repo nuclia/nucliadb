@@ -33,20 +33,13 @@ use nucliadb_protos::{IndexMetadata, NewShardRequest, Resource, ResourceId, Sear
 use tonic::Request;
 use uuid::Uuid;
 
-async fn create_dummy_resources(
-    total: u8,
-    writer: &mut TestNodeWriter,
-    shard_id: String,
-    access_groups: Vec<String>,
-) {
+async fn create_dummy_resources(total: u8, writer: &mut TestNodeWriter, shard_id: String, access_groups: Vec<String>) {
     for i in 0..total {
         println!("Creating dummy resource {}/{}", i, total);
         let rid = Uuid::new_v4();
         let field = format!("dummy-{i:0>3}");
 
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap();
+        let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
         let timestamp = Timestamp {
             seconds: now.as_secs() as i64 - (total - i) as i64,
             nanos: 0,
@@ -97,20 +90,12 @@ async fn test_security_search() -> Result<(), Box<dyn std::error::Error>> {
     let mut writer = fixture.writer_client();
     let mut reader = fixture.reader_client();
 
-    let new_shard_response = writer
-        .new_shard(Request::new(NewShardRequest::default()))
-        .await?;
+    let new_shard_response = writer.new_shard(Request::new(NewShardRequest::default())).await?;
     let shard_id = &new_shard_response.get_ref().id;
 
     let group_engineering = "engineering".to_string();
 
-    create_dummy_resources(
-        1,
-        &mut writer,
-        shard_id.clone(),
-        vec![group_engineering.clone()],
-    )
-    .await;
+    create_dummy_resources(1, &mut writer, shard_id.clone(), vec![group_engineering.clone()]).await;
 
     // Searching with no security should return 1 results
     let response = reader
@@ -184,9 +169,7 @@ async fn test_security_search_public_resource() -> Result<(), Box<dyn std::error
     let mut writer = fixture.writer_client();
     let mut reader = fixture.reader_client();
 
-    let new_shard_response = writer
-        .new_shard(Request::new(NewShardRequest::default()))
-        .await?;
+    let new_shard_response = writer.new_shard(Request::new(NewShardRequest::default())).await?;
     let shard_id = &new_shard_response.get_ref().id;
 
     create_dummy_resources(1, &mut writer, shard_id.clone(), vec![]).await;

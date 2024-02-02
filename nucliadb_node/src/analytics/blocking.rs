@@ -34,15 +34,16 @@ impl SyncAnalyticsLoop {
         let Some(client) = BlockingHttpClient::try_new() else {
             return None;
         };
-        Some(SyncAnalyticsLoop { rtxn, client })
+        Some(SyncAnalyticsLoop {
+            rtxn,
+            client,
+        })
     }
     pub fn run(self) {
         loop {
             match self.rtxn.recv() {
                 Err(err) => tracing::info!("channel error {}", err),
-                Ok(event) => self
-                    .client
-                    .blocking_send(AnalyticsPayload::from_single_event(event)),
+                Ok(event) => self.client.blocking_send(AnalyticsPayload::from_single_event(event)),
             }
         }
     }

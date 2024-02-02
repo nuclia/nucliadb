@@ -158,11 +158,7 @@ fn test_faceted_search() {
         };
         let response = reader.search(&request).unwrap();
         println!("Response: {response:#?}");
-        assert_eq!(
-            response.total, expected,
-            "Failed faceted query: '{}'. With facets: {:?}",
-            query, facets
-        );
+        assert_eq!(response.total, expected, "Failed faceted query: '{}'. With facets: {:?}", query, facets);
 
         assert_eq!(response.total, response.results.len() as i32);
         assert!(!response.next_page);

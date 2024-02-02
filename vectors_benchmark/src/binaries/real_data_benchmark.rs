@@ -123,9 +123,7 @@ fn create_request(
     let query_key = format!("{dataset_name}-{query_name}");
     let cfg = Config::new("./requests.cache");
     let store = Store::new(cfg).unwrap();
-    let bucket = store
-        .bucket::<String, Json<Request>>(Some("requests"))
-        .unwrap();
+    let bucket = store.bucket::<String, Json<Request>>(Some("requests")).unwrap();
 
     let stored_request = bucket.get(&query_key).unwrap();
     if let Some(res) = stored_request {
@@ -136,21 +134,13 @@ fn create_request(
     let json: PredictResults = get_vector(&query, "multilingual");
 
     if json.data.len() != dimension {
-        panic!(
-            "[predict] Got a vector of length {}, expected {}",
-            json.data.len(),
-            dimension
-        );
+        panic!("[predict] Got a vector of length {}, expected {}", json.data.len(), dimension);
     }
     // building the formula using tags and key filters
     let mut formula = Formula::new();
     let key_prefixes = key_prefixes.iter().cloned().map(AtomClause::key_prefix);
 
-    labels
-        .iter()
-        .cloned()
-        .map(AtomClause::label)
-        .for_each(|c| formula.extend(c));
+    labels.iter().cloned().map(AtomClause::label).for_each(|c| formula.extend(c));
 
     if key_prefixes.len() > 0 {
         formula.extend(CompoundClause::new(key_prefixes.collect()));
@@ -182,12 +172,7 @@ fn test_search(dataset: &Dataset, cycles: usize) -> Vec<(String, Vec<u128>)> {
         let mut elapsed_times: Vec<u128> = vec![];
 
         for cycle in 0..cycles {
-            print!(
-                "Request {} => cycle {} of {}      \r",
-                i,
-                (cycle + 1),
-                cycles
-            );
+            print!("Request {} => cycle {} of {}      \r", i, (cycle + 1), cycles);
             let _ = std::io::stdout().flush();
 
             let search_result;
@@ -249,8 +234,7 @@ fn trim(data: String) -> String {
 fn get_dataset(definition_file: String, dataset_name: String) -> Option<Dataset> {
     // open the dataset definition
     let datasets = fs::read_to_string(definition_file.clone()).expect("Unable to read file");
-    let dataset_definition: serde_json::Value =
-        serde_json::from_str(&datasets).expect("Unable to parse");
+    let dataset_definition: serde_json::Value = serde_json::from_str(&datasets).expect("Unable to parse");
 
     let defs = dataset_definition["datasets"].as_array().unwrap();
 
@@ -282,25 +266,13 @@ fn get_dataset(definition_file: String, dataset_name: String) -> Option<Dataset>
                 let query_name = trim(query["name"].to_string());
 
                 let labels: Vec<String> = if query.contains_key("tags") {
-                    query["tags"]
-                        .as_array()
-                        .unwrap()
-                        .to_vec()
-                        .iter()
-                        .map(|v| trim(v.to_string()))
-                        .collect()
+                    query["tags"].as_array().unwrap().to_vec().iter().map(|v| trim(v.to_string())).collect()
                 } else {
                     vec![]
                 };
 
                 let key_prefixes: Vec<String> = if query.contains_key("key_prefixes") {
-                    query["key_prefixes"]
-                        .as_array()
-                        .unwrap()
-                        .to_vec()
-                        .iter()
-                        .map(|v| trim(v.to_string()))
-                        .collect()
+                    query["key_prefixes"].as_array().unwrap().to_vec().iter().map(|v| trim(v.to_string())).collect()
                 } else {
                     vec![]
                 };
@@ -356,10 +328,7 @@ fn main() {
     let dataset = get_dataset(args.datasets.clone(), args.dataset_name.clone())
         .unwrap_or_else(|| panic!("Dataset {} not found", args.dataset_name));
 
-    println!(
-        "Using dataset: {:?} shard: {:?}",
-        dataset.name, dataset.shard_id
-    );
+    println!("Using dataset: {:?} shard: {:?}", dataset.name, dataset.shard_id);
 
     let mut json_results = vec![];
     let results = test_search(&dataset, args.cycles);

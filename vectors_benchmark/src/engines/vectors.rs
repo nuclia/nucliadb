@@ -58,14 +58,8 @@ impl VectorEngine for Index {
             let elem = Elem::new(key, vector, LabelDictionary::new(vec![]), None);
             elems.push(elem);
         }
-        let new_dp = DataPoint::new(
-            self.location(),
-            elems,
-            Some(temporal_mark),
-            similarity,
-            Channel::EXPERIMENTAL,
-        )
-        .unwrap();
+        let new_dp =
+            DataPoint::new(self.location(), elems, Some(temporal_mark), similarity, Channel::EXPERIMENTAL).unwrap();
         let mut tx = self.transaction();
         tx.add_segment(new_dp.journal());
         tx.delete_entry(batch_id);

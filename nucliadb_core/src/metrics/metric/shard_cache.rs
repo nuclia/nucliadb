@@ -26,11 +26,7 @@ pub type OpenShardsMetric = Family<(), Gauge>;
 
 pub fn register_open_shards_metric(registry: &mut Registry) -> OpenShardsMetric {
     let open_shards = OpenShardsMetric::default();
-    registry.register(
-        "nucliadb_shard_cache_open",
-        "Open shards",
-        open_shards.clone(),
-    );
+    registry.register("nucliadb_shard_cache_open", "Open shards", open_shards.clone());
     open_shards
 }
 
@@ -38,10 +34,6 @@ pub type EvictedShardsMetric = Family<(), Counter>;
 
 pub fn register_evicted_shards_metric(registry: &mut Registry) -> EvictedShardsMetric {
     let evicted_shards = EvictedShardsMetric::default();
-    registry.register(
-        "nucliadb_shard_cache_evicted",
-        "Evicted shards",
-        evicted_shards.clone(),
-    );
+    registry.register("nucliadb_shard_cache_evicted", "Evicted shards", evicted_shards.clone());
     evicted_shards
 }

@@ -43,10 +43,7 @@ struct TimeSensitiveDLog<'a> {
 }
 impl<'a> DeleteLog for TimeSensitiveDLog<'a> {
     fn is_deleted(&self, key: &[u8]) -> bool {
-        self.dlog
-            .get(key)
-            .map(|t| t > self.time)
-            .unwrap_or_default()
+        self.dlog.get(key).map(|t| t > self.time).unwrap_or_default()
     }
 }
 
@@ -113,7 +110,10 @@ impl StateFile {
             .open(path.join(format!("{}.{STATE_FILE_EXTENSION}", SegmentId::new_v4())))?;
         file.lock_exclusive()?;
 
-        Ok(StateFile { path, file })
+        Ok(StateFile {
+            path,
+            file,
+        })
     }
 
     fn write(&mut self, data: impl Serialize) -> FsResult<()> {
@@ -244,10 +244,7 @@ impl SegmentManager {
             0..count,
             [JournalTransaction {
                 txid: oldest_safe_txid,
-                operations: segments
-                    .iter()
-                    .map(|segment| Operation::AddSegment(*segment))
-                    .collect(),
+                operations: segments.iter().map(|segment| Operation::AddSegment(*segment)).collect(),
             }],
         );
 
@@ -299,11 +296,7 @@ impl SegmentManager {
         let state_version = fs_state::crnt_version(&path)?;
         let state: State = fs_state::load_state(&path)?;
         let mut segments = HashMap::new();
-        for (time, op) in state
-            .journal
-            .iter()
-            .flat_map(|e| e.operations.iter().map(|op| (e.txid, op)))
-        {
+        for (time, op) in state.journal.iter().flat_map(|e| e.operations.iter().map(|op| (e.txid, op))) {
             match op {
                 Operation::AddSegment(dpid) => segments.insert(*dpid, time),
                 Operation::DeleteSegment(dpid) => segments.remove(dpid),
@@ -392,13 +385,8 @@ mod tests {
     fn test_compact() -> VectorR<()> {
         let dir = TempDir::new().unwrap();
         let mut manager = SegmentManager::create(dir.path().to_path_buf()).unwrap();
-        let segments = [
-            SegmentId::new_v4(),
-            SegmentId::new_v4(),
-            SegmentId::new_v4(),
-            SegmentId::new_v4(),
-            SegmentId::new_v4(),
-        ];
+        let segments =
+            [SegmentId::new_v4(), SegmentId::new_v4(), SegmentId::new_v4(), SegmentId::new_v4(), SegmentId::new_v4()];
         // Insert (txid=1)
         manager.commit(Transaction {
             operations: vec![Operation::AddSegment(segments[0])],
@@ -443,12 +431,8 @@ mod tests {
         let compact_tx = &manager.state.journal[0];
         assert_eq!(compact_tx.txid, 2);
         assert_eq!(compact_tx.operations.len(), 2);
-        assert!(compact_tx
-            .operations
-            .contains(&Operation::AddSegment(segments[0])));
-        assert!(compact_tx
-            .operations
-            .contains(&Operation::AddSegment(segments[1])));
+        assert!(compact_tx.operations.contains(&Operation::AddSegment(segments[0])));
+        assert!(compact_tx.operations.contains(&Operation::AddSegment(segments[1])));
         assert_eq!(
             manager.state.journal[1],
             JournalTransaction {
@@ -464,12 +448,7 @@ mod tests {
     fn test_reader_state() -> VectorR<()> {
         let dir = TempDir::new()?;
         let mut writer = SegmentManager::create(dir.path().to_path_buf())?;
-        let segments = [
-            SegmentId::new_v4(),
-            SegmentId::new_v4(),
-            SegmentId::new_v4(),
-            SegmentId::new_v4(),
-        ];
+        let segments = [SegmentId::new_v4(), SegmentId::new_v4(), SegmentId::new_v4(), SegmentId::new_v4()];
         writer.commit(Transaction {
             operations: vec![Operation::AddSegment(segments[0])],
             ..Default::default()
@@ -477,20 +456,14 @@ mod tests {
         let mut reader_1 = SegmentManager::open(dir.path().to_path_buf())?;
 
         writer.commit(Transaction {
-            operations: vec![
-                Operation::AddSegment(segments[1]),
-                Operation::AddSegment(segments[2]),
-            ],
+            operations: vec![Operation::AddSegment(segments[1]), Operation::AddSegment(segments[2])],
             ..Default::default()
         })?;
 
         let mut reader_2 = SegmentManager::open(dir.path().to_path_buf())?;
 
         writer.commit(Transaction {
-            operations: vec![
-                Operation::DeleteSegment(segments[0]),
-                Operation::DeleteSegment(segments[2]),
-            ],
+            operations: vec![Operation::DeleteSegment(segments[0]), Operation::DeleteSegment(segments[2])],
             ..Default::default()
         })?;
 

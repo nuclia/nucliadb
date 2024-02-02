@@ -57,16 +57,12 @@ where
 }
 
 pub fn persist_state<S>(path: &Path, state: &S) -> FsResult<()>
-where S: Serialize {
+where
+    S: Serialize,
+{
     let temporal_path = path.join(names::TEMP);
     let state_path = path.join(names::STATE);
-    let mut file = BufWriter::new(
-        OpenOptions::new()
-            .create(true)
-            .write(true)
-            .truncate(true)
-            .open(&temporal_path)?,
-    );
+    let mut file = BufWriter::new(OpenOptions::new().create(true).write(true).truncate(true).open(&temporal_path)?);
     bincode::serialize_into(&mut file, state)?;
     file.flush()?;
     std::fs::rename(&temporal_path, state_path)?;
@@ -74,12 +70,10 @@ where S: Serialize {
 }
 
 pub fn load_state<S>(path: &Path) -> FsResult<S>
-where S: DeserializeOwned {
-    let mut file = BufReader::new(
-        OpenOptions::new()
-            .read(true)
-            .open(path.join(names::STATE))?,
-    );
+where
+    S: DeserializeOwned,
+{
+    let mut file = BufReader::new(OpenOptions::new().read(true).open(path.join(names::STATE))?);
     Ok(bincode::deserialize_from(&mut file)?)
 }
 pub fn crnt_version(path: &Path) -> FsResult<Version> {

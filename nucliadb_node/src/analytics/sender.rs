@@ -28,9 +28,7 @@ use tokio::task::JoinHandle;
 use tokio::time::Interval;
 use tracing::info;
 
-use crate::analytics::payload::{
-    AnalyticsEvent, AnalyticsPayload, ClientInformation, EventWithTimestamp,
-};
+use crate::analytics::payload::{AnalyticsEvent, AnalyticsPayload, ClientInformation, EventWithTimestamp};
 use crate::analytics::sink::{HttpClient, Sink};
 
 /// At most 1 Request per minutes.
@@ -244,10 +242,7 @@ impl AnalyticsSender {
         }
 
         assert!(
-            self.inner
-                .is_started
-                .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-                .is_ok(),
+            self.inner.is_started.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_ok(),
             "The analytics loop is already started."
         );
 
@@ -390,14 +385,13 @@ mod tests {
         let payload = rx.recv().await.unwrap();
         assert_eq!(payload.events.len(), 1);
         analytics_sender
-            .send(AnalyticsEvent::EndCommand { return_code: 2i32 })
+            .send(AnalyticsEvent::EndCommand {
+                return_code: 2i32,
+            })
             .await;
         loop_handler.terminate_analytics().await;
         let payload = rx.recv().await.unwrap();
         assert_eq!(payload.events.len(), 1);
-        assert!(matches!(
-            &payload.events[0].r#type,
-            &AnalyticsEvent::EndCommand { .. }
-        ));
+        assert!(matches!(&payload.events[0].r#type, &AnalyticsEvent::EndCommand { .. }));
     }
 }

@@ -53,9 +53,7 @@ impl InnerCache {
 
     pub fn get(&mut self, id: &ShardId) -> NodeResult<CacheResult<ShardId, ShardWriter>> {
         if self.blocked_shards.contains(id) {
-            return Err(node_error!(ShardNotFoundError(
-                "Shard {shard_path:?} is not on disk"
-            )));
+            return Err(node_error!(ShardNotFoundError("Shard {shard_path:?} is not on disk")));
         }
 
         Ok(self.active_shards.get(id))
@@ -67,9 +65,7 @@ impl InnerCache {
         shard: Arc<ShardWriter>,
     ) -> NodeResult<Arc<ShardWriter>> {
         if self.blocked_shards.contains(&shard.id) {
-            return Err(node_error!(ShardNotFoundError(
-                "Shard {shard_path:?} is not on disk"
-            )));
+            return Err(node_error!(ShardNotFoundError("Shard {shard_path:?} is not on disk")));
         }
 
         self.active_shards.loaded(guard, &shard);
@@ -143,16 +139,11 @@ impl ShardWriterCache {
         let shard_path = disk_structure::shard_path_by_id(&self.shards_path.clone(), id);
 
         if !ShardMetadata::exists(&shard_path) {
-            return Err(node_error!(ShardNotFoundError(
-                "Shard {shard_path:?} is not on disk"
-            )));
+            return Err(node_error!(ShardNotFoundError("Shard {shard_path:?} is not on disk")));
         }
-        let metadata = metadata_manager
-            .get(id.clone())
-            .expect("Shard metadata not found. This should not happen");
-        let shard = ShardWriter::open(metadata).map_err(|error| {
-            node_error!("Shard {shard_path:?} could not be loaded from disk: {error:?}")
-        })?;
+        let metadata = metadata_manager.get(id.clone()).expect("Shard metadata not found. This should not happen");
+        let shard = ShardWriter::open(metadata)
+            .map_err(|error| node_error!("Shard {shard_path:?} could not be loaded from disk: {error:?}"))?;
 
         Ok(Arc::new(shard))
     }
@@ -170,7 +161,7 @@ impl ShardWriterCache {
                     CacheResult::Cached(shard) => {
                         break Some(shard);
                     }
-                    CacheResult::Load(_) => break None, // Not in cache
+                    CacheResult::Load(_) => break None,         // Not in cache
                     CacheResult::Wait(waiter) => waiter.wait(), // Someone else loading, wait
                 }
             }
@@ -264,23 +255,14 @@ mod tests {
     #[test]
     fn test_safe_deletion() {
         let data_dir = tempdir().unwrap();
-        let settings = Settings::builder()
-            .data_path(data_dir.into_path())
-            .build()
-            .unwrap();
+        let settings = Settings::builder().data_path(data_dir.into_path()).build().unwrap();
         let cache = Arc::new(ShardWriterCache::new(settings.clone()));
 
         let shard_id_0 = ShardId::from("shard_id_0");
         let shard_0_path = settings.shards_path().join(shard_id_0.clone());
         fs::create_dir(settings.shards_path()).unwrap();
 
-        let shard_meta = ShardMetadata::new(
-            shard_0_path.clone(),
-            shard_id_0.clone(),
-            None,
-            Similarity::Cosine,
-            None,
-        );
+        let shard_meta = ShardMetadata::new(shard_0_path.clone(), shard_id_0.clone(), None, Similarity::Cosine, None);
         cache.create(shard_meta).unwrap();
 
         let shard_0 = cache.get(&shard_id_0).unwrap();
@@ -320,13 +302,7 @@ mod tests {
         assert!(cache.get(&shard_id_0).is_err());
 
         // Recreating the shard should work (i.e: it's not stuck in the deletion state)
-        let shard_meta = ShardMetadata::new(
-            shard_0_path.clone(),
-            shard_id_0.clone(),
-            None,
-            Similarity::Cosine,
-            None,
-        );
+        let shard_meta = ShardMetadata::new(shard_0_path.clone(), shard_id_0.clone(), None, Similarity::Cosine, None);
         cache.create(shard_meta).unwrap();
 
         assert!(cache.get(&shard_id_0).is_ok());

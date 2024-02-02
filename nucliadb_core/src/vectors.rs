@@ -35,18 +35,12 @@ pub struct VectorConfig {
     pub channel: Channel,
 }
 
-pub trait VectorReader:
-    ReaderChild<Request = VectorSearchRequest, Response = VectorSearchResponse>
-{
+pub trait VectorReader: ReaderChild<Request = VectorSearchRequest, Response = VectorSearchResponse> {
     fn count(&self, vectorset: &str) -> NodeResult<usize>;
 }
 
 pub trait VectorWriter: WriterChild {
     fn list_vectorsets(&self) -> NodeResult<Vec<String>>;
     fn remove_vectorset(&mut self, setid: &VectorSetId) -> NodeResult<()>;
-    fn add_vectorset(
-        &mut self,
-        setid: &VectorSetId,
-        similarity: VectorSimilarity,
-    ) -> NodeResult<()>;
+    fn add_vectorset(&mut self, setid: &VectorSetId, similarity: VectorSimilarity) -> NodeResult<()>;
 }

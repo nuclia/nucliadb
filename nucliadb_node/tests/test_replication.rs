@@ -25,8 +25,8 @@ use std::sync::Arc;
 
 use common::{resources, NodeFixture, TestNodeReader, TestNodeWriter};
 use nucliadb_core::protos::{
-    op_status, NewShardRequest, NewVectorSetRequest, ReleaseChannel, SearchRequest, SearchResponse,
-    ShardId, UserVector, UserVectors, VectorSetId, VectorSimilarity,
+    op_status, NewShardRequest, NewVectorSetRequest, ReleaseChannel, SearchRequest, SearchResponse, ShardId,
+    UserVector, UserVectors, VectorSetId, VectorSimilarity,
 };
 use nucliadb_node::replication::health::ReplicationHealthManager;
 use rstest::*;
@@ -38,13 +38,7 @@ async fn test_search_replicated_data(
     #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)] release_channel: ReleaseChannel,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut fixture = NodeFixture::new();
-    fixture
-        .with_writer()
-        .await?
-        .with_reader()
-        .await?
-        .with_secondary_reader()
-        .await?;
+    fixture.with_writer().await?.with_reader().await?.with_secondary_reader().await?;
     let mut writer = fixture.writer_client();
     let mut reader = fixture.reader_client();
     let mut secondary_reader = fixture.secondary_reader_client();
@@ -91,16 +85,8 @@ async fn test_search_replicated_data(
     let secondary_shard = Arc::downgrade(&fixture.secondary_shard_cache().get(&shard.id)?);
 
     assert_eq!(
-        primary_shard
-            .upgrade()
-            .unwrap()
-            .metadata
-            .get_generation_id(),
-        secondary_shard
-            .upgrade()
-            .unwrap()
-            .metadata
-            .get_generation_id()
+        primary_shard.upgrade().unwrap().metadata.get_generation_id(),
+        secondary_shard.upgrade().unwrap().metadata.get_generation_id()
     );
 
     // Test deleting shard deletes it from secondary
@@ -122,18 +108,12 @@ struct ShardDetails {
     id: String,
 }
 
-async fn create_shard(
-    writer: &mut TestNodeWriter,
-    release_channel: ReleaseChannel,
-) -> ShardDetails {
+async fn create_shard(writer: &mut TestNodeWriter, release_channel: ReleaseChannel) -> ShardDetails {
     let request = Request::new(NewShardRequest {
         release_channel: release_channel.into(),
         ..Default::default()
     });
-    let new_shard_response = writer
-        .new_shard(request)
-        .await
-        .expect("Unable to create new shard");
+    let new_shard_response = writer.new_shard(request).await.expect("Unable to create new shard");
     let shard_id = &new_shard_response.get_ref().id;
 
     writer
@@ -158,16 +138,10 @@ async fn delete_shard(writer: &mut TestNodeWriter, shard_id: String) {
     let request = Request::new(ShardId {
         id: shard_id.clone(),
     });
-    writer
-        .delete_shard(request)
-        .await
-        .expect("Unable to delete shard");
+    writer.delete_shard(request).await.expect("Unable to delete shard");
 }
 
-async fn create_test_resources(
-    writer: &mut TestNodeWriter,
-    shard_id: String,
-) -> HashMap<&str, String> {
+async fn create_test_resources(writer: &mut TestNodeWriter, shard_id: String) -> HashMap<&str, String> {
     let resources = [
         ("little prince", resources::little_prince(&shard_id)),
         ("zarathustra", resources::thus_spoke_zarathustra(&shard_id)),

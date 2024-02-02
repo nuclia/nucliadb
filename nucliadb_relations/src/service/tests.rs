@@ -303,10 +303,7 @@ fn just_prefix_querying() -> NodeResult<()> {
     let Some(prefix_response) = got.prefix else {
         unreachable!("Wrong variant")
     };
-    let is_permutation = prefix_response
-        .nodes
-        .iter()
-        .all(|member| RESPONSE0.contains(member));
+    let is_permutation = prefix_response.nodes.iter().all(|member| RESPONSE0.contains(member));
     assert!((prefix_response.nodes.len() == RESPONSE0.len()) && is_permutation);
 
     request.prefix = Some(RelationPrefixSearchRequest {
@@ -317,10 +314,7 @@ fn just_prefix_querying() -> NodeResult<()> {
     let Some(prefix_response) = got.prefix else {
         unreachable!("Wrong variant")
     };
-    let is_permutation = prefix_response
-        .nodes
-        .iter()
-        .all(|member| RESPONSE0.contains(member));
+    let is_permutation = prefix_response.nodes.iter().all(|member| RESPONSE0.contains(member));
     assert!((prefix_response.nodes.len() == RESPONSE0.len()) && is_permutation);
 
     request.prefix = Some(RelationPrefixSearchRequest {
@@ -347,17 +341,11 @@ fn getting_node_types() -> NodeResult<()> {
     reader.reload();
     let node_types = reader.get_node_types().unwrap();
     assert_eq!(node_types.list.len(), NODE_TYPES.list.len());
-    assert!(node_types
-        .list
-        .iter()
-        .all(|member| NODE_TYPES.list.contains(member)));
+    assert!(node_types.list.iter().all(|member| NODE_TYPES.list.contains(member)));
 
     let edges = reader.get_edges().unwrap();
     assert_eq!(edges.list.len(), EDGE_LIST.list.len(),);
-    assert!(edges
-        .list
-        .iter()
-        .all(|member| EDGE_LIST.list.contains(member)));
+    assert!(edges.list.iter().all(|member| EDGE_LIST.list.contains(member)));
     Ok(())
 }
 
@@ -372,9 +360,6 @@ fn getting_edges() -> NodeResult<()> {
     reader.reload();
     let edges = reader.get_edges().unwrap();
     assert_eq!(edges.list.len(), EDGE_LIST.list.len(),);
-    assert!(edges
-        .list
-        .iter()
-        .all(|member| EDGE_LIST.list.contains(member)));
+    assert!(edges.list.iter().all(|member| EDGE_LIST.list.contains(member)));
     Ok(())
 }

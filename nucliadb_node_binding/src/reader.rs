@@ -73,9 +73,9 @@ pub struct NodeReader {
 
 impl NodeReader {
     fn obtain_shard(&self, shard_id: String) -> Result<Arc<ShardReader>, PyErr> {
-        self.shards.get(&shard_id).map_err(|error| {
-            LoadShardError::new_err(format!("Error loading shard {}: {}", shard_id, error))
-        })
+        self.shards
+            .get(&shard_id)
+            .map_err(|error| LoadShardError::new_err(format!("Error loading shard {}: {}", shard_id, error)))
     }
 }
 
@@ -91,34 +91,35 @@ impl NodeReader {
     }
 
     pub fn paragraphs(&mut self, shard_id: RawProtos) -> PyResult<PyParagraphProducer> {
-        let request =
-            StreamRequest::decode(&mut Cursor::new(shard_id)).expect("Error decoding arguments");
+        let request = StreamRequest::decode(&mut Cursor::new(shard_id)).expect("Error decoding arguments");
         let Some(shard_id) = request.shard_id.clone() else {
             return Err(PyValueError::new_err("Missing shard_id field"));
         };
         let shard = self.obtain_shard(shard_id.id)?;
         match shard.paragraph_iterator(request) {
-            Ok(iterator) => Ok(PyParagraphProducer { inner: iterator }),
+            Ok(iterator) => Ok(PyParagraphProducer {
+                inner: iterator,
+            }),
             Err(error) => Err(IndexNodeException::new_err(error.to_string())),
         }
     }
 
     pub fn documents(&mut self, shard_id: RawProtos) -> PyResult<PyDocumentProducer> {
-        let request =
-            StreamRequest::decode(&mut Cursor::new(shard_id)).expect("Error decoding arguments");
+        let request = StreamRequest::decode(&mut Cursor::new(shard_id)).expect("Error decoding arguments");
         let Some(shard_id) = request.shard_id.clone() else {
             return Err(PyValueError::new_err("Missing shard_id field"));
         };
         let shard = self.obtain_shard(shard_id.id)?;
         match shard.document_iterator(request) {
-            Ok(iterator) => Ok(PyDocumentProducer { inner: iterator }),
+            Ok(iterator) => Ok(PyDocumentProducer {
+                inner: iterator,
+            }),
             Err(error) => Err(IndexNodeException::new_err(error.to_string())),
         }
     }
 
     pub fn get_shard<'p>(&mut self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let request =
-            GetShardRequest::decode(&mut Cursor::new(shard_id)).expect("Error decoding arguments");
+        let request = GetShardRequest::decode(&mut Cursor::new(shard_id)).expect("Error decoding arguments");
         let Some(shard_id) = request.shard_id.clone() else {
             return Err(PyValueError::new_err("Missing shard_id field"));
         };
@@ -130,8 +131,7 @@ impl NodeReader {
     }
 
     pub fn search<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let search_request =
-            SearchRequest::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
+        let search_request = SearchRequest::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
         let shard_id = search_request.shard.clone();
         let shard = self.obtain_shard(shard_id)?;
         let response = shard.search(search_request);
@@ -142,8 +142,7 @@ impl NodeReader {
     }
 
     pub fn suggest<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let suggest_request =
-            SuggestRequest::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
+        let suggest_request = SuggestRequest::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
         let shard_id = suggest_request.shard.clone();
         let shard = self.obtain_shard(shard_id)?;
         let response = shard.suggest(suggest_request);
@@ -154,8 +153,7 @@ impl NodeReader {
     }
 
     pub fn vector_search<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let vector_request = VectorSearchRequest::decode(&mut Cursor::new(request))
-            .expect("Error decoding arguments");
+        let vector_request = VectorSearchRequest::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
         let shard_id = vector_request.id.clone();
         let shard = self.obtain_shard(shard_id)?;
         let response = shard.vector_search(vector_request);
@@ -165,13 +163,9 @@ impl NodeReader {
         }
     }
 
-    pub fn document_search<'p>(
-        &mut self,
-        request: RawProtos,
-        py: Python<'p>,
-    ) -> PyResult<&'p PyAny> {
-        let document_request = DocumentSearchRequest::decode(&mut Cursor::new(request))
-            .expect("Error decoding arguments");
+    pub fn document_search<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let document_request =
+            DocumentSearchRequest::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
         let shard_id = document_request.id.clone();
         let shard = self.obtain_shard(shard_id)?;
         let response = shard.document_search(document_request);
@@ -181,13 +175,9 @@ impl NodeReader {
         }
     }
 
-    pub fn paragraph_search<'p>(
-        &mut self,
-        request: RawProtos,
-        py: Python<'p>,
-    ) -> PyResult<&'p PyAny> {
-        let paragraph_request = ParagraphSearchRequest::decode(&mut Cursor::new(request))
-            .expect("Error decoding arguments");
+    pub fn paragraph_search<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let paragraph_request =
+            ParagraphSearchRequest::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
         let shard_id = paragraph_request.id.clone();
         let shard = self.obtain_shard(shard_id)?;
         let response = shard.paragraph_search(paragraph_request);
@@ -197,13 +187,9 @@ impl NodeReader {
         }
     }
 
-    pub fn relation_search<'p>(
-        &mut self,
-        request: RawProtos,
-        py: Python<'p>,
-    ) -> PyResult<&'p PyAny> {
-        let relation_request = RelationSearchRequest::decode(&mut Cursor::new(request))
-            .expect("Error decoding arguments");
+    pub fn relation_search<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let relation_request =
+            RelationSearchRequest::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
         let shard_id = relation_request.shard_id.clone();
         let shard = self.obtain_shard(shard_id)?;
         let response = shard.relation_search(relation_request);
@@ -213,13 +199,8 @@ impl NodeReader {
         }
     }
 
-    pub fn relation_edges<'p>(
-        &mut self,
-        request: RawProtos,
-        py: Python<'p>,
-    ) -> PyResult<&'p PyAny> {
-        let shard_id =
-            ShardId::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
+    pub fn relation_edges<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let shard_id = ShardId::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
         let shard = self.obtain_shard(shard_id.id)?;
         let response = shard.get_relations_edges();
         match response {
@@ -228,13 +209,8 @@ impl NodeReader {
         }
     }
 
-    pub fn relation_types<'p>(
-        &mut self,
-        request: RawProtos,
-        py: Python<'p>,
-    ) -> PyResult<&'p PyAny> {
-        let shard_id =
-            ShardId::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
+    pub fn relation_types<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let shard_id = ShardId::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
         let shard = self.obtain_shard(shard_id.id)?;
         let response = shard.get_relations_types();
         match response {
