@@ -154,17 +154,17 @@ impl Index {
         *self.dimension.write().unwrap_or_else(|e| e.into_inner()) = dimension;
     }
 
-    fn read_state(&self) -> RwLockReadGuard<'_, SegmentManager> {
+    fn read_segments(&self) -> RwLockReadGuard<'_, SegmentManager> {
         self.segments.read().unwrap_or_else(|e| e.into_inner())
     }
 
-    fn write_state(&self) -> RwLockWriteGuard<'_, SegmentManager> {
+    fn write_segments(&self) -> RwLockWriteGuard<'_, SegmentManager> {
         self.segments.write().unwrap_or_else(|e| e.into_inner())
     }
 
     fn update(&self) -> VectorR<()> {
-        if self.read_state().needs_refresh()? {
-            self.write_state().refresh()?;
+        if self.read_segments().needs_refresh()? {
+            self.write_segments().refresh()?;
             self.set_dimension(self.stored_dimension()?);
         }
 
@@ -213,7 +213,7 @@ impl Index {
     pub fn get_keys(&self) -> VectorR<Vec<String>> {
         self.update()?;
         let mut keys = vec![];
-        for (delete_log, dpid) in self.read_state().segment_iterator() {
+        for (delete_log, dpid) in self.read_segments().segment_iterator() {
             let dp = DataPoint::open(&self.location, dpid)?;
             keys.append(&mut dp.get_keys(&delete_log));
         }
@@ -238,7 +238,7 @@ impl Index {
         let no_results = request.no_results();
         let min_score = request.min_score();
         let mut ffsv = Fssc::new(request.no_results(), with_duplicates);
-        for (delete_log, dpid) in self.read_state().segment_iterator() {
+        for (delete_log, dpid) in self.read_segments().segment_iterator() {
             let data_point = DataPoint::open(&self.location, dpid)?;
             let partial_solution = data_point.search(
                 &delete_log,
@@ -258,7 +258,7 @@ impl Index {
 
     pub fn no_nodes(&self) -> VectorR<usize> {
         self.update()?;
-        Ok(self.read_state().no_nodes())
+        Ok(self.read_segments().no_nodes())
     }
 
     pub fn collect_garbage(&mut self) -> VectorR<()> {
@@ -267,7 +267,7 @@ impl Index {
 
         // First compact the segment log, to remove all references
         // to segments that are no longer in use by any reader
-        let mut state = self.write_state();
+        let mut state = self.write_segments();
         state.compact()?;
 
         // We iterate all segments in the log including those who have been
@@ -301,7 +301,7 @@ impl Index {
     }
 
     fn stored_dimension(&self) -> VectorR<Option<u64>> {
-        let Some((_, dpid)) = self.read_state().segment_iterator().next() else {
+        let Some((_, dpid)) = self.read_segments().segment_iterator().next() else {
             return Ok(None);
         };
         let data_point = DataPoint::open(&self.location, dpid)?;
@@ -330,13 +330,13 @@ impl Index {
             return Ok(());
         }
 
-        self.write_state().commit(transaction)?;
+        self.write_segments().commit(transaction)?;
 
         if self.get_dimension().is_none() {
             self.set_dimension(self.stored_dimension()?);
         }
 
-        let segment_count = self.read_state().segment_iterator().count();
+        let segment_count = self.read_segments().segment_iterator().count();
         if matches!(self.merger_status, MergerStatus::Free) && segment_count > ALLOWED_BEFORE_MERGE {
             self.start_merge();
         }
@@ -355,7 +355,7 @@ impl Index {
     fn apply_pending_merge(&mut self) -> VectorR<bool> {
         let possible_merge = self.take_available_merge();
         if let Some(merge_tx) = possible_merge {
-            self.write_state().commit(merge_tx)?;
+            self.write_segments().commit(merge_tx)?;
             Ok(true)
         } else {
             Ok(false)
@@ -431,15 +431,15 @@ mod test {
 
         let result = index.get_keys()?;
         assert_eq!(result.len(), 3);
-        assert_eq!(index.read_state().all_segments_iterator().count(), 4);
-        assert_eq!(index.read_state().segment_iterator().count(), 4);
+        assert_eq!(index.read_segments().all_segments_iterator().count(), 4);
+        assert_eq!(index.read_segments().segment_iterator().count(), 4);
 
         // Garbage collection should not do anything since all segments are active
         index.collect_garbage()?;
         let result = index.get_keys()?;
         assert_eq!(result.len(), 3);
-        assert_eq!(index.read_state().all_segments_iterator().count(), 4);
-        assert_eq!(index.read_state().segment_iterator().count(), 4);
+        assert_eq!(index.read_segments().all_segments_iterator().count(), 4);
+        assert_eq!(index.read_segments().segment_iterator().count(), 4);
 
         // Merge segments now, should leave a single live segments and prune the delete log
         Merger::install_global().map(std::thread::spawn)?;
@@ -451,16 +451,16 @@ mod test {
         // Will have a new segment, but old ones are not deleted yet
         let result = index.get_keys()?;
         assert_eq!(result.len(), 3);
-        assert_eq!(index.read_state().all_segments_iterator().count(), 5);
-        assert_eq!(index.read_state().segment_iterator().count(), 1);
+        assert_eq!(index.read_segments().all_segments_iterator().count(), 5);
+        assert_eq!(index.read_segments().segment_iterator().count(), 1);
 
         // After garbage collection, we delete the old stuff
         index.collect_garbage()?;
 
         let result = index.get_keys()?;
         assert_eq!(result.len(), 3);
-        assert_eq!(index.read_state().all_segments_iterator().count(), 1);
-        assert_eq!(index.read_state().segment_iterator().count(), 1);
+        assert_eq!(index.read_segments().all_segments_iterator().count(), 1);
+        assert_eq!(index.read_segments().segment_iterator().count(), 1);
 
         Ok(())
     }

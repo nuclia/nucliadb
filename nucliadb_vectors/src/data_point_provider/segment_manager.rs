@@ -322,9 +322,17 @@ impl SegmentManager {
     }
 
     pub fn refresh(&mut self) -> VectorR<()> {
-        let txid = self.txid();
+        let mut txid = self.txid();
         self.state = fs_state::load_state(&self.path)?;
 
+        if self.txid() < txid {
+            // The new txid is older than the previous one, this can happen if the shard is cleaned/upgraded in-place
+            // In this case, we reset our segments view to force to reload the entire journal
+            self.segments.clear();
+            txid = 0;
+        }
+
+        // Apply the changes to our segments view from the journal, considering transactions since the last we had
         for transaction in &self.state.journal {
             if transaction.txid <= txid {
                 continue;
