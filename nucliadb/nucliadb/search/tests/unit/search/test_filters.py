@@ -56,6 +56,7 @@ def is_paragraph_labelset_kind_mock():
 @pytest.mark.parametrize(
     "original,converted",
     [
+        ("foo", {"literal": "foo"}),
         (Filter(all=["foo"]), {"literal": "foo"}),
         (Filter(all=["foo", "bar"]), {"and": [{"literal": "foo"}, {"literal": "bar"}]}),
         (Filter(any=["foo"]), {"literal": "foo"}),
@@ -78,6 +79,10 @@ def test_convert_filter_to_node_schema(original, converted):
 
 
 def test_convert_to_node_filters():
+    assert convert_to_node_filters(["foo"]) == {"literal": "foo"}
+    assert convert_to_node_filters(["foo", "bar"]) == {
+        "and": [{"literal": "foo"}, {"literal": "bar"}]
+    }
     assert convert_to_node_filters([Filter(all=["foo"])]) == {"literal": "foo"}
     assert convert_to_node_filters([Filter(all=["foo"]), Filter(any=["bar"])]) == {
         "and": [{"literal": "foo"}, {"literal": "bar"}]

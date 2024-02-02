@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional
+from typing import Optional, Union
 
 from nucliadb_models.labels import translate_alias_to_system_label
 from nucliadb_models.search import Filter
@@ -106,14 +106,17 @@ def has_classification_label_filters(filters: list[str]) -> bool:
     return any(filter.startswith(CLASSIFICATION_LABEL_PREFIX) for filter in filters)
 
 
-def convert_to_node_filters(filters: list[Filter]) -> dict:
+def convert_to_node_filters(filters: Union[list[str], list[Filter]]) -> dict:
     if len(filters) == 1:
         return convert_filter_to_node_schema(filters[0])
 
     return {"and": [convert_filter_to_node_schema(fltr) for fltr in filters]}
 
 
-def convert_filter_to_node_schema(fltr: Filter) -> dict:
+def convert_filter_to_node_schema(fltr: Union[str, Filter]) -> dict:
+    if isinstance(fltr, str):
+        return {"literal": fltr}
+
     # any: [a, b] == (a || b)
     if fltr.any is not None:
         if len(fltr.any) == 1:
