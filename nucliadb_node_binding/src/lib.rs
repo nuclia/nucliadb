@@ -35,18 +35,14 @@ type RawProtos = Vec<u8>;
 
 #[pymodule]
 pub fn nucliadb_node_binding(py: Python, m: &PyModule) -> PyResult<()> {
-    let log_levels =
-        parse_log_levels(&env::var("RUST_LOG").unwrap_or("nucliadb_node=WARN".to_string()));
+    let log_levels = parse_log_levels(&env::var("RUST_LOG").unwrap_or("nucliadb_node=WARN".to_string()));
 
     setup_tracing(log_levels);
 
     m.add_class::<reader::NodeReader>()?;
     m.add_class::<writer::NodeWriter>()?;
 
-    m.add(
-        "IndexNodeException",
-        py.get_type::<errors::IndexNodeException>(),
-    )?;
+    m.add("IndexNodeException", py.get_type::<errors::IndexNodeException>())?;
     m.add("LoadShardError", py.get_type::<errors::LoadShardError>())?;
     m.add("ShardNotFound", py.get_type::<errors::ShardNotFound>())?;
 
@@ -56,10 +52,8 @@ pub fn nucliadb_node_binding(py: Python, m: &PyModule) -> PyResult<()> {
 fn setup_tracing(log_levels: Vec<(String, Level)>) {
     let mut layers = Vec::new();
 
-    let stdout_layer = tracing_subscriber::fmt::layer()
-        .with_level(true)
-        .with_filter(Targets::new().with_targets(log_levels))
-        .boxed();
+    let stdout_layer =
+        tracing_subscriber::fmt::layer().with_level(true).with_filter(Targets::new().with_targets(log_levels)).boxed();
 
     layers.push(stdout_layer);
 

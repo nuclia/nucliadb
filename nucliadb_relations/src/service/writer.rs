@@ -72,10 +72,7 @@ impl WriterChild for RelationsWriterService {
         let v = time.elapsed().as_millis();
         debug!("Count starting at {v} ms");
 
-        let count = self
-            .index
-            .start_reading()
-            .and_then(|reader| reader.no_nodes())?;
+        let count = self.index.start_reading().and_then(|reader| reader.no_nodes())?;
         let v = time.elapsed().as_millis();
         debug!("Ending at {v} ms");
 
@@ -109,10 +106,7 @@ impl WriterChild for RelationsWriterService {
             let v = time.elapsed().as_millis();
             debug!("{id:?} - Populating the graph: starts {v} ms");
 
-            let iter = resource
-                .relations
-                .iter()
-                .filter(|rel| rel.to.is_some() || rel.source.is_some());
+            let iter = resource.relations.iter().filter(|rel| rel.to.is_some() || rel.source.is_some());
             let mut writer = self.index.start_writing()?;
             for rel in iter {
                 let edge = relation_type_parsing(rel.relation(), &rel.relation_label);
@@ -125,11 +119,7 @@ impl WriterChild for RelationsWriterService {
                     from_type.0.to_string(),
                     from_type.1.map(|s| s.to_string()),
                 );
-                let to = IoNode::system_node(
-                    to.value.clone(),
-                    to_type.0.to_string(),
-                    to_type.1.map(|s| s.to_string()),
-                );
+                let to = IoNode::system_node(to.value.clone(), to_type.0.to_string(), to_type.1.map(|s| s.to_string()));
                 let edge = IoEdge::new(edge.0.to_string(), edge.1.map(|s| s.to_string()));
                 let metadata = rel.metadata.clone().map(IoEdgeMetadata::from);
                 writer.connect(&self.wmode, &from, &to, &edge, metadata.as_ref())?;
@@ -183,7 +173,10 @@ impl RelationsWriterService {
         } else {
             std::fs::create_dir(path)?;
             let (index, wmode) = Index::new_writer(path)?;
-            Ok(RelationsWriterService { index, wmode })
+            Ok(RelationsWriterService {
+                index,
+                wmode,
+            })
         }
     }
 
@@ -193,7 +186,10 @@ impl RelationsWriterService {
             Err(node_error!("Shard does not exist".to_string()))
         } else {
             let (index, wmode) = Index::new_writer(path)?;
-            Ok(RelationsWriterService { index, wmode })
+            Ok(RelationsWriterService {
+                index,
+                wmode,
+            })
         }
     }
 }

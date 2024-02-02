@@ -77,45 +77,23 @@ impl Args {
         self.index
     }
     pub fn writer_plot(&self) -> BenchR<File> {
-        let command = format!(
-            "plot \"{}\" u 1:2 with linespoints ls 1;\npause -1",
-            out_files::WRT
-        );
+        let command = format!("plot \"{}\" u 1:2 with linespoints ls 1;\npause -1", out_files::WRT);
         let plot = PathBuf::from(&self.output).join("plot_writer.gp");
-        let mut file = OpenOptions::new()
-            .create(true)
-            .truncate(true)
-            .write(true)
-            .open(plot)?;
+        let mut file = OpenOptions::new().create(true).truncate(true).write(true).open(plot)?;
         write!(file, "{command}")?;
 
         let path = PathBuf::from(&self.output).join(out_files::WRT);
-        let file = OpenOptions::new()
-            .create(true)
-            .truncate(true)
-            .write(true)
-            .open(path)?;
+        let file = OpenOptions::new().create(true).truncate(true).write(true).open(path)?;
         Ok(file)
     }
     pub fn reader_plot(&self) -> BenchR<File> {
-        let command = format!(
-            "plot \"{}\" u 1:2 with linespoints ls 1;\npause -1",
-            out_files::RDR
-        );
+        let command = format!("plot \"{}\" u 1:2 with linespoints ls 1;\npause -1", out_files::RDR);
         let plot = PathBuf::from(&self.output).join("plot_reader.gp");
-        let mut file = OpenOptions::new()
-            .create(true)
-            .truncate(true)
-            .write(true)
-            .open(plot)?;
+        let mut file = OpenOptions::new().create(true).truncate(true).write(true).open(plot)?;
         write!(file, "{command}")?;
 
         let path = PathBuf::from(&self.output).join(out_files::RDR);
-        let file = OpenOptions::new()
-            .create(true)
-            .truncate(true)
-            .write(true)
-            .open(path)?;
+        let file = OpenOptions::new().create(true).truncate(true).write(true).open(path)?;
         Ok(file)
     }
     pub fn neighbours(&self) -> usize {

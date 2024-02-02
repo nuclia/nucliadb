@@ -89,7 +89,8 @@ pub struct ResourceCache<K, V> {
 }
 
 impl<K, V> ResourceCache<K, V>
-where K: Eq + Hash + Clone + std::fmt::Debug
+where
+    K: Eq + Hash + Clone + std::fmt::Debug,
 {
     #[allow(dead_code)]
     pub fn new_with_capacity(capacity: NonZeroUsize) -> Self {
@@ -225,8 +226,7 @@ mod tests {
 
     #[test]
     fn test_cache_rng() {
-        let cache: ResourceCache<usize, CacheItem> =
-            ResourceCache::new_with_capacity(NonZeroUsize::new(3).unwrap());
+        let cache: ResourceCache<usize, CacheItem> = ResourceCache::new_with_capacity(NonZeroUsize::new(3).unwrap());
         let cache = Arc::new(Mutex::new(cache));
 
         thread::scope(|s| {
@@ -273,8 +273,7 @@ mod tests {
 
     #[test]
     fn test_lru() {
-        let mut cache: ResourceCache<usize, usize> =
-            ResourceCache::new_with_capacity(NonZeroUsize::new(2).unwrap());
+        let mut cache: ResourceCache<usize, usize> = ResourceCache::new_with_capacity(NonZeroUsize::new(2).unwrap());
 
         let items = vec![Arc::new(0), Arc::new(1), Arc::new(2), Arc::new(3)];
 
@@ -301,8 +300,7 @@ mod tests {
 
     #[test]
     fn test_eviction() {
-        let mut cache: ResourceCache<usize, usize> =
-            ResourceCache::new_with_capacity(NonZeroUsize::new(1).unwrap());
+        let mut cache: ResourceCache<usize, usize> = ResourceCache::new_with_capacity(NonZeroUsize::new(1).unwrap());
 
         let item0 = Arc::new(0);
         let item1 = Arc::new(1);
@@ -352,10 +350,7 @@ mod tests {
             let cache_clone = cache.clone();
             let wait_thread = scope.spawn(move |_| {
                 waiter.wait();
-                assert!(matches!(
-                    cache_clone.lock().unwrap().get(&0),
-                    CacheResult::Cached(_)
-                ));
+                assert!(matches!(cache_clone.lock().unwrap().get(&0), CacheResult::Cached(_)));
                 tx_clone.send(1).unwrap();
             });
             let load_thread = scope.spawn(move |_| {
@@ -402,10 +397,7 @@ mod tests {
                 waiter.wait();
                 // The load will fail, so we expect to be asked
                 // to load it ourselves
-                assert!(matches!(
-                    cache_clone.lock().unwrap().get(&0),
-                    CacheResult::Load(_)
-                ));
+                assert!(matches!(cache_clone.lock().unwrap().get(&0), CacheResult::Load(_)));
                 tx_clone.send(1).unwrap();
             });
             let load_thread = scope.spawn(move |_| {

@@ -24,8 +24,7 @@ use std::time::Instant;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::order_by::{OrderField, OrderType};
 use nucliadb_core::protos::{
-    OrderBy, ParagraphItem, ParagraphSearchRequest, ParagraphSearchResponse, StreamRequest,
-    SuggestRequest,
+    OrderBy, ParagraphItem, ParagraphSearchRequest, ParagraphSearchResponse, StreamRequest, SuggestRequest,
 };
 use nucliadb_core::tracing::{self, *};
 use nucliadb_procs::measure;
@@ -51,10 +50,7 @@ pub struct ParagraphReaderService {
 
 impl Debug for ParagraphReaderService {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("TextService")
-            .field("index", &self.index)
-            .field("schema", &self.schema)
-            .finish()
+        f.debug_struct("TextService").field("index", &self.index).field("schema", &self.schema).finish()
     }
 }
 
@@ -78,8 +74,7 @@ impl ParagraphReader for ParagraphReaderService {
 
         let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
         let text = self.adapt_text(&parser, &request.body);
-        let (original, termc, fuzzied) =
-            suggest_query(&parser, &text, request, &self.schema, FUZZY_DISTANCE);
+        let (original, termc, fuzzied) = suggest_query(&parser, &text, request, &self.schema, FUZZY_DISTANCE);
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Creating query: ends at {v} ms");
 
@@ -166,19 +161,8 @@ impl ReaderChild for ParagraphReaderService {
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Searching: starts at {v} ms");
 
-        let advanced = request
-            .advanced_query
-            .as_ref()
-            .map(|query| parser.parse_query(query))
-            .transpose()?;
-        let (original, termc, fuzzied) = search_query(
-            &parser,
-            &text,
-            request,
-            &self.schema,
-            FUZZY_DISTANCE,
-            advanced,
-        );
+        let advanced = request.advanced_query.as_ref().map(|query| parser.parse_query(query)).transpose()?;
+        let (original, termc, fuzzied) = search_query(&parser, &text, request, &self.schema, FUZZY_DISTANCE, advanced);
         let searcher = Searcher {
             request,
             results,
@@ -227,10 +211,7 @@ impl ReaderChild for ParagraphReaderService {
         let mut keys = vec![];
         let searcher = self.reader.searcher();
         for addr in searcher.search(&AllQuery, &DocSetCollector)? {
-            let Some(key) = searcher
-                .doc(addr)?
-                .get_first(self.schema.uuid)
-                .and_then(|i| i.as_text().map(String::from))
+            let Some(key) = searcher.doc(addr)?.get_first(self.schema.uuid).and_then(|i| i.as_text().map(String::from))
             else {
                 continue;
             };
@@ -249,10 +230,7 @@ impl ParagraphReaderService {
         }
         let paragraph_schema = ParagraphSchema::default();
         let index = Index::open_in_dir(&config.path)?;
-        let reader = index
-            .reader_builder()
-            .reload_policy(ReloadPolicy::OnCommit)
-            .try_into()?;
+        let reader = index.reader_builder().reload_policy(ReloadPolicy::OnCommit).try_into()?;
         Ok(ParagraphReaderService {
             index,
             reader,
@@ -314,7 +292,10 @@ impl Iterator for BatchProducer {
                 .map(|x| x.to_path_string())
                 .filter(|x| x.starts_with("/l/"))
                 .collect::<Vec<_>>();
-            items.push(ParagraphItem { id, labels });
+            items.push(ParagraphItem {
+                id,
+                labels,
+            });
         }
         self.offset += Self::BATCH;
         let v = time.elapsed().as_millis();
@@ -348,15 +329,13 @@ impl<'a> Searcher<'a> {
             OrderType::Desc => |t: u64| t,
             OrderType::Asc => |t: u64| u64::MAX - t,
         };
-        TopDocs::with_limit(limit).and_offset(offset).custom_score(
-            move |segment_reader: &SegmentReader| {
-                let reader = match order.sort_by() {
-                    OrderField::Created => segment_reader.fast_fields().date(created).unwrap(),
-                    OrderField::Modified => segment_reader.fast_fields().date(modified).unwrap(),
-                };
-                move |doc: DocId| sorter(reader.get(doc).to_u64())
-            },
-        )
+        TopDocs::with_limit(limit).and_offset(offset).custom_score(move |segment_reader: &SegmentReader| {
+            let reader = match order.sort_by() {
+                OrderField::Created => segment_reader.fast_fields().date(created).unwrap(),
+                OrderField::Modified => segment_reader.fast_fields().date(modified).unwrap(),
+            };
+            move |doc: DocId| sorter(reader.get(doc).to_u64())
+        })
     }
     fn do_search(
         &self,
@@ -365,13 +344,11 @@ impl<'a> Searcher<'a> {
         service: &ParagraphReaderService,
     ) -> NodeResult<ParagraphSearchResponse> {
         let searcher = service.reader.searcher();
-        let facet_collector = self.facets.iter().fold(
-            FacetCollector::for_field(service.schema.facets),
-            |mut collector, facet| {
+        let facet_collector =
+            self.facets.iter().fold(FacetCollector::for_field(service.schema.facets), |mut collector, facet| {
                 collector.add_facet(Facet::from(facet));
                 collector
-            },
-        );
+            });
         if self.only_faceted {
             // No query search, just facets
             let facets_count = searcher.search(&query, &facet_collector).unwrap();
@@ -385,8 +362,7 @@ impl<'a> Searcher<'a> {
             let extra_result = self.results + 1;
             match self.request.order.clone() {
                 Some(order) => {
-                    let custom_collector =
-                        self.custom_order_collector(order, extra_result, self.offset);
+                    let custom_collector = self.custom_order_collector(order, extra_result, self.offset);
                     let collector = &(Count, custom_collector);
                     let (total, top_docs) = searcher.search(&query, collector)?;
                     Ok(ParagraphSearchResponse::from(SearchIntResponse {
@@ -403,8 +379,7 @@ impl<'a> Searcher<'a> {
                     }))
                 }
                 None => {
-                    let topdocs_collector =
-                        TopDocs::with_limit(extra_result).and_offset(self.offset);
+                    let topdocs_collector = TopDocs::with_limit(extra_result).and_offset(self.offset);
                     let collector = &(Count, topdocs_collector);
                     let (total, top_docs) = searcher.search(&query, collector)?;
                     Ok(ParagraphSearchResponse::from(SearchBm25Response {
@@ -426,8 +401,7 @@ impl<'a> Searcher<'a> {
 
             match self.request.order.clone() {
                 Some(order) => {
-                    let custom_collector =
-                        self.custom_order_collector(order, extra_result, self.offset);
+                    let custom_collector = self.custom_order_collector(order, extra_result, self.offset);
                     let collector = &(Count, facet_collector, custom_collector);
                     let (total, facets_count, top_docs) = searcher.search(&query, collector)?;
                     Ok(ParagraphSearchResponse::from(SearchIntResponse {
@@ -444,8 +418,7 @@ impl<'a> Searcher<'a> {
                     }))
                 }
                 None => {
-                    let topdocs_collector =
-                        TopDocs::with_limit(extra_result).and_offset(self.offset);
+                    let topdocs_collector = TopDocs::with_limit(extra_result).and_offset(self.offset);
                     let collector = &(Count, facet_collector, topdocs_collector);
                     let (total, facets_count, top_docs) = searcher.search(&query, collector)?;
                     Ok(ParagraphSearchResponse::from(SearchBm25Response {
@@ -475,8 +448,8 @@ mod tests {
     use nucliadb_core::protos::prost_types::Timestamp;
     use nucliadb_core::protos::resource::ResourceStatus;
     use nucliadb_core::protos::{
-        Faceted, Filter, IndexMetadata, IndexParagraph, IndexParagraphs, OrderBy, Resource,
-        ResourceId, TextInformation, Timestamps,
+        Faceted, Filter, IndexMetadata, IndexParagraph, IndexParagraphs, OrderBy, Resource, ResourceId,
+        TextInformation, Timestamps,
     };
     use nucliadb_core::NodeResult;
     use tantivy::collector::Count;
@@ -535,23 +508,13 @@ mod tests {
             end: (DOC1_P1.len() + DOC1_P2.len()) as i32,
             sentences: HashMap::new(),
             field: "body".to_string(),
-            labels: vec![
-                "/tantivy".to_string(),
-                "/test".to_string(),
-                "/label1".to_string(),
-            ],
+            labels: vec!["/tantivy".to_string(), "/test".to_string(), "/label1".to_string()],
             index: 1,
             split: "".to_string(),
             repeated_in_field: false,
             metadata: None,
         };
-        let p2_uuid = format!(
-            "{}/{}/{}-{}",
-            UUID,
-            "body",
-            DOC1_P1.len(),
-            DOC1_P1.len() + DOC1_P2.len()
-        );
+        let p2_uuid = format!("{}/{}/{}-{}", UUID, "body", DOC1_P1.len(), DOC1_P1.len() + DOC1_P2.len());
 
         let p3 = IndexParagraph {
             start: (DOC1_P1.len() + DOC1_P2.len()) as i32,
@@ -573,9 +536,7 @@ mod tests {
         );
 
         let body_paragraphs = IndexParagraphs {
-            paragraphs: [(p1_uuid, p1), (p2_uuid, p2), (p3_uuid, p3)]
-                .into_iter()
-                .collect(),
+            paragraphs: [(p1_uuid, p1), (p2_uuid, p2), (p3_uuid, p3)].into_iter().collect(),
         };
 
         let p4 = IndexParagraph {
@@ -595,12 +556,8 @@ mod tests {
             paragraphs: [(p4_uuid, p4)].into_iter().collect(),
         };
 
-        let paragraphs = [
-            ("body".to_string(), body_paragraphs),
-            ("title".to_string(), title_paragraphs),
-        ]
-        .into_iter()
-        .collect();
+        let paragraphs =
+            [("body".to_string(), body_paragraphs), ("title".to_string(), title_paragraphs)].into_iter().collect();
 
         Resource {
             resource: Some(resource_id),
@@ -625,11 +582,11 @@ mod tests {
         let psc = ParagraphConfig {
             path: dir.path().join("paragraphs"),
         };
-        let seconds = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .map(|t| t.as_secs() as i64)
-            .unwrap();
-        let timestamp = Timestamp { seconds, nanos: 0 };
+        let seconds = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).map(|t| t.as_secs() as i64).unwrap();
+        let timestamp = Timestamp {
+            seconds,
+            nanos: 0,
+        };
 
         let mut paragraph_writer_service = ParagraphWriterService::start(&psc).unwrap();
         let resource1 = create_resource("shard1".to_string(), timestamp);
@@ -684,11 +641,11 @@ mod tests {
         let psc = ParagraphConfig {
             path: dir.path().join("paragraphs"),
         };
-        let seconds = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .map(|t| t.as_secs() as i64)
-            .unwrap();
-        let timestamp = Timestamp { seconds, nanos: 0 };
+        let seconds = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).map(|t| t.as_secs() as i64).unwrap();
+        let timestamp = Timestamp {
+            seconds,
+            nanos: 0,
+        };
 
         let mut paragraph_writer_service = ParagraphWriterService::start(&psc).unwrap();
         let resource1 = create_resource("shard1".to_string(), timestamp);
@@ -707,21 +664,12 @@ mod tests {
         // Testing filtering one filter from resource, one from field and one from paragraph
 
         let filter = Filter {
-            field_labels: vec![
-                "/l/mylabel_resource".to_string(),
-                "/c/ool".to_string(),
-                "/e/mylabel".to_string(),
-            ],
+            field_labels: vec!["/l/mylabel_resource".to_string(), "/c/ool".to_string(), "/e/mylabel".to_string()],
             paragraph_labels: vec![],
         };
 
         let faceted = Faceted {
-            labels: vec![
-                "".to_string(),
-                "/l".to_string(),
-                "/e".to_string(),
-                "/c".to_string(),
-            ],
+            labels: vec!["".to_string(), "/l".to_string(), "/e".to_string(), "/c".to_string()],
         };
 
         let order = OrderBy {
@@ -993,10 +941,7 @@ mod tests {
         let (_top_docs, count) = searcher.search(&AllQuery, &(TopDocs::with_limit(10), Count))?;
         assert_eq!(count, 4);
 
-        fn do_search(
-            paragraph_reader_service: &ParagraphReaderService,
-            timestamps: Timestamps,
-        ) -> i32 {
+        fn do_search(paragraph_reader_service: &ParagraphReaderService, timestamps: Timestamps) -> i32 {
             let search = ParagraphSearchRequest {
                 id: "shard1".to_string(),
                 uuid: "".to_string(),

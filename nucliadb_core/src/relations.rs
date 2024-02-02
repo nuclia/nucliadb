@@ -33,9 +33,7 @@ pub struct RelationConfig {
     pub channel: Channel,
 }
 
-pub trait RelationReader:
-    ReaderChild<Request = RelationSearchRequest, Response = RelationSearchResponse>
-{
+pub trait RelationReader: ReaderChild<Request = RelationSearchRequest, Response = RelationSearchResponse> {
     fn get_edges(&self) -> NodeResult<EdgeList>;
     fn get_node_types(&self) -> NodeResult<TypeList>;
     fn count(&self) -> NodeResult<usize>;

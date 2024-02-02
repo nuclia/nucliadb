@@ -23,8 +23,7 @@ use std::time::Instant;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::prost::Message;
 use nucliadb_core::protos::{
-    DocumentScored, DocumentVectorIdentifier, SentenceMetadata, VectorSearchRequest,
-    VectorSearchResponse,
+    DocumentScored, DocumentVectorIdentifier, SentenceMetadata, VectorSearchRequest, VectorSearchResponse,
 };
 use nucliadb_core::tracing::{self, *};
 use nucliadb_procs::measure;
@@ -97,23 +96,10 @@ impl ReaderChild for VectorReaderService {
         let indexet_slock = self.indexset.get_slock()?;
         let index_slock = self.index.get_slock()?;
 
-        let key_filters = request
-            .key_filters
-            .iter()
-            .cloned()
-            .map(AtomClause::key_prefix);
-        let paragraph_labels = request
-            .paragraph_labels
-            .iter()
-            .cloned()
-            .map(AtomClause::label);
+        let key_filters = request.key_filters.iter().cloned().map(AtomClause::key_prefix);
+        let paragraph_labels = request.paragraph_labels.iter().cloned().map(AtomClause::label);
         let mut formula = Formula::new();
-        request
-            .field_labels
-            .iter()
-            .cloned()
-            .map(AtomClause::label)
-            .for_each(|c| formula.extend(c));
+        request.field_labels.iter().cloned().map(AtomClause::label).for_each(|c| formula.extend(c));
 
         if key_filters.len() > 0 {
             formula.extend(CompoundClause::new(key_filters.collect()));
@@ -130,17 +116,11 @@ impl ReaderChild for VectorReaderService {
             debug!("{id:?} - No vectorset specified, searching in the main index");
             self.index.search(&search_request, &index_slock)?
         } else if let Some(index) = self.indexset.get(&request.vector_set, &indexet_slock)? {
-            debug!(
-                "{id:?} - vectorset specified and found, searching on {}",
-                request.vector_set
-            );
+            debug!("{id:?} - vectorset specified and found, searching on {}", request.vector_set);
             let lock = index.get_slock()?;
             index.search(&search_request, &lock)?
         } else {
-            debug!(
-                "{id:?} - A was vectorset specified, but not found. {} is not a vectorset",
-                request.vector_set
-            );
+            debug!("{id:?} - A was vectorset specified, but not found. {} is not a vectorset", request.vector_set);
             vec![]
         };
         let v = time.elapsed().as_millis();
@@ -200,7 +180,9 @@ impl TryFrom<Neighbour> for DocumentScored {
         Ok(DocumentScored {
             labels,
             metadata,
-            doc_id: Some(DocumentVectorIdentifier { id }),
+            doc_id: Some(DocumentVectorIdentifier {
+                id,
+            }),
             score: neighbour.score(),
         })
     }
@@ -455,10 +437,8 @@ mod tests {
             vectorset: dir.path().join("vectorset"),
             channel: Channel::EXPERIMENTAL,
         };
-        let raw_sentences = [
-            ("DOC/KEY/1/1".to_string(), vec![1.0, 2.0, 3.0]),
-            ("DOC/KEY/1/2".to_string(), vec![1.0, 2.0, 3.0]),
-        ];
+        let raw_sentences =
+            [("DOC/KEY/1/1".to_string(), vec![1.0, 2.0, 3.0]), ("DOC/KEY/1/2".to_string(), vec![1.0, 2.0, 3.0])];
         let resource_id = ResourceId {
             shard_id: "DOC".to_string(),
             uuid: "DOC/KEY".to_string(),

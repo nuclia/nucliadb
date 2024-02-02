@@ -66,13 +66,10 @@ impl ShardReaderCache {
         let shard_path = disk_structure::shard_path_by_id(&self.shards_path.clone(), id);
 
         if !ShardMetadata::exists(&shard_path) {
-            return Err(node_error!(ShardNotFoundError(
-                "Shard {shard_path:?} is not on disk"
-            )));
+            return Err(node_error!(ShardNotFoundError("Shard {shard_path:?} is not on disk")));
         }
-        let shard = ShardReader::new(id.clone(), &shard_path).map_err(|error| {
-            node_error!("Shard {shard_path:?} could not be loaded from disk: {error:?}")
-        })?;
+        let shard = ShardReader::new(id.clone(), &shard_path)
+            .map_err(|error| node_error!("Shard {shard_path:?} could not be loaded from disk: {error:?}"))?;
 
         Ok(Arc::new(shard))
     }

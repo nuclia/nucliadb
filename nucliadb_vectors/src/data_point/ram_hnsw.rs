@@ -42,9 +42,7 @@ pub struct RAMLayer {
 
 impl RAMLayer {
     fn out_edges(&self, node: Address) -> std::iter::Copied<std::slice::Iter<'_, (Address, Edge)>> {
-        self.out
-            .get(&node)
-            .map_or_else(|| NO_EDGES.iter().copied(), |out| out.iter().copied())
+        self.out.get(&node).map_or_else(|| NO_EDGES.iter().copied(), |out| out.iter().copied())
     }
     pub fn new() -> RAMLayer {
         RAMLayer::default()
@@ -101,13 +99,13 @@ impl RAMHnsw {
     }
     pub fn update_entry_point(&mut self) -> &mut Self {
         self.remove_empty_layers();
-        self.entry_point = self
-            .layers
-            .iter()
-            .enumerate()
-            .last()
-            .and_then(|(index, l)| l.first().map(|node| (node, index)))
-            .map(|(node, layer)| EntryPoint { node, layer });
+        self.entry_point =
+            self.layers.iter().enumerate().last().and_then(|(index, l)| l.first().map(|node| (node, index))).map(
+                |(node, layer)| EntryPoint {
+                    node,
+                    layer,
+                },
+            );
         self
     }
     pub fn no_layers(&self) -> usize {

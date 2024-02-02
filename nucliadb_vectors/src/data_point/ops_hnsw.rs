@@ -147,9 +147,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
             match best_so_far.map(|n| (n, self.similarity(n, query))) {
                 None => break None,
                 Some((_, score)) if score < self.tracker.min_score() => break None,
-                Some((n, score)) if filter.is_valid(n, score) && filter.passes_formula(n) => {
-                    break Some((n, score))
-                }
+                Some((n, score)) if filter.is_valid(n, score) && filter.passes_formula(n) => break Some((n, score)),
                 Some((down, _)) => {
                     let mut sorted_out: Vec<_> = layer.get_out_edges(down).collect();
                     sorted_out.sort_by(|a, b| b.1.total_cmp(&a.1));
@@ -202,18 +200,9 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                 _ => (),
             }
         }
-        ms_neighbours
-            .into_sorted_vec()
-            .into_iter()
-            .map(|Reverse(Cnx(n, d))| (n, d))
-            .collect()
+        ms_neighbours.into_sorted_vec().into_iter().map(|Reverse(Cnx(n, d))| (n, d)).collect()
     }
-    fn layer_insert(
-        &self,
-        x: Address,
-        layer: &mut RAMLayer,
-        entry_points: &[Address],
-    ) -> Vec<Address> {
+    fn layer_insert(&self, x: Address, layer: &mut RAMLayer, entry_points: &[Address]) -> Vec<Address> {
         use params::*;
         let neighbours = self.layer_search::<&RAMLayer>(x, layer, ef_construction(), entry_points);
         let neighbours = self.select_neighbours_heuristic(m_max(), neighbours);
@@ -231,9 +220,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         for crnt in needs_repair {
             let edges = layer.take_out_edges(crnt);
             let neighbours = self.select_neighbours_heuristic(m_max(), edges);
-            neighbours
-                .into_iter()
-                .for_each(|(y, edge)| layer.add_edge(crnt, edge, y));
+            neighbours.into_iter().for_each(|(y, edge)| layer.add_edge(crnt, edge, y));
         }
         result
     }
@@ -351,9 +338,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                 blocked_addresses: &sol_addresses,
                 vec_counter: &vec_counter,
             };
-            let Some((addr, score)) =
-                self.closest_up_node(addr, query, hnsw.get_layer(0), node_filter)
-            else {
+            let Some((addr, score)) = self.closest_up_node(addr, query, hnsw.get_layer(0), node_filter) else {
                 continue;
             };
             filtered_result.push((addr, score));

@@ -51,9 +51,7 @@ pub fn create_resource(shard_id: String) -> Resource {
         uuid: "f56c58ac-b4f9-4d61-a077-ffccaadd0001".to_string(),
     };
 
-    let now = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap();
+    let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
     let timestamp = Timestamp {
         seconds: now.as_secs() as i64,
         nanos: 0,

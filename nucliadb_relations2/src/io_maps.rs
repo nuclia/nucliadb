@@ -27,10 +27,7 @@ use tantivy::Document;
 use crate::schema::Schema;
 
 pub fn decode_metadata(schema: &Schema, doc: &Document) -> Option<RelationMetadata> {
-    schema
-        .metadata(doc)
-        .map(RelationMetadata::decode)
-        .map(|m| m.expect("Corrupted metadata stored in the index"))
+    schema.metadata(doc).map(RelationMetadata::decode).map(|m| m.expect("Corrupted metadata stored in the index"))
 }
 
 pub fn relation_type_to_u64(relation: RelationType) -> u64 {
@@ -45,7 +42,9 @@ pub fn relation_type_to_u64(relation: RelationType) -> u64 {
 }
 
 pub fn u64_to_relation_type<T>(raw_relation: u64) -> T
-where RelationType: Into<T> {
+where
+    RelationType: Into<T>,
+{
     match raw_relation {
         0 => RelationType::Child.into(),
         1 => RelationType::About.into(),
@@ -67,7 +66,9 @@ pub fn node_type_to_u64(node_type: NodeType) -> u64 {
 }
 
 pub fn u64_to_node_type<T>(raw_node_type: u64) -> T
-where NodeType: Into<T> {
+where
+    NodeType: Into<T>,
+{
     match raw_node_type {
         0 => NodeType::Entity.into(),
         1 => NodeType::Label.into(),

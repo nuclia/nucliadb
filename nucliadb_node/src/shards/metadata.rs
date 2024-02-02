@@ -98,12 +98,7 @@ impl ShardMetadata {
         if !metadata_path.exists() {
             return Err(node_error!("Shard metadata file does not exist"));
         }
-        let requested_shard_id = shard_path
-            .file_name()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string();
+        let requested_shard_id = shard_path.file_name().unwrap().to_str().unwrap().to_string();
 
         let mut reader = BufReader::new(File::open(metadata_path)?);
         let metadata: ShardMetadataFile = serde_json::from_reader(&mut reader)?;
@@ -282,31 +277,16 @@ mod test {
 
     #[test]
     fn test_similarity_mappings() {
-        assert_eq!(
-            Similarity::Cosine,
-            Similarity::from(protos::VectorSimilarity::Cosine)
-        );
-        assert_eq!(
-            Similarity::Dot,
-            Similarity::from(protos::VectorSimilarity::Dot)
-        );
-        assert_eq!(
-            protos::VectorSimilarity::Cosine,
-            protos::VectorSimilarity::from(Similarity::Cosine)
-        );
-        assert_eq!(
-            protos::VectorSimilarity::Dot,
-            protos::VectorSimilarity::from(Similarity::Dot)
-        );
+        assert_eq!(Similarity::Cosine, Similarity::from(protos::VectorSimilarity::Cosine));
+        assert_eq!(Similarity::Dot, Similarity::from(protos::VectorSimilarity::Dot));
+        assert_eq!(protos::VectorSimilarity::Cosine, protos::VectorSimilarity::from(Similarity::Cosine));
+        assert_eq!(protos::VectorSimilarity::Dot, protos::VectorSimilarity::from(Similarity::Dot));
         assert_eq!("Cosine", Similarity::Cosine.to_string());
         assert_eq!("Dot", Similarity::Dot.to_string());
         assert_eq!(Similarity::Cosine, Similarity::from("Cosine".to_string()));
         assert_eq!(Similarity::Dot, Similarity::from("Dot".to_string()));
 
-        assert_eq!(
-            Some(protos::VectorSimilarity::Cosine).map(|i| i.into()),
-            Some(Similarity::Cosine)
-        );
+        assert_eq!(Some(protos::VectorSimilarity::Cosine).map(|i| i.into()), Some(Similarity::Cosine));
     }
 
     #[test]

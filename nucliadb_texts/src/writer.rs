@@ -47,10 +47,7 @@ pub struct TextWriterService {
 
 impl Debug for TextWriterService {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("FieldWriterService")
-            .field("index", &self.index)
-            .field("schema", &self.schema)
-            .finish()
+        f.debug_struct("FieldWriterService").field("index", &self.index).field("schema", &self.schema).finish()
     }
 }
 
@@ -144,12 +141,7 @@ impl WriterChild for TextWriterService {
     }
 
     fn get_segment_ids(&self) -> NodeResult<Vec<String>> {
-        Ok(self
-            .index
-            .searchable_segment_ids()?
-            .iter()
-            .map(|s| s.uuid_string())
-            .collect())
+        Ok(self.index.searchable_segment_ids()?.iter().map(|s| s.uuid_string()).collect())
     }
 
     fn get_index_files(&self, ignored_segment_ids: &[String]) -> NodeResult<IndexFiles> {
@@ -177,9 +169,7 @@ impl TextWriterService {
     pub fn open(config: &TextConfig) -> NodeResult<Self> {
         let field_schema = TextSchema::new();
         let index = Index::open_in_dir(&config.path)?;
-        let writer = index
-            .writer_with_num_threads(1, TANTIVY_INDEX_ARENA_MEMORY)
-            .unwrap();
+        let writer = index.writer_with_num_threads(1, TANTIVY_INDEX_ARENA_MEMORY).unwrap();
 
         Ok(TextWriterService {
             index,
@@ -203,12 +193,8 @@ impl TextWriterService {
         let field_schema = TextSchema::new();
         let mut index_builder = Index::builder().schema(field_schema.schema.clone());
         index_builder = index_builder.settings(settings);
-        let index = index_builder
-            .create_in_dir(&config.path)
-            .expect("Index directory should exist");
-        let writer = index
-            .writer_with_num_threads(1, TANTIVY_INDEX_ARENA_MEMORY)
-            .unwrap();
+        let index = index_builder.create_in_dir(&config.path).expect("Index directory should exist");
+        let writer = index.writer_with_num_threads(1, TANTIVY_INDEX_ARENA_MEMORY).unwrap();
 
         Ok(TextWriterService {
             index,
@@ -237,24 +223,10 @@ impl TextWriterService {
     }
 
     fn index_document(&mut self, resource: &Resource) {
-        let resource_id = resource
-            .resource
-            .as_ref()
-            .expect("Missing resource ID")
-            .uuid
-            .as_str();
-        let metadata = resource
-            .metadata
-            .as_ref()
-            .expect("Missing resource metadata");
-        let modified = metadata
-            .modified
-            .as_ref()
-            .expect("Missing resource modified date in metadata");
-        let created = metadata
-            .created
-            .as_ref()
-            .expect("Missing resource created date in metadata");
+        let resource_id = resource.resource.as_ref().expect("Missing resource ID").uuid.as_str();
+        let metadata = resource.metadata.as_ref().expect("Missing resource metadata");
+        let modified = metadata.modified.as_ref().expect("Missing resource modified date in metadata");
+        let created = metadata.created.as_ref().expect("Missing resource created date in metadata");
 
         let mut base_doc = doc!(
             self.schema.uuid => resource_id,

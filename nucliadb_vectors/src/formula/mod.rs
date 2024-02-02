@@ -34,7 +34,10 @@ pub struct AtomClause {
 }
 impl AtomClause {
     pub fn new(value: String, kind: AtomKind) -> AtomClause {
-        AtomClause { kind, value }
+        AtomClause {
+            kind,
+            value,
+        }
     }
     pub fn label(value: String) -> AtomClause {
         AtomClause::new(value, AtomKind::Label)
@@ -65,7 +68,9 @@ impl CompoundClause {
         self.labels.is_empty()
     }
     pub fn new(labels: Vec<AtomClause>) -> CompoundClause {
-        CompoundClause { labels }
+        CompoundClause {
+            labels,
+        }
     }
     fn run<D: DataRetriever>(&self, x: Address, retriever: &D) -> bool {
         if self.is_empty() {
@@ -130,7 +135,9 @@ impl Formula {
         Formula::default()
     }
     pub fn extend<C>(&mut self, clause: C)
-    where Clause: From<C> {
+    where
+        Clause: From<C>,
+    {
         self.clauses.push(clause.into())
     }
     pub fn run<D: DataRetriever>(&self, x: Address, retriever: &D) -> bool {
@@ -205,10 +212,7 @@ mod tests {
         assert!(!formula.run(ADDRESS, &retriever));
 
         let mut formula = Formula::new();
-        let inner = vec![
-            AtomClause::label(L1.to_string()),
-            AtomClause::label(L2.to_string()),
-        ];
+        let inner = vec![AtomClause::label(L1.to_string()), AtomClause::label(L2.to_string())];
         formula.extend(CompoundClause::new(inner));
         assert!(formula.run(ADDRESS, &retriever));
 

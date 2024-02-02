@@ -171,10 +171,7 @@ impl InnerSettingsBuilder {
         } else if sentry_env == "stage" {
             self.sentry_env = Some(SENTRY_DEV);
         } else {
-            error!(
-                "Invalid sentry environment: {sentry_env}. Keeping default one: {:?}",
-                self.sentry_env
-            );
+            error!("Invalid sentry environment: {sentry_env}. Keeping default one: {:?}", self.sentry_env);
         }
         self
     }

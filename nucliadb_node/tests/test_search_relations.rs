@@ -30,18 +30,14 @@ use nucliadb_core::protos::relation::RelationType;
 use nucliadb_core::protos::relation_node::NodeType;
 use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{
-    EntitiesSubgraphRequest, IndexMetadata, NewShardRequest, Relation, RelationNode,
-    RelationNodeFilter, RelationPrefixSearchRequest, RelationSearchRequest, RelationSearchResponse,
-    ReleaseChannel, Resource, ResourceId,
+    EntitiesSubgraphRequest, IndexMetadata, NewShardRequest, Relation, RelationNode, RelationNodeFilter,
+    RelationPrefixSearchRequest, RelationSearchRequest, RelationSearchResponse, ReleaseChannel, Resource, ResourceId,
 };
 use rstest::*;
 use tonic::Request;
 use uuid::Uuid;
 
-async fn create_knowledge_graph(
-    writer: &mut TestNodeWriter,
-    shard_id: String,
-) -> HashMap<String, RelationNode> {
+async fn create_knowledge_graph(writer: &mut TestNodeWriter, shard_id: String) -> HashMap<String, RelationNode> {
     let rid = Uuid::new_v4();
 
     let mut relation_nodes = HashMap::new();
@@ -295,9 +291,7 @@ async fn create_knowledge_graph(
         },
     ];
 
-    let now = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap();
+    let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
     let timestamp = Timestamp {
         seconds: now.as_secs() as i64,
         nanos: 0,
@@ -389,18 +383,10 @@ async fn test_search_relations_prefixed(
         })
         .await?;
 
-    let expected = HashSet::from_iter([
-        "Cat".to_string(),
-        "Catwoman".to_string(),
-        "Batman".to_string(),
-    ]);
+    let expected = HashSet::from_iter(["Cat".to_string(), "Catwoman".to_string(), "Batman".to_string()]);
     assert!(response.get_ref().prefix.is_some());
     let prefix_response = response.get_ref().prefix.as_ref().unwrap();
-    let results = prefix_response
-        .nodes
-        .iter()
-        .map(|node| node.value.to_owned())
-        .collect::<HashSet<_>>();
+    let results = prefix_response.nodes.iter().map(|node| node.value.to_owned()).collect::<HashSet<_>>();
     assert_eq!(results, expected);
 
     // --------------------------------------------------------------
@@ -424,11 +410,7 @@ async fn test_search_relations_prefixed(
     let expected = HashSet::from_iter(["Cat".to_string()]);
     assert!(response.get_ref().prefix.is_some());
     let prefix_response = response.get_ref().prefix.as_ref().unwrap();
-    let results = prefix_response
-        .nodes
-        .iter()
-        .map(|node| node.value.to_owned())
-        .collect::<HashSet<_>>();
+    let results = prefix_response.nodes.iter().map(|node| node.value.to_owned()).collect::<HashSet<_>>();
     assert_eq!(results, expected);
 
     let response = reader
@@ -448,11 +430,7 @@ async fn test_search_relations_prefixed(
     let expected = HashSet::from_iter(["Catwoman".to_string()]);
     assert!(response.get_ref().prefix.is_some());
     let prefix_response = response.get_ref().prefix.as_ref().unwrap();
-    let results = prefix_response
-        .nodes
-        .iter()
-        .map(|node| node.value.to_owned())
-        .collect::<HashSet<_>>();
+    let results = prefix_response.nodes.iter().map(|node| node.value.to_owned()).collect::<HashSet<_>>();
     assert_eq!(results, expected);
 
     // --------------------------------------------------------------
@@ -476,11 +454,7 @@ async fn test_search_relations_prefixed(
     let expected = HashSet::from_iter(["Cat".to_string()]);
     assert!(response.get_ref().prefix.is_some());
     let prefix_response = response.get_ref().prefix.as_ref().unwrap();
-    let results = prefix_response
-        .nodes
-        .iter()
-        .map(|node| node.value.to_owned())
-        .collect::<HashSet<_>>();
+    let results = prefix_response.nodes.iter().map(|node| node.value.to_owned()).collect::<HashSet<_>>();
     assert_eq!(results, expected);
 
     // --------------------------------------------------------------
@@ -532,10 +506,7 @@ async fn test_search_relations_neighbours(
             .iter()
             .flat_map(|neighbours| neighbours.relations.iter())
             .flat_map(|node| {
-                [(
-                    node.source.as_ref().unwrap().value.to_owned(),
-                    node.to.as_ref().unwrap().value.to_owned(),
-                )]
+                [(node.source.as_ref().unwrap().value.to_owned(), node.to.as_ref().unwrap().value.to_owned())]
             })
             .collect::<HashSet<_>>()
     }

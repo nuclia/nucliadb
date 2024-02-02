@@ -56,5 +56,8 @@ pub async fn thread_dump_service() -> Response {
         format!("Command failed with error: {:?}", output.status)
     };
 
-    Json(Traces { trace: result }).into_response()
+    Json(Traces {
+        trace: result,
+    })
+    .into_response()
 }

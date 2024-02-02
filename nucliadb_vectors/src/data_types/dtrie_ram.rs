@@ -59,11 +59,7 @@ impl DTrie {
                 self.go_table.clear();
             }
             [head, tail @ ..] => {
-                self.go_table
-                    .entry(*head)
-                    .or_insert_with(|| Box::new(DTrie::new()))
-                    .as_mut()
-                    .insert(tail, value);
+                self.go_table.entry(*head).or_insert_with(|| Box::new(DTrie::new())).as_mut().insert(tail, value);
             }
         }
     }

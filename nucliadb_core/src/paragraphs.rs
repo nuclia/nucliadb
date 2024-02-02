@@ -34,7 +34,9 @@ pub struct ParagraphConfig {
 pub struct ParagraphIterator(Box<dyn Iterator<Item = ParagraphItem> + Send>);
 impl ParagraphIterator {
     pub fn new<I>(inner: I) -> ParagraphIterator
-    where I: Iterator<Item = ParagraphItem> + Send + 'static {
+    where
+        I: Iterator<Item = ParagraphItem> + Send + 'static,
+    {
         ParagraphIterator(Box::new(inner))
     }
 }
@@ -45,9 +47,7 @@ impl Iterator for ParagraphIterator {
     }
 }
 
-pub trait ParagraphReader:
-    ReaderChild<Request = ParagraphSearchRequest, Response = ParagraphSearchResponse>
-{
+pub trait ParagraphReader: ReaderChild<Request = ParagraphSearchRequest, Response = ParagraphSearchResponse> {
     fn iterator(&self, request: &StreamRequest) -> NodeResult<ParagraphIterator>;
     fn suggest(&self, request: &SuggestRequest) -> NodeResult<Self::Response>;
     fn count(&self) -> NodeResult<usize>;

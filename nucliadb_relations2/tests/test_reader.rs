@@ -23,8 +23,8 @@ use nucliadb_core::protos::entities_subgraph_request::DeletedEntities;
 use nucliadb_core::protos::relation::RelationType;
 use nucliadb_core::protos::relation_node::NodeType;
 use nucliadb_core::protos::{
-    EntitiesSubgraphRequest, RelationNodeFilter, RelationPrefixSearchRequest,
-    RelationSearchRequest, Resource, ResourceId,
+    EntitiesSubgraphRequest, RelationNodeFilter, RelationPrefixSearchRequest, RelationSearchRequest, Resource,
+    ResourceId,
 };
 use nucliadb_core::Channel;
 use nucliadb_relations2::reader::RelationsReaderService;
@@ -128,8 +128,7 @@ fn test_start_new_reader_after_a_writer() -> NodeResult<()> {
     };
 
     let _writer = RelationsWriterService::start(&config)?;
-    let reader: Result<RelationsReaderService, nucliadb_core::Error> =
-        RelationsReaderService::start(&config);
+    let reader: Result<RelationsReaderService, nucliadb_core::Error> = RelationsReaderService::start(&config);
     assert!(reader.is_ok());
 
     Ok(())
@@ -199,16 +198,8 @@ fn test_search() -> NodeResult<()> {
         subgraph: Some(EntitiesSubgraphRequest {
             depth: Some(1_i32),
             entry_points: vec![
-                common::create_relation_node(
-                    "dog".to_string(),
-                    NodeType::Entity,
-                    "ANIMALS".to_string(),
-                ),
-                common::create_relation_node(
-                    "bird".to_string(),
-                    NodeType::Entity,
-                    "ANIMALS".to_string(),
-                ),
+                common::create_relation_node("dog".to_string(), NodeType::Entity, "ANIMALS".to_string()),
+                common::create_relation_node("bird".to_string(), NodeType::Entity, "ANIMALS".to_string()),
             ],
             ..Default::default()
         }),
