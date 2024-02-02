@@ -142,7 +142,7 @@ enum MergerStatus {
 pub struct Index {
     metadata: IndexMetadata,
     merger_status: MergerStatus,
-    state: RwLock<SegmentManager>,
+    segments: RwLock<SegmentManager>,
     pub location: PathBuf,
     dimension: RwLock<Option<u64>>,
 }
@@ -156,11 +156,11 @@ impl Index {
     }
 
     fn read_state(&self) -> RwLockReadGuard<'_, SegmentManager> {
-        self.state.read().unwrap_or_else(|e| e.into_inner())
+        self.segments.read().unwrap_or_else(|e| e.into_inner())
     }
 
     fn write_state(&self) -> RwLockWriteGuard<'_, SegmentManager> {
-        self.state.write().unwrap_or_else(|e| e.into_inner())
+        self.segments.write().unwrap_or_else(|e| e.into_inner())
     }
 
     fn update(&self) -> VectorR<()> {
@@ -184,7 +184,7 @@ impl Index {
             metadata,
             merger_status: MergerStatus::Free,
             dimension: RwLock::new(None),
-            state: RwLock::new(state),
+            segments: RwLock::new(state),
             location: path.to_path_buf(),
         };
         // Read dimension from segments
@@ -201,7 +201,7 @@ impl Index {
             metadata,
             merger_status: MergerStatus::Free,
             dimension: RwLock::new(None),
-            state: RwLock::new(state),
+            segments: RwLock::new(state),
             location: path.to_path_buf(),
         };
         Ok(index)

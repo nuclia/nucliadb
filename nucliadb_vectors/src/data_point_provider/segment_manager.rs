@@ -33,10 +33,13 @@ use crate::data_types::dtrie_ram::DTrie;
 use crate::data_types::DeleteLog;
 use crate::VectorR;
 
+type TxId = u64;
+type SegmentId = DpId;
+
 #[derive(Clone, Copy)]
 struct TimeSensitiveDLog<'a> {
     dlog: &'a DTrie,
-    time: u64,
+    time: TxId,
 }
 impl<'a> DeleteLog for TimeSensitiveDLog<'a> {
     fn is_deleted(&self, key: &[u8]) -> bool {
@@ -49,14 +52,14 @@ impl<'a> DeleteLog for TimeSensitiveDLog<'a> {
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 struct JournalTransaction {
-    txid: u64,
+    txid: TxId,
     operations: Vec<Operation>,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 enum Operation {
-    AddSegment(DpId),
-    DeleteSegment(DpId),
+    AddSegment(SegmentId),
+    DeleteSegment(SegmentId),
 }
 
 #[derive(Serialize, Deserialize, Default, Clone)]
@@ -64,7 +67,6 @@ struct State {
     journal: Vec<JournalTransaction>,
     delete_log: DTrie,
     no_nodes: usize,
-    oldest_txid_pruned: u64,
 }
 
 #[derive(Default)]
@@ -80,7 +82,7 @@ impl Transaction {
         self.no_nodes += dp_journal.no_nodes();
     }
 
-    pub fn replace_segments(&mut self, old: Vec<DpId>, new: DpId) {
+    pub fn replace_segments(&mut self, old: Vec<SegmentId>, new: SegmentId) {
         for dpid in old {
             self.operations.push(Operation::DeleteSegment(dpid));
         }
@@ -104,7 +106,7 @@ impl StateFile {
         let file = OpenOptions::new()
             .create(true)
             .write(true)
-            .open(path.join(format!("{}.{STATE_FILE_EXTENSION}", DpId::new_v4())))?;
+            .open(path.join(format!("{}.{STATE_FILE_EXTENSION}", SegmentId::new_v4())))?;
         file.lock_exclusive()?;
 
         Ok(StateFile { path, file })
@@ -146,13 +148,13 @@ pub struct SegmentManager {
     state: State,
     state_version: Version,
 
-    segments: HashMap<DpId, u64>,
+    segments: HashMap<SegmentId, TxId>,
     path: PathBuf,
     state_file: StateFile,
 }
 
 impl SegmentManager {
-    fn txid(&self) -> u64 {
+    fn txid(&self) -> TxId {
         self.state.journal.last().map_or(0, |e| e.txid)
     }
 
@@ -197,7 +199,7 @@ impl SegmentManager {
         Ok(())
     }
 
-    fn oldest_live_txid(&self) -> u64 {
+    fn oldest_live_txid(&self) -> TxId {
         *self.segments.values().min().unwrap_or(&0)
     }
 
@@ -258,7 +260,7 @@ impl SegmentManager {
         Ok(())
     }
 
-    fn oldest_txid_in_use(&self) -> VectorR<Option<u64>> {
+    fn oldest_txid_in_use(&self) -> VectorR<Option<TxId>> {
         let mut oldest = None;
         for dir_entry in std::fs::read_dir(&self.path)? {
             let dir_entry = dir_entry?;
@@ -266,7 +268,7 @@ impl SegmentManager {
             if !path.is_file() {
                 continue;
             };
-            let reader_version: Option<u64> = StateFile::try_read(&path)?;
+            let reader_version: Option<TxId> = StateFile::try_read(&path)?;
             if let Some(reader_version) = reader_version {
                 oldest = match oldest {
                     None => Some(reader_version),
@@ -347,7 +349,7 @@ impl SegmentManager {
     }
 
     // Returns active segments
-    pub fn segment_iterator(&self) -> impl Iterator<Item = (&DpId, impl DeleteLog + '_)> {
+    pub fn segment_iterator(&self) -> impl Iterator<Item = (&SegmentId, impl DeleteLog + '_)> {
         self.segments.iter().map(|(id, time)| {
             (
                 id,
@@ -360,7 +362,7 @@ impl SegmentManager {
     }
 
     // Returns all segments in the log, including deleted ones
-    pub fn all_segments_iterator(&self) -> impl Iterator<Item = &DpId> {
+    pub fn all_segments_iterator(&self) -> impl Iterator<Item = &SegmentId> {
         let all_operations = self.state.journal.iter().flat_map(|e| &e.operations);
         all_operations.filter_map(|op| {
             if let Operation::AddSegment(id) = op {
@@ -378,8 +380,7 @@ mod tests {
 
     use tempfile::TempDir;
 
-    use super::SegmentManager;
-    use crate::data_point::DpId;
+    use super::{SegmentId, SegmentManager};
     use crate::data_point_provider::segment_manager::{JournalTransaction, Operation, Transaction};
     use crate::VectorR;
 
@@ -388,11 +389,11 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let mut manager = SegmentManager::create(dir.path().to_path_buf()).unwrap();
         let segments = [
-            DpId::new_v4(),
-            DpId::new_v4(),
-            DpId::new_v4(),
-            DpId::new_v4(),
-            DpId::new_v4(),
+            SegmentId::new_v4(),
+            SegmentId::new_v4(),
+            SegmentId::new_v4(),
+            SegmentId::new_v4(),
+            SegmentId::new_v4(),
         ];
         // Insert (txid=1)
         manager.commit(Transaction {
@@ -460,10 +461,10 @@ mod tests {
         let dir = TempDir::new()?;
         let mut writer = SegmentManager::create(dir.path().to_path_buf())?;
         let segments = [
-            DpId::new_v4(),
-            DpId::new_v4(),
-            DpId::new_v4(),
-            DpId::new_v4(),
+            SegmentId::new_v4(),
+            SegmentId::new_v4(),
+            SegmentId::new_v4(),
+            SegmentId::new_v4(),
         ];
         writer.commit(Transaction {
             operations: vec![Operation::AddSegment(segments[0])],
