@@ -26,9 +26,7 @@ pub type Trie = Vec<(bool, GoTable)>;
 
 fn traverse(buf: &[u8], node: usize, trie: &Trie) -> Result<usize, (usize, usize)> {
     match buf {
-        [head, tail @ ..] if trie[node].1.contains_key(head) => {
-            traverse(tail, trie[node].1[head], trie)
-        }
+        [head, tail @ ..] if trie[node].1.contains_key(head) => traverse(tail, trie[node].1[head], trie),
         [_head, ..] => Err((buf.len(), node)),
         [] => Ok(node),
     }
@@ -83,12 +81,7 @@ mod tests {
             b"BAD".as_slice(),
             b"GOOD".as_slice(),
         ];
-        let not_in_dictionary = [
-            b"WO1D1".as_slice(),
-            b"LORD".as_slice(),
-            b"BAF".as_slice(),
-            b"WOR".as_slice(),
-        ];
+        let not_in_dictionary = [b"WO1D1".as_slice(), b"LORD".as_slice(), b"BAF".as_slice(), b"WOR".as_slice()];
 
         let trie = create_trie(&dictionary);
         assert!(dictionary.iter().all(|w| has_word(&trie, w)));

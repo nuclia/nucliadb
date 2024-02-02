@@ -23,8 +23,7 @@ use nucliadb_protos::utils::Security;
 
 pub use crate::protos::prost_types::Timestamp as ProtoTimestamp;
 use crate::protos::{
-    DocumentSearchRequest, ParagraphSearchRequest, RelationSearchRequest, SearchRequest,
-    VectorSearchRequest,
+    DocumentSearchRequest, ParagraphSearchRequest, RelationSearchRequest, SearchRequest, VectorSearchRequest,
 };
 
 /// A field has two dates
@@ -192,27 +191,19 @@ fn compute_pre_filters(search_request: &SearchRequest) -> Option<PreFilterReques
     let request_has_timestamp_filters = search_request.timestamps.as_ref().is_some();
     if request_has_timestamp_filters {
         let timestamp_filters = compute_timestamp_pre_filters(search_request);
-        pre_filter_request
-            .timestamp_filters
-            .extend(timestamp_filters);
+        pre_filter_request.timestamp_filters.extend(timestamp_filters);
     }
 
     // Labels filters
-    let request_has_labels_filters = search_request
-        .filter
-        .as_ref()
-        .map(|i| !i.field_labels.is_empty())
-        .unwrap_or_default();
+    let request_has_labels_filters =
+        search_request.filter.as_ref().map(|i| !i.field_labels.is_empty()).unwrap_or_default();
 
     if request_has_labels_filters {
         let labels = compute_labels_pre_filters(search_request);
         pre_filter_request.labels_filters.extend(labels);
     }
 
-    if !request_has_timestamp_filters
-        && !request_has_labels_filters
-        && !request_has_security_filters
-    {
+    if !request_has_timestamp_filters && !request_has_labels_filters && !request_has_security_filters {
         return None;
     }
     Some(pre_filter_request)
@@ -242,13 +233,9 @@ fn compute_timestamp_pre_filters(search_request: &SearchRequest) -> Vec<Timestam
 
 fn compute_labels_pre_filters(search_request: &SearchRequest) -> Vec<String> {
     let mut labels_pre_filters = vec![];
-    search_request
-        .filter
-        .iter()
-        .flat_map(|f| f.field_labels.iter())
-        .for_each(|tag| {
-            labels_pre_filters.push(tag.clone());
-        });
+    search_request.filter.iter().flat_map(|f| f.field_labels.iter()).for_each(|tag| {
+        labels_pre_filters.push(tag.clone());
+    });
     labels_pre_filters
 }
 
@@ -304,11 +291,8 @@ fn compute_vectors_request(search_request: &SearchRequest) -> Option<VectorSearc
         .flat_map(|f| f.field_labels.iter().cloned())
         .chain(search_request.fields.iter().cloned())
         .collect();
-    let paragraph_label_filters = search_request
-        .filter
-        .iter()
-        .flat_map(|f| f.paragraph_labels.iter().cloned())
-        .collect();
+    let paragraph_label_filters =
+        search_request.filter.iter().flat_map(|f| f.paragraph_labels.iter().cloned()).collect();
     Some(VectorSearchRequest {
         vector_set: search_request.vectorset.clone(),
         vector: search_request.vector.clone(),

@@ -34,7 +34,9 @@ pub struct TextConfig {
 pub struct DocumentIterator(Box<dyn Iterator<Item = DocumentItem> + Send>);
 impl DocumentIterator {
     pub fn new<I>(inner: I) -> DocumentIterator
-    where I: Iterator<Item = DocumentItem> + Send + 'static {
+    where
+        I: Iterator<Item = DocumentItem> + Send + 'static,
+    {
         DocumentIterator(Box::new(inner))
     }
 }
@@ -45,9 +47,7 @@ impl Iterator for DocumentIterator {
     }
 }
 
-pub trait FieldReader:
-    ReaderChild<Request = DocumentSearchRequest, Response = DocumentSearchResponse>
-{
+pub trait FieldReader: ReaderChild<Request = DocumentSearchRequest, Response = DocumentSearchResponse> {
     fn pre_filter(&self, request: &PreFilterRequest) -> NodeResult<PreFilterResponse>;
     fn iterator(&self, request: &StreamRequest) -> NodeResult<DocumentIterator>;
     fn count(&self) -> NodeResult<usize>;

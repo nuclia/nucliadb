@@ -34,25 +34,13 @@ async fn test_export_tasks_instrumented_count() {
     let meter = PrometheusMeter::new();
     let task_id = "my-task".to_string();
 
-    meter
-        .task_monitor(task_id.clone())
-        .unwrap()
-        .instrument(async {})
-        .await;
+    meter.task_monitor(task_id.clone()).unwrap().instrument(async {}).await;
 
     let export = meter.export().unwrap();
     assert!(export.contains("nucliadb_node_instrumented_count_total{request=\"my-task\"} 1"));
 
-    meter
-        .task_monitor(task_id.clone())
-        .unwrap()
-        .instrument(async {})
-        .await;
-    meter
-        .task_monitor(task_id)
-        .unwrap()
-        .instrument(async {})
-        .await;
+    meter.task_monitor(task_id.clone()).unwrap().instrument(async {}).await;
+    meter.task_monitor(task_id).unwrap().instrument(async {}).await;
 
     let export = meter.export().unwrap();
     assert!(export.contains("nucliadb_node_instrumented_count_total{request=\"my-task\"} 3"));

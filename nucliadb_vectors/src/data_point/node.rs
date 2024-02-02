@@ -80,13 +80,7 @@ impl Node {
         buf
     }
     // labels must be sorted.
-    pub fn serialize_into<W, S, V, T, M>(
-        mut w: W,
-        key: S,
-        vector: V,
-        trie: T,
-        metadata: Option<M>,
-    ) -> io::Result<()>
+    pub fn serialize_into<W, S, V, T, M>(mut w: W, key: S, vector: V, trie: T, metadata: Option<M>) -> io::Result<()>
     where
         W: io::Write,
         S: AsRef<[u8]>,
@@ -102,10 +96,7 @@ impl Node {
         let svector_len = svector.len() + USIZE_LEN;
         let skey_len = skey.len() + USIZE_LEN;
         let slabels_len = strie.len();
-        let metadata_len = metadata
-            .as_ref()
-            .map(|m| m.as_ref().len())
-            .unwrap_or_default();
+        let metadata_len = metadata.as_ref().map(|m| m.as_ref().len()).unwrap_or_default();
 
         // Pointer computations
         let len = HEADER_LEN + svector_len + skey_len + slabels_len + metadata_len;
@@ -239,26 +230,12 @@ mod tests {
         let metadata1 = b"The node 1 has metadata";
         let vector1 = vector::encode_vector(&[12.; 1000]);
         let node1 = buf.len();
-        Node::serialize_into(
-            &mut buf,
-            key1,
-            &vector1,
-            NO_LABELS_TRIE.clone(),
-            Some(&metadata1),
-        )
-        .unwrap();
+        Node::serialize_into(&mut buf, key1, &vector1, NO_LABELS_TRIE.clone(), Some(&metadata1)).unwrap();
         let key2 = b"NODE2";
         let metadata2 = b"Tuns out node 2 also has metadata";
         let vector2 = vector::encode_vector(&[15.; 1000]);
         let node2 = buf.len();
-        Node::serialize_into(
-            &mut buf,
-            key2,
-            &vector2,
-            NO_LABELS_TRIE.clone(),
-            Some(&metadata2),
-        )
-        .unwrap();
+        Node::serialize_into(&mut buf, key2, &vector2, NO_LABELS_TRIE.clone(), Some(&metadata2)).unwrap();
         assert_eq!(Node::key(&buf[node1..]), key1);
         assert_eq!(Node::key(&buf[node2..]), key2);
         assert_eq!(Node::vector(&buf[node1..]), vector1);
@@ -267,13 +244,7 @@ mod tests {
         assert!(Node.keep_in_merge(&buf[node2..]));
         assert_eq!(Node::metadata(&buf[node1..]), metadata1);
         assert_eq!(Node::metadata(&buf[node2..]), metadata2);
-        assert_eq!(
-            Node.read_exact(&buf[node1..]),
-            (&buf[node1..node2], &buf[node2..])
-        );
-        assert_eq!(
-            Node.read_exact(&buf[node2..]),
-            (&buf[node2..], [].as_slice())
-        );
+        assert_eq!(Node.read_exact(&buf[node1..]), (&buf[node1..node2], &buf[node2..]));
+        assert_eq!(Node.read_exact(&buf[node2..]), (&buf[node2..], [].as_slice()));
     }
 }

@@ -44,10 +44,7 @@ impl Debug for RelationsReaderService {
 
 impl RelationsReaderService {
     #[tracing::instrument(skip_all)]
-    fn graph_search(
-        &self,
-        request: &RelationSearchRequest,
-    ) -> NodeResult<Option<EntitiesSubgraphResponse>> {
+    fn graph_search(&self, request: &RelationSearchRequest) -> NodeResult<Option<EntitiesSubgraphResponse>> {
         let Some(bfs_request) = request.subgraph.as_ref() else {
             return Ok(None);
         };
@@ -126,10 +123,7 @@ impl RelationsReaderService {
     }
 
     #[tracing::instrument(skip_all)]
-    fn prefix_search(
-        &self,
-        request: &RelationSearchRequest,
-    ) -> NodeResult<Option<RelationPrefixSearchResponse>> {
+    fn prefix_search(&self, request: &RelationSearchRequest) -> NodeResult<Option<RelationPrefixSearchResponse>> {
         use crate::bfs_engine::BfsGuide;
         let Some(prefix_request) = request.prefix.as_ref() else {
             return Ok(None);
@@ -156,10 +150,7 @@ impl RelationsReaderService {
         let mut node_filters = HashSet::new();
         prefix_request.node_filters.iter().for_each(|filter| {
             let node_type = filter.node_type();
-            let node_subtype = filter
-                .node_subtype
-                .as_ref()
-                .map_or_else(|| "", |subtype| subtype);
+            let node_subtype = filter.node_subtype.as_ref().map_or_else(|| "", |subtype| subtype);
             let type_info = node_type_parsing(node_type, node_subtype);
             node_filters.insert(type_info);
         });
@@ -171,16 +162,13 @@ impl RelationsReaderService {
             jump_always: dictionary::SYNONYM,
         };
 
-        let nodes = prefixes
-            .into_iter()
-            .filter(|n| guide.node_allowed(*n))
-            .map(|id| {
-                reader.get_node(id).map(|node| RelationNode {
-                    value: node.name().to_string(),
-                    subtype: node.subtype().map(|s| s.to_string()).unwrap_or_default(),
-                    ntype: string_to_node_type(node.xtype()) as i32,
-                })
-            });
+        let nodes = prefixes.into_iter().filter(|n| guide.node_allowed(*n)).map(|id| {
+            reader.get_node(id).map(|node| RelationNode {
+                value: node.name().to_string(),
+                subtype: node.subtype().map(|s| s.to_string()).unwrap_or_default(),
+                ntype: string_to_node_type(node.xtype()) as i32,
+            })
+        });
         let v = time.elapsed().as_millis();
         debug!("{id:?} - generating results: ends {v} ms");
 
@@ -206,11 +194,7 @@ impl RelationReader for RelationsReaderService {
     #[measure(actor = "relations", metric = "count")]
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
-        Ok(self
-            .index
-            .start_reading()
-            .and_then(|reader| reader.no_nodes())
-            .map(|v| v as usize)?)
+        Ok(self.index.start_reading().and_then(|reader| reader.no_nodes()).map(|v| v as usize)?)
     }
 
     #[measure(actor = "relations", metric = "get_edges")]
@@ -227,9 +211,7 @@ impl RelationReader for RelationsReaderService {
             let id = id?;
             let edge = reader.get_edge(id)?;
             let xtype = edge.xtype();
-            let subtype = edge
-                .subtype()
-                .map_or_else(String::default, |s| s.to_string());
+            let subtype = edge.subtype().map_or_else(String::default, |s| s.to_string());
             let hash = relations_io::compute_hash(&[xtype.as_bytes(), subtype.as_bytes()]);
             if found.insert(hash) {
                 edges.push(RelationEdge {
@@ -241,7 +223,9 @@ impl RelationReader for RelationsReaderService {
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Ending at {v} ms");
 
-        Ok(EdgeList { list: edges })
+        Ok(EdgeList {
+            list: edges,
+        })
     }
 
     #[measure(actor = "relations", metric = "get_node_types")]
@@ -258,9 +242,7 @@ impl RelationReader for RelationsReaderService {
             let id = id?;
             let node = reader.get_node(id)?;
             let xtype = node.xtype();
-            let subtype = node
-                .subtype()
-                .map_or_else(String::default, |s| s.to_string());
+            let subtype = node.subtype().map_or_else(String::default, |s| s.to_string());
             let hash = relations_io::compute_hash(&[xtype.as_bytes(), subtype.as_bytes()]);
             if found.insert(hash) {
                 types.push(RelationTypeListMember {
@@ -272,7 +254,9 @@ impl RelationReader for RelationsReaderService {
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Ending at {v} ms");
 
-        Ok(TypeList { list: types })
+        Ok(TypeList {
+            list: types,
+        })
     }
 }
 
@@ -311,6 +295,9 @@ impl RelationsReaderService {
             return Err(node_error!("Shard does not exist".to_string()));
         }
         let (index, rmode) = Index::new_reader(&config.path)?;
-        Ok(RelationsReaderService { index, rmode })
+        Ok(RelationsReaderService {
+            index,
+            rmode,
+        })
     }
 }

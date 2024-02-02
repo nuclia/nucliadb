@@ -26,17 +26,14 @@ use nucliadb_core::protos::relation::RelationType;
 use nucliadb_core::protos::relation_node::NodeType;
 use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{
-    IndexMetadata, IndexParagraph, IndexParagraphs, Relation, RelationNode, Resource, ResourceId,
-    TextInformation,
+    IndexMetadata, IndexParagraph, IndexParagraphs, Relation, RelationNode, Resource, ResourceId, TextInformation,
 };
 use uuid::Uuid;
 
 pub fn minimal_resource(shard_id: String) -> Resource {
     let resource_id = Uuid::new_v4().to_string();
 
-    let now = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap();
+    let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
     let timestamp = Timestamp {
         seconds: now.as_secs() as i64,
         nanos: 0,
@@ -205,37 +202,29 @@ pub fn people_and_places(shard_id: impl Into<String>) -> Resource {
         subtype: String::new(),
     };
 
-    let collaborators = ["Anastasia", "Irene"]
-        .into_iter()
-        .map(|collaborator| RelationNode {
-            value: collaborator.to_string(),
-            ntype: NodeType::User as i32,
-            subtype: "".to_string(),
-        });
+    let collaborators = ["Anastasia", "Irene"].into_iter().map(|collaborator| RelationNode {
+        value: collaborator.to_string(),
+        ntype: NodeType::User as i32,
+        subtype: "".to_string(),
+    });
 
-    let people = ["Anna", "Anthony", "Bárcenas", "Ben", "John"]
-        .into_iter()
-        .map(|person| RelationNode {
-            value: person.to_string(),
-            ntype: NodeType::Entity as i32,
-            subtype: "person".to_string(),
-        });
+    let people = ["Anna", "Anthony", "Bárcenas", "Ben", "John"].into_iter().map(|person| RelationNode {
+        value: person.to_string(),
+        ntype: NodeType::Entity as i32,
+        subtype: "person".to_string(),
+    });
 
-    let cities = ["Barcelona", "New York", "York"]
-        .into_iter()
-        .map(|city| RelationNode {
-            value: city.to_string(),
-            ntype: NodeType::Entity as i32,
-            subtype: "city".to_string(),
-        });
+    let cities = ["Barcelona", "New York", "York"].into_iter().map(|city| RelationNode {
+        value: city.to_string(),
+        ntype: NodeType::Entity as i32,
+        subtype: "city".to_string(),
+    });
 
-    let countries = ["Israel", "Netherlands", "Solomon Islands"]
-        .into_iter()
-        .map(|country| RelationNode {
-            value: country.to_string(),
-            ntype: NodeType::Entity as i32,
-            subtype: "country".to_string(),
-        });
+    let countries = ["Israel", "Netherlands", "Solomon Islands"].into_iter().map(|country| RelationNode {
+        value: country.to_string(),
+        ntype: NodeType::Entity as i32,
+        subtype: "country".to_string(),
+    });
 
     let entities = people.chain(cities).chain(countries);
 

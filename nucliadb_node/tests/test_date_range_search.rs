@@ -27,8 +27,8 @@ use nucliadb_core::protos as nucliadb_protos;
 use nucliadb_protos::prost_types::Timestamp;
 use nucliadb_protos::resource::ResourceStatus;
 use nucliadb_protos::{
-    IndexMetadata, IndexParagraph, IndexParagraphs, NewShardRequest, ReleaseChannel, Resource,
-    ResourceId, SearchRequest, TextInformation, Timestamps, VectorSentence,
+    IndexMetadata, IndexParagraph, IndexParagraphs, NewShardRequest, ReleaseChannel, Resource, ResourceId,
+    SearchRequest, TextInformation, Timestamps, VectorSentence,
 };
 use rstest::*;
 use tonic::Request;

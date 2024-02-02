@@ -50,11 +50,8 @@ pub struct IoNode {
 }
 impl IoNode {
     fn inner_new(source: Source, name: String, xtype: String, subtype: Option<String>) -> IoNode {
-        let hash = compute_hash(&[
-            name.as_bytes(),
-            xtype.as_bytes(),
-            subtype.as_ref().map(|s| s.as_bytes()).unwrap_or(&[]),
-        ]);
+        let hash =
+            compute_hash(&[name.as_bytes(), xtype.as_bytes(), subtype.as_ref().map(|s| s.as_bytes()).unwrap_or(&[])]);
         IoNode {
             name,
             xtype,
@@ -128,7 +125,10 @@ pub struct IoEdge {
 }
 impl IoEdge {
     pub fn new(xtype: String, subtype: Option<String>) -> IoEdge {
-        IoEdge { xtype, subtype }
+        IoEdge {
+            xtype,
+            subtype,
+        }
     }
     pub fn xtype(&self) -> &str {
         &self.xtype

@@ -49,9 +49,9 @@ pub struct NodeWriter {
 
 impl NodeWriter {
     fn obtain_shard(&self, shard_id: String) -> Result<Arc<ShardWriter>, PyErr> {
-        self.shards.get(&shard_id).map_err(|error| {
-            LoadShardError::new_err(format!("Error loading shard {}: {}", shard_id, error))
-        })
+        self.shards
+            .get(&shard_id)
+            .map_err(|error| LoadShardError::new_err(format!("Error loading shard {}: {}", shard_id, error)))
     }
 }
 
@@ -62,9 +62,7 @@ impl NodeWriter {
         let settings: Settings = EnvSettingsProvider::generate_settings().unwrap();
 
         if let Err(error) = lifecycle::initialize_writer(settings.clone()) {
-            return Err(IndexNodeException::new_err(format!(
-                "Unable to initialize writer: {error}"
-            )));
+            return Err(IndexNodeException::new_err(format!("Unable to initialize writer: {error}")));
         };
         let shards_path = settings.shards_path();
         Ok(Self {
@@ -76,8 +74,7 @@ impl NodeWriter {
     pub fn new_shard<'p>(&self, metadata: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         send_analytics_event(AnalyticsEvent::Create);
 
-        let request =
-            NewShardRequest::decode(&mut Cursor::new(metadata)).expect("Error decoding arguments");
+        let request = NewShardRequest::decode(&mut Cursor::new(metadata)).expect("Error decoding arguments");
         let shard_id = uuid::Uuid::new_v4().to_string();
         let similarity = VectorSimilarity::from_i32(request.similarity).unwrap();
         let metadata = ShardMetadata::new(
@@ -106,8 +103,7 @@ impl NodeWriter {
 
     pub fn delete_shard<'p>(&mut self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         send_analytics_event(AnalyticsEvent::Delete);
-        let shard_id =
-            ShardId::decode(&mut Cursor::new(shard_id)).expect("Error decoding arguments");
+        let shard_id = ShardId::decode(&mut Cursor::new(shard_id)).expect("Error decoding arguments");
         let deleted = self.shards.delete(&shard_id.id.clone());
         match deleted {
             Ok(_) => Ok(PyList::new(py, shard_id.encode_to_vec())),
@@ -115,13 +111,8 @@ impl NodeWriter {
         }
     }
 
-    pub fn clean_and_upgrade_shard<'p>(
-        &mut self,
-        shard_id: RawProtos,
-        py: Python<'p>,
-    ) -> PyResult<&'p PyAny> {
-        let shard_id =
-            ShardId::decode(&mut Cursor::new(shard_id)).expect("Error decoding arguments");
+    pub fn clean_and_upgrade_shard<'p>(&mut self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let shard_id = ShardId::decode(&mut Cursor::new(shard_id)).expect("Error decoding arguments");
         let upgraded = self.shards.upgrade(&shard_id.id);
         match upgraded {
             Ok(upgrade_details) => Ok(PyList::new(py, upgrade_details.encode_to_vec())),
@@ -136,24 +127,26 @@ impl NodeWriter {
             let entry_path = entry.unwrap().path();
             if entry_path.is_dir() {
                 if let Some(id) = entry_path.file_name().map(|s| s.to_str().map(String::from)) {
-                    shard_ids.push(ShardId { id: id.unwrap() });
+                    shard_ids.push(ShardId {
+                        id: id.unwrap(),
+                    });
                 }
             }
         }
         Ok(PyList::new(
             py,
-            (ShardIds { ids: shard_ids }).encode_to_vec(),
+            (ShardIds {
+                ids: shard_ids,
+            })
+            .encode_to_vec(),
         ))
     }
 
     pub fn set_resource<'p>(&mut self, resource: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let resource =
-            Resource::decode(&mut Cursor::new(resource)).expect("Error decoding arguments");
+        let resource = Resource::decode(&mut Cursor::new(resource)).expect("Error decoding arguments");
         let shard_id = resource.shard_id.clone();
         let shard = self.obtain_shard(shard_id.clone())?;
-        let status = shard
-            .set_resource(&resource)
-            .and_then(|()| shard.get_opstatus());
+        let status = shard.set_resource(&resource).and_then(|()| shard.get_opstatus());
         match status {
             Ok(mut status) => {
                 status.status = 0;
@@ -173,18 +166,11 @@ impl NodeWriter {
         }
     }
 
-    pub fn remove_resource<'p>(
-        &mut self,
-        resource: RawProtos,
-        py: Python<'p>,
-    ) -> PyResult<&'p PyAny> {
-        let resource =
-            ResourceId::decode(&mut Cursor::new(resource)).expect("Error decoding arguments");
+    pub fn remove_resource<'p>(&mut self, resource: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let resource = ResourceId::decode(&mut Cursor::new(resource)).expect("Error decoding arguments");
         let shard_id = resource.shard_id.clone();
         let shard = self.obtain_shard(shard_id.clone())?;
-        let status = shard
-            .remove_resource(&resource)
-            .and_then(|()| shard.get_opstatus());
+        let status = shard.remove_resource(&resource).and_then(|()| shard.get_opstatus());
         match status {
             Ok(mut status) => {
                 status.status = 0;
@@ -206,8 +192,7 @@ impl NodeWriter {
 
     // TODO: rename to list_vectorsets
     pub fn get_vectorset<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let shard_id =
-            ShardId::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
+        let shard_id = ShardId::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
         let shard = self.obtain_shard(shard_id.id.clone())?;
         let vector_sets = shard.list_vectorsets();
         match vector_sets {
@@ -227,8 +212,7 @@ impl NodeWriter {
 
     // TODO
     pub fn set_vectorset<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let request = NewVectorSetRequest::decode(&mut Cursor::new(request))
-            .expect("Error decoding arguments");
+        let request = NewVectorSetRequest::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
         let Some(ref vectorset_id) = request.id else {
             return Err(PyValueError::new_err("Missing vectorset id field"));
         };
@@ -236,9 +220,7 @@ impl NodeWriter {
             return Err(PyValueError::new_err("Missing shard id field"));
         };
         let shard = self.obtain_shard(shard_id.id.clone())?;
-        let status = shard
-            .add_vectorset(vectorset_id, request.similarity())
-            .and_then(|()| shard.get_opstatus());
+        let status = shard.add_vectorset(vectorset_id, request.similarity()).and_then(|()| shard.get_opstatus());
         match status {
             Ok(mut status) => {
                 status.status = 0;
@@ -260,15 +242,12 @@ impl NodeWriter {
 
     // TODO
     pub fn del_vectorset<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let vectorset =
-            VectorSetId::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
+        let vectorset = VectorSetId::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
         let Some(ref shard_id) = vectorset.shard else {
             return Err(PyValueError::new_err("Missing shard id field"));
         };
         let shard = self.obtain_shard(shard_id.id.clone())?;
-        let status = shard
-            .remove_vectorset(&vectorset)
-            .and_then(|()| shard.get_opstatus());
+        let status = shard.remove_vectorset(&vectorset).and_then(|()| shard.get_opstatus());
         match status {
             Ok(mut status) => {
                 status.status = 0;
@@ -290,8 +269,7 @@ impl NodeWriter {
 
     pub fn gc<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         send_analytics_event(AnalyticsEvent::GarbageCollect);
-        let shard_id =
-            ShardId::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
+        let shard_id = ShardId::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
         let shard = self.obtain_shard(shard_id.id)?;
         let result = shard.gc();
         match result {

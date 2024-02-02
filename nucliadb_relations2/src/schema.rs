@@ -104,9 +104,7 @@ impl Schema {
     }
 
     pub fn source_type(&self, doc: &Document) -> u64 {
-        doc.get_first(self.source_type)
-            .and_then(|i| i.as_u64())
-            .expect("Documents must have a source type")
+        doc.get_first(self.source_type).and_then(|i| i.as_u64()).expect("Documents must have a source type")
     }
 
     pub fn source_subtype(&self, doc: &Document) -> String {
@@ -124,9 +122,7 @@ impl Schema {
     }
 
     pub fn target_type(&self, doc: &Document) -> u64 {
-        doc.get_first(self.target_type)
-            .and_then(|i| i.as_u64())
-            .expect("Documents must have a target type")
+        doc.get_first(self.target_type).and_then(|i| i.as_u64()).expect("Documents must have a target type")
     }
 
     pub fn target_subtype(&self, doc: &Document) -> String {
@@ -137,9 +133,7 @@ impl Schema {
     }
 
     pub fn relationship(&self, doc: &Document) -> u64 {
-        doc.get_first(self.relationship)
-            .and_then(|i| i.as_u64())
-            .expect("Documents must have a relationship type")
+        doc.get_first(self.relationship).and_then(|i| i.as_u64()).expect("Documents must have a relationship type")
     }
 
     pub fn relationship_label(&self, doc: &Document) -> String {

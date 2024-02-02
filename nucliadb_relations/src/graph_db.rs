@@ -59,11 +59,7 @@ mod gid_impl {
     }
 }
 
-fn encode_connexion(
-    from: Option<Entity>,
-    to: Option<Entity>,
-    with: Option<Entity>,
-) -> RResult<String> {
+fn encode_connexion(from: Option<Entity>, to: Option<Entity>, with: Option<Entity>) -> RResult<String> {
     match (from, to, with) {
         (Some(from), Some(to), Some(with)) => Ok(format!("({from},{to},{with})")),
         (Some(from), Some(to), None) => Ok(format!("({from},{to},")),
@@ -253,20 +249,14 @@ impl GraphDB {
         }
         Ok(!exits)
     }
-    pub fn iter_node_ids<'a>(
-        &self,
-        txn: &'a RoTxn,
-    ) -> RResult<impl Iterator<Item = RResult<Entity>> + 'a> {
+    pub fn iter_node_ids<'a>(&self, txn: &'a RoTxn) -> RResult<impl Iterator<Item = RResult<Entity>> + 'a> {
         Ok(self
             .node_component
             .iter(txn)
             .map_err(RelationsErr::from)?
             .map(|r| r.map(|n| n.0).map_err(RelationsErr::from)))
     }
-    pub fn iter_edge_ids<'a>(
-        &self,
-        txn: &'a RoTxn,
-    ) -> RResult<impl Iterator<Item = RResult<Entity>> + 'a> {
+    pub fn iter_edge_ids<'a>(&self, txn: &'a RoTxn) -> RResult<impl Iterator<Item = RResult<Entity>> + 'a> {
         Ok(self
             .edge_component
             .iter(txn)
@@ -298,28 +288,16 @@ impl GraphDB {
         let iter = out.map(|r| r.map_err(RelationsErr::from).map(|(v, _)| GCnx::decode(v)));
         Ok(iter)
     }
-    pub fn get_outedges<'a>(
-        &self,
-        txn: &'a RoTxn,
-        from: Entity,
-    ) -> RResult<impl Iterator<Item = RResult<GCnx>> + 'a> {
+    pub fn get_outedges<'a>(&self, txn: &'a RoTxn, from: Entity) -> RResult<impl Iterator<Item = RResult<GCnx>> + 'a> {
         let prefix = encode_connexion(Some(from), None, None)?;
         let out = self.outedges.prefix_iter(txn, &prefix)?;
-        let iter = out
-            .map(|r| r.map_err(RelationsErr::from))
-            .map(|r| r.map(|(v, _)| GCnx::decode(v)));
+        let iter = out.map(|r| r.map_err(RelationsErr::from)).map(|r| r.map(|(v, _)| GCnx::decode(v)));
         Ok(iter)
     }
-    pub fn get_inedges<'a>(
-        &self,
-        txn: &'a RoTxn,
-        to: Entity,
-    ) -> RResult<impl Iterator<Item = RResult<GCnx>> + 'a> {
+    pub fn get_inedges<'a>(&self, txn: &'a RoTxn, to: Entity) -> RResult<impl Iterator<Item = RResult<GCnx>> + 'a> {
         let prefix = encode_connexion(Some(to), None, None)?;
         let xin = self.inedges.prefix_iter(txn, &prefix)?;
-        let inv_iter = xin
-            .map(|r| r.map_err(RelationsErr::from))
-            .map(|r| r.map(|(v, _)| GCnx::decode_inversed(v)));
+        let inv_iter = xin.map(|r| r.map_err(RelationsErr::from)).map(|r| r.map(|(v, _)| GCnx::decode_inversed(v)));
         Ok(inv_iter)
     }
 
@@ -437,26 +415,10 @@ mod tests {
         let expected_outn2 = HashSet::from([(n4, e3.clone())]);
         let expected_outn3 = HashSet::from([(n4, e4.clone())]);
         let expected_outn4 = HashSet::from([(n1, e5.clone())]);
-        let got_outn1 = graphdb
-            .get_outedges(&txn, n1)
-            .unwrap()
-            .collect::<RResult<Vec<_>>>()
-            .unwrap();
-        let got_outn2 = graphdb
-            .get_outedges(&txn, n2)
-            .unwrap()
-            .collect::<RResult<Vec<_>>>()
-            .unwrap();
-        let got_outn3 = graphdb
-            .get_outedges(&txn, n3)
-            .unwrap()
-            .collect::<RResult<Vec<_>>>()
-            .unwrap();
-        let got_outn4 = graphdb
-            .get_outedges(&txn, n4)
-            .unwrap()
-            .collect::<RResult<Vec<_>>>()
-            .unwrap();
+        let got_outn1 = graphdb.get_outedges(&txn, n1).unwrap().collect::<RResult<Vec<_>>>().unwrap();
+        let got_outn2 = graphdb.get_outedges(&txn, n2).unwrap().collect::<RResult<Vec<_>>>().unwrap();
+        let got_outn3 = graphdb.get_outedges(&txn, n3).unwrap().collect::<RResult<Vec<_>>>().unwrap();
+        let got_outn4 = graphdb.get_outedges(&txn, n4).unwrap().collect::<RResult<Vec<_>>>().unwrap();
         assert_eq!(got_outn1.len(), expected_outn1.len());
         assert!(got_outn1.into_iter().all(|cnx| {
             let edge = graphdb.get_edge(&txn, cnx.edge()).unwrap();
@@ -487,26 +449,10 @@ mod tests {
         let expected_inn2 = HashSet::from([(n1, e1.clone())]);
         let expected_inn3 = HashSet::from([(n1, e2.clone())]);
         let expected_inn4 = HashSet::from([(n2, e3.clone()), (n3, e4.clone())]);
-        let got_inn1 = graphdb
-            .get_inedges(&txn, n1)
-            .unwrap()
-            .collect::<RResult<Vec<_>>>()
-            .unwrap();
-        let got_inn2 = graphdb
-            .get_inedges(&txn, n2)
-            .unwrap()
-            .collect::<RResult<Vec<_>>>()
-            .unwrap();
-        let got_inn3 = graphdb
-            .get_inedges(&txn, n3)
-            .unwrap()
-            .collect::<RResult<Vec<_>>>()
-            .unwrap();
-        let got_inn4 = graphdb
-            .get_inedges(&txn, n4)
-            .unwrap()
-            .collect::<RResult<Vec<_>>>()
-            .unwrap();
+        let got_inn1 = graphdb.get_inedges(&txn, n1).unwrap().collect::<RResult<Vec<_>>>().unwrap();
+        let got_inn2 = graphdb.get_inedges(&txn, n2).unwrap().collect::<RResult<Vec<_>>>().unwrap();
+        let got_inn3 = graphdb.get_inedges(&txn, n3).unwrap().collect::<RResult<Vec<_>>>().unwrap();
+        let got_inn4 = graphdb.get_inedges(&txn, n4).unwrap().collect::<RResult<Vec<_>>>().unwrap();
         assert_eq!(got_inn1.len(), expected_inn1.len());
         assert!(got_inn1.into_iter().all(|cnx| {
             let edge = graphdb.get_edge(&txn, cnx.edge()).unwrap();

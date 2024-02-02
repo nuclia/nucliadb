@@ -21,9 +21,7 @@
 mod common;
 
 use common::{NodeFixture, TestNodeReader, TestNodeWriter};
-use nucliadb_core::protos::{
-    EmptyQuery, GetShardRequest, NewShardRequest, ReleaseChannel, ShardId,
-};
+use nucliadb_core::protos::{EmptyQuery, GetShardRequest, NewShardRequest, ReleaseChannel, ShardId};
 use rstest::*;
 use tonic::Request;
 
@@ -92,7 +90,9 @@ async fn test_shard_metadata(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let shard = reader
             .get_shard(Request::new(GetShardRequest {
-                shard_id: Some(ShardId { id: shard_id }),
+                shard_id: Some(ShardId {
+                    id: shard_id,
+                }),
                 ..Default::default()
             }))
             .await?
@@ -133,34 +133,18 @@ async fn test_list_shards(
     fixture.with_writer().await?.with_reader().await?;
     let mut writer = fixture.writer_client();
 
-    let current = writer
-        .list_shards(Request::new(EmptyQuery {}))
-        .await?
-        .get_ref()
-        .ids
-        .iter()
-        .map(|s| s.id.clone())
-        .len();
+    let current =
+        writer.list_shards(Request::new(EmptyQuery {})).await?.get_ref().ids.iter().map(|s| s.id.clone()).len();
 
     let request_ids = create_shards(&mut writer, 5, release_channel).await;
 
-    let response = writer
-        .list_shards(Request::new(EmptyQuery {}))
-        .await
-        .expect("Error in list_shards request");
+    let response = writer.list_shards(Request::new(EmptyQuery {})).await.expect("Error in list_shards request");
 
-    let response_ids: Vec<String> = response
-        .get_ref()
-        .ids
-        .iter()
-        .map(|s| s.id.clone())
-        .collect();
+    let response_ids: Vec<String> = response.get_ref().ids.iter().map(|s| s.id.clone()).collect();
 
     assert!(!request_ids.is_empty());
     assert_eq!(request_ids.len() + current, response_ids.len());
-    assert!(request_ids
-        .iter()
-        .all(|item| { response_ids.contains(item) }));
+    assert!(request_ids.iter().all(|item| { response_ids.contains(item) }));
 
     Ok(())
 }
@@ -174,49 +158,40 @@ async fn test_delete_shards(
     fixture.with_writer().await?.with_reader().await?;
     let mut writer = fixture.writer_client();
 
-    let current = writer
-        .list_shards(Request::new(EmptyQuery {}))
-        .await?
-        .get_ref()
-        .ids
-        .iter()
-        .map(|s| s.id.clone())
-        .len();
+    let current =
+        writer.list_shards(Request::new(EmptyQuery {})).await?.get_ref().ids.iter().map(|s| s.id.clone()).len();
 
     let request_ids = create_shards(&mut writer, 5, release_channel).await;
 
     // XXX why are we doing this?
     for id in request_ids.iter().cloned() {
         _ = writer
-            .clean_and_upgrade_shard(Request::new(ShardId { id }))
+            .clean_and_upgrade_shard(Request::new(ShardId {
+                id,
+            }))
             .await
             .expect("Error in new_shard request");
     }
 
     for (id, expected) in request_ids.iter().map(|v| (v.clone(), v.clone())) {
         let response = writer
-            .delete_shard(Request::new(ShardId { id }))
+            .delete_shard(Request::new(ShardId {
+                id,
+            }))
             .await
             .expect("Error in delete_shard request");
         let deleted_id = response.get_ref().id.clone();
         assert_eq!(deleted_id, expected);
     }
 
-    let response = writer
-        .list_shards(Request::new(EmptyQuery {}))
-        .await
-        .expect("Error in list_shards request");
+    let response = writer.list_shards(Request::new(EmptyQuery {})).await.expect("Error in list_shards request");
 
     assert_eq!(response.get_ref().ids.len(), current);
 
     Ok(())
 }
 
-async fn create_shards(
-    writer: &mut TestNodeWriter,
-    n: usize,
-    release_channel: ReleaseChannel,
-) -> Vec<String> {
+async fn create_shards(writer: &mut TestNodeWriter, n: usize, release_channel: ReleaseChannel) -> Vec<String> {
     let mut shard_ids = Vec::with_capacity(n);
 
     for _ in 0..n {

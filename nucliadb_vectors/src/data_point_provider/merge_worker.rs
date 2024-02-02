@@ -59,10 +59,7 @@ impl Worker {
         info!("{subscriber:?} is ready to perform a merge");
         let state: State = fs_state::load_state(subscriber)?;
         let Some(work) = state.current_work_unit().map(|work| {
-            work.iter()
-                .rev()
-                .map(|journal| (state.delete_log(*journal), journal.id()))
-                .collect::<Vec<_>>()
+            work.iter().rev().map(|journal| (state.delete_log(*journal), journal.id())).collect::<Vec<_>>()
         }) else {
             return Ok(());
         };

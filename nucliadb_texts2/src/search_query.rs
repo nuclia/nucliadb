@@ -73,9 +73,7 @@ pub fn create_query(
     let main_q = if text.is_empty() {
         Box::new(AllQuery)
     } else {
-        parser
-            .parse_query(text)
-            .unwrap_or_else(|_| Box::new(AllQuery))
+        parser.parse_query(text).unwrap_or_else(|_| Box::new(AllQuery))
     };
     queries.push((Occur::Must, main_q));
 
@@ -144,26 +142,16 @@ pub fn create_query(
     }
 }
 
-fn create_stream_filter_queries(
-    schema: &TextSchema,
-    filter: &StreamFilter,
-) -> Vec<(Occur, Box<dyn Query>)> {
+fn create_stream_filter_queries(schema: &TextSchema, filter: &StreamFilter) -> Vec<(Occur, Box<dyn Query>)> {
     let mut queries = vec![];
 
-    let conjunction = Conjunction::from_i32(filter.conjunction)
-        .unwrap_or(Conjunction::And)
-        .into_occur();
+    let conjunction = Conjunction::from_i32(filter.conjunction).unwrap_or(Conjunction::And).into_occur();
 
-    filter
-        .labels
-        .iter()
-        .flat_map(|facet_key| Facet::from_text(facet_key).ok().into_iter())
-        .for_each(|facet| {
-            let facet_term = Term::from_facet(schema.facets, &facet);
-            let facet_term_query: Box<dyn Query> =
-                Box::new(TermQuery::new(facet_term, IndexRecordOption::Basic));
-            queries.push((conjunction, facet_term_query))
-        });
+    filter.labels.iter().flat_map(|facet_key| Facet::from_text(facet_key).ok().into_iter()).for_each(|facet| {
+        let facet_term = Term::from_facet(schema.facets, &facet);
+        let facet_term_query: Box<dyn Query> = Box::new(TermQuery::new(facet_term, IndexRecordOption::Basic));
+        queries.push((conjunction, facet_term_query))
+    });
 
     queries
 }
