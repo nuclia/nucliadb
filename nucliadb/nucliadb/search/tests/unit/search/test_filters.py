@@ -19,9 +19,16 @@
 from unittest import mock
 from unittest.mock import Mock, call
 
+import jsonschema
 import pytest
 
-from nucliadb.search.search.filters import record_filters_counter
+from nucliadb.search.search.filters import (
+    NODE_FILTERS_SCHEMA,
+    convert_filter_to_node_schema,
+    convert_to_node_filters,
+    record_filters_counter,
+)
+from nucliadb_models.search import Filter
 
 
 def test_record_filters_counter():
@@ -44,3 +51,34 @@ def is_paragraph_labelset_kind_mock():
         "nucliadb.search.search.filters.is_paragraph_labelset_kind"
     ) as mocked:
         yield mocked
+
+
+@pytest.mark.parametrize(
+    "original,converted",
+    [
+        (Filter(all=["foo"]), {"literal": "foo"}),
+        (Filter(all=["foo", "bar"]), {"and": [{"literal": "foo"}, {"literal": "bar"}]}),
+        (Filter(any=["foo"]), {"literal": "foo"}),
+        (Filter(any=["foo", "bar"]), {"or": [{"literal": "foo"}, {"literal": "bar"}]}),
+        (Filter(none=["foo"]), {"not": {"literal": "foo"}}),
+        (
+            Filter(none=["foo", "bar"]),
+            {"not": {"or": [{"literal": "foo"}, {"literal": "bar"}]}},
+        ),
+        (Filter(not_all=["foo"]), {"not": {"literal": "foo"}}),
+        (
+            Filter(not_all=["foo", "bar"]),
+            {"not": {"and": [{"literal": "foo"}, {"literal": "bar"}]}},
+        ),
+    ],
+)
+def test_convert_filter_to_node_schema(original, converted):
+    assert convert_filter_to_node_schema(original) == converted
+    jsonschema.validate(converted, NODE_FILTERS_SCHEMA)
+
+
+def test_convert_to_node_filters():
+    assert convert_to_node_filters([Filter(all=["foo"])]) == {"literal": "foo"}
+    assert convert_to_node_filters([Filter(all=["foo"]), Filter(any=["bar"])]) == {
+        "and": [{"literal": "foo"}, {"literal": "bar"}]
+    }

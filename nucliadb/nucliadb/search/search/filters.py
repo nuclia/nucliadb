@@ -20,6 +20,7 @@
 from typing import Optional
 
 from nucliadb_models.labels import translate_alias_to_system_label
+from nucliadb_models.search import Filter
 from nucliadb_protos import knowledgebox_pb2
 from nucliadb_telemetry.metrics import Counter
 
@@ -103,3 +104,63 @@ def is_paragraph_labelset_kind(
 
 def has_classification_label_filters(filters: list[str]) -> bool:
     return any(filter.startswith(CLASSIFICATION_LABEL_PREFIX) for filter in filters)
+
+
+def convert_to_node_filters(filters: list[Filter]) -> dict:
+    if len(filters) == 1:
+        return convert_filter_to_node_schema(filters[0])
+
+    return {"and": [convert_filter_to_node_schema(fltr) for fltr in filters]}
+
+
+def convert_filter_to_node_schema(fltr: Filter) -> dict:
+    # any: [a, b] == (a || b)
+    if fltr.any is not None:
+        if len(fltr.any) == 1:
+            return {"literal": fltr.any[0]}
+        return {"or": [{"literal": term} for term in fltr.any]}
+
+    # all: [a, b] == (a && b)
+    if fltr.all is not None:
+        if len(fltr.all) == 1:
+            return {"literal": fltr.all[0]}
+        return {"and": [{"literal": term} for term in fltr.all]}
+
+    # none: [a, b] == !(a || b)
+    if fltr.none is not None:
+        if len(fltr.none) == 1:
+            return {"not": {"literal": fltr.none[0]}}
+        return {"not": {"or": [{"literal": term} for term in fltr.none]}}
+
+    # not_all: [a, b] == !(a && b)
+    if fltr.not_all is not None:
+        if len(fltr.not_all) == 1:
+            return {"not": {"literal": fltr.not_all[0]}}
+        return {"not": {"and": [{"literal": term} for term in fltr.not_all]}}
+
+    raise ValueError("Invalid filter")
+
+
+NODE_FILTERS_SCHEMA = {
+    "definitions": {
+        "Filter": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": False,
+            "properties": {
+                "literal": {"type": "string"},
+                "and": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {"$ref": "#/definitions/Filter"},
+                },
+                "or": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {"$ref": "#/definitions/Filter"},
+                },
+                "not": {"$ref": "#/definitions/Filter"},
+            },
+        }
+    }
+}

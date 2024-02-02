@@ -581,10 +581,10 @@ class Filter(BaseModel):
         if len(data) != 1:
             raise ValidationError("Use either 'all', 'any', 'none' or 'not_all'")
 
-    all: Optional[List[str]] = None
-    any: Optional[List[str]] = None
-    none: Optional[List[str]] = None
-    not_all: Optional[List[str]] = None
+    all: Optional[List[str]] = Field(default=None, min_items=1)
+    any: Optional[List[str]] = Field(default=None, min_items=1)
+    none: Optional[List[str]] = Field(default=None, min_items=1)
+    not_all: Optional[List[str]] = Field(default=None, min_items=1)
 
 
 class BaseSearchRequest(BaseModel):
