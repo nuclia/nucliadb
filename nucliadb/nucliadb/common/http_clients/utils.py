@@ -17,11 +17,23 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict
-from nucliadb_telemetry import metrics
+import aiohttp
 
-processor_observer = metrics.Observer(
-    "nucliadb_ingest_processor",
-    labels={"type": ""},
-    error_mappings={"kb_conflict": KnowledgeBoxConflict},
-)
+from . import exceptions
+
+
+def check_status(resp: aiohttp.ClientResponse, resp_text: str) -> None:
+    if resp.status < 300:
+        return
+    elif resp.status == 402:
+        raise exceptions.AccountLimitException(f"Account limits exceeded: {resp_text}")
+    elif resp.status == 404:
+        raise exceptions.NotFoundException(f"Resource not found: {resp_text}")
+    elif resp.status in (401, 403):
+        raise exceptions.AuthorizationException(
+            f"Unauthorized to access: {resp.status}"
+        )
+    elif resp.status == 429:
+        raise exceptions.RateLimitException("Rate limited")
+    else:
+        raise exceptions.ClientException(f"Unknown error: {resp.status} - {resp_text}")

@@ -133,18 +133,18 @@ class KBShardManager:
     async def apply_for_all_shards(
         self,
         kbid: str,
-        aw: Callable[[AbstractIndexNode, str, str], Awaitable[Any]],
+        aw: Callable[[AbstractIndexNode, str], Awaitable[Any]],
         timeout: float,
     ) -> list[Any]:
         shards = await self.get_shards_by_kbid(kbid)
         ops = []
 
         for shard_obj in shards:
-            node, shard_id, node_id = choose_node(shard_obj)
+            node, shard_id = choose_node(shard_obj)
             if shard_id is None:
                 raise ShardNotFound("Fount a node but not a shard")
 
-            ops.append(aw(node, shard_id, node_id))
+            ops.append(aw(node, shard_id))
 
         try:
             results = await asyncio.wait_for(
@@ -512,7 +512,7 @@ def choose_node(
     *,
     target_shard_replicas: Optional[list[str]] = None,
     use_read_replica_nodes: bool = False,
-) -> tuple[AbstractIndexNode, str, str]:
+) -> tuple[AbstractIndexNode, str]:
     """Choose an arbitrary node storing `shard` following these rules:
     - nodes containing a shard replica from `target_replicas` are the preferred
     - when enabled, read replica nodes are preferred over primaries
@@ -548,7 +548,7 @@ def choose_node(
 
     top = ranked_nodes[max(ranked_nodes)]
     selected_node, shard_replica_id = random.choice(top)
-    return selected_node, shard_replica_id, selected_node.id
+    return selected_node, shard_replica_id
 
 
 def check_enough_nodes():

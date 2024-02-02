@@ -115,6 +115,8 @@ class NucliaDBDataset(NucliaDataset):
         labels: Optional[List[str]] = None,
         trainset: Optional[TrainSet] = None,
         base_path: Optional[str] = None,
+        search_sdk: Optional[NucliaDB] = None,
+        reader_sdk: Optional[NucliaDB] = None,
     ):
         super().__init__(base_path)
 
@@ -140,9 +142,22 @@ class NucliaDBDataset(NucliaDataset):
         self.kbid = kbid
         self.trainset = trainset
         self.task_definition = task_definition
-        self.sdk = sdk
+        self.train_sdk = sdk
+        if search_sdk is None:
+            self.search_sdk = sdk
+        else:
+            self.search_sdk = search_sdk
+
+        if reader_sdk is None:
+            self.reader_sdk = sdk
+        else:
+            self.reader_sdk = reader_sdk
+
         self.streamer = Streamer(
-            self.trainset, reader_headers=sdk.headers, base_url=sdk.base_url, kbid=kbid
+            self.trainset,
+            reader_headers=self.train_sdk.headers,
+            base_url=self.train_sdk.base_url,
+            kbid=kbid,
         )
 
         self._set_schema(self.task_definition.schema)
@@ -157,7 +172,7 @@ class NucliaDBDataset(NucliaDataset):
             self._check_entities()
 
     def _computed_labels(self) -> Dict[str, LabelSetCount]:
-        search_result: KnowledgeboxSearchResults = self.sdk.search(
+        search_result: KnowledgeboxSearchResults = self.search_sdk.search(
             kbid=self.kbid,
             content=SearchRequest(
                 features=[SearchOptions.DOCUMENT], faceted=["/l"], page_size=0
@@ -184,7 +199,7 @@ class NucliaDBDataset(NucliaDataset):
 
         for labelset, labelset_obj in response.items():
             base_label = f"{facet_prefix}{labelset}"
-            fsearch_result: KnowledgeboxSearchResults = self.sdk.search(
+            fsearch_result: KnowledgeboxSearchResults = self.search_sdk.search(
                 kbid=self.kbid,
                 content=SearchRequest(
                     features=[SearchOptions.DOCUMENT], faceted=[base_label], page_size=0
@@ -206,7 +221,7 @@ class NucliaDBDataset(NucliaDataset):
         if len(self.trainset.filter.labels) != 1:
             raise Exception("Needs to have only one labelset filter to train")
 
-        labels: KnowledgeBoxLabels = self.sdk.get_labelsets(kbid=self.kbid)
+        labels: KnowledgeBoxLabels = self.reader_sdk.get_labelsets(kbid=self.kbid)
         labelset = self.trainset.filter.labels[0]
 
         if labelset not in labels.labelsets:
@@ -220,7 +235,9 @@ class NucliaDBDataset(NucliaDataset):
             raise Exception(f"Labelset not defined for {type} classification")
 
     def _check_entities(self) -> None:
-        entities: KnowledgeBoxEntities = self.sdk.get_entitygroups(kbid=self.kbid)
+        entities: KnowledgeBoxEntities = self.reader_sdk.get_entitygroups(
+            kbid=self.kbid
+        )
         for family_group in self.trainset.filter.labels:
             if family_group not in entities.groups:
                 raise Exception("Family group is not valid")
@@ -240,7 +257,7 @@ class NucliaDBDataset(NucliaDataset):
         """
         Get expected number of partitions from a live NucliaDB
         """
-        partitions: TrainSetPartitions = self.sdk.trainset(kbid=self.kbid)
+        partitions: TrainSetPartitions = self.train_sdk.trainset(kbid=self.kbid)
         if len(partitions.partitions) == 0:
             raise KeyError("There is no partitions")
         return partitions.partitions

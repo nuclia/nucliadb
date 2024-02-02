@@ -27,7 +27,7 @@ from aiohttp.web import Response
 
 from nucliadb_utils.settings import nuclia_settings
 
-from . import exceptions
+from .utils import check_status
 
 logger = logging.getLogger(__name__)
 
@@ -53,23 +53,6 @@ def get_processing_api_url_v2() -> str:
             nuclia_settings.nuclia_processing_cluster_url
             + "/api/internal/v2/processing"
         )
-
-
-def check_status(resp: aiohttp.ClientResponse, resp_text: str) -> None:
-    if resp.status < 300:
-        return
-    elif resp.status == 402:
-        raise exceptions.AccountLimitException(f"Account limits exceeded: {resp_text}")
-    elif resp.status == 404:
-        raise exceptions.NotFoundException(f"Resource not found: {resp_text}")
-    elif resp.status in (401, 403):
-        raise exceptions.AuthorizationException(
-            f"Unauthorized to access: {resp.status}"
-        )
-    elif resp.status == 429:
-        raise exceptions.RateLimitException("Rate limited")
-    else:
-        raise exceptions.ClientException(f"Unknown error: {resp.status} - {resp_text}")
 
 
 class TelemetryHeadersMissing(Exception):

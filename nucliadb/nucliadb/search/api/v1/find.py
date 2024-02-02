@@ -28,6 +28,7 @@ from pydantic.error_wrappers import ValidationError
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.models.responses import HTTPClientError
+from nucliadb.search import predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.search.exceptions import InvalidQueryError
@@ -146,17 +147,10 @@ async def find_knowledgebox(
     except ValidationError as exc:
         detail = json.loads(exc.json())
         return HTTPClientError(status_code=422, detail=detail)
-    try:
-        results, _ = await find(
-            kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
-        )
-        return results
-    except KnowledgeBoxNotFound:
-        return HTTPClientError(status_code=404, detail="Knowledge Box not found")
-    except LimitsExceededError as exc:
-        return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
-    except InvalidQueryError as exc:
-        return HTTPClientError(status_code=412, detail=str(exc))
+
+    return await _find_endpoint(
+        response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
+    )
 
 
 @api.post(
@@ -179,6 +173,19 @@ async def find_post_knowledgebox(
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> Union[KnowledgeboxFindResults, HTTPClientError]:
+    return await _find_endpoint(
+        response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
+    )
+
+
+async def _find_endpoint(
+    response: Response,
+    kbid: str,
+    item: FindRequest,
+    x_ndb_client: NucliaDBClientType,
+    x_nucliadb_user: str,
+    x_forwarded_for: str,
+) -> Union[KnowledgeboxFindResults, HTTPClientError]:
     try:
         results, incomplete = await find(
             kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
@@ -191,3 +198,8 @@ async def find_post_knowledgebox(
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
     except InvalidQueryError as exc:
         return HTTPClientError(status_code=412, detail=str(exc))
+    except predict.ProxiedPredictAPIError as err:
+        return HTTPClientError(
+            status_code=503,
+            detail=f"Inference service unavailable. {err.status}: {err.detail}",
+        )

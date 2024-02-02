@@ -16,12 +16,20 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-#
-from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict
-from nucliadb_telemetry import metrics
 
-processor_observer = metrics.Observer(
-    "nucliadb_ingest_processor",
-    labels={"type": ""},
-    error_mappings={"kb_conflict": KnowledgeBoxConflict},
-)
+from nucliadb.standalone.introspect import remove_sensitive_settings
+from nucliadb.standalone.settings import Settings
+
+
+def test_remove_sensitive_settings():
+    sensitive = dict(
+        nua_api_key="secret",
+        jwk_key="secret",
+        gcs_base64_creds="secret",
+        s3_client_secret="secret",
+        driver_pg_url="secret",
+    )
+    settings = Settings(**sensitive)
+    remove_sensitive_settings(settings)
+    for key in sensitive:
+        assert getattr(settings, key) == "********"

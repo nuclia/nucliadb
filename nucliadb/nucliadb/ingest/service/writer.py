@@ -212,10 +212,17 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 forceuuid=request.forceuuid,
                 release_channel=release_channel,
             )
+            logger.info("KB created successfully", extra={"kbid": kbid})
         except KnowledgeBoxConflict:
+            logger.warning("KB already exists", extra={"slug": request.slug})
             return NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.CONFLICT)
-        except Exception:
-            logger.exception("Could not create KB", exc_info=True)
+        except Exception as exc:
+            errors.capture_exception(exc)
+            logger.exception(
+                "Unexpected error creating KB",
+                exc_info=True,
+                extra={"slug": request.slug},
+            )
             return NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.ERROR)
         return NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.OK, uuid=kbid)
 

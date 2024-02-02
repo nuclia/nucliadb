@@ -16,12 +16,3 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-#
-from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict
-from nucliadb_telemetry import metrics
-
-processor_observer = metrics.Observer(
-    "nucliadb_ingest_processor",
-    labels={"type": ""},
-    error_mappings={"kb_conflict": KnowledgeBoxConflict},
-)

@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 import contextlib
 from time import time
 from typing import Optional
@@ -545,6 +546,9 @@ async def _delete_resource(
 
     # Create processing message
     await transaction.commit(writer, partition, wait=x_synchronous)
+
+    processing = get_processing()
+    asyncio.create_task(processing.delete_from_processing(kbid=kbid, resource_id=rid))
 
     return Response(status_code=204)
 
