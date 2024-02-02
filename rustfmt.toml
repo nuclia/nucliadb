@@ -7,7 +7,6 @@ version = "Two"
 use_small_heuristics = "Off"
 
 normalize_comments = true
-merge_derives = false
 
 max_width = 120
 comment_width = 120
