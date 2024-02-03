@@ -77,25 +77,23 @@ def test_convert_to_node_filters():
 
 
 def test_translate_label_filters():
-    label = "/classification.labels/foo/bar"
-    translated_label = "/l/foo/bar"
-    literal = {"literal": label}
-    translated_literal = {"literal": translated_label}
+    literal = {"literal": "/classification.labels/foo/bar"}
+    translated = {"literal": "/l/foo/bar"}
 
-    assert translate_label_filters(literal) == translated_literal
-    assert translate_label_filters({"not": literal}) == {"not": translated_literal}
+    assert translate_label_filters(literal) == translated
+    assert translate_label_filters({"not": literal}) == {"not": translated}
     assert translate_label_filters({"and": [literal, literal]}) == {
-        "and": [translated_literal, translated_literal]
+        "and": [translated, translated]
     }
     assert translate_label_filters({"or": [literal, literal]}) == {
-        "or": [translated_literal, translated_literal]
+        "or": [translated, translated]
     }
     assert translate_label_filters(
         {"and": [{"or": [literal, literal]}, {"not": literal}]}
     ) == {
         "and": [
-            {"or": [translated_literal, translated_literal]},
-            {"not": translated_literal},
+            {"or": [translated, translated]},
+            {"not": translated},
         ]
     }
 
