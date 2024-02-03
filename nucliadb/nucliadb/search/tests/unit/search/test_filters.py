@@ -17,32 +17,18 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 from unittest import mock
-from unittest.mock import Mock, call
 
 import jsonschema
 import pytest
 
 from nucliadb.search.search.filters import (
-    NODE_FILTERS_SCHEMA,
+    INDEX_NODE_FILTERS_SCHEMA,
     convert_filter_to_node_schema,
     convert_to_node_filters,
-    record_filters_counter,
+    iter_filter_labels_expression,
+    translate_label_filters,
 )
 from nucliadb_models.search import Filter
-
-
-def test_record_filters_counter():
-    counter = Mock()
-
-    record_filters_counter(["", "/l/ls/l1", "/e/ORG/Nuclia"], counter)
-
-    counter.inc.assert_has_calls(
-        [
-            call({"type": "filters"}),
-            call({"type": "filters_entities"}),
-            call({"type": "filters_labels"}),
-        ]
-    )
 
 
 @pytest.fixture(scope="function")
@@ -75,10 +61,11 @@ def is_paragraph_labelset_kind_mock():
 )
 def test_convert_filter_to_node_schema(original, converted):
     assert convert_filter_to_node_schema(original) == converted
-    jsonschema.validate(converted, NODE_FILTERS_SCHEMA)
+    jsonschema.validate(converted, INDEX_NODE_FILTERS_SCHEMA)
 
 
 def test_convert_to_node_filters():
+    assert convert_to_node_filters([]) == {}
     assert convert_to_node_filters(["foo"]) == {"literal": "foo"}
     assert convert_to_node_filters(["foo", "bar"]) == {
         "and": [{"literal": "foo"}, {"literal": "bar"}]
@@ -87,3 +74,43 @@ def test_convert_to_node_filters():
     assert convert_to_node_filters([Filter(all=["foo"]), Filter(any=["bar"])]) == {
         "and": [{"literal": "foo"}, {"literal": "bar"}]
     }
+
+
+def test_translate_label_filters():
+    label = "/classification.labels/foo/bar"
+    translated_label = "/l/foo/bar"
+    literal = {"literal": label}
+    translated_literal = {"literal": translated_label}
+
+    assert translate_label_filters(literal) == translated_literal
+    assert translate_label_filters({"not": literal}) == {"not": translated_literal}
+    assert translate_label_filters({"and": [literal, literal]}) == {
+        "and": [translated_literal, translated_literal]
+    }
+    assert translate_label_filters({"or": [literal, literal]}) == {
+        "or": [translated_literal, translated_literal]
+    }
+    assert translate_label_filters(
+        {"and": [{"or": [literal, literal]}, {"not": literal}]}
+    ) == {
+        "and": [
+            {"or": [translated_literal, translated_literal]},
+            {"not": translated_literal},
+        ]
+    }
+
+
+def test_iter_filter_labels_expression():
+    literal = {"literal": "foo"}
+    assert list(iter_filter_labels_expression(literal)) == ["foo"]
+    assert list(iter_filter_labels_expression({"and": [literal, literal]})) == [
+        "foo",
+        "foo",
+    ]
+    assert list(iter_filter_labels_expression({"or": [literal, literal]})) == [
+        "foo",
+        "foo",
+    ]
+    assert list(
+        iter_filter_labels_expression({"not": {"and": [literal, literal]}})
+    ) == ["foo", "foo"]
