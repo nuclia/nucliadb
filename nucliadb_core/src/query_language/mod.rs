@@ -23,6 +23,7 @@ use std::collections::LinkedList;
 
 use serde_json::Value as JsonExpression;
 
+/// Operators allowed in negated normal form.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum NnfOperator {
     And,
@@ -30,12 +31,16 @@ enum NnfOperator {
     Not,
 }
 
+/// Used to apply [`NnfOperator`]s to [`NnfExpression`]s.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 struct NnfClause {
     operator: NnfOperator,
     operands: LinkedList<NnfExpression>,
 }
 
+/// A [`NnfExpression`] is one formed by using literals and [`NnfOperator`]s.
+/// Every propositional formula must be transformed to this form before it can
+/// be written in conjunctive normal form.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 enum NnfExpression {
     Clause(NnfClause),
@@ -43,14 +48,13 @@ enum NnfExpression {
 }
 
 fn transform_literal(negated: bool, literal: String) -> NnfExpression {
-    let nnf_expression = NnfExpression::Literal(literal);
-    if negated {
+    if !negated {
+        NnfExpression::Literal(literal)
+    } else {
         NnfExpression::Clause(NnfClause {
             operator: NnfOperator::Not,
-            operands: LinkedList::from([nnf_expression]),
+            operands: LinkedList::from([NnfExpression::Literal(literal)]),
         })
-    } else {
-        nnf_expression
     }
 }
 
@@ -127,6 +131,20 @@ mod tests {
             operator: NnfOperator::Not,
             operands: LinkedList::from([NnfExpression::Literal("var".to_string())]),
         });
+        let computed = transform(false, json_expression);
+        assert_eq!(expected, computed);
+    }
+
+    #[test]
+    fn double_negation_literal_to_nnf() {
+        let json_expression = serde_json::json!({
+            "not": {
+                "not": {
+                    "literal": "var",
+                }
+            }
+        });
+        let expected = NnfExpression::Literal("var".to_string());
         let computed = transform(false, json_expression);
         assert_eq!(expected, computed);
     }
