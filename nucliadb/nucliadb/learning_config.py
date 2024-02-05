@@ -76,14 +76,10 @@ async def proxy(
 
 def get_config_api_url() -> str:
     is_onprem = nuclia_settings.nuclia_service_account is not None
-    hostname = nuclia_settings.nuclia_learning_config_url
     if is_onprem is True:
-        # Use public API for on-prem NucliaDB deployments
-        base_url = f"{hostname}/api/v1"
+        return f"{nuclia_settings.nuclia_public_url}/api/v1"
     else:
-        # Use internal API for cloud NucliaDB deployments
-        base_url = f"{hostname}/api/v1/internal"
-    return base_url
+        return f"{nuclia_settings.nuclia_inner_learning_config_url}/api/v1/internal"
 
 
 @contextlib.asynccontextmanager
