@@ -58,7 +58,6 @@ from nucliadb_telemetry.settings import (
     LogSettings,
 )
 from nucliadb_utils.storages.settings import settings as storage_settings
-from nucliadb_utils.store import MAIN
 from nucliadb_utils.tests import free_port
 from nucliadb_utils.utilities import (
     Utility,
@@ -540,7 +539,7 @@ async def local_driver(local_driver_settings) -> AsyncIterator[Driver]:
     await driver.finalize()
 
     ingest_settings.driver_local_url = None
-    MAIN.pop("driver", None)
+    clean_utility(Utility.MAINDB_DRIVER)
 
 
 @pytest.fixture(scope="function")
@@ -576,7 +575,7 @@ async def tikv_driver(tikv_driver_settings) -> AsyncIterator[Driver]:
 
     await driver.finalize()
     ingest_settings.driver_tikv_url = None
-    MAIN.pop("driver", None)
+    clean_utility(Utility.MAINDB_DRIVER)
 
 
 @pytest.fixture(scope="function")
@@ -606,7 +605,7 @@ async def redis_driver(redis_driver_settings) -> AsyncIterator[RedisDriver]:
 
     await driver.finalize()
     ingest_settings.driver_redis_url = None
-    MAIN.pop(Utility.MAINDB_DRIVER, None)
+    clean_utility(Utility.MAINDB_DRIVER)
 
 
 @pytest.fixture(scope="function")
@@ -681,12 +680,12 @@ def driver_lazy_fixtures(default_drivers: str = "redis"):
 )
 async def maindb_driver(request):
     driver = request.param
-    MAIN[Utility.MAINDB_DRIVER] = driver
+    set_utility(Utility.MAINDB_DRIVER, driver)
 
     yield driver
 
     await cleanup_maindb(driver)
-    MAIN.pop(Utility.MAINDB_DRIVER, None)
+    clean_utility(Utility.MAINDB_DRIVER)
 
 
 async def maybe_cleanup_maindb():

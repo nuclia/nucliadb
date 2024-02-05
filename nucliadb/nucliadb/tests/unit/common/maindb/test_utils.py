@@ -23,14 +23,14 @@ import pytest
 
 from nucliadb.common.maindb.utils import settings, setup_driver
 from nucliadb_utils.exceptions import ConfigurationError
-from nucliadb_utils.store import MAIN
+from nucliadb_utils.utilities import Utility, clean_utility
 
 
 @pytest.fixture(autouse=True)
 def reset_driver_utils():
-    MAIN.pop("driver", None)
+    clean_utility(Utility.MAINDB_DRIVER)
     yield
-    MAIN.pop("driver", None)
+    clean_utility(Utility.MAINDB_DRIVER)
 
 
 @pytest.mark.asyncio
