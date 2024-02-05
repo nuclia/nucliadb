@@ -1,14 +1,22 @@
-reader_api=http://reader.nucliadb.svc.cluster.local:8080/api
-search_api=http://search.nucliadb.svc.cluster.local:8080/api
-error_tolerance=5
-max_workers=10
-duration_s=60
-ramp_up=10
-sizing=--sizing
-kbid=tiny
-kb_slug=tiny
-test=test-search-cluster
-benchmark_output=benchmark_output.json
+reader_api = http://reader.nucliadb.svc.cluster.local:8080/api
+search_api = http://search.nucliadb.svc.cluster.local:8080/api
+error_tolerance = 5
+max_workers = 10
+duration_s = 60
+ramp_up = 10
+sizing = --sizing
+kbid = tiny
+kb_slug = tiny
+test = test-search-cluster
+benchmark_output = benchmark_output.json
+
+MOLOTOV_FLAGS = \
+	$(sizing) \
+	--sizing-tolerance=$(error_tolerance) \
+	-w $(max_workers) \
+	--ramp-up $(ramp_up) \
+	-d $(duration_s) \
+	--force-shutdown
 
 
 BOLD_GREEN:=\033[1;32m
@@ -60,9 +68,7 @@ test-search-cluster: export SEARCH_API=$(search_api)
 test-search-cluster: export READER_API=$(reader_api)
 test-search-cluster:
 	echo " *  Test Started at: $$(date -u)"
-
-	molotov ./nucliadb_performance/hosted/test_search_cluster.py $(sizing) --sizing-tolerance=$(error_tolerance) -w $(max_workers) --ramp-up $(ramp_up) -d $(duration_s) --force-shutdown
-
+	molotov $(MOLOTOV_FLAGS) ./nucliadb_performance/hosted/test_search_cluster.py
 	echo " *  Test Finished at: $$(date -u)"
 
 
@@ -72,9 +78,7 @@ test-search-kb: export READER_API=$(reader_api)
 test-search-kb: export KBID=$(kbid)
 test-search-kb:
 	echo " *  Test Started at: $$(date -u)"
-
-	molotov ./nucliadb_performance/hosted/test_search_kb.py $(sizing) --sizing-tolerance=$(error_tolerance) -w $(max_workers) --ramp-up $(ramp_up) -d $(duration_s) --force-shutdown
-
+	molotov $(MOLOTOV_FLAGS) ./nucliadb_performance/hosted/test_search_kb.py
 	echo " *  Test Finished at: $$(date -u)"
 
 
@@ -86,9 +90,7 @@ test-standalone-search: export BENCHMARK_OUTPUT=$(benchmark_output)
 test-standalone-search: export SAVED_REQUESTS_FILE=standalone_search_requests.json
 test-standalone-search:	download-test-data # Stress test search on a standalone instance.
 	echo " *  Test Started at: $$(date -u)"
-
-	molotov ./nucliadb_performance/standalone/test_search.py -w $(max_workers) -d $(duration_s) --force-shutdown
-
+	molotov $(MOLOTOV_FLAGS) ./nucliadb_performance/standalone/test_search.py
 	echo " *  Test Finished at: $$(date -u)"
 
 
