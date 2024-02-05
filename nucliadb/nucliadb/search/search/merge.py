@@ -68,7 +68,6 @@ from nucliadb_models.search import (
     SortOrder,
     TextPosition,
 )
-from nucliadb_telemetry import errors
 
 from .cache import get_resource_cache, get_resource_from_cache
 from .metrics import merge_observer
@@ -486,13 +485,9 @@ def merge_relations_results(
                     )
                 )
             else:
-                error_msg = "Relation search is returning an edge unrelated with queried entities"
-                logger.error(error_msg)
-                with errors.push_scope() as scope:
-                    scope.set_extra("relations_responses", relations_responses)
-                    scope.set_extra("query", query)
-                    scope.set_extra("relation", relation)
-                    errors.capture_message(error_msg, "error")
+                logger.warning(
+                    "Relation search is returning an edge unrelated with queried entities"
+                )
 
     return relations
 
