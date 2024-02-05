@@ -21,6 +21,7 @@
 pub mod fs_state;
 pub mod metrics;
 pub mod paragraphs;
+pub mod query_language;
 pub mod query_planner;
 pub mod relations;
 pub mod tantivy_replica;

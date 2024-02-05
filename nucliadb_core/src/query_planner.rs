@@ -117,6 +117,7 @@ impl IndexQueries {
             paragraph_labels = filter.paragraph_labels.clone();
         }
         let filter = Filter {
+            expression: String::new(),
             field_labels: vec![],
             paragraph_labels,
         };
