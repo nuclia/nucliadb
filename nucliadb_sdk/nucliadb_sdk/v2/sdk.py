@@ -42,7 +42,6 @@ import httpx
 import orjson
 from pydantic import BaseModel
 
-from nucliadb_models.configuration import KBConfiguration
 from nucliadb_models.conversation import InputMessage
 from nucliadb_models.entities import (
     CreateEntitiesGroupPayload,
@@ -490,32 +489,6 @@ class _NucliaDBBase:
         response_type=ResourceFieldAdded,
     )
 
-    # Configuration
-    set_configuration = _request_builder(
-        name="set_configuration",
-        path_template="/v1/kb/{kbid}/configuration",
-        method="PATCH",
-        path_params=("kbid",),
-        request_type=KBConfiguration,
-        response_type=None,
-    )
-    delete_configuration = _request_builder(
-        name="delete_configuration",
-        path_template="/v1/kb/{kbid}/configuration",
-        method="DELETE",
-        path_params=("kbid",),
-        request_type=None,
-        response_type=None,
-    )
-    get_configuration = _request_builder(
-        name="get_configuration",
-        path_template="/v1/kb/{kbid}/configuration",
-        method="GET",
-        path_params=("kbid",),
-        request_type=None,
-        response_type=KBConfiguration,
-    )
-
     # Labels
     set_labelset = _request_builder(
         name="set_labelset",
@@ -734,6 +707,61 @@ class _NucliaDBBase:
         request_type=None,
         response_type=TrainSetPartitions,
         docstring=docstrings.TRAINSET_PARTITIONS,
+    )
+
+    # Learning Configuration
+    get_configuration = _request_builder(
+        name="get_configuration",
+        path_template="/v1/kb/{kbid}/configuration",
+        method="GET",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=None,
+    )
+    set_configuration = _request_builder(
+        name="set_configuration",
+        path_template="/v1/kb/{kbid}/configuration",
+        method="PATCH",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=None,
+    )
+
+    # Learning models
+    download_model = _request_builder(
+        name="download_model",
+        path_template="/v1/kb/{kbid}/models/{model_id}/{filename}",
+        method="GET",
+        path_params=("kbid", "model_id", "filename"),
+        stream_response=True,
+    )
+
+    get_models = _request_builder(
+        name="get_models",
+        path_template="/v1/kb/{kbid}/models",
+        method="GET",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=None,
+    )
+
+    get_model = _request_builder(
+        name="get_model",
+        path_template="/v1/kb/{kbid}/model/{model_id}",
+        method="GET",
+        path_params=("kbid", "model_id"),
+        request_type=None,
+        response_type=None,
+    )
+
+    # Learning config schema
+    get_configuration_schema = _request_builder(
+        name="get_configuration_schema",
+        path_template="/v1/kb/{kbid}/schema",
+        method="GET",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=None,
     )
 
 

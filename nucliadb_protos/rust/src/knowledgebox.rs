@@ -254,6 +254,7 @@ pub struct SemanticModelMetadata {
 }
 // Do not update this model without confirmation of internal Learning Config API
 
+/// Deprecated! please do not use.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct KbConfiguration {
     #[prost(string, tag="2")]

@@ -773,7 +773,10 @@ global___SemanticModelMetadata = SemanticModelMetadata
 
 @typing_extensions.final
 class KBConfiguration(google.protobuf.message.Message):
-    """Do not update this model without confirmation of internal Learning Config API"""
+    """Do not update this model without confirmation of internal Learning Config API
+
+    Deprecated! please do not use.
+    """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

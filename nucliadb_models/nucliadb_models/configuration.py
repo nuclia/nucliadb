@@ -19,10 +19,10 @@
 #
 
 from typing import Optional, Type, TypeVar
+import warnings
 
 from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel
-
 from nucliadb_protos import knowledgebox_pb2
 
 _T = TypeVar("_T")
@@ -35,6 +35,10 @@ class KBConfiguration(BaseModel):
     ner_model: Optional[str] = None
     anonymization_model: Optional[str] = None
     visual_labeling: Optional[str] = None
+
+    def __init__(self, *args, **kwargs):
+        warnings.warn("KBConfiguration is deprecated and should not be used")
+        super().__init__(*args, **kwargs)
 
     @classmethod
     def from_message(cls: Type[_T], message: knowledgebox_pb2.KBConfiguration) -> _T:

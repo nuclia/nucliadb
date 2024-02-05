@@ -34,10 +34,6 @@ spec:
             regex: '^/api/v\d+/kb/[^/]+/resources'
           method:
             regex: "GET|OPTIONS"
-        - uri:
-            regex: '^/api/v\d+/kb/[^/]+/(models|configuration|schema).*'
-          method:
-            regex: "GET|OPTIONS"
       retries:
         attempts: 3
         retryOn: connect-failure

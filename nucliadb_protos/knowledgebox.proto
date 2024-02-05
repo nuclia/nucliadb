@@ -209,7 +209,7 @@ message SemanticModelMetadata {
 
 // Do not update this model without confirmation of internal Learning Config API
 
-
+// Deprecated! please do not use.
 message KBConfiguration {
     string semantic_model = 2;
     string generative_model = 3;

@@ -37,7 +37,6 @@ from nucliadb_protos.writer_pb2 import GetConfigurationResponse, OpStatusWriter
 from pydantic import BaseModel, Field
 
 import nucliadb_models as models
-from nucliadb_models.configuration import KBConfiguration
 from nucliadb_models.resource import QueueType
 from nucliadb_telemetry import metrics
 from nucliadb_utils import const
@@ -115,7 +114,8 @@ class PushPayload(BaseModel):
         default_factory=models.PushProcessingOptions
     )
 
-    learning_config: Optional[KBConfiguration] = None
+    # TODO: should we remove this?
+    learning_config: Optional[dict[str, Any]] = None
 
 
 class PushResponse(BaseModel):
@@ -214,17 +214,11 @@ class ProcessingEngine:
         await self.session.close()
 
     @alru_cache(maxsize=None)
-    async def get_configuration(self, kbid: str) -> Optional[KBConfiguration]:
+    async def get_configuration(self, kbid: str) -> Optional[dict[str, Any]]:
         if self.onprem is False:
             return None
-
-        ingest = get_ingest()
-        kb_obj = KnowledgeBoxID()
-        kb_obj.uuid = kbid
-        pb_response: GetConfigurationResponse = await ingest.GetConfiguration(kb_obj)  # type: ignore
-        if pb_response.status.status != OpStatusWriter.Status.OK:
-            return None
-        return KBConfiguration.from_message(pb_response.config)
+        # TODO: This should be a call to the learning config API
+        return {}
 
     def generate_file_token_from_cloudfile(self, cf: CloudFile) -> str:
         if self.nuclia_jwt_key is None:

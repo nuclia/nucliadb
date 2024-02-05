@@ -21,18 +21,16 @@ from nucliadb_models.configuration import KBConfiguration
 
 
 def test_configuration(sdk: nucliadb_sdk.NucliaDB):
-    # Create a KB with dot similarity
     kb = sdk.create_knowledge_box(slug="config")
     assert kb is not None
-
-    # Add configuration with different similarities
     sdk.set_configuration(
         kbid=kb.uuid,
-        semantic_model="test1",
-        generative_model="test2",
+        content=dict(
+            semantic_model="test1",
+            generative_model="test2",
+        )
     )
-
-    config: KBConfiguration = sdk.get_configuration(kbid=kb.uuid)
-    assert config.semantic_model == "test1"
-    assert config.generative_model == "test2"
-    assert config.anonymization_model is None
+    config = sdk.get_configuration(kbid=kb.uuid)
+    assert config["semantic_model"] == "test1"
+    assert config["generative_model"] == "test2"
+    assert config["anonymization_model"] is None
