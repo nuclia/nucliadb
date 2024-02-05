@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import unittest
 from unittest import mock
 from unittest.mock import Mock
 
@@ -32,14 +31,6 @@ from nucliadb_utils.exceptions import LimitsExceededError
 pytestmark = pytest.mark.asyncio
 
 SUMMARIZE_MODULE = "nucliadb.search.api.v1.summarize"
-
-
-@pytest.fixture(scope="function")
-def has_feature():
-    with unittest.mock.patch(
-        f"{SUMMARIZE_MODULE}.has_feature", return_value=True
-    ) as mock:
-        yield mock
 
 
 class DummyTestRequest(Request):
@@ -90,7 +81,6 @@ async def test_summarize_endpoint_handles_errors(
     summarize,
     predict_error,
     http_error_response,
-    has_feature,
     dummy_request,
 ):
     summarize.side_effect = predict_error
@@ -103,14 +93,3 @@ async def test_summarize_endpoint_handles_errors(
         assert response.status_code == 402
     else:
         assert response.status_code == 503
-
-
-async def test_summarize_endpoint_feature_disabled(has_feature, dummy_request):
-    has_feature.return_value = False
-
-    response = await summarize_endpoint(
-        request=dummy_request,
-        kbid="kbid",
-        item=Mock(),
-    )
-    assert response.status_code == 404
