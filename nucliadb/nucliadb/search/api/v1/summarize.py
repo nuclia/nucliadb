@@ -42,7 +42,7 @@ from nucliadb_utils.utilities import has_feature
     summary="Summarize Your Documents",
     description="Summarize Your Documents",
     tags=["Search"],
-    response_model=None,
+    response_model=SummarizedResponse,
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
