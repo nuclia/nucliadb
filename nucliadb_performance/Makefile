@@ -11,8 +11,8 @@ test=test-search-cluster
 benchmark_output=benchmark_output.json
 
 
-RED=\033[0;31m
-NC=\033[0m
+BOLD_GREEN:=\033[1;32m
+NO_COLOR:=\033[00m
 
 default: help
 
@@ -22,7 +22,7 @@ help: # Show help for each of the Makefile recipes.
 	@echo "NucliaDB Performance testing tool"
 	@echo "----------------------------------\n"
 	@echo "Available options:\n"
-	@grep -E '^[a-zA-Z0-9 -]+:.*#'  Makefile | sort | while read -r l; do printf "\033[1;32m$$(echo $$l | cut -f 1 -d':')\033[00m:$$(echo $$l | cut -f 2- -d'#')\n"; done
+	@grep -E '^[a-zA-Z0-9 -]+:.*#' Makefile | sort | while read -r l; do printf "$(BOLD_GREEN)$$(echo $$l | cut -f 1 -d':')$(NO_COLOR):$$(echo $$l | cut -f 2- -d'#')\n"; done
 	@echo ""
 	@echo "Example usages:\n"
 	@echo "- Run tests against a local nucliadb at port 8080:\n"
