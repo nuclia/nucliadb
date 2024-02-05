@@ -104,7 +104,7 @@ async def setup_driver() -> Driver:
             f"Invalid DRIVER defined configured: {settings.driver}"
         )
 
-    driver: Driver = get_utility(Utility.MAINDB_DRIVER)
+    driver = get_driver()
     if not driver.initialized:
         await driver.initialize()
     return driver
