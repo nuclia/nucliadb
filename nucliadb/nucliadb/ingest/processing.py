@@ -30,10 +30,8 @@ import aiohttp
 import backoff
 import jwt
 from async_lru import alru_cache
-from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxID  # type: ignore
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.resources_pb2 import FieldFile as FieldFilePB
-from nucliadb_protos.writer_pb2 import GetConfigurationResponse, OpStatusWriter
 from pydantic import BaseModel, Field
 
 import nucliadb_models as models
@@ -43,7 +41,7 @@ from nucliadb_utils import const
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.settings import nuclia_settings, storage_settings
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import Utility, get_ingest, has_feature, set_utility
+from nucliadb_utils.utilities import Utility, has_feature, set_utility
 
 logger = logging.getLogger(__name__)
 

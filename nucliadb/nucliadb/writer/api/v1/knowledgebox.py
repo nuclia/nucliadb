@@ -67,7 +67,6 @@ async def create_kb(request: Request, item: KnowledgeBoxConfig):
         requestpb.similarity = item.similarity.to_pb()
     if item.release_channel:
         requestpb.release_channel = item.release_channel.to_pb()
-
     requestpb.config.enabled_filters.extend(item.enabled_filters)
     requestpb.config.enabled_insights.extend(item.enabled_insights)
     kbobj: NewKnowledgeBoxResponse = await ingest.NewKnowledgeBox(requestpb)  # type: ignore
