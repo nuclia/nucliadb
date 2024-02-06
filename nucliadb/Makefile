@@ -1,3 +1,19 @@
+subpackages := standalone reader search train writer ingest
+
+format_target_prefix := format-
+lint_target_prefix := lint-
+test_target_prefix := test-
+test_cov_target_prefix := test-cov-
+
+format_targets = $(addprefix $(format_target_prefix),$(subpackages))
+lint_targets = $(addprefix $(lint_target_prefix),$(subpackages))
+test_targets = $(addprefix $(test_target_prefix),$(subpackages))
+test_cov_targets = $(addprefix $(test_cov_target_prefix),$(subpackages))
+
+pytest_flags = -s -rfE -v --tb=native
+pytest_extra_flags :=
+
+
 .PHONY: install-dev
 install-dev: check-system
 	pip install --upgrade pip wheel
@@ -27,10 +43,17 @@ freeze-requirements:
 	grep -v 'nucliadb' requirements.lock.txt.raw > requirements.lock.txt
 	rm requirements.lock.txt.raw
 
+
+# Global format and lint are preferred in a single process as it's quite faster
+# than executing each subpackage target
+
 .PHONY: format
 format:
 	cd .. && isort --profile black nucliadb
 	black .
+
+$(format_targets):
+
 
 .PHONY: lint
 lint:
@@ -39,45 +62,38 @@ lint:
 	black --check .
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini .
 
-.PHONY: lint-standalone
-lint-standalone:
-	flake8 nucliadb/standalone --config=setup.cfg
-	cd .. && isort -c --profile black nucliadb/nucliadb/standalone
-	black --check nucliadb/standalone
-	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini nucliadb/standalone
+$(lint_targets):
 
-.PHONY: lint-reader
-lint-reader:
-	flake8 nucliadb/reader --config=setup.cfg
-	cd .. && isort -c --profile black nucliadb/nucliadb/reader
-	black --check nucliadb/reader
-	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini nucliadb/reader
+# pytest doesn't support test discovery across our multiple "top-level folders"
+# so we need to run all test targets one by one
+.PHONY: test
+test: $(test_targets)
 
-.PHONY: lint-search
-lint-search:
-	flake8 nucliadb/search --config=setup.cfg
-	cd .. && isort -c --profile black nucliadb/nucliadb/search
-	black --check nucliadb/search
-	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini nucliadb/search
+$(test_targets):
 
-.PHONY: lint-train
-lint-train:
-	flake8 nucliadb/train --config=setup.cfg
-	cd .. && isort -c --profile black nucliadb/nucliadb/train
-	black --check nucliadb/train
-	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini nucliadb/train
+$(test_cov_targets):
 
-.PHONY: lint-writer
-lint-writer:
-	flake8 nucliadb/writer --config=setup.cfg
-	cd .. && isort -c --profile black nucliadb/nucliadb/writer
-	black --check nucliadb/writer
-	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini nucliadb/writer
 
-.PHONY: test-ingest
-test-ingest:
-	pytest -s --tb=native -v nucliadb/ingest
+# Generic implicit rules
 
-.PHONY: test-cov-ingest
-test-cov-ingest:
-	pytest -rfE --cov=nucliadb.ingest --cov-config=../.coveragerc -s --tb=native -v --cov-report term-missing:skip-covered --cov-report xml nucliadb/ingest
+format-%:
+	cd .. && isort --profile black nucliadb/nucliadb/$*
+	black nucliadb/$*
+
+lint-%:
+	flake8 nucliadb/$* --config=setup.cfg
+	cd .. && isort -c --profile black nucliadb/nucliadb/$*
+	black --check nucliadb/$*
+	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini nucliadb/$*
+
+test-%:
+	pytest $(pytest_flags) $(pytest_extra_flags) nucliadb/$*
+
+test-cov-%:
+	pytest $(pytest_flags) $(pytest_extra_flags) \
+		--cov=nucliadb.$* \
+		--cov-config=../.coveragerc \
+		--cov-report xml \
+		--cov-report term-missing:skip-covered \
+		--cov-append \
+		nucliadb/$*
