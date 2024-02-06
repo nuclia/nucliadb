@@ -28,6 +28,8 @@ from fastapi.responses import StreamingResponse
 from nucliadb_telemetry import errors
 from nucliadb_utils.settings import nuclia_settings
 
+NUCLIA_AUTH_HEADER = "X-NUCLIA-NUAKEY"
+
 
 async def proxy(
     request: Request,
@@ -77,9 +79,14 @@ async def proxy(
 def get_config_api_url() -> str:
     is_onprem = nuclia_settings.nuclia_service_account is not None
     if is_onprem is True:
-        return f"{nuclia_settings.nuclia_public_url}/api/v1"
+        nuclia_public_url = nuclia_settings.nuclia_public_url.format(zone=nuclia_settings.nuclia_zone)
+        return f"{nuclia_public_url}/api/v1"
     else:
         return f"{nuclia_settings.nuclia_inner_learning_config_url}/api/v1/internal"
+
+
+def get_config_auth_header() -> dict[str, str]:
+    return {NUCLIA_AUTH_HEADER: f"Bearer {nuclia_settings.nuclia_service_account}"}
 
 
 @contextlib.asynccontextmanager
@@ -89,7 +96,10 @@ async def learning_config_client() -> AsyncIterator[httpx.AsyncClient]:
     For now, a new client session is created for each request. This is to avoid having to
     save a client session in the FastAPI app state.
     """
-    client = httpx.AsyncClient(base_url=get_config_api_url())
+    client = httpx.AsyncClient(
+        base_url=get_config_api_url(),
+        headers=get_config_auth_header(),
+    )
     try:
         yield client
     finally:
