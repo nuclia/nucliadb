@@ -111,8 +111,6 @@ class KnowledgeBoxConfig(BaseModel):
     slug: Optional[SlugString] = None
     title: Optional[str] = None
     description: Optional[str] = None
-    enabled_filters: List[str] = []
-    enabled_insights: List[str] = []
     similarity: Optional[VectorSimilarity] = None
     release_channel: Optional[ReleaseChannel] = None
 
