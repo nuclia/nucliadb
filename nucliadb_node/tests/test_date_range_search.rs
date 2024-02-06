@@ -106,12 +106,13 @@ async fn populate(writer: &mut TestNodeWriter, shard_id: String, metadata: Index
 async fn test_date_range_search(
     #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)] release_channel: ReleaseChannel,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    println!("0");
     let base_time = Timestamp::default();
     let mut fixture = NodeFixture::new();
     fixture.with_writer().await?.with_reader().await?;
     let mut writer = fixture.writer_client();
     let mut reader = fixture.reader_client();
-
+    println!("1");
     let new_shard_response = writer
         .new_shard(Request::new(NewShardRequest {
             release_channel: release_channel.into(),
@@ -125,7 +126,7 @@ async fn test_date_range_search(
         modified: Some(base_time.clone()),
     };
     populate(&mut writer, shard_id.clone(), metadata).await;
-
+    println!("2");
     let mut base_time_plus_one = base_time.clone();
     base_time_plus_one.seconds += 1;
     let metadata = IndexMetadata {
@@ -133,7 +134,7 @@ async fn test_date_range_search(
         modified: Some(base_time_plus_one.clone()),
     };
     populate(&mut writer, shard_id.clone(), metadata).await;
-
+    println!("3");
     let request = SearchRequest {
         shard: shard_id.clone(),
         order: None,
@@ -148,11 +149,13 @@ async fn test_date_range_search(
 
     // No time filter
     let no_time_range = request.clone();
+    println!("3.1");
     let result = reader.search(no_time_range).await.unwrap();
+    println!("3.2");
     let result = result.into_inner();
     let vectors = result.vector.unwrap();
     assert_eq!(vectors.documents.len(), 8);
-
+    println!("4");
     // Time range allows everything
     let mut request_all_range = request.clone();
     request_all_range.timestamps = Some(Timestamps {

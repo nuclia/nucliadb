@@ -57,6 +57,7 @@ pub mod shard_created {
     pub enum VectorService {
         VectorV0 = 0,
         VectorV1 = 1,
+        VectorV2 = 2,
     }
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]

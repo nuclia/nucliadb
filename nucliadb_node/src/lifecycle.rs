@@ -23,6 +23,7 @@
 use nucliadb_core::prelude::*;
 use nucliadb_core::thread::ThreadPoolBuilder;
 use nucliadb_vectors::data_point_provider::Merger as VectorsMerger;
+use nucliadb_vectors2::data_point_provider::Merger as Vectors2Merger;
 
 use crate::settings::Settings;
 
@@ -42,6 +43,7 @@ pub fn initialize_writer(settings: Settings) -> NodeResult<()> {
     // We shallow the error if the threadpools were already initialized
     let _ = ThreadPoolBuilder::new().num_threads(settings.num_global_rayon_threads()).build_global();
     let _ = VectorsMerger::install_global().map(std::thread::spawn);
+    let _ = Vectors2Merger::install_global().map(std::thread::spawn);
 
     Ok(())
 }

@@ -24,7 +24,7 @@ use nucliadb_core::prelude::*;
 use nucliadb_core::Channel;
 use serde::{Deserialize, Serialize};
 
-const VECTORS_VERSION: u32 = 1;
+const VECTORS_VERSION: u32 = 2;
 const PARAGRAPHS_VERSION: u32 = 1;
 const RELATIONS_VERSION: u32 = 2;
 const TEXTS_VERSION: u32 = 2;
@@ -98,6 +98,8 @@ impl Versions {
         match self.version_vectors {
             Some(1) => nucliadb_vectors::service::VectorReaderService::start(config)
                 .map(|i| encapsulate_reader(i) as VectorsReaderPointer),
+            Some(2) => nucliadb_vectors2::service::VectorReaderService::start(config)
+                .map(|i| encapsulate_reader(i) as VectorsReaderPointer),
             Some(v) => Err(node_error!("Invalid vectors version {v}")),
             None => Err(node_error!("Corrupted version file")),
         }
@@ -136,6 +138,8 @@ impl Versions {
     pub fn get_vectors_writer(&self, config: &VectorConfig) -> NodeResult<VectorsWriterPointer> {
         match self.version_vectors {
             Some(1) => nucliadb_vectors::service::VectorWriterService::start(config)
+                .map(|i| encapsulate_writer(i) as VectorsWriterPointer),
+            Some(2) => nucliadb_vectors2::service::VectorWriterService::start(config)
                 .map(|i| encapsulate_writer(i) as VectorsWriterPointer),
             Some(v) => Err(node_error!("Invalid vectors version {v}")),
             None => Err(node_error!("Corrupted version file")),

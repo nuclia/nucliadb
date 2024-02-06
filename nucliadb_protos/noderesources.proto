@@ -39,6 +39,7 @@ message ShardCreated {
     enum VectorService {
         VECTOR_V0 = 0;
         VECTOR_V1 = 1;
+        VECTOR_V2 = 2;
     }
     VectorService vector_service = 4;
     enum RelationService {

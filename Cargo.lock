@@ -1741,6 +1741,7 @@ dependencies = [
  "nucliadb_texts",
  "nucliadb_texts2",
  "nucliadb_vectors",
+ "nucliadb_vectors2",
  "num_cpus",
  "once_cell",
  "openssl",
@@ -1902,6 +1903,26 @@ dependencies = [
 
 [[package]]
 name = "nucliadb_vectors"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "crossbeam",
+ "fs2",
+ "fst",
+ "lazy_static",
+ "memmap2",
+ "nucliadb_core",
+ "nucliadb_procs",
+ "rand",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "uuid 1.7.0",
+]
+
+[[package]]
+name = "nucliadb_vectors2"
 version = "0.1.0"
 dependencies = [
  "bincode",

@@ -132,6 +132,7 @@ impl ShardWriter {
         match self.vector_service_version {
             0 => VectorService::VectorV0,
             1 => VectorService::VectorV1,
+            2 => VectorService::VectorV2,
             i => panic!("Unknown vector version {i}"),
         }
     }
