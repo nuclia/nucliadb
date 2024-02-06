@@ -68,8 +68,6 @@ async def create_kb(request: Request, item: KnowledgeBoxConfig):
     if item.release_channel:
         requestpb.release_channel = item.release_channel.to_pb()
 
-    requestpb.config.enabled_filters.extend(item.enabled_filters)
-    requestpb.config.enabled_insights.extend(item.enabled_insights)
     kbobj: NewKnowledgeBoxResponse = await ingest.NewKnowledgeBox(requestpb)  # type: ignore
     if item.slug != "":
         slug = item.slug
@@ -98,18 +96,10 @@ async def update_kb(request: Request, kbid: str, item: KnowledgeBoxConfig):
     pbrequest = KnowledgeBoxUpdate(uuid=kbid)
     if item.slug is not None:
         pbrequest.slug = item.slug
-
-    for filter_option in item.enabled_filters:
-        pbrequest.config.enabled_filters.append(filter_option)
-    for insight_option in item.enabled_insights:
-        pbrequest.config.enabled_insights.append(insight_option)
-
     if item.title:
         pbrequest.config.title = item.title
-
     if item.description:
         pbrequest.config.description = item.description
-
     kbobj: UpdateKnowledgeBoxResponse = await ingest.UpdateKnowledgeBox(pbrequest)  # type: ignore
     if kbobj.status == KnowledgeBoxResponseStatus.OK:
         return KnowledgeBoxObjID(uuid=kbobj.uuid)
