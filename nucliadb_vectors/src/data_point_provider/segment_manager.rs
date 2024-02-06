@@ -53,7 +53,7 @@ struct JournalTransaction {
     operations: Vec<Operation>,
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Copy)]
 enum Operation {
     AddSegment(SegmentId),
     DeleteSegment(SegmentId),
@@ -172,6 +172,7 @@ impl SegmentManager {
 
         let has_operations = !transaction.operations.is_empty();
         if has_operations {
+            let has_delete = transaction.operations.iter().any(|op| matches!(op, Operation::DeleteSegment(_)));
             self.state.no_nodes += transaction.no_nodes;
             self.state.journal.push(JournalTransaction {
                 txid: next_txid,
@@ -179,7 +180,9 @@ impl SegmentManager {
             });
 
             // We can prune the delete_log at the point of the oldest segment still in use
-            self.state.delete_log.prune(self.oldest_live_txid());
+            if has_delete {
+                self.state.delete_log.prune(self.oldest_live_txid());
+            }
         }
 
         match self.save() {
@@ -215,16 +218,13 @@ impl SegmentManager {
     }
 
     pub fn compact(&mut self) -> VectorR<()> {
-        // We can only compact transactions that:
-        // - Are not in use by any other reader (oldest_txid_in_use)
-        // - And do not reference any unmerged segment (might have delete_log entries)
+        // We can only compact transactions that are not in use by any other reader (oldest_txid_in_use)
         let oldest_txid_in_use = self.oldest_txid_in_use()?.unwrap_or(self.txid());
-        let oldest_safe_txid = std::cmp::min(oldest_txid_in_use, self.oldest_live_txid());
 
         let mut segments = HashSet::new();
         let mut count = 0;
         for transaction in &self.state.journal {
-            if transaction.txid > oldest_safe_txid {
+            if transaction.txid > oldest_txid_in_use {
                 break;
             }
             count += 1;
@@ -235,31 +235,42 @@ impl SegmentManager {
                 };
             }
         }
-        if count <= 1 {
+        if count == 0 {
             return Ok(());
         }
 
+        // Remove segments that were later deleted and deletion operations. Remove empty transactions.
+        let new_transactions: Vec<JournalTransaction> = self.state.journal[0..count]
+            .iter()
+            .filter_map(|tx| {
+                let ops: Vec<Operation> = tx
+                    .operations
+                    .iter()
+                    .filter(|op| match op {
+                        Operation::AddSegment(s) => segments.contains(s),
+                        Operation::DeleteSegment(_) => false,
+                    })
+                    .copied()
+                    .collect();
+                if ops.is_empty() {
+                    None
+                } else {
+                    Some(JournalTransaction {
+                        txid: tx.txid,
+                        operations: ops,
+                    })
+                }
+            })
+            .collect();
+
         let old_state = self.state.clone();
-        self.state.journal.splice(
-            0..count,
-            [JournalTransaction {
-                txid: oldest_safe_txid,
-                operations: segments.iter().map(|segment| Operation::AddSegment(*segment)).collect(),
-            }],
-        );
+        self.state.journal.splice(0..count, new_transactions);
 
         if let Err(e) = self.save() {
             // Rollback
             self.state = old_state;
             return Err(e.into());
         };
-
-        // Update any segments that have moved from txid and are not deleted later
-        for s in &segments {
-            if self.segments.contains_key(s) {
-                self.segments.insert(*s, oldest_safe_txid);
-            }
-        }
 
         Ok(())
     }
@@ -436,17 +447,22 @@ mod tests {
         assert_eq!(manager.segments, expected);
 
         // But changes the first entries of the journal
-        let compact_tx = &manager.state.journal[0];
-        assert_eq!(compact_tx.txid, 2);
-        assert_eq!(compact_tx.operations.len(), 2);
-        assert!(compact_tx.operations.contains(&Operation::AddSegment(segments[0])));
-        assert!(compact_tx.operations.contains(&Operation::AddSegment(segments[1])));
         assert_eq!(
-            manager.state.journal[1],
-            JournalTransaction {
-                txid: 3,
-                operations: vec![Operation::AddSegment(segments[2])],
-            },
+            manager.state.journal,
+            [
+                JournalTransaction {
+                    txid: 2,
+                    operations: vec![Operation::AddSegment(segments[1])]
+                },
+                JournalTransaction {
+                    txid: 4,
+                    operations: vec![Operation::AddSegment(segments[3])]
+                },
+                JournalTransaction {
+                    txid: 5,
+                    operations: vec![Operation::AddSegment(segments[4])]
+                }
+            ]
         );
 
         Ok(())
@@ -461,53 +477,97 @@ mod tests {
             operations: vec![Operation::AddSegment(segments[0])],
             ..Default::default()
         })?;
+        writer.commit(Transaction {
+            operations: vec![Operation::AddSegment(segments[1])],
+            ..Default::default()
+        })?;
         let mut reader_1 = SegmentManager::open(dir.path().to_path_buf())?;
 
         writer.commit(Transaction {
-            operations: vec![Operation::AddSegment(segments[1]), Operation::AddSegment(segments[2])],
+            operations: vec![
+                Operation::AddSegment(segments[2]),
+                Operation::DeleteSegment(segments[0]),
+                Operation::DeleteSegment(segments[1]),
+            ],
             ..Default::default()
         })?;
 
         let mut reader_2 = SegmentManager::open(dir.path().to_path_buf())?;
 
         writer.commit(Transaction {
-            operations: vec![Operation::DeleteSegment(segments[0]), Operation::DeleteSegment(segments[2])],
+            operations: vec![Operation::AddSegment(segments[3])],
             ..Default::default()
         })?;
 
-        // Writer(pos 3), Reader1(pos 1), Reader2(pos 2)
-        assert_eq!(writer.state.journal.first().unwrap().txid, 1);
-        assert_eq!(writer.oldest_txid_in_use()?.unwrap(), 1);
+        // Writer(pos 4), Reader1(pos 2), Reader2(pos 3)
+        assert_eq!(writer.oldest_txid_in_use()?.unwrap(), 2);
         writer.compact()?;
-        assert_eq!(writer.state.journal.first().unwrap().txid, 1);
+        // Nothing changes
+        assert_eq!(
+            writer.state.journal,
+            [
+                JournalTransaction {
+                    txid: 1,
+                    operations: vec![Operation::AddSegment(segments[0])]
+                },
+                JournalTransaction {
+                    txid: 2,
+                    operations: vec![Operation::AddSegment(segments[1])]
+                },
+                JournalTransaction {
+                    txid: 3,
+                    operations: vec![
+                        Operation::AddSegment(segments[2]),
+                        Operation::DeleteSegment(segments[0]),
+                        Operation::DeleteSegment(segments[1]),
+                    ]
+                },
+                JournalTransaction {
+                    txid: 4,
+                    operations: vec![Operation::AddSegment(segments[3])]
+                },
+            ]
+        );
 
         reader_1.refresh()?;
 
-        // Writer(pos 3), Reader1(pos 3), Reader2(pos 2)
-        assert_eq!(writer.state.journal.first().unwrap().txid, 1);
-        assert_eq!(writer.oldest_txid_in_use()?.unwrap(), 2);
+        // Writer(pos 4), Reader1(pos 4), Reader2(pos 3)
+        assert_eq!(writer.oldest_txid_in_use()?.unwrap(), 3);
         writer.compact()?;
-        assert_eq!(writer.state.journal.first().unwrap().txid, 2);
+        // Remove pre-merge transactions
+        assert_eq!(
+            writer.state.journal,
+            [
+                JournalTransaction {
+                    txid: 3,
+                    operations: vec![Operation::AddSegment(segments[2]),]
+                },
+                JournalTransaction {
+                    txid: 4,
+                    operations: vec![Operation::AddSegment(segments[3])]
+                },
+            ]
+        );
 
         writer.commit(Transaction {
             operations: vec![Operation::AddSegment(segments[0])],
             ..Default::default()
         })?;
         writer.commit(Transaction {
-            operations: vec![Operation::AddSegment(segments[3])],
+            operations: vec![Operation::AddSegment(segments[1])],
             ..Default::default()
         })?;
 
-        // Writer(pos 5), Reader1(pos 3), Reader2(pos 2)
-        assert_eq!(writer.oldest_txid_in_use()?.unwrap(), 2);
-
-        reader_2.refresh()?;
-        // Writer(pos 5), Reader1(pos 3), Reader2(pos 5)
+        // Writer(pos 6), Reader1(pos 4), Reader2(pos 3)
         assert_eq!(writer.oldest_txid_in_use()?.unwrap(), 3);
 
+        reader_2.refresh()?;
+        // Writer(pos 6), Reader1(pos 4), Reader2(pos 6)
+        assert_eq!(writer.oldest_txid_in_use()?.unwrap(), 4);
+
         reader_1.refresh()?;
-        // Writer(pos 5), Reader1(pos 5), Reader2(pos 5)
-        assert_eq!(writer.oldest_txid_in_use()?.unwrap(), 5);
+        // Writer(pos 6), Reader1(pos 6), Reader2(pos 6)
+        assert_eq!(writer.oldest_txid_in_use()?.unwrap(), 6);
 
         Ok(())
     }
