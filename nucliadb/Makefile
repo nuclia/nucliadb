@@ -74,6 +74,14 @@ test-all: $(test_targets)
 test-nucliadb:
 	$(PYTEST) nucliadb/tests
 
+test-cov-nucliadb:
+	$(PYTEST) \
+		--cov-config=../.coveragerc \
+		--cov-report xml \
+		--cov-report term-missing:skip-covered \
+		--cov-append \
+		nucliadb/tests
+
 $(test_targets):
 
 $(test_cov_targets):

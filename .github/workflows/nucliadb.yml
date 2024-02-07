@@ -94,7 +94,7 @@ jobs:
           retry_on: error
           timeout_minutes: 10
           command: |
-            make -C nucliadb test-nucliadb pytest_extra_flags="--shard-id=0 --num-shards=3"
+            make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=0 --num-shards=3"
 
       - name: Run PG tests 2/3
         # These tests can be flaky, let's retry them...
@@ -107,7 +107,7 @@ jobs:
           retry_on: error
           timeout_minutes: 10
           command: |
-            make -C nucliadb test-nucliadb pytest_extra_flags="--shard-id=1 --num-shards=3"
+            make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=1 --num-shards=3"
 
       - name: Run PG tests 2/3
         # These tests can be flaky, let's retry them...
@@ -120,7 +120,7 @@ jobs:
           retry_on: error
           timeout_minutes: 10
           command: |
-            make -C nucliadb test-nucliadb pytest_extra_flags="--shard-id=2 --num-shards=3"
+            make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=2 --num-shards=3"
 
       - name: Run Tikv tests 1/2
         # These tests can be flaky, let's retry them...
@@ -133,7 +133,7 @@ jobs:
           retry_on: error
           timeout_minutes: 10
           command: |
-            make -C nucliadb test-nucliadb pytest_extra_flags="--shard-id=0 --num-shards=3"
+            make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=0 --num-shards=3"
 
       - name: Run Tikv tests 2/3
         # These tests can be flaky, let's retry them...
@@ -146,7 +146,7 @@ jobs:
           retry_on: error
           timeout_minutes: 10
           command: |
-            make -C nucliadb test-nucliadb pytest_extra_flags="--shard-id=1 --num-shards=3"
+            make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=1 --num-shards=3"
 
       - name: Run Tikv tests 3/3
         # These tests can be flaky, let's retry them...
@@ -159,7 +159,7 @@ jobs:
           retry_on: error
           timeout_minutes: 10
           command: |
-            make -C nucliadb test-nucliadb pytest_extra_flags="--shard-id=2 --num-shards=3"
+            make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=2 --num-shards=3"
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
