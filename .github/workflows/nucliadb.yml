@@ -4,6 +4,7 @@ env:
   CONTAINER_REGISTRY: eu.gcr.io/${{ secrets.PROJECT_ID }}
   TESTING_TIKV_LOCAL: "true"
 permissions:
+  id-token: write   # This is required for requesting the JWT
   contents: write
 on:
   pull_request:
