@@ -904,8 +904,9 @@ class SummarizeRequest(BaseModel):
     resources: List[str] = Field(
         ...,
         min_items=1,
+        max_items=100,
         title="Resources",
-        description="Uids of the resources to summarize",
+        description="Uids or slugs of the resources to summarize. If the resources are not found, they will be ignored.",
     )
 
     summary_kind: SummaryKind = Field(
