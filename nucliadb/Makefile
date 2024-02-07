@@ -80,7 +80,7 @@ test-nucliadb:
 $(test_targets):
 
 $(test_cov_targets):
-test-cov-search: _pytest_extra_flags += --benchmark-json benchmarks.json
+test-cov-search: _pytest_extra_flags += --benchmark-json ../benchmarks.json
 
 
 # Generic implicit rules
