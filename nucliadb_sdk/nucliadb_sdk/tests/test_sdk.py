@@ -44,11 +44,6 @@ def test_kb_management(sdk: nucliadb_sdk.NucliaDB):
 
 
 def test_kb_services(sdk: nucliadb_sdk.NucliaDB, kb):
-    # Configuration
-    sdk.set_configuration(kbid=kb.uuid, semantic_model="foo")
-    sdk.get_configuration(kbid=kb.uuid)
-    sdk.delete_configuration(kbid=kb.uuid)
-
     # Labels
     sdk.set_labelset(kbid=kb.uuid, labelset="foo", title="Bar")
     sdk.get_labelset(kbid=kb.uuid, labelset="foo")

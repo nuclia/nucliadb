@@ -25,12 +25,8 @@ from unittest.mock import AsyncMock, Mock
 
 import aiohttp
 import backoff
-from async_lru import alru_cache
-from nucliadb_protos.knowledgebox_pb2 import KBConfiguration
 from nucliadb_protos.utils_pb2 import RelationNode
 
-from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
-from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.tests.vectors import Q, Qm2023
 from nucliadb.search import logger
 from nucliadb_models.search import (
@@ -175,16 +171,6 @@ class PredictEngine:
     async def finalize(self):
         await self.session.close()
 
-    async def get_configuration(self, kbid: str) -> Optional[KBConfiguration]:
-        if self.onprem is False:
-            return None
-        return await self._get_configuration(kbid)
-
-    @alru_cache(maxsize=None)
-    async def _get_configuration(self, kbid: str) -> Optional[KBConfiguration]:
-        dm = KnowledgeBoxDataManager(get_driver())
-        return await dm.get_ml_configuration(kbid)
-
     def check_nua_key_is_configured_for_onprem(self):
         if self.onprem and (
             self.nuclia_service_account is None and self.local_predict is False
@@ -199,23 +185,11 @@ class PredictEngine:
         else:
             return f"{self.cluster_url}{PRIVATE_PREDICT}{endpoint}"
 
-    async def get_predict_headers(self, kbid: str) -> dict[str, str]:
+    def get_predict_headers(self, kbid: str) -> dict[str, str]:
         if self.onprem:
             headers = {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
-            config = await self.get_configuration(kbid)
             if self.local_predict_headers is not None:
                 headers.update(self.local_predict_headers)
-            if config is not None:
-                if config.anonymization_model:
-                    headers["X-STF-ANONYMIZATION-MODEL"] = config.anonymization_model
-                if config.semantic_model:
-                    headers["X-STF-SEMANTIC-MODEL"] = config.semantic_model
-                if config.ner_model:
-                    headers["X-STF-NER-MODEL"] = config.ner_model
-                if config.generative_model:
-                    headers["X-STF-GENERATIVE-MODEL"] = config.generative_model
-                if config.visual_labeling:
-                    headers["X-STF-VISUAL-LABELING"] = config.visual_labeling
             return headers
         else:
             return {"X-STF-KBID": kbid}
@@ -275,7 +249,7 @@ class PredictEngine:
             "POST",
             url=self.get_predict_url(FEEDBACK),
             json=data,
-            headers=await self.get_predict_headers(kbid),
+            headers=self.get_predict_headers(kbid),
         )
         await self.check_response(resp, expected_status=204)
 
@@ -292,7 +266,7 @@ class PredictEngine:
             "POST",
             url=self.get_predict_url(REPHRASE),
             json=item.dict(),
-            headers=await self.get_predict_headers(kbid),
+            headers=self.get_predict_headers(kbid),
         )
         await self.check_response(resp, expected_status=200)
         return await _parse_rephrase_response(resp)
@@ -312,7 +286,7 @@ class PredictEngine:
             "POST",
             url=self.get_predict_url(CHAT),
             json=item.dict(),
-            headers=await self.get_predict_headers(kbid),
+            headers=self.get_predict_headers(kbid),
             timeout=None,
         )
         await self.check_response(resp, expected_status=200)
@@ -335,7 +309,7 @@ class PredictEngine:
             "POST",
             url=self.get_predict_url(ASK_DOCUMENT),
             json=item.dict(),
-            headers=await self.get_predict_headers(kbid),
+            headers=self.get_predict_headers(kbid),
             timeout=None,
         )
         await self.check_response(resp, expected_status=200)
@@ -355,7 +329,7 @@ class PredictEngine:
             "GET",
             url=self.get_predict_url(SENTENCE),
             params={"text": sentence},
-            headers=await self.get_predict_headers(kbid),
+            headers=self.get_predict_headers(kbid),
         )
         await self.check_response(resp, expected_status=200)
         data = await resp.json()
@@ -377,7 +351,7 @@ class PredictEngine:
             "GET",
             url=self.get_predict_url(TOKENS),
             params={"text": sentence},
-            headers=await self.get_predict_headers(kbid),
+            headers=self.get_predict_headers(kbid),
         )
         await self.check_response(resp, expected_status=200)
         data = await resp.json()
@@ -395,7 +369,7 @@ class PredictEngine:
             "POST",
             url=self.get_predict_url(SUMMARIZE),
             json=item.dict(),
-            headers=await self.get_predict_headers(kbid),
+            headers=self.get_predict_headers(kbid),
             timeout=None,
         )
         await self.check_response(resp, expected_status=200)
@@ -422,7 +396,7 @@ class DummyPredictEngine(PredictEngine):
     async def finalize(self):
         pass
 
-    async def get_predict_headers(self, kbid: str) -> dict[str, str]:
+    def get_predict_headers(self, kbid: str) -> dict[str, str]:
         return {}
 
     async def make_request(self, method: str, **request_args):

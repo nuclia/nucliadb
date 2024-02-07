@@ -29,22 +29,17 @@ from typing import TYPE_CHECKING, Any, Optional, TypeVar
 import aiohttp
 import backoff
 import jwt
-from async_lru import alru_cache
-from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxID  # type: ignore
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.resources_pb2 import FieldFile as FieldFilePB
-from nucliadb_protos.writer_pb2 import GetConfigurationResponse, OpStatusWriter
 from pydantic import BaseModel, Field
 
 import nucliadb_models as models
-from nucliadb_models.configuration import KBConfiguration
 from nucliadb_models.resource import QueueType
 from nucliadb_telemetry import metrics
-from nucliadb_utils import const
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.settings import nuclia_settings, storage_settings
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import Utility, get_ingest, has_feature, set_utility
+from nucliadb_utils.utilities import Utility, set_utility
 
 logger = logging.getLogger(__name__)
 
@@ -115,8 +110,6 @@ class PushPayload(BaseModel):
         default_factory=models.PushProcessingOptions
     )
 
-    learning_config: Optional[KBConfiguration] = None
-
 
 class PushResponse(BaseModel):
     seqid: Optional[int] = None
@@ -177,14 +170,10 @@ class ProcessingEngine:
             self.nuclia_upload_url = (
                 f"{self.nuclia_cluster_url}/api/v1/processing/upload"
             )
-        self.nuclia_internal_push = (
-            f"{self.nuclia_cluster_url}/api/internal/processing/push"
-        )
         self.nuclia_internal_push_v2 = (
             f"{nuclia_processing_cluster_url}/api/internal/v2/processing/push"
         )
         self.nuclia_internal_delete = f"{nuclia_processing_cluster_url}/api/internal/v2/processing/delete-requests"
-        self.nuclia_external_push = f"{self.nuclia_public_url}/api/v1/processing/push"
         self.nuclia_external_push_v2 = (
             f"{self.nuclia_public_url}/api/v2/processing/push"
         )
@@ -212,19 +201,6 @@ class ProcessingEngine:
 
     async def finalize(self):
         await self.session.close()
-
-    @alru_cache(maxsize=None)
-    async def get_configuration(self, kbid: str) -> Optional[KBConfiguration]:
-        if self.onprem is False:
-            return None
-
-        ingest = get_ingest()
-        kb_obj = KnowledgeBoxID()
-        kb_obj.uuid = kbid
-        pb_response: GetConfigurationResponse = await ingest.GetConfiguration(kb_obj)  # type: ignore
-        if pb_response.status.status != OpStatusWriter.Status.OK:
-            return None
-        return KBConfiguration.from_message(pb_response.config)
 
     def generate_file_token_from_cloudfile(self, cf: CloudFile) -> str:
         if self.nuclia_jwt_key is None:
@@ -406,34 +382,17 @@ class ProcessingEngine:
             headers = {"CONTENT-TYPE": "application/json"}
             if self.onprem is False:
                 # Upload the payload
-                url = self.nuclia_internal_push
-                if has_feature(
-                    const.Features.PROCESSING_V2,
-                    context={
-                        "kbid": item.kbid,
-                    },
-                ):
-                    url = self.nuclia_internal_push_v2
                 item.partition = partition
                 resp = await self.session.post(
-                    url=url, data=item.json(), headers=headers
+                    url=self.nuclia_internal_push_v2, data=item.json(), headers=headers
                 )
             else:
-                url = self.nuclia_external_push + "?partition=" + str(partition)
-                if has_feature(
-                    const.Features.PROCESSING_V2,
-                    context={
-                        "kbid": item.kbid,
-                    },
-                ):
-                    url = self.nuclia_external_push_v2
-                item.learning_config = await self.get_configuration(item.kbid)
                 headers.update(
                     {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
                 )
                 # Upload the payload
                 resp = await self.session.post(
-                    url=url, data=item.json(), headers=headers
+                    url=self.nuclia_external_push_v2, data=item.json(), headers=headers
                 )
             if resp.status == 200:
                 data = await resp.json()
@@ -534,8 +493,6 @@ class DummyProcessingEngine(ProcessingEngine):
         self, item: PushPayload, partition: int
     ) -> ProcessingInfo:
         self.calls.append([item, partition])
-        item.learning_config = await self.get_configuration(item.kbid)
-
         self.values["send_to_process"].append([item, partition])
         return ProcessingInfo(
             seqid=len(self.calls), account_seq=0, queue=QueueType.SHARED

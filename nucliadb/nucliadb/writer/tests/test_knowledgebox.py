@@ -32,8 +32,6 @@ async def test_knowledgebox_lifecycle(writer_api):
                 "slug": "kbid1",
                 "title": "My Knowledge Box",
                 "description": "My lovely knowledgebox",
-                "enabled_filters": ["filter1", "filter2"],
-                "enabled_insights": ["insight1", "insight2"],
             },
         )
         assert resp.status_code == 201
