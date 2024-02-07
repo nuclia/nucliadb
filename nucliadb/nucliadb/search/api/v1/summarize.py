@@ -29,10 +29,8 @@ from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.search.summarize import summarize
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import SummarizedResponse, SummarizeRequest
-from nucliadb_utils import const
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
-from nucliadb_utils.utilities import has_feature
 
 
 @api.post(
@@ -42,7 +40,7 @@ from nucliadb_utils.utilities import has_feature
     summary="Summarize Your Documents",
     description="Summarize Your Documents",
     tags=["Search"],
-    response_model=None,
+    response_model=SummarizedResponse,
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
@@ -51,10 +49,6 @@ async def summarize_endpoint(
     kbid: str,
     item: SummarizeRequest,
 ) -> Union[SummarizedResponse, HTTPClientError]:
-    if not has_feature(const.Features.SUMMARIZATION):
-        return HTTPClientError(
-            status_code=404, detail="Summarize feature is not enabled"
-        )
     try:
         return await summarize(kbid, item)
     except KnowledgeBoxNotFound:
