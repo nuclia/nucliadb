@@ -917,16 +917,16 @@ class SummarizeRequest(BaseModel):
 
 
 class SummarizedResource(BaseModel):
-    summary: str
+    summary: str = Field(..., title="Summary", description="Summary of the resource")
     tokens: int
 
 
 class SummarizedResponse(BaseModel):
     resources: Dict[str, SummarizedResource] = Field(
-        default={}, title="Resources", description="Individual resource summaries"
+        default={}, title="Resources", description="Individual resource summaries. The key is the resource id or slug."
     )
     summary: str = Field(
-        default="", title="Summary", description="Global summary of all resources"
+        default="", title="Summary", description="Global summary of all resources combined."
     )
 
 
