@@ -24,7 +24,7 @@ from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb_protos import knowledgebox_pb2, writer_pb2
-from nucliadb_utils.keys import KB_CONFIGURATION, KB_SHARDS, KB_UUID
+from nucliadb_utils.keys import KB_SHARDS, KB_UUID
 
 
 class KnowledgeBoxDataManager:
@@ -80,18 +80,3 @@ class KnowledgeBoxDataManager:
             return knowledgebox_pb2.SemanticModelMetadata(
                 similarity_function=shards_obj.similarity
             )
-
-    async def get_ml_configuration(
-        self, kbid: str
-    ) -> Optional[knowledgebox_pb2.KBConfiguration]:
-        """
-        Returns the machine learning configuration for the given KB.
-        """
-        async with self.read_only_transaction() as txn:
-            config_key = KB_CONFIGURATION.format(kbid=kbid)
-            payload = await txn.get(config_key)
-            if payload is None:
-                return None
-            kb_pb = knowledgebox_pb2.KBConfiguration()
-            kb_pb.ParseFromString(payload)
-            return kb_pb
