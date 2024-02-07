@@ -713,20 +713,6 @@ pub struct GetSynonymsResponse {
     #[prost(message, optional, tag="2")]
     pub synonyms: ::core::option::Option<super::knowledgebox::Synonyms>,
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct SetKbConfigurationRequest {
-    #[prost(message, optional, tag="1")]
-    pub kb: ::core::option::Option<super::knowledgebox::KnowledgeBoxId>,
-    #[prost(message, optional, tag="2")]
-    pub config: ::core::option::Option<super::knowledgebox::KbConfiguration>,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct GetConfigurationResponse {
-    #[prost(message, optional, tag="1")]
-    pub status: ::core::option::Option<OpStatusWriter>,
-    #[prost(message, optional, tag="2")]
-    pub config: ::core::option::Option<super::knowledgebox::KbConfiguration>,
-}
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
 pub enum NotificationSource {

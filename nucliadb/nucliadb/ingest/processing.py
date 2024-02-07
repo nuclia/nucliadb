@@ -29,22 +29,18 @@ from typing import TYPE_CHECKING, Any, Optional, TypeVar
 import aiohttp
 import backoff
 import jwt
-from async_lru import alru_cache
-from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxID  # type: ignore
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.resources_pb2 import FieldFile as FieldFilePB
-from nucliadb_protos.writer_pb2 import GetConfigurationResponse, OpStatusWriter
 from pydantic import BaseModel, Field
 
 import nucliadb_models as models
-from nucliadb_models.configuration import KBConfiguration
 from nucliadb_models.resource import QueueType
 from nucliadb_telemetry import metrics
 from nucliadb_utils import const
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.settings import nuclia_settings, storage_settings
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import Utility, get_ingest, has_feature, set_utility
+from nucliadb_utils.utilities import Utility, has_feature, set_utility
 
 logger = logging.getLogger(__name__)
 
@@ -114,8 +110,6 @@ class PushPayload(BaseModel):
     processing_options: Optional[models.PushProcessingOptions] = Field(
         default_factory=models.PushProcessingOptions
     )
-
-    learning_config: Optional[KBConfiguration] = None
 
 
 class PushResponse(BaseModel):
@@ -212,19 +206,6 @@ class ProcessingEngine:
 
     async def finalize(self):
         await self.session.close()
-
-    @alru_cache(maxsize=None)
-    async def get_configuration(self, kbid: str) -> Optional[KBConfiguration]:
-        if self.onprem is False:
-            return None
-
-        ingest = get_ingest()
-        kb_obj = KnowledgeBoxID()
-        kb_obj.uuid = kbid
-        pb_response: GetConfigurationResponse = await ingest.GetConfiguration(kb_obj)  # type: ignore
-        if pb_response.status.status != OpStatusWriter.Status.OK:
-            return None
-        return KBConfiguration.from_message(pb_response.config)
 
     def generate_file_token_from_cloudfile(self, cf: CloudFile) -> str:
         if self.nuclia_jwt_key is None:
@@ -427,7 +408,6 @@ class ProcessingEngine:
                     },
                 ):
                     url = self.nuclia_external_push_v2
-                item.learning_config = await self.get_configuration(item.kbid)
                 headers.update(
                     {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
                 )
@@ -534,8 +514,6 @@ class DummyProcessingEngine(ProcessingEngine):
         self, item: PushPayload, partition: int
     ) -> ProcessingInfo:
         self.calls.append([item, partition])
-        item.learning_config = await self.get_configuration(item.kbid)
-
         self.values["send_to_process"].append([item, partition])
         return ProcessingInfo(
             seqid=len(self.calls), account_seq=0, queue=QueueType.SHARED
