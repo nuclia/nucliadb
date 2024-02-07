@@ -92,7 +92,7 @@ class ShardCreatorHandler:
         kb_shards = await self.shard_manager.get_shards_by_kbid_inner(kbid)
         current_shard: writer_pb2.ShardObject = kb_shards.shards[kb_shards.actual]
 
-        node, shard_id, _ = choose_node(current_shard)
+        node, shard_id = choose_node(current_shard)
         shard: nodereader_pb2.Shard = await node.reader.GetShard(
             nodereader_pb2.GetShardRequest(shard_id=noderesources_pb2.ShardId(id=shard_id))  # type: ignore
         )

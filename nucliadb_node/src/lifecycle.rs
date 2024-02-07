@@ -32,10 +32,7 @@ pub fn initialize_writer(settings: Settings) -> NodeResult<()> {
     let data_path = settings.data_path();
     let shards_path = settings.shards_path();
     if !data_path.exists() {
-        return Err(node_error!(
-            "Data directory ({:?}) should be already created",
-            data_path
-        ));
+        return Err(node_error!("Data directory ({:?}) should be already created", data_path));
     }
 
     if !shards_path.exists() {
@@ -43,9 +40,7 @@ pub fn initialize_writer(settings: Settings) -> NodeResult<()> {
     }
 
     // We shallow the error if the threadpools were already initialized
-    let _ = ThreadPoolBuilder::new()
-        .num_threads(settings.num_global_rayon_threads())
-        .build_global();
+    let _ = ThreadPoolBuilder::new().num_threads(settings.num_global_rayon_threads()).build_global();
     let _ = VectorsMerger::install_global().map(std::thread::spawn);
 
     Ok(())
@@ -55,7 +50,5 @@ pub fn initialize_writer(settings: Settings) -> NodeResult<()> {
 /// a reader
 pub fn initialize_reader(settings: Settings) {
     // We swallow the error if the threadpool was already initialized
-    let _ = ThreadPoolBuilder::new()
-        .num_threads(settings.num_global_rayon_threads())
-        .build_global();
+    let _ = ThreadPoolBuilder::new().num_threads(settings.num_global_rayon_threads()).build_global();
 }

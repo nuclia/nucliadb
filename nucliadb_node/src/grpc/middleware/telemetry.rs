@@ -35,7 +35,9 @@ impl<S> Layer<S> for GrpcInstrumentorLayer {
     type Service = GrpcInstrumentor<S>;
 
     fn layer(&self, service: S) -> Self::Service {
-        GrpcInstrumentor { inner: service }
+        GrpcInstrumentor {
+            inner: service,
+        }
     }
 }
 
@@ -108,11 +110,7 @@ struct HeaderMapWrapper<'a> {
 
 impl<'a> Extractor for HeaderMapWrapper<'a> {
     fn get(&self, key: &str) -> Option<&str> {
-        self.inner
-            .get(key)
-            .map(|value| value.to_str())
-            .transpose()
-            .unwrap_or(None)
+        self.inner.get(key).map(|value| value.to_str()).transpose().unwrap_or(None)
     }
 
     fn keys(&self) -> Vec<&str> {

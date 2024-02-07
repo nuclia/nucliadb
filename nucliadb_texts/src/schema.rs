@@ -19,9 +19,7 @@
 //
 use nucliadb_core::protos::*;
 use tantivy::chrono::{DateTime, NaiveDateTime, Utc};
-use tantivy::schema::{
-    Cardinality, FacetOptions, Field, NumericOptions, Schema, STORED, STRING, TEXT,
-};
+use tantivy::schema::{Cardinality, FacetOptions, Field, NumericOptions, Schema, STORED, STRING, TEXT};
 
 #[derive(Debug, Clone)]
 pub struct TextSchema {
@@ -41,21 +39,16 @@ pub struct TextSchema {
 }
 
 pub fn timestamp_to_datetime_utc(timestamp: &prost_types::Timestamp) -> DateTime<Utc> {
-    let naive =
-        NaiveDateTime::from_timestamp_opt(timestamp.seconds, timestamp.nanos as u32).unwrap();
+    let naive = NaiveDateTime::from_timestamp_opt(timestamp.seconds, timestamp.nanos as u32).unwrap();
     DateTime::from_naive_utc_and_offset(naive, tantivy::chrono::Utc)
 }
 
 impl TextSchema {
     pub fn new() -> Self {
         let mut sb = Schema::builder();
-        let num_options: NumericOptions = NumericOptions::default()
-            .set_indexed()
-            .set_fast(Cardinality::SingleValue);
+        let num_options: NumericOptions = NumericOptions::default().set_indexed().set_fast(Cardinality::SingleValue);
 
-        let date_options = NumericOptions::default()
-            .set_indexed()
-            .set_fast(Cardinality::SingleValue);
+        let date_options = NumericOptions::default().set_indexed().set_fast(Cardinality::SingleValue);
 
         let facet_options = FacetOptions::default().set_stored();
 

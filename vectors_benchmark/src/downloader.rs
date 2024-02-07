@@ -102,15 +102,9 @@ fn get_content_length(url: &str) -> u64 {
         panic!("Unexpected server response: {}", status)
     }
 
-    let length = response
-        .headers()
-        .get(CONTENT_LENGTH)
-        .ok_or("response doesn't include the content length")
-        .unwrap();
+    let length = response.headers().get(CONTENT_LENGTH).ok_or("response doesn't include the content length").unwrap();
 
-    u64::from_str(length.to_str().unwrap())
-        .map_err(|_| "invalid Content-Length header")
-        .unwrap()
+    u64::from_str(length.to_str().unwrap()).map_err(|_| "invalid Content-Length header").unwrap()
 }
 
 fn range_request(url: &str, range: &HeaderValue) -> Response {
@@ -138,10 +132,7 @@ pub fn download_shard(
     let mut downloaded_bytes = 0;
     if Path::new(&download_path).exists() {
         // Open the file for appending and get the current file size
-        let mut file = OpenOptions::new()
-            .write(true)
-            .append(true)
-            .open(&download_path)?;
+        let mut file = OpenOptions::new().write(true).append(true).open(&download_path)?;
 
         // Seek to the end to continue the download
         downloaded_bytes = file.seek(SeekFrom::End(0))?;
@@ -154,15 +145,9 @@ pub fn download_shard(
     let content_length = get_content_length(url);
 
     if downloaded_bytes < content_length {
-        let mut file = OpenOptions::new()
-            .write(true)
-            .append(true)
-            .open(&download_path)?;
+        let mut file = OpenOptions::new().write(true).append(true).open(&download_path)?;
 
-        println!(
-            "Downloading {}",
-            Byte::from_bytes(content_length as u128).get_appropriate_unit(true),
-        );
+        println!("Downloading {}", Byte::from_bytes(content_length as u128).get_appropriate_unit(true),);
 
         let pb = ProgressBar::new(content_length);
 
@@ -176,15 +161,7 @@ pub fn download_shard(
             std::io::copy(&mut response, &mut file).unwrap();
 
             // really???
-            let length = u64::from_str(
-                response
-                    .headers()
-                    .get("Content-Length")
-                    .unwrap()
-                    .to_str()
-                    .unwrap(),
-            )
-            .unwrap();
+            let length = u64::from_str(response.headers().get("Content-Length").unwrap().to_str().unwrap()).unwrap();
             downloaded_bytes += length;
             pb.set_position(downloaded_bytes);
             pb.tick();

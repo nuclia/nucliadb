@@ -35,7 +35,9 @@ pub trait MergeQuery: Send {
 struct MergerHandle(MergeTxn);
 impl MergerHandle {
     pub fn send(&self, request: MergeRequest) {
-        let Err(e) = self.0.send(request) else { return };
+        let Err(e) = self.0.send(request) else {
+            return;
+        };
         tracing::info!("Error sending merge request, {e}");
     }
 }
@@ -66,7 +68,12 @@ impl Merger {
             // It is safe to initialize MERGER_NOTIFIER
             // since the setter can only be called once.
             MERGER_NOTIFIER = Some(handler);
-            status = Ok(|| Merger { rtxn }.run());
+            status = Ok(|| {
+                Merger {
+                    rtxn,
+                }
+                .run()
+            });
         });
         status
     }

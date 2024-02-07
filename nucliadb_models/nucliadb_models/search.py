@@ -20,7 +20,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
+from typing import Any, Dict, List, Optional, Type, TypeVar, Union
 
 from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.audit_pb2 import ClientType
@@ -244,7 +244,7 @@ class ResourceSearchResults(JsonBaseModel):
     sentences: Optional[Sentences] = None
     paragraphs: Optional[Paragraphs] = None
     relations: Optional[Relations] = None
-    nodes: Optional[List[Tuple[str, str, str]]] = None
+    nodes: Optional[List[Dict[str, str]]] = None
     shards: Optional[List[str]] = None
 
 
@@ -256,7 +256,7 @@ class KnowledgeboxSearchResults(JsonBaseModel):
     paragraphs: Optional[Paragraphs] = None
     fulltext: Optional[Resources] = None
     relations: Optional[Relations] = None
-    nodes: Optional[List[Tuple[str, str, str]]] = None
+    nodes: Optional[List[Dict[str, str]]] = None
     shards: Optional[List[str]] = None
     autofilters: List[str] = ModelParamDefaults.applied_autofilters.to_pydantic_field()
 
@@ -779,7 +779,8 @@ class FieldExtensionStrategy(RagStrategy):
                     ]
                 )
                 raise ValueError(
-                    f"Field '{field}' does not have a valid field type. Valid field types are: {allowed_field_types_part}."
+                    f"Field '{field}' does not have a valid field type. "
+                    f"Valid field types are: {allowed_field_types_part}."
                 )
 
         return values
@@ -903,8 +904,9 @@ class SummarizeRequest(BaseModel):
     resources: List[str] = Field(
         ...,
         min_items=1,
+        max_items=100,
         title="Resources",
-        description="Uids of the resources to summarize",
+        description="Uids or slugs of the resources to summarize. If the resources are not found, they will be ignored.",
     )
 
     summary_kind: SummaryKind = Field(
@@ -915,16 +917,20 @@ class SummarizeRequest(BaseModel):
 
 
 class SummarizedResource(BaseModel):
-    summary: str
+    summary: str = Field(..., title="Summary", description="Summary of the resource")
     tokens: int
 
 
 class SummarizedResponse(BaseModel):
     resources: Dict[str, SummarizedResource] = Field(
-        default={}, title="Resources", description="Individual resource summaries"
+        default={},
+        title="Resources",
+        description="Individual resource summaries. The key is the resource id or slug.",
     )
     summary: str = Field(
-        default="", title="Summary", description="Global summary of all resources"
+        default="",
+        title="Summary",
+        description="Global summary of all resources combined.",
     )
 
 
@@ -1009,7 +1015,7 @@ class KnowledgeboxFindResults(JsonBaseModel):
     page_number: int = 0
     page_size: int = 20
     next_page: bool = False
-    nodes: Optional[List[Tuple[str, str, str]]] = None
+    nodes: Optional[List[Dict[str, str]]] = None
     shards: Optional[List[str]] = None
     autofilters: List[str] = ModelParamDefaults.applied_autofilters.to_pydantic_field()
     min_score: float = ModelParamDefaults.min_score.to_pydantic_field()

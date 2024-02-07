@@ -41,9 +41,7 @@ use crate::utils::{list_shards, set_primary_node_id};
 
 pub async fn replicate_shard(
     shard_state: replication::PrimaryShardReplicationState,
-    mut client: replication::replication_service_client::ReplicationServiceClient<
-        tonic::transport::Channel,
-    >,
+    mut client: replication::replication_service_client::ReplicationServiceClient<tonic::transport::Channel>,
     shard: Arc<ShardWriter>,
 ) -> NodeResult<()> {
     // do not allow gc while replicating
@@ -119,10 +117,7 @@ pub async fn replicate_shard(
             }
 
             std::fs::rename(temp_filepath.clone(), dest_filepath.clone())?;
-            debug!(
-                "Finished replicating file: {:?} to shard {:?}",
-                resp.filepath, shard_state.shard_id
-            );
+            debug!("Finished replicating file: {:?} to shard {:?}", resp.filepath, shard_state.shard_id);
 
             filepath = None;
             current_read_bytes = 0;
@@ -137,10 +132,7 @@ pub async fn replicate_shard(
         // After successful sync, set the generation id
         shard.metadata.set_generation_id(gen_id);
     } else {
-        warn!(
-            "No generation id received for shard: {:?}",
-            shard_state.shard_id
-        );
+        warn!("No generation id received for shard: {:?}", shard_state.shard_id);
     }
 
     // cleanup leftovers
@@ -154,9 +146,7 @@ pub async fn replicate_shard(
     // We only do this here because GC will not be done otherwise on a secondary
     // XXX this should be removed once we refactor gc/merging
     let sshard = Arc::clone(&shard); // moved shard for gc
-    tokio::task::spawn_blocking(move || sshard.gc())
-        .await?
-        .expect("GC failed");
+    tokio::task::spawn_blocking(move || sshard.gc()).await?.expect("GC failed");
 
     Ok(())
 }
@@ -175,7 +165,9 @@ impl ReplicateWorkerPool {
     }
 
     pub async fn add<F>(&mut self, worker: F) -> NodeResult<()>
-    where F: Future<Output = NodeResult<()>> + Send + 'static {
+    where
+        F: Future<Output = NodeResult<()>> + Send + 'static,
+    {
         let work_lock = Arc::clone(&self.work_lock);
         let permit = work_lock.acquire_owned().await.unwrap();
 
@@ -209,20 +201,15 @@ pub async fn connect_to_primary_and_replicate(
         primary_address = format!("http://{}", primary_address);
     }
     eprintln!("Connecting to primary: {:?}", primary_address);
-    let mut client = replication::replication_service_client::ReplicationServiceClient::connect(
-        primary_address.clone(),
-    )
-    .await?;
+    let mut client =
+        replication::replication_service_client::ReplicationServiceClient::connect(primary_address.clone()).await?;
     // .max_decoding_message_size(256 * 1024 * 1024)
     // .max_encoding_message_size(256 * 1024 * 1024);address);
 
     let repl_health_mng = ReplicationHealthManager::new(settings.clone());
     let metrics = metrics::get_metrics();
 
-    let primary_node_metadata = client
-        .get_metadata(Request::new(EmptyQuery {}))
-        .await?
-        .into_inner();
+    let primary_node_metadata = client.get_metadata(Request::new(EmptyQuery {})).await?.into_inner();
 
     set_primary_node_id(settings.data_path(), primary_node_metadata.node_id)?;
 
@@ -234,27 +221,22 @@ pub async fn connect_to_primary_and_replicate(
 
         let existing_shards = list_shards(settings.shards_path()).await;
         let mut shard_states = Vec::new();
-        let mut worker_pool =
-            ReplicateWorkerPool::new(settings.replication_max_concurrency() as usize);
+        let mut worker_pool = ReplicateWorkerPool::new(settings.replication_max_concurrency() as usize);
         for shard_id in existing_shards.clone() {
             if let Some(metadata) = shard_cache.get_metadata(shard_id.clone()) {
                 shard_states.push(replication::SecondaryShardReplicationState {
                     shard_id: shard_id.clone(),
-                    generation_id: metadata
-                        .get_generation_id()
-                        .unwrap_or("UNSET_SECONDARY".to_string()),
+                    generation_id: metadata.get_generation_id().unwrap_or("UNSET_SECONDARY".to_string()),
                 });
             }
         }
         debug!("Sending shard states: {:?}", shard_states.clone());
 
         let replication_state: replication::PrimaryCheckReplicationStateResponse = client
-            .check_replication_state(Request::new(
-                replication::SecondaryCheckReplicationStateRequest {
-                    secondary_id: secondary_id.clone(),
-                    shard_states,
-                },
-            ))
+            .check_replication_state(Request::new(replication::SecondaryCheckReplicationStateRequest {
+                secondary_id: secondary_id.clone(),
+                shard_states,
+            }))
             .await?
             .into_inner();
 
@@ -276,9 +258,7 @@ pub async fn connect_to_primary_and_replicate(
             if existing_shards.contains(&shard_id) {
                 let shard_cache_clone = shard_cache.clone();
                 let shard_id_clone = shard_id.clone();
-                shard_lookup =
-                    tokio::task::spawn_blocking(move || shard_cache_clone.get(&shard_id_clone))
-                        .await?;
+                shard_lookup = tokio::task::spawn_blocking(move || shard_cache_clone.get(&shard_id_clone)).await?;
             } else {
                 let metadata = ShardMetadata::new(
                     shards_path.join(shard_id.clone()),
@@ -290,8 +270,7 @@ pub async fn connect_to_primary_and_replicate(
                 let shard_cache_clone = Arc::clone(&shard_cache);
 
                 warn!("Creating shard to replicate: {shard_id}");
-                let shard_create =
-                    tokio::task::spawn_blocking(move || shard_cache_clone.create(metadata)).await?;
+                let shard_create = tokio::task::spawn_blocking(move || shard_cache_clone.create(metadata)).await?;
                 if shard_create.is_err() {
                     warn!("Failed to create shard: {:?}", shard_create);
                     continue;
@@ -301,9 +280,7 @@ pub async fn connect_to_primary_and_replicate(
             let shard = shard_lookup?;
             let mut current_gen_id = "UNKNOWN".to_string();
             if let Some(metadata) = shard_cache.get_metadata(shard_id.clone()) {
-                current_gen_id = metadata
-                    .get_generation_id()
-                    .unwrap_or("UNSET_SECONDARY".to_string());
+                current_gen_id = metadata.get_generation_id().unwrap_or("UNSET_SECONDARY".to_string());
             }
 
             info!(
@@ -318,9 +295,7 @@ pub async fn connect_to_primary_and_replicate(
                 std::fs::remove_dir_all(replicate_work_path)?;
             }
 
-            worker_pool
-                .add(replicate_shard(shard_state, client.clone(), shard))
-                .await?;
+            worker_pool.add(replicate_shard(shard_state, client.clone(), shard)).await?;
             metrics.record_replication_op(replication_metrics::ReplicationOpsKey {
                 operation: "shard_replicated".to_string(),
             });
@@ -332,8 +307,7 @@ pub async fn connect_to_primary_and_replicate(
                 continue;
             }
             let shard_cache_clone = shard_cache.clone();
-            let shard_lookup =
-                tokio::task::spawn_blocking(move || shard_cache_clone.delete(&shard_id)).await?;
+            let shard_lookup = tokio::task::spawn_blocking(move || shard_cache_clone.delete(&shard_id)).await?;
             if shard_lookup.is_err() {
                 warn!("Failed to delete shard: {:?}", shard_lookup);
                 continue;
@@ -385,10 +359,7 @@ pub async fn connect_to_primary_and_replicate_forever(
             return Ok(());
         }
 
-        error!(
-            "Error happened during replication. Will retry: {:?}",
-            result
-        );
+        error!("Error happened during replication. Will retry: {:?}", result);
         tokio::time::sleep(settings.replication_delay()).await;
     }
 }

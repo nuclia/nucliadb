@@ -17,6 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
+
 from fastapi import HTTPException, Response
 from fastapi_versioning import version  # type: ignore
 from nucliadb_protos.knowledgebox_pb2 import (
@@ -31,6 +33,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
 from starlette.requests import Request
 
 from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX, api
+from nucliadb.writer.utilities import get_processing
 from nucliadb_models.resource import (
     KnowledgeBoxConfig,
     KnowledgeBoxObj,
@@ -65,8 +68,6 @@ async def create_kb(request: Request, item: KnowledgeBoxConfig):
     if item.release_channel:
         requestpb.release_channel = item.release_channel.to_pb()
 
-    requestpb.config.enabled_filters.extend(item.enabled_filters)
-    requestpb.config.enabled_insights.extend(item.enabled_insights)
     kbobj: NewKnowledgeBoxResponse = await ingest.NewKnowledgeBox(requestpb)  # type: ignore
     if item.slug != "":
         slug = item.slug
@@ -95,18 +96,10 @@ async def update_kb(request: Request, kbid: str, item: KnowledgeBoxConfig):
     pbrequest = KnowledgeBoxUpdate(uuid=kbid)
     if item.slug is not None:
         pbrequest.slug = item.slug
-
-    for filter_option in item.enabled_filters:
-        pbrequest.config.enabled_filters.append(filter_option)
-    for insight_option in item.enabled_insights:
-        pbrequest.config.enabled_insights.append(insight_option)
-
     if item.title:
         pbrequest.config.title = item.title
-
     if item.description:
         pbrequest.config.description = item.description
-
     kbobj: UpdateKnowledgeBoxResponse = await ingest.UpdateKnowledgeBox(pbrequest)  # type: ignore
     if kbobj.status == KnowledgeBoxResponseStatus.OK:
         return KnowledgeBoxObjID(uuid=kbobj.uuid)
@@ -138,5 +131,8 @@ async def delete_kb(request: Request, kbid: str):
         raise HTTPException(status_code=404, detail="Knowledge Box does not exists")
     elif kbobj.status == KnowledgeBoxResponseStatus.ERROR:
         raise HTTPException(status_code=500, detail="Error on deleting knowledge box")
+
+    processing = get_processing()
+    asyncio.create_task(processing.delete_from_processing(kbid=kbid))
 
     return Response(status_code=204)

@@ -65,10 +65,7 @@ struct TimeSensitiveDLog<'a> {
 }
 impl<'a> DeleteLog for TimeSensitiveDLog<'a> {
     fn is_deleted(&self, key: &[u8]) -> bool {
-        self.dlog
-            .get(key)
-            .map(|t| t > self.time)
-            .unwrap_or_default()
+        self.dlog.get(key).map(|t| t > self.time).unwrap_or_default()
     }
 }
 
@@ -162,10 +159,7 @@ pub struct State {
 }
 impl State {
     fn data_point_iterator(&self) -> impl Iterator<Item = &Journal> {
-        self.work_stack
-            .iter()
-            .flat_map(|u| u.load.iter())
-            .chain(self.current.load.iter())
+        self.work_stack.iter().flat_map(|u| u.load.iter()).chain(self.current.load.iter())
     }
     fn close_work_unit(&mut self) {
         let prev = mem::replace(&mut self.current, WorkUnit::new());
@@ -209,15 +203,8 @@ impl State {
         for journal in self.data_point_iterator().copied() {
             let delete_log = self.delete_log(journal);
             let data_point = DataPoint::open(location, journal.id())?;
-            let partial_solution = data_point.search(
-                &delete_log,
-                query,
-                filter,
-                with_duplicates,
-                no_results,
-                similarity,
-                min_score,
-            );
+            let partial_solution =
+                data_point.search(&delete_log, query, filter, with_duplicates, no_results, similarity, min_score);
             for candidate in partial_solution {
                 ffsv.add(candidate);
             }
@@ -238,10 +225,7 @@ impl State {
         let Some(unit) = self.work_stack.pop_back() else {
             return;
         };
-        let age_cap = self
-            .work_stack
-            .back()
-            .and_then(|v| v.load.last().map(|l| l.time()));
+        let age_cap = self.work_stack.back().and_then(|v| v.load.last().map(|l| l.time()));
         if let Some(age_cap) = age_cap {
             self.delete_log.prune(age_cap);
         }
@@ -253,9 +237,7 @@ impl State {
         self.add(journal);
     }
     pub fn dpid_iter(&self) -> impl Iterator<Item = DpId> + '_ {
-        self.data_point_iterator()
-            .copied()
-            .map(|journal| journal.id())
+        self.data_point_iterator().copied().map(|journal| journal.id())
     }
     pub fn keys(&self, location: &Path) -> VectorR<Vec<String>> {
         let mut keys = vec![];
@@ -358,21 +340,10 @@ mod test {
             for _ in 0..no_vectors {
                 let key = Uuid::new_v4().to_string();
                 let labels = LabelDictionary::new(vec![]);
-                let vector = (0..self.dimension)
-                    .map(|_| random::<f32>())
-                    .collect::<Vec<_>>();
+                let vector = (0..self.dimension).map(|_| random::<f32>()).collect::<Vec<_>>();
                 elems.push(Elem::new(key, vector, labels, None));
             }
-            Some(
-                DataPoint::new(
-                    self.path,
-                    elems,
-                    None,
-                    Similarity::Cosine,
-                    Channel::EXPERIMENTAL,
-                )
-                .unwrap(),
-            )
+            Some(DataPoint::new(self.path, elems, None, Similarity::Cosine, Channel::EXPERIMENTAL).unwrap())
         }
     }
 
@@ -393,12 +364,8 @@ mod test {
         assert_eq!(state.work_stack.len(), 1);
         assert_eq!(state.current.size(), 0);
         let work = state.current_work_unit().unwrap();
-        let work = work
-            .iter()
-            .map(|j| (state.delete_log(*j), j.id()))
-            .collect::<Vec<_>>();
-        let new =
-            DataPoint::merge(dir.path(), &work, Similarity::Cosine, Channel::EXPERIMENTAL).unwrap();
+        let work = work.iter().map(|j| (state.delete_log(*j), j.id())).collect::<Vec<_>>();
+        let new = DataPoint::merge(dir.path(), &work, Similarity::Cosine, Channel::EXPERIMENTAL).unwrap();
         std::mem::drop(work);
         state.replace_work_unit(new.journal());
         assert!(state.current_work_unit().is_none());

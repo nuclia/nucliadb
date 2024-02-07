@@ -18,21 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from unittest import mock
 from uuid import uuid4
 
 import pytest
 
 from nucliadb.tests.utils.aiohttp_session import get_mocked_session
-
-
-@pytest.fixture(scope="function")
-def ingest_util():
-    ingest = mock.Mock()
-    ingest.GetConfiguration = mock.AsyncMock()
-    with mock.patch("nucliadb.ingest.processing.get_ingest") as mock_get_ingest:
-        mock_get_ingest.return_value = ingest
-        yield
 
 
 @pytest.mark.parametrize("onprem", [True, False])
@@ -48,7 +38,7 @@ def ingest_util():
     ],
 )
 @pytest.mark.asyncio
-async def test_send_to_process(onprem, mock_payload, ingest_util):
+async def test_send_to_process(onprem, mock_payload):
     """
     Test that send_to_process does not fail
     """
@@ -71,5 +61,35 @@ async def test_send_to_process(onprem, mock_payload, ingest_util):
         "POST", 200, json=mock_payload, context_manager=False
     )
     await processing_engine.send_to_process(payload, partition=0)
+
+    await processing_engine.finalize()
+
+
+@pytest.mark.parametrize("onprem", [True, False])
+@pytest.mark.asyncio
+async def test_delete_from_processing(onprem):
+    """
+    Test that send_to_process does not fail
+    """
+
+    from nucliadb.ingest.processing import ProcessingEngine
+
+    fake_nuclia_proxy_url = "http://fake_proxy"
+    processing_engine = ProcessingEngine(
+        onprem=onprem,
+        nuclia_cluster_url=fake_nuclia_proxy_url,
+        nuclia_public_url=fake_nuclia_proxy_url,
+    )
+    await processing_engine.initialize()
+
+    processing_engine.session = get_mocked_session(
+        "POST",
+        200,
+        json={"kbid": "kbid", "resource_id": "resource_id"},
+        context_manager=False,
+    )
+    await processing_engine.delete_from_processing(
+        kbid="kbid", resource_id="resource_id"
+    )
 
     await processing_engine.finalize()

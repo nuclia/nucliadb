@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import warnings
 from typing import Optional, Type, TypeVar
 
 from google.protobuf.json_format import MessageToDict
@@ -29,6 +30,10 @@ _T = TypeVar("_T")
 
 
 class KBConfiguration(BaseModel):
+    def __init__(self, **data):
+        warnings.warn("KBConfiguration model is deprecated", DeprecationWarning)
+        super().__init__(**data)
+
     # Do not touch this model synced on Processing side
     semantic_model: Optional[str] = None
     generative_model: Optional[str] = None

@@ -46,17 +46,10 @@ fn main() -> Result<()> {
         &["../../"],
     )?;
 
-    tonic_build::configure()
-        .build_server(true)
-        .out_dir("src")
-        .compile(
-            &[
-                "nucliadb_protos/nodewriter.proto",
-                "nucliadb_protos/nodereader.proto",
-                "nucliadb_protos/replication.proto",
-            ],
-            &["../../"],
-        )?;
+    tonic_build::configure().build_server(true).out_dir("src").compile(
+        &["nucliadb_protos/nodewriter.proto", "nucliadb_protos/nodereader.proto", "nucliadb_protos/replication.proto"],
+        &["../../"],
+    )?;
 
     Ok(())
 }

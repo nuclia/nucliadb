@@ -72,16 +72,14 @@ fn main() -> std::io::Result<()> {
     let batch_size = args.batch_size();
     let plotw = PlotWriter::new(args.writer_plot().unwrap());
     let vector_it = RandomVectors::new(args.embedding_dim()).take(args.index_len());
-    let writer_handler =
-        thread::spawn(move || writer::write_benchmark(batch_size, writer, plotw, vector_it));
+    let writer_handler = thread::spawn(move || writer::write_benchmark(batch_size, writer, plotw, vector_it));
 
     let stop = stop_point.clone();
     let reader = Index::open(&location).unwrap();
     let no_results = args.neighbours();
     let plotw = PlotWriter::new(args.reader_plot().unwrap());
     let query_it = RandomVectors::new(args.embedding_dim());
-    let reader_handler =
-        thread::spawn(move || reader::read_benchmark(stop, no_results, reader, plotw, query_it));
+    let reader_handler = thread::spawn(move || reader::read_benchmark(stop, no_results, reader, plotw, query_it));
 
     writer_handler.join().unwrap();
     stop_point.store(true, Ordering::SeqCst);
@@ -97,9 +95,6 @@ fn main() -> std::io::Result<()> {
 
     write_json(args.json_output(), json_results, args.merge).unwrap();
 
-    println!(
-        "Total vector storage size: {}",
-        storage_size.get_appropriate_unit(true)
-    );
+    println!("Total vector storage size: {}", storage_size.get_appropriate_unit(true));
     Ok(())
 }

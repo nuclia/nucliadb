@@ -127,21 +127,15 @@ impl LabelIndex {
     /// `path` is the directory to store the FST and index file.
     /// `labels` is an iterator of Label objects.
     pub fn new<I>(path: &Path, labels: I) -> VectorR<Self>
-    where I: Iterator<Item = Label> {
+    where
+        I: Iterator<Item = Label>,
+    {
         let records_file_path = path.join(Self::LABELS_IDX);
         let fst_file_path = path.join(Self::LABELS_FST);
 
         // create the record and fst files
-        let mut records_file = OpenOptions::new()
-            .create(true)
-            .write(true)
-            .read(true)
-            .open(&records_file_path)?;
-        let mut fst_file = OpenOptions::new()
-            .create(true)
-            .write(true)
-            .read(true)
-            .open(&fst_file_path)?;
+        let mut records_file = OpenOptions::new().create(true).write(true).read(true).open(&records_file_path)?;
+        let mut fst_file = OpenOptions::new().create(true).write(true).read(true).open(&fst_file_path)?;
         let mut records_writer = BufWriter::new(&mut records_file);
         let fst_writer = BufWriter::new(&mut fst_file);
         let mut fst_builder = MapBuilder::new(fst_writer)?;
@@ -226,15 +220,13 @@ impl KeyIndex {
     /// `path` is the directory to store the FST and index file.
     /// `labels` is an iterator of Label objects.
     pub fn new<I>(path: &Path, keys: I) -> VectorR<Self>
-    where I: Iterator<Item = (String, u64)> {
+    where
+        I: Iterator<Item = (String, u64)>,
+    {
         let fst_file_path = path.join(Self::KEYS_FST);
 
         // create the fst file
-        let mut fst_file = OpenOptions::new()
-            .create(true)
-            .write(true)
-            .read(true)
-            .open(&fst_file_path)?;
+        let mut fst_file = OpenOptions::new().create(true).write(true).read(true).open(&fst_file_path)?;
 
         let fst_writer = BufWriter::new(&mut fst_file);
         let mut fst_builder = MapBuilder::new(fst_writer)?;
@@ -294,11 +286,7 @@ mod tests {
         }
 
         // if one label does not exist, we return 0
-        match label_index.get_nodes(&[
-            "key1".to_string(),
-            "key3".to_string(),
-            "IDONTEXIST".to_string(),
-        ]) {
+        match label_index.get_nodes(&["key1".to_string(), "key3".to_string(), "IDONTEXIST".to_string()]) {
             Err(err) => panic!("{err:?}"),
             Ok(node_addresses) => assert_eq!(node_addresses.len(), 0),
         }
@@ -310,11 +298,8 @@ mod tests {
         }
 
         // let's create the id lookup
-        let mut keys: Vec<(String, u64)> = vec![
-            ("key-for-1".to_string(), 1),
-            ("key-for-2".to_string(), 2),
-            ("key-for-3".to_string(), 3),
-        ];
+        let mut keys: Vec<(String, u64)> =
+            vec![("key-for-1".to_string(), 1), ("key-for-2".to_string(), 2), ("key-for-3".to_string(), 3)];
 
         // needs to be sorted by keys
         keys.sort();

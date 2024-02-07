@@ -55,12 +55,7 @@ impl IndexSet {
         let mut write = self.state.write().unwrap();
         write.remove_index(index)
     }
-    pub fn get_or_create<'a, S>(
-        &'a mut self,
-        index: S,
-        similarity: Similarity,
-        _: &ELock,
-    ) -> VectorR<Index>
+    pub fn get_or_create<'a, S>(&'a mut self, index: S, similarity: Similarity, _: &ELock) -> VectorR<Index>
     where
         S: Into<std::borrow::Cow<'a, str>>,
     {

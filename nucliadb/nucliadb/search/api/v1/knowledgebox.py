@@ -103,7 +103,7 @@ async def knowledgebox_counters(
     queried_shards = []
     for shard_object in shard_groups:
         try:
-            node, shard_id, _ = choose_node(shard_object)
+            node, shard_id = choose_node(shard_object)
         except KeyError:
             raise HTTPException(
                 status_code=500,

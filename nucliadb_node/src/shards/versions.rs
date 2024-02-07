@@ -44,11 +44,7 @@ pub struct Versions {
 
 impl Versions {
     fn deprecated_versions_exists(versions_file: &Path) -> bool {
-        versions_file
-            .parent()
-            .map(|v| v.join(DEPRECATED_CONFIG))
-            .map(|v| v.exists())
-            .unwrap_or_default()
+        versions_file.parent().map(|v| v.join(DEPRECATED_CONFIG)).map(|v| v.exists()).unwrap_or_default()
     }
     fn new_from_deprecated() -> Versions {
         Versions {
@@ -106,10 +102,7 @@ impl Versions {
             None => Err(node_error!("Corrupted version file")),
         }
     }
-    pub fn get_paragraphs_reader(
-        &self,
-        config: &ParagraphConfig,
-    ) -> NodeResult<ParagraphsReaderPointer> {
+    pub fn get_paragraphs_reader(&self, config: &ParagraphConfig) -> NodeResult<ParagraphsReaderPointer> {
         match self.version_paragraphs {
             Some(1) => nucliadb_paragraphs::reader::ParagraphReaderService::start(config)
                 .map(|i| encapsulate_reader(i) as ParagraphsReaderPointer),
@@ -129,10 +122,7 @@ impl Versions {
         }
     }
 
-    pub fn get_relations_reader(
-        &self,
-        config: &RelationConfig,
-    ) -> NodeResult<RelationsReaderPointer> {
+    pub fn get_relations_reader(&self, config: &RelationConfig) -> NodeResult<RelationsReaderPointer> {
         match self.version_relations {
             Some(1) => nucliadb_relations::service::RelationsReaderService::start(config)
                 .map(|i| encapsulate_reader(i) as RelationsReaderPointer),
@@ -151,10 +141,7 @@ impl Versions {
             None => Err(node_error!("Corrupted version file")),
         }
     }
-    pub fn get_paragraphs_writer(
-        &self,
-        config: &ParagraphConfig,
-    ) -> NodeResult<ParagraphsWriterPointer> {
+    pub fn get_paragraphs_writer(&self, config: &ParagraphConfig) -> NodeResult<ParagraphsWriterPointer> {
         match self.version_paragraphs {
             Some(1) => nucliadb_paragraphs::writer::ParagraphWriterService::start(config)
                 .map(|i| encapsulate_writer(i) as ParagraphsWriterPointer),
@@ -174,10 +161,7 @@ impl Versions {
         }
     }
 
-    pub fn get_relations_writer(
-        &self,
-        config: &RelationConfig,
-    ) -> NodeResult<RelationsWriterPointer> {
+    pub fn get_relations_writer(&self, config: &RelationConfig) -> NodeResult<RelationsWriterPointer> {
         match self.version_relations {
             Some(1) => nucliadb_relations::service::RelationsWriterService::start(config)
                 .map(|i| encapsulate_writer(i) as RelationsWriterPointer),

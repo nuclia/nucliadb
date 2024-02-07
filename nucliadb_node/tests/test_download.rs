@@ -63,11 +63,7 @@ async fn test_download_shard(
         // grabbing a JSON file and making sure it's readable
         if shard_file.relative_path == "paragraph/meta.json" {
             let mut content = String::new();
-            let mut response_stream = reader
-                .download_shard_file(Request::new(req))
-                .await
-                .unwrap()
-                .into_inner();
+            let mut response_stream = reader.download_shard_file(Request::new(req)).await.unwrap().into_inner();
 
             while let Some(response) = response_stream.message().await? {
                 // Process the response element (FileChunk in this case).
@@ -86,18 +82,12 @@ struct ShardDetails {
     id: String,
 }
 
-async fn create_shard(
-    writer: &mut TestNodeWriter,
-    release_channel: ReleaseChannel,
-) -> ShardDetails {
+async fn create_shard(writer: &mut TestNodeWriter, release_channel: ReleaseChannel) -> ShardDetails {
     let request = Request::new(NewShardRequest {
         release_channel: release_channel.into(),
         ..Default::default()
     });
-    let new_shard_response = writer
-        .new_shard(request)
-        .await
-        .expect("Unable to create new shard");
+    let new_shard_response = writer.new_shard(request).await.expect("Unable to create new shard");
     let shard_id = &new_shard_response.get_ref().id;
     create_test_resources(writer, shard_id.clone()).await;
     ShardDetails {
@@ -105,10 +95,7 @@ async fn create_shard(
     }
 }
 
-async fn create_test_resources(
-    writer: &mut TestNodeWriter,
-    shard_id: String,
-) -> HashMap<&str, String> {
+async fn create_test_resources(writer: &mut TestNodeWriter, shard_id: String) -> HashMap<&str, String> {
     let resources = [
         ("little prince", resources::little_prince(&shard_id)),
         ("zarathustra", resources::thus_spoke_zarathustra(&shard_id)),

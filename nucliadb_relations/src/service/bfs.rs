@@ -70,9 +70,7 @@ impl<'a> BfsGuide for GrpcGuide<'a> {
     }
     fn free_jump(&self, cnx: GCnx) -> bool {
         self.treat_bfs_error(false, cnx.edge(), |edge: Entity| {
-            self.reader
-                .get_edge(edge)
-                .map(|edge| edge.xtype() == self.jump_always)
+            self.reader.get_edge(edge).map(|edge| edge.xtype() == self.jump_always)
         })
     }
 }

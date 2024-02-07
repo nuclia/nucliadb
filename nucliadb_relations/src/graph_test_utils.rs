@@ -39,11 +39,7 @@ impl Iterator for UNodes {
     type Item = IoNode;
     fn next(&mut self) -> Option<Self::Item> {
         let seed = Uuid::new_v4();
-        Some(IoNode::new(
-            seed.to_string(),
-            seed.to_string(),
-            Some(seed.to_string()),
-        ))
+        Some(IoNode::new(seed.to_string(), seed.to_string(), Some(seed.to_string())))
     }
 }
 

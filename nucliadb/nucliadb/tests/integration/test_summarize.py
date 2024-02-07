@@ -33,28 +33,35 @@ async def test_summarize(
     kbid = knowledgebox
 
     resource_uuids = []
+    resource_slugs = []
 
     # Create some resources
-    for i in range(25):
+    for i in range(20):
+        slug = f"resource-{i}"
         resp = await nucliadb_writer.post(
             f"/kb/{kbid}/resources",
             json={
                 "title": f"Resource {i}",
+                "slug": slug,
                 "texts": {"text": {"body": f"My extracted text {i}"}},
             },
         )
         assert resp.status_code == 201
+        resource_slugs.append(slug)
         resource_uuids.append(resp.json()["uuid"])
+
+    # Uuids and slugs can be used interchangeably
+    resources = resource_uuids[0:9] + resource_slugs[10:]
 
     # Summarize all of them
     resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/summarize", json={"resources": resource_uuids + ["non-existent"]}
+        f"/kb/{kbid}/summarize", json={"resources": resources + ["non-existent"]}
     )
     assert resp.status_code == 200, resp.text
 
     content = resp.json()
     response = SummarizedResponse.parse_obj(content)
-    assert set(response.resources.keys()) == set(resource_uuids)
+    assert set(response.resources.keys()) == set(resources)
 
 
 @pytest.mark.asyncio()

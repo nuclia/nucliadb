@@ -119,7 +119,7 @@ class IndexAuditHandler:
         total_paragraphs = 0
 
         for shard_obj in shard_groups:
-            node, shard_id, _ = choose_node(shard_obj)
+            node, shard_id = choose_node(shard_obj)
             shard: nodereader_pb2.Shard = await node.reader.GetShard(
                 nodereader_pb2.GetShardRequest(shard_id=noderesources_pb2.ShardId(id=shard_id))  # type: ignore
             )

@@ -89,9 +89,7 @@ impl Journal {
     }
 }
 
-#[derive(
-    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
-)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
 pub struct Address(usize);
 impl Address {
     #[cfg(test)]
@@ -326,12 +324,7 @@ pub struct Elem {
     pub labels: LabelDictionary,
 }
 impl Elem {
-    pub fn new(
-        key: String,
-        vector: Vec<f32>,
-        labels: LabelDictionary,
-        metadata: Option<Vec<u8>>,
-    ) -> Elem {
+    pub fn new(key: String, vector: Vec<f32>, labels: LabelDictionary, metadata: Option<Vec<u8>>) -> Elem {
         Elem {
             labels,
             metadata,
@@ -343,13 +336,7 @@ impl Elem {
 
 impl data_store::IntoBuffer for Elem {
     fn serialize_into<W: io::Write>(self, w: W) -> io::Result<()> {
-        Node::serialize_into(
-            w,
-            self.key,
-            self.vector,
-            self.labels.0,
-            self.metadata.as_ref(),
-        )
+        Node::serialize_into(w, self.key, self.vector, self.labels.0, self.metadata.as_ref())
     }
 }
 
@@ -448,8 +435,8 @@ impl DataPoint {
         let data_iterator = (0..length).map(|i| data_store::get_value(Node, node_storage, i));
         let mut keys = Vec::new();
         for data in data_iterator {
-            if !delete_log.is_deleted(data) {
-                let raw_key = Node.get_key(data);
+            let raw_key = Node.get_key(data);
+            if !delete_log.is_deleted(raw_key) {
                 let string_key = String::from_utf8_lossy(raw_key).to_string();
                 keys.push(string_key);
             }
@@ -469,35 +456,15 @@ impl DataPoint {
         min_score: f32,
     ) -> impl Iterator<Item = Neighbour> + '_ {
         let encoded_query = vector::encode_vector(query);
-        let tracker = Retriever::new(
-            &encoded_query,
-            &self.nodes,
-            delete_log,
-            similarity,
-            min_score,
-        );
+        let tracker = Retriever::new(&encoded_query, &self.nodes, delete_log, similarity, min_score);
 
         let no_nodes = data_store::stored_elements(&self.nodes);
 
-        let filter = FormulaFilter::new(
-            filter,
-            self.key_index.as_ref(),
-            self.label_index.as_ref(),
-            no_nodes,
-        );
+        let filter = FormulaFilter::new(filter, self.key_index.as_ref(), self.label_index.as_ref(), no_nodes);
 
         let ops = HnswOps::new(&tracker);
-        let neighbours = ops.search(
-            Address(self.journal.nodes),
-            self.index.as_ref(),
-            results,
-            filter,
-            with_duplicates,
-        );
-        neighbours
-            .into_iter()
-            .map(|(address, dist)| (Neighbour::new(address, &self.nodes, dist)))
-            .take(results)
+        let neighbours = ops.search(Address(self.journal.nodes), self.index.as_ref(), results, filter, with_duplicates);
+        neighbours.into_iter().map(|(address, dist)| (Neighbour::new(address, &self.nodes, dist))).take(results)
     }
     pub fn merge<Dlog>(
         dir: &path::Path,
@@ -511,31 +478,17 @@ impl DataPoint {
         let uid = DpId::new_v4().to_string();
         let id = dir.join(&uid);
         fs::create_dir(&id)?;
-        let mut nodes = fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(id.join(file_names::NODES))?;
-        let mut journalf = fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(id.join(file_names::JOURNAL))?;
-        let mut hnswf = fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(id.join(file_names::HNSW))?;
+        let mut nodes = fs::OpenOptions::new().read(true).write(true).create(true).open(id.join(file_names::NODES))?;
+        let mut journalf =
+            fs::OpenOptions::new().read(true).write(true).create(true).open(id.join(file_names::JOURNAL))?;
+        let mut hnswf = fs::OpenOptions::new().read(true).write(true).create(true).open(id.join(file_names::HNSW))?;
         let operants = operants
             .iter()
             .map(|(dlog, dp_id)| DataPoint::open(dir, *dp_id).map(|v| (dlog, v)))
             .collect::<VectorR<Vec<_>>>()?;
 
         // Creating the node store
-        let node_producers: Vec<_> = operants
-            .iter()
-            .map(|dp| ((dp.0, Node), dp.1.nodes.as_ref()))
-            .collect();
+        let node_producers: Vec<_> = operants.iter().map(|dp| ((dp.0, Node), dp.1.nodes.as_ref())).collect();
         data_store::merge(&mut nodes, &node_producers)?;
         let nodes = unsafe { Mmap::map(&nodes)? };
         let no_nodes = data_store::stored_elements(&nodes);
@@ -600,15 +553,9 @@ impl DataPoint {
     pub fn open(dir: &path::Path, uid: DpId) -> VectorR<DataPoint> {
         let uid = uid.to_string();
         let id = dir.join(uid);
-        let nodes = fs::OpenOptions::new()
-            .read(true)
-            .open(id.join(file_names::NODES))?;
-        let journal = fs::OpenOptions::new()
-            .read(true)
-            .open(id.join(file_names::JOURNAL))?;
-        let hnswf = fs::OpenOptions::new()
-            .read(true)
-            .open(id.join(file_names::HNSW))?;
+        let nodes = fs::OpenOptions::new().read(true).open(id.join(file_names::NODES))?;
+        let journal = fs::OpenOptions::new().read(true).open(id.join(file_names::JOURNAL))?;
+        let hnswf = fs::OpenOptions::new().read(true).open(id.join(file_names::HNSW))?;
 
         let nodes = unsafe { Mmap::map(&nodes)? };
         let index = unsafe { Mmap::map(&hnswf)? };
@@ -616,13 +563,9 @@ impl DataPoint {
 
         let fst_dir = id.join(file_names::FST);
 
-        let (label_index, key_index) = if LabelIndex::exists(&fst_dir) && KeyIndex::exists(&fst_dir)
-        {
+        let (label_index, key_index) = if LabelIndex::exists(&fst_dir) && KeyIndex::exists(&fst_dir) {
             debug!("Found FSTs on disk");
-            (
-                Some(LabelIndex::open(&fst_dir)?),
-                Some(KeyIndex::open(&fst_dir)?),
-            )
+            (Some(LabelIndex::open(&fst_dir)?), Some(KeyIndex::open(&fst_dir)?))
         } else {
             (None, None)
         };
@@ -643,10 +586,7 @@ impl DataPoint {
         })
     }
 
-    fn create_fsts(
-        root_dir: &path::Path,
-        nodes: &[u8],
-    ) -> VectorR<(Option<LabelIndex>, Option<KeyIndex>)> {
+    fn create_fsts(root_dir: &path::Path, nodes: &[u8]) -> VectorR<(Option<LabelIndex>, Option<KeyIndex>)> {
         let no_nodes = data_store::stored_elements(nodes);
 
         // building the KeyIndex and LabelIndex FSTs
@@ -707,21 +647,10 @@ impl DataPoint {
         let uid = DpId::new_v4().to_string();
         let id = dir.join(&uid);
         fs::create_dir(&id)?;
-        let mut nodesf = fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(id.join(file_names::NODES))?;
-        let mut journalf = fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(id.join(file_names::JOURNAL))?;
-        let mut hnswf = fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(id.join(file_names::HNSW))?;
+        let mut nodesf = fs::OpenOptions::new().read(true).write(true).create(true).open(id.join(file_names::NODES))?;
+        let mut journalf =
+            fs::OpenOptions::new().read(true).write(true).create(true).open(id.join(file_names::JOURNAL))?;
+        let mut hnswf = fs::OpenOptions::new().read(true).write(true).create(true).open(id.join(file_names::HNSW))?;
 
         // Serializing nodes on disk
         // Nodes are stored on disk and mmaped.

@@ -53,7 +53,7 @@ def predict_response():
 @pytest.fixture(scope="function")
 def predict(predict_response):
     predict_engine = Mock()
-    predict_engine.get_predict_headers = AsyncMock(return_value={})
+    predict_engine.get_predict_headers = Mock(return_value={})
     predict_engine.make_request = AsyncMock(return_value=predict_response)
     with patch(f"{MODULE}.get_predict", return_value=predict_engine):
         yield predict_engine

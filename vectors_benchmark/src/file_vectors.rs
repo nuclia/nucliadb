@@ -29,15 +29,19 @@ pub struct FileVectors<Contents> {
 }
 
 impl<Contents> FileVectors<Contents>
-where Contents: Read
+where
+    Contents: Read,
 {
     pub fn new(reader: Contents) -> FileVectors<Contents> {
-        FileVectors { reader }
+        FileVectors {
+            reader,
+        }
     }
 }
 
 impl<Contents> Iterator for FileVectors<Contents>
-where Contents: Read
+where
+    Contents: Read,
 {
     type Item = Vec<f32>;
     fn next(&mut self) -> Option<Self::Item> {
@@ -100,7 +104,10 @@ mod test {
         for i in V3 {
             buf.write_all(&i.to_le_bytes()).unwrap();
         }
-        let vec_reader = VecReader { idx: 0, buf: &buf };
+        let vec_reader = VecReader {
+            idx: 0,
+            buf: &buf,
+        };
         let mut iter = FileVectors::new(vec_reader);
         let v1 = iter.next();
         assert_eq!(v1.as_deref(), Some(V1.as_slice()));

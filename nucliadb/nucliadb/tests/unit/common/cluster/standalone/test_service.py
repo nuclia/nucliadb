@@ -22,6 +22,8 @@ import tempfile
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from nucliadb_protos.noderesources_pb2 import ShardId
+from nucliadb_protos.utils_pb2 import RelationNode
 
 from nucliadb.common.cluster.settings import Settings
 from nucliadb.common.cluster.standalone import service
@@ -48,6 +50,20 @@ def self_node(cluster_settings):
     self_node.writer = AsyncMock()
     self_node.reader.Search.return_value = nodereader_pb2.SearchResponse()
 
+    relation_types = nodereader_pb2.TypeList()
+    member = nodereader_pb2.RelationTypeListMember(
+        with_type=RelationNode.NodeType.ENTITY, with_subtype="foo"
+    )
+    relation_types.list.append(member)
+    self_node.reader.RelationTypes.return_value = relation_types
+
+    relation_edges = nodereader_pb2.EdgeList()
+    edge = nodereader_pb2.RelationEdge(
+        edge_type=RelationNode.NodeType.ENTITY, property="foo"
+    )
+    relation_edges.list.append(edge)
+    self_node.reader.RelationEdges.return_value = relation_edges
+
     with patch("nucliadb.common.cluster.standalone.service.get_self") as mock_get_self:
         mock_get_self.return_value = self_node
         yield self_node
@@ -73,6 +89,36 @@ async def test_node_action(
     )
     assert resp == standalone_pb2.NodeActionResponse(
         payload=self_node.reader.Search.return_value.SerializeToString()
+    )
+
+
+async def test_reader_node_action_relations(
+    servicer: service.StandaloneClusterServiceServicer,
+    self_node,
+    cluster_settings,
+):
+    resp = await servicer.NodeAction(
+        standalone_pb2.NodeActionRequest(
+            service="reader",
+            action="RelationTypes",
+            payload=ShardId(id="test").SerializeToString(),
+        ),
+        None,
+    )
+    assert resp == standalone_pb2.NodeActionResponse(
+        payload=self_node.reader.RelationTypes.return_value.SerializeToString()
+    )
+
+    resp = await servicer.NodeAction(
+        standalone_pb2.NodeActionRequest(
+            service="reader",
+            action="RelationEdges",
+            payload=ShardId(id="test").SerializeToString(),
+        ),
+        None,
+    )
+    assert resp == standalone_pb2.NodeActionResponse(
+        payload=self_node.reader.RelationEdges.return_value.SerializeToString()
     )
 
 

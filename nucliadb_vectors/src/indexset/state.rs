@@ -58,7 +58,9 @@ impl State {
         }
     }
     pub fn get_or_create<'a, S>(&mut self, index: S, similarity: Similarity) -> VectorR<Index>
-    where S: Into<Cow<'a, str>> {
+    where
+        S: Into<Cow<'a, str>>,
+    {
         let index: Cow<_> = index.into();
         if self.indexes.contains(index.as_ref()) {
             let index = index.as_ref();
@@ -90,15 +92,9 @@ mod test {
     fn basic_functionality_test() {
         let dir = TempDir::new().unwrap();
         let mut vectorset = State::new(dir.path().to_path_buf());
-        let _index1 = vectorset
-            .get_or_create("Index1".to_string(), Similarity::Cosine)
-            .unwrap();
-        let _index2 = vectorset
-            .get_or_create("Index2".to_string(), Similarity::Cosine)
-            .unwrap();
-        let _index3 = vectorset
-            .get_or_create("Index3".to_string(), Similarity::Cosine)
-            .unwrap();
+        let _index1 = vectorset.get_or_create("Index1".to_string(), Similarity::Cosine).unwrap();
+        let _index2 = vectorset.get_or_create("Index2".to_string(), Similarity::Cosine).unwrap();
+        let _index3 = vectorset.get_or_create("Index3".to_string(), Similarity::Cosine).unwrap();
         assert!(vectorset.get("Index1").unwrap().is_some());
         assert!(vectorset.get("Index2").unwrap().is_some());
         assert!(vectorset.get("Index3").unwrap().is_some());

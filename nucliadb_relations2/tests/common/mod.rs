@@ -40,11 +40,7 @@ pub fn create_relation(
     rel_type: RelationType,
 ) -> Relation {
     Relation {
-        source: Some(create_relation_node(
-            source,
-            source_node_type,
-            source_subtype,
-        )),
+        source: Some(create_relation_node(source, source_node_type, source_subtype)),
         to: Some(create_relation_node(to, to_node_type, to_subtype)),
         relation: rel_type.into(),
         relation_label: "relation_label".to_string(),

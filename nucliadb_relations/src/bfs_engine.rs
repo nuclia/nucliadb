@@ -50,7 +50,8 @@ struct BfsNode {
 #[derive(derive_builder::Builder)]
 #[builder(name = "BfsEngineBuilder", pattern = "owned")]
 pub struct BfsEngine<'a, Guide>
-where Guide: BfsGuide
+where
+    Guide: BfsGuide,
 {
     #[builder(setter(skip))]
     #[builder(default = "LinkedList::new()")]
@@ -72,20 +73,30 @@ where Guide: BfsGuide
 }
 
 impl<'a, Guide> BfsEngineBuilder<'a, Guide>
-where Guide: BfsGuide
+where
+    Guide: BfsGuide,
 {
     pub fn new() -> BfsEngineBuilder<'a, Guide> {
         BfsEngineBuilder::create_empty()
     }
 }
 impl<'a, Guide> BfsEngine<'a, Guide>
-where Guide: BfsGuide
+where
+    Guide: BfsGuide,
 {
     pub fn search(mut self) -> RResult<impl Iterator<Item = GCnx>> {
         self.entry_points
             .iter()
             .copied()
-            .map(|point| (BfsNode { point, depth: 0 }, self.visited.insert(point)))
+            .map(|point| {
+                (
+                    BfsNode {
+                        point,
+                        depth: 0,
+                    },
+                    self.visited.insert(point),
+                )
+            })
             .filter(|(_, v)| *v)
             .for_each(|(e, _)| self.work_stack.push_back(e));
         while let Some(node) = self.work_stack.pop_front() {
@@ -160,22 +171,12 @@ mod test {
     fn graph(dir: &Path) -> (Vec<Entity>, GraphDB) {
         let graphdb = GraphDB::new(dir, SIZE).unwrap();
         let mut txn = graphdb.rw_txn().unwrap();
-        let ids = UNodes
-            .take(4)
-            .map(|node| graphdb.add_node(&mut txn, &node).unwrap())
-            .collect::<Vec<_>>();
-        UEdges
-            .take(ids.len() - 1)
-            .enumerate()
-            .for_each(|(i, edge)| {
-                graphdb
-                    .connect(&mut txn, ids[i], &edge, ids[i + 1], None)
-                    .unwrap();
-            });
+        let ids = UNodes.take(4).map(|node| graphdb.add_node(&mut txn, &node).unwrap()).collect::<Vec<_>>();
+        UEdges.take(ids.len() - 1).enumerate().for_each(|(i, edge)| {
+            graphdb.connect(&mut txn, ids[i], &edge, ids[i + 1], None).unwrap();
+        });
         let backedge = UEdges.next().unwrap();
-        graphdb
-            .connect(&mut txn, ids[3], &backedge, ids[0], None)
-            .unwrap();
+        graphdb.connect(&mut txn, ids[3], &backedge, ids[0], None).unwrap();
         txn.commit().unwrap();
         (ids, graphdb)
     }

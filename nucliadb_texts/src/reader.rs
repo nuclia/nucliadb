@@ -25,8 +25,8 @@ use itertools::Itertools;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::order_by::{OrderField, OrderType};
 use nucliadb_core::protos::{
-    DocumentItem, DocumentResult, DocumentSearchRequest, DocumentSearchResponse, FacetResult,
-    FacetResults, OrderBy, ResultScore, StreamRequest,
+    DocumentItem, DocumentResult, DocumentSearchRequest, DocumentSearchResponse, FacetResult, FacetResults, OrderBy,
+    ResultScore, StreamRequest,
 };
 use nucliadb_core::query_planner::{
     FieldDateType, PreFilterRequest, PreFilterResponse, ValidField, ValidFieldCollector,
@@ -58,7 +58,14 @@ fn produce_facets(facets: Vec<String>, facets_count: FacetCounts) -> HashMap<Str
         .map(|facet| (&facets_count, facet))
         .map(|(facets_count, facet)| (facet_count(&facet, facets_count), facet))
         .filter(|(r, _)| !r.is_empty())
-        .map(|(facetresults, facet)| (facet, FacetResults { facetresults }))
+        .map(|(facetresults, facet)| {
+            (
+                facet,
+                FacetResults {
+                    facetresults,
+                },
+            )
+        })
         .collect()
 }
 
@@ -81,10 +88,7 @@ pub struct TextReaderService {
 
 impl Debug for TextReaderService {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("FieldReaderService")
-            .field("index", &self.index)
-            .field("schema", &self.schema)
-            .finish()
+        f.debug_struct("FieldReaderService").field("index", &self.index).field("schema", &self.schema).finish()
     }
 }
 
@@ -116,27 +120,25 @@ impl FieldReader for TextReaderService {
             labels_queries.push(Box::new(term_query));
         }
 
-        let pre_filter_query: Box<dyn Query> = if created_queries.is_empty()
-            && modified_queries.is_empty()
-            && labels_queries.is_empty()
-        {
-            Box::new(AllQuery)
-        } else {
-            let mut subqueries = vec![];
-            if !created_queries.is_empty() {
-                let created_query: Box<dyn Query> = Box::new(BooleanQuery::new(created_queries));
-                subqueries.push(created_query);
-            }
-            if !modified_queries.is_empty() {
-                let modified_query: Box<dyn Query> = Box::new(BooleanQuery::new(modified_queries));
-                subqueries.push(modified_query);
-            }
-            if !labels_queries.is_empty() {
-                let labels_query = Box::new(BooleanQuery::intersection(labels_queries));
-                subqueries.push(labels_query);
-            }
-            Box::new(BooleanQuery::intersection(subqueries))
-        };
+        let pre_filter_query: Box<dyn Query> =
+            if created_queries.is_empty() && modified_queries.is_empty() && labels_queries.is_empty() {
+                Box::new(AllQuery)
+            } else {
+                let mut subqueries = vec![];
+                if !created_queries.is_empty() {
+                    let created_query: Box<dyn Query> = Box::new(BooleanQuery::new(created_queries));
+                    subqueries.push(created_query);
+                }
+                if !modified_queries.is_empty() {
+                    let modified_query: Box<dyn Query> = Box::new(BooleanQuery::new(modified_queries));
+                    subqueries.push(modified_query);
+                }
+                if !labels_queries.is_empty() {
+                    let labels_query = Box::new(BooleanQuery::intersection(labels_queries));
+                    subqueries.push(labels_query);
+                }
+                Box::new(BooleanQuery::intersection(subqueries))
+            };
         let searcher = self.reader.searcher();
         let docs_fulfilled = searcher.search(&pre_filter_query, &DocSetCollector)?;
 
@@ -257,15 +259,13 @@ impl TextReaderService {
             OrderType::Desc => |t: u64| t,
             OrderType::Asc => |t: u64| u64::MAX - t,
         };
-        TopDocs::with_limit(limit).and_offset(offset).custom_score(
-            move |segment_reader: &SegmentReader| {
-                let reader = match order.sort_by() {
-                    OrderField::Created => segment_reader.fast_fields().date(created).unwrap(),
-                    OrderField::Modified => segment_reader.fast_fields().date(modified).unwrap(),
-                };
-                move |doc: DocId| sorter(reader.get(doc).to_u64())
-            },
-        )
+        TopDocs::with_limit(limit).and_offset(offset).custom_score(move |segment_reader: &SegmentReader| {
+            let reader = match order.sort_by() {
+                OrderField::Created => segment_reader.fast_fields().date(created).unwrap(),
+                OrderField::Modified => segment_reader.fast_fields().date(modified).unwrap(),
+            };
+            move |doc: DocId| sorter(reader.get(doc).to_u64())
+        })
     }
 
     #[tracing::instrument(skip_all)]
@@ -276,10 +276,7 @@ impl TextReaderService {
         let field_schema = TextSchema::new();
         let index = Index::open_in_dir(&config.path)?;
 
-        let reader = index
-            .reader_builder()
-            .reload_policy(ReloadPolicy::OnCommit)
-            .try_into()?;
+        let reader = index.reader_builder().reload_policy(ReloadPolicy::OnCommit).try_into()?;
 
         Ok(TextReaderService {
             index,
@@ -288,11 +285,7 @@ impl TextReaderService {
         })
     }
 
-    fn convert_int_order(
-        &self,
-        response: SearchResponse<u64>,
-        searcher: &Searcher,
-    ) -> DocumentSearchResponse {
+    fn convert_int_order(&self, response: SearchResponse<u64>, searcher: &Searcher) -> DocumentSearchResponse {
         let total = response.total as i32;
         let retrieved_results = (response.page_number + 1) * response.results_per_page;
         let next_page = total > retrieved_results;
@@ -349,20 +342,12 @@ impl TextReaderService {
         }
     }
 
-    fn convert_bm25_order(
-        &self,
-        response: SearchResponse<f32>,
-        searcher: &Searcher,
-    ) -> DocumentSearchResponse {
+    fn convert_bm25_order(&self, response: SearchResponse<f32>, searcher: &Searcher) -> DocumentSearchResponse {
         let total = response.total as i32;
         let retrieved_results = (response.page_number + 1) * response.results_per_page;
         let next_page = total > retrieved_results;
         let results_per_page = response.results_per_page as usize;
-        let result_stream = response
-            .top_docs
-            .into_iter()
-            .take(results_per_page)
-            .enumerate();
+        let result_stream = response.top_docs.into_iter().take(results_per_page).enumerate();
 
         let mut results = Vec::with_capacity(results_per_page);
         for (id, (score, doc_address)) in result_stream {
@@ -443,11 +428,8 @@ impl TextReaderService {
             query_parser
         };
         let text = TextReaderService::adapt_text(&query_parser, &request.body);
-        let advanced_query = request
-            .advanced_query
-            .as_ref()
-            .map(|query| query_parser.parse_query(query))
-            .transpose()?;
+        let advanced_query =
+            request.advanced_query.as_ref().map(|query| query_parser.parse_query(query)).transpose()?;
         let query = create_query(&query_parser, request, &self.schema, &text, advanced_query);
 
         // Offset to search from
@@ -455,11 +437,8 @@ impl TextReaderService {
         let offset = results * request.page_number as usize;
         let extra_result = results + 1;
         let maybe_order = request.order.clone();
-        let valid_facet_iter = request.faceted.iter().flat_map(|v| {
-            v.labels
-                .iter()
-                .filter(|s| TextReaderService::is_valid_facet(s))
-        });
+        let valid_facet_iter =
+            request.faceted.iter().flat_map(|v| v.labels.iter().filter(|s| TextReaderService::is_valid_facet(s)));
 
         let mut facets = vec![];
         let mut facet_collector = FacetCollector::for_field(self.schema.facets);

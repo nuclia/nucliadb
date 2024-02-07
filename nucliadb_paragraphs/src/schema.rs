@@ -21,9 +21,7 @@ use nucliadb_core::protos::prost::Message;
 use nucliadb_core::protos::prost_types::Timestamp;
 use nucliadb_core::protos::ParagraphMetadata;
 use tantivy::chrono::{DateTime, NaiveDateTime, Utc};
-use tantivy::schema::{
-    Cardinality, FacetOptions, Field, NumericOptions, Schema, STORED, STRING, TEXT,
-};
+use tantivy::schema::{Cardinality, FacetOptions, Field, NumericOptions, Schema, STORED, STRING, TEXT};
 use tantivy::Document;
 
 #[derive(Debug, Clone)]
@@ -58,8 +56,7 @@ pub struct ParagraphSchema {
 }
 
 pub fn timestamp_to_datetime_utc(timestamp: &Timestamp) -> DateTime<Utc> {
-    let naive =
-        NaiveDateTime::from_timestamp_opt(timestamp.seconds, timestamp.nanos as u32).unwrap();
+    let naive = NaiveDateTime::from_timestamp_opt(timestamp.seconds, timestamp.nanos as u32).unwrap();
     DateTime::from_naive_utc_and_offset(naive, tantivy::chrono::Utc)
 }
 
@@ -70,26 +67,17 @@ impl ParagraphSchema {
 
     /// Returns the paragraph metadata for the given document, if any.
     pub fn metadata(&self, doc: &Document) -> Option<ParagraphMetadata> {
-        doc.get_first(self.metadata)
-            .and_then(|value| ParagraphMetadata::decode(value.as_bytes()?).ok())
+        doc.get_first(self.metadata).and_then(|value| ParagraphMetadata::decode(value.as_bytes()?).ok())
     }
 }
 
 impl Default for ParagraphSchema {
     fn default() -> Self {
         let mut sb = Schema::builder();
-        let num_options: NumericOptions = NumericOptions::default()
-            .set_stored()
-            .set_fast(Cardinality::SingleValue);
+        let num_options: NumericOptions = NumericOptions::default().set_stored().set_fast(Cardinality::SingleValue);
 
-        let date_options = NumericOptions::default()
-            .set_indexed()
-            .set_stored()
-            .set_fast(Cardinality::SingleValue);
-        let repeated_options = NumericOptions::default()
-            .set_indexed()
-            .set_stored()
-            .set_fast(Cardinality::SingleValue);
+        let date_options = NumericOptions::default().set_indexed().set_stored().set_fast(Cardinality::SingleValue);
+        let repeated_options = NumericOptions::default().set_indexed().set_stored().set_fast(Cardinality::SingleValue);
         let facet_options = FacetOptions::default().set_stored();
 
         let uuid = sb.add_text_field("uuid", STRING | STORED);

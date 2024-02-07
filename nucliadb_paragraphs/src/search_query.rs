@@ -64,7 +64,11 @@ impl TermCollector {
             let term_dict = index.terms();
             let mut term_s = vec![];
             let found = term_dict.ord_to_term(term, &mut term_s).unwrap_or(false);
-            let elem = if found { term_s } else { vec![] };
+            let elem = if found {
+                term_s
+            } else {
+                vec![]
+            };
             match String::from_utf8(elem).ok() {
                 Some(v) if v.len() > 2 => terms.push(v),
                 _ => (),
@@ -91,18 +95,11 @@ impl SharedTermC {
     }
 }
 
-fn term_to_fuzzy(
-    query: Box<dyn Query>,
-    distance: u8,
-    termc: SharedTermC,
-    as_prefix: bool,
-) -> Box<dyn Query> {
+fn term_to_fuzzy(query: Box<dyn Query>, distance: u8, termc: SharedTermC, as_prefix: bool) -> Box<dyn Query> {
     let term_query: &TermQuery = query.downcast_ref().unwrap();
     let term = term_query.term().clone();
     let term_as_str = term.as_str();
-    let should_be_prefixed = term_as_str
-        .map(|s| as_prefix && s.len() > 3)
-        .unwrap_or_default();
+    let should_be_prefixed = term_as_str.map(|s| as_prefix && s.len() > 3).unwrap_or_default();
     if should_be_prefixed {
         Box::new(FuzzyTermQuery::new_prefix(term, distance, true, termc))
     } else {
@@ -110,23 +107,13 @@ fn term_to_fuzzy(
     }
 }
 
-fn queryp_map(
-    queries: Vec<QueryP>,
-    distance: u8,
-    as_prefix: Option<usize>,
-    termc: SharedTermC,
-) -> Vec<QueryP> {
+fn queryp_map(queries: Vec<QueryP>, distance: u8, as_prefix: Option<usize>, termc: SharedTermC) -> Vec<QueryP> {
     queries
         .into_iter()
         .enumerate()
         .map(|(id, (_, query))| {
             let query = if query.is::<TermQuery>() {
-                term_to_fuzzy(
-                    query,
-                    distance,
-                    termc.clone(),
-                    as_prefix.map_or(false, |v| id == v),
-                )
+                term_to_fuzzy(query, distance, termc.clone(), as_prefix.map_or(false, |v| id == v))
             } else {
                 query
             };
@@ -136,11 +123,9 @@ fn queryp_map(
 }
 
 fn flat_bool_query(query: BooleanQuery, collector: (usize, Vec<QueryP>)) -> (usize, Vec<QueryP>) {
-    query
-        .clauses()
-        .iter()
-        .map(|(occur, subq)| (*occur, subq.box_clone()))
-        .fold(collector, |(mut id, mut c), (occur, subq)| {
+    query.clauses().iter().map(|(occur, subq)| (*occur, subq.box_clone())).fold(
+        collector,
+        |(mut id, mut c), (occur, subq)| {
             if subq.is::<BooleanQuery>() {
                 let subq: Box<BooleanQuery> = subq.downcast().unwrap();
                 flat_bool_query(*subq, (id, c))
@@ -152,15 +137,11 @@ fn flat_bool_query(query: BooleanQuery, collector: (usize, Vec<QueryP>)) -> (usi
                 c.push((occur, subq));
                 (id, c)
             }
-        })
+        },
+    )
 }
 
-fn flat_and_adapt(
-    query: Box<dyn Query>,
-    prefixed: bool,
-    distance: u8,
-    termc: SharedTermC,
-) -> Vec<QueryP> {
+fn flat_and_adapt(query: Box<dyn Query>, prefixed: bool, distance: u8, termc: SharedTermC) -> Vec<QueryP> {
     let (queries, as_prefix) = if query.is::<BooleanQuery>() {
         let query: Box<BooleanQuery> = query.downcast().unwrap();
         let (as_prefix, queries) = flat_bool_query(*query, (usize::MAX, vec![]));
@@ -177,17 +158,16 @@ fn flat_and_adapt(
     queryp_map(
         queries,
         distance,
-        if prefixed { Some(as_prefix) } else { None },
+        if prefixed {
+            Some(as_prefix)
+        } else {
+            None
+        },
         termc,
     )
 }
 
-fn fuzzied_queries(
-    query: Box<dyn Query>,
-    prefixed: bool,
-    distance: u8,
-    termc: SharedTermC,
-) -> Vec<QueryP> {
+fn fuzzied_queries(query: Box<dyn Query>, prefixed: bool, distance: u8, termc: SharedTermC) -> Vec<QueryP> {
     if query.is::<AllQuery>() {
         vec![]
     } else {
@@ -199,10 +179,7 @@ fn parse_query(parser: &QueryParser, text: &str) -> Box<dyn Query> {
     if text.is_empty() {
         Box::new(AllQuery) as Box<dyn Query>
     } else {
-        parser
-            .parse_query(text)
-            .ok()
-            .unwrap_or_else(|| Box::new(AllQuery))
+        parser.parse_query(text).ok().unwrap_or_else(|| Box::new(AllQuery))
     }
 }
 
@@ -215,12 +192,9 @@ fn parse_query(parser: &QueryParser, text: &str) -> Box<dyn Query> {
 /// The last term of the query is a prefix fuzzy term and must be preserved.
 fn remove_stop_words(query: &str) -> Cow<'_, str> {
     match query.rsplit_once(' ') {
-        Some((query, last_term)) => query
-            .split(' ')
-            .filter(|term| !is_stop_word(&term.to_lowercase()))
-            .chain([last_term])
-            .join(" ")
-            .into(),
+        Some((query, last_term)) => {
+            query.split(' ').filter(|term| !is_stop_word(&term.to_lowercase())).chain([last_term]).join(" ").into()
+        }
         None => query.into(),
     }
 }
@@ -248,10 +222,7 @@ fn preprocess_raw_query(query: &str, tc: &mut TermCollector) -> ProcessedQuery {
         let unquote = query[start..qstart].trim();
         let unquote = remove_stop_words(unquote);
 
-        unquote
-            .split(' ')
-            .filter(|s| !s.is_empty())
-            .for_each(|t| tc.log_eterm(t.to_string()));
+        unquote.split(' ').filter(|s| !s.is_empty()).for_each(|t| tc.log_eterm(t.to_string()));
         tc.log_eterm(quote.to_string());
 
         if !regular_query.is_empty() {
@@ -274,9 +245,7 @@ fn preprocess_raw_query(query: &str, tc: &mut TermCollector) -> ProcessedQuery {
         let tail = query[start..].trim();
         let tail = remove_stop_words(tail);
 
-        tail.split(' ')
-            .filter(|s| !s.is_empty())
-            .for_each(|t| tc.log_eterm(t.to_string()));
+        tail.split(' ').filter(|s| !s.is_empty()).for_each(|t| tc.log_eterm(t.to_string()));
 
         if !regular_query.is_empty() {
             regular_query.push(' ');
@@ -410,11 +379,8 @@ pub fn search_query(
             time_ranges.from_modified.clone(),
             time_ranges.to_modified.clone(),
         );
-        let created = produce_date_range_query(
-            schema.created,
-            time_ranges.from_created.clone(),
-            time_ranges.to_created.clone(),
-        );
+        let created =
+            produce_date_range_query(schema.created, time_ranges.from_created.clone(), time_ranges.to_created.clone());
 
         if let Some(modified) = modified {
             fuzzies.push((Occur::Must, Box::new(modified.clone())));
@@ -562,32 +528,21 @@ mod tests {
 
     #[test]
     fn test() {
-        let subqueries0: Vec<_> = vec![dummy_term_query; 12]
-            .into_iter()
-            .map(|f| (Occur::Must, f()))
-            .collect();
-        let subqueries1: Vec<_> = vec![dummy_term_query; 12]
-            .into_iter()
-            .map(|f| (Occur::Must, f()))
-            .collect();
+        let subqueries0: Vec<_> = vec![dummy_term_query; 12].into_iter().map(|f| (Occur::Must, f())).collect();
+        let subqueries1: Vec<_> = vec![dummy_term_query; 12].into_iter().map(|f| (Occur::Must, f())).collect();
         let boolean0: Box<dyn Query> = Box::new(BooleanQuery::new(subqueries0));
         let boolean1: Box<dyn Query> = Box::new(BooleanQuery::new(subqueries1));
         let nested = BooleanQuery::new(vec![(Occur::Should, boolean0), (Occur::Should, boolean1)]);
         let adapted = flat_and_adapt(Box::new(nested), true, 2, SharedTermC::new());
         assert_eq!(adapted.len(), 24);
         assert!(adapted.iter().all(|(occur, _)| *occur == Occur::Must));
-        assert!(adapted
-            .iter()
-            .all(|(_, query)| query.is::<FuzzyTermQuery>()));
+        assert!(adapted.iter().all(|(_, query)| query.is::<FuzzyTermQuery>()));
     }
 
     #[test]
     fn it_removes_stop_word_fterms() {
         let tests = [
-            (
-                "nuclia is a database for unstructured data",
-                "nuclia database unstructured data",
-            ),
+            ("nuclia is a database for unstructured data", "nuclia database unstructured data"),
             (
                 "nuclia is a database for the",
                 // keeps last term even if is a stop word
@@ -596,31 +551,16 @@ mod tests {
             ("is a for and", "and"),
             ("what does stop is?", "stop is?"),
             ("", ""),
-            (
-                "comment s'appelle le train à grande vitesse",
-                "comment s'appelle train grande vitesse",
-            ),
-            (
-                "¿Qué significa la palabra sentence en español?",
-                "¿Qué significa palabra sentence español?",
-            ),
-            (
-                "Per què les vaques no són de color rosa?",
-                "vaques color rosa?",
-            ),
-            (
-                "How can I learn to make a flat white?",
-                "learn make flat white?",
-            ),
+            ("comment s'appelle le train à grande vitesse", "comment s'appelle train grande vitesse"),
+            ("¿Qué significa la palabra sentence en español?", "¿Qué significa palabra sentence español?"),
+            ("Per què les vaques no són de color rosa?", "vaques color rosa?"),
+            ("How can I learn to make a flat white?", "learn make flat white?"),
             ("Qué es escalada en bloque?", "escalada bloque?"),
             (
                 "Wer hat gesagt: 'Kaffeetrinken ist integraler Bestandteil des Kletterns'?",
                 "Wer gesagt: 'Kaffeetrinken integraler Bestandteil Kletterns'?",
             ),
-            (
-                "i pistacchi siciliani sono i migliori al mondo?",
-                "pistacchi siciliani migliori mondo?",
-            ),
+            ("i pistacchi siciliani sono i migliori al mondo?", "pistacchi siciliani migliori mondo?"),
         ];
 
         for (query, expected_fuzzy_query) in tests {

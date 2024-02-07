@@ -31,11 +31,6 @@ async def test_kb_management(sdk_async: nucliadb_sdk.NucliaDBAsync):
 
 
 async def test_kb_services(sdk_async: nucliadb_sdk.NucliaDBAsync, kb):
-    # Configuration
-    await sdk_async.set_configuration(kbid=kb.uuid, semantic_model="foo")
-    await sdk_async.get_configuration(kbid=kb.uuid)
-    await sdk_async.delete_configuration(kbid=kb.uuid)
-
     # Labels
     await sdk_async.set_labelset(kbid=kb.uuid, labelset="foo", title="Bar")
     await sdk_async.get_labelset(kbid=kb.uuid, labelset="foo")

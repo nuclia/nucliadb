@@ -32,24 +32,17 @@ impl From<NodeMetadata> for nucliadb_core::protos::NodeMetadata {
     fn from(node_metadata: NodeMetadata) -> Self {
         nucliadb_core::protos::NodeMetadata {
             shard_count: node_metadata.shard_count,
-            node_id: utils::read_host_key(node_metadata.settings.host_key_path())
-                .unwrap()
-                .to_string(),
+            node_id: utils::read_host_key(node_metadata.settings.host_key_path()).unwrap().to_string(),
             primary_node_id: get_primary_node_id(node_metadata.settings.data_path()),
             ..Default::default()
         }
     }
 }
 
-pub fn create_node_metadata_pb(
-    settings: Settings,
-    node_metadata: NodeMetadata,
-) -> nucliadb_core::protos::NodeMetadata {
+pub fn create_node_metadata_pb(settings: Settings, node_metadata: NodeMetadata) -> nucliadb_core::protos::NodeMetadata {
     nucliadb_core::protos::NodeMetadata {
         shard_count: node_metadata.shard_count,
-        node_id: utils::read_host_key(settings.host_key_path())
-            .unwrap()
-            .to_string(),
+        node_id: utils::read_host_key(settings.host_key_path()).unwrap().to_string(),
         primary_node_id: get_primary_node_id(settings.data_path()),
         ..Default::default()
     }
@@ -59,11 +52,7 @@ impl NodeMetadata {
     pub async fn new(settings: Settings) -> NodeResult<Self> {
         Ok(Self {
             settings: settings.clone(),
-            shard_count: list_shards(settings.shards_path())
-                .await
-                .len()
-                .try_into()
-                .unwrap(),
+            shard_count: list_shards(settings.shards_path()).await.len().try_into().unwrap(),
         })
     }
 

@@ -74,9 +74,7 @@ impl TokioRuntimeObserver {
         let mut intervals = self.unpoisoned_intervals()?;
         match intervals.next() {
             Some(metrics) => Ok(metrics),
-            None => Err(node_error!(
-                "Cannot export tokio runtime metrics, iterator didn't return values"
-            )),
+            None => Err(node_error!("Cannot export tokio runtime metrics, iterator didn't return values")),
         }
     }
 
@@ -85,14 +83,12 @@ impl TokioRuntimeObserver {
             match intervals.try_lock() {
                 Ok(intervals) => Ok(intervals),
                 Err(TryLockError::Poisoned(inner)) => Ok(inner.into_inner()),
-                Err(TryLockError::WouldBlock) => Err(node_error!(
-                    "Cannot acquire runtime metrics lock. There's a concurrent export going on?"
-                )),
+                Err(TryLockError::WouldBlock) => {
+                    Err(node_error!("Cannot acquire runtime metrics lock. There's a concurrent export going on?"))
+                }
             }
         } else {
-            Err(node_error!(
-                "Cannot export tokio runtime metrics, no runtime available"
-            ))
+            Err(node_error!("Cannot export tokio runtime metrics, no runtime available"))
         }
     }
 }
@@ -151,8 +147,8 @@ pub struct TokioRuntimeMetrics {
 // production, we should reconsider changing them and customize for every
 // Histogram metric
 const BUCKETS: [f64; 15] = [
-    0.000010, 0.000025, 0.000050, 0.000100, 0.000250, 0.000500, 0.001, 0.002, 0.005, 0.010, 0.100,
-    0.250, 0.500, 1.0, 5.0,
+    0.000010, 0.000025, 0.000050, 0.000100, 0.000250, 0.000500, 0.001, 0.002, 0.005, 0.010, 0.100, 0.250, 0.500, 1.0,
+    5.0,
 ];
 
 impl TokioRuntimeMetrics {
@@ -402,11 +398,7 @@ impl TokioRuntimeMetrics {
         );
 
         let elapsed = Histogram::new(BUCKETS.iter().copied());
-        registry.register(
-            "elapsed",
-            "Total amount of time elapsed since observing runtime metrics",
-            elapsed.clone(),
-        );
+        registry.register("elapsed", "Total amount of time elapsed since observing runtime metrics", elapsed.clone());
 
         let budget_forced_yield_count = Gauge::default();
         registry.register(
@@ -438,11 +430,7 @@ impl TokioRuntimeMetrics {
         );
 
         let active_tasks_count = Gauge::default();
-        registry.register(
-            "active_tasks_count",
-            "Number of active tasks in the runtime",
-            active_tasks_count.clone(),
-        );
+        registry.register("active_tasks_count", "Number of active tasks in the runtime", active_tasks_count.clone());
 
         let blocking_queue_depth = Gauge::default();
         registry.register(
@@ -453,11 +441,7 @@ impl TokioRuntimeMetrics {
         );
 
         let busy_ratio = Gauge::default();
-        registry.register(
-            "busy_ratio",
-            "Busy ratio during scrapes (busy duration / elapsed)",
-            busy_ratio.clone(),
-        );
+        registry.register("busy_ratio", "Busy ratio during scrapes (busy duration / elapsed)", busy_ratio.clone());
 
         let mean_polls_per_park = Gauge::default();
         registry.register(
@@ -512,84 +496,53 @@ impl TokioRuntimeMetrics {
         }
     }
 
-    fn update(
-        &self,
-        raw_metrics: tokio::runtime::RuntimeMetrics,
-        metrics: tokio_metrics::RuntimeMetrics,
-    ) {
+    fn update(&self, raw_metrics: tokio::runtime::RuntimeMetrics, metrics: tokio_metrics::RuntimeMetrics) {
         self.workers_count.set(metrics.workers_count as i64);
         self.total_park_count.inc_by(metrics.total_park_count);
         self.max_park_count.set(metrics.total_park_count as i64);
         self.min_park_count.set(metrics.min_park_count as i64);
-        self.mean_poll_duration
-            .observe(metrics.mean_poll_duration.as_secs_f64());
-        self.mean_poll_duration_worker_min
-            .observe(metrics.mean_poll_duration_worker_min.as_secs_f64());
-        self.mean_poll_duration_worker_max
-            .observe(metrics.mean_poll_duration_worker_max.as_secs_f64());
+        self.mean_poll_duration.observe(metrics.mean_poll_duration.as_secs_f64());
+        self.mean_poll_duration_worker_min.observe(metrics.mean_poll_duration_worker_min.as_secs_f64());
+        self.mean_poll_duration_worker_max.observe(metrics.mean_poll_duration_worker_max.as_secs_f64());
         self.total_noop_count.inc_by(metrics.total_noop_count);
         self.max_noop_count.set(metrics.max_noop_count as i64);
         self.min_noop_count.set(metrics.min_noop_count as i64);
         self.total_steal_count.inc_by(metrics.total_steal_count);
         self.max_steal_count.set(metrics.max_steal_count as i64);
         self.min_steal_count.set(metrics.min_steal_count as i64);
-        self.total_steal_operations
-            .inc_by(metrics.total_steal_operations);
-        self.max_steal_operations
-            .set(metrics.max_steal_operations as i64);
-        self.min_steal_operations
-            .set(metrics.min_steal_operations as i64);
-        self.num_remote_schedules
-            .set(metrics.num_remote_schedules as i64);
-        self.total_local_schedule_count
-            .inc_by(metrics.total_local_schedule_count);
-        self.max_local_schedule_count
-            .set(metrics.max_local_schedule_count as i64);
-        self.min_local_schedule_count
-            .set(metrics.min_local_schedule_count as i64);
-        self.total_overflow_count
-            .inc_by(metrics.total_overflow_count);
-        self.max_overflow_count
-            .set(metrics.max_overflow_count as i64);
-        self.min_overflow_count
-            .set(metrics.min_overflow_count as i64);
+        self.total_steal_operations.inc_by(metrics.total_steal_operations);
+        self.max_steal_operations.set(metrics.max_steal_operations as i64);
+        self.min_steal_operations.set(metrics.min_steal_operations as i64);
+        self.num_remote_schedules.set(metrics.num_remote_schedules as i64);
+        self.total_local_schedule_count.inc_by(metrics.total_local_schedule_count);
+        self.max_local_schedule_count.set(metrics.max_local_schedule_count as i64);
+        self.min_local_schedule_count.set(metrics.min_local_schedule_count as i64);
+        self.total_overflow_count.inc_by(metrics.total_overflow_count);
+        self.max_overflow_count.set(metrics.max_overflow_count as i64);
+        self.min_overflow_count.set(metrics.min_overflow_count as i64);
         self.total_polls_count.inc_by(metrics.total_polls_count);
         self.max_polls_count.set(metrics.max_polls_count as i64);
         self.min_polls_count.set(metrics.min_polls_count as i64);
-        self.total_busy_duration
-            .observe(metrics.total_busy_duration.as_secs_f64());
-        self.max_busy_duration
-            .observe(metrics.max_busy_duration.as_secs_f64());
-        self.min_busy_duration
-            .observe(metrics.min_busy_duration.as_secs_f64());
-        self.injection_queue_depth
-            .set(metrics.injection_queue_depth as i64);
-        self.total_local_queue_depth
-            .inc_by(metrics.total_local_queue_depth as u64);
-        self.max_local_queue_depth
-            .set(metrics.max_local_queue_depth as i64);
-        self.min_local_queue_depth
-            .set(metrics.min_local_queue_depth as i64);
+        self.total_busy_duration.observe(metrics.total_busy_duration.as_secs_f64());
+        self.max_busy_duration.observe(metrics.max_busy_duration.as_secs_f64());
+        self.min_busy_duration.observe(metrics.min_busy_duration.as_secs_f64());
+        self.injection_queue_depth.set(metrics.injection_queue_depth as i64);
+        self.total_local_queue_depth.inc_by(metrics.total_local_queue_depth as u64);
+        self.max_local_queue_depth.set(metrics.max_local_queue_depth as i64);
+        self.min_local_queue_depth.set(metrics.min_local_queue_depth as i64);
         self.elapsed.observe(metrics.elapsed.as_secs_f64());
-        self.budget_forced_yield_count
-            .set(metrics.budget_forced_yield_count as i64);
-        self.io_driver_ready_count
-            .set(metrics.io_driver_ready_count as i64);
+        self.budget_forced_yield_count.set(metrics.budget_forced_yield_count as i64);
+        self.io_driver_ready_count.set(metrics.io_driver_ready_count as i64);
 
-        self.blocking_threads_count
-            .set(raw_metrics.num_blocking_threads() as i64);
-        self.idle_blocking_threads_count
-            .set(raw_metrics.num_idle_blocking_threads() as i64);
-        self.active_tasks_count
-            .set(raw_metrics.active_tasks_count() as i64);
-        self.blocking_queue_depth
-            .set(raw_metrics.blocking_queue_depth() as i64);
+        self.blocking_threads_count.set(raw_metrics.num_blocking_threads() as i64);
+        self.idle_blocking_threads_count.set(raw_metrics.num_idle_blocking_threads() as i64);
+        self.active_tasks_count.set(raw_metrics.active_tasks_count() as i64);
+        self.blocking_queue_depth.set(raw_metrics.blocking_queue_depth() as i64);
 
         // Gauges are signed integers but our ratio is a float. We multiply by
         // 10^3 to get 3 decimals and lose less precision (it should be divided
         // by 1000 on its dashboard)
         self.busy_ratio.set((metrics.busy_ratio() * 1000.0) as i64);
-        self.mean_polls_per_park
-            .set((metrics.mean_polls_per_park() * 1000.0) as i64);
+        self.mean_polls_per_park.set((metrics.mean_polls_per_park() * 1000.0) as i64);
     }
 }

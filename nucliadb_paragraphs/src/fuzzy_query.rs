@@ -47,11 +47,7 @@ where
     A::State: Clone,
 {
     /// Create a new AutomationWeight
-    pub fn new<IntoArcA: Into<Arc<A>>>(
-        field: Field,
-        automaton: IntoArcA,
-        terms: SharedTermC,
-    ) -> AutomatonWeight<A> {
+    pub fn new<IntoArcA: Into<Arc<A>>>(field: Field, automaton: IntoArcA, terms: SharedTermC) -> AutomatonWeight<A> {
         AutomatonWeight {
             field,
             terms,
@@ -59,10 +55,7 @@ where
         }
     }
 
-    fn automaton_stream<'a>(
-        &'a self,
-        term_dict: &'a TermDictionary,
-    ) -> io::Result<TermStreamer<'a, &'a A>> {
+    fn automaton_stream<'a>(&'a self, term_dict: &'a TermDictionary) -> io::Result<TermStreamer<'a, &'a A>> {
         let automaton: &A = &self.automaton;
         let term_stream_builder = term_dict.search(automaton);
         term_stream_builder.into_stream()
@@ -84,8 +77,8 @@ where
         while term_stream.advance() {
             let term_key = term_stream.term_ord();
             let term_info = term_stream.value();
-            let mut block_segment_postings = inverted_index
-                .read_block_postings_from_terminfo(term_info, IndexRecordOption::Basic)?;
+            let mut block_segment_postings =
+                inverted_index.read_block_postings_from_terminfo(term_info, IndexRecordOption::Basic)?;
             loop {
                 let docs = block_segment_postings.docs();
                 if docs.is_empty() {
@@ -109,9 +102,7 @@ where
         if scorer.seek(doc) == doc {
             Ok(Explanation::new("AutomatonScorer", 1.0))
         } else {
-            Err(TantivyError::InvalidArgument(
-                "Document does not exist".to_string(),
-            ))
+            Err(TantivyError::InvalidArgument("Document does not exist".to_string()))
         }
     }
 }
@@ -177,12 +168,7 @@ impl std::fmt::Debug for FuzzyTermQuery {
 }
 impl FuzzyTermQuery {
     /// Creates a new Fuzzy Query
-    pub fn new(
-        term: Term,
-        distance: u8,
-        transposition_cost_one: bool,
-        termc: SharedTermC,
-    ) -> FuzzyTermQuery {
+    pub fn new(term: Term, distance: u8, transposition_cost_one: bool, termc: SharedTermC) -> FuzzyTermQuery {
         FuzzyTermQuery {
             term,
             termc,
@@ -193,12 +179,7 @@ impl FuzzyTermQuery {
     }
 
     /// Creates a new Fuzzy Query of the Term prefix
-    pub fn new_prefix(
-        term: Term,
-        distance: u8,
-        transposition_cost_one: bool,
-        termc: SharedTermC,
-    ) -> FuzzyTermQuery {
+    pub fn new_prefix(term: Term, distance: u8, transposition_cost_one: bool, termc: SharedTermC) -> FuzzyTermQuery {
         FuzzyTermQuery {
             term,
             termc,
@@ -214,20 +195,14 @@ impl FuzzyTermQuery {
             // Unwrap the option and build the Ok(AutomatonWeight)
             Some(automaton_builder) => {
                 let term_text = self.term.as_str().ok_or_else(|| {
-                    tantivy::TantivyError::InvalidArgument(
-                        "The fuzzy term query requires a string term.".to_string(),
-                    )
+                    tantivy::TantivyError::InvalidArgument("The fuzzy term query requires a string term.".to_string())
                 })?;
                 let automaton = if self.prefix {
                     automaton_builder.build_prefix_dfa(term_text)
                 } else {
                     automaton_builder.build_dfa(term_text)
                 };
-                Ok(AutomatonWeight::new(
-                    self.term.field(),
-                    DfaWrapper(automaton),
-                    self.termc.clone(),
-                ))
+                Ok(AutomatonWeight::new(self.term.field(), DfaWrapper(automaton), self.termc.clone()))
             }
             None => Err(InvalidArgument(format!(
                 "Levenshtein distance of {} is not allowed. Choose a value in the {:?} range",
@@ -238,11 +213,7 @@ impl FuzzyTermQuery {
 }
 
 impl Query for FuzzyTermQuery {
-    fn weight(
-        &self,
-        _searcher: &Searcher,
-        _scoring_enabled: bool,
-    ) -> tantivy::Result<Box<dyn Weight>> {
+    fn weight(&self, _searcher: &Searcher, _scoring_enabled: bool) -> tantivy::Result<Box<dyn Weight>> {
         Ok(Box::new(self.specialized_weight()?))
     }
 }

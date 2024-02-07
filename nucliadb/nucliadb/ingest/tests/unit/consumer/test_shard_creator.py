@@ -64,7 +64,7 @@ def shard_manager(reader):
         "nucliadb.ingest.consumer.shard_creator.get_shard_manager", return_value=sm
     ), patch(
         "nucliadb.ingest.consumer.shard_creator.choose_node",
-        return_value=(node, "shard_id", None),
+        return_value=(node, "shard_id"),
     ):
         yield sm
 

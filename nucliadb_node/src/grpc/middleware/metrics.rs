@@ -34,7 +34,9 @@ impl<S> Layer<S> for GrpcTasksMetricsLayer {
     type Service = GrpcTasksMetrics<S>;
 
     fn layer(&self, service: S) -> Self::Service {
-        GrpcTasksMetrics { inner: service }
+        GrpcTasksMetrics {
+            inner: service,
+        }
     }
 }
 
