@@ -40,35 +40,31 @@ struct NnfClause {
 
 /// A [`NnfExpression`] is one formed by using literals and [`NnfOperator`]s.
 /// Every propositional formula must be transformed to this form before it can
-/// be written in conjunctive normal form.
+/// be written in conjunctive normal form. This form has the following invariants:
+///     - Not is only applied to literals.
+///     - Nested applications of the same operator are flattened.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 enum NnfExpression {
     Clause(NnfClause),
     Literal(String),
 }
 
-fn transform_literal(negated: bool, literal: String) -> NnfExpression {
-    if !negated {
-        NnfExpression::Literal(literal)
-    } else {
-        NnfExpression::Clause(NnfClause {
-            operator: NnfOperator::Not,
-            operands: LinkedList::from([NnfExpression::Literal(literal)]),
-        })
-    }
-}
-
 fn transform_not(negated: bool, operand: JsonExpression) -> NnfExpression {
     transform(!negated, operand)
 }
 
-fn transform_other(negated: bool, operator: NnfOperator, json_operands: Vec<JsonExpression>) -> NnfExpression {
+fn transform_literal(negated: bool, literal: String) -> NnfExpression {
+    match negated {
+        false => NnfExpression::Literal(literal),
+        true => NnfExpression::Clause(NnfClause {
+            operator: NnfOperator::Not,
+            operands: LinkedList::from([NnfExpression::Literal(literal)]),
+        }),
+    }
+}
+
+fn transform_or(negated: bool, json_operands: Vec<JsonExpression>) -> NnfExpression {
     let mut operands = LinkedList::new();
-    let operator = match operator {
-        NnfOperator::And if negated => NnfOperator::Or,
-        NnfOperator::Or if negated => NnfOperator::And,
-        operator => operator,
-    };
 
     for json_operand in json_operands {
         let nnf_expression = transform(negated, json_operand);
@@ -76,7 +72,7 @@ fn transform_other(negated: bool, operator: NnfOperator, json_operands: Vec<Json
             operands.push_back(nnf_expression);
             continue;
         };
-        if clause.operator == operator {
+        if let NnfOperator::Or = clause.operator {
             operands.append(&mut clause.operands);
         } else {
             operands.push_back(NnfExpression::Clause(clause));
@@ -84,8 +80,30 @@ fn transform_other(negated: bool, operator: NnfOperator, json_operands: Vec<Json
     }
 
     NnfExpression::Clause(NnfClause {
-        operator,
         operands,
+        operator: NnfOperator::Or,
+    })
+}
+
+fn transform_and(negated: bool, json_operands: Vec<JsonExpression>) -> NnfExpression {
+    let mut operands = LinkedList::new();
+
+    for json_operand in json_operands {
+        let nnf_expression = transform(negated, json_operand);
+        let NnfExpression::Clause(mut clause) = nnf_expression else {
+            operands.push_back(nnf_expression);
+            continue;
+        };
+        if let NnfOperator::And = clause.operator {
+            operands.append(&mut clause.operands);
+        } else {
+            operands.push_back(NnfExpression::Clause(clause));
+        }
+    }
+
+    NnfExpression::Clause(NnfClause {
+        operands,
+        operator: NnfOperator::And,
     })
 }
 
@@ -96,11 +114,13 @@ fn transform(negated: bool, expression: JsonExpression) -> NnfExpression {
     let Some((key, expression)) = json_object.into_iter().next() else {
         panic!("Empty objects are not valid expressions");
     };
-    match (key.as_str(), expression) {
-        ("literal", JsonExpression::String(literal)) => transform_literal(negated, literal),
-        ("and", JsonExpression::Array(operands)) => transform_other(negated, NnfOperator::And, operands),
-        ("or", JsonExpression::Array(operands)) => transform_other(negated, NnfOperator::Or, operands),
-        ("not", operand) => transform_not(negated, operand),
+    match (key.as_str(), negated, expression) {
+        ("and", true, JsonExpression::Array(operands)) => transform_or(negated, operands),
+        ("and", false, JsonExpression::Array(operands)) => transform_and(negated, operands),
+        ("or", true, JsonExpression::Array(operands)) => transform_and(negated, operands),
+        ("or", false, JsonExpression::Array(operands)) => transform_or(negated, operands),
+        ("not", _, operand) => transform_not(negated, operand),
+        ("literal", _, JsonExpression::String(literal)) => transform_literal(negated, literal),
         ill_formed => panic!("Unexpected expression: {ill_formed:?} "),
     }
 }
@@ -145,6 +165,32 @@ mod tests {
             }
         });
         let expected = NnfExpression::Literal("var".to_string());
+        let computed = transform(false, json_expression);
+        assert_eq!(expected, computed);
+    }
+
+    #[test]
+    fn nested_formulas_are_flattened() {
+        let json_expression = serde_json::json!({
+            "or": [
+                { "literal": "var" },
+                {
+                    "or": [
+                        { "literal": "var" },
+                        { "literal": "foo" },
+                    ]
+                }
+
+            ]
+        });
+        let expected = NnfExpression::Clause(NnfClause {
+            operator: NnfOperator::Or,
+            operands: LinkedList::from([
+                NnfExpression::Literal("var".to_string()),
+                NnfExpression::Literal("var".to_string()),
+                NnfExpression::Literal("foo".to_string()),
+            ]),
+        });
         let computed = transform(false, json_expression);
         assert_eq!(expected, computed);
     }
