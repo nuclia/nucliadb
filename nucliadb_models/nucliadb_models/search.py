@@ -923,10 +923,14 @@ class SummarizedResource(BaseModel):
 
 class SummarizedResponse(BaseModel):
     resources: Dict[str, SummarizedResource] = Field(
-        default={}, title="Resources", description="Individual resource summaries. The key is the resource id or slug."
+        default={},
+        title="Resources",
+        description="Individual resource summaries. The key is the resource id or slug.",
     )
     summary: str = Field(
-        default="", title="Summary", description="Global summary of all resources combined."
+        default="",
+        title="Summary",
+        description="Global summary of all resources combined.",
     )
 
 
