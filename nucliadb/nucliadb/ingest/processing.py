@@ -36,11 +36,10 @@ from pydantic import BaseModel, Field
 import nucliadb_models as models
 from nucliadb_models.resource import QueueType
 from nucliadb_telemetry import metrics
-from nucliadb_utils import const
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.settings import nuclia_settings, storage_settings
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import Utility, has_feature, set_utility
+from nucliadb_utils.utilities import Utility, set_utility
 
 logger = logging.getLogger(__name__)
 
@@ -171,14 +170,10 @@ class ProcessingEngine:
             self.nuclia_upload_url = (
                 f"{self.nuclia_cluster_url}/api/v1/processing/upload"
             )
-        self.nuclia_internal_push = (
-            f"{self.nuclia_cluster_url}/api/internal/processing/push"
-        )
         self.nuclia_internal_push_v2 = (
             f"{nuclia_processing_cluster_url}/api/internal/v2/processing/push"
         )
         self.nuclia_internal_delete = f"{nuclia_processing_cluster_url}/api/internal/v2/processing/delete-requests"
-        self.nuclia_external_push = f"{self.nuclia_public_url}/api/v1/processing/push"
         self.nuclia_external_push_v2 = (
             f"{self.nuclia_public_url}/api/v2/processing/push"
         )
@@ -387,33 +382,17 @@ class ProcessingEngine:
             headers = {"CONTENT-TYPE": "application/json"}
             if self.onprem is False:
                 # Upload the payload
-                url = self.nuclia_internal_push
-                if has_feature(
-                    const.Features.PROCESSING_V2,
-                    context={
-                        "kbid": item.kbid,
-                    },
-                ):
-                    url = self.nuclia_internal_push_v2
                 item.partition = partition
                 resp = await self.session.post(
-                    url=url, data=item.json(), headers=headers
+                    url=self.nuclia_internal_push_v2, data=item.json(), headers=headers
                 )
             else:
-                url = self.nuclia_external_push + "?partition=" + str(partition)
-                if has_feature(
-                    const.Features.PROCESSING_V2,
-                    context={
-                        "kbid": item.kbid,
-                    },
-                ):
-                    url = self.nuclia_external_push_v2
                 headers.update(
                     {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
                 )
                 # Upload the payload
                 resp = await self.session.post(
-                    url=url, data=item.json(), headers=headers
+                    url=self.nuclia_external_push_v2, data=item.json(), headers=headers
                 )
             if resp.status == 200:
                 data = await resp.json()
