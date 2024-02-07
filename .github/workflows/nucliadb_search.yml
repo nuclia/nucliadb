@@ -159,7 +159,7 @@ jobs:
           TESTING_MAINDB_DRIVER: ${{ matrix.maindb_driver }}
           TESTING_STORAGE_BACKEND: ${{ matrix.storage_backend }}
         run: |
-          pytest -x -rfE --cov=nucliadb.search -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json nucliadb/nucliadb/search
+          make -C nucliadb/ test-cov-search
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3

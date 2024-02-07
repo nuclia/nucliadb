@@ -11,7 +11,7 @@ test_targets = $(addprefix $(test_target_prefix),$(subpackages))
 test_cov_targets = $(addprefix $(test_cov_target_prefix),$(subpackages))
 
 pytest_flags = -s -rfE -v --tb=native
-pytest_extra_flags :=
+_pytest_extra_flags := $(pytest_extra_flags)
 
 
 .PHONY: install-dev
@@ -66,12 +66,17 @@ $(lint_targets):
 
 # pytest doesn't support test discovery across our multiple "top-level folders"
 # so we need to run all test targets one by one
-.PHONY: test
-test: $(test_targets)
+.PHONY: test-all
+test-all: $(test_targets)
+
+test-nucliadb:
+	pytest $(pytest_flags) $(_pytest_extra_flags) nucliadb/tests
 
 $(test_targets):
 
 $(test_cov_targets):
+
+test-cov-search: _pytest_extra_flags += --benchmark-json benchmarks.json
 
 
 # Generic implicit rules
@@ -87,13 +92,13 @@ lint-%:
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini nucliadb/$*
 
 test-%:
-	pytest $(pytest_flags) $(pytest_extra_flags) nucliadb/$*
+	pytest $(pytest_flags) $(_pytest_extra_flags) nucliadb/$*/tests
 
 test-cov-%:
-	pytest $(pytest_flags) $(pytest_extra_flags) \
+	pytest $(pytest_flags) $(_pytest_extra_flags) \
 		--cov=nucliadb.$* \
 		--cov-config=../.coveragerc \
 		--cov-report xml \
 		--cov-report term-missing:skip-covered \
 		--cov-append \
-		nucliadb/$*
+		nucliadb/$*/tests

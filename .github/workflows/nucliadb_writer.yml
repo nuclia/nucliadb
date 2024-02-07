@@ -66,7 +66,7 @@ jobs:
         env:
           TESTING_STORAGE_BACKEND: ${{ matrix.storage_backend }}
         run: |
-          pytest -rfE --cov=nucliadb.writer -s --tb=native -v --cov-report xml --cov-append nucliadb/nucliadb/writer
+          make -C nucliadb/ test-cov-writer
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
