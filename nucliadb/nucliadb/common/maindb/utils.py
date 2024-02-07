@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 from nucliadb.common.maindb.driver import Driver
+from nucliadb.common.maindb.exceptions import UnsetUtility
 from nucliadb.ingest.settings import settings
 from nucliadb_utils.exceptions import ConfigurationError
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
@@ -54,7 +55,7 @@ except ImportError:  # pragma: no cover
 def get_driver() -> Driver:
     driver = get_utility(Utility.MAINDB_DRIVER)
     if driver is None:
-        raise Exception("Driver is not configured")
+        raise UnsetUtility("Driver is not configured")
     return driver
 
 

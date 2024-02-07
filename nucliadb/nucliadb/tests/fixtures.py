@@ -38,6 +38,7 @@ from redis import asyncio as aioredis
 
 from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.common.maindb.driver import Driver
+from nucliadb.common.maindb.exceptions import UnsetUtility
 from nucliadb.common.maindb.local import LocalDriver
 from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.common.maindb.redis import RedisDriver
@@ -691,7 +692,7 @@ async def maindb_driver(request):
 async def maybe_cleanup_maindb():
     try:
         driver = get_driver()
-    except KeyError:
+    except UnsetUtility:
         pass
     else:
         try:
