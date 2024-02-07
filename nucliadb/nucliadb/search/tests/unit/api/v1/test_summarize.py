@@ -79,7 +79,6 @@ async def test_summarize_endpoint_handles_errors(
     summarize,
     predict_error,
     http_error_response,
-    has_feature,
     dummy_request,
 ):
     summarize.side_effect = predict_error
