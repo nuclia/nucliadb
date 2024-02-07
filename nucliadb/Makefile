@@ -5,10 +5,10 @@ lint_target_prefix := lint-
 test_target_prefix := test-
 test_cov_target_prefix := test-cov-
 
-format_targets = $(addprefix $(format_target_prefix),$(subpackages))
-lint_targets = $(addprefix $(lint_target_prefix),$(subpackages))
-test_targets = $(addprefix $(test_target_prefix),$(subpackages))
-test_cov_targets = $(addprefix $(test_cov_target_prefix),$(subpackages))
+format_subpackages_targets = $(addprefix $(format_target_prefix),$(subpackages))
+lint_subpackages_targets = $(addprefix $(lint_target_prefix),$(subpackages))
+test_subpackages_targets = $(addprefix $(test_target_prefix),$(subpackages))
+test_cov_subpackages_targets = $(addprefix $(test_cov_target_prefix),$(subpackages))
 
 pytest_flags := -s -rfE -v --tb=native
 pytest_extra_flags :=
@@ -54,7 +54,7 @@ format:
 	cd .. && isort --profile black nucliadb
 	black .
 
-$(format_targets):
+$(format_subpackages_targets):
 
 
 .PHONY: lint
@@ -64,12 +64,12 @@ lint:
 	black --check .
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini .
 
-$(lint_targets):
+$(lint_subpackages_targets):
 
 # pytest doesn't support test discovery across our multiple "top-level folders"
 # so we need to run all test targets one by one
 .PHONY: test-all
-test-all: $(test_targets)
+test-all: test-nucliadb $(test_subpackages_targets)
 
 test-nucliadb:
 	$(PYTEST) nucliadb/tests
@@ -82,9 +82,9 @@ test-cov-nucliadb:
 		--cov-append \
 		nucliadb/tests
 
-$(test_targets):
+$(test_subpackages_targets):
 
-$(test_cov_targets):
+$(test_cov_subpackages_targets):
 
 
 # Generic implicit rules
