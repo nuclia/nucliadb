@@ -26,6 +26,7 @@ pub mod ram_hnsw;
 #[cfg(test)]
 mod tests;
 use std::collections::{HashMap, HashSet};
+use std::io::BufReader;
 use std::time::SystemTime;
 use std::{fs, io, path};
 
@@ -559,7 +560,7 @@ impl DataPoint {
 
         let nodes = unsafe { Mmap::map(&nodes)? };
         let index = unsafe { Mmap::map(&hnswf)? };
-        let journal: Journal = serde_json::from_reader(journal)?;
+        let journal: Journal = serde_json::from_reader(BufReader::new(journal))?;
 
         let fst_dir = id.join(file_names::FST);
 
