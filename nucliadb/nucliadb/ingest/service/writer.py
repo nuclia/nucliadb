@@ -271,13 +271,26 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request: KnowledgeBoxID, context=None
     ) -> DeleteKnowledgeBoxResponse:
         try:
-            await self.proc.delete_kb(request.uuid, request.slug)
+            await self.delete_kb(request)
         except KnowledgeBoxNotFound:
             logger.warning(f"KB not found: kbid={request.uuid}, slug={request.slug}")
         except Exception:
             logger.exception("Could not delete KB", exc_info=True)
             return DeleteKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.ERROR)
         return DeleteKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.OK)
+
+    async def delete_kb(self, request: KnowledgeBoxID) -> None:
+        kbid = request.uuid
+        await self.proc.delete_kb(kbid, request.slug)
+        try:
+            await learning_config.delete_configuration(kbid)
+            logger.info("Learning configuration deleted", extra={"kbid": kbid})
+        except Exception:
+            logger.exception(
+                "Unexpected error deleting learning configuration",
+                exc_info=True,
+                extra={"kbid": kbid},
+            )
 
     async def ListKnowledgeBox(  # type: ignore
         self, request: KnowledgeBoxPrefix, context=None

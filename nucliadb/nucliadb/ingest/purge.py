@@ -22,7 +22,6 @@ from typing import AsyncGenerator
 
 import pkg_resources
 
-from nucliadb import learning_config
 from nucliadb.common.cluster.exceptions import NodeError, ShardNotFound
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.maindb.driver import Driver
@@ -57,8 +56,6 @@ async def purge_kb(driver: Driver):
                 f"  X Skipping purge {key}, wrong key format, expected {KB_TO_DELETE_BASE}"
             )
             continue
-
-        await purge_kb_learning_config(kbid)
 
         try:
             await KnowledgeBox.purge(driver, kbid)
@@ -140,15 +137,6 @@ async def purge_kb_storage(driver: Driver, storage: Storage):
                 await txn.commit()
 
     logger.info("FINISH PURGING KB STORAGE")
-
-
-async def purge_kb_learning_config(kbid: str):
-    try:
-        await learning_config.delete_configuration(kbid)
-        logger.info(f"  √ Successfully deleted learning config", extra={"kbid": kbid})
-    except Exception as exc:
-        errors.capture_exception(exc)
-        logger.error(f"  X Error while deleting learning config", extra={"kbid": kbid})
 
 
 async def main():

@@ -39,13 +39,6 @@ class DataIterator:
             yield item
 
 
-@pytest.fixture(autouse=True)
-def learning_config():
-    with patch("nucliadb.ingest.purge.learning_config") as mocked:
-        mocked.delete_configuration = AsyncMock(return_value=None)
-        yield mocked
-
-
 @pytest.fixture
 def keys():
     yield []
@@ -81,14 +74,13 @@ def kb():
         yield mock
 
 
-async def test_purge(kb, keys, driver, learning_config):
+async def test_purge(kb, keys, driver):
     keys.append("/pathto/kbid")
 
     await purge.purge_kb(driver)
 
     kb.purge.assert_called_once_with(driver, "kbid")
     driver.begin.return_value.commit.assert_called_once()
-    learning_config.delete_configuration.assert_called_once_with("kbid")
 
 
 async def test_purge_handle_errors(kb, keys, driver):
