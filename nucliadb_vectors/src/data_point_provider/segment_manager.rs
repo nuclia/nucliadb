@@ -104,11 +104,14 @@ struct StateFile {
 
 impl StateFile {
     fn new(path: PathBuf) -> FsResult<Self> {
-        let file = OpenOptions::new()
-            .create(true)
-            .write(true)
-            .open(path.join(format!("{}.{STATE_FILE_EXTENSION}", SegmentId::new_v4())))?;
+        let reader_id = uuid::Uuid::new_v4();
+        let tmp_path = path.join(format!("{}.{STATE_FILE_EXTENSION}-tmp", reader_id));
+        let lock_path = path.join(format!("{}.{STATE_FILE_EXTENSION}", reader_id));
+
+        // Open and lock the file atomically via rename
+        let file = OpenOptions::new().create(true).write(true).open(&tmp_path)?;
         file.lock_exclusive()?;
+        fs::rename(tmp_path, lock_path)?;
 
         Ok(StateFile {
             path,
