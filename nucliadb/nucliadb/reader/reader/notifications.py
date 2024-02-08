@@ -74,6 +74,9 @@ async def kb_notifications_stream(
                     context, pb_notification, resource_cache
                 )
                 line = encode_streamed_notification(notification) + b"\n"
+                logger.debug(
+                    f"Sending notification: {notification.type}", extra={"kbid": kbid}
+                )
                 yield line
     except asyncio.TimeoutError:
         return
@@ -113,6 +116,12 @@ async def kb_notifications(kbid: str) -> AsyncGenerator[writer_pb2.Notification,
             while True:
                 notification: writer_pb2.Notification = await queue.get()
                 yield notification
+        except asyncio.CancelledError:
+            if not queue.empty():
+                logger.warning(
+                    "Queue is not empty after cancellation. Some notifications may have been lost",
+                    extra={"kbid": kbid},
+                )
         except Exception as ex:
             capture_exception(ex)
             logger.error(
