@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import contextlib
+import logging
 from collections.abc import AsyncIterator
 from typing import Any, Type, Union
 
@@ -27,6 +28,10 @@ from fastapi.responses import StreamingResponse
 
 from nucliadb_telemetry import errors
 from nucliadb_utils.settings import nuclia_settings
+
+SERVICE_NAME = "nucliadb.learning_config"
+logger = logging.getLogger(SERVICE_NAME)
+
 
 NUCLIA_ONPREM_AUTH_HEADER = "X-NUCLIA-NUAKEY"
 
@@ -141,7 +146,7 @@ class DummyClient(httpx.AsyncClient):
 
 
 @contextlib.asynccontextmanager
-async def learning_config_client() -> AsyncIterator[httpx.AsyncClient]:  # type: ignore
+async def learning_config_client() -> AsyncIterator[httpx.AsyncClient]:
     """
     Context manager for the learning client. Makes sure the client is closed after use.
     For now, a new client session is created for each request. This is to avoid having to
@@ -152,6 +157,9 @@ async def learning_config_client() -> AsyncIterator[httpx.AsyncClient]:  # type:
         # This is a workaround to be able to run integration tests that start nucliadb with docker.
         # The learning config API is not available in the docker setup, so we use a dummy client.
         client_class = DummyClient
+        logger.warning(
+            "Using dummy learning config client. If you see this in production, something is wrong."
+        )
     else:
         client_class = httpx.AsyncClient
 
