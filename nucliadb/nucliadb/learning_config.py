@@ -28,7 +28,7 @@ from fastapi.responses import StreamingResponse
 from nucliadb_telemetry import errors
 from nucliadb_utils.settings import nuclia_settings
 
-NUCLIA_AUTH_HEADER = "X-NUCLIA-NUAKEY"
+NUCLIA_ONPREM_AUTH_HEADER = "X-NUCLIA-NUAKEY"
 
 
 async def set_configuration(
@@ -93,9 +93,12 @@ async def proxy(
         )
 
 
+def is_onprem() -> bool:
+    return nuclia_settings.nuclia_service_account is not None
+
+
 def get_config_api_url() -> str:
-    is_onprem = nuclia_settings.nuclia_service_account is not None
-    if is_onprem is True:
+    if is_onprem():
         nuclia_public_url = nuclia_settings.nuclia_public_url.format(
             zone=nuclia_settings.nuclia_zone
         )
@@ -105,7 +108,12 @@ def get_config_api_url() -> str:
 
 
 def get_config_auth_header() -> dict[str, str]:
-    return {NUCLIA_AUTH_HEADER: f"Bearer {nuclia_settings.nuclia_service_account}"}
+    if is_onprem():
+        return {
+            NUCLIA_ONPREM_AUTH_HEADER: f"Bearer {nuclia_settings.nuclia_service_account}"
+        }
+    else:
+        return {}
 
 
 @contextlib.asynccontextmanager
