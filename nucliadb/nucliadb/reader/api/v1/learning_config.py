@@ -21,7 +21,7 @@ from fastapi import Request
 from fastapi_versioning import version
 
 from nucliadb import learning_config
-from nucliadb.search.api.v1.router import KB_PREFIX, api
+from nucliadb.reader.api.v1.router import KB_PREFIX, api
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires
 

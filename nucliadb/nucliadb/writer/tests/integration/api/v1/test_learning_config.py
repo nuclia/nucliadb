@@ -17,27 +17,37 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from fastapi import Request
-from fastapi_versioning import version
+
+from unittest import mock
+
+import pytest
+from fastapi import Response
 
 from nucliadb import learning_config
-from nucliadb.writer.api.v1.router import KB_PREFIX, api
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_utils.authentication import requires
 
 
-@api.patch(
-    path=f"/{KB_PREFIX}/{{kbid}}/configuration",
-    status_code=204,
-    name="Update Knowledge Box models configuration",
-    description="Update current configuration of models assigned to a Knowledge Box",
-    response_model=None,
-    tags=["Knowledge Boxes"],
-)
-@requires(NucliaDBRoles.WRITER)
-@version(1)
-async def patch_configuration(
-    request: Request,
-    kbid: str,
-):
-    return await learning_config.proxy(request, "POST", f"/config/{kbid}")
+class MockProxy:
+    def __init__(self):
+        self.calls = []
+
+    async def __call__(self, request, method, url):
+        self.calls.append((request, method, url))
+        return Response(status_code=204)
+
+
+@pytest.fixture()
+def learning_config_proxy():
+    proxy = MockProxy()
+    with mock.patch.object(learning_config, "proxy", proxy):
+        yield proxy
+
+
+async def test_api(writer_api, knowledgebox_ingest, learning_config_proxy):
+    kbid = knowledgebox_ingest
+    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
+        # Get configuration
+        resp = await client.patch(f"/kb/{kbid}/configuration", json={"some": "data"})
+        assert resp.status_code == 204
+
+        assert learning_config_proxy.calls[0][1:] == ("POST", f"/config/{kbid}")
