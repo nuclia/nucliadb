@@ -142,7 +142,7 @@ class KBShardManager:
         for shard_obj in shards:
             node, shard_id = choose_node(shard_obj)
             if shard_id is None:
-                raise ShardNotFound("Fount a node but not a shard")
+                raise ShardNotFound("Found a node but not a shard")
 
             ops.append(aw(node, shard_id))
 

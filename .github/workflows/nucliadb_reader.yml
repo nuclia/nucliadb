@@ -63,7 +63,7 @@ jobs:
 
       - name: Run tests
         run: |
-          pytest -rfE --cov=nucliadb.reader -s --tb=native -v --cov-report xml --cov-append nucliadb/nucliadb/reader
+          make -C nucliadb/ test-cov-reader
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
