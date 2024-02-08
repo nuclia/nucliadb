@@ -683,13 +683,13 @@ class GCSStorage(Storage):
                 logger.info(f"Deleted bucket: {bucket_name}")
                 deleted = True
             elif resp.status == 409:
-                details = resp.text()
+                details = await resp.text()
                 logger.info(f"Conflict on deleting bucket {bucket_name}: {details}")
                 conflict = True
             elif resp.status == 404:
                 logger.info(f"Does not exit on deleting: {bucket_name}")
             else:
-                details = resp.text()
+                details = await resp.text()
                 logger.error(
                     f"Delete KB bucket returned an unexpected status {resp.status}: {details}"
                 )
