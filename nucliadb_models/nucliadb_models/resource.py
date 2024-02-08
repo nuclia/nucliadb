@@ -21,7 +21,7 @@
 import string
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Optional, Type, TypeVar, Union
+from typing import Any, Dict, List, Optional, Type, TypeVar, Union
 
 from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig as PBKnowledgeBoxConfig
@@ -108,11 +108,32 @@ RELEASE_CHANNEL_PB_TO_ENUM = {v: k for k, v in RELEASE_CHANNEL_ENUM_TO_PB.items(
 
 
 class KnowledgeBoxConfig(BaseModel):
-    slug: Optional[SlugString] = None
-    title: Optional[str] = None
-    description: Optional[str] = None
-    similarity: Optional[VectorSimilarity] = None
-    release_channel: Optional[ReleaseChannel] = None
+    slug: Optional[SlugString] = Field(
+        default=None, title="Slug", description="Slug for the Knowledge Box."
+    )
+    title: Optional[str] = Field(
+        default=None, title="Title", description="Title for the Knowledge Box."
+    )
+    description: Optional[str] = Field(
+        default=None,
+        title="Description",
+        description="Description for the Knowledge Box.",
+    )
+    similarity: Optional[VectorSimilarity] = Field(
+        default=None,
+        title="Similarity",
+        description="Similarity function for the main Knowledge Box vectors index.",
+    )
+    release_channel: Optional[ReleaseChannel] = Field(
+        default=None,
+        title="Release Channel",
+        description="Release channel for the Knowledge Box.",
+    )
+    learning_config: Optional[dict[str, Any]] = Field(
+        default={},
+        title="Learning Config",
+        description="Learning config for the Knowledge Box.",
+    )
 
     @validator("slug")
     def id_check(cls, v: str) -> str:

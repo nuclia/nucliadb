@@ -19,7 +19,7 @@
 #
 import contextlib
 from collections.abc import AsyncIterator
-from typing import Union
+from typing import Any, Union
 
 import httpx
 from fastapi import Request, Response
@@ -29,6 +29,23 @@ from nucliadb_telemetry import errors
 from nucliadb_utils.settings import nuclia_settings
 
 NUCLIA_AUTH_HEADER = "X-NUCLIA-NUAKEY"
+
+
+async def set_configuration(
+    kbid: str,
+    config: dict[str, Any],
+) -> None:
+    async with learning_config_client() as client:
+        resp = await client.post(f"config/{kbid}", json=config)
+        resp.raise_for_status()
+
+
+async def delete_configuration(
+    kbid: str,
+) -> None:
+    async with learning_config_client() as client:
+        resp = await client.delete(f"config/{kbid}")
+        resp.raise_for_status()
 
 
 async def proxy(
@@ -79,7 +96,9 @@ async def proxy(
 def get_config_api_url() -> str:
     is_onprem = nuclia_settings.nuclia_service_account is not None
     if is_onprem is True:
-        nuclia_public_url = nuclia_settings.nuclia_public_url.format(zone=nuclia_settings.nuclia_zone)
+        nuclia_public_url = nuclia_settings.nuclia_public_url.format(
+            zone=nuclia_settings.nuclia_zone
+        )
         return f"{nuclia_public_url}/api/v1"
     else:
         return f"{nuclia_settings.nuclia_inner_learning_config_url}/api/v1/internal"
