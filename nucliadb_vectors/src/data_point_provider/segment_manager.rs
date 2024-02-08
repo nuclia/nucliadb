@@ -39,11 +39,11 @@ type SegmentId = DpId;
 #[derive(Clone, Copy)]
 struct TimeSensitiveDLog<'a> {
     dlog: &'a DTrie,
-    time: TxId,
+    transaction: TxId,
 }
 impl<'a> DeleteLog for TimeSensitiveDLog<'a> {
     fn is_deleted(&self, key: &[u8]) -> bool {
-        self.dlog.get(key).map(|t| t > self.time).unwrap_or_default()
+        self.dlog.get(key).map(|t| t > self.transaction).unwrap_or_default()
     }
 }
 
@@ -174,13 +174,16 @@ impl SegmentManager {
         }
 
         let has_operations = !transaction.operations.is_empty();
+        let mut operations = &vec![];
         if has_operations {
             let has_delete = transaction.operations.iter().any(|op| matches!(op, Operation::DeleteSegment(_)));
             self.state.no_nodes += transaction.no_nodes;
+
             self.state.journal.push(JournalTransaction {
                 txid: next_txid,
                 operations: transaction.operations,
             });
+            operations = &self.state.journal.last().unwrap().operations;
 
             // We can prune the delete_log at the point of the oldest segment still in use
             if has_delete {
@@ -190,14 +193,12 @@ impl SegmentManager {
 
         match self.save() {
             Ok(_) => {
-                if has_operations {
-                    // Apply the changes to the segment view
-                    for op in &self.state.journal.last().unwrap().operations {
-                        match op {
-                            Operation::AddSegment(dpid) => self.segments.insert(*dpid, next_txid),
-                            Operation::DeleteSegment(dpid) => self.segments.remove(dpid),
-                        };
-                    }
+                // Apply the changes to the segment view
+                for op in operations {
+                    match op {
+                        Operation::AddSegment(dpid) => self.segments.insert(*dpid, next_txid),
+                        Operation::DeleteSegment(dpid) => self.segments.remove(dpid),
+                    };
                 }
                 Ok(())
             }
@@ -372,7 +373,7 @@ impl SegmentManager {
         self.segments.iter().map(|(id, time)| {
             (
                 TimeSensitiveDLog {
-                    time: *time,
+                    transaction: *time,
                     dlog: &self.state.delete_log,
                 },
                 *id,
