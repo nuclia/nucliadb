@@ -128,7 +128,13 @@ def test_update_shards_pb_replica():
 
 class TestWriterServicer:
     @pytest.fixture
-    def writer(self):
+    def learning_config(self):
+        with patch("nucliadb.ingest.service.writer.learning_config") as mocked:
+            mocked.set_configuration = AsyncMock(return_value=None)
+            yield mocked
+
+    @pytest.fixture
+    def writer(self, learning_config):
         servicer = WriterServicer()
         servicer.driver = AsyncMock()
         servicer.driver.transaction = MagicMock(return_value=AsyncMock())

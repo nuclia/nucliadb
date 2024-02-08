@@ -41,8 +41,9 @@ class DataIterator:
 
 @pytest.fixture(autouse=True)
 def learning_config():
-    with patch("nucliadb.ingest.purge.learning_config"):
-        yield
+    with patch("nucliadb.ingest.purge.learning_config") as mocked:
+        mocked.delete_configuration = AsyncMock(return_value=None)
+        yield mocked
 
 
 @pytest.fixture
@@ -80,13 +81,14 @@ def kb():
         yield mock
 
 
-async def test_purge(kb, keys, driver):
+async def test_purge(kb, keys, driver, learning_config):
     keys.append("/pathto/kbid")
 
     await purge.purge_kb(driver)
 
     kb.purge.assert_called_once_with(driver, "kbid")
     driver.begin.return_value.commit.assert_called_once()
+    learning_config.delete_configuration.assert_called_once_with("kbid")
 
 
 async def test_purge_handle_errors(kb, keys, driver):
@@ -99,14 +101,17 @@ async def test_purge_handle_errors(kb, keys, driver):
     kb.purge.side_effect = [ShardNotFound(), NodeError(), Exception(), None]
     driver.begin.return_value.delete.side_effect = Exception()
 
-    breakpoint()
     await purge.purge_kb(driver)
 
     driver.begin.return_value.commit.assert_not_called()
     driver.begin.return_value.abort.assert_called_once()
 
 
-async def test_purge_kb_storage(keys, driver, storage):
+async def test_purge_kb_storage(
+    keys,
+    driver,
+    storage,
+):
     keys.append("/pathto/kbid")
 
     await purge.purge_kb_storage(driver, storage)

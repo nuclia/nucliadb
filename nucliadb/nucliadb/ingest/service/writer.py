@@ -234,7 +234,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         )
         try:
             lconfig = {}
-            if request.HasField("learning_config"):
+            if request.learning_config:
                 lconfig = json.loads(request.learning_config)
             await learning_config.set_configuration(kbid, lconfig)
             logger.info("Learning configuration set", extra={"kbid": kbid})
@@ -878,24 +878,18 @@ def update_shards_with_updated_replica(
 def parse_model_metadata(request: KnowledgeBoxNew) -> SemanticModelMetadata:
     model = SemanticModelMetadata()
 
-    learning_config = {}
-    if request.HasField("learning_config"):
-        learning_config = json.loads(request.learning_config)
+    lconfig = {}
+    if request.learning_config:
+        lconfig = json.loads(request.learning_config)
 
     # Parse vector similarity function
-    if request.HasField("similarity"):
-        model.similarity_function = request.similarity
-    elif learning_config.get("similarity"):
-        model.similarity_function = learning_config["similarity"]
-    else:
-        logger.warning("Vector similarity not set, defaulting to cosine.")
-        model.similarity_function = utils_pb2.VectorSimilarity.COSINE
+    model.similarity_function = request.similarity
 
     # Parse vector dimension
     if request.HasField("vector_dimension"):
         model.vector_dimension = request.vector_dimension
-    elif learning_config.get("vector_dimension"):
-        model.vector_dimension = learning_config["vector_dimension"]
+    elif lconfig.get("vector_dimension"):
+        model.vector_dimension = lconfig["vector_dimension"]
     else:
         logger.warning(
             "Vector dimension not set. Will be detected automatically on the first vector set."
@@ -904,8 +898,8 @@ def parse_model_metadata(request: KnowledgeBoxNew) -> SemanticModelMetadata:
     # Parse model default min score
     if request.HasField("default_min_score"):
         model.default_min_score = request.default_min_score
-    elif learning_config.get("default_min_score") is not None:
-        model.default_min_score = learning_config["default_min_score"]
+    elif lconfig.get("default_min_score") is not None:
+        model.default_min_score = lconfig["default_min_score"]
     else:
         logger.warning("Default min score not set!")
 

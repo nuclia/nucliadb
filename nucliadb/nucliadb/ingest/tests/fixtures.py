@@ -117,7 +117,9 @@ async def ingest_processed_consumer(
 
 
 @pytest.fixture(scope="function")
-async def grpc_servicer(maindb_driver, ingest_consumers, ingest_processed_consumer):
+async def grpc_servicer(
+    maindb_driver, ingest_consumers, ingest_processed_consumer, learning_config
+):
     servicer = WriterServicer()
     await servicer.initialize()
 
@@ -181,8 +183,17 @@ async def fake_node(_natsd_reset, indexing_utility_ingest, shard_manager):
     manager.INDEX_NODES.clear()
 
 
+@pytest.fixture()
+def learning_config():
+    with patch("nucliadb.ingest.service.writer.learning_config") as mocked:
+        mocked.set_configuration = AsyncMock(return_value=None)
+        yield mocked
+
+
 @pytest.fixture(scope="function")
-async def knowledgebox_ingest(storage, maindb_driver: Driver, shard_manager):
+async def knowledgebox_ingest(
+    storage, maindb_driver: Driver, shard_manager, learning_config
+):
     kbid = str(uuid.uuid4())
     kbslug = str(uuid.uuid4())
     async with maindb_driver.transaction() as txn:
