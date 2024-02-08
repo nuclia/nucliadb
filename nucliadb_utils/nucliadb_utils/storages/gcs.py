@@ -682,12 +682,17 @@ class GCSStorage(Storage):
             if resp.status == 200:
                 logger.info(f"Deleted bucket: {bucket_name}")
                 deleted = True
-            if resp.status == 409:
+            elif resp.status == 409:
                 details = resp.text()
                 logger.info(f"Conflict on deleting bucket {bucket_name}: {details}")
                 conflict = True
-            if resp.status == 404:
+            elif resp.status == 404:
                 logger.info(f"Does not exit on deleting: {bucket_name}")
+            else:
+                details = resp.text()
+                logger.error(
+                    f"Delete KB bucket returned an unexpected status {resp.status}: {details}"
+                )
         return deleted, conflict
 
     async def iterate_bucket(self, bucket: str, prefix: str) -> AsyncIterator[Any]:
