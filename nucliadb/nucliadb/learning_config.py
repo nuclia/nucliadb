@@ -19,7 +19,7 @@
 #
 import contextlib
 from collections.abc import AsyncIterator
-from typing import Any, Union
+from typing import Any, Type, Union
 
 import httpx
 from fastapi import Request, Response
@@ -116,14 +116,46 @@ def get_config_auth_header() -> dict[str, str]:
         return {}
 
 
+class DummyClient(httpx.AsyncClient):
+    def _response(self):
+        return httpx.Response(
+            status_code=200,
+            content=b"Dummy client is not supposed to be used",
+        )
+
+    async def get(self, *args: Any, **kwargs: Any):
+        return self._response()
+
+    async def post(self, *args: Any, **kwargs: Any):
+        return self._response()
+
+    async def delete(self, *args: Any, **kwargs: Any):
+        return self._response()
+
+    async def request(
+        self,
+        *args: Any,
+        **kwargs: Any,
+    ) -> httpx.Response:
+        return self._response()
+
+
 @contextlib.asynccontextmanager
-async def learning_config_client() -> AsyncIterator[httpx.AsyncClient]:
+async def learning_config_client() -> AsyncIterator[httpx.AsyncClient]:  # type: ignore
     """
     Context manager for the learning client. Makes sure the client is closed after use.
     For now, a new client session is created for each request. This is to avoid having to
     save a client session in the FastAPI app state.
     """
-    client = httpx.AsyncClient(
+    client_class: Type[httpx.AsyncClient]
+    if nuclia_settings.dummy_learning_config:
+        # This is a workaround to be able to run integration tests that start nucliadb with docker.
+        # The learning config API is not available in the docker setup, so we use a dummy client.
+        client_class = DummyClient
+    else:
+        client_class = httpx.AsyncClient
+
+    client = client_class(
         base_url=get_config_api_url(),
         headers=get_config_auth_header(),
     )

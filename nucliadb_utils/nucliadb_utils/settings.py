@@ -140,6 +140,7 @@ class NucliaSettings(BaseSettings):
 
     dummy_processing: bool = False
     dummy_predict: bool = False
+    dummy_learning_config: bool = False
     local_predict: bool = False
     local_predict_headers: Dict[str, str] = {}
 
