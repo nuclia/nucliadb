@@ -48,14 +48,14 @@ async def summarize(kbid: str, request: SummarizeRequest) -> SummarizedResponse:
     predict_request.user_prompt = request.user_prompt
     predict_request.summary_kind = request.summary_kind
 
-    for rid, field_id, extracted_text in await get_extracted_texts(
+    for uuid_or_slug, field_id, extracted_text in await get_extracted_texts(
         kbid, request.resources
     ):
         if extracted_text is None:
             continue
 
         fields = predict_request.resources.setdefault(
-            rid, SummarizeResourceModel()
+            uuid_or_slug, SummarizeResourceModel()
         ).fields
         fields[field_id] = extracted_text.text
 
@@ -63,7 +63,9 @@ async def summarize(kbid: str, request: SummarizeRequest) -> SummarizedResponse:
     return await predict.summarize(kbid, predict_request)
 
 
-async def get_extracted_texts(kbid: str, resource_uuids: list[str]) -> ExtractedTexts:
+async def get_extracted_texts(
+    kbid: str, resource_uuids_or_slugs: list[str]
+) -> ExtractedTexts:
     results: ExtractedTexts = []
 
     driver = get_driver()
@@ -79,11 +81,19 @@ async def get_extracted_texts(kbid: str, resource_uuids: list[str]) -> Extracted
     # Schedule getting extracted text for each field of each resource
     async with driver.transaction() as txn:
         kb_orm = KnowledgeBox(txn, storage, kbid)
-        for rid in set(resource_uuids):
-            resource_orm = Resource(txn=txn, storage=storage, kb=kb_orm, uuid=rid)
+        for uuid_or_slug in set(resource_uuids_or_slugs):
+            uuid = await get_resource_uuid(kb_orm, uuid_or_slug)
+            if uuid is None:
+                logger.warning(
+                    f"Resource {uuid_or_slug} not found in KB", extra={"kbid": kbid}
+                )
+                continue
+            resource_orm = Resource(txn=txn, storage=storage, kb=kb_orm, uuid=uuid)
             fields = await resource_orm.get_fields(force=True)
             for _, field in fields.items():
-                task = asyncio.create_task(get_extracted_text(rid, field, max_tasks))
+                task = asyncio.create_task(
+                    get_extracted_text(uuid_or_slug, field, max_tasks)
+                )
                 tasks.append(task)
 
         if len(tasks) == 0:
@@ -107,9 +117,27 @@ async def get_extracted_texts(kbid: str, resource_uuids: list[str]) -> Extracted
 
 
 async def get_extracted_text(
-    rid: str, field: Field, max_operations: asyncio.Semaphore
+    uuid_or_slug, field: Field, max_operations: asyncio.Semaphore
 ) -> tuple[str, str, Optional[ExtractedText]]:
     async with max_operations:
         extracted_text = await field.get_extracted_text(force=True)
         field_key = f"{field.type}/{field.id}"
-        return rid, field_key, extracted_text
+        return uuid_or_slug, field_key, extracted_text
+
+
+async def get_resource_uuid(kbobj: KnowledgeBox, uuid_or_slug: str) -> Optional[str]:
+    """
+    Return the uuid of the resource with the given uuid_or_slug.
+    """
+    # Try with uuid first
+    resource = await kbobj.get(uuid_or_slug)
+    if resource is not None:
+        return uuid_or_slug
+
+    # Try with slug
+    uuid = await kbobj.get_resource_uuid_by_slug(uuid_or_slug)
+    if uuid is not None:
+        return uuid
+
+    # Resource not found
+    return None

@@ -75,4 +75,3 @@ class Features:
     ASK_YOUR_DOCUMENTS = "nucliadb_ask_your_documents"
     EXPERIMENTAL_KB = "nucliadb_experimental_kb"
     READ_REPLICA_SEARCHES = "nucliadb_read_replica_searches"
-    SUMMARIZATION = "nuclia_summarization"
