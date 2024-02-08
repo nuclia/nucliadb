@@ -142,13 +142,10 @@ fn data_merge() {
     let elems1 = vec![Elem::new(key1.clone(), vector1.clone(), LabelDictionary::default(), None)];
     let dp_0 = DataPoint::new(temp_dir.path(), elems0, None, SIMILARITY, Channel::EXPERIMENTAL).unwrap();
     let dp_1 = DataPoint::new(temp_dir.path(), elems1, None, SIMILARITY, Channel::EXPERIMENTAL).unwrap();
-    let dp = DataPoint::merge(
-        temp_dir.path(),
-        &[(HashSet::default(), dp_1.get_id()), (HashSet::default(), dp_0.get_id())],
-        Similarity::Cosine,
-        Channel::EXPERIMENTAL,
-    )
-    .unwrap();
+    let dlog_0 = HashSet::default();
+    let dlog_1 = HashSet::default();
+    let mut work = [(dlog_1, dp_1), (dlog_0, dp_0)];
+    let dp = DataPoint::merge(temp_dir.path(), work.iter(), Similarity::Cosine, Channel::EXPERIMENTAL).unwrap();
     let formula = Formula::new();
     let result: Vec<_> = dp.search(&HashSet::new(), &vector1, &formula, true, 1, Similarity::Cosine, -1.0).collect();
     assert_eq!(result.len(), 1);
@@ -158,14 +155,10 @@ fn data_merge() {
     assert_eq!(result.len(), 1);
     assert!(result[0].score() >= 0.9);
     assert!(result[0].id() == key0.as_bytes());
-    let dlog = HashSet::from([key1, key0]);
-    let dp = DataPoint::merge(
-        temp_dir.path(),
-        &[(&dlog, dp_1.get_id()), (&dlog, dp_0.get_id())],
-        Similarity::Cosine,
-        Channel::EXPERIMENTAL,
-    )
-    .unwrap();
+
+    work[1].0.insert(key0);
+    work[0].0.insert(key1);
+    let dp = DataPoint::merge(temp_dir.path(), work.iter(), Similarity::Cosine, Channel::EXPERIMENTAL).unwrap();
     assert_eq!(dp.journal().no_nodes(), 0);
 }
 

@@ -57,20 +57,25 @@ impl Worker {
         let subscriber = self.location.as_path();
         info!("{subscriber:?} is ready to perform a merge");
         let sm = SegmentManager::open(subscriber.to_path_buf())?;
-        let work = sm.segment_iterator().collect::<Vec<_>>();
+        let work = sm
+            .segment_iterator()
+            .map(|(dlog, dpid)| (dlog, DataPoint::open(&self.location, dpid).unwrap()))
+            .collect::<Vec<_>>();
 
-        let new_dp = DataPoint::merge(subscriber, &work, self.similarity, self.channel)?;
-        let new_dp_id = new_dp.get_id();
+        let new_dp = DataPoint::merge(subscriber, work.iter(), self.similarity, self.channel)?;
 
         let mut transaction = Transaction::default();
-        transaction.replace_segments(work.iter().map(|(_, id)| *id).collect(), new_dp.get_id());
+        for (_, dp) in work {
+            transaction.delete_segment(dp.journal());
+        }
+        transaction.add_segment(new_dp.journal());
 
         if self.sender.send(transaction).is_err() {
             // If the sender has been deallocated this data point becomes garbage,
             // therefore is removed.
             DataPoint::delete(subscriber, new_dp.get_id())?;
         }
-        info!("Merge request completed: {new_dp_id}");
+        info!("Merge request completed: {}", new_dp.get_id());
         Ok(())
     }
 }

@@ -70,20 +70,18 @@ struct State {
 pub struct Transaction {
     operations: Vec<Operation>,
     deleted_entries: Vec<String>,
-    no_nodes: usize,
+    no_nodes: i64,
 }
 
 impl Transaction {
     pub fn add_segment(&mut self, dp_journal: Journal) {
         self.operations.push(Operation::AddSegment(dp_journal.id()));
-        self.no_nodes += dp_journal.no_nodes();
+        self.no_nodes += dp_journal.no_nodes() as i64;
     }
 
-    pub fn replace_segments(&mut self, old: Vec<SegmentId>, new: SegmentId) {
-        for dpid in old {
-            self.operations.push(Operation::DeleteSegment(dpid));
-        }
-        self.operations.push(Operation::AddSegment(new));
+    pub fn delete_segment(&mut self, dp_journal: Journal) {
+        self.operations.push(Operation::DeleteSegment(dp_journal.id()));
+        self.no_nodes -= dp_journal.no_nodes() as i64;
     }
 
     pub fn delete_entry(&mut self, prefix: String) {
@@ -177,7 +175,8 @@ impl SegmentManager {
         let mut operations = &vec![];
         if has_operations {
             let has_delete = transaction.operations.iter().any(|op| matches!(op, Operation::DeleteSegment(_)));
-            self.state.no_nodes += transaction.no_nodes;
+            let new_no_nodes = self.state.no_nodes as i64 + transaction.no_nodes;
+            self.state.no_nodes = new_no_nodes.try_into().unwrap_or(0);
 
             self.state.journal.push(JournalTransaction {
                 txid: next_txid,
