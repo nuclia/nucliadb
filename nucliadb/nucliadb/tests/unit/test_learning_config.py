@@ -115,6 +115,7 @@ async def test_proxy(async_client):
     request = mock.Mock(
         query_params={"some": "data"},
         body=mock.AsyncMock(return_value=b"some data"),
+        headers={"x-nucliadb-user": "user", "x-nucliadb-roles": "roles"},
     )
     response = await proxy(request, "GET", "url")
 
@@ -124,7 +125,11 @@ async def test_proxy(async_client):
     assert response.headers["x-foo"] == "bar"
 
     async_client.request.assert_called_once_with(
-        method="GET", url="url", params={"some": "data"}, content=b"some data"
+        method="GET",
+        url="url",
+        params={"some": "data"},
+        content=b"some data",
+        headers={"x-nucliadb-user": "user", "x-nucliadb-roles": "roles"},
     )
 
 
@@ -134,6 +139,7 @@ async def test_proxy_stream_response(async_client, config_stream_response):
     request = mock.Mock(
         query_params={"some": "data"},
         body=mock.AsyncMock(return_value=b"some data"),
+        headers={"x-nucliadb-user": "user", "x-nucliadb-roles": "roles"},
     )
     response = await proxy(request, "GET", "url")
 
@@ -145,7 +151,11 @@ async def test_proxy_stream_response(async_client, config_stream_response):
     assert response.headers["Transfer-Encoding"] == "chunked"
 
     async_client.request.assert_called_once_with(
-        method="GET", url="url", params={"some": "data"}, content=b"some data"
+        method="GET",
+        url="url",
+        params={"some": "data"},
+        content=b"some data",
+        headers={"x-nucliadb-user": "user", "x-nucliadb-roles": "roles"},
     )
 
 
@@ -155,6 +165,7 @@ async def test_proxy_error(async_client):
     request = mock.Mock(
         query_params={"some": "data"},
         body=mock.AsyncMock(return_value=b"some data"),
+        headers={},
     )
     response = await proxy(request, "GET", "url")
 
@@ -166,5 +177,9 @@ async def test_proxy_error(async_client):
     assert response.media_type == "text/plain"
 
     async_client.request.assert_called_once_with(
-        method="GET", url="url", params={"some": "data"}, content=b"some data"
+        method="GET",
+        url="url",
+        params={"some": "data"},
+        content=b"some data",
+        headers={},
     )

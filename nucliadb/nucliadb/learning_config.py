@@ -75,6 +75,7 @@ async def proxy(
                 url=url,
                 params=request.query_params,
                 content=await request.body(),
+                headers=request.headers,
             )
         except Exception as exc:
             errors.capture_exception(exc)
@@ -114,10 +115,11 @@ def get_config_api_url() -> str:
 
 def get_config_auth_header() -> dict[str, str]:
     if is_onprem():
-        return {
-            NUCLIA_ONPREM_AUTH_HEADER: f"Bearer {nuclia_settings.nuclia_service_account}"
-        }
+        # public api: auth is done via the 'x-nuclia-nuakey' header
+        return {"X-NUCLIA-NUAKEY": f"Bearer {nuclia_settings.nuclia_service_account}"}
     else:
+        # internal api: auth is proxied from the request to the learning
+        # config api via the 'x-nucliadb-user' and 'x-nucliadb-roles' headers
         return {}
 
 
