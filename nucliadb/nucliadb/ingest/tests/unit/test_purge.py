@@ -39,6 +39,12 @@ class DataIterator:
             yield item
 
 
+@pytest.fixture(autouse=True)
+def learning_config():
+    with patch("nucliadb.ingest.purge.learning_config"):
+        yield
+
+
 @pytest.fixture
 def keys():
     yield []
@@ -93,6 +99,7 @@ async def test_purge_handle_errors(kb, keys, driver):
     kb.purge.side_effect = [ShardNotFound(), NodeError(), Exception(), None]
     driver.begin.return_value.delete.side_effect = Exception()
 
+    breakpoint()
     await purge.purge_kb(driver)
 
     driver.begin.return_value.commit.assert_not_called()
@@ -125,6 +132,8 @@ async def test_main(driver, storage):
         "nucliadb.ingest.purge.get_storage", return_value=storage
     ), patch(
         "nucliadb.ingest.purge.setup_driver", return_value=driver
+    ), patch(
+        "nucliadb.ingest.purge.setup_cluster", return_value=driver
     ):
         await purge.main()
 

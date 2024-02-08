@@ -233,7 +233,10 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             release_channel=release_channel,
         )
         try:
-            await learning_config.set_configuration(kbid, learning_config)
+            lconfig = {}
+            if request.HasField("learning_config"):
+                lconfig = json.loads(request.learning_config)
+            await learning_config.set_configuration(kbid, lconfig)
             logger.info("Learning configuration set", extra={"kbid": kbid})
         except Exception:
             # Rollback KB that was just created
@@ -874,7 +877,10 @@ def update_shards_with_updated_replica(
 
 def parse_model_metadata(request: KnowledgeBoxNew) -> SemanticModelMetadata:
     model = SemanticModelMetadata()
-    learning_config = json.loads(request.learning_config)
+
+    learning_config = {}
+    if request.HasField("learning_config"):
+        learning_config = json.loads(request.learning_config)
 
     # Parse vector similarity function
     if request.HasField("similarity"):

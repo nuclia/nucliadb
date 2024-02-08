@@ -60,6 +60,8 @@ pub struct KnowledgeBoxNew {
     pub default_min_score: ::core::option::Option<f32>,
     #[prost(enumeration="super::utils::ReleaseChannel", tag="7")]
     pub release_channel: i32,
+    #[prost(string, tag="8")]
+    pub learning_config: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NewKnowledgeBoxResponse {
