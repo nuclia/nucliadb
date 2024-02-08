@@ -74,7 +74,9 @@ async def kb_notifications_stream(
                     context, pb_notification, resource_cache
                 )
                 line = encode_streamed_notification(notification) + b"\n"
-                logger.debug(f"Sending notification: {notification.type}", extra={"kbid": kbid})
+                logger.debug(
+                    f"Sending notification: {notification.type}", extra={"kbid": kbid}
+                )
                 yield line
     except asyncio.TimeoutError:
         return
