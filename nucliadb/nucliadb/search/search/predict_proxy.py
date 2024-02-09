@@ -38,6 +38,12 @@ class PredictProxiedEndpoints(str, Enum):
     TOKENS = "tokens"
     CHAT = "chat"
     REPHRASE = "rephrase"
+    FEEDBACK = "feedback"
+
+
+MAPPED_ENDPOINTS = {
+    PredictProxiedEndpoints.FEEDBACK: "/collect/feedback/{kbid}",
+}
 
 
 async def predict_proxy(
@@ -46,19 +52,26 @@ async def predict_proxy(
     method: str,
     params: QueryParams,
     json: Optional[Any] = None,
+    headers: Optional[dict[str, str]] = None,
 ) -> Union[JSONResponse, StreamingResponse]:
     if not await exists_kb(kbid):
         raise KnowledgeBoxNotFound()
 
     predict: PredictEngine = get_predict()
 
-    # Add KB configuration headers
-    headers = predict.get_predict_headers(kbid)
+    headers = headers or {}
+    predict_headers = predict.get_predict_headers(kbid)
+    headers.update(predict_headers)
+
+    predict_endpoint: str = str(endpoint)
+    if endpoint in MAPPED_ENDPOINTS:
+        predict_endpoint = MAPPED_ENDPOINTS[endpoint].format(kbid=kbid)
+    url = predict.get_predict_url(predict_endpoint)
 
     # Proxy the request to predict API
     predict_response = await predict.make_request(
         method=method,
-        url=predict.get_predict_url(endpoint),
+        url=url,
         json=json,
         params=params,
         headers=headers,

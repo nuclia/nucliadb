@@ -177,6 +177,7 @@ def test_predict_proxy(kbid: str):
     _test_predict_proxy_chat(kbid)
     _test_predict_proxy_tokens(kbid)
     _test_predict_proxy_rephrase(kbid)
+    _test_predict_proxy_feedback(kbid)
 
 
 def test_learning_config(kbid: str):
@@ -289,6 +290,20 @@ def _test_predict_proxy_rephrase(kbid: str):
     rephrased_query = resp.json()
     # Status code 0 means success...
     assert rephrased_query.endswith("0")
+
+
+def _test_predict_proxy_feedback(kbid: str):
+    resp = requests.get(
+        os.path.join(BASE_URL, f"api/v1/kb/{kbid}/predict/feedback?month=2023-01"),
+        headers={
+            "content-type": "application/json",
+            "X-NUCLIADB-ROLES": "READER",
+            "x-ndb-client": "web",
+        },
+    )
+    raise_for_status(resp)
+    for _ in resp.iter_content():
+        pass
 
 
 def raise_for_status(resp):
