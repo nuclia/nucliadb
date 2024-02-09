@@ -39,9 +39,10 @@ from nucliadb_models.search import (
     SummarizeModel,
 )
 from nucliadb_telemetry import metrics
+from nucliadb_utils import const
 from nucliadb_utils.exceptions import LimitsExceededError
 from nucliadb_utils.settings import nuclia_settings
-from nucliadb_utils.utilities import Utility, set_utility
+from nucliadb_utils.utilities import Utility, has_feature, set_utility
 
 
 class SendToPredictError(Exception):
@@ -83,6 +84,7 @@ DUMMY_LEARNING_ID = "00"
 
 PUBLIC_PREDICT = "/api/v1/predict"
 PRIVATE_PREDICT = "/api/internal/predict"
+VERSIONED_PRIVATE_PREDICT = "/api/v1/internal/predict"
 SENTENCE = "/sentence"
 TOKENS = "/tokens"
 SUMMARIZE = "/summarize"
@@ -183,7 +185,10 @@ class PredictEngine:
         if self.onprem:
             return f"{self.public_url}{PUBLIC_PREDICT}{endpoint}"
         else:
-            return f"{self.cluster_url}{PRIVATE_PREDICT}{endpoint}"
+            if has_feature(const.Features.VERSIONED_PREDICT_API):
+                return f"{self.cluster_url}{VERSIONED_PRIVATE_PREDICT}{endpoint}"
+            else:
+                return f"{self.cluster_url}{PRIVATE_PREDICT}{endpoint}"
 
     def get_predict_headers(self, kbid: str) -> dict[str, str]:
         if self.onprem:

@@ -74,7 +74,7 @@ async def test_dummy_predict_engine():
             "X-STF-NUAKEY",
             "Bearer {service_account}",
         ),
-        (False, "{cluster}/api/internal/predict/sentence", "X-STF-KBID", "{kbid}"),
+        (False, "{cluster}/api/v1/internal/predict/sentence", "X-STF-KBID", "{kbid}"),
     ],
 )
 async def test_convert_sentence_ok(
@@ -137,7 +137,7 @@ async def test_convert_sentence_error(onprem):
             "X-STF-NUAKEY",
             "Bearer {service_account}",
         ),
-        (False, "{cluster}/api/internal/predict/tokens", "X-STF-KBID", "{kbid}"),
+        (False, "{cluster}/api/v1/internal/predict/tokens", "X-STF-KBID", "{kbid}"),
     ],
 )
 async def test_detect_entities_ok(
@@ -324,7 +324,7 @@ async def test_ask_document_cloud():
     )
 
     pe.session.post.assert_awaited_once_with(
-        url="cluster/api/internal/predict/ask_document",
+        url="cluster/api/v1/internal/predict/ask_document",
         json=AskDocumentModel(
             question="query", blocks=[["footext"]], user_id="userid"
         ).dict(),
@@ -353,7 +353,7 @@ async def test_rephrase():
     assert rephrased_query == "rephrased"
 
     pe.session.post.assert_awaited_once_with(
-        url="cluster/api/internal/predict/rephrase",
+        url="cluster/api/v1/internal/predict/rephrase",
         json=item.dict(),
         headers={"X-STF-KBID": "kbid"},
     )
@@ -423,7 +423,7 @@ async def test_summarize():
     assert summarize_response == summarized
 
     pe.session.post.assert_awaited_once_with(
-        url="cluster/api/internal/predict/summarize",
+        url="cluster/api/v1/internal/predict/summarize",
         json=item.dict(),
         headers={"X-STF-KBID": "kbid"},
         timeout=None,
