@@ -233,6 +233,9 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             release_channel=release_channel,
         )
         if not request.learning_config:
+            # Since we depend on the NucliaDB admin to adapt to these changes and send the learning
+            # config on KB creation, we will log a warning and continue for now. Eventually we will
+            # want to enforce that the learning config is always provided on KB creation.
             logger.warning("No learning configuration set for KB", extra={"kbid": kbid})
             return kbid
         try:
