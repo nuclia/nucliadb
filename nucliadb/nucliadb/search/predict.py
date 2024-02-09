@@ -185,7 +185,7 @@ class PredictEngine:
         if self.onprem:
             return f"{self.public_url}{PUBLIC_PREDICT}{endpoint}"
         else:
-            if has_feature(const.Features.VERSIONED_PREDICT_API):
+            if has_feature(const.Features.VERSIONED_PRIVATE_PREDICT):
                 return f"{self.cluster_url}{VERSIONED_PRIVATE_PREDICT}{endpoint}"
             else:
                 return f"{self.cluster_url}{PRIVATE_PREDICT}{endpoint}"
