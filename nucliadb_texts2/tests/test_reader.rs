@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use nucliadb_core::prelude::*;
+use nucliadb_core::texts::*;
 use nucliadb_texts2::reader::TextReaderService;
 use nucliadb_texts2::writer::TextWriterService;
 use tempfile::TempDir;

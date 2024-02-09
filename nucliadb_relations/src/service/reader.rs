@@ -24,6 +24,7 @@ use std::time::Instant;
 
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::*;
+use nucliadb_core::relations::*;
 use nucliadb_core::tracing::{self, *};
 use nucliadb_procs::measure;
 
@@ -44,7 +45,7 @@ impl Debug for RelationsReaderService {
 
 impl RelationsReaderService {
     #[tracing::instrument(skip_all)]
-    fn graph_search(&self, request: &RelationSearchRequest) -> NodeResult<Option<EntitiesSubgraphResponse>> {
+    fn graph_search(&self, request: &ProtosRequest) -> NodeResult<Option<EntitiesSubgraphResponse>> {
         let Some(bfs_request) = request.subgraph.as_ref() else {
             return Ok(None);
         };
@@ -123,7 +124,7 @@ impl RelationsReaderService {
     }
 
     #[tracing::instrument(skip_all)]
-    fn prefix_search(&self, request: &RelationSearchRequest) -> NodeResult<Option<RelationPrefixSearchResponse>> {
+    fn prefix_search(&self, request: &ProtosRequest) -> NodeResult<Option<RelationPrefixSearchResponse>> {
         use crate::bfs_engine::BfsGuide;
         let Some(prefix_request) = request.prefix.as_ref() else {
             return Ok(None);
@@ -261,7 +262,7 @@ impl RelationsReader for RelationsReaderService {
 
     #[measure(actor = "relations", metric = "search")]
     #[tracing::instrument(skip_all)]
-    fn search(&self, request: &RelationSearchRequest) -> NodeResult<RelationSearchResponse> {
+    fn search(&self, request: &ProtosRequest) -> NodeResult<ProtosResponse> {
         Ok(RelationSearchResponse {
             subgraph: self.graph_search(request)?,
             prefix: self.prefix_search(request)?,

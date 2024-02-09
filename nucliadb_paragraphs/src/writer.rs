@@ -22,6 +22,7 @@ use std::fmt::Debug;
 use std::fs;
 use std::time::Instant;
 
+use nucliadb_core::paragraphs::*;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::prost::Message;
 use nucliadb_core::protos::resource::ResourceStatus;

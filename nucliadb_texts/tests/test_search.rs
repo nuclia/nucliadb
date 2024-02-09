@@ -20,8 +20,8 @@
 
 mod common;
 
-use nucliadb_core::prelude::*;
 use nucliadb_core::protos::{DocumentSearchRequest, Faceted, Filter};
+use nucliadb_core::texts::*;
 use nucliadb_texts::reader::TextReaderService;
 
 #[test]

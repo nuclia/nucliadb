@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 mod common;
+
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::entities_subgraph_request::DeletedEntities;
 use nucliadb_core::protos::relation::RelationType;
@@ -26,6 +27,7 @@ use nucliadb_core::protos::{
     EntitiesSubgraphRequest, RelationNodeFilter, RelationPrefixSearchRequest, RelationSearchRequest, Resource,
     ResourceId,
 };
+use nucliadb_core::relations::*;
 use nucliadb_core::Channel;
 use nucliadb_relations2::reader::RelationsReaderService;
 use nucliadb_relations2::writer::RelationsWriterService;

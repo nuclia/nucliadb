@@ -180,13 +180,14 @@ fn split_mixed(expression: BooleanExpression, context: &QueryContext) -> NodeRes
     })
 }
 
+#[derive(Default)]
 pub struct QueryAnalysis {
     pub prefilter_query: Option<BooleanExpression>,
     pub search_query: Option<BooleanExpression>,
 }
 
-pub fn build_query_plan(query: Json, context: QueryContext) -> NodeResult<QueryAnalysis> {
-    let Json::Object(subexpressions) = query else {
+pub fn translate(query: String, context: QueryContext) -> NodeResult<QueryAnalysis> {
+    let Json::Object(subexpressions) = serde_json::from_str(&query)? else {
         #[rustfmt::skip] return Err(node_error!(
             "Unexpected query format {query}"
         ));

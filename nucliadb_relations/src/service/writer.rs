@@ -24,6 +24,7 @@ use std::time::Instant;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{Resource, ResourceId};
+use nucliadb_core::relations::*;
 use nucliadb_core::tracing::{self, *};
 use nucliadb_core::{IndexFiles, RawReplicaState};
 use nucliadb_procs::measure;

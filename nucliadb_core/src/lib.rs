@@ -43,10 +43,6 @@ pub mod thread {
 }
 
 pub mod prelude {
-    pub use crate::paragraphs::{self, *};
-    pub use crate::relations::{self, *};
-    pub use crate::texts::{self, *};
-    pub use crate::vectors::{self, *};
     pub use crate::{
         encapsulate_reader, encapsulate_writer, node_error, paragraph_read, paragraph_write, relation_read,
         relation_write, text_read, text_write, vector_read, vector_write, Context, NodeResult,

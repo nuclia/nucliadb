@@ -18,6 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use crate::query_language::{self, BooleanExpression, QueryAnalysis, QueryContext};
+use crate::NodeResult;
 use nucliadb_protos::prelude::Filter;
 use nucliadb_protos::utils::Security;
 
@@ -49,8 +51,8 @@ pub struct TimestampFilter {
 #[derive(Debug, Clone)]
 pub struct PreFilterRequest {
     pub timestamp_filters: Vec<TimestampFilter>,
-    pub labels_filters: Vec<String>,
     pub security: Option<Security>,
+    pub formula: Option<BooleanExpression>,
 }
 
 /// Represents a field that has met all of the
@@ -134,8 +136,8 @@ impl IndexQueries {
 
     /// When a pre-filter is run, the result can be used to modify the queries
     /// that the indexes must resolve.
-    pub fn apply_pre_filter(&mut self, pre_filtered: PreFilterResponse) {
-        if matches!(pre_filtered.valid_fields, ValidFieldCollector::None) {
+    pub fn apply_prefilter(&mut self, prefiltered: PreFilterResponse) {
+        if matches!(prefiltered.valid_fields, ValidFieldCollector::None) {
             // There are no matches so there is no need to run the rest of the search
             self.vectors_request = None;
             self.paragraphs_request = None;
@@ -145,10 +147,10 @@ impl IndexQueries {
         }
 
         if let Some(vectors_request) = self.vectors_request.as_mut() {
-            IndexQueries::apply_to_vectors(vectors_request, &pre_filtered);
+            IndexQueries::apply_to_vectors(vectors_request, &prefiltered);
         };
         if let Some(paragraph_request) = self.paragraphs_request.as_mut() {
-            IndexQueries::apply_to_paragraphs(paragraph_request, &pre_filtered);
+            IndexQueries::apply_to_paragraphs(paragraph_request, &prefiltered);
         };
     }
 }
@@ -156,64 +158,76 @@ impl IndexQueries {
 /// A shard reader will use this plan to produce search results as efficiently as
 /// possible.
 pub struct QueryPlan {
-    pub pre_filter: Option<PreFilterRequest>,
+    pub prefilter: Option<PreFilterRequest>,
     pub index_queries: IndexQueries,
 }
 
-/// A [`QueryPlan`] can be traced from a [`SearchRequest`]
-impl From<SearchRequest> for QueryPlan {
-    fn from(search_request: SearchRequest) -> Self {
-        QueryPlan {
-            pre_filter: compute_pre_filters(&search_request),
-            index_queries: IndexQueries {
-                vectors_request: compute_vectors_request(&search_request),
-                paragraphs_request: compute_paragraphs_request(&search_request),
-                texts_request: compute_texts_request(&search_request),
-                relations_request: compute_relations_request(&search_request),
-            },
-        }
-    }
+fn analyze_filter(search_request: &SearchRequest) -> NodeResult<QueryAnalysis> {
+    let Some(filter) = &search_request.filter else {
+        return Ok(QueryAnalysis::default());
+    };
+    let context = QueryContext {
+        field_labels: filter.field_labels.iter().cloned().collect(),
+        paragraph_labels: filter.paragraph_labels.iter().cloned().collect(),
+    };
+    let query = filter.expression.clone();
+
+    query_language::translate(query, context)
 }
 
-fn compute_pre_filters(search_request: &SearchRequest) -> Option<PreFilterRequest> {
-    let mut pre_filter_request = PreFilterRequest {
+pub fn build_query_plan(search_request: SearchRequest) -> NodeResult<QueryPlan> {
+    let mut query_analysis = analyze_filter(&search_request)?;
+    let prefilter = compute_prefilters(&search_request, &mut query_analysis);
+    let vectors_request = compute_vectors_request(&search_request);
+    let paragraphs_request = compute_paragraphs_request(&search_request);
+    let texts_request = compute_texts_request(&search_request);
+    let relations_request = compute_relations_request(&search_request);
+
+    Ok(QueryPlan {
+        prefilter: prefilter,
+        index_queries: IndexQueries {
+            vectors_request,
+            paragraphs_request,
+            texts_request,
+            relations_request,
+        },
+    })
+}
+
+fn compute_prefilters(search_request: &SearchRequest, analysis: &mut QueryAnalysis) -> Option<PreFilterRequest> {
+    let mut prefilter_request = PreFilterRequest {
         timestamp_filters: vec![],
-        labels_filters: vec![],
+        formula: None,
         security: None,
     };
 
     // Security filters
     let request_has_security_filters = search_request.security.is_some();
     if request_has_security_filters {
-        pre_filter_request.security = search_request.security.clone();
+        prefilter_request.security = search_request.security.clone();
     }
 
     // Timestamp filters
     let request_has_timestamp_filters = search_request.timestamps.as_ref().is_some();
     if request_has_timestamp_filters {
-        let timestamp_filters = compute_timestamp_pre_filters(search_request);
-        pre_filter_request.timestamp_filters.extend(timestamp_filters);
+        let timestamp_filters = compute_timestamp_prefilters(search_request);
+        prefilter_request.timestamp_filters.extend(timestamp_filters);
     }
 
     // Labels filters
-    let request_has_labels_filters =
-        search_request.filter.as_ref().map(|i| !i.field_labels.is_empty()).unwrap_or_default();
-
-    if request_has_labels_filters {
-        let labels = compute_labels_pre_filters(search_request);
-        pre_filter_request.labels_filters.extend(labels);
-    }
+    let request_has_labels_filters = analysis.prefilter_query.is_some();
+    prefilter_request.formula = analysis.prefilter_query.take();
 
     if !request_has_timestamp_filters && !request_has_labels_filters && !request_has_security_filters {
         return None;
     }
-    Some(pre_filter_request)
+    Some(prefilter_request)
 }
 
-fn compute_timestamp_pre_filters(search_request: &SearchRequest) -> Vec<TimestampFilter> {
-    let mut timestamp_pre_filters = vec![];
+fn compute_timestamp_prefilters(search_request: &SearchRequest) -> Vec<TimestampFilter> {
+    let mut timestamp_prefilters = vec![];
     let Some(request_timestamp_filters) = search_request.timestamps.as_ref() else {
-        return timestamp_pre_filters;
+        return timestamp_prefilters;
     };
 
     let modified_filter = TimestampFilter {
@@ -221,23 +235,15 @@ fn compute_timestamp_pre_filters(search_request: &SearchRequest) -> Vec<Timestam
         from: request_timestamp_filters.from_modified.clone(),
         to: request_timestamp_filters.to_modified.clone(),
     };
-    timestamp_pre_filters.push(modified_filter);
+    timestamp_prefilters.push(modified_filter);
 
     let created_filter = TimestampFilter {
         applies_to: FieldDateType::Created,
         from: request_timestamp_filters.from_created.clone(),
         to: request_timestamp_filters.to_created.clone(),
     };
-    timestamp_pre_filters.push(created_filter);
-    timestamp_pre_filters
-}
-
-fn compute_labels_pre_filters(search_request: &SearchRequest) -> Vec<String> {
-    let mut labels_pre_filters = vec![];
-    search_request.filter.iter().flat_map(|f| f.field_labels.iter()).for_each(|tag| {
-        labels_pre_filters.push(tag.clone());
-    });
-    labels_pre_filters
+    timestamp_prefilters.push(created_filter);
+    timestamp_prefilters
 }
 
 fn compute_paragraphs_request(search_request: &SearchRequest) -> Option<ParagraphSearchRequest> {
@@ -249,7 +255,6 @@ fn compute_paragraphs_request(search_request: &SearchRequest) -> Option<Paragrap
         with_duplicates: search_request.with_duplicates,
         body: search_request.body.clone(),
         fields: search_request.fields.clone(),
-        filter: search_request.filter.clone(),
         order: search_request.order.clone(),
         faceted: search_request.faceted.clone(),
         page_number: search_request.page_number,
@@ -269,7 +274,6 @@ fn compute_texts_request(search_request: &SearchRequest) -> Option<DocumentSearc
     Some(DocumentSearchRequest {
         body: search_request.body.clone(),
         fields: search_request.fields.clone(),
-        filter: search_request.filter.clone(),
         order: search_request.order.clone(),
         faceted: search_request.faceted.clone(),
         page_number: search_request.page_number,
@@ -286,14 +290,6 @@ fn compute_vectors_request(search_request: &SearchRequest) -> Option<VectorSearc
     if search_request.result_per_page == 0 || search_request.vector.is_empty() {
         return None;
     }
-    let field_label_filters = search_request
-        .filter
-        .iter()
-        .flat_map(|f| f.field_labels.iter().cloned())
-        .chain(search_request.fields.iter().cloned())
-        .collect();
-    let paragraph_label_filters =
-        search_request.filter.iter().flat_map(|f| f.paragraph_labels.iter().cloned()).collect();
     Some(VectorSearchRequest {
         vector_set: search_request.vectorset.clone(),
         vector: search_request.vector.clone(),
@@ -301,8 +297,6 @@ fn compute_vectors_request(search_request: &SearchRequest) -> Option<VectorSearc
         result_per_page: search_request.result_per_page,
         with_duplicates: search_request.with_duplicates,
         key_filters: search_request.key_filters.clone(),
-        field_labels: field_label_filters,
-        paragraph_labels: paragraph_label_filters,
         min_score: search_request.min_score,
         ..Default::default()
     })

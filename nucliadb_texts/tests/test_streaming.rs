@@ -20,8 +20,8 @@
 
 mod common;
 
-use nucliadb_core::prelude::*;
 use nucliadb_core::protos::StreamRequest;
+use nucliadb_core::texts::*;
 
 #[test]
 fn test_stream_request_iterator() {

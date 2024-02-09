@@ -26,6 +26,7 @@ use nucliadb_core::protos::{
     DocumentScored, DocumentVectorIdentifier, SentenceMetadata, VectorSearchRequest, VectorSearchResponse,
 };
 use nucliadb_core::tracing::{self, *};
+use nucliadb_core::vectors::*;
 use nucliadb_procs::measure;
 
 use crate::data_point_provider::*;
@@ -80,7 +81,7 @@ impl VectorReader for VectorReaderService {
 
     #[measure(actor = "vectors", metric = "search")]
     #[tracing::instrument(skip_all)]
-    fn search(&self, request: &VectorSearchRequest) -> NodeResult<VectorSearchResponse> {
+    fn search(&self, request: &ProtosRequest, _: &VectorsContext) -> NodeResult<ProtosResponse> {
         let time = Instant::now();
 
         let id = Some(&request.id);
@@ -295,11 +296,12 @@ mod tests {
             with_duplicates: true,
             ..Default::default()
         };
-        let result = reader.search(&request).unwrap();
+        let context = VectorsContext::default();
+        let result = reader.search(&request, &context).unwrap();
         assert_eq!(result.documents.len(), 4);
 
         request.key_filters = vec!["DOC/KEY/0".to_string()];
-        let result = reader.search(&request).unwrap();
+        let result = reader.search(&request, &context).unwrap();
         assert_eq!(result.documents.len(), 0);
     }
 
@@ -375,7 +377,8 @@ mod tests {
             with_duplicates: true,
             ..Default::default()
         };
-        let result = reader.search(&request).unwrap();
+        let context = VectorsContext::default();
+        let result = reader.search(&request, &context).unwrap();
         assert_eq!(result.documents.len(), 4);
 
         let request = VectorSearchRequest {
@@ -388,7 +391,7 @@ mod tests {
             with_duplicates: false,
             ..Default::default()
         };
-        let result = reader.search(&request).unwrap();
+        let result = reader.search(&request, &context).unwrap();
         let no_nodes = reader.count("").unwrap();
         assert_eq!(no_nodes, 4);
         assert_eq!(result.documents.len(), 3);
@@ -405,7 +408,7 @@ mod tests {
             min_score: 900.0,
             ..Default::default()
         };
-        let result = reader.search(&request).unwrap();
+        let result = reader.search(&request, &context).unwrap();
         let no_nodes = reader.count("").unwrap();
         assert_eq!(no_nodes, 4);
         assert_eq!(result.documents.len(), 0);
@@ -420,7 +423,7 @@ mod tests {
             with_duplicates: false,
             ..Default::default()
         };
-        assert!(reader.search(&bad_request).is_err());
+        assert!(reader.search(&bad_request, &context).is_err());
     }
 
     #[test]
@@ -490,7 +493,8 @@ mod tests {
             with_duplicates: true,
             ..Default::default()
         };
-        let result = reader.search(&request).unwrap();
+        let context = VectorsContext::default();
+        let result = reader.search(&request, &context).unwrap();
         assert_eq!(result.documents.len(), 2);
 
         let request = VectorSearchRequest {
@@ -503,7 +507,7 @@ mod tests {
             with_duplicates: false,
             ..Default::default()
         };
-        let result = reader.search(&request).unwrap();
+        let result = reader.search(&request, &context).unwrap();
         assert_eq!(result.documents.len(), 1);
     }
 }

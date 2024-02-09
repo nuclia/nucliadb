@@ -27,6 +27,8 @@ use crate::IndexFiles;
 
 pub type TextsReaderPointer = Arc<dyn FieldReader>;
 pub type TextsWriterPointer = Arc<RwLock<dyn FieldWriter>>;
+pub type ProtosRequest = DocumentSearchRequest;
+pub type ProtosResponse = DocumentSearchResponse;
 
 #[derive(Debug, Clone)]
 pub struct TextConfig {
@@ -50,7 +52,7 @@ impl Iterator for DocumentIterator {
 }
 
 pub trait FieldReader: std::fmt::Debug + Send + Sync {
-    fn search(&self, request: &DocumentSearchRequest) -> NodeResult<DocumentSearchResponse>;
+    fn search(&self, request: &ProtosRequest) -> NodeResult<ProtosResponse>;
     fn stored_ids(&self) -> NodeResult<Vec<String>>;
     fn pre_filter(&self, request: &PreFilterRequest) -> NodeResult<PreFilterResponse>;
     fn iterator(&self, request: &StreamRequest) -> NodeResult<DocumentIterator>;

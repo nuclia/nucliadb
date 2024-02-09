@@ -22,11 +22,14 @@ use std::sync::{Arc, RwLock};
 
 use crate::prelude::*;
 use crate::protos::*;
+use crate::query_language::BooleanExpression;
 use crate::Channel;
 use crate::IndexFiles;
 
 pub type VectorsReaderPointer = Arc<dyn VectorReader>;
 pub type VectorsWriterPointer = Arc<RwLock<dyn VectorWriter>>;
+pub type ProtosRequest = VectorSearchRequest;
+pub type ProtosResponse = VectorSearchResponse;
 
 #[derive(Clone)]
 pub struct VectorConfig {
@@ -36,8 +39,16 @@ pub struct VectorConfig {
     pub channel: Channel,
 }
 
+// In an ideal world this should be part of the actual request, but since
+// we use protos all the way down the stack here we are. Once the protos use
+// is restricted to only the upper layer, this type won't be needed anymore.
+#[derive(Clone, Default)]
+pub struct VectorsContext {
+    pub filtering_formula: Option<BooleanExpression>,
+}
+
 pub trait VectorReader: std::fmt::Debug + Send + Sync {
-    fn search(&self, request: &VectorSearchRequest) -> NodeResult<VectorSearchResponse>;
+    fn search(&self, request: &ProtosRequest, context: &VectorsContext) -> NodeResult<ProtosResponse>;
     fn stored_ids(&self) -> NodeResult<Vec<String>>;
     fn count(&self, vectorset: &str) -> NodeResult<usize>;
 }

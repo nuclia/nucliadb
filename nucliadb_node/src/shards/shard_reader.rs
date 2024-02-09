@@ -16,12 +16,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashSet;
-use std::fs::{self, File};
-use std::io::{BufReader, Read};
-use std::path::{Path, PathBuf};
-
 use crossbeam_utils::thread as crossbeam_thread;
+use nucliadb_core::paragraphs::*;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos;
 use nucliadb_core::protos::shard_created::{DocumentService, ParagraphService, RelationService, VectorService};
@@ -31,13 +27,20 @@ use nucliadb_core::protos::{
     SearchResponse, Shard, ShardFile, ShardFileChunk, ShardFileList, StreamRequest, SuggestFeatures, SuggestRequest,
     SuggestResponse, TypeList, VectorSearchRequest, VectorSearchResponse,
 };
-use nucliadb_core::query_planner::QueryPlan;
+use nucliadb_core::query_planner;
+use nucliadb_core::relations::*;
+use nucliadb_core::texts::*;
 use nucliadb_core::thread::*;
 use nucliadb_core::tracing::{self, *};
+use nucliadb_core::vectors::*;
 use nucliadb_procs::measure;
 use nucliadb_protos::nodereader::{RelationNodeFilter, RelationPrefixSearchResponse};
 use nucliadb_protos::utils::relation_node::NodeType;
 use nucliadb_relations2::reader::HashedRelationNode;
+use std::collections::HashSet;
+use std::fs::{self, File};
+use std::io::{BufReader, Read};
+use std::path::{Path, PathBuf};
 
 use crate::disk_structure::*;
 use crate::shards::metadata::ShardMetadata;
@@ -404,17 +407,17 @@ impl ShardReader {
     #[measure(actor = "shard", metric = "request/search")]
     #[tracing::instrument(skip_all)]
     pub fn search(&self, search_request: SearchRequest) -> NodeResult<SearchResponse> {
-        let query_plan = QueryPlan::from(search_request);
+        let query_plan = query_planner::build_query_plan(search_request)?;
 
         let search_id = uuid::Uuid::new_v4().to_string();
         let span = tracing::Span::current();
-        let pre_filter = query_plan.pre_filter;
+        let pre_filter = query_plan.prefilter;
         let mut index_queries = query_plan.index_queries;
 
         // Apply pre-filtering to the query plan
         if let Some(pre_filter) = pre_filter {
             let pre_filtered = self.text_reader.pre_filter(&pre_filter)?;
-            index_queries.apply_pre_filter(pre_filtered);
+            index_queries.apply_prefilter(pre_filtered);
         }
 
         // Run the rest of the plan
@@ -430,7 +433,7 @@ impl ShardReader {
             request.id = search_id.clone();
             let paragraph_reader_service = self.paragraph_reader.clone();
             let info = info_span!(parent: &span, "paragraph search");
-            let task = move || paragraph_reader_service.search(&request);
+            let task = move || paragraph_reader_service.search(&request, &ParagraphsContext::default());
             || run_with_telemetry(info, task)
         });
 
@@ -438,7 +441,7 @@ impl ShardReader {
             request.id = search_id.clone();
             let vector_reader_service = self.vector_reader.clone();
             let info = info_span!(parent: &span, "vector search");
-            let task = move || vector_reader_service.search(&request);
+            let task = move || vector_reader_service.search(&request, &VectorsContext::default());
             || run_with_telemetry(info, task)
         });
 
@@ -541,7 +544,7 @@ impl ShardReader {
     pub fn paragraph_search(&self, search_request: ParagraphSearchRequest) -> NodeResult<ParagraphSearchResponse> {
         let span = tracing::Span::current();
         run_with_telemetry(info_span!(parent: &span, "paragraph reader search"), || {
-            self.paragraph_reader.search(&search_request)
+            self.paragraph_reader.search(&search_request, &ParagraphsContext::default())
         })
     }
 
@@ -559,7 +562,7 @@ impl ShardReader {
         let span = tracing::Span::current();
 
         run_with_telemetry(info_span!(parent: &span, "vector reader search"), || {
-            self.vector_reader.search(&search_request)
+            self.vector_reader.search(&search_request, &VectorsContext::default())
         })
     }
     #[tracing::instrument(skip_all)]

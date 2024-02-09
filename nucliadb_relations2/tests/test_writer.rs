@@ -23,6 +23,7 @@ use nucliadb_core::prelude::*;
 use nucliadb_core::protos::relation::RelationType;
 use nucliadb_core::protos::relation_node::NodeType;
 use nucliadb_core::protos::{Resource, ResourceId};
+use nucliadb_core::relations::*;
 use nucliadb_core::Channel;
 use nucliadb_relations2::writer::RelationsWriterService;
 use tempfile::TempDir;
