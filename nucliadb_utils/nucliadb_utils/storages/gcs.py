@@ -64,7 +64,7 @@ OBJECT_DATA_CHUNK_SIZE = 1 * MB
 
 
 DEFAULT_SCOPES = ["https://www.googleapis.com/auth/devstorage.read_write"]
-MAX_TRIES = 4
+MAX_TRIES = 6
 
 POLICY_DELETE = {
     "lifecycle": {
