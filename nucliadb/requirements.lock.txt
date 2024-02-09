@@ -57,7 +57,7 @@ mmh3==4.0.1
 mrflagly==0.2.5
 multidict==6.0.4
 mypy-protobuf==3.4.0
-nats-py==2.5.0
+nats-py==2.6.0
 nkeys==0.1.0
 oauth2client==4.1.3
 opentelemetry-api==1.21.0
