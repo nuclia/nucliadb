@@ -56,7 +56,9 @@ class Writer:
     async def garbage_collector(self, shard_id: str):
         return await self.stub.GC(ShardId(id=shard_id))  # type: ignore
 
-    @backoff.on_exception(backoff.expo, (AioRpcError,), max_tries=4)
+    @backoff.on_exception(
+        backoff.expo, (AioRpcError,), jitter=backoff.random_jitter, max_tries=4
+    )
     async def shards(self) -> ShardIds:
         pb = EmptyQuery()
         return await self.stub.ListShards(pb)  # type: ignore
