@@ -99,7 +99,11 @@ async def test_purge_handle_errors(kb, keys, driver):
     driver.begin.return_value.abort.assert_called_once()
 
 
-async def test_purge_kb_storage(keys, driver, storage):
+async def test_purge_kb_storage(
+    keys,
+    driver,
+    storage,
+):
     keys.append("/pathto/kbid")
 
     await purge.purge_kb_storage(driver, storage)
@@ -125,6 +129,8 @@ async def test_main(driver, storage):
         "nucliadb.ingest.purge.get_storage", return_value=storage
     ), patch(
         "nucliadb.ingest.purge.setup_driver", return_value=driver
+    ), patch(
+        "nucliadb.ingest.purge.setup_cluster", return_value=driver
     ):
         await purge.main()
 

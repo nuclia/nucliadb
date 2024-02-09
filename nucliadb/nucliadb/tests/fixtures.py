@@ -22,7 +22,7 @@ import os
 import tempfile
 from os.path import dirname
 from typing import AsyncIterator
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock, patch
 
 import asyncpg
 import pytest
@@ -122,8 +122,17 @@ def tmpdir():
         pass
 
 
+@pytest.fixture()
+def learning_config():
+    with patch("nucliadb.ingest.service.writer.learning_config") as mocked:
+        mocked.set_configuration = AsyncMock(return_value=None)
+        yield mocked
+
+
 @pytest.fixture(scope="function")
-async def nucliadb(dummy_processing, analytics_disabled, driver_settings, tmpdir):
+async def nucliadb(
+    dummy_processing, analytics_disabled, driver_settings, tmpdir, learning_config
+):
     from nucliadb.common.cluster import manager
 
     manager.INDEX_NODES.clear()

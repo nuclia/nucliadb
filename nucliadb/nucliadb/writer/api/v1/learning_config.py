@@ -17,11 +17,27 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from . import export_import  # noqa
-from . import field  # noqa
-from . import knowledgebox  # noqa
-from . import learning_config  # noqa
-from . import resource  # noqa
-from . import services  # noqa
-from . import upload  # noqa
-from .router import api  # noqa
+from fastapi import Request
+from fastapi_versioning import version
+
+from nucliadb import learning_config
+from nucliadb.writer.api.v1.router import KB_PREFIX, api
+from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_utils.authentication import requires
+
+
+@api.patch(
+    path=f"/{KB_PREFIX}/{{kbid}}/configuration",
+    status_code=204,
+    name="Update Knowledge Box models configuration",
+    description="Update current configuration of models assigned to a Knowledge Box",
+    response_model=None,
+    tags=["Knowledge Boxes"],
+)
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def patch_configuration(
+    request: Request,
+    kbid: str,
+):
+    return await learning_config.proxy(request, "POST", f"/config/{kbid}")

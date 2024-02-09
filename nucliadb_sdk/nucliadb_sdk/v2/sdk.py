@@ -21,7 +21,6 @@ import base64
 import enum
 import inspect
 import io
-import json
 import warnings
 from typing import (
     Any,
@@ -122,7 +121,7 @@ def chat_response_parser(response: httpx.Response) -> ChatResponse:
         answer, tail = answer.split(b"_CIT_")
         citations_length = int.from_bytes(tail[:4], byteorder="big", signed=False)
         citations_bytes = tail[4 : 4 + citations_length]
-        citations = json.loads(base64.b64decode(citations_bytes).decode())
+        citations = orjson.loads(base64.b64decode(citations_bytes).decode())
     except ValueError:
         citations = {}
     return ChatResponse(
@@ -159,6 +158,7 @@ def _parse_response(response_type, resp: httpx.Response) -> Any:
 def is_raw_request_content(content: Any) -> bool:
     return (
         isinstance(content, str)
+        or isinstance(content, dict)
         or isinstance(content, bytes)
         or inspect.isgenerator(content)
         or inspect.isasyncgen(content)
@@ -215,6 +215,7 @@ def _request_builder(
                 data = request_type.parse_obj(content_data).json(by_alias=True)  # type: ignore
         elif is_raw_request_content(content):
             raw_content = content
+
         query_params = kwargs.pop("query_params", None)
         if len(kwargs) > 0:
             raise TypeError(f"Invalid arguments provided: {kwargs}")
@@ -709,6 +710,63 @@ class _NucliaDBBase:
         docstring=docstrings.TRAINSET_PARTITIONS,
     )
 
+    # Learning Configuration
+    get_configuration = _request_builder(
+        name="get_configuration",
+        path_template="/v1/kb/{kbid}/configuration",
+        method="GET",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=None,
+    )
+    set_configuration = _request_builder(
+        name="set_configuration",
+        path_template="/v1/kb/{kbid}/configuration",
+        method="PATCH",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=None,
+    )
+
+    # Learning models
+    download_model = _request_builder(
+        name="download_model",
+        path_template="/v1/kb/{kbid}/models/{model_id}/{filename}",
+        method="GET",
+        path_params=("kbid", "model_id", "filename"),
+        stream_response=True,
+        request_type=None,
+        response_type=None,
+    )
+
+    get_models = _request_builder(
+        name="get_models",
+        path_template="/v1/kb/{kbid}/models",
+        method="GET",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=None,
+    )
+
+    get_model = _request_builder(
+        name="get_model",
+        path_template="/v1/kb/{kbid}/model/{model_id}",
+        method="GET",
+        path_params=("kbid", "model_id"),
+        request_type=None,
+        response_type=None,
+    )
+
+    # Learning config schema
+    get_configuration_schema = _request_builder(
+        name="get_configuration_schema",
+        path_template="/v1/kb/{kbid}/schema",
+        method="GET",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=None,
+    )
+
 
 class NucliaDB(_NucliaDBBase):
     """
@@ -777,6 +835,8 @@ class NucliaDB(_NucliaDBBase):
         if data is not None:
             opts["content"] = data
         if content is not None:
+            if isinstance(content, dict):
+                content = orjson.dumps(content)
             opts["content"] = content
         if query_params is not None:
             opts["params"] = query_params
@@ -873,6 +933,8 @@ class NucliaDBAsync(_NucliaDBBase):
         if data is not None:
             opts["content"] = data
         if content is not None:
+            if isinstance(content, dict):
+                content = orjson.dumps(content)
             opts["content"] = content
         if query_params is not None:
             opts["params"] = query_params
