@@ -69,7 +69,9 @@ def async_client(config_response):
     client.request = mock.AsyncMock(return_value=config_response)
     client.post = mock.AsyncMock(return_value=config_response)
     client.delete = mock.AsyncMock(return_value=config_response)
-    with mock.patch("nucliadb.learning_config.httpx.AsyncClient", return_value=client):
+    with mock.patch("nucliadb.learning_config.learning_config_client") as mocked:
+        mocked.return_value.__aenter__.return_value = client
+        mocked.return_value.__aexit__.return_value = None
         yield client
 
 
