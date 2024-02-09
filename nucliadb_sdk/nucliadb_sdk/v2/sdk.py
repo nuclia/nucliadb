@@ -933,6 +933,8 @@ class NucliaDBAsync(_NucliaDBBase):
         if data is not None:
             opts["content"] = data
         if content is not None:
+            if isinstance(content, dict):
+                content = orjson.dumps(content)
             opts["content"] = content
         if query_params is not None:
             opts["params"] = query_params
