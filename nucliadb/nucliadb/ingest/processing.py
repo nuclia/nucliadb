@@ -164,9 +164,9 @@ class ProcessingEngine:
                 f"{nuclia_processing_cluster_url}/api/v1/processing/upload"
             )
         self.nuclia_internal_push_v2 = (
-            f"{nuclia_processing_cluster_url}/api/internal/v2/processing/push"
+            f"{nuclia_processing_cluster_url}/api/v2/internal/processing/push"
         )
-        self.nuclia_internal_delete = f"{nuclia_processing_cluster_url}/api/internal/v2/processing/delete-requests"
+        self.nuclia_internal_delete = f"{nuclia_processing_cluster_url}/api/v2/internal/processing/delete-requests"
         self.nuclia_external_push_v2 = (
             f"{self.nuclia_public_url}/api/v2/processing/push"
         )

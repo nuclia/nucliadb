@@ -40,7 +40,8 @@ def get_processing_api_url() -> str:
         )
     else:
         return (
-            nuclia_settings.nuclia_processing_cluster_url + "/api/internal/processing"
+            nuclia_settings.nuclia_processing_cluster_url
+            + "/api/v1/internal/processing"
         )
 
 
@@ -53,7 +54,7 @@ def get_processing_api_url_v2() -> str:
     else:
         return (
             nuclia_settings.nuclia_processing_cluster_url
-            + "/api/internal/v2/processing"
+            + "/api/v2/internal/processing"
         )
 
 

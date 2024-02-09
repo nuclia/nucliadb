@@ -61,7 +61,7 @@ async def pull_processor_api():
     app = FastAPI()
     messages: list[BrokerMessage] = []  # type: ignore
 
-    @app.get("/api/internal/processing/pull")
+    @app.get("/api/v1/internal/processing/pull")
     async def pull():
         if len(messages) == 0:
             return {"status": "empty"}

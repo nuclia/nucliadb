@@ -76,7 +76,7 @@ def test_get_processing_api_url():
     ):
         assert (
             processing.get_processing_api_url()
-            == "https://nuclia_processing_cluster_url/api/internal/processing"
+            == "https://nuclia_processing_cluster_url/api/v1/internal/processing"
         )
 
 
