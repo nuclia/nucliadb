@@ -19,110 +19,217 @@
 
 #![allow(unused)]
 
-use std::collections::LinkedList;
+use crate::node_error;
+use crate::NodeResult;
+use serde_json::Value as Json;
+use std::collections::HashSet;
 
-use serde_json::Value as JsonExpression;
+pub struct QueryContext {
+    pub paragraph_labels: HashSet<String>,
+    pub field_labels: HashSet<String>,
+}
 
-/// Operators allowed in negated normal form.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-enum NnfOperator {
+pub enum Operator {
     And,
     Or,
     Not,
 }
 
-/// Used to apply [`NnfOperator`]s to [`NnfExpression`]s.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-struct NnfClause {
-    operator: NnfOperator,
-    operands: LinkedList<NnfExpression>,
+pub struct BooleanOperation {
+    pub operator: Operator,
+    pub operands: Vec<BooleanExpression>,
 }
 
-/// A [`NnfExpression`] is one formed by using literals and [`NnfOperator`]s.
-/// Every propositional formula must be transformed to this form before it can
-/// be written in conjunctive normal form. This form has the following invariants:
-///     - Not is only applied to literals.
-///     - Nested applications of the same operator are flattened.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-enum NnfExpression {
-    Clause(NnfClause),
+pub enum BooleanExpression {
     Literal(String),
+    Operation(BooleanOperation),
 }
 
-fn transform_not(negated: bool, operand: JsonExpression) -> NnfExpression {
-    transform(!negated, operand)
+#[derive(Debug, Clone)]
+struct Translated {
+    is_nested: bool,
+    has_field_labels: bool,
+    has_paragraph_labels: bool,
+    expression: BooleanExpression,
 }
 
-fn transform_literal(negated: bool, literal: String) -> NnfExpression {
-    match negated {
-        false => NnfExpression::Literal(literal),
-        true => NnfExpression::Clause(NnfClause {
-            operator: NnfOperator::Not,
-            operands: LinkedList::from([NnfExpression::Literal(literal)]),
+fn translate_literal(literal: String, context: &QueryContext) -> Translated {
+    Translated {
+        is_nested: false,
+        has_field_labels: context.field_labels.contains(&literal),
+        has_paragraph_labels: context.paragraph_labels.contains(&literal),
+        expression: BooleanExpression::Literal(literal),
+    }
+}
+
+fn translate_not(inner: Json, context: &QueryContext) -> NodeResult<Translated> {
+    let inner = translate_json(inner, context)?;
+    Ok(Translated {
+        has_field_labels: inner.has_field_labels,
+        has_paragraph_labels: inner.has_paragraph_labels,
+        is_nested: match &inner.expression {
+            BooleanExpression::Literal(_) => false,
+            BooleanExpression::Operation(_) => true,
+        },
+        expression: BooleanExpression::Operation(BooleanOperation {
+            operator: Operator::Not,
+            operands: vec![inner.expression],
         }),
-    }
-}
-
-fn transform_or(negated: bool, json_operands: Vec<JsonExpression>) -> NnfExpression {
-    let mut operands = LinkedList::new();
-
-    for json_operand in json_operands {
-        let nnf_expression = transform(negated, json_operand);
-        let NnfExpression::Clause(mut clause) = nnf_expression else {
-            operands.push_back(nnf_expression);
-            continue;
-        };
-        if let NnfOperator::Or = clause.operator {
-            operands.append(&mut clause.operands);
-        } else {
-            operands.push_back(NnfExpression::Clause(clause));
-        }
-    }
-
-    NnfExpression::Clause(NnfClause {
-        operands,
-        operator: NnfOperator::Or,
     })
 }
 
-fn transform_and(negated: bool, json_operands: Vec<JsonExpression>) -> NnfExpression {
-    let mut operands = LinkedList::new();
-
-    for json_operand in json_operands {
-        let nnf_expression = transform(negated, json_operand);
-        let NnfExpression::Clause(mut clause) = nnf_expression else {
-            operands.push_back(nnf_expression);
-            continue;
-        };
-        if let NnfOperator::And = clause.operator {
-            operands.append(&mut clause.operands);
-        } else {
-            operands.push_back(NnfExpression::Clause(clause));
+fn translate_other(operator: Operator, operands: Vec<Json>, context: &QueryContext) -> NodeResult<Translated> {
+    let mut is_nested = false;
+    let mut has_field_labels = false;
+    let mut has_paragraph_labels = false;
+    let mut boolean_operation = BooleanOperation {
+        operator,
+        operands: Vec::with_capacity(operands.len()),
+    };
+    for json_operand in operands {
+        let operand = translate_json(json_operand, context)?;
+        if let BooleanExpression::Operation(_) = &operand.expression {
+            is_nested = true;
         }
+        has_field_labels = has_field_labels || operand.has_field_labels;
+        has_paragraph_labels = has_paragraph_labels || operand.has_paragraph_labels;
+        boolean_operation.operands.push(operand.expression);
     }
-
-    NnfExpression::Clause(NnfClause {
-        operands,
-        operator: NnfOperator::And,
+    Ok(Translated {
+        is_nested,
+        has_field_labels,
+        has_paragraph_labels,
+        expression: BooleanExpression::Operation(boolean_operation),
     })
 }
 
-fn transform(negated: bool, expression: JsonExpression) -> NnfExpression {
-    let JsonExpression::Object(json_object) = expression else {
-        panic!("This function should only be called with json objects");
+fn translate_json(query: Json, context: &QueryContext) -> NodeResult<Translated> {
+    let Json::Object(json_object) = query else {
+        #[rustfmt::skip] return Err(node_error!(
+            "Only json objects are valid roots for expressions: {query}"
+        ));
     };
-    let Some((key, expression)) = json_object.into_iter().next() else {
-        panic!("Empty objects are not valid expressions");
+    let Some((root_id, inner_expression)) = json_object.into_iter().next() else {
+        #[rustfmt::skip] return Err(node_error!(
+            "Empty objects are not supported by the schema"
+        ));
     };
-    match (key.as_str(), negated, expression) {
-        ("and", true, JsonExpression::Array(operands)) => transform_or(negated, operands),
-        ("and", false, JsonExpression::Array(operands)) => transform_and(negated, operands),
-        ("or", true, JsonExpression::Array(operands)) => transform_and(negated, operands),
-        ("or", false, JsonExpression::Array(operands)) => transform_or(negated, operands),
-        ("not", _, operand) => transform_not(negated, operand),
-        ("literal", _, JsonExpression::String(literal)) => transform_literal(negated, literal),
-        ill_formed => panic!("Unexpected expression: {ill_formed:?} "),
+    match (root_id.as_str(), inner_expression) {
+        ("literal", Json::String(literal)) => Ok(translate_literal(literal, context)),
+        ("and", Json::Array(operands)) => translate_other(Operator::And, operands, context),
+        ("or", Json::Array(operands)) => translate_other(Operator::Or, operands, context),
+        ("not", operand) => translate_not(operand, context),
+        (root_id, _) => Err(node_error!("{root_id} is not a valid expression")),
     }
+}
+
+struct ExpressionSplit {
+    fields_only: BooleanExpression,
+    paragraphs_only: BooleanExpression,
+}
+
+fn split_mixed(expression: BooleanExpression, context: &QueryContext) -> NodeResult<ExpressionSplit> {
+    let BooleanExpression::Operation(expression) = expression else {
+        #[rustfmt::skip] return Err(node_error!(
+            "This function can not operate with literals"
+        ));
+    };
+    if !matches!(expression.operator, Operator::And) {
+        #[rustfmt::skip] return Err(node_error!(
+            "Only mixed ANDs can be splitted"
+        ));
+    }
+
+    let operands = expression.operands;
+    let mut fields_only = Vec::new();
+    let mut paragraphs_only = Vec::new();
+
+    for operand in operands {
+        let BooleanExpression::Literal(literal) = operand else {
+            #[rustfmt::skip] return Err(node_error!(
+                "Nested expressions can not be splitted"
+            ));
+        };
+        if context.field_labels.contains(&literal) {
+            fields_only.push(BooleanExpression::Literal(literal));
+        } else {
+            paragraphs_only.push(BooleanExpression::Literal(literal))
+        }
+    }
+
+    Ok(ExpressionSplit {
+        fields_only: if fields_only.len() == 1 {
+            fields_only.pop().unwrap()
+        } else {
+            BooleanExpression::Operation(BooleanOperation {
+                operator: Operator::And,
+                operands: fields_only,
+            })
+        },
+        paragraphs_only: if paragraphs_only.len() == 1 {
+            paragraphs_only.pop().unwrap()
+        } else {
+            BooleanExpression::Operation(BooleanOperation {
+                operator: Operator::And,
+                operands: paragraphs_only,
+            })
+        },
+    })
+}
+
+pub struct QueryAnalysis {
+    pub prefilter_query: Option<BooleanExpression>,
+    pub search_query: Option<BooleanExpression>,
+}
+
+pub fn build_query_plan(query: Json, context: QueryContext) -> NodeResult<QueryAnalysis> {
+    let Json::Object(subexpressions) = query else {
+        #[rustfmt::skip] return Err(node_error!(
+            "Unexpected query format {query}"
+        ));
+    };
+
+    let mut prefilter_queries = Vec::new();
+    let mut search_queries = Vec::new();
+
+    for (root_id, expression) in subexpressions {
+        let as_json_expression = serde_json::json!({ root_id: expression });
+        let translation_report = translate_json(as_json_expression, &context)?;
+        if translation_report.has_field_labels && translation_report.has_paragraph_labels {
+            let splitted = split_mixed(translation_report.expression, &context)?;
+            prefilter_queries.push(splitted.fields_only);
+            search_queries.push(splitted.paragraphs_only);
+        } else if translation_report.is_nested {
+            prefilter_queries.push(translation_report.expression);
+        } else if translation_report.has_field_labels {
+            prefilter_queries.push(translation_report.expression);
+        } else {
+            search_queries.push(translation_report.expression);
+        }
+    }
+
+    Ok(QueryAnalysis {
+        prefilter_query: if prefilter_queries.len() <= 1 {
+            prefilter_queries.pop()
+        } else {
+            Some(BooleanExpression::Operation(BooleanOperation {
+                operator: Operator::And,
+                operands: prefilter_queries,
+            }))
+        },
+
+        search_query: if search_queries.len() <= 1 {
+            search_queries.pop()
+        } else {
+            Some(BooleanExpression::Operation(BooleanOperation {
+                operator: Operator::And,
+                operands: search_queries,
+            }))
+        },
+    })
 }
 
 #[cfg(test)]
@@ -130,108 +237,207 @@ mod tests {
     use super::*;
 
     #[test]
-    fn literal_to_nnf() {
-        let json_expression = serde_json::json!({
-            "literal": "var",
+    fn translate_json_and_nested() {
+        #[rustfmt::skip] let context = QueryContext {
+            paragraph_labels: HashSet::from([
+                "foo".to_string(),
+            ]),
+            field_labels: HashSet::from([
+                "var".to_string(),
+            ]),
+        };
+        let query = serde_json::json!({
+            "and": [
+                { "not": {"literal": "var"}},
+                {"literal": "foo"},
+            ]
         });
-        let expected = NnfExpression::Literal("var".to_string());
-        let computed = transform(false, json_expression);
 
-        assert_eq!(expected, computed);
+        let not_var = BooleanExpression::Operation(BooleanOperation {
+            operator: Operator::Not,
+            operands: vec![BooleanExpression::Literal("var".to_string())],
+        });
+        let expected = BooleanExpression::Operation(BooleanOperation {
+            operator: Operator::And,
+            operands: vec![not_var, BooleanExpression::Literal("foo".to_string())],
+        });
+
+        let translation = translate_json(query, &context).unwrap();
+        assert!(translation.is_nested);
+        assert!(translation.has_paragraph_labels);
+        assert!(translation.has_field_labels);
+        assert_eq!(translation.expression, expected);
     }
 
     #[test]
-    fn negated_literal_to_nnf() {
-        let json_expression = serde_json::json!({
+    fn translate_json_and() {
+        #[rustfmt::skip] let context = QueryContext {
+            paragraph_labels: HashSet::from([
+                "foo".to_string(),
+            ]),
+            field_labels: HashSet::from([
+                "var".to_string(),
+            ]),
+        };
+        let query = serde_json::json!({
+            "and": [
+                {"literal": "var"},
+                {"literal": "foo"},
+            ]
+        });
+        let expected = BooleanExpression::Operation(BooleanOperation {
+            operator: Operator::And,
+            operands: vec![
+                BooleanExpression::Literal("var".to_string()),
+                BooleanExpression::Literal("foo".to_string()),
+            ],
+        });
+
+        let translation = translate_json(query, &context).unwrap();
+        assert!(!translation.is_nested);
+        assert!(translation.has_paragraph_labels);
+        assert!(translation.has_field_labels);
+        assert_eq!(translation.expression, expected);
+    }
+
+    #[test]
+    fn translate_json_or() {
+        #[rustfmt::skip] let context = QueryContext {
+            paragraph_labels: HashSet::with_capacity(0),
+            field_labels: HashSet::from([
+                "var".to_string(),
+                "foo".to_string(),
+            ]),
+        };
+        let query = serde_json::json!({
+            "or": [
+                {"literal": "var"},
+                {"literal": "foo"},
+            ]
+        });
+        let expected = BooleanExpression::Operation(BooleanOperation {
+            operator: Operator::Or,
+            operands: vec![
+                BooleanExpression::Literal("var".to_string()),
+                BooleanExpression::Literal("foo".to_string()),
+            ],
+        });
+
+        let translation = translate_json(query, &context).unwrap();
+        assert!(!translation.is_nested);
+        assert!(!translation.has_paragraph_labels);
+        assert!(translation.has_field_labels);
+        assert_eq!(translation.expression, expected);
+    }
+
+    #[test]
+    fn translate_json_not() {
+        #[rustfmt::skip] let context = QueryContext {
+            paragraph_labels: HashSet::with_capacity(0),
+            field_labels: HashSet::from([
+                "var".to_string()
+            ]),
+        };
+        let query = serde_json::json!({
             "not": {
                 "literal": "var",
             }
         });
-        let expected = NnfExpression::Clause(NnfClause {
-            operator: NnfOperator::Not,
-            operands: LinkedList::from([NnfExpression::Literal("var".to_string())]),
+        let expected = BooleanExpression::Operation(BooleanOperation {
+            operator: Operator::Not,
+            operands: vec![BooleanExpression::Literal("var".to_string())],
         });
-        let computed = transform(false, json_expression);
-        assert_eq!(expected, computed);
+
+        let translation = translate_json(query, &context).unwrap();
+        assert!(!translation.is_nested);
+        assert!(!translation.has_paragraph_labels);
+        assert!(translation.has_field_labels);
+        assert_eq!(translation.expression, expected);
     }
 
     #[test]
-    fn double_negation_literal_to_nnf() {
-        let json_expression = serde_json::json!({
-            "not": {
-                "not": {
-                    "literal": "var",
-                }
-            }
-        });
-        let expected = NnfExpression::Literal("var".to_string());
-        let computed = transform(false, json_expression);
-        assert_eq!(expected, computed);
-    }
+    fn translate_json_literal() {
+        let expected = BooleanExpression::Literal("var".to_string());
 
-    #[test]
-    fn nested_formulas_are_flattened() {
-        let json_expression = serde_json::json!({
-            "or": [
-                { "literal": "var" },
-                {
-                    "or": [
-                        { "literal": "var" },
-                        { "literal": "foo" },
-                    ]
-                }
-
-            ]
-        });
-        let expected = NnfExpression::Clause(NnfClause {
-            operator: NnfOperator::Or,
-            operands: LinkedList::from([
-                NnfExpression::Literal("var".to_string()),
-                NnfExpression::Literal("var".to_string()),
-                NnfExpression::Literal("foo".to_string()),
+        #[rustfmt::skip] let context = QueryContext {
+            paragraph_labels: HashSet::with_capacity(0),
+            field_labels: HashSet::from([
+                "var".to_string()
             ]),
+        };
+        let query = serde_json::json!({
+            "literal": "var",
         });
-        let computed = transform(false, json_expression);
-        assert_eq!(expected, computed);
+
+        let translation = translate_json(query, &context).unwrap();
+        assert!(!translation.is_nested);
+        assert!(!translation.has_paragraph_labels);
+        assert!(translation.has_field_labels);
+        assert_eq!(translation.expression, expected);
+
+        #[rustfmt::skip] let context = QueryContext {
+            field_labels: HashSet::with_capacity(0),
+            paragraph_labels: HashSet::from([
+                "var".to_string()
+            ]),
+        };
+        let query = serde_json::json!({
+            "literal": "var",
+        });
+        let translation = translate_json(query, &context).unwrap();
+        assert!(!translation.is_nested);
+        assert!(!translation.has_field_labels);
+        assert!(translation.has_paragraph_labels);
+        assert_eq!(translation.expression, expected);
     }
 
     #[test]
-    fn nested_formulas_to_nnf() {
-        let json_expression = serde_json::json!({
-            "and": [
-                {
-                    "not": {
-                        "or": [
-                            { "literal": "var" },
-                            { "not": { "literal": "foo"} }
-                        ],
-                    }
-                },
-                {
-                    "or": [
-                        { "literal": "var" },
-                        { "literal": "foo" },
-                    ]
-                }
-            ]
+    fn test_split() {
+        #[rustfmt::skip] let context = QueryContext {
+            paragraph_labels: HashSet::from([
+                "foo_paragraph".to_string(), 
+                "var_paragraph".to_string()
+            ]),
+            field_labels: HashSet::from([
+                "foo_field".to_string(), 
+                "var_field".to_string()
+            ]),
+        };
+        let mixed_and = BooleanExpression::Operation(BooleanOperation {
+            operator: Operator::And,
+            operands: vec![
+                BooleanExpression::Literal("foo_field".to_string()),
+                BooleanExpression::Literal("foo_paragraph".to_string()),
+                BooleanExpression::Literal("var_field".to_string()),
+                BooleanExpression::Literal("var_paragraph".to_string()),
+            ],
         });
 
-        // Expected formula is: !var AND foo AND (var OR foo)
-        let var = NnfExpression::Literal("var".to_string());
-        let foo = NnfExpression::Literal("foo".to_string());
-        let not_var = NnfExpression::Clause(NnfClause {
-            operator: NnfOperator::Not,
-            operands: LinkedList::from([var.clone()]),
-        });
-        let var_or_foo = NnfExpression::Clause(NnfClause {
-            operator: NnfOperator::Or,
-            operands: LinkedList::from([var, foo.clone()]),
-        });
-        let expected = NnfExpression::Clause(NnfClause {
-            operator: NnfOperator::And,
-            operands: LinkedList::from([not_var, foo, var_or_foo]),
-        });
-        let computed = transform(false, json_expression);
-        assert_eq!(expected, computed);
+        let splitted_expression = split_mixed(mixed_and, &context).unwrap();
+        let BooleanExpression::Operation(fields_only) = splitted_expression.fields_only else {
+            panic!("Unexpected variant");
+        };
+        assert!(matches!(fields_only.operator, Operator::And));
+        assert_eq!(fields_only.operands.len(), context.field_labels.len());
+        for operand in fields_only.operands {
+            if let BooleanExpression::Literal(literal) = operand {
+                assert!(context.field_labels.contains(&literal));
+            } else {
+                panic!("Ill formed split");
+            }
+        }
+
+        let BooleanExpression::Operation(paragraphs_only) = splitted_expression.paragraphs_only else {
+            panic!("Unexpected variant");
+        };
+        assert!(matches!(paragraphs_only.operator, Operator::And));
+        assert_eq!(paragraphs_only.operands.len(), context.field_labels.len());
+        for operand in paragraphs_only.operands {
+            if let BooleanExpression::Literal(literal) = operand {
+                assert!(context.paragraph_labels.contains(&literal));
+            } else {
+                panic!("Ill formed split");
+            }
+        }
     }
 }
