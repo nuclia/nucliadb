@@ -124,7 +124,6 @@ async def start_processing_engine():
             nuclia_zone=nuclia_settings.nuclia_zone,
             onprem=nuclia_settings.onprem,
             nuclia_jwt_key=nuclia_settings.nuclia_jwt_key,
-            nuclia_cluster_url=nuclia_settings.nuclia_cluster_url,
             nuclia_processing_cluster_url=nuclia_settings.nuclia_processing_cluster_url,
             nuclia_public_url=nuclia_settings.nuclia_public_url,
             driver=storage_settings.file_backend,
@@ -140,7 +139,6 @@ class ProcessingEngine:
         nuclia_service_account: Optional[str] = None,
         nuclia_zone: Optional[str] = None,
         nuclia_public_url: Optional[str] = None,
-        nuclia_cluster_url: Optional[str] = None,
         nuclia_processing_cluster_url: Optional[str] = None,
         onprem: Optional[bool] = False,
         nuclia_jwt_key: Optional[str] = None,
@@ -156,11 +154,6 @@ class ProcessingEngine:
         else:
             self.nuclia_public_url = None
 
-        if nuclia_cluster_url is not None:
-            self.nuclia_cluster_url: Optional[str] = nuclia_cluster_url
-        else:
-            self.nuclia_cluster_url = None
-
         self.onprem = onprem
         if self.onprem:
             self.nuclia_upload_url = (
@@ -168,7 +161,7 @@ class ProcessingEngine:
             )
         else:
             self.nuclia_upload_url = (
-                f"{self.nuclia_cluster_url}/api/v1/processing/upload"
+                f"{nuclia_processing_cluster_url}/api/v1/processing/upload"
             )
         self.nuclia_internal_push_v2 = (
             f"{nuclia_processing_cluster_url}/api/internal/v2/processing/push"

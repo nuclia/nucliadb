@@ -63,7 +63,7 @@ async def test_dummy_processing_engine():
 def engine():
     pe = ProcessingEngine(
         onprem=True,
-        nuclia_cluster_url="cluster_url",
+        nuclia_processing_cluster_url="cluster_url",
         nuclia_public_url="public_url",
     )
     yield pe

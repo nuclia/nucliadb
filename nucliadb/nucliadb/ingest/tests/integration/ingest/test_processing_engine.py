@@ -48,7 +48,7 @@ async def test_send_to_process(onprem, mock_payload):
     fake_nuclia_proxy_url = "http://fake_proxy"
     processing_engine = ProcessingEngine(
         onprem=onprem,
-        nuclia_cluster_url=fake_nuclia_proxy_url,
+        nuclia_processing_cluster_url=fake_nuclia_proxy_url,
         nuclia_public_url=fake_nuclia_proxy_url,
     )
     await processing_engine.initialize()
@@ -77,7 +77,7 @@ async def test_delete_from_processing(onprem):
     fake_nuclia_proxy_url = "http://fake_proxy"
     processing_engine = ProcessingEngine(
         onprem=onprem,
-        nuclia_cluster_url=fake_nuclia_proxy_url,
+        nuclia_processing_cluster_url=fake_nuclia_proxy_url,
         nuclia_public_url=fake_nuclia_proxy_url,
     )
     await processing_engine.initialize()

@@ -53,7 +53,7 @@ class TestPullWorker:
             storage=AsyncMock(),
             pull_time_error_backoff=100,
             zone="zone",
-            nuclia_cluster_url="nuclia_cluster_url",
+            nuclia_processing_cluster_url="nuclia_processing_cluster_url",
             nuclia_public_url="nuclia_public_url",
             audit=None,
             onprem=False,
