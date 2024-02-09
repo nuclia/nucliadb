@@ -27,7 +27,7 @@ vector-bench:
 
 .PHONY: samply
 samply:
-	samply --help > /dev/null || cargo install samply
+	samply --help > /dev/null || cargo install samply --locked
 
 .PHONY: samply-vector-bench
 samply-vector-bench: samply
