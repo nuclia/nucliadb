@@ -68,7 +68,7 @@ def async_client(config_response):
     client.is_closed.return_value = False
     client.request = mock.AsyncMock(return_value=config_response)
     client.post = mock.AsyncMock(return_value=config_response)
-    client.post = mock.AsyncMock(return_value=config_response)
+    client.delete = mock.AsyncMock(return_value=config_response)
     with mock.patch("httpx.AsyncClient", return_value=client):
         yield client
 
