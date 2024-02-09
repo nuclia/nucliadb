@@ -92,3 +92,12 @@ def test_search_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
     sdk.chat_on_resource(kbid=kb.uuid, rid=resource.uuid, query="foo")
     sdk.feedback(kbid=kb.uuid, ident="bar", good=True, feedback="baz", task="CHAT")
     sdk.summarize(kbid=kb.uuid, resources=["foobar"])
+
+
+def test_learning_config_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
+    sdk.set_configuration(kbid=kb.uuid, content={"foo": "bar"})
+    sdk.get_configuration(kbid=kb.uuid)
+    sdk.download_model(kbid=kb.uuid, model_id="foo", filename="bar")
+    sdk.get_models(kbid=kb.uuid)
+    sdk.get_model(kbid=kb.uuid, model_id="foo")
+    sdk.get_configuration_schema(kbid=kb.uuid)
