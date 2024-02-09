@@ -25,4 +25,4 @@ RUN set -eux; \
 
 # Required by tonic
 RUN rustup component add rustfmt \
-    && cargo install cargo-chef
+    && cargo install cargo-chef --locked
