@@ -156,7 +156,9 @@ async def wait_for_node(app_context: ApplicationContext, node_id: str) -> None:
         await asyncio.sleep(2)
 
 
-@backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=8)
+@backoff.on_exception(
+    backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=8
+)
 async def index_resource(
     app_context: ApplicationContext,
     kbid: str,

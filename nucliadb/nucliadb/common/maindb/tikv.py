@@ -82,7 +82,9 @@ class TiKVDataLayer:
                 output[key.decode()] = value
         return [output.get(key) for key in keys]
 
-    @backoff.on_exception(backoff.expo, (TimeoutError,), jitter=backoff.random_jitter, max_tries=2)
+    @backoff.on_exception(
+        backoff.expo, (TimeoutError,), jitter=backoff.random_jitter, max_tries=2
+    )
     async def get(self, key: str) -> Optional[bytes]:
         try:
             with tikv_observer({"type": "get"}):
@@ -226,7 +228,9 @@ class TiKVTransaction(Transaction):
         assert self.open
         return await self.data_layer.batch_get(keys)
 
-    @backoff.on_exception(backoff.expo, (TimeoutError,), jitter=backoff.random_jitter, max_tries=2)
+    @backoff.on_exception(
+        backoff.expo, (TimeoutError,), jitter=backoff.random_jitter, max_tries=2
+    )
     async def get(self, key: str) -> Optional[bytes]:
         assert self.open
         return await self.data_layer.get(key)

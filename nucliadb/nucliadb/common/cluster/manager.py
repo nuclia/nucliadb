@@ -427,7 +427,9 @@ class StandaloneKBShardManager(KBShardManager):
             )
             await index_node.writer.GC(noderesources_pb2.ShardId(id=shard_id))  # type: ignore
 
-    @backoff.on_exception(backoff.expo, NodesUnsync, jitter=backoff.random_jitter, max_tries=5)
+    @backoff.on_exception(
+        backoff.expo, NodesUnsync, jitter=backoff.random_jitter, max_tries=5
+    )
     async def delete_resource(
         self,
         shard: writer_pb2.ShardObject,
@@ -453,7 +455,9 @@ class StandaloneKBShardManager(KBShardManager):
                 )
             )
 
-    @backoff.on_exception(backoff.expo, NodesUnsync, jitter=backoff.random_jitter, max_tries=5)
+    @backoff.on_exception(
+        backoff.expo, NodesUnsync, jitter=backoff.random_jitter, max_tries=5
+    )
     async def add_resource(
         self,
         shard: writer_pb2.ShardObject,
