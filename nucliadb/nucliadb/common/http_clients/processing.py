@@ -98,9 +98,9 @@ class ProcessingHTTPClient:
         self.base_url = get_processing_api_url()
         self.headers = {}
         if nuclia_settings.nuclia_service_account is not None:
-            self.headers["X-STF-NUAKEY"] = (
-                f"Bearer {nuclia_settings.nuclia_service_account}"
-            )
+            self.headers[
+                "X-STF-NUAKEY"
+            ] = f"Bearer {nuclia_settings.nuclia_service_account}"
 
     async def __aenter__(self):
         return self
@@ -215,9 +215,9 @@ class ProcessingV2HTTPClient:
         self.base_url = get_processing_api_url_v2()
         self.headers = {}
         if nuclia_settings.nuclia_service_account is not None:
-            self.headers["X-STF-NUAKEY"] = (
-                f"Bearer {nuclia_settings.nuclia_service_account}"
-            )
+            self.headers[
+                "X-STF-NUAKEY"
+            ] = f"Bearer {nuclia_settings.nuclia_service_account}"
 
     async def __aenter__(self):
         return self
