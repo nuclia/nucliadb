@@ -123,9 +123,14 @@ def get_config_auth_header() -> dict[str, str]:
         return {}
 
 
+class DummyResponse(httpx.Response):
+    def raise_for_status(self) -> httpx.Response:
+        return self
+
+
 class DummyClient(httpx.AsyncClient):
     def _response(self):
-        return httpx.Response(
+        return DummyResponse(
             status_code=200,
             content=b"Dummy client is not supposed to be used",
         )
