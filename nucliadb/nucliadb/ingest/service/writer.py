@@ -232,10 +232,11 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             forceuuid=request.forceuuid,
             release_channel=release_channel,
         )
+        if not request.learning_config:
+            logger.warning("No learning configuration set for KB", extra={"kbid": kbid})
+            return kbid
         try:
-            lconfig = {}
-            if request.learning_config:
-                lconfig = json.loads(request.learning_config)
+            lconfig = json.loads(request.learning_config)
             await learning_config.set_configuration(kbid, lconfig)
             logger.info("Learning configuration set", extra={"kbid": kbid})
         except Exception:
