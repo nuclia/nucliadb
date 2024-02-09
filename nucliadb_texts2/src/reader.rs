@@ -240,15 +240,10 @@ impl FieldReader for TextReaderService {
 
         Ok(count)
     }
-}
-
-impl ReaderChild for TextReaderService {
-    type Request = DocumentSearchRequest;
-    type Response = DocumentSearchResponse;
 
     #[measure(actor = "texts", metric = "search")]
     #[tracing::instrument(skip_all)]
-    fn search(&self, request: &Self::Request) -> NodeResult<Self::Response> {
+    fn search(&self, request: &DocumentSearchRequest) -> NodeResult<DocumentSearchResponse> {
         self.do_search(request)
     }
 

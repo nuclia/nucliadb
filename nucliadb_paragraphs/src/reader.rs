@@ -65,7 +65,7 @@ impl ParagraphReader for ParagraphReaderService {
 
     #[measure(actor = "paragraphs", metric = "suggest")]
     #[tracing::instrument(skip_all)]
-    fn suggest(&self, request: &SuggestRequest) -> NodeResult<Self::Response> {
+    fn suggest(&self, request: &SuggestRequest) -> NodeResult<ParagraphSearchResponse> {
         let time = Instant::now();
         let id = Some(&request.shard);
 
@@ -128,15 +128,10 @@ impl ParagraphReader for ParagraphReaderService {
         };
         Ok(ParagraphIterator::new(producer.flatten()))
     }
-}
-
-impl ReaderChild for ParagraphReaderService {
-    type Request = ParagraphSearchRequest;
-    type Response = ParagraphSearchResponse;
 
     #[measure(actor = "paragraphs", metric = "search")]
     #[tracing::instrument(skip_all)]
-    fn search(&self, request: &Self::Request) -> NodeResult<Self::Response> {
+    fn search(&self, request: &ParagraphSearchRequest) -> NodeResult<ParagraphSearchResponse> {
         let time = Instant::now();
         let id = Some(&request.id);
 
@@ -666,6 +661,7 @@ mod tests {
         let filter = Filter {
             field_labels: vec!["/l/mylabel_resource".to_string(), "/c/ool".to_string(), "/e/mylabel".to_string()],
             paragraph_labels: vec![],
+            ..Default::default()
         };
 
         let faceted = Faceted {

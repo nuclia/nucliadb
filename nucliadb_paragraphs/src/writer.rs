@@ -55,9 +55,7 @@ impl Debug for ParagraphWriterService {
     }
 }
 
-impl ParagraphWriter for ParagraphWriterService {}
-
-impl WriterChild for ParagraphWriterService {
+impl ParagraphWriter for ParagraphWriterService {
     #[measure(actor = "paragraphs", metric = "count")]
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {

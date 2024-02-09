@@ -108,9 +108,7 @@ impl VectorWriter for VectorWriterService {
 
         Ok(())
     }
-}
 
-impl WriterChild for VectorWriterService {
     #[measure(actor = "vectors", metric = "count")]
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {

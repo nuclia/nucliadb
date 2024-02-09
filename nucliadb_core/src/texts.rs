@@ -23,6 +23,8 @@ use std::sync::{Arc, RwLock};
 use crate::prelude::*;
 use crate::protos::*;
 use crate::query_planner::{PreFilterRequest, PreFilterResponse};
+use crate::IndexFiles;
+
 pub type TextsReaderPointer = Arc<dyn FieldReader>;
 pub type TextsWriterPointer = Arc<RwLock<dyn FieldWriter>>;
 
@@ -47,10 +49,19 @@ impl Iterator for DocumentIterator {
     }
 }
 
-pub trait FieldReader: ReaderChild<Request = DocumentSearchRequest, Response = DocumentSearchResponse> {
+pub trait FieldReader: std::fmt::Debug + Send + Sync {
+    fn search(&self, request: &DocumentSearchRequest) -> NodeResult<DocumentSearchResponse>;
+    fn stored_ids(&self) -> NodeResult<Vec<String>>;
     fn pre_filter(&self, request: &PreFilterRequest) -> NodeResult<PreFilterResponse>;
     fn iterator(&self, request: &StreamRequest) -> NodeResult<DocumentIterator>;
     fn count(&self) -> NodeResult<usize>;
 }
 
-pub trait FieldWriter: WriterChild {}
+pub trait FieldWriter: std::fmt::Debug + Send + Sync {
+    fn set_resource(&mut self, resource: &Resource) -> NodeResult<()>;
+    fn delete_resource(&mut self, resource_id: &ResourceId) -> NodeResult<()>;
+    fn garbage_collection(&mut self) -> NodeResult<()>;
+    fn count(&self) -> NodeResult<usize>;
+    fn get_segment_ids(&self) -> NodeResult<Vec<String>>;
+    fn get_index_files(&self, ignored_segment_ids: &[String]) -> NodeResult<IndexFiles>;
+}

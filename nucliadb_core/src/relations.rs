@@ -23,9 +23,10 @@ use std::sync::{Arc, RwLock};
 use crate::prelude::*;
 use crate::protos::*;
 use crate::Channel;
+use crate::IndexFiles;
 
-pub type RelationsReaderPointer = Arc<dyn RelationReader>;
-pub type RelationsWriterPointer = Arc<RwLock<dyn RelationWriter>>;
+pub type RelationsReaderPointer = Arc<dyn RelationsReader>;
+pub type RelationsWriterPointer = Arc<RwLock<dyn RelationsWriter>>;
 
 #[derive(Clone)]
 pub struct RelationConfig {
@@ -33,10 +34,19 @@ pub struct RelationConfig {
     pub channel: Channel,
 }
 
-pub trait RelationReader: ReaderChild<Request = RelationSearchRequest, Response = RelationSearchResponse> {
+pub trait RelationsReader: std::fmt::Debug + Send + Sync {
+    fn search(&self, request: &RelationSearchRequest) -> NodeResult<RelationSearchResponse>;
+    fn stored_ids(&self) -> NodeResult<Vec<String>>;
     fn get_edges(&self) -> NodeResult<EdgeList>;
     fn get_node_types(&self) -> NodeResult<TypeList>;
     fn count(&self) -> NodeResult<usize>;
 }
 
-pub trait RelationWriter: WriterChild {}
+pub trait RelationsWriter: std::fmt::Debug + Send + Sync {
+    fn set_resource(&mut self, resource: &Resource) -> NodeResult<()>;
+    fn delete_resource(&mut self, resource_id: &ResourceId) -> NodeResult<()>;
+    fn garbage_collection(&mut self) -> NodeResult<()>;
+    fn count(&self) -> NodeResult<usize>;
+    fn get_segment_ids(&self) -> NodeResult<Vec<String>>;
+    fn get_index_files(&self, ignored_segment_ids: &[String]) -> NodeResult<IndexFiles>;
+}

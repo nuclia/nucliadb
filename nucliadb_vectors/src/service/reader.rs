@@ -77,15 +77,10 @@ impl VectorReader for VectorReaderService {
             }
         }
     }
-}
-
-impl ReaderChild for VectorReaderService {
-    type Request = VectorSearchRequest;
-    type Response = VectorSearchResponse;
 
     #[measure(actor = "vectors", metric = "search")]
     #[tracing::instrument(skip_all)]
-    fn search(&self, request: &Self::Request) -> NodeResult<Self::Response> {
+    fn search(&self, request: &VectorSearchRequest) -> NodeResult<VectorSearchResponse> {
         let time = Instant::now();
 
         let id = Some(&request.id);

@@ -190,7 +190,7 @@ impl RelationsReaderService {
     }
 }
 
-impl RelationReader for RelationsReaderService {
+impl RelationsReader for RelationsReaderService {
     #[measure(actor = "relations", metric = "count")]
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
@@ -258,15 +258,10 @@ impl RelationReader for RelationsReaderService {
             list: types,
         })
     }
-}
-
-impl ReaderChild for RelationsReaderService {
-    type Request = RelationSearchRequest;
-    type Response = RelationSearchResponse;
 
     #[measure(actor = "relations", metric = "search")]
     #[tracing::instrument(skip_all)]
-    fn search(&self, request: &Self::Request) -> NodeResult<Self::Response> {
+    fn search(&self, request: &RelationSearchRequest) -> NodeResult<RelationSearchResponse> {
         Ok(RelationSearchResponse {
             subgraph: self.graph_search(request)?,
             prefix: self.prefix_search(request)?,

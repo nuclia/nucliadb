@@ -52,11 +52,7 @@ impl Debug for RelationsWriterService {
     }
 }
 
-impl FieldWriter for RelationsWriterService {}
-
-impl RelationWriter for RelationsWriterService {}
-
-impl WriterChild for RelationsWriterService {
+impl RelationsWriter for RelationsWriterService {
     #[measure(actor = "relations" metric = "count")]
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
