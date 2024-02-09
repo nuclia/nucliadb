@@ -69,7 +69,7 @@ def async_client(config_response):
     client.request = mock.AsyncMock(return_value=config_response)
     client.post = mock.AsyncMock(return_value=config_response)
     client.delete = mock.AsyncMock(return_value=config_response)
-    with mock.patch("httpx.AsyncClient", return_value=client):
+    with mock.patch("nucliadb.learning_config.httpx.AsyncClient", return_value=client):
         yield client
 
 
@@ -101,10 +101,12 @@ async def get_learning_config_client(settings):
 
 async def test_set_configuration(async_client):
     await set_configuration("kbid", {"some": "data"})
+    async_client.post.assert_called_once_with("config/kbid", json={"some": "data"})
 
 
 async def test_delete_configuration(async_client):
     await delete_configuration("kbid")
+    async_client.delete.assert_called_once_with("config/kbid")
 
 
 async def test_proxy(async_client):
