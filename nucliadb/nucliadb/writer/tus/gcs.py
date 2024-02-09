@@ -64,6 +64,7 @@ MAX_RETRIES = 5
 
 RETRIABLE_EXCEPTIONS = (
     GoogleCloudException,
+    GoogleCloudRateLimit,
     aiohttp.client_exceptions.ClientPayloadError,
 )
 
