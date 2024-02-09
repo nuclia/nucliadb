@@ -53,7 +53,7 @@ class S3FileStorageManager(FileStorageManager):
     chunk_size = CHUNK_SIZE
     min_upload_size = MIN_UPLOAD_SIZE
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=3)
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=3)
     async def _abort_multipart(self, dm: FileDataManager):
         try:
             mpu = dm.get("mpu")
@@ -79,7 +79,7 @@ class S3FileStorageManager(FileStorageManager):
             bucket=bucket,
         )
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=3)
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=3)
     async def _create_multipart(self, path, bucket):
         return await self.storage._s3aioclient.create_multipart_upload(
             Bucket=bucket, Key=path
@@ -99,7 +99,7 @@ class S3FileStorageManager(FileStorageManager):
 
         return size
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=3)
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=3)
     async def _upload_part(self, dm: FileDataManager, data):
         return await self.storage._s3aioclient.upload_part(
             Bucket=dm.get("bucket"),
@@ -116,7 +116,7 @@ class S3FileStorageManager(FileStorageManager):
         await dm.finish()
         return path
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=3)
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=3)
     async def _complete_multipart_upload(self, dm: FileDataManager):
         # if blocks is 0, it means the file is of zero length so we need to
         # trick it to finish a multiple part with no data.
@@ -134,7 +134,7 @@ class S3FileStorageManager(FileStorageManager):
             MultipartUpload=dm.get("multipart"),
         )
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=3)
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=3)
     async def _download(self, uri: str, kbid: str, **kwargs):
         bucket = self.storage.get_bucket_name(kbid)
         return await self.storage._s3aioclient.get_object(

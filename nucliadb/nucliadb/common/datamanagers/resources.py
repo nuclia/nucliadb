@@ -42,7 +42,7 @@ class ResourcesDataManager:
         self.driver = driver
         self.storage = storage
 
-    @backoff.on_exception(backoff.expo, (Exception,), max_tries=3)
+    @backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
     async def iter_resource_slugs(self, kbid: str) -> AsyncGenerator[str, None]:
         async with self.driver.transaction() as txn:
             async for key in txn.keys(
@@ -50,7 +50,7 @@ class ResourcesDataManager:
             ):
                 yield key.split("/")[-1]
 
-    @backoff.on_exception(backoff.expo, (Exception,), max_tries=3)
+    @backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
     async def get_resource_ids_from_slugs(
         self, kbid: str, slugs: list[str]
     ) -> list[str]:
@@ -77,7 +77,7 @@ class ResourcesDataManager:
             for rid in await self.get_resource_ids_from_slugs(kbid, batch):
                 yield rid
 
-    @backoff.on_exception(backoff.expo, (Exception,), max_tries=3)
+    @backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
     async def get_resource_shard_id(self, kbid: str, rid: str) -> Optional[str]:
         async with self.driver.transaction() as txn:
             shard = await txn.get(KB_RESOURCE_SHARD.format(kbid=kbid, uuid=rid))
@@ -86,7 +86,7 @@ class ResourcesDataManager:
             else:
                 return None
 
-    @backoff.on_exception(backoff.expo, (Exception,), max_tries=3)
+    @backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
     async def get_resource(self, kbid: str, rid: str) -> Optional[ResourceORM]:
         """
         Not ideal to return Resource type here but refactoring would
@@ -98,7 +98,7 @@ class ResourcesDataManager:
             kb_orm = KnowledgeBoxORM(txn, self.storage, kbid)
             return await kb_orm.get(rid)
 
-    @backoff.on_exception(backoff.expo, (Exception,), max_tries=3)
+    @backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
     async def get_resource_index_message(
         self, kbid: str, rid: str
     ) -> Optional[noderesources_pb2.Resource]:

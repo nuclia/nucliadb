@@ -223,7 +223,7 @@ class PredictEngine:
         logger.error(f"Predict API error at {resp.url}: {detail}")
         raise ProxiedPredictAPIError(status=resp.status, detail=detail)
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=MAX_TRIES)
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=MAX_TRIES)
     async def make_request(self, method: str, **request_args):
         func = getattr(self.session, method.lower())
         return await func(**request_args)

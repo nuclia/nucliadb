@@ -137,7 +137,7 @@ async def _get_index_node_metadata(
     )
 
 
-@backoff.on_exception(backoff.expo, (Exception,), max_tries=4)
+@backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=4)
 async def _get_standalone_index_node_metadata(
     settings: Settings, address: str
 ) -> IndexNodeMetadata:
