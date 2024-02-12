@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import contextlib
+import json
 import logging
 from collections.abc import AsyncIterator
 from typing import Any, Type, Union
@@ -130,9 +131,11 @@ class DummyResponse(httpx.Response):
 
 class DummyClient(httpx.AsyncClient):
     def _response(self):
+        content = {"detail": "Dummy client is not supposed to be used"}
         return DummyResponse(
             status_code=200,
-            content=b"Dummy client is not supposed to be used",
+            headers={"content-type": "application/json"},
+            content=json.dumps(content).encode(),
         )
 
     async def get(self, *args: Any, **kwargs: Any):
