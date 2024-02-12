@@ -143,7 +143,7 @@ fn create_request(
     labels.iter().cloned().map(AtomClause::label).for_each(|c| formula.extend(c));
 
     if key_prefixes.len() > 0 {
-        formula.extend(CompoundClause::new(key_prefixes.collect()));
+        formula.extend(Compound::new(key_prefixes.collect()));
     }
 
     let res = Request {

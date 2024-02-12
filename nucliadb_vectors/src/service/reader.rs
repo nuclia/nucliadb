@@ -30,8 +30,9 @@ use nucliadb_core::vectors::*;
 use nucliadb_procs::measure;
 
 use crate::data_point_provider::*;
-use crate::formula::{AtomClause, CompoundClause, Formula};
+use crate::formula::{AtomClause, BooleanOperator, Clause, CompoundClause, Formula};
 use crate::indexset::IndexSet;
+use crate::service::query_io;
 
 impl<'a> SearchRequest for (usize, &'a VectorSearchRequest, Formula) {
     fn with_duplicates(&self) -> bool {
@@ -81,7 +82,7 @@ impl VectorReader for VectorReaderService {
 
     #[measure(actor = "vectors", metric = "search")]
     #[tracing::instrument(skip_all)]
-    fn search(&self, request: &ProtosRequest, _: &VectorsContext) -> NodeResult<ProtosResponse> {
+    fn search(&self, request: &ProtosRequest, context: &VectorsContext) -> NodeResult<ProtosResponse> {
         let time = Instant::now();
 
         let id = Some(&request.id);
@@ -93,15 +94,24 @@ impl VectorReader for VectorReaderService {
         let index_slock = self.index.get_slock()?;
 
         let key_filters = request.key_filters.iter().cloned().map(AtomClause::key_prefix);
-        let paragraph_labels = request.paragraph_labels.iter().cloned().map(AtomClause::label);
+        let field_labels = request.field_labels.iter().cloned().map(AtomClause::label);
         let mut formula = Formula::new();
-        request.field_labels.iter().cloned().map(AtomClause::label).for_each(|c| formula.extend(c));
+
+        if request.field_labels.len() > 0 {
+            let field_atoms = field_labels.map(Clause::Atom).collect();
+            let field_clause = CompoundClause::new(BooleanOperator::And, field_atoms);
+            formula.extend(field_clause);
+        }
 
         if key_filters.len() > 0 {
-            formula.extend(CompoundClause::new(key_filters.collect()));
+            let clause_labels = key_filters.map(Clause::Atom).collect();
+            let key_clause = CompoundClause::new(BooleanOperator::Or, clause_labels);
+            formula.extend(key_clause);
         }
-        for paragraph_label in paragraph_labels {
-            formula.extend(paragraph_label);
+
+        if let Some(filter) = context.filtering_formula.as_ref() {
+            let clause = query_io::map_expression(filter);
+            formula.extend(clause);
         }
 
         let search_request = (total_to_get, request, formula);

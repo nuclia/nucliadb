@@ -20,7 +20,7 @@
 
 use crate::data_point::{Address, DataRetriever};
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+#[derive(Debug, Copy, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 pub enum AtomKind {
     KeyPrefix,
     Label,
@@ -53,30 +53,45 @@ impl AtomClause {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+pub enum BooleanOperator {
+    Not,
+    Or,
+    And,
+}
+
 /// Is a clause formed by the conjuction of several LabelClauses. Additionally this
 /// clause has a threshold that specifies the minimum number of AtomClauses that have to
 /// succeed in order for the overall conjuction to be satisfied.
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, PartialEq)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct CompoundClause {
-    labels: Vec<AtomClause>,
+    operator: BooleanOperator,
+    operands: Vec<Clause>,
 }
 impl CompoundClause {
     pub fn len(&self) -> usize {
-        self.labels.len()
+        self.operands.len()
     }
     pub fn is_empty(&self) -> bool {
-        self.labels.is_empty()
+        self.operands.is_empty()
     }
-    pub fn new(labels: Vec<AtomClause>) -> CompoundClause {
+    pub fn new(operator: BooleanOperator, operands: Vec<Clause>) -> CompoundClause {
         CompoundClause {
-            labels,
+            operator,
+            operands,
         }
     }
     fn run<D: DataRetriever>(&self, x: Address, retriever: &D) -> bool {
         if self.is_empty() {
             return true;
         }
-        self.labels.iter().any(|label| label.run(x, retriever))
+
+        let mut subquery_iterator = self.operands.iter();
+        match self.operator {
+            BooleanOperator::And => subquery_iterator.all(|subquery| subquery.run(x, retriever)),
+            BooleanOperator::Or => subquery_iterator.any(|subquery| subquery.run(x, retriever)),
+            BooleanOperator::Not => !subquery_iterator.all(|subquery| subquery.run(x, retriever)),
+        }
     }
 }
 
@@ -144,14 +159,15 @@ impl Formula {
     /// Returns the atoms that form a formula
     pub fn get_atoms(&self) -> AtomCollector {
         let mut collector = AtomCollector::default();
-        for clause in self.clauses.iter() {
+        let mut work: Vec<_> = self.clauses.iter().collect();
+        while let Some(clause) = work.pop() {
             match clause {
-                Clause::Compound(q) => {
-                    for label in q.labels.iter() {
-                        collector.add(label.clone());
+                Clause::Atom(q) => collector.add(q.clone()),
+                Clause::Compound(clause) => {
+                    for clause in clause.operands.iter() {
+                        work.push(clause);
                     }
                 }
-                Clause::Atom(q) => collector.add(q.clone()),
             }
         }
         collector
@@ -209,19 +225,22 @@ mod tests {
         formula.extend(AtomClause::label(L2.to_string()));
         assert!(!formula.run(ADDRESS, &retriever));
 
+        #[rustfmt::skip] let inner = vec![
+            Clause::Atom(AtomClause::label(L1.to_string())), 
+            Clause::Atom(AtomClause::label(L2.to_string()))
+        ];
         let mut formula = Formula::new();
-        let inner = vec![AtomClause::label(L1.to_string()), AtomClause::label(L2.to_string())];
-        formula.extend(CompoundClause::new(inner));
+        formula.extend(CompoundClause::new(BooleanOperator::Or, inner));
         assert!(formula.run(ADDRESS, &retriever));
 
         let mut formula = Formula::new();
-        let inner = vec![AtomClause::key_prefix("/This/is".to_string())];
-        formula.extend(CompoundClause::new(inner));
+        let inner = vec![Clause::Atom(AtomClause::key_prefix("/This/is".to_string()))];
+        formula.extend(CompoundClause::new(BooleanOperator::Or, inner));
         assert!(formula.run(ADDRESS, &retriever));
         let mut formula = Formula::new();
 
-        let inner = vec![AtomClause::key_prefix("/This/is/not".to_string())];
-        formula.extend(CompoundClause::new(inner));
+        let inner = vec![Clause::Atom(AtomClause::key_prefix("/This/is/not".to_string()))];
+        formula.extend(CompoundClause::new(BooleanOperator::Or, inner));
         assert!(!formula.run(ADDRESS, &retriever));
     }
 }
