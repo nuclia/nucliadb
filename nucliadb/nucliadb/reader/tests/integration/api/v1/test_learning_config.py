@@ -92,4 +92,4 @@ async def test_api(reader_api, knowledgebox_ingest, learning_config_proxy):
         # Get schema
         resp = await client.get(f"/kb/{kbid}/schema")
         assert resp.status_code == 200
-        assert learning_config_proxy.calls[-1][1:] == ("GET", f"/schema/{kbid}")
+        assert learning_config_proxy.calls[-1][1:] == ("GET", f"/schema/{kbid}", None)
