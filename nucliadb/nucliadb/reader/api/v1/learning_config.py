@@ -97,7 +97,10 @@ async def get_model(
     model_id: str,
 ):
     return await learning_config.proxy(
-        request, "GET", f"/models/{kbid}/model/{model_id}"
+        request,
+        "GET",
+        f"/models/{kbid}/model/{model_id}",
+        headers={"X-STF-USER": request.headers.get("X-NUCLIADB-USER", "")},
     )
 
 

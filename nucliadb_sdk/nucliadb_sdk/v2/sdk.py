@@ -101,6 +101,10 @@ class ChatResponse(BaseModel):
 RawRequestContent = Union[str, bytes, Iterable[bytes], AsyncIterable[bytes]]
 
 
+def json_response_parser(response: httpx.Response) -> Any:
+    return orjson.loads(response.content.decode())
+
+
 def chat_response_parser(response: httpx.Response) -> ChatResponse:
     raw = io.BytesIO(response.content)
     header = raw.read(4)
@@ -717,7 +721,7 @@ class _NucliaDBBase:
         method="GET",
         path_params=("kbid",),
         request_type=None,
-        response_type=None,
+        response_type=json_response_parser,
     )
     set_configuration = _request_builder(
         name="set_configuration",
@@ -745,7 +749,7 @@ class _NucliaDBBase:
         method="GET",
         path_params=("kbid",),
         request_type=None,
-        response_type=None,
+        response_type=json_response_parser,
     )
 
     get_model = _request_builder(
@@ -754,7 +758,7 @@ class _NucliaDBBase:
         method="GET",
         path_params=("kbid", "model_id"),
         request_type=None,
-        response_type=None,
+        response_type=json_response_parser,
     )
 
     # Learning config schema
@@ -764,7 +768,7 @@ class _NucliaDBBase:
         method="GET",
         path_params=("kbid",),
         request_type=None,
-        response_type=None,
+        response_type=json_response_parser,
     )
 
 
