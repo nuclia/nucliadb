@@ -21,7 +21,7 @@ import contextlib
 import json
 import logging
 from collections.abc import AsyncIterator
-from typing import Any, Type, Union
+from typing import Any, Optional, Type, Union
 
 import httpx
 from fastapi import Request, Response
@@ -42,7 +42,7 @@ async def set_configuration(
     config: dict[str, Any],
 ) -> None:
     async with learning_config_client() as client:
-        resp = await client.post(f"config/{kbid}", json=config)
+        resp = await client.patch(f"config/{kbid}", json=config)
         resp.raise_for_status()
 
 
@@ -55,9 +55,7 @@ async def delete_configuration(
 
 
 async def proxy(
-    request: Request,
-    method: str,
-    url: str,
+    request: Request, method: str, url: str, headers: Optional[dict[str, str]] = None
 ) -> Union[Response, StreamingResponse]:
     """
     Proxy the request to the learning config API.
@@ -69,6 +67,8 @@ async def proxy(
     Returns: Response. The response from the learning config API.
     If the response is chunked, a StreamingResponse is returned.
     """
+    proxied_headers = headers or {}
+    proxied_headers.update(request.headers)
     async with learning_config_client() as client:
         try:
             response = await client.request(
@@ -76,7 +76,7 @@ async def proxy(
                 url=url,
                 params=request.query_params,
                 content=await request.body(),
-                headers=request.headers,
+                headers=proxied_headers,
             )
         except Exception as exc:
             errors.capture_exception(exc)

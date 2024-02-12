@@ -33,8 +33,8 @@ class MockProxy:
     def __init__(self):
         self.calls = []
 
-    async def __call__(self, request, method, url):
-        self.calls.append((request, method, url))
+    async def __call__(self, request, method, url, headers=None):
+        self.calls.append((request, method, url, headers))
         if method == "GET" and "download" in url:
 
             async def iter_content():
@@ -58,7 +58,7 @@ async def test_api(reader_api, knowledgebox_ingest, learning_config_proxy):
         # Get configuration
         resp = await client.get(f"/kb/{kbid}/configuration")
         assert resp.status_code == 200
-        assert learning_config_proxy.calls[-1][1:] == ("GET", f"/config/{kbid}")
+        assert learning_config_proxy.calls[-1][1:] == ("GET", f"/config/{kbid}", None)
 
         # Download model
         resp = await client.get(f"/kb/{kbid}/models/model1/path")
@@ -70,19 +70,23 @@ async def test_api(reader_api, knowledgebox_ingest, learning_config_proxy):
         assert learning_config_proxy.calls[-1][1:] == (
             "GET",
             f"/download/{kbid}/model/model1/path",
+            None,
         )
 
         # List models
         resp = await client.get(f"/kb/{kbid}/models")
         assert resp.status_code == 200
-        assert learning_config_proxy.calls[-1][1:] == ("GET", f"/models/{kbid}")
+        assert learning_config_proxy.calls[-1][1:] == ("GET", f"/models/{kbid}", None)
 
         # Get metadata of a model
-        resp = await client.get(f"/kb/{kbid}/model/model1")
+        resp = await client.get(
+            f"/kb/{kbid}/model/model1", headers={"x-nucliadb-user": "userfoo"}
+        )
         assert resp.status_code == 200
         assert learning_config_proxy.calls[-1][1:] == (
             "GET",
             f"/models/{kbid}/model/model1",
+            {"X-STF-USER": "userfoo"},
         )
 
         # Get schema
