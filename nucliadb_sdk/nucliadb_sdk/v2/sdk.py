@@ -101,7 +101,6 @@ class ChatResponse(BaseModel):
 RawRequestContent = Union[str, bytes, Iterable[bytes], AsyncIterable[bytes]]
 
 
-
 def json_response_parser(response: httpx.Response) -> Any:
     return orjson.loads(response.content.decode())
 
@@ -771,7 +770,6 @@ class _NucliaDBBase:
         request_type=None,
         response_type=json_response_parser,
     )
-
 
 
 class NucliaDB(_NucliaDBBase):
