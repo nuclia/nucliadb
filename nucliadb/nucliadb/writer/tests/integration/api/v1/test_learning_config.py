@@ -50,4 +50,4 @@ async def test_api(writer_api, knowledgebox_ingest, learning_config_proxy):
         resp = await client.patch(f"/kb/{kbid}/configuration", json={"some": "data"})
         assert resp.status_code == 204
 
-        assert learning_config_proxy.calls[0][1:] == ("POST", f"/config/{kbid}")
+        assert learning_config_proxy.calls[0][1:] == ("PATCH", f"/config/{kbid}")
