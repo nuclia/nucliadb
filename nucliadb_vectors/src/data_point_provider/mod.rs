@@ -20,7 +20,7 @@
 
 mod merge_worker;
 mod merger;
-mod state;
+pub mod state;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Write};
@@ -335,18 +335,8 @@ mod test {
         let data_point = DataPoint::new(
             &vectors_path,
             vec![
-                Elem::new(
-                    "key_0".to_string(),
-                    vec![1.0],
-                    LabelDictionary::default(),
-                    None,
-                ),
-                Elem::new(
-                    "key_1".to_string(),
-                    vec![1.0],
-                    LabelDictionary::default(),
-                    None,
-                ),
+                Elem::new("key_0".to_string(), vec![1.0], LabelDictionary::default(), None),
+                Elem::new("key_1".to_string(), vec![1.0], LabelDictionary::default(), None),
             ],
             None,
             Similarity::Cosine,
@@ -356,10 +346,7 @@ mod test {
         index.add(data_point, &lock).unwrap();
         index.commit(&lock).unwrap();
 
-        assert_eq!(
-            index.get_keys(&lock).unwrap(),
-            vec!["key_0".to_string(), "key_1".to_string()]
-        );
+        assert_eq!(index.get_keys(&lock).unwrap(), vec!["key_0".to_string(), "key_1".to_string()]);
 
         index.delete("key_0", SystemTime::now(), &lock);
         assert_eq!(index.get_keys(&lock).unwrap(), vec!["key_1".to_string()]);

@@ -56,7 +56,7 @@ impl TermCollector {
         self.eterms.insert(term);
     }
     pub fn log_fterm(&mut self, doc: DocId, data: (Arc<InvertedIndexReader>, u64)) {
-        self.fterms.entry(doc).or_insert_with(Vec::new).push(data);
+        self.fterms.entry(doc).or_default().push(data);
     }
     pub fn get_fterms(&self, doc: DocId) -> Vec<String> {
         let mut terms = Vec::new();

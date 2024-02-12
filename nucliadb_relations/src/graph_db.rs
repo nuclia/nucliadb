@@ -126,7 +126,7 @@ pub struct GraphDB {
 
 macro_rules! database_name {
     (const $l:ident) => {
-        const $l: &str = stringify!($l);
+        const $l: &'static str = stringify!($l);
     };
 }
 impl GraphDB {
