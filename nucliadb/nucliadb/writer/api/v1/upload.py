@@ -294,7 +294,7 @@ async def _tus_post(
     await storage_manager.start(dm, path=path, kbid=kbid)
     await dm.save()
 
-    location = f"{request['path']}/{upload_id}"
+    location = api.url_path_for("Upload information", kbid=kbid, upload_id=upload_id)
     return Response(
         status_code=201,
         headers={

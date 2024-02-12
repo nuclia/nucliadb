@@ -102,7 +102,6 @@ async def test_knowledgebox_file_tus_upload_root(writer_api, knowledgebox_writer
         data = io_bytes.read(min_chunk_size)
         while data != b"":
             resp = await client.head(url)
-
             assert resp.headers["Upload-Length"] == f"0"
             assert resp.headers["Upload-Offset"] == f"{offset}"
 
