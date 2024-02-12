@@ -119,16 +119,16 @@ class KnowledgeBox:
     async def delete_kb(cls, txn: Transaction, slug: str = "", kbid: str = ""):
         # Mark storage to be deleted
         # Mark keys to be deleted
-        if kbid == "" and slug == "":
+        if not kbid and not slug:
             raise AttributeError()
 
-        if kbid == "" and slug != "":
+        if slug and not kbid:
             kbid_bytes = await txn.get(KB_SLUGS.format(slug=slug))
             if kbid_bytes is None:
                 raise KnowledgeBoxNotFound()
             kbid = kbid_bytes.decode()
 
-        if slug == "" and kbid != "":
+        if kbid and not slug:
             kbconfig_bytes = await txn.get(KB_UUID.format(kbid=kbid))
             if kbconfig_bytes is None:
                 raise KnowledgeBoxNotFound()
