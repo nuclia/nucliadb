@@ -362,41 +362,44 @@ class KnowledgeBox:
         exists = await storage.schedule_delete_kb(kbid)
         if exists is False:
             logger.error(f"{kbid} KB does not exists on Storage")
-        txn = await driver.begin()
-        storage_to_delete = KB_TO_DELETE_STORAGE.format(kbid=kbid)
-        await txn.set(storage_to_delete, b"")
 
-        # Delete KB Shards
-        shards_match = KB_SHARDS.format(kbid=kbid)
-        payload = await txn.get(shards_match)
+        async with driver.transaction() as txn:
+            storage_to_delete = KB_TO_DELETE_STORAGE.format(kbid=kbid)
+            await txn.set(storage_to_delete, b"")
 
-        if payload is None:
-            logger.warning(f"Shards not found for kbid={kbid}")
-        else:
-            shards_obj = writer_pb2.Shards()
-            shards_obj.ParseFromString(payload)  # type: ignore
+            # Delete KB Shards
+            shards_match = KB_SHARDS.format(kbid=kbid)
+            payload = await txn.get(shards_match)
 
-            for shard in shards_obj.shards:
-                # Delete the shard on nodes
-                for replica in shard.replicas:
-                    node = get_index_node(replica.node)
-                    if node is None:
-                        logger.error(
-                            f"No node {replica.node} found lets continue. Some shards may stay orphaned"
-                        )
-                        continue
-                    try:
-                        await node.delete_shard(replica.shard.id)
-                        logger.debug(
-                            f"Succeded deleting shard from nodeid={replica.node} at {node.address}"
-                        )
-                    except AioRpcError as exc:
-                        if exc.code() == StatusCode.NOT_FOUND:
+            if payload is None:
+                logger.warning(f"Shards not found for kbid={kbid}")
+            else:
+                shards_obj = writer_pb2.Shards()
+                shards_obj.ParseFromString(payload)  # type: ignore
+
+                for shard in shards_obj.shards:
+                    # Delete the shard on nodes
+                    for replica in shard.replicas:
+                        node = get_index_node(replica.node)
+                        if node is None:
+                            logger.error(
+                                f"No node {replica.node} found, let's continue. Some shards may stay orphaned",
+                                extra={"kbid": kbid},
+                            )
                             continue
-                        await txn.abort()
-                        raise ShardNotFound(f"{exc.details()} @ {node.address}")
+                        try:
+                            await node.delete_shard(replica.shard.id)
+                            logger.debug(
+                                f"Succeded deleting shard from nodeid={replica.node} at {node.address}",
+                                extra={"kbid": kbid, "node_id": replica.node},
+                            )
+                        except AioRpcError as exc:
+                            if exc.code() == StatusCode.NOT_FOUND:
+                                continue
+                            await txn.abort()
+                            raise ShardNotFound(f"{exc.details()} @ {node.address}")
 
-        await txn.commit()
+            await txn.commit()
         await cls.delete_all_kb_keys(driver, kbid)
 
     @classmethod
