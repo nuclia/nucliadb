@@ -40,4 +40,4 @@ async def patch_configuration(
     request: Request,
     kbid: str,
 ):
-    return await learning_config.proxy(request, "POST", f"/config/{kbid}")
+    return await learning_config.proxy(request, "PATCH", f"/config/{kbid}")
