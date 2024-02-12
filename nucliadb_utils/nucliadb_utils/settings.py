@@ -124,7 +124,6 @@ storage_settings = StorageSettings()
 class NucliaSettings(BaseSettings):
     nuclia_service_account: Optional[str] = None
     nuclia_public_url: str = "https://{zone}.nuclia.cloud"
-    nuclia_cluster_url: str = "http://nucliadb_proxy.processing.svc.cluster.local:8080"
     nuclia_processing_cluster_url: str = (
         "http://processing-api.processing.svc.cluster.local:8080"
     )
