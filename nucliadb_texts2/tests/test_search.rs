@@ -100,8 +100,9 @@ fn test_filtered_search() {
         &reader,
         "",
         Filter {
+            paragraph_labels: vec![],
             field_labels: vec!["/l/mylabel".to_string()],
-            ..Default::default()
+            expression: "{ \"literal\": \"/l/mylabel\" }".to_string(),
         },
         1,
     );
@@ -109,8 +110,9 @@ fn test_filtered_search() {
         &reader,
         "",
         Filter {
+            paragraph_labels: vec![],
             field_labels: vec!["/e/myentity".to_string()],
-            ..Default::default()
+            expression: "{ \"literal\": \"/e/myentity\" }".to_string(),
         },
         1,
     );
@@ -118,8 +120,9 @@ fn test_filtered_search() {
         &reader,
         "",
         Filter {
+            paragraph_labels: vec![],
             field_labels: vec!["/l/fakelabel".to_string()],
-            ..Default::default()
+            expression: "{ \"literal\": \"/l/fakelabel\" }".to_string(),
         },
         0,
     );

@@ -122,9 +122,7 @@ impl AtomCollector {
     }
 }
 
-/// Formulas are boolean expressions in conjuctive normal form, but for labels.
-/// The clauses in a formula are connected by intersections, and they are formed
-/// by strings. Once applied to a given address, the formula becomes a boolean
+/// Once applied to a given address, the formula becomes a boolean
 /// expression that evaluates to whether the address is valid or not.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct Formula {
