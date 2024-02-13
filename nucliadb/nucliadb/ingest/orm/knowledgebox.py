@@ -396,7 +396,6 @@ class KnowledgeBox:
                         except AioRpcError as exc:
                             if exc.code() == StatusCode.NOT_FOUND:
                                 continue
-                            await txn.abort()
                             raise ShardNotFound(f"{exc.details()} @ {node.address}")
 
             await txn.commit()
