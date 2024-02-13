@@ -46,6 +46,10 @@ spec:
             regex: '^/api/v\d+/kb/[^/]+/schema'
           method:
             regex: "GET|OPTIONS"
+        - uri:
+            regex: '^/api/v\d+/kb/[^/]+/learning/.*'
+          method:
+            regex: "GET|OPTIONS"
       retries:
         attempts: 3
         retryOn: connect-failure

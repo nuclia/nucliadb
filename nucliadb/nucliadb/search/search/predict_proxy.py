@@ -38,12 +38,6 @@ class PredictProxiedEndpoints(str, Enum):
     TOKENS = "tokens"
     CHAT = "chat"
     REPHRASE = "rephrase"
-    FEEDBACK = "feedback"
-
-
-MAPPED_ENDPOINTS = {
-    PredictProxiedEndpoints.FEEDBACK: "/collect/feedback/{kbid}",
-}
 
 
 async def predict_proxy(
@@ -64,8 +58,6 @@ async def predict_proxy(
     headers.update(predict_headers)
 
     predict_endpoint: str = str(endpoint)
-    if endpoint in MAPPED_ENDPOINTS:
-        predict_endpoint = MAPPED_ENDPOINTS[endpoint].format(kbid=kbid)
     url = predict.get_predict_url(predict_endpoint)
 
     # Proxy the request to predict API

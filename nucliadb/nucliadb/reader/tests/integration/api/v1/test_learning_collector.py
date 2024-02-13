@@ -25,7 +25,7 @@ import pytest
 from fastapi import Response
 from fastapi.responses import StreamingResponse
 
-from nucliadb import learning_config
+from nucliadb import learning_collector
 from nucliadb_models.resource import NucliaDBRoles
 
 
@@ -46,50 +46,29 @@ class MockProxy:
 
 
 @pytest.fixture()
-def learning_config_proxy():
+def learning_collector_proxy():
     proxy = MockProxy()
-    with mock.patch.object(learning_config, "proxy", proxy):
+    with mock.patch.object(learning_collector, "proxy", proxy):
         yield proxy
 
 
-async def test_api(reader_api, knowledgebox_ingest, learning_config_proxy):
+async def test_api(reader_api, knowledgebox_ingest, learning_collector_proxy):
     kbid = knowledgebox_ingest
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
-        # Get configuration
-        resp = await client.get(f"/kb/{kbid}/configuration")
+        # Get feedback months
+        resp = await client.get(f"/kb/{kbid}/learning/collect/feedback")
         assert resp.status_code == 200
-        assert learning_config_proxy.calls[-1][1:] == ("GET", f"/config/{kbid}", None)
+        assert learning_collector_proxy.calls[-1][1:] == ("GET", f"/collect/feedback/{kbid}", None)
 
-        # Download model
-        resp = await client.get(f"/kb/{kbid}/models/model1/path")
+        # Download feedback for a month
+        resp = await client.get(f"/kb/{kbid}/learning/collect/feedback/2021-01")
         assert resp.status_code == 200
         data = BytesIO()
         for chunk in resp.iter_bytes():
             data.write(chunk)
         assert data.getvalue() == b"some content"
-        assert learning_config_proxy.calls[-1][1:] == (
+        assert learning_collector_proxy.calls[-1][1:] == (
             "GET",
-            f"/download/{kbid}/model/model1/path",
+            f"/collect/feedback/{kbid}/2021-01",
             None,
         )
-
-        # List models
-        resp = await client.get(f"/kb/{kbid}/models")
-        assert resp.status_code == 200
-        assert learning_config_proxy.calls[-1][1:] == ("GET", f"/models/{kbid}", None)
-
-        # Get metadata of a model
-        resp = await client.get(
-            f"/kb/{kbid}/model/model1", headers={"x-nucliadb-user": "userfoo"}
-        )
-        assert resp.status_code == 200
-        assert learning_config_proxy.calls[-1][1:] == (
-            "GET",
-            f"/models/{kbid}/model/model1",
-            {"X-STF-USER": "userfoo"},
-        )
-
-        # Get schema
-        resp = await client.get(f"/kb/{kbid}/schema")
-        assert resp.status_code == 200
-        assert learning_config_proxy.calls[-1][1:] == ("GET", f"/schema/{kbid}", None)
