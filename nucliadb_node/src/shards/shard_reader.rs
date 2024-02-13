@@ -431,17 +431,19 @@ impl ShardReader {
 
         let paragraph_task = index_queries.paragraphs_request.map(|mut request| {
             request.id = search_id.clone();
+            let paragraphs_context = &index_queries.paragraphs_context;
             let paragraph_reader_service = self.paragraph_reader.clone();
             let info = info_span!(parent: &span, "paragraph search");
-            let task = move || paragraph_reader_service.search(&request, &ParagraphsContext::default());
+            let task = move || paragraph_reader_service.search(&request, paragraphs_context);
             || run_with_telemetry(info, task)
         });
 
         let vector_task = index_queries.vectors_request.map(|mut request| {
             request.id = search_id.clone();
+            let vectors_context = &index_queries.vectors_context;
             let vector_reader_service = self.vector_reader.clone();
             let info = info_span!(parent: &span, "vector search");
-            let task = move || vector_reader_service.search(&request, &VectorsContext::default());
+            let task = move || vector_reader_service.search(&request, vectors_context);
             || run_with_telemetry(info, task)
         });
 

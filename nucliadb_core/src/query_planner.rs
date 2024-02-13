@@ -18,15 +18,16 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::query_language::{self, BooleanExpression, QueryAnalysis, QueryContext};
-use crate::NodeResult;
-use nucliadb_protos::prelude::Filter;
-use nucliadb_protos::utils::Security;
-
+use crate::paragraphs::ParagraphsContext;
 pub use crate::protos::prost_types::Timestamp as ProtoTimestamp;
 use crate::protos::{
     DocumentSearchRequest, ParagraphSearchRequest, RelationSearchRequest, SearchRequest, VectorSearchRequest,
 };
+use crate::query_language::{self, BooleanExpression, QueryAnalysis, QueryContext};
+use crate::vectors::VectorsContext;
+use crate::NodeResult;
+use nucliadb_protos::prelude::Filter;
+use nucliadb_protos::utils::Security;
 
 /// A field has two dates
 #[derive(Debug, Clone, Copy)]
@@ -80,8 +81,10 @@ pub struct PreFilterResponse {
 }
 
 /// The queries a [`QueryPlan`] has decided to send to each index.
-#[derive(Debug, Default, Clone)]
+#[derive(Default, Clone)]
 pub struct IndexQueries {
+    pub vectors_context: VectorsContext,
+    pub paragraphs_context: ParagraphsContext,
     pub vectors_request: Option<VectorSearchRequest>,
     pub paragraphs_request: Option<ParagraphSearchRequest>,
     pub texts_request: Option<DocumentSearchRequest>,
@@ -176,8 +179,18 @@ fn analyze_filter(search_request: &SearchRequest) -> NodeResult<QueryAnalysis> {
 }
 
 pub fn build_query_plan(search_request: SearchRequest) -> NodeResult<QueryPlan> {
-    let mut query_analysis = analyze_filter(&search_request)?;
-    let prefilter = compute_prefilters(&search_request, &mut query_analysis);
+    let query_analysis = analyze_filter(&search_request)?;
+    let prefilter_query = query_analysis.prefilter_query;
+    let search_query = query_analysis.search_query;
+
+    let vectors_context = VectorsContext {
+        filtering_formula: search_query.clone(),
+    };
+    let paragraphs_context = ParagraphsContext {
+        filtering_formula: search_query,
+    };
+
+    let prefilter = compute_prefilters(&search_request, prefilter_query);
     let vectors_request = compute_vectors_request(&search_request);
     let paragraphs_request = compute_paragraphs_request(&search_request);
     let texts_request = compute_texts_request(&search_request);
@@ -186,6 +199,8 @@ pub fn build_query_plan(search_request: SearchRequest) -> NodeResult<QueryPlan> 
     Ok(QueryPlan {
         prefilter,
         index_queries: IndexQueries {
+            vectors_context,
+            paragraphs_context,
             vectors_request,
             paragraphs_request,
             texts_request,
@@ -194,10 +209,10 @@ pub fn build_query_plan(search_request: SearchRequest) -> NodeResult<QueryPlan> 
     })
 }
 
-fn compute_prefilters(search_request: &SearchRequest, analysis: &mut QueryAnalysis) -> Option<PreFilterRequest> {
+fn compute_prefilters(search_request: &SearchRequest, query: Option<BooleanExpression>) -> Option<PreFilterRequest> {
     let mut prefilter_request = PreFilterRequest {
         timestamp_filters: vec![],
-        formula: None,
+        formula: query,
         security: None,
     };
 
@@ -214,14 +229,13 @@ fn compute_prefilters(search_request: &SearchRequest, analysis: &mut QueryAnalys
         prefilter_request.timestamp_filters.extend(timestamp_filters);
     }
 
-    // Labels filters
-    let request_has_labels_filters = analysis.prefilter_query.is_some();
-    prefilter_request.formula = analysis.prefilter_query.take();
+    let request_has_labels_filters = prefilter_request.formula.is_some();
 
     if !request_has_timestamp_filters && !request_has_labels_filters && !request_has_security_filters {
-        return None;
+        None
+    } else {
+        Some(prefilter_request)
     }
-    Some(prefilter_request)
 }
 
 fn compute_timestamp_prefilters(search_request: &SearchRequest) -> Vec<TimestampFilter> {
