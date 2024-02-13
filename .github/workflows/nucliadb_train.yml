@@ -136,8 +136,8 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@v1
         with:
-          app-id: ${{ vars.GHAPP_NUCLIA_SERVICE_BOT_ID }}
-          private-key: ${{ secrets.GHAPP_NUCLIA_SERVICE_BOT_PK }}
+          app-id: ${{ secrets.GHAPP_ID_NUCLIABOT }}
+          private-key: ${{ secrets.PK_GHAPP_NUCLIABOT }}
           owner: nuclia
 
       - name: Checkout repository
