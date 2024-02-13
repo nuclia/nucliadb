@@ -20,8 +20,8 @@
 from . import download  # noqa
 from . import export_import  # noqa
 from . import knowledgebox  # noqa
-from . import learning_config  # noqa
 from . import learning_collector  # noqa
+from . import learning_config  # noqa
 from . import resource  # noqa
 from . import services  # noqa
 from .router import api  # noqa

@@ -128,8 +128,12 @@ class NucliaSettings(BaseSettings):
         "http://processing-api.processing.svc.cluster.local:8080"
     )
     nuclia_inner_predict_url: str = "http://predict.learning.svc.cluster.local:8080"
-    nuclia_inner_learning_config_url: str = "http://config.learning.svc.cluster.local:8080"
-    nuclia_inner_learning_collector_url: str = "http://collector-api.learning.svc.cluster.local:8080"
+    nuclia_inner_learning_config_url: str = (
+        "http://config.learning.svc.cluster.local:8080"
+    )
+    nuclia_inner_learning_collector_url: str = (
+        "http://collector-api.learning.svc.cluster.local:8080"
+    )
 
     nuclia_zone: str = "europe-1"
     onprem: bool = True

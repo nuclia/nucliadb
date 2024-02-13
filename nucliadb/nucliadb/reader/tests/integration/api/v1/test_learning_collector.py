@@ -58,7 +58,11 @@ async def test_api(reader_api, knowledgebox_ingest, learning_collector_proxy):
         # Get feedback months
         resp = await client.get(f"/kb/{kbid}/learning/collect/feedback")
         assert resp.status_code == 200
-        assert learning_collector_proxy.calls[-1][1:] == ("GET", f"/collect/feedback/{kbid}", None)
+        assert learning_collector_proxy.calls[-1][1:] == (
+            "GET",
+            f"/collect/feedback/{kbid}",
+            None,
+        )
 
         # Download feedback for a month
         resp = await client.get(f"/kb/{kbid}/learning/collect/feedback/2021-01")
