@@ -284,7 +284,6 @@ async def worker(
     listeners,
 ) -> AsyncIterable[Worker]:
     settings.force_host_id = "node1"
-    settings.data_path = data_path
 
     await get_storage(service_name=SERVICE_NAME)
     worker = await start_worker(writer, nats_manager)
