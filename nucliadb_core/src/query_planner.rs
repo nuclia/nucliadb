@@ -26,7 +26,6 @@ use crate::protos::{
 use crate::query_language::{self, BooleanExpression, QueryAnalysis, QueryContext};
 use crate::vectors::VectorsContext;
 use crate::NodeResult;
-use nucliadb_protos::prelude::Filter;
 use nucliadb_protos::utils::Security;
 
 /// A field has two dates
@@ -115,18 +114,6 @@ impl IndexQueries {
         let ValidFieldCollector::Some(valid_fields) = &response.valid_fields else {
             return;
         };
-
-        // Clear filter labels to avoid duplicate filtering
-        let mut paragraph_labels = vec![];
-        if let Some(filter) = request.filter.as_ref() {
-            paragraph_labels = filter.paragraph_labels.clone();
-        }
-        let filter = Filter {
-            expression: String::new(),
-            field_labels: vec![],
-            paragraph_labels,
-        };
-        request.filter.replace(filter);
 
         // Add key filters
         for valid_field in valid_fields {

@@ -411,11 +411,10 @@ impl ShardReader {
 
         let search_id = uuid::Uuid::new_v4().to_string();
         let span = tracing::Span::current();
-        let pre_filter = query_plan.prefilter;
         let mut index_queries = query_plan.index_queries;
 
         // Apply pre-filtering to the query plan
-        if let Some(pre_filter) = pre_filter {
+        if let Some(pre_filter) = &query_plan.prefilter {
             let pre_filtered = self.text_reader.pre_filter(&pre_filter)?;
             index_queries.apply_prefilter(pre_filtered);
         }

@@ -412,8 +412,8 @@ pub fn search_query(
         fuzzies.push((Occur::Must, field_filter.clone()));
         originals.push((Occur::Must, field_filter));
     }
-    // Label filters
 
+    // Label filters
     if let Some(formula) = &context.filtering_formula {
         let query = query_io::translate_expression(formula, schema);
         fuzzies.push((Occur::Must, query.box_clone()));
@@ -443,6 +443,7 @@ pub fn search_query(
         let key_filter_query = Box::new(BooleanQuery::intersection(key_filter));
         key_filters.push(key_filter_query);
     });
+
     if !key_filters.is_empty() {
         let key_filters_query = Box::new(BooleanQuery::union(key_filters));
         fuzzies.push((Occur::Must, key_filters_query.clone()));
