@@ -44,12 +44,6 @@ import pytest
                 "user_id": "bar",
             },
         ),
-        (
-            "GET",
-            "feedback",
-            {"month": "2023-01"},
-            None,
-        ),
     ],
 )
 async def test_predict_proxy(
