@@ -173,11 +173,11 @@ def test_search(kbid: str, resource_id: str):
     assert len(search_results["resources"]) == 1
 
 
-def test_predict_proxy(kbid: str):
+def test_learning_proxied_endpoints(kbid: str):
     _test_predict_proxy_chat(kbid)
     _test_predict_proxy_tokens(kbid)
     _test_predict_proxy_rephrase(kbid)
-    _test_predict_proxy_feedback(kbid)
+    _test_learning_collect_proxy(kbid)
 
 
 def test_learning_config(kbid: str):
@@ -292,9 +292,18 @@ def _test_predict_proxy_rephrase(kbid: str):
     assert rephrased_query.endswith("0")
 
 
-def _test_predict_proxy_feedback(kbid: str):
+def _test_learning_collect_proxy(kbid: str):
     resp = requests.get(
-        os.path.join(BASE_URL, f"api/v1/kb/{kbid}/predict/feedback?month=2023-01"),
+        os.path.join(BASE_URL, f"api/v1/kb/{kbid}/learning/collect/feedback"),
+        headers={
+            "content-type": "application/json",
+            "X-NUCLIADB-ROLES": "READER",
+            "x-ndb-client": "web",
+        },
+    )
+    raise_for_status(resp)
+    resp = requests.get(
+        os.path.join(BASE_URL, f"api/v1/kb/{kbid}/learning/collect/feedback/2023-01"),
         headers={
             "content-type": "application/json",
             "X-NUCLIADB-ROLES": "READER",
