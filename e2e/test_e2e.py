@@ -173,13 +173,6 @@ def test_search(kbid: str, resource_id: str):
     assert len(search_results["resources"]) == 1
 
 
-def test_learning_proxied_endpoints(kbid: str):
-    _test_predict_proxy_chat(kbid)
-    _test_predict_proxy_tokens(kbid)
-    _test_predict_proxy_rephrase(kbid)
-    _test_learning_collect_proxy(kbid)
-
-
 def test_learning_config(kbid: str):
     resp = requests.post(
         os.path.join(BASE_URL, f"api/v1/kb/{kbid}/configuration"),
@@ -226,7 +219,7 @@ def test_learning_config(kbid: str):
     raise_for_status(resp)
 
 
-def _test_predict_proxy_chat(kbid: str):
+def test_predict_proxy_chat(kbid: str):
     resp = requests.post(
         os.path.join(BASE_URL, f"api/v1/kb/{kbid}/predict/chat"),
         headers={
@@ -249,7 +242,7 @@ def _test_predict_proxy_chat(kbid: str):
     assert "Messi" in answer
 
 
-def _test_predict_proxy_tokens(kbid: str):
+def test_predict_proxy_tokens(kbid: str):
     resp = requests.get(
         os.path.join(BASE_URL, f"api/v1/kb/{kbid}/predict/tokens"),
         headers={
@@ -266,7 +259,7 @@ def _test_predict_proxy_tokens(kbid: str):
     assert data["tokens"][0]["text"] == "Barcelona"
 
 
-def _test_predict_proxy_rephrase(kbid: str):
+def test_predict_proxy_rephrase(kbid: str):
     resp = requests.post(
         os.path.join(BASE_URL, f"api/v1/kb/{kbid}/predict/rephrase"),
         headers={
@@ -292,7 +285,7 @@ def _test_predict_proxy_rephrase(kbid: str):
     assert rephrased_query.endswith("0")
 
 
-def _test_learning_collect_proxy(kbid: str):
+def test_learning_collect_proxy(kbid: str):
     resp = requests.get(
         os.path.join(BASE_URL, f"api/v1/kb/{kbid}/learning/collect/feedback"),
         headers={
