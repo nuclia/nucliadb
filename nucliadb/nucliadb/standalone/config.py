@@ -121,7 +121,7 @@ def config_nucliadb(nucliadb_args: Settings):
         ingest_settings.disable_pull_worker = True
         nuclia_settings.dummy_processing = True
         nuclia_settings.dummy_predict = True
-        nuclia_settings.dummy_learning_config = True
+        nuclia_settings.dummy_learning = True
 
     if nucliadb_args.zone is not None:
         nuclia_settings.nuclia_zone = nucliadb_args.zone

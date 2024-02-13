@@ -162,7 +162,7 @@ async def learning_config_client() -> AsyncIterator[httpx.AsyncClient]:
     save a client session in the FastAPI app state.
     """
     client_class: Type[httpx.AsyncClient]
-    if nuclia_settings.dummy_learning_config:
+    if nuclia_settings.dummy_learning:
         # This is a workaround to be able to run integration tests that start nucliadb with docker.
         # The learning config API is not available in the docker setup, so we use a dummy client.
         client_class = DummyClient
