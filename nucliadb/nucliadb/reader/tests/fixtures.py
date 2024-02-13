@@ -50,7 +50,7 @@ def test_settings_reader(cache, gcs, fake_node, maindb_driver):  # type: ignore
 
 
 @pytest.fixture(scope="function")
-async def reader_api(test_settings_reader: None, local_files, event_loop):  # type: ignore
+async def reader_api(test_settings_reader: None, local_files):  # type: ignore
     from nucliadb.reader.app import create_application
 
     application = create_application()

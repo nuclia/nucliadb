@@ -49,7 +49,6 @@ async def writer_api(
     transaction_utility,
     processing_utility,
     tus_manager,
-    event_loop,
 ) -> AsyncIterator[Callable[[list[Enum], str, str], AsyncClient]]:
     nucliadb_settings.nucliadb_ingest = grpc_servicer.host
     from nucliadb.writer.app import create_application
