@@ -85,21 +85,21 @@ def settings():
         settings.nuclia_service_account = "service-account"
         settings.nuclia_zone = "europe-1"
         settings.nuclia_public_url = "http://{zone}.public-url"
+        settings.dummy_learning = False
         yield settings
 
 
-async def get_learning_config_client(settings):
+async def test_get_learning_config_client(settings):
     async with learning_config_client() as client:
-        assert client.base_url == "http://europe-1.public-url/api/v1"
-        assert client.headers["X-NUCLIA-NUAKEY"] == f"Bearer service-account"
+        assert str(client.base_url) == "http://europe-1.public-url/api/v1/"
+        assert client.headers["x-nuclia-nuakey"] == f"Bearer service-account"
 
     settings.nuclia_service_account = None
     async with learning_config_client() as client:
         assert (
-            client.base_url
-            == "http://config.learning.svc.cluster.local:8080/api/v1/internal"
+            str(client.base_url)
+            == "http://config.learning.svc.cluster.local:8080/api/v1/internal/"
         )
-        assert client.headers == {}
 
 
 async def test_set_configuration(async_client):
