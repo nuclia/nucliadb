@@ -17,10 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use std::collections::HashMap;
-use std::fmt::Debug;
-use std::time::*;
-
+use crate::query_io;
 use itertools::Itertools;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::order_by::{OrderField, OrderType};
@@ -34,6 +31,9 @@ use nucliadb_core::query_planner::{
 use nucliadb_core::texts::*;
 use nucliadb_core::tracing::{self, *};
 use nucliadb_procs::measure;
+use std::collections::HashMap;
+use std::fmt::Debug;
+use std::time::*;
 use tantivy::collector::{Collector, Count, DocSetCollector, FacetCollector, FacetCounts, TopDocs};
 use tantivy::query::{AllQuery, BooleanQuery, Occur, Query, QueryParser};
 use tantivy::schema::*;
@@ -97,6 +97,7 @@ impl FieldReader for TextReaderService {
     #[measure(actor = "texts", metric = "prefilter")]
     #[tracing::instrument(skip_all)]
     fn pre_filter(&self, request: &PreFilterRequest) -> NodeResult<PreFilterResponse> {
+        let schema = &self.schema;
         let mut created_queries = Vec::new();
         let mut modified_queries = Vec::new();
 
@@ -124,6 +125,10 @@ impl FieldReader for TextReaderService {
             if !modified_queries.is_empty() {
                 let modified_query: Box<dyn Query> = Box::new(BooleanQuery::new(modified_queries));
                 subqueries.push(modified_query);
+            }
+            if let Some(formula) = request.formula.as_ref() {
+                let formula_query = query_io::translate_expression(formula, schema);
+                subqueries.push(formula_query);
             }
             Box::new(BooleanQuery::intersection(subqueries))
         };
@@ -413,7 +418,7 @@ impl TextReaderService {
         let text = TextReaderService::adapt_text(&query_parser, &request.body);
         let advanced_query =
             request.advanced_query.as_ref().map(|query| query_parser.parse_query(query)).transpose()?;
-        let query = create_query(&query_parser, request, &self.schema, &text, advanced_query);
+        let query = create_query(&query_parser, request, &self.schema, &text, advanced_query)?;
 
         // Offset to search from
         let results = request.result_per_page as usize;

@@ -88,8 +88,8 @@ fn test_filtered_search() {
         };
 
         let response = reader.search(&request).unwrap();
-        assert_eq!(response.total, expected, "Failed query: '{}'", query);
 
+        assert_eq!(response.total, expected, "Failed query: '{}'", query);
         assert_eq!(response.total, response.results.len() as i32);
         assert!(!response.next_page);
     }
@@ -101,6 +101,7 @@ fn test_filtered_search() {
         "",
         Filter {
             field_labels: vec!["/l/mylabel".to_string()],
+            expression: "{ \"literal\": \"/l/mylabel\" }".to_string(),
             ..Default::default()
         },
         1,
@@ -110,6 +111,7 @@ fn test_filtered_search() {
         "",
         Filter {
             field_labels: vec!["/e/myentity".to_string()],
+            expression: "{ \"literal\": \"/e/myentity\" }".to_string(),
             ..Default::default()
         },
         1,
@@ -119,6 +121,7 @@ fn test_filtered_search() {
         "",
         Filter {
             field_labels: vec!["/l/fakelabel".to_string()],
+            expression: "{ \"literal\": \"/l/fakelabel\" }".to_string(),
             ..Default::default()
         },
         0,
