@@ -86,25 +86,32 @@ def analytics_disabled():
 
 
 def reset_config():
+    from nucliadb.common.cluster import settings as cluster_settings
     from nucliadb.ingest import settings as ingest_settings
     from nucliadb.train import settings as train_settings
     from nucliadb.writer import settings as writer_settings
     from nucliadb_utils import settings as utils_settings
     from nucliadb_utils.cache import settings as cache_settings
 
-    ingest_settings.settings.parse_obj(ingest_settings.Settings())
-    train_settings.settings.parse_obj(train_settings.Settings())
-    writer_settings.settings.parse_obj(writer_settings.Settings())
-    cache_settings.settings.parse_obj(cache_settings.Settings())
-
-    utils_settings.audit_settings.parse_obj(utils_settings.AuditSettings())
-    utils_settings.indexing_settings.parse_obj(utils_settings.IndexingSettings())
-    utils_settings.transaction_settings.parse_obj(utils_settings.TransactionSettings())
-    utils_settings.nucliadb_settings.parse_obj(utils_settings.NucliaDBSettings())
-    utils_settings.nuclia_settings.parse_obj(utils_settings.NucliaSettings())
-    utils_settings.storage_settings.parse_obj(utils_settings.StorageSettings())
-
-    yield
+    all_settings = [
+        cluster_settings.settings,
+        ingest_settings.settings,
+        train_settings.settings,
+        writer_settings.settings,
+        cache_settings.settings,
+        utils_settings.audit_settings,
+        utils_settings.http_settings,
+        utils_settings.indexing_settings,
+        utils_settings.nuclia_settings,
+        utils_settings.nucliadb_settings,
+        utils_settings.storage_settings,
+        utils_settings.transaction_settings,
+    ]
+    for settings in all_settings:
+        defaults = type(settings)()
+        for attr, _value in settings:
+            default_value = getattr(defaults, attr)
+            setattr(settings, attr, default_value)
 
     from nucliadb.common.cluster import manager
 
@@ -520,7 +527,7 @@ async def redis_config(redis):
     ingest_settings.driver_redis_url = None
     ingest_settings.driver = default_driver
     await driver.flushall()
-    await driver.close(close_connection_pool=True)
+    await driver.aclose(close_connection_pool=True)
 
     pubsub = get_utility(Utility.PUBSUB)
     if pubsub is not None:
