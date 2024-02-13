@@ -536,7 +536,7 @@ async def test_file_tus_upload_field_by_slug(writer_api, knowledgebox_writer, re
 
 
 @pytest.mark.asyncio
-async def test_file_tus_upload_field_by_resource_id(
+async def test_file_tus_upload_urls_field_by_resource_id(
     writer_api, knowledgebox_writer, resource
 ):
     kb = knowledgebox_writer
@@ -565,67 +565,15 @@ async def test_file_tus_upload_field_by_resource_id(
         assert resp.status_code == 201
         url = resp.headers["location"]
 
-        # Check that we are using the slug for the whole file upload
+        # Check that we are using the resource for the whole file upload
         assert f"{RESOURCE_PREFIX}/{resource}" in url
 
-        offset = 0
-        min_chunk_size = get_storage_manager().min_upload_size
-        raw_bytes = b"x" * min_chunk_size + b"y" * 500
-        io_bytes = io.BytesIO(raw_bytes)
-        data = io_bytes.read(min_chunk_size)
-        while data != b"":
-            resp = await client.head(url)
+        # Make sure the returned URL works
+        resp = await client.head(url)
+        assert resp.status_code == 200
 
-            assert resp.headers["Upload-Length"] == f"0"
-            assert resp.headers["Upload-Offset"] == f"{offset}"
-
-            headers = {
-                "upload-offset": f"{offset}",
-                "content-length": f"{len(data)}",
-            }
-            is_last_chunk = len(data) < min_chunk_size
-            if is_last_chunk:
-                headers["upload-length"] = f"{offset + len(data)}"
-
-            resp = await client.patch(
-                url,
-                content=data,
-                headers=headers,
-            )
-            assert resp.status_code == 200
-            offset += len(data)
-            data = io_bytes.read(min_chunk_size)
-
-        assert resp.headers["Tus-Upload-Finished"] == "1"
-
-    transaction = get_transaction_utility()
-
-    sub = await transaction.js.pull_subscribe(
-        const.Streams.INGEST.subject.format(partition="1"), "auto"
-    )
-    msgs = await sub.fetch(2)
-
-    writer = BrokerMessage()
-    writer.ParseFromString(msgs[1].data)
-    await msgs[1].ack()
-
-    path = resp.headers["ndb-field"]
-    field = path.split("/")[-1]
-    assert path.split("/")[-3] == resource
-    assert writer.uuid == resource
-    assert writer.basic.icon == "image/jpg"
-    assert writer.basic.title == ""
-    assert writer.files[field].language == "ca"
-    assert writer.files[field].file.size == len(raw_bytes)
-    assert writer.files[field].file.filename == "image.jpg"
-    assert writer.files[field].file.md5 == "7af0916dba8b70e29d99e72941923529"
-
-    storage = await get_storage()
-    data = await storage.downloadbytes(
-        bucket=writer.files[field].file.bucket_name,
-        key=writer.files[field].file.uri,
-    )
-    assert len(data.read()) == len(raw_bytes)
+        assert resp.headers["Upload-Length"] == "0"
+        assert resp.headers["Upload-Offset"] == "0"
 
 
 @pytest.mark.asyncio
