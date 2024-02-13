@@ -53,7 +53,7 @@ lazy_static::lazy_static! {
     static ref SYNC_ANALYTICS: Option<Mutex<Sender<AnalyticsEvent>>> = {
         if is_analytics_enabled() {
             let (stxn, rtxn) = channel();
-            let Some(analytics_loop) = SyncAnalyticsLoop::new(rtxn) else { return None };
+            let analytics_loop = SyncAnalyticsLoop::new(rtxn)?;
             std::thread::spawn(move || analytics_loop.run());
             Some(Mutex::new(stxn))
         } else {

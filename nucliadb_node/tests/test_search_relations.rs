@@ -377,7 +377,6 @@ async fn test_search_relations_prefixed(
                     node_subtype: None,
                     node_type: NodeType::Entity as i32,
                 }],
-                ..Default::default()
             }),
             ..Default::default()
         })
