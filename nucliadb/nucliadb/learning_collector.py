@@ -30,7 +30,7 @@ from fastapi.responses import StreamingResponse
 from nucliadb_telemetry import errors
 from nucliadb_utils.settings import nuclia_settings
 
-SERVICE_NAME = "nucliadb.learning_config"
+SERVICE_NAME = "nucliadb.learning_collector"
 logger = logging.getLogger(SERVICE_NAME)
 
 
@@ -87,7 +87,7 @@ def is_onprem() -> bool:
     return nuclia_settings.nuclia_service_account is not None
 
 
-def get_config_api_url() -> str:
+def get_collector_api_api_url() -> str:
     if is_onprem():
         nuclia_public_url = nuclia_settings.nuclia_public_url.format(
             zone=nuclia_settings.nuclia_zone
@@ -97,13 +97,13 @@ def get_config_api_url() -> str:
         return f"{nuclia_settings.nuclia_inner_learning_collector_url}/api/v1/internal"
 
 
-def get_config_auth_header() -> dict[str, str]:
+def get_collector_api_auth_header() -> dict[str, str]:
     if is_onprem():
         # public api: auth is done via the 'x-nuclia-nuakey' header
         return {"X-NUCLIA-NUAKEY": f"Bearer {nuclia_settings.nuclia_service_account}"}
     else:
         # internal api: auth is proxied from the request to the learning
-        # config api via the 'x-nucliadb-user' and 'x-nucliadb-roles' headers
+        # collector api via the 'x-nucliadb-user' and 'x-nucliadb-roles' headers
         return {}
 
 
@@ -148,8 +148,8 @@ async def learning_collector_client() -> AsyncIterator[httpx.AsyncClient]:
         client_class = httpx.AsyncClient
 
     client = client_class(
-        base_url=get_config_api_url(),
-        headers=get_config_auth_header(),
+        base_url=get_collector_api_api_url(),
+        headers=get_collector_api_auth_header(),
     )
     try:
         yield client
