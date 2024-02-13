@@ -1,10 +1,18 @@
 # NucliaDB SDK
 
-This library is a thin Python wrapper around the [NucliaDB HTTP API](https://docs.nuclia.dev/docs/api).
-The intended audience are developers who want to write low-level scripts to interact with NucliaDB. 
+The NucliaDB SDK is a Python library designed as a thin wrapper around the [NucliaDB HTTP API](https://docs.nuclia.dev/docs/api). It is tailored for developers who wish to create low-level scripts to interact with NucliaDB.
 
 ## :warning: WARNING :warning:
-If it's your first time using Nuclia or you want a simple way to push your unstructured data to Nuclia with a script or a CLI, we highly recommend using the [Nuclia CLI/SDK](https://github.com/nuclia/nuclia.py) instead.
+
+If it's your first time using Nuclia or you want a simple way to push your unstructured data to Nuclia with a script or a CLI, we highly recommend using the [Nuclia CLI/SDK](https://github.com/nuclia/nuclia.py) instead, as it is much more user-friendly and use-case focused.
+
+## Installation
+
+To install it, simply with pip:
+
+```bash
+pip install nucliadb-sdk
+```
 
 ## How to use it?
 
@@ -53,7 +61,7 @@ Query parameters can be passed too on each method with the `query_params` argume
 >>> ndb.get_resource_by_id(kbid="my-kbid", rid="rid", query_params={"show": ["values"]})
 ```
 
-## Example Usage
+### Example Usage
 
 The following is a sample script that fetches the HTML of a website, extracts all links that it finds on it and pushes them to NucliaDB so that they get processed by Nuclia's processing engine.
 
@@ -97,10 +105,12 @@ def upload_link_to_nuclia(ndb, *, kbid, link, tags):
 
 
 def main(site):
+    # Define the NucliaDB instance with region and URL
     ndb = nucliadb_sdk.NucliaDB(region="on-prem", url="http://localhost:8080")
+
+    # Loop through extracted links and upload to NucliaDB
     for link in extract_links_from_url(site):
         upload_link_to_nuclia(ndb, kbid="my-kb-id", link=link, tags=["news"])
-
 
 if __name__ == "__main__":
     main(site="https://en.wikipedia.org/wiki/The_Lion_King")
@@ -116,3 +126,7 @@ After the data is pushed, the NucliaDB SDK could also be used to find answers on
 >>> print(resp.answer)
 'Hakuna matata is actually a phrase in the East African language of Swahili that literally means “no trouble” or “no problems”.'
 ```
+
+## Conclusion
+
+Explore more features and capabilities of the NucliaDB SDK by referring to the [official documentation](https://docs.nuclia.dev/docs/guides/nucliadb/python_nucliadb_sdk). We welcome your feedback and contributions to make this SDK even better!
