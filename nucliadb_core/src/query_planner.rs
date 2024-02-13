@@ -314,3 +314,60 @@ fn compute_relations_request(search_request: &SearchRequest) -> Option<RelationS
         ..Default::default()
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::protos::Filter;
+    use crate::query_language::{BooleanExpression, Operator};
+    #[test]
+    fn proper_propagation() {
+        let expression = serde_json::json!({
+            "and": [
+                { "literal": "this" },
+                { "literal": "and" },
+                { "literal": "that"},
+            ],
+        });
+        let request = SearchRequest {
+            filter: Some(Filter {
+                field_labels: vec!["this".to_string()],
+                paragraph_labels: vec!["and".to_string(), "that".to_string()],
+                expression: expression.to_string(),
+            }),
+            ..Default::default()
+        };
+        let query_plan = build_query_plan(request).unwrap();
+        let Some(prefilter) = query_plan.prefilter else {
+            panic!("There should be a prefilter");
+        };
+        let Some(formula) = prefilter.formula else {
+            panic!("The prefilter should have a formula");
+        };
+        let BooleanExpression::Literal(literal) = formula else {
+            panic!("The formula should be a literal")
+        };
+        assert_eq!(literal, "this");
+
+        let index_queries = query_plan.index_queries;
+        let vectors_context = index_queries.vectors_context;
+        let paragraphs_context = index_queries.paragraphs_context;
+        assert_eq!(vectors_context.filtering_formula, paragraphs_context.filtering_formula);
+
+        let Some(formula) = paragraphs_context.filtering_formula else {
+            panic!("there should be a paragraphs formula")
+        };
+        let BooleanExpression::Operation(inner_formula) = formula else {
+            panic!("the inner formula should be an operation");
+        };
+        assert!(matches!(inner_formula.operator, Operator::And));
+        let BooleanExpression::Literal(literal) = &inner_formula.operands[0] else {
+            panic!("first operand should be a literal");
+        };
+        assert_eq!(literal, "and");
+        let BooleanExpression::Literal(literal) = &inner_formula.operands[1] else {
+            panic!("second operand should be a literal");
+        };
+        assert_eq!(literal, "that");
+    }
+}
