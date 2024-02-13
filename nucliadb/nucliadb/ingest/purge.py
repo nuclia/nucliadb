@@ -115,6 +115,9 @@ async def purge_kb_storage(driver: Driver, storage: Storage):
             logger.info(
                 f"  . Nothing was deleted for {key}, (Bucket not yet empty), will try next time"
             )
+            # Just in case something failed while setting a lifecycle policy to
+            # remove all elements from the bucket, reschedule it
+            await storage.schedule_delete_kb(kbid)
         elif not deleted:
             logger.info(
                 f"  ! Expected bucket for {key} was not found, will delete marker"
