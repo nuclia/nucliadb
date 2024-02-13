@@ -10,18 +10,20 @@ If it's your first time using Nuclia or you want a simple way to push your unstr
 
 You can find the auto-generated documentation of the NucliaDB sdk [here](https://docs.nuclia.dev/docs/guides/nucliadb/python_nucliadb_sdk).
 
-Essentially, each method of the `NucliaDB` class maps to an HTTP endpoint of the NucliaDB API. The method-to-endpoint mappings are declared in-code [in the _NucliaDBBase class](https://github.com/nuclia/nucliadb/blob/main/nucliadb_sdk/nucliadb_sdk/v2/sdk.py).
+Essentially, each method of the `NucliaDB` class maps to an HTTP endpoint of the NucliaDB API. The parameters it accepts correspond to the Pydantic models associated to the request body scheme of the endpoint.
+
+The method-to-endpoint mappings for the sdk are declared in-code [in the _NucliaDBBase class](https://github.com/nuclia/nucliadb/blob/main/nucliadb_sdk/nucliadb_sdk/v2/sdk.py).
 
 For instance, to create a resource in your Knowledge Box, the endpoint is defined [here](https://docs.nuclia.dev/docs/api#tag/Resources/operation/Create_Resource_kb__kbid__resources_post).
 
-It has a `{kbid}` path parameter and is expecting a json payload with some optional keys. With `curl`, the command would be:
+It has a `{kbid}` path parameter and is expecting a json payload with some optional keys like `slug` or `title`, that are of type string. With `curl`, the command would be:
 
 ```bash
 curl -XPOST http://localhost:8080/api/v1/kb/my-kbid/resources -H 'x-nucliadb-roles: WRITER' --data-binary '{"slug":"my-resource","title":"My Resource"}' -H "Content-Type: application/json"
 {"uuid":"fbdb10a79abc45c0b13400f5697ea2ba","seqid":1}
 ```
 
-and with the NucliaDB sdk it would be:
+and with the NucliaDB sdk:
 
 ```python
 >>> from nucliadb_sdk import NucliaDB
@@ -31,7 +33,7 @@ and with the NucliaDB sdk it would be:
 ResourceCreated(uuid='fbdb10a79abc45c0b13400f5697ea2ba', elapsed=None, seqid=1)
 ```
 
-Note that paths parameters are mapped as required keyword arguments of the `NucliaDB` class methods: hence the `kbid="my-kbid"`. Any other keyword arguments specified in the method will be sent as content of the HTTP request.
+Note that paths parameters are mapped as required keyword arguments of the `NucliaDB` class methods: hence the `kbid="my-kbid"`. Any other keyword arguments specified in the method will be sent along in the json request body of the HTTP request.
 
 Alternatively, you can also define the `content` parameter and pass an instance of the Pydantic model that the endpoint expects:
 
