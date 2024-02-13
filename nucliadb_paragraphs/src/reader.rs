@@ -447,8 +447,8 @@ mod tests {
     use nucliadb_core::protos::prost_types::Timestamp;
     use nucliadb_core::protos::resource::ResourceStatus;
     use nucliadb_core::protos::{
-        Faceted, Filter, IndexMetadata, IndexParagraph, IndexParagraphs, OrderBy, Resource, ResourceId,
-        TextInformation, Timestamps,
+        Faceted, IndexMetadata, IndexParagraph, IndexParagraphs, OrderBy, Resource, ResourceId, TextInformation,
+        Timestamps,
     };
     use nucliadb_core::query_language::{self, BooleanExpression};
     use nucliadb_core::NodeResult;
@@ -662,16 +662,6 @@ mod tests {
         let mut context = ParagraphsContext::default();
         let (_top_docs, count) = searcher.search(&AllQuery, &(TopDocs::with_limit(10), Count))?;
         assert_eq!(count, 4);
-
-        let faceted = Faceted {
-            labels: vec!["".to_string(), "/l".to_string(), "/e".to_string(), "/c".to_string()],
-        };
-
-        let order = OrderBy {
-            sort_by: OrderField::Created as i32,
-            r#type: 0,
-            ..Default::default()
-        };
 
         // Only one paragraph  matches
         let search = ProtosRequest {

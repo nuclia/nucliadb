@@ -61,8 +61,8 @@ pub struct ParagraphsContext {
 
 pub trait ParagraphReader: std::fmt::Debug + Send + Sync {
     fn search(&self, request: &ProtosRequest, context: &ParagraphsContext) -> NodeResult<ProtosResponse>;
+    fn suggest(&self, request: &SuggestRequest) -> NodeResult<ProtosResponse>;
     fn iterator(&self, request: &StreamRequest) -> NodeResult<ParagraphIterator>;
-    fn suggest(&self, request: &SuggestRequest) -> NodeResult<ParagraphSearchResponse>;
     fn stored_ids(&self) -> NodeResult<Vec<String>>;
     fn count(&self) -> NodeResult<usize>;
 }

@@ -316,6 +316,20 @@ pub fn suggest_query(
             originals.push((Occur::Must, Box::new(facet_term_query)));
         });
 
+    // WARNING: this only works due to constraints outside the node's control.
+    // Suggest is assuming that filters work like they did in the beginning.
+    request
+        .filter
+        .iter()
+        .flat_map(|f| f.field_labels.iter())
+        .flat_map(|facet_key| Facet::from_text(facet_key).ok().into_iter())
+        .for_each(|facet| {
+            let facet_term = Term::from_facet(schema.facets, &facet);
+            let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
+            fuzzies.push((Occur::Must, Box::new(facet_term_query.clone())));
+            originals.push((Occur::Must, Box::new(facet_term_query)));
+        });
+
     if originals.len() == 1 && originals[0].1.is::<AllQuery>() {
         let original = originals.pop().unwrap().1;
         let fuzzy = Box::new(BooleanQuery::new(vec![]));
