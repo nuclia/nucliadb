@@ -20,7 +20,7 @@
 
 mod merge_worker;
 mod merger;
-pub mod state;
+mod state;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Write};

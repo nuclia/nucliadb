@@ -158,7 +158,7 @@ pub struct State {
     resources: HashMap<String, usize>,
 }
 impl State {
-    pub fn data_point_iterator(&self) -> impl Iterator<Item = &Journal> {
+    fn data_point_iterator(&self) -> impl Iterator<Item = &Journal> {
         self.work_stack.iter().flat_map(|u| u.load.iter()).chain(self.current.load.iter())
     }
     fn close_work_unit(&mut self) {

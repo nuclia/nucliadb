@@ -364,7 +364,7 @@ message Notification {
 }
 
 
-/// The member information.
+// The member information.
 message Member {
     enum Type {
         IO = 0;

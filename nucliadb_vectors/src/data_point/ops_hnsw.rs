@@ -71,7 +71,7 @@ impl PartialEq for Cnx {
 }
 impl PartialOrd for Cnx {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        f32::partial_cmp(&self.1, &other.1)
+        Some(self.cmp(other))
     }
 }
 
