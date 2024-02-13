@@ -26,7 +26,7 @@ and with the NucliaDB sdk it would be:
 ```python
 >>> from nucliadb_sdk import NucliaDB
 >>>
->>> ndb = NucliaDB(region="on-prem", url="http://localhost:8080/api", headers={"x-nucliadb-roles": "WRITER"})
+>>> ndb = NucliaDB(region="on-prem", url="http://localhost:8080/api")
 >>> ndb.create_resource(kbid="my-kbid", slug="my-resource", title="My Resource")
 ResourceCreated(uuid='fbdb10a79abc45c0b13400f5697ea2ba', elapsed=None, seqid=1)
 ```
@@ -39,7 +39,7 @@ Alternatively, you can also define the `content` parameter and pass an instance 
 >>> from nucliadb_sdk import NucliaDB
 >>> from nucliadb_models.writer import CreateResourcePayload
 >>> 
->>> ndb = NucliaDB(region="on-prem", url="http://localhost:8080/api", headers={"x-nucliadb-roles": "WRITER"})
+>>> ndb = NucliaDB(region="on-prem", url="http://localhost:8080/api")
 >>> content = CreateResourcePayload(slug="my-resource", title="My Resource")
 >>> ndb.create_resource(kbid="my-kbid", content=content)
 ResourceCreated(uuid='fbdb10a79abc45c0b13400f5697ea2ba', elapsed=None, seqid=1)
@@ -63,7 +63,7 @@ import requests
 from bs4 import BeautifulSoup
 
 
-def extract_links(url):
+def extract_links_from_url(url):
     response = requests.get(url)
     soup = BeautifulSoup(response.text, "html.parser")
     unique_links = set()
@@ -72,7 +72,7 @@ def extract_links(url):
     return unique_links
 
 
-def create_resource(ndb, kbid, link, tags):
+def upload_link_to_nuclia(ndb, *, kbid, link, tags):
     try:
         title = link.replace("-", " ")
         slug = "-".join(tags) + "-" + link.split("/")[-1]
@@ -95,16 +95,9 @@ def create_resource(ndb, kbid, link, tags):
 
 
 def main(site):
-    ndb = nucliadb_sdk.NucliaDB(
-        region="on-prem",
-        url="http://localhost:8080",
-        headers={"X-NUCLIADB-ROLES": "READER;WRITER;MANAGER"},
-    )
-    kbid = "my-kb-id"
-    ndb.get_knowledge_box(kbid=kbid)
-
-    for link in extract_links(site):
-        create_resource(ndb, kbid, link, tags=["news"])
+    ndb = nucliadb_sdk.NucliaDB(region="on-prem", url="http://localhost:8080")
+    for link in extract_links_from_url(site):
+        upload_link_to_nuclia(ndb, kbid="my-kb-id", link=link, tags=["news"])
 
 
 if __name__ == "__main__":
@@ -116,13 +109,8 @@ After the data is pushed, the NucliaDB SDK could also be used to find answers on
 ```python
 >>> import nucliadb_sdk
 >>> 
->>> ndb = nucliadb_sdk.NucliaDB(
-...     region="on-prem",
-...     url="http://localhost:8080",
-...     headers={"X-NUCLIADB-ROLES": "READER;WRITER;MANAGER"},
-... )
->>> kbid = "my-kb-id"
->>> resp = ndb.chat(kbid=kbid, query="What does Hakuna Matata mean?")
+>>> ndb = nucliadb_sdk.NucliaDB(region="on-prem", url="http://localhost:8080")
+>>> resp = ndb.chat(kbid="my-kb-id", query="What does Hakuna Matata mean?")
 >>> print(resp.answer)
 'Hakuna matata is actually a phrase in the East African language of Swahili that literally means “no trouble” or “no problems”.'
 ```
