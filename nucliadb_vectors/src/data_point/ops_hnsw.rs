@@ -61,7 +61,7 @@ struct Cnx(Address, f32);
 impl Eq for Cnx {}
 impl Ord for Cnx {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(other).unwrap()
+        f32::total_cmp(&self.1, &other.1)
     }
 }
 impl PartialEq for Cnx {
