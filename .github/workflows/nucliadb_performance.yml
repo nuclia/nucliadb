@@ -17,6 +17,13 @@ jobs:
     name: Trigger Internal Performance Tests
     runs-on: ubuntu-latest
     steps:
+      - name: Generate a token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.GHAPP_NUCLIA_SERVICE_BOT_ID }}
+          private-key: ${{ secrets.GHAPP_NUCLIA_SERVICE_BOT_PK }}
+          owner: nuclia
 
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -41,7 +48,7 @@ jobs:
       - name: Repository Dispatch
         uses: peter-evans/repository-dispatch@v2
         with:
-          token: ${{ secrets.GH_CICD_PUBLIC }}
+          token: ${{ steps.app-token.outputs.token }}
           repository: nuclia/nucliadb_deploy
           event-type: performance-tests
           client-payload: '{"nucliadb_checkout_id": "${{ github.sha }}", "build_node_bindings": ${{ steps.filter.outputs.node_modified }}}'

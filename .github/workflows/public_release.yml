@@ -127,6 +127,14 @@ jobs:
     if: github.event_name == 'push'
 
     steps:
+      - name: Generate a token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.GHAPP_NUCLIA_SERVICE_BOT_ID }}
+          private-key: ${{ secrets.GHAPP_NUCLIA_SERVICE_BOT_PK }}
+          owner: nuclia
+
       - name: Checkout
         uses: actions/checkout@v3
 
@@ -160,6 +168,6 @@ jobs:
       - name: Trigger doc update
         uses: peter-evans/repository-dispatch@v2
         with:
-          token: ${{ secrets.GH_CICD_PUBLIC }}
+          token: ${{ steps.app-token.outputs.token }}
           repository: nuclia/docs
           event-type: merge
