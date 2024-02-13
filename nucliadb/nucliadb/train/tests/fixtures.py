@@ -321,7 +321,7 @@ def test_settings_train(cache, gcs, fake_node, maindb_driver):  # type: ignore
 
 
 @pytest.fixture(scope="function")
-async def train_api(test_settings_train: None, local_files, event_loop):  # type: ignore
+async def train_api(test_settings_train: None, local_files):  # type: ignore
     from nucliadb.train.utils import start_train_grpc, stop_train_grpc
 
     await start_shard_manager()

@@ -251,7 +251,7 @@ async def indexing_utility_ingest(natsd):
 
 
 @pytest.fixture(scope="function")
-async def _natsd_reset(natsd, event_loop):
+async def _natsd_reset(natsd):
     nc = await nats.connect(servers=[natsd])
     js = nc.jetstream()
     try:
