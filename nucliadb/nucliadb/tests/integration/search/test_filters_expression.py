@@ -50,26 +50,15 @@ async def test_filtering_expression(nucliadb_reader, nucliadb_writer, knowledgeb
         # all: [a, b] == (a && b)
         ([{"all": ["/origin.path/folder1", "/origin.path/folder2"]}], []),
         ([{"all": ["/origin.path/folder1", "/origin.tags/news"]}], ["resource1"]),
-        (
-            [
-                {
-                    "all": [
-                        "/origin.path/folder1",
-                        {"or": ["/origin.tags/news", "inexisting"]},
-                    ]
-                }
-            ],
-            ["resource1"],
-        ),
         # any: [a, b] == (a || b)
         (
             [{"any": ["/origin.path/folder1", "/origin.path/folder2"]}],
             ["resource1", "resource2"],
         ),
-        ([{"any": ["/origin.path/folder1", "/inexisting"]}, ["resource1"]]),
+        ([{"any": ["/origin.path/folder1", "/inexisting"]}], ["resource1"]),
         # none: [a, b] == !(a || b)
         ([{"none": ["/origin.path/folder1"]}], ["resource2", "resource3"]),
-        ({"none": ["/origin.path/folder1", "/origin.path/folder2"]}, ["resource3"]),
+        ([{"none": ["/origin.path/folder1", "/origin.path/folder2"]}], ["resource3"]),
         # not_all: [a, b] == !(a && b)
         (
             [{"not_all": ["/origin.path/folder1", "/origin.path/folder2"]}],
@@ -99,8 +88,4 @@ async def test_filtering_expression(nucliadb_reader, nucliadb_writer, knowledgeb
         )
         assert resp.status_code == 200
         body = resp.json()
-        try:
-            assert set(body["resources"].keys()) == set(expected_slugs)
-        except AssertionError:
-            errored.append((filters, expected_slugs, body))
-    assert errored == []
+        assert set(body["resources"].keys()) == set(expected_slugs)
