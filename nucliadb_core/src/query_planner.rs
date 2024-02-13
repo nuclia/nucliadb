@@ -184,7 +184,7 @@ pub fn build_query_plan(search_request: SearchRequest) -> NodeResult<QueryPlan> 
     let relations_request = compute_relations_request(&search_request);
 
     Ok(QueryPlan {
-        prefilter: prefilter,
+        prefilter,
         index_queries: IndexQueries {
             vectors_request,
             paragraphs_request,

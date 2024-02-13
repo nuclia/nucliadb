@@ -203,9 +203,7 @@ pub fn translate(query: String, context: QueryContext) -> NodeResult<QueryAnalys
             let splitted = split_mixed(translation_report.expression, &context)?;
             prefilter_queries.push(splitted.fields_only);
             search_queries.push(splitted.paragraphs_only);
-        } else if translation_report.is_nested {
-            prefilter_queries.push(translation_report.expression);
-        } else if translation_report.has_field_labels {
+        } else if translation_report.is_nested || translation_report.has_field_labels {
             prefilter_queries.push(translation_report.expression);
         } else {
             search_queries.push(translation_report.expression);
