@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-import tempfile
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, Mock
 
@@ -29,7 +28,6 @@ from nucliadb_protos.nodewriter_pb2 import IndexMessage, TypeMessage
 from nucliadb_node.listeners import IndexedPublisher
 from nucliadb_node.listeners.gc_scheduler import ShardManager
 from nucliadb_node.pull import Worker
-from nucliadb_node.settings import settings
 from nucliadb_utils import const
 
 
@@ -141,14 +139,6 @@ class TestIndexedPublisher:
 
 
 class TestSubscriptionWorker:
-    @pytest.fixture(scope="function")
-    def settings(self):
-        previous = settings.data_path
-        with tempfile.TemporaryDirectory() as td:
-            settings.data_path = str(td)
-            yield
-        settings.data_path = previous
-
     @pytest.fixture
     def nats_manager(self):
         return AsyncMock()
