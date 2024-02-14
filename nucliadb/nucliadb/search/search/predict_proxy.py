@@ -57,7 +57,7 @@ async def predict_proxy(
     predict_headers = predict.get_predict_headers(kbid)
     headers.update(predict_headers)
 
-    predict_endpoint: str = str(endpoint)
+    predict_endpoint: str = endpoint.value
     url = predict.get_predict_url(predict_endpoint)
 
     # Proxy the request to predict API
