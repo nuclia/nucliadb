@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from uuid import uuid4
 import pytest
 from httpx import AsyncClient
 
@@ -36,7 +37,7 @@ from nucliadb_utils.storages.storage import Storage
     [ReleaseChannel.EXPERIMENTAL, ReleaseChannel.STABLE],
 )
 @pytest.mark.skip(
-    "For some reason, introducing this test makes test_pull.py fail"
+    "For some reason, introducing this test makes many other tests fail"
 )
 async def test_purge_deletes_everything(
     maindb_driver: Driver,
@@ -50,7 +51,7 @@ async def test_purge_deletes_everything(
     removes every key from maindb
 
     """
-    kb_slug = "knowledgebox"
+    kb_slug = uuid4().hex
     resp = await nucliadb_manager.post(
         "/kbs", json={"slug": kb_slug, "release_channel": release_channel}
     )
