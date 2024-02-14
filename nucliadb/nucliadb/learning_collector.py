@@ -136,6 +136,7 @@ async def learning_collector_client() -> AsyncIterator[httpx.AsyncClient]:
     For now, a new client session is created for each request. This is to avoid having to
     save a client session in the FastAPI app state.
     """
+    breakpoint()
     client_class: Type[httpx.AsyncClient]
     if nuclia_settings.dummy_learning:
         # This is a workaround to be able to run integration tests that start nucliadb with docker.

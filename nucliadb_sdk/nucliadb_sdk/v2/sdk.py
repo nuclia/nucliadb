@@ -653,6 +653,25 @@ class _NucliaDBBase:
         response_type=None,
     )
 
+    list_feedback_months = _request_builder(
+        name="list_feedback_months",
+        path_template="/v1/kb/{kbid}/learning/collect/feedback",
+        method="GET",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=json_response_parser,
+    )
+
+    download_feedback = _request_builder(
+        name="download_feedback",
+        path_template="/v1/kb/{kbid}/learning/collect/feedback/{month}",
+        method="GET",
+        path_params=("kbid", "month"),
+        request_type=None,
+        response_type=None,
+        stream_response=True,
+    )
+
     start_export = _request_builder(
         name="start_export",
         path_template="/v1/kb/{kbid}/export",
