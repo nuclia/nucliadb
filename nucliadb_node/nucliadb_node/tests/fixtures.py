@@ -17,8 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import os
-import tempfile
 import time
 from typing import AsyncIterable, Optional
 
@@ -277,7 +275,6 @@ async def worker(
     node_single,
     gcs_storage,
     nats_manager: NatsConnectionManager,
-    data_path: str,
     writer: Writer,
     writer_stub: NodeWriterStub,
     grpc_server,
@@ -339,18 +336,3 @@ async def bunch_of_shards(
     finally:
         for shard_id in shard_ids:
             await writer_stub.DeleteShard(ShardId(id=shard_id))  # type: ignore
-
-
-@pytest.fixture(scope="function")
-def data_path():
-    with tempfile.TemporaryDirectory() as td:
-        previous = os.environ.get("DATA_PATH")
-        os.environ["DATA_PATH"] = str(td)
-
-        print("DATA_PATH set to:", str(td))
-        yield str(td)
-
-        if previous is None:
-            os.environ.pop("DATA_PATH")
-        else:  # pragma: no cover
-            os.environ["DATA_PATH"] = previous
