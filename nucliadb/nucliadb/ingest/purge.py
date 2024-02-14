@@ -18,11 +18,15 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+from dataclasses import dataclass
 from typing import AsyncGenerator
 
 import pkg_resources
+from grpc.aio import AioRpcError
 
-from nucliadb.common.cluster.exceptions import NodeError, ShardNotFound
+from nucliadb.common.cluster import manager
+from nucliadb.common.cluster.exceptions import NodeError, ShardNotFound, ShardsNotFound
+from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.utils import setup_driver, teardown_driver
@@ -40,7 +44,7 @@ from nucliadb_utils.utilities import get_storage
 
 
 async def _iter_keys(driver: Driver, match: str) -> AsyncGenerator[str, None]:
-    async with driver.transaction() as keys_txn:
+    async with driver.transaction(read_only=True) as keys_txn:
         async for key in keys_txn.keys(match=match, count=-1):
             yield key
 
@@ -124,7 +128,7 @@ async def purge_kb_storage(driver: Driver, storage: Storage):
             )
             delete_marker = True
         elif deleted:
-            logger.info(f"  √ Bucket successfully deleted")
+            logger.info("  √ Bucket successfully deleted")
             delete_marker = True
 
         if delete_marker:
@@ -142,6 +146,98 @@ async def purge_kb_storage(driver: Driver, storage: Storage):
     logger.info("FINISH PURGING KB STORAGE")
 
 
+async def purge_orphan_shards(driver: Driver):
+    """
+    Purging a knowledgebox can lead to orphan shards if index nodes are not
+    available or fail. Find those shards and purge them.
+    """
+
+    @dataclass
+    class ShardLocation:
+        kbid: str
+        node_id: str
+
+    stored_shards: dict[str, ShardLocation] = {}
+    shards_manager = KBShardManager()
+
+    async with driver.transaction(read_only=True) as txn:
+        async for kbid, _ in KnowledgeBox.get_kbs(txn, slug=""):
+            try:
+                kb_shards = await shards_manager.get_shards_by_kbid(kbid)
+            except ShardsNotFound:
+                logger.warning(
+                    "KB not found while purging orphan shards", extra={"kbid": kbid}
+                )
+                continue
+            else:
+                for shard_object_pb in kb_shards:
+                    for shard_replica_pb in shard_object_pb.replicas:
+                        shard_replica_id = shard_replica_pb.shard.id
+                        node_id = shard_replica_pb.node
+                        stored_shards[shard_replica_id] = ShardLocation(
+                            kbid=kbid, node_id=node_id
+                        )
+
+    indexed_shards: dict[str, ShardLocation] = {}
+    broken_shards: dict[str, ShardLocation] = {}
+
+    available_nodes = manager.get_index_nodes()
+    for node in available_nodes:
+        node_shards = await node.list_shards()
+        for shard_id in node_shards:
+            try:
+                shard_pb = await node.get_shard(shard_id)
+            except AioRpcError as grpc_error:
+                logger.error(
+                    "Can't get shard while looking for orphans in index nodes, is it broken?",
+                    exc_info=grpc_error,
+                    extra={
+                        "shard_id": shard_id,
+                        "node_id": node.id,
+                    },
+                )
+                broken_shards[shard_id] = ShardLocation(kbid="UNKNOWN", node_id=node.id)
+            else:
+                kbid = shard_pb.metadata.kbid
+                indexed_shards[shard_id] = ShardLocation(kbid=kbid, node_id=node.id)
+
+    # Log an error in case we found a shard stored but not indexed, this should
+    # never happen as shards are created in the index node and then stored in
+    # maindb
+    not_indexed_shards = stored_shards.keys() - indexed_shards.keys()
+    for shard_id in not_indexed_shards:
+        location = stored_shards[shard_id]
+        logger.error(
+            "Found a shard on maindb not indexed in the index nodes",
+            extra={
+                "shard_id": shard_id,
+                "kbid": location.kbid,
+                "node_id": location.node_id,
+            },
+        )
+
+    orphan_shards = indexed_shards.keys() - stored_shards.keys()
+    async with driver.transaction(read_only=True) as txn:
+        for shard_id in orphan_shards:
+            location = indexed_shards[shard_id]
+            node = manager.get_index_node(location.node_id)
+            kb_exists = await KnowledgeBox.exist_kb(txn, location.kbid)
+            if kb_exists:
+                msg = "Deleting orphan shard from index node for existing KB"
+            else:
+                msg = "Deleting orphan shard from index node for already removed KB"
+
+            logger.info(
+                msg,
+                extra={
+                    "shard_id": shard_id,
+                    "kbid": location.kbid,
+                    "node_id": location.node_id,
+                },
+            )
+            await node.delete_shard(shard_id)
+
+
 async def main():
     """
     This script will purge all knowledge boxes marked to be deleted in maindb.
@@ -155,6 +251,7 @@ async def main():
     try:
         await purge_kb(driver)
         await purge_kb_storage(driver, storage)
+        await purge_orphan_shards(driver)
     finally:
         await storage.finalize()
         await teardown_driver()
