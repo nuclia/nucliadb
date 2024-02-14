@@ -2,9 +2,9 @@
 
 The NucliaDB SDK is a Python library designed as a thin wrapper around the [NucliaDB HTTP API](https://docs.nuclia.dev/docs/api). It is tailored for developers who wish to create low-level scripts to interact with NucliaDB.
 
-## :warning: WARNING :warning:
+## WARNING
 
-If it's your first time using Nuclia or you want a simple way to push your unstructured data to Nuclia with a script or a CLI, we highly recommend using the [Nuclia CLI/SDK](https://github.com/nuclia/nuclia.py) instead, as it is much more user-friendly and use-case focused.
+⚠️ If it's your first time using Nuclia or you want a simple way to push your unstructured data to Nuclia with a script or a CLI, we highly recommend using the [Nuclia CLI/SDK](https://github.com/nuclia/nuclia.py) instead, as it is much more user-friendly and use-case focused. ⚠️
 
 ## Installation
 
@@ -20,7 +20,7 @@ You can find the auto-generated documentation of the NucliaDB sdk [here](https:/
 
 Essentially, each method of the `NucliaDB` class maps to an HTTP endpoint of the NucliaDB API. The parameters it accepts correspond to the Pydantic models associated to the request body scheme of the endpoint.
 
-The method-to-endpoint mappings for the sdk are declared in-code [in the _NucliaDBBase class](https://github.com/nuclia/nucliadb/blob/main/nucliadb_sdk/nucliadb_sdk/v2/sdk.py).
+The method-to-endpoint mappings for the sdk are declared in-code [in the NucliaDBBase class](https://github.com/nuclia/nucliadb/blob/main/nucliadb_sdk/nucliadb_sdk/v2/sdk.py).
 
 For instance, to create a resource in your Knowledge Box, the endpoint is defined [here](https://docs.nuclia.dev/docs/api#tag/Resources/operation/Create_Resource_kb__kbid__resources_post).
 
@@ -124,7 +124,7 @@ After the data is pushed, the NucliaDB SDK could also be used to find answers on
 >>> ndb = nucliadb_sdk.NucliaDB(region="on-prem", url="http://localhost:8080")
 >>> resp = ndb.chat(kbid="my-kb-id", query="What does Hakuna Matata mean?")
 >>> print(resp.answer)
-'Hakuna matata is actually a phrase in the East African language of Swahili that literally means “no trouble” or “no problems”.'
+'Hakuna matata is actually a phrase in the East African language of Swahili that literally means "no trouble" or "no problems".'
 ```
 
 ## Conclusion
