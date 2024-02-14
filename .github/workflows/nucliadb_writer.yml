@@ -92,6 +92,14 @@ jobs:
     if: github.event_name == 'push'
 
     steps:
+      - name: Generate a token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.GHAPP_ID_NUCLIABOT }}
+          private-key: ${{ secrets.PK_GHAPP_NUCLIABOT }}
+          owner: nuclia
+
       - name: Checkout repository
         uses: actions/checkout@v3
 
@@ -130,7 +138,7 @@ jobs:
       - name: Repository Dispatch
         uses: peter-evans/repository-dispatch@v2
         with:
-          token: ${{ secrets.GH_CICD_PUBLIC }}
+          token: ${{ steps.app-token.outputs.token }}
           repository: nuclia/nucliadb_deploy
           event-type: promote
           client-payload: '{"component": "nucliadb_writer", "chart-version": "${{ steps.version_step.outputs.version_number }}" }'

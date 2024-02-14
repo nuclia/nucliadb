@@ -148,37 +148,28 @@ async def pubsub(natsd):
         set_utility(Utility.PUBSUB, pubsub)
 
     yield pubsub
+    clean_utility(Utility.PUBSUB)
     await pubsub.finalize()
-    set_utility(Utility.PUBSUB, None)
 
 
 @pytest.fixture(scope="function")
-async def fake_node(_natsd_reset, indexing_utility_ingest, shard_manager):
+async def fake_node(indexing_utility, shard_manager):
     manager.INDEX_NODES.clear()
-    uuid1 = str(uuid.uuid4())
-    uuid2 = str(uuid.uuid4())
     manager.add_index_node(
-        id=uuid1,
+        id=str(uuid.uuid4()),
         address="nohost",
         shard_count=0,
         dummy=True,
     )
     manager.add_index_node(
-        id=uuid2,
+        id=str(uuid.uuid4()),
         address="nohost",
         shard_count=0,
-        dummy=True,
-    )
-    indexing_utility = IndexingUtility(
-        nats_creds=indexing_settings.index_jetstream_auth,
-        nats_servers=indexing_settings.index_jetstream_servers,
         dummy=True,
     )
 
     with patch.object(cluster_settings, "standalone_mode", False):
-        set_utility(Utility.INDEXING, indexing_utility)
         yield
-        clean_utility(Utility.INDEXING)
 
     manager.INDEX_NODES.clear()
 
@@ -229,57 +220,54 @@ async def stream_audit(natsd: str):
 
 
 @pytest.fixture(scope="function")
-async def indexing_utility_ingest(natsd):
-    nc = await nats.connect(servers=[natsd])
-    js = nc.jetstream()
-    try:
-        await js.delete_consumer("node", "node-1")
-    except nats.js.errors.NotFoundError:
-        pass
-
-    try:
-        await js.delete_stream(name="node")
-    except nats.js.errors.NotFoundError:
-        pass
-
-    await js.add_stream(name="node", subjects=["node.*"])
-    indexing_settings.index_jetstream_servers = [natsd]
-    await nc.drain()
-    await nc.close()
+async def indexing_utility(natsd, _clean_natsd):
+    indexing_utility = IndexingUtility(
+        nats_creds=indexing_settings.index_jetstream_auth,
+        nats_servers=indexing_settings.index_jetstream_servers,
+        dummy=True,
+    )
+    await indexing_utility.initialize()
+    set_utility(Utility.INDEXING, indexing_utility)
 
     yield
 
+    clean_utility(Utility.INDEXING)
+    await indexing_utility.finalize()
+
 
 @pytest.fixture(scope="function")
-async def _natsd_reset(natsd, event_loop):
+async def _clean_natsd(natsd):
     nc = await nats.connect(servers=[natsd])
     js = nc.jetstream()
-    try:
-        await js.delete_consumer(
-            const.Streams.INGEST.name,
-            const.Streams.INGEST.group.format(partition="1"),
-        )
-    except nats.js.errors.NotFoundError:
-        pass
-    try:
-        await js.delete_consumer(
-            const.Streams.INGEST_PROCESSED.name,
-            const.Streams.INGEST_PROCESSED.group,
-        )
-    except nats.js.errors.NotFoundError:
-        pass
 
-    try:
-        await js.delete_stream(name="nucliadb")
-    except nats.js.errors.NotFoundError:
-        pass
+    consumers = [
+        (const.Streams.INGEST.name, const.Streams.INGEST.group.format(partition="1")),
+        (const.Streams.INGEST_PROCESSED.name, const.Streams.INGEST_PROCESSED.group),
+        (const.Streams.INDEX.name, const.Streams.INDEX.group.format(node="1")),
+    ]
+    for stream, consumer in consumers:
+        try:
+            await js.delete_consumer(stream, consumer)
+        except nats.js.errors.NotFoundError:
+            pass
 
-    await js.add_stream(
-        name="nucliadb",
-        subjects=[const.Streams.INGEST.subject.format(partition=">")],
-    )
+    streams = [
+        (const.Streams.INGEST.name, const.Streams.INGEST.subject.format(partition=">")),
+        (const.Streams.INDEX.name, const.Streams.INDEX.subject.format(node="*")),
+    ]
+    for stream, subject in streams:
+        try:
+            await js.delete_stream(stream)
+        except nats.js.errors.NotFoundError:
+            pass
+
+        await js.add_stream(name=stream, subjects=[subject])
+
     await nc.drain()
     await nc.close()
+
+    indexing_settings.index_jetstream_servers = [natsd]
+
     yield
 
 
@@ -752,7 +740,7 @@ async def entities_manager_mock():
     klass = "nucliadb.ingest.service.writer.EntitiesManager"
     with patch(f"{klass}.get_indexed_entities_group", AsyncMock(return_value=None)):
         with patch(
-            f"nucliadb.common.cluster.manager.KBShardManager.apply_for_all_shards",
+            "nucliadb.common.cluster.manager.KBShardManager.apply_for_all_shards",
             AsyncMock(return_value=[]),
         ):
             yield

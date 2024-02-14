@@ -500,7 +500,7 @@ pub mod notification {
         Deleted = 3,
     }
 }
-//// The member information.
+/// The member information.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Member {
     //// Member ID.　A string of the UUID.

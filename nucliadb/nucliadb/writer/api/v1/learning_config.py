@@ -26,6 +26,23 @@ from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires
 
 
+@api.post(
+    path=f"/{KB_PREFIX}/{{kbid}}/configuration",
+    status_code=204,
+    name="Create Knowledge Box models configuration",
+    description="Create configuration of models assigned to a Knowledge Box",
+    response_model=None,
+    tags=["Knowledge Boxes"],
+)
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def set_configuration(
+    request: Request,
+    kbid: str,
+):
+    return await learning_config.proxy(request, "POST", f"/config/{kbid}")
+
+
 @api.patch(
     path=f"/{KB_PREFIX}/{{kbid}}/configuration",
     status_code=204,

@@ -457,10 +457,11 @@ class ProcessingEngine:
             url = self.nuclia_external_delete
             headers.update({"X-NUCLIA-NUAKEY": f"Bearer {self.nuclia_service_account}"})
 
-        resp = await self.session.post(url=url, data=data, headers=headers)
+        resp = await self.session.post(url=url, json=data, headers=headers)
         if resp.status != 200:
             logger.warning(
-                "Error deleting from processing", extra={"status": resp.status}
+                "Error deleting from processing",
+                extra={"status": resp.status, "text": await resp.text()},
             )
 
 
