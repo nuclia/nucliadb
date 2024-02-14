@@ -79,7 +79,7 @@ impl VectorWriter for VectorWriterService {
         let set = &setid.vectorset;
         let indexid = setid.vectorset.as_str();
         let similarity = similarity.into();
-        self.indexset.get_or_create(indexid, similarity)?;
+        self.indexset.get_or_create(indexid, similarity, true)?;
         self.indexset.commit()?;
 
         let took = time.elapsed().as_secs_f64();
@@ -222,7 +222,7 @@ impl WriterChild for VectorWriterService {
         debug!("{id:?} - Delete requests for indexes in the set: starts {v} ms");
 
         let index_iter =
-            resource.vectors_to_delete.iter().flat_map(|(k, v)| self.indexset.get(k).transpose().map(|i| (v, i)));
+            resource.vectors_to_delete.iter().flat_map(|(k, v)| self.indexset.get(k, true).transpose().map(|i| (v, i)));
         for (vectorlist, index) in index_iter {
             let mut tx = self.index.transaction();
             let mut index = index?;
@@ -242,7 +242,7 @@ impl WriterChild for VectorWriterService {
         let indexes = resource
             .vectors
             .keys()
-            .map(|k| (k, self.indexset.get(k)))
+            .map(|k| (k, self.indexset.get(k, true)))
             .map(|(key, index)| index.map(|index| (key, index)))
             .collect::<Result<HashMap<_, _>, _>>()?;
         self.indexset.commit()?;
@@ -436,7 +436,7 @@ impl VectorWriterService {
             Err(node_error!("Shard does not exist".to_string()))
         } else {
             Ok(VectorWriterService {
-                index: Index::open(path)?,
+                index: Index::open(path, true)?,
                 indexset: IndexSet::new(indexset)?,
                 channel: config.channel,
                 config: config.clone(),

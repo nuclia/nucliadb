@@ -43,7 +43,7 @@ impl<'a, D: DeleteLog> DeleteLog for &'a D {
     }
 }
 
-impl DeleteLog for dtrie_ram::DTrie {
+impl<T: Sync + Default + Ord + Copy> DeleteLog for dtrie_ram::DTrie<T> {
     fn is_deleted(&self, key: &[u8]) -> bool {
         self.get(key).is_some()
     }

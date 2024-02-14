@@ -24,6 +24,7 @@ use std::mem;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
+use nucliadb_core::fs_state::{self, FsResult, Version};
 use serde::{Deserialize, Serialize};
 
 use super::{SearchRequest, VectorR};
@@ -60,7 +61,7 @@ impl WorkUnit {
 
 #[derive(Clone, Copy)]
 struct TimeSensitiveDLog<'a> {
-    dlog: &'a DTrie,
+    dlog: &'a DTrie<SystemTime>,
     time: SystemTime,
 }
 impl<'a> DeleteLog for TimeSensitiveDLog<'a> {
@@ -140,7 +141,7 @@ pub struct State {
 
     // Trie containing the deleted keys and the
     // time when they were deleted
-    delete_log: DTrie,
+    pub delete_log: DTrie<SystemTime>,
 
     // Already closed WorkUnits waiting to be merged
     work_stack: LinkedList<WorkUnit>,
@@ -158,7 +159,7 @@ pub struct State {
     resources: HashMap<String, usize>,
 }
 impl State {
-    fn data_point_iterator(&self) -> impl Iterator<Item = &Journal> {
+    pub fn data_point_iterator(&self) -> impl Iterator<Item = &Journal> {
         self.work_stack.iter().flat_map(|u| u.load.iter()).chain(self.current.load.iter())
     }
     fn close_work_unit(&mut self) {
@@ -182,7 +183,7 @@ impl State {
             location: PathBuf::default(),
             no_nodes: usize::default(),
             current: WorkUnit::default(),
-            delete_log: DTrie::default(),
+            delete_log: DTrie::new(),
             work_stack: LinkedList::default(),
             data_points: HashMap::default(),
             resources: HashMap::default(),
@@ -346,34 +347,38 @@ mod test {
             Some(DataPoint::new(self.path, elems, None, Similarity::Cosine, Channel::EXPERIMENTAL).unwrap())
         }
     }
+}
 
-    #[test]
-    fn state_test() {
-        let dir = tempfile::TempDir::new().unwrap();
-        let mut state = State::new();
-        let no_nodes = DataPointProducer::new(dir.path())
-            .take(5)
-            .map(|dp| {
-                let journal = dp.journal();
-                let no_nodes = journal.no_nodes();
-                state.add(journal);
-                no_nodes
-            })
-            .sum::<usize>();
-        assert_eq!(state.no_nodes(), no_nodes);
-        assert_eq!(state.work_stack.len(), 1);
-        assert_eq!(state.current.size(), 0);
-        let work = state.current_work_unit().unwrap();
-        let work = work.iter().map(|j| (state.delete_log(*j), j.id())).collect::<Vec<_>>();
-        let new = DataPoint::merge(dir.path(), &work, Similarity::Cosine, Channel::EXPERIMENTAL).unwrap();
-        std::mem::drop(work);
-        state.replace_work_unit(new.journal());
-        assert!(state.current_work_unit().is_none());
-        assert_eq!(state.work_stack.len(), 0);
-        assert_eq!(state.current.size(), 1);
-        assert_eq!(state.no_nodes(), no_nodes);
-        assert_eq!(state.work_stack.len(), 0);
-        assert_eq!(state.current.size(), 1);
-        assert_eq!(state.no_nodes(), no_nodes);
+pub struct StateV1 {
+    pub state: State,
+    state_version: Version,
+    path: PathBuf,
+}
+
+impl StateV1 {
+    pub fn open(path: &Path) -> VectorR<Self> {
+        let state = fs_state::load_state::<State>(path)?;
+        let state_version = fs_state::crnt_version(path)?;
+
+        Ok(Self {
+            state,
+            state_version,
+            path: path.to_path_buf(),
+        })
+    }
+
+    pub fn segment_iterator(&self) -> impl Iterator<Item = (impl DeleteLog + '_, DpId)> {
+        self.state.data_point_iterator().map(|j| (self.state.delete_log(*j), j.id()))
+    }
+
+    pub fn refresh(&mut self) -> VectorR<()> {
+        self.state = fs_state::load_state(&self.path)?;
+        self.state_version = fs_state::crnt_version(&self.path)?;
+
+        Ok(())
+    }
+
+    pub fn needs_refresh(&self) -> FsResult<bool> {
+        Ok(fs_state::crnt_version(&self.path)? > self.state_version)
     }
 }

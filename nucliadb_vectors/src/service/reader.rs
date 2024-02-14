@@ -66,7 +66,7 @@ impl VectorReader for VectorReaderService {
         if vectorset.is_empty() {
             debug!("Id for the vectorset is empty");
             self.index_count(&self.index)
-        } else if let Some(index) = self.indexset.get(vectorset)? {
+        } else if let Some(index) = self.indexset.get(vectorset, false)? {
             debug!("Counting nodes for {vectorset}");
             self.index_count(&index)
         } else {
@@ -110,7 +110,7 @@ impl ReaderChild for VectorReaderService {
         let result = if request.vector_set.is_empty() {
             debug!("{id:?} - No vectorset specified, searching in the main index");
             self.index.search(&search_request)?
-        } else if let Some(index) = self.indexset.get(&request.vector_set)? {
+        } else if let Some(index) = self.indexset.get(&request.vector_set, false)? {
             debug!("{id:?} - vectorset specified and found, searching on {}", request.vector_set);
             index.search(&search_request)?
         } else {
@@ -188,7 +188,7 @@ impl VectorReaderService {
             return Err(node_error!("Invalid path {:?}", config.vectorset));
         }
         Ok(VectorReaderService {
-            index: Index::open(&config.path)?,
+            index: Index::open(&config.path, false)?,
             indexset: IndexSet::new(&config.vectorset)?,
         })
     }

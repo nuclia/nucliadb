@@ -21,14 +21,15 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
+use std::hash::Hash;
 
 #[derive(Default, Clone, Serialize, Deserialize)]
-pub struct DTrie {
-    value: Option<u64>,
-    go_table: HashMap<u8, Box<DTrie>>,
+pub struct DTrie<T> {
+    value: Option<T>,
+    go_table: HashMap<u8, Box<DTrie<T>>>,
 }
-impl DTrie {
-    fn inner_get(&self, key: &[u8], current: Option<u64>) -> Option<u64> {
+impl<T: Ord + Copy> DTrie<T> {
+    fn inner_get(&self, key: &[u8], current: Option<T>) -> Option<T> {
         let current = std::cmp::max(current, self.value);
         let [head, tail @ ..] = key else {
             return current;
@@ -38,7 +39,7 @@ impl DTrie {
         };
         node.inner_get(tail, current)
     }
-    fn inner_prune(&mut self, time: u64) -> bool {
+    fn inner_prune(&mut self, time: T) -> bool {
         self.value = self.value.filter(|v| *v > time);
         self.go_table = std::mem::take(&mut self.go_table)
             .into_iter()
@@ -48,10 +49,13 @@ impl DTrie {
             .collect();
         self.value.is_none() && self.go_table.is_empty()
     }
-    pub fn new() -> DTrie {
-        DTrie::default()
+    pub fn new() -> Self {
+        Self {
+            value: None,
+            go_table: HashMap::default(),
+        }
     }
-    pub fn insert(&mut self, key: &[u8], value: u64) {
+    pub fn insert(&mut self, key: &[u8], value: T) {
         match key {
             [] => {
                 self.value = Some(value);
@@ -62,11 +66,31 @@ impl DTrie {
             }
         }
     }
-    pub fn get(&self, key: &[u8]) -> Option<u64> {
+    pub fn get(&self, key: &[u8]) -> Option<T> {
         self.inner_get(key, None)
     }
-    pub fn prune(&mut self, time: u64) {
+    pub fn prune(&mut self, time: T) {
         self.inner_prune(time);
+    }
+}
+
+impl<T: Ord + Copy + Hash> DTrie<T> {
+    pub fn convert(&self, mapper: &Vec<T>) -> DTrie<u64> {
+        let new = if let Some(ref v) = self.value {
+            let mut new_value = 0;
+            for (txid, time) in mapper.iter().enumerate() {
+                if v > time {
+                    new_value = txid as u64 + 2;
+                }
+            }
+            Some(new_value)
+        } else {
+            None
+        };
+        DTrie {
+            value: new,
+            go_table: HashMap::from_iter(self.go_table.iter().map(|(k, v)| (*k, Box::new(v.convert(mapper))))),
+        }
     }
 }
 

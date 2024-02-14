@@ -55,12 +55,12 @@ impl IndexSet {
         let mut write = self.state.write().unwrap();
         write.remove_index(index)
     }
-    pub fn get_or_create<'a, S>(&'a mut self, index: S, similarity: Similarity) -> VectorR<Index>
+    pub fn get_or_create<'a, S>(&'a mut self, index: S, similarity: Similarity, writer: bool) -> VectorR<Index>
     where
         S: Into<std::borrow::Cow<'a, str>>,
     {
         let mut write = self.state.write().unwrap();
-        write.get_or_create(index, similarity)
+        write.get_or_create(index, similarity, writer)
     }
     fn update(&self) -> VectorR<()> {
         let disk_v = fs_state::crnt_version(&self.location)?;
@@ -75,10 +75,10 @@ impl IndexSet {
         let read = self.state.read().unwrap();
         read.index_keys(c);
     }
-    pub fn get(&self, index: &str) -> VectorR<Option<Index>> {
+    pub fn get(&self, index: &str, write: bool) -> VectorR<Option<Index>> {
         self.update()?;
         let read = self.state.read().unwrap();
-        read.get(index)
+        read.get(index, write)
     }
     pub fn get_location(&self) -> &Path {
         &self.location
