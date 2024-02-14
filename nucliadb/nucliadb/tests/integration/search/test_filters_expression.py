@@ -25,8 +25,7 @@ import pytest
 async def test_filtering_expression(nucliadb_reader, nucliadb_writer, knowledgebox):
     kbid = knowledgebox
 
-    uuid_for_slug = {}
-
+    slug_to_uuid = {}
     # Create 3 resources in different folders
     for title, slug, path, tag in [
         ("Resource1", "resource1", "folder1", "news"),
@@ -46,7 +45,7 @@ async def test_filtering_expression(nucliadb_reader, nucliadb_writer, knowledgeb
             headers={"x-synchronous": "true"},
         )
         assert resp.status_code == 201
-        uuid_for_slug[slug] = resp.json()["uuid"]
+        slug_to_uuid[slug] = resp.json()["uuid"]
 
     for filters, expected_slugs in [
         # all: [a, b] == (a && b)
@@ -86,10 +85,12 @@ async def test_filtering_expression(nucliadb_reader, nucliadb_writer, knowledgeb
         ),
     ]:
         resp = await nucliadb_reader.post(
-            f"/kb/{kbid}/find", json={"query": "", "filters": filters}
+            f"/kb/{kbid}/find",
+            json={"query": "", "filters": filters},
+            timeout=None,
         )
         assert resp.status_code == 200
         body = resp.json()
-        expected_uuids = {uuid_for_slug[slug] for slug in expected_slugs}
-        found_uuids = {r["uuid"] for r in body["resources"].keys()}
+        expected_uuids = {slug_to_uuid[slug] for slug in expected_slugs}
+        found_uuids = set(body["resources"].keys())
         assert found_uuids == expected_uuids
