@@ -4,4 +4,23 @@ error[E0599]: no function or associated item named `wrong` found for struct `Req
 23 | #[measure(actor = "wrong", metric = "my-test")]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ function or associated item not found in `RequestTimeKey`
    |
+note: if you're trying to build a new `RequestTimeKey` consider using one of the following associated functions:
+      RequestTimeKey::new
+      RequestTimeKey::shard
+      RequestTimeKey::vectors
+      RequestTimeKey::paragraphs
+      and $N others
+  --> $WORKSPACE/nucliadb_core/src/metrics/metric/request_time.rs
+   |
+   |     fn new(actor: RequestActor, request: String) -> RequestTimeKey {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+   |     pub fn shard(request: String) -> RequestTimeKey {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+   |     pub fn vectors(request: String) -> RequestTimeKey {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+   |     pub fn paragraphs(request: String) -> RequestTimeKey {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    = note: this error originates in the attribute macro `measure` (in Nightly builds, run with -Z macro-backtrace for more info)

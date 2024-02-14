@@ -359,7 +359,7 @@ impl Ord for Neighbour {
 }
 impl PartialOrd for Neighbour {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.node.partial_cmp(&other.node)
+        Some(self.cmp(other))
     }
 }
 impl PartialEq for Neighbour {

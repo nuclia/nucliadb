@@ -132,7 +132,7 @@ pub fn download_shard(
     let mut downloaded_bytes = 0;
     if Path::new(&download_path).exists() {
         // Open the file for appending and get the current file size
-        let mut file = OpenOptions::new().write(true).append(true).open(&download_path)?;
+        let mut file = OpenOptions::new().append(true).open(&download_path)?;
 
         // Seek to the end to continue the download
         downloaded_bytes = file.seek(SeekFrom::End(0))?;
@@ -145,7 +145,7 @@ pub fn download_shard(
     let content_length = get_content_length(url);
 
     if downloaded_bytes < content_length {
-        let mut file = OpenOptions::new().write(true).append(true).open(&download_path)?;
+        let mut file = OpenOptions::new().append(true).open(&download_path)?;
 
         println!("Downloading {}", Byte::from_bytes(content_length as u128).get_appropriate_unit(true),);
 
