@@ -712,7 +712,10 @@ class GCSStorage(Storage):
                 details = await resp.text()
                 msg = f"Delete KB bucket returned an unexpected status {resp.status}: {details}"
                 logger.error(msg, extra={"kbid": kbid})
-                errors.capture_exception(Exception(msg))
+                with errors.push_scope() as scope:
+                    scope.set_extra("kbid", kbid)
+                    scope.set_extra("status_code", resp.status)
+                    errors.capture_message(msg, "error", scope)
         return deleted, conflict
 
     async def iterate_bucket(self, bucket: str, prefix: str) -> AsyncIterator[Any]:
