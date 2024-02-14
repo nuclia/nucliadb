@@ -17,6 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import uuid
+from unittest.mock import AsyncMock
+
 import pytest
 from httpx import AsyncClient
 
@@ -35,19 +38,18 @@ from nucliadb_utils.storages.storage import Storage
     "release_channel",
     [ReleaseChannel.EXPERIMENTAL, ReleaseChannel.STABLE],
 )
-async def test_purge_deletes_everything(
+async def test_purge_deletes_everything_from_maindb(
     maindb_driver: Driver,
     storage: Storage,
     nucliadb_manager: AsyncClient,
-    nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     release_channel: str,
 ):
-    """Create a kb and some resource and then purge it. Validate that purge
+    """Create a KB and some resource and then purge it. Validate that purge
     removes every key from maindb
 
     """
-    kb_slug = "knowledgebox"
+    kb_slug = str(uuid.uuid4())
     resp = await nucliadb_manager.post(
         "/kbs", json={"slug": kb_slug, "release_channel": release_channel}
     )
@@ -98,6 +100,13 @@ async def test_purge_deletes_everything(
     # After deletion and purge, no keys should be in maindb
     keys_after_purge_storage = await list_all_keys(maindb_driver)
     assert len(keys_after_purge_storage) == 0
+
+
+@pytest.fixture(scope="function")
+def storage():
+    storage = AsyncMock()
+    storage.delete_kb = AsyncMock(return_value=(True, False))
+    yield storage
 
 
 async def list_all_keys(driver: Driver) -> list[str]:
