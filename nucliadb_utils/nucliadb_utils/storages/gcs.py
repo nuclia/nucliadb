@@ -699,7 +699,7 @@ class GCSStorage(Storage):
         deleted = False
         conflict = False
         async with self.session.delete(url, headers=headers) as resp:
-            if resp.status == 200:
+            if resp.status == 204:
                 logger.info(f"Deleted bucket: {bucket_name}")
                 deleted = True
             elif resp.status == 409:
