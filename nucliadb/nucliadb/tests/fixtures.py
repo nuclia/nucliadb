@@ -130,21 +130,6 @@ def tmpdir():
         pass
 
 
-@pytest.fixture()
-def learning_config():
-    lconfig = LearningConfiguration(
-        semantic_model="multilingual",
-        semantic_threshold=None,
-        semantic_vector_size=None,
-        semantic_vector_similarity="cosine",
-    )
-    with patch("nucliadb.ingest.service.writer.learning_proxy") as mocked:
-        mocked.set_configuration = AsyncMock(return_value=None)
-        mocked.get_configuration = AsyncMock(return_value=lconfig)
-        mocked.delete_configuration = AsyncMock(return_value=None)
-        yield mocked
-
-
 @pytest.fixture(scope="function")
 async def nucliadb(
     dummy_processing, analytics_disabled, driver_settings, tmpdir, learning_config
