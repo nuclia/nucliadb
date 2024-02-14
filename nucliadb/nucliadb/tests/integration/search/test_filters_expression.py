@@ -25,6 +25,8 @@ import pytest
 async def test_filtering_expression(nucliadb_reader, nucliadb_writer, knowledgebox):
     kbid = knowledgebox
 
+    uuid_for_slug = {}
+
     # Create 3 resources in different folders
     for title, slug, path, tag in [
         ("Resource1", "resource1", "folder1", "news"),
@@ -44,8 +46,8 @@ async def test_filtering_expression(nucliadb_reader, nucliadb_writer, knowledgeb
             headers={"x-synchronous": "true"},
         )
         assert resp.status_code == 201
+        uuid_for_slug[slug] = resp.json()["uuid"]
 
-    errored = []
     for filters, expected_slugs in [
         # all: [a, b] == (a && b)
         ([{"all": ["/origin.path/folder1", "/origin.path/folder2"]}], []),
@@ -88,4 +90,6 @@ async def test_filtering_expression(nucliadb_reader, nucliadb_writer, knowledgeb
         )
         assert resp.status_code == 200
         body = resp.json()
-        assert set(body["resources"].keys()) == set(expected_slugs)
+        expected_uuids = {uuid_for_slug[slug] for slug in expected_slugs}
+        found_uuids = {r["uuid"] for r in body["resources"].keys()}
+        assert found_uuids == expected_uuids
