@@ -116,7 +116,7 @@ async def test_proxy(async_client):
     request = mock.Mock(
         query_params={"some": "data"},
         body=mock.AsyncMock(return_value=b"some data"),
-        headers={"x-nucliadb-user": "user", "x-nucliadb-roles": "roles"},
+        headers={"X-NUCLIADB-USER": "user"},
     )
     response = await proxy(request, "GET", "url", headers={"foo": "bar"})
 
@@ -130,7 +130,7 @@ async def test_proxy(async_client):
         url="url",
         params={"some": "data"},
         content=b"some data",
-        headers={"foo": "bar"},
+        headers={"foo": "bar", "X-STF-USER": "user"},
     )
 
 
@@ -140,7 +140,7 @@ async def test_proxy_stream_response(async_client, config_stream_response):
     request = mock.Mock(
         query_params={"some": "data"},
         body=mock.AsyncMock(return_value=b"some data"),
-        headers={"x-nucliadb-user": "user", "x-nucliadb-roles": "roles"},
+        headers={"X-NUCLIADB-USER": "user"},
     )
     response = await proxy(request, "GET", "url")
 
@@ -156,7 +156,7 @@ async def test_proxy_stream_response(async_client, config_stream_response):
         url="url",
         params={"some": "data"},
         content=b"some data",
-        headers={},
+        headers={"X-STF-USER": "user"},
     )
 
 

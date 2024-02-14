@@ -68,6 +68,8 @@ async def proxy(
     If the response is chunked, a StreamingResponse is returned.
     """
     proxied_headers = headers or {}
+    if "X-NUCLIADB-USER" in request.headers:
+        proxied_headers["X-STF-USER"] = request.headers["X-NUCLIADB-USER"]
     async with learning_config_client() as client:
         try:
             response = await client.request(
