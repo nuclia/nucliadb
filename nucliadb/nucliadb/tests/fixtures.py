@@ -527,7 +527,7 @@ async def redis_config(redis):
     ingest_settings.driver_redis_url = None
     ingest_settings.driver = default_driver
     await driver.flushall()
-    await driver.aclose(close_connection_pool=True)
+    await driver.close(close_connection_pool=True)
 
     pubsub = get_utility(Utility.PUBSUB)
     if pubsub is not None:
