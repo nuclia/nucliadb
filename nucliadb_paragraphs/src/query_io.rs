@@ -19,7 +19,7 @@
 
 use crate::schema::ParagraphSchema;
 use nucliadb_core::query_language::{BooleanExpression, BooleanOperation, Operator};
-use tantivy::query::{BooleanQuery, Occur, Query, TermQuery};
+use tantivy::query::{AllQuery, BooleanQuery, Occur, Query, TermQuery};
 use tantivy::schema::{Facet, IndexRecordOption};
 use tantivy::Term;
 
@@ -37,6 +37,13 @@ fn translate_operation(operation: &BooleanOperation, schema: &ParagraphSchema) -
     };
 
     let mut operands = Vec::with_capacity(operation.operands.len());
+
+    if matches!(operator, Occur::MustNot) {
+        // Check the following issue to see why the additional AllQuery is needed:
+        // https://github.com/quickwit-oss/tantivy/issues/2317
+        let all_query: Box<dyn Query> = Box::new(AllQuery);
+        operands.push((Occur::Must, all_query));
+    }
     for operand in operation.operands.iter() {
         let subquery = translate_expression(operand, schema);
         operands.push((operator, subquery));

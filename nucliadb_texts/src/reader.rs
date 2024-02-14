@@ -127,12 +127,13 @@ impl FieldReader for TextReaderService {
             let formula_query = query_io::translate_expression(formula, schema);
             subqueries.push(formula_query);
         }
-        let prefilter_query: Box<dyn Query> = if subqueries.is_empty() {
-            Box::new(AllQuery)
-        } else {
-            Box::new(BooleanQuery::intersection(subqueries))
-        };
+        if subqueries.is_empty() {
+            return Ok(PreFilterResponse {
+                valid_fields: ValidFieldCollector::All,
+            });
+        }
 
+        let prefilter_query: Box<dyn Query> = Box::new(BooleanQuery::intersection(subqueries));
         let searcher = self.reader.searcher();
         let docs_fulfilled = searcher.search(&prefilter_query, &DocSetCollector)?;
 

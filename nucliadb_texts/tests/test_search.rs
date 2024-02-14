@@ -77,6 +77,42 @@ fn test_search_queries() {
 }
 
 #[test]
+fn test_prefilter_all_search() {
+    let reader = common::test_reader();
+    let request = PreFilterRequest {
+        security: None,
+        formula: None,
+        timestamp_filters: vec![],
+    };
+    let response = reader.pre_filter(&request).unwrap();
+    assert!(matches!(response.valid_fields, ValidFieldCollector::All));
+}
+
+#[test]
+fn test_prefilter_not_search() {
+    let reader = common::test_reader();
+
+    let context = nucliadb_core::query_language::QueryContext {
+        field_labels: HashSet::from(["/l/mylabel".to_string()]),
+        paragraph_labels: HashSet::with_capacity(0),
+    };
+    let query = "{ \"not\": { \"literal\": \"/l/mylabel\" } }".to_string();
+    let expression = nucliadb_core::query_language::translate(query, context).unwrap();
+    let request = PreFilterRequest {
+        security: None,
+        timestamp_filters: vec![],
+        formula: expression.prefilter_query,
+    };
+    println!("expression: {:?}", request.formula);
+    let response = reader.pre_filter(&request).unwrap();
+    let valid_fields = &response.valid_fields;
+    let ValidFieldCollector::Some(fields) = valid_fields else {
+        panic!("Response is not on the right variant {valid_fields:?}");
+    };
+    assert_eq!(fields.len(), 1);
+}
+
+#[test]
 fn test_prefilter_search() {
     let reader = common::test_reader();
 
@@ -96,14 +132,6 @@ fn test_prefilter_search() {
         panic!("Response is not on the right variant");
     };
     assert_eq!(fields.len(), 1);
-
-    let request = PreFilterRequest {
-        security: None,
-        formula: None,
-        timestamp_filters: vec![],
-    };
-    let response = reader.pre_filter(&request).unwrap();
-    assert!(matches!(response.valid_fields, ValidFieldCollector::All));
 }
 
 #[test]
