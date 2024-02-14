@@ -201,7 +201,8 @@ def test_learning_config(kbid: str):
             "x-ndb-client": "web",
         },
     )
-    raise_for_status(resp)
+    # 404 because there's no configuration
+    assert resp.status_code == 404
 
     resp = requests.get(
         os.path.join(BASE_URL, f"api/v1/kb/{kbid}/schema"),
