@@ -21,7 +21,7 @@ spec:
         - uri:
             regex: '^/api/v\d+/kb/[^/]+/configuration'
           method:
-            regex: "PATCH|OPTIONS"
+            regex: "POST|PATCH|OPTIONS"
       route:
         - destination:
             port:

@@ -42,7 +42,7 @@ async def set_configuration(
     config: dict[str, Any],
 ) -> None:
     async with learning_config_client() as client:
-        resp = await client.patch(f"config/{kbid}", json=config)
+        resp = await client.post(f"config/{kbid}", json=config)
         resp.raise_for_status()
 
 
@@ -68,7 +68,6 @@ async def proxy(
     If the response is chunked, a StreamingResponse is returned.
     """
     proxied_headers = headers or {}
-    proxied_headers.update(request.headers)
     async with learning_config_client() as client:
         try:
             response = await client.request(

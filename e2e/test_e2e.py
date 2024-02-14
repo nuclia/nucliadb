@@ -179,6 +179,52 @@ def test_predict_proxy(kbid: str):
     _test_predict_proxy_rephrase(kbid)
 
 
+def test_learning_config(kbid: str):
+    resp = requests.post(
+        os.path.join(BASE_URL, f"api/v1/kb/{kbid}/configuration"),
+        headers={
+            "content-type": "application/json",
+            "X-NUCLIADB-ROLES": "WRITER",
+            "x-ndb-client": "web",
+        },
+        json={
+            "foo": "bar",
+        }
+    )
+    assert resp.status_code == 422
+
+    resp = requests.get(
+        os.path.join(BASE_URL, f"api/v1/kb/{kbid}/configuration"),
+        headers={
+            "content-type": "application/json",
+            "X-NUCLIADB-ROLES": "READER",
+            "x-ndb-client": "web",
+        },
+    )
+    # 404 because there's no configuration
+    assert resp.status_code == 404
+
+    resp = requests.get(
+        os.path.join(BASE_URL, f"api/v1/kb/{kbid}/schema"),
+        headers={
+            "content-type": "application/json",
+            "X-NUCLIADB-ROLES": "READER",
+            "x-ndb-client": "web",
+        },
+    )
+    raise_for_status(resp)
+
+    resp = requests.get(
+        os.path.join(BASE_URL, f"api/v1/kb/{kbid}/models"),
+        headers={
+            "content-type": "application/json",
+            "X-NUCLIADB-ROLES": "READER",
+            "x-ndb-client": "web",
+        },
+    )
+    raise_for_status(resp)
+
+
 def _test_predict_proxy_chat(kbid: str):
     resp = requests.post(
         os.path.join(BASE_URL, f"api/v1/kb/{kbid}/predict/chat"),
