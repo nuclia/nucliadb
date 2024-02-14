@@ -67,6 +67,7 @@ def async_client(config_response):
     client = mock.AsyncMock()
     client.is_closed.return_value = False
     client.request = mock.AsyncMock(return_value=config_response)
+    client.post = mock.AsyncMock(return_value=config_response)
     client.patch = mock.AsyncMock(return_value=config_response)
     client.delete = mock.AsyncMock(return_value=config_response)
     with mock.patch("nucliadb.learning_config.learning_config_client") as mocked:
@@ -103,7 +104,7 @@ async def get_learning_config_client(settings):
 
 async def test_set_configuration(async_client):
     await set_configuration("kbid", {"some": "data"})
-    async_client.patch.assert_called_once_with("config/kbid", json={"some": "data"})
+    async_client.post.assert_called_once_with("config/kbid", json={"some": "data"})
 
 
 async def test_delete_configuration(async_client):
@@ -129,7 +130,7 @@ async def test_proxy(async_client):
         url="url",
         params={"some": "data"},
         content=b"some data",
-        headers={"x-nucliadb-user": "user", "x-nucliadb-roles": "roles", "foo": "bar"},
+        headers={"foo": "bar"},
     )
 
 
@@ -155,7 +156,7 @@ async def test_proxy_stream_response(async_client, config_stream_response):
         url="url",
         params={"some": "data"},
         content=b"some data",
-        headers={"x-nucliadb-user": "user", "x-nucliadb-roles": "roles"},
+        headers={},
     )
 
 
