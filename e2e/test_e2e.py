@@ -184,7 +184,7 @@ def test_learning_config(kbid: str):
         os.path.join(BASE_URL, f"api/v1/kb/{kbid}/configuration"),
         headers={
             "content-type": "application/json",
-            "X-NUCLIADB-ROLES": "READER",
+            "X-NUCLIADB-ROLES": "WRITER",
             "x-ndb-client": "web",
         },
         json={
