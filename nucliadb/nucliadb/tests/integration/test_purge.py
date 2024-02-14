@@ -23,12 +23,14 @@ from unittest.mock import AsyncMock
 import pytest
 from httpx import AsyncClient
 
+from nucliadb.common.cluster import manager
+from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.knowledgebox import (
     KB_TO_DELETE_BASE,
     KB_TO_DELETE_STORAGE_BASE,
 )
-from nucliadb.ingest.purge import purge_kb, purge_kb_storage
+from nucliadb.ingest.purge import purge_kb, purge_kb_storage, purge_orphan_shards
 from nucliadb_models.resource import ReleaseChannel
 from nucliadb_utils.storages.storage import Storage
 
@@ -100,6 +102,72 @@ async def test_purge_deletes_everything_from_maindb(
     # After deletion and purge, no keys should be in maindb
     keys_after_purge_storage = await list_all_keys(maindb_driver)
     assert len(keys_after_purge_storage) == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "release_channel",
+    [ReleaseChannel.EXPERIMENTAL, ReleaseChannel.STABLE],
+)
+async def test_purge_orphan_shards(
+    maindb_driver: Driver,
+    storage: Storage,
+    nucliadb_manager: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    release_channel: str,
+):
+    """Create a KB with some resource (hence a shard) and delete it. Simulate an
+    index node is down and validate orphan shards purge works as expected.
+
+    """
+    kb_slug = str(uuid.uuid4())
+    resp = await nucliadb_manager.post(
+        "/kbs", json={"slug": kb_slug, "release_channel": release_channel}
+    )
+    assert resp.status_code == 201
+    kbid = resp.json().get("uuid")
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        headers={"x-synchronous": "true"},
+        json={
+            "title": "My title",
+            "slug": "myresource",
+            "texts": {"text1": {"body": "My text"}},
+        },
+    )
+    assert resp.status_code == 201
+
+    resp = await nucliadb_manager.delete(f"/kb/{kbid}")
+    assert resp.status_code == 200
+
+    # Purge while index nodes are not available
+    index_nodes = manager.INDEX_NODES
+    manager.INDEX_NODES = type(manager.INDEX_NODES)()
+
+    await purge_kb(maindb_driver)
+
+    manager.INDEX_NODES = index_nodes
+
+    # We have removed the shards in maindb but left them orphan in the index
+    # nodes
+    shard_manager = KBShardManager()
+    async with maindb_driver.transaction(read_only=True) as txn:
+        maindb_shards = await shard_manager.get_all_shards(txn, kbid)
+        assert maindb_shards is None
+
+    shards = []
+    for node in manager.get_index_nodes():
+        shards.extend(await node.list_shards())
+    assert len(shards) > 0
+
+    # Purge orphans and validate
+    await purge_orphan_shards(maindb_driver)
+
+    shards = []
+    for node in manager.get_index_nodes():
+        shards.extend(await node.list_shards())
+    assert len(shards) == 0
 
 
 @pytest.fixture(scope="function")
