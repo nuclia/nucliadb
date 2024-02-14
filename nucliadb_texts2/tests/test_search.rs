@@ -19,10 +19,11 @@
 //
 
 mod common;
-
 use nucliadb_core::protos::{DocumentSearchRequest, Faceted, Filter};
+use nucliadb_core::query_planner::{PreFilterRequest, ValidFieldCollector};
 use nucliadb_core::texts::*;
 use nucliadb_texts2::reader::TextReaderService;
+use std::collections::HashSet;
 
 #[test]
 fn test_search_queries() {
@@ -72,6 +73,36 @@ fn test_search_queries() {
     // partial words
     // TODO: uncomment after fixing sc-5626
     // query(&reader, "shou", 1);
+}
+
+#[test]
+fn test_prefilter_search() {
+    let reader = common::test_reader();
+
+    let context = nucliadb_core::query_language::QueryContext {
+        field_labels: HashSet::from(["/l/mylabel".to_string()]),
+        paragraph_labels: HashSet::with_capacity(0),
+    };
+    let query = "{ \"literal\": \"/l/mylabel\" }".to_string();
+    let expression = nucliadb_core::query_language::translate(query, context).unwrap();
+    let request = PreFilterRequest {
+        security: None,
+        formula: expression.prefilter_query,
+        timestamp_filters: vec![],
+    };
+    let response = reader.pre_filter(&request).unwrap();
+    let ValidFieldCollector::Some(fields) = response.valid_fields else {
+        panic!("Response is not on the right variant");
+    };
+    assert_eq!(fields.len(), 1);
+
+    let request = PreFilterRequest {
+        security: None,
+        formula: None,
+        timestamp_filters: vec![],
+    };
+    let response = reader.pre_filter(&request).unwrap();
+    assert!(matches!(response.valid_fields, ValidFieldCollector::All));
 }
 
 #[test]

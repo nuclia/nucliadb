@@ -114,26 +114,27 @@ impl FieldReader for TextReaderService {
             }
         }
 
-        let pre_filter_query: Box<dyn Query> = if created_queries.is_empty() && modified_queries.is_empty() {
+        let mut subqueries = vec![];
+        if !created_queries.is_empty() {
+            let created_query: Box<dyn Query> = Box::new(BooleanQuery::new(created_queries));
+            subqueries.push(created_query);
+        }
+        if !modified_queries.is_empty() {
+            let modified_query: Box<dyn Query> = Box::new(BooleanQuery::new(modified_queries));
+            subqueries.push(modified_query);
+        }
+        if let Some(formula) = request.formula.as_ref() {
+            let formula_query = query_io::translate_expression(formula, schema);
+            subqueries.push(formula_query);
+        }
+        let prefilter_query: Box<dyn Query> = if subqueries.is_empty() {
             Box::new(AllQuery)
         } else {
-            let mut subqueries = vec![];
-            if !created_queries.is_empty() {
-                let created_query: Box<dyn Query> = Box::new(BooleanQuery::new(created_queries));
-                subqueries.push(created_query);
-            }
-            if !modified_queries.is_empty() {
-                let modified_query: Box<dyn Query> = Box::new(BooleanQuery::new(modified_queries));
-                subqueries.push(modified_query);
-            }
-            if let Some(formula) = request.formula.as_ref() {
-                let formula_query = query_io::translate_expression(formula, schema);
-                subqueries.push(formula_query);
-            }
             Box::new(BooleanQuery::intersection(subqueries))
         };
+
         let searcher = self.reader.searcher();
-        let docs_fulfilled = searcher.search(&pre_filter_query, &DocSetCollector)?;
+        let docs_fulfilled = searcher.search(&prefilter_query, &DocSetCollector)?;
 
         // If none of the fields match the pre-filter, thats all the query planner needs to know.
         if docs_fulfilled.is_empty() {
