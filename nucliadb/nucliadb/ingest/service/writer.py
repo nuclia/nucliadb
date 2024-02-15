@@ -240,7 +240,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 raise LearningConfigurationMissingError(
                     "Learning configuration missing. This should have been set by idp"
                 )
-            lconfig = await learning_config.set_configuration(kbid)
+            lconfig = await learning_config.set_configuration(kbid, config={})
         try:
             await self.proc.create_kb(
                 request.slug,
