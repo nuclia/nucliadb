@@ -203,7 +203,7 @@ def test_learning_config(kbid: str):
             "x-ndb-client": "web",
         },
     )
-    assert resp.status_code == 202
+    assert resp.status_code == 200
 
     # Get the schema
     resp = requests.get(
