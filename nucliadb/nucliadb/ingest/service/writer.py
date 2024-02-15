@@ -228,19 +228,22 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
     async def create_kb(self, request: KnowledgeBoxNew) -> str:
         """
-        Create first the knowledge box and then set the learning configuration.
-        If the learning configuration fails, the knowledge box is deleted.
+        First, try to get the learning configuration for the new knowledge box.
+        From there we need to extract the semantic model metadata and pass it to the create_kb method.
+        If the kb creation fails, rollback the learning configuration for the kbid that was just created.
         """
-        kbid = str(uuid.uuid4())
+        kbid = request.forceuuid or str(uuid.uuid4())
         release_channel = get_release_channel(request)
         request.config.release_channel = release_channel
         lconfig = await learning_config.get_configuration(kbid)
+        lconfig_created = False
         if lconfig is None:
             if not is_onprem_nucliadb():
                 raise LearningConfigurationMissingError(
                     "Learning configuration missing. This should have been set by idp"
                 )
             await learning_config.set_configuration(kbid, config={})
+            lconfig_created = True
             lconfig = await learning_config.get_configuration(kbid)
         if lconfig is None:
             raise LearningConfigurationMissingError(
@@ -258,7 +261,8 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         except Exception:
             # Rollback learning config for the kbid that was just created
             try:
-                await learning_config.delete_configuration(kbid)
+                if lconfig_created:
+                    await learning_config.delete_configuration(kbid)
             except Exception:
                 logger.warning(
                     "Could not rollback learning configuration",
