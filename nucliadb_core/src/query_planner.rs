@@ -166,22 +166,20 @@ fn analyze_filter(search_request: &SearchRequest) -> NodeResult<QueryAnalysis> {
 }
 
 pub fn build_query_plan(search_request: SearchRequest) -> NodeResult<QueryPlan> {
+    let vectors_request = compute_vectors_request(&search_request);
+    let paragraphs_request = compute_paragraphs_request(&search_request);
+    let texts_request = compute_texts_request(&search_request);
+    let relations_request = compute_relations_request(&search_request);
     let query_analysis = analyze_filter(&search_request)?;
     let prefilter_query = query_analysis.prefilter_query;
     let search_query = query_analysis.search_query;
-
     let vectors_context = VectorsContext {
         filtering_formula: search_query.clone(),
     };
     let paragraphs_context = ParagraphsContext {
         filtering_formula: search_query,
     };
-
     let prefilter = compute_prefilters(&search_request, prefilter_query);
-    let vectors_request = compute_vectors_request(&search_request);
-    let paragraphs_request = compute_paragraphs_request(&search_request);
-    let texts_request = compute_texts_request(&search_request);
-    let relations_request = compute_relations_request(&search_request);
 
     Ok(QueryPlan {
         prefilter,
@@ -251,6 +249,8 @@ fn compute_paragraphs_request(search_request: &SearchRequest) -> Option<Paragrap
     if !search_request.paragraph {
         return None;
     }
+
+    #[allow(deprecated)]
     Some(ParagraphSearchRequest {
         uuid: "".to_string(),
         with_duplicates: search_request.with_duplicates,
@@ -264,7 +264,9 @@ fn compute_paragraphs_request(search_request: &SearchRequest) -> Option<Paragrap
         only_faceted: search_request.only_faceted,
         advanced_query: search_request.advanced_query.clone(),
         key_filters: search_request.key_filters.clone(),
-        ..Default::default()
+        id: String::default(),
+        filter: None,
+        reload: search_request.reload,
     })
 }
 
@@ -272,7 +274,10 @@ fn compute_texts_request(search_request: &SearchRequest) -> Option<DocumentSearc
     if !search_request.document {
         return None;
     }
+
+    #[allow(deprecated)]
     Some(DocumentSearchRequest {
+        id: search_request.shard.clone(),
         body: search_request.body.clone(),
         fields: search_request.fields.clone(),
         order: search_request.order.clone(),
@@ -283,7 +288,8 @@ fn compute_texts_request(search_request: &SearchRequest) -> Option<DocumentSearc
         only_faceted: search_request.only_faceted,
         advanced_query: search_request.advanced_query.clone(),
         with_status: search_request.with_status,
-        ..Default::default()
+        filter: search_request.filter.clone(),
+        reload: search_request.reload,
     })
 }
 
@@ -291,7 +297,10 @@ fn compute_vectors_request(search_request: &SearchRequest) -> Option<VectorSearc
     if search_request.result_per_page == 0 || search_request.vector.is_empty() {
         return None;
     }
+
+    #[allow(deprecated)]
     Some(VectorSearchRequest {
+        id: search_request.shard.clone(),
         vector_set: search_request.vectorset.clone(),
         vector: search_request.vector.clone(),
         page_number: search_request.page_number,
@@ -299,7 +308,9 @@ fn compute_vectors_request(search_request: &SearchRequest) -> Option<VectorSearc
         with_duplicates: search_request.with_duplicates,
         key_filters: search_request.key_filters.clone(),
         min_score: search_request.min_score,
-        ..Default::default()
+        field_labels: Vec::with_capacity(0),
+        paragraph_labels: Vec::with_capacity(0),
+        reload: search_request.reload,
     })
 }
 
@@ -307,11 +318,13 @@ fn compute_relations_request(search_request: &SearchRequest) -> Option<RelationS
     if search_request.relation_prefix.is_none() && search_request.relation_subgraph.is_none() {
         return None;
     }
+
+    #[allow(deprecated)]
     Some(RelationSearchRequest {
         shard_id: search_request.shard.clone(),
         prefix: search_request.relation_prefix.clone(),
         subgraph: search_request.relation_subgraph.clone(),
-        ..Default::default()
+        reload: search_request.reload,
     })
 }
 
