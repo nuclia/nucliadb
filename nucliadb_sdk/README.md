@@ -2,9 +2,9 @@
 
 The NucliaDB SDK is a Python library designed as a thin wrapper around the [NucliaDB HTTP API](https://docs.nuclia.dev/docs/api). It is tailored for developers who wish to create low-level scripts to interact with NucliaDB.
 
-## :warning: WARNING :warning:
+## WARNING
 
-If it's your first time using Nuclia or you want a simple way to push your unstructured data to Nuclia with a script or a CLI, we highly recommend using the [Nuclia CLI/SDK](https://github.com/nuclia/nuclia.py) instead, as it is much more user-friendly and use-case focused.
+:warning: If it's your first time using Nuclia or you want a simple way to push your unstructured data to Nuclia with a script or a CLI, we highly recommend using the [Nuclia CLI/SDK](https://github.com/nuclia/nuclia.py) instead, as it is much more user-friendly and use-case focused. :warning:
 
 ## Installation
 
