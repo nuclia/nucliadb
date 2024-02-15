@@ -68,6 +68,9 @@ async def proxy(
     If the response is chunked, a StreamingResponse is returned.
     """
     proxied_headers = headers or {}
+    proxied_headers.update({k.lower(): v for k, v in request.headers.items()})
+    proxied_headers.pop("host", None)
+
     async with learning_config_client() as client:
         try:
             response = await client.request(
