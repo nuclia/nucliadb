@@ -35,7 +35,6 @@ from nucliadb_protos.nodereader_pb2 import (
     VectorSearchResponse,
 )
 
-from nucliadb.search import logger
 from nucliadb.search.search.fetch import (
     fetch_resources,
     get_labels_paragraph,
