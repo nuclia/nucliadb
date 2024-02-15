@@ -70,3 +70,10 @@ class IndexDataNotFound(Exception):
     """
     Raised when the index data is not found in storage
     """
+
+
+class UnparsableResponse(Exception):
+    """
+    Raised when trying to parse a response from a storage API and it's not
+    possible
+    """

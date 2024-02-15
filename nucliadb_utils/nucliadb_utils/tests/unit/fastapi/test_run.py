@@ -26,9 +26,8 @@ from uvicorn.server import Server  # type: ignore
 from nucliadb_utils.fastapi import run
 from nucliadb_utils.settings import running_settings
 
-pytestmark = pytest.mark.asyncio
 
-
+@pytest.mark.asyncio
 async def test_run_server_forever():
     server = AsyncMock(install_signal_handlers=MagicMock(), should_exit=False)
     config = MagicMock(loaded=False)
@@ -50,6 +49,7 @@ def test_metrics_app():
     assert config.port == running_settings.metrics_port
 
 
+@pytest.mark.asyncio
 async def test_serve_metrics():
     server = Mock()
     config = Mock()
