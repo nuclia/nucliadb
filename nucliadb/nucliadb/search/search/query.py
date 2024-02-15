@@ -243,6 +243,8 @@ class QueryParser:
                 field_labels, paragraph_labels = split_labels_by_type(
                     self.flat_filter_labels, classification_labels
                 )
+                check_supported_filters(self.filters, paragraph_labels)
+
             request.filter.field_labels.extend(field_labels)
             request.filter.paragraph_labels.extend(paragraph_labels)
             request.filter.expression = json.dumps(self.filters)
@@ -656,3 +658,27 @@ async def get_deleted_entity_groups(kbid: str) -> list[str]:
 async def get_classification_labels(kbid: str) -> knowledgebox_pb2.Labels:
     txn = await get_read_only_transaction()
     return await LabelsDataManager.inner_get_labels(kbid, txn)
+
+
+def check_supported_filters(filters: dict[str, Any], paragraph_labels: list[str]):
+    """
+    Check if the provided filters are supported:
+    Paragraph labels can only be used with simple 'and' expressions (not nested).
+    """
+    if len(paragraph_labels) == 0:
+        return
+    if "literal" in filters:
+        return
+    if "and" not in filters:
+        # Paragraph labels can only be used with 'and' filter
+        raise InvalidQueryError(
+            "filters",
+            "Paragraph labels can only be used with 'all' filter",
+        )
+    for term in filters["and"]:
+        # Nested expressions are not allowed with paragraph labels
+        if "literal" not in term:
+            raise InvalidQueryError(
+                "filters",
+                "Paragraph labels can only be used with 'all' filter",
+            )
