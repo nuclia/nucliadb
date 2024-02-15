@@ -98,7 +98,7 @@ async def test_delete_kb_errors():
 
     # Test GCS responses and how we behave
 
-    response_mock.status = 200
+    response_mock.status = 204
     deleted, conflict = await storage.delete_kb(kbid)
     assert deleted
     assert not conflict
