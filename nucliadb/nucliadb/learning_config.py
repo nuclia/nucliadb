@@ -179,7 +179,7 @@ class DummyClient(httpx.AsyncClient):
         )
         return self._response(content=lconfig.dict())
 
-    async def request(
+    async def request(  # type: ignore
         self,
         method: str,
         url: str,
