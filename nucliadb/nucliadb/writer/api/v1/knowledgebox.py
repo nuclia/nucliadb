@@ -18,9 +18,10 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+import json
 
 from fastapi import HTTPException, Response
-from fastapi_versioning import version  # type: ignore
+from fastapi_versioning import version
 from nucliadb_protos.knowledgebox_pb2 import (
     DeleteKnowledgeBoxResponse,
     KnowledgeBoxID,
@@ -57,19 +58,7 @@ from nucliadb_utils.utilities import get_ingest
 async def create_kb(request: Request, item: KnowledgeBoxConfig):
     ingest = get_ingest()
     requestpb = KnowledgeBoxNew()
-    if item.slug:
-        requestpb.slug = item.slug
-    if item.title:
-        requestpb.config.title = item.title
-    if item.description:
-        requestpb.config.description = item.description
-    if item.similarity:
-        requestpb.similarity = item.similarity.to_pb()
-    if item.release_channel:
-        requestpb.release_channel = item.release_channel.to_pb()
-
-    requestpb.config.enabled_filters.extend(item.enabled_filters)
-    requestpb.config.enabled_insights.extend(item.enabled_insights)
+    requestpb = parse_create_kb_request(item)
     kbobj: NewKnowledgeBoxResponse = await ingest.NewKnowledgeBox(requestpb)  # type: ignore
     if item.slug != "":
         slug = item.slug
@@ -81,6 +70,23 @@ async def create_kb(request: Request, item: KnowledgeBoxConfig):
         raise HTTPException(status_code=419, detail="Knowledge box already exists")
     elif kbobj.status == KnowledgeBoxResponseStatus.ERROR:
         raise HTTPException(status_code=500, detail="Error on creating knowledge box")
+
+
+def parse_create_kb_request(item: KnowledgeBoxConfig) -> KnowledgeBoxNew:
+    requestpb = KnowledgeBoxNew()
+    if item.slug:
+        requestpb.slug = item.slug
+    if item.title:
+        requestpb.config.title = item.title
+    if item.description:
+        requestpb.config.description = item.description
+    if item.similarity:
+        requestpb.similarity = item.similarity.to_pb()
+    if item.release_channel:
+        requestpb.release_channel = item.release_channel.to_pb()
+    if item.learning_config:
+        requestpb.learning_config = json.dumps(item.learning_config)
+    return requestpb
 
 
 @api.patch(
@@ -98,18 +104,10 @@ async def update_kb(request: Request, kbid: str, item: KnowledgeBoxConfig):
     pbrequest = KnowledgeBoxUpdate(uuid=kbid)
     if item.slug is not None:
         pbrequest.slug = item.slug
-
-    for filter_option in item.enabled_filters:
-        pbrequest.config.enabled_filters.append(filter_option)
-    for insight_option in item.enabled_insights:
-        pbrequest.config.enabled_insights.append(insight_option)
-
     if item.title:
         pbrequest.config.title = item.title
-
     if item.description:
         pbrequest.config.description = item.description
-
     kbobj: UpdateKnowledgeBoxResponse = await ingest.UpdateKnowledgeBox(pbrequest)  # type: ignore
     if kbobj.status == KnowledgeBoxResponseStatus.OK:
         return KnowledgeBoxObjID(uuid=kbobj.uuid)

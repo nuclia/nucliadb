@@ -72,8 +72,8 @@ pub struct LabelIndex {
 /// LabelIndex manages an FST file along with an index file.
 /// They are created by iterating on Label objects.
 impl LabelIndex {
-    const LABELS_FST: &str = "labels.fst";
-    const LABELS_IDX: &str = "labels.idx";
+    const LABELS_FST: &'static str = "labels.fst";
+    const LABELS_IDX: &'static str = "labels.idx";
 
     /// Returns true if FST files are present
     pub fn exists(path: &Path) -> bool {
@@ -175,7 +175,7 @@ pub struct KeyIndex {
 
 /// KeyIndex stores a (key, doc_id) tuple used to speed up lookups.
 impl KeyIndex {
-    const KEYS_FST: &str = "keys.fst";
+    const KEYS_FST: &'static str = "keys.fst";
 
     /// Returns true if the FST file is present
     pub fn exists(path: &Path) -> bool {

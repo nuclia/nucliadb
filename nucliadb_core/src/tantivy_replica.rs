@@ -227,8 +227,8 @@ mod tests {
         let replica_index = Index::open_in_dir(replica_workspace.path()).unwrap();
         let reader = replica_index.reader().unwrap();
         let searcher = reader.searcher();
-        let mut collector = tantivy::collector::DocSetCollector;
-        let docs = searcher.search(&tantivy::query::AllQuery, &mut collector).unwrap();
+        let collector = tantivy::collector::DocSetCollector;
+        let docs = searcher.search(&tantivy::query::AllQuery, &collector).unwrap();
 
         assert_eq!(docs.len(), 1);
     }

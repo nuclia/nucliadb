@@ -924,8 +924,9 @@ class SummarizeRequest(BaseModel):
     resources: List[str] = Field(
         ...,
         min_items=1,
+        max_items=100,
         title="Resources",
-        description="Uids of the resources to summarize",
+        description="Uids or slugs of the resources to summarize. If the resources are not found, they will be ignored.",
     )
 
     summary_kind: SummaryKind = Field(
@@ -936,16 +937,20 @@ class SummarizeRequest(BaseModel):
 
 
 class SummarizedResource(BaseModel):
-    summary: str
+    summary: str = Field(..., title="Summary", description="Summary of the resource")
     tokens: int
 
 
 class SummarizedResponse(BaseModel):
     resources: Dict[str, SummarizedResource] = Field(
-        default={}, title="Resources", description="Individual resource summaries"
+        default={},
+        title="Resources",
+        description="Individual resource summaries. The key is the resource id or slug.",
     )
     summary: str = Field(
-        default="", title="Summary", description="Global summary of all resources"
+        default="",
+        title="Summary",
+        description="Global summary of all resources combined.",
     )
 
 

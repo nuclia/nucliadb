@@ -294,7 +294,10 @@ async def _tus_post(
     await storage_manager.start(dm, path=path, kbid=kbid)
     await dm.save()
 
-    location = f"{request['path']}/{upload_id}"
+    # Find the URL for upload, with the same parameter as this call
+    location = api.url_path_for(
+        "Upload information", upload_id=upload_id, **request.path_params
+    )
     return Response(
         status_code=201,
         headers={
@@ -325,7 +328,7 @@ async def tus_head_rslug_prefix(
 
 
 @api.head(
-    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/file/{{field}}/{TUSUPLOAD}/{{upload_id}}",
+    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{path_rid}}/file/{{field}}/{TUSUPLOAD}/{{upload_id}}",
     tags=["Resource field TUS uploads"],
     status_code=200,
     openapi_extra={"x-operation-order": 3},
@@ -336,7 +339,7 @@ async def tus_head_rslug_prefix(
 async def tus_head_rid_prefix(
     request: Request,
     kbid: str,
-    rid: str,
+    path_rid: str,
     field: str,
     upload_id: str,
 ) -> Response:

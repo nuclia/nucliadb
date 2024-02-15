@@ -142,7 +142,7 @@ class KBShardManager:
         for shard_obj in shards:
             node, shard_id = choose_node(shard_obj)
             if shard_id is None:
-                raise ShardNotFound("Fount a node but not a shard")
+                raise ShardNotFound("Found a node but not a shard")
 
             ops.append(aw(node, shard_id))
 
@@ -427,7 +427,9 @@ class StandaloneKBShardManager(KBShardManager):
             )
             await index_node.writer.GC(noderesources_pb2.ShardId(id=shard_id))  # type: ignore
 
-    @backoff.on_exception(backoff.expo, NodesUnsync, max_tries=5)
+    @backoff.on_exception(
+        backoff.expo, NodesUnsync, jitter=backoff.random_jitter, max_tries=5
+    )
     async def delete_resource(
         self,
         shard: writer_pb2.ShardObject,
@@ -453,7 +455,9 @@ class StandaloneKBShardManager(KBShardManager):
                 )
             )
 
-    @backoff.on_exception(backoff.expo, NodesUnsync, max_tries=5)
+    @backoff.on_exception(
+        backoff.expo, NodesUnsync, jitter=backoff.random_jitter, max_tries=5
+    )
     async def add_resource(
         self,
         shard: writer_pb2.ShardObject,

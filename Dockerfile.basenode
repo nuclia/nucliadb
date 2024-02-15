@@ -1,4 +1,4 @@
-FROM rust:1.72.1-bullseye
+FROM rust:1.76.0-bullseye
 
 LABEL maintainer="info@nuclia.com"
 LABEL org.opencontainers.image.vendor="Nuclia Inc."
@@ -25,4 +25,4 @@ RUN set -eux; \
 
 # Required by tonic
 RUN rustup component add rustfmt \
-    && cargo install cargo-chef
+    && cargo install cargo-chef --locked

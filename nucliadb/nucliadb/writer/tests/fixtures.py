@@ -37,9 +37,8 @@ from nucliadb_utils.settings import (
     nucliadb_settings,
     storage_settings,
 )
-from nucliadb_utils.store import MAIN
 from nucliadb_utils.tests.conftest import get_testing_storage_backend
-from nucliadb_utils.utilities import Utility
+from nucliadb_utils.utilities import Utility, clean_utility, set_utility
 
 
 @pytest.fixture(scope="function")
@@ -50,7 +49,6 @@ async def writer_api(
     transaction_utility,
     processing_utility,
     tus_manager,
-    event_loop,
 ) -> AsyncIterator[Callable[[list[Enum], str, str], AsyncClient]]:
     nucliadb_settings.nucliadb_ingest = grpc_servicer.host
     from nucliadb.writer.app import create_application
@@ -130,11 +128,11 @@ async def storage_writer(request):
     Generic storage fixture that allows us to run the same tests for different storage backends.
     """
     storage_driver = request.param
-    MAIN[Utility.STORAGE] = storage_driver
+    set_utility(Utility.STORAGE, storage_driver)
 
     yield storage_driver
 
-    MAIN.pop(Utility.STORAGE, None)
+    clean_utility(Utility.STORAGE)
 
 
 @pytest.fixture(scope="function")

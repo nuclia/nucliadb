@@ -32,18 +32,8 @@ class Settings(BaseSettings):
     reader_listen_address: str = "0.0.0.0:10001"
     sidecar_listen_address: str = "0.0.0.0:10002"  # this component's listen address
 
-    data_path: Optional[str] = None
-
     max_resources_before_gc: int = 1000
 
 
 settings = Settings()
 indexing_settings = utils_settings.IndexingSettings()
-
-
-class RunningSettings(BaseSettings):
-    debug: bool = True
-    log_level: str = "DEBUG"
-
-
-running_settings = RunningSettings()

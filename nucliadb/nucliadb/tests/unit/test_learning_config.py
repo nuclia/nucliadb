@@ -1,0 +1,186 @@
+# Copyright (C) 2021 Bosutech XXI S.L.
+#
+# nucliadb is offered under the AGPL v3.0 and as commercial software.
+# For commercial licensing, contact us at info@nuclia.com.
+#
+# AGPL:
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+from io import BytesIO
+from unittest import mock
+
+import pytest
+
+from nucliadb.learning_config import (
+    delete_configuration,
+    learning_config_client,
+    proxy,
+    set_configuration,
+)
+
+
+@pytest.fixture()
+def config_response():
+    resp = mock.Mock(
+        status_code=200,
+        headers={
+            "x-foo": "bar",
+            "Content-Type": "application/json",
+        },
+        content=b"some data",
+    )
+    resp.raise_for_status.return_value = None
+    yield resp
+
+
+@pytest.fixture()
+def config_stream_response():
+    resp = mock.Mock(
+        status_code=200,
+        headers={
+            "Transfer-Encoding": "chunked",
+        },
+        content=b"some data",
+    )
+
+    async def aiter_bytes():
+        yield b"some data"
+
+    resp.aiter_bytes = aiter_bytes
+    resp.raise_for_status.return_value = None
+    yield resp
+
+
+@pytest.fixture()
+def async_client(config_response):
+    client = mock.AsyncMock()
+    client.is_closed.return_value = False
+    client.request = mock.AsyncMock(return_value=config_response)
+    client.post = mock.AsyncMock(return_value=config_response)
+    client.patch = mock.AsyncMock(return_value=config_response)
+    client.delete = mock.AsyncMock(return_value=config_response)
+    with mock.patch("nucliadb.learning_config.learning_config_client") as mocked:
+        mocked.return_value.__aenter__.return_value = client
+        mocked.return_value.__aexit__.return_value = None
+        yield client
+
+
+@pytest.fixture()
+def settings():
+    with mock.patch("nucliadb.learning_config.nuclia_settings") as settings:
+        settings.nuclia_inner_learning_config_url = (
+            "http://config.learning.svc.cluster.local:8080"
+        )
+        settings.nuclia_service_account = "service-account"
+        settings.nuclia_zone = "europe-1"
+        settings.nuclia_public_url = "http://{zone}.public-url"
+        yield settings
+
+
+async def get_learning_config_client(settings):
+    async with learning_config_client() as client:
+        assert client.base_url == "http://europe-1.public-url/api/v1"
+        assert client.headers["X-NUCLIA-NUAKEY"] == f"Bearer service-account"
+
+    settings.nuclia_service_account = None
+    async with learning_config_client() as client:
+        assert (
+            client.base_url
+            == "http://config.learning.svc.cluster.local:8080/api/v1/internal"
+        )
+        assert client.headers == {}
+
+
+async def test_set_configuration(async_client):
+    await set_configuration("kbid", {"some": "data"})
+    async_client.post.assert_called_once_with("config/kbid", json={"some": "data"})
+
+
+async def test_delete_configuration(async_client):
+    await delete_configuration("kbid")
+    async_client.delete.assert_called_once_with("config/kbid")
+
+
+async def test_proxy(async_client):
+    request = mock.Mock(
+        query_params={"some": "data"},
+        body=mock.AsyncMock(return_value=b"some data"),
+        headers={"x-nucliadb-user": "user", "x-nucliadb-roles": "roles"},
+    )
+    response = await proxy(request, "GET", "url", headers={"foo": "bar"})
+
+    assert response.status_code == 200
+    assert response.body == b"some data"
+    assert response.media_type == "application/json"
+    assert response.headers["x-foo"] == "bar"
+
+    async_client.request.assert_called_once_with(
+        method="GET",
+        url="url",
+        params={"some": "data"},
+        content=b"some data",
+        headers={"foo": "bar"},
+    )
+
+
+async def test_proxy_stream_response(async_client, config_stream_response):
+    async_client.request.return_value = config_stream_response
+
+    request = mock.Mock(
+        query_params={"some": "data"},
+        body=mock.AsyncMock(return_value=b"some data"),
+        headers={"x-nucliadb-user": "user", "x-nucliadb-roles": "roles"},
+    )
+    response = await proxy(request, "GET", "url")
+
+    assert response.status_code == 200
+    data = BytesIO()
+    async for chunk in response.body_iterator:
+        data.write(chunk)
+    assert data.getvalue() == b"some data"
+    assert response.headers["Transfer-Encoding"] == "chunked"
+
+    async_client.request.assert_called_once_with(
+        method="GET",
+        url="url",
+        params={"some": "data"},
+        content=b"some data",
+        headers={},
+    )
+
+
+async def test_proxy_error(async_client):
+    async_client.request.side_effect = Exception("some error")
+
+    request = mock.Mock(
+        query_params={"some": "data"},
+        body=mock.AsyncMock(return_value=b"some data"),
+        headers={},
+    )
+    response = await proxy(request, "GET", "url")
+
+    assert response.status_code == 503
+    assert (
+        response.body
+        == b"Unexpected error while trying to proxy the request to the learning config API. Please try again later."
+    )
+    assert response.media_type == "text/plain"
+
+    async_client.request.assert_called_once_with(
+        method="GET",
+        url="url",
+        params={"some": "data"},
+        content=b"some data",
+        headers={},
+    )

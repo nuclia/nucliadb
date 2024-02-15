@@ -364,7 +364,7 @@ message Notification {
 }
 
 
-/// The member information.
+// The member information.
 message Member {
     enum Type {
         IO = 0;
@@ -515,17 +515,6 @@ message GetSynonymsResponse {
     knowledgebox.Synonyms synonyms = 2;
 }
 
-message SetKBConfigurationRequest {
-    knowledgebox.KnowledgeBoxID kb = 1;
-    knowledgebox.KBConfiguration config = 2;
-}
-
-message GetConfigurationResponse {
-    OpStatusWriter status = 1;
-    knowledgebox.KBConfiguration config = 2;
-}
-
-
 
 service Writer {
     rpc GetKnowledgeBox(knowledgebox.KnowledgeBoxID) returns (knowledgebox.KnowledgeBox) {}
@@ -567,11 +556,6 @@ service Writer {
     rpc GetSynonyms(knowledgebox.KnowledgeBoxID) returns (GetSynonymsResponse) {}
     rpc SetSynonyms(SetSynonymsRequest) returns (OpStatusWriter) {}
     rpc DelSynonyms(knowledgebox.KnowledgeBoxID) returns (OpStatusWriter) {}
-
-    // Configuration
-    rpc SetConfiguration(SetKBConfigurationRequest) returns (OpStatusWriter) {}
-    rpc DelConfiguration(knowledgebox.KnowledgeBoxID) returns (OpStatusWriter) {}
-    rpc GetConfiguration(knowledgebox.KnowledgeBoxID) returns (GetConfigurationResponse) {}
 
     rpc Status(WriterStatusRequest) returns (WriterStatusResponse) {}
 

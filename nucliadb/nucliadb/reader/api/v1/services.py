@@ -26,7 +26,6 @@ from fastapi_versioning import version  # type: ignore
 from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxID
 from nucliadb_protos.writer_pb2 import (
-    GetConfigurationResponse,
     GetEntitiesGroupRequest,
     GetEntitiesGroupResponse,
     GetEntitiesRequest,
@@ -55,7 +54,6 @@ from nucliadb.models.responses import HTTPClientError
 from nucliadb.reader import SERVICE_NAME
 from nucliadb.reader.api.v1.router import KB_PREFIX, api
 from nucliadb.reader.reader.notifications import kb_notifications_stream
-from nucliadb_models.configuration import KBConfiguration
 from nucliadb_models.entities import EntitiesGroup, KnowledgeBoxEntities
 from nucliadb_models.labels import KnowledgeBoxLabels, LabelSet
 from nucliadb_models.resource import NucliaDBRoles
@@ -286,31 +284,6 @@ async def get_custom_synonyms(request: Request, kbid: str):
     elif pbresponse.status.status == OpStatusWriter.Status.ERROR:
         raise HTTPException(
             status_code=500, detail="Error getting synonyms of a Knowledge box"
-        )
-
-
-@api.get(
-    f"/{KB_PREFIX}/{{kbid}}/configuration",
-    status_code=200,
-    name="Get Knowledge Box Configuration",
-    tags=["Knowledge Box Services"],
-    response_model=KBConfiguration,
-    response_model_exclude_unset=True,
-    openapi_extra={"x-hidden-operation": True},
-)
-@requires(NucliaDBRoles.READER)
-@version(1)
-async def get_configuration(request: Request, kbid: str):
-    ingest = get_ingest()
-    pbrequest = KnowledgeBoxID(uuid=kbid)
-    pbresponse: GetConfigurationResponse = await ingest.GetConfiguration(pbrequest)  # type: ignore
-    if pbresponse.status.status == OpStatusWriter.Status.OK:
-        return KBConfiguration.from_message(pbresponse.config)
-    elif pbresponse.status.status == OpStatusWriter.Status.NOTFOUND:
-        raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
-    elif pbresponse.status.status == OpStatusWriter.Status.ERROR:
-        raise HTTPException(
-            status_code=500, detail="Error getting configuration of a Knowledge box"
         )
 
 

@@ -23,3 +23,7 @@ class ConflictError(Exception):
 
 class NotFoundError(Exception):
     ...
+
+
+class UnsetUtility(Exception):
+    ...

@@ -53,7 +53,7 @@ async def predict_proxy(
     predict: PredictEngine = get_predict()
 
     # Add KB configuration headers
-    headers = await predict.get_predict_headers(kbid)
+    headers = predict.get_predict_headers(kbid)
 
     # Proxy the request to predict API
     predict_response = await predict.make_request(

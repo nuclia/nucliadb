@@ -457,7 +457,9 @@ def node(_node, request):
     yield _node
 
 
-@backoff.on_exception(backoff.expo, Exception, max_tries=5)
+@backoff.on_exception(
+    backoff.expo, Exception, jitter=backoff.random_jitter, max_tries=5
+)
 def cleanup_node(writer: NodeWriterStub):
     for shard in writer.ListShards(EmptyQuery()).ids:
         writer.DeleteShard(ShardId(id=shard.id))

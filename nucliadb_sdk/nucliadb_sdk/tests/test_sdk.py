@@ -44,11 +44,6 @@ def test_kb_management(sdk: nucliadb_sdk.NucliaDB):
 
 
 def test_kb_services(sdk: nucliadb_sdk.NucliaDB, kb):
-    # Configuration
-    sdk.set_configuration(kbid=kb.uuid, semantic_model="foo")
-    sdk.get_configuration(kbid=kb.uuid)
-    sdk.delete_configuration(kbid=kb.uuid)
-
     # Labels
     sdk.set_labelset(kbid=kb.uuid, labelset="foo", title="Bar")
     sdk.get_labelset(kbid=kb.uuid, labelset="foo")
@@ -97,3 +92,12 @@ def test_search_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
     sdk.chat_on_resource(kbid=kb.uuid, rid=resource.uuid, query="foo")
     sdk.feedback(kbid=kb.uuid, ident="bar", good=True, feedback="baz", task="CHAT")
     sdk.summarize(kbid=kb.uuid, resources=["foobar"])
+
+
+def test_learning_config_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
+    sdk.set_configuration(kbid=kb.uuid, content={"foo": "bar"})
+    sdk.get_configuration(kbid=kb.uuid)
+    sdk.download_model(kbid=kb.uuid, model_id="foo", filename="bar")
+    sdk.get_models(kbid=kb.uuid)
+    sdk.get_model(kbid=kb.uuid, model_id="foo")
+    sdk.get_configuration_schema(kbid=kb.uuid)

@@ -34,8 +34,8 @@ message KnowledgeBox {
 message KnowledgeBoxConfig {
     string title = 1;
     string description = 2;
-    repeated string enabled_filters = 3;
-    repeated string enabled_insights = 4;
+    repeated string enabled_filters = 3 [deprecated = true];
+    repeated string enabled_insights = 4 [deprecated = true];
     string slug = 5;
     bool disable_vectors = 6 [deprecated = true];
     int64 migration_version = 7;
@@ -52,6 +52,7 @@ message KnowledgeBoxNew {
     optional int32 vector_dimension = 5;
     optional float default_min_score = 6;
     utils.ReleaseChannel release_channel = 7;
+    string learning_config = 8;
 }
 
 
@@ -209,7 +210,7 @@ message SemanticModelMetadata {
 
 // Do not update this model without confirmation of internal Learning Config API
 
-
+// Deprecated
 message KBConfiguration {
     string semantic_model = 2;
     string generative_model = 3;

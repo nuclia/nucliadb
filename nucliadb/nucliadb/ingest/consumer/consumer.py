@@ -114,7 +114,9 @@ class IngestConsumer:
             f"Subscribed to {subject} on stream {const.Streams.INGEST.name} from {last_seqid}"
         )
 
-    @backoff.on_exception(backoff.expo, (ConflictError,), max_tries=4)
+    @backoff.on_exception(
+        backoff.expo, (ConflictError,), jitter=backoff.random_jitter, max_tries=4
+    )
     async def _process(self, pb: BrokerMessage, seqid: int):
         await self.processor.process(pb, seqid, self.partition)
 
@@ -267,7 +269,9 @@ class IngestProcessedConsumer(IngestConsumer):
             f"Subscribed to {subject} on stream {const.Streams.INGEST_PROCESSED.name}"
         )
 
-    @backoff.on_exception(backoff.expo, (ConflictError,), max_tries=4)
+    @backoff.on_exception(
+        backoff.expo, (ConflictError,), jitter=backoff.random_jitter, max_tries=4
+    )
     async def _process(self, pb: BrokerMessage, seqid: int):
         """
         We are setting `transaction_check` to False here because we can not mix

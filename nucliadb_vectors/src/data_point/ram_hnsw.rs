@@ -48,7 +48,7 @@ impl RAMLayer {
         RAMLayer::default()
     }
     pub fn add_node(&mut self, node: Address) {
-        self.out.entry(node).or_insert_with(Vec::new);
+        self.out.entry(node).or_default();
     }
     pub fn add_edge(&mut self, from: Address, edge: Edge, to: Address) {
         if let Some(edges) = self.out.get_mut(&from) {

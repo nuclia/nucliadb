@@ -127,7 +127,9 @@ class StreamAuditStorage(AuditStorage):
     async def send(self, message: AuditRequest):
         self.queue.put_nowait(message)
 
-    @backoff.on_exception(backoff.expo, (Exception,), max_tries=4)
+    @backoff.on_exception(
+        backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=4
+    )
     async def _send(self, message: AuditRequest):
         if self.js is None:  # pragma: no cover
             raise AttributeError()

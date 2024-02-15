@@ -24,12 +24,10 @@ import mrflagly
 import pydantic
 
 from nucliadb_utils import const
+from nucliadb_utils.settings import nuclia_settings, running_settings
 
 
 class Settings(pydantic.BaseSettings):
-    environment: str = pydantic.Field(
-        "local", env=["environment", "running_environment"]
-    )
     flag_settings_url: Optional[str]
 
 
@@ -51,31 +49,26 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
         "rollout": 0,
         "variants": {"environment": ["local"]},
     },
-    const.Features.SUMMARIZATION: {
+    const.Features.VERSIONED_PRIVATE_PREDICT: {
         "rollout": 0,
         "variants": {"environment": ["local"]},
-    },
-    const.Features.PROCESSING_V2: {
-        "rollout": 0,
-        "variants": {"environment": ["testing"]},
     },
 }
 
 
 class FlagService:
     def __init__(self):
-        self.settings = Settings()
-        if self.settings.flag_settings_url is None:
+        settings = Settings()
+        if settings.flag_settings_url is None:
             self.flag_service = mrflagly.FlagService(data=json.dumps(DEFAULT_FLAG_DATA))
         else:
-            self.flag_service = mrflagly.FlagService(
-                url=self.settings.flag_settings_url
-            )
+            self.flag_service = mrflagly.FlagService(url=settings.flag_settings_url)
 
     def enabled(
         self, flag_key: str, default: bool = False, context: Optional[dict] = None
     ) -> bool:
         if context is None:
             context = {}
-        context["environment"] = self.settings.environment
+        context["environment"] = running_settings.running_environment
+        context["zone"] = nuclia_settings.nuclia_zone
         return self.flag_service.enabled(flag_key, default=default, context=context)

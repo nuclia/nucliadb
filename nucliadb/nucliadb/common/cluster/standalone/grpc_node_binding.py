@@ -409,6 +409,8 @@ READER_METHODS = {
     "RelationSearch": (RelationSearchRequest, RelationSearchResponse),
     "GetShard": (GetShardRequest, NodeResourcesShard),
     "Suggest": (SuggestRequest, SuggestResponse),
+    "RelationEdges": (ShardId, EdgeList),
+    "RelationTypes": (ShardId, TypeList),
 }
 WRITER_METHODS = {
     "NewShard": (ShardMetadata, ShardCreated),

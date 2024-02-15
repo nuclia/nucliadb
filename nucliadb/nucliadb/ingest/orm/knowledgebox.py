@@ -24,7 +24,6 @@ from uuid import uuid4
 from grpc import StatusCode
 from grpc.aio import AioRpcError  # type: ignore
 from nucliadb_protos.knowledgebox_pb2 import (
-    KBConfiguration,
     KnowledgeBoxConfig,
     Labels,
     LabelSet,
@@ -55,7 +54,7 @@ from nucliadb.ingest.orm.synonyms import Synonyms
 from nucliadb.ingest.orm.utils import compute_paragraph_key, get_basic, set_basic
 from nucliadb.migrator.utils import get_latest_version
 from nucliadb_protos import writer_pb2
-from nucliadb_utils.keys import KB_CONFIGURATION, KB_SHARDS, KB_UUID
+from nucliadb_utils.keys import KB_SHARDS, KB_UUID
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_audit, get_storage
 
@@ -120,16 +119,16 @@ class KnowledgeBox:
     async def delete_kb(cls, txn: Transaction, slug: str = "", kbid: str = ""):
         # Mark storage to be deleted
         # Mark keys to be deleted
-        if kbid == "" and slug == "":
+        if not kbid and not slug:
             raise AttributeError()
 
-        if kbid == "" and slug != "":
+        if slug and not kbid:
             kbid_bytes = await txn.get(KB_SLUGS.format(slug=slug))
             if kbid_bytes is None:
                 raise KnowledgeBoxNotFound()
             kbid = kbid_bytes.decode()
 
-        if slug == "" and kbid != "":
+        if kbid and not slug:
             kbconfig_bytes = await txn.get(KB_UUID.format(kbid=kbid))
             if kbconfig_bytes is None:
                 raise KnowledgeBoxNotFound()
@@ -282,27 +281,6 @@ class KnowledgeBox:
                 if node is not None:
                     yield node, replica.shard.id
 
-    # Configuration
-    async def get_configuration(self, response: KBConfiguration):
-        configuration_key = KB_CONFIGURATION.format(kbid=self.kbid)
-        payload = await self.txn.get(configuration_key)
-        if payload is not None:
-            response.ParseFromString(payload)
-
-    async def del_configuration(self):
-        configuration_key = KB_CONFIGURATION.format(kbid=self.kbid)
-        await self.txn.delete(configuration_key)
-
-    async def set_configuration(self, config: KBConfiguration):
-        configuration_key = KB_CONFIGURATION.format(kbid=self.kbid)
-        payload = await self.txn.get(configuration_key)
-        kb_conf = KBConfiguration()
-        if payload is not None:
-            kb_conf.ParseFromString(payload)
-        kb_conf.MergeFrom(config)
-        payload = kb_conf.SerializeToString()
-        await self.txn.set(configuration_key, payload)
-
     # Vectorset
     async def get_vectorsets(self, response: writer_pb2.GetVectorSetsResponse):
         vectorset_key = KB_VECTORSET.format(kbid=self.kbid)
@@ -384,41 +362,43 @@ class KnowledgeBox:
         exists = await storage.schedule_delete_kb(kbid)
         if exists is False:
             logger.error(f"{kbid} KB does not exists on Storage")
-        txn = await driver.begin()
-        storage_to_delete = KB_TO_DELETE_STORAGE.format(kbid=kbid)
-        await txn.set(storage_to_delete, b"")
 
-        # Delete KB Shards
-        shards_match = KB_SHARDS.format(kbid=kbid)
-        payload = await txn.get(shards_match)
+        async with driver.transaction() as txn:
+            storage_to_delete = KB_TO_DELETE_STORAGE.format(kbid=kbid)
+            await txn.set(storage_to_delete, b"")
 
-        if payload is None:
-            logger.warning(f"Shards not found for kbid={kbid}")
-        else:
-            shards_obj = writer_pb2.Shards()
-            shards_obj.ParseFromString(payload)  # type: ignore
+            # Delete KB Shards
+            shards_match = KB_SHARDS.format(kbid=kbid)
+            payload = await txn.get(shards_match)
 
-            for shard in shards_obj.shards:
-                # Delete the shard on nodes
-                for replica in shard.replicas:
-                    node = get_index_node(replica.node)
-                    if node is None:
-                        logger.error(
-                            f"No node {replica.node} found lets continue. Some shards may stay orphaned"
-                        )
-                        continue
-                    try:
-                        await node.delete_shard(replica.shard.id)
-                        logger.debug(
-                            f"Succeded deleting shard from nodeid={replica.node} at {node.address}"
-                        )
-                    except AioRpcError as exc:
-                        if exc.code() == StatusCode.NOT_FOUND:
+            if payload is None:
+                logger.warning(f"Shards not found for kbid={kbid}")
+            else:
+                shards_obj = writer_pb2.Shards()
+                shards_obj.ParseFromString(payload)  # type: ignore
+
+                for shard in shards_obj.shards:
+                    # Delete the shard on nodes
+                    for replica in shard.replicas:
+                        node = get_index_node(replica.node)
+                        if node is None:
+                            logger.error(
+                                f"No node {replica.node} found, let's continue. Some shards may stay orphaned",
+                                extra={"kbid": kbid},
+                            )
                             continue
-                        await txn.abort()
-                        raise ShardNotFound(f"{exc.details()} @ {node.address}")
+                        try:
+                            await node.delete_shard(replica.shard.id)
+                            logger.debug(
+                                f"Succeded deleting shard from nodeid={replica.node} at {node.address}",
+                                extra={"kbid": kbid, "node_id": replica.node},
+                            )
+                        except AioRpcError as exc:
+                            if exc.code() == StatusCode.NOT_FOUND:
+                                continue
+                            raise ShardNotFound(f"{exc.details()} @ {node.address}")
 
-        await txn.commit()
+            await txn.commit()
         await cls.delete_all_kb_keys(driver, kbid)
 
     @classmethod

@@ -170,7 +170,9 @@ class GCloudFileStorageManager(FileStorageManager):
     chunk_size = CHUNK_SIZE
     min_upload_size = MIN_UPLOAD_SIZE
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=4)
+    @backoff.on_exception(
+        backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=4
+    )
     async def start(self, dm: FileDataManager, path: str, kbid: str):
         """Init an upload.
 
@@ -232,7 +234,9 @@ class GCloudFileStorageManager(FileStorageManager):
             resumable_uri=resumable_uri, upload_file_id=upload_file_id, path=path
         )
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=4)
+    @backoff.on_exception(
+        backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=4
+    )
     async def delete_upload(self, uri, kbid):
         bucket = self.storage.get_bucket_name(kbid)
 
@@ -264,6 +268,9 @@ class GCloudFileStorageManager(FileStorageManager):
         else:
             raise AttributeError("No valid uri")
 
+    @backoff.on_exception(
+        backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=4
+    )
     async def _append(self, dm: FileDataManager, data, offset):
         if self.storage.session is None:
             raise AttributeError()
@@ -295,7 +302,7 @@ class GCloudFileStorageManager(FileStorageManager):
         ) as call:
             text = await call.text()  # noqa
             if call.status not in [200, 201, 308]:
-                logger.error(text)
+                raise GoogleCloudException(f"{call.status}: {text}")
             return call
 
     async def append(self, dm: FileDataManager, iterable, offset) -> int:
@@ -328,6 +335,9 @@ class GCloudFileStorageManager(FileStorageManager):
                 break
         return count
 
+    @backoff.on_exception(
+        backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=4
+    )
     async def finish(self, dm: FileDataManager):
         if dm.size == 0:
             if self.storage.session is None:
@@ -347,7 +357,7 @@ class GCloudFileStorageManager(FileStorageManager):
             ) as call:
                 text = await call.text()  # noqa
                 if call.status not in [200, 201, 308]:
-                    logger.error(text)
+                    raise GoogleCloudException(f"{call.status}: {text}")
                 return call
         path = dm.get("path")
         await dm.finish()

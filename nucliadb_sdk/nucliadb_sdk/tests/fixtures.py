@@ -30,9 +30,6 @@ from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
 import nucliadb_sdk
-from nucliadb_models.resource import KnowledgeBoxObj
-from nucliadb_sdk.client import Environment, NucliaDBClient
-from nucliadb_sdk.knowledgebox import KnowledgeBox
 
 images.settings["nucliadb"] = {
     "image": "nuclia/nucliadb",
@@ -130,22 +127,6 @@ def kb(sdk: nucliadb_sdk.NucliaDB):
     yield kb
 
     sdk.delete_knowledge_box(kbid=kb.uuid)
-
-
-@pytest.fixture(scope="function")
-def knowledgebox(kb: KnowledgeBoxObj, nucliadb: NucliaFixture):
-    """
-    b/w compatible fixture since other components depend on this
-    """
-    url = f"{nucliadb.url}/v1/kb/{kb.uuid}"
-    client = NucliaDBClient(
-        environment=Environment.OSS,
-        writer_host=url,
-        reader_host=url,
-        search_host=url,
-        train_host=url,
-    )
-    yield KnowledgeBox(client)
 
 
 async def init_fixture(

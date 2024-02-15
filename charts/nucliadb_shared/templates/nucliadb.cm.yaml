@@ -44,7 +44,6 @@ data:
   NUCLIA_SERVICE_ACCOUNT: {{ .Values.nuclia.nuclia_service_account }}
 {{- end }}
   NUCLIA_PUBLIC_URL: {{ .Values.nuclia.nuclia_public_url }}
-  NUCLIA_CLUSTER_URL: {{ .Values.nuclia.nuclia_cluster_url }}
   NUCLIA_ZONE: {{ .Values.nuclia.nuclia_zone }}
 {{- if .Values.nuclia.onprem }}
   ONPREM: "True"

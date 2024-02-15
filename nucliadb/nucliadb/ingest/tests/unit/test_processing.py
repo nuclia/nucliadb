@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from unittest import mock
 from unittest.mock import Mock
 
 import pytest
@@ -48,15 +47,6 @@ TEST_CLOUD_FILE = CloudFile(
 TEST_ITEM = PushPayload(uuid="foo", kbid="bar", userid="baz", partition=1)
 
 
-@pytest.fixture(scope="function", autouse=True)
-def get_configuration():
-    with mock.patch(
-        "nucliadb.ingest.processing.ProcessingEngine.get_configuration",
-        return_value=None,
-    ):
-        yield
-
-
 @pytest.mark.asyncio
 async def test_dummy_processing_engine():
     engine = DummyProcessingEngine()
@@ -73,11 +63,10 @@ async def test_dummy_processing_engine():
 def engine():
     pe = ProcessingEngine(
         onprem=True,
-        nuclia_cluster_url="cluster_url",
+        nuclia_processing_cluster_url="cluster_url",
         nuclia_public_url="public_url",
     )
-    with mock.patch.object(pe, "get_configuration", return_value=None):
-        yield pe
+    yield pe
 
 
 async def test_convert_filefield_to_str_200(engine):

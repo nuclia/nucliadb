@@ -20,4 +20,3 @@
 
 KB_SHARDS = "/kbs/{kbid}/shards"
 KB_UUID = "/kbs/{kbid}/config"
-KB_CONFIGURATION = "/kbs/{kbid}/configuration"
