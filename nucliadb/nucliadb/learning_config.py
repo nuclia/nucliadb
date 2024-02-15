@@ -147,29 +147,51 @@ class DummyResponse(httpx.Response):
 
 
 class DummyClient(httpx.AsyncClient):
-    def _response(self):
-        content = {"detail": "Dummy client is not supposed to be used"}
+    def _response(self, content=None):
+        if content is None:
+            content = {"detail": "Dummy client is not supposed to be used"}
         return DummyResponse(
             status_code=200,
             headers={"content-type": "application/json"},
             content=json.dumps(content).encode(),
         )
 
-    async def get(self, *args: Any, **kwargs: Any):
-        return self._response()
+    async def get(self, *args, **kwargs: Any):
+        return await self._handle_request("GET", *args, **kwargs)
 
     async def post(self, *args: Any, **kwargs: Any):
-        return self._response()
+        return await self._handle_request("POST", *args, **kwargs)
+
+    async def patch(self, *args: Any, **kwargs: Any):
+        return await self._handle_request("PATCH", *args, **kwargs)
 
     async def delete(self, *args: Any, **kwargs: Any):
-        return self._response()
+        return await self._handle_request("DELETE", *args, **kwargs)
+
+    async def get_config(self, *args: Any, **kwargs: Any):
+        lconfig = LearningConfiguration(
+            semantic_model="multilingual",
+            semantic_vector_similarity="cosine",
+            semantic_vector_size=None,
+            semantic_threshold=None,
+        )
+        return self._response(content=lconfig.dict())
 
     async def request(
         self,
         *args: Any,
         **kwargs: Any,
     ) -> httpx.Response:
-        return self._response()
+        return await self._handle_request(*args, **kwargs)
+
+    async def _handle_request(self, *args: Any, **kwargs: Any) -> httpx.Response:
+        http_method = args[0]
+        http_url = args[1]
+        method = f"{http_method.lower()}_{http_url.split('/')[0]}"
+        if hasattr(self, method):
+            return await getattr(self, method)(*args, **kwargs)
+        else:
+            return self._response()
 
 
 @contextlib.asynccontextmanager
