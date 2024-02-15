@@ -28,7 +28,7 @@ from nucliadb_utils.utilities import Utility
 
 images.settings["s3"] = {
     "image": "localstack/localstack",
-    "version": "3.1",
+    "version": "0.12.18",
     "env": {"SERVICES": "s3"},
     "options": {
         "ports": {"4566": None, "4571": None},
@@ -43,7 +43,7 @@ class S3(BaseImage):
     def check(self):
         try:
             response = requests.get(f"http://{self.host}:{self.get_port()}")
-            return response.status_code == 200
+            return response.status_code == 404
         except Exception:
             return False
 
