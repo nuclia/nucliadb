@@ -37,7 +37,7 @@ import yarl
 from google.oauth2 import service_account  # type: ignore
 from nucliadb_protos.resources_pb2 import CloudFile
 
-from nucliadb_telemetry import metrics
+from nucliadb_telemetry import errors, metrics
 from nucliadb_telemetry.utils import setup_telemetry
 from nucliadb_utils import logger
 from nucliadb_utils.storages import CHUNK_SIZE
@@ -699,7 +699,7 @@ class GCSStorage(Storage):
         deleted = False
         conflict = False
         async with self.session.delete(url, headers=headers) as resp:
-            if resp.status == 200:
+            if resp.status == 204:
                 logger.info(f"Deleted bucket: {bucket_name}")
                 deleted = True
             elif resp.status == 409:
@@ -710,9 +710,12 @@ class GCSStorage(Storage):
                 logger.info(f"Does not exit on deleting: {bucket_name}")
             else:
                 details = await resp.text()
-                logger.error(
-                    f"Delete KB bucket returned an unexpected status {resp.status}: {details}"
-                )
+                msg = f"Delete KB bucket returned an unexpected status {resp.status}: {details}"
+                logger.error(msg, extra={"kbid": kbid})
+                with errors.push_scope() as scope:
+                    scope.set_extra("kbid", kbid)
+                    scope.set_extra("status_code", resp.status)
+                    errors.capture_message(msg, "error", scope)
         return deleted, conflict
 
     async def iterate_bucket(self, bucket: str, prefix: str) -> AsyncIterator[Any]:
