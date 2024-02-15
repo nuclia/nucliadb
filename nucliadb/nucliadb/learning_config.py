@@ -101,8 +101,10 @@ async def proxy(
             )
         except Exception as exc:
             errors.capture_exception(exc)
+            msg = "Unexpected error while trying to proxy the request to the learning config API."
+            logger.exception(msg, exc_info=True)
             return Response(
-                content=b"Unexpected error while trying to proxy the request to the learning config API. Please try again later.",  # noqa
+                content=msg.encode(),
                 status_code=503,
                 media_type="text/plain",
             )
@@ -157,18 +159,18 @@ class DummyClient(httpx.AsyncClient):
         )
 
     async def get(self, *args, **kwargs: Any):
-        return await self._handle_request("GET", *args, **kwargs)
+        return self._handle_request("GET", *args, **kwargs)
 
     async def post(self, *args: Any, **kwargs: Any):
-        return await self._handle_request("POST", *args, **kwargs)
+        return self._handle_request("POST", *args, **kwargs)
 
     async def patch(self, *args: Any, **kwargs: Any):
-        return await self._handle_request("PATCH", *args, **kwargs)
+        return self._handle_request("PATCH", *args, **kwargs)
 
     async def delete(self, *args: Any, **kwargs: Any):
-        return await self._handle_request("DELETE", *args, **kwargs)
+        return self._handle_request("DELETE", *args, **kwargs)
 
-    async def get_config(self, *args: Any, **kwargs: Any):
+    def get_config(self, *args: Any, **kwargs: Any):
         lconfig = LearningConfiguration(
             semantic_model="multilingual",
             semantic_vector_similarity="cosine",
@@ -179,17 +181,26 @@ class DummyClient(httpx.AsyncClient):
 
     async def request(
         self,
-        *args: Any,
-        **kwargs: Any,
+        method: str,
+        url: str,
+        params=None,
+        content=None,
+        headers=None,
     ) -> httpx.Response:
-        return await self._handle_request(*args, **kwargs)
+        return self._handle_request(
+            method, url, params=params, content=content, headers=headers
+        )
 
-    async def _handle_request(self, *args: Any, **kwargs: Any) -> httpx.Response:
+    def _handle_request(self, *args: Any, **kwargs: Any) -> httpx.Response:
+        """
+        Try to map HTTP Method + Path to methods of this class:
+        e.g: GET /config/{kbid} -> get_config
+        """
         http_method = args[0]
         http_url = args[1]
         method = f"{http_method.lower()}_{http_url.split('/')[0]}"
         if hasattr(self, method):
-            return await getattr(self, method)(*args, **kwargs)
+            return getattr(self, method)(*args, **kwargs)
         else:
             return self._response()
 
