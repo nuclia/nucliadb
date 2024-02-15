@@ -56,9 +56,15 @@ async def test_api(reader_api, knowledgebox_ingest, learning_config_proxy):
     kbid = knowledgebox_ingest
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         # Get configuration
-        resp = await client.get(f"/kb/{kbid}/configuration")
+        resp = await client.get(
+            f"/kb/{kbid}/configuration", headers={"x-nucliadb-user": "userfoo"}
+        )
         assert resp.status_code == 200
-        assert learning_config_proxy.calls[-1][1:] == ("GET", f"/config/{kbid}", None)
+        assert learning_config_proxy.calls[-1][1:] == (
+            "GET",
+            f"/config/{kbid}",
+            {"X-STF-USER": "userfoo"},
+        )
 
         # Download model
         resp = await client.get(f"/kb/{kbid}/models/model1/path")

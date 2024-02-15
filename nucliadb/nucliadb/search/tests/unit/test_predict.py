@@ -70,7 +70,7 @@ async def test_dummy_predict_engine():
     [
         (
             True,
-            "{public_url}/api/v1/predict/sentence",
+            "{public_url}/api/v1/predict/sentence/kbid",
             "X-STF-NUAKEY",
             "Bearer {service_account}",
         ),
@@ -133,7 +133,7 @@ async def test_convert_sentence_error(onprem):
     [
         (
             True,
-            "{public_url}/api/v1/predict/tokens",
+            "{public_url}/api/v1/predict/tokens/kbid",
             "X-STF-NUAKEY",
             "Bearer {service_account}",
         ),
@@ -299,7 +299,7 @@ async def test_ask_document_onprem():
     )
 
     pe.session.post.assert_awaited_once_with(
-        url="public-europe1/api/v1/predict/ask_document",
+        url="public-europe1/api/v1/predict/ask_document/kbid",
         json=AskDocumentModel(
             question="query", blocks=[["footext"]], user_id="userid"
         ).dict(),
@@ -356,6 +356,89 @@ async def test_rephrase():
         url="cluster/api/v1/internal/predict/rephrase",
         json=item.dict(),
         headers={"X-STF-KBID": "kbid"},
+    )
+
+
+async def test_rephrase_onprem():
+    pe = PredictEngine(
+        "cluster",
+        "public-{zone}",
+        zone="europe1",
+        onprem=True,
+        nuclia_service_account="nuakey",
+    )
+    pe.session = get_mocked_session(
+        "POST", 200, json="rephrased", context_manager=False
+    )
+
+    item = RephraseModel(
+        question="question", chat_history=[], user_id="foo", user_context=["foo"]
+    )
+    rephrased_query = await pe.rephrase_query("kbid", item)
+    # The rephrase query should not be wrapped in quotes, otherwise it will trigger an exact match query to the index
+    assert rephrased_query.strip('"') == rephrased_query
+    assert rephrased_query == "rephrased"
+
+    pe.session.post.assert_awaited_once_with(
+        url="public-europe1/api/v1/predict/rephrase/kbid",
+        json=item.dict(),
+        headers={"X-STF-NUAKEY": "Bearer nuakey"},
+    )
+
+
+async def test_feedback():
+    pe = PredictEngine(
+        "cluster",
+        "public-{zone}",
+        zone="europe1",
+        onprem=False,
+    )
+    pe.session = get_mocked_session("POST", 204, json="", context_manager=False)
+
+    x_nucliadb_user = "user"
+    x_ndb_client = "client"
+    x_forwarded_for = "fwfor"
+    item = FeedbackRequest(ident="foo", good=True, task=FeedbackTasks.CHAT)
+    await pe.send_feedback("kbid", item, x_nucliadb_user, x_ndb_client, x_forwarded_for)
+
+    json_data = item.dict()
+    json_data["user_id"] = x_nucliadb_user
+    json_data["client"] = x_ndb_client
+    json_data["forwarded"] = x_forwarded_for
+
+    pe.session.post.assert_awaited_once_with(
+        url="cluster/api/v1/internal/predict/feedback",
+        json=json_data,
+        headers={"X-STF-KBID": "kbid"},
+    )
+
+
+async def test_feedback_onprem():
+    pe = PredictEngine(
+        "cluster",
+        "public-{zone}",
+        zone="europe1",
+        onprem=True,
+        nuclia_service_account="nuakey",
+    )
+
+    pe.session = get_mocked_session("POST", 204, json="", context_manager=False)
+
+    x_nucliadb_user = "user"
+    x_ndb_client = "client"
+    x_forwarded_for = "fwfor"
+    item = FeedbackRequest(ident="foo", good=True, task=FeedbackTasks.CHAT)
+    await pe.send_feedback("kbid", item, x_nucliadb_user, x_ndb_client, x_forwarded_for)
+
+    json_data = item.dict()
+    json_data["user_id"] = x_nucliadb_user
+    json_data["client"] = x_ndb_client
+    json_data["forwarded"] = x_forwarded_for
+
+    pe.session.post.assert_awaited_once_with(
+        url="public-europe1/api/v1/predict/feedback/kbid",
+        json=json_data,
+        headers={"X-STF-NUAKEY": "Bearer nuakey"},
     )
 
 
@@ -426,6 +509,37 @@ async def test_summarize():
         url="cluster/api/v1/internal/predict/summarize",
         json=item.dict(),
         headers={"X-STF-KBID": "kbid"},
+        timeout=None,
+    )
+
+
+async def test_summarize_onprem():
+    pe = PredictEngine(
+        "cluster",
+        "public-{zone}",
+        zone="europe1",
+        onprem=True,
+        nuclia_service_account="nuakey",
+    )
+
+    summarized = SummarizedResponse(
+        resources={"r1": SummarizedResource(summary="resource summary", tokens=10)}
+    )
+    pe.session = get_mocked_session(
+        "POST", 200, json=summarized.dict(), context_manager=False
+    )
+
+    item = SummarizeModel(
+        resources={"r1": SummarizeResourceModel(fields={"f1": "field extracted text"})}
+    )
+    summarize_response = await pe.summarize("kbid", item)
+
+    assert summarize_response == summarized
+
+    pe.session.post.assert_awaited_once_with(
+        url="public-europe1/api/v1/predict/summarize/kbid",
+        json=item.dict(),
+        headers={"X-STF-NUAKEY": "Bearer nuakey"},
         timeout=None,
     )
 
