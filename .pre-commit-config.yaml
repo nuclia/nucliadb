@@ -22,6 +22,13 @@ repos:
         files: (^nucliadb_utils/)|(^nucliadb_node/)|(^nucliadb_telemetry/)|(^nucliadb_dataset/)|(^nucliadb_sdk/)|(^nucliadb_models/)|(^nucliadb/)(^nucliadb_performace/)
         types: ["python"]
 
+      - id: mypy_nucliadb
+        name: mypy
+        entry: env MYPYPATH=mypy_stubs/ mypy --config-file=mypy.ini --show-traceback
+        language: system
+        files: (^nucliadb_utils/)|(^nucliadb_node/)|(^nucliadb_telemetry/)|(^nucliadb_dataset/)|(^nucliadb_sdk/)|(^nucliadb_models/)|(^nucliadb/)(^nucliadb_performace/)
+        types: ["python"]
+
       - id: rustfmt_nucliadb
         name: fmt
         entry: cargo +nightly fmt --check
