@@ -339,13 +339,14 @@ impl SegmentManager {
         Self::open(path)
     }
 
-    pub fn upgrade_v1_state(path: &Path, v1: state_v1::State) -> VectorR<Self> {
+    pub fn from_v1_state(path: &Path, v1: state_v1::State, state_version: Version) -> VectorR<Self> {
         let mut state = State {
             no_nodes: v1.no_nodes(),
             ..Default::default()
         };
 
         let mut time_map = Vec::new();
+        let mut segments = HashMap::new();
         let mut v1_segments: Vec<_> = v1.data_point_iterator().collect();
         v1_segments.sort_by_key(|j| j.time());
         let mut txid = 0u64;
@@ -357,13 +358,22 @@ impl SegmentManager {
             state.journal.push(JournalEntry {
                 txid,
                 operation: Operation::AddSegment(segment.id()),
-            })
+            });
+            segments.insert(segment.id(), txid);
         }
         state.delete_log = v1.delete_log.convert(&time_map);
 
-        fs_state::persist_state(path, &state)?;
+        let state_file = StateFile::new(path.to_path_buf())?;
 
-        Self::open(path.to_path_buf())
+        let mut sm = SegmentManager {
+            state,
+            state_version,
+            segments,
+            path: path.to_path_buf(),
+            state_file,
+        };
+        sm.write_state()?;
+        Ok(sm)
     }
 
     pub fn refresh(&mut self) -> VectorR<()> {
