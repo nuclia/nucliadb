@@ -97,7 +97,7 @@ impl VectorReader for VectorReaderService {
         let field_labels = request.field_labels.iter().cloned().map(AtomClause::label);
         let mut formula = Formula::new();
 
-        if request.field_labels.len() > 0 {
+        if !request.field_labels.is_empty() {
             let field_atoms = field_labels.map(Clause::Atom).collect();
             let field_clause = CompoundClause::new(BooleanOperator::And, field_atoms);
             formula.extend(field_clause);

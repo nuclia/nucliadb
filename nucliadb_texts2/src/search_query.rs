@@ -96,8 +96,8 @@ pub fn create_query(
             paragraph_labels: filter.paragraph_labels.iter().cloned().collect(),
             field_labels: filter.field_labels.iter().cloned().collect(),
         };
-        let query = filter.expression.clone();
-        let analysis = query_language::translate(query, context)?;
+
+        let analysis = query_language::translate(&filter.expression, &context)?;
 
         if let Some(expression) = analysis.prefilter_query {
             let query = query_io::translate_expression(&expression, schema);

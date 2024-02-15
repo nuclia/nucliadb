@@ -33,7 +33,6 @@ pub struct QueryContext {
 pub enum Operator {
     And,
     Or,
-    Not,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -45,6 +44,7 @@ pub struct BooleanOperation {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum BooleanExpression {
     Literal(String),
+    Not(Box<BooleanExpression>),
     Operation(BooleanOperation),
 }
 
@@ -66,22 +66,19 @@ fn translate_literal(literal: String, context: &QueryContext) -> Translated {
 }
 
 fn translate_not(inner: Json, context: &QueryContext) -> NodeResult<Translated> {
-    let inner = translate_json(inner, context)?;
+    let inner = translate_expression(inner, context)?;
+    if matches!(&inner.expression, BooleanExpression::Not(_)) {
+        return Ok(inner);
+    }
+
     Ok(Translated {
-        has_field_labels: inner.has_field_labels,
-        has_paragraph_labels: inner.has_paragraph_labels,
-        is_nested: match &inner.expression {
-            BooleanExpression::Literal(_) => false,
-            BooleanExpression::Operation(_) => true,
-        },
-        expression: BooleanExpression::Operation(BooleanOperation {
-            operator: Operator::Not,
-            operands: vec![inner.expression],
-        }),
+        is_nested: matches!(&inner.expression, BooleanExpression::Not(_)),
+        expression: BooleanExpression::Not(Box::new(inner.expression)),
+        ..inner
     })
 }
 
-fn translate_other(operator: Operator, operands: Vec<Json>, context: &QueryContext) -> NodeResult<Translated> {
+fn translate_operation(operator: Operator, operands: Vec<Json>, context: &QueryContext) -> NodeResult<Translated> {
     let mut is_nested = false;
     let mut has_field_labels = false;
     let mut has_paragraph_labels = false;
@@ -90,7 +87,7 @@ fn translate_other(operator: Operator, operands: Vec<Json>, context: &QueryConte
         operands: Vec::with_capacity(operands.len()),
     };
     for json_operand in operands {
-        let operand = translate_json(json_operand, context)?;
+        let operand = translate_expression(json_operand, context)?;
         if let BooleanExpression::Operation(_) = &operand.expression {
             is_nested = true;
         }
@@ -106,7 +103,7 @@ fn translate_other(operator: Operator, operands: Vec<Json>, context: &QueryConte
     })
 }
 
-fn translate_json(query: Json, context: &QueryContext) -> NodeResult<Translated> {
+fn translate_expression(query: Json, context: &QueryContext) -> NodeResult<Translated> {
     let Json::Object(json_object) = query else {
         #[rustfmt::skip] return Err(node_error!(
             "Only json objects are valid roots for expressions: {query}"
@@ -119,8 +116,8 @@ fn translate_json(query: Json, context: &QueryContext) -> NodeResult<Translated>
     };
     match (root_id.as_str(), inner_expression) {
         ("literal", Json::String(literal)) => Ok(translate_literal(literal, context)),
-        ("and", Json::Array(operands)) => translate_other(Operator::And, operands, context),
-        ("or", Json::Array(operands)) => translate_other(Operator::Or, operands, context),
+        ("and", Json::Array(operands)) => translate_operation(Operator::And, operands, context),
+        ("or", Json::Array(operands)) => translate_operation(Operator::Or, operands, context),
         ("not", operand) => translate_not(operand, context),
         (root_id, _) => Err(node_error!("{root_id} is not a valid expression")),
     }
@@ -148,15 +145,22 @@ fn split_mixed(expression: BooleanExpression, context: &QueryContext) -> NodeRes
     let mut paragraphs_only = Vec::new();
 
     for operand in operands {
-        let BooleanExpression::Literal(literal) = operand else {
-            #[rustfmt::skip] return Err(node_error!(
+        let literal = match &operand {
+            BooleanExpression::Literal(literal) => literal,
+            BooleanExpression::Not(subexpression) => match subexpression.as_ref() {
+                BooleanExpression::Literal(literal) => literal,
+                #[rustfmt::skip] _ => return Err(node_error!(
+                    "Nested expressions can not be splitted"
+                )),
+            },
+            #[rustfmt::skip] _ => return Err(node_error!(
                 "Nested expressions can not be splitted"
-            ));
+            )),
         };
-        if context.field_labels.contains(&literal) {
-            fields_only.push(BooleanExpression::Literal(literal));
+        if context.field_labels.contains(literal) {
+            fields_only.push(operand);
         } else {
-            paragraphs_only.push(BooleanExpression::Literal(literal))
+            paragraphs_only.push(operand)
         }
     }
 
@@ -186,8 +190,8 @@ pub struct QueryAnalysis {
     pub search_query: Option<BooleanExpression>,
 }
 
-pub fn translate(query: String, context: QueryContext) -> NodeResult<QueryAnalysis> {
-    let Json::Object(subexpressions) = serde_json::from_str(&query)? else {
+pub fn translate(query: &str, context: &QueryContext) -> NodeResult<QueryAnalysis> {
+    let Json::Object(subexpressions) = serde_json::from_str(query)? else {
         #[rustfmt::skip] return Err(node_error!(
             "Unexpected query format {query}"
         ));
@@ -198,14 +202,14 @@ pub fn translate(query: String, context: QueryContext) -> NodeResult<QueryAnalys
 
     for (root_id, expression) in subexpressions {
         let as_json_expression = serde_json::json!({ root_id: expression });
-        let translation_report = translate_json(as_json_expression, &context)?;
+        let translation_report = translate_expression(as_json_expression, context)?;
         if translation_report.has_field_labels && translation_report.has_paragraph_labels {
-            let splitted = split_mixed(translation_report.expression, &context)?;
+            let splitted = split_mixed(translation_report.expression, context)?;
             prefilter_queries.push(splitted.fields_only);
             search_queries.push(splitted.paragraphs_only);
-        } else if translation_report.is_nested || translation_report.has_field_labels {
+        } else if translation_report.has_field_labels {
             prefilter_queries.push(translation_report.expression);
-        } else {
+        } else if translation_report.has_paragraph_labels {
             search_queries.push(translation_report.expression);
         }
     }
@@ -236,7 +240,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn translate_json_and_nested() {
+    fn do_proper_analysis() {
         #[rustfmt::skip] let context = QueryContext {
             paragraph_labels: HashSet::from([
                 "foo".to_string(),
@@ -249,19 +253,65 @@ mod tests {
             "and": [
                 { "not": {"literal": "var"}},
                 {"literal": "foo"},
+            ],
+            "literal": "var",
+        });
+
+        let not_var = BooleanExpression::Not(Box::new(BooleanExpression::Literal("var".to_string())));
+        let expected_prefilter = BooleanExpression::Operation(BooleanOperation {
+            operator: Operator::And,
+            operands: vec![not_var, BooleanExpression::Literal("var".to_string())],
+        });
+        let expected_search = BooleanExpression::Literal("foo".to_string());
+
+        let analysis = translate(&query.to_string(), &context).unwrap();
+        let Some(prefilter_query) = analysis.prefilter_query else {
+            panic!("The json used should produce a prefilter")
+        };
+        let Some(search_query) = analysis.search_query else {
+            panic!("The json used should produce a search query")
+        };
+
+        assert!(matches!(prefilter_query, expected_prefilter));
+        assert!(matches!(expected_search, expected_search));
+    }
+
+    #[test]
+    fn translate_json_and_nested() {
+        #[rustfmt::skip] let context = QueryContext {
+            paragraph_labels: HashSet::from([
+                "foo".to_string(),
+            ]),
+            field_labels: HashSet::from([
+                "var".to_string(),
+            ]),
+        };
+        let query = serde_json::json!({
+            "and": [
+                { "not": {"literal": "var"}},
+                {
+                    "and": [
+                        {"literal": "var"},
+                        {"literal": "foo"},
+                    ]
+                }
             ]
         });
 
-        let not_var = BooleanExpression::Operation(BooleanOperation {
-            operator: Operator::Not,
-            operands: vec![BooleanExpression::Literal("var".to_string())],
+        let inner_and = BooleanExpression::Operation(BooleanOperation {
+            operator: Operator::And,
+            operands: vec![
+                BooleanExpression::Literal("var".to_string()),
+                BooleanExpression::Literal("foo".to_string()),
+            ],
         });
+        let not_var = BooleanExpression::Not(Box::new(BooleanExpression::Literal("var".to_string())));
         let expected = BooleanExpression::Operation(BooleanOperation {
             operator: Operator::And,
-            operands: vec![not_var, BooleanExpression::Literal("foo".to_string())],
+            operands: vec![not_var, inner_and],
         });
 
-        let translation = translate_json(query, &context).unwrap();
+        let translation = translate_expression(query, &context).unwrap();
         assert!(translation.is_nested);
         assert!(translation.has_paragraph_labels);
         assert!(translation.has_field_labels);
@@ -292,7 +342,7 @@ mod tests {
             ],
         });
 
-        let translation = translate_json(query, &context).unwrap();
+        let translation = translate_expression(query, &context).unwrap();
         assert!(!translation.is_nested);
         assert!(translation.has_paragraph_labels);
         assert!(translation.has_field_labels);
@@ -322,7 +372,7 @@ mod tests {
             ],
         });
 
-        let translation = translate_json(query, &context).unwrap();
+        let translation = translate_expression(query, &context).unwrap();
         assert!(!translation.is_nested);
         assert!(!translation.has_paragraph_labels);
         assert!(translation.has_field_labels);
@@ -342,12 +392,9 @@ mod tests {
                 "literal": "var",
             }
         });
-        let expected = BooleanExpression::Operation(BooleanOperation {
-            operator: Operator::Not,
-            operands: vec![BooleanExpression::Literal("var".to_string())],
-        });
+        let expected = BooleanExpression::Not(Box::new(BooleanExpression::Literal("var".to_string())));
 
-        let translation = translate_json(query, &context).unwrap();
+        let translation = translate_expression(query, &context).unwrap();
         assert!(!translation.is_nested);
         assert!(!translation.has_paragraph_labels);
         assert!(translation.has_field_labels);
@@ -368,7 +415,7 @@ mod tests {
             "literal": "var",
         });
 
-        let translation = translate_json(query, &context).unwrap();
+        let translation = translate_expression(query, &context).unwrap();
         assert!(!translation.is_nested);
         assert!(!translation.has_paragraph_labels);
         assert!(translation.has_field_labels);
@@ -383,7 +430,7 @@ mod tests {
         let query = serde_json::json!({
             "literal": "var",
         });
-        let translation = translate_json(query, &context).unwrap();
+        let translation = translate_expression(query, &context).unwrap();
         assert!(!translation.is_nested);
         assert!(!translation.has_field_labels);
         assert!(translation.has_paragraph_labels);

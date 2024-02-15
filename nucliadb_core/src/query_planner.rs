@@ -160,9 +160,8 @@ fn analyze_filter(search_request: &SearchRequest) -> NodeResult<QueryAnalysis> {
         field_labels: filter.field_labels.iter().cloned().collect(),
         paragraph_labels: filter.paragraph_labels.iter().cloned().collect(),
     };
-    let query = filter.expression.clone();
 
-    query_language::translate(query, context)
+    query_language::translate(&filter.expression, &context)
 }
 
 pub fn build_query_plan(search_request: SearchRequest) -> NodeResult<QueryPlan> {

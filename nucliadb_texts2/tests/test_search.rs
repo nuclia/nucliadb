@@ -95,8 +95,8 @@ fn test_prefilter_not_search() {
         field_labels: HashSet::from(["/l/mylabel".to_string()]),
         paragraph_labels: HashSet::with_capacity(0),
     };
-    let query = "{ \"not\": { \"literal\": \"/l/mylabel\" } }".to_string();
-    let expression = nucliadb_core::query_language::translate(query, context).unwrap();
+    let query = "{ \"not\": { \"literal\": \"/l/mylabel\" } }";
+    let expression = nucliadb_core::query_language::translate(query, &context).unwrap();
     let request = PreFilterRequest {
         security: None,
         timestamp_filters: vec![],
@@ -119,8 +119,8 @@ fn test_prefilter_search() {
         field_labels: HashSet::from(["/l/mylabel".to_string()]),
         paragraph_labels: HashSet::with_capacity(0),
     };
-    let query = "{ \"literal\": \"/l/mylabel\" }".to_string();
-    let expression = nucliadb_core::query_language::translate(query, context).unwrap();
+    let query = "{ \"literal\": \"/l/mylabel\" }";
+    let expression = nucliadb_core::query_language::translate(query, &context).unwrap();
     let request = PreFilterRequest {
         security: None,
         formula: expression.prefilter_query,

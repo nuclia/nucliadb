@@ -29,21 +29,28 @@ fn translate_literal(literal: &str, schema: &TextSchema) -> Box<dyn Query> {
     Box::new(TermQuery::new(term, IndexRecordOption::Basic))
 }
 
+fn translate_not(inner: &BooleanExpression, schema: &TextSchema) -> Box<dyn Query> {
+    let mut operands = Vec::with_capacity(2);
+
+    // Check the following issue to see why the additional AllQuery is needed:
+    // https://github.com/quickwit-oss/tantivy/issues/2317
+    let all_query: Box<dyn Query> = Box::new(AllQuery);
+    operands.push((Occur::Must, all_query));
+
+    let subquery = translate_expression(inner, schema);
+    operands.push((Occur::MustNot, subquery));
+
+    Box::new(BooleanQuery::new(operands))
+}
+
 fn translate_operation(operation: &BooleanOperation, schema: &TextSchema) -> Box<dyn Query> {
     let operator = match operation.operator {
-        Operator::Not => Occur::MustNot,
         Operator::And => Occur::Must,
         Operator::Or => Occur::Should,
     };
 
-    let mut operands = Vec::with_capacity(operation.operands.len());
+    let mut operands = Vec::with_capacity(operation.operands.len() + 1);
 
-    if matches!(operator, Occur::MustNot) {
-        // Check the following issue to see why the additional AllQuery is needed:
-        // https://github.com/quickwit-oss/tantivy/issues/2317
-        let all_query: Box<dyn Query> = Box::new(AllQuery);
-        operands.push((Occur::Must, all_query));
-    }
     for operand in operation.operands.iter() {
         let subquery = translate_expression(operand, schema);
         operands.push((operator, subquery));
@@ -54,6 +61,7 @@ fn translate_operation(operation: &BooleanOperation, schema: &TextSchema) -> Box
 
 pub fn translate_expression(expression: &BooleanExpression, schema: &TextSchema) -> Box<dyn Query> {
     match expression {
+        BooleanExpression::Not(inner) => translate_not(inner, schema),
         BooleanExpression::Literal(literal) => translate_literal(literal, schema),
         BooleanExpression::Operation(operation) => translate_operation(operation, schema),
     }
