@@ -488,9 +488,7 @@ def merge_relations_results(
                 logger.warning(
                     "Relation search is returning an edge unrelated with queried entities",
                     extra={
-                        "queried_entities": query.entry_points,
                         "relation": relation,
-                        "index_responses": relations_responses,
                     },
                 )
 
