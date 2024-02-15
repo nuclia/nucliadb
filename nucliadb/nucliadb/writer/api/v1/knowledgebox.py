@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-import json
 
 from fastapi import HTTPException, Response
 from fastapi_versioning import version
@@ -80,12 +79,8 @@ def parse_create_kb_request(item: KnowledgeBoxConfig) -> KnowledgeBoxNew:
         requestpb.config.title = item.title
     if item.description:
         requestpb.config.description = item.description
-    if item.similarity:
-        requestpb.similarity = item.similarity.to_pb()
     if item.release_channel:
         requestpb.release_channel = item.release_channel.to_pb()
-    if item.learning_config:
-        requestpb.learning_config = json.dumps(item.learning_config)
     return requestpb
 
 

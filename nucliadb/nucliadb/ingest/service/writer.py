@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import json
 import uuid
 from io import BytesIO
 from typing import AsyncIterator, Optional
@@ -109,7 +108,7 @@ from nucliadb_protos import utils_pb2, writer_pb2, writer_pb2_grpc
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
 from nucliadb_utils.keys import KB_SHARDS
-from nucliadb_utils.settings import running_settings
+from nucliadb_utils.settings import is_onprem_nucliadb, running_settings
 from nucliadb_utils.storages.storage import Storage, StorageField
 from nucliadb_utils.utilities import (
     get_partitioning,
@@ -118,6 +117,15 @@ from nucliadb_utils.utilities import (
     get_transaction_utility,
     has_feature,
 )
+
+
+class LearningConfigurationMissingError(Exception):
+    """
+    Exception raised when the learning configuration is missing
+    for a knowledge box on the hosted deployment.
+    """
+
+    pass
 
 
 class WriterServicer(writer_pb2_grpc.WriterServicer):
@@ -223,37 +231,36 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         Create first the knowledge box and then set the learning configuration.
         If the learning configuration fails, the knowledge box is deleted.
         """
+        kbid = str(uuid.uuid4())
         release_channel = get_release_channel(request)
         request.config.release_channel = release_channel
-        kbid = await self.proc.create_kb(
-            request.slug,
-            request.config,
-            parse_model_metadata(request),
-            forceuuid=request.forceuuid,
-            release_channel=release_channel,
-        )
-        if not request.learning_config:
-            # Since we depend on the NucliaDB admin to adapt to these changes and send the learning
-            # config on KB creation, we will log a warning and continue for now. Eventually we will
-            # want to enforce that the learning config is always provided on KB creation.
-            logger.warning("No learning configuration set for KB", extra={"kbid": kbid})
-            return kbid
+        lconfig = await learning_config.get_configuration(kbid)
+        if lconfig is None:
+            if not is_onprem_nucliadb():
+                raise LearningConfigurationMissingError(
+                    "Learning configuration missing. This should have been set by idp"
+                )
+            lconfig = await learning_config.set_configuration(kbid)
         try:
-            lconfig = json.loads(request.learning_config)
-            await learning_config.set_configuration(kbid, lconfig)
-            logger.info("Learning configuration set", extra={"kbid": kbid})
+            await self.proc.create_kb(
+                request.slug,
+                request.config,
+                parse_model_metadata(lconfig),
+                forceuuid=kbid,
+                release_channel=release_channel,
+            )
+            return kbid
         except Exception:
-            # Rollback KB that was just created
+            # Rollback learning config for the kbid that was just created
             try:
-                await self.proc.delete_kb(kbid=kbid)
+                await learning_config.delete_configuration(kbid)
             except Exception:
                 logger.warning(
-                    "Could not rollback KB", exc_info=True, extra={"kbid": kbid}
+                    "Could not rollback learning configuration",
+                    exc_info=True,
+                    extra={"kbid": kbid},
                 )
-                pass
             raise
-
-        return kbid
 
     async def UpdateKnowledgeBox(  # type: ignore
         self, request: KnowledgeBoxUpdate, context=None
@@ -892,34 +899,22 @@ def update_shards_with_updated_replica(
                 return
 
 
-def parse_model_metadata(request: KnowledgeBoxNew) -> SemanticModelMetadata:
+def parse_model_metadata(
+    lconfig: learning_config.LearningConfiguration,
+) -> SemanticModelMetadata:
     model = SemanticModelMetadata()
-
-    lconfig = {}
-    if request.learning_config:
-        lconfig = json.loads(request.learning_config)
-
     # Parse vector similarity function
-    model.similarity_function = request.similarity
-
+    model.similarity_function = lconfig.semantic_vector_similarity
     # Parse vector dimension
-    if request.HasField("vector_dimension"):
-        model.vector_dimension = request.vector_dimension
-    elif lconfig.get("vector_dimension"):
-        model.vector_dimension = lconfig["vector_dimension"]
+    if lconfig.semantic_vector_size is not None:
+        model.vector_dimension = lconfig.semantic_vector_size
     else:
-        logger.warning(
-            "Vector dimension not set. Will be detected automatically on the first vector set."
-        )
-
+        logger.warning("Vector dimension not set!")
     # Parse model default min score
-    if request.HasField("default_min_score"):
-        model.default_min_score = request.default_min_score
-    elif lconfig.get("default_min_score") is not None:
-        model.default_min_score = lconfig["default_min_score"]
+    if lconfig.semantic_threshold is not None:
+        model.default_min_score = lconfig.semantic_threshold
     else:
         logger.warning("Default min score not set!")
-
     return model
 
 

@@ -119,20 +119,10 @@ class KnowledgeBoxConfig(BaseModel):
         title="Description",
         description="Description for the Knowledge Box.",
     )
-    similarity: Optional[VectorSimilarity] = Field(
-        default=None,
-        title="Similarity",
-        description="Similarity function for the main Knowledge Box vectors index.",
-    )
     release_channel: Optional[ReleaseChannel] = Field(
         default=None,
         title="Release Channel",
         description="Release channel for the Knowledge Box.",
-    )
-    learning_config: Optional[dict[str, Any]] = Field(
-        default={},
-        title="Learning Config",
-        description="Learning config for the Knowledge Box.",
     )
 
     @validator("slug")

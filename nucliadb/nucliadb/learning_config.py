@@ -26,9 +26,10 @@ from typing import Any, Optional, Type, Union
 import httpx
 from fastapi import Request, Response
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from nucliadb_telemetry import errors
-from nucliadb_utils.settings import nuclia_settings
+from nucliadb_utils.settings import is_onprem_nucliadb, nuclia_settings
 
 SERVICE_NAME = "nucliadb.learning_config"
 logger = logging.getLogger(SERVICE_NAME)
@@ -37,13 +38,35 @@ logger = logging.getLogger(SERVICE_NAME)
 NUCLIA_ONPREM_AUTH_HEADER = "X-NUCLIA-NUAKEY"
 
 
+class LearningConfiguration(BaseModel):
+    semantic_model: str
+    semantic_vector_similarity: str
+    semantic_vector_size: Optional[str]
+    semantic_threshold: Optional[float]
+
+
+async def get_configuration(
+    kbid: str,
+) -> Optional[LearningConfiguration]:
+    async with learning_config_client() as client:
+        resp = await client.get(f"config/{kbid}")
+        try:
+            resp.raise_for_status()
+        except httpx.HTTPStatusError as err:
+            if err.response.status_code == 404:
+                return None
+            raise
+        return LearningConfiguration.parse_obj(resp.json())
+
+
 async def set_configuration(
     kbid: str,
     config: dict[str, Any],
-) -> None:
+) -> LearningConfiguration:
     async with learning_config_client() as client:
         resp = await client.post(f"config/{kbid}", json=config)
         resp.raise_for_status()
+        return LearningConfiguration.parse_obj(resp.json())
 
 
 async def delete_configuration(
@@ -99,12 +122,8 @@ async def proxy(
         )
 
 
-def is_onprem() -> bool:
-    return nuclia_settings.nuclia_service_account is not None
-
-
 def get_config_api_url() -> str:
-    if is_onprem():
+    if is_onprem_nucliadb():
         nuclia_public_url = nuclia_settings.nuclia_public_url.format(
             zone=nuclia_settings.nuclia_zone
         )
@@ -114,7 +133,7 @@ def get_config_api_url() -> str:
 
 
 def get_config_auth_header() -> dict[str, str]:
-    if is_onprem():
+    if is_onprem_nucliadb():
         # public api: auth is done via the 'x-nuclia-nuakey' header
         return {"X-NUCLIA-NUAKEY": f"Bearer {nuclia_settings.nuclia_service_account}"}
     else:
