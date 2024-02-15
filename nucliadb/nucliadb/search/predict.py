@@ -179,11 +179,14 @@ class PredictEngine:
         ):
             raise NUAKeyMissingError()
 
-    def get_predict_url(self, endpoint: str) -> str:
+    def get_predict_url(self, endpoint: str, kbid: str) -> str:
         if not endpoint.startswith("/"):
             endpoint = "/" + endpoint
         if self.onprem:
-            return f"{self.public_url}{PUBLIC_PREDICT}{endpoint}"
+            # On-prem NucliaDB uses the public URL for the predict API. Examples:
+            # /api/v1/predict/chat/{kbid}
+            # /api/v1/predict/rephrase/{kbid}
+            return f"{self.public_url}{PUBLIC_PREDICT}{endpoint}/{kbid}"
         else:
             if has_feature(const.Features.VERSIONED_PRIVATE_PREDICT):
                 return f"{self.cluster_url}{VERSIONED_PRIVATE_PREDICT}{endpoint}"
@@ -257,7 +260,7 @@ class PredictEngine:
 
         resp = await self.make_request(
             "POST",
-            url=self.get_predict_url(FEEDBACK),
+            url=self.get_predict_url(FEEDBACK, kbid),
             json=data,
             headers=self.get_predict_headers(kbid),
         )
@@ -274,7 +277,7 @@ class PredictEngine:
 
         resp = await self.make_request(
             "POST",
-            url=self.get_predict_url(REPHRASE),
+            url=self.get_predict_url(REPHRASE, kbid),
             json=item.dict(),
             headers=self.get_predict_headers(kbid),
         )
@@ -294,7 +297,7 @@ class PredictEngine:
 
         resp = await self.make_request(
             "POST",
-            url=self.get_predict_url(CHAT),
+            url=self.get_predict_url(CHAT, kbid),
             json=item.dict(),
             headers=self.get_predict_headers(kbid),
             timeout=None,
@@ -317,7 +320,7 @@ class PredictEngine:
         item = AskDocumentModel(question=question, blocks=blocks, user_id=user_id)
         resp = await self.make_request(
             "POST",
-            url=self.get_predict_url(ASK_DOCUMENT),
+            url=self.get_predict_url(ASK_DOCUMENT, kbid),
             json=item.dict(),
             headers=self.get_predict_headers(kbid),
             timeout=None,
@@ -337,7 +340,7 @@ class PredictEngine:
 
         resp = await self.make_request(
             "GET",
-            url=self.get_predict_url(SENTENCE),
+            url=self.get_predict_url(SENTENCE, kbid),
             params={"text": sentence},
             headers=self.get_predict_headers(kbid),
         )
@@ -359,7 +362,7 @@ class PredictEngine:
 
         resp = await self.make_request(
             "GET",
-            url=self.get_predict_url(TOKENS),
+            url=self.get_predict_url(TOKENS, kbid),
             params={"text": sentence},
             headers=self.get_predict_headers(kbid),
         )
@@ -377,7 +380,7 @@ class PredictEngine:
             raise SendToPredictError(error)
         resp = await self.make_request(
             "POST",
-            url=self.get_predict_url(SUMMARIZE),
+            url=self.get_predict_url(SUMMARIZE, kbid),
             json=item.dict(),
             headers=self.get_predict_headers(kbid),
             timeout=None,
