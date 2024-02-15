@@ -1,6 +1,14 @@
+# nucliadb dependencies are auto pinned on release
+nucliadb-telemetry[all]
+nucliadb-utils[storages,fastapi,cache]
+nucliadb-protos
+nucliadb-models
+nucliadb-admin-assets>=1.0.0.post1224
+nucliadb-node-binding>=2.26.0
+
+# external dependencies
 uvicorn<0.19.0
 pydantic_argparse
-nucliadb-node-binding>=2.26.0
 
 aiohttp>=3.9.3
 lru-dict>=1.1.7
@@ -41,13 +49,6 @@ grpc-stubs>=1.24.7
 aiodns>=3.0.0
 
 types-orjson
-
-# nucliadb dependencies are auto pinned on release
-nucliadb-telemetry[all]
-nucliadb-utils[storages,fastapi,cache]
-nucliadb-protos
-nucliadb-models
-nucliadb-admin-assets>=1.0.0.post1224
 
 asyncpg>=0.27.0
 tikv-client>=0.0.3
