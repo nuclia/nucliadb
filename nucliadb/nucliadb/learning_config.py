@@ -41,7 +41,7 @@ NUCLIA_ONPREM_AUTH_HEADER = "X-NUCLIA-NUAKEY"
 class LearningConfiguration(BaseModel):
     semantic_model: str
     semantic_vector_similarity: str
-    semantic_vector_size: Optional[str]
+    semantic_vector_size: Optional[int]
     semantic_threshold: Optional[float]
 
 
@@ -62,11 +62,10 @@ async def get_configuration(
 async def set_configuration(
     kbid: str,
     config: dict[str, Any],
-) -> LearningConfiguration:
+) -> None:
     async with learning_config_client() as client:
         resp = await client.post(f"config/{kbid}", json=config)
         resp.raise_for_status()
-        return LearningConfiguration.parse_obj(resp.json())
 
 
 async def delete_configuration(

@@ -21,7 +21,7 @@
 import string
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Type, TypeVar, Union
+from typing import Dict, List, Optional, Type, TypeVar, Union
 
 from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig as PBKnowledgeBoxConfig
@@ -55,11 +55,7 @@ from nucliadb_models.metadata import (
 from nucliadb_models.security import ResourceSecurity
 from nucliadb_models.text import FieldText
 from nucliadb_models.utils import SlugString
-from nucliadb_models.vectors import (
-    SemanticModelMetadata,
-    UserVectorSet,
-    VectorSimilarity,
-)
+from nucliadb_models.vectors import SemanticModelMetadata, UserVectorSet
 
 _T = TypeVar("_T")
 

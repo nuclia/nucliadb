@@ -240,7 +240,12 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 raise LearningConfigurationMissingError(
                     "Learning configuration missing. This should have been set by idp"
                 )
-            lconfig = await learning_config.set_configuration(kbid, config={})
+            await learning_config.set_configuration(kbid, config={})
+            lconfig = await learning_config.get_configuration(kbid)
+        if lconfig is None:
+            raise LearningConfigurationMissingError(
+                "Could not set learning configuration for the new knowledge box."
+            )
         try:
             await self.proc.create_kb(
                 request.slug,
@@ -899,12 +904,20 @@ def update_shards_with_updated_replica(
                 return
 
 
+LEARNING_SIMILARITY_FUNCTION_TO_PROTO = {
+    "cosine": utils_pb2.VectorSimilarity.COSINE,
+    "dot": utils_pb2.VectorSimilarity.DOT,
+}
+
+
 def parse_model_metadata(
     lconfig: learning_config.LearningConfiguration,
 ) -> SemanticModelMetadata:
     model = SemanticModelMetadata()
     # Parse vector similarity function
-    model.similarity_function = lconfig.semantic_vector_similarity
+    model.similarity_function = LEARNING_SIMILARITY_FUNCTION_TO_PROTO[
+        lconfig.semantic_vector_similarity
+    ]
     # Parse vector dimension
     if lconfig.semantic_vector_size is not None:
         model.vector_dimension = lconfig.semantic_vector_size
