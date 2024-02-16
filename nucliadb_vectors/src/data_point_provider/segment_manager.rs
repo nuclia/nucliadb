@@ -361,7 +361,19 @@ impl SegmentManager {
             });
             segments.insert(segment.id(), txid);
         }
-        state.delete_log = v1.delete_log.convert(&time_map);
+        state.delete_log = v1.delete_log.convert(&|delete_time| {
+            let mut new_value = 0;
+            for (tx_idx, tx_time) in time_map.iter().enumerate() {
+                if delete_time > tx_time {
+                    // Delete time is later than this transaction, so
+                    // we can say it happens at the next transaction
+                    // The transactions are 1-indexed and vec is 0-indexed
+                    // So idx + 1 = txid. txid + 1 = next_txid
+                    new_value = tx_idx as u64 + 2;
+                }
+            }
+            new_value
+        });
 
         let state_file = StateFile::new(path.to_path_buf())?;
 

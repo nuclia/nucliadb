@@ -75,18 +75,8 @@ impl<T: Ord + Copy> DTrie<T> {
 }
 
 impl<T: Ord + Copy + Hash> DTrie<T> {
-    pub fn convert(&self, mapper: &Vec<T>) -> DTrie<u64> {
-        let new = if let Some(ref v) = self.value {
-            let mut new_value = 0;
-            for (txid, time) in mapper.iter().enumerate() {
-                if v > time {
-                    new_value = txid as u64 + 2;
-                }
-            }
-            Some(new_value)
-        } else {
-            None
-        };
+    pub fn convert<U>(&self, mapper: &impl Fn(&T) -> U) -> DTrie<U> {
+        let new = self.value.as_ref().map(mapper);
         DTrie {
             value: new,
             go_table: HashMap::from_iter(self.go_table.iter().map(|(k, v)| (*k, Box::new(v.convert(mapper))))),
