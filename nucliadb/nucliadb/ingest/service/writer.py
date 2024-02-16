@@ -230,16 +230,16 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         lconfig = await learning_config.get_configuration(kbid)
         lconfig_created = False
         if lconfig is None:
-            logger.warning(
-                "Learning configuration missing. Setting a new one.",
-                extra={"kbid": kbid},
-            )
             if request.learning_config:
                 # We parse the desired configuration from the request and set it
                 config = json.loads(request.learning_config)
             else:
                 # We set an empty configuration so that learning chooses the default values.
                 config = {}
+                logger.warning(
+                    "No learning configuration provided. Default will be used.",
+                    extra={"kbid": kbid},
+                )
             lconfig = await learning_config.set_configuration(kbid, config=config)
             lconfig_created = True
         try:
