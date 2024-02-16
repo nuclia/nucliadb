@@ -23,7 +23,6 @@ from typing import Any, Optional
 
 import aiohttp
 import pydantic
-from aiohttp.web import Response
 
 from nucliadb_utils.settings import nuclia_settings
 
@@ -56,29 +55,6 @@ def get_processing_api_url_v2() -> str:
             nuclia_settings.nuclia_processing_cluster_url
             + "/api/v2/internal/processing"
         )
-
-
-class TelemetryHeadersMissing(Exception):
-    pass
-
-
-def check_proxy_telemetry_headers(resp: Response):
-    if nuclia_settings.nuclia_service_account is not None:
-        # do not care with on prem
-        return
-    try:
-        expected = [
-            "x-b3-traceid",
-            "x-b3-spanid",
-            "x-b3-sampled",
-        ]
-        missing = [header for header in expected if header not in resp.headers]
-        if len(missing) > 0:
-            raise TelemetryHeadersMissing(
-                f"Missing headers {missing} in proxy response"
-            )
-    except TelemetryHeadersMissing:
-        logger.warning("Some telemetry headers not found in proxy response")
 
 
 class StatusResponse(pydantic.BaseModel):
@@ -122,7 +98,6 @@ class ProcessingHTTPClient:
         url = self.base_url + "/pull?partition=" + partition
         async with self.session.get(url, headers=self.headers) as resp:
             resp_text = await resp.text()
-            check_proxy_telemetry_headers(resp)
             check_status(resp, resp_text)
             return PullResponse.parse_raw(resp_text)
 
