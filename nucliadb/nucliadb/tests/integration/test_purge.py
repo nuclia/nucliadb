@@ -30,7 +30,8 @@ from nucliadb.ingest.orm.knowledgebox import (
     KB_TO_DELETE_BASE,
     KB_TO_DELETE_STORAGE_BASE,
 )
-from nucliadb.ingest.purge import purge_kb, purge_kb_storage, purge_orphan_shards
+from nucliadb.ingest.purge import purge_kb, purge_kb_storage
+from nucliadb.purge.orphan_shards import detect_orphan_shards, purge_orphan_shards
 from nucliadb_models.resource import ReleaseChannel
 from nucliadb_utils.storages.storage import Storage
 
@@ -160,6 +161,9 @@ async def test_purge_orphan_shards(
     for node in manager.get_index_nodes():
         shards.extend(await node.list_shards())
     assert len(shards) > 0
+
+    orphan_shards = await detect_orphan_shards(maindb_driver)
+    assert len(orphan_shards) == len(shards)
 
     # Purge orphans and validate
     await purge_orphan_shards(maindb_driver)
