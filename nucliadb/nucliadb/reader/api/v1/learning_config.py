@@ -61,7 +61,12 @@ async def get_configuration(
     request: Request,
     kbid: str,
 ):
-    return await learning_config.proxy(request, "GET", f"/config/{kbid}")
+    return await learning_config.proxy(
+        request,
+        "GET",
+        f"/config/{kbid}",
+        headers={"X-STF-USER": request.headers.get("X-NUCLIADB-USER", "")},
+    )
 
 
 @api.get(

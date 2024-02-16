@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 import datetime
 import math
 from typing import Any, Optional, Set, Union
@@ -34,7 +35,6 @@ from nucliadb_protos.nodereader_pb2 import (
     VectorSearchResponse,
 )
 
-from nucliadb.search import logger
 from nucliadb.search.search.fetch import (
     fetch_resources,
     get_labels_paragraph,
@@ -448,7 +448,17 @@ async def merge_paragraph_results(
 
 
 @merge_observer.wrap({"type": "merge_relations"})
-def merge_relations_results(
+async def merge_relations_results(
+    relations_responses: list[RelationSearchResponse],
+    query: EntitiesSubgraphRequest,
+) -> Relations:
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        None, _merge_relations_results, relations_responses, query
+    )
+
+
+def _merge_relations_results(
     relations_responses: list[RelationSearchResponse],
     query: EntitiesSubgraphRequest,
 ) -> Relations:
@@ -483,13 +493,6 @@ def merge_relations_results(
                         relation_label=relation_label,
                         direction=RelationDirection.IN,
                     )
-                )
-            else:
-                logger.warning(
-                    "Relation search is returning an edge unrelated with queried entities",
-                    extra={
-                        "relation": relation,
-                    },
                 )
 
     return relations
@@ -543,7 +546,9 @@ async def merge_results(
             vectors, resources, kbid, count, page, min_score=min_score
         )
 
-        api_results.relations = merge_relations_results(relations, requested_relations)
+        api_results.relations = await merge_relations_results(
+            relations, requested_relations
+        )
 
         api_results.resources = await fetch_resources(
             resources, kbid, show, field_type_filter, extracted

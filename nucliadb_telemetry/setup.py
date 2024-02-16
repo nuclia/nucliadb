@@ -27,9 +27,9 @@ requirements_otel = [
     "opentelemetry-proto==1.21.0",
     "opentelemetry-exporter-jaeger==1.21.0",
     "opentelemetry-propagator-b3==1.21.0",
-    "opentelemetry-instrumentation-fastapi==0.42b0",
-    "opentelemetry-instrumentation-aiohttp-client==0.42b0",
-    "opentelemetry-semantic-conventions==0.42b0",
+    "opentelemetry-instrumentation-fastapi>=0.42b0",
+    "opentelemetry-instrumentation-aiohttp-client>=0.42b0",
+    "opentelemetry-semantic-conventions>=0.42b0",
 ]
 requirements_grpc = [
     "grpcio>=1.44.0",

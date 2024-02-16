@@ -58,7 +58,7 @@ async def predict_proxy(
     # Proxy the request to predict API
     predict_response = await predict.make_request(
         method=method,
-        url=predict.get_predict_url(endpoint),
+        url=predict.get_predict_url(endpoint, kbid),
         json=json,
         params=params,
         headers=headers,

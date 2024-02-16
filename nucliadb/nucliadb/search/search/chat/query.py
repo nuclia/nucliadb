@@ -189,7 +189,9 @@ async def get_relations_results(
             relation_request,
             target_shard_replicas=chat_request.shards,
         )
-        return merge_relations_results(relations_results, relation_request.subgraph)
+        return await merge_relations_results(
+            relations_results, relation_request.subgraph
+        )
     except Exception as exc:
         capture_exception(exc)
         logger.exception("Error getting relations results")

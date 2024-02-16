@@ -424,7 +424,9 @@ async def find_merge_results(
             highlight,
             ematches,
         )
-        api_results.relations = merge_relations_results(relations, requested_relations)
+        api_results.relations = await merge_relations_results(
+            relations, requested_relations
+        )
 
         return api_results
     finally:
