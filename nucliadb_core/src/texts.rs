@@ -54,7 +54,7 @@ impl Iterator for DocumentIterator {
 pub trait FieldReader: std::fmt::Debug + Send + Sync {
     fn search(&self, request: &ProtosRequest) -> NodeResult<ProtosResponse>;
     fn stored_ids(&self) -> NodeResult<Vec<String>>;
-    fn pre_filter(&self, request: &PreFilterRequest) -> NodeResult<PreFilterResponse>;
+    fn prefilter(&self, request: &PreFilterRequest) -> NodeResult<PreFilterResponse>;
     fn iterator(&self, request: &StreamRequest) -> NodeResult<DocumentIterator>;
     fn count(&self) -> NodeResult<usize>;
 }

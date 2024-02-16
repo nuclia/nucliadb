@@ -84,7 +84,7 @@ fn test_prefilter_all_search() {
         formula: None,
         timestamp_filters: vec![],
     };
-    let response = reader.pre_filter(&request).unwrap();
+    let response = reader.prefilter(&request).unwrap();
     assert!(matches!(response.valid_fields, ValidFieldCollector::All));
 }
 
@@ -104,7 +104,7 @@ fn test_prefilter_not_search() {
         formula: expression.prefilter_query,
     };
     println!("expression: {:?}", request.formula);
-    let response = reader.pre_filter(&request).unwrap();
+    let response = reader.prefilter(&request).unwrap();
     let valid_fields = &response.valid_fields;
     let ValidFieldCollector::Some(fields) = valid_fields else {
         panic!("Response is not on the right variant {valid_fields:?}");
@@ -127,7 +127,7 @@ fn test_prefilter_search() {
         formula: expression.prefilter_query,
         timestamp_filters: vec![],
     };
-    let response = reader.pre_filter(&request).unwrap();
+    let response = reader.prefilter(&request).unwrap();
     let ValidFieldCollector::Some(fields) = response.valid_fields else {
         panic!("Response is not on the right variant");
     };

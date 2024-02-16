@@ -277,7 +277,7 @@ mod tests {
     }
 
     #[test]
-    fn translate_json_and_nested() {
+    fn translate_expression_and_nested() {
         #[rustfmt::skip] let context = QueryContext {
             paragraph_labels: HashSet::from([
                 "foo".to_string(),
@@ -319,7 +319,7 @@ mod tests {
     }
 
     #[test]
-    fn translate_json_and() {
+    fn translate_expression_and() {
         #[rustfmt::skip] let context = QueryContext {
             paragraph_labels: HashSet::from([
                 "foo".to_string(),
@@ -350,7 +350,7 @@ mod tests {
     }
 
     #[test]
-    fn translate_json_or() {
+    fn translate_expression_json_or() {
         #[rustfmt::skip] let context = QueryContext {
             paragraph_labels: HashSet::with_capacity(0),
             field_labels: HashSet::from([
@@ -380,7 +380,7 @@ mod tests {
     }
 
     #[test]
-    fn translate_json_not() {
+    fn translate_expression_not() {
         #[rustfmt::skip] let context = QueryContext {
             paragraph_labels: HashSet::with_capacity(0),
             field_labels: HashSet::from([
@@ -402,7 +402,7 @@ mod tests {
     }
 
     #[test]
-    fn translate_json_literal() {
+    fn translate_expression_literal() {
         let expected = BooleanExpression::Literal("var".to_string());
 
         #[rustfmt::skip] let context = QueryContext {

@@ -49,7 +49,7 @@ fn translate_operation(operation: &BooleanOperation, schema: &TextSchema) -> Box
         Operator::Or => Occur::Should,
     };
 
-    let mut operands = Vec::with_capacity(operation.operands.len() + 1);
+    let mut operands = Vec::with_capacity(operation.operands.len());
 
     for operand in operation.operands.iter() {
         let subquery = translate_expression(operand, schema);

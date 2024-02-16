@@ -38,11 +38,7 @@ fn map_operation(operation: &BooleanOperation) -> Clause {
         Operator::And => BooleanOperator::And,
         Operator::Or => BooleanOperator::Or,
     };
-    let mut operands = vec![];
-    for operand in operation.operands.iter() {
-        let operand = map_expression(operand);
-        operands.push(operand);
-    }
+    let operands = operation.operands.iter().map(map_expression).collect();
 
     Clause::Compound(CompoundClause::new(operator, operands))
 }

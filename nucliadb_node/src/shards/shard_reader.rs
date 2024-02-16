@@ -414,9 +414,9 @@ impl ShardReader {
         let mut index_queries = query_plan.index_queries;
 
         // Apply pre-filtering to the query plan
-        if let Some(pre_filter) = &query_plan.prefilter {
-            let pre_filtered = self.text_reader.pre_filter(pre_filter)?;
-            index_queries.apply_prefilter(pre_filtered);
+        if let Some(prefilter) = &query_plan.prefilter {
+            let prefiltered = self.text_reader.prefilter(prefilter)?;
+            index_queries.apply_prefilter(prefiltered);
         }
 
         // Run the rest of the plan

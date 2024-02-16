@@ -96,7 +96,7 @@ impl Debug for TextReaderService {
 impl FieldReader for TextReaderService {
     #[measure(actor = "texts", metric = "prefilter")]
     #[tracing::instrument(skip_all)]
-    fn pre_filter(&self, request: &PreFilterRequest) -> NodeResult<PreFilterResponse> {
+    fn prefilter(&self, request: &PreFilterRequest) -> NodeResult<PreFilterResponse> {
         let schema = &self.schema;
         let mut created_queries = Vec::new();
         let mut modified_queries = Vec::new();
