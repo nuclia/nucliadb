@@ -24,6 +24,7 @@ use std::time::Instant;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{Resource, ResourceId};
+use nucliadb_core::relations::*;
 use nucliadb_core::tracing::{self, *};
 use nucliadb_core::{IndexFiles, RawReplicaState};
 use nucliadb_procs::measure;
@@ -55,15 +56,13 @@ impl RelationsWriterService {
     }
 }
 
-impl RelationWriter for RelationsWriterService {}
-
 impl std::fmt::Debug for RelationsWriterService {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RelationWriterService").finish()
     }
 }
 
-impl WriterChild for RelationsWriterService {
+impl RelationsWriter for RelationsWriterService {
     #[measure(actor = "relations", metric = "count")]
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {

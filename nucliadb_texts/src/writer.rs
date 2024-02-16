@@ -26,6 +26,7 @@ use std::time::Instant;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{Resource, ResourceId};
+use nucliadb_core::texts::*;
 use nucliadb_core::tracing::{self, *};
 use nucliadb_core::{tantivy_replica, IndexFiles};
 use nucliadb_procs::measure;
@@ -51,9 +52,7 @@ impl Debug for TextWriterService {
     }
 }
 
-impl FieldWriter for TextWriterService {}
-
-impl WriterChild for TextWriterService {
+impl FieldWriter for TextWriterService {
     #[measure(actor = "texts", metric = "count")]
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {

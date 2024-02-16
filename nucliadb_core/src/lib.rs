@@ -21,6 +21,7 @@
 pub mod fs_state;
 pub mod metrics;
 pub mod paragraphs;
+pub mod query_language;
 pub mod query_planner;
 pub mod relations;
 pub mod tantivy_replica;
@@ -42,14 +43,9 @@ pub mod thread {
 }
 
 pub mod prelude {
-    pub use crate::paragraphs::{self, *};
-    pub use crate::relations::{self, *};
-    pub use crate::texts::{self, *};
-    pub use crate::vectors::{self, *};
     pub use crate::{
         encapsulate_reader, encapsulate_writer, node_error, paragraph_read, paragraph_write, relation_read,
-        relation_write, text_read, text_write, vector_read, vector_write, Context, NodeResult, ReaderChild,
-        WriterChild,
+        relation_write, text_read, text_write, vector_read, vector_write, Context, NodeResult,
     };
 }
 
@@ -57,7 +53,6 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 pub use anyhow::{anyhow as node_error, Context, Error};
-use nucliadb_protos::noderesources::{Resource, ResourceId};
 use serde::{Deserialize, Serialize};
 
 use crate::tantivy_replica::TantivyReplicaState;
@@ -95,7 +90,7 @@ pub fn vector_write(x: &vectors::VectorsWriterPointer) -> RwLockWriteGuard<'_, d
 
 pub fn relation_write(
     x: &relations::RelationsWriterPointer,
-) -> RwLockWriteGuard<'_, dyn relations::RelationWriter + 'static> {
+) -> RwLockWriteGuard<'_, dyn relations::RelationsWriter + 'static> {
     x.write().unwrap_or_else(|l| l.into_inner())
 }
 
@@ -115,7 +110,7 @@ pub fn vector_read(x: &vectors::VectorsWriterPointer) -> RwLockReadGuard<'_, dyn
 
 pub fn relation_read(
     x: &relations::RelationsWriterPointer,
-) -> RwLockReadGuard<'_, dyn relations::RelationWriter + 'static> {
+) -> RwLockReadGuard<'_, dyn relations::RelationsWriter + 'static> {
     x.read().unwrap_or_else(|l| l.into_inner())
 }
 
@@ -136,20 +131,4 @@ pub struct RawReplicaState {
 pub enum IndexFiles {
     Tantivy(TantivyReplicaState),
     Other(RawReplicaState),
-}
-
-pub trait WriterChild: std::fmt::Debug + Send + Sync {
-    fn set_resource(&mut self, resource: &Resource) -> NodeResult<()>;
-    fn delete_resource(&mut self, resource_id: &ResourceId) -> NodeResult<()>;
-    fn garbage_collection(&mut self) -> NodeResult<()>;
-    fn count(&self) -> NodeResult<usize>;
-    fn get_segment_ids(&self) -> NodeResult<Vec<String>>;
-    fn get_index_files(&self, ignored_segment_ids: &[String]) -> NodeResult<IndexFiles>;
-}
-
-pub trait ReaderChild: std::fmt::Debug + Send + Sync {
-    type Request;
-    type Response;
-    fn search(&self, request: &Self::Request) -> NodeResult<Self::Response>;
-    fn stored_ids(&self) -> NodeResult<Vec<String>>;
 }

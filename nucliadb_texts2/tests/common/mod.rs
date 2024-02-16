@@ -24,10 +24,10 @@
 use std::collections::HashMap;
 use std::time::SystemTime;
 
-use nucliadb_core::prelude::*;
 use nucliadb_core::protos;
 use nucliadb_core::protos::prost_types::Timestamp;
 use nucliadb_core::protos::{Resource, ResourceId};
+use nucliadb_core::texts::*;
 use nucliadb_texts2::reader::TextReaderService;
 use nucliadb_texts2::writer::TextWriterService;
 use tempfile::TempDir;

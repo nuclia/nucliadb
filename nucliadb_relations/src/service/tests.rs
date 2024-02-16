@@ -17,17 +17,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use std::collections::HashMap;
-use std::path::Path;
-
 use lazy_static::lazy_static;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::*;
+use nucliadb_core::relations::*;
 use nucliadb_core::Channel;
 use prost_types::Timestamp;
 use relation::*;
 use relation_node::NodeType;
+use std::collections::HashMap;
+use std::path::Path;
 
 use super::*;
 

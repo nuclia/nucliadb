@@ -21,11 +21,10 @@
 use std::fmt::Debug;
 use std::time::Instant;
 
+use nucliadb_core::paragraphs::*;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::order_by::{OrderField, OrderType};
-use nucliadb_core::protos::{
-    OrderBy, ParagraphItem, ParagraphSearchRequest, ParagraphSearchResponse, StreamRequest, SuggestRequest,
-};
+use nucliadb_core::protos::{OrderBy, ParagraphItem, StreamRequest, SuggestRequest};
 use nucliadb_core::tracing::{self, *};
 use nucliadb_procs::measure;
 use search_query::{search_query, suggest_query};
@@ -65,7 +64,7 @@ impl ParagraphReader for ParagraphReaderService {
 
     #[measure(actor = "paragraphs", metric = "suggest")]
     #[tracing::instrument(skip_all)]
-    fn suggest(&self, request: &SuggestRequest) -> NodeResult<Self::Response> {
+    fn suggest(&self, request: &SuggestRequest) -> NodeResult<ProtosResponse> {
         let time = Instant::now();
         let id = Some(&request.shard);
 
@@ -102,7 +101,7 @@ impl ParagraphReader for ParagraphReaderService {
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Ending at: {v} ms");
 
-        Ok(ParagraphSearchResponse::from(SearchBm25Response {
+        Ok(ProtosResponse::from(SearchBm25Response {
             total: results.len(),
             top_docs: results,
             facets_count: None,
@@ -128,15 +127,10 @@ impl ParagraphReader for ParagraphReaderService {
         };
         Ok(ParagraphIterator::new(producer.flatten()))
     }
-}
-
-impl ReaderChild for ParagraphReaderService {
-    type Request = ParagraphSearchRequest;
-    type Response = ParagraphSearchResponse;
 
     #[measure(actor = "paragraphs", metric = "search")]
     #[tracing::instrument(skip_all)]
-    fn search(&self, request: &Self::Request) -> NodeResult<Self::Response> {
+    fn search(&self, request: &ProtosRequest, context: &ParagraphsContext) -> NodeResult<ProtosResponse> {
         let time = Instant::now();
         let id = Some(&request.id);
 
@@ -162,7 +156,15 @@ impl ReaderChild for ParagraphReaderService {
         debug!("{id:?} - Searching: starts at {v} ms");
 
         let advanced = request.advanced_query.as_ref().map(|query| parser.parse_query(query)).transpose()?;
-        let (original, termc, fuzzied) = search_query(&parser, &text, request, &self.schema, FUZZY_DISTANCE, advanced);
+        #[rustfmt::skip] let (original, termc, fuzzied) = search_query(
+            &parser,
+            &text,
+            request,
+            &self.schema,
+            context,
+            FUZZY_DISTANCE,
+            advanced
+        );
         let searcher = Searcher {
             request,
             results,
@@ -306,7 +308,7 @@ impl Iterator for BatchProducer {
 }
 
 struct Searcher<'a> {
-    request: &'a ParagraphSearchRequest,
+    request: &'a ProtosRequest,
     results: usize,
     offset: usize,
     facets: &'a [String],
@@ -342,7 +344,7 @@ impl<'a> Searcher<'a> {
         termc: SharedTermC,
         query: Box<dyn Query>,
         service: &ParagraphReaderService,
-    ) -> NodeResult<ParagraphSearchResponse> {
+    ) -> NodeResult<ProtosResponse> {
         let searcher = service.reader.searcher();
         let facet_collector =
             self.facets.iter().fold(FacetCollector::for_field(service.schema.facets), |mut collector, facet| {
@@ -352,7 +354,7 @@ impl<'a> Searcher<'a> {
         if self.only_faceted {
             // No query search, just facets
             let facets_count = searcher.search(&query, &facet_collector).unwrap();
-            Ok(ParagraphSearchResponse::from(SearchFacetsResponse {
+            Ok(ProtosResponse::from(SearchFacetsResponse {
                 text_service: service,
                 facets_count: Some(facets_count),
                 facets: self.facets.to_vec(),
@@ -365,7 +367,7 @@ impl<'a> Searcher<'a> {
                     let custom_collector = self.custom_order_collector(order, extra_result, self.offset);
                     let collector = &(Count, custom_collector);
                     let (total, top_docs) = searcher.search(&query, collector)?;
-                    Ok(ParagraphSearchResponse::from(SearchIntResponse {
+                    Ok(ProtosResponse::from(SearchIntResponse {
                         total,
                         facets_count: None,
                         facets: self.facets.to_vec(),
@@ -382,7 +384,7 @@ impl<'a> Searcher<'a> {
                     let topdocs_collector = TopDocs::with_limit(extra_result).and_offset(self.offset);
                     let collector = &(Count, topdocs_collector);
                     let (total, top_docs) = searcher.search(&query, collector)?;
-                    Ok(ParagraphSearchResponse::from(SearchBm25Response {
+                    Ok(ProtosResponse::from(SearchBm25Response {
                         total,
                         facets_count: None,
                         facets: self.facets.to_vec(),
@@ -404,7 +406,7 @@ impl<'a> Searcher<'a> {
                     let custom_collector = self.custom_order_collector(order, extra_result, self.offset);
                     let collector = &(Count, facet_collector, custom_collector);
                     let (total, facets_count, top_docs) = searcher.search(&query, collector)?;
-                    Ok(ParagraphSearchResponse::from(SearchIntResponse {
+                    Ok(ProtosResponse::from(SearchIntResponse {
                         total,
                         top_docs,
                         facets_count: Some(facets_count),
@@ -421,7 +423,7 @@ impl<'a> Searcher<'a> {
                     let topdocs_collector = TopDocs::with_limit(extra_result).and_offset(self.offset);
                     let collector = &(Count, facet_collector, topdocs_collector);
                     let (total, facets_count, top_docs) = searcher.search(&query, collector)?;
-                    Ok(ParagraphSearchResponse::from(SearchBm25Response {
+                    Ok(ProtosResponse::from(SearchBm25Response {
                         total,
                         top_docs,
                         facets_count: Some(facets_count),
@@ -442,16 +444,16 @@ impl<'a> Searcher<'a> {
 #[cfg(test)]
 mod tests {
 
-    use std::collections::HashMap;
-    use std::time::SystemTime;
-
     use nucliadb_core::protos::prost_types::Timestamp;
     use nucliadb_core::protos::resource::ResourceStatus;
     use nucliadb_core::protos::{
-        Faceted, Filter, IndexMetadata, IndexParagraph, IndexParagraphs, OrderBy, Resource, ResourceId,
-        TextInformation, Timestamps,
+        Faceted, IndexMetadata, IndexParagraph, IndexParagraphs, OrderBy, Resource, ResourceId, TextInformation,
+        Timestamps,
     };
+    use nucliadb_core::query_language::{self, BooleanExpression};
     use nucliadb_core::NodeResult;
+    use std::collections::HashMap;
+    use std::time::SystemTime;
     use tantivy::collector::Count;
     use tantivy::query::AllQuery;
     use tempfile::TempDir;
@@ -592,9 +594,10 @@ mod tests {
         let resource1 = create_resource("shard1".to_string(), timestamp);
         let _ = paragraph_writer_service.set_resource(&resource1);
         let paragraph_reader_service = ParagraphReaderService::start(&psc).unwrap();
+        let context = ParagraphsContext::default();
 
         // Search on all paragraphs faceted
-        let search = ParagraphSearchRequest {
+        let search = ProtosRequest {
             id: "shard1".to_string(),
             uuid: UUID.to_string(),
             body: "".to_string(),
@@ -609,11 +612,11 @@ mod tests {
             only_faceted: false,
             ..Default::default()
         };
-        let result = paragraph_reader_service.search(&search).unwrap();
+        let result = paragraph_reader_service.search(&search, &context).unwrap();
         assert_eq!(result.total, 4);
         assert_eq!(result.results.len(), 4);
 
-        let search = ParagraphSearchRequest {
+        let search = ProtosRequest {
             id: "shard1".to_string(),
             uuid: UUID.to_string(),
             body: "".to_string(),
@@ -628,7 +631,7 @@ mod tests {
             only_faceted: false,
             ..Default::default()
         };
-        let result = paragraph_reader_service.search(&search).unwrap();
+        let result = paragraph_reader_service.search(&search, &context).unwrap();
         assert!(result.results.is_empty());
         assert_eq!(result.total, 4);
 
@@ -636,7 +639,8 @@ mod tests {
     }
 
     #[test]
-    fn test_new_paragraph() -> NodeResult<()> {
+    fn test_filtered_search() -> NodeResult<()> {
+        const UUID: &str = "f56c58ac-b4f9-4d61-a077-ffccaadd0001";
         let dir = TempDir::new().unwrap();
         let psc = ParagraphConfig {
             path: dir.path().join("paragraphs"),
@@ -655,31 +659,12 @@ mod tests {
 
         let reader = paragraph_writer_service.index.reader()?;
         let searcher = reader.searcher();
-
+        let mut context = ParagraphsContext::default();
         let (_top_docs, count) = searcher.search(&AllQuery, &(TopDocs::with_limit(10), Count))?;
         assert_eq!(count, 4);
 
-        const UUID: &str = "f56c58ac-b4f9-4d61-a077-ffccaadd0001";
-
-        // Testing filtering one filter from resource, one from field and one from paragraph
-
-        let filter = Filter {
-            field_labels: vec!["/l/mylabel_resource".to_string(), "/c/ool".to_string(), "/e/mylabel".to_string()],
-            paragraph_labels: vec![],
-        };
-
-        let faceted = Faceted {
-            labels: vec!["".to_string(), "/l".to_string(), "/e".to_string(), "/c".to_string()],
-        };
-
-        let order = OrderBy {
-            sort_by: OrderField::Created as i32,
-            r#type: 0,
-            ..Default::default()
-        };
-
-        // Search on all paragraphs faceted
-        let search = ParagraphSearchRequest {
+        // Only one paragraph  matches
+        let search = ProtosRequest {
             id: "shard1".to_string(),
             uuid: UUID.to_string(),
             body: "".to_string(),
@@ -694,16 +679,76 @@ mod tests {
             only_faceted: false,
             ..Default::default()
         };
-        let result = paragraph_reader_service.search(&search).unwrap();
-        assert_eq!(result.total, 4);
+        context.filtering_formula = Some(BooleanExpression::Literal("/tantivy".to_string()));
+        let result = paragraph_reader_service.search(&search, &context).unwrap();
+        assert_eq!(result.total, 1);
 
-        // Search on all paragraphs
-        let search = ParagraphSearchRequest {
+        // Two matches due to OR
+        let expression = query_language::BooleanOperation {
+            operator: query_language::Operator::Or,
+            operands: vec![
+                BooleanExpression::Literal("/tantivy".to_string()),
+                BooleanExpression::Literal("/label2".to_string()),
+            ],
+        };
+        context.filtering_formula = Some(BooleanExpression::Operation(expression));
+        let result = paragraph_reader_service.search(&search, &context).unwrap();
+        assert_eq!(result.total, 2);
+
+        // No matches due to AND
+        let expression = query_language::BooleanOperation {
+            operator: query_language::Operator::And,
+            operands: vec![
+                BooleanExpression::Literal("/tantivy".to_string()),
+                BooleanExpression::Literal("/label2".to_string()),
+            ],
+        };
+        context.filtering_formula = Some(BooleanExpression::Operation(expression));
+        let result = paragraph_reader_service.search(&search, &context).unwrap();
+        assert_eq!(result.total, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_new_paragraph() -> NodeResult<()> {
+        const UUID: &str = "f56c58ac-b4f9-4d61-a077-ffccaadd0001";
+        let dir = TempDir::new().unwrap();
+        let psc = ParagraphConfig {
+            path: dir.path().join("paragraphs"),
+        };
+        let seconds = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).map(|t| t.as_secs() as i64).unwrap();
+        let timestamp = Timestamp {
+            seconds,
+            nanos: 0,
+        };
+        let mut paragraph_writer_service = ParagraphWriterService::start(&psc).unwrap();
+        let resource1 = create_resource("shard1".to_string(), timestamp);
+        let _ = paragraph_writer_service.set_resource(&resource1);
+        let paragraph_reader_service = ParagraphReaderService::start(&psc).unwrap();
+        let reader = paragraph_writer_service.index.reader()?;
+        let searcher = reader.searcher();
+        let empty_context = ParagraphsContext::default();
+        let (_top_docs, count) = searcher.search(&AllQuery, &(TopDocs::with_limit(10), Count))?;
+        assert_eq!(count, 4);
+
+        let faceted = Faceted {
+            labels: vec!["".to_string(), "/l".to_string(), "/e".to_string(), "/c".to_string()],
+        };
+
+        let order = OrderBy {
+            sort_by: OrderField::Created as i32,
+            r#type: 0,
+            ..Default::default()
+        };
+
+        // Search on all paragraphs faceted
+        let search = ProtosRequest {
             id: "shard1".to_string(),
             uuid: UUID.to_string(),
             body: "".to_string(),
-            fields: vec![],
-            filter: Some(filter.clone()),
+            fields: vec!["body".to_string(), "title".to_string()],
+            filter: None,
             faceted: None,
             order: None,
             page_number: 0,
@@ -713,11 +758,11 @@ mod tests {
             only_faceted: false,
             ..Default::default()
         };
-        let result = paragraph_reader_service.search(&search).unwrap();
-        assert_eq!(result.total, 1);
+        let result = paragraph_reader_service.search(&search, &empty_context).unwrap();
+        assert_eq!(result.total, 4);
 
         // Search on all paragraphs without fields
-        let search = ParagraphSearchRequest {
+        let search = ProtosRequest {
             id: "shard1".to_string(),
             uuid: UUID.to_string(),
             body: "".to_string(),
@@ -732,11 +777,11 @@ mod tests {
             only_faceted: false,
             ..Default::default()
         };
-        let result = paragraph_reader_service.search(&search).unwrap();
+        let result = paragraph_reader_service.search(&search, &empty_context).unwrap();
         assert_eq!(result.total, 4);
 
         // Search on all paragraphs in resource with typo
-        let search = ParagraphSearchRequest {
+        let search = ProtosRequest {
             id: "shard1".to_string(),
             uuid: UUID.to_string(),
             body: "shoupd enaugh".to_string(),
@@ -751,11 +796,11 @@ mod tests {
             only_faceted: false,
             ..Default::default()
         };
-        let result = paragraph_reader_service.search(&search).unwrap();
+        let result = paragraph_reader_service.search(&search, &empty_context).unwrap();
         assert_eq!(result.total, 1);
 
         // Search on all paragraphs in resource with typo
-        let search = ParagraphSearchRequest {
+        let search = ProtosRequest {
             id: "shard1".to_string(),
             uuid: UUID.to_string(),
             body: "\"should\" enaugh".to_string(),
@@ -770,11 +815,11 @@ mod tests {
             only_faceted: false,
             ..Default::default()
         };
-        let result = paragraph_reader_service.search(&search).unwrap();
+        let result = paragraph_reader_service.search(&search, &empty_context).unwrap();
         assert_eq!(result.total, 1);
 
         // Search typo on all paragraph
-        let search = ParagraphSearchRequest {
+        let search = ProtosRequest {
             id: "shard1".to_string(),
             uuid: "".to_string(),
             body: "shoupd enaugh".to_string(),
@@ -789,11 +834,11 @@ mod tests {
             only_faceted: false,
             ..Default::default()
         };
-        let result = paragraph_reader_service.search(&search).unwrap();
+        let result = paragraph_reader_service.search(&search, &empty_context).unwrap();
         assert_eq!(result.total, 1);
 
         // Search with invalid and unbalanced grammar
-        let search = ParagraphSearchRequest {
+        let search = ProtosRequest {
             id: "shard1".to_string(),
             uuid: "".to_string(),
             body: "shoupd + enaugh\"".to_string(),
@@ -808,12 +853,12 @@ mod tests {
             only_faceted: false,
             ..Default::default()
         };
-        let result = paragraph_reader_service.search(&search).unwrap();
+        let result = paragraph_reader_service.search(&search, &empty_context).unwrap();
         assert_eq!(result.query, "\"shoupd + enaugh\"");
         assert_eq!(result.total, 0);
 
         // Search with invalid grammar
-        let search = ParagraphSearchRequest {
+        let search = ProtosRequest {
             id: "shard1".to_string(),
             uuid: "".to_string(),
             body: "shoupd + enaugh".to_string(),
@@ -828,12 +873,12 @@ mod tests {
             only_faceted: false,
             ..Default::default()
         };
-        let result = paragraph_reader_service.search(&search).unwrap();
+        let result = paragraph_reader_service.search(&search, &empty_context).unwrap();
         assert_eq!(result.query, "\"shoupd + enaugh\"");
         assert_eq!(result.total, 0);
 
         // Empty search
-        let search = ParagraphSearchRequest {
+        let search = ProtosRequest {
             id: "shard1".to_string(),
             uuid: "".to_string(),
             body: "".to_string(),
@@ -848,11 +893,11 @@ mod tests {
             only_faceted: false,
             ..Default::default()
         };
-        let result = paragraph_reader_service.search(&search).unwrap();
+        let result = paragraph_reader_service.search(&search, &empty_context).unwrap();
         assert_eq!(result.total, 4);
 
         // Search filter all paragraphs
-        let search = ParagraphSearchRequest {
+        let search = ProtosRequest {
             id: "shard1".to_string(),
             uuid: "".to_string(),
             body: "this is the".to_string(),
@@ -867,28 +912,11 @@ mod tests {
             only_faceted: false,
             ..Default::default()
         };
-        let result = paragraph_reader_service.search(&search).unwrap();
+        let result = paragraph_reader_service.search(&search, &empty_context).unwrap();
         assert_eq!(result.total, 3);
-        let search = ParagraphSearchRequest {
-            id: "shard1".to_string(),
-            uuid: "".to_string(),
-            body: "this is the".to_string(),
-            fields: vec![],
-            filter: Some(filter),
-            faceted: Some(faceted),
-            order: None, // Some(order),
-            page_number: 0,
-            result_per_page: 20,
-            timestamps: None,
-            with_duplicates: false,
-            only_faceted: false,
-            ..Default::default()
-        };
-        let result = paragraph_reader_service.search(&search).unwrap();
-        assert_eq!(result.total, 1);
 
         // Search typo on all paragraph
-        let search = ParagraphSearchRequest {
+        let search = ProtosRequest {
             id: "shard1".to_string(),
             uuid: "".to_string(),
             body: "\"shoupd\"".to_string(),
@@ -903,7 +931,7 @@ mod tests {
             only_faceted: false,
             ..Default::default()
         };
-        let result = paragraph_reader_service.search(&search).unwrap();
+        let result = paragraph_reader_service.search(&search, &empty_context).unwrap();
         assert_eq!(result.total, 0);
 
         let request = StreamRequest {
@@ -937,12 +965,11 @@ mod tests {
 
         let reader = paragraph_writer_service.index.reader()?;
         let searcher = reader.searcher();
-
         let (_top_docs, count) = searcher.search(&AllQuery, &(TopDocs::with_limit(10), Count))?;
         assert_eq!(count, 4);
 
         fn do_search(paragraph_reader_service: &ParagraphReaderService, timestamps: Timestamps) -> i32 {
-            let search = ParagraphSearchRequest {
+            let search = ProtosRequest {
                 id: "shard1".to_string(),
                 uuid: "".to_string(),
                 body: "this is the".to_string(),
@@ -957,7 +984,8 @@ mod tests {
                 only_faceted: false,
                 ..Default::default()
             };
-            let result = paragraph_reader_service.search(&search).unwrap();
+            let context = ParagraphsContext::default();
+            let result = paragraph_reader_service.search(&search, &context).unwrap();
             result.total
         }
 

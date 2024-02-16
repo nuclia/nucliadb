@@ -17,24 +17,25 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use std::collections::HashMap;
-use std::fmt::Debug;
-use std::time::*;
-
+use crate::query_io;
 use itertools::Itertools;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::order_by::{OrderField, OrderType};
 use nucliadb_core::protos::{
-    DocumentItem, DocumentResult, DocumentSearchRequest, DocumentSearchResponse, FacetResult, FacetResults, OrderBy,
-    ResultScore, StreamRequest,
+    DocumentItem, DocumentResult, DocumentSearchResponse, FacetResult, FacetResults, OrderBy, ResultScore,
+    StreamRequest,
 };
 use nucliadb_core::query_planner::{
     FieldDateType, PreFilterRequest, PreFilterResponse, ValidField, ValidFieldCollector,
 };
+use nucliadb_core::texts::*;
 use nucliadb_core::tracing::{self, *};
 use nucliadb_procs::measure;
+use std::collections::HashMap;
+use std::fmt::Debug;
+use std::time::*;
 use tantivy::collector::{Collector, Count, DocSetCollector, FacetCollector, FacetCounts, TopDocs};
-use tantivy::query::{AllQuery, BooleanQuery, Occur, Query, QueryParser, TermQuery};
+use tantivy::query::{AllQuery, BooleanQuery, Occur, Query, QueryParser};
 use tantivy::schema::*;
 use tantivy::{DocAddress, Index, IndexReader, LeasedItem, ReloadPolicy, Searcher};
 
@@ -95,10 +96,10 @@ impl Debug for TextReaderService {
 impl FieldReader for TextReaderService {
     #[measure(actor = "texts", metric = "prefilter")]
     #[tracing::instrument(skip_all)]
-    fn pre_filter(&self, request: &PreFilterRequest) -> NodeResult<PreFilterResponse> {
+    fn prefilter(&self, request: &PreFilterRequest) -> NodeResult<PreFilterResponse> {
+        let schema = &self.schema;
         let mut created_queries = Vec::new();
         let mut modified_queries = Vec::new();
-        let mut labels_queries: Vec<Box<dyn Query>> = Vec::new();
 
         for timestamp_query in request.timestamp_filters.iter() {
             let from = timestamp_query.from.as_ref();
@@ -113,34 +114,28 @@ impl FieldReader for TextReaderService {
             }
         }
 
-        for label in request.labels_filters.iter() {
-            let facet = Facet::from_text(label).unwrap();
-            let term = Term::from_facet(self.schema.facets, &facet);
-            let term_query = TermQuery::new(term, IndexRecordOption::Basic);
-            labels_queries.push(Box::new(term_query));
+        let mut subqueries = vec![];
+        if !created_queries.is_empty() {
+            let created_query: Box<dyn Query> = Box::new(BooleanQuery::new(created_queries));
+            subqueries.push(created_query);
+        }
+        if !modified_queries.is_empty() {
+            let modified_query: Box<dyn Query> = Box::new(BooleanQuery::new(modified_queries));
+            subqueries.push(modified_query);
+        }
+        if let Some(formula) = request.formula.as_ref() {
+            let formula_query = query_io::translate_expression(formula, schema);
+            subqueries.push(formula_query);
+        }
+        if subqueries.is_empty() {
+            return Ok(PreFilterResponse {
+                valid_fields: ValidFieldCollector::All,
+            });
         }
 
-        let pre_filter_query: Box<dyn Query> =
-            if created_queries.is_empty() && modified_queries.is_empty() && labels_queries.is_empty() {
-                Box::new(AllQuery)
-            } else {
-                let mut subqueries = vec![];
-                if !created_queries.is_empty() {
-                    let created_query: Box<dyn Query> = Box::new(BooleanQuery::new(created_queries));
-                    subqueries.push(created_query);
-                }
-                if !modified_queries.is_empty() {
-                    let modified_query: Box<dyn Query> = Box::new(BooleanQuery::new(modified_queries));
-                    subqueries.push(modified_query);
-                }
-                if !labels_queries.is_empty() {
-                    let labels_query = Box::new(BooleanQuery::intersection(labels_queries));
-                    subqueries.push(labels_query);
-                }
-                Box::new(BooleanQuery::intersection(subqueries))
-            };
+        let prefilter_query: Box<dyn Query> = Box::new(BooleanQuery::intersection(subqueries));
         let searcher = self.reader.searcher();
-        let docs_fulfilled = searcher.search(&pre_filter_query, &DocSetCollector)?;
+        let docs_fulfilled = searcher.search(&prefilter_query, &DocSetCollector)?;
 
         // If none of the fields match the pre-filter, thats all the query planner needs to know.
         if docs_fulfilled.is_empty() {
@@ -212,15 +207,10 @@ impl FieldReader for TextReaderService {
 
         Ok(count)
     }
-}
-
-impl ReaderChild for TextReaderService {
-    type Request = DocumentSearchRequest;
-    type Response = DocumentSearchResponse;
 
     #[measure(actor = "texts", metric = "search")]
     #[tracing::instrument(skip_all)]
-    fn search(&self, request: &Self::Request) -> NodeResult<Self::Response> {
+    fn search(&self, request: &ProtosRequest) -> NodeResult<ProtosResponse> {
         self.do_search(request)
     }
 
@@ -414,7 +404,7 @@ impl TextReaderService {
     }
 
     #[tracing::instrument(skip_all)]
-    fn do_search(&self, request: &DocumentSearchRequest) -> NodeResult<DocumentSearchResponse> {
+    fn do_search(&self, request: &ProtosRequest) -> NodeResult<ProtosResponse> {
         use crate::search_query::create_query;
         let id = Some(&request.id);
         let time = Instant::now();
@@ -430,7 +420,7 @@ impl TextReaderService {
         let text = TextReaderService::adapt_text(&query_parser, &request.body);
         let advanced_query =
             request.advanced_query.as_ref().map(|query| query_parser.parse_query(query)).transpose()?;
-        let query = create_query(&query_parser, request, &self.schema, &text, advanced_query);
+        let query = create_query(&query_parser, request, &self.schema, &text, advanced_query)?;
 
         // Offset to search from
         let results = request.result_per_page as usize;

@@ -26,6 +26,7 @@ use nucliadb_core::prelude::*;
 use nucliadb_core::protos::prost::Message;
 use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{Resource, ResourceId};
+use nucliadb_core::relations::*;
 use nucliadb_core::tracing::{self, *};
 use nucliadb_core::{tantivy_replica, IndexFiles};
 use nucliadb_procs::measure;
@@ -52,11 +53,7 @@ impl Debug for RelationsWriterService {
     }
 }
 
-impl FieldWriter for RelationsWriterService {}
-
-impl RelationWriter for RelationsWriterService {}
-
-impl WriterChild for RelationsWriterService {
+impl RelationsWriter for RelationsWriterService {
     #[measure(actor = "relations" metric = "count")]
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {

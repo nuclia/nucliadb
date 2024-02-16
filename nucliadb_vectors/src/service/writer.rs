@@ -28,6 +28,7 @@ use nucliadb_core::protos::prost::Message;
 use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{Resource, ResourceId, VectorSetId, VectorSimilarity};
 use nucliadb_core::tracing::{self, *};
+use nucliadb_core::vectors::*;
 use nucliadb_core::{metrics, Channel, IndexFiles, RawReplicaState};
 use nucliadb_procs::measure;
 
@@ -108,9 +109,7 @@ impl VectorWriter for VectorWriterService {
 
         Ok(())
     }
-}
 
-impl WriterChild for VectorWriterService {
     #[measure(actor = "vectors", metric = "count")]
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
@@ -546,19 +545,20 @@ mod tests {
             with_duplicates: false,
             ..Default::default()
         };
-        let results = reader.search(&request).unwrap();
+        let context = VectorsContext::default();
+        let results = reader.search(&request, &context).unwrap();
         let id = results.documents[0].doc_id.clone().unwrap().id;
         assert_eq!(results.documents.len(), 1);
         assert_eq!(id, "4/key");
 
         // Same set, but no label match
         request.field_labels = vec!["5/label".to_string()];
-        let results = reader.search(&request).unwrap();
+        let results = reader.search(&request, &context).unwrap();
         assert_eq!(results.documents.len(), 0);
 
         // Invalid set
         request.vector_set = "not a set".to_string();
-        let results = reader.search(&request).unwrap();
+        let results = reader.search(&request, &context).unwrap();
         assert_eq!(results.documents.len(), 0);
 
         // Remove set 4
@@ -576,7 +576,7 @@ mod tests {
         // Now vectorset 4 is no longer available
         request.vector_set = "4".to_string();
         request.field_labels = vec!["4/label".to_string()];
-        let results = reader.search(&request).unwrap();
+        let results = reader.search(&request, &context).unwrap();
         assert_eq!(results.documents.len(), 0);
     }
 

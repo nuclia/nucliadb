@@ -20,11 +20,13 @@
 // use std::convert::TryFrom;
 // use std::time::SystemTime;
 
-use std::ops::Bound;
-
+use crate::query_io;
 use nucliadb_core::protos::prost_types::Timestamp as ProstTimestamp;
 use nucliadb_core::protos::stream_filter::Conjunction;
 use nucliadb_core::protos::{DocumentSearchRequest, StreamFilter, StreamRequest};
+use nucliadb_core::query_language;
+use nucliadb_core::NodeResult;
+use std::ops::Bound;
 use tantivy::query::*;
 use tantivy::schema::{Facet, Field, IndexRecordOption};
 use tantivy::Term;
@@ -68,7 +70,7 @@ pub fn create_query(
     schema: &TextSchema,
     text: &str,
     with_advance: Option<Box<dyn Query>>,
-) -> Box<dyn Query> {
+) -> NodeResult<Box<dyn Query>> {
     let mut queries = vec![];
     let main_q = if text.is_empty() {
         Box::new(AllQuery)
@@ -89,17 +91,19 @@ pub fn create_query(
             queries.push((Occur::Must, Box::new(facet_term_query)));
         });
 
-    // Field label filter
-    search
-        .filter
-        .iter()
-        .flat_map(|f| f.field_labels.iter())
-        .flat_map(|facet_key| Facet::from_text(facet_key).ok().into_iter())
-        .for_each(|facet| {
-            let facet_term = Term::from_facet(schema.facets, &facet);
-            let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
-            queries.push((Occur::Must, Box::new(facet_term_query)));
-        });
+    if let Some(filter) = search.filter.as_ref() {
+        let context = query_language::QueryContext {
+            paragraph_labels: filter.paragraph_labels.iter().cloned().collect(),
+            field_labels: filter.field_labels.iter().cloned().collect(),
+        };
+
+        let analysis = query_language::translate(&filter.expression, &context)?;
+
+        if let Some(expression) = analysis.prefilter_query {
+            let query = query_io::translate_expression(&expression, schema);
+            queries.push((Occur::Must, query));
+        }
+    }
 
     // Status filters
     if let Some(status) = search.with_status.map(|status| status as u64) {
@@ -136,9 +140,9 @@ pub fn create_query(
     }
 
     if queries.len() == 1 && queries[0].1.is::<AllQuery>() {
-        queries.pop().unwrap().1
+        Ok(queries.pop().unwrap().1)
     } else {
-        Box::new(BooleanQuery::new(queries))
+        Ok(Box::new(BooleanQuery::new(queries)))
     }
 }
 

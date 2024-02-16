@@ -20,7 +20,11 @@
 
 use std::path::Path;
 
+use nucliadb_core::paragraphs::*;
 use nucliadb_core::prelude::*;
+use nucliadb_core::relations::*;
+use nucliadb_core::texts::*;
+use nucliadb_core::vectors::*;
 use nucliadb_core::Channel;
 use serde::{Deserialize, Serialize};
 

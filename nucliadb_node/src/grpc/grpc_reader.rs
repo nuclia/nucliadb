@@ -20,9 +20,10 @@
 
 use std::sync::Arc;
 
-use nucliadb_core::prelude::{DocumentIterator, ParagraphIterator};
+use nucliadb_core::paragraphs::ParagraphIterator;
 use nucliadb_core::protos::node_reader_server::NodeReader;
 use nucliadb_core::protos::*;
+use nucliadb_core::texts::DocumentIterator;
 use nucliadb_core::tracing::{info_span, Span};
 use Shard as ShardPB;
 
