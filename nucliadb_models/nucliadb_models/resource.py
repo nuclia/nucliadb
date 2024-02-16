@@ -21,7 +21,7 @@
 import string
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Optional, Type, TypeVar, Union
+from typing import Any, Dict, List, Optional, Type, TypeVar, Union
 
 from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig as PBKnowledgeBoxConfig
@@ -119,6 +119,11 @@ class KnowledgeBoxConfig(BaseModel):
         default=None,
         title="Release Channel",
         description="Release channel for the Knowledge Box.",
+    )
+    learning_configuration: Optional[Dict[str, Any]] = Field(
+        default=None,
+        title="Learning Configuration",
+        description="Learning configuration for the Knowledge Box. If provided, NucliaDB will set the learning configuration for the Knowledge Box.",  # noqa: E501
     )
 
     @validator("slug")

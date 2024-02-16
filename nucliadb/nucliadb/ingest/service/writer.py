@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import json
 import uuid
 from io import BytesIO
 from typing import AsyncIterator, Optional
@@ -108,7 +109,7 @@ from nucliadb_protos import utils_pb2, writer_pb2, writer_pb2_grpc
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
 from nucliadb_utils.keys import KB_SHARDS
-from nucliadb_utils.settings import is_onprem_nucliadb, running_settings
+from nucliadb_utils.settings import running_settings
 from nucliadb_utils.storages.storage import Storage, StorageField
 from nucliadb_utils.utilities import (
     get_partitioning,
@@ -117,15 +118,6 @@ from nucliadb_utils.utilities import (
     get_transaction_utility,
     has_feature,
 )
-
-
-class LearningConfigurationMissingError(Exception):
-    """
-    Exception raised when the learning configuration is missing
-    for a knowledge box on the hosted deployment.
-    """
-
-    pass
 
 
 class WriterServicer(writer_pb2_grpc.WriterServicer):
@@ -238,17 +230,18 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         lconfig = await learning_config.get_configuration(kbid)
         lconfig_created = False
         if lconfig is None:
-            if not is_onprem_nucliadb():
-                raise LearningConfigurationMissingError(
-                    "Learning configuration missing. This should have been set by idp"
-                )
-            await learning_config.set_configuration(kbid, config={})
-            lconfig_created = True
-            lconfig = await learning_config.get_configuration(kbid)
-        if lconfig is None:
-            raise LearningConfigurationMissingError(
-                "Could not set learning configuration for the new knowledge box."
+            logger.warning(
+                "Learning configuration missing. Setting a new one.",
+                extra={"kbid": kbid},
             )
+            if request.learning_config:
+                # We parse the desired configuration from the request and set it
+                config = json.loads(request.learning_config)
+            else:
+                # We set an empty configuration so that learning chooses the default values.
+                config = {}
+            lconfig = await learning_config.set_configuration(kbid, config=config)
+            lconfig_created = True
         try:
             await self.proc.create_kb(
                 request.slug,

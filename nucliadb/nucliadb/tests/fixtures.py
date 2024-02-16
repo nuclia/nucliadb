@@ -133,6 +133,7 @@ def tmpdir():
 @pytest.fixture()
 def learning_config():
     lconfig = LearningConfiguration(
+        semantic_model="multilingual",
         semantic_threshold=None,
         semantic_vector_size=None,
         semantic_vector_similarity="cosine",
