@@ -124,9 +124,15 @@ async def test_get_configuration(async_client):
     async_client.get.assert_called_once_with("config/kbid")
 
 
-async def test_set_configuration(async_client):
+async def test_set_configuration(config_response, async_client):
+    config_response.json.return_value = {
+        "semantic_model": "multilingual",
+        "semantic_threshold": 1.5,
+        "semantic_vector_size": 222,
+        "semantic_vector_similarity": "cosine",
+    }
     resp = await set_configuration("kbid", {"some": "data"})
-    assert resp is None
+    assert resp is not None
     async_client.post.assert_called_once_with("config/kbid", json={"some": "data"})
 
 
