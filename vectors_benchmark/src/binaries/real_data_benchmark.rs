@@ -143,7 +143,9 @@ fn create_request(
     labels.iter().cloned().map(AtomClause::label).for_each(|c| formula.extend(c));
 
     if key_prefixes.len() > 0 {
-        formula.extend(CompoundClause::new(key_prefixes.collect()));
+        let subqueries: Vec<_> = key_prefixes.map(Clause::Atom).collect();
+        let clause = CompoundClause::new(BooleanOperator::Or, subqueries);
+        formula.extend(clause);
     }
 
     let res = Request {

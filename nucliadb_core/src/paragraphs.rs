@@ -22,9 +22,13 @@ use std::sync::{Arc, RwLock};
 
 use crate::prelude::*;
 use crate::protos::*;
+use crate::query_language::BooleanExpression;
+use crate::IndexFiles;
 
 pub type ParagraphsReaderPointer = Arc<dyn ParagraphReader>;
 pub type ParagraphsWriterPointer = Arc<RwLock<dyn ParagraphWriter>>;
+pub type ProtosRequest = ParagraphSearchRequest;
+pub type ProtosResponse = ParagraphSearchResponse;
 
 #[derive(Debug, Clone)]
 pub struct ParagraphConfig {
@@ -47,10 +51,27 @@ impl Iterator for ParagraphIterator {
     }
 }
 
-pub trait ParagraphReader: ReaderChild<Request = ParagraphSearchRequest, Response = ParagraphSearchResponse> {
+// In an ideal world this should be part of the actual request, but since
+// we use protos all the way down the stack here we are. Once the protos use
+// is restricted to only the upper layer, this type won't be needed anymore.
+#[derive(Clone, Default)]
+pub struct ParagraphsContext {
+    pub filtering_formula: Option<BooleanExpression>,
+}
+
+pub trait ParagraphReader: std::fmt::Debug + Send + Sync {
+    fn search(&self, request: &ProtosRequest, context: &ParagraphsContext) -> NodeResult<ProtosResponse>;
+    fn suggest(&self, request: &SuggestRequest) -> NodeResult<ProtosResponse>;
     fn iterator(&self, request: &StreamRequest) -> NodeResult<ParagraphIterator>;
-    fn suggest(&self, request: &SuggestRequest) -> NodeResult<Self::Response>;
+    fn stored_ids(&self) -> NodeResult<Vec<String>>;
     fn count(&self) -> NodeResult<usize>;
 }
 
-pub trait ParagraphWriter: WriterChild {}
+pub trait ParagraphWriter: std::fmt::Debug + Send + Sync {
+    fn set_resource(&mut self, resource: &Resource) -> NodeResult<()>;
+    fn delete_resource(&mut self, resource_id: &ResourceId) -> NodeResult<()>;
+    fn garbage_collection(&mut self) -> NodeResult<()>;
+    fn count(&self) -> NodeResult<usize>;
+    fn get_segment_ids(&self) -> NodeResult<Vec<String>>;
+    fn get_index_files(&self, ignored_segment_ids: &[String]) -> NodeResult<IndexFiles>;
+}

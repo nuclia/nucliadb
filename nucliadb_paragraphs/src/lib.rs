@@ -19,6 +19,7 @@
 //
 
 pub mod fuzzy_query;
+pub mod query_io;
 pub mod reader;
 pub mod schema;
 pub mod search_query;
