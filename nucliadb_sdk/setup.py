@@ -26,6 +26,7 @@ setup(
     name="nucliadb_sdk",
     version=VERSION,
     long_description=README,
+    long_description_content_type="text/markdown",
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
