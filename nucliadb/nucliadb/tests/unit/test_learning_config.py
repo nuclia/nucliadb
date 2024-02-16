@@ -203,7 +203,7 @@ async def test_proxy_error(async_client):
     assert response.status_code == 503
     assert (
         response.body
-        == b"Unexpected error while trying to proxy the request to the learning config API. Please try again later."
+        == b"Unexpected error while trying to proxy the request to the learning config API."
     )
     assert response.media_type == "text/plain"
 
