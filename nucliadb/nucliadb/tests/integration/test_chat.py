@@ -395,7 +395,7 @@ async def test_chat_rag_options_validation(nucliadb_reader):
         f"/kb/kbid/chat",
         json={
             "query": "title",
-            "rag_strategies": [{"type": "foobar", "fields": ["a/summary"]}],
+            "rag_strategies": [{"name": "foobar", "fields": ["a/summary"]}],
         },
     )
     assert resp.status_code == 422
@@ -407,7 +407,7 @@ async def test_chat_rag_options_validation(nucliadb_reader):
             "query": "title",
             "rag_strategies": [
                 {"name": "full_resource"},
-                {"name": "extend_with_fields", "fields": ["a/summary"]},
+                {"name": "field_extension", "fields": ["a/summary"]},
             ],
         },
     )
