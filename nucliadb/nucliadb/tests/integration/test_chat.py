@@ -390,6 +390,16 @@ async def test_chat_rag_options_extend_with_fields(
 
 @pytest.mark.asyncio()
 async def test_chat_rag_options_validation(nucliadb_reader):
+    # Invalid strategy
+    resp = await nucliadb_reader.post(
+        f"/kb/kbid/chat",
+        json={
+            "query": "title",
+            "rag_strategies": [{"type": "foobar", "fields": ["a/summary"]}],
+        },
+    )
+    assert resp.status_code == 422
+
     # full_resource cannot be combined with other strategies
     resp = await nucliadb_reader.post(
         f"/kb/kbid/chat",
