@@ -109,7 +109,7 @@ from nucliadb_protos import utils_pb2, writer_pb2, writer_pb2_grpc
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
 from nucliadb_utils.keys import KB_SHARDS
-from nucliadb_utils.settings import running_settings
+from nucliadb_utils.settings import is_onprem_nucliadb, running_settings
 from nucliadb_utils.storages.storage import Storage, StorageField
 from nucliadb_utils.utilities import (
     get_partitioning,
@@ -219,6 +219,12 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         return NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.OK, uuid=kbid)
 
     async def create_kb(self, request: KnowledgeBoxNew) -> str:
+        if is_onprem_nucliadb():
+            return await self.create_kb_onprem(request)
+        else:
+            return await self.create_kb_hosted(request)
+
+    async def _create_kb_onprem(self, request: KnowledgeBoxNew) -> str:
         """
         First, try to get the learning configuration for the new knowledge box.
         From there we need to extract the semantic model metadata and pass it to the create_kb method.
@@ -242,11 +248,13 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 )
             lconfig = await learning_config.set_configuration(kbid, config=config)
             lconfig_created = True
+        else:
+            logger.info("Learning configuration already exists", extra={"kbid": kbid})
         try:
             await self.proc.create_kb(
                 request.slug,
                 request.config,
-                parse_model_metadata(lconfig),
+                parse_model_metadata_from_learning_config(lconfig),
                 forceuuid=kbid,
                 release_channel=release_channel,
             )
@@ -263,6 +271,23 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                     extra={"kbid": kbid},
                 )
             raise
+
+    async def _create_kb_hosted(self, request: KnowledgeBoxNew) -> str:
+        """
+        For the hosted case, we assume that the learning configuration
+        is already set and we are given the model metadata in the request.
+        """
+        kbid = request.forceuuid or str(uuid.uuid4())
+        release_channel = get_release_channel(request)
+        request.config.release_channel = release_channel
+        await self.proc.create_kb(
+            request.slug,
+            request.config,
+            parse_model_metadata_from_request(request),
+            forceuuid=kbid,
+            release_channel=release_channel,
+        )
+        return kbid
 
     async def UpdateKnowledgeBox(  # type: ignore
         self, request: KnowledgeBoxUpdate, context=None
@@ -907,22 +932,37 @@ LEARNING_SIMILARITY_FUNCTION_TO_PROTO = {
 }
 
 
-def parse_model_metadata(
+def parse_model_metadata_from_learning_config(
     lconfig: learning_config.LearningConfiguration,
 ) -> SemanticModelMetadata:
     model = SemanticModelMetadata()
-    # Parse vector similarity function
     model.similarity_function = LEARNING_SIMILARITY_FUNCTION_TO_PROTO[
         lconfig.semantic_vector_similarity
     ]
-    # Parse vector dimension
     if lconfig.semantic_vector_size is not None:
         model.vector_dimension = lconfig.semantic_vector_size
     else:
         logger.warning("Vector dimension not set!")
-    # Parse model default min score
     if lconfig.semantic_threshold is not None:
         model.default_min_score = lconfig.semantic_threshold
+    else:
+        logger.warning("Default min score not set!")
+    return model
+
+
+def parse_model_metadata_from_request(
+    request: KnowledgeBoxNew,
+) -> SemanticModelMetadata:
+    model = SemanticModelMetadata()
+    model.similarity_function = request.similarity
+    if request.HasField("vector_dimension"):
+        model.vector_dimension = request.vector_dimension
+    else:
+        logger.warning(
+            "Vector dimension not set. Will be detected automatically on the first vector set."
+        )
+    if request.HasField("default_min_score"):
+        model.default_min_score = request.default_min_score
     else:
         logger.warning("Default min score not set!")
     return model
