@@ -30,6 +30,7 @@ from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 from pydantic import BaseModel, Field, ValidationError, root_validator, validator
+from typing_extensions import Annotated
 
 from nucliadb_models.common import FieldTypeName, ParamDefault
 from nucliadb_models.metadata import RelationType
@@ -805,8 +806,6 @@ class FieldExtensionStrategy(RagStrategy):
 class FullResourceStrategy(RagStrategy):
     name: Literal["full_resource"]
 
-
-from typing_extensions import Annotated
 
 RagStrategies = Annotated[
     Union[FieldExtensionStrategy, FullResourceStrategy], Field(discriminator="name")
