@@ -24,7 +24,7 @@ from nucliadb_sdk import NucliaDB, Region
 ndb = NucliaDB(region=Region.EUROPE1, api_key="my-api-key")
 ```
 
-Alternately, to connect to a NucliaDB local installation, use:
+Alternatively, to connect to a NucliaDB local installation, use:
 
 ```python
 ndb = NucliaDB(region=Region.ON_PREM, api="http://localhost:8080/api")
