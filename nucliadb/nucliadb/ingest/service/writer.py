@@ -220,9 +220,9 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
     async def create_kb(self, request: KnowledgeBoxNew) -> str:
         if is_onprem_nucliadb():
-            return await self.create_kb_onprem(request)
+            return await self._create_kb_onprem(request)
         else:
-            return await self.create_kb_hosted(request)
+            return await self._create_kb_hosted(request)
 
     async def _create_kb_onprem(self, request: KnowledgeBoxNew) -> str:
         """
