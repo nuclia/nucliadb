@@ -23,7 +23,9 @@ from unittest import mock
 import pytest
 
 from nucliadb.learning_config import (
+    LearningConfiguration,
     delete_configuration,
+    get_configuration,
     learning_config_client,
     proxy,
     set_configuration,
@@ -67,6 +69,7 @@ def async_client(config_response):
     client = mock.AsyncMock()
     client.is_closed.return_value = False
     client.request = mock.AsyncMock(return_value=config_response)
+    client.get = mock.AsyncMock(return_value=config_response)
     client.post = mock.AsyncMock(return_value=config_response)
     client.patch = mock.AsyncMock(return_value=config_response)
     client.delete = mock.AsyncMock(return_value=config_response)
@@ -102,13 +105,40 @@ async def get_learning_config_client(settings):
         assert client.headers == {}
 
 
-async def test_set_configuration(async_client):
-    await set_configuration("kbid", {"some": "data"})
+async def test_get_configuration(async_client):
+    lconfig = LearningConfiguration(
+        semantic_model="multilingual",
+        semantic_threshold=1.5,
+        semantic_vector_size=222,
+        semantic_vector_similarity="cosine",
+    )
+    resp = mock.Mock()
+    resp.raise_for_status.return_value = None
+    resp.json.return_value = lconfig.dict()
+    async_client.get.return_value = resp
+
+    resp = await get_configuration("kbid")
+
+    assert resp is not None
+    assert resp == lconfig
+    async_client.get.assert_called_once_with("config/kbid")
+
+
+async def test_set_configuration(config_response, async_client):
+    config_response.json.return_value = {
+        "semantic_model": "multilingual",
+        "semantic_threshold": 1.5,
+        "semantic_vector_size": 222,
+        "semantic_vector_similarity": "cosine",
+    }
+    resp = await set_configuration("kbid", {"some": "data"})
+    assert resp is not None
     async_client.post.assert_called_once_with("config/kbid", json={"some": "data"})
 
 
 async def test_delete_configuration(async_client):
-    await delete_configuration("kbid")
+    resp = await delete_configuration("kbid")
+    assert resp is None
     async_client.delete.assert_called_once_with("config/kbid")
 
 
@@ -173,7 +203,7 @@ async def test_proxy_error(async_client):
     assert response.status_code == 503
     assert (
         response.body
-        == b"Unexpected error while trying to proxy the request to the learning config API. Please try again later."
+        == b"Unexpected error while trying to proxy the request to the learning config API."
     )
     assert response.media_type == "text/plain"
 

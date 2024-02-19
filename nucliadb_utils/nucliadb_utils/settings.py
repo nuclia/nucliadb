@@ -207,3 +207,7 @@ class NATSConsumerSettings(BaseSettings):
 
 
 nats_consumer_settings = NATSConsumerSettings()
+
+
+def is_onprem_nucliadb() -> bool:
+    return nuclia_settings.nuclia_service_account is not None

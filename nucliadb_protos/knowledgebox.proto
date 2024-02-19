@@ -48,11 +48,14 @@ message KnowledgeBoxNew {
     string slug = 1;
     KnowledgeBoxConfig config = 2;
     string forceuuid = 3;
-    utils.VectorSimilarity similarity = 4;
-    optional int32 vector_dimension = 5;
-    optional float default_min_score = 6;
     utils.ReleaseChannel release_channel = 7;
     string learning_config = 8;
+
+    /* Deprecated: these are no longer allowed to be set by the user
+       and will be fetched from the learning config api */
+    utils.VectorSimilarity similarity = 4 [deprecated = true];
+    optional int32 vector_dimension = 5 [deprecated = true];
+    optional float default_min_score = 6 [deprecated = true];    
 }
 
 

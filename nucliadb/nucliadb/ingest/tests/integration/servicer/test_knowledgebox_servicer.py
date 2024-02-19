@@ -86,44 +86,6 @@ async def get_kb_config(txn, kbid) -> knowledgebox_pb2.KnowledgeBoxConfig:
     return config
 
 
-async def get_kb_similarity(txn, kbid) -> utils_pb2.VectorSimilarity.ValueType:
-    shards = await get_kb_shards(txn, kbid)
-    return shards.similarity
-
-
-@pytest.mark.asyncio
-async def test_create_knowledgebox_with_similarity(grpc_servicer: IngestFixture):
-    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)  # type: ignore
-    pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test-dot")
-    pb.config.title = "My Title"
-    pb.similarity = utils_pb2.VectorSimilarity.DOT
-    result = await stub.NewKnowledgeBox(pb)  # type: ignore
-    assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
-
-    async with grpc_servicer.servicer.driver.transaction() as txn:
-        assert (
-            await get_kb_similarity(txn, result.uuid) == utils_pb2.VectorSimilarity.DOT
-        )
-
-
-@pytest.mark.asyncio
-async def test_create_knowledgebox_defaults_to_cosine_similarity(
-    grpc_servicer: IngestFixture,
-    txn,
-):
-    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)  # type: ignore
-    pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test-default")
-    pb.config.title = "My Title"
-    result = await stub.NewKnowledgeBox(pb)  # type: ignore
-    assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
-
-    async with grpc_servicer.servicer.driver.transaction() as txn:
-        assert (
-            await get_kb_similarity(txn, result.uuid)
-            == utils_pb2.VectorSimilarity.COSINE
-        )
-
-
 @pytest.mark.asyncio
 async def test_get_resource_id(grpc_servicer: IngestFixture) -> None:
     stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)  # type: ignore
