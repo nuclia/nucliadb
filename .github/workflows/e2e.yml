@@ -90,7 +90,7 @@ jobs:
         run: |
           kubectl port-forward -n nucliadb service/nucliadb 8080:8080 &
           sleep 10
-          pytest -s --tb=native e2e/test_e2e.py ||
+          pytest -s -vv --tb=native e2e/test_e2e.py ||
             (kubectl get all --all-namespaces &&
               microk8s inspect &&
               kubectl logs -n nucliadb pod/nucliadb-0 &&
