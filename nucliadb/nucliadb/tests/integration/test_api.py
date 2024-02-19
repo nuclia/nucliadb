@@ -39,6 +39,7 @@ from nucliadb_protos.train_pb2_grpc import TrainStub
 from nucliadb_protos.writer_pb2 import BrokerMessage, OpStatusWriter
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
+from nucliadb.learning_config import LearningConfiguration
 from nucliadb.tests.utils import broker_resource, inject_message
 from nucliadb_models import common, metadata
 from nucliadb_models.resource import Resource
@@ -47,36 +48,35 @@ from nucliadb_protos import writer_pb2 as wpb
 
 
 @pytest.mark.asyncio
-async def test_kb_creation_with_similarity(
+async def test_kb_creation_allows_setting_learning_configuration(
     nucliadb_manager,
     nucliadb_reader,
+    learning_config,
 ):
-    # Check that by default we get cosine similarity
+    # We set this to None to test the case where the user has not
+    # defined a learning configuration yet before creating the KB.
+    learning_config.get_configuration.return_value = None
+    learning_config.set_configuration.return_value = LearningConfiguration(
+        semantic_model="english",
+        semantic_vector_similarity="cosine",
+        semantic_vector_size=384,
+    )
+
+    # Check that we can define it to a different semantic model
     resp = await nucliadb_manager.post(
         f"/kbs",
-        json={"title": "My KB", "slug": "kb1"},
-        timeout=None,
+        json={
+            "title": "My KB with english semantic model",
+            "slug": "english",
+            "learning_configuration": {"semantic_model": "english"},
+        },
     )
     assert resp.status_code == 201
     kbid = resp.json()["uuid"]
-    resp = await nucliadb_manager.get(f"/kb/{kbid}/shards")
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["similarity"] == "cosine"
-    assert body["model"]["similarity_function"] == "cosine"
 
-    # Check that we can define it to dot similarity
-    resp = await nucliadb_manager.post(
-        f"/kbs",
-        json={"title": "My KB with dot similarity", "slug": "dot", "similarity": "dot"},
+    learning_config.set_configuration.assert_called_once_with(
+        kbid, config={"semantic_model": "english"}
     )
-    assert resp.status_code == 201
-    dot_kbid = resp.json()["uuid"]
-    resp = await nucliadb_manager.get(f"/kb/{dot_kbid}/shards")
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["similarity"] == "dot"
-    assert body["model"]["similarity_function"] == "dot"
 
 
 @pytest.mark.asyncio

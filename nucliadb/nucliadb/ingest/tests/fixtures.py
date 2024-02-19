@@ -41,6 +41,7 @@ from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.service.writer import WriterServicer
 from nucliadb.ingest.settings import settings
 from nucliadb.ingest.tests.vectors import V1, V2, V3
+from nucliadb.learning_config import LearningConfiguration
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import utils_pb2 as upb
 from nucliadb_protos import writer_pb2_grpc
@@ -176,8 +177,16 @@ async def fake_node(indexing_utility, shard_manager):
 
 @pytest.fixture()
 def learning_config():
+    lconfig = LearningConfiguration(
+        semantic_model="multilingual",
+        semantic_threshold=None,
+        semantic_vector_size=None,
+        semantic_vector_similarity="cosine",
+    )
     with patch("nucliadb.ingest.service.writer.learning_config") as mocked:
         mocked.set_configuration = AsyncMock(return_value=None)
+        mocked.get_configuration = AsyncMock(return_value=lconfig)
+        mocked.delete_configuration = AsyncMock(return_value=None)
         yield mocked
 
 

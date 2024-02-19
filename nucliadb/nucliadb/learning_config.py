@@ -26,9 +26,10 @@ from typing import Any, Optional, Type, Union
 import httpx
 from fastapi import Request, Response
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from nucliadb_telemetry import errors
-from nucliadb_utils.settings import nuclia_settings
+from nucliadb_utils.settings import is_onprem_nucliadb, nuclia_settings
 
 SERVICE_NAME = "nucliadb.learning_config"
 logger = logging.getLogger(SERVICE_NAME)
@@ -37,13 +38,35 @@ logger = logging.getLogger(SERVICE_NAME)
 NUCLIA_ONPREM_AUTH_HEADER = "X-NUCLIA-NUAKEY"
 
 
+class LearningConfiguration(BaseModel):
+    semantic_model: str
+    semantic_vector_similarity: str
+    semantic_vector_size: Optional[int]
+    semantic_threshold: Optional[float]
+
+
+async def get_configuration(
+    kbid: str,
+) -> Optional[LearningConfiguration]:
+    async with learning_config_client() as client:
+        resp = await client.get(f"config/{kbid}")
+        try:
+            resp.raise_for_status()
+        except httpx.HTTPStatusError as err:
+            if err.response.status_code == 404:
+                return None
+            raise
+        return LearningConfiguration.parse_obj(resp.json())
+
+
 async def set_configuration(
     kbid: str,
     config: dict[str, Any],
-) -> None:
+) -> LearningConfiguration:
     async with learning_config_client() as client:
         resp = await client.post(f"config/{kbid}", json=config)
         resp.raise_for_status()
+        return LearningConfiguration.parse_obj(resp.json())
 
 
 async def delete_configuration(
@@ -82,8 +105,10 @@ async def proxy(
             )
         except Exception as exc:
             errors.capture_exception(exc)
+            msg = "Unexpected error while trying to proxy the request to the learning config API."
+            logger.exception(msg, exc_info=True)
             return Response(
-                content=b"Unexpected error while trying to proxy the request to the learning config API. Please try again later.",  # noqa
+                content=msg.encode(),
                 status_code=503,
                 media_type="text/plain",
             )
@@ -102,12 +127,8 @@ async def proxy(
         )
 
 
-def is_onprem() -> bool:
-    return nuclia_settings.nuclia_service_account is not None
-
-
 def get_config_api_url() -> str:
-    if is_onprem():
+    if is_onprem_nucliadb():
         nuclia_public_url = nuclia_settings.nuclia_public_url.format(
             zone=nuclia_settings.nuclia_zone
         )
@@ -117,7 +138,7 @@ def get_config_api_url() -> str:
 
 
 def get_config_auth_header() -> dict[str, str]:
-    if is_onprem():
+    if is_onprem_nucliadb():
         # public api: auth is done via the 'x-nuclia-nuakey' header
         return {"X-NUCLIA-NUAKEY": f"Bearer {nuclia_settings.nuclia_service_account}"}
     else:
@@ -132,29 +153,60 @@ class DummyResponse(httpx.Response):
 
 
 class DummyClient(httpx.AsyncClient):
-    def _response(self):
-        content = {"detail": "Dummy client is not supposed to be used"}
+    def _response(self, content=None):
+        if content is None:
+            content = {"detail": "Dummy client is not supposed to be used"}
         return DummyResponse(
             status_code=200,
             headers={"content-type": "application/json"},
             content=json.dumps(content).encode(),
         )
 
-    async def get(self, *args: Any, **kwargs: Any):
-        return self._response()
+    async def get(self, *args, **kwargs: Any):
+        return self._handle_request("GET", *args, **kwargs)
 
     async def post(self, *args: Any, **kwargs: Any):
-        return self._response()
+        return self._handle_request("POST", *args, **kwargs)
+
+    async def patch(self, *args: Any, **kwargs: Any):
+        return self._handle_request("PATCH", *args, **kwargs)
 
     async def delete(self, *args: Any, **kwargs: Any):
-        return self._response()
+        return self._handle_request("DELETE", *args, **kwargs)
 
-    async def request(
+    def get_config(self, *args: Any, **kwargs: Any):
+        lconfig = LearningConfiguration(
+            semantic_model="multilingual",
+            semantic_vector_similarity="cosine",
+            semantic_vector_size=None,
+            semantic_threshold=None,
+        )
+        return self._response(content=lconfig.dict())
+
+    async def request(  # type: ignore
         self,
-        *args: Any,
-        **kwargs: Any,
+        method: str,
+        url: str,
+        params=None,
+        content=None,
+        headers=None,
     ) -> httpx.Response:
-        return self._response()
+        return self._handle_request(
+            method, url, params=params, content=content, headers=headers
+        )
+
+    def _handle_request(self, *args: Any, **kwargs: Any) -> httpx.Response:
+        """
+        Try to map HTTP Method + Path to methods of this class:
+        e.g: GET /config/{kbid} -> get_config
+        """
+        http_method = args[0]
+        http_url = args[1]
+        method = f"{http_method.lower()}_{http_url.split('/')[0]}"
+        if hasattr(self, method):
+            return getattr(self, method)(*args, **kwargs)
+        else:
+            return self._response()
 
 
 @contextlib.asynccontextmanager

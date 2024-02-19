@@ -80,12 +80,10 @@ def parse_create_kb_request(item: KnowledgeBoxConfig) -> KnowledgeBoxNew:
         requestpb.config.title = item.title
     if item.description:
         requestpb.config.description = item.description
-    if item.similarity:
-        requestpb.similarity = item.similarity.to_pb()
     if item.release_channel:
         requestpb.release_channel = item.release_channel.to_pb()
-    if item.learning_config:
-        requestpb.learning_config = json.dumps(item.learning_config)
+    if item.learning_configuration:
+        requestpb.learning_config = json.dumps(item.learning_configuration)
     return requestpb
 
 

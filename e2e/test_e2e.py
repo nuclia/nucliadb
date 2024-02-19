@@ -181,6 +181,7 @@ def test_predict_proxy(kbid: str):
 
 
 def test_learning_config(kbid: str):
+    # Try to patch some config
     resp = requests.post(
         os.path.join(BASE_URL, f"api/v1/kb/{kbid}/configuration"),
         headers={
@@ -194,6 +195,7 @@ def test_learning_config(kbid: str):
     )
     assert resp.status_code == 422
 
+    # Get config
     resp = requests.get(
         os.path.join(BASE_URL, f"api/v1/kb/{kbid}/configuration"),
         headers={
@@ -202,9 +204,9 @@ def test_learning_config(kbid: str):
             "x-ndb-client": "web",
         },
     )
-    # 404 because there's no configuration
-    assert resp.status_code == 404
+    assert resp.status_code == 200
 
+    # Get the schema
     resp = requests.get(
         os.path.join(BASE_URL, f"api/v1/kb/{kbid}/schema"),
         headers={
@@ -215,6 +217,7 @@ def test_learning_config(kbid: str):
     )
     raise_for_status(resp)
 
+    # Get the models
     resp = requests.get(
         os.path.join(BASE_URL, f"api/v1/kb/{kbid}/models"),
         headers={

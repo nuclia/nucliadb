@@ -26,22 +26,6 @@ from nucliadb.common.http_clients import exceptions, processing
 from nucliadb_utils.settings import nuclia_settings
 
 
-def test_check_proxy_telemetry_headers_ok():
-    resp = Response(
-        headers={"x-b3-traceid": "foo", "x-b3-spanid": "bar", "x-b3-sampled": "baz"}
-    )
-    with mock.patch("nucliadb.common.http_clients.processing.logger") as logger:
-        processing.check_proxy_telemetry_headers(resp)
-        logger.warning.assert_not_called()
-
-
-def test_check_proxy_telemetry_headers_error_logs():
-    resp = Response(headers={})
-    with mock.patch("nucliadb.common.http_clients.processing.logger") as logger:
-        processing.check_proxy_telemetry_headers(resp)
-        logger.warning.assert_called_once()
-
-
 def test_check_status():
     processing.check_status(Response(status=200), "ok")
     with pytest.raises(exceptions.AccountLimitException):

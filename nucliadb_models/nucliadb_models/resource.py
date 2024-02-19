@@ -55,11 +55,7 @@ from nucliadb_models.metadata import (
 from nucliadb_models.security import ResourceSecurity
 from nucliadb_models.text import FieldText
 from nucliadb_models.utils import SlugString
-from nucliadb_models.vectors import (
-    SemanticModelMetadata,
-    UserVectorSet,
-    VectorSimilarity,
-)
+from nucliadb_models.vectors import SemanticModelMetadata, UserVectorSet
 
 _T = TypeVar("_T")
 
@@ -119,20 +115,15 @@ class KnowledgeBoxConfig(BaseModel):
         title="Description",
         description="Description for the Knowledge Box.",
     )
-    similarity: Optional[VectorSimilarity] = Field(
-        default=None,
-        title="Similarity",
-        description="Similarity function for the main Knowledge Box vectors index.",
-    )
     release_channel: Optional[ReleaseChannel] = Field(
         default=None,
         title="Release Channel",
         description="Release channel for the Knowledge Box.",
     )
-    learning_config: Optional[dict[str, Any]] = Field(
-        default={},
-        title="Learning Config",
-        description="Learning config for the Knowledge Box.",
+    learning_configuration: Optional[Dict[str, Any]] = Field(
+        default=None,
+        title="Learning Configuration",
+        description="Learning configuration for the Knowledge Box. If provided, NucliaDB will set the learning configuration for the Knowledge Box.",  # noqa: E501
     )
 
     @validator("slug")
