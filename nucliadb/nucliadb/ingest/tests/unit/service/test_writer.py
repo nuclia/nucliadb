@@ -130,6 +130,13 @@ def test_update_shards_pb_replica():
 
 class TestWriterServicer:
     @pytest.fixture
+    def onprem_nucliadb(self):
+        with patch(
+            "nucliadb.ingest.service.writer.is_onprem_nucliadb", return_value=True
+        ) as mocked:
+            yield mocked
+
+    @pytest.fixture
     def learning_config(self):
         lconfig = LearningConfiguration(
             semantic_model="english",
@@ -142,7 +149,7 @@ class TestWriterServicer:
             yield mocked
 
     @pytest.fixture
-    def writer(self, learning_config):
+    def writer(self, learning_config, onprem_nucliadb):
         servicer = WriterServicer()
         servicer.driver = AsyncMock()
         servicer.driver.transaction = MagicMock(return_value=AsyncMock())
@@ -255,6 +262,35 @@ class TestWriterServicer:
             expected_model_metadata,
             forceuuid=request.forceuuid,
             release_channel=1,
+        )
+        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
+
+    async def test_NewKnowledgeBox_hosted_nucliadb(
+        self, writer: WriterServicer, onprem_nucliadb
+    ):
+        onprem_nucliadb.return_value = False
+
+        request = writer_pb2.KnowledgeBoxNew(
+            slug="slug",
+            forceuuid="kbid",
+            similarity=VectorSimilarity.COSINE,
+            vector_dimension=200,
+            default_min_score=1.0,
+        )
+
+        resp = await writer.NewKnowledgeBox(request)
+
+        expected_model_metadata = SemanticModelMetadata(
+            similarity_function=VectorSimilarity.COSINE,
+            vector_dimension=200,
+            default_min_score=1.0,
+        )
+        writer.proc.create_kb.assert_called_once_with(
+            request.slug,
+            request.config,
+            expected_model_metadata,
+            forceuuid="kbid",
+            release_channel=0,
         )
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
 
