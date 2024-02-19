@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+from unittest import mock
 
 import pytest
 from httpx import AsyncClient
@@ -47,11 +48,19 @@ from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import writer_pb2 as wpb
 
 
+@pytest.fixture
+def onprem_nucliadb():
+    with mock.patch("nucliadb.ingest.service.writer.is_onprem_nucliadb") as mocked:
+        mocked.return_value = True
+        yield
+
+
 @pytest.mark.asyncio
 async def test_kb_creation_allows_setting_learning_configuration(
     nucliadb_manager,
     nucliadb_reader,
     learning_config,
+    onprem_nucliadb,
 ):
     # We set this to None to test the case where the user has not
     # defined a learning configuration yet before creating the KB.
