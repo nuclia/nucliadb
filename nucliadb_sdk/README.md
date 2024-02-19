@@ -16,9 +16,31 @@ pip install nucliadb-sdk
 
 ## How to use it?
 
-You can find the auto-generated documentation of the NucliaDB sdk [here](https://docs.nuclia.dev/docs/guides/nucliadb/python_nucliadb_sdk).
+To connect to a Nuclia-hosted NucliaDB instance, just use the `NucliaDB` constructor method with the `api_key`:
 
-Essentially, each method of the `NucliaDB` class maps to an HTTP endpoint of the NucliaDB API. The parameters it accepts correspond to the Pydantic models associated to the request body scheme of the endpoint.
+```python
+from nucliadb_sdk import NucliaDB, Region
+
+ndb = NucliaDB(region=Region.EUROPE1, api_key="my-api-key")
+```
+
+Alternately, to connect to a NucliaDB local installation, use:
+
+```python
+ndb = NucliaDB(region=Region.ON_PREM, api="http://localhost:8080/api")
+```
+
+Then, each method of the `NucliaDB` class maps to an HTTP endpoint of the NucliaDB API. The parameters it accepts correspond to the Pydantic models associated to the request body scheme of the endpoint.
+
+You can use Python's built-in `help` directive to check the list of available methods with their signature:
+
+```python
+from nucliadb_sdk import NucliaDB
+
+help(NucliaDB)
+help(NucliaDB.chat)
+help(NucliaDB.create_resource)
+```
 
 The method-to-endpoint mappings for the sdk are declared in-code [in the _NucliaDBBase class](https://github.com/nuclia/nucliadb/blob/main/nucliadb_sdk/nucliadb_sdk/v2/sdk.py).
 
@@ -126,7 +148,3 @@ After the data is pushed, the NucliaDB SDK could also be used to find answers on
 >>> print(resp.answer)
 'Hakuna matata is actually a phrase in the East African language of Swahili that literally means “no trouble” or “no problems”.'
 ```
-
-## Conclusion
-
-Explore more features and capabilities of the NucliaDB SDK by referring to the [official documentation](https://docs.nuclia.dev/docs/guides/nucliadb/python_nucliadb_sdk). We welcome your feedback and contributions to make this SDK even better!
