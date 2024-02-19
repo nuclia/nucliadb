@@ -1450,7 +1450,7 @@ global___Notification = Notification
 
 @typing_extensions.final
 class Member(google.protobuf.message.Message):
-    """/ The member information."""
+    """The member information."""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
