@@ -180,13 +180,6 @@ class TestWriterServicer:
         with patch("nucliadb.ingest.service.writer.ResourceORM", return_value=mock):
             yield mock
 
-    async def test_GetKnowledgeBox(self, writer):
-        value = Mock()
-        writer.proc.get_kb.return_value = value
-        req = Mock(slug="slug", uuid="uuid")
-
-        assert await writer.GetKnowledgeBox(req, None) is value
-
     async def test_SetVectors(self, writer: WriterServicer, resource):
         request = writer_pb2.SetVectorsRequest(
             kbid="kbid",

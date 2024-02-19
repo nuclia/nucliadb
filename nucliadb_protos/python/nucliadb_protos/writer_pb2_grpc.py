@@ -15,11 +15,6 @@ class WriterStub(object):
         Args:
             channel: A grpc.Channel.
         """
-        self.GetKnowledgeBox = channel.unary_unary(
-                '/fdbwriter.Writer/GetKnowledgeBox',
-                request_serializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxID.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBox.FromString,
-                )
         self.NewKnowledgeBox = channel.unary_unary(
                 '/fdbwriter.Writer/NewKnowledgeBox',
                 request_serializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxNew.SerializeToString,
@@ -39,11 +34,6 @@ class WriterStub(object):
                 '/fdbwriter.Writer/CleanAndUpgradeKnowledgeBoxIndex',
                 request_serializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxID.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_knowledgebox__pb2.CleanedKnowledgeBoxResponse.FromString,
-                )
-        self.ListKnowledgeBox = channel.unary_stream(
-                '/fdbwriter.Writer/ListKnowledgeBox',
-                request_serializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxPrefix.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxID.FromString,
                 )
         self.GCKnowledgeBox = channel.unary_unary(
                 '/fdbwriter.Writer/GCKnowledgeBox',
@@ -195,12 +185,6 @@ class WriterStub(object):
 class WriterServicer(object):
     """Missing associated documentation comment in .proto file."""
 
-    def GetKnowledgeBox(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
     def NewKnowledgeBox(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -220,12 +204,6 @@ class WriterServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def CleanAndUpgradeKnowledgeBoxIndex(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def ListKnowledgeBox(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -412,11 +390,6 @@ class WriterServicer(object):
 
 def add_WriterServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'GetKnowledgeBox': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetKnowledgeBox,
-                    request_deserializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxID.FromString,
-                    response_serializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBox.SerializeToString,
-            ),
             'NewKnowledgeBox': grpc.unary_unary_rpc_method_handler(
                     servicer.NewKnowledgeBox,
                     request_deserializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxNew.FromString,
@@ -436,11 +409,6 @@ def add_WriterServicer_to_server(servicer, server):
                     servicer.CleanAndUpgradeKnowledgeBoxIndex,
                     request_deserializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxID.FromString,
                     response_serializer=nucliadb__protos_dot_knowledgebox__pb2.CleanedKnowledgeBoxResponse.SerializeToString,
-            ),
-            'ListKnowledgeBox': grpc.unary_stream_rpc_method_handler(
-                    servicer.ListKnowledgeBox,
-                    request_deserializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxPrefix.FromString,
-                    response_serializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxID.SerializeToString,
             ),
             'GCKnowledgeBox': grpc.unary_unary_rpc_method_handler(
                     servicer.GCKnowledgeBox,
@@ -598,23 +566,6 @@ class Writer(object):
     """Missing associated documentation comment in .proto file."""
 
     @staticmethod
-    def GetKnowledgeBox(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/GetKnowledgeBox',
-            nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxID.SerializeToString,
-            nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBox.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
     def NewKnowledgeBox(request,
             target,
             options=(),
@@ -679,23 +630,6 @@ class Writer(object):
         return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/CleanAndUpgradeKnowledgeBoxIndex',
             nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxID.SerializeToString,
             nucliadb__protos_dot_knowledgebox__pb2.CleanedKnowledgeBoxResponse.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def ListKnowledgeBox(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_stream(request, target, '/fdbwriter.Writer/ListKnowledgeBox',
-            nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxPrefix.SerializeToString,
-            nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxID.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 

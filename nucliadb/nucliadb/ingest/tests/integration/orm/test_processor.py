@@ -21,16 +21,20 @@ import pytest
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig, SemanticModelMetadata
 from nucliadb_protos.utils_pb2 import VectorSimilarity
 
+from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.tests.fixtures import IngestFixture
 
 
 @pytest.mark.asyncio
-async def test_create_knowledgebox(grpc_servicer: IngestFixture):
-    count = 0
-    async for key in grpc_servicer.servicer.proc.list_kb(""):
-        count += 1
+async def test_create_knowledgebox(
+    grpc_servicer: IngestFixture,
+    maindb_driver: Driver,
+):
+    count = await count_all_kbs(maindb_driver)
     assert count == 0
+
     model = SemanticModelMetadata(
         similarity_function=VectorSimilarity.COSINE,
         vector_dimension=384,
@@ -51,15 +55,19 @@ async def test_create_knowledgebox(grpc_servicer: IngestFixture):
     )
     assert kbid2
 
-    count = 0
-    async for key in grpc_servicer.servicer.proc.list_kb(""):
-        count += 1
+    count = await count_all_kbs(maindb_driver)
     assert count == 2
 
     kbid = await grpc_servicer.servicer.proc.delete_kb(kbid=kbid2)
     assert kbid
 
-    count = 0
-    async for key in grpc_servicer.servicer.proc.list_kb(""):
-        count += 1
+    count = await count_all_kbs(maindb_driver)
     assert count == 1
+
+
+async def count_all_kbs(driver: Driver):
+    count = 0
+    async with driver.transaction(read_only=True) as txn:
+        async for _ in KnowledgeBox.get_kbs(txn, slug=""):
+            count += 1
+    return count

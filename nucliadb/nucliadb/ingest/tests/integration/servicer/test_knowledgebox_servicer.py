@@ -21,10 +21,12 @@
 import pytest
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 
+from nucliadb.common.cluster.manager import KBShardManager
+from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.local import LocalDriver
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.tests.fixtures import IngestFixture
 from nucliadb_protos import knowledgebox_pb2, utils_pb2, writer_pb2, writer_pb2_grpc
-from nucliadb_utils.keys import KB_SHARDS, KB_UUID
 
 
 @pytest.mark.asyncio
@@ -33,21 +35,16 @@ async def test_create_knowledgebox(grpc_servicer: IngestFixture, maindb_driver):
         pytest.skip("There is a bug in the local driver that needs to be fixed")
 
     stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)  # type: ignore
-    pb_prefix = knowledgebox_pb2.KnowledgeBoxPrefix(prefix="")
 
-    count = 0
-    async for _ in stub.ListKnowledgeBox(pb_prefix):  # type: ignore
-        count += 1
-    assert count == 0
+    kbs = await list_kb_shards(maindb_driver)
+    assert len(kbs) == 0
 
     pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test")
     pb.config.title = "My Title"
     result = await stub.NewKnowledgeBox(pb)  # type: ignore
     assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
 
-    pb = knowledgebox_pb2.KnowledgeBoxNew(
-        slug="test",
-    )
+    pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test")
     pb.config.title = "My Title 2"
     result = await stub.NewKnowledgeBox(pb)  # type: ignore
     assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.CONFLICT
@@ -56,11 +53,7 @@ async def test_create_knowledgebox(grpc_servicer: IngestFixture, maindb_driver):
     result = await stub.NewKnowledgeBox(pb)  # type: ignore
     assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
 
-    pb_prefix = knowledgebox_pb2.KnowledgeBoxPrefix(prefix="test")
-    slugs = []
-    async for kpb in stub.ListKnowledgeBox(pb_prefix):  # type: ignore
-        slugs.append(kpb.slug)
-
+    slugs = await list_kb_shards(maindb_driver)
     assert "test" in slugs
     assert "test2" in slugs
 
@@ -68,21 +61,24 @@ async def test_create_knowledgebox(grpc_servicer: IngestFixture, maindb_driver):
     result = await stub.DeleteKnowledgeBox(pbid)  # type: ignore
 
 
+async def list_kb_shards(driver: Driver) -> list[str]:
+    slugs = []
+    async with driver.transaction(read_only=True) as txn:
+        async for _, slug in KnowledgeBox.get_kbs(txn, slug=""):
+            slugs.append(slug)
+    return slugs
+
+
 async def get_kb_shards(txn, kbid) -> PBShards:
-    kb_shards_key = KB_SHARDS.format(kbid=kbid)
-    kb_shards_binary = await txn.get(kb_shards_key)
-    assert kb_shards_binary, "Shards object not found!"
-    kb_shards = PBShards()
-    kb_shards.ParseFromString(kb_shards_binary)
-    return kb_shards
+    shard_manager = KBShardManager()
+    shards = await shard_manager.get_all_shards(txn, kbid)
+    assert shards, "Shards object not found!"
+    return shards
 
 
 async def get_kb_config(txn, kbid) -> knowledgebox_pb2.KnowledgeBoxConfig:
-    key = KB_UUID.format(kbid=kbid)
-    binary = await txn.get(key)
-    assert binary, "Config object not found!"
-    config = knowledgebox_pb2.KnowledgeBoxConfig()
-    config.ParseFromString(binary)
+    config = await KnowledgeBox.get_kb(txn, kbid)
+    assert config, "Config object not found!"
     return config
 
 

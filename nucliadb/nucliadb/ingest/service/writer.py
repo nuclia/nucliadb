@@ -26,10 +26,8 @@ from nucliadb_protos.knowledgebox_pb2 import (
     CleanedKnowledgeBoxResponse,
     DeleteKnowledgeBoxResponse,
     GCKnowledgeBoxResponse,
-    KnowledgeBox,
     KnowledgeBoxID,
     KnowledgeBoxNew,
-    KnowledgeBoxPrefix,
     KnowledgeBoxResponseStatus,
     KnowledgeBoxUpdate,
     Labels,
@@ -135,12 +133,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
     async def finalize(self):
         ...
-
-    async def GetKnowledgeBox(self, request: KnowledgeBoxID, context=None) -> KnowledgeBox:  # type: ignore
-        response: KnowledgeBox = await self.proc.get_kb(
-            slug=request.slug, uuid=request.uuid
-        )
-        return response
 
     async def CleanAndUpgradeKnowledgeBoxIndex(  # type: ignore
         self, request: KnowledgeBoxID, context=None
@@ -329,13 +321,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 exc_info=True,
                 extra={"kbid": kbid},
             )
-
-    async def ListKnowledgeBox(  # type: ignore
-        self, request: KnowledgeBoxPrefix, context=None
-    ) -> AsyncIterator[KnowledgeBoxID]:  # type: ignore
-        async for slug in self.proc.list_kb(request.prefix):
-            uuid = await self.proc.get_kb_uuid(slug)
-            yield KnowledgeBoxID(uuid=uuid, slug=slug)
 
     async def GCKnowledgeBox(  # type: ignore
         self, request: KnowledgeBoxID, context=None
