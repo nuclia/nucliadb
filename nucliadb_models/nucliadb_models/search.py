@@ -20,7 +20,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Type, TypeVar, Union
+from typing import Any, Dict, List, Literal, Optional, Type, TypeVar, Union
 
 from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.audit_pb2 import ClientType
@@ -30,6 +30,7 @@ from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 from pydantic import BaseModel, Field, ValidationError, root_validator, validator
+from typing_extensions import Annotated
 
 from nucliadb_models.common import FieldTypeName, ParamDefault
 from nucliadb_models.metadata import RelationType
@@ -766,8 +767,8 @@ ALLOWED_FIELD_TYPES: dict[str, str] = {
 
 
 class FieldExtensionStrategy(RagStrategy):
-    name: str = Field(RagStrategyName.FIELD_EXTENSION, const=True)
-    fields: list[str] = Field(
+    name: Literal["field_extension"]
+    fields: List[str] = Field(
         title="Fields",
         description="List of field ids to extend the context with. It will try to extend the retrieval context with the specified fields in the matching resources. The field ids have to be in the format `{field_type}/{field_name}`, like 'a/title', 'a/summary' for title and summary fields or 't/amend' for a text field named 'amend'.",  # noqa
         min_items=1,
@@ -803,11 +804,12 @@ class FieldExtensionStrategy(RagStrategy):
 
 
 class FullResourceStrategy(RagStrategy):
-    name: str = Field(RagStrategyName.FULL_RESOURCE, const=True)
+    name: Literal["full_resource"]
 
 
-RagStrategies = Union[FieldExtensionStrategy, FullResourceStrategy]
-
+RagStrategies = Annotated[
+    Union[FieldExtensionStrategy, FullResourceStrategy], Field(discriminator="name")
+]
 PromptContext = dict[str, str]
 PromptContextOrder = dict[str, int]
 
