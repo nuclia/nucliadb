@@ -135,6 +135,7 @@ def test_search(kbid: str, resource_id: str):
             "autofilter": False,
             "page_number": 0,
             "filters": [],
+            "debug": True,
         },
     )
 
@@ -169,7 +170,7 @@ def test_search(kbid: str, resource_id: str):
     print(f"Answer: {chat_answer}")
     print(f"Citations: {citations}")
 
-    assert "Not enough data to answer this" not in chat_answer
+    assert "Not enough data to answer this" not in chat_answer, search_results
     assert len(search_results["resources"]) == 1
 
 
