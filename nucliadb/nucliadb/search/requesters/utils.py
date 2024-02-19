@@ -23,7 +23,7 @@ from typing import Any, Optional, TypeVar, Union, overload
 
 from fastapi import HTTPException
 from grpc import StatusCode as GrpcStatusCode
-from grpc.aio import AioRpcError  # type: ignore
+from grpc.aio import AioRpcError
 from nucliadb_protos.nodereader_pb2 import (
     ParagraphSearchRequest,
     ParagraphSearchResponse,

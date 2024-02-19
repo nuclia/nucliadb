@@ -25,7 +25,7 @@ import nats
 import pytest
 import requests
 from fastapi import FastAPI
-from grpc import aio  # type: ignore
+from grpc import aio
 from httpx import AsyncClient
 from nats.aio.msg import Msg
 from nats.js import api

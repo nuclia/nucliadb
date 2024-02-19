@@ -21,8 +21,7 @@ import json
 import logging
 from typing import Optional
 
-from grpc import aio  # type: ignore
-from grpc import ChannelCredentials
+from grpc import ChannelCredentials, aio
 
 from nucliadb_telemetry.grpc import GRPCTelemetry
 from nucliadb_telemetry.grpc_sentry import SentryInterceptor

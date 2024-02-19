@@ -27,7 +27,7 @@ from unittest.mock import AsyncMock, patch
 
 import nats
 import pytest
-from grpc import aio  # type: ignore
+from grpc import aio
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
 from nucliadb_protos.writer_pb2 import BrokerMessage
 

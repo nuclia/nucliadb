@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from grpc import aio  # type: ignore
+from grpc import aio
 from grpc_health.v1 import health, health_pb2_grpc
 
 from nucliadb_node import SERVICE_NAME

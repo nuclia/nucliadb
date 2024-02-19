@@ -24,7 +24,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from grpc import StatusCode
-from grpc.aio import AioRpcError  # type: ignore
+from grpc.aio import AioRpcError
 from nucliadb_protos.nodewriter_pb2 import (
     IndexMessage,
     IndexMessageSource,

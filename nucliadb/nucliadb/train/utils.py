@@ -19,7 +19,7 @@
 #
 from typing import Optional
 
-from grpc import aio  # type: ignore
+from grpc import aio
 from grpc_health.v1 import health, health_pb2_grpc
 
 from nucliadb.common.maindb.utils import setup_driver, teardown_driver

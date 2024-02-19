@@ -19,7 +19,7 @@
 #
 from typing import Optional
 
-from grpc import aio  # type: ignore
+from grpc import aio
 
 from nucliadb import health
 from nucliadb.ingest import logger

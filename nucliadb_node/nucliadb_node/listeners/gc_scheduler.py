@@ -22,7 +22,7 @@ from functools import partial
 from typing import Optional
 
 from grpc import StatusCode
-from grpc.aio import AioRpcError  # type: ignore
+from grpc.aio import AioRpcError
 from nucliadb_protos.nodewriter_pb2 import GarbageCollectorResponse
 
 from nucliadb_node import logger, signals

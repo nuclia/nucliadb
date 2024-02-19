@@ -21,8 +21,8 @@ import functools
 from typing import Any, Awaitable, Callable, Union
 
 import grpc
-from grpc import ClientCallDetails, aio  # type: ignore
-from grpc.experimental import wrap_server_method_handler  # type: ignore
+from grpc import ClientCallDetails, aio
+from grpc.experimental import wrap_server_method_handler
 
 from nucliadb_telemetry import metrics
 
