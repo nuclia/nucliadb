@@ -21,7 +21,7 @@ import asyncio
 from dataclasses import dataclass
 
 import pkg_resources
-from grpc.aio import AioRpcError
+from grpc.aio import AioRpcError  # noqa
 
 from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.exceptions import ShardsNotFound
