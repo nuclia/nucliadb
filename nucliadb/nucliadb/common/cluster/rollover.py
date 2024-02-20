@@ -151,8 +151,13 @@ async def wait_for_node(app_context: ApplicationContext, node_id: str) -> None:
             const.Streams.INDEX.name, const.Streams.INDEX.group.format(node=node_id)
         )
         if consumer_info.num_pending < 5:
+            logger.info(f"Node is ready to consume messages.", extra={"node": node_id})
             return
-        logger.info("Waiting for node to consume messages", extra={"node": node_id})
+
+        logger.info(
+            f"Waiting for node to consume messages. {consumer_info.num_pending} messages left.",
+            extra={"node": node_id},
+        )
         await asyncio.sleep(2)
 
 
