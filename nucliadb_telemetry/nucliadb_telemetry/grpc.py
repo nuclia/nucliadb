@@ -24,8 +24,8 @@ from contextlib import contextmanager
 from typing import Any, Awaitable, Callable, List, Optional, Tuple
 
 import grpc
-from grpc import ChannelCredentials, ClientCallDetails, aio  # type: ignore
-from grpc.experimental import wrap_server_method_handler  # type: ignore
+from grpc import ChannelCredentials, ClientCallDetails, aio
+from grpc.experimental import wrap_server_method_handler
 from opentelemetry.context import attach, detach
 from opentelemetry.propagate import extract, inject
 from opentelemetry.propagators.textmap import CarrierT, Setter  # type: ignore

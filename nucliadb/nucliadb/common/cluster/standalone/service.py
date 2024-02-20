@@ -19,7 +19,7 @@
 #
 import os
 
-from grpc import aio  # type: ignore
+from grpc import aio
 
 from nucliadb.common.cluster.settings import settings
 from nucliadb.common.cluster.settings import settings as cluster_settings

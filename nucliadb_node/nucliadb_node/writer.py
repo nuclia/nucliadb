@@ -21,7 +21,7 @@ import asyncio
 from typing import Optional
 
 import backoff
-from grpc.aio import AioRpcError  # type: ignore
+from grpc.aio import AioRpcError
 from nucliadb_protos.noderesources_pb2 import (
     EmptyQuery,
     Resource,

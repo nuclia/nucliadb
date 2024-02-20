@@ -20,7 +20,7 @@
 from unittest.mock import patch
 
 import pytest
-from grpc.aio import AioRpcError  # type: ignore
+from grpc.aio import AioRpcError
 
 from nucliadb_telemetry.grpc import GRPCTelemetry
 from nucliadb_telemetry.grpc_sentry import SentryInterceptor
