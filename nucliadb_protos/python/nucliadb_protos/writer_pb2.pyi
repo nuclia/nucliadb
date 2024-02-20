@@ -1739,21 +1739,6 @@ class ResourceIdResponse(google.protobuf.message.Message):
 global___ResourceIdResponse = ResourceIdResponse
 
 @typing_extensions.final
-class ExportRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    KBID_FIELD_NUMBER: builtins.int
-    kbid: builtins.str
-    def __init__(
-        self,
-        *,
-        kbid: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["kbid", b"kbid"]) -> None: ...
-
-global___ExportRequest = ExportRequest
-
-@typing_extensions.final
 class SetVectorsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

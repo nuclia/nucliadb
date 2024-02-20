@@ -160,11 +160,6 @@ class WriterStub(object):
                 request_serializer=nucliadb__protos_dot_writer__pb2.IndexResource.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_writer__pb2.IndexStatus.FromString,
                 )
-        self.Export = channel.unary_stream(
-                '/fdbwriter.Writer/Export',
-                request_serializer=nucliadb__protos_dot_writer__pb2.ExportRequest.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_writer__pb2.BrokerMessage.FromString,
-                )
         self.DownloadFile = channel.unary_stream(
                 '/fdbwriter.Writer/DownloadFile',
                 request_serializer=nucliadb__protos_dot_writer__pb2.FileRequest.SerializeToString,
@@ -358,12 +353,6 @@ class WriterServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def Export(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
     def DownloadFile(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -523,11 +512,6 @@ def add_WriterServicer_to_server(servicer, server):
                     servicer.ReIndex,
                     request_deserializer=nucliadb__protos_dot_writer__pb2.IndexResource.FromString,
                     response_serializer=nucliadb__protos_dot_writer__pb2.IndexStatus.SerializeToString,
-            ),
-            'Export': grpc.unary_stream_rpc_method_handler(
-                    servicer.Export,
-                    request_deserializer=nucliadb__protos_dot_writer__pb2.ExportRequest.FromString,
-                    response_serializer=nucliadb__protos_dot_writer__pb2.BrokerMessage.SerializeToString,
             ),
             'DownloadFile': grpc.unary_stream_rpc_method_handler(
                     servicer.DownloadFile,
@@ -1039,23 +1023,6 @@ class Writer(object):
         return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/ReIndex',
             nucliadb__protos_dot_writer__pb2.IndexResource.SerializeToString,
             nucliadb__protos_dot_writer__pb2.IndexStatus.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def Export(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_stream(request, target, '/fdbwriter.Writer/Export',
-            nucliadb__protos_dot_writer__pb2.ExportRequest.SerializeToString,
-            nucliadb__protos_dot_writer__pb2.BrokerMessage.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 

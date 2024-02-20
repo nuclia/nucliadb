@@ -253,10 +253,6 @@ class WriterStub:
         nucliadb_protos.writer_pb2.IndexResource,
         nucliadb_protos.writer_pb2.IndexStatus,
     ]
-    Export: grpc.UnaryStreamMultiCallable[
-        nucliadb_protos.writer_pb2.ExportRequest,
-        nucliadb_protos.writer_pb2.BrokerMessage,
-    ]
     DownloadFile: grpc.UnaryStreamMultiCallable[
         nucliadb_protos.writer_pb2.FileRequest,
         nucliadb_protos.writer_pb2.BinaryData,
@@ -445,12 +441,6 @@ class WriterServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.writer_pb2.IndexResource,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.IndexStatus: ...
-    @abc.abstractmethod
-    def Export(
-        self,
-        request: nucliadb_protos.writer_pb2.ExportRequest,
-        context: grpc.ServicerContext,
-    ) -> collections.abc.Iterator[nucliadb_protos.writer_pb2.BrokerMessage]: ...
     @abc.abstractmethod
     def DownloadFile(
         self,

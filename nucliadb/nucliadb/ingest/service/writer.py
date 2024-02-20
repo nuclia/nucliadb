@@ -41,7 +41,6 @@ from nucliadb_protos.writer_pb2 import (
     DelEntitiesRequest,
     DelLabelsRequest,
     DelVectorSetRequest,
-    ExportRequest,
     ExtractedVectorsWrapper,
     FileRequest,
     FileUploaded,
@@ -801,16 +800,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         except Exception as e:
             errors.capture_exception(e)
             logger.error("Error in ingest gRPC servicer", exc_info=True)
-            raise
-
-    async def Export(self, request: ExportRequest, context=None):
-        try:
-            async with self.driver.transaction() as txn:
-                kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
-                async for resource in kbobj.iterate_resources():
-                    yield await resource.generate_broker_message()
-        except Exception:
-            logger.exception("Export", stack_info=True)
             raise
 
     async def DownloadFile(self, request: FileRequest, context=None):

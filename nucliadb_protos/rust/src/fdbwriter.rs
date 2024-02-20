@@ -629,11 +629,6 @@ pub struct ResourceIdResponse {
     pub uuid: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ExportRequest {
-    #[prost(string, tag="1")]
-    pub kbid: ::prost::alloc::string::String,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SetVectorsRequest {
     #[prost(message, optional, tag="1")]
     pub vectors: ::core::option::Option<super::utils::VectorObject>,
