@@ -21,7 +21,7 @@ mod state;
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 
-use nucliadb_core::fs_state::{self, Version};
+use crate::data_point_provider::fs_state::{self, Version};
 use state::State;
 
 use crate::data_point::Similarity;

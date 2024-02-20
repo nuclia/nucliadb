@@ -75,7 +75,7 @@ fn main() -> std::io::Result<()> {
     let writer_handler = thread::spawn(move || writer::write_benchmark(batch_size, writer, plotw, vector_it));
 
     let stop = stop_point.clone();
-    let reader = Index::open(&location).unwrap();
+    let reader = Index::open(&location, false).unwrap();
     let no_results = args.neighbours();
     let plotw = PlotWriter::new(args.reader_plot().unwrap());
     let query_it = RandomVectors::new(args.embedding_dim());

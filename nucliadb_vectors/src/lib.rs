@@ -38,7 +38,7 @@ pub enum VectorErr {
     #[error("IO error: {0}")]
     IoErr(#[from] std::io::Error),
     #[error("Error in fs: {0}")]
-    FsError(#[from] nucliadb_core::fs_state::FsError),
+    FsError(#[from] data_point_provider::fs_state::FsError),
     #[error("Garbage collection delayed")]
     WorkDelayed,
     #[error("Several writers are open at the same time ")]

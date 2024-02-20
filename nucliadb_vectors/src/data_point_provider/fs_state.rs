@@ -39,6 +39,7 @@ pub enum FsError {
 
 mod names {
     pub const STATE: &str = "state.bincode";
+    pub const STATE_BAK: &str = "state.bincode.bak";
     pub const TEMP: &str = "temp_state.bincode";
 }
 
@@ -79,6 +80,10 @@ where
 pub fn crnt_version(path: &Path) -> FsResult<Version> {
     let meta = std::fs::metadata(path.join(names::STATE))?;
     Ok(Version(meta.modified()?))
+}
+pub fn backup_state(path: &Path) -> FsResult<()> {
+    std::fs::copy(path.join(names::STATE), path.join(names::STATE_BAK))?;
+    Ok(())
 }
 
 #[cfg(test)]

@@ -18,10 +18,12 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+pub(crate) mod fs_state;
 mod merge_worker;
 mod merger;
 mod segment_manager;
 mod state_v1;
+
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
@@ -33,7 +35,7 @@ use std::time::SystemTime;
 use crossbeam::channel::{self, Receiver};
 pub use merger::Merger;
 use nucliadb_core::tracing::*;
-use nucliadb_core::{fs_state, Channel};
+use nucliadb_core::Channel;
 use serde::{Deserialize, Serialize};
 
 use self::merge_worker::Worker;
@@ -191,7 +193,8 @@ impl Index {
             // Failed to open V2 metadata, try V1
             let migrated_v1 = Self::load_v1_state(path)?;
             if write {
-                // Persist the changes
+                // Make a backup and persist the changes
+                fs_state::backup_state(path)?;
                 migrated_v1.save()?;
             }
             migrated_v1
@@ -397,7 +400,9 @@ mod test {
     use std::thread::{self, sleep};
     use std::time::Duration;
 
-    use nucliadb_core::{fs_state, NodeResult};
+    use nucliadb_core::NodeResult;
+
+    use super::fs_state;
 
     use super::*;
     use crate::data_point::{Elem, LabelDictionary, Similarity};

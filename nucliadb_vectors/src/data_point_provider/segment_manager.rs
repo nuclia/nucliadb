@@ -24,8 +24,8 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{Seek, Write};
 use std::path::{Path, PathBuf};
 
+use super::fs_state::{self, FsResult, Version};
 use fs2::FileExt;
-use nucliadb_core::fs_state::{self, FsResult, Version};
 use serde::{Deserialize, Serialize};
 
 use crate::data_point::{DpId, Journal};

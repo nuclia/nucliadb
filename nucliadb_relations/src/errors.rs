@@ -18,7 +18,6 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use nucliadb_core::fs_state::FsError;
 use tantivy::TantivyError;
 
 #[derive(Debug, thiserror::Error)]
@@ -29,8 +28,6 @@ pub enum RelationsErr {
     BincodeError(#[from] bincode::Error),
     #[error("IO error: {0}")]
     IOError(#[from] std::io::Error),
-    #[error("Disk error: {0}")]
-    DiskError(#[from] FsError),
     #[error("Tantivy error: {0}")]
     TantivyError(#[from] TantivyError),
     #[error("Database is full")]

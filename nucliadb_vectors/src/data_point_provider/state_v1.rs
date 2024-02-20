@@ -22,7 +22,7 @@ use std::collections::{HashMap, LinkedList};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
-use nucliadb_core::fs_state::{self};
+use super::fs_state;
 use serde::{Deserialize, Serialize};
 
 use super::VectorR;
