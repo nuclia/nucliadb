@@ -137,9 +137,9 @@ fn add_batch(batch_no: usize, writer: &mut Index, elems: Vec<(String, Vec<f32>)>
 
     let new_dp =
         DataPoint::new(writer.location(), elems, Some(temporal_mark), similarity, Channel::EXPERIMENTAL).unwrap();
-    let mut tx = writer.transaction();
-    tx.add_segment(new_dp.journal());
-    writer.commit(tx).unwrap();
+    let lock = writer.get_slock().unwrap();
+    writer.add(new_dp, &lock).unwrap();
+    writer.commit(&lock).unwrap();
 }
 
 fn vector_random_subset<T: Clone>(vector: Vec<T>) -> Vec<T> {
@@ -176,7 +176,9 @@ fn create_db(db_location: &Path, index_size: usize, batch_size: usize, vecs: &[R
         let _ = std::io::stdout().flush();
     }
     println!("\nCleaning garbage..");
-    writer.collect_garbage().unwrap();
+    let exclusive = writer.get_elock().unwrap();
+    writer.collect_garbage(&exclusive).unwrap();
+    std::mem::drop(exclusive);
     println!("Garbage cleaned");
     writing_time
 }
@@ -215,14 +217,15 @@ fn test_datapoint(
 
     stats.writing_time = create_db(&db_location, index_size, batch_size, vecs) as u128;
 
-    let reader = Index::open(&db_location, false).unwrap();
+    let reader = Index::open(&db_location).unwrap();
+    let lock = reader.get_slock().unwrap();
 
     for cycle in 0..cycles {
         print!("Unfiltered Search => cycle {} of {}      \r", (cycle + 1), cycles);
         let _ = std::io::stdout().flush();
 
         let (_, elapsed_time) = measure_time!(microseconds {
-            reader.search(unfiltered_request).unwrap();
+            reader.search(unfiltered_request, &lock).unwrap();
         });
         stats.read_time += elapsed_time as u128;
     }
@@ -235,13 +238,14 @@ fn test_datapoint(
         let _ = std::io::stdout().flush();
 
         let (_, elapsed_time) = measure_time!(microseconds {
-            reader.search(filtered_request).unwrap();
+            reader.search(filtered_request, &lock).unwrap();
         });
         stats.tagged_time += elapsed_time as u128;
     }
 
     println!();
     stats.tagged_time /= cycles as u128;
+    std::mem::drop(lock);
     stats
 }
 

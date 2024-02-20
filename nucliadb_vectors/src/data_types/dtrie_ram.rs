@@ -19,17 +19,17 @@
 //
 
 use std::collections::HashMap;
+use std::time::SystemTime;
 
 use serde::{Deserialize, Serialize};
-use std::hash::Hash;
 
 #[derive(Default, Clone, Serialize, Deserialize)]
-pub struct DTrie<T> {
-    value: Option<T>,
-    go_table: HashMap<u8, Box<DTrie<T>>>,
+pub struct DTrie {
+    value: Option<SystemTime>,
+    go_table: HashMap<u8, Box<DTrie>>,
 }
-impl<T: Ord + Copy> DTrie<T> {
-    fn inner_get(&self, key: &[u8], current: Option<T>) -> Option<T> {
+impl DTrie {
+    fn inner_get(&self, key: &[u8], current: Option<SystemTime>) -> Option<SystemTime> {
         let current = std::cmp::max(current, self.value);
         let [head, tail @ ..] = key else {
             return current;
@@ -39,7 +39,7 @@ impl<T: Ord + Copy> DTrie<T> {
         };
         node.inner_get(tail, current)
     }
-    fn inner_prune(&mut self, time: T) -> bool {
+    fn inner_prune(&mut self, time: SystemTime) -> bool {
         self.value = self.value.filter(|v| *v > time);
         self.go_table = std::mem::take(&mut self.go_table)
             .into_iter()
@@ -49,13 +49,10 @@ impl<T: Ord + Copy> DTrie<T> {
             .collect();
         self.value.is_none() && self.go_table.is_empty()
     }
-    pub fn new() -> Self {
-        Self {
-            value: None,
-            go_table: HashMap::default(),
-        }
+    pub fn new() -> DTrie {
+        DTrie::default()
     }
-    pub fn insert(&mut self, key: &[u8], value: T) {
+    pub fn insert(&mut self, key: &[u8], value: SystemTime) {
         match key {
             [] => {
                 self.value = Some(value);
@@ -66,26 +63,18 @@ impl<T: Ord + Copy> DTrie<T> {
             }
         }
     }
-    pub fn get(&self, key: &[u8]) -> Option<T> {
+    pub fn get(&self, key: &[u8]) -> Option<SystemTime> {
         self.inner_get(key, None)
     }
-    pub fn prune(&mut self, time: T) {
+    pub fn prune(&mut self, time: SystemTime) {
         self.inner_prune(time);
-    }
-}
-
-impl<T: Ord + Copy + Hash> DTrie<T> {
-    pub fn convert<U>(&self, mapper: &impl Fn(&T) -> U) -> DTrie<U> {
-        let new = self.value.as_ref().map(mapper);
-        DTrie {
-            value: new,
-            go_table: HashMap::from_iter(self.go_table.iter().map(|(k, v)| (*k, Box::new(v.convert(mapper))))),
-        }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use super::*;
 
     const KEY: &str = "key";
@@ -95,10 +84,10 @@ mod tests {
 
     #[test]
     fn insert_search() {
-        let tplus0 = 0;
-        let tplus1 = 1;
-        let tplus2 = 2;
-        let tplus3 = 3;
+        let tplus0 = SystemTime::now();
+        let tplus1 = tplus0 + Duration::from_secs(1);
+        let tplus2 = tplus0 + Duration::from_secs(2);
+        let tplus3 = tplus0 + Duration::from_secs(3);
 
         // Time matches the prefix order
         let mut trie = DTrie::new();
@@ -144,10 +133,10 @@ mod tests {
     }
     #[test]
     fn prune() {
-        let tplus0 = 0;
-        let tplus1 = 1;
-        let tplus2 = 2;
-        let tplus3 = 3;
+        let tplus0 = SystemTime::now();
+        let tplus1 = tplus0 + Duration::from_secs(1);
+        let tplus2 = tplus0 + Duration::from_secs(2);
+        let tplus3 = tplus0 + Duration::from_secs(3);
 
         let mut trie = DTrie::new();
         trie.insert(KEY.as_bytes(), tplus0);
