@@ -49,15 +49,15 @@ impl State {
         }
         Ok(())
     }
-    pub fn get(&self, index: &str, write: bool) -> VectorR<Option<Index>> {
+    pub fn get(&self, index: &str) -> VectorR<Option<Index>> {
         if self.indexes.contains(index) {
             let location = self.location.join(index);
-            Some(Index::open(&location, write)).transpose()
+            Some(Index::open(&location)).transpose()
         } else {
             Ok(None)
         }
     }
-    pub fn get_or_create<'a, S>(&mut self, index: S, similarity: Similarity, write: bool) -> VectorR<Index>
+    pub fn get_or_create<'a, S>(&mut self, index: S, similarity: Similarity) -> VectorR<Index>
     where
         S: Into<Cow<'a, str>>,
     {
@@ -65,7 +65,7 @@ impl State {
         if self.indexes.contains(index.as_ref()) {
             let index = index.as_ref();
             let location = self.location.join(index);
-            Index::open(&location, write)
+            Index::open(&location)
         } else {
             let index = index.to_string();
             let location = self.location.join(&index);
@@ -92,24 +92,24 @@ mod test {
     fn basic_functionality_test() {
         let dir = TempDir::new().unwrap();
         let mut vectorset = State::new(dir.path().to_path_buf());
-        let _index1 = vectorset.get_or_create("Index1".to_string(), Similarity::Cosine, true).unwrap();
-        let _index2 = vectorset.get_or_create("Index2".to_string(), Similarity::Cosine, true).unwrap();
-        let _index3 = vectorset.get_or_create("Index3".to_string(), Similarity::Cosine, true).unwrap();
-        assert!(vectorset.get("Index1", false).unwrap().is_some());
-        assert!(vectorset.get("Index2", false).unwrap().is_some());
-        assert!(vectorset.get("Index3", false).unwrap().is_some());
-        assert!(vectorset.get("Index4", false).unwrap().is_none());
+        let _index1 = vectorset.get_or_create("Index1".to_string(), Similarity::Cosine).unwrap();
+        let _index2 = vectorset.get_or_create("Index2".to_string(), Similarity::Cosine).unwrap();
+        let _index3 = vectorset.get_or_create("Index3".to_string(), Similarity::Cosine).unwrap();
+        assert!(vectorset.get("Index1").unwrap().is_some());
+        assert!(vectorset.get("Index2").unwrap().is_some());
+        assert!(vectorset.get("Index3").unwrap().is_some());
+        assert!(vectorset.get("Index4").unwrap().is_none());
         vectorset.remove_index("Index1").unwrap();
-        assert!(vectorset.get("Index1", false).unwrap().is_none());
-        assert!(vectorset.get("Index2", false).unwrap().is_some());
-        assert!(vectorset.get("Index3", false).unwrap().is_some());
+        assert!(vectorset.get("Index1").unwrap().is_none());
+        assert!(vectorset.get("Index2").unwrap().is_some());
+        assert!(vectorset.get("Index3").unwrap().is_some());
         vectorset.remove_index("Index2").unwrap();
-        assert!(vectorset.get("Index1", false).unwrap().is_none());
-        assert!(vectorset.get("Index2", false).unwrap().is_none());
-        assert!(vectorset.get("Index3", false).unwrap().is_some());
+        assert!(vectorset.get("Index1").unwrap().is_none());
+        assert!(vectorset.get("Index2").unwrap().is_none());
+        assert!(vectorset.get("Index3").unwrap().is_some());
         vectorset.remove_index("Index3").unwrap();
-        assert!(vectorset.get("Index1", false).unwrap().is_none());
-        assert!(vectorset.get("Index2", false).unwrap().is_none());
-        assert!(vectorset.get("Index3", false).unwrap().is_none());
+        assert!(vectorset.get("Index1").unwrap().is_none());
+        assert!(vectorset.get("Index2").unwrap().is_none());
+        assert!(vectorset.get("Index3").unwrap().is_none());
     }
 }

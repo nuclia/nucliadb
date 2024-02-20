@@ -35,6 +35,7 @@ use nucliadb_procs::measure;
 use crate::data_point::{DataPoint, Elem, LabelDictionary};
 use crate::data_point_provider::*;
 use crate::indexset::{IndexKeyCollector, IndexSet};
+use crate::VectorErr;
 
 impl IndexKeyCollector for Vec<String> {
     fn add_key(&mut self, key: String) {
@@ -63,7 +64,8 @@ impl VectorWriter for VectorWriterService {
 
         let id: Option<String> = None;
         let mut collector = Vec::new();
-        self.indexset.index_keys(&mut collector);
+        let indexset_slock = self.indexset.get_slock()?;
+        self.indexset.index_keys(&mut collector, &indexset_slock);
 
         let took = time.elapsed().as_secs_f64();
         debug!("{id:?} - Ending at {took} ms");
@@ -80,8 +82,9 @@ impl VectorWriter for VectorWriterService {
         let set = &setid.vectorset;
         let indexid = setid.vectorset.as_str();
         let similarity = similarity.into();
-        self.indexset.get_or_create(indexid, similarity, true)?;
-        self.indexset.commit()?;
+        let indexset_elock = self.indexset.get_elock()?;
+        self.indexset.get_or_create(indexid, similarity, &indexset_elock)?;
+        self.indexset.commit(indexset_elock)?;
 
         let took = time.elapsed().as_secs_f64();
         debug!("{id:?}/{set} - Ending at {took} ms");
@@ -97,8 +100,9 @@ impl VectorWriter for VectorWriterService {
         let id = setid.shard.as_ref().map(|s| &s.id);
         let set = &setid.vectorset;
         let indexid = &setid.vectorset;
-        self.indexset.remove_index(indexid)?;
-        self.indexset.commit()?;
+        let indexset_elock = self.indexset.get_elock()?;
+        self.indexset.remove_index(indexid, &indexset_elock)?;
+        self.indexset.commit(indexset_elock)?;
 
         let took = time.elapsed().as_secs_f64();
         debug!("{id:?}/{set} - Ending at {took} ms");
@@ -112,7 +116,9 @@ impl VectorWriter for VectorWriterService {
         let time = Instant::now();
 
         let id: Option<String> = None;
-        let no_nodes = self.index.no_nodes()?;
+        let lock = self.index.get_slock()?;
+        let no_nodes = self.index.no_nodes(&lock);
+        std::mem::drop(lock);
 
         let took = time.elapsed().as_secs_f64();
         debug!("{id:?} - Ending at {took} ms");
@@ -126,10 +132,10 @@ impl VectorWriter for VectorWriterService {
         let time = Instant::now();
 
         let id = Some(&resource_id.shard_id);
-
-        let mut tx = self.index.transaction();
-        tx.delete_entry(resource_id.uuid.clone());
-        self.index.commit(tx)?;
+        let temporal_mark = TemporalMark::now();
+        let lock = self.index.get_slock()?;
+        self.index.delete(&resource_id.uuid, temporal_mark, &lock);
+        self.index.commit(&lock)?;
 
         let took = time.elapsed().as_secs_f64();
         debug!("{id:?} - Ending at {took} ms");
@@ -194,12 +200,12 @@ impl VectorWriter for VectorWriterService {
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Datapoint creation: ends {v} ms");
 
+        let lock = self.index.get_slock()?;
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Processing Sentences to delete: starts {v} ms");
 
-        let mut tx = self.index.transaction();
         for to_delete in &resource.sentences_to_delete {
-            tx.delete_entry(to_delete.to_string())
+            self.index.delete(to_delete, temporal_mark, &lock)
         }
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Processing Sentences to delete: ends {v} ms");
@@ -207,11 +213,11 @@ impl VectorWriter for VectorWriterService {
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Indexing datapoint: starts {v} ms");
 
-        if let Some(dp) = new_dp {
-            tx.add_segment(dp.journal());
+        match new_dp.map(|i| self.index.add(i, &lock)).unwrap_or(Ok(())) {
+            Ok(_) => self.index.commit(&lock)?,
+            Err(e) => tracing::error!("{id:?}/default could insert vectors: {e:?}"),
         }
-        self.index.commit(tx)?;
-
+        std::mem::drop(lock);
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Indexing datapoint: ends {v} ms");
 
@@ -220,16 +226,20 @@ impl VectorWriter for VectorWriterService {
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Delete requests for indexes in the set: starts {v} ms");
 
-        let index_iter =
-            resource.vectors_to_delete.iter().flat_map(|(k, v)| self.indexset.get(k, true).transpose().map(|i| (v, i)));
+        let indexset_slock = self.indexset.get_slock()?;
+        let index_iter = resource
+            .vectors_to_delete
+            .iter()
+            .flat_map(|(k, v)| self.indexset.get(k, &indexset_slock).transpose().map(|i| (v, i)));
         for (vectorlist, index) in index_iter {
-            let mut tx = self.index.transaction();
             let mut index = index?;
+            let index_lock = index.get_slock()?;
             vectorlist.vectors.iter().for_each(|vector| {
-                tx.delete_entry(vector.to_string());
+                index.delete(vector, temporal_mark, &index_lock);
             });
-            index.commit(tx)?;
+            index.commit(&index_lock)?;
         }
+        std::mem::drop(indexset_slock);
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Delete requests for indexes in the set: ends {v} ms");
 
@@ -238,13 +248,14 @@ impl VectorWriter for VectorWriterService {
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Creating and geting indexes in the set: starts {v} ms");
 
+        let indexset_elock = self.indexset.get_elock()?;
         let indexes = resource
             .vectors
             .keys()
-            .map(|k| (k, self.indexset.get(k, true)))
+            .map(|k| (k, self.indexset.get(k, &indexset_elock)))
             .map(|(key, index)| index.map(|index| (key, index)))
             .collect::<Result<HashMap<_, _>, _>>()?;
-        self.indexset.commit()?;
+        self.indexset.commit(indexset_elock)?;
 
         // Inner indexes are updated
         for (index_key, mut index) in indexes.into_iter().flat_map(|i| i.1.map(|j| (i.0, j))) {
@@ -264,9 +275,11 @@ impl VectorWriter for VectorWriterService {
                 let similarity = index.metadata().similarity;
                 let location = index.location();
                 let new_dp = DataPoint::new(location, elems, Some(temporal_mark), similarity, self.channel)?;
-                let mut tx = self.index.transaction();
-                tx.add_segment(new_dp.journal());
-                index.commit(tx)?;
+                let lock = index.get_slock()?;
+                match index.add(new_dp, &lock) {
+                    Ok(_) => index.commit(&lock)?,
+                    Err(e) => tracing::error!("Could not insert at {id:?}/{index_key}: {e:?}"),
+                }
             }
         }
         let v = time.elapsed().as_millis();
@@ -286,7 +299,15 @@ impl VectorWriter for VectorWriterService {
     fn garbage_collection(&mut self) -> NodeResult<()> {
         let time = Instant::now();
 
-        self.index.collect_garbage()?;
+        let lock = match self.index.try_elock() {
+            Ok(lock) => lock,
+            Err(VectorErr::FsError(fs_error)) => {
+                warn!("Garbage collection error: {fs_error}");
+                return Err(VectorErr::WorkDelayed.into());
+            }
+            Err(error) => return NodeResult::Err(error.into()),
+        };
+        self.index.collect_garbage(&lock)?;
 
         let took = time.elapsed().as_secs_f64();
         debug!("Garbage collection {took} ms");
@@ -295,7 +316,7 @@ impl VectorWriter for VectorWriterService {
     }
 
     fn get_segment_ids(&self) -> NodeResult<Vec<String>> {
-        let mut seg_ids = self.get_segment_ids_for_vectorset(&self.index.location().to_path_buf())?;
+        let mut seg_ids = self.get_segment_ids_for_vectorset(&self.index.location)?;
         let vectorsets = self.list_vectorsets()?;
         for vs in vectorsets {
             let vs_seg_ids = self.get_segment_ids_for_vectorset(&self.config.vectorset.join(vs))?;
@@ -312,7 +333,7 @@ impl VectorWriter for VectorWriterService {
 
         let mut files = Vec::new();
 
-        for segment_id in self.get_segment_ids_for_vectorset(&self.index.location().to_path_buf())? {
+        for segment_id in self.get_segment_ids_for_vectorset(&self.index.location)? {
             if ignored_segment_ids.contains(&segment_id) {
                 continue;
             }
@@ -320,7 +341,7 @@ impl VectorWriter for VectorWriterService {
             files.push(format!("vectors/{}/journal.json", segment_id));
             files.push(format!("vectors/{}/nodes.kv", segment_id));
 
-            let fst_path = self.index.location().join(format!("{}/fst", segment_id));
+            let fst_path = self.index.location.join(format!("{}/fst", segment_id));
             if fst_path.exists() {
                 files.push(format!("vectors/{}/fst/keys.fst", segment_id));
                 files.push(format!("vectors/{}/fst/labels.fst", segment_id));
@@ -435,7 +456,7 @@ impl VectorWriterService {
             Err(node_error!("Shard does not exist".to_string()))
         } else {
             Ok(VectorWriterService {
-                index: Index::open(path, true)?,
+                index: Index::open(path)?,
                 indexset: IndexSet::new(indexset)?,
                 channel: config.channel,
                 config: config.clone(),

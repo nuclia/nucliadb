@@ -21,16 +21,16 @@ use std::path::PathBuf;
 
 use crossbeam::channel::Sender;
 use nucliadb_core::tracing::*;
-use nucliadb_core::Channel;
+use nucliadb_core::{fs_state, Channel};
 
 use super::merger::{MergeQuery, MergeRequest};
-use super::segment_manager::{SegmentManager, Transaction};
-use crate::data_point::{DataPoint, Similarity};
+use super::State;
+use crate::data_point::{DataPoint, Journal, Similarity};
 use crate::VectorR;
 
 pub(crate) struct Worker {
     location: PathBuf,
-    sender: Sender<Transaction>,
+    sender: Sender<Journal>,
     similarity: Similarity,
     channel: Channel,
 }
@@ -42,7 +42,7 @@ impl MergeQuery for Worker {
 impl Worker {
     pub(crate) fn request(
         location: PathBuf,
-        sender: Sender<Transaction>,
+        sender: Sender<Journal>,
         similarity: Similarity,
         channel: Channel,
     ) -> MergeRequest {
@@ -55,27 +55,22 @@ impl Worker {
     }
     fn work(&self) -> VectorR<()> {
         let subscriber = self.location.as_path();
+        let _lock = fs_state::shared_lock(subscriber)?;
         info!("{subscriber:?} is ready to perform a merge");
-        let sm = SegmentManager::open(subscriber.to_path_buf())?;
-        let work = sm
-            .segment_iterator()
-            .map(|(dlog, dpid)| (dlog, DataPoint::open(&self.location, dpid).unwrap()))
-            .collect::<Vec<_>>();
-
-        let new_dp = DataPoint::merge(subscriber, work.iter(), self.similarity, self.channel)?;
-
-        let mut transaction = Transaction::default();
-        for (_, dp) in work {
-            transaction.delete_segment(dp.journal());
-        }
-        transaction.add_segment(new_dp.journal());
-
-        if self.sender.send(transaction).is_err() {
+        let state: State = fs_state::load_state(subscriber)?;
+        let Some(work) = state.current_work_unit().map(|work| {
+            work.iter().rev().map(|journal| (state.delete_log(*journal), journal.id())).collect::<Vec<_>>()
+        }) else {
+            return Ok(());
+        };
+        let new_dp = DataPoint::merge(subscriber, &work, self.similarity, self.channel)?;
+        let new_dp_id = new_dp.get_id();
+        if self.sender.send(new_dp.journal()).is_err() {
             // If the sender has been deallocated this data point becomes garbage,
             // therefore is removed.
             DataPoint::delete(subscriber, new_dp.get_id())?;
         }
-        info!("Merge request completed: {}", new_dp.get_id());
+        info!("Merge request completed: {new_dp_id}");
         Ok(())
     }
 }

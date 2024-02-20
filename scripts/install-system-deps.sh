@@ -20,13 +20,12 @@ if [ "$machine" == "linux" ]; then
 	case $ID in
 	debian | ubuntu | mint)
 		$SUDO apt-get -y update
-		$SUDO apt-get install -y libdw-dev pkg-config libssl-dev cpanminus
-		$SUDO cpanm IPC::Cmd
+		$SUDO apt-get install -y libdw-dev pkg-config libssl-dev
 		;;
 
 	fedora | rhel | centos)
 		$SUDO yum update -y
-		$SUDO yum -y install elfutils-devel pkgconfig openssl-devel perl-IPC-Cmd
+		$SUDO yum -y install elfutils-devel pkgconfig openssl-devel
 		;;
 
 	*)
