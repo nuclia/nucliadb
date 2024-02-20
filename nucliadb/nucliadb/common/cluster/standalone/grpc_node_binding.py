@@ -50,7 +50,6 @@ from nucliadb_protos.noderesources_pb2 import (
 )
 from nucliadb_protos.noderesources_pb2 import Shard as NodeResourcesShard
 from nucliadb_protos.noderesources_pb2 import (
-    ShardCleaned,
     ShardCreated,
     ShardId,
     ShardIds,
@@ -329,18 +328,6 @@ class StandaloneWriterWrapper:
         shard_ids.ParseFromString(pb_bytes)
         return shard_ids
 
-    async def CleanAndUpgradeShard(self, request: ShardId) -> ShardCleaned:
-        loop = asyncio.get_running_loop()
-        resp = await loop.run_in_executor(
-            self.executor,
-            self.writer.clean_and_upgrade_shard,
-            request.SerializeToString(),
-        )
-        pb_bytes = bytes(resp)
-        resp = ShardCleaned()
-        resp.ParseFromString(pb_bytes)
-        return resp
-
     async def RemoveVectorSet(self, request: VectorSetID):
         loop = asyncio.get_running_loop()
         resp = await loop.run_in_executor(
@@ -416,7 +403,6 @@ WRITER_METHODS = {
     "NewShard": (ShardMetadata, ShardCreated),
     "DeleteShard": (ShardId, ShardId),
     "ListShards": (EmptyQuery, ShardIds),
-    "CleanAndUpgradeShard": (ShardId, ShardCleaned),
     "RemoveVectorSet": (VectorSetID, OpStatus),
     "AddVectorSet": (VectorSetID, OpStatus),
     "ListVectorSets": (ShardId, VectorSetList),

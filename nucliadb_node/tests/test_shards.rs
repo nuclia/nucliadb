@@ -163,16 +163,6 @@ async fn test_delete_shards(
 
     let request_ids = create_shards(&mut writer, 5, release_channel).await;
 
-    // XXX why are we doing this?
-    for id in request_ids.iter().cloned() {
-        _ = writer
-            .clean_and_upgrade_shard(Request::new(ShardId {
-                id,
-            }))
-            .await
-            .expect("Error in new_shard request");
-    }
-
     for (id, expected) in request_ids.iter().map(|v| (v.clone(), v.clone())) {
         let response = writer
             .delete_shard(Request::new(ShardId {

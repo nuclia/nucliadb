@@ -111,15 +111,6 @@ impl NodeWriter {
         }
     }
 
-    pub fn clean_and_upgrade_shard<'p>(&mut self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let shard_id = ShardId::decode(&mut Cursor::new(shard_id)).expect("Error decoding arguments");
-        let upgraded = self.shards.upgrade(&shard_id.id);
-        match upgraded {
-            Ok(upgrade_details) => Ok(PyList::new(py, upgrade_details.encode_to_vec())),
-            Err(error) => Err(IndexNodeException::new_err(error.to_string())),
-        }
-    }
-
     pub fn list_shards<'p>(&mut self, py: Python<'p>) -> PyResult<&'p PyAny> {
         let entries = fs::read_dir(self.shards.shards_path.clone())?;
         let mut shard_ids = Vec::new();

@@ -253,18 +253,6 @@ class DeleteKnowledgeBoxResponse(google.protobuf.message.Message):
 global___DeleteKnowledgeBoxResponse = DeleteKnowledgeBoxResponse
 
 @typing_extensions.final
-class CleanedKnowledgeBoxResponse(google.protobuf.message.Message):
-    """Clean Index"""
-
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    def __init__(
-        self,
-    ) -> None: ...
-
-global___CleanedKnowledgeBoxResponse = CleanedKnowledgeBoxResponse
-
-@typing_extensions.final
 class Label(google.protobuf.message.Message):
     """Labels on a Knowledge Box"""
 

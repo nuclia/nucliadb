@@ -19,7 +19,6 @@ from nucliadb_protos.noderesources_pb2 import (
     ResourceID as ResourceID,
     SentenceMetadata as SentenceMetadata,
     Shard as Shard,
-    ShardCleaned as ShardCleaned,
     ShardCreated as ShardCreated,
     ShardId as ShardId,
     ShardIds as ShardIds,
@@ -35,10 +34,6 @@ class NodeWriterStub:
     NewShard: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.nodewriter_pb2.NewShardRequest,
         nucliadb_protos.noderesources_pb2.ShardCreated,
-    ]
-    CleanAndUpgradeShard: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.noderesources_pb2.ShardId,
-        nucliadb_protos.noderesources_pb2.ShardCleaned,
     ]
     DeleteShard: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.noderesources_pb2.ShardId,
@@ -84,12 +79,6 @@ class NodeWriterServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.nodewriter_pb2.NewShardRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.noderesources_pb2.ShardCreated: ...
-    @abc.abstractmethod
-    def CleanAndUpgradeShard(
-        self,
-        request: nucliadb_protos.noderesources_pb2.ShardId,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.noderesources_pb2.ShardCleaned: ...
     @abc.abstractmethod
     def DeleteShard(
         self,

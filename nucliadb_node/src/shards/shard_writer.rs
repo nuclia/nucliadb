@@ -148,36 +148,6 @@ impl ShardWriter {
             i => panic!("Unknown relation version {i}"),
         }
     }
-    pub fn clean_and_create(metadata: Arc<ShardMetadata>) -> NodeResult<ShardWriter> {
-        let path = metadata.shard_path();
-        std::fs::remove_dir_all(path.clone())?;
-        std::fs::create_dir(path.clone())?;
-        let tsc = TextConfig {
-            path: path.clone().join(TEXTS_DIR),
-        };
-
-        let psc = ParagraphConfig {
-            path: path.clone().join(PARAGRAPHS_DIR),
-        };
-
-        let channel = metadata.channel();
-
-        let vsc = VectorConfig {
-            similarity: Some(metadata.similarity()),
-            path: path.clone().join(VECTORS_DIR),
-            vectorset: path.clone().join(VECTORSET_DIR),
-            channel,
-        };
-        let rsc = RelationConfig {
-            path: path.clone().join(RELATIONS_DIR),
-            channel,
-        };
-        let shard_metadata = Arc::clone(&metadata);
-        let sw = ShardWriter::initialize(shard_metadata, tsc, psc, vsc, rsc)?;
-        metadata.new_generation_id();
-
-        Ok(sw)
-    }
 
     #[measure(actor = "shard", metric = "new")]
     pub fn new(metadata: Arc<ShardMetadata>) -> NodeResult<ShardWriter> {

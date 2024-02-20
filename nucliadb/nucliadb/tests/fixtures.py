@@ -723,7 +723,7 @@ async def maybe_cleanup_maindb():
         try:
             await cleanup_maindb(driver)
         except Exception:
-            logger.error(f"Could not cleanup maindb on test teardown")
+            logger.error("Could not cleanup maindb on test teardown")
             pass
 
 

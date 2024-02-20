@@ -22,7 +22,6 @@ else:
     import typing_extensions
 from nucliadb_protos.knowledgebox_pb2 import (
     CONFLICT as CONFLICT,
-    CleanedKnowledgeBoxResponse as CleanedKnowledgeBoxResponse,
     DeleteKnowledgeBoxResponse as DeleteKnowledgeBoxResponse,
     DeletedEntitiesGroups as DeletedEntitiesGroups,
     ERROR as ERROR,
@@ -64,7 +63,6 @@ from nucliadb_protos.noderesources_pb2 import (
     ResourceID as ResourceID,
     SentenceMetadata as SentenceMetadata,
     Shard as Shard,
-    ShardCleaned as ShardCleaned,
     ShardCreated as ShardCreated,
     ShardId as ShardId,
     ShardIds as ShardIds,
