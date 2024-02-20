@@ -112,3 +112,14 @@ def test_iter_filter_labels_expression():
     assert list(
         iter_filter_labels_expression({"not": {"and": [literal, literal]}})
     ) == ["foo", "foo"]
+
+
+def test_filters_model():
+    f = Filter(all=["foo", "bar"], any=None)
+    assert f.all == ["foo", "bar"]
+    assert f.any is None
+    assert f.none is None
+    assert f.not_all is None
+
+    with pytest.raises(ValueError):
+        Filter(all=["foo"], any=["bar"])

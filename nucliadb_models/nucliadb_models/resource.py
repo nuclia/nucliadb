@@ -55,7 +55,11 @@ from nucliadb_models.metadata import (
 from nucliadb_models.security import ResourceSecurity
 from nucliadb_models.text import FieldText
 from nucliadb_models.utils import SlugString
-from nucliadb_models.vectors import SemanticModelMetadata, UserVectorSet
+from nucliadb_models.vectors import (
+    SemanticModelMetadata,
+    UserVectorSet,
+    VectorSimilarity,
+)
 
 _T = TypeVar("_T")
 
@@ -124,6 +128,11 @@ class KnowledgeBoxConfig(BaseModel):
         default=None,
         title="Learning Configuration",
         description="Learning configuration for the Knowledge Box. If provided, NucliaDB will set the learning configuration for the Knowledge Box.",  # noqa: E501
+    )
+
+    similarity: Optional[VectorSimilarity] = Field(
+        default=None,
+        description="This field is deprecated. Use 'learning_configuration' instead.",
     )
 
     @validator("slug")
