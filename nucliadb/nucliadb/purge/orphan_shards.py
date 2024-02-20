@@ -33,7 +33,6 @@ from nucliadb.ingest import logger
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.logs import setup_logging
-from nucliadb_utils.settings import running_settings
 
 
 @dataclass
@@ -183,8 +182,7 @@ async def main():
     try:
         orphan_shards = await detect_orphan_shards(driver)
         logger.info(f"Orphan shards detect found {len(orphan_shards)} orphans")
-        if running_settings.debug:
-            await report_orphan_shards(orphan_shards, driver)
+        await report_orphan_shards(orphan_shards, driver)
     finally:
         await teardown_driver()
         await teardown_cluster()
