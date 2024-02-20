@@ -29,22 +29,17 @@ from typing import TYPE_CHECKING, Any, Optional, TypeVar
 import aiohttp
 import backoff
 import jwt
-from async_lru import alru_cache
-from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxID  # type: ignore
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.resources_pb2 import FieldFile as FieldFilePB
-from nucliadb_protos.writer_pb2 import GetConfigurationResponse, OpStatusWriter
 from pydantic import BaseModel, Field
 
 import nucliadb_models as models
-from nucliadb_models.configuration import KBConfiguration
 from nucliadb_models.resource import QueueType
 from nucliadb_telemetry import metrics
-from nucliadb_utils import const
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.settings import nuclia_settings, storage_settings
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import Utility, get_ingest, has_feature, set_utility
+from nucliadb_utils.utilities import Utility, set_utility
 
 logger = logging.getLogger(__name__)
 
@@ -115,8 +110,6 @@ class PushPayload(BaseModel):
         default_factory=models.PushProcessingOptions
     )
 
-    learning_config: Optional[KBConfiguration] = None
-
 
 class PushResponse(BaseModel):
     seqid: Optional[int] = None
@@ -131,7 +124,6 @@ async def start_processing_engine():
             nuclia_zone=nuclia_settings.nuclia_zone,
             onprem=nuclia_settings.onprem,
             nuclia_jwt_key=nuclia_settings.nuclia_jwt_key,
-            nuclia_cluster_url=nuclia_settings.nuclia_cluster_url,
             nuclia_processing_cluster_url=nuclia_settings.nuclia_processing_cluster_url,
             nuclia_public_url=nuclia_settings.nuclia_public_url,
             driver=storage_settings.file_backend,
@@ -147,7 +139,6 @@ class ProcessingEngine:
         nuclia_service_account: Optional[str] = None,
         nuclia_zone: Optional[str] = None,
         nuclia_public_url: Optional[str] = None,
-        nuclia_cluster_url: Optional[str] = None,
         nuclia_processing_cluster_url: Optional[str] = None,
         onprem: Optional[bool] = False,
         nuclia_jwt_key: Optional[str] = None,
@@ -163,11 +154,6 @@ class ProcessingEngine:
         else:
             self.nuclia_public_url = None
 
-        if nuclia_cluster_url is not None:
-            self.nuclia_cluster_url: Optional[str] = nuclia_cluster_url
-        else:
-            self.nuclia_cluster_url = None
-
         self.onprem = onprem
         if self.onprem:
             self.nuclia_upload_url = (
@@ -175,16 +161,12 @@ class ProcessingEngine:
             )
         else:
             self.nuclia_upload_url = (
-                f"{self.nuclia_cluster_url}/api/v1/processing/upload"
+                f"{nuclia_processing_cluster_url}/api/v1/processing/upload"
             )
-        self.nuclia_internal_push = (
-            f"{self.nuclia_cluster_url}/api/internal/processing/push"
-        )
         self.nuclia_internal_push_v2 = (
-            f"{nuclia_processing_cluster_url}/api/internal/v2/processing/push"
+            f"{nuclia_processing_cluster_url}/api/v2/internal/processing/push"
         )
-        self.nuclia_internal_delete = f"{nuclia_processing_cluster_url}/api/internal/v2/processing/delete-requests"
-        self.nuclia_external_push = f"{self.nuclia_public_url}/api/v1/processing/push"
+        self.nuclia_internal_delete = f"{nuclia_processing_cluster_url}/api/v2/internal/processing/delete-requests"
         self.nuclia_external_push_v2 = (
             f"{self.nuclia_public_url}/api/v2/processing/push"
         )
@@ -212,19 +194,6 @@ class ProcessingEngine:
 
     async def finalize(self):
         await self.session.close()
-
-    @alru_cache(maxsize=None)
-    async def get_configuration(self, kbid: str) -> Optional[KBConfiguration]:
-        if self.onprem is False:
-            return None
-
-        ingest = get_ingest()
-        kb_obj = KnowledgeBoxID()
-        kb_obj.uuid = kbid
-        pb_response: GetConfigurationResponse = await ingest.GetConfiguration(kb_obj)  # type: ignore
-        if pb_response.status.status != OpStatusWriter.Status.OK:
-            return None
-        return KBConfiguration.from_message(pb_response.config)
 
     def generate_file_token_from_cloudfile(self, cf: CloudFile) -> str:
         if self.nuclia_jwt_key is None:
@@ -276,7 +245,12 @@ class ProcessingEngine:
         }
         return jwt.encode(payload, self.nuclia_jwt_key, algorithm="HS256")
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=MAX_TRIES)
+    @backoff.on_exception(
+        backoff.expo,
+        RETRIABLE_EXCEPTIONS,
+        jitter=backoff.random_jitter,
+        max_tries=MAX_TRIES,
+    )
     @processing_observer.wrap({"type": "file_field_upload"})
     async def convert_filefield_to_str(self, file: models.FileField) -> str:
         # Upload file without storing on Nuclia DB
@@ -327,7 +301,12 @@ class ProcessingEngine:
         }
         return jwt.encode(payload, self.nuclia_jwt_key, algorithm="HS256")
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=MAX_TRIES)
+    @backoff.on_exception(
+        backoff.expo,
+        RETRIABLE_EXCEPTIONS,
+        jitter=backoff.random_jitter,
+        max_tries=MAX_TRIES,
+    )
     @processing_observer.wrap({"type": "file_field_upload_internal"})
     async def convert_internal_filefield_to_str(
         self, file: FieldFilePB, storage: Storage
@@ -365,7 +344,12 @@ class ProcessingEngine:
                     raise Exception(f"STATUS: {resp.status} - {text}")
         return jwttoken
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=MAX_TRIES)
+    @backoff.on_exception(
+        backoff.expo,
+        RETRIABLE_EXCEPTIONS,
+        jitter=backoff.random_jitter,
+        max_tries=MAX_TRIES,
+    )
     @processing_observer.wrap({"type": "cloud_file_upload"})
     async def convert_internal_cf_to_str(self, cf: CloudFile, storage: Storage) -> str:
         if self.onprem is False:
@@ -397,7 +381,12 @@ class ProcessingEngine:
 
         return jwttoken
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=MAX_TRIES)
+    @backoff.on_exception(
+        backoff.expo,
+        RETRIABLE_EXCEPTIONS,
+        jitter=backoff.random_jitter,
+        max_tries=MAX_TRIES,
+    )
     async def send_to_process(
         self, item: PushPayload, partition: int
     ) -> ProcessingInfo:
@@ -406,34 +395,17 @@ class ProcessingEngine:
             headers = {"CONTENT-TYPE": "application/json"}
             if self.onprem is False:
                 # Upload the payload
-                url = self.nuclia_internal_push
-                if has_feature(
-                    const.Features.PROCESSING_V2,
-                    context={
-                        "kbid": item.kbid,
-                    },
-                ):
-                    url = self.nuclia_internal_push_v2
                 item.partition = partition
                 resp = await self.session.post(
-                    url=url, data=item.json(), headers=headers
+                    url=self.nuclia_internal_push_v2, data=item.json(), headers=headers
                 )
             else:
-                url = self.nuclia_external_push + "?partition=" + str(partition)
-                if has_feature(
-                    const.Features.PROCESSING_V2,
-                    context={
-                        "kbid": item.kbid,
-                    },
-                ):
-                    url = self.nuclia_external_push_v2
-                item.learning_config = await self.get_configuration(item.kbid)
                 headers.update(
                     {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
                 )
                 # Upload the payload
                 resp = await self.session.post(
-                    url=url, data=item.json(), headers=headers
+                    url=self.nuclia_external_push_v2, data=item.json(), headers=headers
                 )
             if resp.status == 200:
                 data = await resp.json()
@@ -485,10 +457,11 @@ class ProcessingEngine:
             url = self.nuclia_external_delete
             headers.update({"X-NUCLIA-NUAKEY": f"Bearer {self.nuclia_service_account}"})
 
-        resp = await self.session.post(url=url, data=data, headers=headers)
+        resp = await self.session.post(url=url, json=data, headers=headers)
         if resp.status != 200:
             logger.warning(
-                "Error deleting from processing", extra={"status": resp.status}
+                "Error deleting from processing",
+                extra={"status": resp.status, "text": await resp.text()},
             )
 
 
@@ -534,8 +507,6 @@ class DummyProcessingEngine(ProcessingEngine):
         self, item: PushPayload, partition: int
     ) -> ProcessingInfo:
         self.calls.append([item, partition])
-        item.learning_config = await self.get_configuration(item.kbid)
-
         self.values["send_to_process"].append([item, partition])
         return ProcessingInfo(
             seqid=len(self.calls), account_seq=0, queue=QueueType.SHARED

@@ -21,6 +21,7 @@ mod noop;
 mod prometheus;
 
 pub use noop::NoOpMeter;
+#[cfg(any(prometheus_metrics, test))]
 pub use prometheus::PrometheusMeter;
 
 use crate::metrics::metric::grpc_ops::{GrpcOpKey, GrpcOpValue};

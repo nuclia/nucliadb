@@ -4,6 +4,7 @@ env:
   CONTAINER_REGISTRY: eu.gcr.io/${{ secrets.PROJECT_ID }}
   TESTING_TIKV_LOCAL: "true"
 permissions:
+  id-token: write   # This is required for requesting the JWT
   contents: write
 on:
   pull_request:
@@ -94,7 +95,7 @@ jobs:
           retry_on: error
           timeout_minutes: 10
           command: |
-            pytest -rfE --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json  --shard-id=0 --num-shards=3 nucliadb/nucliadb/tests
+            make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=0 --num-shards=3"
 
       - name: Run PG tests 2/3
         # These tests can be flaky, let's retry them...
@@ -107,7 +108,7 @@ jobs:
           retry_on: error
           timeout_minutes: 10
           command: |
-            pytest -rfE --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json --shard-id=1 --num-shards=3 nucliadb/nucliadb/tests
+            make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=1 --num-shards=3"
 
       - name: Run PG tests 2/3
         # These tests can be flaky, let's retry them...
@@ -120,7 +121,7 @@ jobs:
           retry_on: error
           timeout_minutes: 10
           command: |
-            pytest -rfE --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json --shard-id=2 --num-shards=3 nucliadb/nucliadb/tests
+            make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=2 --num-shards=3"
 
       - name: Run Tikv tests 1/2
         # These tests can be flaky, let's retry them...
@@ -133,7 +134,7 @@ jobs:
           retry_on: error
           timeout_minutes: 10
           command: |
-            pytest -rfE --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json --shard-id=0 --num-shards=3 nucliadb/nucliadb/tests
+            make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=0 --num-shards=3"
 
       - name: Run Tikv tests 2/3
         # These tests can be flaky, let's retry them...
@@ -146,7 +147,7 @@ jobs:
           retry_on: error
           timeout_minutes: 10
           command: |
-            pytest -rfE --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json --shard-id=1 --num-shards=3 nucliadb/nucliadb/tests
+            make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=1 --num-shards=3"
 
       - name: Run Tikv tests 3/3
         # These tests can be flaky, let's retry them...
@@ -159,7 +160,7 @@ jobs:
           retry_on: error
           timeout_minutes: 10
           command: |
-            pytest -rfE --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json --shard-id=2 --num-shards=3 nucliadb/nucliadb/tests
+            make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=2 --num-shards=3"
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
@@ -183,27 +184,50 @@ jobs:
           BRANCH_NAME=`echo $GITHUB_HEAD_REF | sed 's$/$-$g'`
           echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
 
-      - name: Setup gcloud CLI
+      - name: Authenticate to Google Cloud
+        id: gcp-auth
         uses: google-github-actions/auth@v1
         with:
-          credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
+          workload_identity_provider: "${{ secrets.GCP_REGISTRY_WORKLOAD_IDENTITY_PROVIDER }}"
+          service_account: "${{ secrets.GCP_REGISTRY_SERVICE_ACCOUNT }}"
+          token_format: access_token
 
-      - name: "Set up Cloud SDK"
-        uses: "google-github-actions/setup-gcloud@v1"
+      - name: Login to GCR
+        uses: docker/login-action@v3
+        with:
+          registry: eu.gcr.io
+          username: oauth2accesstoken
+          password: ${{ steps.gcp-auth.outputs.access_token }}
 
-      - name: Configure Docker
-        run: docker login -u oauth2accesstoken -p "$(gcloud auth application-default print-access-token)" https://eu.gcr.io
+      - name: Login to Google Artifact Registry
+        uses: docker/login-action@v3
+        with:
+          registry: europe-west4-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.gcp-auth.outputs.access_token }}
 
       # We need to setup buildx to be able to cache with gha
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Build and push
+      - name: Build and push to GCR
         uses: docker/build-push-action@v4
         with:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ env.CONTAINER_REGISTRY }}/${{ env.COMPONENT }}:${{ steps.branch_name.outputs.branch_name }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=min
+
+      - name: Build and push to Google Artifact Repository
+        uses: docker/build-push-action@v4
+        env:
+          REGISTRY: europe-west4-docker.pkg.dev/nuclia-internal/private
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.COMPONENT }}:${{ steps.branch_name.outputs.branch_name }}
           cache-from: type=gha
           cache-to: type=gha,mode=min

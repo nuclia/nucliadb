@@ -17,49 +17,72 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional
+from collections.abc import Iterator
+from typing import Any, Optional, Union
 
 from nucliadb_models.labels import translate_alias_to_system_label
+from nucliadb_models.search import Filter
 from nucliadb_protos import knowledgebox_pb2
-from nucliadb_telemetry.metrics import Counter
 
 from .exceptions import InvalidQueryError
 
 ENTITY_PREFIX = "/e/"
 CLASSIFICATION_LABEL_PREFIX = "/l/"
 
+INDEX_NODE_FILTERS_SCHEMA = {
+    "definitions": {
+        "Filter": {
+            "type": "object",
+            "minProperties": 1,
+            "maxProperties": 1,
+            "additionalProperties": False,
+            "properties": {
+                "literal": {"type": "string"},
+                "and": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {"$ref": "#/definitions/Filter"},
+                },
+                "or": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {"$ref": "#/definitions/Filter"},
+                },
+                "not": {"$ref": "#/definitions/Filter"},
+            },
+        }
+    }
+}
 
-def translate_label_filters(filters: list[str]) -> list[str]:
+
+def translate_label(literal: str) -> str:
+    if len(literal) == 0:
+        raise InvalidQueryError("filters", "Invalid empty label")
+    if literal[0] != "/":
+        raise InvalidQueryError(
+            "filters", f"Invalid label. It must start with a `/`: {literal}"
+        )
+    return translate_alias_to_system_label(literal)
+
+
+def translate_label_filters(filters: dict[str, Any]) -> dict[str, Any]:
     """
     Translate friendly filter names to the shortened filter names.
     """
-    output = []
-    for fltr in filters:
-        if len(fltr) == 0:
-            raise InvalidQueryError("filters", f"Invalid empty label")
-        if fltr[0] != "/":
-            raise InvalidQueryError(
-                "filters", f"Invalid label. It must start with a `/`: {fltr}"
-            )
+    if "literal" in filters:
+        return {"literal": translate_label(filters["literal"])}
 
-        output.append(translate_alias_to_system_label(fltr))
-    return output
+    if "not" in filters:
+        return {"not": translate_label_filters(filters["not"])}
 
+    if "and" in filters:
+        return {"and": [translate_label_filters(fltr) for fltr in filters["and"]]}
 
-def record_filters_counter(filters: list[str], counter: Counter) -> None:
-    counter.inc({"type": "filters"})
-    filters.sort()
-    entity_found = False
-    label_found = False
-    for fltr in filters:
-        if entity_found and label_found:
-            break
-        if not entity_found and fltr.startswith(ENTITY_PREFIX):
-            entity_found = True
-            counter.inc({"type": "filters_entities"})
-        elif not label_found and fltr.startswith(CLASSIFICATION_LABEL_PREFIX):
-            label_found = True
-            counter.inc({"type": "filters_labels"})
+    if "or" in filters:
+        return {"or": [translate_label_filters(fltr) for fltr in filters["or"]]}
+
+    # pragma: no cover
+    raise ValueError(f"Invalid filters: {filters}")
 
 
 def split_labels_by_type(
@@ -101,5 +124,76 @@ def is_paragraph_labelset_kind(
         return False
 
 
+def flat_filter_labels(filters: Union[list[str], dict[str, Any]]) -> list[str]:
+    if isinstance(filters, list):
+        return filters
+    else:
+        return list(iter_filter_labels_expression(filters))
+
+
+def iter_filter_labels_expression(expression: dict[str, Any]) -> Iterator[str]:
+    if "literal" in expression:
+        yield expression["literal"]
+        return
+
+    if "not" in expression:
+        for label in iter_filter_labels_expression(expression["not"]):
+            yield label
+        return
+
+    if "and" in expression:
+        for and_term in expression["and"]:
+            for label in iter_filter_labels_expression(and_term):
+                yield label
+        return
+
+    if "or" in expression:
+        for or_term in expression["or"]:
+            for label in iter_filter_labels_expression(or_term):
+                yield label
+        return
+
+
 def has_classification_label_filters(filters: list[str]) -> bool:
-    return any(filter.startswith(CLASSIFICATION_LABEL_PREFIX) for filter in filters)
+    return any(label.startswith(CLASSIFICATION_LABEL_PREFIX) for label in filters)
+
+
+def convert_to_node_filters(filters: Union[list[str], list[Filter]]) -> dict[str, Any]:
+    if len(filters) == 0:
+        return {}
+
+    if len(filters) == 1:
+        return convert_filter_to_node_schema(filters[0])
+
+    return {"and": [convert_filter_to_node_schema(fltr) for fltr in filters]}
+
+
+def convert_filter_to_node_schema(fltr: Union[str, Filter]) -> dict[str, Any]:
+    if isinstance(fltr, str):
+        return {"literal": fltr}
+
+    # any: [a, b] == (a || b)
+    if fltr.any is not None:
+        if len(fltr.any) == 1:
+            return {"literal": fltr.any[0]}
+        return {"or": [{"literal": term} for term in fltr.any]}
+
+    # all: [a, b] == (a && b)
+    if fltr.all is not None:
+        if len(fltr.all) == 1:
+            return {"literal": fltr.all[0]}
+        return {"and": [{"literal": term} for term in fltr.all]}
+
+    # none: [a, b] == !(a || b)
+    if fltr.none is not None:
+        if len(fltr.none) == 1:
+            return {"not": {"literal": fltr.none[0]}}
+        return {"not": {"or": [{"literal": term} for term in fltr.none]}}
+
+    # not_all: [a, b] == !(a && b)
+    if fltr.not_all is not None:
+        if len(fltr.not_all) == 1:
+            return {"not": {"literal": fltr.not_all[0]}}
+        return {"not": {"and": [{"literal": term} for term in fltr.not_all]}}
+
+    raise ValueError("Invalid filter")

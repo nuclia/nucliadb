@@ -98,6 +98,7 @@ async fn test_suggest_paragraphs(
             filter: Some(Filter {
                 field_labels: vec!["/s/p/en".to_string()],
                 paragraph_labels: vec![],
+                ..Default::default()
             }),
             ..request.clone()
         }))
@@ -115,6 +116,7 @@ async fn test_suggest_paragraphs(
             filter: Some(Filter {
                 field_labels: vec!["/s/p/de".to_string()],
                 paragraph_labels: vec![],
+                ..Default::default()
             }),
             ..request
         }))

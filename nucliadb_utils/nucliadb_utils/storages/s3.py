@@ -30,7 +30,9 @@ import botocore  # type: ignore
 from aiobotocore.session import AioSession, get_session  # type: ignore
 from nucliadb_protos.resources_pb2 import CloudFile
 
+from nucliadb_telemetry import errors
 from nucliadb_utils import logger
+from nucliadb_utils.storages.exceptions import UnparsableResponse
 from nucliadb_utils.storages.storage import Storage, StorageField
 
 MB = 1024 * 1024
@@ -67,7 +69,12 @@ POLICY_DELETE = {
 class S3StorageField(StorageField):
     storage: S3Storage
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=MAX_TRIES)
+    @backoff.on_exception(
+        backoff.expo,
+        RETRIABLE_EXCEPTIONS,
+        jitter=backoff.random_jitter,
+        max_tries=MAX_TRIES,
+    )
     async def _download(self, uri, bucket, **kwargs):
         if "headers" in kwargs:
             for key, value in kwargs["headers"].items():
@@ -78,7 +85,8 @@ class S3StorageField(StorageField):
                 Bucket=bucket, Key=uri, **kwargs
             )
         except botocore.exceptions.ClientError as e:
-            if e.response["Error"].get("Code") == "NoSuchKey":
+            error_code = parse_status_code(e)
+            if error_code == 404:
                 raise KeyError(f"S3 cloud file not found : {uri}")
             else:
                 raise
@@ -156,7 +164,12 @@ class S3StorageField(StorageField):
         field.upload_uri = upload_uri
         return field
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=MAX_TRIES)
+    @backoff.on_exception(
+        backoff.expo,
+        RETRIABLE_EXCEPTIONS,
+        jitter=backoff.random_jitter,
+        max_tries=MAX_TRIES,
+    )
     async def _create_multipart(self, bucket_name: str, upload_id: str, cf: CloudFile):
         return await self.storage._s3aioclient.create_multipart_upload(
             Bucket=bucket_name,
@@ -189,7 +202,12 @@ class S3StorageField(StorageField):
 
         return size
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=MAX_TRIES)
+    @backoff.on_exception(
+        backoff.expo,
+        RETRIABLE_EXCEPTIONS,
+        jitter=backoff.random_jitter,
+        max_tries=MAX_TRIES,
+    )
     async def _upload_part(self, cf: CloudFile, data: bytes):
         if self.field is None:
             raise AttributeError("No field configured")
@@ -227,7 +245,12 @@ class S3StorageField(StorageField):
         self.field.ClearField("upload_uri")
         self.field.ClearField("parts")
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=MAX_TRIES)
+    @backoff.on_exception(
+        backoff.expo,
+        RETRIABLE_EXCEPTIONS,
+        jitter=backoff.random_jitter,
+        max_tries=MAX_TRIES,
+    )
     async def _complete_multipart_upload(self):
         # if blocks is 0, it means the file is of zero length so we need to
         # trick it to finish a multiple part with no data.
@@ -277,8 +300,9 @@ class S3StorageField(StorageField):
                 }
             else:
                 return None
-        except botocore.exceptions.ClientError as ex:
-            if ex.response["Error"]["Code"] == "NoSuchKey":
+        except botocore.exceptions.ClientError as e:
+            error_code = parse_status_code(e)
+            if error_code == 404:
                 return None
             raise
 
@@ -418,7 +442,7 @@ class S3Storage(Storage):
             if res["ResponseMetadata"]["HTTPStatusCode"] == 404:
                 missing = True
         except botocore.exceptions.ClientError as e:
-            error_code = int(e.response["Error"]["Code"])
+            error_code = parse_status_code(e)
             if error_code == 404:
                 missing = True
 
@@ -440,7 +464,7 @@ class S3Storage(Storage):
             if res["ResponseMetadata"]["HTTPStatusCode"] == 404:
                 missing = True
         except botocore.exceptions.ClientError as e:
-            error_code = int(e.response["Error"]["Code"])
+            error_code = parse_status_code(e)
             if error_code == 404:
                 missing = True
 
@@ -448,7 +472,7 @@ class S3Storage(Storage):
             try:
                 res = await self._s3aioclient.delete_bucket(Bucket=bucket_name)
             except botocore.exceptions.ClientError as e:
-                error_code = int(e.response["Error"]["Code"])
+                error_code = parse_status_code(e)
                 if error_code == 409:
                     conflict = True
                 if error_code in (200, 204):
@@ -463,7 +487,7 @@ async def bucket_exists(client: AioSession, bucket_name: str) -> bool:
         if res["ResponseMetadata"]["HTTPStatusCode"] == 404:
             exists = False
     except botocore.exceptions.ClientError as e:
-        error_code = int(e.response["Error"]["Code"])
+        error_code = parse_status_code(e)
         if error_code == 404:
             exists = False
     return exists
@@ -494,3 +518,25 @@ async def create_bucket(
                 ]
             },
         )
+
+
+def parse_status_code(error: botocore.exceptions.ClientError) -> int:
+    error_code = error.response["Error"]["Code"]
+    if error_code.isnumeric():
+        return int(error_code)
+
+    # See https://docs.aws.amazon.com/AmazonS3/latest/API/ErrorResponses.html#ErrorCodeList
+    error_code_mappings = {
+        "NoSuchBucket": 404,
+        "NoSuchKey": 404,
+    }
+
+    if error_code in error_code_mappings:
+        return error_code_mappings[error_code]
+
+    msg = f"Unexpected error status while parsing error response: {error_code}"
+    with errors.push_scope() as scope:
+        scope.set_extra("response", error.response)
+        errors.capture_message(msg, "error", scope)
+
+    raise UnparsableResponse(msg) from error

@@ -26,11 +26,13 @@ use nucliadb_core::protos::{
     DocumentScored, DocumentVectorIdentifier, SentenceMetadata, VectorSearchRequest, VectorSearchResponse,
 };
 use nucliadb_core::tracing::{self, *};
+use nucliadb_core::vectors::*;
 use nucliadb_procs::measure;
 
 use crate::data_point_provider::*;
-use crate::formula::{AtomClause, CompoundClause, Formula};
+use crate::formula::{AtomClause, BooleanOperator, Clause, CompoundClause, Formula};
 use crate::indexset::IndexSet;
+use crate::service::query_io;
 
 impl<'a> SearchRequest for (usize, &'a VectorSearchRequest, Formula) {
     fn with_duplicates(&self) -> bool {
@@ -74,15 +76,10 @@ impl VectorReader for VectorReaderService {
             Ok(0)
         }
     }
-}
-
-impl ReaderChild for VectorReaderService {
-    type Request = VectorSearchRequest;
-    type Response = VectorSearchResponse;
 
     #[measure(actor = "vectors", metric = "search")]
     #[tracing::instrument(skip_all)]
-    fn search(&self, request: &Self::Request) -> NodeResult<Self::Response> {
+    fn search(&self, request: &ProtosRequest, context: &VectorsContext) -> NodeResult<ProtosResponse> {
         let time = Instant::now();
 
         let id = Some(&request.id);
@@ -92,15 +89,24 @@ impl ReaderChild for VectorReaderService {
         let total_to_get = total_to_get as usize;
 
         let key_filters = request.key_filters.iter().cloned().map(AtomClause::key_prefix);
-        let paragraph_labels = request.paragraph_labels.iter().cloned().map(AtomClause::label);
+        let field_labels = request.field_labels.iter().cloned().map(AtomClause::label);
         let mut formula = Formula::new();
-        request.field_labels.iter().cloned().map(AtomClause::label).for_each(|c| formula.extend(c));
+
+        if !request.field_labels.is_empty() {
+            let field_atoms = field_labels.map(Clause::Atom).collect();
+            let field_clause = CompoundClause::new(BooleanOperator::And, field_atoms);
+            formula.extend(field_clause);
+        }
 
         if key_filters.len() > 0 {
-            formula.extend(CompoundClause::new(key_filters.collect()));
+            let clause_labels = key_filters.map(Clause::Atom).collect();
+            let key_clause = CompoundClause::new(BooleanOperator::Or, clause_labels);
+            formula.extend(key_clause);
         }
-        for paragraph_label in paragraph_labels {
-            formula.extend(paragraph_label);
+
+        if let Some(filter) = context.filtering_formula.as_ref() {
+            let clause = query_io::map_expression(filter);
+            formula.extend(clause);
         }
 
         let search_request = (total_to_get, request, formula);
@@ -287,11 +293,12 @@ mod tests {
             with_duplicates: true,
             ..Default::default()
         };
-        let result = reader.search(&request).unwrap();
+        let context = VectorsContext::default();
+        let result = reader.search(&request, &context).unwrap();
         assert_eq!(result.documents.len(), 4);
 
         request.key_filters = vec!["DOC/KEY/0".to_string()];
-        let result = reader.search(&request).unwrap();
+        let result = reader.search(&request, &context).unwrap();
         assert_eq!(result.documents.len(), 0);
     }
 
@@ -367,7 +374,8 @@ mod tests {
             with_duplicates: true,
             ..Default::default()
         };
-        let result = reader.search(&request).unwrap();
+        let context = VectorsContext::default();
+        let result = reader.search(&request, &context).unwrap();
         assert_eq!(result.documents.len(), 4);
 
         let request = VectorSearchRequest {
@@ -380,7 +388,7 @@ mod tests {
             with_duplicates: false,
             ..Default::default()
         };
-        let result = reader.search(&request).unwrap();
+        let result = reader.search(&request, &context).unwrap();
         let no_nodes = reader.count("").unwrap();
         assert_eq!(no_nodes, 4);
         assert_eq!(result.documents.len(), 3);
@@ -397,7 +405,7 @@ mod tests {
             min_score: 900.0,
             ..Default::default()
         };
-        let result = reader.search(&request).unwrap();
+        let result = reader.search(&request, &context).unwrap();
         let no_nodes = reader.count("").unwrap();
         assert_eq!(no_nodes, 4);
         assert_eq!(result.documents.len(), 0);
@@ -412,7 +420,7 @@ mod tests {
             with_duplicates: false,
             ..Default::default()
         };
-        assert!(reader.search(&bad_request).is_err());
+        assert!(reader.search(&bad_request, &context).is_err());
     }
 
     #[test]
@@ -482,7 +490,8 @@ mod tests {
             with_duplicates: true,
             ..Default::default()
         };
-        let result = reader.search(&request).unwrap();
+        let context = VectorsContext::default();
+        let result = reader.search(&request, &context).unwrap();
         assert_eq!(result.documents.len(), 2);
 
         let request = VectorSearchRequest {
@@ -495,7 +504,7 @@ mod tests {
             with_duplicates: false,
             ..Default::default()
         };
-        let result = reader.search(&request).unwrap();
+        let result = reader.search(&request, &context).unwrap();
         assert_eq!(result.documents.len(), 1);
     }
 }

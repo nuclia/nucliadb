@@ -22,7 +22,7 @@ import os
 import tempfile
 from os.path import dirname
 from typing import AsyncIterator
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock, patch
 
 import asyncpg
 import pytest
@@ -38,6 +38,7 @@ from redis import asyncio as aioredis
 
 from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.common.maindb.driver import Driver
+from nucliadb.common.maindb.exceptions import UnsetUtility
 from nucliadb.common.maindb.local import LocalDriver
 from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.common.maindb.redis import RedisDriver
@@ -45,6 +46,7 @@ from nucliadb.common.maindb.tikv import TiKVDriver
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.settings import DriverConfig, DriverSettings
 from nucliadb.ingest.settings import settings as ingest_settings
+from nucliadb.learning_config import LearningConfiguration
 from nucliadb.standalone.config import config_nucliadb
 from nucliadb.standalone.run import run_async_nucliadb
 from nucliadb.standalone.settings import Settings
@@ -58,7 +60,6 @@ from nucliadb_telemetry.settings import (
     LogSettings,
 )
 from nucliadb_utils.storages.settings import settings as storage_settings
-from nucliadb_utils.store import MAIN
 from nucliadb_utils.tests import free_port
 from nucliadb_utils.utilities import (
     Utility,
@@ -86,25 +87,32 @@ def analytics_disabled():
 
 
 def reset_config():
+    from nucliadb.common.cluster import settings as cluster_settings
     from nucliadb.ingest import settings as ingest_settings
     from nucliadb.train import settings as train_settings
     from nucliadb.writer import settings as writer_settings
     from nucliadb_utils import settings as utils_settings
     from nucliadb_utils.cache import settings as cache_settings
 
-    ingest_settings.settings.parse_obj(ingest_settings.Settings())
-    train_settings.settings.parse_obj(train_settings.Settings())
-    writer_settings.settings.parse_obj(writer_settings.Settings())
-    cache_settings.settings.parse_obj(cache_settings.Settings())
-
-    utils_settings.audit_settings.parse_obj(utils_settings.AuditSettings())
-    utils_settings.indexing_settings.parse_obj(utils_settings.IndexingSettings())
-    utils_settings.transaction_settings.parse_obj(utils_settings.TransactionSettings())
-    utils_settings.nucliadb_settings.parse_obj(utils_settings.NucliaDBSettings())
-    utils_settings.nuclia_settings.parse_obj(utils_settings.NucliaSettings())
-    utils_settings.storage_settings.parse_obj(utils_settings.StorageSettings())
-
-    yield
+    all_settings = [
+        cluster_settings.settings,
+        ingest_settings.settings,
+        train_settings.settings,
+        writer_settings.settings,
+        cache_settings.settings,
+        utils_settings.audit_settings,
+        utils_settings.http_settings,
+        utils_settings.indexing_settings,
+        utils_settings.nuclia_settings,
+        utils_settings.nucliadb_settings,
+        utils_settings.storage_settings,
+        utils_settings.transaction_settings,
+    ]
+    for settings in all_settings:
+        defaults = type(settings)()
+        for attr, _value in settings:
+            default_value = getattr(defaults, attr)
+            setattr(settings, attr, default_value)
 
     from nucliadb.common.cluster import manager
 
@@ -122,8 +130,25 @@ def tmpdir():
         pass
 
 
+@pytest.fixture()
+def learning_config():
+    lconfig = LearningConfiguration(
+        semantic_model="multilingual",
+        semantic_threshold=None,
+        semantic_vector_size=None,
+        semantic_vector_similarity="cosine",
+    )
+    with patch("nucliadb.ingest.service.writer.learning_config") as mocked:
+        mocked.set_configuration = AsyncMock(return_value=None)
+        mocked.get_configuration = AsyncMock(return_value=lconfig)
+        mocked.delete_configuration = AsyncMock(return_value=None)
+        yield mocked
+
+
 @pytest.fixture(scope="function")
-async def nucliadb(dummy_processing, analytics_disabled, driver_settings, tmpdir):
+async def nucliadb(
+    dummy_processing, analytics_disabled, driver_settings, tmpdir, learning_config
+):
     from nucliadb.common.cluster import manager
 
     manager.INDEX_NODES.clear()
@@ -540,7 +565,7 @@ async def local_driver(local_driver_settings) -> AsyncIterator[Driver]:
     await driver.finalize()
 
     ingest_settings.driver_local_url = None
-    MAIN.pop("driver", None)
+    clean_utility(Utility.MAINDB_DRIVER)
 
 
 @pytest.fixture(scope="function")
@@ -576,7 +601,7 @@ async def tikv_driver(tikv_driver_settings) -> AsyncIterator[Driver]:
 
     await driver.finalize()
     ingest_settings.driver_tikv_url = None
-    MAIN.pop("driver", None)
+    clean_utility(Utility.MAINDB_DRIVER)
 
 
 @pytest.fixture(scope="function")
@@ -606,7 +631,7 @@ async def redis_driver(redis_driver_settings) -> AsyncIterator[RedisDriver]:
 
     await driver.finalize()
     ingest_settings.driver_redis_url = None
-    MAIN.pop(Utility.MAINDB_DRIVER, None)
+    clean_utility(Utility.MAINDB_DRIVER)
 
 
 @pytest.fixture(scope="function")
@@ -681,18 +706,18 @@ def driver_lazy_fixtures(default_drivers: str = "redis"):
 )
 async def maindb_driver(request):
     driver = request.param
-    MAIN[Utility.MAINDB_DRIVER] = driver
+    set_utility(Utility.MAINDB_DRIVER, driver)
 
     yield driver
 
     await cleanup_maindb(driver)
-    MAIN.pop(Utility.MAINDB_DRIVER, None)
+    clean_utility(Utility.MAINDB_DRIVER)
 
 
 async def maybe_cleanup_maindb():
     try:
         driver = get_driver()
-    except KeyError:
+    except UnsetUtility:
         pass
     else:
         try:

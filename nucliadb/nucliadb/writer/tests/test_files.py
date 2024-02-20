@@ -28,7 +28,7 @@ from httpx import AsyncClient
 from nucliadb_protos.resources_pb2 import FieldType
 from nucliadb_protos.writer_pb2 import BrokerMessage, ResourceFieldId
 
-from nucliadb.writer.api.v1.router import KB_PREFIX, RSLUG_PREFIX
+from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX
 from nucliadb.writer.api.v1.upload import maybe_b64decode
 from nucliadb.writer.tus import TUSUPLOAD, UPLOAD, get_storage_manager
 from nucliadb_models.resource import NucliaDBRoles
@@ -102,7 +102,6 @@ async def test_knowledgebox_file_tus_upload_root(writer_api, knowledgebox_writer
         data = io_bytes.read(min_chunk_size)
         while data != b"":
             resp = await client.head(url)
-
             assert resp.headers["Upload-Length"] == f"0"
             assert resp.headers["Upload-Offset"] == f"{offset}"
 
@@ -534,6 +533,47 @@ async def test_file_tus_upload_field_by_slug(writer_api, knowledgebox_writer, re
         key=writer.files[field].file.uri,
     )
     assert len(data.read()) == len(raw_bytes)
+
+
+@pytest.mark.asyncio
+async def test_file_tus_upload_urls_field_by_resource_id(
+    writer_api, knowledgebox_writer, resource
+):
+    kb = knowledgebox_writer
+
+    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
+        language = base64.b64encode(b"ca").decode()
+        filename = base64.b64encode(b"image.jpg").decode()
+        md5 = base64.b64encode(b"7af0916dba8b70e29d99e72941923529").decode()
+        headers = {
+            "tus-resumable": "1.0.0",
+            "upload-metadata": f"filename {filename},language {language},md5 {md5}",
+            "content-type": "image/jpg",
+            "upload-defer-length": "1",
+        }
+
+        resp = await client.post(
+            f"/{KB_PREFIX}/{kb}/resource/idonotexist/file/field1/{TUSUPLOAD}",
+            headers=headers,
+        )
+        assert resp.status_code == 404
+
+        resp = await client.post(
+            f"/{KB_PREFIX}/{kb}/resource/{resource}/file/field1/{TUSUPLOAD}",
+            headers=headers,
+        )
+        assert resp.status_code == 201
+        url = resp.headers["location"]
+
+        # Check that we are using the resource for the whole file upload
+        assert f"{RESOURCE_PREFIX}/{resource}" in url
+
+        # Make sure the returned URL works
+        resp = await client.head(url)
+        assert resp.status_code == 200
+
+        assert resp.headers["Upload-Length"] == "0"
+        assert resp.headers["Upload-Offset"] == "0"
 
 
 @pytest.mark.asyncio

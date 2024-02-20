@@ -17,13 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import unittest
-from unittest.mock import call
+from unittest.mock import AsyncMock, Mock, call, patch
 
 import aiohttp
 import pytest
 
 from nucliadb_utils.storages.gcs import (
+    GCSStorage,
     GCSStorageField,
     GoogleCloudException,
     ReadingResponseContentException,
@@ -37,9 +37,7 @@ def storage_field():
 
 @pytest.fixture(scope="function")
 def asyncio_sleep():
-    with unittest.mock.patch(
-        "nucliadb_utils.storages.gcs.asyncio.sleep"
-    ) as asyncio_sleep:
+    with patch("nucliadb_utils.storages.gcs.asyncio.sleep") as asyncio_sleep:
         yield asyncio_sleep
 
 
@@ -81,3 +79,41 @@ async def test_iter_data_reading_content_error_is_not_retried(storage_field):
             pass
 
     storage_field._inner_iter_data.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_delete_kb_errors():
+    kbid = "my-kbid"
+    storage = GCSStorage(bucket="bucket")
+
+    # Let's mock session.delete to return a mock response
+    response_mock = AsyncMock()
+
+    delete_context = Mock()
+    delete_context.__aenter__ = AsyncMock(return_value=response_mock)
+    delete_context.__aexit__ = AsyncMock()
+
+    storage.session = Mock()
+    storage.session.delete = Mock(return_value=delete_context)
+
+    # Test GCS responses and how we behave
+
+    response_mock.status = 204
+    deleted, conflict = await storage.delete_kb(kbid)
+    assert deleted
+    assert not conflict
+
+    response_mock.status = 404
+    deleted, conflict = await storage.delete_kb(kbid)
+    assert not deleted
+    assert not conflict
+
+    response_mock.status = 409
+    deleted, conflict = await storage.delete_kb(kbid)
+    assert not deleted
+    assert conflict
+
+    response_mock.status = 500
+    deleted, conflict = await storage.delete_kb(kbid)
+    assert not deleted
+    assert not conflict

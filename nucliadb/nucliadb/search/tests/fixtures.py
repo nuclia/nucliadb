@@ -56,6 +56,7 @@ def test_settings_search(storage, natsd, node, maindb_driver):  # type: ignore
 
     nuclia_settings.dummy_processing = True
     nuclia_settings.dummy_predict = True
+    nuclia_settings.dummy_learning_config = True
 
     ingest_settings.grpc_port = free_port()
 

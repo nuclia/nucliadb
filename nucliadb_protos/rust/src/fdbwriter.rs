@@ -500,7 +500,7 @@ pub mod notification {
         Deleted = 3,
     }
 }
-//// The member information.
+/// The member information.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Member {
     //// Member ID.　A string of the UUID.
@@ -712,20 +712,6 @@ pub struct GetSynonymsResponse {
     pub status: ::core::option::Option<OpStatusWriter>,
     #[prost(message, optional, tag="2")]
     pub synonyms: ::core::option::Option<super::knowledgebox::Synonyms>,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct SetKbConfigurationRequest {
-    #[prost(message, optional, tag="1")]
-    pub kb: ::core::option::Option<super::knowledgebox::KnowledgeBoxId>,
-    #[prost(message, optional, tag="2")]
-    pub config: ::core::option::Option<super::knowledgebox::KbConfiguration>,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct GetConfigurationResponse {
-    #[prost(message, optional, tag="1")]
-    pub status: ::core::option::Option<OpStatusWriter>,
-    #[prost(message, optional, tag="2")]
-    pub config: ::core::option::Option<super::knowledgebox::KbConfiguration>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]

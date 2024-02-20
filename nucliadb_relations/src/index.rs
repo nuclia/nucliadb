@@ -36,8 +36,8 @@ pub struct Index {
     dictionary: NodeDictionary,
 }
 impl Index {
-    const DICTIONARY_PATH: &str = "NodeDictionary";
-    const GRAPH_PATH: &str = "GraphDB";
+    const DICTIONARY_PATH: &'static str = "NodeDictionary";
+    const GRAPH_PATH: &'static str = "GraphDB";
     const GRAPH_SIZE: usize = 1048576 * 100000;
     fn connect(
         &self,

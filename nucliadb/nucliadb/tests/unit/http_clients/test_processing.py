@@ -26,22 +26,6 @@ from nucliadb.common.http_clients import exceptions, processing
 from nucliadb_utils.settings import nuclia_settings
 
 
-def test_check_proxy_telemetry_headers_ok():
-    resp = Response(
-        headers={"x-b3-traceid": "foo", "x-b3-spanid": "bar", "x-b3-sampled": "baz"}
-    )
-    with mock.patch("nucliadb.common.http_clients.processing.logger") as logger:
-        processing.check_proxy_telemetry_headers(resp)
-        logger.warning.assert_not_called()
-
-
-def test_check_proxy_telemetry_headers_error_logs():
-    resp = Response(headers={})
-    with mock.patch("nucliadb.common.http_clients.processing.logger") as logger:
-        processing.check_proxy_telemetry_headers(resp)
-        logger.warning.assert_called_once()
-
-
 def test_check_status():
     processing.check_status(Response(status=200), "ok")
     with pytest.raises(exceptions.AccountLimitException):
@@ -70,11 +54,13 @@ def test_get_processing_api_url():
         )
 
     with mock.patch.object(
-        nuclia_settings, "nuclia_cluster_url", "https://nuclia_cluster_url"
+        nuclia_settings,
+        "nuclia_processing_cluster_url",
+        "https://nuclia_processing_cluster_url",
     ):
         assert (
             processing.get_processing_api_url()
-            == "https://nuclia_cluster_url/api/internal/processing"
+            == "https://nuclia_processing_cluster_url/api/v1/internal/processing"
         )
 
 

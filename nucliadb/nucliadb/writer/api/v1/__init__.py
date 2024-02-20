@@ -20,6 +20,7 @@
 from . import export_import  # noqa
 from . import field  # noqa
 from . import knowledgebox  # noqa
+from . import learning_config  # noqa
 from . import resource  # noqa
 from . import services  # noqa
 from . import upload  # noqa

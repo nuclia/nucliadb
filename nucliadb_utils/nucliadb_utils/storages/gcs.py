@@ -37,7 +37,7 @@ import yarl
 from google.oauth2 import service_account  # type: ignore
 from nucliadb_protos.resources_pb2 import CloudFile
 
-from nucliadb_telemetry import metrics
+from nucliadb_telemetry import errors, metrics
 from nucliadb_telemetry.utils import setup_telemetry
 from nucliadb_utils import logger
 from nucliadb_utils.storages import CHUNK_SIZE
@@ -116,7 +116,12 @@ class GCSStorageField(StorageField):
         )
         await self.storage.delete_upload(origin_uri, origin_bucket_name)
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=MAX_TRIES)
+    @backoff.on_exception(
+        backoff.expo,
+        RETRIABLE_EXCEPTIONS,
+        jitter=backoff.random_jitter,
+        max_tries=MAX_TRIES,
+    )
     @storage_ops_observer.wrap({"type": "copy"})
     async def copy(
         self,
@@ -225,7 +230,12 @@ class GCSStorageField(StorageField):
         ):
             yield chunk
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=MAX_TRIES)
+    @backoff.on_exception(
+        backoff.expo,
+        RETRIABLE_EXCEPTIONS,
+        jitter=backoff.random_jitter,
+        max_tries=MAX_TRIES,
+    )
     @storage_ops_observer.wrap({"type": "start_upload"})
     async def start(self, cf: CloudFile) -> CloudFile:
         """Init an upload.
@@ -394,7 +404,12 @@ class GCSStorageField(StorageField):
         self.field.ClearField("upload_uri")
         self.field.ClearField("parts")
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=MAX_TRIES)
+    @backoff.on_exception(
+        backoff.expo,
+        RETRIABLE_EXCEPTIONS,
+        jitter=backoff.random_jitter,
+        max_tries=MAX_TRIES,
+    )
     @storage_ops_observer.wrap({"type": "exists"})
     async def exists(self) -> Optional[Dict[str, str]]:
         """
@@ -535,7 +550,12 @@ class GCSStorage(Storage):
         token = await loop.run_in_executor(self._executor, self._get_access_token)
         return {"AUTHORIZATION": f"Bearer {token}"}
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=MAX_TRIES)
+    @backoff.on_exception(
+        backoff.expo,
+        RETRIABLE_EXCEPTIONS,
+        jitter=backoff.random_jitter,
+        max_tries=MAX_TRIES,
+    )
     @storage_ops_observer.wrap({"type": "delete"})
     async def delete_upload(self, uri: str, bucket_name: str):
         if self.session is None:
@@ -679,14 +699,23 @@ class GCSStorage(Storage):
         deleted = False
         conflict = False
         async with self.session.delete(url, headers=headers) as resp:
-            if resp.status == 200:
+            if resp.status == 204:
                 logger.info(f"Deleted bucket: {bucket_name}")
                 deleted = True
-            if resp.status == 409:
-                logger.info(f"Conflict on deleting: {bucket_name}")
+            elif resp.status == 409:
+                details = await resp.text()
+                logger.info(f"Conflict on deleting bucket {bucket_name}: {details}")
                 conflict = True
-            if resp.status == 404:
+            elif resp.status == 404:
                 logger.info(f"Does not exit on deleting: {bucket_name}")
+            else:
+                details = await resp.text()
+                msg = f"Delete KB bucket returned an unexpected status {resp.status}: {details}"
+                logger.error(msg, extra={"kbid": kbid})
+                with errors.push_scope() as scope:
+                    scope.set_extra("kbid", kbid)
+                    scope.set_extra("status_code", resp.status)
+                    errors.capture_message(msg, "error", scope)
         return deleted, conflict
 
     async def iterate_bucket(self, bucket: str, prefix: str) -> AsyncIterator[Any]:

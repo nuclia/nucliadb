@@ -17,6 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import pytest
+
 import nucliadb_sdk
 from nucliadb_models.search import FeedbackTasks
 
@@ -31,11 +33,6 @@ async def test_kb_management(sdk_async: nucliadb_sdk.NucliaDBAsync):
 
 
 async def test_kb_services(sdk_async: nucliadb_sdk.NucliaDBAsync, kb):
-    # Configuration
-    await sdk_async.set_configuration(kbid=kb.uuid, semantic_model="foo")
-    await sdk_async.get_configuration(kbid=kb.uuid)
-    await sdk_async.delete_configuration(kbid=kb.uuid)
-
     # Labels
     await sdk_async.set_labelset(kbid=kb.uuid, labelset="foo", title="Bar")
     await sdk_async.get_labelset(kbid=kb.uuid, labelset="foo")
@@ -74,7 +71,10 @@ async def test_resource_endpoints(sdk_async: nucliadb_sdk.NucliaDBAsync, kb):
     await sdk_async.reprocess_resource_by_slug(kbid=kb.uuid, slug="resource")
 
     # Delete
-    await sdk_async.delete_resource(kbid=kb.uuid, rid=resource.id)
+    await sdk_async.delete_resource_by_slug(kbid=kb.uuid, rslug="resource")
+
+    with pytest.raises(nucliadb_sdk.exceptions.NotFoundError):
+        await sdk_async.delete_resource(kbid=kb.uuid, rid=resource.id)
 
 
 async def test_search_endpoints(sdk_async: nucliadb_sdk.NucliaDBAsync, kb):
@@ -90,3 +90,14 @@ async def test_search_endpoints(sdk_async: nucliadb_sdk.NucliaDBAsync, kb):
         kbid=kb.uuid, ident="bar", good=True, feedback="baz", task=FeedbackTasks.CHAT
     )
     await sdk_async.summarize(kbid=kb.uuid, resources=["foobar"])
+
+
+async def test_learning_config_endpoints(sdk_async: nucliadb_sdk.NucliaDB, kb):
+    await sdk_async.set_configuration(kbid=kb.uuid, content={"foo": "bar"})
+    await sdk_async.get_configuration(kbid=kb.uuid)
+    iterator = sdk_async.download_model(kbid=kb.uuid, model_id="foo", filename="bar")
+    async for _ in iterator():
+        pass
+    await sdk_async.get_models(kbid=kb.uuid)
+    await sdk_async.get_model(kbid=kb.uuid, model_id="foo")
+    await sdk_async.get_configuration_schema(kbid=kb.uuid)

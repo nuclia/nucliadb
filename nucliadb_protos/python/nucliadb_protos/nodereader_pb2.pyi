@@ -85,17 +85,21 @@ class Filter(google.protobuf.message.Message):
 
     FIELD_LABELS_FIELD_NUMBER: builtins.int
     PARAGRAPH_LABELS_FIELD_NUMBER: builtins.int
+    EXPRESSION_FIELD_NUMBER: builtins.int
     @property
     def field_labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     @property
     def paragraph_labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    expression: builtins.str
+    """JSON string with the filter expression"""
     def __init__(
         self,
         *,
         field_labels: collections.abc.Iterable[builtins.str] | None = ...,
         paragraph_labels: collections.abc.Iterable[builtins.str] | None = ...,
+        expression: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["field_labels", b"field_labels", "paragraph_labels", b"paragraph_labels"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["expression", b"expression", "field_labels", b"field_labels", "paragraph_labels", b"paragraph_labels"]) -> None: ...
 
 global___Filter = Filter
 

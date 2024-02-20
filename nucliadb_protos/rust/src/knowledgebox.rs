@@ -26,8 +26,10 @@ pub struct KnowledgeBoxConfig {
     pub title: ::prost::alloc::string::String,
     #[prost(string, tag="2")]
     pub description: ::prost::alloc::string::String,
+    #[deprecated]
     #[prost(string, repeated, tag="3")]
     pub enabled_filters: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[deprecated]
     #[prost(string, repeated, tag="4")]
     pub enabled_insights: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(string, tag="5")]
@@ -58,6 +60,8 @@ pub struct KnowledgeBoxNew {
     pub default_min_score: ::core::option::Option<f32>,
     #[prost(enumeration="super::utils::ReleaseChannel", tag="7")]
     pub release_channel: i32,
+    #[prost(string, tag="8")]
+    pub learning_config: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NewKnowledgeBoxResponse {
@@ -254,6 +258,7 @@ pub struct SemanticModelMetadata {
 }
 // Do not update this model without confirmation of internal Learning Config API
 
+/// Deprecated
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct KbConfiguration {
     #[prost(string, tag="2")]

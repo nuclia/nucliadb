@@ -25,8 +25,10 @@ from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata, Synonyms
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.utils_pb2 import RelationNode, VectorSimilarity
 
+from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.query import (
     QueryParser,
+    check_supported_filters,
     get_default_min_score,
     get_kb_model_default_min_score,
     parse_entities_to_filters,
@@ -190,3 +192,15 @@ class TestApplySynonymsToRequest:
 
         request.ClearField.assert_called_once_with("body")
         assert request.advanced_query == "planet OR earth OR globe"
+
+
+def test_check_supported_filters():
+    check_supported_filters({"literal": "a"}, ["a"])
+    check_supported_filters({"or": [{"literal": "a"}, {"literal": "b"}]}, [])
+    with pytest.raises(InvalidQueryError):
+        check_supported_filters({"or": [{"literal": "a"}, {"literal": "b"}]}, ["b"])
+    with pytest.raises(InvalidQueryError):
+        check_supported_filters(
+            {"and": [{"literal": "a"}, {"and": [{"literal": "c"}, {"literal": "b"}]}]},
+            ["b"],
+        )

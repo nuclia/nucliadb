@@ -20,7 +20,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Type, TypeVar, Union
+from typing import Any, Dict, List, Literal, Optional, Type, TypeVar, Union
 
 from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.audit_pb2 import ClientType
@@ -30,6 +30,7 @@ from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 from pydantic import BaseModel, Field, root_validator, validator
+from typing_extensions import Annotated
 
 from nucliadb_models.common import FieldTypeName, ParamDefault
 from nucliadb_models.metadata import RelationType
@@ -575,10 +576,27 @@ class SearchParamDefaults:
     )
 
 
+class Filter(BaseModel):
+    all: Optional[List[str]] = Field(default=None, min_items=1)
+    any: Optional[List[str]] = Field(default=None, min_items=1)
+    none: Optional[List[str]] = Field(default=None, min_items=1)
+    not_all: Optional[List[str]] = Field(default=None, min_items=1)
+
+    @root_validator(pre=True)
+    def validate_filter(cls, values):
+        if len({k for k, v in values.items() if v is not None}) != 1:
+            raise ValueError("Only one of 'all', 'any', 'none' or 'not_all' can be set")
+        return values
+
+
 class BaseSearchRequest(BaseModel):
     query: str = SearchParamDefaults.query.to_pydantic_field()
     fields: List[str] = SearchParamDefaults.fields.to_pydantic_field()
-    filters: List[str] = SearchParamDefaults.filters.to_pydantic_field()
+    filters: Union[List[str], List[Filter]] = Field(
+        default=[],
+        title="Filters",
+        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/docs/using/search/#filters",  # noqa: E501
+    )
     faceted: List[str] = SearchParamDefaults.faceted.to_pydantic_field()
     page_number: int = SearchParamDefaults.page_number.to_pydantic_field()
     page_size: int = SearchParamDefaults.page_size.to_pydantic_field()
@@ -750,8 +768,8 @@ ALLOWED_FIELD_TYPES: dict[str, str] = {
 
 
 class FieldExtensionStrategy(RagStrategy):
-    name: str = Field(RagStrategyName.FIELD_EXTENSION, const=True)
-    fields: list[str] = Field(
+    name: Literal["field_extension"]
+    fields: List[str] = Field(
         title="Fields",
         description="List of field ids to extend the context with. It will try to extend the retrieval context with the specified fields in the matching resources. The field ids have to be in the format `{field_type}/{field_name}`, like 'a/title', 'a/summary' for title and summary fields or 't/amend' for a text field named 'amend'.",  # noqa
         min_items=1,
@@ -787,11 +805,12 @@ class FieldExtensionStrategy(RagStrategy):
 
 
 class FullResourceStrategy(RagStrategy):
-    name: str = Field(RagStrategyName.FULL_RESOURCE, const=True)
+    name: Literal["full_resource"]
 
 
-RagStrategies = Union[FieldExtensionStrategy, FullResourceStrategy]
-
+RagStrategies = Annotated[
+    Union[FieldExtensionStrategy, FullResourceStrategy], Field(discriminator="name")
+]
 PromptContext = dict[str, str]
 PromptContextOrder = dict[str, int]
 
@@ -799,7 +818,11 @@ PromptContextOrder = dict[str, int]
 class ChatRequest(BaseModel):
     query: str = SearchParamDefaults.chat_query.to_pydantic_field()
     fields: List[str] = SearchParamDefaults.fields.to_pydantic_field()
-    filters: List[str] = SearchParamDefaults.filters.to_pydantic_field()
+    filters: Union[List[str], List[Filter]] = Field(
+        default=[],
+        title="Filters",
+        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/docs/using/search/#filters",  # noqa: E501
+    )
     min_score: Optional[float] = SearchParamDefaults.min_score.to_pydantic_field()
     features: List[ChatOptions] = SearchParamDefaults.chat_features.to_pydantic_field()
     range_creation_start: Optional[
@@ -904,8 +927,9 @@ class SummarizeRequest(BaseModel):
     resources: List[str] = Field(
         ...,
         min_items=1,
+        max_items=100,
         title="Resources",
-        description="Uids of the resources to summarize",
+        description="Uids or slugs of the resources to summarize. If the resources are not found, they will be ignored.",
     )
 
     summary_kind: SummaryKind = Field(
@@ -916,16 +940,20 @@ class SummarizeRequest(BaseModel):
 
 
 class SummarizedResource(BaseModel):
-    summary: str
+    summary: str = Field(..., title="Summary", description="Summary of the resource")
     tokens: int
 
 
 class SummarizedResponse(BaseModel):
     resources: Dict[str, SummarizedResource] = Field(
-        default={}, title="Resources", description="Individual resource summaries"
+        default={},
+        title="Resources",
+        description="Individual resource summaries. The key is the resource id or slug.",
     )
     summary: str = Field(
-        default="", title="Summary", description="Global summary of all resources"
+        default="",
+        title="Summary",
+        description="Global summary of all resources combined.",
     )
 
 

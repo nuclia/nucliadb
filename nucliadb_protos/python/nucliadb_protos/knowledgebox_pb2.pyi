@@ -157,6 +157,7 @@ class KnowledgeBoxNew(google.protobuf.message.Message):
     VECTOR_DIMENSION_FIELD_NUMBER: builtins.int
     DEFAULT_MIN_SCORE_FIELD_NUMBER: builtins.int
     RELEASE_CHANNEL_FIELD_NUMBER: builtins.int
+    LEARNING_CONFIG_FIELD_NUMBER: builtins.int
     slug: builtins.str
     @property
     def config(self) -> global___KnowledgeBoxConfig: ...
@@ -165,6 +166,7 @@ class KnowledgeBoxNew(google.protobuf.message.Message):
     vector_dimension: builtins.int
     default_min_score: builtins.float
     release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType
+    learning_config: builtins.str
     def __init__(
         self,
         *,
@@ -175,9 +177,10 @@ class KnowledgeBoxNew(google.protobuf.message.Message):
         vector_dimension: builtins.int | None = ...,
         default_min_score: builtins.float | None = ...,
         release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType = ...,
+        learning_config: builtins.str = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["_default_min_score", b"_default_min_score", "_vector_dimension", b"_vector_dimension", "config", b"config", "default_min_score", b"default_min_score", "vector_dimension", b"vector_dimension"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["_default_min_score", b"_default_min_score", "_vector_dimension", b"_vector_dimension", "config", b"config", "default_min_score", b"default_min_score", "forceuuid", b"forceuuid", "release_channel", b"release_channel", "similarity", b"similarity", "slug", b"slug", "vector_dimension", b"vector_dimension"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["_default_min_score", b"_default_min_score", "_vector_dimension", b"_vector_dimension", "config", b"config", "default_min_score", b"default_min_score", "forceuuid", b"forceuuid", "learning_config", b"learning_config", "release_channel", b"release_channel", "similarity", b"similarity", "slug", b"slug", "vector_dimension", b"vector_dimension"]) -> None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing_extensions.Literal["_default_min_score", b"_default_min_score"]) -> typing_extensions.Literal["default_min_score"] | None: ...
     @typing.overload
@@ -773,7 +776,10 @@ global___SemanticModelMetadata = SemanticModelMetadata
 
 @typing_extensions.final
 class KBConfiguration(google.protobuf.message.Message):
-    """Do not update this model without confirmation of internal Learning Config API"""
+    """Do not update this model without confirmation of internal Learning Config API
+
+    Deprecated
+    """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

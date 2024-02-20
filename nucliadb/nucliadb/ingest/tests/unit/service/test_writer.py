@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import json
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
@@ -33,6 +34,7 @@ from nucliadb.ingest.service.writer import (
     get_release_channel,
     update_shards_with_updated_replica,
 )
+from nucliadb.learning_config import LearningConfiguration
 from nucliadb_protos import writer_pb2
 
 
@@ -128,7 +130,26 @@ def test_update_shards_pb_replica():
 
 class TestWriterServicer:
     @pytest.fixture
-    def writer(self):
+    def onprem_nucliadb(self):
+        with patch(
+            "nucliadb.ingest.service.writer.is_onprem_nucliadb", return_value=True
+        ) as mocked:
+            yield mocked
+
+    @pytest.fixture
+    def learning_config(self):
+        lconfig = LearningConfiguration(
+            semantic_model="english",
+            semantic_threshold=1,
+            semantic_vector_size=200,
+            semantic_vector_similarity="dot",
+        )
+        with patch("nucliadb.ingest.service.writer.learning_config") as mocked:
+            mocked.get_configuration = AsyncMock(return_value=lconfig)
+            yield mocked
+
+    @pytest.fixture
+    def writer(self, learning_config, onprem_nucliadb):
         servicer = WriterServicer()
         servicer.driver = AsyncMock()
         servicer.driver.transaction = MagicMock(return_value=AsyncMock())
@@ -205,37 +226,35 @@ class TestWriterServicer:
         assert resp.found
 
     async def test_NewKnowledgeBox(self, writer: WriterServicer):
-        request = writer_pb2.KnowledgeBoxNew(
-            slug="slug", similarity=VectorSimilarity.DOT
-        )
-        writer.proc.create_kb.return_value = "kbid"
+        request = writer_pb2.KnowledgeBoxNew(slug="slug", forceuuid="kbid")
 
         resp = await writer.NewKnowledgeBox(request)
 
         expected_model_metadata = SemanticModelMetadata(
-            similarity_function=VectorSimilarity.DOT
+            similarity_function=VectorSimilarity.DOT,
+            vector_dimension=200,
+            default_min_score=1.0,
         )
         writer.proc.create_kb.assert_called_once_with(
             request.slug,
             request.config,
             expected_model_metadata,
-            forceuuid=request.forceuuid,
+            forceuuid="kbid",
             release_channel=0,
         )
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
 
     async def test_NewKnowledgeBox_experimental_channel(self, writer: WriterServicer):
         request = writer_pb2.KnowledgeBoxNew(
-            slug="slug",
-            similarity=VectorSimilarity.DOT,
-            release_channel=ReleaseChannel.EXPERIMENTAL,
+            slug="slug", release_channel=ReleaseChannel.EXPERIMENTAL, forceuuid="kbid"
         )
-        writer.proc.create_kb.return_value = "kbid"
 
         resp = await writer.NewKnowledgeBox(request)
 
         expected_model_metadata = SemanticModelMetadata(
-            similarity_function=VectorSimilarity.DOT
+            similarity_function=VectorSimilarity.DOT,
+            vector_dimension=200,
+            default_min_score=1.0,
         )
         writer.proc.create_kb.assert_called_once_with(
             request.slug,
@@ -246,13 +265,53 @@ class TestWriterServicer:
         )
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
 
-    async def test_NewKnowledgeBox_with_model_metadata(self, writer: WriterServicer):
+    async def test_NewKnowledgeBox_hosted_nucliadb(
+        self, writer: WriterServicer, onprem_nucliadb
+    ):
+        onprem_nucliadb.return_value = False
+
+        request = writer_pb2.KnowledgeBoxNew(
+            slug="slug",
+            forceuuid="kbid",
+            similarity=VectorSimilarity.COSINE,
+            vector_dimension=200,
+            default_min_score=1.0,
+        )
+
+        resp = await writer.NewKnowledgeBox(request)
+
+        expected_model_metadata = SemanticModelMetadata(
+            similarity_function=VectorSimilarity.COSINE,
+            vector_dimension=200,
+            default_min_score=1.0,
+        )
+        writer.proc.create_kb.assert_called_once_with(
+            request.slug,
+            request.config,
+            expected_model_metadata,
+            forceuuid="kbid",
+            release_channel=0,
+        )
+        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
+
+    async def test_NewKnowledgeBox_with_learning_config(
+        self, writer: WriterServicer, learning_config
+    ):
+        learning_config.get_configuration.return_value = None
+        learning_config.set_configuration = AsyncMock(
+            return_value=LearningConfiguration(
+                semantic_model="multilingual",
+                semantic_threshold=-1,
+                semantic_vector_size=10,
+                semantic_vector_similarity="cosine",
+            )
+        )
+
         request = writer_pb2.KnowledgeBoxNew(
             slug="slug2",
-            vector_dimension=10,
-            default_min_score=-1.0,
+            forceuuid="kbid",
+            learning_config=json.dumps({"semantic_model": "multilingual"}),
         )
-        writer.proc.create_kb.return_value = "kbid"
 
         resp = await writer.NewKnowledgeBox(request)
 

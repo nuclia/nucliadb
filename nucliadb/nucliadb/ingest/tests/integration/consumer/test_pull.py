@@ -61,7 +61,7 @@ async def pull_processor_api():
     app = FastAPI()
     messages: list[BrokerMessage] = []  # type: ignore
 
-    @app.get("/api/internal/processing/pull")
+    @app.get("/api/v1/internal/processing/pull")
     async def pull():
         if len(messages) == 0:
             return {"status": "empty"}
@@ -80,7 +80,7 @@ async def pull_processor_api():
 
     url = f"http://127.0.0.1:{port}"
     with patch(
-        "nucliadb.common.http_clients.processing.nuclia_settings.nuclia_cluster_url",
+        "nucliadb.common.http_clients.processing.nuclia_settings.nuclia_processing_cluster_url",
         url,
     ):
         yield PullProcessorAPI(url=url, messages=messages)

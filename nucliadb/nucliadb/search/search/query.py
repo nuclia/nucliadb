@@ -18,8 +18,9 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+import json
 from datetime import datetime
-from typing import Awaitable, Optional
+from typing import Any, Awaitable, Optional, Union
 
 from async_lru import alru_cache
 from nucliadb_protos.noderesources_pb2 import Resource
@@ -33,9 +34,11 @@ from nucliadb.middleware.transaction import get_read_only_transaction
 from nucliadb.search import logger
 from nucliadb.search.predict import PredictVectorMissing, SendToPredictError
 from nucliadb.search.search.filters import (
+    convert_to_node_filters,
+    flat_filter_labels,
     has_classification_label_filters,
-    record_filters_counter,
     split_labels_by_type,
+    translate_label,
     translate_label_filters,
 )
 from nucliadb.search.search.metrics import (
@@ -46,6 +49,7 @@ from nucliadb.search.utilities import get_predict
 from nucliadb_models.labels import translate_system_to_alias_label
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import (
+    Filter,
     SearchOptions,
     SortField,
     SortFieldMap,
@@ -89,7 +93,7 @@ class QueryParser:
         kbid: str,
         features: list[SearchOptions],
         query: str,
-        filters: list[str],
+        filters: Union[list[str], list[Filter]],
         faceted: list[str],
         page_number: int,
         page_size: int,
@@ -112,7 +116,8 @@ class QueryParser:
         self.kbid = kbid
         self.features = features
         self.query = query
-        self.filters = filters
+        self.filters: dict[str, Any] = convert_to_node_filters(filters)
+        self.flat_filter_labels: list[str] = []
         self.faceted = faceted
         self.page_number = page_number
         self.page_size = page_size
@@ -134,7 +139,7 @@ class QueryParser:
 
         if len(self.filters) > 0:
             self.filters = translate_label_filters(self.filters)
-            record_filters_counter(self.filters, node_features)
+            self.flat_filter_labels = flat_filter_labels(self.filters)
 
     def _get_default_min_score(self) -> Awaitable[float]:
         if self._min_score_task is None:  # pragma: no cover
@@ -186,7 +191,9 @@ class QueryParser:
         This will schedule concurrent tasks for different data that needs to be pulled
         for the sake of the query being performed
         """
-        if len(self.filters) > 0 and has_classification_label_filters(self.filters):
+        if len(self.filters) > 0 and has_classification_label_filters(
+            self.flat_filter_labels
+        ):
             asyncio.ensure_future(self._get_classification_labels())
         if self.min_score is None:
             asyncio.ensure_future(self._get_default_min_score())
@@ -229,17 +236,22 @@ class QueryParser:
 
     async def parse_filters(self, request: nodereader_pb2.SearchRequest) -> None:
         if len(self.filters) > 0:
-            field_labels = self.filters
+            field_labels = self.flat_filter_labels
             paragraph_labels: list[str] = []
-            if has_classification_label_filters(self.filters):
+            if has_classification_label_filters(self.flat_filter_labels):
                 classification_labels = await self._get_classification_labels()
                 field_labels, paragraph_labels = split_labels_by_type(
-                    self.filters, classification_labels
+                    self.flat_filter_labels, classification_labels
                 )
+                check_supported_filters(self.filters, paragraph_labels)
+
             request.filter.field_labels.extend(field_labels)
             request.filter.paragraph_labels.extend(paragraph_labels)
+            request.filter.expression = json.dumps(self.filters)
 
-        request.faceted.labels.extend(translate_label_filters(self.faceted))
+        request.faceted.labels.extend(
+            [translate_label(facet) for facet in self.faceted]
+        )
         request.fields.extend(self.fields)
 
         if self.security is not None and len(self.security.groups) > 0:
@@ -467,7 +479,7 @@ async def paragraph_query_to_pb(
             request.filter.field_labels.extend(field_labels)
             request.filter.paragraph_labels.extend(paragraph_labels)
 
-        request.faceted.labels.extend(translate_label_filters(faceted))
+        request.faceted.labels.extend([translate_label(facet) for facet in faceted])
         if sort:
             request.order.field = sort
             request.order.type = sort_ord  # type: ignore
@@ -554,6 +566,13 @@ def parse_entities_to_filters(
         if entity_filter not in request.filter.field_labels:
             request.filter.field_labels.append(entity_filter)
             added_filters.append(entity_filter)
+    # We need to expand the filter expression with the automatically detected entities.
+    if len(added_filters) > 0:
+        expanded_expression = {"and": [{"literal": entity} for entity in added_filters]}
+        if request.filter.expression:
+            expression = json.loads(request.filter.expression)
+            expanded_expression["and"].extend(expression)
+        request.filter.expression = json.dumps(expanded_expression)
     return added_filters
 
 
@@ -576,7 +595,7 @@ def suggest_query_to_pb(
 
     if SuggestOptions.PARAGRAPH in features:
         request.features.append(nodereader_pb2.SuggestFeatures.PARAGRAPHS)
-        filters = translate_label_filters(filters)
+        filters = [translate_label(fltr) for fltr in filters]
         request.filter.field_labels.extend(filters)
         request.fields.extend(fields)
 
@@ -646,3 +665,27 @@ async def get_deleted_entity_groups(kbid: str) -> list[str]:
 async def get_classification_labels(kbid: str) -> knowledgebox_pb2.Labels:
     txn = await get_read_only_transaction()
     return await LabelsDataManager.inner_get_labels(kbid, txn)
+
+
+def check_supported_filters(filters: dict[str, Any], paragraph_labels: list[str]):
+    """
+    Check if the provided filters are supported:
+    Paragraph labels can only be used with simple 'and' expressions (not nested).
+    """
+    if len(paragraph_labels) == 0:
+        return
+    if "literal" in filters:
+        return
+    if "and" not in filters:
+        # Paragraph labels can only be used with 'and' filter
+        raise InvalidQueryError(
+            "filters",
+            "Paragraph labels can only be used with 'all' filter",
+        )
+    for term in filters["and"]:
+        # Nested expressions are not allowed with paragraph labels
+        if "literal" not in term:
+            raise InvalidQueryError(
+                "filters",
+                "Paragraph labels can only be used with 'all' filter",
+            )

@@ -23,8 +23,9 @@ use std::fmt::Debug;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::{
     EdgeList, EntitiesSubgraphResponse, RelationEdge, RelationNode, RelationPrefixSearchResponse,
-    RelationSearchRequest, RelationSearchResponse, RelationTypeListMember, TypeList,
+    RelationSearchResponse, RelationTypeListMember, TypeList,
 };
+use nucliadb_core::relations::*;
 use nucliadb_core::tracing::{self, *};
 use nucliadb_procs::measure;
 use tantivy::collector::{Count, DocSetCollector, TopDocs};
@@ -50,7 +51,7 @@ impl Debug for RelationsReaderService {
     }
 }
 
-impl RelationReader for RelationsReaderService {
+impl RelationsReader for RelationsReaderService {
     #[measure(actor = "relations", metric = "count")]
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
@@ -121,15 +122,10 @@ impl RelationReader for RelationsReaderService {
             list,
         })
     }
-}
-
-impl ReaderChild for RelationsReaderService {
-    type Request = RelationSearchRequest;
-    type Response = RelationSearchResponse;
 
     #[measure(actor = "relations", metric = "search")]
     #[tracing::instrument(skip_all)]
-    fn search(&self, request: &Self::Request) -> NodeResult<Self::Response> {
+    fn search(&self, request: &ProtosRequest) -> NodeResult<ProtosResponse> {
         Ok(RelationSearchResponse {
             subgraph: self.graph_search(request)?,
             prefix: self.prefix_search(request)?,
@@ -172,7 +168,7 @@ impl RelationsReaderService {
     }
 
     #[tracing::instrument(skip_all)]
-    fn graph_search(&self, request: &RelationSearchRequest) -> NodeResult<Option<EntitiesSubgraphResponse>> {
+    fn graph_search(&self, request: &ProtosRequest) -> NodeResult<Option<EntitiesSubgraphResponse>> {
         let Some(bfs_request) = request.subgraph.as_ref() else {
             return Ok(None);
         };
@@ -307,7 +303,7 @@ impl RelationsReaderService {
     }
 
     #[tracing::instrument(skip_all)]
-    fn prefix_search(&self, request: &RelationSearchRequest) -> NodeResult<Option<RelationPrefixSearchResponse>> {
+    fn prefix_search(&self, request: &ProtosRequest) -> NodeResult<Option<RelationPrefixSearchResponse>> {
         let Some(prefix_request) = request.prefix.as_ref() else {
             return Ok(None);
         };

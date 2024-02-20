@@ -39,8 +39,8 @@ pub struct NodeDictionary {
     index: Index,
 }
 impl NodeDictionary {
-    const NODE_VALUE: &str = "value";
-    const NODE_HASH: &str = "hash";
+    const NODE_VALUE: &'static str = "value";
+    const NODE_HASH: &'static str = "hash";
     const NUM_THREADS: usize = 1;
     const MEM_LIMIT: usize = 6_000_000;
 

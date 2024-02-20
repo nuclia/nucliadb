@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import json
 import uuid
 from io import BytesIO
 from typing import AsyncIterator, Optional
@@ -48,7 +49,6 @@ from nucliadb_protos.writer_pb2 import (
     ExtractedVectorsWrapper,
     FileRequest,
     FileUploaded,
-    GetConfigurationResponse,
     GetEntitiesGroupRequest,
     GetEntitiesGroupResponse,
     GetEntitiesRequest,
@@ -74,7 +74,6 @@ from nucliadb_protos.writer_pb2 import (
     ResourceIdRequest,
     ResourceIdResponse,
     SetEntitiesRequest,
-    SetKBConfigurationRequest,
     SetLabelsRequest,
     SetSynonymsRequest,
     SetVectorSetRequest,
@@ -90,6 +89,7 @@ from nucliadb_protos.writer_pb2 import (
     WriterStatusResponse,
 )
 
+from nucliadb import learning_config
 from nucliadb.common.cluster.exceptions import AlreadyExists, EntitiesGroupNotFound
 from nucliadb.common.cluster.manager import clean_and_upgrade, get_index_nodes
 from nucliadb.common.cluster.utils import get_shard_manager
@@ -109,7 +109,7 @@ from nucliadb_protos import utils_pb2, writer_pb2, writer_pb2_grpc
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
 from nucliadb_utils.keys import KB_SHARDS
-from nucliadb_utils.settings import running_settings
+from nucliadb_utils.settings import is_onprem_nucliadb, running_settings
 from nucliadb_utils.storages.storage import Storage, StorageField
 from nucliadb_utils.utilities import (
     get_partitioning,
@@ -203,15 +203,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request: KnowledgeBoxNew, context=None
     ) -> NewKnowledgeBoxResponse:
         try:
-            release_channel = get_release_channel(request)
-            request.config.release_channel = release_channel
-            kbid = await self.proc.create_kb(
-                request.slug,
-                request.config,
-                parse_model_metadata(request),
-                forceuuid=request.forceuuid,
-                release_channel=release_channel,
-            )
+            kbid = await self.create_kb(request)
             logger.info("KB created successfully", extra={"kbid": kbid})
         except KnowledgeBoxConflict:
             logger.warning("KB already exists", extra={"slug": request.slug})
@@ -225,6 +217,77 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             )
             return NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.ERROR)
         return NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.OK, uuid=kbid)
+
+    async def create_kb(self, request: KnowledgeBoxNew) -> str:
+        if is_onprem_nucliadb():
+            return await self._create_kb_onprem(request)
+        else:
+            return await self._create_kb_hosted(request)
+
+    async def _create_kb_onprem(self, request: KnowledgeBoxNew) -> str:
+        """
+        First, try to get the learning configuration for the new knowledge box.
+        From there we need to extract the semantic model metadata and pass it to the create_kb method.
+        If the kb creation fails, rollback the learning configuration for the kbid that was just created.
+        """
+        kbid = request.forceuuid or str(uuid.uuid4())
+        release_channel = get_release_channel(request)
+        request.config.release_channel = release_channel
+        lconfig = await learning_config.get_configuration(kbid)
+        lconfig_created = False
+        if lconfig is None:
+            if request.learning_config:
+                # We parse the desired configuration from the request and set it
+                config = json.loads(request.learning_config)
+            else:
+                # We set an empty configuration so that learning chooses the default values.
+                config = {}
+                logger.warning(
+                    "No learning configuration provided. Default will be used.",
+                    extra={"kbid": kbid},
+                )
+            lconfig = await learning_config.set_configuration(kbid, config=config)
+            lconfig_created = True
+        else:
+            logger.info("Learning configuration already exists", extra={"kbid": kbid})
+        try:
+            await self.proc.create_kb(
+                request.slug,
+                request.config,
+                parse_model_metadata_from_learning_config(lconfig),
+                forceuuid=kbid,
+                release_channel=release_channel,
+            )
+            return kbid
+        except Exception:
+            # Rollback learning config for the kbid that was just created
+            try:
+                if lconfig_created:
+                    await learning_config.delete_configuration(kbid)
+            except Exception:
+                logger.warning(
+                    "Could not rollback learning configuration",
+                    exc_info=True,
+                    extra={"kbid": kbid},
+                )
+            raise
+
+    async def _create_kb_hosted(self, request: KnowledgeBoxNew) -> str:
+        """
+        For the hosted case, we assume that the learning configuration
+        is already set and we are given the model metadata in the request.
+        """
+        kbid = request.forceuuid or str(uuid.uuid4())
+        release_channel = get_release_channel(request)
+        request.config.release_channel = release_channel
+        await self.proc.create_kb(
+            request.slug,
+            request.config,
+            parse_model_metadata_from_request(request),
+            forceuuid=kbid,
+            release_channel=release_channel,
+        )
+        return kbid
 
     async def UpdateKnowledgeBox(  # type: ignore
         self, request: KnowledgeBoxUpdate, context=None
@@ -246,13 +309,26 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request: KnowledgeBoxID, context=None
     ) -> DeleteKnowledgeBoxResponse:
         try:
-            await self.proc.delete_kb(request.uuid, request.slug)
+            await self.delete_kb(request)
         except KnowledgeBoxNotFound:
             logger.warning(f"KB not found: kbid={request.uuid}, slug={request.slug}")
         except Exception:
             logger.exception("Could not delete KB", exc_info=True)
             return DeleteKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.ERROR)
         return DeleteKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.OK)
+
+    async def delete_kb(self, request: KnowledgeBoxID) -> None:
+        kbid = request.uuid
+        await self.proc.delete_kb(kbid, request.slug)
+        try:
+            await learning_config.delete_configuration(kbid)
+            logger.info("Learning configuration deleted", extra={"kbid": kbid})
+        except Exception:
+            logger.exception(
+                "Unexpected error deleting learning configuration",
+                exc_info=True,
+                extra={"kbid": kbid},
+            )
 
     async def ListKnowledgeBox(  # type: ignore
         self, request: KnowledgeBoxPrefix, context=None
@@ -567,68 +643,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 response.status = OpStatusWriter.Status.OK
             return response
 
-    async def SetConfiguration(  # type: ignore
-        self, request: SetKBConfigurationRequest, context=None
-    ) -> OpStatusWriter:
-        response = OpStatusWriter()
-        txn: Transaction
-        async with self.driver.transaction() as txn:
-            kbobj = await self.proc.get_kb_obj(txn, request.kb)
-            if kbobj is None:
-                response.status = OpStatusWriter.Status.NOTFOUND
-                return response
-            try:
-                await kbobj.set_configuration(request.config)
-                await txn.commit()
-                response.status = OpStatusWriter.Status.OK
-                return response
-            except Exception as e:
-                errors.capture_exception(e)
-                logger.exception("Errors setting configuration")
-                response.status = OpStatusWriter.Status.ERROR
-                return response
-
-    async def GetConfiguration(  # type: ignore
-        self, request: KnowledgeBoxID, context=None
-    ) -> GetConfigurationResponse:
-        response = GetConfigurationResponse()
-        txn: Transaction
-        async with self.driver.transaction() as txn:
-            kbobj = await self.proc.get_kb_obj(txn, request)
-            if kbobj is None:
-                response.status.status = OpStatusWriter.Status.NOTFOUND
-                return response
-            try:
-                await kbobj.get_configuration(response.config)
-                response.status.status = OpStatusWriter.Status.OK
-                return response
-            except Exception as e:
-                errors.capture_exception(e)
-                logger.exception("Errors getting configuration")
-                response.status.status = OpStatusWriter.Status.ERROR
-                return response
-
-    async def DelConfiguration(  # type: ignore
-        self, request: KnowledgeBoxID, context=None
-    ) -> OpStatusWriter:
-        response = OpStatusWriter()
-        txn: Transaction
-        async with self.driver.transaction() as txn:
-            kbobj = await self.proc.get_kb_obj(txn, request)
-            if kbobj is None:
-                response.status = OpStatusWriter.Status.NOTFOUND
-                return response
-            try:
-                await kbobj.del_configuration()
-                await txn.commit()
-                response.status = OpStatusWriter.Status.OK
-                return response
-            except Exception as e:
-                errors.capture_exception(e)
-                logger.exception("Errors setting synonyms")
-                response.status = OpStatusWriter.Status.ERROR
-                return response
-
     async def GetSynonyms(  # type: ignore
         self, request: KnowledgeBoxID, context=None
     ) -> GetSynonymsResponse:
@@ -912,15 +926,45 @@ def update_shards_with_updated_replica(
                 return
 
 
-def parse_model_metadata(request: KnowledgeBoxNew) -> SemanticModelMetadata:
+LEARNING_SIMILARITY_FUNCTION_TO_PROTO = {
+    "cosine": utils_pb2.VectorSimilarity.COSINE,
+    "dot": utils_pb2.VectorSimilarity.DOT,
+}
+
+
+def parse_model_metadata_from_learning_config(
+    lconfig: learning_config.LearningConfiguration,
+) -> SemanticModelMetadata:
+    model = SemanticModelMetadata()
+    model.similarity_function = LEARNING_SIMILARITY_FUNCTION_TO_PROTO[
+        lconfig.semantic_vector_similarity
+    ]
+    if lconfig.semantic_vector_size is not None:
+        model.vector_dimension = lconfig.semantic_vector_size
+    else:
+        logger.warning("Vector dimension not set!")
+    if lconfig.semantic_threshold is not None:
+        model.default_min_score = lconfig.semantic_threshold
+    else:
+        logger.warning("Default min score not set!")
+    return model
+
+
+def parse_model_metadata_from_request(
+    request: KnowledgeBoxNew,
+) -> SemanticModelMetadata:
     model = SemanticModelMetadata()
     model.similarity_function = request.similarity
-    # TODO: remove `HasField` conditions once we are sure
-    # they are always provided (both in self-hosted and cloud)
     if request.HasField("vector_dimension"):
         model.vector_dimension = request.vector_dimension
+    else:
+        logger.warning(
+            "Vector dimension not set. Will be detected automatically on the first vector set."
+        )
     if request.HasField("default_min_score"):
         model.default_min_score = request.default_min_score
+    else:
+        logger.warning("Default min score not set!")
     return model
 
 

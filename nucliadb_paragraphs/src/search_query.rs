@@ -17,14 +17,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+use crate::query_io;
+use itertools::Itertools;
+use nucliadb_core::paragraphs::ParagraphsContext;
+use nucliadb_core::protos::prost_types::Timestamp as ProstTimestamp;
+use nucliadb_core::protos::{ParagraphSearchRequest, StreamRequest, SuggestRequest};
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::ops::Bound;
 use std::sync::{Arc, Mutex};
-
-use itertools::Itertools;
-use nucliadb_core::protos::prost_types::Timestamp as ProstTimestamp;
-use nucliadb_core::protos::{ParagraphSearchRequest, StreamRequest, SuggestRequest};
 use tantivy::query::*;
 use tantivy::schema::{Facet, Field, IndexRecordOption};
 use tantivy::{DocId, InvertedIndexReader, Term};
@@ -56,7 +57,7 @@ impl TermCollector {
         self.eterms.insert(term);
     }
     pub fn log_fterm(&mut self, doc: DocId, data: (Arc<InvertedIndexReader>, u64)) {
-        self.fterms.entry(doc).or_insert_with(Vec::new).push(data);
+        self.fterms.entry(doc).or_default().push(data);
     }
     pub fn get_fterms(&self, doc: DocId) -> Vec<String> {
         let mut terms = Vec::new();
@@ -315,7 +316,8 @@ pub fn suggest_query(
             originals.push((Occur::Must, Box::new(facet_term_query)));
         });
 
-    // Filters
+    // WARNING: this only works due to constraints outside the node's control.
+    // Suggest is assuming that filters work like they did in the beginning.
     request
         .filter
         .iter()
@@ -347,6 +349,7 @@ pub fn search_query(
     text: &str,
     search: &ParagraphSearchRequest,
     schema: &ParagraphSchema,
+    context: &ParagraphsContext,
     distance: u8,
     with_advance: Option<Box<dyn Query>>,
 ) -> (Box<dyn Query>, SharedTermC, Box<dyn Query>) {
@@ -409,32 +412,12 @@ pub fn search_query(
         fuzzies.push((Occur::Must, field_filter.clone()));
         originals.push((Occur::Must, field_filter));
     }
+
     // Label filters
-    let mut label_filters: Vec<Box<dyn Query>> = vec![];
-    search
-        .filter
-        .iter()
-        .flat_map(|f| f.field_labels.iter())
-        .flat_map(|facet_key| Facet::from_text(facet_key).ok().into_iter())
-        .for_each(|facet| {
-            let facet_term = Term::from_facet(schema.facets, &facet);
-            let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
-            label_filters.push(Box::new(facet_term_query));
-        });
-    search
-        .filter
-        .iter()
-        .flat_map(|f| f.paragraph_labels.iter())
-        .flat_map(|facet_key| Facet::from_text(facet_key).ok().into_iter())
-        .for_each(|facet| {
-            let facet_term = Term::from_facet(schema.facets, &facet);
-            let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
-            label_filters.push(Box::new(facet_term_query));
-        });
-    if !label_filters.is_empty() {
-        let label_filters_query = Box::new(BooleanQuery::intersection(label_filters));
-        fuzzies.push((Occur::Must, label_filters_query.clone()));
-        originals.push((Occur::Must, label_filters_query));
+    if let Some(formula) = &context.filtering_formula {
+        let query = query_io::translate_expression(formula, schema);
+        fuzzies.push((Occur::Must, query.box_clone()));
+        originals.push((Occur::Must, query));
     }
 
     // Keys filter
@@ -460,6 +443,7 @@ pub fn search_query(
         let key_filter_query = Box::new(BooleanQuery::intersection(key_filter));
         key_filters.push(key_filter_query);
     });
+
     if !key_filters.is_empty() {
         let key_filters_query = Box::new(BooleanQuery::union(key_filters));
         fuzzies.push((Occur::Must, key_filters_query.clone()));
