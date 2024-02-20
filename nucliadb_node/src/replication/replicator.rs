@@ -125,6 +125,7 @@ pub async fn replicate_shard(
             file = tokio::fs::File::create(temp_filepath.clone()).await?;
         }
     }
+    shard.reload_state();
     drop(file);
     drop(_gc_lock);
 

@@ -63,4 +63,5 @@ pub trait VectorWriter: std::fmt::Debug + Send + Sync {
     fn list_vectorsets(&self) -> NodeResult<Vec<String>>;
     fn remove_vectorset(&mut self, setid: &VectorSetId) -> NodeResult<()>;
     fn add_vectorset(&mut self, setid: &VectorSetId, similarity: VectorSimilarity) -> NodeResult<()>;
+    fn reload_state(&mut self) -> NodeResult<()>;
 }

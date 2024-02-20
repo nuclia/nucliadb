@@ -372,6 +372,12 @@ impl VectorWriter for VectorWriterService {
             files,
         }))
     }
+
+    fn reload_state(&mut self) -> NodeResult<()> {
+        self.index.reload_state()?;
+        self.indexset.update()?;
+        Ok(())
+    }
 }
 
 impl VectorWriterService {

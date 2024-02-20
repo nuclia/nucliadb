@@ -62,7 +62,7 @@ impl IndexSet {
         let mut write = self.state.write().unwrap();
         write.get_or_create(index, similarity, writer)
     }
-    fn update(&self) -> VectorR<()> {
+    pub fn update(&self) -> VectorR<()> {
         let disk_v = fs_state::crnt_version(&self.location)?;
         let new_state = fs_state::load_state(&self.location)?;
         let mut state = self.state.write().unwrap();

@@ -173,6 +173,10 @@ impl Index {
         Ok(())
     }
 
+    pub fn reload_state(&self) -> VectorR<()> {
+        self.write_segments().refresh()
+    }
+
     fn load_v1_state(path: &Path) -> VectorR<SegmentManager> {
         let v1 = state_v1::State::open(path)?;
         let state_version = fs_state::crnt_version(path)?;

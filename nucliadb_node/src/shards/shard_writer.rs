@@ -501,6 +501,10 @@ impl ShardWriter {
         files.push((PathBuf::from(RELATIONS_DIR), relation_files));
         Ok(files)
     }
+
+    pub fn reload_state(&self) -> NodeResult<()> {
+        vector_write(&self.vector_writer).reload_state()
+    }
 }
 
 pub enum GarbageCollectorStatus {
