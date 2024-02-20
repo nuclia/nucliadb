@@ -215,7 +215,7 @@ fn test_datapoint(
 
     stats.writing_time = create_db(&db_location, index_size, batch_size, vecs) as u128;
 
-    let reader = Index::open(&db_location).unwrap();
+    let reader = Index::open(&db_location, false).unwrap();
 
     for cycle in 0..cycles {
         print!("Unfiltered Search => cycle {} of {}      \r", (cycle + 1), cycles);

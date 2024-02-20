@@ -38,7 +38,7 @@ pub enum VectorErr {
     #[error("IO error: {0}")]
     IoErr(#[from] std::io::Error),
     #[error("Error in fs: {0}")]
-    FsError(#[from] nucliadb_core::fs_state::FsError),
+    FsError(#[from] data_point_provider::fs_state::FsError),
     #[error("Garbage collection delayed")]
     WorkDelayed,
     #[error("Several writers are open at the same time ")]
@@ -51,6 +51,8 @@ pub enum VectorErr {
     InconsistentDimensions,
     #[error("UTF8 decoding error: {0}")]
     FromUtf8Error(#[from] std::string::FromUtf8Error),
+    #[error("Cannot write to old metadata")]
+    OldMetadata,
 }
 
 pub type VectorR<O> = Result<O, VectorErr>;

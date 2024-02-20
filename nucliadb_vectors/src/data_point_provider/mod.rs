@@ -18,9 +18,12 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+pub(crate) mod fs_state;
 mod merge_worker;
 mod merger;
 mod segment_manager;
+mod state_v1;
+
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
@@ -137,11 +140,10 @@ enum MergerStatus {
     Free,
     WorkScheduled(Receiver<Transaction>),
 }
-
 pub struct Index {
     metadata: IndexMetadata,
     merger_status: MergerStatus,
-    segments: RwLock<SegmentManager>,
+    state: RwLock<SegmentManager>,
     pub location: PathBuf,
     dimension: RwLock<Option<u64>>,
 }
@@ -155,11 +157,11 @@ impl Index {
     }
 
     fn read_segments(&self) -> RwLockReadGuard<'_, SegmentManager> {
-        self.segments.read().unwrap_or_else(|e| e.into_inner())
+        self.state.read().unwrap_or_else(|e| e.into_inner())
     }
 
     fn write_segments(&self) -> RwLockWriteGuard<'_, SegmentManager> {
-        self.segments.write().unwrap_or_else(|e| e.into_inner())
+        self.state.write().unwrap_or_else(|e| e.into_inner())
     }
 
     fn update(&self) -> VectorR<()> {
@@ -171,19 +173,38 @@ impl Index {
         Ok(())
     }
 
-    pub fn open(path: &Path) -> VectorR<Index> {
-        let state = SegmentManager::open(path.to_path_buf())?;
+    fn load_v1_state(path: &Path) -> VectorR<SegmentManager> {
+        let v1 = state_v1::State::open(path)?;
+        let state_version = fs_state::crnt_version(path)?;
+        SegmentManager::from_v1_state(path, v1, state_version)
+    }
+
+    pub fn open(path: &Path, write: bool) -> VectorR<Index> {
         let metadata = IndexMetadata::open(path)?.map(Ok).unwrap_or_else(|| {
             // Old indexes may not have this file so in that case the
             // metadata file they should have is created.
             let metadata = IndexMetadata::default();
             metadata.write(path).map(|_| metadata)
         })?;
+
+        let state = if let Ok(v2) = SegmentManager::open(path.to_path_buf()) {
+            v2
+        } else {
+            // Failed to open V2 metadata, try V1
+            let migrated_v1 = Self::load_v1_state(path)?;
+            if write {
+                // Make a backup and persist the changes
+                fs_state::backup_state(path)?;
+                migrated_v1.save()?;
+            }
+            migrated_v1
+        };
+
         let index = Index {
             metadata,
             merger_status: MergerStatus::Free,
             dimension: RwLock::new(None),
-            segments: RwLock::new(state),
+            state: RwLock::new(state),
             location: path.to_path_buf(),
         };
         // Read dimension from segments
@@ -200,7 +221,7 @@ impl Index {
             metadata,
             merger_status: MergerStatus::Free,
             dimension: RwLock::new(None),
-            segments: RwLock::new(state),
+            state: RwLock::new(state),
             location: path.to_path_buf(),
         };
         Ok(index)
@@ -238,6 +259,7 @@ impl Index {
         let no_results = request.no_results();
         let min_score = request.min_score();
         let mut ffsv = Fssc::new(request.no_results(), with_duplicates);
+
         for (delete_log, dpid) in self.read_segments().segment_iterator() {
             let data_point = DataPoint::open(&self.location, dpid)?;
             let partial_solution = data_point.search(
@@ -253,6 +275,7 @@ impl Index {
                 ffsv.add(candidate);
             }
         }
+
         Ok(ffsv.into())
     }
 
@@ -304,6 +327,7 @@ impl Index {
         let Some((_, dpid)) = self.read_segments().segment_iterator().next() else {
             return Ok(None);
         };
+
         let data_point = DataPoint::open(&self.location, dpid)?;
         Ok(data_point.stored_len())
     }
@@ -373,10 +397,12 @@ impl Index {
 
 #[cfg(test)]
 mod test {
-    use std::thread::sleep;
+    use std::thread::{self, sleep};
     use std::time::Duration;
 
     use nucliadb_core::NodeResult;
+
+    use super::fs_state;
 
     use super::*;
     use crate::data_point::{Elem, LabelDictionary, Similarity};
@@ -397,12 +423,12 @@ mod test {
         Ok(())
     }
 
-    fn insert_resource(index: &mut Index, i: u32) {
+    fn insert_resource(index: &mut Index, i: u32) -> VectorR<()> {
         let e = Elem::new(format!("key_{i}"), vec![2.0 + (i as f32 * 0.1)], LabelDictionary::new(vec![]), None);
         let dp = DataPoint::new(index.location(), vec![e], None, Similarity::Cosine, Channel::EXPERIMENTAL).unwrap();
         let mut tx = index.transaction();
         tx.add_segment(dp.journal());
-        index.commit(tx).unwrap();
+        index.commit(tx)
     }
 
     #[test]
@@ -413,7 +439,7 @@ mod test {
 
         // Insert(0, 1, 2)
         for i in 0..3 {
-            insert_resource(&mut index, i);
+            insert_resource(&mut index, i)?;
         }
         let result = index.get_keys()?;
         assert_eq!(result.len(), 3);
@@ -427,7 +453,7 @@ mod test {
         assert_eq!(result.len(), 2);
 
         // Insert(0)
-        insert_resource(&mut index, 0);
+        insert_resource(&mut index, 0)?;
 
         let result = index.get_keys()?;
         assert_eq!(result.len(), 3);
@@ -461,6 +487,52 @@ mod test {
         assert_eq!(result.len(), 3);
         assert_eq!(index.read_segments().all_segments_iterator().count(), 1);
         assert_eq!(index.read_segments().segment_iterator().count(), 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_index_metadata_upgrade() -> NodeResult<()> {
+        // Manually create an Index V1 since we do not allow this anymore
+        let dir = tempfile::tempdir()?;
+        let vectors_path = dir.path();
+        let mut v1_state = state_v1::State::new();
+        fs_state::persist_state(vectors_path, &v1_state)?;
+        let meta = IndexMetadata::default();
+        meta.write(vectors_path)?;
+
+        // Fill in some data manually, since we don't allow writes in V1 anymore
+        {
+            for i in 0..13 {
+                let e = Elem::new(format!("key_{i}"), vec![2.0 + (i as f32 * 0.1)], LabelDictionary::new(vec![]), None);
+                let dp =
+                    DataPoint::new(vectors_path, vec![e], None, Similarity::Cosine, Channel::EXPERIMENTAL).unwrap();
+                v1_state.add(dp.journal());
+            }
+            v1_state.remove("key_12", SystemTime::now());
+            v1_state.remove("key_6", SystemTime::now().checked_sub(Duration::from_secs(10)).unwrap());
+            fs_state::persist_state(vectors_path, &v1_state)?;
+        }
+
+        // A reader can open a V1 index
+        let index_reader = Index::open(dir.path(), false)?;
+        assert_eq!(index_reader.get_keys()?.len(), 12);
+        // assert!(matches!(*index_reader.read_segments(), State::V1(_)));
+
+        // Will upgrade to V2 when a writer opens this
+        thread::sleep(Duration::from_millis(500));
+        let mut index_writer = Index::open(dir.path(), true)?;
+        // assert!(matches!(*index_writer.read_segments(), State::V2(_)));
+
+        // The reader also gets updated on next read
+        thread::sleep(Duration::from_millis(500));
+        assert_eq!(index_reader.get_keys()?.len(), 12);
+        // assert!(matches!(*index_reader.read_segments(), State::V2(_)));
+
+        // Writer can write to V2, and reader sees it
+        insert_resource(&mut index_writer, 15)?;
+        thread::sleep(Duration::from_millis(500));
+        assert_eq!(index_reader.get_keys()?.len(), 13);
 
         Ok(())
     }

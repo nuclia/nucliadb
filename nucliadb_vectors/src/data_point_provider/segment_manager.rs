@@ -24,8 +24,8 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{Seek, Write};
 use std::path::{Path, PathBuf};
 
+use super::fs_state::{self, FsResult, Version};
 use fs2::FileExt;
-use nucliadb_core::fs_state::{self, FsResult, Version};
 use serde::{Deserialize, Serialize};
 
 use crate::data_point::{DpId, Journal};
@@ -33,12 +33,14 @@ use crate::data_types::dtrie_ram::DTrie;
 use crate::data_types::DeleteLog;
 use crate::VectorR;
 
+use super::state_v1;
+
 type TxId = u64;
 type SegmentId = DpId;
 
 #[derive(Clone, Copy)]
 struct TimeSensitiveDLog<'a> {
-    dlog: &'a DTrie,
+    dlog: &'a DTrie<u64>,
     transaction: TxId,
 }
 impl<'a> DeleteLog for TimeSensitiveDLog<'a> {
@@ -81,7 +83,7 @@ impl Operation {
 #[derive(Serialize, Deserialize, Default, Clone)]
 struct State {
     journal: Vec<JournalEntry>,
-    delete_log: DTrie,
+    delete_log: DTrie<u64>,
     no_nodes: usize,
 }
 
@@ -337,9 +339,59 @@ impl SegmentManager {
         Self::open(path)
     }
 
+    pub fn from_v1_state(path: &Path, v1: state_v1::State, state_version: Version) -> VectorR<Self> {
+        let mut state = State {
+            no_nodes: v1.no_nodes(),
+            ..Default::default()
+        };
+
+        let mut time_map = Vec::new();
+        let mut segments = HashMap::new();
+        let mut v1_segments: Vec<_> = v1.data_point_iterator().collect();
+        v1_segments.sort_by_key(|j| j.time());
+        let mut txid = 0u64;
+        for segment in v1_segments {
+            let time = segment.time();
+            txid += 1;
+            time_map.push(time);
+
+            state.journal.push(JournalEntry {
+                txid,
+                operation: Operation::AddSegment(segment.id()),
+            });
+            segments.insert(segment.id(), txid);
+        }
+        state.delete_log = v1.delete_log.convert(&|delete_time| {
+            let mut new_value = 0;
+            for (tx_idx, tx_time) in time_map.iter().enumerate() {
+                if delete_time > tx_time {
+                    // Delete time is later than this transaction, so
+                    // we can say it happens at the next transaction
+                    // The transactions are 1-indexed and vec is 0-indexed
+                    // So idx + 1 = txid. txid + 1 = next_txid
+                    new_value = tx_idx as u64 + 2;
+                }
+            }
+            new_value
+        });
+
+        let state_file = StateFile::new(path.to_path_buf())?;
+
+        let mut sm = SegmentManager {
+            state,
+            state_version,
+            segments,
+            path: path.to_path_buf(),
+            state_file,
+        };
+        sm.write_state()?;
+        Ok(sm)
+    }
+
     pub fn refresh(&mut self) -> VectorR<()> {
         let mut old_txid = self.txid();
         self.state = fs_state::load_state(&self.path)?;
+        self.state_version = fs_state::crnt_version(&self.path)?;
 
         if self.txid() < old_txid {
             // The new txid is older than the previous one, this can happen if the shard is cleaned/upgraded in-place
