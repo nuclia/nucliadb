@@ -41,6 +41,9 @@ class ShardLocation:
     node_id: str
 
 
+UNKNOWN_KB = "unknown"
+
+
 async def detect_orphan_shards(driver: Driver):
     """Detect orphan shards in the system. An orphan shard is one indexed but
     not referenced for any stored KB.
@@ -67,9 +70,28 @@ async def detect_orphan_shards(driver: Driver):
         )
 
     orphan_shard_ids = indexed_shards.keys() - stored_shards.keys()
-    orphan_shards: dict[str, ShardLocation] = {
-        shard_id: indexed_shards[shard_id] for shard_id in orphan_shard_ids
-    }
+    orphan_shards: dict[str, ShardLocation] = {}
+    for shard_id in orphan_shard_ids:
+        node_id = indexed_shards[shard_id].node_id
+        node = manager.get_index_node(node_id)
+
+        kbid = UNKNOWN_KB
+        try:
+            shard_pb = await node.get_shard(shard_id)
+        except AioRpcError as grpc_error:
+            logger.error(
+                "Can't get shard while looking for orphans in index nodes, is it broken?",
+                exc_info=grpc_error,
+                extra={
+                    "shard_id": shard_id,
+                    "node_id": node.id,
+                },
+            )
+        else:
+            kbid = shard_pb.metadata.kbid
+
+        orphan_shards[shard_id] = ShardLocation(kbid=kbid, node_id=node.id)
+
     return orphan_shards
 
 
@@ -79,20 +101,7 @@ async def _get_indexed_shards() -> dict[str, ShardLocation]:
     for node in available_nodes:
         node_shards = await node.list_shards()
         for shard_id in node_shards:
-            try:
-                shard_pb = await node.get_shard(shard_id)
-            except AioRpcError as grpc_error:
-                logger.error(
-                    "Can't get shard while looking for orphans in index nodes, is it broken?",
-                    exc_info=grpc_error,
-                    extra={
-                        "shard_id": shard_id,
-                        "node_id": node.id,
-                    },
-                )
-            else:
-                kbid = shard_pb.metadata.kbid
-                indexed_shards[shard_id] = ShardLocation(kbid=kbid, node_id=node.id)
+            indexed_shards[shard_id] = ShardLocation(kbid=UNKNOWN_KB, node_id=node.id)
     return indexed_shards
 
 
