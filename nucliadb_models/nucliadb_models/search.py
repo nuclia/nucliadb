@@ -29,7 +29,7 @@ from nucliadb_protos.nodereader_pb2 import ParagraphResult as PBParagraphResult
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb_protos.writer_pb2 import Shards as PBShards
-from pydantic import BaseModel, Field, ValidationError, root_validator, validator
+from pydantic import BaseModel, Field, root_validator, validator
 from typing_extensions import Annotated
 
 from nucliadb_models.common import FieldTypeName, ParamDefault
@@ -577,15 +577,16 @@ class SearchParamDefaults:
 
 
 class Filter(BaseModel):
-    def __init__(self, **data):
-        super().__init__(**data)
-        if len(data) != 1:
-            raise ValidationError("Use either 'all', 'any', 'none' or 'not_all'")
-
     all: Optional[List[str]] = Field(default=None, min_items=1)
     any: Optional[List[str]] = Field(default=None, min_items=1)
     none: Optional[List[str]] = Field(default=None, min_items=1)
     not_all: Optional[List[str]] = Field(default=None, min_items=1)
+
+    @root_validator(pre=True)
+    def validate_filter(cls, values):
+        if len({k for k, v in values.items() if v is not None}) != 1:
+            raise ValueError("Only one of 'all', 'any', 'none' or 'not_all' can be set")
+        return values
 
 
 class BaseSearchRequest(BaseModel):
