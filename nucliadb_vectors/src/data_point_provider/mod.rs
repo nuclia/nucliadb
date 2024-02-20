@@ -288,6 +288,11 @@ impl Index {
         // A merge may be waiting to be recorded.
         self.apply_pending_merge()?;
 
+        if matches!(self.merger_status, MergerStatus::WorkScheduled(_)) {
+            // Cannot GC while a merge is running
+            return Ok(());
+        }
+
         // First compact the segment log, to remove all references
         // to segments that are no longer in use by any reader
         let mut state = self.write_segments();
@@ -397,10 +402,13 @@ impl Index {
 
 #[cfg(test)]
 mod test {
+    use crossbeam::channel::Sender;
     use std::thread::{self, sleep};
     use std::time::Duration;
 
     use nucliadb_core::NodeResult;
+
+    use self::merger::MergeQuery;
 
     use super::fs_state;
 
@@ -429,6 +437,74 @@ mod test {
         let mut tx = index.transaction();
         tx.add_segment(dp.journal());
         index.commit(tx)
+    }
+
+    struct TestWorker {
+        worker: Box<dyn MergeQuery>,
+        sender: Sender<Transaction>,
+        receiver: Receiver<Transaction>,
+    }
+    impl TestWorker {
+        fn new(location: PathBuf, sender: Sender<Transaction>, similarity: Similarity, channel: Channel) -> Self {
+            let (internal_sender, receiver) = crossbeam::channel::unbounded();
+            let worker = Worker::request(location, internal_sender, similarity, channel);
+            Self {
+                worker,
+                sender,
+                receiver,
+            }
+        }
+    }
+    impl MergeQuery for TestWorker {
+        fn do_work(&self) -> VectorR<()> {
+            self.worker.do_work()?;
+            let msg = self.receiver.recv().unwrap();
+            thread::sleep(Duration::from_millis(200));
+            let _ = self.sender.send(msg); // This will fail if the test has already finished
+
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn merge_and_gc_test() -> NodeResult<()> {
+        let dir = tempfile::tempdir()?;
+        let vectors_path = dir.path().join("vectors");
+        let mut index = Index::new(&vectors_path, IndexMetadata::default())?;
+
+        for i in 0..3 {
+            insert_resource(&mut index, i)?;
+        }
+
+        let num_files = std::fs::read_dir(&vectors_path)?.count();
+        let _ = Merger::install_global().map(std::thread::spawn);
+
+        // Start merge. The TestWorker will delay the results for a second
+        let (sender, receiver) = channel::unbounded();
+        let worker = TestWorker::new(index.location.clone(), sender, index.metadata.similarity, index.metadata.channel);
+        index.merger_status = MergerStatus::WorkScheduled(receiver);
+        merger::send_merge_request(Box::new(worker));
+
+        // Wait until the new segment is created
+        for _ in 0..10 {
+            if std::fs::read_dir(&vectors_path).unwrap().count() > num_files {
+                break;
+            }
+            thread::sleep(Duration::from_millis(50));
+        }
+        let num_files_with_merge = std::fs::read_dir(&vectors_path).unwrap().count();
+        assert!(num_files_with_merge > num_files, "Merger did not create a new segment in time");
+
+        // At this point the segment exists but the merger should not have finished
+        // due to the 1 second delay. GC should avoid deleting the newly created segment
+        index.collect_garbage().unwrap();
+
+        assert!(
+            std::fs::read_dir(&vectors_path).unwrap().count() == num_files_with_merge,
+            "GC deleted the merger segment"
+        );
+
+        Ok(())
     }
 
     #[test]
@@ -468,7 +544,7 @@ mod test {
         assert_eq!(index.read_segments().segment_iterator().count(), 4);
 
         // Merge segments now, should leave a single live segments and prune the delete log
-        Merger::install_global().map(std::thread::spawn)?;
+        let _ = Merger::install_global().map(std::thread::spawn);
         index.start_merge();
         while !index.apply_pending_merge()? {
             sleep(Duration::from_millis(50));
