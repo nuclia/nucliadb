@@ -128,7 +128,8 @@ impl StateFile {
         let lock_path = path.join(format!("{}.{STATE_FILE_EXTENSION}", reader_id));
 
         // Open and lock the file atomically via rename
-        let file = OpenOptions::new().create(true).write(true).open(&tmp_path)?;
+        let mut file = OpenOptions::new().create(true).write(true).open(&tmp_path)?;
+        Self::write_to_file(&mut file, &0u64)?;
         file.lock_exclusive()?;
         fs::rename(tmp_path, lock_path)?;
 
@@ -138,10 +139,15 @@ impl StateFile {
         })
     }
 
-    fn write(&mut self, data: impl Serialize) -> FsResult<()> {
-        self.file.seek(std::io::SeekFrom::Start(0))?;
-        bincode::serialize_into(&mut self.file, &data)?;
-        self.file.flush()?;
+    fn write(&mut self, data: &impl Serialize) -> FsResult<()> {
+        Self::write_to_file(&mut self.file, data)
+    }
+
+    fn write_to_file(mut file: &mut File, data: &impl Serialize) -> FsResult<()> {
+        file.seek(std::io::SeekFrom::Start(0))?;
+        let writer = &mut file;
+        bincode::serialize_into(writer, data)?;
+        file.flush()?;
 
         Ok(())
     }
@@ -309,7 +315,7 @@ impl SegmentManager {
     }
 
     fn write_state(&mut self) -> VectorR<()> {
-        self.state_file.write(self.txid())?;
+        self.state_file.write(&self.txid())?;
         Ok(())
     }
 
