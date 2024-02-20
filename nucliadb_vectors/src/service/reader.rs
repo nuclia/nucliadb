@@ -68,15 +68,12 @@ impl VectorReader for VectorReaderService {
         if vectorset.is_empty() {
             debug!("Id for the vectorset is empty");
             self.index_count(&self.index)
+        } else if let Some(index) = self.indexset.get(vectorset, false)? {
+            debug!("Counting nodes for {vectorset}");
+            self.index_count(&index)
         } else {
-            let indexet_slock = self.indexset.get_slock()?;
-            if let Some(index) = self.indexset.get(vectorset, &indexet_slock)? {
-                debug!("Counting nodes for {vectorset}");
-                self.index_count(&index)
-            } else {
-                debug!("There was not a set called {vectorset}");
-                Ok(0)
-            }
+            debug!("There was not a set called {vectorset}");
+            Ok(0)
         }
     }
 
@@ -90,8 +87,6 @@ impl VectorReader for VectorReaderService {
         let total_to_get = offset + request.result_per_page;
         let offset = offset as usize;
         let total_to_get = total_to_get as usize;
-        let indexet_slock = self.indexset.get_slock()?;
-        let index_slock = self.index.get_slock()?;
 
         let key_filters = request.key_filters.iter().cloned().map(AtomClause::key_prefix);
         let field_labels = request.field_labels.iter().cloned().map(AtomClause::label);
@@ -120,20 +115,16 @@ impl VectorReader for VectorReaderService {
 
         let result = if request.vector_set.is_empty() {
             debug!("{id:?} - No vectorset specified, searching in the main index");
-            self.index.search(&search_request, &index_slock)?
-        } else if let Some(index) = self.indexset.get(&request.vector_set, &indexet_slock)? {
+            self.index.search(&search_request)?
+        } else if let Some(index) = self.indexset.get(&request.vector_set, false)? {
             debug!("{id:?} - vectorset specified and found, searching on {}", request.vector_set);
-            let lock = index.get_slock()?;
-            index.search(&search_request, &lock)?
+            index.search(&search_request)?
         } else {
             debug!("{id:?} - A was vectorset specified, but not found. {} is not a vectorset", request.vector_set);
             vec![]
         };
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Searching: ends at {v} ms");
-
-        std::mem::drop(indexet_slock);
-        std::mem::drop(index_slock);
 
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Creating results: starts at {v} ms");
@@ -162,8 +153,7 @@ impl VectorReader for VectorReaderService {
     #[tracing::instrument(skip_all)]
     fn stored_ids(&self) -> NodeResult<Vec<String>> {
         let time = Instant::now();
-        let lock = self.index.get_slock().unwrap();
-        let result = self.index.get_keys(&lock)?;
+        let result = self.index.get_keys()?;
         let v = time.elapsed().as_millis();
         debug!("Ending at {v} ms");
 
@@ -204,17 +194,14 @@ impl VectorReaderService {
             return Err(node_error!("Invalid path {:?}", config.vectorset));
         }
         Ok(VectorReaderService {
-            index: Index::open(&config.path)?,
+            index: Index::open(&config.path, false)?,
             indexset: IndexSet::new(&config.vectorset)?,
         })
     }
 
     #[measure(actor = "vectors", metric = "count")]
     fn index_count(&self, index: &Index) -> NodeResult<usize> {
-        let lock = index.get_slock()?;
-        let no_nodes = index.no_nodes(&lock);
-        std::mem::drop(lock);
-        Ok(no_nodes)
+        Ok(index.no_nodes()?)
     }
 }
 

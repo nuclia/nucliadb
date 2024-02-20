@@ -467,14 +467,15 @@ impl DataPoint {
         let neighbours = ops.search(Address(self.journal.nodes), self.index.as_ref(), results, filter, with_duplicates);
         neighbours.into_iter().map(|(address, dist)| (Neighbour::new(address, &self.nodes, dist))).take(results)
     }
-    pub fn merge<Dlog>(
+    pub fn merge<'a, Dlog, DPs>(
         dir: &path::Path,
-        operants: &[(Dlog, DpId)],
+        operants: DPs,
         similarity: Similarity,
         channel: Channel,
     ) -> VectorR<DataPoint>
     where
-        Dlog: DeleteLog,
+        Dlog: DeleteLog + 'a,
+        DPs: Iterator<Item = &'a (Dlog, DataPoint)>,
     {
         let uid = DpId::new_v4().to_string();
         let id = dir.join(&uid);
@@ -483,13 +484,9 @@ impl DataPoint {
         let mut journalf =
             fs::OpenOptions::new().read(true).write(true).create(true).open(id.join(file_names::JOURNAL))?;
         let mut hnswf = fs::OpenOptions::new().read(true).write(true).create(true).open(id.join(file_names::HNSW))?;
-        let operants = operants
-            .iter()
-            .map(|(dlog, dp_id)| DataPoint::open(dir, *dp_id).map(|v| (dlog, v)))
-            .collect::<VectorR<Vec<_>>>()?;
 
         // Creating the node store
-        let node_producers: Vec<_> = operants.iter().map(|dp| ((dp.0, Node), dp.1.nodes.as_ref())).collect();
+        let node_producers: Vec<_> = operants.map(|dp| ((&dp.0, Node), dp.1.nodes.as_ref())).collect();
         data_store::merge(&mut nodes, &node_producers)?;
         let nodes = unsafe { Mmap::map(&nodes)? };
         let no_nodes = data_store::stored_elements(&nodes);

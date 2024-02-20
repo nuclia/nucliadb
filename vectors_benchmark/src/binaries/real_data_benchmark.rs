@@ -160,17 +160,15 @@ fn create_request(
 }
 
 fn get_num_dimensions(vectors_path: &Path) -> usize {
-    let reader = Index::open(vectors_path).unwrap();
+    let reader = Index::open(vectors_path, false).unwrap();
     reader.get_dimension().unwrap() as usize
 }
 
 fn test_search(dataset: &Dataset, cycles: usize) -> Vec<(String, Vec<u128>)> {
     println!("Opening vectors located at {:?}", dataset.vectors_path);
     let _ = Merger::install_global().map(std::thread::spawn);
-    let reader = Index::open(dataset.vectors_path.as_path()).unwrap();
+    let reader = Index::open(dataset.vectors_path.as_path(), false).unwrap();
     let mut results: Vec<(String, Vec<u128>)> = vec![];
-
-    let lock = reader.get_slock().unwrap();
 
     for (i, query) in dataset.queries.iter().enumerate() {
         let mut elapsed_times: Vec<u128> = vec![];
@@ -182,7 +180,7 @@ fn test_search(dataset: &Dataset, cycles: usize) -> Vec<(String, Vec<u128>)> {
             let search_result;
 
             let (_, elapsed_time) = measure_time!(microseconds {
-                search_result = reader.search(&query.request, &lock).unwrap();
+                search_result = reader.search(&query.request).unwrap();
 
             });
 
@@ -214,7 +212,6 @@ fn test_search(dataset: &Dataset, cycles: usize) -> Vec<(String, Vec<u128>)> {
         results.push((query.name.clone(), elapsed_times));
     }
     println!();
-    std::mem::drop(lock);
     results
 }
 
