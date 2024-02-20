@@ -94,3 +94,37 @@ async def test_filtering_expression(nucliadb_reader, nucliadb_writer, knowledgeb
         expected_uuids = {slug_to_uuid[slug] for slug in expected_slugs}
         found_uuids = set(body["resources"].keys())
         assert found_uuids == expected_uuids
+
+
+@pytest.mark.asyncio
+async def test_filtering_expression_validation(nucliadb_reader, nucliadb_writer):
+    # Make sure we only allow one operator per filter
+    resp = await nucliadb_reader.post(
+        f"/kb/foobar/find",
+        json={
+            "query": "",
+            "filters": [
+                {"all": ["/origin.path/folder1"], "any": ["/origin.path/folder2"]}
+            ],
+        },
+    )
+    assert resp.status_code == 422
+    assert (
+        resp.json()["detail"][-1]["msg"]
+        == "Only one of 'all', 'any', 'none' or 'not_all' can be set"
+    )
+
+    # Empty lists of filter operators are not allowed
+    resp = await nucliadb_reader.post(
+        f"/kb/foobar/find",
+        json={"query": "", "filters": [{"all": []}]},
+    )
+    assert resp.status_code == 422
+    assert resp.json()["detail"][-1]["msg"] == "ensure this value has at least 1 items"
+
+    # But we ignore None values
+    resp = await nucliadb_reader.post(
+        f"/kb/foobar/find",
+        json={"query": "", "filters": [{"all": ["/origin.path/folder1"], "any": None}]},
+    )
+    assert resp.status_code != 422

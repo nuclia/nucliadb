@@ -418,6 +418,14 @@ class _NucliaDBBase:
         request_type=None,
         response_type=None,
     )
+    delete_resource_by_slug = _request_builder(
+        name="delete_resource_by_slug",
+        path_template="/v1/kb/{kbid}/slug/{rslug}",
+        method="DELETE",
+        path_params=("kbid", "rslug"),
+        request_type=None,
+        response_type=None,
+    )
     get_resource_by_slug = _request_builder(
         name="get_resource_by_slug",
         path_template="/v1/kb/{kbid}/slug/{slug}",

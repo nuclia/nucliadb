@@ -17,6 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import pytest
+
 import nucliadb_sdk
 from nucliadb_models.search import FeedbackTasks
 
@@ -69,7 +71,10 @@ async def test_resource_endpoints(sdk_async: nucliadb_sdk.NucliaDBAsync, kb):
     await sdk_async.reprocess_resource_by_slug(kbid=kb.uuid, slug="resource")
 
     # Delete
-    await sdk_async.delete_resource(kbid=kb.uuid, rid=resource.id)
+    await sdk_async.delete_resource_by_slug(kbid=kb.uuid, rslug="resource")
+
+    with pytest.raises(nucliadb_sdk.exceptions.NotFoundError):
+        await sdk_async.delete_resource(kbid=kb.uuid, rid=resource.id)
 
 
 async def test_search_endpoints(sdk_async: nucliadb_sdk.NucliaDBAsync, kb):
