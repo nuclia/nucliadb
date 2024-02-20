@@ -22,9 +22,9 @@ from typing import AsyncIterable, Optional
 
 import docker  # type: ignore
 import pytest
-from grpc import aio, insecure_channel  # type: ignore
-from grpc_health.v1 import health_pb2_grpc  # type: ignore
-from grpc_health.v1.health_pb2 import HealthCheckRequest  # type: ignore
+from grpc import aio, insecure_channel
+from grpc_health.v1 import health_pb2_grpc
+from grpc_health.v1.health_pb2 import HealthCheckRequest
 from nucliadb_protos.noderesources_pb2 import EmptyQuery, ShardCreated, ShardId
 from nucliadb_protos.nodewriter_pb2 import NewShardRequest
 from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub

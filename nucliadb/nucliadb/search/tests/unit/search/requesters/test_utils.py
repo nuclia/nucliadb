@@ -22,7 +22,7 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 from fastapi import HTTPException
 from grpc import StatusCode
-from grpc.aio import AioRpcError  # type: ignore
+from grpc.aio import AioRpcError
 
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.search.requesters import utils

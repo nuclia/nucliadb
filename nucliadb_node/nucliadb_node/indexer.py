@@ -24,7 +24,7 @@ from functools import cached_property, partial, total_ordering
 from typing import Optional
 
 from grpc import StatusCode
-from grpc.aio import AioRpcError  # type: ignore
+from grpc.aio import AioRpcError
 from nats.aio.client import Msg
 from nucliadb_protos.noderesources_pb2 import ResourceID
 from nucliadb_protos.nodewriter_pb2 import (

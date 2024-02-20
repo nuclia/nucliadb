@@ -27,7 +27,7 @@ from unittest.mock import AsyncMock, Mock, patch
 import asyncpg
 import pytest
 import tikv_client  # type: ignore
-from grpc import aio  # type: ignore
+from grpc import aio
 from httpx import AsyncClient
 from nucliadb_protos.train_pb2_grpc import TrainStub
 from nucliadb_protos.utils_pb2 import Relation, RelationNode

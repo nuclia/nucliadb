@@ -26,7 +26,7 @@ from uuid import uuid4
 from fastapi import HTTPException, Query, Response
 from fastapi_versioning import version
 from grpc import StatusCode as GrpcStatusCode
-from grpc.aio import AioRpcError  # type: ignore
+from grpc.aio import AioRpcError
 from nucliadb_protos.resources_pb2 import Metadata
 from nucliadb_protos.writer_pb2 import (
     BrokerMessage,

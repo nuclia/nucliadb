@@ -22,7 +22,7 @@ from typing import AsyncGenerator, AsyncIterator, Optional, Sequence
 from uuid import uuid4
 
 from grpc import StatusCode
-from grpc.aio import AioRpcError  # type: ignore
+from grpc.aio import AioRpcError
 from nucliadb_protos.knowledgebox_pb2 import (
     KnowledgeBoxConfig,
     Labels,

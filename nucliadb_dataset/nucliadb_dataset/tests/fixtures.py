@@ -22,9 +22,9 @@ import tempfile
 from typing import AsyncIterator, Iterator, Optional
 
 import docker  # type: ignore
-import grpc  # type: ignore
+import grpc
 import pytest
-from grpc import aio  # type: ignore
+from grpc import aio
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb_models.common import FieldID, UserClassification

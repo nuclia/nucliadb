@@ -21,8 +21,8 @@ import asyncio
 import logging
 from typing import Awaitable, Callable, Optional
 
-from grpc import aio  # type: ignore
-from grpc_health.v1 import health, health_pb2, health_pb2_grpc  # type: ignore
+from grpc import aio
+from grpc_health.v1 import health, health_pb2, health_pb2_grpc
 
 from nucliadb_utils.cache.nats import NatsPubsub
 from nucliadb_utils.cache.pubsub import PubSubDriver

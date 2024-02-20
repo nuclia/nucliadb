@@ -32,7 +32,7 @@ from fastapi.requests import Request
 from fastapi.responses import Response
 from fastapi_versioning import version  # type: ignore
 from grpc import StatusCode as GrpcStatusCode
-from grpc.aio import AioRpcError  # type: ignore
+from grpc.aio import AioRpcError
 from nucliadb_protos.resources_pb2 import FieldFile
 from nucliadb_protos.writer_pb2 import (
     BrokerMessage,
