@@ -28,6 +28,7 @@ use nucliadb_core::protos::prost::Message;
 use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{Resource, ResourceId, VectorSetId, VectorSimilarity};
 use nucliadb_core::tracing::{self, *};
+use nucliadb_core::vectors::MergeMetrics;
 use nucliadb_core::vectors::*;
 use nucliadb_core::{metrics, Channel, IndexFiles, RawReplicaState};
 use nucliadb_procs::measure;
@@ -57,6 +58,22 @@ impl Debug for VectorWriterService {
 }
 
 impl VectorWriter for VectorWriterService {
+    #[measure(actor = "vectors", metric = "merge")]
+    #[tracing::instrument(skip_all)]
+    fn merge(&mut self) -> NodeResult<MergeMetrics> {
+        let time = Instant::now();
+
+        let lock = self.index.get_slock()?;
+        let inner_metrics = self.index.force_merge(&lock)?;
+
+        let took = time.elapsed().as_secs_f64();
+        debug!("Forcing a merge took: {took} s");
+        Ok(MergeMetrics {
+            merged: inner_metrics.merged,
+            left: inner_metrics.segments_left,
+        })
+    }
+
     #[measure(actor = "vectors", metric = "list_vectorsets")]
     #[tracing::instrument(skip_all)]
     fn list_vectorsets(&self) -> NodeResult<Vec<String>> {

@@ -77,6 +77,23 @@ pub struct NewVectorSetRequest {
     #[prost(enumeration="super::utils::VectorSimilarity", tag="2")]
     pub similarity: i32,
 }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct MergeResponse {
+    #[prost(enumeration="merge_response::MergeStatus", tag="1")]
+    pub status: i32,
+    #[prost(uint32, tag="2")]
+    pub merged_segments: u32,
+    #[prost(uint32, tag="3")]
+    pub remaining_segments: u32,
+}
+/// Nested message and enum types in `MergeResponse`.
+pub mod merge_response {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum MergeStatus {
+        Ok = 0,
+    }
+}
 // Implemented at nucliadb_object_storage
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
@@ -238,6 +255,25 @@ pub mod node_writer_client {
             let path = http::uri::PathAndQuery::from_static("/nodewriter.NodeWriter/GC");
             self.inner.unary(request.into_request(), path, codec).await
         }
+        pub async fn merge(
+            &mut self,
+            request: impl tonic::IntoRequest<super::super::noderesources::ShardId>,
+        ) -> Result<tonic::Response<super::MergeResponse>, tonic::Status> {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/nodewriter.NodeWriter/Merge",
+            );
+            self.inner.unary(request.into_request(), path, codec).await
+        }
         pub async fn set_resource(
             &mut self,
             request: impl tonic::IntoRequest<super::super::noderesources::Resource>,
@@ -392,6 +428,10 @@ pub mod node_writer_server {
             &self,
             request: tonic::Request<super::super::noderesources::ShardId>,
         ) -> Result<tonic::Response<super::GarbageCollectorResponse>, tonic::Status>;
+        async fn merge(
+            &self,
+            request: tonic::Request<super::super::noderesources::ShardId>,
+        ) -> Result<tonic::Response<super::MergeResponse>, tonic::Status>;
         async fn set_resource(
             &self,
             request: tonic::Request<super::super::noderesources::Resource>,
@@ -616,6 +656,44 @@ pub mod node_writer_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = GCSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/nodewriter.NodeWriter/Merge" => {
+                    #[allow(non_camel_case_types)]
+                    struct MergeSvc<T: NodeWriter>(pub Arc<T>);
+                    impl<
+                        T: NodeWriter,
+                    > tonic::server::UnaryService<super::super::noderesources::ShardId>
+                    for MergeSvc<T> {
+                        type Response = super::MergeResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::super::noderesources::ShardId>,
+                        ) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move { (*inner).merge(request).await };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = MergeSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

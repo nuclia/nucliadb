@@ -436,6 +436,11 @@ impl ShardWriter {
         }
     }
 
+    #[tracing::instrument(skip_all)]
+    pub fn merge(&self) -> NodeResult<MergeMetrics> {
+        vector_write(&self.vector_writer).merge()
+    }
+
     pub async fn block_shard(&self) -> BlockingToken {
         let mutex_guard = self.write_lock.lock().expect("Poisoned write lock");
         BlockingToken(mutex_guard)

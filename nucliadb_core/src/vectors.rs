@@ -47,6 +47,11 @@ pub struct VectorsContext {
     pub filtering_formula: Option<BooleanExpression>,
 }
 
+pub struct MergeMetrics {
+    pub merged: usize,
+    pub left: usize,
+}
+
 pub trait VectorReader: std::fmt::Debug + Send + Sync {
     fn search(&self, request: &ProtosRequest, context: &VectorsContext) -> NodeResult<ProtosResponse>;
     fn stored_ids(&self) -> NodeResult<Vec<String>>;
@@ -54,6 +59,7 @@ pub trait VectorReader: std::fmt::Debug + Send + Sync {
 }
 
 pub trait VectorWriter: std::fmt::Debug + Send + Sync {
+    fn merge(&mut self) -> NodeResult<MergeMetrics>;
     fn set_resource(&mut self, resource: &Resource) -> NodeResult<()>;
     fn delete_resource(&mut self, resource_id: &ResourceId) -> NodeResult<()>;
     fn garbage_collection(&mut self) -> NodeResult<()>;
