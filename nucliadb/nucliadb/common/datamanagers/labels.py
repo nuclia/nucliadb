@@ -142,7 +142,7 @@ class LabelsDataManager:
         """
         async with self.driver.transaction() as txn:
             labelset_ids = list(labels.labelset.keys())
-            await LabelsDataManager._add_to_labelset_ids(kbid, txn, labelset_ids)
+            await LabelsDataManager._set_labelset_ids(kbid, txn, labelset_ids)
             for ls_id, ls_labels in labels.labelset.items():
                 await LabelsDataManager._set_labelset(kbid, ls_id, ls_labels, txn)
             await txn.commit()
