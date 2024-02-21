@@ -43,7 +43,7 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
             logger.info("No need for labelset list migration", extra={"kbid": kbid})
             return
 
-        labelset_list = await LabelsDataManager._get_labelsets_list_bw_compat(kbid, txn)
+        labelset_list = await LabelsDataManager._legacy_get_labelsets_list(kbid, txn)
         await LabelsDataManager._set_labelsets_list(kbid, txn, labelset_list)
         logger.info("Labelset list migrated", extra={"kbid": kbid})
         await txn.commit()

@@ -61,8 +61,11 @@ class LabelsDataManager:
         labelsets = await cls._get_labelsets_list(kbid, txn)
         if labelsets is not None:
             return labelsets
+        # TODO: Remove this after migration #11
+        return await cls._legacy_get_labelsets_list(kbid, txn)
 
-        # TODO: Backward compatibility. Remove after migration
+    @classmethod
+    async def _legacy_get_labelsets_list(cls, kbid: str, txn: Transaction) -> list[str]:
         labelsets = []
         labels_key = KB_LABELS.format(kbid=kbid)
         async for key in txn.keys(labels_key, count=-1):
@@ -85,9 +88,11 @@ class LabelsDataManager:
         cls, kbid: str, txn: Transaction, labelsets: list[str]
     ) -> None:
         previous = await cls._get_labelsets_list(kbid, txn)
-        if previous is None:
-            previous = []
         needs_set = False
+        if previous is None:
+            # TODO: Remove this after migration #11
+            needs_set = True
+            previous = await LabelsDataManager._legacy_get_labelsets_list(kbid, txn)
         for labelset in labelsets:
             if labelset not in previous:
                 needs_set = True
@@ -99,10 +104,12 @@ class LabelsDataManager:
     async def _delete_from_labelset_list(
         cls, kbid: str, txn: Transaction, labelsets: list[str]
     ) -> None:
+        needs_set = False
         previous = await cls._get_labelsets_list(kbid, txn)
         if previous is None:
-            previous = []
-        needs_set = False
+            # TODO: Remove this after migration #11
+            needs_set = True
+            previous = await LabelsDataManager._legacy_get_labelsets_list(kbid, txn)
         for labelset in labelsets:
             if labelset in previous:
                 needs_set = True
