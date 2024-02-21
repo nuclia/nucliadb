@@ -61,7 +61,7 @@ async def test_labelset_ids(maindb_driver):
         await ldm._set_labelset_ids(kbid, txn, ["bar", "baz"])
         await txn.commit()
 
-    ldb_obj = ldm(maindb_driver)
+    ldb_obj = LabelsDataManager(maindb_driver)
     labels = Labels()
     labels.labelset["bar"].title = "bar"
     await ldb_obj.set_labels(kbid, labels)
