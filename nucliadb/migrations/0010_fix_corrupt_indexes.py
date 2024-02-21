@@ -18,26 +18,33 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from grpc import aio
-from grpc_health.v1 import health, health_pb2_grpc
+"""Migration #10
 
-from nucliadb_node import SERVICE_NAME
-from nucliadb_node.settings import settings
-from nucliadb_node.writer import Writer
-from nucliadb_utils.grpc import get_traced_grpc_server
+Due to a bug in the index nodes, some KBs have been affected in stage with an
+index data loss. Rollover affected KBs
+
+"""
+
+import logging
+
+from nucliadb.common.cluster.rollover import rollover_kb_shards
+from nucliadb.migrator.context import ExecutionContext
+
+logger = logging.getLogger(__name__)
+
+AFFECTED_KBS = [
+    "1efc5a33-bc5a-490c-8b47-b190beee212d",
+    "f11d6eb9-da5e-4519-ac3d-e304bfa5c354",
+    "096d9070-f7be-40c8-a24c-19c89072e3ff",
+    "848f01bc-341a-4346-b473-6b11b76b26eb",
+]
 
 
-async def start_grpc(writer: Writer):
-    aio.init_grpc_aio()  # type: ignore
+async def migrate(context: ExecutionContext) -> None:
+    ...
 
-    server = get_traced_grpc_server(SERVICE_NAME)
-    health_servicer = health.aio.HealthServicer()  # type: ignore
-    server.add_insecure_port(settings.sidecar_listen_address)
 
-    health_pb2_grpc.add_HealthServicer_to_server(health_servicer, server)
-    await server.start()
-
-    async def finalizer():
-        await server.stop(grace=False)
-
-    return finalizer
+async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
+    if kbid in AFFECTED_KBS:
+        logger.info(f"Rolling over affected KB: {kbid}")
+        await rollover_kb_shards(context, kbid)

@@ -22,7 +22,7 @@ import asyncio
 import logging
 
 import backoff
-from grpc.aio import AioRpcError  # type: ignore
+from grpc.aio import AioRpcError
 
 from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.discovery.types import IndexNodeMetadata

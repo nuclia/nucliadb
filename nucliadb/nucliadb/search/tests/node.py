@@ -26,9 +26,9 @@ from typing import Union
 import backoff
 import docker  # type: ignore
 import pytest
-from grpc import insecure_channel  # type: ignore
-from grpc_health.v1 import health_pb2_grpc  # type: ignore
-from grpc_health.v1.health_pb2 import HealthCheckRequest  # type: ignore
+from grpc import insecure_channel
+from grpc_health.v1 import health_pb2_grpc
+from grpc_health.v1.health_pb2 import HealthCheckRequest
 from nucliadb_protos.nodewriter_pb2 import EmptyQuery, ShardId
 from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
 from pytest_docker_fixtures import images  # type: ignore

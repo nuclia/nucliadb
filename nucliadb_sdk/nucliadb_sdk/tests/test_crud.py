@@ -96,10 +96,13 @@ def test_crud_resource(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaDB):
     )
     assert resource.data.texts["text"].value.body == "I'm an updated Ramon"
 
-    sdk.delete_resource(kbid=kb.uuid, rid=resource.id)
+    sdk.delete_resource_by_slug(kbid=kb.uuid, rslug="mykey1")
 
     with pytest.raises(nucliadb_sdk.exceptions.NotFoundError):
         sdk.get_resource_by_slug(kbid=kb.uuid, slug="mykey1")
+
+    with pytest.raises(nucliadb_sdk.exceptions.NotFoundError):
+        sdk.delete_resource(kbid=kb.uuid, rid=resource.id)
 
 
 def test_modify_resource_slug(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaDB):
