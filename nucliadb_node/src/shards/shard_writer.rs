@@ -438,7 +438,10 @@ impl ShardWriter {
 
     #[tracing::instrument(skip_all)]
     pub fn merge(&self) -> NodeResult<MergeMetrics> {
-        vector_write(&self.vector_writer).merge()
+        let result = vector_write(&self.vector_writer).merge();
+        self.metadata.new_generation_id();
+
+        result
     }
 
     pub async fn block_shard(&self) -> BlockingToken {
