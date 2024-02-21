@@ -20,11 +20,14 @@
 
 from typing import Optional
 
+import orjson
+
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb_protos import knowledgebox_pb2 as kb_pb2
 
 KB_LABELS = "/kbs/{kbid}/labels"
 KB_LABELSET = "/kbs/{kbid}/labels/{id}"
+KB_LABELSETS_LIST = "/kbs/{kbid}/labelsets"
 
 
 class LabelsDataManager:
@@ -41,15 +44,79 @@ class LabelsDataManager:
     @classmethod
     async def inner_get_labels(cls, kbid: str, txn: Transaction) -> kb_pb2.Labels:
         labels = kb_pb2.Labels()
+        labelset_ids = await cls._get_labelsets_list_bw_compat(kbid, txn)
+        for labelset_id in labelset_ids:
+            labelset = await txn.get(KB_LABELSET.format(kbid=kbid, id=labelset_id))
+            if not labelset:
+                continue
+            ls = kb_pb2.LabelSet()
+            ls.ParseFromString(labelset)
+            labels.labelset[labelset_id].CopyFrom(ls)
+        return labels
+
+    @classmethod
+    async def _get_labelsets_list_bw_compat(
+        cls, kbid: str, txn: Transaction
+    ) -> list[str]:
+        labelsets = await cls._get_labelsets_list(kbid, txn)
+        if labelsets is not None:
+            return labelsets
+
+        # TODO: Backward compatibility. Remove after migration
+        labelsets = []
         labels_key = KB_LABELS.format(kbid=kbid)
         async for key in txn.keys(labels_key, count=-1):
-            labelset = await txn.get(key)
             id = key.split("/")[-1]
-            if labelset:
-                ls = kb_pb2.LabelSet()
-                ls.ParseFromString(labelset)
-                labels.labelset[id].CopyFrom(ls)
-        return labels
+            labelsets.append(id)
+        return labelsets
+
+    @classmethod
+    async def _get_labelsets_list(
+        cls, kbid: str, txn: Transaction
+    ) -> Optional[list[str]]:
+        key = KB_LABELSETS_LIST.format(kbid=kbid)
+        data = await txn.get(key)
+        if not data:
+            return None
+        return orjson.loads(data)
+
+    @classmethod
+    async def _add_to_labelset_list(
+        cls, kbid: str, txn: Transaction, labelsets: list[str]
+    ) -> None:
+        previous = await cls._get_labelsets_list(kbid, txn)
+        if previous is None:
+            previous = []
+        needs_set = False
+        for labelset in labelsets:
+            if labelset not in previous:
+                needs_set = True
+                previous.append(labelset)
+        if needs_set:
+            await cls._set_labelsets_list(kbid, txn, previous)
+
+    @classmethod
+    async def _delete_from_labelset_list(
+        cls, kbid: str, txn: Transaction, labelsets: list[str]
+    ) -> None:
+        previous = await cls._get_labelsets_list(kbid, txn)
+        if previous is None:
+            previous = []
+        needs_set = False
+        for labelset in labelsets:
+            if labelset in previous:
+                needs_set = True
+                previous.remove(labelset)
+        if needs_set:
+            await cls._set_labelsets_list(kbid, txn, previous)
+
+    @classmethod
+    async def _set_labelsets_list(
+        cls, kbid: str, txn: Transaction, labelsets: list[str]
+    ) -> None:
+        key = KB_LABELSETS_LIST.format(kbid=kbid)
+        data = orjson.dumps(labelsets)
+        await txn.set(key, data)
 
     @classmethod
     async def inner_get_labelset(
@@ -68,13 +135,30 @@ class LabelsDataManager:
         Set all labels for a knowledge box (may include multiple labelsets)
         """
         async with self.driver.transaction() as txn:
+            labelset_ids = list(labels.labelset.keys())
+            await LabelsDataManager._add_to_labelset_list(kbid, txn, labelset_ids)
             for ls_id, ls_labels in labels.labelset.items():
-                await LabelsDataManager.set_labelset(kbid, ls_id, ls_labels, txn)
+                await LabelsDataManager._set_labelset(kbid, ls_id, ls_labels, txn)
             await txn.commit()
 
     @classmethod
     async def set_labelset(
         cls, kbid: str, labelset_id: str, labelset: kb_pb2.LabelSet, txn: Transaction
     ) -> None:
+        await cls._add_to_labelset_list(kbid, txn, [labelset_id])
+        await cls._set_labelset(kbid, labelset_id, labelset, txn)
+
+    @classmethod
+    async def _set_labelset(
+        cls, kbid: str, labelset_id: str, labelset: kb_pb2.LabelSet, txn: Transaction
+    ) -> None:
         labelset_key = KB_LABELSET.format(kbid=kbid, id=labelset_id)
         await txn.set(labelset_key, labelset.SerializeToString())
+
+    @classmethod
+    async def delete_labelset(
+        cls, kbid: str, labelset_id: str, txn: Transaction
+    ) -> None:
+        await cls._delete_from_labelset_list(kbid, txn, [labelset_id])
+        labelset_key = KB_LABELSET.format(kbid=kbid, id=labelset_id)
+        await txn.delete(labelset_key)
