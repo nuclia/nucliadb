@@ -71,26 +71,36 @@ async def detect_orphan_shards(driver: Driver):
 
     orphan_shard_ids = indexed_shards.keys() - stored_shards.keys()
     orphan_shards: dict[str, ShardLocation] = {}
+    unavailable_nodes = set()
     for shard_id in orphan_shard_ids:
         node_id = indexed_shards[shard_id].node_id
         node = manager.get_index_node(node_id)
-
         kbid = UNKNOWN_KB
-        try:
-            shard_pb = await node.get_shard(shard_id)
-        except AioRpcError as grpc_error:
-            logger.error(
-                "Can't get shard while looking for orphans in index nodes, is it broken?",
-                exc_info=grpc_error,
-                extra={
-                    "shard_id": shard_id,
-                    "node_id": node.id,
-                },
-            )
-        else:
-            kbid = shard_pb.metadata.kbid
 
-        orphan_shards[shard_id] = ShardLocation(kbid=kbid, node_id=node.id)
+        if node is None:
+            unavailable_nodes.add(node_id)
+        else:
+            try:
+                shard_pb = await node.get_shard(shard_id)
+            except AioRpcError as grpc_error:
+                logger.error(
+                    "Can't get shard while looking for orphans in index nodes, is it broken?",
+                    exc_info=grpc_error,
+                    extra={
+                        "shard_id": shard_id,
+                        "node_id": node.id,
+                    },
+                )
+            else:
+                kbid = shard_pb.metadata.kbid
+
+        orphan_shards[shard_id] = ShardLocation(kbid=kbid, node_id=node_id)
+
+    if len(unavailable_nodes) > 0:
+        logger.info(
+            "Some nodes were unavailable while checking shard details and were skipped",
+            extra={"nodes": list(unavailable_nodes)},
+        )
 
     return orphan_shards
 
