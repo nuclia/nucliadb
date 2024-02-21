@@ -19,7 +19,7 @@
 
 use std::sync::Arc;
 
-use super::merger::{MergeQuery, MergeRequest};
+use super::merger::{self, MergeQuery, MergeRequest};
 use super::IndexInner;
 use crate::VectorR;
 
@@ -38,7 +38,14 @@ impl Worker {
         })
     }
     fn work(&self) -> VectorR<()> {
-        self.index.do_merge();
+        let more = self.index.do_merge();
+
+        if more {
+            merger::send_merge_request(
+                self.index.location.to_string_lossy().into(),
+                Worker::request(self.index.clone()),
+            )
+        }
         Ok(())
     }
 }

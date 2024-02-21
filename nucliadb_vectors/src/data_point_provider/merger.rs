@@ -17,74 +17,58 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::mpsc::{self, Receiver, Sender};
-use std::sync::Once;
-
+use lazy_static;
 use nucliadb_core::tracing;
+use std::collections::VecDeque;
+use std::sync::{Condvar, Mutex};
 
-use crate::{VectorErr, VectorR};
+use crate::VectorR;
 
 pub type MergeRequest = Box<dyn MergeQuery>;
-pub type MergeTxn = Sender<MergeRequest>;
 
 pub trait MergeQuery: Send {
     fn do_work(&self) -> VectorR<()>;
 }
 
-#[derive(Clone)]
-struct MergerHandle(MergeTxn);
-impl MergerHandle {
-    pub fn send(&self, request: MergeRequest) {
-        let Err(e) = self.0.send(request) else {
-            return;
-        };
-        tracing::info!("Error sending merge request, {e}");
-    }
+lazy_static::lazy_static! {
+    static ref MERGER_SCHEDULER: Merger = Merger::default();
 }
 
-static mut MERGER_NOTIFIER: Option<MergerHandle> = None;
-static MERGER_NOTIFIER_SET: Once = Once::new();
-
-pub fn send_merge_request(request: MergeRequest) {
-    // It is always safe to read from MERGER_NOTIFIER since
-    // it can only be writen through MERGER_NOTIFIER_SET and is not exposed in the public interface.
-    // MERGER_NOTIFIER_SET is protected by the type Once so we avoid concurrency problems.
-    match unsafe { &MERGER_NOTIFIER } {
-        Some(merger) => merger.send(request),
-        None => tracing::warn!("Merge requests are being sent without a merger intalled"),
-    }
+pub fn send_merge_request(key: String, request: MergeRequest) {
+    MERGER_SCHEDULER.enqueue(key, request);
 }
 
+#[derive(Default)]
 pub struct Merger {
-    rtxn: Receiver<MergeRequest>,
+    queue: Mutex<VecDeque<(String, MergeRequest)>>,
+    condvar: Condvar,
 }
 
 impl Merger {
-    pub fn install_global() -> VectorR<impl FnOnce()> {
-        let mut status = Err(VectorErr::MergerAlreadyInitialized);
-        MERGER_NOTIFIER_SET.call_once(|| unsafe {
-            let (stxn, rtxn) = mpsc::channel();
-            let handler = MergerHandle(stxn);
-            // It is safe to initialize MERGER_NOTIFIER
-            // since the setter can only be called once.
-            MERGER_NOTIFIER = Some(handler);
-            status = Ok(|| {
-                Merger {
-                    rtxn,
-                }
-                .run()
-            });
-        });
-        status
+    fn enqueue(&self, key: String, request: MergeRequest) {
+        let mut queue = self.queue.lock().expect("Poisoned Merger scheduler mutex");
+        if queue.iter().any(|e| e.0 == key) {
+            tracing::info!("Skipping dedup merge request");
+            return;
+        }
+        queue.push_back((key, request));
+        self.condvar.notify_all();
     }
-    fn run(self) {
+
+    pub fn install_global() -> VectorR<impl FnOnce()> {
+        Ok(move || MERGER_SCHEDULER.run())
+    }
+    fn run(&self) {
         loop {
-            match self.rtxn.recv() {
-                Err(err) => tracing::info!("channel error {}", err),
-                Ok(query) => match query.do_work() {
-                    Ok(()) => (),
-                    Err(err) => tracing::info!("error merging: {err}"),
-                },
+            let mut queue = self.queue.lock().expect("Poisoned Merger scheduler mutex");
+            while queue.is_empty() {
+                queue = self.condvar.wait(queue).expect("Poisoned Merger scheduler mutex");
+            }
+            let (_, task) = queue.pop_front().unwrap();
+            drop(queue);
+            match task.do_work() {
+                Ok(()) => (),
+                Err(err) => tracing::info!("error merging: {err}"),
             }
         }
     }

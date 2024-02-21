@@ -130,9 +130,8 @@ impl IndexInner {
         }
         Ok(())
     }
-    fn do_merge(&self) {
+    fn do_merge(&self) -> bool {
         if let Ok(_mutex) = self.merge_lock.try_lock() {
-            info!("Starting merge request");
             let _lock = self.get_slock().unwrap();
 
             let state_guard = self.read_state();
@@ -142,7 +141,7 @@ impl IndexInner {
             let Some(work) = state.current_work_unit().map(|work| {
                 work.iter().rev().map(|journal| (state.delete_log(*journal), journal.id())).collect::<Vec<_>>()
             }) else {
-                return;
+                return false;
             };
 
             let new_dp =
@@ -150,7 +149,7 @@ impl IndexInner {
 
             if !self.alive.load(std::sync::atomic::Ordering::Acquire) {
                 warn!("Shard was closed while merge was running, discarding it");
-                return;
+                return false;
             }
 
             let mut state = self.write_state();
@@ -159,9 +158,12 @@ impl IndexInner {
             fs_state::persist_state::<State>(&self.location, &state).unwrap();
             *date = fs_state::crnt_version(&self.location).unwrap();
 
-            info!("Merge request completed {}", state.dpid_iter().count());
+            info!("Merge request completed for {:?}", &self.location);
+
+            state.work_stack_len() > 5
         } else {
             warn!("Cannot merge, a merge was already running");
+            false
         }
     }
     pub fn get_slock(&self) -> VectorR<SLock> {
@@ -181,7 +183,7 @@ impl Index {
             let metadata = IndexMetadata::default();
             metadata.write(path).map(|_| metadata)
         })?;
-        let index = IndexInner {
+        let index = Arc::new(IndexInner {
             metadata,
             dimension: RwLock::new(dimension_used),
             state: RwLock::new(state),
@@ -189,8 +191,11 @@ impl Index {
             location: path.to_path_buf(),
             merge_lock: Mutex::default(),
             alive: AtomicBool::new(true),
-        };
-        Ok(Index(Arc::new(index)))
+        });
+        if index.read_state().work_stack_len() > ALLOWED_BEFORE_MERGE {
+            merger::send_merge_request(path.to_string_lossy().into(), Worker::request(index.clone()))
+        }
+        Ok(Index(index))
     }
     pub fn new(path: &Path, metadata: IndexMetadata) -> VectorR<Index> {
         std::fs::create_dir(path)?;
@@ -222,7 +227,7 @@ impl Index {
         let work_stack_len = state.work_stack_len();
 
         if work_stack_len > ALLOWED_BEFORE_MERGE {
-            merger::send_merge_request(Worker::request(self.0.clone()))
+            merger::send_merge_request(self.location().to_string_lossy().into(), Worker::request(self.0.clone()))
         }
         std::mem::drop(state);
         std::mem::drop(date);
