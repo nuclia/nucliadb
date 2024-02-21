@@ -27,7 +27,7 @@ from nucliadb_protos import knowledgebox_pb2 as kb_pb2
 
 KB_LABELS = "/kbs/{kbid}/labels"
 KB_LABELSET = "/kbs/{kbid}/labels/{id}"
-KB_LABELSETS_LIST = "/kbs/{kbid}/labelsets"
+KB_LABELSET_IDS_LIST = "/kbs/{kbid}/labelset-ids"
 
 
 class LabelsDataManager:
@@ -77,7 +77,7 @@ class LabelsDataManager:
     async def _get_labelsets_list(
         cls, kbid: str, txn: Transaction
     ) -> Optional[list[str]]:
-        key = KB_LABELSETS_LIST.format(kbid=kbid)
+        key = KB_LABELSET_IDS_LIST.format(kbid=kbid)
         data = await txn.get(key)
         if not data:
             return None
@@ -121,7 +121,7 @@ class LabelsDataManager:
     async def _set_labelsets_list(
         cls, kbid: str, txn: Transaction, labelsets: list[str]
     ) -> None:
-        key = KB_LABELSETS_LIST.format(kbid=kbid)
+        key = KB_LABELSET_IDS_LIST.format(kbid=kbid)
         data = orjson.dumps(labelsets)
         await txn.set(key, data)
 
