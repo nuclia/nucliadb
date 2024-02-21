@@ -366,10 +366,10 @@ impl NodeWriter for NodeWriterGRPCDriver {
             .map_err(|error| tonic::Status::internal(format!("Blocking task panicked: {error:?}")))?;
 
         match result {
-            Ok(()) => Ok(tonic::Response::new(MergeResponse {
+            Ok(metrics) => Ok(tonic::Response::new(MergeResponse {
                 status: merge_response::MergeStatus::Ok.into(),
-                merged_segments: 0,
-                remaining_segments: 0,
+                merged_segments: metrics.merged as u32,
+                remaining_segments: metrics.left as u32,
             })),
             Err(error) => Err(tonic::Status::internal(error.to_string())),
         }

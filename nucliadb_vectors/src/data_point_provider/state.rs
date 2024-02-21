@@ -35,6 +35,7 @@ const BUFFER_CAP: usize = 5;
 
 #[derive(Serialize, Deserialize)]
 struct WorkUnit {
+    // This field is deprecated.
     pub age: SystemTime,
     pub load: Vec<Journal>,
 }
@@ -221,6 +222,35 @@ impl State {
             self.close_work_unit();
         }
     }
+
+    /// The [`WorkUnit`] type is a bad abstraction, and this function is
+    /// a result of it. This is the only way of giving fine grained control
+    /// of merges to [State] clients.
+    /// In the future, the state should just hold a list of journals.
+    pub fn rebuilt_work_stack_with(&mut self, journals: Vec<Journal>) {
+        let mut work_stack = LinkedList::new();
+        let mut current_work_unit = WorkUnit::new();
+        let mut number_of_nodes = 0;
+        let mut age_cap = SystemTime::now();
+
+        for journal in journals {
+            number_of_nodes += journal.no_nodes();
+            age_cap = std::cmp::min(age_cap, journal.time());
+            current_work_unit.add_unit(journal);
+            if current_work_unit.size() == BUFFER_CAP {
+                let closed_work_unit = mem::take(&mut current_work_unit);
+                work_stack.push_back(closed_work_unit);
+            }
+        }
+        if current_work_unit.size() > 0 {
+            work_stack.push_back(current_work_unit);
+        }
+
+        self.delete_log.prune(age_cap);
+        self.no_nodes = number_of_nodes;
+        self.work_stack = work_stack;
+    }
+
     pub fn replace_work_unit(&mut self, journal: Journal) {
         let Some(unit) = self.work_stack.pop_back() else {
             return;
@@ -236,8 +266,8 @@ impl State {
         }
         self.add(journal);
     }
-    pub fn dpid_iter(&self) -> impl Iterator<Item = DpId> + '_ {
-        self.data_point_iterator().copied().map(|journal| journal.id())
+    pub fn dpid_iter(&self) -> impl Iterator<Item = Journal> + '_ {
+        self.data_point_iterator().copied()
     }
     pub fn keys(&self, location: &Path) -> VectorR<Vec<String>> {
         let mut keys = vec![];
