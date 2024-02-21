@@ -22,7 +22,6 @@ else:
     import typing_extensions
 from nucliadb_protos.knowledgebox_pb2 import (
     CONFLICT as CONFLICT,
-    CleanedKnowledgeBoxResponse as CleanedKnowledgeBoxResponse,
     DeleteKnowledgeBoxResponse as DeleteKnowledgeBoxResponse,
     DeletedEntitiesGroups as DeletedEntitiesGroups,
     ERROR as ERROR,
@@ -33,11 +32,9 @@ from nucliadb_protos.knowledgebox_pb2 import (
     EntityGroupDuplicateIndex as EntityGroupDuplicateIndex,
     GCKnowledgeBoxResponse as GCKnowledgeBoxResponse,
     KBConfiguration as KBConfiguration,
-    KnowledgeBox as KnowledgeBox,
     KnowledgeBoxConfig as KnowledgeBoxConfig,
     KnowledgeBoxID as KnowledgeBoxID,
     KnowledgeBoxNew as KnowledgeBoxNew,
-    KnowledgeBoxPrefix as KnowledgeBoxPrefix,
     KnowledgeBoxResponseStatus as KnowledgeBoxResponseStatus,
     KnowledgeBoxUpdate as KnowledgeBoxUpdate,
     Label as Label,
@@ -66,7 +63,6 @@ from nucliadb_protos.noderesources_pb2 import (
     ResourceID as ResourceID,
     SentenceMetadata as SentenceMetadata,
     Shard as Shard,
-    ShardCleaned as ShardCleaned,
     ShardCreated as ShardCreated,
     ShardId as ShardId,
     ShardIds as ShardIds,
@@ -1741,21 +1737,6 @@ class ResourceIdResponse(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["uuid", b"uuid"]) -> None: ...
 
 global___ResourceIdResponse = ResourceIdResponse
-
-@typing_extensions.final
-class ExportRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    KBID_FIELD_NUMBER: builtins.int
-    kbid: builtins.str
-    def __init__(
-        self,
-        *,
-        kbid: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["kbid", b"kbid"]) -> None: ...
-
-global___ExportRequest = ExportRequest
 
 @typing_extensions.final
 class SetVectorsRequest(google.protobuf.message.Message):

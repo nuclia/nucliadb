@@ -109,11 +109,6 @@ class AbstractIndexNode(metaclass=ABCMeta):
         resp: noderesources_pb2.ShardId = await self.writer.DeleteShard(req)  # type: ignore
         return resp.id
 
-    async def clean_and_upgrade_shard(self, id: str) -> noderesources_pb2.ShardCleaned:
-        req = noderesources_pb2.ShardId(id=id)
-        resp = await self.writer.CleanAndUpgradeShard(req)  # type: ignore
-        return resp
-
     async def del_vectorset(self, shard_id: str, vectorset: str) -> OpStatus:
         req = noderesources_pb2.VectorSetID()
         req.shard.id = shard_id

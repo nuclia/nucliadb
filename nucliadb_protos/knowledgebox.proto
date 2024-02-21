@@ -20,16 +20,7 @@ message KnowledgeBoxID {
     string uuid = 2;
 }
 
-// GET
-
-message KnowledgeBox {
-    string slug = 1;
-    string uuid = 2;
-    KnowledgeBoxResponseStatus status = 3;
-
-    KnowledgeBoxConfig config = 4;
-}
-
+// CONFIG
 
 message KnowledgeBoxConfig {
     string title = 1;
@@ -61,11 +52,6 @@ message NewKnowledgeBoxResponse {
     string uuid = 2;
 }
 
-// SEARCH / LIST
-
-message KnowledgeBoxPrefix {
-    string prefix = 1;
-}
 
 // UPDATE
 
@@ -92,11 +78,6 @@ message DeleteKnowledgeBoxResponse {
     KnowledgeBoxResponseStatus status = 1;
 }
 
-// Clean Index
-
-message CleanedKnowledgeBoxResponse {
-
-}
 
 // Labels on a Knowledge Box
 

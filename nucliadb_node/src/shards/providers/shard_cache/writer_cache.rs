@@ -23,7 +23,6 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread::sleep;
 use std::time::Duration;
 
-use nucliadb_core::protos::ShardCleaned;
 use nucliadb_core::tracing::debug;
 use nucliadb_core::{node_error, NodeResult};
 
@@ -204,32 +203,6 @@ impl ShardWriterCache {
         self.cache().remove(id);
 
         Ok(())
-    }
-
-    pub fn upgrade(&self, id: &ShardId) -> NodeResult<ShardCleaned> {
-        // Mark the shard as deleted and wait until not in use
-        self.mark_as_deleted(id);
-
-        let metadata = self.metadata_manager.get(id.clone());
-        // If upgrading fails, the safe thing is to keep the being deleted flag
-
-        let upgraded = ShardWriter::clean_and_create(metadata.unwrap())?;
-        let details = ShardCleaned {
-            document_service: upgraded.document_version() as i32,
-            paragraph_service: upgraded.paragraph_version() as i32,
-            vector_service: upgraded.vector_version() as i32,
-            relation_service: upgraded.relation_version() as i32,
-        };
-
-        // The shard was upgraded, is safe to allow access again
-        let shard = Arc::new(upgraded);
-        let mut cache_writer = self.cache();
-        // Old shard is completely removed
-        cache_writer.remove(id);
-        // The clean and upgraded version takes its place
-        cache_writer.add_active_shard(id, &shard);
-
-        Ok(details)
     }
 
     pub fn get_metadata(&self, id: ShardId) -> Option<Arc<ShardMetadata>> {

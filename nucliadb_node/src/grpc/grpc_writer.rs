@@ -23,8 +23,7 @@ use std::sync::Arc;
 use nucliadb_core::protos::node_writer_server::NodeWriter;
 use nucliadb_core::protos::{
     garbage_collector_response, op_status, EmptyQuery, GarbageCollectorResponse, NewShardRequest, NewVectorSetRequest,
-    NodeMetadata, OpStatus, Resource, ResourceId, ShardCleaned, ShardCreated, ShardId, ShardIds, VectorSetId,
-    VectorSetList,
+    NodeMetadata, OpStatus, Resource, ResourceId, ShardCreated, ShardId, ShardIds, VectorSetId, VectorSetList,
 };
 use nucliadb_core::tracing::{self, Span, *};
 use nucliadb_core::Channel;
@@ -146,22 +145,6 @@ impl NodeWriter for NodeWriterGRPCDriver {
                 error!("{}", error_msg);
                 Err(tonic::Status::internal(error_msg))
             }
-        }
-    }
-
-    async fn clean_and_upgrade_shard(&self, request: Request<ShardId>) -> Result<Response<ShardCleaned>, Status> {
-        let shard_id = request.into_inner().id;
-
-        // No need to load shard to upgrade it
-        let shards = Arc::clone(&self.shards);
-        let shard_id_clone = shard_id.clone();
-        let upgraded = tokio::task::spawn_blocking(move || shards.upgrade(&shard_id_clone))
-            .await
-            .map_err(|error| tonic::Status::internal(format!("Error deleted shard {}: {error:?}", shard_id)))?;
-
-        match upgraded {
-            Ok(upgrade_details) => Ok(tonic::Response::new(upgrade_details)),
-            Err(error) => Err(tonic::Status::internal(error.to_string())),
         }
     }
 

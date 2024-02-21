@@ -18,95 +18,113 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+from functools import partial
 
 import pytest
 from httpx import AsyncClient
-from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxID
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
+from nucliadb.common.cluster.base import AbstractIndexNode
+from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb.tests.utils import inject_message
+from nucliadb_protos import noderesources_pb2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_reindex(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox,
+):
+    rid = await create_resource(knowledgebox, nucliadb_grpc)
+
+    # Doing a search should return results
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query=text")
+    assert resp.status_code == 200
+    content = resp.json()
+    assert len(content["sentences"]["results"]) > 0
+    assert len(content["paragraphs"]["results"]) > 0
+
+    async def clean_shard(
+        resources: list[str], node: AbstractIndexNode, shard_replica_id: str
+    ):
+        nonlocal rid
+        return await node.writer.RemoveResource(  # type: ignore
+            noderesources_pb2.ResourceID(
+                shard_id=shard_replica_id,
+                uuid=rid,
+            )
+        )
+
+    shard_manager = KBShardManager()
+    results = await shard_manager.apply_for_all_shards(
+        knowledgebox, partial(clean_shard, [rid]), timeout=5
+    )
+    for result in results:
+        assert not isinstance(result, Exception)
+
+    await asyncio.sleep(0.5)
+
+    # Doing a search should not return any result now
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query=My+own")
+    assert resp.status_code == 200
+    content = resp.json()
+    assert len(content["sentences"]["results"]) == 0
+    assert len(content["paragraphs"]["results"]) == 0
+
+    # Then do a reindex of the resource with its vectors
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/resource/{rid}/reindex?reindex_vectors=true"
+    )
+    assert resp.status_code == 200
+
+    await asyncio.sleep(0.5)
+
+    # Doing a search should return semantic results
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query=My+own")
+    assert resp.status_code == 200
+    content = resp.json()
+    assert len(content["sentences"]["results"]) > 0
+    assert len(content["paragraphs"]["results"]) > 0
+
+
+async def create_resource(knowledgebox, writer: WriterStub):
+    bm = broker_resource(knowledgebox)
+    await inject_message(writer, bm)
+    return bm.uuid
 
 
 def broker_resource(knowledgebox: str) -> BrokerMessage:
-    import uuid
-    from datetime import datetime
-
     from nucliadb.ingest.tests.vectors import V1, V2, V3
+    from nucliadb.tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
     from nucliadb_protos import resources_pb2 as rpb
 
-    rid = str(uuid.uuid4())
-    slug = f"{rid}slug1"
+    bmb = BrokerMessageBuilder(kbid=knowledgebox)
+    bmb.with_title("Title Resource")
+    bmb.with_summary("Summary of document")
 
-    bm: BrokerMessage = BrokerMessage(
-        kbid=knowledgebox,
-        uuid=rid,
-        slug=slug,
-        type=BrokerMessage.AUTOCOMMIT,
+    file_field = FieldBuilder("file", rpb.FieldType.FILE)
+    file_field.with_extracted_text(
+        "My own text Ramon. This is great to be here. \n Where is my beer?"
+    )
+    file_field.with_extracted_paragraph_metadata(
+        rpb.Paragraph(
+            start=0,
+            end=45,
+        )
+    )
+    file_field.with_extracted_paragraph_metadata(
+        rpb.Paragraph(
+            start=47,
+            end=64,
+        )
     )
 
-    bm.basic.icon = "text/plain"
-    bm.basic.title = "Title Resource"
-    bm.basic.summary = "Summary of document"
-    bm.basic.thumbnail = "doc"
-    bm.basic.layout = "default"
-    bm.basic.metadata.useful = True
-    bm.basic.metadata.language = "es"
-    bm.basic.created.FromDatetime(datetime.now())
-    bm.basic.modified.FromDatetime(datetime.now())
-    bm.origin.source = rpb.Origin.Source.WEB
-
-    etw = rpb.ExtractedTextWrapper()
-    etw.body.text = "My own text Ramon. This is great to be here. \n Where is my beer?"
-    etw.field.field = "file"
-    etw.field.field_type = rpb.FieldType.FILE
-    bm.extracted_text.append(etw)
-
-    etw = rpb.ExtractedTextWrapper()
-    etw.body.text = "Summary of document"
-    etw.field.field = "summary"
-    etw.field.field_type = rpb.FieldType.GENERIC
-    bm.extracted_text.append(etw)
-
-    etw = rpb.ExtractedTextWrapper()
-    etw.body.text = "Title Resource"
-    etw.field.field = "title"
-    etw.field.field_type = rpb.FieldType.GENERIC
-    bm.extracted_text.append(etw)
-
-    bm.files["file"].added.FromDatetime(datetime.now())
-    bm.files["file"].file.source = rpb.CloudFile.Source.EXTERNAL
-
-    fcm = rpb.FieldComputedMetadataWrapper()
-    fcm.field.field = "file"
-    fcm.field.field_type = rpb.FieldType.FILE
-    p1 = rpb.Paragraph(
-        start=0,
-        end=45,
-    )
-    p1.start_seconds.append(0)
-    p1.end_seconds.append(10)
-    p2 = rpb.Paragraph(
-        start=47,
-        end=64,
-    )
-    p2.start_seconds.append(10)
-    p2.end_seconds.append(20)
-    p2.start_seconds.append(20)
-    p2.end_seconds.append(30)
-
-    fcm.metadata.metadata.paragraphs.append(p1)
-    fcm.metadata.metadata.paragraphs.append(p2)
-    fcm.metadata.metadata.last_index.FromDatetime(datetime.now())
-    fcm.metadata.metadata.last_understanding.FromDatetime(datetime.now())
-    fcm.metadata.metadata.last_extract.FromDatetime(datetime.now())
-    fcm.metadata.metadata.ner["Ramon"] = "PERSON"
-
-    c1 = rpb.Classification()
-    c1.label = "label1"
-    c1.labelset = "labelset1"
-    fcm.metadata.metadata.classifications.append(c1)
-    bm.field_metadata.append(fcm)
+    bmb.add_field_builder(file_field)
+    bm = bmb.build()
 
     ev = rpb.ExtractedVectorsWrapper()
     ev.field.field = "file"
@@ -137,57 +155,4 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
     ev.vectors.vectors.vectors.append(v3)
 
     bm.field_vectors.append(ev)
-    bm.source = BrokerMessage.MessageSource.WRITER
     return bm
-
-
-async def create_resource(knowledgebox, writer: WriterStub):
-    bm = broker_resource(knowledgebox)
-    await inject_message(writer, bm)
-    return bm.uuid
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_reindex(
-    nucliadb_reader: AsyncClient,
-    nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
-    knowledgebox,
-):
-    rid = await create_resource(knowledgebox, nucliadb_grpc)
-
-    # Doing a search should return results
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query=text")
-    assert resp.status_code == 200
-    content = resp.json()
-    assert len(content["sentences"]["results"]) > 0
-    assert len(content["paragraphs"]["results"]) > 0
-
-    # Clean the index first
-    await nucliadb_grpc.CleanAndUpgradeKnowledgeBoxIndex(  # type: ignore
-        KnowledgeBoxID(uuid=knowledgebox)
-    )
-    await asyncio.sleep(1)
-
-    # Doing a search should not return any result now
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query=My+own")
-    assert resp.status_code == 200
-    content = resp.json()
-    assert len(content["sentences"]["results"]) == 0
-    assert len(content["paragraphs"]["results"]) == 0
-
-    # Then do a reindex of the resource with its vectors
-    resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resource/{rid}/reindex?reindex_vectors=true"
-    )
-    assert resp.status_code == 200
-
-    await asyncio.sleep(1)
-
-    # Doing a search should return semantic results
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query=My+own")
-    assert resp.status_code == 200
-    content = resp.json()
-    assert len(content["sentences"]["results"]) > 0
-    assert len(content["paragraphs"]["results"]) > 0

@@ -79,35 +79,9 @@ class KnowledgeBoxID(google.protobuf.message.Message):
 global___KnowledgeBoxID = KnowledgeBoxID
 
 @typing_extensions.final
-class KnowledgeBox(google.protobuf.message.Message):
-    """GET"""
-
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    SLUG_FIELD_NUMBER: builtins.int
-    UUID_FIELD_NUMBER: builtins.int
-    STATUS_FIELD_NUMBER: builtins.int
-    CONFIG_FIELD_NUMBER: builtins.int
-    slug: builtins.str
-    uuid: builtins.str
-    status: global___KnowledgeBoxResponseStatus.ValueType
-    @property
-    def config(self) -> global___KnowledgeBoxConfig: ...
-    def __init__(
-        self,
-        *,
-        slug: builtins.str = ...,
-        uuid: builtins.str = ...,
-        status: global___KnowledgeBoxResponseStatus.ValueType = ...,
-        config: global___KnowledgeBoxConfig | None = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["config", b"config"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["config", b"config", "slug", b"slug", "status", b"status", "uuid", b"uuid"]) -> None: ...
-
-global___KnowledgeBox = KnowledgeBox
-
-@typing_extensions.final
 class KnowledgeBoxConfig(google.protobuf.message.Message):
+    """CONFIG"""
+
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     TITLE_FIELD_NUMBER: builtins.int
@@ -207,23 +181,6 @@ class NewKnowledgeBoxResponse(google.protobuf.message.Message):
 global___NewKnowledgeBoxResponse = NewKnowledgeBoxResponse
 
 @typing_extensions.final
-class KnowledgeBoxPrefix(google.protobuf.message.Message):
-    """SEARCH / LIST"""
-
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    PREFIX_FIELD_NUMBER: builtins.int
-    prefix: builtins.str
-    def __init__(
-        self,
-        *,
-        prefix: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["prefix", b"prefix"]) -> None: ...
-
-global___KnowledgeBoxPrefix = KnowledgeBoxPrefix
-
-@typing_extensions.final
 class KnowledgeBoxUpdate(google.protobuf.message.Message):
     """UPDATE"""
 
@@ -294,18 +251,6 @@ class DeleteKnowledgeBoxResponse(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["status", b"status"]) -> None: ...
 
 global___DeleteKnowledgeBoxResponse = DeleteKnowledgeBoxResponse
-
-@typing_extensions.final
-class CleanedKnowledgeBoxResponse(google.protobuf.message.Message):
-    """Clean Index"""
-
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    def __init__(
-        self,
-    ) -> None: ...
-
-global___CleanedKnowledgeBoxResponse = CleanedKnowledgeBoxResponse
 
 @typing_extensions.final
 class Label(google.protobuf.message.Message):

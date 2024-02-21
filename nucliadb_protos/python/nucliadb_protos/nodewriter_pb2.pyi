@@ -28,7 +28,6 @@ from nucliadb_protos.noderesources_pb2 import (
     ResourceID as ResourceID,
     SentenceMetadata as SentenceMetadata,
     Shard as Shard,
-    ShardCleaned as ShardCleaned,
     ShardCreated as ShardCreated,
     ShardId as ShardId,
     ShardIds as ShardIds,

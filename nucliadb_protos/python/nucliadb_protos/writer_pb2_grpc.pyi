@@ -9,7 +9,6 @@ import nucliadb_protos.knowledgebox_pb2
 import nucliadb_protos.writer_pb2
 from nucliadb_protos.knowledgebox_pb2 import (
     CONFLICT as CONFLICT,
-    CleanedKnowledgeBoxResponse as CleanedKnowledgeBoxResponse,
     DeleteKnowledgeBoxResponse as DeleteKnowledgeBoxResponse,
     DeletedEntitiesGroups as DeletedEntitiesGroups,
     ERROR as ERROR,
@@ -20,11 +19,9 @@ from nucliadb_protos.knowledgebox_pb2 import (
     EntityGroupDuplicateIndex as EntityGroupDuplicateIndex,
     GCKnowledgeBoxResponse as GCKnowledgeBoxResponse,
     KBConfiguration as KBConfiguration,
-    KnowledgeBox as KnowledgeBox,
     KnowledgeBoxConfig as KnowledgeBoxConfig,
     KnowledgeBoxID as KnowledgeBoxID,
     KnowledgeBoxNew as KnowledgeBoxNew,
-    KnowledgeBoxPrefix as KnowledgeBoxPrefix,
     KnowledgeBoxResponseStatus as KnowledgeBoxResponseStatus,
     KnowledgeBoxUpdate as KnowledgeBoxUpdate,
     Label as Label,
@@ -53,7 +50,6 @@ from nucliadb_protos.noderesources_pb2 import (
     ResourceID as ResourceID,
     SentenceMetadata as SentenceMetadata,
     Shard as Shard,
-    ShardCleaned as ShardCleaned,
     ShardCreated as ShardCreated,
     ShardId as ShardId,
     ShardIds as ShardIds,
@@ -137,10 +133,6 @@ from nucliadb_protos.resources_pb2 import (
 
 class WriterStub:
     def __init__(self, channel: grpc.Channel) -> None: ...
-    GetKnowledgeBox: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
-        nucliadb_protos.knowledgebox_pb2.KnowledgeBox,
-    ]
     NewKnowledgeBox: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.knowledgebox_pb2.KnowledgeBoxNew,
         nucliadb_protos.knowledgebox_pb2.NewKnowledgeBoxResponse,
@@ -152,14 +144,6 @@ class WriterStub:
     UpdateKnowledgeBox: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.knowledgebox_pb2.KnowledgeBoxUpdate,
         nucliadb_protos.knowledgebox_pb2.UpdateKnowledgeBoxResponse,
-    ]
-    CleanAndUpgradeKnowledgeBoxIndex: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
-        nucliadb_protos.knowledgebox_pb2.CleanedKnowledgeBoxResponse,
-    ]
-    ListKnowledgeBox: grpc.UnaryStreamMultiCallable[
-        nucliadb_protos.knowledgebox_pb2.KnowledgeBoxPrefix,
-        nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
     ]
     GCKnowledgeBox: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
@@ -269,10 +253,6 @@ class WriterStub:
         nucliadb_protos.writer_pb2.IndexResource,
         nucliadb_protos.writer_pb2.IndexStatus,
     ]
-    Export: grpc.UnaryStreamMultiCallable[
-        nucliadb_protos.writer_pb2.ExportRequest,
-        nucliadb_protos.writer_pb2.BrokerMessage,
-    ]
     DownloadFile: grpc.UnaryStreamMultiCallable[
         nucliadb_protos.writer_pb2.FileRequest,
         nucliadb_protos.writer_pb2.BinaryData,
@@ -283,12 +263,6 @@ class WriterStub:
     ]
 
 class WriterServicer(metaclass=abc.ABCMeta):
-    @abc.abstractmethod
-    def GetKnowledgeBox(
-        self,
-        request: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.knowledgebox_pb2.KnowledgeBox: ...
     @abc.abstractmethod
     def NewKnowledgeBox(
         self,
@@ -307,18 +281,6 @@ class WriterServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxUpdate,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.knowledgebox_pb2.UpdateKnowledgeBoxResponse: ...
-    @abc.abstractmethod
-    def CleanAndUpgradeKnowledgeBoxIndex(
-        self,
-        request: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.knowledgebox_pb2.CleanedKnowledgeBoxResponse: ...
-    @abc.abstractmethod
-    def ListKnowledgeBox(
-        self,
-        request: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxPrefix,
-        context: grpc.ServicerContext,
-    ) -> collections.abc.Iterator[nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID]: ...
     @abc.abstractmethod
     def GCKnowledgeBox(
         self,
@@ -479,12 +441,6 @@ class WriterServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.writer_pb2.IndexResource,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.IndexStatus: ...
-    @abc.abstractmethod
-    def Export(
-        self,
-        request: nucliadb_protos.writer_pb2.ExportRequest,
-        context: grpc.ServicerContext,
-    ) -> collections.abc.Iterator[nucliadb_protos.writer_pb2.BrokerMessage]: ...
     @abc.abstractmethod
     def DownloadFile(
         self,

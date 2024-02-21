@@ -18,7 +18,6 @@ else:
     import typing_extensions
 from nucliadb_protos.knowledgebox_pb2 import (
     CONFLICT as CONFLICT,
-    CleanedKnowledgeBoxResponse as CleanedKnowledgeBoxResponse,
     DeleteKnowledgeBoxResponse as DeleteKnowledgeBoxResponse,
     DeletedEntitiesGroups as DeletedEntitiesGroups,
     ERROR as ERROR,
@@ -29,11 +28,9 @@ from nucliadb_protos.knowledgebox_pb2 import (
     EntityGroupDuplicateIndex as EntityGroupDuplicateIndex,
     GCKnowledgeBoxResponse as GCKnowledgeBoxResponse,
     KBConfiguration as KBConfiguration,
-    KnowledgeBox as KnowledgeBox,
     KnowledgeBoxConfig as KnowledgeBoxConfig,
     KnowledgeBoxID as KnowledgeBoxID,
     KnowledgeBoxNew as KnowledgeBoxNew,
-    KnowledgeBoxPrefix as KnowledgeBoxPrefix,
     KnowledgeBoxResponseStatus as KnowledgeBoxResponseStatus,
     KnowledgeBoxUpdate as KnowledgeBoxUpdate,
     Label as Label,
@@ -130,7 +127,6 @@ from nucliadb_protos.writer_pb2 import (
     DelLabelsRequest as DelLabelsRequest,
     DelVectorSetRequest as DelVectorSetRequest,
     Error as Error,
-    ExportRequest as ExportRequest,
     FileRequest as FileRequest,
     FileUploaded as FileUploaded,
     GetEntitiesGroupRequest as GetEntitiesGroupRequest,

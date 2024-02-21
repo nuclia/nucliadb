@@ -23,13 +23,10 @@ from io import BytesIO
 from typing import AsyncIterator, Optional
 
 from nucliadb_protos.knowledgebox_pb2 import (
-    CleanedKnowledgeBoxResponse,
     DeleteKnowledgeBoxResponse,
     GCKnowledgeBoxResponse,
-    KnowledgeBox,
     KnowledgeBoxID,
     KnowledgeBoxNew,
-    KnowledgeBoxPrefix,
     KnowledgeBoxResponseStatus,
     KnowledgeBoxUpdate,
     Labels,
@@ -37,7 +34,6 @@ from nucliadb_protos.knowledgebox_pb2 import (
     SemanticModelMetadata,
     UpdateKnowledgeBoxResponse,
 )
-from nucliadb_protos.noderesources_pb2 import ShardCleaned
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.writer_pb2 import (
     BinaryData,
@@ -45,7 +41,6 @@ from nucliadb_protos.writer_pb2 import (
     DelEntitiesRequest,
     DelLabelsRequest,
     DelVectorSetRequest,
-    ExportRequest,
     ExtractedVectorsWrapper,
     FileRequest,
     FileUploaded,
@@ -79,9 +74,6 @@ from nucliadb_protos.writer_pb2 import (
     SetVectorSetRequest,
     SetVectorsRequest,
     SetVectorsResponse,
-)
-from nucliadb_protos.writer_pb2 import Shards as PBShards
-from nucliadb_protos.writer_pb2 import (
     UpdateEntitiesGroupRequest,
     UpdateEntitiesGroupResponse,
     UploadBinaryData,
@@ -91,7 +83,7 @@ from nucliadb_protos.writer_pb2 import (
 
 from nucliadb import learning_config
 from nucliadb.common.cluster.exceptions import AlreadyExists, EntitiesGroupNotFound
-from nucliadb.common.cluster.manager import clean_and_upgrade, get_index_nodes
+from nucliadb.common.cluster.manager import get_index_nodes
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
@@ -108,7 +100,6 @@ from nucliadb.ingest.settings import settings
 from nucliadb_protos import utils_pb2, writer_pb2, writer_pb2_grpc
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
-from nucliadb_utils.keys import KB_SHARDS
 from nucliadb_utils.settings import is_onprem_nucliadb, running_settings
 from nucliadb_utils.storages.storage import Storage, StorageField
 from nucliadb_utils.utilities import (
@@ -135,38 +126,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
     async def finalize(self):
         ...
-
-    async def GetKnowledgeBox(self, request: KnowledgeBoxID, context=None) -> KnowledgeBox:  # type: ignore
-        response: KnowledgeBox = await self.proc.get_kb(
-            slug=request.slug, uuid=request.uuid
-        )
-        return response
-
-    async def CleanAndUpgradeKnowledgeBoxIndex(  # type: ignore
-        self, request: KnowledgeBoxID, context=None
-    ) -> CleanedKnowledgeBoxResponse:
-        try:
-            async with self.driver.transaction() as txn:
-                all_shards = await self.shards_manager.get_all_shards(txn, request.uuid)
-
-                updated_shards = PBShards()
-                updated_shards.CopyFrom(all_shards)
-
-                for logic_shard in all_shards.shards:
-                    replicas_cleaned = await clean_and_upgrade(logic_shard)
-                    for replica_id, shard_cleaned in replicas_cleaned.items():
-                        update_shards_with_updated_replica(
-                            updated_shards, replica_id, shard_cleaned
-                        )
-
-                key = KB_SHARDS.format(kbid=request.uuid)
-                await txn.set(key, updated_shards.SerializeToString())
-                await txn.commit()
-                return CleanedKnowledgeBoxResponse()
-        except Exception as e:
-            errors.capture_exception(e)
-            logger.error("Error in ingest gRPC servicer", exc_info=True)
-            raise
 
     async def SetVectors(  # type: ignore
         self, request: SetVectorsRequest, context=None
@@ -329,13 +288,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 exc_info=True,
                 extra={"kbid": kbid},
             )
-
-    async def ListKnowledgeBox(  # type: ignore
-        self, request: KnowledgeBoxPrefix, context=None
-    ) -> AsyncIterator[KnowledgeBoxID]:  # type: ignore
-        async for slug in self.proc.list_kb(request.prefix):
-            uuid = await self.proc.get_kb_uuid(slug)
-            yield KnowledgeBoxID(uuid=uuid, slug=slug)
 
     async def GCKnowledgeBox(  # type: ignore
         self, request: KnowledgeBoxID, context=None
@@ -850,16 +802,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             logger.error("Error in ingest gRPC servicer", exc_info=True)
             raise
 
-    async def Export(self, request: ExportRequest, context=None):
-        try:
-            async with self.driver.transaction() as txn:
-                kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
-                async for resource in kbobj.iterate_resources():
-                    yield await resource.generate_broker_message()
-        except Exception:
-            logger.exception("Export", stack_info=True)
-            raise
-
     async def DownloadFile(self, request: FileRequest, context=None):
         async for data in self.storage.download(request.bucket, request.key):
             yield BinaryData(data=data)
@@ -911,19 +853,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         )
         result = FileUploaded()
         return result
-
-
-def update_shards_with_updated_replica(
-    shards: PBShards, replica_id: str, updated_replica: ShardCleaned
-):
-    for logic_shard in shards.shards:
-        for replica in logic_shard.replicas:
-            if replica.shard.id == replica_id:
-                replica.shard.document_service = updated_replica.document_service
-                replica.shard.vector_service = updated_replica.vector_service
-                replica.shard.paragraph_service = updated_replica.paragraph_service
-                replica.shard.relation_service = updated_replica.relation_service
-                return
 
 
 LEARNING_SIMILARITY_FUNCTION_TO_PROTO = {

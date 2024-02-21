@@ -28,7 +28,6 @@ from nucliadb_protos.nodereader_pb2 import (
 from nucliadb_protos.noderesources_pb2 import EmptyResponse
 from nucliadb_protos.noderesources_pb2 import Shard as NodeResourcesShard
 from nucliadb_protos.noderesources_pb2 import (
-    ShardCleaned,
     ShardCreated,
     ShardId,
     ShardIds,
@@ -48,15 +47,6 @@ class DummyWriterStub:  # pragma: no cover
     async def DeleteShard(self, data):  # pragma: no cover
         self.calls.setdefault("DeleteShard", []).append(data)
         return ShardId(id="shard")
-
-    async def CleanAndUpgradeShard(self, data):  # pragma: no cover
-        self.calls.setdefault("CleanAndUpgradeShard", []).append(data)
-        return ShardCleaned(
-            document_service=ShardCreated.DocumentService.DOCUMENT_V1,
-            paragraph_service=ShardCreated.ParagraphService.PARAGRAPH_V1,
-            vector_service=ShardCreated.VectorService.VECTOR_V1,
-            relation_service=ShardCreated.RelationService.RELATION_V1,
-        )
 
     async def ListShards(self, data):  # pragma: no cover
         self.calls.setdefault("ListShards", []).append(data)

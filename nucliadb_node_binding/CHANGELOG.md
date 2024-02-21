@@ -1,4 +1,9 @@
 # Changelog
+
+## 0.8.0
+
+- Remove `clean_and_upgrade` method
+
 ## 0.7.9
 
 - restructured disk handling

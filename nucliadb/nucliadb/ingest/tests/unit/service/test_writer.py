@@ -23,109 +23,14 @@ from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxNew, SemanticModelMetadata
-from nucliadb_protos.noderesources_pb2 import ShardCleaned
 from nucliadb_protos.resources_pb2 import FieldID, FieldText, FieldType
 from nucliadb_protos.utils_pb2 import ReleaseChannel, VectorSimilarity
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.ingest.fields.text import Text
-from nucliadb.ingest.service.writer import (
-    WriterServicer,
-    get_release_channel,
-    update_shards_with_updated_replica,
-)
+from nucliadb.ingest.service.writer import WriterServicer, get_release_channel
 from nucliadb.learning_config import LearningConfiguration
 from nucliadb_protos import writer_pb2
-
-
-def test_update_shards_pb_replica():
-    shard1_rep1 = writer_pb2.ShardReplica(
-        node="node1",
-        shard=writer_pb2.ShardCreated(
-            id="shard1rep1",
-            document_service=writer_pb2.ShardCreated.DOCUMENT_V0,
-            paragraph_service=writer_pb2.ShardCreated.PARAGRAPH_V0,
-            relation_service=writer_pb2.ShardCreated.RELATION_V0,
-            vector_service=writer_pb2.ShardCreated.VECTOR_V0,
-        ),
-    )
-    shard1_rep2 = writer_pb2.ShardReplica(
-        node="node2",
-        shard=writer_pb2.ShardCreated(
-            id="shard1rep2",
-            document_service=writer_pb2.ShardCreated.DOCUMENT_V0,
-            paragraph_service=writer_pb2.ShardCreated.PARAGRAPH_V0,
-            relation_service=writer_pb2.ShardCreated.RELATION_V0,
-            vector_service=writer_pb2.ShardCreated.VECTOR_V0,
-        ),
-    )
-    shard2_rep1 = writer_pb2.ShardReplica(
-        node="node1",
-        shard=writer_pb2.ShardCreated(
-            id="shard2rep1",
-            document_service=writer_pb2.ShardCreated.DOCUMENT_V0,
-            paragraph_service=writer_pb2.ShardCreated.PARAGRAPH_V0,
-            relation_service=writer_pb2.ShardCreated.RELATION_V0,
-            vector_service=writer_pb2.ShardCreated.VECTOR_V0,
-        ),
-    )
-    shard2_rep2 = writer_pb2.ShardReplica(
-        node="node2",
-        shard=writer_pb2.ShardCreated(
-            id="shard2rep2",
-            document_service=writer_pb2.ShardCreated.DOCUMENT_V0,
-            paragraph_service=writer_pb2.ShardCreated.PARAGRAPH_V0,
-            relation_service=writer_pb2.ShardCreated.RELATION_V0,
-            vector_service=writer_pb2.ShardCreated.VECTOR_V0,
-        ),
-    )
-    shard1 = writer_pb2.ShardObject(shard="shard1", replicas=[shard1_rep1, shard1_rep2])
-    shard2 = writer_pb2.ShardObject(shard="shard2", replicas=[shard2_rep1, shard2_rep2])
-
-    shards = writer_pb2.Shards(shards=[shard1, shard2])
-
-    new_replica_info = ShardCleaned(
-        document_service=writer_pb2.ShardCreated.DOCUMENT_V1,
-        relation_service=writer_pb2.ShardCreated.RELATION_V1,
-        vector_service=writer_pb2.ShardCreated.VECTOR_V1,
-        paragraph_service=writer_pb2.ShardCreated.PARAGRAPH_V1,
-    )
-
-    update_shards_with_updated_replica(shards, "shard1rep1", new_replica_info)
-
-    found = False
-    for shard in shards.shards:
-        for replica in shard.replicas:
-            if replica.shard.id == "shard1rep1":
-                assert (
-                    replica.shard.document_service
-                    == writer_pb2.ShardCreated.DOCUMENT_V1
-                )
-                assert (
-                    replica.shard.paragraph_service
-                    == writer_pb2.ShardCreated.PARAGRAPH_V1
-                )
-                assert replica.shard.vector_service == writer_pb2.ShardCreated.VECTOR_V1
-                assert (
-                    replica.shard.relation_service
-                    == writer_pb2.ShardCreated.RELATION_V1
-                )
-                found = True
-            else:
-                assert (
-                    replica.shard.document_service
-                    == writer_pb2.ShardCreated.DOCUMENT_V0
-                )
-                assert (
-                    replica.shard.paragraph_service
-                    == writer_pb2.ShardCreated.PARAGRAPH_V0
-                )
-                assert replica.shard.vector_service == writer_pb2.ShardCreated.VECTOR_V0
-                assert (
-                    replica.shard.relation_service
-                    == writer_pb2.ShardCreated.RELATION_V0
-                )
-    assert found
 
 
 class TestWriterServicer:
@@ -179,13 +84,6 @@ class TestWriterServicer:
         mock.get_field.return_value = field
         with patch("nucliadb.ingest.service.writer.ResourceORM", return_value=mock):
             yield mock
-
-    async def test_GetKnowledgeBox(self, writer):
-        value = Mock()
-        writer.proc.get_kb.return_value = value
-        req = Mock(slug="slug", uuid="uuid")
-
-        assert await writer.GetKnowledgeBox(req, None) is value
 
     async def test_SetVectors(self, writer: WriterServicer, resource):
         request = writer_pb2.SetVectorsRequest(

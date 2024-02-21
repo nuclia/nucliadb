@@ -457,10 +457,6 @@ message ResourceIdResponse {
     string uuid = 1;
 }
 
-message ExportRequest {
-    string kbid = 1;
-}
-
 message SetVectorsRequest {
     utils.VectorObject vectors = 1;
     string kbid = 2;
@@ -517,12 +513,9 @@ message GetSynonymsResponse {
 
 
 service Writer {
-    rpc GetKnowledgeBox(knowledgebox.KnowledgeBoxID) returns (knowledgebox.KnowledgeBox) {}
     rpc NewKnowledgeBox(knowledgebox.KnowledgeBoxNew) returns (knowledgebox.NewKnowledgeBoxResponse) {}
     rpc DeleteKnowledgeBox(knowledgebox.KnowledgeBoxID) returns (knowledgebox.DeleteKnowledgeBoxResponse) {}
     rpc UpdateKnowledgeBox(knowledgebox.KnowledgeBoxUpdate) returns (knowledgebox.UpdateKnowledgeBoxResponse) {}
-    rpc CleanAndUpgradeKnowledgeBoxIndex(knowledgebox.KnowledgeBoxID) returns (knowledgebox.CleanedKnowledgeBoxResponse) {}
-    rpc ListKnowledgeBox(knowledgebox.KnowledgeBoxPrefix) returns (stream knowledgebox.KnowledgeBoxID) {}
     rpc GCKnowledgeBox(knowledgebox.KnowledgeBoxID) returns (knowledgebox.GCKnowledgeBoxResponse) {}
     rpc SetVectors(SetVectorsRequest) returns (SetVectorsResponse) {}
 
@@ -564,7 +557,6 @@ service Writer {
     rpc Index(IndexResource) returns (IndexStatus) {}
     rpc ReIndex(IndexResource) returns (IndexStatus) {}
 
-    rpc Export(ExportRequest) returns (stream BrokerMessage) {}
     rpc DownloadFile(FileRequest) returns (stream BinaryData) {}
     rpc UploadFile(stream UploadBinaryData) returns (FileUploaded) {}
 }

@@ -7,19 +7,8 @@ pub struct KnowledgeBoxId {
     #[prost(string, tag="2")]
     pub uuid: ::prost::alloc::string::String,
 }
-// GET
+// CONFIG
 
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct KnowledgeBox {
-    #[prost(string, tag="1")]
-    pub slug: ::prost::alloc::string::String,
-    #[prost(string, tag="2")]
-    pub uuid: ::prost::alloc::string::String,
-    #[prost(enumeration="KnowledgeBoxResponseStatus", tag="3")]
-    pub status: i32,
-    #[prost(message, optional, tag="4")]
-    pub config: ::core::option::Option<KnowledgeBoxConfig>,
-}
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct KnowledgeBoxConfig {
     #[prost(string, tag="1")]
@@ -70,13 +59,6 @@ pub struct NewKnowledgeBoxResponse {
     #[prost(string, tag="2")]
     pub uuid: ::prost::alloc::string::String,
 }
-// SEARCH / LIST
-
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct KnowledgeBoxPrefix {
-    #[prost(string, tag="1")]
-    pub prefix: ::prost::alloc::string::String,
-}
 // UPDATE
 
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -106,11 +88,6 @@ pub struct GcKnowledgeBoxResponse {
 pub struct DeleteKnowledgeBoxResponse {
     #[prost(enumeration="KnowledgeBoxResponseStatus", tag="1")]
     pub status: i32,
-}
-// Clean Index
-
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct CleanedKnowledgeBoxResponse {
 }
 // Labels on a Knowledge Box
 

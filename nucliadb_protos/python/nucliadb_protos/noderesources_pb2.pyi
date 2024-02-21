@@ -197,30 +197,6 @@ class ShardCreated(google.protobuf.message.Message):
 global___ShardCreated = ShardCreated
 
 @typing_extensions.final
-class ShardCleaned(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    DOCUMENT_SERVICE_FIELD_NUMBER: builtins.int
-    PARAGRAPH_SERVICE_FIELD_NUMBER: builtins.int
-    VECTOR_SERVICE_FIELD_NUMBER: builtins.int
-    RELATION_SERVICE_FIELD_NUMBER: builtins.int
-    document_service: global___ShardCreated.DocumentService.ValueType
-    paragraph_service: global___ShardCreated.ParagraphService.ValueType
-    vector_service: global___ShardCreated.VectorService.ValueType
-    relation_service: global___ShardCreated.RelationService.ValueType
-    def __init__(
-        self,
-        *,
-        document_service: global___ShardCreated.DocumentService.ValueType = ...,
-        paragraph_service: global___ShardCreated.ParagraphService.ValueType = ...,
-        vector_service: global___ShardCreated.VectorService.ValueType = ...,
-        relation_service: global___ShardCreated.RelationService.ValueType = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["document_service", b"document_service", "paragraph_service", b"paragraph_service", "relation_service", b"relation_service", "vector_service", b"vector_service"]) -> None: ...
-
-global___ShardCleaned = ShardCleaned
-
-@typing_extensions.final
 class ResourceID(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

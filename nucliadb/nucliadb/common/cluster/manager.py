@@ -596,15 +596,3 @@ def sorted_nodes(avoid_nodes: Optional[list[str]] = None) -> list[str]:
         nid for nid in available_node_ids if nid not in preferred_nodes
     ]
     return preferred_node_order
-
-
-async def clean_and_upgrade(
-    shard: writer_pb2.ShardObject,
-) -> dict[str, writer_pb2.ShardCleaned]:
-    replicas_cleaned: dict[str, writer_pb2.ShardCleaned] = {}
-    for shardreplica in shard.replicas:
-        index_node = get_index_node(shardreplica.node)
-        replica_id = shardreplica.shard
-        cleaned = await index_node.writer.CleanAndUpgradeShard(replica_id)  # type: ignore
-        replicas_cleaned[replica_id.id] = cleaned
-    return replicas_cleaned

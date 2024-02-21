@@ -67,17 +67,6 @@ pub mod shard_created {
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ShardCleaned {
-    #[prost(enumeration="shard_created::DocumentService", tag="2")]
-    pub document_service: i32,
-    #[prost(enumeration="shard_created::ParagraphService", tag="3")]
-    pub paragraph_service: i32,
-    #[prost(enumeration="shard_created::VectorService", tag="4")]
-    pub vector_service: i32,
-    #[prost(enumeration="shard_created::RelationService", tag="5")]
-    pub relation_service: i32,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ResourceId {
     #[prost(string, tag="1")]
     pub shard_id: ::prost::alloc::string::String,

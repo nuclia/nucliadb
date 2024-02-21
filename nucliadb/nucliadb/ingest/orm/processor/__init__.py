@@ -624,39 +624,6 @@ class Processor:
         kbobj = KnowledgeBox(txn, storage, uuid)
         return kbobj
 
-    async def get_kb(
-        self, slug: str = "", uuid: Optional[str] = ""
-    ) -> knowledgebox_pb2.KnowledgeBox:
-        txn = await self.driver.begin()
-
-        if uuid == "" and slug != "":
-            uuid = await KnowledgeBox.get_kb_uuid(txn, slug)
-
-        response = knowledgebox_pb2.KnowledgeBox()
-        if uuid is None:
-            response.status = knowledgebox_pb2.KnowledgeBoxResponseStatus.NOTFOUND
-            await txn.abort()
-            return response
-
-        config = await KnowledgeBox.get_kb(txn, uuid)
-
-        await txn.abort()
-
-        if config is None:
-            response.status = knowledgebox_pb2.KnowledgeBoxResponseStatus.NOTFOUND
-            return response
-
-        response.uuid = uuid
-        response.slug = config.slug
-        response.config.CopyFrom(config)
-        return response
-
-    async def get_kb_uuid(self, slug: str) -> Optional[str]:
-        txn = await self.driver.begin()
-        uuid = await KnowledgeBox.get_kb_uuid(txn, slug)
-        await txn.abort()
-        return uuid
-
     @processor_observer.wrap({"type": "create_kb"})
     async def create_kb(
         self,
@@ -700,12 +667,6 @@ class Processor:
             raise e
         await txn.commit()
         return uuid
-
-    async def list_kb(self, prefix: str):
-        txn = await self.driver.begin()
-        async for kbid, slug in KnowledgeBox.get_kbs(txn, prefix):
-            yield slug
-        await txn.abort()
 
     async def delete_kb(self, kbid: str = "", slug: str = "") -> str:
         txn = await self.driver.begin()
