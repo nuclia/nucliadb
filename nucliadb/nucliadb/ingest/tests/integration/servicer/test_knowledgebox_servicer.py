@@ -36,7 +36,7 @@ async def test_create_knowledgebox(grpc_servicer: IngestFixture, maindb_driver):
 
     stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)  # type: ignore
 
-    kbs = await list_kb_shards(maindb_driver)
+    kbs = await list_all_kb_slugs(maindb_driver)
     assert len(kbs) == 0
 
     pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test")
@@ -53,7 +53,7 @@ async def test_create_knowledgebox(grpc_servicer: IngestFixture, maindb_driver):
     result = await stub.NewKnowledgeBox(pb)  # type: ignore
     assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
 
-    slugs = await list_kb_shards(maindb_driver)
+    slugs = await list_all_kb_slugs(maindb_driver)
     assert "test" in slugs
     assert "test2" in slugs
 
@@ -61,7 +61,7 @@ async def test_create_knowledgebox(grpc_servicer: IngestFixture, maindb_driver):
     result = await stub.DeleteKnowledgeBox(pbid)  # type: ignore
 
 
-async def list_kb_shards(driver: Driver) -> list[str]:
+async def list_all_kb_slugs(driver: Driver) -> list[str]:
     slugs = []
     async with driver.transaction(read_only=True) as txn:
         async for _, slug in KnowledgeBox.get_kbs(txn, slug=""):
