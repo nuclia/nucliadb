@@ -21,20 +21,33 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from nucliadb.common.maindb.tikv import TiKVDataLayer
+from nucliadb.common.maindb.exceptions import ConflictError
+from nucliadb.common.maindb.tikv import LeaderNotFoundError, TiKVDataLayer
 
 
-async def test_get_timeout_is_retried():
-    inner_txn = MagicMock(
-        get=AsyncMock(
-            side_effect=Exception(
-                "gRPC error: RpcFailure: 4-DEADLINE_EXCEEDED Deadline Exceeded"
-            )
-        )
-    )
+@pytest.mark.parametrize(
+    "tikv_exception,handled_exception",
+    [
+        (
+            Exception("gRPC error: RpcFailure: 4-DEADLINE_EXCEEDED Deadline Exceeded"),
+            TimeoutError,
+        ),
+        (Exception("Leader of region 34234 is not found"), LeaderNotFoundError),
+    ],
+)
+async def test_get_retrials(tikv_exception, handled_exception):
+    inner_txn = MagicMock(get=AsyncMock(side_effect=tikv_exception))
     tikv_txn = TiKVDataLayer(inner_txn)
 
-    with pytest.raises(TimeoutError):
+    with pytest.raises(handled_exception):
         await tikv_txn.get("key")
 
     assert inner_txn.get.call_count == 2
+
+
+async def test_commit_raises_conflict_error():
+    inner_txn = MagicMock(commit=AsyncMock(side_effect=Exception("WriteConflict")))
+    tikv_txn = TiKVDataLayer(inner_txn)
+
+    with pytest.raises(ConflictError):
+        await tikv_txn.commit()

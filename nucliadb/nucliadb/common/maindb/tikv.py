@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import random
 from typing import Any, List, Optional, Union
@@ -42,10 +43,24 @@ try:
 except ImportError:  # pragma: no cover
     TiKV = False
 
+
+class LeaderNotFoundError(Exception):
+    """
+    Raised when the tikv client raises an exception indicating that the leader of a region is not found.
+    This is a transient error and the operation should be retried.
+    """
+
+    pass
+
+
 tikv_observer = metrics.Observer(
     "tikv_client",
     labels={"type": ""},
-    error_mappings={"conflict_error": ConflictError, "timeout_error": TimeoutError},
+    error_mappings={
+        "conflict_error": ConflictError,
+        "timeout_error": TimeoutError,
+        "leader_not_found_error": LeaderNotFoundError,
+    },
 )
 logger = logging.getLogger(__name__)
 
@@ -64,47 +79,53 @@ class TiKVDataLayer:
                 logger.exception("Error rolling back transaction")
 
     async def commit(self):
-        with tikv_observer({"type": "commit"}):
-            try:
-                await self.connection.commit()
-            except Exception as exc:
-                exc_text = str(exc)
-                if "WriteConflict" in exc_text:
-                    raise ConflictError(exc_text) from exc
-                else:
-                    raise
+        with tikv_observer({"type": "commit"}), self.tikv_error_handler():
+            await self.connection.commit()
 
     async def batch_get(self, keys: list[str]) -> list[Optional[bytes]]:
         bytes_keys: list[bytes] = [x.encode() for x in keys]
-        with tikv_observer({"type": "batch_get"}):
+        with tikv_observer({"type": "batch_get"}), self.tikv_error_handler():
             output = {}
             for key, value in await self.connection.batch_get(bytes_keys):
                 output[key.decode()] = value
-        return [output.get(key) for key in keys]
+            return [output.get(key) for key in keys]
 
     @backoff.on_exception(
-        backoff.expo, (TimeoutError,), jitter=backoff.random_jitter, max_tries=2
+        backoff.expo,
+        (TimeoutError, LeaderNotFoundError),
+        jitter=backoff.random_jitter,
+        max_tries=2,
     )
     async def get(self, key: str) -> Optional[bytes]:
+        with tikv_observer({"type": "get"}), self.tikv_error_handler():
+            return await self.connection.get(key.encode())
+
+    @contextlib.contextmanager
+    def tikv_error_handler(self):
+        """
+        The tikv_client library does not provide specific exceptions and simply
+        raises generic Exception class with different error strings. That forces
+        us to parse the error string to determine the type of error...
+        """
         try:
-            with tikv_observer({"type": "get"}):
-                return await self.connection.get(key.encode())
+            yield
         except Exception as exc:
-            # The tikv_client library does not provide specific exceptions and simply
-            # raises generic Exception class with different error strings. That forces
-            # us to parse the error string to determine the type of error...
             exc_text = str(exc)
-            if "4-DEADLINE_EXCEEDED" in exc_text:
+            if "WriteConflict" in exc_text:
+                raise ConflictError(exc_text) from exc
+            elif "4-DEADLINE_EXCEEDED" in exc_text:
                 raise TimeoutError(exc_text) from exc
+            elif "Leader of region" in exc_text and "not found" in exc_text:
+                raise LeaderNotFoundError(exc_text) from exc
             else:
                 raise
 
     async def set(self, key: str, value: bytes) -> None:
-        with tikv_observer({"type": "put"}):
+        with tikv_observer({"type": "put"}), self.tikv_error_handler():
             await self.connection.put(key.encode(), value)
 
     async def delete(self, key: str) -> None:
-        with tikv_observer({"type": "delete"}):
+        with tikv_observer({"type": "delete"}), self.tikv_error_handler():
             await self.connection.delete(key.encode())
 
     async def keys(
@@ -126,7 +147,7 @@ class TiKVDataLayer:
         _include_start = include_start
 
         while True:
-            with tikv_observer({"type": "scan_keys"}):
+            with tikv_observer({"type": "scan_keys"}), self.tikv_error_handler():
                 keys = await self.connection.scan_keys(
                     start=start_key,
                     end=None,
@@ -163,7 +184,7 @@ class TiKVDataLayer:
 
         value = 0
         while True:
-            with tikv_observer({"type": "scan_keys"}):
+            with tikv_observer({"type": "scan_keys"}), self.tikv_error_handler():
                 keys = await self.connection.scan_keys(
                     start=start_key,
                     end=None,
@@ -229,7 +250,10 @@ class TiKVTransaction(Transaction):
         return await self.data_layer.batch_get(keys)
 
     @backoff.on_exception(
-        backoff.expo, (TimeoutError,), jitter=backoff.random_jitter, max_tries=2
+        backoff.expo,
+        (TimeoutError, LeaderNotFoundError),
+        jitter=backoff.random_jitter,
+        max_tries=2,
     )
     async def get(self, key: str) -> Optional[bytes]:
         assert self.open
