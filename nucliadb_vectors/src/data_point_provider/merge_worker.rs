@@ -17,22 +17,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use std::path::PathBuf;
-
-use crossbeam::channel::Sender;
-use nucliadb_core::tracing::*;
-use nucliadb_core::{fs_state, Channel};
+use std::sync::Arc;
 
 use super::merger::{MergeQuery, MergeRequest};
-use super::State;
-use crate::data_point::{DataPoint, Journal, Similarity};
+use super::IndexInner;
 use crate::VectorR;
 
 pub(crate) struct Worker {
-    location: PathBuf,
-    sender: Sender<Journal>,
-    similarity: Similarity,
-    channel: Channel,
+    index: Arc<IndexInner>,
 }
 impl MergeQuery for Worker {
     fn do_work(&self) -> VectorR<()> {
@@ -40,37 +32,13 @@ impl MergeQuery for Worker {
     }
 }
 impl Worker {
-    pub(crate) fn request(
-        location: PathBuf,
-        sender: Sender<Journal>,
-        similarity: Similarity,
-        channel: Channel,
-    ) -> MergeRequest {
+    pub(crate) fn request(index: Arc<IndexInner>) -> MergeRequest {
         Box::new(Worker {
-            similarity,
-            location,
-            sender,
-            channel,
+            index,
         })
     }
     fn work(&self) -> VectorR<()> {
-        let subscriber = self.location.as_path();
-        let _lock = fs_state::shared_lock(subscriber)?;
-        info!("{subscriber:?} is ready to perform a merge");
-        let state: State = fs_state::load_state(subscriber)?;
-        let Some(work) = state.current_work_unit().map(|work| {
-            work.iter().rev().map(|journal| (state.delete_log(*journal), journal.id())).collect::<Vec<_>>()
-        }) else {
-            return Ok(());
-        };
-        let new_dp = DataPoint::merge(subscriber, &work, self.similarity, self.channel)?;
-        let new_dp_id = new_dp.get_id();
-        if self.sender.send(new_dp.journal()).is_err() {
-            // If the sender has been deallocated this data point becomes garbage,
-            // therefore is removed.
-            DataPoint::delete(subscriber, new_dp.get_id())?;
-        }
-        info!("Merge request completed: {new_dp_id}");
+        self.index.do_merge();
         Ok(())
     }
 }

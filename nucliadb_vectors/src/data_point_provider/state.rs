@@ -33,7 +33,7 @@ use crate::data_types::DeleteLog;
 
 const BUFFER_CAP: usize = 5;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 struct WorkUnit {
     pub age: SystemTime,
     pub load: Vec<Journal>,
@@ -122,7 +122,7 @@ impl Fssc {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct State {
     // Deprecated, location must be passed as an argument.
     // WARNING: Can not use serde::skip nor move this field due to a bug in serde.

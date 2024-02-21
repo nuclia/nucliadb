@@ -19,7 +19,7 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use nucliadb_core::metrics::request_time;
@@ -316,7 +316,7 @@ impl VectorWriter for VectorWriterService {
     }
 
     fn get_segment_ids(&self) -> NodeResult<Vec<String>> {
-        let mut seg_ids = self.get_segment_ids_for_vectorset(&self.index.location)?;
+        let mut seg_ids = self.get_segment_ids_for_vectorset(self.index.location())?;
         let vectorsets = self.list_vectorsets()?;
         for vs in vectorsets {
             let vs_seg_ids = self.get_segment_ids_for_vectorset(&self.config.vectorset.join(vs))?;
@@ -333,7 +333,7 @@ impl VectorWriter for VectorWriterService {
 
         let mut files = Vec::new();
 
-        for segment_id in self.get_segment_ids_for_vectorset(&self.index.location)? {
+        for segment_id in self.get_segment_ids_for_vectorset(self.index.location())? {
             if ignored_segment_ids.contains(&segment_id) {
                 continue;
             }
@@ -341,7 +341,7 @@ impl VectorWriter for VectorWriterService {
             files.push(format!("vectors/{}/journal.json", segment_id));
             files.push(format!("vectors/{}/nodes.kv", segment_id));
 
-            let fst_path = self.index.location.join(format!("{}/fst", segment_id));
+            let fst_path = self.index.location().join(format!("{}/fst", segment_id));
             if fst_path.exists() {
                 files.push(format!("vectors/{}/fst/keys.fst", segment_id));
                 files.push(format!("vectors/{}/fst/labels.fst", segment_id));
@@ -464,7 +464,7 @@ impl VectorWriterService {
         }
     }
 
-    fn get_segment_ids_for_vectorset(&self, location: &PathBuf) -> NodeResult<Vec<String>> {
+    fn get_segment_ids_for_vectorset(&self, location: &Path) -> NodeResult<Vec<String>> {
         let mut ids = Vec::new();
         for dir_entry in std::fs::read_dir(location)? {
             let entry = dir_entry?;
