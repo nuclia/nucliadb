@@ -292,19 +292,26 @@ impl Index {
         let channel = self.metadata.channel;
         let location = self.location.clone();
         let similarity = self.metadata.similarity;
+        let max_nodes_per_segment = 50_000;
         let force_merge_capacity = 100;
         let mut live_segments: Vec<_> = state.dpid_iter().collect();
+        let mut blocked_segments = vec![];
         let mut buffer = Vec::with_capacity(force_merge_capacity);
 
         while buffer.len() < force_merge_capacity {
             let Some(journal) = live_segments.pop() else {
                 break;
             };
-            buffer.push((state.delete_log(journal), journal.id()));
+            if journal.no_nodes() >= max_nodes_per_segment {
+                blocked_segments.push(journal);
+            } else {
+                buffer.push((state.delete_log(journal), journal.id()));
+            }
         }
 
         let new_dp = DataPoint::merge(&location, &buffer, similarity, channel)?;
         live_segments.push(new_dp.journal());
+        live_segments.extend(blocked_segments);
         let stats = ForceMergeMetrics {
             merged: buffer.len(),
             segments_left: live_segments.len(),
