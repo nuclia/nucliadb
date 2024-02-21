@@ -38,12 +38,12 @@ async def migrate(context: ExecutionContext) -> None:
 
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
     async with context.kv_driver.transaction() as txn:
-        labelset_list = await LabelsDataManager._get_labelsets_list(kbid, txn)
+        labelset_list = await LabelsDataManager._get_labelset_ids(kbid, txn)
         if labelset_list is not None:
             logger.info("No need for labelset list migration", extra={"kbid": kbid})
             return
 
-        labelset_list = await LabelsDataManager._legacy_get_labelsets_list(kbid, txn)
-        await LabelsDataManager._set_labelsets_list(kbid, txn, labelset_list)
+        labelset_list = await LabelsDataManager._legacy_get_labelset_ids(kbid, txn)
+        await LabelsDataManager._set_labelset_ids(kbid, txn, labelset_list)
         logger.info("Labelset list migrated", extra={"kbid": kbid})
         await txn.commit()
