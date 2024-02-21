@@ -336,7 +336,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let shards = Arc::clone(&self.shards);
         let shard_id_clone = shard_id.id.clone();
         let span = Span::current();
-        let info = info_span!(parent: &span, "list vector sets");
+        let info = info_span!(parent: &span, "garbage collection");
         let task = || {
             let shard = obtain_shard(shards, shard_id_clone)?;
             run_with_telemetry(info, move || shard.gc())
@@ -348,6 +348,24 @@ impl NodeWriter for NodeWriterGRPCDriver {
             Ok(status) => Ok(tonic::Response::new(GarbageCollectorResponse {
                 status: garbage_collector_response::Status::from(status) as i32,
             })),
+            Err(error) => Err(tonic::Status::internal(error.to_string())),
+        }
+    }
+
+    async fn merge(&self, request: Request<ShardId>) -> Result<Response<EmptyQuery>, Status> {
+        let shard_id = request.into_inner().id;
+        let shards = Arc::clone(&self.shards);
+        let span = info_span!(parent: Span::current(), "merge");
+        let task = || {
+            let shard = obtain_shard(shards, shard_id)?;
+            run_with_telemetry(span, move || shard.merge())
+        };
+        let result = tokio::task::spawn_blocking(task)
+            .await
+            .map_err(|error| tonic::Status::internal(format!("Blocking task panicked: {error:?}")))?;
+
+        match result {
+            Ok(()) => Ok(tonic::Response::new(EmptyQuery {})),
             Err(error) => Err(tonic::Status::internal(error.to_string())),
         }
     }
