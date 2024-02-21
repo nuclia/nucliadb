@@ -22,8 +22,9 @@ use std::sync::Arc;
 
 use nucliadb_core::protos::node_writer_server::NodeWriter;
 use nucliadb_core::protos::{
-    garbage_collector_response, op_status, EmptyQuery, GarbageCollectorResponse, NewShardRequest, NewVectorSetRequest,
-    NodeMetadata, OpStatus, Resource, ResourceId, ShardCreated, ShardId, ShardIds, VectorSetId, VectorSetList,
+    garbage_collector_response, merge_response, op_status, EmptyQuery, GarbageCollectorResponse, MergeResponse,
+    NewShardRequest, NewVectorSetRequest, NodeMetadata, OpStatus, Resource, ResourceId, ShardCreated, ShardId,
+    ShardIds, VectorSetId, VectorSetList,
 };
 use nucliadb_core::tracing::{self, Span, *};
 use nucliadb_core::Channel;
@@ -352,7 +353,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
     }
 
-    async fn merge(&self, request: Request<ShardId>) -> Result<Response<EmptyQuery>, Status> {
+    async fn merge(&self, request: Request<ShardId>) -> Result<Response<MergeResponse>, Status> {
         let shard_id = request.into_inner().id;
         let shards = Arc::clone(&self.shards);
         let span = info_span!(parent: Span::current(), "merge");
@@ -365,7 +366,11 @@ impl NodeWriter for NodeWriterGRPCDriver {
             .map_err(|error| tonic::Status::internal(format!("Blocking task panicked: {error:?}")))?;
 
         match result {
-            Ok(()) => Ok(tonic::Response::new(EmptyQuery {})),
+            Ok(()) => Ok(tonic::Response::new(MergeResponse {
+                status: merge_response::MergeStatus::Ok.into(),
+                merged_segments: 0,
+                remaining_segments: 0,
+            })),
             Err(error) => Err(tonic::Status::internal(error.to_string())),
         }
     }

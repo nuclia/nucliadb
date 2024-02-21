@@ -49,7 +49,7 @@ class NodeWriterStub:
     ]
     Merge: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.noderesources_pb2.ShardId,
-        nucliadb_protos.noderesources_pb2.EmptyQuery,
+        nucliadb_protos.nodewriter_pb2.MergeResponse,
     ]
     SetResource: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.noderesources_pb2.Resource,
@@ -106,7 +106,7 @@ class NodeWriterServicer(metaclass=abc.ABCMeta):
         self,
         request: nucliadb_protos.noderesources_pb2.ShardId,
         context: grpc.ServicerContext,
-    ) -> nucliadb_protos.noderesources_pb2.EmptyQuery: ...
+    ) -> nucliadb_protos.nodewriter_pb2.MergeResponse: ...
     @abc.abstractmethod
     def SetResource(
         self,

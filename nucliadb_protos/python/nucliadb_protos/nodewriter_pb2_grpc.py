@@ -38,7 +38,7 @@ class NodeWriterStub(object):
         self.Merge = channel.unary_unary(
                 '/nodewriter.NodeWriter/Merge',
                 request_serializer=nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_noderesources__pb2.EmptyQuery.FromString,
+                response_deserializer=nucliadb__protos_dot_nodewriter__pb2.MergeResponse.FromString,
                 )
         self.SetResource = channel.unary_unary(
                 '/nodewriter.NodeWriter/SetResource',
@@ -167,7 +167,7 @@ def add_NodeWriterServicer_to_server(servicer, server):
             'Merge': grpc.unary_unary_rpc_method_handler(
                     servicer.Merge,
                     request_deserializer=nucliadb__protos_dot_noderesources__pb2.ShardId.FromString,
-                    response_serializer=nucliadb__protos_dot_noderesources__pb2.EmptyQuery.SerializeToString,
+                    response_serializer=nucliadb__protos_dot_nodewriter__pb2.MergeResponse.SerializeToString,
             ),
             'SetResource': grpc.unary_unary_rpc_method_handler(
                     servicer.SetResource,
@@ -290,7 +290,7 @@ class NodeWriter(object):
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/nodewriter.NodeWriter/Merge',
             nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
-            nucliadb__protos_dot_noderesources__pb2.EmptyQuery.FromString,
+            nucliadb__protos_dot_nodewriter__pb2.MergeResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 

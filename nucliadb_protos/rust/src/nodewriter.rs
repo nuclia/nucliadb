@@ -77,6 +77,23 @@ pub struct NewVectorSetRequest {
     #[prost(enumeration="super::utils::VectorSimilarity", tag="2")]
     pub similarity: i32,
 }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct MergeResponse {
+    #[prost(enumeration="merge_response::MergeStatus", tag="1")]
+    pub status: i32,
+    #[prost(uint32, tag="2")]
+    pub merged_segments: u32,
+    #[prost(uint32, tag="3")]
+    pub remaining_segments: u32,
+}
+/// Nested message and enum types in `MergeResponse`.
+pub mod merge_response {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum MergeStatus {
+        Ok = 0,
+    }
+}
 // Implemented at nucliadb_object_storage
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
@@ -241,10 +258,7 @@ pub mod node_writer_client {
         pub async fn merge(
             &mut self,
             request: impl tonic::IntoRequest<super::super::noderesources::ShardId>,
-        ) -> Result<
-            tonic::Response<super::super::noderesources::EmptyQuery>,
-            tonic::Status,
-        > {
+        ) -> Result<tonic::Response<super::MergeResponse>, tonic::Status> {
             self.inner
                 .ready()
                 .await
@@ -417,10 +431,7 @@ pub mod node_writer_server {
         async fn merge(
             &self,
             request: tonic::Request<super::super::noderesources::ShardId>,
-        ) -> Result<
-            tonic::Response<super::super::noderesources::EmptyQuery>,
-            tonic::Status,
-        >;
+        ) -> Result<tonic::Response<super::MergeResponse>, tonic::Status>;
         async fn set_resource(
             &self,
             request: tonic::Request<super::super::noderesources::Resource>,
@@ -663,7 +674,7 @@ pub mod node_writer_server {
                         T: NodeWriter,
                     > tonic::server::UnaryService<super::super::noderesources::ShardId>
                     for MergeSvc<T> {
-                        type Response = super::super::noderesources::EmptyQuery;
+                        type Response = super::MergeResponse;
                         type Future = BoxFuture<
                             tonic::Response<Self::Response>,
                             tonic::Status,

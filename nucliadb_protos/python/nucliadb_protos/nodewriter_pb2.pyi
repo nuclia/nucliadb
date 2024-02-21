@@ -229,3 +229,35 @@ class NewVectorSetRequest(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["id", b"id", "similarity", b"similarity"]) -> None: ...
 
 global___NewVectorSetRequest = NewVectorSetRequest
+
+@typing_extensions.final
+class MergeResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class _MergeStatus:
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+
+    class _MergeStatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[MergeResponse._MergeStatus.ValueType], builtins.type):  # noqa: F821
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        OK: MergeResponse._MergeStatus.ValueType  # 0
+
+    class MergeStatus(_MergeStatus, metaclass=_MergeStatusEnumTypeWrapper): ...
+    OK: MergeResponse.MergeStatus.ValueType  # 0
+
+    STATUS_FIELD_NUMBER: builtins.int
+    MERGED_SEGMENTS_FIELD_NUMBER: builtins.int
+    REMAINING_SEGMENTS_FIELD_NUMBER: builtins.int
+    status: global___MergeResponse.MergeStatus.ValueType
+    merged_segments: builtins.int
+    remaining_segments: builtins.int
+    def __init__(
+        self,
+        *,
+        status: global___MergeResponse.MergeStatus.ValueType = ...,
+        merged_segments: builtins.int = ...,
+        remaining_segments: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["merged_segments", b"merged_segments", "remaining_segments", b"remaining_segments", "status", b"status"]) -> None: ...
+
+global___MergeResponse = MergeResponse
