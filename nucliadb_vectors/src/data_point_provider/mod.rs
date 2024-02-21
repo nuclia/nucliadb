@@ -310,8 +310,9 @@ impl Index {
         }
 
         let new_dp = DataPoint::merge(&location, &buffer, similarity, channel)?;
-        live_segments.push(new_dp.journal());
-        live_segments.extend(blocked_segments);
+        blocked_segments.push(new_dp.journal());
+        blocked_segments.extend(live_segments);
+        let live_segments = blocked_segments;
         let stats = ForceMergeMetrics {
             merged: buffer.len(),
             segments_left: live_segments.len(),
