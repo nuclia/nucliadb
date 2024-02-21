@@ -75,7 +75,7 @@ async def test_labelset_ids_bw_compat(maindb_driver):
     kbid = "foo"
     # Check that initially all are empty
     async with maindb_driver.transaction() as txn:
-        assert await ldm._legacy_get_labelset_ids(kbid, txn) == []
+        assert await ldm._deprecated_scan_labelset_ids(kbid, txn) == []
         assert await ldm._get_labelset_ids(kbid, txn) is None
         assert await ldm._get_labelset_ids_bw_compat(kbid, txn) == []
 
@@ -85,7 +85,7 @@ async def test_labelset_ids_bw_compat(maindb_driver):
         await txn.commit()
     async with maindb_driver.transaction() as txn:
         assert await ldm._get_labelset_ids(kbid, txn) == ["bar", "ba"]
-        assert await ldm._legacy_get_labelset_ids(kbid, txn) == []
+        assert await ldm._deprecated_scan_labelset_ids(kbid, txn) == []
 
     # Check that adding appends to the list
     async with maindb_driver.transaction() as txn:
@@ -115,5 +115,5 @@ async def test_labelset_ids_bw_compat(maindb_driver):
         await txn.commit()
     async with maindb_driver.transaction() as txn:
         await ldm._get_labelset_ids("foo", txn) is None
-        await ldm._legacy_get_labelset_ids("foo", txn) == ["1"]
+        await ldm._deprecated_scan_labelset_ids("foo", txn) == ["1"]
         await ldm._get_labelset_ids_bw_compat("foo", txn) == ["1"]

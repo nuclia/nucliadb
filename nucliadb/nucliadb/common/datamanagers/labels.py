@@ -61,10 +61,12 @@ class LabelsDataManager:
         if labelsets is not None:
             return labelsets
         # TODO: Remove this after migration #11
-        return await cls._legacy_get_labelset_ids(kbid, txn)
+        return await cls._deprecated_scan_labelset_ids(kbid, txn)
 
     @classmethod
-    async def _legacy_get_labelset_ids(cls, kbid: str, txn: Transaction) -> list[str]:
+    async def _deprecated_scan_labelset_ids(
+        cls, kbid: str, txn: Transaction
+    ) -> list[str]:
         labelsets = []
         labels_key = KB_LABELS.format(kbid=kbid)
         async for key in txn.keys(labels_key, count=-1, include_start=False):
@@ -91,7 +93,7 @@ class LabelsDataManager:
         if previous is None:
             # TODO: Remove this after migration #11
             needs_set = True
-            previous = await LabelsDataManager._legacy_get_labelset_ids(kbid, txn)
+            previous = await LabelsDataManager._deprecated_scan_labelset_ids(kbid, txn)
         for labelset in labelsets:
             if labelset not in previous:
                 needs_set = True
@@ -108,7 +110,7 @@ class LabelsDataManager:
         if previous is None:
             # TODO: Remove this after migration #11
             needs_set = True
-            previous = await LabelsDataManager._legacy_get_labelset_ids(kbid, txn)
+            previous = await LabelsDataManager._deprecated_scan_labelset_ids(kbid, txn)
         for labelset in labelsets:
             if labelset in previous:
                 needs_set = True
