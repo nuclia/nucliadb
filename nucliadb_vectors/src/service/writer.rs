@@ -67,7 +67,7 @@ impl VectorWriter for VectorWriterService {
         let inner_metrics = self.index.force_merge(&lock)?;
 
         let took = time.elapsed().as_secs_f64();
-        debug!("Forcing a merge took: {took} ms");
+        debug!("Forcing a merge took: {took} s");
         Ok(MergeMetrics {
             merged: inner_metrics.merged,
             left: inner_metrics.segments_left,
