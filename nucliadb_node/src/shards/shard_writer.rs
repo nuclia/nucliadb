@@ -447,6 +447,7 @@ impl ShardWriter {
         segments.insert("paragraph".to_string(), paragraph_read(&self.paragraph_writer).get_segment_ids()?);
         segments.insert("text".to_string(), text_read(&self.text_writer).get_segment_ids()?);
         segments.insert("vector".to_string(), vector_read(&self.vector_writer).get_segment_ids()?);
+        segments.insert("relation".to_string(), relation_read(&self.relation_writer).get_segment_ids()?);
 
         Ok(segments)
     }
