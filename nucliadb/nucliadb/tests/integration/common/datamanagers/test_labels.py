@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import pytest
+from nucliadb_protos.knowledgebox_pb2 import Labels
 
 from nucliadb.common.datamanagers.labels import LabelsDataManager
 
@@ -54,6 +55,19 @@ async def test_labelset_ids(maindb_driver):
         await txn.commit()
     async with maindb_driver.transaction() as txn:
         assert await ldm._get_labelset_ids(kbid, txn) == []
+
+    # Check that set_labels overwrites the list
+    async with maindb_driver.transaction() as txn:
+        await ldm._set_labelset_ids(kbid, txn, ["bar", "baz"])
+        await txn.commit()
+
+    ldb_obj = ldm(maindb_driver)
+    labels = Labels()
+    labels.labelset["bar"].title = "bar"
+    await ldb_obj.set_labels(kbid, labels)
+
+    async with maindb_driver.transaction() as txn:
+        assert await ldm._get_labelset_ids(kbid, txn) == ["bar"]
 
 
 async def test_labelset_ids_bw_compat(maindb_driver):
