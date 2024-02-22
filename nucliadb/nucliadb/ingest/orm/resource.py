@@ -621,9 +621,10 @@ class Resource:
                 self.fields[(type, field)] = await self.get_field(field, type)
         return self.fields
 
-    async def _scan_fields_ids(self) -> AsyncIterator[tuple[FieldType.ValueType, str]]:
-        # TODO: Remove this method when we are sure that all KBs have the `allfields` key set
-        logger.error("Scanning fields ids. This is not optimal.")
+    async def _deprecated_scan_fields_ids(
+        self,
+    ) -> AsyncIterator[tuple[FieldType.ValueType, str]]:
+        logger.warning("Scanning fields ids. This is not optimal.")
         prefix = KB_RESOURCE_FIELDS.format(kbid=self.kb.kbid, uuid=self.uuid)
         allfields = set()
         async for key in self.txn.keys(prefix, count=-1):
@@ -649,11 +650,6 @@ class Resource:
         if all_fields is not None:
             for f in all_fields.fields:
                 result.add((f.field_type, f.field))
-        else:
-            # backward compatibility if all fields key is not set
-            async for (field_type, field_id) in self._scan_fields_ids():
-                result.add((field_type, field_id))
-
         # We make sure that title and summary are set to be added
         basic = await self.get_basic()
         if basic is not None:
