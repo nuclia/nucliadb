@@ -83,7 +83,7 @@ class TestProcessingHTTPClient:
 
     @pytest.mark.asyncio
     async def test_requests(self, client: processing.ProcessingHTTPClient, response):
-        response_data = processing.StatusResponse(shared={"foobar": 54}, account={})
+        response_data = processing.RequestsResults()
         response.status = 200
         response.text.return_value = response_data.json()
 
