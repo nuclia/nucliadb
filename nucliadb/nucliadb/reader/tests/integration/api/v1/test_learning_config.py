@@ -52,7 +52,17 @@ def learning_config_proxy():
         yield proxy
 
 
-async def test_api(reader_api, knowledgebox_ingest, learning_config_proxy):
+@pytest.fixture()
+def onprem_nucliadb():
+    with mock.patch(
+        "nucliadb.reader.api.v1.learning_config.is_onprem_nucliadb", return_value=True
+    ) as mocked:
+        yield mocked
+
+
+async def test_api(
+    reader_api, knowledgebox_ingest, learning_config_proxy, onprem_nucliadb
+):
     kbid = knowledgebox_ingest
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         # Get configuration
@@ -95,7 +105,18 @@ async def test_api(reader_api, knowledgebox_ingest, learning_config_proxy):
             {"X-STF-USER": "userfoo"},
         )
 
-        # Get schema
+        # Get schema for updates
         resp = await client.get(f"/kb/{kbid}/schema")
         assert resp.status_code == 200
         assert learning_config_proxy.calls[-1][1:] == ("GET", f"/schema/{kbid}", None)
+
+        # Get schema for creation
+        resp = await client.get("/nua/schema")
+        assert resp.status_code == 200
+        assert learning_config_proxy.calls[-1][1:] == ("GET", "/schema", None)
+
+        # Check that getting the creation schema does not work for hosted nucliadb
+        onprem_nucliadb.return_value = False
+
+        resp = await client.get("/nua/schema")
+        assert resp.status_code == 404
