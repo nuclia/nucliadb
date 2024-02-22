@@ -44,65 +44,13 @@ def get_processing_api_url() -> str:
         )
 
 
-def get_processing_api_url_v2() -> str:
-    if nuclia_settings.nuclia_service_account:
-        return (
-            nuclia_settings.nuclia_public_url.format(zone=nuclia_settings.nuclia_zone)
-            + "/api/v2/processing"
-        )
-    else:
-        return (
-            nuclia_settings.nuclia_processing_cluster_url
-            + "/api/v2/internal/processing"
-        )
-
-
-class StatusResponse(pydantic.BaseModel):
-    shared: dict[str, Any]
-    account: Any
-
-
 class PullResponse(pydantic.BaseModel):
     status: str
     payload: Optional[str] = None
     msgid: Optional[int] = None
 
 
-class ProcessingHTTPClient:
-    def __init__(self):
-        self.session = aiohttp.ClientSession()
-        self.base_url = get_processing_api_url()
-        self.headers = {}
-        if nuclia_settings.nuclia_service_account is not None:
-            self.headers[
-                "X-STF-NUAKEY"
-            ] = f"Bearer {nuclia_settings.nuclia_service_account}"
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *args):
-        await self.close()
-
-    async def close(self):
-        await self.session.close()
-
-    async def status(self) -> StatusResponse:
-        url = self.base_url + "/status"
-        async with self.session.get(url, headers=self.headers) as resp:
-            resp_text = await resp.text()
-            check_status(resp, resp_text)
-            return StatusResponse.parse_raw(resp_text)
-
-    async def pull(self, partition: str) -> PullResponse:
-        url = self.base_url + "/pull?partition=" + partition
-        async with self.session.get(url, headers=self.headers) as resp:
-            resp_text = await resp.text()
-            check_status(resp, resp_text)
-            return PullResponse.parse_raw(resp_text)
-
-
-class StatusResultV2(pydantic.BaseModel):
+class RequestsResult(pydantic.BaseModel):
     processing_id: str = pydantic.Field(
         ...,
         title="Processing ID",
@@ -171,8 +119,8 @@ class StatusResultV2(pydantic.BaseModel):
     )
 
 
-class StatusResultsV2(pydantic.BaseModel):
-    results: list[StatusResultV2] = pydantic.Field(
+class RequestsResults(pydantic.BaseModel):
+    results: list[RequestsResult] = pydantic.Field(
         [],
         title="Results",
         description="List of results.",
@@ -184,10 +132,10 @@ class StatusResultsV2(pydantic.BaseModel):
     )
 
 
-class ProcessingV2HTTPClient:
+class ProcessingHTTPClient:
     def __init__(self):
         self.session = aiohttp.ClientSession()
-        self.base_url = get_processing_api_url_v2()
+        self.base_url = get_processing_api_url()
         self.headers = {}
         if nuclia_settings.nuclia_service_account is not None:
             self.headers[
@@ -203,14 +151,21 @@ class ProcessingV2HTTPClient:
     async def close(self):
         await self.session.close()
 
-    async def status(
+    async def pull(self, partition: str) -> PullResponse:
+        url = self.base_url + "/pull?partition=" + partition
+        async with self.session.get(url, headers=self.headers) as resp:
+            resp_text = await resp.text()
+            check_status(resp, resp_text)
+            return PullResponse.parse_raw(resp_text)
+
+    async def requests(
         self,
         cursor: Optional[str] = None,
         scheduled: Optional[bool] = None,
         kbid: Optional[str] = None,
         limit: int = 20,
-    ) -> StatusResultsV2:
-        url = self.base_url + "/status"
+    ) -> RequestsResults:
+        url = self.base_url + "/requests"
         params: dict[str, str] = {"limit": str(limit)}
         if cursor is not None:
             params["cursor"] = cursor
@@ -222,4 +177,4 @@ class ProcessingV2HTTPClient:
         async with self.session.get(url, headers=self.headers, params=params) as resp:
             resp_text = await resp.text()
             check_status(resp, resp_text)
-            return StatusResultsV2.parse_raw(resp_text)
+            return RequestsResults.parse_raw(resp_text)

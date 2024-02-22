@@ -333,7 +333,7 @@ async def exists_kb(context: ApplicationContext, kbid: str) -> bool:
     name="Knowledge Box Processing Status",
     description="Provides the status of the processing of the given Knowledge Box.",
     tags=["Knowledge Box Services"],
-    response_model=processing.StatusResultsV2,
+    response_model=processing.RequestsResults,
     responses={
         "404": {"description": "Knowledge Box not found"},
     },
@@ -346,14 +346,14 @@ async def processing_status(
     cursor: Optional[str] = None,
     scheduled: Optional[bool] = None,
     limit: int = 20,
-) -> Union[processing.StatusResultsV2, HTTPClientError]:
+) -> Union[processing.RequestsResults, HTTPClientError]:
     context = get_app_context(request.app)
 
     if not await exists_kb(context, kbid):
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
 
-    async with processing.ProcessingV2HTTPClient() as client:
-        results = await client.status(
+    async with processing.ProcessingHTTPClient() as client:
+        results = await client.requests(
             cursor=cursor, scheduled=scheduled, kbid=kbid, limit=limit
         )
 
@@ -365,18 +365,29 @@ async def processing_status(
 
         max_simultaneous = asyncio.Semaphore(10)
 
-        async def _composition(result: processing.StatusResultV2) -> None:
+        async def _composition(
+            result: processing.RequestsResult,
+        ) -> Optional[processing.RequestsResult]:
             async with max_simultaneous:
                 resource = await kb.get(result.resource_id)
                 if resource is None:
-                    return
+                    return None
 
                 basic = await resource.get_basic()
                 if basic is None:
-                    return
+                    return None
 
                 result.title = basic.title
+                return result
 
-        await asyncio.gather(*[_composition(result) for result in results.results])
+        result_items = [
+            item
+            for item in await asyncio.gather(
+                *[_composition(result) for result in results.results]
+            )
+            if item is not None
+        ]
 
+    # overwrite result with only resources that exist in the database.
+    results.results = result_items
     return results
