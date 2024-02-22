@@ -20,6 +20,7 @@
 import argparse
 import asyncio
 from dataclasses import dataclass
+from datetime import datetime
 
 import pkg_resources
 from grpc.aio import AioRpcError  # type: ignore
@@ -165,20 +166,28 @@ async def report_orphan_shards(
 async def purge_orphan_shards(driver: Driver):
     orphan_shards = await detect_orphan_shards(driver)
 
+    unavailable_nodes: dict[str, datetime] = {}
     for shard_id, location in orphan_shards.items():
         node = manager.get_index_node(location.node_id)
-        extra = {
-            "shard_id": shard_id,
-            "kbid": location.kbid,
-            "node_id": location.node_id,
-        }
         if node is None:
-            logger.warning(
-                "Node not available while purging orphan shard, skipping", extra=extra
-            )
+            now = datetime.now()
+            last_try = unavailable_nodes.setdefault(location.node_id, now)
+            if (now - last_try).seconds < 10:
+                logger.warning(
+                    "Node not available while purging orphan shards, skipping",
+                    extra={"node_id": location.node_id},
+                )
+                unavailable_nodes[location.node_id] = now
             continue
 
-        logger.info("Deleting orphan shard from index node", extra=extra)
+        logger.info(
+            "Deleting orphan shard from index node",
+            extra={
+                "shard_id": shard_id,
+                "kbid": location.kbid,
+                "node_id": location.node_id,
+            },
+        )
         await node.delete_shard(shard_id)
 
 
