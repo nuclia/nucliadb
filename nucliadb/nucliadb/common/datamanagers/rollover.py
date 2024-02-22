@@ -43,6 +43,17 @@ class RolloverDataManager:
         async with self.driver.transaction(wait_for_abort=False) as txn:
             return await get_kv_pb(txn, key, writer_pb2.Shards)
 
+    async def is_rollover_shard(self, kbid: str, shard_id: str) -> bool:
+        shards = await self.get_kb_rollover_shards(kbid)
+        if shards is None:
+            return False
+
+        for shard_obj in shards.shards:
+            for replica_obj in shard_obj.replicas:
+                if shard_id == replica_obj.shard.id:
+                    return True
+        return False
+
     async def update_kb_rollover_shards(
         self, kbid: str, kb_shards: writer_pb2.Shards
     ) -> None:
