@@ -712,7 +712,7 @@ async def create_resource(
     datetime_field = await test_resource.set_field(
         rpb.FieldType.DATETIME, "datetime1", d2
     )
-    await add_field_id(test_resource, kws_field)
+    await add_field_id(test_resource, datetime_field)
     await make_field(datetime_field, "MyText")
 
     # 3 USER VECTORS
