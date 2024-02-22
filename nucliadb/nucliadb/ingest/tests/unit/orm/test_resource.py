@@ -191,6 +191,13 @@ async def test_get_fields_ids_caches_keys(txn, storage, kb):
     resource._inner_get_fields_ids.assert_awaited_once()
     assert resource.all_fields_keys == new_field_keys
 
+    # If the all_field_keys is an empty list,
+    # we should not be calling the inner_get_fields_ids
+    resource.all_fields_keys = []
+    resource._inner_get_fields_ids.reset_mock()
+    assert await resource.get_fields_ids() == []
+    resource._inner_get_fields_ids.assert_not_awaited()
+
 
 async def test_get_set_all_field_ids(txn, storage, kb):
     resource = Resource(txn, storage, kb, "rid")
