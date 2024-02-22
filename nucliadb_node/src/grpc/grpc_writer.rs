@@ -39,7 +39,7 @@ use crate::shards::metadata::ShardMetadata;
 use crate::shards::providers::shard_cache::ShardWriterCache;
 use crate::shards::writer::ShardWriter;
 use crate::telemetry::run_with_telemetry;
-use crate::utils::list_shards;
+use crate::utils::{get_primary_node_id, list_shards, read_host_key};
 
 pub struct NodeWriterGRPCDriver {
     shards: Arc<ShardWriterCache>,
@@ -323,12 +323,16 @@ impl NodeWriter for NodeWriterGRPCDriver {
     }
 
     async fn get_metadata(&self, _request: Request<EmptyQuery>) -> Result<Response<NodeMetadata>, Status> {
-        let metadata_settings = self.settings.clone();
-        let metadata = crate::node_metadata::NodeMetadata::new(metadata_settings).await;
-        match metadata {
-            Ok(metadata) => Ok(tonic::Response::new(metadata.into())),
-            Err(error) => Err(tonic::Status::internal(error.to_string())),
-        }
+        let settings = &self.settings.clone();
+        let disks = sysinfo::Disks::new_with_refreshed_list();
+
+        Ok(tonic::Response::new(NodeMetadata {
+            shard_count: list_shards(settings.shards_path()).await.len().try_into().unwrap(),
+            node_id: read_host_key(settings.host_key_path()).unwrap().to_string(),
+            primary_node_id: get_primary_node_id(settings.data_path()),
+            available_disk: disks.into_iter().map(|d| d.available_space()).sum(),
+            ..Default::default()
+        }))
     }
 
     async fn gc(&self, request: Request<ShardId>) -> Result<Response<GarbageCollectorResponse>, Status> {

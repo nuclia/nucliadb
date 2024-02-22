@@ -176,4 +176,5 @@ message NodeMetadata {
     map<string, ShardMetadata> shards = 3 [deprecated = true];
     string node_id = 4;
     optional string primary_node_id = 5;
+    uint64 available_disk = 6;
 }
