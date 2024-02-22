@@ -29,6 +29,7 @@ from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
+from nucliadb.common.datamanagers.rollover import RolloverDataManager
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.utils import setup_driver, teardown_driver
 from nucliadb.ingest import logger
@@ -74,6 +75,7 @@ async def detect_orphan_shards(driver: Driver):
     orphan_shard_ids = indexed_shards.keys() - stored_shards.keys()
     orphan_shards: dict[str, ShardLocation] = {}
     unavailable_nodes = set()
+    rollover_dm = RolloverDataManager(driver)
     for shard_id in orphan_shard_ids:
         node_id = indexed_shards[shard_id].node_id
         node = manager.get_index_node(node_id)
@@ -95,6 +97,13 @@ async def detect_orphan_shards(driver: Driver):
                 )
             else:
                 kbid = shard_pb.metadata.kbid
+
+        # Shards with knwon KB ids can be checked and ignore those comming from
+        # an ongoing migration/rollover
+        if kbid != UNKNOWN_KB:
+            skip = await _is_rollover_shard(rollover_dm, kbid, shard_id)
+            if skip:
+                continue
 
         orphan_shards[shard_id] = ShardLocation(kbid=kbid, node_id=node_id)
 
@@ -139,6 +148,23 @@ async def _get_stored_shards(driver: Driver) -> dict[str, ShardLocation]:
                             kbid=kbid, node_id=node_id
                         )
     return stored_shards
+
+
+async def _is_rollover_shard(
+    rollover_dm: RolloverDataManager, kbid: str, shard_id: str
+) -> bool:
+    rollover_shards = await rollover_dm.get_kb_rollover_shards(kbid)
+    if rollover_shards is None:
+        return False
+
+    kb_shard_manager = KBShardManager()
+    for shard_obj in rollover_shards.shards:
+        replicas = kb_shard_manager.indexing_replicas(shard_obj)
+        for shard_replica_id, _ in replicas:
+            if shard_id == shard_replica_id:
+                return True
+
+    return False
 
 
 async def report_orphan_shards(
