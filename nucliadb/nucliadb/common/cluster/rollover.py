@@ -35,7 +35,6 @@ from nucliadb_protos import noderesources_pb2, writer_pb2
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
 
-from .exceptions import ExhaustedNodesError
 from .manager import get_index_node
 from .settings import settings
 
