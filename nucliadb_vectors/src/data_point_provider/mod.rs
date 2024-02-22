@@ -198,9 +198,11 @@ impl Index {
         let possible_merge = self.take_available_merge();
         let mut state = self.write_state();
         let mut date = self.write_date();
+
         if let Some(journal) = possible_merge {
             state.replace_work_unit(journal)
         }
+
         fs_state::persist_state::<State>(&self.location, &state)?;
         *date = fs_state::crnt_version(&self.location)?;
         std::mem::drop(state);
@@ -289,7 +291,6 @@ impl Index {
             });
         }
 
-        let channel = self.metadata.channel;
         let location = self.location.clone();
         let similarity = self.metadata.similarity;
         let max_nodes_per_segment = 50_000;
@@ -309,7 +310,7 @@ impl Index {
             }
         }
 
-        let new_dp = DataPoint::merge(&location, &buffer, similarity, channel)?;
+        let new_dp = DataPoint::merge(&location, &buffer, similarity)?;
         blocked_segments.push(new_dp.journal());
         blocked_segments.extend(live_segments);
         let live_segments = blocked_segments;
@@ -344,7 +345,7 @@ impl Index {
             let location = self.location.clone();
             let similarity = self.metadata.similarity;
             let (sender, receiver) = channel::unbounded();
-            let worker = Worker::request(location, sender, similarity, self.metadata.channel);
+            let worker = Worker::request(location, sender, similarity);
             self.merger_status = MergerStatus::WorkScheduled(receiver);
             merger::send_merge_request(worker);
         }
@@ -390,10 +391,9 @@ mod test {
         let mut journals = vec![];
         for _ in 0..200 {
             let similarity = Similarity::Cosine;
-            let channel = Channel::EXPERIMENTAL;
             let embeddings = vec![];
             let time = Some(SystemTime::now());
-            let data_point = DataPoint::new(&vectors_path, embeddings, time, similarity, channel).unwrap();
+            let data_point = DataPoint::new(&vectors_path, embeddings, time, similarity).unwrap();
             journals.push(data_point.journal());
         }
 
@@ -415,10 +415,9 @@ mod test {
         let mut journals = vec![];
         for _ in 0..50 {
             let similarity = Similarity::Cosine;
-            let channel = Channel::EXPERIMENTAL;
             let embeddings = vec![];
             let time = Some(SystemTime::now());
-            let data_point = DataPoint::new(&vectors_path, embeddings, time, similarity, channel).unwrap();
+            let data_point = DataPoint::new(&vectors_path, embeddings, time, similarity).unwrap();
             journals.push(data_point.journal());
         }
 
@@ -440,10 +439,9 @@ mod test {
         let mut journals = vec![];
         for _ in 0..100 {
             let similarity = Similarity::Cosine;
-            let channel = Channel::EXPERIMENTAL;
             let embeddings = vec![];
             let time = Some(SystemTime::now());
-            let data_point = DataPoint::new(&vectors_path, embeddings, time, similarity, channel).unwrap();
+            let data_point = DataPoint::new(&vectors_path, embeddings, time, similarity).unwrap();
             journals.push(data_point.journal());
         }
 
@@ -469,7 +467,7 @@ mod test {
 
         let empty_no_entries = std::fs::read_dir(&vectors_path)?.count();
         for _ in 0..10 {
-            DataPoint::new(&vectors_path, vec![], None, Similarity::Cosine, Channel::EXPERIMENTAL).unwrap();
+            DataPoint::new(&vectors_path, vec![], None, Similarity::Cosine).unwrap();
         }
 
         index.collect_garbage(&lock)?;
@@ -493,7 +491,6 @@ mod test {
             ],
             None,
             Similarity::Cosine,
-            Channel::EXPERIMENTAL,
         )
         .unwrap();
         index.add(data_point, &lock).unwrap();
