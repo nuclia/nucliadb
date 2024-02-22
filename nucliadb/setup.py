@@ -73,7 +73,7 @@ setup(
             "nucliadb-train = nucliadb.train.run:run",
             # utilities
             "nucliadb-purge = nucliadb.purge:run",
-            "nucliadb-detect-orphan-shards = nucliadb.purge.orphan_shards:run",
+            "nucliadb-orphan-shards = nucliadb.purge.orphan_shards:run",
             "nucliadb-migrate = nucliadb.migrator.command:main",
             "nucliadb-migration-runner = nucliadb.migrator.command:main_forever",
             "nucliadb-metrics-exporter = nucliadb.metrics_exporter:main",

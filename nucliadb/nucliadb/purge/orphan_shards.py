@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import argparse
 import asyncio
 from dataclasses import dataclass
 
@@ -181,6 +182,19 @@ async def purge_orphan_shards(driver: Driver):
         await node.delete_shard(shard_id)
 
 
+def parse_arguments():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--purge",
+        action="store_true",
+        default=False,
+        required=False,
+        help="Purge detected orphan shards",
+    )
+    args = parser.parse_args()
+    return args
+
+
 async def main():
     """This script will detect orphan shards, i.e., indexed shards with no
     reference in our source of truth.
@@ -189,12 +203,14 @@ async def main():
     available or fail. It's possible that other procedures in our database left
     orphan shards too.
 
-    ATENTION!
-    While migrations are running, new shards are indexed and are
-    not yet stored as shards belonging to a KB, so they can be misclassified as
-    orphan. It is highly recommended to don't remove orphan shards that hasn't
-    exist for a long time.
+    ATENTION! In the future, some new process which adds new shards could be
+    implemented. If orphan shard detection is not updated, this will lead to
+    incorrect detection. To avoid data loss/corruption, it is highly recommended
+    to don't remove orphan shards that hasn't exist for a long time.
+
     """
+    args = parse_arguments()
+
     await setup_cluster()
     driver = await setup_driver()
 
@@ -202,6 +218,9 @@ async def main():
         orphan_shards = await detect_orphan_shards(driver)
         logger.info(f"Orphan shards detect found {len(orphan_shards)} orphans")
         await report_orphan_shards(orphan_shards, driver)
+        if args.purge:
+            await purge_orphan_shards(driver)
+
     finally:
         await teardown_driver()
         await teardown_cluster()
