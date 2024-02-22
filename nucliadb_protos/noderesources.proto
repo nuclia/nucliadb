@@ -177,4 +177,5 @@ message NodeMetadata {
     string node_id = 4;
     optional string primary_node_id = 5;
     uint64 available_disk = 6;
+    uint64 total_disk = 7;
 }

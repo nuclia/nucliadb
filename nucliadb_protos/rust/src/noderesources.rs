@@ -250,6 +250,8 @@ pub struct NodeMetadata {
     pub primary_node_id: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(uint64, tag="6")]
     pub available_disk: u64,
+    #[prost(uint64, tag="7")]
+    pub total_disk: u64,
 }
 /// Nested message and enum types in `NodeMetadata`.
 pub mod node_metadata {
