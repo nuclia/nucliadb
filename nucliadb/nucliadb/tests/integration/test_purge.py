@@ -30,7 +30,7 @@ from nucliadb.ingest.orm.knowledgebox import (
     KB_TO_DELETE_BASE,
     KB_TO_DELETE_STORAGE_BASE,
 )
-from nucliadb.ingest.purge import purge_kb, purge_kb_storage
+from nucliadb.purge import purge_kb, purge_kb_storage
 from nucliadb.purge.orphan_shards import detect_orphan_shards, purge_orphan_shards
 from nucliadb_models.resource import ReleaseChannel
 from nucliadb_utils.storages.storage import Storage
