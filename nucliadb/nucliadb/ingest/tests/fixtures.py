@@ -35,9 +35,10 @@ from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.consumer import service as consumer_service
+from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor import Processor
-from nucliadb.ingest.orm.resource import Resource
+from nucliadb.ingest.orm.resource import KB_REVERSE, Resource
 from nucliadb.ingest.service.writer import WriterServicer
 from nucliadb.ingest.settings import settings
 from nucliadb.ingest.tests.vectors import V1, V2, V3
@@ -609,6 +610,7 @@ async def create_resource(
     t2.file.CopyFrom(TEST_CLOUDFILE)
 
     file_field = await test_resource.set_field(rpb.FieldType.FILE, "file1", t2)
+    await add_field_id(test_resource, file_field)
     await make_field(file_field, "MyText")
 
     # 2.2 LINK FIELD
@@ -630,12 +632,14 @@ async def create_resource(
     ex1.link_thumbnail.CopyFrom(THUMBNAIL)
 
     await linkfield.set_link_extracted_data(ex1)
+    await add_field_id(test_resource, linkfield)
     await make_field(linkfield, "MyText")
 
     # 2.3 TEXT FIELDS
 
     t23 = rpb.FieldText(body="This is my text field", format=rpb.FieldText.Format.PLAIN)
     textfield = await test_resource.set_field(rpb.FieldType.TEXT, "text1", t23)
+    await add_field_id(test_resource, textfield)
     await make_field(textfield, "MyText")
 
     # 2.4 LAYOUT FIELD
@@ -650,6 +654,7 @@ async def create_resource(
     l2.body.blocks["field1"].file.CopyFrom(TEST_CLOUDFILE)
 
     layoutfield = await test_resource.set_field(rpb.FieldType.LAYOUT, "layout1", l2)
+    await add_field_id(test_resource, layoutfield)
 
     await layoutfield.set_extracted_text(
         make_extracted_text(layoutfield.id, body="MyText")
@@ -686,6 +691,7 @@ async def create_resource(
         c2.messages.append(new_message)
 
     convfield = await test_resource.set_field(rpb.FieldType.CONVERSATION, "conv1", c2)
+    await add_field_id(test_resource, convfield)
     await make_field(convfield, extracted_text="MyText")
 
     # 2.6 KEYWORDSET FIELD
@@ -696,6 +702,7 @@ async def create_resource(
     kws_field = await test_resource.set_field(
         rpb.FieldType.KEYWORDSET, "keywordset1", k2
     )
+    await add_field_id(test_resource, kws_field)
     await make_field(kws_field, "MyText")
 
     # 2.7 DATETIMES FIELD
@@ -705,6 +712,7 @@ async def create_resource(
     datetime_field = await test_resource.set_field(
         rpb.FieldType.DATETIME, "datetime1", d2
     )
+    await add_field_id(test_resource, kws_field)
     await make_field(datetime_field, "MyText")
 
     # 3 USER VECTORS
@@ -736,6 +744,12 @@ async def create_resource(
 
     await txn.commit()
     return test_resource
+
+
+async def add_field_id(resource: Resource, field: Field):
+    field_type = KB_REVERSE[field.type]
+    field_id = rpb.FieldID(field_type=field_type, field=field.id)
+    await resource.update_all_field_ids(updated=[field_id])
 
 
 @pytest.fixture(scope="function")
