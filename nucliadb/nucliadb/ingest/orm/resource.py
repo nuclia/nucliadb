@@ -148,7 +148,7 @@ class Resource:
         self.fields: dict[tuple[FieldType.ValueType, str], Field] = {}
         self.conversations: dict[int, PBConversation] = {}
         self.relations: Optional[PBRelations] = None
-        self.all_fields_keys: list[tuple[FieldType.ValueType, str]] = []
+        self.all_fields_keys: Optional[list[tuple[FieldType.ValueType, str]]] = None
         self.origin: Optional[PBOrigin] = None
         self.extra: Optional[PBExtra] = None
         self.security: Optional[utils_pb2.Security] = None
@@ -640,15 +640,13 @@ class Resource:
 
     async def _inner_get_fields_ids(self) -> list[tuple[FieldType.ValueType, str]]:
         result = []
-        all_fields: Optional[PBAllFieldIDs] = await self.get_all_field_ids()
+        all_fields = await self.get_all_field_ids()
         if all_fields is not None:
             result = [(f.field_type, f.field) for f in all_fields.fields]
         else:
             # backward compatibility if all fields key is not set
-            all_fields = PBAllFieldIDs()
             async for (field_type, field_id) in self._scan_fields_ids():
                 result.append((field_type, field_id))
-                all_fields.fields.append(FieldID(field_type=field_type, field=field_id))
 
         # We make sure that title and summary are set to be added
         basic = await self.get_basic()
@@ -666,8 +664,11 @@ class Resource:
     async def get_fields_ids(
         self, force: bool = False
     ) -> list[tuple[FieldType.ValueType, str]]:
+        """
+        Get all ids of the fields of the resource and cache them.
+        """
         # Get all fields
-        if len(self.all_fields_keys) == 0 or force:
+        if self.all_fields_keys is None or force is True:
             self.all_fields_keys = await self._inner_get_fields_ids()
         return self.all_fields_keys
 
@@ -688,8 +689,9 @@ class Resource:
         else:
             field_obj = self.fields[field]
         await field_obj.set_value(payload)
+        if self.all_fields_keys is None:
+            self.all_fields_keys = []
         self.all_fields_keys.append(field)
-
         self.modified = True
         return field_obj
 
@@ -701,8 +703,9 @@ class Resource:
         else:
             field_obj = KB_FIELDS[type](id=key, resource=self)
 
-        if field in self.all_fields_keys:
-            self.all_fields_keys.remove(field)
+        if self.all_fields_keys is not None:
+            if field in self.all_fields_keys:
+                self.all_fields_keys.remove(field)
 
         field_key = self.generate_field_id(FieldID(field_type=type, field=key))  # type: ignore
         vo = await field_obj.get_vectors()
