@@ -174,7 +174,8 @@ async def test_processing_status(
                     timestamp=datetime.now(),
                 )
                 for resource_id in resources
-            ]
+            ],
+            cursor=None,
         )
     )
     with patch(

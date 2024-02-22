@@ -83,7 +83,7 @@ class TestProcessingHTTPClient:
 
     @pytest.mark.asyncio
     async def test_requests(self, client: processing.ProcessingHTTPClient, response):
-        response_data = processing.RequestsResults()
+        response_data = processing.RequestsResults(results=[], cursor=None)
         response.status = 200
         response.text.return_value = response_data.json()
 
