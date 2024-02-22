@@ -32,6 +32,8 @@ use std::{fs, io, path};
 
 use data_store::Interpreter;
 use disk_hnsw::DiskHnsw;
+use fs::{File, OpenOptions};
+use fs2::FileExt;
 use io::{BufWriter, Write};
 use memmap2::Mmap;
 use node::Node;
@@ -53,6 +55,37 @@ mod file_names {
     pub const HNSW: &str = "index.hnsw";
     pub const JOURNAL: &str = "journal.json";
     pub const FST: &str = "fst";
+    pub const DATA_POINT_PIN: &str = ".pin";
+}
+
+pub struct PinnedDataPoint {
+    data_point_id: DpId,
+    workspace: path::PathBuf,
+    #[allow(unused)]
+    pin: File,
+}
+impl PinnedDataPoint {
+    pub fn open_data_point(&self) -> VectorR<DataPoint> {
+        DataPoint::open(&self.workspace, self.data_point_id)
+    }
+
+    pub fn pin(dir: &path::Path, id: DpId) -> io::Result<PinnedDataPoint> {
+        let data_pint_path = dir.join(id.to_string());
+        let pin_path = data_pint_path.join(file_names::DATA_POINT_PIN);
+
+        let mut options = OpenOptions::new();
+        options.create(true);
+        options.read(true);
+        let pin_file = options.open(&pin_path)?;
+
+        pin_file.lock_shared()?;
+
+        Ok(PinnedDataPoint {
+            pin: pin_file,
+            workspace: dir.into(),
+            data_point_id: id,
+        })
+    }
 }
 
 pub struct NoDLog;
