@@ -19,7 +19,7 @@
 #
 import logging
 from datetime import datetime
-from typing import Any, Optional
+from typing import Optional
 
 import aiohttp
 import pydantic
@@ -138,9 +138,9 @@ class ProcessingHTTPClient:
         self.base_url = get_processing_api_url()
         self.headers = {}
         if nuclia_settings.nuclia_service_account is not None:
-            self.headers[
-                "X-STF-NUAKEY"
-            ] = f"Bearer {nuclia_settings.nuclia_service_account}"
+            self.headers["X-STF-NUAKEY"] = (
+                f"Bearer {nuclia_settings.nuclia_service_account}"
+            )
 
     async def __aenter__(self):
         return self
