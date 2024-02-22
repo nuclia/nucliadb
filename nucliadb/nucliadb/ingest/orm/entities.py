@@ -211,7 +211,10 @@ class EntitiesManager:
             return await node.reader.RelationSearch(request)  # type: ignore
 
         results = await shard_manager.apply_for_all_shards(
-            self.kbid, do_entities_search, settings.relation_search_timeout
+            self.kbid,
+            do_entities_search,
+            settings.relation_search_timeout,
+            use_read_replica_nodes=True,
         )
         for result in results:
             if isinstance(result, Exception):
@@ -296,6 +299,7 @@ class EntitiesManager:
             self.kbid,
             query_indexed_entities_group_names,
             settings.relation_types_timeout,
+            use_read_replica_nodes=True,
         )
         for result in results:
             if isinstance(result, Exception):

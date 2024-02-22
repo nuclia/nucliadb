@@ -21,11 +21,14 @@
 import pickle
 from typing import AsyncGenerator, Optional
 
+import orjson
+
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb_protos import knowledgebox_pb2 as kb_pb2
 
 KB_ENTITIES = "/kbs/{kbid}/entities/"
 KB_ENTITIES_GROUP = "/kbs/{kbid}/entities/{id}"
+KB_ENTITIES_GROUP_IDS = "/kbs/{kbid}/group-ids-entities"
 KB_DELETED_ENTITIES_GROUPS = "/kbs/{kbid}/deletedentities"
 KB_ENTITIES_CACHE = "/kbs/{kbid}/entities-cache"
 
@@ -68,7 +71,8 @@ class EntitiesDataManager:
     async def get_entities_groups(self, kbid: str) -> kb_pb2.EntitiesGroups:
         kbent = kb_pb2.EntitiesGroups()
         async with self.driver.transaction() as txn:
-            async for group in EntitiesDataManager.iterate_entities_groups(kbid, txn):
+            groups = await EntitiesDataManager.get_entities_groups_ids(kbid, txn)
+            for group in groups:
                 eg = await EntitiesDataManager.get_entities_group(kbid, group, txn)
                 if eg is None:
                     continue
@@ -79,19 +83,86 @@ class EntitiesDataManager:
         self, kbid: str, entities_groups: kb_pb2.EntitiesGroups
     ) -> None:
         async with self.driver.transaction() as txn:
+            groups_ids = list(entities_groups.entities_groups.keys())
+            await EntitiesDataManager._set_entities_groups_ids(kbid, groups_ids, txn)
             for group, entities in entities_groups.entities_groups.items():
-                await EntitiesDataManager.set_entities_group(kbid, group, entities, txn)
+                await EntitiesDataManager._set_entities_group(
+                    kbid, group, entities, txn
+                )
             await txn.commit()
 
     @classmethod
+    async def _add_entity_group_id(
+        cls, kbid: str, group_id: str, txn: Transaction
+    ) -> None:
+        needs_set = False
+        group_ids = await cls._get_entities_groups_ids(kbid, txn)
+        if group_ids is None:
+            needs_set = True
+            group_ids = await cls._deprecated_scan_entities_groups_ids(kbid, txn)
+        if group_id not in group_ids:
+            needs_set = True
+            group_ids.append(group_id)
+        if needs_set:
+            await cls._set_entities_groups_ids(kbid, group_ids, txn)
+
+    @classmethod
+    async def _delete_entity_group_id(
+        cls, kbid: str, group_id: str, txn: Transaction
+    ) -> None:
+        needs_set = False
+        group_ids = await cls._get_entities_groups_ids(kbid, txn)
+        if group_ids is None:
+            needs_set = True
+            group_ids = await cls._deprecated_scan_entities_groups_ids(kbid, txn)
+        if group_id in group_ids:
+            needs_set = True
+            group_ids.remove(group_id)
+        if needs_set:
+            await cls._set_entities_groups_ids(kbid, group_ids, txn)
+
+    @classmethod
+    async def get_entities_groups_ids(cls, kbid: str, txn: Transaction) -> list[str]:
+        group_ids = await cls._get_entities_groups_ids(kbid, txn)
+        if group_ids is not None:
+            return group_ids
+        # TODO: Remove after migration #12 is done
+        return await cls._deprecated_scan_entities_groups_ids(kbid, txn)
+
+    @classmethod
+    async def _get_entities_groups_ids(
+        cls, kbid: str, txn: Transaction
+    ) -> Optional[list[str]]:
+        key = KB_ENTITIES_GROUP_IDS.format(kbid=kbid)
+        data = await txn.get(key)
+        if not data:
+            return None
+        return orjson.loads(data)
+
+    @classmethod
+    async def _set_entities_groups_ids(
+        cls, kbid: str, entities_groups_ids: list[str], txn: Transaction
+    ) -> Optional[list[str]]:
+        key = KB_ENTITIES_GROUP_IDS.format(kbid=kbid)
+        data = orjson.dumps(entities_groups_ids)
+        await txn.set(key, data)
+
+    @classmethod
     async def set_entities_group(
+        cls, kbid: str, group_id: str, entities: kb_pb2.EntitiesGroup, txn: Transaction
+    ) -> None:
+        await cls._add_entity_group_id(kbid, group_id, txn)
+        await cls._set_entities_groups(kbid, group_id, entities, txn)
+
+    @classmethod
+    async def _set_entities_group(
         cls, kbid: str, group_id: str, entities: kb_pb2.EntitiesGroup, txn: Transaction
     ) -> None:
         key = KB_ENTITIES_GROUP.format(kbid=kbid, id=group_id)
         await txn.set(key, entities.SerializeToString())
 
     @classmethod
-    async def iterate_entities_groups(
+    async def _deprecated_scan_entities_groups_ids(
         cls, kbid: str, txn: Transaction
     ) -> AsyncGenerator[str, None]:
         entities_key = KB_ENTITIES.format(kbid=kbid)
