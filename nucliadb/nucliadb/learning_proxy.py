@@ -41,6 +41,7 @@ NUCLIA_ONPREM_AUTH_HEADER = "X-NUCLIA-NUAKEY"
 
 class LearningService(str, Enum):
     CONFIG = "config"
+    COLLECTOR = "collector-api"
 
 
 class LearningConfiguration(BaseModel):
@@ -90,6 +91,21 @@ async def learning_config_proxy(
 ) -> Union[Response, StreamingResponse]:
     return await proxy(
         service=LearningService.CONFIG,
+        request=request,
+        method=method,
+        url=url,
+        extra_headers=extra_headers,
+    )
+
+
+async def learning_collector_proxy(
+    request: Request,
+    method: str,
+    url: str,
+    extra_headers: Optional[dict[str, str]] = None,
+) -> Union[Response, StreamingResponse]:
+    return await proxy(
+        service=LearningService.COLLECTOR,
         request=request,
         method=method,
         url=url,
