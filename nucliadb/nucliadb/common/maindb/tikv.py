@@ -44,13 +44,27 @@ except ImportError:  # pragma: no cover
     TiKV = False
 
 
-class LeaderNotFoundError(Exception):
+class TikvError(Exception):
     """
-    Raised when the tikv client raises an exception indicating that the leader of a region is not found.
-    This is a transient error and the operation should be retried.
+    Base class for all exceptions raised by the tikv client.
     """
 
     pass
+
+
+class LeaderNotFoundError(TikvError):
+    pass
+
+
+class EntryNotFoundInRegionCacheError(TikvError):
+    pass
+
+
+RETRIABLE_EXCEPTIONS = (
+    LeaderNotFoundError,
+    EntryNotFoundInRegionCacheError,
+    TimeoutError,
+)
 
 
 tikv_observer = metrics.Observer(
@@ -60,6 +74,7 @@ tikv_observer = metrics.Observer(
         "conflict_error": ConflictError,
         "timeout_error": TimeoutError,
         "leader_not_found_error": LeaderNotFoundError,
+        "entry_not_found_in_region_cache": EntryNotFoundInRegionCacheError,
     },
 )
 logger = logging.getLogger(__name__)
@@ -92,7 +107,7 @@ class TiKVDataLayer:
 
     @backoff.on_exception(
         backoff.expo,
-        (TimeoutError, LeaderNotFoundError),
+        RETRIABLE_EXCEPTIONS,
         jitter=backoff.random_jitter,
         max_tries=2,
     )
@@ -117,6 +132,8 @@ class TiKVDataLayer:
                 raise TimeoutError(exc_text) from exc
             elif "Leader of region" in exc_text and "not found" in exc_text:
                 raise LeaderNotFoundError(exc_text) from exc
+            elif "The specified entry is not found in the region cache" in exc_text:
+                raise EntryNotFoundInRegionCacheError(exc_text) from exc
             else:
                 raise
 
@@ -251,7 +268,7 @@ class TiKVTransaction(Transaction):
 
     @backoff.on_exception(
         backoff.expo,
-        (TimeoutError, LeaderNotFoundError),
+        RETRIABLE_EXCEPTIONS,
         jitter=backoff.random_jitter,
         max_tries=2,
     )
