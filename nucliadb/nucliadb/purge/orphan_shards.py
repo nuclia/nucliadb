@@ -47,7 +47,7 @@ class ShardLocation:
 UNKNOWN_KB = "unknown"
 
 
-async def detect_orphan_shards(driver: Driver):
+async def detect_orphan_shards(driver: Driver) -> dict[str, ShardLocation]:
     """Detect orphan shards in the system. An orphan shard is one indexed but
     not referenced for any stored KB.
 
