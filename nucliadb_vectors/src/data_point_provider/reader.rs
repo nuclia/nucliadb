@@ -121,7 +121,7 @@ impl Reader {
         let mut lock_options = OpenOptions::new();
         lock_options.read(true);
         lock_options.write(true);
-        let lock_file = lock_options.open(&lock_path)?;
+        let lock_file = lock_options.open(lock_path)?;
         lock_file.lock_shared()?;
 
         let metadata = IndexMetadata::open(path)?.map(Ok).unwrap_or_else(|| {
@@ -174,7 +174,7 @@ impl Reader {
 
         let path = &self.path;
         let state_path = path.join(STATE);
-        let state_file = File::open(&state_path)?;
+        let state_file = File::open(state_path)?;
         let mut state: State = bincode::deserialize_from(BufReader::new(state_file))?;
 
         let new_delete_log = mem::take(&mut state.delete_log);

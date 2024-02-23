@@ -79,7 +79,7 @@ impl DataPointPin {
         options.create(true);
         options.read(true);
         options.write(true);
-        let pin_file = options.open(&pin_path)?;
+        let pin_file = options.open(pin_path)?;
 
         pin_file.lock_shared()?;
 

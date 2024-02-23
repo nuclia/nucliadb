@@ -126,7 +126,7 @@ impl Writer {
         })?;
 
         let state_path = path.join(STATE);
-        let state_file = File::open(&state_path)?;
+        let state_file = File::open(state_path)?;
         let mut state: State = bincode::deserialize_from(BufReader::new(state_file))?;
 
         let delete_log = mem::take(&mut state.delete_log);
