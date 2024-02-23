@@ -81,7 +81,7 @@ from nucliadb_protos.writer_pb2 import (
     WriterStatusResponse,
 )
 
-from nucliadb import learning_config
+from nucliadb import learning_proxy
 from nucliadb.common.cluster.exceptions import AlreadyExists, EntitiesGroupNotFound
 from nucliadb.common.cluster.manager import get_index_nodes
 from nucliadb.common.cluster.utils import get_shard_manager
@@ -192,7 +192,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         kbid = request.forceuuid or str(uuid.uuid4())
         release_channel = get_release_channel(request)
         request.config.release_channel = release_channel
-        lconfig = await learning_config.get_configuration(kbid)
+        lconfig = await learning_proxy.get_configuration(kbid)
         lconfig_created = False
         if lconfig is None:
             if request.learning_config:
@@ -205,7 +205,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                     "No learning configuration provided. Default will be used.",
                     extra={"kbid": kbid},
                 )
-            lconfig = await learning_config.set_configuration(kbid, config=config)
+            lconfig = await learning_proxy.set_configuration(kbid, config=config)
             lconfig_created = True
         else:
             logger.info("Learning configuration already exists", extra={"kbid": kbid})
@@ -222,7 +222,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             # Rollback learning config for the kbid that was just created
             try:
                 if lconfig_created:
-                    await learning_config.delete_configuration(kbid)
+                    await learning_proxy.delete_configuration(kbid)
             except Exception:
                 logger.warning(
                     "Could not rollback learning configuration",
@@ -280,7 +280,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         kbid = request.uuid
         await self.proc.delete_kb(kbid, request.slug)
         try:
-            await learning_config.delete_configuration(kbid)
+            await learning_proxy.delete_configuration(kbid)
             logger.info("Learning configuration deleted", extra={"kbid": kbid})
         except Exception:
             logger.exception(
@@ -862,7 +862,7 @@ LEARNING_SIMILARITY_FUNCTION_TO_PROTO = {
 
 
 def parse_model_metadata_from_learning_config(
-    lconfig: learning_config.LearningConfiguration,
+    lconfig: learning_proxy.LearningConfiguration,
 ) -> SemanticModelMetadata:
     model = SemanticModelMetadata()
     model.similarity_function = LEARNING_SIMILARITY_FUNCTION_TO_PROTO[

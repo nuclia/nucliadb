@@ -29,7 +29,7 @@ from nucliadb_protos.utils_pb2 import ReleaseChannel, VectorSimilarity
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.service.writer import WriterServicer, get_release_channel
-from nucliadb.learning_config import LearningConfiguration
+from nucliadb.learning_proxy import LearningConfiguration
 from nucliadb_protos import writer_pb2
 
 
@@ -49,7 +49,7 @@ class TestWriterServicer:
             semantic_vector_size=200,
             semantic_vector_similarity="dot",
         )
-        with patch("nucliadb.ingest.service.writer.learning_config") as mocked:
+        with patch("nucliadb.ingest.service.writer.learning_proxy") as mocked:
             mocked.get_configuration = AsyncMock(return_value=lconfig)
             yield mocked
 

@@ -42,7 +42,7 @@ from nucliadb.ingest.orm.resource import KB_REVERSE, Resource
 from nucliadb.ingest.service.writer import WriterServicer
 from nucliadb.ingest.settings import settings
 from nucliadb.ingest.tests.vectors import V1, V2, V3
-from nucliadb.learning_config import LearningConfiguration
+from nucliadb.learning_proxy import LearningConfiguration
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import utils_pb2 as upb
 from nucliadb_protos import writer_pb2_grpc
@@ -184,7 +184,7 @@ def learning_config():
         semantic_vector_size=None,
         semantic_vector_similarity="cosine",
     )
-    with patch("nucliadb.ingest.service.writer.learning_config") as mocked:
+    with patch("nucliadb.ingest.service.writer.learning_proxy") as mocked:
         mocked.set_configuration = AsyncMock(return_value=None)
         mocked.get_configuration = AsyncMock(return_value=lconfig)
         mocked.delete_configuration = AsyncMock(return_value=None)

@@ -46,7 +46,7 @@ from nucliadb.common.maindb.tikv import TiKVDriver
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.settings import DriverConfig, DriverSettings
 from nucliadb.ingest.settings import settings as ingest_settings
-from nucliadb.learning_config import LearningConfiguration
+from nucliadb.learning_proxy import LearningConfiguration
 from nucliadb.standalone.config import config_nucliadb
 from nucliadb.standalone.run import run_async_nucliadb
 from nucliadb.standalone.settings import Settings
@@ -138,7 +138,7 @@ def learning_config():
         semantic_vector_size=None,
         semantic_vector_similarity="cosine",
     )
-    with patch("nucliadb.ingest.service.writer.learning_config") as mocked:
+    with patch("nucliadb.ingest.service.writer.learning_proxy") as mocked:
         mocked.set_configuration = AsyncMock(return_value=None)
         mocked.get_configuration = AsyncMock(return_value=lconfig)
         mocked.delete_configuration = AsyncMock(return_value=None)

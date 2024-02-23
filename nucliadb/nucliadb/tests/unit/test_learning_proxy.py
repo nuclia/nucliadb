@@ -22,14 +22,17 @@ from unittest import mock
 
 import pytest
 
-from nucliadb.learning_config import (
+from nucliadb.learning_proxy import (
     LearningConfiguration,
+    LearningService,
     delete_configuration,
     get_configuration,
     learning_config_client,
     proxy,
     set_configuration,
 )
+
+MODULE = "nucliadb.learning_proxy"
 
 
 @pytest.fixture()
@@ -73,17 +76,23 @@ def async_client(config_response):
     client.post = mock.AsyncMock(return_value=config_response)
     client.patch = mock.AsyncMock(return_value=config_response)
     client.delete = mock.AsyncMock(return_value=config_response)
-    with mock.patch("nucliadb.learning_config.learning_config_client") as mocked:
+    with mock.patch(f"{MODULE}.service_client") as mocked:
         mocked.return_value.__aenter__.return_value = client
         mocked.return_value.__aexit__.return_value = None
         yield client
 
 
 @pytest.fixture()
+def is_onprem_nucliadb_mock():
+    with mock.patch(f"{MODULE}.is_onprem_nucliadb", return_value=False) as mocked:
+        yield mocked
+
+
+@pytest.fixture()
 def settings():
-    with mock.patch("nucliadb.learning_config.nuclia_settings") as settings:
-        settings.nuclia_inner_learning_config_url = (
-            "http://config.learning.svc.cluster.local:8080"
+    with mock.patch(f"{MODULE}.nuclia_settings") as settings:
+        settings.learning_internal_svc_base_url = (
+            "http://{service}.learning.svc.cluster.local:8080"
         )
         settings.nuclia_service_account = "service-account"
         settings.nuclia_zone = "europe-1"
@@ -91,18 +100,19 @@ def settings():
         yield settings
 
 
-async def get_learning_config_client(settings):
+async def test_get_learning_config_client(settings, is_onprem_nucliadb_mock):
+    is_onprem_nucliadb_mock.return_value = True
     async with learning_config_client() as client:
-        assert client.base_url == "http://europe-1.public-url/api/v1"
+        assert str(client.base_url) == "http://europe-1.public-url/api/v1/"
         assert client.headers["X-NUCLIA-NUAKEY"] == f"Bearer service-account"
 
-    settings.nuclia_service_account = None
+    is_onprem_nucliadb_mock.return_value = False
     async with learning_config_client() as client:
         assert (
-            client.base_url
-            == "http://config.learning.svc.cluster.local:8080/api/v1/internal"
+            str(client.base_url)
+            == "http://config.learning.svc.cluster.local:8080/api/v1/internal/"
         )
-        assert client.headers == {}
+        assert "X-NUCLIA-NUAKEY" not in client.headers
 
 
 async def test_get_configuration(async_client):
@@ -148,7 +158,9 @@ async def test_proxy(async_client):
         body=mock.AsyncMock(return_value=b"some data"),
         headers={"x-nucliadb-user": "user", "x-nucliadb-roles": "roles"},
     )
-    response = await proxy(request, "GET", "url", headers={"foo": "bar"})
+    response = await proxy(
+        LearningService.CONFIG, request, "GET", "url", extra_headers={"foo": "bar"}
+    )
 
     assert response.status_code == 200
     assert response.body == b"some data"
@@ -172,7 +184,7 @@ async def test_proxy_stream_response(async_client, config_stream_response):
         body=mock.AsyncMock(return_value=b"some data"),
         headers={"x-nucliadb-user": "user", "x-nucliadb-roles": "roles"},
     )
-    response = await proxy(request, "GET", "url")
+    response = await proxy(LearningService.CONFIG, request, "GET", "url")
 
     assert response.status_code == 200
     data = BytesIO()
@@ -198,7 +210,7 @@ async def test_proxy_error(async_client):
         body=mock.AsyncMock(return_value=b"some data"),
         headers={},
     )
-    response = await proxy(request, "GET", "url")
+    response = await proxy(LearningService.CONFIG, request, "GET", "url")
 
     assert response.status_code == 503
     assert (
@@ -226,7 +238,7 @@ async def test_proxy_headers(async_client):
             "host": "localhost",
         },
     )
-    response = await proxy(request, "GET", "url")
+    response = await proxy(LearningService.CONFIG, request, "GET", "url")
 
     assert response.status_code == 200
 
