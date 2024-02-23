@@ -49,7 +49,7 @@ class TestWriterServicer:
             semantic_vector_size=200,
             semantic_vector_similarity="dot",
         )
-        with patch("nucliadb.ingest.service.writer.learning_config") as mocked:
+        with patch("nucliadb.ingest.service.writer.learning_proxy") as mocked:
             mocked.get_configuration = AsyncMock(return_value=lconfig)
             yield mocked
 

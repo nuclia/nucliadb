@@ -57,7 +57,7 @@ async def test_api(reader_api, knowledgebox_ingest, learning_collector_proxy_moc
     kbid = knowledgebox_ingest
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         # Get feedback months
-        resp = await client.get(f"/kb/{kbid}/learning/collect/feedback")
+        resp = await client.get(f"/kb/{kbid}/feedback")
         assert resp.status_code == 200
         assert learning_collector_proxy_mock.calls[-1][1:] == (
             "GET",
@@ -66,7 +66,7 @@ async def test_api(reader_api, knowledgebox_ingest, learning_collector_proxy_moc
         )
 
         # Download feedback for a month
-        resp = await client.get(f"/kb/{kbid}/learning/collect/feedback/2021-01")
+        resp = await client.get(f"/kb/{kbid}/feedback/2021-01")
         assert resp.status_code == 200
         data = BytesIO()
         for chunk in resp.iter_bytes():

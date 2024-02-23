@@ -23,7 +23,6 @@ from unittest import mock
 import pytest
 from fastapi import Response
 
-from nucliadb.learning_proxy import learning_config_proxy
 from nucliadb_models.resource import NucliaDBRoles
 
 
@@ -39,7 +38,9 @@ class MockProxy:
 @pytest.fixture()
 def learning_config_proxy_mock():
     proxy = MockProxy()
-    with mock.patch.object(learning_config_proxy, "proxy", proxy):
+    with mock.patch(
+        "nucliadb.writer.api.v1.learning_config.learning_config_proxy", proxy
+    ):
         yield proxy
 
 

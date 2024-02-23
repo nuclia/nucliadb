@@ -25,7 +25,6 @@ import pytest
 from fastapi import Response
 from fastapi.responses import StreamingResponse
 
-from nucliadb.learning_proxy import learning_config_proxy
 from nucliadb_models.resource import NucliaDBRoles
 
 
@@ -33,8 +32,8 @@ class MockProxy:
     def __init__(self):
         self.calls = []
 
-    async def __call__(self, request, method, url, headers=None):
-        self.calls.append((request, method, url, headers))
+    async def __call__(self, request, method, url, extra_headers=None):
+        self.calls.append((request, method, url, extra_headers))
         if method == "GET" and "download" in url:
 
             async def iter_content():
@@ -48,7 +47,9 @@ class MockProxy:
 @pytest.fixture()
 def learning_config_proxy_mock():
     proxy = MockProxy()
-    with mock.patch.object(learning_config_proxy, "proxy", proxy):
+    with mock.patch(
+        "nucliadb.reader.api.v1.learning_config.learning_config_proxy", proxy
+    ):
         yield proxy
 
 
