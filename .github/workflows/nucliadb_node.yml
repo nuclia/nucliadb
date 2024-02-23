@@ -55,7 +55,7 @@ env:
   RUST_BACKTRACE: 1
   CARGO_TERM_COLOR: always
   COMPONENT: nucliadb-node
-  CONTAINER_REGISTRY: eu.gcr.io/${{ secrets.PROJECT_ID }}
+  CONTAINER_REGISTRY: europe-west4-docker.pkg.dev/nuclia-internal/nuclia
   IMAGE_NAME_BASE_NODE: basenode
   IMAGE_NAME_NODE: node
   IMAGE_NAME_NODE_SIDECAR: node_sidecar
