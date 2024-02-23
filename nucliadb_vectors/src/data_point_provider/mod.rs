@@ -18,12 +18,13 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+pub mod garbage_collector;
+pub mod reader;
+pub mod writer;
+
 mod merge_worker;
 mod merger;
 mod state;
-
-pub mod reader;
-pub mod writer;
 
 use std::collections::HashSet;
 use std::fs::File;
@@ -332,86 +333,6 @@ mod test {
 
     use super::*;
     use crate::data_point::{Elem, LabelDictionary, Similarity};
-
-    #[allow(unused)]
-    fn force_merge_more_than_limit() -> NodeResult<()> {
-        let dir = tempfile::tempdir()?;
-        let vectors_path = dir.path().join("vectors");
-        let mut index = Index::new(&vectors_path, IndexMetadata::default())?;
-        let lock = index.get_elock()?;
-
-        let mut journals = vec![];
-        for _ in 0..200 {
-            let similarity = Similarity::Cosine;
-            let channel = Channel::EXPERIMENTAL;
-            let embeddings = vec![];
-            let time = Some(SystemTime::now());
-            let data_point = DataPoint::new(&vectors_path, embeddings, time, similarity, channel).unwrap();
-            journals.push(data_point.journal());
-        }
-
-        index.write_state().rebuilt_work_stack_with(journals);
-
-        let metrics = index.force_merge(&lock).unwrap();
-        assert_eq!(metrics.merged, 100);
-        assert_eq!(metrics.segments_left, 101);
-        Ok(())
-    }
-
-    #[allow(unused)]
-    fn force_merge_less_than_limit() -> NodeResult<()> {
-        let dir = tempfile::tempdir()?;
-        let vectors_path = dir.path().join("vectors");
-        let mut index = Index::new(&vectors_path, IndexMetadata::default())?;
-        let lock = index.get_elock()?;
-
-        let mut journals = vec![];
-        for _ in 0..50 {
-            let similarity = Similarity::Cosine;
-            let channel = Channel::EXPERIMENTAL;
-            let embeddings = vec![];
-            let time = Some(SystemTime::now());
-            let data_point = DataPoint::new(&vectors_path, embeddings, time, similarity, channel).unwrap();
-            journals.push(data_point.journal());
-        }
-
-        index.write_state().rebuilt_work_stack_with(journals);
-
-        let metrics = index.force_merge(&lock).unwrap();
-        assert_eq!(metrics.merged, 50);
-        assert_eq!(metrics.segments_left, 1);
-        Ok(())
-    }
-
-    #[allow(unused)]
-    fn force_merge_test() -> NodeResult<()> {
-        let dir = tempfile::tempdir()?;
-        let vectors_path = dir.path().join("vectors");
-        let mut index = Index::new(&vectors_path, IndexMetadata::default())?;
-        let lock = index.get_elock()?;
-
-        let mut journals = vec![];
-        for _ in 0..100 {
-            let similarity = Similarity::Cosine;
-            let channel = Channel::EXPERIMENTAL;
-            let embeddings = vec![];
-            let time = Some(SystemTime::now());
-            let data_point = DataPoint::new(&vectors_path, embeddings, time, similarity, channel).unwrap();
-            journals.push(data_point.journal());
-        }
-
-        index.write_state().rebuilt_work_stack_with(journals);
-
-        let metrics = index.force_merge(&lock).unwrap();
-        assert_eq!(metrics.merged, 100);
-        assert_eq!(metrics.segments_left, 1);
-
-        let metrics = index.force_merge(&lock).unwrap();
-        assert_eq!(metrics.merged, 0);
-        assert_eq!(metrics.segments_left, 1);
-
-        Ok(())
-    }
 
     #[test]
     fn garbage_collection_test() -> NodeResult<()> {

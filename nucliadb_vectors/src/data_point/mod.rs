@@ -34,7 +34,7 @@ use data_store::Interpreter;
 use disk_hnsw::DiskHnsw;
 use fs::{File, OpenOptions};
 use fs2::FileExt;
-use io::{BufWriter, Write};
+use io::{BufWriter, ErrorKind, Write};
 use memmap2::Mmap;
 use node::Node;
 use nucliadb_core::tracing::{debug, error};
@@ -66,6 +66,27 @@ pub struct DataPointPin {
     pin: File,
 }
 impl DataPointPin {
+    pub fn is_pinned(path: &path::Path, id: DpId) -> io::Result<bool> {
+        let data_point_path = path.join(id.to_string());
+        let pin_path = data_point_path.join(file_names::DATA_POINT_PIN);
+
+        if !pin_path.is_file() {
+            return Err(io::Error::new(ErrorKind::InvalidData, "Data point without pin"));
+        }
+
+        let pin_file = File::open(pin_path)?;
+
+        let Err(error) = pin_file.try_lock_exclusive() else {
+            return Ok(false);
+        };
+
+        if let ErrorKind::WouldBlock = error.kind() {
+            Ok(true)
+        } else {
+            Err(error)
+        }
+    }
+
     pub fn open_data_point(&self) -> VectorR<DataPoint> {
         DataPoint::open(&self.workspace, self.data_point_id)
     }
