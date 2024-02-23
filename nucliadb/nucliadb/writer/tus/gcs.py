@@ -47,7 +47,7 @@ from nucliadb.writer.tus.exceptions import (
 )
 from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
 from nucliadb.writer.tus.utils import to_str
-from nucliadb_utils.storages.gcs import CHUNK_SIZE, MIN_UPLOAD_SIZE
+from nucliadb_utils.storages.gcs import CHUNK_SIZE, GCS_MIN_UPLOAD_SIZE
 
 
 class GoogleCloudException(Exception):
@@ -168,7 +168,7 @@ class GCloudBlobStore(BlobStore):
 class GCloudFileStorageManager(FileStorageManager):
     storage: GCloudBlobStore
     chunk_size = CHUNK_SIZE
-    min_upload_size = MIN_UPLOAD_SIZE
+    min_upload_size = GCS_MIN_UPLOAD_SIZE
 
     @backoff.on_exception(
         backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=4

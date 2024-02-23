@@ -720,6 +720,7 @@ async def test_tus_validates_intermediate_chunks_length(
         )
         assert resp.status_code == 201
         url = resp.headers["location"]
+
         # We upload a chunk that is smaller than the minimum chunk size
         min_chunk_size = get_storage_manager().min_upload_size
         raw_bytes = b"x" * min_chunk_size + b"y" * 500
@@ -741,3 +742,22 @@ async def test_tus_validates_intermediate_chunks_length(
         assert resp.json()["detail"].startswith(
             "Intermediate chunks cannot be smaller than"
         )
+
+        # Check that uploading the right chunk size works
+        min_chunk_size = get_storage_manager().min_upload_size
+        raw_bytes = b"x" * min_chunk_size + b"y" * 500
+        io_bytes = io.BytesIO(raw_bytes)
+        chunk = io_bytes.read(min_chunk_size)
+
+        resp = await client.head(url)
+
+        headers = {
+            "upload-offset": f"0",
+            "content-length": f"{len(chunk)}",
+        }
+        resp = await client.patch(
+            url,
+            content=chunk,
+            headers=headers,
+        )
+        assert resp.status_code == 200

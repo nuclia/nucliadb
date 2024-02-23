@@ -565,7 +565,7 @@ def check_uploaded_chunk_size(read_bytes: int, storage_manager: FileStorageManag
         and read_bytes < storage_manager.min_upload_size
     ):
         raise HTTPPreconditionFailed(
-            detail=f"Intermediate chunks cannot be smaller than {storage_manager.min_upload_size} bytes"
+            detail=f"Intermediate chunks cannot be smaller than {storage_manager.min_upload_size} bytes. Provided chunk is {read_bytes} bytes."  # noqa
         )
 
 

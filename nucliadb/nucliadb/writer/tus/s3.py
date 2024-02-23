@@ -36,7 +36,7 @@ from nucliadb.writer.tus.exceptions import CloudFileNotFound
 from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
 from nucliadb_utils.storages.s3 import (
     CHUNK_SIZE,
-    MIN_UPLOAD_SIZE,
+    S3_MIN_UPLOAD_SIZE,
     bucket_exists,
     create_bucket,
 )
@@ -51,7 +51,7 @@ RETRIABLE_EXCEPTIONS = (
 class S3FileStorageManager(FileStorageManager):
     storage: S3BlobStore
     chunk_size = CHUNK_SIZE
-    min_upload_size = MIN_UPLOAD_SIZE
+    min_upload_size = S3_MIN_UPLOAD_SIZE
 
     @backoff.on_exception(
         backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=3
