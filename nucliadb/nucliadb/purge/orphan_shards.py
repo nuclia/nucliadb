@@ -55,15 +55,26 @@ async def detect_orphan_shards(driver: Driver) -> dict[str, ShardLocation]:
     """
     # To avoid detecting a new shard as orphan, query the index first and maindb
     # afterwards
-    indexed_shards = await _get_indexed_shards()
+    indexed_shards: dict[str, ShardLocation] = {}
+    available_nodes = manager.get_index_nodes()
+    for node in available_nodes:
+        node_shards = await _get_indexed_shards(node)
+        indexed_shards.update(node_shards)
+
     stored_shards = await _get_stored_shards(driver)
 
     # Log an error in case we found a shard stored but not indexed, this should
     # never happen as shards are created in the index node and then stored in
     # maindb
     not_indexed_shards = stored_shards.keys() - indexed_shards.keys()
+    available_nodes_ids = [node.id for node in available_nodes]
     for shard_id in not_indexed_shards:
         location = stored_shards[shard_id]
+
+        # skip shards from unavailable nodes
+        if location.node_id not in available_nodes_ids:
+            continue
+
         logger.error(
             "Found a shard on maindb not indexed in the index nodes",
             extra={
@@ -75,11 +86,11 @@ async def detect_orphan_shards(driver: Driver) -> dict[str, ShardLocation]:
 
     orphan_shard_ids = indexed_shards.keys() - stored_shards.keys()
     orphan_shards: dict[str, ShardLocation] = {}
-    unavailable_nodes = set()
+    unavailable_nodes: set[str] = set()
     rollover_dm = RolloverDataManager(driver)
     for shard_id in orphan_shard_ids:
         node_id = indexed_shards[shard_id].node_id
-        node = manager.get_index_node(node_id)
+        node = manager.get_index_node(node_id)  # type: ignore
         if node is None:
             unavailable_nodes.add(node_id)
             kbid = UNKNOWN_KB
@@ -104,13 +115,11 @@ async def detect_orphan_shards(driver: Driver) -> dict[str, ShardLocation]:
     return orphan_shards
 
 
-async def _get_indexed_shards() -> dict[str, ShardLocation]:
+async def _get_indexed_shards(node: AbstractIndexNode) -> dict[str, ShardLocation]:
     indexed_shards: dict[str, ShardLocation] = {}
-    available_nodes = manager.get_index_nodes()
-    for node in available_nodes:
-        node_shards = await node.list_shards()
-        for shard_id in node_shards:
-            indexed_shards[shard_id] = ShardLocation(kbid=UNKNOWN_KB, node_id=node.id)
+    node_shards = await node.list_shards()
+    for shard_id in node_shards:
+        indexed_shards[shard_id] = ShardLocation(kbid=UNKNOWN_KB, node_id=node.id)
     return indexed_shards
 
 
