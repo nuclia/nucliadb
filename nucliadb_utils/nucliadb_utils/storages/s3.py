@@ -529,6 +529,7 @@ def parse_status_code(error: botocore.exceptions.ClientError) -> int:
     error_code_mappings = {
         "NoSuchBucket": 404,
         "NoSuchKey": 404,
+        "BucketNotEmpty": 409,
     }
 
     if error_code in error_code_mappings:
