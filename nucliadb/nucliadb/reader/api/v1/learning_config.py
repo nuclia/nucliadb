@@ -20,7 +20,7 @@
 from fastapi import Request
 from fastapi_versioning import version
 
-from nucliadb import learning_config
+from nucliadb.learning_proxy import learning_config_proxy
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.reader.api.v1.router import KB_PREFIX, api
 from nucliadb_models.resource import NucliaDBRoles
@@ -44,7 +44,7 @@ async def download_model(
     model_id: str,
     filename: str,
 ):
-    return await learning_config.proxy(
+    return await learning_config_proxy(
         request, "GET", f"/download/{kbid}/model/{model_id}/{filename}"
     )
 
@@ -63,11 +63,11 @@ async def get_configuration(
     request: Request,
     kbid: str,
 ):
-    return await learning_config.proxy(
+    return await learning_config_proxy(
         request,
         "GET",
         f"/config/{kbid}",
-        headers={"X-STF-USER": request.headers.get("X-NUCLIADB-USER", "")},
+        extra_headers={"X-STF-USER": request.headers.get("X-NUCLIADB-USER", "")},
     )
 
 
@@ -85,7 +85,7 @@ async def get_models(
     request: Request,
     kbid: str,
 ):
-    return await learning_config.proxy(request, "GET", f"/models/{kbid}")
+    return await learning_config_proxy(request, "GET", f"/models/{kbid}")
 
 
 @api.get(
@@ -103,11 +103,11 @@ async def get_model(
     kbid: str,
     model_id: str,
 ):
-    return await learning_config.proxy(
+    return await learning_config_proxy(
         request,
         "GET",
         f"/models/{kbid}/model/{model_id}",
-        headers={"X-STF-USER": request.headers.get("X-NUCLIADB-USER", "")},
+        extra_headers={"X-STF-USER": request.headers.get("X-NUCLIADB-USER", "")},
     )
 
 
@@ -125,7 +125,7 @@ async def get_schema_for_configuration_updates(
     request: Request,
     kbid: str,
 ):
-    return await learning_config.proxy(request, "GET", f"/schema/{kbid}")
+    return await learning_config_proxy(request, "GET", f"/schema/{kbid}")
 
 
 @api.get(
@@ -146,4 +146,4 @@ async def get_schema_for_configuration_creation(
         return HTTPClientError(
             status_code=404, detail="Endpoint not available for Hosted NucliaDB"
         )
-    return await learning_config.proxy(request, "GET", f"/schema")
+    return await learning_config_proxy(request, "GET", f"/schema")

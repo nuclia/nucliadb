@@ -20,7 +20,7 @@
 from fastapi import Request
 from fastapi_versioning import version
 
-from nucliadb import learning_config
+from nucliadb.learning_proxy import learning_config_proxy
 from nucliadb.writer.api.v1.router import KB_PREFIX, api
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires
@@ -40,7 +40,7 @@ async def set_configuration(
     request: Request,
     kbid: str,
 ):
-    return await learning_config.proxy(request, "POST", f"/config/{kbid}")
+    return await learning_config_proxy(request, "POST", f"/config/{kbid}")
 
 
 @api.patch(
@@ -57,4 +57,4 @@ async def patch_configuration(
     request: Request,
     kbid: str,
 ):
-    return await learning_config.proxy(request, "PATCH", f"/config/{kbid}")
+    return await learning_config_proxy(request, "PATCH", f"/config/{kbid}")

@@ -40,7 +40,7 @@ from nucliadb_protos.train_pb2_grpc import TrainStub
 from nucliadb_protos.writer_pb2 import BrokerMessage, OpStatusWriter
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
-from nucliadb.learning_config import LearningConfiguration
+from nucliadb.learning_proxy import LearningConfiguration
 from nucliadb.tests.utils import broker_resource, inject_message
 from nucliadb_models import common, metadata
 from nucliadb_models.resource import Resource

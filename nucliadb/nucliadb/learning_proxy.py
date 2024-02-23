@@ -21,7 +21,8 @@ import contextlib
 import json
 import logging
 from collections.abc import AsyncIterator
-from typing import Any, Optional, Type, Union
+from enum import Enum
+from typing import Any, Optional, Union
 
 import httpx
 from fastapi import Request, Response
@@ -31,11 +32,15 @@ from pydantic import BaseModel
 from nucliadb_telemetry import errors
 from nucliadb_utils.settings import is_onprem_nucliadb, nuclia_settings
 
-SERVICE_NAME = "nucliadb.learning_config"
+SERVICE_NAME = "nucliadb.learning_proxy"
 logger = logging.getLogger(SERVICE_NAME)
 
 
 NUCLIA_ONPREM_AUTH_HEADER = "X-NUCLIA-NUAKEY"
+
+
+class LearningService(str, Enum):
+    CONFIG = "config"
 
 
 class LearningConfiguration(BaseModel):
@@ -77,24 +82,47 @@ async def delete_configuration(
         resp.raise_for_status()
 
 
+async def learning_config_proxy(
+    request: Request,
+    method: str,
+    url: str,
+    extra_headers: Optional[dict[str, str]] = None,
+) -> Union[Response, StreamingResponse]:
+    return await proxy(
+        service=LearningService.CONFIG,
+        request=request,
+        method=method,
+        url=url,
+        extra_headers=extra_headers,
+    )
+
+
 async def proxy(
-    request: Request, method: str, url: str, headers: Optional[dict[str, str]] = None
+    service: LearningService,
+    request: Request,
+    method: str,
+    url: str,
+    extra_headers: Optional[dict[str, str]] = None,
 ) -> Union[Response, StreamingResponse]:
     """
-    Proxy the request to the learning config API.
+    Proxy the request to a learning API.
 
+    service: LearningService. The learning service to proxy the request to.
     request: Request. The incoming request.
     method: str. The HTTP method to use.
     url: str. The URL to proxy the request to.
+    extra_headers: Optional[dict[str, str]]. Extra headers to include in the proxied request.
 
-    Returns: Response. The response from the learning config API.
-    If the response is chunked, a StreamingResponse is returned.
+    Returns: Response. The response from the learning API. If the response is chunked, a StreamingResponse is returned.
     """
-    proxied_headers = headers or {}
+    proxied_headers = extra_headers or {}
     proxied_headers.update({k.lower(): v for k, v in request.headers.items()})
     proxied_headers.pop("host", None)
 
-    async with learning_config_client() as client:
+    async with service_client(
+        base_url=get_base_url(service=service),
+        headers=get_auth_headers(),
+    ) as client:
         try:
             response = await client.request(
                 method=method.upper(),
@@ -105,7 +133,7 @@ async def proxy(
             )
         except Exception as exc:
             errors.capture_exception(exc)
-            msg = "Unexpected error while trying to proxy the request to the learning config API."
+            msg = f"Unexpected error while trying to proxy the request to the learning {service.value} API."
             logger.exception(msg, exc_info=True)
             return Response(
                 content=msg.encode(),
@@ -127,24 +155,64 @@ async def proxy(
         )
 
 
-def get_config_api_url() -> str:
+def get_base_url(service: LearningService) -> str:
     if is_onprem_nucliadb():
         nuclia_public_url = nuclia_settings.nuclia_public_url.format(
             zone=nuclia_settings.nuclia_zone
         )
         return f"{nuclia_public_url}/api/v1"
-    else:
-        return f"{nuclia_settings.nuclia_inner_learning_config_url}/api/v1/internal"
+    learning_svc_base_url = nuclia_settings.learning_internal_svc_base_url.format(
+        service=service.value
+    )
+    return f"{learning_svc_base_url}/api/v1/internal"
 
 
-def get_config_auth_header() -> dict[str, str]:
+def get_auth_headers() -> dict[str, str]:
     if is_onprem_nucliadb():
         # public api: auth is done via the 'x-nuclia-nuakey' header
         return {"X-NUCLIA-NUAKEY": f"Bearer {nuclia_settings.nuclia_service_account}"}
     else:
-        # internal api: auth is proxied from the request to the learning
-        # config api via the 'x-nucliadb-user' and 'x-nucliadb-roles' headers
+        # internal api: auth is proxied from the request coming to NucliaDB to the learning
+        # apis via the 'x-nucliadb-user' and 'x-nucliadb-roles' headers that
+        # idp injects on auth lookup.
         return {}
+
+
+@contextlib.asynccontextmanager
+async def service_client(
+    base_url: str,
+    headers: dict[str, str],
+) -> AsyncIterator[httpx.AsyncClient]:
+    """
+    Context manager for the learning client. Makes sure the client is closed after use.
+    For now, a new client session is created for each request. This is to avoid having to
+    save a client session in the FastAPI app state.
+    """
+    if nuclia_settings.dummy_learning_services:
+        # This is a workaround to be able to run integration tests that start nucliadb with docker.
+        # The learning APIs are not available in the docker setup, so we use a dummy client.
+        client = DummyClient(base_url=base_url, headers=headers)
+        logger.warning(
+            "Using dummy client. If you see this in production, something is wrong."
+        )
+    else:
+        client = httpx.AsyncClient(base_url=base_url, headers=headers)  # type: ignore
+    try:
+        yield client
+    finally:
+        if client.is_closed is False:
+            await client.aclose()
+
+
+@contextlib.asynccontextmanager
+async def learning_config_client() -> AsyncIterator[httpx.AsyncClient]:
+    """
+    Context manager for the learning config client.
+    """
+    async with service_client(
+        base_url=get_base_url(LearningService.CONFIG), headers=get_auth_headers()
+    ) as client:
+        yield client
 
 
 class DummyResponse(httpx.Response):
@@ -207,32 +275,3 @@ class DummyClient(httpx.AsyncClient):
             return getattr(self, method)(*args, **kwargs)
         else:
             return self._response()
-
-
-@contextlib.asynccontextmanager
-async def learning_config_client() -> AsyncIterator[httpx.AsyncClient]:
-    """
-    Context manager for the learning client. Makes sure the client is closed after use.
-    For now, a new client session is created for each request. This is to avoid having to
-    save a client session in the FastAPI app state.
-    """
-    client_class: Type[httpx.AsyncClient]
-    if nuclia_settings.dummy_learning_config:
-        # This is a workaround to be able to run integration tests that start nucliadb with docker.
-        # The learning config API is not available in the docker setup, so we use a dummy client.
-        client_class = DummyClient
-        logger.warning(
-            "Using dummy learning config client. If you see this in production, something is wrong."
-        )
-    else:
-        client_class = httpx.AsyncClient
-
-    client = client_class(
-        base_url=get_config_api_url(),
-        headers=get_config_auth_header(),
-    )
-    try:
-        yield client
-    finally:
-        if client.is_closed is False:
-            await client.aclose()
