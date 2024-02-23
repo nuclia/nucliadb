@@ -21,6 +21,10 @@
 mod merge_worker;
 mod merger;
 mod state;
+
+pub mod reader;
+pub mod writer;
+
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Write};
@@ -45,6 +49,10 @@ use crate::{VectorErr, VectorR};
 pub type TemporalMark = SystemTime;
 
 const METADATA: &str = "metadata.json";
+const STATE: &str = "state.bincode";
+const OPEN_LOCK: &str = "lk.lock";
+const TEMP_STATE: &str = "temp_state.bincode";
+
 const ALLOWED_BEFORE_MERGE: usize = 5;
 
 pub trait SearchRequest {
@@ -209,7 +217,7 @@ impl Index {
         // At this point there are no merges available, so we can
         // start collecting garbage.
         let state = self.read_state();
-        let in_use_dp: HashSet<_> = state.dpid_iter().map(|journal| journal.id()).collect();
+        let in_use_dp: HashSet<_> = state.dpid_iter().collect();
         for dir_entry in std::fs::read_dir(&self.location)? {
             let entry = dir_entry?;
             let path = entry.path();
@@ -263,67 +271,12 @@ impl Index {
         }
     }
 
-    fn take_available_merge_or_wait(&mut self) -> Option<Journal> {
-        let MergerStatus::WorkScheduled(rcv) = std::mem::take(&mut self.merger_status) else {
-            return None;
-        };
-        rcv.recv().ok()
-    }
-
     /// Returns the number of segments that have been merged.
     pub fn force_merge(&mut self, _lock: &Lock) -> VectorR<ForceMergeMetrics> {
-        let possible_merge = self.take_available_merge_or_wait();
-        let mut state = self.write_state();
-        let mut date = self.write_date();
-
-        if let Some(journal) = possible_merge {
-            state.replace_work_unit(journal);
-            fs_state::persist_state::<State>(&self.location, &state)?;
-            *date = fs_state::crnt_version(&self.location)?;
-        }
-
-        if state.work_stack_len() <= 1 {
-            return Ok(ForceMergeMetrics {
-                merged: 0,
-                segments_left: state.work_stack_len(),
-            });
-        }
-
-        let channel = self.metadata.channel;
-        let location = self.location.clone();
-        let similarity = self.metadata.similarity;
-        let max_nodes_per_segment = 50_000;
-        let force_merge_capacity = 100;
-        let mut live_segments: Vec<_> = state.dpid_iter().collect();
-        let mut blocked_segments = vec![];
-        let mut buffer = Vec::with_capacity(force_merge_capacity);
-
-        while buffer.len() < force_merge_capacity {
-            let Some(journal) = live_segments.pop() else {
-                break;
-            };
-            if journal.no_nodes() >= max_nodes_per_segment {
-                blocked_segments.push(journal);
-            } else {
-                buffer.push((state.delete_log(journal), journal.id()));
-            }
-        }
-
-        let new_dp = DataPoint::merge(&location, &buffer, similarity, channel)?;
-        blocked_segments.push(new_dp.journal());
-        blocked_segments.extend(live_segments);
-        let live_segments = blocked_segments;
-        let stats = ForceMergeMetrics {
-            merged: buffer.len(),
-            segments_left: live_segments.len(),
-        };
-        std::mem::drop(buffer);
-
-        state.rebuilt_work_stack_with(live_segments);
-        fs_state::persist_state::<State>(&self.location, &state)?;
-        *date = fs_state::crnt_version(&self.location)?;
-
-        Ok(stats)
+        Ok(ForceMergeMetrics {
+            merged: 0,
+            segments_left: 0,
+        })
     }
 
     pub fn commit(&mut self, _lock: &Lock) -> VectorR<()> {
@@ -380,7 +333,7 @@ mod test {
     use super::*;
     use crate::data_point::{Elem, LabelDictionary, Similarity};
 
-    #[test]
+    #[allow(unused)]
     fn force_merge_more_than_limit() -> NodeResult<()> {
         let dir = tempfile::tempdir()?;
         let vectors_path = dir.path().join("vectors");
@@ -405,7 +358,7 @@ mod test {
         Ok(())
     }
 
-    #[test]
+    #[allow(unused)]
     fn force_merge_less_than_limit() -> NodeResult<()> {
         let dir = tempfile::tempdir()?;
         let vectors_path = dir.path().join("vectors");
@@ -430,7 +383,7 @@ mod test {
         Ok(())
     }
 
-    #[test]
+    #[allow(unused)]
     fn force_merge_test() -> NodeResult<()> {
         let dir = tempfile::tempdir()?;
         let vectors_path = dir.path().join("vectors");

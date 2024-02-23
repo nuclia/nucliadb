@@ -58,29 +58,36 @@ mod file_names {
     pub const DATA_POINT_PIN: &str = ".pin";
 }
 
-pub struct PinnedDataPoint {
-    data_point_id: DpId,
+pub struct DataPointPin {
+    pub journal: Journal,
+    pub data_point_id: DpId,
     workspace: path::PathBuf,
     #[allow(unused)]
     pin: File,
 }
-impl PinnedDataPoint {
+impl DataPointPin {
     pub fn open_data_point(&self) -> VectorR<DataPoint> {
         DataPoint::open(&self.workspace, self.data_point_id)
     }
 
-    pub fn pin(dir: &path::Path, id: DpId) -> io::Result<PinnedDataPoint> {
-        let data_pint_path = dir.join(id.to_string());
-        let pin_path = data_pint_path.join(file_names::DATA_POINT_PIN);
+    pub fn pin(dir: &path::Path, id: DpId) -> io::Result<DataPointPin> {
+        let data_point_path = dir.join(id.to_string());
+        let pin_path = data_point_path.join(file_names::DATA_POINT_PIN);
+        let journal_path = data_point_path.join(file_names::JOURNAL);
 
         let mut options = OpenOptions::new();
         options.create(true);
         options.read(true);
+        options.write(true);
         let pin_file = options.open(&pin_path)?;
 
         pin_file.lock_shared()?;
 
-        Ok(PinnedDataPoint {
+        let journal = fs::OpenOptions::new().read(true).open(journal_path)?;
+        let journal: Journal = serde_json::from_reader(BufReader::new(journal))?;
+
+        Ok(DataPointPin {
+            journal,
             pin: pin_file,
             workspace: dir.into(),
             data_point_id: id,

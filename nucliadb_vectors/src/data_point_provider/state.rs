@@ -141,10 +141,17 @@ pub struct State {
 
     // Trie containing the deleted keys and the
     // time when they were deleted
-    delete_log: DTrie,
+    pub delete_log: DTrie,
 
     // Already closed WorkUnits waiting to be merged
+    // Consider this field deprecated in favor of data_points.
+    // WorkUnit is a bad abstraction that adds to much complexity.
+    // The goal is to remove it in a future refactor.
     work_stack: LinkedList<WorkUnit>,
+
+    // Available data points
+    #[serde(default)]
+    pub available_data_points: LinkedList<DpId>,
 
     // This field is deprecated and is only
     // used for old states. Always use
@@ -159,7 +166,7 @@ pub struct State {
     resources: HashMap<String, usize>,
 }
 impl State {
-    fn data_point_iterator(&self) -> impl Iterator<Item = &Journal> {
+    fn work_stack_iterator(&self) -> impl Iterator<Item = &Journal> {
         self.work_stack.iter().flat_map(|u| u.load.iter()).chain(self.current.load.iter())
     }
     fn close_work_unit(&mut self) {
@@ -180,6 +187,7 @@ impl State {
     #[allow(deprecated)]
     pub fn new() -> State {
         State {
+            available_data_points: LinkedList::default(),
             location: PathBuf::default(),
             no_nodes: usize::default(),
             current: WorkUnit::default(),
@@ -201,7 +209,7 @@ impl State {
         let no_results = request.no_results();
         let min_score = request.min_score();
         let mut ffsv = Fssc::new(request.no_results(), with_duplicates);
-        for journal in self.data_point_iterator().copied() {
+        for journal in self.work_stack_iterator().copied() {
             let delete_log = self.delete_log(journal);
             let data_point = DataPoint::open(location, journal.id())?;
             let partial_solution =
@@ -223,34 +231,6 @@ impl State {
         }
     }
 
-    /// The [`WorkUnit`] type is a bad abstraction, and this function is
-    /// a result of it. This is the only way of giving fine grained control
-    /// of merges to [State] clients.
-    /// In the future, the state should just hold a list of journals.
-    pub fn rebuilt_work_stack_with(&mut self, journals: Vec<Journal>) {
-        let mut work_stack = LinkedList::new();
-        let mut current_work_unit = WorkUnit::new();
-        let mut number_of_nodes = 0;
-        let mut age_cap = SystemTime::now();
-
-        for journal in journals {
-            number_of_nodes += journal.no_nodes();
-            age_cap = std::cmp::min(age_cap, journal.time());
-            current_work_unit.add_unit(journal);
-            if current_work_unit.size() == BUFFER_CAP {
-                let closed_work_unit = mem::take(&mut current_work_unit);
-                work_stack.push_back(closed_work_unit);
-            }
-        }
-        if current_work_unit.size() > 0 {
-            work_stack.push_back(current_work_unit);
-        }
-
-        self.delete_log.prune(age_cap);
-        self.no_nodes = number_of_nodes;
-        self.work_stack = work_stack;
-    }
-
     pub fn replace_work_unit(&mut self, journal: Journal) {
         let Some(unit) = self.work_stack.pop_back() else {
             return;
@@ -266,12 +246,15 @@ impl State {
         }
         self.add(journal);
     }
-    pub fn dpid_iter(&self) -> impl Iterator<Item = Journal> + '_ {
-        self.data_point_iterator().copied()
+    pub fn dpid_iter(&self) -> impl Iterator<Item = DpId> + '_ {
+        let available = self.available_data_points.iter().copied();
+        // Older versions will have data point journals in the work stack.
+        let work_stack = self.work_stack_iterator().map(|journal| journal.id());
+        available.chain(work_stack)
     }
     pub fn keys(&self, location: &Path) -> VectorR<Vec<String>> {
         let mut keys = vec![];
-        for journal in self.data_point_iterator().copied() {
+        for journal in self.work_stack_iterator().copied() {
             let delete_log = self.delete_log(journal);
             let dp_id = journal.id();
             let data_point = DataPoint::open(location, dp_id)?;
@@ -296,7 +279,7 @@ impl State {
         self.work_stack.back().map(|wu| wu.load.as_slice())
     }
     pub fn stored_len(&self, location: &Path) -> VectorR<Option<u64>> {
-        let Some(journal) = self.data_point_iterator().next() else {
+        let Some(journal) = self.work_stack_iterator().next() else {
             return Ok(None);
         };
         let data_point = DataPoint::open(location, journal.id())?;
