@@ -126,6 +126,8 @@ spec:
           - containerPort: 14271
             name: admin-http
             protocol: TCP
+        resources:
+{{ toYaml .Values.jaeger_agent_resources | indent 10 }}
         args:
           - --reporter.grpc.host-port=dns:///{{ .Values.tracing.jaegerCollectorHost }}:{{ .Values.tracing.jaegerCollectorGrpcPort }}
           - --reporter.type=grpc
