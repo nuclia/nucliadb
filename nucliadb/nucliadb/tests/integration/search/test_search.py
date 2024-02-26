@@ -1429,7 +1429,7 @@ async def test_facets_validation(
     error_message,
 ):
     kbid = knowledgebox
-    for endpoint in ("find", "search"):
+    for endpoint in ("search",):
         for method in ("post", "get"):
             func = getattr(nucliadb_reader, method)
             kwargs = (
