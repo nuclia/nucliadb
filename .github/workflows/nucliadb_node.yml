@@ -63,6 +63,8 @@ env:
   IMAGE_NAME_BASE_NODE: basenode
   IMAGE_NAME_NODE: node
   IMAGE_NAME_NODE_SIDECAR: node_sidecar
+  GCP_WORKLOAD_IDENTITY_PROVIDER: "projects/725951671212/locations/global/workloadIdentityPools/gh-nuclia/providers/gh-nuclia-provider"
+  GCP_SERVICE_ACCOUNT: "github-actions@stashify-218417.iam.gserviceaccount.com"
 
 jobs:
   pre-checks-python:
@@ -174,12 +176,13 @@ jobs:
       - name: Checkout the repository
         uses: actions/checkout@v3
 
+      # setup docker, as we need to pull the node image to run the tests
       - name: Authenticate to Google Cloud
         id: gcp-auth
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: "${{ secrets.GCP_REGISTRY_WORKLOAD_IDENTITY_PROVIDER }}"
-          service_account: "${{ secrets.GCP_REGISTRY_SERVICE_ACCOUNT }}"
+          workload_identity_provider: "${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}"
+          service_account: "${{ env.GCP_SERVICE_ACCOUNT }}"
           token_format: access_token
 
       - name: Login to Google Artifact Registry
