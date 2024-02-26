@@ -99,6 +99,9 @@ jobs:
       - name: 'Set up Cloud SDK'
         uses: 'google-github-actions/setup-gcloud@v1'
 
+      - name: take a peek
+        run: gcloud auth list
+
       # setup docker, as we need to pull the node image to run the tests
       - name: Configure Docker
         run: docker login -u oauth2accesstoken -p "$(gcloud auth application-default print-access-token)" https://eu.gcr.io
