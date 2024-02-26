@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import os
+import shutil
 
 from grpc import aio
 
@@ -60,10 +61,13 @@ class StandaloneClusterServiceServicer(
         index_node.shard_count = len(
             os.listdir(os.path.join(cluster_settings.data_path, "shards"))
         )
+        total_disk, _, available_disk = shutil.disk_usage(cluster_settings.data_path)
         return standalone_pb2.NodeInfoResponse(
             id=index_node.id,
             address=index_node.address,
             shard_count=index_node.shard_count,
+            available_disk=available_disk,
+            total_disk=total_disk,
         )
 
 

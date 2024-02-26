@@ -83,6 +83,7 @@ def add_index_node(
     id: str,
     address: str,
     shard_count: int,
+    available_disk: Optional[int] = None,
     dummy: bool = False,
     primary_id: Optional[str] = None,
 ) -> AbstractIndexNode:
@@ -91,13 +92,18 @@ def add_index_node(
             node = get_self()
         else:
             node = ProxyStandaloneIndexNode(
-                id=id, address=address, shard_count=shard_count, dummy=dummy
+                id=id,
+                address=address,
+                shard_count=shard_count,
+                available_disk=available_disk,
+                dummy=dummy,
             )
     else:
         node = IndexNode(  # type: ignore
             id=id,
             address=address,
             shard_count=shard_count,
+            available_disk=available_disk,
             dummy=dummy,
             primary_id=primary_id,
         )

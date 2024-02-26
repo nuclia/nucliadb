@@ -20,6 +20,8 @@ message NodeInfoResponse {
     string id = 1;
     string address = 2;
     uint32 shard_count = 3;
+    uint64 available_disk = 4;
+    uint64 total_disk = 5;
 }
 
 

@@ -43,6 +43,7 @@ class SingleNodeDiscovery(AbstractClusterDiscovery):
                     name=self_node.id,
                     address=self_node.address,
                     shard_count=self_node.shard_count,
+                    available_disk=self_node.available_disk,
                 )
             ]
         )

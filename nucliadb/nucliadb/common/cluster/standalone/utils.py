@@ -19,6 +19,7 @@
 
 import logging
 import os
+import shutil
 import uuid
 from socket import gethostname
 
@@ -64,6 +65,8 @@ def get_self() -> StandaloneIndexNode:
                 if os.path.isdir(os.path.join(_shards_dir, shard_dir))
             ]
         )
+        _, _, available_disk = shutil.disk_usage(cluster_settings.data_path)
+        _SELF_INDEX_NODE.available_disk = available_disk
     except FileNotFoundError:  # pragma: no cover
         ...
     return _SELF_INDEX_NODE
