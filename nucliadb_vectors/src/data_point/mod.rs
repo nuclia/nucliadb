@@ -21,15 +21,16 @@
 pub mod disk_hnsw;
 pub mod node;
 pub mod ops_hnsw;
-mod params;
 pub mod ram_hnsw;
+
+mod params;
 #[cfg(test)]
 mod tests;
-use std::collections::{HashMap, HashSet};
-use std::io::BufReader;
-use std::time::SystemTime;
-use std::{fs, io, path};
 
+use crate::data_types::{data_store, trie, trie_ram, vector, DeleteLog};
+use crate::formula::Formula;
+use crate::fst_index::{KeyIndex, Label, LabelIndex};
+use crate::VectorR;
 use data_store::Interpreter;
 use disk_hnsw::DiskHnsw;
 use fs::{File, OpenOptions};
@@ -43,12 +44,13 @@ pub use ops_hnsw::DataRetriever;
 use ops_hnsw::HnswOps;
 use ram_hnsw::RAMHnsw;
 use serde::{Deserialize, Serialize};
-pub use uuid::Uuid as DpId;
+use std::collections::{HashMap, HashSet};
+use std::io::BufReader;
+use std::path::{Path, PathBuf};
+use std::time::SystemTime;
+use std::{fs, io};
 
-use crate::data_types::{data_store, trie, trie_ram, vector, DeleteLog};
-use crate::formula::Formula;
-use crate::fst_index::{KeyIndex, Label, LabelIndex};
-use crate::VectorR;
+pub use uuid::Uuid as DpId;
 
 mod file_names {
     pub const NODES: &str = "nodes.kv";
@@ -59,14 +61,19 @@ mod file_names {
 }
 
 pub struct DataPointPin {
-    pub journal: Journal,
-    pub data_point_id: DpId,
-    workspace: path::PathBuf,
+    data_point_id: DpId,
+    data_point_path: PathBuf,
+    journal_path: PathBuf,
+    workspace: PathBuf,
     #[allow(unused)]
     pin: File,
 }
 impl DataPointPin {
-    pub fn is_pinned(path: &path::Path, id: DpId) -> io::Result<bool> {
+    pub fn path(&self) -> &Path {
+        &self.data_point_path
+    }
+
+    pub fn is_pinned(path: &Path, id: DpId) -> io::Result<bool> {
         let data_point_path = path.join(id.to_string());
         let pin_path = data_point_path.join(file_names::DATA_POINT_PIN);
 
@@ -91,7 +98,19 @@ impl DataPointPin {
         DataPoint::open(&self.workspace, self.data_point_id)
     }
 
-    pub fn pin(dir: &path::Path, id: DpId) -> io::Result<DataPointPin> {
+    pub fn read_journal(&self) -> io::Result<Journal> {
+        let journal = File::open(&self.journal_path)?;
+        let journal: Journal = serde_json::from_reader(BufReader::new(journal))?;
+        Ok(journal)
+    }
+
+    pub fn create_pin(dir: &Path) -> io::Result<DataPointPin> {
+        let id = DpId::new_v4();
+        std::fs::create_dir(dir.join(id.to_string()))?;
+        DataPointPin::open_pin(dir, id)
+    }
+
+    pub fn open_pin(dir: &Path, id: DpId) -> io::Result<DataPointPin> {
         let data_point_path = dir.join(id.to_string());
         let pin_path = data_point_path.join(file_names::DATA_POINT_PIN);
         let journal_path = data_point_path.join(file_names::JOURNAL);
@@ -104,16 +123,197 @@ impl DataPointPin {
 
         pin_file.lock_shared()?;
 
-        let journal = fs::OpenOptions::new().read(true).open(journal_path)?;
-        let journal: Journal = serde_json::from_reader(BufReader::new(journal))?;
-
         Ok(DataPointPin {
-            journal,
+            journal_path,
+            data_point_path,
             pin: pin_file,
             workspace: dir.into(),
             data_point_id: id,
         })
     }
+}
+
+pub fn merge_data_points<Dlog>(
+    pin: &DataPointPin,
+    operants: &[(Dlog, DpId)],
+    similarity: Similarity,
+    channel: Channel,
+) -> VectorR<DataPoint>
+where
+    Dlog: DeleteLog,
+{
+    let workspace = &pin.workspace;
+    let data_point_id = pin.data_point_id;
+    let data_point_path = &pin.data_point_path;
+
+    let nodes_path = data_point_path.join(file_names::NODES);
+    let mut nodes_file_options = OpenOptions::new();
+    nodes_file_options.read(true);
+    nodes_file_options.write(true);
+    nodes_file_options.create(true);
+    let mut nodes_file = nodes_file_options.open(nodes_path)?;
+
+    let journal_path = data_point_path.join(file_names::JOURNAL);
+    let mut journal_file_options = OpenOptions::new();
+    journal_file_options.read(true);
+    journal_file_options.write(true);
+    journal_file_options.create(true);
+    let mut journal_file = journal_file_options.open(journal_path)?;
+
+    let hnsw_path = data_point_path.join(file_names::HNSW);
+    let mut hnsw_file_options = OpenOptions::new();
+    hnsw_file_options.read(true);
+    hnsw_file_options.write(true);
+    hnsw_file_options.create(true);
+    let mut hnsw_file = hnsw_file_options.open(hnsw_path)?;
+
+    let operants = operants
+        .iter()
+        .map(|(dlog, dp_id)| DataPoint::open(workspace, *dp_id).map(|v| (dlog, v)))
+        .collect::<VectorR<Vec<_>>>()?;
+
+    // Creating the node store
+    let node_producers: Vec<_> = operants.iter().map(|dp| ((dp.0, Node), dp.1.nodes.as_ref())).collect();
+    data_store::merge(&mut nodes_file, &node_producers)?;
+    let nodes = unsafe { Mmap::map(&nodes_file)? };
+    let no_nodes = data_store::stored_elements(&nodes);
+
+    // Creating the FSTs with the new nodes
+    let (label_index, key_index) = if channel == Channel::EXPERIMENTAL {
+        debug!("Indexing with experimental FSTs");
+        DataPoint::create_fsts(&data_point_path, &nodes)?
+    } else {
+        (None, None)
+    };
+
+    // Creating the hnsw for the new node store.
+    let tracker = Retriever::new(&[], &nodes, &NoDLog, similarity, -1.0);
+    let mut ops = HnswOps::new(&tracker);
+    let mut index = RAMHnsw::new();
+    for id in 0..no_nodes {
+        ops.insert(Address(id), &mut index)
+    }
+
+    {
+        let mut hnswf_buffer = BufWriter::new(&mut hnsw_file);
+        DiskHnsw::serialize_into(&mut hnswf_buffer, no_nodes, index)?;
+        hnswf_buffer.flush()?;
+    }
+
+    let index = unsafe { Mmap::map(&hnsw_file)? };
+
+    let journal = Journal {
+        nodes: no_nodes,
+        uid: data_point_id,
+        ctime: SystemTime::now(),
+    };
+
+    {
+        let mut journalf_buffer = BufWriter::new(&mut journal_file);
+        journalf_buffer.write_all(&serde_json::to_vec(&journal)?)?;
+        journalf_buffer.flush()?;
+    }
+
+    // Telling the OS our expected access pattern
+    #[cfg(not(target_os = "windows"))]
+    {
+        nodes.advise(memmap2::Advice::WillNeed)?;
+        index.advise(memmap2::Advice::Sequential)?;
+    }
+
+    Ok(DataPoint {
+        journal,
+        nodes,
+        index,
+        label_index,
+        key_index,
+    })
+}
+
+pub fn create_data_point(
+    pin: &DataPointPin,
+    elems: Vec<Elem>,
+    time: Option<SystemTime>,
+    similarity: Similarity,
+    channel: Channel,
+) -> VectorR<DataPoint> {
+    let data_point_id = pin.data_point_id;
+    let data_point_path = &pin.data_point_path;
+    let mut nodes_file_options = OpenOptions::new();
+    nodes_file_options.read(true);
+    nodes_file_options.write(true);
+    nodes_file_options.create(true);
+    let mut nodesf = nodes_file_options.open(data_point_path.join(file_names::NODES))?;
+
+    let mut journal_file_options = OpenOptions::new();
+    journal_file_options.read(true);
+    journal_file_options.write(true);
+    journal_file_options.create(true);
+    let mut journalf = journal_file_options.open(data_point_path.join(file_names::JOURNAL))?;
+
+    let mut hnsw_file_options = OpenOptions::new();
+    hnsw_file_options.read(true);
+    hnsw_file_options.write(true);
+    hnsw_file_options.create(true);
+    let mut hnswf = hnsw_file_options.open(data_point_path.join(file_names::HNSW))?;
+
+    // Serializing nodes on disk
+    // Nodes are stored on disk and mmaped.
+    data_store::create_key_value(&mut nodesf, elems)?;
+    let nodes = unsafe { Mmap::map(&nodesf)? };
+    let no_nodes = data_store::stored_elements(&nodes);
+
+    // Creating the FSTs
+    let (label_index, key_index) = if channel == Channel::EXPERIMENTAL {
+        debug!("Indexing with experimental FSTs");
+        DataPoint::create_fsts(&data_point_path, &nodes)?
+    } else {
+        (None, None)
+    };
+
+    // Creating the HNSW using the mmaped nodes
+    let tracker = Retriever::new(&[], &nodes, &NoDLog, similarity, -1.0);
+    let mut ops = HnswOps::new(&tracker);
+    let mut index = RAMHnsw::new();
+    for id in 0..no_nodes {
+        ops.insert(Address(id), &mut index)
+    }
+
+    {
+        // The HNSW is on RAM
+        // Serializing the HNSW into disk
+        let mut hnswf_buffer = BufWriter::new(&mut hnswf);
+        DiskHnsw::serialize_into(&mut hnswf_buffer, no_nodes, index)?;
+        hnswf_buffer.flush()?;
+    }
+    let index = unsafe { Mmap::map(&hnswf)? };
+
+    let journal = Journal {
+        nodes: no_nodes,
+        uid: data_point_id,
+        ctime: time.unwrap_or_else(SystemTime::now),
+    };
+    {
+        // Saving the journal
+        let mut journalf_buffer = BufWriter::new(&mut journalf);
+        journalf_buffer.write_all(&serde_json::to_vec(&journal)?)?;
+        journalf_buffer.flush()?;
+    }
+
+    // Telling the OS our expected access pattern
+    #[cfg(not(target_os = "windows"))]
+    {
+        nodes.advise(memmap2::Advice::WillNeed)?;
+        index.advise(memmap2::Advice::Sequential)?;
+    }
+
+    Ok(DataPoint {
+        journal,
+        nodes,
+        index,
+        label_index,
+        key_index,
+    })
 }
 
 pub struct NoDLog;
@@ -529,7 +729,7 @@ impl DataPoint {
         neighbours.into_iter().map(|(address, dist)| (Neighbour::new(address, &self.nodes, dist))).take(results)
     }
     pub fn merge<Dlog>(
-        dir: &path::Path,
+        dir: &Path,
         operants: &[(Dlog, DpId)],
         similarity: Similarity,
         channel: Channel,
@@ -606,13 +806,13 @@ impl DataPoint {
             key_index,
         })
     }
-    pub fn delete(dir: &path::Path, uid: DpId) -> VectorR<()> {
+    pub fn delete(dir: &Path, uid: DpId) -> VectorR<()> {
         let uid = uid.to_string();
         let id = dir.join(uid);
         fs::remove_dir_all(id)?;
         Ok(())
     }
-    pub fn open(dir: &path::Path, uid: DpId) -> VectorR<DataPoint> {
+    pub fn open(dir: &Path, uid: DpId) -> VectorR<DataPoint> {
         let uid = uid.to_string();
         let id = dir.join(uid);
         let nodes = fs::OpenOptions::new().read(true).open(id.join(file_names::NODES))?;
@@ -648,7 +848,7 @@ impl DataPoint {
         })
     }
 
-    fn create_fsts(root_dir: &path::Path, nodes: &[u8]) -> VectorR<(Option<LabelIndex>, Option<KeyIndex>)> {
+    fn create_fsts(root_dir: &Path, nodes: &[u8]) -> VectorR<(Option<LabelIndex>, Option<KeyIndex>)> {
         let no_nodes = data_store::stored_elements(nodes);
 
         // building the KeyIndex and LabelIndex FSTs
@@ -700,19 +900,55 @@ impl DataPoint {
     }
 
     pub fn new(
-        dir: &path::Path,
+        dir: &Path,
         elems: Vec<Elem>,
         time: Option<SystemTime>,
         similarity: Similarity,
         channel: Channel,
     ) -> VectorR<DataPoint> {
-        let uid = DpId::new_v4().to_string();
-        let id = dir.join(&uid);
-        fs::create_dir(&id)?;
-        let mut nodesf = fs::OpenOptions::new().read(true).write(true).create(true).open(id.join(file_names::NODES))?;
-        let mut journalf =
-            fs::OpenOptions::new().read(true).write(true).create(true).open(id.join(file_names::JOURNAL))?;
-        let mut hnswf = fs::OpenOptions::new().read(true).write(true).create(true).open(id.join(file_names::HNSW))?;
+        let data_point_id = DpId::new_v4();
+        let data_point_path = dir.join(data_point_id.to_string());
+        fs::create_dir(&data_point_path)?;
+        DataPoint::new_with_id(&data_point_path, data_point_id, elems, time, similarity, channel)
+    }
+
+    pub fn new_from_pin(
+        data_point_pin: &DataPointPin,
+        elems: Vec<Elem>,
+        time: Option<SystemTime>,
+        similarity: Similarity,
+        channel: Channel,
+    ) -> VectorR<DataPoint> {
+        let data_point_id = data_point_pin.data_point_id;
+        let data_point_path = &data_point_pin.data_point_path;
+        DataPoint::new_with_id(&data_point_path, data_point_id, elems, time, similarity, channel)
+    }
+
+    fn new_with_id(
+        data_point_path: &Path,
+        data_point_id: DpId,
+        elems: Vec<Elem>,
+        time: Option<SystemTime>,
+        similarity: Similarity,
+        channel: Channel,
+    ) -> VectorR<DataPoint> {
+        let mut nodes_file_options = OpenOptions::new();
+        nodes_file_options.read(true);
+        nodes_file_options.write(true);
+        nodes_file_options.create(true);
+        let mut nodesf = nodes_file_options.open(data_point_path.join(file_names::NODES))?;
+
+        let mut journal_file_options = OpenOptions::new();
+        journal_file_options.read(true);
+        journal_file_options.write(true);
+        journal_file_options.create(true);
+        let mut journalf = journal_file_options.open(data_point_path.join(file_names::JOURNAL))?;
+
+        let mut hnsw_file_options = OpenOptions::new();
+        hnsw_file_options.read(true);
+        hnsw_file_options.write(true);
+        hnsw_file_options.create(true);
+        let mut hnswf = hnsw_file_options.open(data_point_path.join(file_names::HNSW))?;
 
         // Serializing nodes on disk
         // Nodes are stored on disk and mmaped.
@@ -723,7 +959,7 @@ impl DataPoint {
         // Creating the FSTs
         let (label_index, key_index) = if channel == Channel::EXPERIMENTAL {
             debug!("Indexing with experimental FSTs");
-            Self::create_fsts(&id, &nodes)?
+            Self::create_fsts(&data_point_path, &nodes)?
         } else {
             (None, None)
         };
@@ -747,7 +983,7 @@ impl DataPoint {
 
         let journal = Journal {
             nodes: no_nodes,
-            uid: DpId::parse_str(&uid).unwrap(),
+            uid: data_point_id,
             ctime: time.unwrap_or_else(SystemTime::now),
         };
         {

@@ -141,15 +141,15 @@ impl Reader {
         let mut number_of_embeddings = 0;
         let mut data_points = HashMap::new();
         for data_point_id in state.dpid_iter() {
-            let pinned = DataPointPin::pin(path, data_point_id)?;
-            let data_point_journal = pinned.journal;
+            let data_point_pin = DataPointPin::open_pin(path, data_point_id)?;
+            let data_point_journal = data_point_pin.read_journal()?;
 
             if dimension.is_none() {
-                let data_point = pinned.open_data_point()?;
+                let data_point = data_point_pin.open_data_point()?;
                 dimension = data_point.stored_len();
             }
 
-            data_points.insert(data_point_id, pinned);
+            data_points.insert(data_point_id, data_point_pin);
             number_of_embeddings += data_point_journal.no_nodes();
         }
 
@@ -182,15 +182,15 @@ impl Reader {
         let mut new_number_of_embeddings = 0;
         let mut new_data_points = HashMap::new();
         for data_point_id in state.dpid_iter() {
-            let pinned = DataPointPin::pin(path, data_point_id)?;
-            let data_point_journal = pinned.journal;
+            let data_point_pin = DataPointPin::open_pin(path, data_point_id)?;
+            let data_point_journal = data_point_pin.read_journal()?;
 
             if new_dimension.is_none() {
-                let data_point = pinned.open_data_point()?;
+                let data_point = data_point_pin.open_data_point()?;
                 new_dimension = data_point.stored_len();
             }
 
-            new_data_points.insert(data_point_id, pinned);
+            new_data_points.insert(data_point_id, data_point_pin);
             new_number_of_embeddings += data_point_journal.no_nodes();
         }
 
