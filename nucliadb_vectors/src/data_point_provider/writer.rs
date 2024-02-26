@@ -148,15 +148,17 @@ impl Writer {
         state.delete_log = self.delete_log.clone();
 
         for pin in &current_data_points {
-            if !removed_data_points.contains(&pin.id()) {
-                state.available_data_points.push(pin.id());
+            if removed_data_points.contains(&pin.id()) {
+                continue;
             }
+            state.available_data_points.push(pin.id());
         }
 
         for pin in &added_data_points {
-            if !removed_data_points.contains(&pin.id()) {
-                state.available_data_points.push(pin.id());
+            if removed_data_points.contains(&pin.id()) {
+                continue;
             }
+            state.available_data_points.push(pin.id());
         }
 
         for (entry, time) in &added_to_delete_log {
@@ -164,9 +166,6 @@ impl Writer {
         }
 
         if let Err(err) = persist_state(&self.path, &state) {
-            self.added_to_delete_log = added_to_delete_log;
-            self.removed_data_points = removed_data_points;
-            self.added_data_points = added_data_points;
             self.data_points = current_data_points;
             return Err(err);
         };
@@ -175,14 +174,16 @@ impl Writer {
 
         for pin in added_data_points {
             if removed_data_points.contains(&pin.id()) {
-                alive_data_points.push(pin);
+                continue;
             }
+            alive_data_points.push(pin);
         }
 
         for pin in current_data_points {
             if removed_data_points.contains(&pin.id()) {
-                alive_data_points.push(pin);
+                continue;
             }
+            alive_data_points.push(pin);
         }
 
         self.data_points = alive_data_points;
