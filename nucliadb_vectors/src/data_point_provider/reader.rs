@@ -21,7 +21,7 @@
 use fs2::FileExt;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
-use std::fs::{File, OpenOptions};
+use std::fs::File;
 use std::io::{self, BufReader};
 use std::mem;
 use std::path::{Path, PathBuf};
@@ -31,8 +31,8 @@ use crate::data_point_provider::state::*;
 use crate::data_point_provider::{IndexMetadata, SearchRequest, OPEN_LOCK, STATE};
 use crate::data_types::DeleteLog;
 
+use crate::data_point::DataPointPin;
 pub use crate::data_point::Neighbour;
-use crate::data_point::{DataPointPin, DpId};
 use crate::data_types::dtrie_ram::DTrie;
 use crate::{VectorErr, VectorR};
 
@@ -108,7 +108,7 @@ fn last_modified(path: &Path) -> io::Result<SystemTime> {
 pub struct Reader {
     metadata: IndexMetadata,
     path: PathBuf,
-    data_points: HashMap<DpId, DataPointPin>,
+    data_points: Vec<DataPointPin>,
     delete_log: DTrie,
     number_of_embeddings: usize,
     version: SystemTime,
@@ -118,10 +118,7 @@ pub struct Reader {
 impl Reader {
     pub fn open(path: &Path) -> VectorR<Reader> {
         let lock_path = path.join(OPEN_LOCK);
-        let mut lock_options = OpenOptions::new();
-        lock_options.read(true);
-        lock_options.write(true);
-        let lock_file = lock_options.open(lock_path)?;
+        let lock_file = File::open(lock_path)?;
         lock_file.lock_shared()?;
 
         let metadata = IndexMetadata::open(path)?.map(Ok).unwrap_or_else(|| {
@@ -135,11 +132,11 @@ impl Reader {
         let state_file = File::open(&state_path)?;
         let version = last_modified(&state_path)?;
         let mut state: State = bincode::deserialize_from(BufReader::new(state_file))?;
-
         let delete_log = mem::take(&mut state.delete_log);
         let mut dimension = None;
+        let mut data_points = Vec::new();
         let mut number_of_embeddings = 0;
-        let mut data_points = HashMap::new();
+
         for data_point_id in state.dpid_iter() {
             let data_point_pin = DataPointPin::open_pin(path, data_point_id)?;
             let data_point_journal = data_point_pin.read_journal()?;
@@ -149,8 +146,8 @@ impl Reader {
                 dimension = data_point.stored_len();
             }
 
-            data_points.insert(data_point_id, data_point_pin);
             number_of_embeddings += data_point_journal.no_nodes();
+            data_points.push(data_point_pin);
         }
 
         Ok(Reader {
@@ -180,7 +177,8 @@ impl Reader {
         let new_delete_log = mem::take(&mut state.delete_log);
         let mut new_dimension = None;
         let mut new_number_of_embeddings = 0;
-        let mut new_data_points = HashMap::new();
+        let mut new_data_points = Vec::new();
+
         for data_point_id in state.dpid_iter() {
             let data_point_pin = DataPointPin::open_pin(path, data_point_id)?;
             let data_point_journal = data_point_pin.read_journal()?;
@@ -190,8 +188,8 @@ impl Reader {
                 new_dimension = data_point.stored_len();
             }
 
-            new_data_points.insert(data_point_id, data_point_pin);
             new_number_of_embeddings += data_point_journal.no_nodes();
+            new_data_points.push(data_point_pin);
         }
 
         self.version = disk_version;
@@ -219,7 +217,7 @@ impl Reader {
         let min_score = request.min_score();
         let mut ffsv = Fssc::new(request.no_results(), with_duplicates);
 
-        for pinned_data_points in self.data_points.values() {
+        for pinned_data_points in self.data_points.iter() {
             let data_point = pinned_data_points.open_data_point()?;
             let data_point_journal = data_point.journal();
             let delete_log = TimeSensitiveDLog {

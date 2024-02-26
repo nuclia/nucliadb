@@ -69,6 +69,10 @@ pub struct DataPointPin {
     pin: File,
 }
 impl DataPointPin {
+    pub fn id(&self) -> DpId {
+        self.data_point_id
+    }
+
     pub fn path(&self) -> &Path {
         &self.data_point_path
     }
@@ -181,7 +185,7 @@ where
     // Creating the FSTs with the new nodes
     let (label_index, key_index) = if channel == Channel::EXPERIMENTAL {
         debug!("Indexing with experimental FSTs");
-        DataPoint::create_fsts(&data_point_path, &nodes)?
+        DataPoint::create_fsts(data_point_path, &nodes)?
     } else {
         (None, None)
     };
@@ -266,7 +270,7 @@ pub fn create_data_point(
     // Creating the FSTs
     let (label_index, key_index) = if channel == Channel::EXPERIMENTAL {
         debug!("Indexing with experimental FSTs");
-        DataPoint::create_fsts(&data_point_path, &nodes)?
+        DataPoint::create_fsts(data_point_path, &nodes)?
     } else {
         (None, None)
     };
@@ -921,7 +925,7 @@ impl DataPoint {
     ) -> VectorR<DataPoint> {
         let data_point_id = data_point_pin.data_point_id;
         let data_point_path = &data_point_pin.data_point_path;
-        DataPoint::new_with_id(&data_point_path, data_point_id, elems, time, similarity, channel)
+        DataPoint::new_with_id(data_point_path, data_point_id, elems, time, similarity, channel)
     }
 
     fn new_with_id(
@@ -959,7 +963,7 @@ impl DataPoint {
         // Creating the FSTs
         let (label_index, key_index) = if channel == Channel::EXPERIMENTAL {
             debug!("Indexing with experimental FSTs");
-            Self::create_fsts(&data_point_path, &nodes)?
+            Self::create_fsts(data_point_path, &nodes)?
         } else {
             (None, None)
         };

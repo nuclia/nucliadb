@@ -151,7 +151,7 @@ pub struct State {
 
     // Available data points
     #[serde(default)]
-    pub available_data_points: LinkedList<DpId>,
+    pub available_data_points: Vec<DpId>,
 
     // This field is deprecated and is only
     // used for old states. Always use
@@ -187,7 +187,7 @@ impl State {
     #[allow(deprecated)]
     pub fn new() -> State {
         State {
-            available_data_points: LinkedList::default(),
+            available_data_points: Vec::default(),
             location: PathBuf::default(),
             no_nodes: usize::default(),
             current: WorkUnit::default(),
