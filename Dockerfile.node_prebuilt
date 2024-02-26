@@ -14,7 +14,7 @@ RUN apt-get -y update \
     build-essential && \
     /tmp/install-system-deps.sh && rm /tmp/install-system-deps.sh && rm -rf /var/lib/apt/lists/*
 
-COPY --from=europe-west4-docker.pkg.dev/nuclia-internal/nuclia/basenode:latest /bin/grpc_health_probe /bin/grpc_health_probe
+COPY --from=europe-west4-docker.pkg.dev/nuclia-internal/private/basenode:latest /bin/grpc_health_probe /bin/grpc_health_probe
 
 
 COPY ./builds/node_reader /usr/local/bin/node_reader
