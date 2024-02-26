@@ -40,6 +40,7 @@ class StandaloneIndexNode(AbstractIndexNode):
         id: str,
         address: str,
         shard_count: int,
+        available_disk: Optional[int] = None,
         dummy: bool = False,
         primary_id: Optional[str] = None,
     ):
@@ -47,6 +48,7 @@ class StandaloneIndexNode(AbstractIndexNode):
             id=id,
             address=address,
             shard_count=shard_count,
+            available_disk=available_disk,
             dummy=dummy,
             # standalone does not support read replicas
             primary_id=None,
@@ -106,8 +108,17 @@ class ProxyCallerWrapper:
 class ProxyStandaloneIndexNode(StandaloneIndexNode):
     label: str = "proxy_standalone"
 
-    def __init__(self, id: str, address: str, shard_count: int, dummy: bool = False):
-        super().__init__(id, address, shard_count, dummy)
+    def __init__(
+        self,
+        id: str,
+        address: str,
+        shard_count: int,
+        available_disk: Optional[int] = None,
+        dummy: bool = False,
+    ):
+        super().__init__(
+            id, address, shard_count, available_disk=available_disk, dummy=dummy
+        )
         if dummy:
             return
 

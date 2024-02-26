@@ -40,7 +40,9 @@ pytestmark = pytest.mark.asyncio
 def writer_stub():
     writer_stub = MagicMock()
     writer_stub.GetMetadata = AsyncMock(
-        return_value=nodewriter_pb2.NodeMetadata(node_id="node_id", shard_count=1)
+        return_value=nodewriter_pb2.NodeMetadata(
+            node_id="node_id", shard_count=1, available_disk=10, total_disk=10
+        )
     )
     with patch(
         "nucliadb.common.cluster.discovery.base.nodewriter_pb2_grpc.NodeWriterStub",

@@ -55,6 +55,9 @@ def update_members(members: list[IndexNodeMetadata]) -> None:
             shard_count = 0
             logger.warning(f"Node {member.node_id} has no shard_count")
 
+        if member.available_disk is None:
+            logger.warning(f"Node {member.node_id} is not not reporting available_disk")
+
         node = manager.get_index_node(member.node_id)
         if node is None:
             logger.debug(f"{member.node_id} add {member.address}")
@@ -62,6 +65,7 @@ def update_members(members: list[IndexNodeMetadata]) -> None:
                 id=member.node_id,
                 address=member.address,
                 shard_count=shard_count,
+                available_disk=member.available_disk,
                 primary_id=member.primary_id,
             )
             logger.debug("Node added")
@@ -69,6 +73,7 @@ def update_members(members: list[IndexNodeMetadata]) -> None:
             logger.debug(f"{member.node_id} update")
             node.address = member.address
             node.shard_count = shard_count
+            node.available_disk = member.available_disk
             logger.debug("Node updated")
 
     # Then cleanup nodes that are no longer reported
@@ -128,12 +133,20 @@ async def _get_index_node_metadata(
         raise Exception(
             "Primary node id not found when it is expected to be a read replica"
         )
+
+    # We use the metadata.total_disk to distinguish between the proto
+    # default value for available_disk and a real 0
+    available_disk = None
+    if metadata.total_disk > 0:
+        available_disk = metadata.available_disk
+
     return IndexNodeMetadata(
         node_id=metadata.node_id,
         name=metadata.node_id,
         address=address,
         shard_count=metadata.shard_count,
         primary_id=primary_id,
+        available_disk=available_disk,
     )
 
 
@@ -155,6 +168,7 @@ async def _get_standalone_index_node_metadata(
         name=resp.id,
         address=address,
         shard_count=resp.shard_count,
+        available_disk=resp.available_disk,
     )
 
 
