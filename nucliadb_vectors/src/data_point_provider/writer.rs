@@ -148,17 +148,15 @@ impl Writer {
         state.delete_log = self.delete_log.clone();
 
         for pin in &current_data_points {
-            if removed_data_points.contains(&pin.id()) {
-                continue;
+            if !removed_data_points.contains(&pin.id()) {
+                state.available_data_points.push(pin.id());
             }
-            state.available_data_points.push(pin.id());
         }
 
         for pin in &added_data_points {
-            if removed_data_points.contains(&pin.id()) {
-                continue;
+            if !removed_data_points.contains(&pin.id()) {
+                state.available_data_points.push(pin.id());
             }
-            state.available_data_points.push(pin.id());
         }
 
         for (entry, time) in &added_to_delete_log {
@@ -173,15 +171,18 @@ impl Writer {
             return Err(err);
         };
 
-        let added_data_points = added_data_points.into_iter();
-        let current_data_points = current_data_points.into_iter();
         let mut alive_data_points = Vec::new();
 
-        for pin in added_data_points.chain(current_data_points) {
+        for pin in added_data_points {
             if removed_data_points.contains(&pin.id()) {
-                continue;
+                alive_data_points.push(pin);
             }
-            alive_data_points.push(pin)
+        }
+
+        for pin in current_data_points {
+            if removed_data_points.contains(&pin.id()) {
+                alive_data_points.push(pin);
+            }
         }
 
         self.data_points = alive_data_points;
