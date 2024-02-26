@@ -91,20 +91,33 @@ jobs:
       - name: Checkout the repository
         uses: actions/checkout@v3
 
+      - name: take a peek
+        run: gcloud auth list
+        if: ${{ always() }}
+
       # Setup gcloud CLI
       - uses: google-github-actions/auth@v1
         with:
           credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+
+      - name: take a peek
+        run: gcloud auth list
+        if: ${{ always() }}
 
       - name: 'Set up Cloud SDK'
         uses: 'google-github-actions/setup-gcloud@v1'
 
       - name: take a peek
         run: gcloud auth list
+        if: ${{ always() }}
 
       # setup docker, as we need to pull the node image to run the tests
       - name: Configure Docker
         run: docker login -u oauth2accesstoken -p "$(gcloud auth application-default print-access-token)" https://eu.gcr.io
+
+      - name: take a peek
+        run: gcloud auth list
+        if: ${{ always() }}
 
       - name: Setup Python
         uses: actions/setup-python@v4
