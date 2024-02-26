@@ -102,6 +102,7 @@ async def test_get_node_metadata(k8s_discovery: KubernetesDiscovery, writer_stub
         name="node_id",
         address="1.1.1.1",
         updated_at=ANY,
+        available_disk=10,
     )
 
     writer_stub.GetMetadata.assert_awaited_once()
