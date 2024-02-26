@@ -104,6 +104,10 @@ class AbstractIndexNode(metaclass=ABCMeta):
         resp = await self.writer.NewShard(req)  # type: ignore
         return resp
 
+    async def list_shards(self) -> list[str]:
+        shards = await self.writer.ListShards(noderesources_pb2.EmptyQuery())  # type: ignore
+        return [shard.id for shard in shards.ids]
+
     async def delete_shard(self, id: str) -> str:
         req = noderesources_pb2.ShardId(id=id)
         resp: noderesources_pb2.ShardId = await self.writer.DeleteShard(req)  # type: ignore

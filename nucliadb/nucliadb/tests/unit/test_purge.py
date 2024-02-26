@@ -21,8 +21,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from nucliadb import purge
 from nucliadb.common.cluster.exceptions import NodeError, ShardNotFound
-from nucliadb.ingest import purge
 
 pytestmark = pytest.mark.asyncio
 
@@ -70,7 +70,7 @@ def storage():
 @pytest.fixture(autouse=True)
 def kb():
     mock = AsyncMock()
-    with patch("nucliadb.ingest.purge.KnowledgeBox", mock):
+    with patch("nucliadb.purge.KnowledgeBox", mock):
         yield mock
 
 
@@ -123,14 +123,14 @@ async def test_purge_kb_storage_handle_errors(keys, driver, storage):
 
 
 async def test_main(driver, storage):
-    with patch("nucliadb.ingest.purge.purge_kb", AsyncMock()) as purge_kb, patch(
-        "nucliadb.ingest.purge.purge_kb_storage", AsyncMock()
+    with patch("nucliadb.purge.purge_kb", AsyncMock()) as purge_kb, patch(
+        "nucliadb.purge.purge_kb_storage", AsyncMock()
     ) as purge_kb_storage, patch(
-        "nucliadb.ingest.purge.get_storage", return_value=storage
+        "nucliadb.purge.get_storage", return_value=storage
     ), patch(
-        "nucliadb.ingest.purge.setup_driver", return_value=driver
+        "nucliadb.purge.setup_driver", return_value=driver
     ), patch(
-        "nucliadb.ingest.purge.setup_cluster", return_value=driver
+        "nucliadb.purge.setup_cluster", return_value=driver
     ):
         await purge.main()
 

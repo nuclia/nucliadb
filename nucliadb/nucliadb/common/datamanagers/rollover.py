@@ -57,6 +57,17 @@ class RolloverDataManager:
             await txn.delete(key)
             await txn.commit()
 
+    async def is_rollover_shard(self, kbid: str, shard_id: str) -> bool:
+        shards = await self.get_kb_rollover_shards(kbid)
+        if shards is None:
+            return False
+
+        for shard_obj in shards.shards:
+            for replica_obj in shard_obj.replicas:
+                if shard_id == replica_obj.shard.id:
+                    return True
+        return False
+
     async def add_batch_to_index(self, kbid: str, batch: list[str]) -> None:
         async with self.driver.transaction() as txn:
             for key in batch:
