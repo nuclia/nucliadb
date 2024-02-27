@@ -18,8 +18,9 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::data_point::{DataPointPin, DpId};
+use crate::data_point::{self, DataPointPin, DpId};
 use crate::data_point_provider::state::*;
+use crate::data_point_provider::TimeSensitiveDLog;
 use crate::data_point_provider::{IndexMetadata, OPENING_FLAG, STATE, TEMP_STATE, WRITING_FLAG};
 use crate::data_types::dtrie_ram::DTrie;
 use crate::{VectorErr, VectorR};
@@ -47,6 +48,12 @@ fn persist_state(path: &Path, state: &State) -> VectorR<()> {
     std::fs::rename(&temporal_path, state_path)?;
 
     Ok(())
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct MergeMetrics {
+    pub merged: usize,
+    pub segments_left: usize,
 }
 
 pub struct Writer {
@@ -82,6 +89,63 @@ impl Writer {
         self.has_uncommitted_changes = true;
     }
 
+    pub fn merge(&mut self) -> VectorR<MergeMetrics> {
+        if self.has_uncommitted_changes {
+            return Err(VectorErr::UncommittedChangesError);
+        }
+
+        let channel = self.metadata.channel;
+        let similarity = self.metadata.similarity;
+        let max_nodes_per_segment = 50_000;
+        let force_merge_capacity = 100;
+        let mut blocked_segments = vec![];
+        let mut live_segments = mem::take(&mut self.data_points);
+        let mut buffer = Vec::with_capacity(force_merge_capacity);
+
+        while buffer.len() < force_merge_capacity {
+            let Some(data_point_pin) = live_segments.pop() else {
+                break;
+            };
+            let Ok(data_point_journal) = data_point_pin.read_journal() else {
+                continue;
+            };
+            if data_point_journal.no_nodes() >= max_nodes_per_segment {
+                blocked_segments.push(data_point_pin);
+            } else {
+                let delete_log = TimeSensitiveDLog {
+                    time: data_point_journal.time(),
+                    dlog: &self.delete_log,
+                };
+                let data_point_id = data_point_pin.id();
+                buffer.push((delete_log, data_point_id));
+            }
+        }
+
+        let merged_pin = DataPointPin::create_pin(self.location())?;
+        data_point::merge_data_points(&merged_pin, &buffer, similarity, channel)?;
+        blocked_segments.push(merged_pin);
+        blocked_segments.extend(live_segments);
+        self.data_points = blocked_segments;
+
+        let metrics = MergeMetrics {
+            merged: buffer.len(),
+            segments_left: self.data_points.len(),
+        };
+
+        let mut state = State::new();
+        state.delete_log = self.delete_log.clone();
+        state.available_data_points = self.data_points.iter().map(|i| i.id()).collect();
+        persist_state(&self.location(), &state)?;
+
+        Ok(metrics)
+    }
+
+    pub fn abort(&mut self) {
+        self.added_to_delete_log.clear();
+        self.removed_data_points.clear();
+        self.added_data_points.clear();
+    }
+
     pub fn commit(&mut self) -> VectorR<()> {
         if !self.has_uncommitted_changes {
             return Ok(());
@@ -91,8 +155,8 @@ impl Writer {
         let removed_data_points = mem::take(&mut self.removed_data_points);
         let added_data_points = mem::take(&mut self.added_data_points);
         let current_data_points = mem::take(&mut self.data_points);
-        let mut state = State::default();
 
+        let mut state = State::default();
         state.delete_log = self.delete_log.clone();
 
         for pin in &current_data_points {
@@ -118,6 +182,7 @@ impl Writer {
             return Err(err);
         };
 
+        let updated_delete_log = state.delete_log;
         let mut alive_data_points = Vec::new();
 
         for pin in added_data_points {
@@ -135,7 +200,7 @@ impl Writer {
         }
 
         self.data_points = alive_data_points;
-        self.delete_log = state.delete_log;
+        self.delete_log = updated_delete_log;
         self.has_uncommitted_changes = false;
         Ok(())
     }

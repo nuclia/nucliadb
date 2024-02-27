@@ -43,6 +43,8 @@ pub enum VectorErr {
     NoWriterError,
     #[error("Only one writer can be open at the same time")]
     MultipleWritersError,
+    #[error("Writer has uncommitted changes, please commit or abort")]
+    UncommittedChangesError,
     #[error("Garbage collection delayed")]
     WorkDelayed,
     #[error("Merger is already initialized")]
