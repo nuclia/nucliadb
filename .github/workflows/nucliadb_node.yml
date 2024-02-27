@@ -50,6 +50,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
+permissions:
+  id-token: write   # This is required for requesting the JWT
+  contents: read    # This is required for actions/checkout
+
 env:
   RUSTFLAGS: -Dwarnings
   RUST_BACKTRACE: 1
@@ -59,6 +63,8 @@ env:
   IMAGE_NAME_BASE_NODE: basenode
   IMAGE_NAME_NODE: node
   IMAGE_NAME_NODE_SIDECAR: node_sidecar
+  GCP_WORKLOAD_IDENTITY_PROVIDER: "projects/725951671212/locations/global/workloadIdentityPools/gh-nuclia/providers/gh-nuclia-provider"
+  GCP_SERVICE_ACCOUNT: "github-actions@stashify-218417.iam.gserviceaccount.com"
 
 jobs:
   pre-checks-python:
@@ -170,17 +176,24 @@ jobs:
       - name: Checkout the repository
         uses: actions/checkout@v3
 
-      # Setup gcloud CLI
-      - uses: google-github-actions/auth@v1
+      # setup docker, as we need to pull the node image to run the tests
+      - name: Authenticate to Google Cloud
+        id: gcp-auth
+        uses: google-github-actions/auth@v2
         with:
-          credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
+          workload_identity_provider: "${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}"
+          service_account: "${{ env.GCP_SERVICE_ACCOUNT }}"
+          token_format: access_token
+
+      - name: Login to Google Artifact Registry
+        uses: docker/login-action@v3
+        with:
+          registry: europe-west4-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.gcp-auth.outputs.access_token }}
 
       - name: "Set up Cloud SDK"
         uses: "google-github-actions/setup-gcloud@v1"
-
-      # setup docker, as we need to pull the node image to run the tests
-      - name: Configure Docker
-        run: docker login -u oauth2accesstoken -p "$(gcloud auth application-default print-access-token)" https://eu.gcr.io
 
       - name: Setup Python
         uses: actions/setup-python@v4
