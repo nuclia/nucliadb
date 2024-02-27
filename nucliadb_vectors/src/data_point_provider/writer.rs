@@ -115,6 +115,7 @@ impl Writer {
                 break;
             };
             let Ok(data_point_journal) = data_point_pin.read_journal() else {
+                blocked_segments.push(data_point_pin);
                 continue;
             };
             if data_point_journal.no_nodes() >= MAX_DATA_POINT_SIZE {
