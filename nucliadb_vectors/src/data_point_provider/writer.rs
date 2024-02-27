@@ -32,6 +32,9 @@ use std::mem;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
+const MAX_DATA_POINT_SIZE: usize = 50_000;
+const MERGE_CAPACITY: usize = 100;
+
 fn persist_state(path: &Path, state: &State) -> VectorR<()> {
     let temporal_path = path.join(TEMP_STATE);
     let state_path = path.join(STATE);
@@ -94,22 +97,27 @@ impl Writer {
             return Err(VectorErr::UncommittedChangesError);
         }
 
+        if self.data_points.len() <= 1 {
+            return Ok(MergeMetrics {
+                merged: 0,
+                segments_left: self.data_points.len(),
+            });
+        }
+
         let channel = self.metadata.channel;
         let similarity = self.metadata.similarity;
-        let max_nodes_per_segment = 50_000;
-        let force_merge_capacity = 100;
         let mut blocked_segments = vec![];
         let mut live_segments = mem::take(&mut self.data_points);
-        let mut buffer = Vec::with_capacity(force_merge_capacity);
+        let mut buffer = Vec::with_capacity(MERGE_CAPACITY);
 
-        while buffer.len() < force_merge_capacity {
+        while buffer.len() < MERGE_CAPACITY {
             let Some(data_point_pin) = live_segments.pop() else {
                 break;
             };
             let Ok(data_point_journal) = data_point_pin.read_journal() else {
                 continue;
             };
-            if data_point_journal.no_nodes() >= max_nodes_per_segment {
+            if data_point_journal.no_nodes() >= MAX_DATA_POINT_SIZE {
                 blocked_segments.push(data_point_pin);
             } else {
                 let delete_log = TimeSensitiveDLog {
@@ -290,5 +298,93 @@ impl Writer {
 
     pub fn metadata(&self) -> &IndexMetadata {
         &self.metadata
+    }
+}
+
+#[cfg(test)]
+mod test {
+
+    use super::*;
+    use crate::data_point::Similarity;
+    use data_point::create_data_point;
+    use nucliadb_core::Channel;
+
+    #[test]
+    fn force_merge_more_than_limit() {
+        let dir = tempfile::tempdir().unwrap();
+        let vectors_path = dir.path().join("vectors");
+
+        let mut writer = Writer::new(&vectors_path, IndexMetadata::default()).unwrap();
+        let mut data_points = vec![];
+
+        for _ in 0..200 {
+            let similarity = Similarity::Cosine;
+            let channel = Channel::EXPERIMENTAL;
+            let embeddings = vec![];
+            let time = Some(SystemTime::now());
+            let data_point_pin = DataPointPin::create_pin(&vectors_path).unwrap();
+            create_data_point(&data_point_pin, embeddings, time, similarity, channel).unwrap();
+            data_points.push(data_point_pin);
+        }
+
+        writer.data_points = data_points;
+
+        let metrics = writer.merge().unwrap();
+        assert_eq!(metrics.merged, 100);
+        assert_eq!(metrics.segments_left, 101);
+    }
+
+    #[test]
+    fn force_merge_less_than_limit() {
+        let dir = tempfile::tempdir().unwrap();
+        let vectors_path = dir.path().join("vectors");
+
+        let mut writer = Writer::new(&vectors_path, IndexMetadata::default()).unwrap();
+        let mut data_points = vec![];
+
+        for _ in 0..50 {
+            let similarity = Similarity::Cosine;
+            let channel = Channel::EXPERIMENTAL;
+            let embeddings = vec![];
+            let time = Some(SystemTime::now());
+            let data_point_pin = DataPointPin::create_pin(&vectors_path).unwrap();
+            create_data_point(&data_point_pin, embeddings, time, similarity, channel).unwrap();
+            data_points.push(data_point_pin);
+        }
+
+        writer.data_points = data_points;
+
+        let metrics = writer.merge().unwrap();
+        assert_eq!(metrics.merged, 50);
+        assert_eq!(metrics.segments_left, 1);
+    }
+
+    #[test]
+    fn force_merge_all() {
+        let dir = tempfile::tempdir().unwrap();
+        let vectors_path = dir.path().join("vectors");
+
+        let mut writer = Writer::new(&vectors_path, IndexMetadata::default()).unwrap();
+        let mut data_points = vec![];
+
+        for _ in 0..100 {
+            let similarity = Similarity::Cosine;
+            let channel = Channel::EXPERIMENTAL;
+            let embeddings = vec![];
+            let time = Some(SystemTime::now());
+            let data_point_pin = DataPointPin::create_pin(&vectors_path).unwrap();
+            create_data_point(&data_point_pin, embeddings, time, similarity, channel).unwrap();
+            data_points.push(data_point_pin);
+        }
+
+        writer.data_points = data_points;
+
+        let metrics = writer.merge().unwrap();
+        assert_eq!(metrics.merged, 100);
+        assert_eq!(metrics.segments_left, 1);
+
+        let metrics = writer.merge().unwrap();
+        assert_eq!(metrics.merged, 0);
+        assert_eq!(metrics.segments_left, 1);
     }
 }
