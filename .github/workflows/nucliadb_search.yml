@@ -206,12 +206,12 @@ jobs:
           tool: 'pytest'
           output-file-path: benchmarks.json
           external-data-json-path: ./cache/benchmark-data.json
-          save-data-file: false
-          comment-always: true
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          comment-on-alert: true
+          # save-data-file: false
+          # comment-always: true
+          # github-token: ${{ secrets.GITHUB_TOKEN }}
+          # comment-on-alert: true
           fail-on-alert: true
-          alert-comment-cc-users: '@nuclia/nuclia-db'
+          # alert-comment-cc-users: '@nuclia/nuclia-db'
 
       - name: Store on GH Pages
         uses: benchmark-action/github-action-benchmark@v1
