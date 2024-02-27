@@ -32,9 +32,15 @@ pytestmark = pytest.mark.asyncio
 @pytest.fixture()
 def available_nodes():
     nodes = {
-        "0": IndexNode(id="0", address="node-0", shard_count=0, dummy=True),
-        "1": IndexNode(id="1", address="node-1", shard_count=30, dummy=True),
-        "2": IndexNode(id="2", address="node-2", shard_count=40, dummy=True),
+        "0": IndexNode(
+            id="0", address="node-0", available_disk=100, shard_count=0, dummy=True
+        ),
+        "1": IndexNode(
+            id="1", address="node-1", available_disk=100, shard_count=0, dummy=True
+        ),
+        "2": IndexNode(
+            id="2", address="node-2", available_disk=100, shard_count=0, dummy=True
+        ),
     }
     with patch.object(manager, "INDEX_NODES", new=nodes):
         yield nodes
