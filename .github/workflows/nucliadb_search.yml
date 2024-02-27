@@ -207,8 +207,8 @@ jobs:
           output-file-path: benchmarks.json
           external-data-json-path: ./cache/benchmark-data.json
           save-data-file: false
-          # comment-always: true
-          # github-token: ${{ secrets.GITHUB_TOKEN }}
+          comment-always: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           # comment-on-alert: true
           fail-on-alert: true
           # alert-comment-cc-users: '@nuclia/nuclia-db'
