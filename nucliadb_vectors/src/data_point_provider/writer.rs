@@ -135,7 +135,7 @@ impl Writer {
         let mut state = State::new();
         state.delete_log = self.delete_log.clone();
         state.available_data_points = self.data_points.iter().map(|i| i.id()).collect();
-        persist_state(&self.location(), &state)?;
+        persist_state(self.location(), &state)?;
 
         Ok(metrics)
     }
