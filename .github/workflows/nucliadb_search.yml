@@ -46,7 +46,6 @@ permissions:
   contents: read    # This is required for actions/checkout
 
 env:
-  CONTAINER_REGISTRY: eu.gcr.io/${{ secrets.PROJECT_ID }}
   IMAGE_NAME: search
   GCP_WORKLOAD_IDENTITY_PROVIDER: "projects/725951671212/locations/global/workloadIdentityPools/gh-nuclia/providers/gh-nuclia-provider"
   GCP_SERVICE_ACCOUNT: "github-actions@stashify-218417.iam.gserviceaccount.com"
@@ -266,6 +265,8 @@ jobs:
 
       - name: Set helm package image
         id: version_step
+        env:
+          CONTAINER_REGISTRY: eu.gcr.io/${{ secrets.PROJECT_ID }}
         run: |-
           sed -i.bak "s#IMAGE_TO_REPLACE#$IMAGE_NAME:${{ steps.env-vars.outputs.short_sha }}#" ./charts/nucliadb_search/values.yaml
           sed -i.bak "s#CONTAINER_REGISTRY_TO_REPLACE#$CONTAINER_REGISTRY#" ./charts/nucliadb_search/values.yaml
