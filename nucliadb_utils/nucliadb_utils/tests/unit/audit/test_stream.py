@@ -128,6 +128,7 @@ async def test_chat(audit_storage: StreamAuditStorage, nats):
         rephrased_question="rephrased",
         context=[ChatContext(author="USER", text="epa")],
         answer="bar",
+        learning_id="learning_id"
     )
 
     await wait_for_queue(audit_storage)
@@ -140,5 +141,6 @@ async def test_chat(audit_storage: StreamAuditStorage, nats):
     assert pb.chat.question == "foo"
     assert pb.chat.rephrased_question == "rephrased"
     assert pb.chat.answer == "bar"
+    assert pb.chat.learning_id == "learning_id"
     assert pb.chat.context[0].author == "USER"
     assert pb.chat.context[0].text == "epa"
