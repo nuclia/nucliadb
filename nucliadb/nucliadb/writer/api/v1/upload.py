@@ -468,7 +468,10 @@ async def tus_patch(
             x_synchronous=x_synchronous,
         )
     except ResumableURINotAvailable:
-        return HTTPClientError(status_code=404, detail="Resumable URI not found")
+        return HTTPClientError(
+            status_code=404,
+            detail=f"Resumable URI not found for upload_id: {upload_id}",
+        )
 
 
 # called by one the three PATCH above - there are defined distinctly to produce clean API doc
@@ -489,6 +492,11 @@ async def _tus_patch(
 
     dm = get_dm()
     await dm.load(upload_id)
+    if not dm.metadata:
+        # If the metadata is not found for the upload id, this means
+        # that the upload was never started or it has expired
+        raise ResumableURINotAvailable()
+
     to_upload = None
     if "content-length" in request.headers:
         # header is optional, we'll be okay with unknown lengths...
