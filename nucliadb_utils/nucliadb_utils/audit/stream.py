@@ -260,6 +260,7 @@ class StreamAuditStorage(AuditStorage):
         rephrased_question: Optional[str],
         context: List[ChatContext],
         answer: Optional[str],
+        learning_id: str,
     ):
         auditrequest = AuditRequest()
         auditrequest.origin = origin
@@ -272,6 +273,7 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.trace_id = get_trace_id()
         auditrequest.chat.question = question
         auditrequest.chat.context.extend(context)
+        auditrequest.chat.learning_id = learning_id
         if rephrased_question is not None:
             auditrequest.chat.rephrased_question = rephrased_question
         if answer is not None:
