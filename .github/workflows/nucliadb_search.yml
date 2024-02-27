@@ -209,9 +209,9 @@ jobs:
           save-data-file: false
           comment-always: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          # comment-on-alert: true
+          comment-on-alert: true
           fail-on-alert: true
-          # alert-comment-cc-users: '@nuclia/nuclia-db'
+          alert-comment-cc-users: '@nuclia/nuclia-db'
 
       - name: Store on GH Pages
         uses: benchmark-action/github-action-benchmark@v1
