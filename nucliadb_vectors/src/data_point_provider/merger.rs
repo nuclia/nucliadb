@@ -18,24 +18,26 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use lazy_static;
-use nucliadb_core::tracing;
-use std::collections::VecDeque;
-use std::sync::{Condvar, Mutex};
+use nucliadb_core::tracing::debug;
+use std::{
+    collections::VecDeque,
+    sync::{Arc, Condvar, Mutex},
+};
 
 use crate::VectorR;
 
-pub type MergeRequest = Box<dyn MergeQuery>;
-
-pub trait MergeQuery: Send {
-    fn do_work(&self) -> VectorR<()>;
-}
+use super::IndexInner;
 
 lazy_static::lazy_static! {
-    static ref MERGER_SCHEDULER: Merger = Merger::default();
+    static ref MERGE_SCHEDULER: Merger = Merger::default();
+}
+
+pub fn install_global() -> VectorR<impl FnOnce()> {
+    Ok(move || MERGE_SCHEDULER.run_forever())
 }
 
 pub fn send_merge_request(key: String, request: MergeRequest) {
-    MERGER_SCHEDULER.enqueue(key, request);
+    MERGE_SCHEDULER.request_merge(key, request);
 }
 
 #[derive(Default)]
@@ -45,31 +47,46 @@ pub struct Merger {
 }
 
 impl Merger {
-    fn enqueue(&self, key: String, request: MergeRequest) {
-        let mut queue = self.queue.lock().expect("Poisoned Merger scheduler mutex");
-        if queue.iter().any(|e| e.0 == key) {
-            tracing::info!("Skipping dedup merge request");
-            return;
-        }
-        queue.push_back((key, request));
-        self.condvar.notify_all();
-    }
-
-    pub fn install_global() -> VectorR<impl FnOnce()> {
-        Ok(move || MERGER_SCHEDULER.run())
-    }
-    fn run(&self) {
+    fn run_forever(&self) {
         loop {
             let mut queue = self.queue.lock().expect("Poisoned Merger scheduler mutex");
             while queue.is_empty() {
                 queue = self.condvar.wait(queue).expect("Poisoned Merger scheduler mutex");
             }
-            let (_, task) = queue.pop_front().unwrap();
+            let (_, request) = queue.pop_front().unwrap();
             drop(queue);
-            match task.do_work() {
-                Ok(()) => (),
-                Err(err) => tracing::info!("error merging: {err}"),
-            }
+            request.run();
+        }
+    }
+
+    fn request_merge(&self, key: String, request: MergeRequest) {
+        let mut queue = self.queue.lock().expect("Poisoned Merger scheduler mutex");
+        if queue.iter().any(|e| e.0 == key) {
+            debug!("Skipping dedup merge request");
+            return;
+        }
+        queue.push_back((key, request));
+        self.condvar.notify_all();
+    }
+}
+
+pub struct MergeRequest {
+    index: Arc<IndexInner>,
+}
+
+impl MergeRequest {
+    pub fn new(index: Arc<IndexInner>) -> Self {
+        Self {
+            index,
+        }
+    }
+
+    fn run(self) {
+        let more = self.index.do_merge();
+
+        if more {
+            // if we can merge more, schedule another merge for the same index
+            send_merge_request(self.index.location.to_string_lossy().into(), self)
         }
     }
 }

@@ -19,7 +19,7 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::Instant;
 
 use nucliadb_core::metrics::request_time;

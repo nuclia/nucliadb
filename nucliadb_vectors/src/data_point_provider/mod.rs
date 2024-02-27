@@ -18,9 +18,9 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-mod merge_worker;
-mod merger;
+pub mod merger;
 mod state;
+
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Write};
@@ -30,7 +30,6 @@ use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::time::SystemTime;
 
-pub use merger::Merger;
 use nucliadb_core::fs_state::{self, ELock, Lock, SLock, Version};
 use nucliadb_core::tracing::*;
 use nucliadb_core::Channel;
@@ -39,9 +38,11 @@ use state::*;
 
 pub use crate::data_point::Neighbour;
 use crate::data_point::{DataPoint, DpId, Similarity};
-use crate::data_point_provider::merge_worker::Worker;
 use crate::formula::Formula;
 use crate::{VectorErr, VectorR};
+
+use merger::MergeRequest;
+
 pub type TemporalMark = SystemTime;
 
 const METADATA: &str = "metadata.json";
@@ -193,7 +194,7 @@ impl Index {
             alive: AtomicBool::new(true),
         });
         if index.read_state().work_stack_len() > ALLOWED_BEFORE_MERGE {
-            merger::send_merge_request(path.to_string_lossy().into(), Worker::request(index.clone()))
+            merger::send_merge_request(path.to_string_lossy().into(), MergeRequest::new(index.clone()))
         }
         Ok(Index(index))
     }
@@ -227,7 +228,7 @@ impl Index {
         let work_stack_len = state.work_stack_len();
 
         if work_stack_len > ALLOWED_BEFORE_MERGE {
-            merger::send_merge_request(self.location().to_string_lossy().into(), Worker::request(self.0.clone()))
+            merger::send_merge_request(self.location().to_string_lossy().into(), MergeRequest::new(self.0.clone()))
         }
         std::mem::drop(state);
         std::mem::drop(date);
