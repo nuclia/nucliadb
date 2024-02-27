@@ -94,9 +94,9 @@ class QueryParser:
         features: list[SearchOptions],
         query: str,
         filters: Union[list[str], list[Filter]],
-        faceted: list[str],
         page_number: int,
         page_size: int,
+        faceted: Optional[list[str]] = None,
         min_score: Optional[float] = None,
         sort: Optional[SortOptions] = None,
         range_creation_start: Optional[datetime] = None,
@@ -118,7 +118,7 @@ class QueryParser:
         self.query = query
         self.filters: dict[str, Any] = convert_to_node_filters(filters)
         self.flat_filter_labels: list[str] = []
-        self.faceted = faceted
+        self.faceted = faceted or []
         self.page_number = page_number
         self.page_size = page_size
         self.min_score = min_score
