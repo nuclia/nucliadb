@@ -83,7 +83,7 @@ def add_index_node(
     id: str,
     address: str,
     shard_count: int,
-    available_disk: Optional[int] = None,
+    available_disk: int,
     dummy: bool = False,
     primary_id: Optional[str] = None,
 ) -> AbstractIndexNode:
@@ -223,7 +223,7 @@ class KBShardManager:
         existing_kb_nodes = [
             replica.node for shard in kb_shards.shards for replica in shard.replicas
         ]
-        nodes = sorted_nodes(avoid_nodes=existing_kb_nodes)
+        nodes = sorted_primary_nodes(avoid_nodes=existing_kb_nodes)
 
         sharduuid = uuid.uuid4().hex
         shard = writer_pb2.ShardObject(shard=sharduuid)
@@ -583,16 +583,20 @@ def check_enough_nodes():
             )
 
 
-def sorted_nodes(avoid_nodes: Optional[list[str]] = None) -> list[str]:
+def sorted_primary_nodes(avoid_nodes: Optional[list[str]] = None) -> list[str]:
     """
-    Returns the list of all node ids sorted by increasing shard count.
+    Returns the list of all primary node ids sorted by decreasing available
+    disk space (from more to less available disk reported).
+
     It will put the node ids in `avoid_nodes` at the tail of the list.
     """
-    available_nodes = get_index_nodes()
+    available_nodes = get_index_nodes(include_secondary=False)
 
-    # Sort available nodes by increasing shard_count
-    sorted_nodes = sorted(available_nodes, key=lambda n: n.shard_count)
-    available_node_ids = [node.id for node in sorted_nodes]
+    # Sort by available disk
+    sorted_primary_nodes = sorted(
+        available_nodes, key=lambda n: n.available_disk, reverse=True
+    )
+    available_node_ids = [node.id for node in sorted_primary_nodes]
 
     avoid_nodes = avoid_nodes or []
     # get preferred nodes first

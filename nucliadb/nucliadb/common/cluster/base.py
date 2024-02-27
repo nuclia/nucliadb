@@ -40,7 +40,7 @@ class AbstractIndexNode(metaclass=ABCMeta):
         id: str,
         address: str,
         shard_count: int,
-        available_disk: Optional[int] = None,
+        available_disk: int,
         dummy: bool = False,
         primary_id: Optional[str] = None,
     ):

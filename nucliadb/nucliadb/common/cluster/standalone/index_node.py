@@ -40,7 +40,7 @@ class StandaloneIndexNode(AbstractIndexNode):
         id: str,
         address: str,
         shard_count: int,
-        available_disk: Optional[int] = None,
+        available_disk: int,
         dummy: bool = False,
         primary_id: Optional[str] = None,
     ):
@@ -113,7 +113,7 @@ class ProxyStandaloneIndexNode(StandaloneIndexNode):
         id: str,
         address: str,
         shard_count: int,
-        available_disk: Optional[int] = None,
+        available_disk: int,
         dummy: bool = False,
     ):
         super().__init__(

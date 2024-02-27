@@ -46,18 +46,21 @@ async def fake_nodes():
         id="node-0",
         address="nohost",
         shard_count=0,
+        available_disk=100,
         dummy=True,
     )
     manager.add_index_node(
         id="node-1",
         address="nohost",
         shard_count=0,
+        available_disk=100,
         dummy=True,
     )
     manager.add_index_node(
         id="node-2",
         address="nohost",
         shard_count=0,
+        available_disk=100,
         dummy=True,
     )
     yield

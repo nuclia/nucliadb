@@ -149,10 +149,12 @@ async def test_remove_stale_nodes(k8s_discovery: KubernetesDiscovery):
         id="node_id",
         address="1.1.1.1",
         shard_count=1,
+        available_disk=100,
     )
     nmd = IndexNodeMetadata(
         node_id="node_id",
         shard_count=1,
+        available_disk=100,
         name="node_id",
         address="1.1.1.1",
         updated_at=time.time() - k8s_discovery.node_heartbeat_interval * 3,

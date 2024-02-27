@@ -89,7 +89,7 @@ async def create_rollover_shards(
     # create new shards
     created_shards = []
     try:
-        nodes = cluster_manager.sorted_nodes()
+        nodes = cluster_manager.sorted_primary_nodes()
         for shard in kb_shards.shards:
             shard.ClearField("replicas")
             # Attempt to create configured number of replicas
@@ -97,7 +97,7 @@ async def create_rollover_shards(
             while replicas_created < settings.node_replicas:
                 if len(nodes) == 0:
                     # could have multiple shards on single node
-                    nodes = cluster_manager.sorted_nodes()
+                    nodes = cluster_manager.sorted_primary_nodes()
                 node_id = nodes.pop(0)
 
                 node = get_index_node(node_id)

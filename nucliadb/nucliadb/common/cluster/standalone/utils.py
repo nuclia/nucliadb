@@ -55,7 +55,9 @@ def get_self() -> StandaloneIndexNode:
             host = f"{hn}.{ns}"
         else:
             host = gethostname()
-        _SELF_INDEX_NODE = StandaloneIndexNode(id=node_id, address=host, shard_count=0)
+        _SELF_INDEX_NODE = StandaloneIndexNode(
+            id=node_id, address=host, shard_count=0, available_disk=0
+        )
     try:
         _shards_dir = os.path.join(cluster_settings.data_path, "shards")
         _SELF_INDEX_NODE.shard_count = len(
