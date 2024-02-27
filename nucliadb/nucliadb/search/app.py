@@ -117,6 +117,7 @@ async def node_members(request: Request) -> JSONResponse:
                 "listen_address": node.address,
                 "type": node.label,
                 "shard_count": node.shard_count,
+                "available_disk": node.available_disk,
                 "dummy": node.dummy,
                 "primary_id": node.primary_id,
             }

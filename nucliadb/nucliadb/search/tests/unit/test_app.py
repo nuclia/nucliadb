@@ -54,9 +54,16 @@ async def test_not_ready():
 
 async def test_node_members():
     nodes = [
-        IndexNode(id="node1", address="node1", shard_count=0, dummy=True),
         IndexNode(
-            id="node2", address="node2", shard_count=0, dummy=True, primary_id="node1"
+            id="node1", address="node1", shard_count=0, available_disk=100, dummy=True
+        ),
+        IndexNode(
+            id="node2",
+            address="node2",
+            shard_count=0,
+            available_disk=50,
+            dummy=True,
+            primary_id="node1",
         ),
     ]
     with patch.object(app.manager, "get_index_nodes", return_value=nodes):
@@ -66,5 +73,7 @@ async def test_node_members():
         sorted(members, key=lambda x: x["id"])
         assert members[0]["id"] == "node1"
         assert members[0]["primary_id"] is None
+        assert members[0]["available_disk"] == 100
         assert members[1]["id"] == "node2"
         assert members[1]["primary_id"] == "node1"
+        assert members[1]["available_disk"] == 50
