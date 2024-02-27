@@ -28,7 +28,7 @@ use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 use crate::data_point_provider::state::*;
-use crate::data_point_provider::{IndexMetadata, SearchRequest, OPEN_LOCK, STATE};
+use crate::data_point_provider::{IndexMetadata, SearchRequest, OPENING_FLAG, STATE};
 use crate::data_types::DeleteLog;
 
 use crate::data_point::DataPointPin;
@@ -117,7 +117,7 @@ pub struct Reader {
 
 impl Reader {
     pub fn open(path: &Path) -> VectorR<Reader> {
-        let lock_path = path.join(OPEN_LOCK);
+        let lock_path = path.join(OPENING_FLAG);
         let lock_file = File::open(lock_path)?;
         lock_file.lock_shared()?;
 

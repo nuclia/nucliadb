@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+pub mod garbage_collector;
 pub mod reader;
 pub mod writer;
 
@@ -50,8 +51,9 @@ pub type TemporalMark = SystemTime;
 
 const METADATA: &str = "metadata.json";
 const STATE: &str = "state.bincode";
-const OPEN_LOCK: &str = "lk.lock";
 const TEMP_STATE: &str = "temp_state.bincode";
+const OPENING_FLAG: &str = ".opening";
+const WRITING_FLAG: &str = ".writing";
 
 const ALLOWED_BEFORE_MERGE: usize = 5;
 

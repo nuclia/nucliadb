@@ -18,13 +18,12 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::data_point::{DataPoint, DataPointPin, DpId};
+use crate::data_point::{DataPointPin, DpId};
 use crate::data_point_provider::state::*;
-use crate::data_point_provider::{IndexMetadata, OPEN_LOCK, STATE, TEMP_STATE};
+use crate::data_point_provider::{IndexMetadata, OPENING_FLAG, STATE, TEMP_STATE, WRITING_FLAG};
 use crate::data_types::dtrie_ram::DTrie;
 use crate::{VectorErr, VectorR};
 use fs2::FileExt;
-use nucliadb_core::tracing::*;
 use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter, Write};
@@ -50,59 +49,6 @@ fn persist_state(path: &Path, state: &State) -> VectorR<()> {
     Ok(())
 }
 
-#[derive(Default)]
-pub struct GarbageCollectionMetrics {
-    pub unknown_items: usize,
-    pub partial_data_points: usize,
-    pub garbage_not_deleted: usize,
-    pub garbage_deleted: usize,
-    pub total: usize,
-}
-
-pub fn collect_garbage(path: &Path) -> VectorR<GarbageCollectionMetrics> {
-    let lock_path = path.join(OPEN_LOCK);
-    let lock_file = File::open(lock_path)?;
-    lock_file.lock_exclusive()?;
-
-    let mut metrics = GarbageCollectionMetrics::default();
-    for dir_entry in std::fs::read_dir(path)? {
-        let entry = dir_entry?;
-        let dir_path = entry.path();
-        let name = entry.file_name().to_string_lossy().to_string();
-        if dir_path.is_file() {
-            continue;
-        }
-
-        let Ok(data_point_id) = DpId::parse_str(&name) else {
-            info!("Unknown item {dir_path:?} found");
-            metrics.unknown_items += 1;
-            continue;
-        };
-
-        metrics.total += 1;
-
-        let Ok(is_pinned) = DataPointPin::is_pinned(path, data_point_id) else {
-            warn!("Error checking {data_point_id}");
-            metrics.partial_data_points += 1;
-            continue;
-        };
-
-        if is_pinned {
-            continue;
-        }
-
-        match DataPoint::delete(path, data_point_id) {
-            Ok(_) => metrics.garbage_deleted += 1,
-            Err(err) => {
-                warn!("{name} is garbage not deleted: {err}");
-                metrics.garbage_not_deleted += 1;
-            }
-        }
-    }
-
-    Ok(metrics)
-}
-
 pub struct Writer {
     has_uncommitted_changes: bool,
     metadata: IndexMetadata,
@@ -113,6 +59,8 @@ pub struct Writer {
     data_points: Vec<DataPointPin>,
     delete_log: DTrie,
     dimension: Option<u64>,
+    #[allow(unused)]
+    writing: File,
 }
 
 impl Writer {
@@ -194,10 +142,16 @@ impl Writer {
 
     pub fn new(path: &Path, metadata: IndexMetadata) -> VectorR<Writer> {
         std::fs::create_dir(path)?;
-        File::create(path.join(OPEN_LOCK))?;
+        File::create(path.join(OPENING_FLAG))?;
+
+        let writing_path = path.join(WRITING_FLAG);
+        let writing_file = File::create(writing_path)?;
+
+        if writing_file.try_lock_exclusive().is_err() {
+            return Err(VectorErr::MultipleWritersError);
+        }
 
         metadata.write(path)?;
-
         persist_state(path, &State::default())?;
 
         Ok(Writer {
@@ -210,11 +164,19 @@ impl Writer {
             delete_log: DTrie::new(),
             has_uncommitted_changes: false,
             dimension: None,
+            writing: writing_file,
         })
     }
 
     pub fn open(path: &Path) -> VectorR<Writer> {
-        let lock_path = path.join(OPEN_LOCK);
+        let writing_path = path.join(WRITING_FLAG);
+        let writing_file = File::open(writing_path)?;
+
+        if writing_file.try_lock_exclusive().is_err() {
+            return Err(VectorErr::MultipleWritersError);
+        }
+
+        let lock_path = path.join(OPENING_FLAG);
         let lock_file = File::open(lock_path)?;
         lock_file.lock_shared()?;
 
@@ -253,6 +215,7 @@ impl Writer {
             added_to_delete_log: Vec::new(),
             path: path.to_path_buf(),
             has_uncommitted_changes: false,
+            writing: writing_file,
         })
     }
 
@@ -262,82 +225,5 @@ impl Writer {
 
     pub fn metadata(&self) -> &IndexMetadata {
         &self.metadata
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn gc_with_some_garbage() {
-        let workspace = tempfile::tempdir().unwrap();
-        let index_path = workspace.path();
-        let lock_path = index_path.join(OPEN_LOCK);
-        File::create(&lock_path).unwrap();
-
-        DataPointPin::create_pin(index_path).unwrap();
-        DataPointPin::create_pin(index_path).unwrap();
-        let pin = DataPointPin::create_pin(index_path).unwrap();
-
-        let metrics = collect_garbage(index_path).unwrap();
-
-        assert!(pin.path().is_dir());
-        assert_eq!(metrics.total, 3);
-        assert_eq!(metrics.garbage_deleted, 2);
-        assert_eq!(metrics.garbage_not_deleted, 0);
-    }
-
-    #[test]
-    fn gc_all_garbage() {
-        let workspace = tempfile::tempdir().unwrap();
-        let index_path = workspace.path();
-        let lock_path = index_path.join(OPEN_LOCK);
-        File::create(&lock_path).unwrap();
-
-        DataPointPin::create_pin(index_path).unwrap();
-        DataPointPin::create_pin(index_path).unwrap();
-        DataPointPin::create_pin(index_path).unwrap();
-
-        let metrics = collect_garbage(index_path).unwrap();
-
-        assert_eq!(metrics.total, 3);
-        assert_eq!(metrics.garbage_deleted, 3);
-        assert_eq!(metrics.garbage_not_deleted, 0);
-    }
-
-    #[test]
-    fn gc_every_data_point_pinned() {
-        let workspace = tempfile::tempdir().unwrap();
-        let index_path = workspace.path();
-        let lock_path = index_path.join(OPEN_LOCK);
-        File::create(&lock_path).unwrap();
-
-        let pin_0 = DataPointPin::create_pin(index_path).unwrap();
-        let pin_1 = DataPointPin::create_pin(index_path).unwrap();
-        let pin_2 = DataPointPin::create_pin(index_path).unwrap();
-
-        let metrics = collect_garbage(index_path).unwrap();
-
-        assert!(pin_0.path().is_dir());
-        assert!(pin_1.path().is_dir());
-        assert!(pin_2.path().is_dir());
-        assert_eq!(metrics.total, 3);
-        assert_eq!(metrics.garbage_deleted, 0);
-        assert_eq!(metrics.garbage_not_deleted, 0);
-    }
-
-    #[test]
-    fn gc_no_data_points() {
-        let workspace = tempfile::tempdir().unwrap();
-        let index_path = workspace.path();
-        let lock_path = index_path.join(OPEN_LOCK);
-        File::create(&lock_path).unwrap();
-
-        let metrics = collect_garbage(index_path).unwrap();
-
-        assert_eq!(metrics.total, 0);
-        assert_eq!(metrics.garbage_deleted, 0);
-        assert_eq!(metrics.garbage_not_deleted, 0);
     }
 }
