@@ -206,7 +206,7 @@ jobs:
           tool: 'pytest'
           output-file-path: benchmarks.json
           external-data-json-path: ./cache/benchmark-data.json
-          # save-data-file: false
+          save-data-file: false
           # comment-always: true
           # github-token: ${{ secrets.GITHUB_TOKEN }}
           # comment-on-alert: true
