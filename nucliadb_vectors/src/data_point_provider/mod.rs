@@ -269,7 +269,7 @@ impl Index {
         rcv.recv().ok()
     }
 
-    fn merge(&self, state: &State, nodes_per_segment: usize, capacity: usize) -> VectorR<Merge> {
+    fn merge(&self, state: &State, max_nodes_per_segment: usize, capacity: usize) -> VectorR<Merge> {
         let channel = self.metadata.channel;
         let location = self.location.clone();
         let similarity = self.metadata.similarity;
@@ -281,7 +281,7 @@ impl Index {
             let Some(journal) = live_segments.pop() else {
                 break;
             };
-            if journal.no_nodes() >= nodes_per_segment {
+            if journal.no_nodes() >= max_nodes_per_segment {
                 blocked_segments.push(journal);
             } else {
                 buffer.push((state.delete_log(journal), journal.id()));
