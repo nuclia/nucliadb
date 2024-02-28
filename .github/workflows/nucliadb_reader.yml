@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  CONTAINER_REGISTRY: eu.gcr.io/${{ secrets.PROJECT_ID }}
+  CONTAINER_REGISTRY: europe-west4-docker.pkg.dev/nuclia-internal/nuclia
   IMAGE_NAME: reader
 
 jobs:

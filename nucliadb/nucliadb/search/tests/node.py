@@ -41,7 +41,7 @@ from nucliadb_utils.tests.conftest import get_testing_storage_backend
 logger = logging.getLogger(__name__)
 
 images.settings["nucliadb_node_reader"] = {
-    "image": "eu.gcr.io/stashify-218417/node",
+    "image": "europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node",
     "version": "latest",
     "env": {
         "HOST_KEY_PATH": "/data/node.key",
@@ -63,7 +63,7 @@ images.settings["nucliadb_node_reader"] = {
 }
 
 images.settings["nucliadb_node_writer"] = {
-    "image": "eu.gcr.io/stashify-218417/node",
+    "image": "europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node",
     "version": "latest",
     "env": {
         "HOST_KEY_PATH": "/data/node.key",
@@ -85,7 +85,7 @@ images.settings["nucliadb_node_writer"] = {
 }
 
 images.settings["nucliadb_node_sidecar"] = {
-    "image": "eu.gcr.io/stashify-218417/node_sidecar",
+    "image": "europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node_sidecar",
     "version": "latest",
     "env": {
         "INDEX_JETSTREAM_SERVERS": "[]",
