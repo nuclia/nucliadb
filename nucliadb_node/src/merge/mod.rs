@@ -18,9 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-
 mod scheduler;
-mod work_queue;
+mod work;
 
-pub use work_queue::MergePriority;
-pub use scheduler::{install_global, request_merge, MergeScheduler, MergeRequest};
+pub use scheduler::{install_global, request_merge, MergeScheduler};
+pub use work::{MergePriority, MergeRequest};

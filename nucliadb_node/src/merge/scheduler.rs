@@ -21,21 +21,17 @@
 use std::fs;
 use std::sync::OnceLock;
 use std::{
-    collections::BinaryHeap,
     path::PathBuf,
     sync::{Arc, Mutex},
 };
 
-use crate::{
-    settings::Settings,
-    shards::{providers::shard_cache::ShardWriterCache, ShardId},
-};
+use crate::{settings::Settings, shards::providers::shard_cache::ShardWriterCache};
 use anyhow::bail;
 use lazy_static::lazy_static;
 use nucliadb_core::tracing::warn;
 use nucliadb_core::NodeResult;
 
-use crate::merge::MergePriority;
+use super::work::{MergePriority, MergeRequest, WorkQueue};
 
 lazy_static! {
     static ref MERGE_SCHEDULER: OnceLock<MergeScheduler> = OnceLock::new();
@@ -62,7 +58,7 @@ pub fn request_merge(request: MergeRequest) {
 /// index. When running, it takes the most prioritary merge request, takes a
 /// shard writer and executes the merge.
 pub struct MergeScheduler {
-    work_queue: Mutex<BinaryHeap<MergeRequest>>,
+    work_queue: Mutex<WorkQueue>,
     shard_cache: Arc<ShardWriterCache>,
     settings: Settings,
 }
@@ -70,7 +66,7 @@ pub struct MergeScheduler {
 impl MergeScheduler {
     pub fn new(shard_cache: Arc<ShardWriterCache>, settings: Settings) -> Self {
         Self {
-            work_queue: Mutex::new(BinaryHeap::new()),
+            work_queue: Mutex::new(WorkQueue::new()),
             shard_cache,
             settings,
         }
@@ -128,24 +124,6 @@ impl MergeScheduler {
             priority: MergePriority::WhenFree,
         });
         self.bulk_schedule(requests);
-    }
-}
-
-#[derive(PartialEq, Eq)]
-pub struct MergeRequest {
-    pub shard_id: ShardId,
-    pub priority: MergePriority,
-}
-
-impl PartialOrd for MergeRequest {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for MergeRequest {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.priority.cmp(&other.priority)
     }
 }
 
@@ -209,28 +187,5 @@ mod tests {
 
         assert_eq!(merger.next_request().unwrap().shard_id, "shard-a".to_string());
         assert_eq!(merger.next_request().unwrap().shard_id, "shard-b".to_string());
-    }
-
-    #[test]
-    fn test_merge_request_priorities() {
-        let urgent = MergeRequest {
-            shard_id: "urgent".to_string(),
-            priority: MergePriority::High,
-        };
-        let deferrable = MergeRequest {
-            shard_id: "deferrable".to_string(),
-            priority: MergePriority::Low,
-        };
-        let not_important = MergeRequest {
-            shard_id: "not-important".to_string(),
-            priority: MergePriority::WhenFree,
-        };
-
-        assert!(urgent > deferrable);
-        assert!(urgent > not_important);
-        assert!(deferrable < urgent);
-        assert!(deferrable > not_important);
-        assert!(not_important < urgent);
-        assert!(not_important < deferrable);
     }
 }
