@@ -48,7 +48,7 @@ const METADATA: &str = "metadata.json";
 const ALLOWED_BEFORE_MERGE: usize = 5;
 
 const MAX_NODES_PER_SEGMENT_VAR: &str = "MAX_NODES_PER_SEGMENT";
-const MAX_SEGMENTS_MERGE_ON_COMMIT_VAR: &str = "MAX_SEGMENTS_MERGE_ON_COMMIT_VAR";
+const MAX_SEGMENTS_MERGE_ON_COMMIT_VAR: &str = "MAX_SEGMENTS_MERGE_ON_COMMIT";
 
 pub trait SearchRequest {
     fn get_query(&self) -> &[f32];
