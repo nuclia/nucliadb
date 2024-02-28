@@ -24,19 +24,8 @@ use crate::settings::Settings;
 use crate::utils::{self, get_primary_node_id, list_shards};
 
 pub struct NodeMetadata {
-    shard_count: u64,
-    settings: Settings,
-}
-
-impl From<NodeMetadata> for nucliadb_core::protos::NodeMetadata {
-    fn from(node_metadata: NodeMetadata) -> Self {
-        nucliadb_core::protos::NodeMetadata {
-            shard_count: node_metadata.shard_count,
-            node_id: utils::read_host_key(node_metadata.settings.host_key_path()).unwrap().to_string(),
-            primary_node_id: get_primary_node_id(node_metadata.settings.data_path()),
-            ..Default::default()
-        }
-    }
+    pub shard_count: u64,
+    pub settings: Settings,
 }
 
 pub fn create_node_metadata_pb(settings: Settings, node_metadata: NodeMetadata) -> nucliadb_core::protos::NodeMetadata {

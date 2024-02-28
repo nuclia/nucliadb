@@ -40,7 +40,7 @@ from nucliadb_utils.utilities import get_storage
 
 
 async def _iter_keys(driver: Driver, match: str) -> AsyncGenerator[str, None]:
-    async with driver.transaction() as keys_txn:
+    async with driver.transaction(read_only=True) as keys_txn:
         async for key in keys_txn.keys(match=match, count=-1):
             yield key
 
@@ -124,7 +124,7 @@ async def purge_kb_storage(driver: Driver, storage: Storage):
             )
             delete_marker = True
         elif deleted:
-            logger.info(f"  √ Bucket successfully deleted")
+            logger.info("  √ Bucket successfully deleted")
             delete_marker = True
 
         if delete_marker:

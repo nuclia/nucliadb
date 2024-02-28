@@ -321,7 +321,8 @@ class StandaloneWriterWrapper:
     async def ListShards(self, request: EmptyQuery) -> ShardIds:
         loop = asyncio.get_running_loop()
         resp = await loop.run_in_executor(
-            self.executor, self.writer.list_shards, request.SerializeToString()
+            self.executor,
+            self.writer.list_shards,
         )
         pb_bytes = bytes(resp)
         shard_ids = ShardIds()

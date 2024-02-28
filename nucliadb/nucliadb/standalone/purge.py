@@ -27,7 +27,7 @@ from nucliadb.standalone.settings import Settings
 
 
 def purge():
-    from nucliadb.ingest.purge import main
+    from nucliadb.purge import main
 
     parser = pydantic_argparse.ArgumentParser(
         model=Settings,

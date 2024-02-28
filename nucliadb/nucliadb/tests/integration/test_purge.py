@@ -17,19 +17,25 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import random
 import uuid
 from unittest.mock import AsyncMock
 
 import pytest
 from httpx import AsyncClient
 
+from nucliadb.common.cluster import manager
+from nucliadb.common.cluster.manager import KBShardManager
+from nucliadb.common.datamanagers.rollover import RolloverDataManager
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.knowledgebox import (
     KB_TO_DELETE_BASE,
     KB_TO_DELETE_STORAGE_BASE,
 )
-from nucliadb.ingest.purge import purge_kb, purge_kb_storage
+from nucliadb.purge import purge_kb, purge_kb_storage
+from nucliadb.purge.orphan_shards import detect_orphan_shards, purge_orphan_shards
 from nucliadb_models.resource import ReleaseChannel
+from nucliadb_protos import utils_pb2, writer_pb2
 from nucliadb_utils.storages.storage import Storage
 
 
@@ -100,6 +106,125 @@ async def test_purge_deletes_everything_from_maindb(
     # After deletion and purge, no keys should be in maindb
     keys_after_purge_storage = await list_all_keys(maindb_driver)
     assert len(keys_after_purge_storage) == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "release_channel",
+    [ReleaseChannel.EXPERIMENTAL, ReleaseChannel.STABLE],
+)
+async def test_purge_orphan_shards(
+    maindb_driver: Driver,
+    storage: Storage,
+    nucliadb_manager: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    release_channel: str,
+):
+    """Create a KB with some resource (hence a shard) and delete it. Simulate an
+    index node is down and validate orphan shards purge works as expected.
+
+    """
+    kb_slug = str(uuid.uuid4())
+    resp = await nucliadb_manager.post(
+        "/kbs", json={"slug": kb_slug, "release_channel": release_channel}
+    )
+    assert resp.status_code == 201
+    kbid = resp.json().get("uuid")
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        headers={"x-synchronous": "true"},
+        json={
+            "title": "My title",
+            "slug": "myresource",
+            "texts": {"text1": {"body": "My text"}},
+        },
+    )
+    assert resp.status_code == 201
+
+    resp = await nucliadb_manager.delete(f"/kb/{kbid}")
+    assert resp.status_code == 200
+
+    # Purge while index nodes are not available
+    index_nodes = manager.INDEX_NODES
+    manager.INDEX_NODES = type(manager.INDEX_NODES)()
+
+    await purge_kb(maindb_driver)
+
+    manager.INDEX_NODES = index_nodes
+
+    # We have removed the shards in maindb but left them orphan in the index
+    # nodes
+    shard_manager = KBShardManager()
+    async with maindb_driver.transaction(read_only=True) as txn:
+        maindb_shards = await shard_manager.get_all_shards(txn, kbid)
+        assert maindb_shards is None
+
+    shards = []
+    for node in manager.get_index_nodes():
+        shards.extend(await node.list_shards())
+    assert len(shards) > 0
+
+    orphan_shards = await detect_orphan_shards(maindb_driver)
+    assert len(orphan_shards) == len(shards)
+
+    # Purge orphans and validate
+    await purge_orphan_shards(maindb_driver)
+
+    shards = []
+    for node in manager.get_index_nodes():
+        shards.extend(await node.list_shards())
+    assert len(shards) == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "release_channel",
+    [ReleaseChannel.EXPERIMENTAL, ReleaseChannel.STABLE],
+)
+async def test_purge_orphan_shard_detection(
+    maindb_driver: Driver,
+    storage: Storage,
+    nucliadb_manager: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    release_channel: str,
+):
+    """Prepare a situation where there are:
+    - a regular KB
+    - an orphan shard
+    - a shard from a rollover
+
+    Then, validate orphan shard detection find only the true orphan shard.
+    """
+    # Regular KB
+    kb_slug = str(uuid.uuid4())
+    resp = await nucliadb_manager.post(
+        "/kbs", json={"slug": kb_slug, "release_channel": release_channel}
+    )
+    assert resp.status_code == 201
+    kbid = resp.json().get("uuid")
+
+    # Orphan shard
+    available_nodes = manager.get_index_nodes()
+    node = random.choice(available_nodes)
+    orphan_shard = await node.new_shard(
+        kbid="deleted-kb",
+        similarity=utils_pb2.VectorSimilarity.COSINE,
+        release_channel=utils_pb2.ReleaseChannel.STABLE,
+    )
+    orphan_shard_id = orphan_shard.id
+
+    # Rollover shard
+    rollover_dm = RolloverDataManager(maindb_driver)
+    rollover_shards = writer_pb2.Shards(
+        shards=[writer_pb2.ShardObject(shard="rollover-shard")],
+        kbid=kbid,
+    )
+    await rollover_dm.update_kb_rollover_shards(kbid, rollover_shards)
+
+    orphan_shards = await detect_orphan_shards(maindb_driver)
+    assert len(orphan_shards) == 1
+    assert orphan_shard_id in orphan_shards
 
 
 @pytest.fixture(scope="function")
