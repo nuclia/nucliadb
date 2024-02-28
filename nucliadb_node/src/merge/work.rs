@@ -24,7 +24,7 @@ use itertools::Itertools;
 
 use crate::shards::ShardId;
 
-#[derive(PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct MergeRequest {
     pub shard_id: ShardId,
     pub priority: MergePriority,
@@ -42,7 +42,7 @@ impl Ord for MergeRequest {
     }
 }
 
-#[derive(Debug, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum MergePriority {
     WhenFree = 0,
     #[default]
@@ -52,6 +52,8 @@ pub enum MergePriority {
 
 const MERGE_PRIORITIES_COUNT: usize = 3;
 
+/// Work queue structure for merge scheduler. It serves as a priority queue with
+/// deduplication of elements
 pub struct WorkQueue {
     queues: HashMap<MergePriority, VecDeque<MergeRequest>>,
 }
@@ -74,10 +76,13 @@ impl WorkQueue {
         }
     }
 
-    /// Pushes an item to the queue
+    /// Pushes an item to the queue if it wasn't there yet
     pub fn push(&mut self, item: MergeRequest) {
         let queue = self.queues.get_mut(&item.priority).expect("Priority queue must exist");
-        queue.push_back(item);
+
+        if !queue.contains(&item) {
+            queue.push_back(item);
+        }
     }
 
     /// Removes the greatest item from the queue and returns it, or `None` if
@@ -170,5 +175,17 @@ mod tests {
         assert!(queue.pop().is_none());
 
         assert_eq!(queue.len(), 0);
+    }
+
+    #[test]
+    fn test_work_queue_dedup_push() {
+        let mut queue = WorkQueue::new();
+        let item = MergeRequest {
+            shard_id: "my-shard".to_string(),
+            priority: MergePriority::default(),
+        };
+        queue.push(item.clone());
+        queue.push(item);
+        assert_eq!(queue.len(), 1);
     }
 }
