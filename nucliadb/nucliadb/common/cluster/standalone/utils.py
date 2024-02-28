@@ -59,6 +59,11 @@ def get_self() -> StandaloneIndexNode:
             id=node_id, address=host, shard_count=0, available_disk=0
         )
     try:
+        _, _, available_disk = shutil.disk_usage(cluster_settings.data_path)
+        _SELF_INDEX_NODE.available_disk = available_disk
+    except FileNotFoundError:  # pragma: no cover
+        ...
+    try:
         _shards_dir = os.path.join(cluster_settings.data_path, "shards")
         _SELF_INDEX_NODE.shard_count = len(
             [
@@ -67,8 +72,6 @@ def get_self() -> StandaloneIndexNode:
                 if os.path.isdir(os.path.join(_shards_dir, shard_dir))
             ]
         )
-        _, _, available_disk = shutil.disk_usage(cluster_settings.data_path)
-        _SELF_INDEX_NODE.available_disk = available_disk
     except FileNotFoundError:  # pragma: no cover
         ...
     return _SELF_INDEX_NODE
