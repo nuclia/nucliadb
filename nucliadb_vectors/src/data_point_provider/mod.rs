@@ -47,6 +47,9 @@ pub type TemporalMark = SystemTime;
 const METADATA: &str = "metadata.json";
 const ALLOWED_BEFORE_MERGE: usize = 5;
 
+const MAX_NODES_PER_SEGMENT_VAR: &str = "MAX_NODES_PER_SEGMENT";
+const MAX_SEGMENTS_MERGE_ON_COMMIT_VAR: &str = "MAX_SEGMENTS_MERGE_ON_COMMIT_VAR";
+
 pub trait SearchRequest {
     fn get_query(&self) -> &[f32];
     fn get_filter(&self) -> &Formula;
@@ -99,6 +102,8 @@ enum MergerStatus {
 }
 
 pub struct Index {
+    max_nodes_per_segment: usize,
+    max_segments_in_merge: usize,
     metadata: IndexMetadata,
     merger_status: MergerStatus,
     state: RwLock<State>,
@@ -153,8 +158,18 @@ impl Index {
             let metadata = IndexMetadata::default();
             metadata.write(path).map(|_| metadata)
         })?;
+        let max_nodes_per_segment: usize = match std::env::var(MAX_NODES_PER_SEGMENT_VAR) {
+            Ok(v) => v.parse().unwrap_or(50_000),
+            Err(_) => 50_000,
+        };
+        let max_segments_in_merge: usize = match std::env::var(MAX_SEGMENTS_MERGE_ON_COMMIT_VAR) {
+            Ok(v) => v.parse().unwrap_or(10),
+            Err(_) => 10,
+        };
         let index = Index {
             metadata,
+            max_nodes_per_segment,
+            max_segments_in_merge,
             merger_status: MergerStatus::Free,
             dimension: RwLock::new(dimension_used),
             state: RwLock::new(state),
@@ -168,10 +183,21 @@ impl Index {
         std::fs::create_dir(path)?;
         fs_state::initialize_disk(path, State::new)?;
         metadata.write(path)?;
+
         let state = fs_state::load_state::<State>(path)?;
         let date = fs_state::crnt_version(path)?;
+        let max_nodes_per_segment: usize = match std::env::var(MAX_NODES_PER_SEGMENT_VAR) {
+            Ok(v) => v.parse().unwrap_or(50_000),
+            Err(_) => 50_000,
+        };
+        let max_segments_in_merge: usize = match std::env::var(MAX_SEGMENTS_MERGE_ON_COMMIT_VAR) {
+            Ok(v) => v.parse().unwrap_or(10),
+            Err(_) => 10,
+        };
         let index = Index {
             metadata,
+            max_nodes_per_segment,
+            max_segments_in_merge,
             merger_status: MergerStatus::Free,
             dimension: RwLock::new(None),
             state: RwLock::new(state),
@@ -343,7 +369,9 @@ impl Index {
         }
 
         if state.work_stack_len() > 1 {
-            let merge = self.merge(&state, 50_000, 10)?;
+            let max_nodes_per_segment = self.max_nodes_per_segment;
+            let max_segments_in_merge = self.max_segments_in_merge;
+            let merge = self.merge(&state, max_nodes_per_segment, max_segments_in_merge)?;
             let data_points = merge.new_data_points;
             state.rebuilt_work_stack_with(data_points);
         }
