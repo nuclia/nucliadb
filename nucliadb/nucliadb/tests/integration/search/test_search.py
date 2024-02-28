@@ -1613,3 +1613,29 @@ async def test_search_handles_limits_exceeded_error(
     resp = await nucliadb_reader.post(f"/kb/{kb}/search", json={})
     assert resp.status_code == 402
     assert resp.json() == {"detail": "over the quota"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_catalog_returns_shard_and_node_data(
+    nucliadb_reader: AsyncClient,
+    knowledgebox,
+):
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/catalog",
+        params={
+            "query": "",
+        },
+    )
+    assert resp.status_code == 200
+    assert len(resp.json()["shards"]) > 0
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/catalog",
+        params={
+            "query": "",
+            "debug": "true",
+        },
+    )
+    assert resp.status_code == 200
+    assert len(resp.json()["nodes"]) > 0
