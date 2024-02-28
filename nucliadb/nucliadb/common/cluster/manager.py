@@ -590,11 +590,11 @@ def sorted_primary_nodes(avoid_nodes: Optional[list[str]] = None) -> list[str]:
 
     It will put the node ids in `avoid_nodes` at the tail of the list.
     """
-    available_nodes = get_index_nodes(include_secondary=False)
+    primary_nodes = get_index_nodes(include_secondary=False)
 
     # Sort by available disk
     sorted_primary_nodes = sorted(
-        available_nodes, key=lambda n: n.available_disk, reverse=True
+        primary_nodes, key=lambda n: n.available_disk, reverse=True
     )
     available_node_ids = [node.id for node in sorted_primary_nodes]
 
