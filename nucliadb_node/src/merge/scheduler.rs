@@ -35,6 +35,8 @@ use lazy_static::lazy_static;
 use nucliadb_core::tracing::warn;
 use nucliadb_core::NodeResult;
 
+use crate::merge::MergePriority;
+
 lazy_static! {
     static ref MERGE_SCHEDULER: OnceLock<MergeScheduler> = OnceLock::new();
 }
@@ -147,14 +149,6 @@ impl Ord for MergeRequest {
     }
 }
 
-#[derive(Default, PartialEq, Eq, PartialOrd, Ord)]
-pub enum MergePriority {
-    WhenFree = 0,
-    #[default]
-    Low = 1,
-    High = 2,
-}
-
 fn iter_shards(shards_path: PathBuf) -> impl Iterator<Item = String> {
     fs::read_dir(shards_path).expect("Can't open shards path").filter_map(|entry| entry.ok()).filter_map(|entry| {
         let path = entry.path();
@@ -180,29 +174,6 @@ mod tests {
         let settings = Settings::builder().data_path(temp_dir.path()).build().unwrap();
         let shard_cache = Arc::new(ShardWriterCache::new(settings.clone()));
         (MergeScheduler::new(shard_cache, settings), temp_dir)
-    }
-
-    #[test]
-    fn test_merge_request_priorities() {
-        let urgent = MergeRequest {
-            shard_id: "urgent".to_string(),
-            priority: MergePriority::High,
-        };
-        let deferrable = MergeRequest {
-            shard_id: "deferrable".to_string(),
-            priority: MergePriority::Low,
-        };
-        let not_important = MergeRequest {
-            shard_id: "not-important".to_string(),
-            priority: MergePriority::WhenFree,
-        };
-
-        assert!(urgent > deferrable);
-        assert!(urgent > not_important);
-        assert!(deferrable < urgent);
-        assert!(deferrable > not_important);
-        assert!(not_important < urgent);
-        assert!(not_important < deferrable);
     }
 
     #[test]
@@ -238,5 +209,28 @@ mod tests {
 
         assert_eq!(merger.next_request().unwrap().shard_id, "shard-a".to_string());
         assert_eq!(merger.next_request().unwrap().shard_id, "shard-b".to_string());
+    }
+
+    #[test]
+    fn test_merge_request_priorities() {
+        let urgent = MergeRequest {
+            shard_id: "urgent".to_string(),
+            priority: MergePriority::High,
+        };
+        let deferrable = MergeRequest {
+            shard_id: "deferrable".to_string(),
+            priority: MergePriority::Low,
+        };
+        let not_important = MergeRequest {
+            shard_id: "not-important".to_string(),
+            priority: MergePriority::WhenFree,
+        };
+
+        assert!(urgent > deferrable);
+        assert!(urgent > not_important);
+        assert!(deferrable < urgent);
+        assert!(deferrable > not_important);
+        assert!(not_important < urgent);
+        assert!(not_important < deferrable);
     }
 }
