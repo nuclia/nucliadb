@@ -20,10 +20,8 @@
 
 use std::collections::{HashMap, VecDeque};
 
-use itertools::Itertools;
-
 use super::request::MergePriority;
-use super::request::MERGE_PRIORITIES_COUNT;
+use super::request::MERGE_PRIORITIES;
 
 /// Work queue structure for merge scheduler. It serves as a priority queue with
 /// deduplication of elements
@@ -39,10 +37,10 @@ pub struct WorkQueue<T> {
 // priorities in our methods.
 impl<T: PartialEq> WorkQueue<T> {
     pub fn new() -> Self {
-        let mut queues = HashMap::with_capacity(MERGE_PRIORITIES_COUNT);
-        queues.insert(MergePriority::WhenFree, VecDeque::new());
-        queues.insert(MergePriority::Low, VecDeque::new());
-        queues.insert(MergePriority::High, VecDeque::new());
+        let mut queues = HashMap::with_capacity(MERGE_PRIORITIES.len());
+        for priority in MERGE_PRIORITIES {
+            queues.insert(priority, VecDeque::new());
+        }
 
         Self {
             queues,
@@ -62,9 +60,11 @@ impl<T: PartialEq> WorkQueue<T> {
     /// Removes the greatest item from the queue and returns it, or `None` if
     /// it's empty
     pub fn pop(&mut self) -> Option<T> {
-        for (_, queue) in self.queues.iter_mut().sorted_by_key(|x| x.0).rev() {
-            if let Some(item) = queue.pop_front() {
-                return Some(item);
+        for priority in MERGE_PRIORITIES {
+            let queue = self.queues.get_mut(&priority).unwrap();
+            let item = queue.pop_front();
+            if item.is_some() {
+                return item;
             }
         }
         None
@@ -82,29 +82,6 @@ impl<T: PartialEq> WorkQueue<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // #[test]
-    // fn test_merge_request_priorities() {
-    //     let urgent = MergeRequest {
-    //         shard_id: "urgent".to_string(),
-    //         priority: MergePriority::High,
-    //     };
-    //     let deferrable = MergeRequest {
-    //         shard_id: "deferrable".to_string(),
-    //         priority: MergePriority::Low,
-    //     };
-    //     let not_important = MergeRequest {
-    //         shard_id: "not-important".to_string(),
-    //         priority: MergePriority::WhenFree,
-    //     };
-
-    //     assert!(urgent > deferrable);
-    //     assert!(urgent > not_important);
-    //     assert!(deferrable < urgent);
-    //     assert!(deferrable > not_important);
-    //     assert!(not_important < urgent);
-    //     assert!(not_important < deferrable);
-    // }
 
     #[test]
     fn test_work_queues_priorities() {

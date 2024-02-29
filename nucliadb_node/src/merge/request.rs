@@ -33,39 +33,12 @@ pub enum MergeWaiter {
     Async,
 }
 
-#[derive(Copy, Clone, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Default, Hash, PartialEq, Eq)]
 pub enum MergePriority {
-    WhenFree = 0,
+    WhenFree,
     #[default]
     Low,
     High,
 }
 
-// Hardcoded count of `MergePriority` variants
-pub const MERGE_PRIORITIES_COUNT: usize = 3;
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_merge_priority_variants() {
-        // Ensure the hardcoded constant remains correct
-        match MergePriority::WhenFree {
-            MergePriority::WhenFree => {}
-            MergePriority::Low => {}
-            MergePriority::High => {}
-        }
-        assert_eq!(MERGE_PRIORITIES_COUNT, 3);
-    }
-
-    #[test]
-    fn test_merge_request_priorities() {
-        assert!(MergePriority::WhenFree < MergePriority::Low);
-        assert!(MergePriority::WhenFree < MergePriority::High);
-        assert!(MergePriority::Low > MergePriority::WhenFree);
-        assert!(MergePriority::Low < MergePriority::High);
-        assert!(MergePriority::High > MergePriority::WhenFree);
-        assert!(MergePriority::High > MergePriority::Low);
-    }
-}
+pub const MERGE_PRIORITIES: [MergePriority; 3] = [MergePriority::High, MergePriority::Low, MergePriority::WhenFree];
