@@ -30,7 +30,7 @@ use nucliadb_core::protos::{Resource, ResourceId, VectorSetId, VectorSimilarity}
 use nucliadb_core::tracing::{self, *};
 use nucliadb_core::vectors::MergeMetrics;
 use nucliadb_core::vectors::*;
-use nucliadb_core::{metrics, Channel, IndexFiles, RawReplicaState};
+use nucliadb_core::{metrics, IndexFiles, RawReplicaState};
 use nucliadb_procs::measure;
 
 use crate::data_point::{DataPoint, Elem, LabelDictionary};
@@ -47,7 +47,6 @@ impl IndexKeyCollector for Vec<String> {
 pub struct VectorWriterService {
     index: Index,
     indexset: IndexSet,
-    channel: Channel,
     config: VectorConfig,
 }
 
@@ -203,13 +202,10 @@ impl VectorWriter for VectorWriterService {
         }
 
         let new_dp = if !elems.is_empty() {
-            Some(DataPoint::new(
-                self.index.location(),
-                elems,
-                Some(temporal_mark),
-                self.index.metadata().similarity,
-                self.channel,
-            )?)
+            let location = self.index.location();
+            let time = Some(temporal_mark);
+            let similarity = self.index.metadata().similarity;
+            Some(DataPoint::new(location, elems, time, similarity)?)
         } else {
             None
         };
@@ -291,7 +287,7 @@ impl VectorWriter for VectorWriterService {
             } else if !elems.is_empty() {
                 let similarity = index.metadata().similarity;
                 let location = index.location();
-                let new_dp = DataPoint::new(location, elems, Some(temporal_mark), similarity, self.channel)?;
+                let new_dp = DataPoint::new(location, elems, Some(temporal_mark), similarity)?;
                 let lock = index.get_slock()?;
                 match index.add(new_dp, &lock) {
                     Ok(_) => index.commit(&lock)?,
@@ -357,13 +353,6 @@ impl VectorWriter for VectorWriterService {
             files.push(format!("vectors/{}/index.hnsw", segment_id));
             files.push(format!("vectors/{}/journal.json", segment_id));
             files.push(format!("vectors/{}/nodes.kv", segment_id));
-
-            let fst_path = self.index.location.join(format!("{}/fst", segment_id));
-            if fst_path.exists() {
-                files.push(format!("vectors/{}/fst/keys.fst", segment_id));
-                files.push(format!("vectors/{}/fst/labels.fst", segment_id));
-                files.push(format!("vectors/{}/fst/labels.idx", segment_id));
-            }
         }
 
         let vectorsets = self.list_vectorsets()?;
@@ -378,13 +367,6 @@ impl VectorWriter for VectorWriterService {
                     files.push(format!("vectorset/{}/{}/index.hnsw", vs, segment_id));
                     files.push(format!("vectorset/{}/{}/journal.json", vs, segment_id));
                     files.push(format!("vectorset/{}/{}/nodes.kv", vs, segment_id));
-
-                    let fst_path = self.config.vectorset.join(format!("{}/fst", segment_id));
-                    if fst_path.exists() {
-                        files.push(format!("vectors/{}/fst/keys.fst", segment_id));
-                        files.push(format!("vectors/{}/fst/labels.fst", segment_id));
-                        files.push(format!("vectors/{}/fst/labels.idx", segment_id));
-                    }
                 }
                 metadata_files.insert(
                     format!("vectorset/{}/state.bincode", vs),
@@ -459,7 +441,6 @@ impl VectorWriterService {
                     },
                 )?,
                 indexset: IndexSet::new(indexset)?,
-                channel: config.channel,
                 config: config.clone(),
             })
         }
@@ -475,7 +456,6 @@ impl VectorWriterService {
             Ok(VectorWriterService {
                 index: Index::open(path)?,
                 indexset: IndexSet::new(indexset)?,
-                channel: config.channel,
                 config: config.clone(),
             })
         }
@@ -498,13 +478,13 @@ impl VectorWriterService {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::{HashMap, HashSet};
-
     use nucliadb_core::protos::resource::ResourceStatus;
     use nucliadb_core::protos::{
         IndexParagraph, IndexParagraphs, Resource, ResourceId, UserVector, UserVectors, VectorSearchRequest,
         VectorSentence, VectorSimilarity,
     };
+    use nucliadb_core::Channel;
+    use std::collections::{HashMap, HashSet};
     use tempfile::TempDir;
 
     use super::*;
@@ -539,8 +519,6 @@ mod tests {
         };
 
         let mut writer = VectorWriterService::start(&vsc).expect("Error starting vector writer");
-        assert_eq!(writer.channel, Channel::EXPERIMENTAL);
-
         let indexes: HashMap<_, _> = (0..10).map(|i| create_vector_set(&mut writer, i.to_string())).collect();
         let keys: HashSet<_> = indexes.keys().cloned().collect();
         let resource = Resource {
@@ -735,9 +713,6 @@ mod tests {
             expected_files.push(format!("vectors/{}/index.hnsw", segment));
             expected_files.push(format!("vectors/{}/journal.json", segment));
             expected_files.push(format!("vectors/{}/nodes.kv", segment));
-            expected_files.push(format!("vectors/{}/fst/keys.fst", segment));
-            expected_files.push(format!("vectors/{}/fst/labels.fst", segment));
-            expected_files.push(format!("vectors/{}/fst/labels.idx", segment));
         }
         assert_eq!(index_files.files, expected_files);
         assert_eq!(index_files.metadata_files.len(), 2);

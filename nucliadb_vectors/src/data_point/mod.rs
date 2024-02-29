@@ -38,9 +38,6 @@ use fs2::FileExt;
 use io::{BufWriter, ErrorKind, Write};
 use memmap2::Mmap;
 use node::Node;
-use nucliadb_core::tracing::{debug, error};
-use nucliadb_core::Channel;
-pub use ops_hnsw::DataRetriever;
 use ops_hnsw::HnswOps;
 use ram_hnsw::RAMHnsw;
 use serde::{Deserialize, Serialize};
@@ -50,6 +47,7 @@ use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use std::{fs, io};
 
+pub use ops_hnsw::DataRetriever;
 pub use uuid::Uuid as DpId;
 
 mod file_names {
@@ -365,109 +363,17 @@ impl Address {
 }
 
 pub struct FormulaFilter<'a> {
-    pub matching_nodes: HashSet<u64>,
-    empty_formula: bool,
     filter: &'a Formula,
-    pub use_fst: bool,
-    total_nodes: usize,
 }
 
 impl FormulaFilter<'_> {
-    fn try_new_with_fst<'a>(
-        filter: &'a Formula,
-        key_index: &'a KeyIndex,
-        label_index: &'a LabelIndex,
-        total_nodes: usize,
-    ) -> VectorR<FormulaFilter<'a>> {
-        debug!("Using FST index files");
-        let collector = filter.get_atoms();
-        let empty_formula = collector.labels.is_empty() && collector.key_prefixes.is_empty();
-
-        // preparing the list of matching nodes
-        let mut matching_labels = None;
-        let mut matching_keys = None;
-        if !collector.labels.is_empty() {
-            matching_labels = Some(label_index.get_nodes(&collector.labels)?);
-        }
-        if !collector.key_prefixes.is_empty() {
-            matching_keys = Some(key_index.get_nodes(&collector.key_prefixes)?);
-        }
-
-        let matching_nodes: HashSet<u64> = match (matching_keys, matching_labels) {
-            (None, labels) => labels.unwrap_or_default(),
-            (keys, None) => keys.unwrap_or_default(),
-            (Some(keys), Some(labels)) => keys.intersection(&labels).copied().collect(),
-        };
-
-        Ok(FormulaFilter {
-            matching_nodes,
-            empty_formula,
+    pub fn new(filter: &Formula) -> FormulaFilter {
+        FormulaFilter {
             filter,
-            use_fst: true,
-            total_nodes,
-        })
-    }
-    pub fn new<'a>(
-        filter: &'a Formula,
-        key_index: Option<&'a KeyIndex>,
-        label_index: Option<&'a LabelIndex>,
-        total_nodes: usize,
-    ) -> FormulaFilter<'a> {
-        let (Some(key_index), Some(label_index)) = (key_index, label_index) else {
-            debug!("No FST index files found, using regular filtering");
-            return FormulaFilter {
-                filter,
-                total_nodes,
-                matching_nodes: HashSet::new(),
-                empty_formula: true,
-                use_fst: false,
-            };
-        };
-
-        match FormulaFilter::try_new_with_fst(filter, key_index, label_index, total_nodes) {
-            Ok(successful_fst) => successful_fst,
-            Err(err) => {
-                error!("No FST due to corrupted index files: {err:?}");
-                FormulaFilter {
-                    filter,
-                    total_nodes,
-                    matching_nodes: HashSet::new(),
-                    empty_formula: true,
-                    use_fst: false,
-                }
-            }
         }
     }
-
-    /// Returns the ratio of matching nodes
-    pub fn matching_ratio(&self) -> Option<f64> {
-        if !self.use_fst || self.empty_formula {
-            return None;
-        }
-
-        if self.matching_nodes.is_empty() {
-            return Some(0.0);
-        }
-
-        Some(self.matching_nodes.len() as f64 / self.total_nodes as f64)
-    }
-
     pub fn run<DR: DataRetriever>(&self, address: Address, tracker: &DR) -> bool {
-        if !self.use_fst {
-            // we don't use FST, calling legacy run
-            self.filter.run(address, tracker)
-        } else {
-            // if we did not have any filtering, it's always a match
-            if self.empty_formula {
-                return true;
-            }
-            // if we have no matches at all, we can return false
-            if self.matching_nodes.is_empty() {
-                return false;
-            }
-            // O(1) on average
-            self.matching_nodes.contains(&(address.0 as u64))
-        }
+        self.filter.run(address, tracker)
     }
 }
 
@@ -671,8 +577,6 @@ pub struct DataPoint {
     journal: Journal,
     nodes: Mmap,
     index: Mmap,
-    label_index: Option<LabelIndex>,
-    key_index: Option<KeyIndex>,
 }
 
 impl AsRef<DataPoint> for DataPoint {
@@ -723,21 +627,14 @@ impl DataPoint {
     ) -> impl Iterator<Item = Neighbour> + '_ {
         let encoded_query = vector::encode_vector(query);
         let tracker = Retriever::new(&encoded_query, &self.nodes, delete_log, similarity, min_score);
-
-        let no_nodes = data_store::stored_elements(&self.nodes);
-
-        let filter = FormulaFilter::new(filter, self.key_index.as_ref(), self.label_index.as_ref(), no_nodes);
-
+        let filter = FormulaFilter::new(filter);
         let ops = HnswOps::new(&tracker);
         let neighbours = ops.search(Address(self.journal.nodes), self.index.as_ref(), results, filter, with_duplicates);
+
         neighbours.into_iter().map(|(address, dist)| (Neighbour::new(address, &self.nodes, dist))).take(results)
     }
-    pub fn merge<Dlog>(
-        dir: &Path,
-        operants: &[(Dlog, DpId)],
-        similarity: Similarity,
-        channel: Channel,
-    ) -> VectorR<DataPoint>
+
+    pub fn merge<Dlog>(dir: &path::Path, operants: &[(Dlog, DpId)], similarity: Similarity) -> VectorR<DataPoint>
     where
         Dlog: DeleteLog,
     {
@@ -758,14 +655,6 @@ impl DataPoint {
         data_store::merge(&mut nodes, &node_producers)?;
         let nodes = unsafe { Mmap::map(&nodes)? };
         let no_nodes = data_store::stored_elements(&nodes);
-
-        // Creating the FSTs with the new nodes
-        let (label_index, key_index) = if channel == Channel::EXPERIMENTAL {
-            debug!("Indexing with experimental FSTs");
-            Self::create_fsts(&id, &nodes)?
-        } else {
-            (None, None)
-        };
 
         // Creating the hnsw for the new node store.
         let tracker = Retriever::new(&[], &nodes, &NoDLog, similarity, -1.0);
@@ -806,8 +695,6 @@ impl DataPoint {
             journal,
             nodes,
             index,
-            label_index,
-            key_index,
         })
     }
     pub fn delete(dir: &Path, uid: DpId) -> VectorR<()> {
@@ -827,15 +714,6 @@ impl DataPoint {
         let index = unsafe { Mmap::map(&hnswf)? };
         let journal: Journal = serde_json::from_reader(BufReader::new(journal))?;
 
-        let fst_dir = id.join(file_names::FST);
-
-        let (label_index, key_index) = if LabelIndex::exists(&fst_dir) && KeyIndex::exists(&fst_dir) {
-            debug!("Found FSTs on disk");
-            (Some(LabelIndex::open(&fst_dir)?), Some(KeyIndex::open(&fst_dir)?))
-        } else {
-            (None, None)
-        };
-
         // Telling the OS our expected access pattern
         #[cfg(not(target_os = "windows"))]
         {
@@ -847,60 +725,7 @@ impl DataPoint {
             journal,
             nodes,
             index,
-            label_index,
-            key_index,
         })
-    }
-
-    fn create_fsts(root_dir: &Path, nodes: &[u8]) -> VectorR<(Option<LabelIndex>, Option<KeyIndex>)> {
-        let no_nodes = data_store::stored_elements(nodes);
-
-        // building the KeyIndex and LabelIndex FSTs
-        let fst_dir = root_dir.join(file_names::FST);
-        fs::create_dir(&fst_dir)?;
-
-        // Memory representations of the FSTs we want to store
-        // - node_keys holds (key, record id) tuples
-        // - labels_map holds a mapping of (label, record ids)
-        // - labels_list holds (label, record ids) tuples
-        let mut node_keys: Vec<(String, u64)> = Vec::new();
-        let mut labels_map: HashMap<String, Vec<u64>> = HashMap::new();
-
-        // we iterate on each node to fill `keys`
-        for node_id in 0..no_nodes {
-            let node = data_store::get_value(Node, nodes, node_id);
-            let key: String = String::from_utf8(Node::key(node).to_vec())?;
-            let node_labels = Node::labels(node);
-
-            for label in &node_labels {
-                if let Some(vec) = labels_map.get_mut(label) {
-                    vec.push(node_id as u64);
-                } else {
-                    let new_vec = vec![node_id as u64];
-                    labels_map.insert(label.to_string(), new_vec);
-                }
-            }
-            node_keys.push((key.clone(), node_id as u64));
-        }
-        node_keys.sort();
-        // create the KeyIndex
-        let key_index = KeyIndex::new(&fst_dir, node_keys.into_iter())?;
-
-        // we convert `labels_map` into a list
-        let mut labels_list: Vec<Label> = Vec::new();
-        for (key, mut node_addresses) in labels_map {
-            node_addresses.sort();
-            labels_list.push(Label {
-                key,
-                node_addresses,
-            })
-        }
-        labels_list.sort_by_key(|label| label.key.clone());
-
-        // creating the LabelIndex
-        let label_index = LabelIndex::new(&fst_dir, labels_list.into_iter())?;
-
-        Ok((Some(label_index), Some(key_index)))
     }
 
     pub fn new(
@@ -908,7 +733,6 @@ impl DataPoint {
         elems: Vec<Elem>,
         time: Option<SystemTime>,
         similarity: Similarity,
-        channel: Channel,
     ) -> VectorR<DataPoint> {
         let data_point_id = DpId::new_v4();
         let data_point_path = dir.join(data_point_id.to_string());
@@ -960,14 +784,6 @@ impl DataPoint {
         let nodes = unsafe { Mmap::map(&nodesf)? };
         let no_nodes = data_store::stored_elements(&nodes);
 
-        // Creating the FSTs
-        let (label_index, key_index) = if channel == Channel::EXPERIMENTAL {
-            debug!("Indexing with experimental FSTs");
-            Self::create_fsts(data_point_path, &nodes)?
-        } else {
-            (None, None)
-        };
-
         // Creating the HNSW using the mmaped nodes
         let tracker = Retriever::new(&[], &nodes, &NoDLog, similarity, -1.0);
         let mut ops = HnswOps::new(&tracker);
@@ -1008,8 +824,6 @@ impl DataPoint {
             journal,
             nodes,
             index,
-            label_index,
-            key_index,
         })
     }
 }

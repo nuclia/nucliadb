@@ -162,10 +162,10 @@ async def test_processing_status(
     processing_client = MagicMock()
     processing_client.__aenter__ = AsyncMock(return_value=processing_client)
     processing_client.__aexit__ = AsyncMock(return_value=None)
-    processing_client.status = AsyncMock(
-        return_value=processing.StatusResultsV2(  # type: ignore
+    processing_client.requests = AsyncMock(
+        return_value=processing.RequestsResults(  # type: ignore
             results=[
-                processing.StatusResultV2(  # type: ignore
+                processing.RequestsResult(  # type: ignore
                     processing_id="processing_id",
                     resource_id=resource_id,
                     kbid=kbid,
@@ -174,17 +174,18 @@ async def test_processing_status(
                     timestamp=datetime.now(),
                 )
                 for resource_id in resources
-            ]
+            ],
+            cursor=None,
         )
     )
     with patch(
-        "nucliadb.reader.api.v1.services.processing.ProcessingV2HTTPClient",
+        "nucliadb.reader.api.v1.services.processing.ProcessingHTTPClient",
         return_value=processing_client,
     ):
         async with reader_api(roles=[NucliaDBRoles.READER]) as client:
             resp = await client.get(f"/{KB_PREFIX}/{kbid}/processing-status")
             assert resp.status_code == 200
 
-            data = processing.StatusResultsV2.parse_obj(resp.json())
+            data = processing.RequestsResults.parse_obj(resp.json())
 
             assert all([result.title is not None for result in data.results])

@@ -1,2 +1,2 @@
-{{$data := dict "Values" .Values "Release" .Release "Chart" .Chart "command" "nucliadb-ingest-purge" "schedule" "*/15 * * * *" "cronname" "nucliadb-purge-cron"}}
+{{$data := dict "Values" .Values "Release" .Release "Chart" .Chart "command" "nucliadb-purge" "schedule" "*/15 * * * *" "cronname" "nucliadb-purge-cron"}}
 {{- include "purge.cronjob" $data }}

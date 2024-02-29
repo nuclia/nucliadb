@@ -67,16 +67,22 @@ class NodeInfoResponse(google.protobuf.message.Message):
     ID_FIELD_NUMBER: builtins.int
     ADDRESS_FIELD_NUMBER: builtins.int
     SHARD_COUNT_FIELD_NUMBER: builtins.int
+    AVAILABLE_DISK_FIELD_NUMBER: builtins.int
+    TOTAL_DISK_FIELD_NUMBER: builtins.int
     id: builtins.str
     address: builtins.str
     shard_count: builtins.int
+    available_disk: builtins.int
+    total_disk: builtins.int
     def __init__(
         self,
         *,
         id: builtins.str = ...,
         address: builtins.str = ...,
         shard_count: builtins.int = ...,
+        available_disk: builtins.int = ...,
+        total_disk: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["address", b"address", "id", b"id", "shard_count", b"shard_count"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["address", b"address", "available_disk", b"available_disk", "id", b"id", "shard_count", b"shard_count", "total_disk", b"total_disk"]) -> None: ...
 
 global___NodeInfoResponse = NodeInfoResponse

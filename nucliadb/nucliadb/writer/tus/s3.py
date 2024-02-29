@@ -32,7 +32,7 @@ from nucliadb_protos.resources_pb2 import CloudFile
 
 from nucliadb.writer import logger
 from nucliadb.writer.tus.dm import FileDataManager
-from nucliadb.writer.tus.exceptions import CloudFileNotFound
+from nucliadb.writer.tus.exceptions import CloudFileNotFound, ResumableURINotAvailable
 from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
 from nucliadb_utils.storages.s3 import (
     CHUNK_SIZE,
@@ -107,6 +107,12 @@ class S3FileStorageManager(FileStorageManager):
         backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=3
     )
     async def _upload_part(self, dm: FileDataManager, data):
+        mpu = dm.get("mpu")
+        if mpu is None:
+            # If we don't have an ongoing multipart upload for the current upload_id
+            # we need to abort the request.
+            raise ResumableURINotAvailable()
+
         return await self.storage._s3aioclient.upload_part(
             Bucket=dm.get("bucket"),
             Key=dm.get("path"),

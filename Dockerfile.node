@@ -1,4 +1,4 @@
-FROM eu.gcr.io/stashify-218417/basenode:latest as planner
+FROM europe-west4-docker.pkg.dev/nuclia-internal/nuclia/basenode:latest as planner
 
 # XXX As COPY copies the contents of a directory and not the directory itself,
 # we use multiple COPY commands to avoid including Pyhton sources. Ideally, we
@@ -26,7 +26,7 @@ RUN cargo chef prepare --recipe-path recipe.json
 
 # --------------------------------------------------------------------
 
-FROM eu.gcr.io/stashify-218417/basenode:latest as builder
+FROM europe-west4-docker.pkg.dev/nuclia-internal/nuclia/basenode:latest as builder
 
 ARG CARGO_FEATURES=release-feature-set
 ARG CARGO_PROFILE=release
@@ -103,7 +103,7 @@ RUN apt-get -y update \
     && cp /usr/bin/perf_5.10 /usr/bin/perf_5.15 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=eu.gcr.io/stashify-218417/basenode:latest /bin/grpc_health_probe /bin/grpc_health_probe
+COPY --from=europe-west4-docker.pkg.dev/nuclia-internal/nuclia/basenode:latest /bin/grpc_health_probe /bin/grpc_health_probe
 
 COPY --from=builder /nucliadb/bin/node_reader /usr/local/bin/node_reader
 COPY --from=builder /nucliadb/bin/node_writer /usr/local/bin/node_writer

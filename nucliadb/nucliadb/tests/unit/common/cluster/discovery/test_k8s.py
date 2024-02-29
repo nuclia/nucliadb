@@ -40,7 +40,9 @@ pytestmark = pytest.mark.asyncio
 def writer_stub():
     writer_stub = MagicMock()
     writer_stub.GetMetadata = AsyncMock(
-        return_value=nodewriter_pb2.NodeMetadata(node_id="node_id", shard_count=1)
+        return_value=nodewriter_pb2.NodeMetadata(
+            node_id="node_id", shard_count=1, available_disk=10, total_disk=10
+        )
     )
     with patch(
         "nucliadb.common.cluster.discovery.base.nodewriter_pb2_grpc.NodeWriterStub",
@@ -100,6 +102,7 @@ async def test_get_node_metadata(k8s_discovery: KubernetesDiscovery, writer_stub
         name="node_id",
         address="1.1.1.1",
         updated_at=ANY,
+        available_disk=10,
     )
 
     writer_stub.GetMetadata.assert_awaited_once()
@@ -146,10 +149,12 @@ async def test_remove_stale_nodes(k8s_discovery: KubernetesDiscovery):
         id="node_id",
         address="1.1.1.1",
         shard_count=1,
+        available_disk=100,
     )
     nmd = IndexNodeMetadata(
         node_id="node_id",
         shard_count=1,
+        available_disk=100,
         name="node_id",
         address="1.1.1.1",
         updated_at=time.time() - k8s_discovery.node_heartbeat_interval * 3,

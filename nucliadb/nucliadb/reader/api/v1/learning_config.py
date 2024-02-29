@@ -20,10 +20,12 @@
 from fastapi import Request
 from fastapi_versioning import version
 
-from nucliadb import learning_config
+from nucliadb.learning_proxy import learning_config_proxy
+from nucliadb.models.responses import HTTPClientError
 from nucliadb.reader.api.v1.router import KB_PREFIX, api
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires
+from nucliadb_utils.settings import is_onprem_nucliadb
 
 
 @api.get(
@@ -32,7 +34,7 @@ from nucliadb_utils.authentication import requires
     name="Download the Knowledege Box model",
     description="Download the trained model or any other generated file as a result of a training task on a Knowledge Box.",  # noqa
     response_model=None,
-    tags=["Training"],
+    tags=["Models"],
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
@@ -42,7 +44,7 @@ async def download_model(
     model_id: str,
     filename: str,
 ):
-    return await learning_config.proxy(
+    return await learning_config_proxy(
         request, "GET", f"/download/{kbid}/model/{model_id}/{filename}"
     )
 
@@ -53,7 +55,7 @@ async def download_model(
     name="Get Knowledge Box models configuration",
     description="Current configuration of models assigned to a Knowledge Box",
     response_model=None,
-    tags=["Knowledge Boxes"],
+    tags=["Models"],
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
@@ -61,11 +63,11 @@ async def get_configuration(
     request: Request,
     kbid: str,
 ):
-    return await learning_config.proxy(
+    return await learning_config_proxy(
         request,
         "GET",
         f"/config/{kbid}",
-        headers={"X-STF-USER": request.headers.get("X-NUCLIADB-USER", "")},
+        extra_headers={"X-STF-USER": request.headers.get("X-NUCLIADB-USER", "")},
     )
 
 
@@ -83,7 +85,7 @@ async def get_models(
     request: Request,
     kbid: str,
 ):
-    return await learning_config.proxy(request, "GET", f"/models/{kbid}")
+    return await learning_config_proxy(request, "GET", f"/models/{kbid}")
 
 
 @api.get(
@@ -101,11 +103,11 @@ async def get_model(
     kbid: str,
     model_id: str,
 ):
-    return await learning_config.proxy(
+    return await learning_config_proxy(
         request,
         "GET",
         f"/models/{kbid}/model/{model_id}",
-        headers={"X-STF-USER": request.headers.get("X-NUCLIADB-USER", "")},
+        extra_headers={"X-STF-USER": request.headers.get("X-NUCLIADB-USER", "")},
     )
 
 
@@ -113,14 +115,35 @@ async def get_model(
     path=f"/{KB_PREFIX}/{{kbid}}/schema",
     status_code=200,
     name="Learning configuration schema",
-    description="Get jsonschema definition for `learning_configuration` field of Knowledge Box creation payload",
+    description="Get jsonschema definition to update the `learning_configuration` of your Knowledge Box",
     response_model=None,
-    tags=["Knowledge Boxes"],
+    tags=["Models"],
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def get_schema(
+async def get_schema_for_configuration_updates(
     request: Request,
     kbid: str,
 ):
-    return await learning_config.proxy(request, "GET", f"/schema/{kbid}")
+    return await learning_config_proxy(request, "GET", f"/schema/{kbid}")
+
+
+@api.get(
+    path=f"/nua/schema",
+    status_code=200,
+    name="Learning configuration schema for Knowledge Box creation",
+    description="Get jsonschema definition for `learning_configuration` field for the Knowledge Box creation payload",
+    response_model=None,
+    tags=["Models"],
+    include_in_schema=False,
+)
+@requires(NucliaDBRoles.READER)
+@version(1)
+async def get_schema_for_configuration_creation(
+    request: Request,
+):
+    if not is_onprem_nucliadb():
+        return HTTPClientError(
+            status_code=404, detail="Endpoint not available for Hosted NucliaDB"
+        )
+    return await learning_config_proxy(request, "GET", f"/schema")

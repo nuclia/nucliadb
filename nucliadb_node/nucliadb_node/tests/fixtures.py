@@ -45,7 +45,7 @@ from nucliadb_utils.settings import nats_consumer_settings
 from nucliadb_utils.utilities import get_storage, start_nats_manager, stop_nats_manager
 
 images.settings["nucliadb_node_reader"] = {
-    "image": "eu.gcr.io/stashify-218417/node",
+    "image": "europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node",
     "version": "latest",
     "env": {
         "NUCLIADB_DISABLE_ANALYTICS": "True",
@@ -66,7 +66,7 @@ images.settings["nucliadb_node_reader"] = {
 }
 
 images.settings["nucliadb_node_writer"] = {
-    "image": "eu.gcr.io/stashify-218417/node",
+    "image": "europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node",
     "version": "latest",
     "env": {
         "NUCLIADB_DISABLE_ANALYTICS": "True",

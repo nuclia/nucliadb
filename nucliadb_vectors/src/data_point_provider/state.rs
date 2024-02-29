@@ -297,7 +297,6 @@ impl Default for State {
 mod test {
     use std::path::Path;
 
-    use nucliadb_core::Channel;
     use rand::random;
     use uuid::Uuid;
 
@@ -362,7 +361,7 @@ mod test {
                 let vector = (0..self.dimension).map(|_| random::<f32>()).collect::<Vec<_>>();
                 elems.push(Elem::new(key, vector, labels, None));
             }
-            Some(DataPoint::new(self.path, elems, None, Similarity::Cosine, Channel::EXPERIMENTAL).unwrap())
+            Some(DataPoint::new(self.path, elems, None, Similarity::Cosine).unwrap())
         }
     }
 
@@ -384,7 +383,7 @@ mod test {
         assert_eq!(state.current.size(), 0);
         let work = state.current_work_unit().unwrap();
         let work = work.iter().map(|j| (state.delete_log(*j), j.id())).collect::<Vec<_>>();
-        let new = DataPoint::merge(dir.path(), &work, Similarity::Cosine, Channel::EXPERIMENTAL).unwrap();
+        let new = DataPoint::merge(dir.path(), &work, Similarity::Cosine).unwrap();
         std::mem::drop(work);
         state.replace_work_unit(new.journal());
         assert!(state.current_work_unit().is_none());

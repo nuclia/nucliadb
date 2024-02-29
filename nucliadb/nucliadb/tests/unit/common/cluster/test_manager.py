@@ -58,6 +58,7 @@ async def fake_node():
         id="node-0",
         address="nohost",
         shard_count=0,
+        available_disk=100,
         dummy=True,
     )
     manager.INDEX_NODES.clear()
@@ -92,6 +93,7 @@ def add_index_node(id: str):
         id=id,
         address="nohost",
         shard_count=0,
+        available_disk=100,
         dummy=True,
     )
 
@@ -101,6 +103,7 @@ def add_read_replica_node(id: str, primary_id: str):
         id=id,
         address="nohost",
         shard_count=0,
+        available_disk=100,
         dummy=True,
         primary_id=primary_id,
     )
@@ -368,6 +371,7 @@ def test_get_index_nodes(standalone_mode_off, index_nodes):
         id="node-0",
         address="nohost",
         shard_count=0,
+        available_disk=100,
         dummy=True,
     )
     # Add a secondary replica of node-0
@@ -375,6 +379,7 @@ def test_get_index_nodes(standalone_mode_off, index_nodes):
         id="node-1",
         address="nohost",
         shard_count=0,
+        available_disk=100,
         dummy=True,
         primary_id="node-0",
     )

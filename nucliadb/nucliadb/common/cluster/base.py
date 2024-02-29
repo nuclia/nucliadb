@@ -40,12 +40,14 @@ class AbstractIndexNode(metaclass=ABCMeta):
         id: str,
         address: str,
         shard_count: int,
+        available_disk: int,
         dummy: bool = False,
         primary_id: Optional[str] = None,
     ):
         self.id = id
         self.address = address
         self.shard_count = shard_count
+        self.available_disk = available_disk
         self.dummy = dummy
         self.primary_id = primary_id
 
@@ -103,6 +105,10 @@ class AbstractIndexNode(metaclass=ABCMeta):
         )
         resp = await self.writer.NewShard(req)  # type: ignore
         return resp
+
+    async def list_shards(self) -> list[str]:
+        shards = await self.writer.ListShards(noderesources_pb2.EmptyQuery())  # type: ignore
+        return [shard.id for shard in shards.ids]
 
     async def delete_shard(self, id: str) -> str:
         req = noderesources_pb2.ShardId(id=id)

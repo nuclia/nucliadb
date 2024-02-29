@@ -35,7 +35,6 @@ from nucliadb_protos import noderesources_pb2, writer_pb2
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
 
-from .exceptions import ExhaustedNodesError
 from .manager import get_index_node
 from .settings import settings
 
@@ -90,18 +89,16 @@ async def create_rollover_shards(
     # create new shards
     created_shards = []
     try:
+        nodes = cluster_manager.sorted_primary_nodes()
         for shard in kb_shards.shards:
-            nodes = cluster_manager.sorted_nodes()
             shard.ClearField("replicas")
             # Attempt to create configured number of replicas
             replicas_created = 0
             while replicas_created < settings.node_replicas:
-                try:
-                    node_id = nodes.pop(0)
-                except IndexError:
-                    # It was not possible to find enough nodes
-                    # available/responsive to create the required replicas
-                    raise ExhaustedNodesError()
+                if len(nodes) == 0:
+                    # could have multiple shards on single node
+                    nodes = cluster_manager.sorted_primary_nodes()
+                node_id = nodes.pop(0)
 
                 node = get_index_node(node_id)
                 if node is None:

@@ -72,6 +72,8 @@ tracing:
   jaegerCollectorHost: jaeger-collector.observability.svc.cluster.local
   jaegerCollectorGrpcPort: 14250
 
+jaeger_agent_resources: {}
+
 # ingest-orm-grpc settings
 # flat structure so no issues merging
 ingest_orm_grpc_resources:
