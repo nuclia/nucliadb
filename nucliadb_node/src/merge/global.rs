@@ -18,12 +18,29 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-pub mod errors;
-mod global;
-mod request;
-mod scheduler;
-mod work;
+use std::sync::OnceLock;
 
-pub use global::{global_merger, install_global};
-pub use request::{MergePriority, MergeRequest, MergeWaiter};
-pub use scheduler::MergeScheduler;
+use lazy_static::lazy_static;
+
+use crate::merge::errors::MergerError;
+use crate::merge::MergeScheduler;
+
+lazy_static! {
+    static ref MERGE_SCHEDULER: OnceLock<MergeScheduler> = OnceLock::new();
+}
+
+/// Install merger as the global merge scheduler.
+pub fn install_global(merger: MergeScheduler) -> Result<impl FnOnce(), MergerError> {
+    if MERGE_SCHEDULER.get().is_some() {
+        return Err(MergerError::GlobalMergerAlreadyInstalled);
+    }
+    let global_merger = MERGE_SCHEDULER.get_or_init(move || merger);
+    Ok(move || global_merger.run_forever())
+}
+
+/// Get a referente to the global merge scheduler
+///
+/// This function panics if the global merger hasn't been installed
+pub fn global_merger() -> &'static MergeScheduler {
+    MERGE_SCHEDULER.get().expect("Global merge scheduler must be installed")
+}

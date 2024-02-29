@@ -19,48 +19,40 @@
 //
 
 use std::fs;
-use std::sync::OnceLock;
+use std::sync::Condvar;
+use std::time::Duration;
 use std::{
     path::PathBuf,
     sync::{Arc, Mutex},
 };
 
+use anyhow::anyhow;
+use nucliadb_core::vectors::MergeMetrics;
+use tokio::sync::oneshot;
+use tokio::sync::oneshot::{Receiver, Sender};
+
+use crate::shards::ShardId;
 use crate::{settings::Settings, shards::providers::shard_cache::ShardWriterCache};
-use anyhow::bail;
-use lazy_static::lazy_static;
 use nucliadb_core::tracing::warn;
 use nucliadb_core::NodeResult;
 
-use super::work::{MergePriority, MergeRequest, WorkQueue};
+use super::work::WorkQueue;
+use crate::merge::{MergePriority, MergeRequest, MergeWaiter};
 
-lazy_static! {
-    static ref MERGE_SCHEDULER: OnceLock<MergeScheduler> = OnceLock::new();
-}
-
-/// Install merger as the global merge scheduler.
-pub fn install_global(merger: MergeScheduler) -> NodeResult<impl FnOnce()> {
-    if MERGE_SCHEDULER.get().is_some() {
-        bail!("Global merge scheduler has already been installed");
-    }
-    let global_merger = MERGE_SCHEDULER.get_or_init(move || merger);
-    Ok(move || global_merger.run_forever())
-}
-
-/// Request a merge to the global merge scheduler.
-///
-/// This function panics if the global merger hasn't been installed
-pub fn request_merge(request: MergeRequest) {
-    let merger = MERGE_SCHEDULER.get().expect("Global merge scheduler must be installed");
-    merger.schedule(request);
-}
+// Time between scheduler being idle and scheduling all shards for merge
+#[cfg(not(test))]
+const SCHEDULE_ALL_SHARDS_DELAY: Duration = Duration::from_secs(10);
+#[cfg(test)]
+const SCHEDULE_ALL_SHARDS_DELAY: Duration = Duration::from_millis(50);
 
 /// Merge scheduler is the responsible for scheduling merges in the vectors
 /// index. When running, it takes the most prioritary merge request, takes a
 /// shard writer and executes the merge.
 pub struct MergeScheduler {
-    work_queue: Mutex<WorkQueue>,
+    work_queue: Mutex<WorkQueue<InternalMergeRequest>>,
     shard_cache: Arc<ShardWriterCache>,
     settings: Settings,
+    condvar: Condvar,
 }
 
 impl MergeScheduler {
@@ -69,61 +61,138 @@ impl MergeScheduler {
             work_queue: Mutex::new(WorkQueue::new()),
             shard_cache,
             settings,
+            condvar: Condvar::default(),
         }
     }
 
-    pub fn schedule(&self, request: MergeRequest) {
-        let mut queue = self.work_queue.lock().expect("Poisoned merger scheduler mutex");
-        queue.push(request);
-    }
+    /// Schedule a new merge request. The work handle returned can be used to
+    /// wait for the merge result.
+    pub fn schedule(&self, request: MergeRequest) -> WorkHandle {
+        let (request, priority, handle) = self.prepare(request);
 
-    fn bulk_schedule(&self, requests: impl Iterator<Item = MergeRequest>) {
         let mut queue = self.work_queue.lock().expect("Poisoned merger scheduler mutex");
-        for request in requests {
-            queue.push(request);
-        }
+        queue.push(request, priority);
+        drop(queue);
+
+        // Awake scheduler if it's asleep
+        self.condvar.notify_all();
+
+        handle
     }
 
     pub fn run_forever(&self) {
         loop {
-            let result = self.run();
-            if let Err(error) = result {
-                warn!("An error occurred merging: {}", error);
+            let merge = self.run();
+            if let Err(error) = merge {
+                warn!("An error occurred while merging: {}", error);
             }
         }
     }
 
     /// Take the most prioritary work from the scheduler queue and perform a
-    /// merge.
+    /// merge
     fn run(&self) -> NodeResult<()> {
-        let request = self.next_request();
+        let request = self.blocking_next();
+        let result = self.merge_shard(&request.shard_id);
 
-        // Schedule all shards for a merge when we have no more work to do
-        if request.is_none() {
-            self.schedule_all_shards();
-            return Ok(());
+        // When a notifier is requested, send the merge result and let the
+        // caller be responsible to handle errors
+        match request.notifier {
+            Some(notifier) => {
+                let _ = notifier.send(result);
+            }
+            None => {
+                result?;
+            }
         }
-        let request = request.unwrap();
-
-        let shard = self.shard_cache.get(&request.shard_id)?;
-        shard.merge()?;
 
         Ok(())
     }
 
-    fn next_request(&self) -> Option<MergeRequest> {
+    fn blocking_next(&self) -> InternalMergeRequest {
         let mut queue = self.work_queue.lock().expect("Poisoned merger scheduler mutex");
-        let request = queue.pop();
-        drop(queue);
-        request
+        while queue.is_empty() {
+            let wait;
+            (queue, wait) =
+                self.condvar.wait_timeout(queue, SCHEDULE_ALL_SHARDS_DELAY).expect("Poisoned merger scheduler mutex");
+
+            if wait.timed_out() {
+                // Nobody requested a merge and it's been a while since last,
+                // let's schedule all shards for a merge
+                for (request, priority) in self.all_shards_requests() {
+                    queue.push(request, priority);
+                }
+            }
+        }
+        queue.pop().unwrap()
     }
 
-    fn schedule_all_shards(&self) {
-        let requests = iter_shards(self.settings.shards_path()).map(|shard_id| MergeRequest {
-            shard_id,
-            priority: MergePriority::WhenFree,
-        });
-        self.bulk_schedule(requests);
+    fn prepare(&self, request: MergeRequest) -> (InternalMergeRequest, MergePriority, WorkHandle) {
+        let mut internal_request = InternalMergeRequest {
+            shard_id: request.shard_id,
+            notifier: None,
+        };
+        let mut handle = WorkHandle {
+            waiter: None,
+        };
+
+        match request.waiter {
+            MergeWaiter::None => {}
+            MergeWaiter::Async => {
+                let (tx, rx) = oneshot::channel();
+                internal_request.notifier = Some(tx);
+                handle.waiter = Some(rx);
+            }
+        };
+
+        (internal_request, request.priority, handle)
+    }
+
+    fn all_shards_requests(&self) -> impl Iterator<Item = (InternalMergeRequest, MergePriority)> + '_ {
+        iter_shards(self.settings.shards_path())
+            .map(|shard_id| MergeRequest {
+                shard_id,
+                priority: MergePriority::WhenFree,
+                waiter: MergeWaiter::None,
+            })
+            .map(|request| {
+                let (request, priority, _handle) = self.prepare(request);
+                (request, priority)
+            })
+    }
+
+    fn merge_shard(&self, shard_id: &ShardId) -> NodeResult<MergeMetrics> {
+        let shard = self.shard_cache.get(shard_id)?;
+        shard.merge()
+    }
+
+    #[cfg(test)]
+    pub fn pending_work(&self) -> usize {
+        self.work_queue.lock().unwrap().len()
+    }
+}
+
+struct InternalMergeRequest {
+    shard_id: String,
+    notifier: Option<Sender<NodeResult<MergeMetrics>>>,
+}
+
+impl PartialEq for InternalMergeRequest {
+    fn eq(&self, other: &Self) -> bool {
+        self.shard_id.eq(&other.shard_id)
+    }
+}
+
+pub struct WorkHandle {
+    waiter: Option<Receiver<NodeResult<MergeMetrics>>>,
+}
+
+impl WorkHandle {
+    pub async fn wait(self) -> NodeResult<MergeMetrics> {
+        match self.waiter {
+            Some(waiter) => waiter.await?,
+            None => Err(anyhow!("There was no waiter for this handle")),
+        }
     }
 }
 
@@ -158,18 +227,19 @@ mod tests {
     fn test_merge_scheduler() {
         let (merger, _guards) = merge_scheduler();
 
-        assert_eq!(merger.work_queue.lock().unwrap().len(), 0);
+        assert_eq!(merger.pending_work(), 0);
 
         merger.schedule(MergeRequest {
             shard_id: "shard-id".to_string(),
             priority: MergePriority::default(),
+            waiter: MergeWaiter::None,
         });
-        assert_eq!(merger.work_queue.lock().unwrap().len(), 1);
+        assert_eq!(merger.pending_work(), 1);
 
         // shard is fake, so this fails but work is done
         let result = merger.run();
         assert!(result.is_err());
-        assert_eq!(merger.work_queue.lock().unwrap().len(), 0);
+        assert_eq!(merger.pending_work(), 0);
     }
 
     #[test]
@@ -181,11 +251,11 @@ mod tests {
         fs::create_dir_all(shards_path.join("shard-a")).unwrap();
         fs::create_dir_all(shards_path.join("shard-b")).unwrap();
 
-        // Run found no work and schedules all shards to merge
+        // A run will trigger a schedule for all shards, we can run twice.
+        // Errors are returned because shards are fake
         let result = merger.run();
-        assert!(result.is_ok());
-
-        assert_eq!(merger.next_request().unwrap().shard_id, "shard-a".to_string());
-        assert_eq!(merger.next_request().unwrap().shard_id, "shard-b".to_string());
+        assert!(result.is_err());
+        let result = merger.run();
+        assert!(result.is_err());
     }
 }

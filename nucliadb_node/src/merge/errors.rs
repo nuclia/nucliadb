@@ -18,12 +18,10 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-pub mod errors;
-mod global;
-mod request;
-mod scheduler;
-mod work;
+use thiserror::Error;
 
-pub use global::{global_merger, install_global};
-pub use request::{MergePriority, MergeRequest, MergeWaiter};
-pub use scheduler::MergeScheduler;
+#[derive(Debug, Error)]
+pub enum MergerError {
+    #[error("Global merger is already installed")]
+    GlobalMergerAlreadyInstalled,
+}
