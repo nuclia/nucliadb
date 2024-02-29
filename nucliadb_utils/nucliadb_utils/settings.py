@@ -128,7 +128,7 @@ class NucliaSettings(BaseSettings):
         "http://processing-api.processing.svc.cluster.local:8080"
     )
     nuclia_inner_predict_url: str = "http://predict.learning.svc.cluster.local:8080"
-    nuclia_inner_learning_config_url = "http://config.learning.svc.cluster.local:8080"
+    learning_internal_svc_base_url = "http://{service}.learning.svc.cluster.local:8080"
 
     nuclia_zone: str = "europe-1"
     onprem: bool = True
@@ -139,7 +139,7 @@ class NucliaSettings(BaseSettings):
 
     dummy_processing: bool = False
     dummy_predict: bool = False
-    dummy_learning_config: bool = False
+    dummy_learning_services: bool = False
     local_predict: bool = False
     local_predict_headers: Dict[str, str] = {}
 

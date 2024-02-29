@@ -134,11 +134,13 @@ class ChatAudit(google.protobuf.message.Message):
     ANSWER_FIELD_NUMBER: builtins.int
     REPHRASED_QUESTION_FIELD_NUMBER: builtins.int
     CONTEXT_FIELD_NUMBER: builtins.int
+    LEARNING_ID_FIELD_NUMBER: builtins.int
     question: builtins.str
     answer: builtins.str
     rephrased_question: builtins.str
     @property
     def context(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ChatContext]: ...
+    learning_id: builtins.str
     def __init__(
         self,
         *,
@@ -146,9 +148,10 @@ class ChatAudit(google.protobuf.message.Message):
         answer: builtins.str | None = ...,
         rephrased_question: builtins.str | None = ...,
         context: collections.abc.Iterable[global___ChatContext] | None = ...,
+        learning_id: builtins.str = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["_answer", b"_answer", "_rephrased_question", b"_rephrased_question", "answer", b"answer", "rephrased_question", b"rephrased_question"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["_answer", b"_answer", "_rephrased_question", b"_rephrased_question", "answer", b"answer", "context", b"context", "question", b"question", "rephrased_question", b"rephrased_question"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["_answer", b"_answer", "_rephrased_question", b"_rephrased_question", "answer", b"answer", "context", b"context", "learning_id", b"learning_id", "question", b"question", "rephrased_question", b"rephrased_question"]) -> None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing_extensions.Literal["_answer", b"_answer"]) -> typing_extensions.Literal["answer"] | None: ...
     @typing.overload

@@ -35,7 +35,8 @@ use crate::settings::Settings;
 use crate::shards::metadata::Similarity;
 use crate::shards::providers::shard_cache::ShardWriterCache;
 use crate::shards::writer::ShardWriter;
-use crate::utils::list_shards;
+use crate::utils::{get_primary_node_id, list_shards, read_host_key};
+
 pub struct ReplicationServiceGRPCDriver {
     settings: Settings,
     shards: Arc<ShardWriterCache>,
@@ -292,10 +293,21 @@ impl replication::replication_service_server::ReplicationService for Replication
         &self,
         _request: tonic::Request<noderesources::EmptyQuery>,
     ) -> Result<tonic::Response<noderesources::NodeMetadata>, tonic::Status> {
-        let metadata = crate::node_metadata::NodeMetadata::new(self.settings.clone()).await;
-        match metadata {
-            Ok(metadata) => Ok(tonic::Response::new(metadata.into())),
-            Err(error) => Err(tonic::Status::internal(error.to_string())),
+        let settings = &self.settings.clone();
+        let mut total_disk = 0;
+        let mut available_disk = 0;
+
+        for disk in sysinfo::Disks::new_with_refreshed_list().into_iter() {
+            total_disk += disk.total_space();
+            available_disk += disk.available_space();
         }
+        Ok(tonic::Response::new(noderesources::NodeMetadata {
+            shard_count: list_shards(settings.shards_path()).await.len().try_into().unwrap(),
+            node_id: read_host_key(settings.host_key_path()).unwrap().to_string(),
+            primary_node_id: get_primary_node_id(settings.data_path()),
+            total_disk,
+            available_disk,
+            ..Default::default()
+        }))
     }
 }

@@ -14,7 +14,7 @@ concurrency:
 
 env:
   COMPONENT: nucliadb-train
-  CONTAINER_REGISTRY: eu.gcr.io/${{ secrets.PROJECT_ID }}
+  CONTAINER_REGISTRY: europe-west4-docker.pkg.dev/nuclia-internal/nuclia
   IMAGE_NAME: nucliadb_train
 
 jobs:

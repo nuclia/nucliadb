@@ -373,7 +373,6 @@ async def find_merge_results(
     vectors: list[list[DocumentScored]] = []
     relations = []
 
-    # facets_counter = Counter()
     next_page = True
     ematches: list[str] = []
     real_query = ""
@@ -381,9 +380,6 @@ async def find_merge_results(
     for response in search_responses:
         # Iterate over answers from different logic shards
 
-        # Merge facets
-        # TODO
-        # facets_counter.update(response.paragraph.facets)
         ematches.extend(response.paragraph.ematches)
         real_query = response.paragraph.query
         next_page = next_page and response.paragraph.next_page
@@ -403,7 +399,6 @@ async def find_merge_results(
 
         api_results = KnowledgeboxFindResults(
             resources={},
-            facets={},
             query=real_query,
             total=total_paragraphs,
             page_number=page,

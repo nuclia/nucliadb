@@ -88,6 +88,7 @@ class AuditStorage:
         rephrased_question: Optional[str],
         context: List[ChatContext],
         answer: Optional[str],
+        learning_id: str,
     ):
         raise NotImplementedError
 

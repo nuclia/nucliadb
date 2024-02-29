@@ -20,41 +20,44 @@
 from fastapi import Request
 from fastapi_versioning import version
 
-from nucliadb.learning_proxy import learning_config_proxy
-from nucliadb.writer.api.v1.router import KB_PREFIX, api
+from nucliadb.learning_proxy import learning_collector_proxy
+from nucliadb.reader.api.v1.router import KB_PREFIX, api
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires
 
 
-@api.post(
-    path=f"/{KB_PREFIX}/{{kbid}}/configuration",
-    status_code=204,
-    name="Create Knowledge Box models configuration",
-    description="Create configuration of models assigned to a Knowledge Box",
+@api.get(
+    path=f"/{KB_PREFIX}/{{kbid}}/feedback/{{month}}",
+    status_code=200,
+    name="Download feedback of a Knowledge Box",
+    description="Download the feedback of a particular month in a Knowledge Box",  # noqa
     response_model=None,
     tags=["Knowledge Boxes"],
 )
-@requires(NucliaDBRoles.WRITER)
+@requires(NucliaDBRoles.READER)
 @version(1)
-async def set_configuration(
+async def feedback_download(
     request: Request,
     kbid: str,
+    month: str,
 ):
-    return await learning_config_proxy(request, "POST", f"/config/{kbid}")
+    return await learning_collector_proxy(
+        request, "GET", f"/collect/feedback/{kbid}/{month}"
+    )
 
 
-@api.patch(
-    path=f"/{KB_PREFIX}/{{kbid}}/configuration",
-    status_code=204,
-    name="Update Knowledge Box models configuration",
-    description="Update current configuration of models assigned to a Knowledge Box",
+@api.get(
+    path=f"/{KB_PREFIX}/{{kbid}}/feedback",
+    status_code=200,
+    name="Feedback avalaible months",
+    description="List of months within the last year with feedback data",
     response_model=None,
     tags=["Knowledge Boxes"],
 )
-@requires(NucliaDBRoles.WRITER)
+@requires(NucliaDBRoles.READER)
 @version(1)
-async def patch_configuration(
+async def feedback_list_months(
     request: Request,
     kbid: str,
 ):
-    return await learning_config_proxy(request, "PATCH", f"/config/{kbid}")
+    return await learning_collector_proxy(request, "GET", f"/collect/feedback/{kbid}")

@@ -163,15 +163,17 @@ class ProcessingEngine:
             self.nuclia_upload_url = (
                 f"{nuclia_processing_cluster_url}/api/v1/processing/upload"
             )
-        self.nuclia_internal_push_v2 = (
-            f"{nuclia_processing_cluster_url}/api/v2/internal/processing/push"
+        self.nuclia_internal_push = (
+            f"{nuclia_processing_cluster_url}/api/v1/internal/processing/push"
         )
-        self.nuclia_internal_delete = f"{nuclia_processing_cluster_url}/api/v2/internal/processing/delete-requests"
+        self.nuclia_internal_delete = (
+            f"{nuclia_processing_cluster_url}/api/v1/internal/processing/requests"
+        )
         self.nuclia_external_push_v2 = (
-            f"{self.nuclia_public_url}/api/v2/processing/push"
+            f"{self.nuclia_public_url}/api/v1/processing/push"
         )
         self.nuclia_external_delete = (
-            f"{self.nuclia_public_url}/api/v2/processing/delete-requests"
+            f"{self.nuclia_public_url}/api/v1/processing/requests"
         )
 
         self.nuclia_jwt_key = nuclia_jwt_key
@@ -397,7 +399,7 @@ class ProcessingEngine:
                 # Upload the payload
                 item.partition = partition
                 resp = await self.session.post(
-                    url=self.nuclia_internal_push_v2, data=item.json(), headers=headers
+                    url=self.nuclia_internal_push, data=item.json(), headers=headers
                 )
             else:
                 headers.update(
@@ -457,7 +459,7 @@ class ProcessingEngine:
             url = self.nuclia_external_delete
             headers.update({"X-NUCLIA-NUAKEY": f"Bearer {self.nuclia_service_account}"})
 
-        resp = await self.session.post(url=url, json=data, headers=headers)
+        resp = await self.session.delete(url=url, json=data, headers=headers)
         if resp.status != 200:
             logger.warning(
                 "Error deleting from processing",
