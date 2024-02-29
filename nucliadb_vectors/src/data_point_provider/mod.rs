@@ -18,9 +18,12 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-mod merge_worker;
-mod merger;
 mod state;
+use nucliadb_core::fs_state::{self, ELock, Lock, SLock, Version};
+use nucliadb_core::tracing::*;
+use nucliadb_core::Channel;
+use serde::{Deserialize, Serialize};
+use state::*;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Write};
@@ -29,24 +32,13 @@ use std::path::{Path, PathBuf};
 use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::time::SystemTime;
 
-use crossbeam::channel::{self, Receiver};
-pub use merger::Merger;
-use nucliadb_core::fs_state::{self, ELock, Lock, SLock, Version};
-use nucliadb_core::tracing::*;
-use nucliadb_core::Channel;
-use serde::{Deserialize, Serialize};
-use state::*;
-
 pub use crate::data_point::Neighbour;
 use crate::data_point::{DataPoint, DpId, Journal, Similarity};
-use crate::data_point_provider::merge_worker::Worker;
 use crate::formula::Formula;
 use crate::{VectorErr, VectorR};
 pub type TemporalMark = SystemTime;
 
 const METADATA: &str = "metadata.json";
-const ALLOWED_BEFORE_MERGE: usize = 5;
-
 const MAX_NODES_PER_SEGMENT_VAR: &str = "MAX_NODES_PER_SEGMENT";
 const MAX_SEGMENTS_MERGE_ON_COMMIT_VAR: &str = "MAX_SEGMENTS_MERGE_ON_COMMIT";
 
@@ -94,18 +86,10 @@ impl IndexMetadata {
     }
 }
 
-#[derive(Default)]
-enum MergerStatus {
-    #[default]
-    Free,
-    WorkScheduled(Receiver<Journal>),
-}
-
 pub struct Index {
     max_nodes_per_segment: usize,
     max_segments_in_merge: usize,
     metadata: IndexMetadata,
-    merger_status: MergerStatus,
     state: RwLock<State>,
     date: RwLock<Version>,
     pub location: PathBuf,
@@ -170,7 +154,6 @@ impl Index {
             metadata,
             max_nodes_per_segment,
             max_segments_in_merge,
-            merger_status: MergerStatus::Free,
             dimension: RwLock::new(dimension_used),
             state: RwLock::new(state),
             date: RwLock::new(date),
@@ -198,7 +181,6 @@ impl Index {
             metadata,
             max_nodes_per_segment,
             max_segments_in_merge,
-            merger_status: MergerStatus::Free,
             dimension: RwLock::new(None),
             state: RwLock::new(state),
             date: RwLock::new(date),
@@ -231,22 +213,6 @@ impl Index {
     }
 
     pub fn collect_garbage(&mut self, _lock: &ELock) -> VectorR<()> {
-        // A merge may be waiting to be recorded.
-        let possible_merge = self.take_available_merge_or_wait();
-        let mut state = self.write_state();
-        let mut date = self.write_date();
-
-        if let Some(journal) = possible_merge {
-            state.replace_work_unit(journal)
-        }
-
-        fs_state::persist_state::<State>(&self.location, &state)?;
-        *date = fs_state::crnt_version(&self.location)?;
-        std::mem::drop(state);
-        std::mem::drop(date);
-
-        // At this point there are no merges available, so we can
-        // start collecting garbage.
         let state = self.read_state();
         let in_use_dp: HashSet<_> = state.dpid_iter().map(|journal| journal.id()).collect();
         for dir_entry in std::fs::read_dir(&self.location)? {
@@ -289,13 +255,6 @@ impl Index {
         Ok(())
     }
 
-    fn take_available_merge_or_wait(&mut self) -> Option<Journal> {
-        let MergerStatus::WorkScheduled(rcv) = std::mem::take(&mut self.merger_status) else {
-            return None;
-        };
-        rcv.recv().ok()
-    }
-
     fn merge(&self, state: &State, max_nodes_per_segment: usize, capacity: usize) -> VectorR<Merge> {
         let location = self.location.clone();
         let similarity = self.metadata.similarity;
@@ -333,13 +292,8 @@ impl Index {
 
     /// Returns the number of segments that have been merged.
     pub fn force_merge(&mut self, _lock: &Lock) -> VectorR<MergeMetrics> {
-        let possible_merge = self.take_available_merge_or_wait();
         let mut state = self.write_state();
         let mut date = self.write_date();
-
-        if let Some(journal) = possible_merge {
-            state.replace_work_unit(journal);
-        }
 
         if state.work_stack_len() <= 1 {
             return Ok(MergeMetrics {
@@ -360,13 +314,8 @@ impl Index {
     }
 
     pub fn commit(&mut self, _lock: &Lock) -> VectorR<()> {
-        let possible_merge = self.take_available_merge_or_wait();
         let mut state = self.write_state();
         let mut date = self.write_date();
-
-        if let Some(journal) = possible_merge {
-            state.replace_work_unit(journal);
-        }
 
         if state.work_stack_len() > 1 {
             let max_nodes_per_segment = self.max_nodes_per_segment;
@@ -378,18 +327,6 @@ impl Index {
 
         fs_state::persist_state::<State>(&self.location, &state)?;
         *date = fs_state::crnt_version(&self.location)?;
-        let work_stack_len = state.work_stack_len();
-        std::mem::drop(state);
-        std::mem::drop(date);
-
-        if work_stack_len > ALLOWED_BEFORE_MERGE {
-            let location = self.location.clone();
-            let similarity = self.metadata.similarity;
-            let (sender, receiver) = channel::unbounded();
-            let worker = Worker::request(location, sender, similarity);
-            self.merger_status = MergerStatus::WorkScheduled(receiver);
-            merger::send_merge_request(worker);
-        }
         Ok(())
     }
     pub fn try_elock(&self) -> VectorR<ELock> {

@@ -251,24 +251,10 @@ impl State {
         self.work_stack = work_stack;
     }
 
-    pub fn replace_work_unit(&mut self, journal: Journal) {
-        let Some(unit) = self.work_stack.pop_back() else {
-            return;
-        };
-        let age_cap = self.work_stack.back().and_then(|v| v.load.last().map(|l| l.time()));
-        if let Some(age_cap) = age_cap {
-            self.delete_log.prune(age_cap);
-        }
-        for dp in unit.load.iter() {
-            // The data_point may be older that the refactor
-            self.data_points.remove(&dp.id());
-            self.no_nodes -= dp.no_nodes();
-        }
-        self.add(journal);
-    }
     pub fn dpid_iter(&self) -> impl Iterator<Item = Journal> + '_ {
         self.data_point_iterator().copied()
     }
+
     pub fn keys(&self, location: &Path) -> VectorR<Vec<String>> {
         let mut keys = vec![];
         for journal in self.data_point_iterator().copied() {
@@ -291,9 +277,6 @@ impl State {
     }
     pub fn work_stack_len(&self) -> usize {
         self.work_stack.len()
-    }
-    pub fn current_work_unit(&self) -> Option<&[Journal]> {
-        self.work_stack.back().map(|wu| wu.load.as_slice())
     }
     pub fn stored_len(&self, location: &Path) -> VectorR<Option<u64>> {
         let Some(journal) = self.data_point_iterator().next() else {
@@ -398,17 +381,5 @@ mod test {
         assert_eq!(state.no_nodes(), no_nodes);
         assert_eq!(state.work_stack.len(), 1);
         assert_eq!(state.current.size(), 0);
-        let work = state.current_work_unit().unwrap();
-        let work = work.iter().map(|j| (state.delete_log(*j), j.id())).collect::<Vec<_>>();
-        let new = DataPoint::merge(dir.path(), &work, Similarity::Cosine).unwrap();
-        std::mem::drop(work);
-        state.replace_work_unit(new.journal());
-        assert!(state.current_work_unit().is_none());
-        assert_eq!(state.work_stack.len(), 0);
-        assert_eq!(state.current.size(), 1);
-        assert_eq!(state.no_nodes(), no_nodes);
-        assert_eq!(state.work_stack.len(), 0);
-        assert_eq!(state.current.size(), 1);
-        assert_eq!(state.no_nodes(), no_nodes);
     }
 }
