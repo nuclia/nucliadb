@@ -17,7 +17,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use std::borrow::Cow;
 use std::collections::HashSet;
 use std::path::PathBuf;
 
@@ -57,13 +56,8 @@ impl State {
             Ok(None)
         }
     }
-    pub fn get_or_create<'a, S>(&mut self, index: S, similarity: Similarity) -> VectorR<Index>
-    where
-        S: Into<Cow<'a, str>>,
-    {
-        let index: Cow<_> = index.into();
-        if self.indexes.contains(index.as_ref()) {
-            let index = index.as_ref();
+    pub fn create(&mut self, index: &str, similarity: Similarity) -> VectorR<Index> {
+        if self.indexes.contains(index) {
             let location = self.location.join(index);
             Index::open(&location)
         } else {
@@ -92,9 +86,9 @@ mod test {
     fn basic_functionality_test() {
         let dir = TempDir::new().unwrap();
         let mut vectorset = State::new(dir.path().to_path_buf());
-        let _index1 = vectorset.get_or_create("Index1".to_string(), Similarity::Cosine).unwrap();
-        let _index2 = vectorset.get_or_create("Index2".to_string(), Similarity::Cosine).unwrap();
-        let _index3 = vectorset.get_or_create("Index3".to_string(), Similarity::Cosine).unwrap();
+        let _index1 = vectorset.create("Index1", Similarity::Cosine).unwrap();
+        let _index2 = vectorset.create("Index2", Similarity::Cosine).unwrap();
+        let _index3 = vectorset.create("Index3", Similarity::Cosine).unwrap();
         assert!(vectorset.get("Index1").unwrap().is_some());
         assert!(vectorset.get("Index2").unwrap().is_some());
         assert!(vectorset.get("Index3").unwrap().is_some());

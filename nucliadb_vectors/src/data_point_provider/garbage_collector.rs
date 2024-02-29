@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::data_point::{DataPoint, DataPointPin, DpId};
+use crate::data_point::{DataPointPin, DpId, OpenDataPoint};
 use crate::data_point_provider::{OPENING_FLAG, WRITING_FLAG};
 use crate::{VectorErr, VectorR};
 use fs2::FileExt;
@@ -74,7 +74,7 @@ pub fn collect_garbage(path: &Path) -> VectorR<Metrics> {
             continue;
         }
 
-        match DataPoint::delete(path, data_point_id) {
+        match OpenDataPoint::delete(path, data_point_id) {
             Ok(_) => metrics.garbage_deleted += 1,
             Err(err) => {
                 warn!("{name} is garbage not deleted: {err}");

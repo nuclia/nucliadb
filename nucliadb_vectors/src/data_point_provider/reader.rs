@@ -27,14 +27,14 @@ use std::mem;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
+use crate::data_point::{self, DataPointPin};
 use crate::data_point_provider::state::*;
 use crate::data_point_provider::{IndexMetadata, SearchRequest, OPENING_FLAG, STATE};
-use crate::data_types::DeleteLog;
-
-use crate::data_point::DataPointPin;
-pub use crate::data_point::Neighbour;
 use crate::data_types::dtrie_ram::DTrie;
+use crate::data_types::DeleteLog;
 use crate::{VectorErr, VectorR};
+
+pub use crate::data_point::Neighbour;
 
 #[derive(Clone, Copy)]
 struct TimeSensitiveDLog<'a> {
@@ -142,7 +142,7 @@ impl Reader {
             let data_point_journal = data_point_pin.read_journal()?;
 
             if dimension.is_none() {
-                let data_point = data_point_pin.open_data_point()?;
+                let data_point = data_point::open(&data_point_pin)?;
                 dimension = data_point.stored_len();
             }
 
@@ -184,7 +184,7 @@ impl Reader {
             let data_point_journal = data_point_pin.read_journal()?;
 
             if new_dimension.is_none() {
-                let data_point = data_point_pin.open_data_point()?;
+                let data_point = data_point::open(&data_point_pin)?;
                 new_dimension = data_point.stored_len();
             }
 
@@ -217,8 +217,8 @@ impl Reader {
         let min_score = request.min_score();
         let mut ffsv = Fssc::new(request.no_results(), with_duplicates);
 
-        for pinned_data_points in self.data_points.iter() {
-            let data_point = pinned_data_points.open_data_point()?;
+        for data_point_pin in self.data_points.iter() {
+            let data_point = data_point::open(data_point_pin)?;
             let data_point_journal = data_point.journal();
             let delete_log = TimeSensitiveDLog {
                 time: data_point_journal.time(),

@@ -33,7 +33,7 @@ use nucliadb_core::vectors::*;
 use nucliadb_core::{metrics, IndexFiles, RawReplicaState};
 use nucliadb_procs::measure;
 
-use crate::data_point::{DataPoint, Elem, LabelDictionary};
+use crate::data_point::{Elem, LabelDictionary, OpenDataPoint};
 use crate::data_point_provider::*;
 use crate::indexset::{IndexKeyCollector, IndexSet};
 use crate::VectorErr;
@@ -99,7 +99,7 @@ impl VectorWriter for VectorWriterService {
         let indexid = setid.vectorset.as_str();
         let similarity = similarity.into();
         let indexset_elock = self.indexset.get_elock()?;
-        self.indexset.get_or_create(indexid, similarity, &indexset_elock)?;
+        self.indexset.create(indexid, similarity, &indexset_elock)?;
         self.indexset.commit(indexset_elock)?;
 
         let took = time.elapsed().as_secs_f64();
@@ -205,7 +205,7 @@ impl VectorWriter for VectorWriterService {
             let location = self.index.location();
             let time = Some(temporal_mark);
             let similarity = self.index.metadata().similarity;
-            Some(DataPoint::new(location, elems, time, similarity)?)
+            Some(OpenDataPoint::new(location, elems, time, similarity)?)
         } else {
             None
         };
@@ -287,7 +287,7 @@ impl VectorWriter for VectorWriterService {
             } else if !elems.is_empty() {
                 let similarity = index.metadata().similarity;
                 let location = index.location();
-                let new_dp = DataPoint::new(location, elems, Some(temporal_mark), similarity)?;
+                let new_dp = OpenDataPoint::new(location, elems, Some(temporal_mark), similarity)?;
                 let lock = index.get_slock()?;
                 match index.add(new_dp, &lock) {
                     Ok(_) => index.commit(&lock)?,

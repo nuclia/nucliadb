@@ -74,15 +74,15 @@ pub struct Writer {
 }
 
 impl Writer {
-    pub fn add_data_point(&mut self, pin: DataPointPin) -> VectorR<()> {
-        let data_point = pin.open_data_point()?;
+    pub fn add_data_point(&mut self, data_point_pin: DataPointPin) -> VectorR<()> {
+        let data_point = data_point::open(&data_point_pin)?;
         let data_point_len = data_point.stored_len();
 
         if self.dimension != data_point_len {
             return Err(VectorErr::InconsistentDimensions);
         }
 
-        self.added_data_points.push(pin);
+        self.added_data_points.push(data_point_pin);
         self.has_uncommitted_changes = true;
         Ok(())
     }
@@ -104,7 +104,6 @@ impl Writer {
             });
         }
 
-        let channel = self.metadata.channel;
         let similarity = self.metadata.similarity;
         let mut blocked_segments = vec![];
         let mut live_segments = mem::take(&mut self.data_points);
@@ -131,7 +130,7 @@ impl Writer {
         }
 
         let merged_pin = DataPointPin::create_pin(self.location())?;
-        data_point::merge_data_points(&merged_pin, &buffer, similarity, channel)?;
+        data_point::merge(&merged_pin, &buffer, similarity)?;
         blocked_segments.push(merged_pin);
         blocked_segments.extend(live_segments);
         self.data_points = blocked_segments;
@@ -272,7 +271,7 @@ impl Writer {
             let data_point_pin = DataPointPin::open_pin(path, data_point_id)?;
 
             if dimension.is_none() {
-                let data_point = data_point_pin.open_data_point()?;
+                let data_point = data_point::open(&data_point_pin)?;
                 dimension = data_point.stored_len();
             }
 
@@ -307,8 +306,7 @@ mod test {
 
     use super::*;
     use crate::data_point::Similarity;
-    use data_point::create_data_point;
-    use nucliadb_core::Channel;
+    use data_point::create;
 
     #[test]
     fn force_merge_more_than_limit() {
@@ -320,11 +318,10 @@ mod test {
 
         for _ in 0..200 {
             let similarity = Similarity::Cosine;
-            let channel = Channel::EXPERIMENTAL;
             let embeddings = vec![];
             let time = Some(SystemTime::now());
             let data_point_pin = DataPointPin::create_pin(&vectors_path).unwrap();
-            create_data_point(&data_point_pin, embeddings, time, similarity, channel).unwrap();
+            create(&data_point_pin, embeddings, time, similarity).unwrap();
             data_points.push(data_point_pin);
         }
 
@@ -345,11 +342,10 @@ mod test {
 
         for _ in 0..50 {
             let similarity = Similarity::Cosine;
-            let channel = Channel::EXPERIMENTAL;
             let embeddings = vec![];
             let time = Some(SystemTime::now());
             let data_point_pin = DataPointPin::create_pin(&vectors_path).unwrap();
-            create_data_point(&data_point_pin, embeddings, time, similarity, channel).unwrap();
+            create(&data_point_pin, embeddings, time, similarity).unwrap();
             data_points.push(data_point_pin);
         }
 
@@ -370,11 +366,10 @@ mod test {
 
         for _ in 0..100 {
             let similarity = Similarity::Cosine;
-            let channel = Channel::EXPERIMENTAL;
             let embeddings = vec![];
             let time = Some(SystemTime::now());
             let data_point_pin = DataPointPin::create_pin(&vectors_path).unwrap();
-            create_data_point(&data_point_pin, embeddings, time, similarity, channel).unwrap();
+            create(&data_point_pin, embeddings, time, similarity).unwrap();
             data_points.push(data_point_pin);
         }
 

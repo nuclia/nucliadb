@@ -29,7 +29,6 @@ mod tests;
 
 use crate::data_types::{data_store, trie, trie_ram, vector, DeleteLog};
 use crate::formula::Formula;
-use crate::fst_index::{KeyIndex, Label, LabelIndex};
 use crate::VectorR;
 use data_store::Interpreter;
 use disk_hnsw::DiskHnsw;
@@ -41,7 +40,6 @@ use node::Node;
 use ops_hnsw::HnswOps;
 use ram_hnsw::RAMHnsw;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -54,7 +52,6 @@ mod file_names {
     pub const NODES: &str = "nodes.kv";
     pub const HNSW: &str = "index.hnsw";
     pub const JOURNAL: &str = "journal.json";
-    pub const FST: &str = "fst";
     pub const DATA_POINT_PIN: &str = ".pin";
 }
 
@@ -96,10 +93,6 @@ impl DataPointPin {
         }
     }
 
-    pub fn open_data_point(&self) -> VectorR<DataPoint> {
-        DataPoint::open(&self.workspace, self.data_point_id)
-    }
-
     pub fn read_journal(&self) -> io::Result<Journal> {
         let journal = File::open(&self.journal_path)?;
         let journal: Journal = serde_json::from_reader(BufReader::new(journal))?;
@@ -135,12 +128,31 @@ impl DataPointPin {
     }
 }
 
-pub fn merge_data_points<Dlog>(
-    pin: &DataPointPin,
-    operants: &[(Dlog, DpId)],
-    similarity: Similarity,
-    channel: Channel,
-) -> VectorR<DataPoint>
+pub fn open(pin: &DataPointPin) -> VectorR<OpenDataPoint> {
+    let data_point_path = &pin.data_point_path;
+    let nodes_file = File::open(data_point_path.join(file_names::NODES))?;
+    let journal_file = File::open(data_point_path.join(file_names::JOURNAL))?;
+    let hnsw_file = File::open(data_point_path.join(file_names::HNSW))?;
+
+    let nodes = unsafe { Mmap::map(&nodes_file)? };
+    let index = unsafe { Mmap::map(&hnsw_file)? };
+    let journal: Journal = serde_json::from_reader(BufReader::new(journal_file))?;
+
+    // Telling the OS our expected access pattern
+    #[cfg(not(target_os = "windows"))]
+    {
+        nodes.advise(memmap2::Advice::WillNeed)?;
+        index.advise(memmap2::Advice::Sequential)?;
+    }
+
+    Ok(OpenDataPoint {
+        journal,
+        nodes,
+        index,
+    })
+}
+
+pub fn merge<Dlog>(pin: &DataPointPin, operants: &[(Dlog, DpId)], similarity: Similarity) -> VectorR<OpenDataPoint>
 where
     Dlog: DeleteLog,
 {
@@ -171,7 +183,7 @@ where
 
     let operants = operants
         .iter()
-        .map(|(dlog, dp_id)| DataPoint::open(workspace, *dp_id).map(|v| (dlog, v)))
+        .map(|(dlog, dp_id)| OpenDataPoint::open(workspace, *dp_id).map(|v| (dlog, v)))
         .collect::<VectorR<Vec<_>>>()?;
 
     // Creating the node store
@@ -179,14 +191,6 @@ where
     data_store::merge(&mut nodes_file, &node_producers)?;
     let nodes = unsafe { Mmap::map(&nodes_file)? };
     let no_nodes = data_store::stored_elements(&nodes);
-
-    // Creating the FSTs with the new nodes
-    let (label_index, key_index) = if channel == Channel::EXPERIMENTAL {
-        debug!("Indexing with experimental FSTs");
-        DataPoint::create_fsts(data_point_path, &nodes)?
-    } else {
-        (None, None)
-    };
 
     // Creating the hnsw for the new node store.
     let tracker = Retriever::new(&[], &nodes, &NoDLog, similarity, -1.0);
@@ -223,22 +227,19 @@ where
         index.advise(memmap2::Advice::Sequential)?;
     }
 
-    Ok(DataPoint {
+    Ok(OpenDataPoint {
         journal,
         nodes,
         index,
-        label_index,
-        key_index,
     })
 }
 
-pub fn create_data_point(
+pub fn create(
     pin: &DataPointPin,
     elems: Vec<Elem>,
     time: Option<SystemTime>,
     similarity: Similarity,
-    channel: Channel,
-) -> VectorR<DataPoint> {
+) -> VectorR<OpenDataPoint> {
     let data_point_id = pin.data_point_id;
     let data_point_path = &pin.data_point_path;
     let mut nodes_file_options = OpenOptions::new();
@@ -264,14 +265,6 @@ pub fn create_data_point(
     data_store::create_key_value(&mut nodesf, elems)?;
     let nodes = unsafe { Mmap::map(&nodesf)? };
     let no_nodes = data_store::stored_elements(&nodes);
-
-    // Creating the FSTs
-    let (label_index, key_index) = if channel == Channel::EXPERIMENTAL {
-        debug!("Indexing with experimental FSTs");
-        DataPoint::create_fsts(data_point_path, &nodes)?
-    } else {
-        (None, None)
-    };
 
     // Creating the HNSW using the mmaped nodes
     let tracker = Retriever::new(&[], &nodes, &NoDLog, similarity, -1.0);
@@ -309,12 +302,10 @@ pub fn create_data_point(
         index.advise(memmap2::Advice::Sequential)?;
     }
 
-    Ok(DataPoint {
+    Ok(OpenDataPoint {
         journal,
         nodes,
         index,
-        label_index,
-        key_index,
     })
 }
 
@@ -573,19 +564,19 @@ impl Neighbour {
     }
 }
 
-pub struct DataPoint {
+pub struct OpenDataPoint {
     journal: Journal,
     nodes: Mmap,
     index: Mmap,
 }
 
-impl AsRef<DataPoint> for DataPoint {
-    fn as_ref(&self) -> &DataPoint {
+impl AsRef<OpenDataPoint> for OpenDataPoint {
+    fn as_ref(&self) -> &OpenDataPoint {
         self
     }
 }
 
-impl DataPoint {
+impl OpenDataPoint {
     pub fn stored_len(&self) -> Option<u64> {
         if data_store::stored_elements(&self.nodes) == 0 {
             return None;
@@ -634,7 +625,7 @@ impl DataPoint {
         neighbours.into_iter().map(|(address, dist)| (Neighbour::new(address, &self.nodes, dist))).take(results)
     }
 
-    pub fn merge<Dlog>(dir: &path::Path, operants: &[(Dlog, DpId)], similarity: Similarity) -> VectorR<DataPoint>
+    pub fn merge<Dlog>(dir: &Path, operants: &[(Dlog, DpId)], similarity: Similarity) -> VectorR<OpenDataPoint>
     where
         Dlog: DeleteLog,
     {
@@ -647,7 +638,7 @@ impl DataPoint {
         let mut hnswf = fs::OpenOptions::new().read(true).write(true).create(true).open(id.join(file_names::HNSW))?;
         let operants = operants
             .iter()
-            .map(|(dlog, dp_id)| DataPoint::open(dir, *dp_id).map(|v| (dlog, v)))
+            .map(|(dlog, dp_id)| OpenDataPoint::open(dir, *dp_id).map(|v| (dlog, v)))
             .collect::<VectorR<Vec<_>>>()?;
 
         // Creating the node store
@@ -691,7 +682,7 @@ impl DataPoint {
             index.advise(memmap2::Advice::Sequential)?;
         }
 
-        Ok(DataPoint {
+        Ok(OpenDataPoint {
             journal,
             nodes,
             index,
@@ -703,7 +694,7 @@ impl DataPoint {
         fs::remove_dir_all(id)?;
         Ok(())
     }
-    pub fn open(dir: &Path, uid: DpId) -> VectorR<DataPoint> {
+    pub fn open(dir: &Path, uid: DpId) -> VectorR<OpenDataPoint> {
         let uid = uid.to_string();
         let id = dir.join(uid);
         let nodes = fs::OpenOptions::new().read(true).open(id.join(file_names::NODES))?;
@@ -721,7 +712,7 @@ impl DataPoint {
             index.advise(memmap2::Advice::Sequential)?;
         }
 
-        Ok(DataPoint {
+        Ok(OpenDataPoint {
             journal,
             nodes,
             index,
@@ -733,11 +724,11 @@ impl DataPoint {
         elems: Vec<Elem>,
         time: Option<SystemTime>,
         similarity: Similarity,
-    ) -> VectorR<DataPoint> {
+    ) -> VectorR<OpenDataPoint> {
         let data_point_id = DpId::new_v4();
         let data_point_path = dir.join(data_point_id.to_string());
         fs::create_dir(&data_point_path)?;
-        DataPoint::new_with_id(&data_point_path, data_point_id, elems, time, similarity, channel)
+        OpenDataPoint::new_with_id(&data_point_path, data_point_id, elems, time, similarity)
     }
 
     pub fn new_from_pin(
@@ -745,11 +736,10 @@ impl DataPoint {
         elems: Vec<Elem>,
         time: Option<SystemTime>,
         similarity: Similarity,
-        channel: Channel,
-    ) -> VectorR<DataPoint> {
+    ) -> VectorR<OpenDataPoint> {
         let data_point_id = data_point_pin.data_point_id;
         let data_point_path = &data_point_pin.data_point_path;
-        DataPoint::new_with_id(data_point_path, data_point_id, elems, time, similarity, channel)
+        OpenDataPoint::new_with_id(data_point_path, data_point_id, elems, time, similarity)
     }
 
     fn new_with_id(
@@ -758,8 +748,7 @@ impl DataPoint {
         elems: Vec<Elem>,
         time: Option<SystemTime>,
         similarity: Similarity,
-        channel: Channel,
-    ) -> VectorR<DataPoint> {
+    ) -> VectorR<OpenDataPoint> {
         let mut nodes_file_options = OpenOptions::new();
         nodes_file_options.read(true);
         nodes_file_options.write(true);
@@ -820,7 +809,7 @@ impl DataPoint {
             index.advise(memmap2::Advice::Sequential)?;
         }
 
-        Ok(DataPoint {
+        Ok(OpenDataPoint {
             journal,
             nodes,
             index,

@@ -25,7 +25,7 @@ use nucliadb_core::tracing::*;
 
 use super::merger::{MergeQuery, MergeRequest};
 use super::State;
-use crate::data_point::{DataPoint, Journal, Similarity};
+use crate::data_point::{Journal, OpenDataPoint, Similarity};
 use crate::VectorR;
 
 pub(crate) struct Worker {
@@ -56,12 +56,12 @@ impl Worker {
         }) else {
             return Ok(());
         };
-        let new_dp = DataPoint::merge(subscriber, &work, self.similarity)?;
+        let new_dp = OpenDataPoint::merge(subscriber, &work, self.similarity)?;
         let new_dp_id = new_dp.get_id();
         if self.sender.send(new_dp.journal()).is_err() {
             // If the sender has been deallocated this data point becomes garbage,
             // therefore is removed.
-            DataPoint::delete(subscriber, new_dp.get_id())?;
+            OpenDataPoint::delete(subscriber, new_dp.get_id())?;
         }
         info!("Merge request completed: {new_dp_id}");
         Ok(())

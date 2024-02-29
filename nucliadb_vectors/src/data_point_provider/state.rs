@@ -27,7 +27,7 @@ use std::time::SystemTime;
 use serde::{Deserialize, Serialize};
 
 use super::{SearchRequest, VectorR};
-use crate::data_point::{DataPoint, DpId, Journal, Neighbour, Similarity};
+use crate::data_point::{DpId, Journal, Neighbour, OpenDataPoint, Similarity};
 use crate::data_types::dtrie_ram::DTrie;
 use crate::data_types::DeleteLog;
 
@@ -211,7 +211,7 @@ impl State {
         let mut ffsv = Fssc::new(request.no_results(), with_duplicates);
         for journal in self.work_stack_iterator().copied() {
             let delete_log = self.delete_log(journal);
-            let data_point = DataPoint::open(location, journal.id())?;
+            let data_point = OpenDataPoint::open(location, journal.id())?;
             let partial_solution =
                 data_point.search(&delete_log, query, filter, with_duplicates, no_results, similarity, min_score);
             for candidate in partial_solution {
@@ -257,7 +257,7 @@ impl State {
         for journal in self.work_stack_iterator().copied() {
             let delete_log = self.delete_log(journal);
             let dp_id = journal.id();
-            let data_point = DataPoint::open(location, dp_id)?;
+            let data_point = OpenDataPoint::open(location, dp_id)?;
             let mut results = data_point.get_keys(&delete_log);
             keys.append(&mut results);
         }
@@ -282,7 +282,7 @@ impl State {
         let Some(journal) = self.work_stack_iterator().next() else {
             return Ok(None);
         };
-        let data_point = DataPoint::open(location, journal.id())?;
+        let data_point = OpenDataPoint::open(location, journal.id())?;
         Ok(data_point.stored_len())
     }
 }
@@ -351,7 +351,7 @@ mod test {
         }
     }
     impl<'a> Iterator for DataPointProducer<'a> {
-        type Item = DataPoint;
+        type Item = OpenDataPoint;
         fn next(&mut self) -> Option<Self::Item> {
             let no_vectors = random::<usize>() % 20;
             let mut elems = vec![];
@@ -361,7 +361,7 @@ mod test {
                 let vector = (0..self.dimension).map(|_| random::<f32>()).collect::<Vec<_>>();
                 elems.push(Elem::new(key, vector, labels, None));
             }
-            Some(DataPoint::new(self.path, elems, None, Similarity::Cosine).unwrap())
+            Some(OpenDataPoint::new(self.path, elems, None, Similarity::Cosine).unwrap())
         }
     }
 
@@ -383,7 +383,7 @@ mod test {
         assert_eq!(state.current.size(), 0);
         let work = state.current_work_unit().unwrap();
         let work = work.iter().map(|j| (state.delete_log(*j), j.id())).collect::<Vec<_>>();
-        let new = DataPoint::merge(dir.path(), &work, Similarity::Cosine).unwrap();
+        let new = OpenDataPoint::merge(dir.path(), &work, Similarity::Cosine).unwrap();
         std::mem::drop(work);
         state.replace_work_unit(new.journal());
         assert!(state.current_work_unit().is_none());

@@ -43,7 +43,7 @@ use serde::{Deserialize, Serialize};
 use state::*;
 
 pub use crate::data_point::Neighbour;
-use crate::data_point::{DataPoint, DpId, Journal, Similarity};
+use crate::data_point::{DpId, Journal, OpenDataPoint, Similarity};
 use crate::data_point_provider::merge_worker::Worker;
 use crate::data_types::dtrie_ram::DTrie;
 use crate::data_types::DeleteLog;
@@ -83,15 +83,10 @@ impl<'a> DeleteLog for TimeSensitiveDLog<'a> {
 
 /// Used to provide metrics about a [`Index::force_merge`] execution.
 /// Can used to determine if another call should be done.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct MergeMetrics {
     pub merged: usize,
     pub segments_left: usize,
-}
-
-pub struct Merge {
-    new_data_points: Vec<Journal>,
-    metrics: MergeMetrics,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -125,7 +120,9 @@ enum MergerStatus {
 }
 
 pub struct Index {
+    #[allow(dead_code)]
     max_nodes_per_segment: usize,
+    #[allow(dead_code)]
     max_segments_in_merge: usize,
     metadata: IndexMetadata,
     merger_status: MergerStatus,
@@ -285,7 +282,7 @@ impl Index {
             };
             if !in_use_dp.contains(&dpid) {
                 info!("found garbage {name}");
-                let Err(err) = DataPoint::delete(&self.location, dpid) else {
+                let Err(err) = OpenDataPoint::delete(&self.location, dpid) else {
                     continue;
                 };
                 warn!("{name} is garbage and could not be deleted because of {err}");
@@ -294,7 +291,7 @@ impl Index {
         Ok(())
     }
 
-    pub fn add(&mut self, dp: DataPoint, _lock: &Lock) -> VectorR<()> {
+    pub fn add(&mut self, dp: OpenDataPoint, _lock: &Lock) -> VectorR<()> {
         let mut state = self.write_state();
         let Some(new_dp_vector_len) = dp.stored_len() else {
             return Ok(());
@@ -319,67 +316,9 @@ impl Index {
         rcv.recv().ok()
     }
 
-    fn merge(&self, state: &State, max_nodes_per_segment: usize, capacity: usize) -> VectorR<Merge> {
-        let location = self.location.clone();
-        let similarity = self.metadata.similarity;
-        let mut live_segments: Vec<_> = state.dpid_iter().collect();
-        let mut blocked_segments = vec![];
-        let mut buffer = Vec::with_capacity(capacity);
-
-        while buffer.len() < capacity {
-            let Some(journal) = live_segments.pop() else {
-                break;
-            };
-            if journal.no_nodes() >= max_nodes_per_segment {
-                blocked_segments.push(journal);
-            } else {
-                buffer.push((state.delete_log(journal), journal.id()));
-            }
-        }
-
-        let new_dp = DataPoint::merge(&location, &buffer, similarity)?;
-        blocked_segments.push(new_dp.journal());
-        blocked_segments.extend(live_segments);
-        let live_segments = blocked_segments;
-
-        let metrics = MergeMetrics {
-            merged: buffer.len(),
-            segments_left: live_segments.len(),
-        };
-        let merge = Merge {
-            metrics,
-            new_data_points: live_segments,
-        };
-
-        Ok(merge)
-    }
-
     /// Returns the number of segments that have been merged.
     pub fn force_merge(&mut self, _lock: &Lock) -> VectorR<MergeMetrics> {
-        let possible_merge = self.take_available_merge_or_wait();
-        let mut state = self.write_state();
-        let mut date = self.write_date();
-
-        if let Some(journal) = possible_merge {
-            state.replace_work_unit(journal);
-        }
-
-        if state.work_stack_len() <= 1 {
-            return Ok(MergeMetrics {
-                merged: 0,
-                segments_left: state.work_stack_len(),
-            });
-        }
-
-        let merge = self.merge(&state, 50_000, 100)?;
-        let live_segments = merge.new_data_points;
-        let metrics = merge.metrics;
-
-        state.rebuilt_work_stack_with(live_segments);
-        fs_state::persist_state::<State>(&self.location, &state)?;
-        *date = fs_state::crnt_version(&self.location)?;
-
-        Ok(metrics)
+        Ok(MergeMetrics::default())
     }
 
     pub fn commit(&mut self, _lock: &Lock) -> VectorR<()> {
@@ -389,14 +328,6 @@ impl Index {
 
         if let Some(journal) = possible_merge {
             state.replace_work_unit(journal);
-        }
-
-        if state.work_stack_len() > 1 {
-            let max_nodes_per_segment = self.max_nodes_per_segment;
-            let max_segments_in_merge = self.max_segments_in_merge;
-            let merge = self.merge(&state, max_nodes_per_segment, max_segments_in_merge)?;
-            let data_points = merge.new_data_points;
-            state.rebuilt_work_stack_with(data_points);
         }
 
         fs_state::persist_state::<State>(&self.location, &state)?;
@@ -446,84 +377,6 @@ mod test {
     use crate::data_point::{Elem, LabelDictionary, Similarity};
 
     #[test]
-
-    fn force_merge_more_than_limit() -> NodeResult<()> {
-        let dir = tempfile::tempdir()?;
-        let vectors_path = dir.path().join("vectors");
-        let mut index = Index::new(&vectors_path, IndexMetadata::default())?;
-        let lock = index.get_elock()?;
-
-        let mut journals = vec![];
-        for _ in 0..200 {
-            let similarity = Similarity::Cosine;
-            let embeddings = vec![];
-            let time = Some(SystemTime::now());
-            let data_point = DataPoint::new(&vectors_path, embeddings, time, similarity).unwrap();
-            journals.push(data_point.journal());
-        }
-
-        index.write_state().rebuilt_work_stack_with(journals);
-
-        let metrics = index.force_merge(&lock).unwrap();
-        assert_eq!(metrics.merged, 100);
-        assert_eq!(metrics.segments_left, 101);
-        Ok(())
-    }
-
-    #[test]
-    fn force_merge_less_than_limit() -> NodeResult<()> {
-        let dir = tempfile::tempdir()?;
-        let vectors_path = dir.path().join("vectors");
-        let mut index = Index::new(&vectors_path, IndexMetadata::default())?;
-        let lock = index.get_elock()?;
-
-        let mut journals = vec![];
-        for _ in 0..50 {
-            let similarity = Similarity::Cosine;
-            let embeddings = vec![];
-            let time = Some(SystemTime::now());
-            let data_point = DataPoint::new(&vectors_path, embeddings, time, similarity).unwrap();
-            journals.push(data_point.journal());
-        }
-
-        index.write_state().rebuilt_work_stack_with(journals);
-
-        let metrics = index.force_merge(&lock).unwrap();
-        assert_eq!(metrics.merged, 50);
-        assert_eq!(metrics.segments_left, 1);
-        Ok(())
-    }
-
-    #[test]
-    fn force_merge_test() -> NodeResult<()> {
-        let dir = tempfile::tempdir()?;
-        let vectors_path = dir.path().join("vectors");
-        let mut index = Index::new(&vectors_path, IndexMetadata::default())?;
-        let lock = index.get_elock()?;
-
-        let mut journals = vec![];
-        for _ in 0..100 {
-            let similarity = Similarity::Cosine;
-            let embeddings = vec![];
-            let time = Some(SystemTime::now());
-            let data_point = DataPoint::new(&vectors_path, embeddings, time, similarity).unwrap();
-            journals.push(data_point.journal());
-        }
-
-        index.write_state().rebuilt_work_stack_with(journals);
-
-        let metrics = index.force_merge(&lock).unwrap();
-        assert_eq!(metrics.merged, 100);
-        assert_eq!(metrics.segments_left, 1);
-
-        let metrics = index.force_merge(&lock).unwrap();
-        assert_eq!(metrics.merged, 0);
-        assert_eq!(metrics.segments_left, 1);
-
-        Ok(())
-    }
-
-    #[test]
     fn garbage_collection_test() -> NodeResult<()> {
         let dir = tempfile::tempdir()?;
         let vectors_path = dir.path().join("vectors");
@@ -532,7 +385,7 @@ mod test {
 
         let empty_no_entries = std::fs::read_dir(&vectors_path)?.count();
         for _ in 0..10 {
-            DataPoint::new(&vectors_path, vec![], None, Similarity::Cosine).unwrap();
+            OpenDataPoint::new(&vectors_path, vec![], None, Similarity::Cosine).unwrap();
         }
 
         index.collect_garbage(&lock)?;
@@ -548,7 +401,7 @@ mod test {
         let mut index = Index::new(&vectors_path, IndexMetadata::default())?;
         let lock = index.get_slock().unwrap();
 
-        let data_point = DataPoint::new(
+        let data_point = OpenDataPoint::new(
             &vectors_path,
             vec![
                 Elem::new("key_0".to_string(), vec![1.0], LabelDictionary::default(), None),
