@@ -296,9 +296,7 @@ impl Index {
         rcv.recv().ok()
     }
 
-
     fn merge(&self, state: &State, max_nodes_per_segment: usize, capacity: usize) -> VectorR<Merge> {
-        let channel = self.metadata.channel;
         let location = self.location.clone();
         let similarity = self.metadata.similarity;
         let mut live_segments: Vec<_> = state.dpid_iter().collect();
