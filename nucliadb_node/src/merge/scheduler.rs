@@ -122,6 +122,9 @@ impl MergeScheduler {
         Ok(())
     }
 
+    // Get the next merge request. If there's no more available, wait until
+    // someone requests or, after a timeout, schedule all shards for merge and
+    // get 1 request
     fn blocking_next(&self) -> InternalMergeRequest {
         let mut queue = self.work_queue.lock().expect("Poisoned merger scheduler mutex");
         while queue.is_empty() {
@@ -226,6 +229,7 @@ fn iter_shards(shards_path: PathBuf) -> impl Iterator<Item = String> {
 #[cfg(test)]
 mod tests {
     use tempfile::{self, TempDir};
+    use tokio;
 
     use super::*;
 
@@ -255,6 +259,21 @@ mod tests {
         assert_eq!(merger.pending_work(), 0);
     }
 
+    #[tokio::test]
+    async fn test_merger_with_waiter() {
+        let (merger, _guards) = merge_scheduler();
+
+        let handle = merger.schedule(MergeRequest {
+            shard_id: "shard-id".to_string(),
+            priority: MergePriority::default(),
+            waiter: MergeWaiter::None,
+        });
+
+        let merge = handle.wait().await;
+        // merge is an error because shard doesn't exist
+        assert!(merge.is_err())
+    }
+
     #[test]
     fn test_merger_schedules_all_shards_when_idle() {
         let (merger, _guards) = merge_scheduler();
@@ -264,11 +283,12 @@ mod tests {
         fs::create_dir_all(shards_path.join("shard-a")).unwrap();
         fs::create_dir_all(shards_path.join("shard-b")).unwrap();
 
-        // A run will trigger a schedule for all shards, we can run twice.
-        // Errors are returned because shards are fake
-        let result = merger.process();
-        assert!(result.is_err());
-        let result = merger.process();
-        assert!(result.is_err());
+        // this call will block, wait and schedule all shards
+        merger.blocking_next();
+        assert_eq!(merger.pending_work(), 1);
+
+        // now it'll get without blocking
+        merger.blocking_next();
+        assert_eq!(merger.pending_work(), 0);
     }
 }
