@@ -82,12 +82,12 @@ class TestProcessingHTTPClient:
         yield cl
 
     @pytest.mark.asyncio
-    async def test_status(self, client: processing.ProcessingHTTPClient, response):
-        response_data = processing.StatusResponse(shared={"foobar": 54}, account={})
+    async def test_requests(self, client: processing.ProcessingHTTPClient, response):
+        response_data = processing.RequestsResults(results=[], cursor=None)
         response.status = 200
         response.text.return_value = response_data.json()
 
-        assert await client.status() == response_data
+        assert await client.requests() == response_data
 
     @pytest.mark.asyncio
     async def test_pull(self, client: processing.ProcessingHTTPClient, response):

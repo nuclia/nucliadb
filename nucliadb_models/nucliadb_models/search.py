@@ -597,7 +597,6 @@ class BaseSearchRequest(BaseModel):
         title="Filters",
         description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/docs/using/search/#filters",  # noqa: E501
     )
-    faceted: List[str] = SearchParamDefaults.faceted.to_pydantic_field()
     page_number: int = SearchParamDefaults.page_number.to_pydantic_field()
     page_size: int = SearchParamDefaults.page_size.to_pydantic_field()
     min_score: Optional[float] = SearchParamDefaults.min_score.to_pydantic_field()
@@ -644,6 +643,11 @@ class BaseSearchRequest(BaseModel):
         RequestSecurity
     ] = SearchParamDefaults.security.to_pydantic_field()
 
+
+class SearchRequest(BaseSearchRequest):
+    faceted: List[str] = SearchParamDefaults.faceted.to_pydantic_field()
+    sort: Optional[SortOptions] = SearchParamDefaults.sort.to_pydantic_field()
+
     @validator("faceted")
     def nested_facets_not_supported(cls, facets):
         """
@@ -675,10 +679,6 @@ class BaseSearchRequest(BaseModel):
                     )
             facet = next_facet
         return facets
-
-
-class SearchRequest(BaseSearchRequest):
-    sort: Optional[SortOptions] = SearchParamDefaults.sort.to_pydantic_field()
 
 
 class Author(str, Enum):
@@ -1055,14 +1055,21 @@ class KnowledgeboxFindResults(JsonBaseModel):
 
     resources: Dict[str, FindResource]
     relations: Optional[Relations] = None
-    facets: FacetsResult
     query: Optional[str] = None
     total: int = 0
     page_number: int = 0
     page_size: int = 20
     next_page: bool = False
-    nodes: Optional[List[Dict[str, str]]] = None
-    shards: Optional[List[str]] = None
+    nodes: Optional[List[Dict[str, str]]] = Field(
+        default=None,
+        title="Nodes",
+        description="List of nodes queried in the search",
+    )
+    shards: Optional[List[str]] = Field(
+        default=None,
+        title="Shards",
+        description="The list of shard replica ids used for the search.",
+    )
     autofilters: List[str] = ModelParamDefaults.applied_autofilters.to_pydantic_field()
     min_score: float = ModelParamDefaults.min_score.to_pydantic_field()
     best_matches: List[str] = Field(

@@ -45,7 +45,7 @@ def cluster_settings():
 
 @pytest.fixture
 def self_node(cluster_settings):
-    self_node = MagicMock(id="id", address="address", shard_count=0)
+    self_node = MagicMock(id="id", address="address", shard_count=0, available_disk=10)
     self_node.reader = AsyncMock()
     self_node.writer = AsyncMock()
     self_node.reader.Search.return_value = nodereader_pb2.SearchResponse()
@@ -126,8 +126,7 @@ async def test_node_info(
     servicer: service.StandaloneClusterServiceServicer, self_node, cluster_settings
 ):
     resp = await servicer.NodeInfo(standalone_pb2.NodeInfoRequest(), None)
-    assert resp == standalone_pb2.NodeInfoResponse(
-        id=self_node.id,
-        address=self_node.address,
-        shard_count=self_node.shard_count,
-    )
+    assert resp.id == self_node.id
+    assert resp.address == self_node.address
+    assert resp.shard_count == self_node.shard_count
+    assert resp.available_disk > 0

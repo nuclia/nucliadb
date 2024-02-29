@@ -294,6 +294,7 @@ async def chat(
                 status_code=status_code.value,
                 chat_history=chat_history,
                 query_context=prompt_context,
+                learning_id=nuclia_learning_id,
             )
 
         answer_stream = _wrapped_stream()
@@ -343,6 +344,7 @@ async def maybe_audit_chat(
     status_code: Optional[AnswerStatusCode],
     chat_history: list[ChatContextMessage],
     query_context: list[str],
+    learning_id: str,
 ):
     audit = get_audit()
     if audit is None:
@@ -371,6 +373,7 @@ async def maybe_audit_chat(
         rephrased_question=rephrased_query,
         context=audit_context,
         answer=audit_answer,
+        learning_id=learning_id,
     )
 
 

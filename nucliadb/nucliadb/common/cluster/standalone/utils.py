@@ -19,6 +19,7 @@
 
 import logging
 import os
+import shutil
 import uuid
 from socket import gethostname
 
@@ -54,7 +55,14 @@ def get_self() -> StandaloneIndexNode:
             host = f"{hn}.{ns}"
         else:
             host = gethostname()
-        _SELF_INDEX_NODE = StandaloneIndexNode(id=node_id, address=host, shard_count=0)
+        _SELF_INDEX_NODE = StandaloneIndexNode(
+            id=node_id, address=host, shard_count=0, available_disk=0
+        )
+    try:
+        _, _, available_disk = shutil.disk_usage(cluster_settings.data_path)
+        _SELF_INDEX_NODE.available_disk = available_disk
+    except FileNotFoundError:  # pragma: no cover
+        ...
     try:
         _shards_dir = os.path.join(cluster_settings.data_path, "shards")
         _SELF_INDEX_NODE.shard_count = len(

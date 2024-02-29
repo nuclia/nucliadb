@@ -209,6 +209,7 @@ async def catalog(
     with_status: Optional[ResourceProcessingStatus] = fastapi_query(
         SearchParamDefaults.with_status
     ),
+    debug: bool = fastapi_query(SearchParamDefaults.debug),
 ) -> Union[KnowledgeboxSearchResults, HTTPClientError]:
     sort_options = SortOptions(  # default
         field=SortField.CREATED,
@@ -238,7 +239,7 @@ async def catalog(
         )
         pb_query, _, _ = await query_parser.parse()
 
-        (results, _, _) = await node_query(
+        (results, _, queried_nodes) = await node_query(
             kbid,
             Method.SEARCH,
             pb_query,
@@ -262,6 +263,10 @@ async def catalog(
             min_score=query_parser.min_score,
             highlight=False,
         )
+        if debug:
+            search_results.nodes = debug_nodes_info(queried_nodes)
+        queried_shards = [shard_id for _, shard_id in queried_nodes]
+        search_results.shards = queried_shards
         return search_results
     except KnowledgeBoxNotFound:
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")

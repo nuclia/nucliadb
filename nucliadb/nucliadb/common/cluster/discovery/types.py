@@ -27,5 +27,6 @@ class IndexNodeMetadata:
     name: str
     address: str
     shard_count: int
+    available_disk: int
     primary_id: Optional[str] = None
     updated_at: float = field(default_factory=time.time)

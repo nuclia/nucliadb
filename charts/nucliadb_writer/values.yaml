@@ -30,6 +30,7 @@ resources: {}
 #    memory: "600Mi"
 #  requests:
 #    cpu: "300m"
+jaeger_agent_resources: {}
 
 serving:
   port: 8080

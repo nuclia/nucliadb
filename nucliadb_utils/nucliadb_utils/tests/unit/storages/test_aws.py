@@ -29,8 +29,10 @@ from nucliadb_utils.storages.exceptions import UnparsableResponse
     [
         ("200", 200),
         ("404", 404),
+        ("409", 409),
         ("NoSuchBucket", 404),
         ("NoSuchKey", 404),
+        ("BucketNotEmpty", 409),
     ],
 )
 def test_parse_status_code(response_generator, code: str, expected: int):

@@ -42,6 +42,7 @@ message ChatAudit {
   optional string answer = 2;
   optional string rephrased_question = 3;
   repeated ChatContext context = 4;
+  string learning_id = 5;
 }
 
 message AuditRequest {
