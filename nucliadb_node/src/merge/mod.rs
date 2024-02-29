@@ -24,6 +24,6 @@ mod request;
 mod scheduler;
 mod work;
 
-pub use global::{global_merger, install_global};
+pub use global::{global_merger, install_global, stop_global_merger};
 pub use request::{MergePriority, MergeRequest, MergeWaiter};
 pub use scheduler::MergeScheduler;

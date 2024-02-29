@@ -157,6 +157,7 @@ async fn wait_for_sigkill(shutdown_notifier: Arc<Notify>) -> NodeResult<()> {
     }
 
     shutdown_notifier.notify_waiters();
+    lifecycle::finalize_merger();
 
     Ok(())
 }

@@ -53,6 +53,7 @@ pub struct MergeScheduler {
     shard_cache: Arc<ShardWriterCache>,
     settings: Settings,
     condvar: Condvar,
+    shutdown: Mutex<bool>,
 }
 
 impl MergeScheduler {
@@ -62,6 +63,7 @@ impl MergeScheduler {
             shard_cache,
             settings,
             condvar: Condvar::default(),
+            shutdown: Mutex::new(false),
         }
     }
 
@@ -80,18 +82,29 @@ impl MergeScheduler {
         handle
     }
 
-    pub fn run_forever(&self) {
+    /// Runs the scheduler until stopped
+    pub fn run(&self) {
+        let mut shutdown = self.shutdown.lock().expect("Poisoned merger shutdown signal");
+        *shutdown = false;
+        drop(shutdown);
+
         loop {
-            let merge = self.run();
+            let merge = self.process();
             if let Err(error) = merge {
                 warn!("An error occurred while merging: {}", error);
             }
         }
     }
 
+    /// Signals the scheduler to stop
+    pub fn stop(&self) {
+        let mut shutdown = self.shutdown.lock().expect("Poisoned merger shutdown signal");
+        *shutdown = true;
+    }
+
     /// Take the most prioritary work from the scheduler queue and perform a
     /// merge
-    fn run(&self) -> NodeResult<()> {
+    fn process(&self) -> NodeResult<()> {
         let request = self.blocking_next();
         let result = self.merge_shard(&request.shard_id);
 
@@ -237,7 +250,7 @@ mod tests {
         assert_eq!(merger.pending_work(), 1);
 
         // shard is fake, so this fails but work is done
-        let result = merger.run();
+        let result = merger.process();
         assert!(result.is_err());
         assert_eq!(merger.pending_work(), 0);
     }
@@ -253,9 +266,9 @@ mod tests {
 
         // A run will trigger a schedule for all shards, we can run twice.
         // Errors are returned because shards are fake
-        let result = merger.run();
+        let result = merger.process();
         assert!(result.is_err());
-        let result = merger.run();
+        let result = merger.process();
         assert!(result.is_err());
     }
 }

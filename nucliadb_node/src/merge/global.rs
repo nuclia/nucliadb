@@ -35,7 +35,7 @@ pub fn install_global(merger: MergeScheduler) -> Result<impl FnOnce(), MergerErr
         return Err(MergerError::GlobalMergerAlreadyInstalled);
     }
     let global_merger = MERGE_SCHEDULER.get_or_init(move || merger);
-    Ok(move || global_merger.run_forever())
+    Ok(move || global_merger.run())
 }
 
 /// Get a referente to the global merge scheduler
@@ -43,4 +43,9 @@ pub fn install_global(merger: MergeScheduler) -> Result<impl FnOnce(), MergerErr
 /// This function panics if the global merger hasn't been installed
 pub fn global_merger() -> &'static MergeScheduler {
     MERGE_SCHEDULER.get().expect("Global merge scheduler must be installed")
+}
+
+/// Stop global merger
+pub fn stop_global_merger() {
+    global_merger().stop()
 }

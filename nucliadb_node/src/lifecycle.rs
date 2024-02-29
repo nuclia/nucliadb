@@ -56,6 +56,12 @@ pub fn initialize_merger(shard_cache: Arc<ShardWriterCache>, settings: Settings)
     Ok(())
 }
 
+/// Finalizes the global merge scheduler. This function should be called before
+/// finishing the process that started the merge
+pub fn finalize_merger() {
+    merge::stop_global_merger();
+}
+
 /// Initialize the index node reader. This function must be called before using
 /// a reader
 pub fn initialize_reader(settings: Settings) {
