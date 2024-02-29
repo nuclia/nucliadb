@@ -45,6 +45,7 @@ MAX_GET_EXTRACTED_TEXT_OPS = 20
 
 async def summarize(kbid: str, request: SummarizeRequest) -> SummarizedResponse:
     predict_request = SummarizeModel()
+    predict_request.generative_model = request.generative_model
     predict_request.user_prompt = request.user_prompt
     predict_request.summary_kind = request.summary_kind
 

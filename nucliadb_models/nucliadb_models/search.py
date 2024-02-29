@@ -732,7 +732,7 @@ class ChatModel(BaseModel):
     generative_model: Optional[str] = Field(
         default=None,
         title="Generative model",
-        description="The generative model to use for the chat endpoint. If not provided, the model configured for the Knowledge Box is used.",
+        description="The generative model to use for the predict chat endpoint. If not provided, the model configured for the Knowledge Box is used.",
     )
 
 
@@ -925,6 +925,7 @@ class SummarizeModel(BaseModel):
     """
 
     resources: Dict[str, SummarizeResourceModel] = {}
+    generative_model: Optional[str] = None
     user_prompt: Optional[str] = None
     summary_kind: SummaryKind = SummaryKind.SIMPLE
 
@@ -933,6 +934,12 @@ class SummarizeRequest(BaseModel):
     """
     Model for the request payload of the summarize endpoint
     """
+
+    generative_model: Optional[str] = Field(
+        default=None,
+        title="Generative model",
+        description="The generative model to use for the summarization. If not provided, the model configured for the Knowledge Box is used.",
+    )
 
     user_prompt: Optional[str] = Field(
         default=None,
