@@ -43,7 +43,7 @@ use crate::RawProtos;
 
 #[pyclass]
 pub struct NodeWriter {
-    shards: ShardWriterCache,
+    shards: Arc<ShardWriterCache>,
     shards_path: PathBuf,
 }
 
@@ -60,13 +60,17 @@ impl NodeWriter {
     #[new]
     pub fn new() -> PyResult<Self> {
         let settings: Settings = EnvSettingsProvider::generate_settings().unwrap();
+        let shard_cache = Arc::new(ShardWriterCache::new(settings.clone()));
 
         if let Err(error) = lifecycle::initialize_writer(settings.clone()) {
             return Err(IndexNodeException::new_err(format!("Unable to initialize writer: {error}")));
         };
+        if let Err(error) = lifecycle::initialize_merger(Arc::clone(&shard_cache), settings.clone()) {
+            return Err(IndexNodeException::new_err(format!("Unable to initialize merger: {error}")));
+        }
         let shards_path = settings.shards_path();
         Ok(Self {
-            shards: ShardWriterCache::new(settings),
+            shards: shard_cache,
             shards_path,
         })
     }
