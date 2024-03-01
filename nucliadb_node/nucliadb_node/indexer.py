@@ -285,6 +285,10 @@ class PriorityIndexer:
                 while not self.work_queue.empty():
                     pending_work.append(self.work_queue.get_nowait())
 
+                # Wait for some time before nak'ing the messages to avoid
+                # flooding stdout with logs in case of an unhandled error.
+                await asyncio.sleep(1)
+
                 await work.nats_msg.nak()
                 await work.mpu.end()
 
