@@ -222,14 +222,8 @@ async def catalog_get(
         debug=debug,
         with_status=with_status,
     )
-    sort_options = SortOptions(  # default
-        field=SortField.CREATED,
-        order=SortOrder.DESC,
-        limit=None,
-    )
     if sort_field:
-        sort_options = SortOptions(field=sort_field, limit=sort_limit, order=sort_order)
-    item.sort = sort_options
+        item.sort = SortOptions(field=sort_field, limit=sort_limit, order=sort_order)
     return await catalog(kbid, item)
 
 
@@ -262,6 +256,15 @@ async def catalog(
     It is useful for listing resources in a knowledge box.
     """
     try:
+        sort = item.sort
+        if item.sort is None:
+            # By default we sort by creation date (most recent first)
+            sort = SortOptions(
+                field=SortField.CREATED,
+                order=SortOrder.DESC,
+                limit=None,
+            )
+
         # Min score is not relevant here, as catalog endpoint
         # only returns bm25 results on titles
         min_score = 0.0
@@ -272,7 +275,7 @@ async def catalog(
             query=item.query,
             filters=item.filters,
             faceted=item.faceted,
-            sort=item.sort,
+            sort=sort,
             page_number=item.page_number,
             page_size=item.page_size,
             min_score=min_score,
