@@ -59,7 +59,7 @@ def strip_query_params(url: yarl.URL) -> str:
 KB = 1024
 MB = 1024 * KB
 
-MIN_UPLOAD_SIZE = 256 * KB
+GCS_MIN_UPLOAD_SIZE = 256 * KB
 OBJECT_DATA_CHUNK_SIZE = 1 * MB
 
 

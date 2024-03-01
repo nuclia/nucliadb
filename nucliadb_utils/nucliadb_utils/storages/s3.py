@@ -36,8 +36,8 @@ from nucliadb_utils.storages.exceptions import UnparsableResponse
 from nucliadb_utils.storages.storage import Storage, StorageField
 
 MB = 1024 * 1024
-MIN_UPLOAD_SIZE = 5 * MB
-CHUNK_SIZE = MIN_UPLOAD_SIZE
+S3_MIN_UPLOAD_SIZE = 5 * MB
+CHUNK_SIZE = S3_MIN_UPLOAD_SIZE
 MAX_TRIES = 3
 
 RETRIABLE_EXCEPTIONS = (
@@ -190,7 +190,7 @@ class S3StorageField(StorageField):
         async for chunk in iterable:
             size += len(chunk)
             upload_chunk += chunk
-            if len(upload_chunk) >= MIN_UPLOAD_SIZE:
+            if len(upload_chunk) >= S3_MIN_UPLOAD_SIZE:
                 part = await self._upload_part(cf, upload_chunk)
                 self.field.parts.append(part["ETag"])
                 self.field.offset += 1
