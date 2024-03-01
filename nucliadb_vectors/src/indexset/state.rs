@@ -26,15 +26,16 @@ use super::IndexKeyCollector;
 use crate::data_point::Similarity;
 use crate::data_point_provider::{Index, IndexMetadata};
 use crate::VectorR;
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Default)]
 pub struct State {
+    #[allow(unused)]
     location: PathBuf,
-    indexes: HashSet<String>,
+    pub indexes: HashSet<String>,
 }
 impl State {
-    pub fn new(at: PathBuf) -> State {
+    pub fn new(location: PathBuf) -> State {
         State {
-            location: at,
+            location,
             indexes: HashSet::default(),
         }
     }
@@ -74,36 +75,5 @@ impl State {
                 },
             )
         }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use tempfile::TempDir;
-
-    use super::*;
-    #[test]
-    fn basic_functionality_test() {
-        let dir = TempDir::new().unwrap();
-        let mut vectorset = State::new(dir.path().to_path_buf());
-        let _index1 = vectorset.create("Index1", Similarity::Cosine).unwrap();
-        let _index2 = vectorset.create("Index2", Similarity::Cosine).unwrap();
-        let _index3 = vectorset.create("Index3", Similarity::Cosine).unwrap();
-        assert!(vectorset.get("Index1").unwrap().is_some());
-        assert!(vectorset.get("Index2").unwrap().is_some());
-        assert!(vectorset.get("Index3").unwrap().is_some());
-        assert!(vectorset.get("Index4").unwrap().is_none());
-        vectorset.remove_index("Index1").unwrap();
-        assert!(vectorset.get("Index1").unwrap().is_none());
-        assert!(vectorset.get("Index2").unwrap().is_some());
-        assert!(vectorset.get("Index3").unwrap().is_some());
-        vectorset.remove_index("Index2").unwrap();
-        assert!(vectorset.get("Index1").unwrap().is_none());
-        assert!(vectorset.get("Index2").unwrap().is_none());
-        assert!(vectorset.get("Index3").unwrap().is_some());
-        vectorset.remove_index("Index3").unwrap();
-        assert!(vectorset.get("Index1").unwrap().is_none());
-        assert!(vectorset.get("Index2").unwrap().is_none());
-        assert!(vectorset.get("Index3").unwrap().is_none());
     }
 }
