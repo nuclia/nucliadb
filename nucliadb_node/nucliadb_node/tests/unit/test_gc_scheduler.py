@@ -17,9 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
+from grpc import StatusCode
+from grpc.aio import AioRpcError
 from nucliadb_protos.noderesources_pb2 import ShardId, ShardIds
 from nucliadb_protos.nodewriter_pb2 import IndexMessage
 
@@ -88,6 +90,37 @@ class TestShardManager:
         )
         writer = AsyncMock(side_effect=try_later)
 
+        with patch("nucliadb_node.listeners.gc_scheduler.asyncio"), patch(
+            "nucliadb_node.listeners.gc_scheduler.capture_exception"
+        ) as capture_exception:
+            sm = ShardManager(shard_id="shard", writer=writer, gc_lock=AsyncMock())
+            await sm.gc()
+
+            assert writer.garbage_collector.await_count == 1
+            assert capture_exception.call_count == 0
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "grpc_error",
+        [
+            AioRpcError(
+                code=StatusCode.NOT_FOUND,
+                details="foobar",
+                initial_metadata=MagicMock(),
+                trailing_metadata=MagicMock(),
+            ),
+            AioRpcError(
+                code=StatusCode.INTERNAL,
+                details="Shard not found",
+                initial_metadata=MagicMock(),
+                trailing_metadata=MagicMock(),
+            ),
+        ],
+    )
+    async def test_garbage_collector_shard_not_found_handling(self, grpc_error):
+        from nucliadb_node.listeners.gc_scheduler import ShardManager
+
+        writer = Mock(garbage_collector=AsyncMock(side_effect=grpc_error))
         with patch("nucliadb_node.listeners.gc_scheduler.asyncio"), patch(
             "nucliadb_node.listeners.gc_scheduler.capture_exception"
         ) as capture_exception:
