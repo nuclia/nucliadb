@@ -75,8 +75,9 @@ async def update_migration_metrics(context: ApplicationContext):
     async for kbid in iter_kbids(context):
         kb_info = await mdm.get_kb_info(kbid)
         if kb_info is not None:
-            version_count.setdefault(str(kb_info.current_version), 0)
-            version_count[str(kb_info.current_version)] += 1
+            current_version = str(kb_info.current_version)
+            version_count.setdefault(current_version, 0)
+            version_count[current_version] += 1
 
     for version, count in version_count.items():
         MIGRATION_COUNT.set(count, labels=dict(type="kb", version=version))

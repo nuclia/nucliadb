@@ -55,7 +55,6 @@ async def test_run_exporter():
 
 
 async def test_update_migration_metrics():
-
     async def iter_kbids(context):
         yield "foo"
         yield "bar"
