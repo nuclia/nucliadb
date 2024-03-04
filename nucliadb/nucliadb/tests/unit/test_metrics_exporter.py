@@ -30,10 +30,12 @@ from nucliadb.metrics_exporter import (
 
 async def test_run_exporter_task():
     coro = AsyncMock()
-    task = asyncio.create_task(run_exporter_task(coro, interval=0.5))
+    context = Mock()
+    task = asyncio.create_task(run_exporter_task(context, coro, interval=0.5))
     await asyncio.sleep(1)
     task.cancel()
     assert coro.await_count == 2
+    assert coro.call_args_list[0] == mock.call(context)
 
 
 async def test_run_exporter():

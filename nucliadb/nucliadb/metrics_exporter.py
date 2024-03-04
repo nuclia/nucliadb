@@ -20,7 +20,6 @@
 from __future__ import annotations
 
 import asyncio
-import functools
 from typing import AsyncGenerator, Callable
 
 from nucliadb import logger
@@ -40,7 +39,7 @@ MIGRATION_COUNT = metrics.Gauge(
 )
 
 
-async def update_node_metrics():
+async def update_node_metrics(context: ApplicationContext):
     """
     Report the number of shards in each node.
     """
@@ -83,7 +82,9 @@ async def update_migration_metrics(context: ApplicationContext):
         MIGRATION_COUNT.set(count, labels=dict(type="kb", version=version))
 
 
-async def run_exporter_task(callable: Callable, interval: int):
+async def run_exporter_task(
+    context: ApplicationContext, exporter_task: Callable, interval: int
+):
     """
     Run coroutine infinitely, catching exceptions and logging them.
     It will wait for the interval before running again.
@@ -91,10 +92,10 @@ async def run_exporter_task(callable: Callable, interval: int):
     try:
         while True:
             try:
-                await callable()
+                await exporter_task(context)
             except Exception:
                 logger.error(
-                    f"Error on exporter task {callable.__name__}", exc_info=True
+                    f"Error on exporter task {exporter_task.__name__}", exc_info=True
                 )
             await asyncio.sleep(interval)
     except asyncio.CancelledError:
@@ -102,24 +103,22 @@ async def run_exporter_task(callable: Callable, interval: int):
 
 
 async def run_exporter(context: ApplicationContext):
+    # Schedule exporter tasks
     tasks = []
-
-    tasks.append(
-        asyncio.create_task(run_exporter_task(update_node_metrics, interval=10))
-    )
-
-    update_migration_metrics_callable = functools.partial(
-        update_migration_metrics, context
-    )
-    tasks.append(
-        asyncio.create_task(
-            run_exporter_task(update_migration_metrics_callable, interval=60 * 3)
+    for export_task, interval in [
+        (update_node_metrics, 10),
+        (update_migration_metrics, 60 * 3),
+    ]:
+        tasks.append(
+            asyncio.create_task(
+                run_exporter_task(context, export_task, interval=interval)
+            )
         )
-    )
     try:
         while True:
             await asyncio.sleep(10)
     except (asyncio.CancelledError, Exception):
+        # Cancel all tasks
         task: asyncio.Task
         for task in tasks:
             task.cancel()
