@@ -303,7 +303,7 @@ async def catalog(
             show=[ResourceProperties.BASIC],
             field_type_filter=[],
             extracted=[],
-            sort=item.sort,
+            sort=sort,
             requested_relations=pb_query.relation_subgraph,
             min_score=query_parser.min_score,
             highlight=False,
