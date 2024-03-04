@@ -54,7 +54,7 @@ async def test_run_all_kb_migrations_raises_on_failure():
     )
     execution_context.settings = Mock(max_concurrent_migrations=1)
     with patch(
-        "nucliadb.migrator.migrator.run_kb_migrations_in_parallel",
+        "nucliadb.migrator.migrator.run_kb_migrations",
         side_effect=[None, Exception("Boom")],
     ) as mock:
         with pytest.raises(Exception) as exc_info:
