@@ -108,12 +108,14 @@ class TestShardManager:
                 details="foobar",
                 initial_metadata=MagicMock(),
                 trailing_metadata=MagicMock(),
+                debug_error_string="",
             ),
             AioRpcError(
                 code=StatusCode.INTERNAL,
                 details="Shard not found",
                 initial_metadata=MagicMock(),
                 trailing_metadata=MagicMock(),
+                debug_error_string="",
             ),
         ],
     )
