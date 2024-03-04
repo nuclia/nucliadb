@@ -26,5 +26,5 @@ class Settings(pydantic.BaseSettings):
     redis_url: Optional[str] = None
     max_concurrent_migrations: int = pydantic.Field(
         default=5,
-        description="Maximum number of concurrent migrations allowed. Default is 5.",
+        description="Maximum number of concurrent KB migrations allowed.",
     )
