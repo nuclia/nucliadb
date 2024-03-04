@@ -1,7 +1,6 @@
 name: nucliadb (py)
 env:
   COMPONENT: nucliadb
-  CONTAINER_REGISTRY: eu.gcr.io/${{ secrets.PROJECT_ID }}
   TESTING_TIKV_LOCAL: "true"
 permissions:
   id-token: write   # This is required for requesting the JWT
@@ -192,13 +191,6 @@ jobs:
           service_account: "${{ secrets.GCP_REGISTRY_SERVICE_ACCOUNT }}"
           token_format: access_token
 
-      - name: Login to GCR
-        uses: docker/login-action@v3
-        with:
-          registry: eu.gcr.io
-          username: oauth2accesstoken
-          password: ${{ steps.gcp-auth.outputs.access_token }}
-
       - name: Login to Google Artifact Registry
         uses: docker/login-action@v3
         with:
@@ -209,16 +201,6 @@ jobs:
       # We need to setup buildx to be able to cache with gha
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-
-      - name: Build and push to GCR
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ env.CONTAINER_REGISTRY }}/${{ env.COMPONENT }}:${{ steps.branch_name.outputs.branch_name }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=min
 
       - name: Build and push to Google Artifact Repository
         uses: docker/build-push-action@v4
