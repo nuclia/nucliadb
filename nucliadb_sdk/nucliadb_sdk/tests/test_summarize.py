@@ -24,7 +24,9 @@ def test_summarize(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
     results: KnowledgeboxFindResults = sdk.find(kbid=docs_dataset, query="love")
     resource_uuids = [uuid for uuid in results.resources.keys()]
 
-    response = sdk.summarize(kbid=docs_dataset, resources=[resource_uuids[0]])
+    response = sdk.summarize(
+        kbid=docs_dataset, resources=[resource_uuids[0]], generative_model="everest"
+    )
     assert response.summary == "global summary"
 
     content = SummarizeRequest(resources=[resource_uuids[0]])

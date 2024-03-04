@@ -87,6 +87,7 @@ async def rephrase_query(
     query: str,
     user_id: str,
     user_context: list[str],
+    generative_model: Optional[str] = None,
 ) -> str:
     predict = get_predict()
     req = RephraseModel(
@@ -94,6 +95,7 @@ async def rephrase_query(
         chat_history=chat_history,
         user_id=user_id,
         user_context=user_context,
+        generative_model=generative_model,
     )
     return await predict.rephrase_query(kbid, req)
 
@@ -227,6 +229,7 @@ async def chat(
             query=user_query,
             user_id=user_id,
             user_context=user_context,
+            generative_model=chat_request.generative_model,
         )
 
     find_results: KnowledgeboxFindResults = await get_find_results(
@@ -265,6 +268,7 @@ async def chat(
             truncate=True,
             user_prompt=user_prompt,
             citations=chat_request.citations,
+            generative_model=chat_request.generative_model,
         )
         predict = get_predict()
         nuclia_learning_id, predict_generator = await predict.chat_query(
@@ -290,6 +294,7 @@ async def chat(
                 status_code=status_code.value,
                 chat_history=chat_history,
                 query_context=prompt_context,
+                learning_id=nuclia_learning_id,
             )
 
         answer_stream = _wrapped_stream()
@@ -339,6 +344,7 @@ async def maybe_audit_chat(
     status_code: Optional[AnswerStatusCode],
     chat_history: list[ChatContextMessage],
     query_context: list[str],
+    learning_id: str,
 ):
     audit = get_audit()
     if audit is None:
@@ -367,6 +373,7 @@ async def maybe_audit_chat(
         rephrased_question=rephrased_query,
         context=audit_context,
         answer=audit_answer,
+        learning_id=learning_id,
     )
 
 

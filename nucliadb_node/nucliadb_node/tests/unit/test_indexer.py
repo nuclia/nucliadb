@@ -306,6 +306,19 @@ class TestPriorityIndexer:
             await indexer._index_message(pb)
 
     @pytest.mark.asyncio
+    async def test_node_writer_status_shard_not_found_errors_are_handled(
+        self, indexer: PriorityIndexer, writer: AsyncMock
+    ):
+        status = OpStatus()
+        status.status = OpStatus.Status.ERROR
+        status.detail = 'status: NotFound, message: "Shard not found: Shard'
+
+        writer.set_resource.return_value = status
+        pb = IndexMessage()
+        pb.typemessage = TypeMessage.CREATION
+        await indexer._index_message(pb)
+
+    @pytest.mark.asyncio
     async def test_node_writer_aio_rpc_errors_are_handled(
         self, indexer: PriorityIndexer, writer: AsyncMock
     ):

@@ -103,3 +103,18 @@ async def test_file_tus_upload_and_download(
     resp = await nucliadb_reader.get(download_url)
     assert resp.status_code == 200
     assert resp.headers["Content-Disposition"] == f'attachment; filename="{filename}"'
+
+
+@pytest.mark.asyncio
+async def test_tus_upload_handles_unknown_upload_ids(
+    configure_redis_dm, nucliadb_writer, nucliadb_reader, knowledgebox_one
+):
+    kbid = knowledgebox_one
+    resp = await nucliadb_writer.patch(
+        f"/kb/{kbid}/{TUSUPLOAD}/foobarid",
+        headers={},
+        data=b"foobar",
+    )
+    assert resp.status_code == 404
+    error_detail = resp.json().get("detail")
+    assert error_detail == "Resumable URI not found for upload_id: foobarid"

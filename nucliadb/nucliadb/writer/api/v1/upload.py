@@ -43,6 +43,7 @@ from starlette.requests import Request as StarletteRequest
 
 from nucliadb.ingest.orm.utils import set_title
 from nucliadb.ingest.processing import PushPayload, Source
+from nucliadb.models.responses import HTTPClientError
 from nucliadb.writer import SERVICE_NAME
 from nucliadb.writer.api.v1.resource import get_rid_from_params_or_raise_error
 from nucliadb.writer.exceptions import (
@@ -62,6 +63,7 @@ from nucliadb.writer.tus.exceptions import (
     HTTPPreconditionFailed,
     HTTPServiceUnavailable,
     InvalidTUSMetadata,
+    ResumableURINotAvailable,
 )
 from nucliadb.writer.tus.storage import FileStorageManager  # type: ignore
 from nucliadb.writer.tus.utils import parse_tus_metadata
@@ -401,7 +403,7 @@ async def tus_patch_rslug_prefix(
     upload_id: str,
     x_synchronous: bool = Header(False),  # type: ignore
 ) -> Response:
-    return await _tus_patch(
+    return await tus_patch(
         request, kbid, upload_id, rslug=rslug, field=field, x_synchronous=x_synchronous
     )
 
@@ -423,7 +425,7 @@ async def tus_patch_rid_prefix(
     upload_id: str,
     x_synchronous: bool = Header(False),  # type: ignore
 ) -> Response:
-    return await _tus_patch(
+    return await tus_patch(
         request, kbid, upload_id, rid=rid, field=field, x_synchronous=x_synchronous
     )
 
@@ -443,7 +445,33 @@ async def patch(
     upload_id: str,
     x_synchronous: bool = Header(False),  # type: ignore
 ) -> Response:
-    return await _tus_patch(request, kbid, upload_id, x_synchronous=x_synchronous)
+    return await tus_patch(request, kbid, upload_id, x_synchronous=x_synchronous)
+
+
+async def tus_patch(
+    request: Request,
+    kbid: str,
+    upload_id: str,
+    rid: Optional[str] = None,
+    rslug: Optional[str] = None,
+    field: Optional[str] = None,
+    x_synchronous: bool = False,
+):
+    try:
+        return await _tus_patch(
+            request,
+            kbid,
+            upload_id,
+            rid=rid,
+            rslug=rslug,
+            field=field,
+            x_synchronous=x_synchronous,
+        )
+    except ResumableURINotAvailable:
+        return HTTPClientError(
+            status_code=404,
+            detail=f"Resumable URI not found for upload_id: {upload_id}",
+        )
 
 
 # called by one the three PATCH above - there are defined distinctly to produce clean API doc
@@ -454,7 +482,7 @@ async def _tus_patch(
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
     field: Optional[str] = None,
-    x_synchronous: bool = Header(False),  # type: ignore
+    x_synchronous: bool = False,
 ) -> Response:
     """
     Upload all bytes in the requests and append them in the specifyied offset
@@ -464,6 +492,11 @@ async def _tus_patch(
 
     dm = get_dm()
     await dm.load(upload_id)
+    if not dm.metadata:
+        # If the metadata is not found for the upload id, this means
+        # that the upload was never started or it has expired
+        raise ResumableURINotAvailable()
+
     to_upload = None
     if "content-length" in request.headers:
         # header is optional, we'll be okay with unknown lengths...

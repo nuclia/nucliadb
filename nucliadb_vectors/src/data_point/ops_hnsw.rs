@@ -244,50 +244,6 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         }
     }
 
-    // Brute-force search.
-    pub fn brute_force_search(
-        &self,
-        query: Address,
-        k_neighbours: usize,
-        with_filter: FormulaFilter,
-        with_duplicates: bool,
-    ) -> Neighbours {
-        let no_blocked = HashSet::with_capacity(0);
-        let mut result = BinaryHeap::with_capacity(k_neighbours);
-        let mut rep_counter = RepCounter::new(!with_duplicates);
-
-        for addr in with_filter.matching_nodes.iter().copied() {
-            let addr = Address(addr as usize);
-            let score = self.tracker.similarity(addr, query);
-            let filter = NodeFilter {
-                tracker: self.tracker,
-                filter: &with_filter,
-                blocked_addresses: &no_blocked,
-                vec_counter: &rep_counter,
-            };
-            if score < self.tracker.min_score() || !filter.is_valid(addr, score) {
-                continue;
-            } else if result.len() < k_neighbours {
-                rep_counter.add(self.tracker.get_vector(addr));
-                result.push(Reverse(Cnx(addr, score)));
-            } else {
-                // Is safe to unwrap because k >= k_neighbours
-                let Reverse(Cnx(_, min_score)) = result.peek().copied().unwrap();
-                if min_score < score {
-                    result.pop();
-                    rep_counter.add(self.tracker.get_vector(addr));
-                    result.push(Reverse(Cnx(addr, score)));
-                }
-            }
-        }
-        // Moving from heap to sorted vec, k*log(k)
-        let mut as_sorted_vec = Vec::new();
-        while let Some(Reverse(Cnx(addr, score))) = result.pop() {
-            as_sorted_vec.push((addr, score));
-        }
-        as_sorted_vec
-    }
-
     pub fn search<H: Hnsw>(
         &self,
         query: Address,
@@ -298,13 +254,6 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
     ) -> Neighbours {
         if k_neighbours == 0 {
             return Neighbours::with_capacity(0);
-        }
-
-        // If we have filters, we check how many nodes are matching those filters using FST
-        // If the number is low, we don't use HNSW and return right away those nodes
-        let filter_ratio = with_filter.matching_ratio().unwrap_or(f64::MAX);
-        if filter_ratio < 0.1 {
-            return self.brute_force_search(query, k_neighbours, with_filter, with_duplicates);
         }
 
         let Some(entry_point) = hnsw.get_entry_point() else {

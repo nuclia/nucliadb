@@ -91,6 +91,7 @@ class BasicAuditStorage(AuditStorage):
         rephrased_question: Optional[str],
         context: List[ChatContext],
         answer: Optional[str],
+        learning_id: str,
     ):
         logger.debug(f"CHAT {kbid} {user} {origin} {timeit}")
 

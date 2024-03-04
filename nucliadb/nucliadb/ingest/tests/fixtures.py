@@ -161,12 +161,14 @@ async def fake_node(indexing_utility, shard_manager):
         id=str(uuid.uuid4()),
         address="nohost",
         shard_count=0,
+        available_disk=100,
         dummy=True,
     )
     manager.add_index_node(
         id=str(uuid.uuid4()),
         address="nohost",
         shard_count=0,
+        available_disk=100,
         dummy=True,
     )
 

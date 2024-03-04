@@ -114,7 +114,10 @@ class ShardManager:
                             extra={"shard": self._shard_id},
                         )
             except AioRpcError as grpc_error:
-                if grpc_error.code() == StatusCode.NOT_FOUND:
+                if grpc_error.code() == StatusCode.NOT_FOUND or (
+                    grpc_error.code() == StatusCode.INTERNAL
+                    and "Shard not found" in grpc_error.details()
+                ):
                     logger.error(
                         "Shard does not exist and can't be garbage collected",
                         extra={"shard": self._shard_id},

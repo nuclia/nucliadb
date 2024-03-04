@@ -62,6 +62,7 @@ def update_members(members: list[IndexNodeMetadata]) -> None:
                 id=member.node_id,
                 address=member.address,
                 shard_count=shard_count,
+                available_disk=member.available_disk,
                 primary_id=member.primary_id,
             )
             logger.debug("Node added")
@@ -69,6 +70,7 @@ def update_members(members: list[IndexNodeMetadata]) -> None:
             logger.debug(f"{member.node_id} update")
             node.address = member.address
             node.shard_count = shard_count
+            node.available_disk = member.available_disk
             logger.debug("Node updated")
 
     # Then cleanup nodes that are no longer reported
@@ -128,12 +130,14 @@ async def _get_index_node_metadata(
         raise Exception(
             "Primary node id not found when it is expected to be a read replica"
         )
+
     return IndexNodeMetadata(
         node_id=metadata.node_id,
         name=metadata.node_id,
         address=address,
         shard_count=metadata.shard_count,
         primary_id=primary_id,
+        available_disk=metadata.available_disk,
     )
 
 
@@ -155,6 +159,7 @@ async def _get_standalone_index_node_metadata(
         name=resp.id,
         address=address,
         shard_count=resp.shard_count,
+        available_disk=resp.available_disk,
     )
 
 

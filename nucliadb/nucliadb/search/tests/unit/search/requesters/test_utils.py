@@ -41,12 +41,14 @@ def fake_nodes():
         id="node-0",
         address="nohost",
         shard_count=0,
+        available_disk=100,
         dummy=True,
     )
     manager.add_index_node(
         id="node-replica-0",
         address="nohost",
         shard_count=0,
+        available_disk=100,
         dummy=True,
         primary_id="node-0",
     )
