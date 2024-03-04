@@ -249,6 +249,7 @@ impl State {
         self.delete_log.prune(age_cap);
         self.no_nodes = number_of_nodes;
         self.work_stack = work_stack;
+        self.current = WorkUnit::new();
     }
 
     pub fn dpid_iter(&self) -> impl Iterator<Item = Journal> + '_ {
