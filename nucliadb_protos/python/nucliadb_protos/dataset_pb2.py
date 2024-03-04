@@ -20,6 +20,7 @@ _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'nucliadb_protos.dataset_pb2', _globals)
 if _descriptor._USE_C_DESCRIPTORS == False:
+
   DESCRIPTOR._options = None
   _globals['_TASKTYPE']._serialized_start=1304
   _globals['_TASKTYPE']._serialized_end=1507

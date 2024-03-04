@@ -29,6 +29,7 @@ _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'nucliadb_protos.nodereader_pb2', _globals)
 if _descriptor._USE_C_DESCRIPTORS == False:
+
   DESCRIPTOR._options = None
   _globals['_ORDERBY'].fields_by_name['field']._options = None
   _globals['_ORDERBY'].fields_by_name['field']._serialized_options = b'\030\001'
