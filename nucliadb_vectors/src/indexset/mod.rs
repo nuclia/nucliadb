@@ -21,84 +21,17 @@ mod state;
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 
-use nucliadb_core::fs_state::{self, ELock, Lock, SLock, Version};
+use nucliadb_core::fs_state::{self, Version};
 use state::State;
 
 use crate::data_point::Similarity;
 use crate::data_point_provider::reader::Reader;
 use crate::data_point_provider::writer::Writer;
-use crate::data_point_provider::{Index, IndexMetadata};
+use crate::data_point_provider::IndexMetadata;
 use crate::VectorR;
 
 pub trait IndexKeyCollector {
     fn add_key(&mut self, key: String);
-}
-
-pub struct IndexSet {
-    state: RwLock<State>,
-    date: RwLock<Version>,
-    location: PathBuf,
-}
-impl IndexSet {
-    pub fn new(path: &Path) -> VectorR<IndexSet> {
-        if !path.exists() {
-            std::fs::create_dir(path)?;
-        }
-        fs_state::initialize_disk(path, || State::new(path.to_path_buf()))?;
-        let state = fs_state::load_state::<State>(path)?;
-        let date = fs_state::crnt_version(path)?;
-        let index = IndexSet {
-            state: RwLock::new(state),
-            date: RwLock::new(date),
-            location: path.to_path_buf(),
-        };
-        Ok(index)
-    }
-    pub fn remove_index(&mut self, index: &str, _: &ELock) -> VectorR<()> {
-        let mut write = self.state.write().unwrap();
-        write.remove_index(index)
-    }
-    pub fn create(&mut self, index: &str, similarity: Similarity, _: &ELock) -> VectorR<Index> {
-        let mut write = self.state.write().unwrap();
-        write.create(index, similarity)
-    }
-    fn update(&self, _lock: &fs_state::Lock) -> VectorR<()> {
-        let disk_v = fs_state::crnt_version(&self.location)?;
-        let new_state = fs_state::load_state(&self.location)?;
-        let mut state = self.state.write().unwrap();
-        let mut date = self.date.write().unwrap();
-        *state = new_state;
-        *date = disk_v;
-        Ok(())
-    }
-    pub fn index_keys<C: IndexKeyCollector>(&self, c: &mut C, _: &Lock) {
-        let read = self.state.read().unwrap();
-        read.index_keys(c);
-    }
-    pub fn get(&self, index: &str, _: &Lock) -> VectorR<Option<Index>> {
-        let read = self.state.read().unwrap();
-        read.get(index)
-    }
-    pub fn get_elock(&self) -> VectorR<ELock> {
-        let lock = fs_state::exclusive_lock(&self.location)?;
-        self.update(&lock)?;
-        Ok(lock)
-    }
-    pub fn get_slock(&self) -> VectorR<SLock> {
-        let lock = fs_state::shared_lock(&self.location)?;
-        self.update(&lock)?;
-        Ok(lock)
-    }
-    pub fn get_location(&self) -> &Path {
-        &self.location
-    }
-    pub fn commit(&self, _: ELock) -> VectorR<()> {
-        let state = self.state.read().unwrap();
-        let mut date = self.date.write().unwrap();
-        fs_state::persist_state::<State>(&self.location, &state)?;
-        *date = fs_state::crnt_version(&self.location)?;
-        Ok(())
-    }
 }
 
 pub struct WriterSet {
@@ -120,7 +53,7 @@ impl WriterSet {
     pub fn remove_index(&mut self, index: &str) {
         self.state.indexes.remove(index);
     }
-    pub fn create_index(&mut self, index: &str, similarity: Similarity, _: &ELock) -> VectorR<Writer> {
+    pub fn create_index(&mut self, index: &str, similarity: Similarity) -> VectorR<Writer> {
         if self.state.indexes.contains(index) {
             let location = self.location.join(index);
             Writer::open(&location)
@@ -149,7 +82,7 @@ impl WriterSet {
     pub fn get_location(&self) -> &Path {
         &self.location
     }
-    pub fn commit(&self, _: ELock) -> VectorR<()> {
+    pub fn commit(&self) -> VectorR<()> {
         fs_state::persist_state::<State>(&self.location, &self.state)?;
         Ok(())
     }

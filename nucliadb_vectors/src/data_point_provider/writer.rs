@@ -18,14 +18,13 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::data_point::{self, DataPointPin, DpId};
+use crate::data_point::{self, DataPointPin};
 use crate::data_point_provider::state::*;
 use crate::data_point_provider::TimeSensitiveDLog;
 use crate::data_point_provider::{IndexMetadata, OPENING_FLAG, STATE, TEMP_STATE, WRITING_FLAG};
 use crate::data_types::dtrie_ram::DTrie;
 use crate::{VectorErr, VectorR};
 use fs2::FileExt;
-use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter, Write};
 use std::mem;
@@ -64,11 +63,11 @@ pub struct Writer {
     metadata: IndexMetadata,
     path: PathBuf,
     added_data_points: Vec<DataPointPin>,
-    removed_data_points: HashSet<DpId>,
     added_to_delete_log: Vec<(Vec<u8>, SystemTime)>,
-    data_points: Vec<DataPointPin>,
+    online_data_points: Vec<DataPointPin>,
     delete_log: DTrie,
     dimension: Option<u64>,
+    number_of_embeddings: usize,
     #[allow(unused)]
     writing: File,
 }
@@ -78,7 +77,7 @@ impl Writer {
         let data_point = data_point::open(&data_point_pin)?;
         let data_point_len = data_point.stored_len();
 
-        if self.dimension != data_point_len {
+        if self.dimension.is_some() && (self.dimension != data_point_len) {
             return Err(VectorErr::InconsistentDimensions);
         }
 
@@ -97,16 +96,17 @@ impl Writer {
             return Err(VectorErr::UncommittedChangesError);
         }
 
-        if self.data_points.len() <= 1 {
+        if self.online_data_points.len() <= 1 {
             return Ok(MergeMetrics {
                 merged: 0,
-                segments_left: self.data_points.len(),
+                segments_left: self.online_data_points.len(),
             });
         }
 
         let similarity = self.metadata.similarity;
-        let mut blocked_segments = vec![];
-        let mut live_segments = mem::take(&mut self.data_points);
+        let mut blocked_segments = Vec::new();
+        let mut being_merged = Vec::new();
+        let mut live_segments = mem::take(&mut self.online_data_points);
         let mut buffer = Vec::with_capacity(MERGE_CAPACITY);
 
         while buffer.len() < MERGE_CAPACITY {
@@ -125,24 +125,44 @@ impl Writer {
                     dlog: &self.delete_log,
                 };
                 let data_point_id = data_point_pin.id();
+                being_merged.push(data_point_pin);
                 buffer.push((delete_log, data_point_id));
             }
         }
 
         let merged_pin = DataPointPin::create_pin(self.location())?;
-        data_point::merge(&merged_pin, &buffer, similarity)?;
+
+        if let Err(err) = data_point::merge(&merged_pin, &buffer, similarity) {
+            self.online_data_points.extend(blocked_segments);
+            self.online_data_points.extend(being_merged);
+            self.online_data_points.extend(live_segments);
+            return Err(err);
+        }
+
         blocked_segments.push(merged_pin);
         blocked_segments.extend(live_segments);
-        self.data_points = blocked_segments;
+        self.online_data_points = blocked_segments;
 
         let metrics = MergeMetrics {
             merged: buffer.len(),
-            segments_left: self.data_points.len(),
+            segments_left: self.online_data_points.len(),
         };
 
+        let mut oldest_age = SystemTime::now();
+        let mut persisted_data_points = Vec::new();
+
+        for data_point_pin in self.online_data_points.iter() {
+            let journal = data_point_pin.read_journal()?;
+            persisted_data_points.push(data_point_pin.id());
+            oldest_age = std::cmp::min(oldest_age, journal.time());
+        }
+
+        self.delete_log.prune(oldest_age);
+
         let mut state = State::new();
+        state.available_data_points = persisted_data_points;
         state.delete_log = self.delete_log.clone();
-        state.available_data_points = self.data_points.iter().map(|i| i.id()).collect();
+
         persist_state(self.location(), &state)?;
 
         Ok(metrics)
@@ -150,7 +170,6 @@ impl Writer {
 
     pub fn abort(&mut self) {
         self.added_to_delete_log.clear();
-        self.removed_data_points.clear();
         self.added_data_points.clear();
     }
 
@@ -160,24 +179,17 @@ impl Writer {
         }
 
         let added_to_delete_log = mem::take(&mut self.added_to_delete_log);
-        let removed_data_points = mem::take(&mut self.removed_data_points);
         let added_data_points = mem::take(&mut self.added_data_points);
-        let current_data_points = mem::take(&mut self.data_points);
+        let current_data_points = mem::take(&mut self.online_data_points);
 
         let mut state = State::default();
         state.delete_log = self.delete_log.clone();
 
         for pin in &current_data_points {
-            if removed_data_points.contains(&pin.id()) {
-                continue;
-            }
             state.available_data_points.push(pin.id());
         }
 
         for pin in &added_data_points {
-            if removed_data_points.contains(&pin.id()) {
-                continue;
-            }
             state.available_data_points.push(pin.id());
         }
 
@@ -186,30 +198,37 @@ impl Writer {
         }
 
         if let Err(err) = persist_state(&self.path, &state) {
-            self.data_points = current_data_points;
+            self.online_data_points = current_data_points;
             return Err(err);
         };
 
         let updated_delete_log = state.delete_log;
         let mut alive_data_points = Vec::new();
+        let mut number_of_embeddings = 0;
 
         for pin in added_data_points {
-            if removed_data_points.contains(&pin.id()) {
+            let Ok(journal) = pin.read_journal() else {
                 continue;
-            }
+            };
+
+            number_of_embeddings += journal.no_nodes();
             alive_data_points.push(pin);
         }
 
         for pin in current_data_points {
-            if removed_data_points.contains(&pin.id()) {
+            let Ok(journal) = pin.read_journal() else {
                 continue;
-            }
+            };
+
+            number_of_embeddings += journal.no_nodes();
             alive_data_points.push(pin);
         }
 
-        self.data_points = alive_data_points;
+        self.online_data_points = alive_data_points;
         self.delete_log = updated_delete_log;
         self.has_uncommitted_changes = false;
+        self.number_of_embeddings = number_of_embeddings;
+
         Ok(())
     }
 
@@ -231,12 +250,12 @@ impl Writer {
             metadata,
             path: path.to_path_buf(),
             added_data_points: Vec::new(),
-            removed_data_points: HashSet::new(),
             added_to_delete_log: Vec::new(),
-            data_points: Vec::new(),
+            online_data_points: Vec::new(),
             delete_log: DTrie::new(),
             has_uncommitted_changes: false,
             dimension: None,
+            number_of_embeddings: 0,
             writing: writing_file,
         })
     }
@@ -266,25 +285,29 @@ impl Writer {
 
         let delete_log = mem::take(&mut state.delete_log);
         let mut dimension = None;
-        let mut data_points = Vec::new();
-        for data_point_id in state.dpid_iter() {
+        let mut number_of_embeddings = 0;
+        let mut online_data_points = Vec::new();
+
+        for data_point_id in state.data_point_iter() {
             let data_point_pin = DataPointPin::open_pin(path, data_point_id)?;
+            let data_point_journal = data_point_pin.read_journal()?;
 
             if dimension.is_none() {
                 let data_point = data_point::open(&data_point_pin)?;
                 dimension = data_point.stored_len();
             }
 
-            data_points.push(data_point_pin);
+            number_of_embeddings += data_point_journal.no_nodes();
+            online_data_points.push(data_point_pin);
         }
 
         Ok(Writer {
             metadata,
-            data_points,
+            online_data_points,
             delete_log,
             dimension,
+            number_of_embeddings,
             added_data_points: Vec::new(),
-            removed_data_points: HashSet::new(),
             added_to_delete_log: Vec::new(),
             path: path.to_path_buf(),
             has_uncommitted_changes: false,
@@ -298,6 +321,10 @@ impl Writer {
 
     pub fn metadata(&self) -> &IndexMetadata {
         &self.metadata
+    }
+
+    pub fn size(&self) -> usize {
+        self.number_of_embeddings
     }
 }
 
@@ -325,7 +352,7 @@ mod test {
             data_points.push(data_point_pin);
         }
 
-        writer.data_points = data_points;
+        writer.online_data_points = data_points;
 
         let metrics = writer.merge().unwrap();
         assert_eq!(metrics.merged, 100);
@@ -349,7 +376,7 @@ mod test {
             data_points.push(data_point_pin);
         }
 
-        writer.data_points = data_points;
+        writer.online_data_points = data_points;
 
         let metrics = writer.merge().unwrap();
         assert_eq!(metrics.merged, 50);
@@ -373,7 +400,7 @@ mod test {
             data_points.push(data_point_pin);
         }
 
-        writer.data_points = data_points;
+        writer.online_data_points = data_points;
 
         let metrics = writer.merge().unwrap();
         assert_eq!(metrics.merged, 100);

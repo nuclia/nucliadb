@@ -17,63 +17,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-use serde::{Deserialize, Serialize};
-
-use super::IndexKeyCollector;
-use crate::data_point::Similarity;
-use crate::data_point_provider::{Index, IndexMetadata};
-use crate::VectorR;
 #[derive(Serialize, Deserialize, Default)]
 pub struct State {
     #[allow(unused)]
     location: PathBuf,
     pub indexes: HashSet<String>,
-}
-impl State {
-    pub fn new(location: PathBuf) -> State {
-        State {
-            location,
-            indexes: HashSet::default(),
-        }
-    }
-    pub fn index_keys<C: IndexKeyCollector>(&self, c: &mut C) {
-        self.indexes.iter().cloned().for_each(|s| c.add_key(s));
-    }
-    pub fn remove_index(&mut self, index: &str) -> VectorR<()> {
-        if self.indexes.remove(index) {
-            let index_path = self.location.join(index);
-            std::fs::remove_dir_all(index_path)?;
-        }
-        Ok(())
-    }
-    pub fn get(&self, index: &str) -> VectorR<Option<Index>> {
-        if self.indexes.contains(index) {
-            let location = self.location.join(index);
-            Some(Index::open(&location)).transpose()
-        } else {
-            Ok(None)
-        }
-    }
-    pub fn create(&mut self, index: &str, similarity: Similarity) -> VectorR<Index> {
-        if self.indexes.contains(index) {
-            let location = self.location.join(index);
-            Index::open(&location)
-        } else {
-            let index = index.to_string();
-            let location = self.location.join(&index);
-            self.indexes.insert(index);
-            // TODO: for now we set the channel to STABLE here
-            let channel = nucliadb_core::Channel::STABLE;
-            Index::new(
-                &location,
-                IndexMetadata {
-                    similarity,
-                    channel,
-                },
-            )
-        }
-    }
 }

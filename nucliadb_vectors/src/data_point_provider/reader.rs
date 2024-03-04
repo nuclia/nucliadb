@@ -137,7 +137,7 @@ impl Reader {
         let mut data_points = Vec::new();
         let mut number_of_embeddings = 0;
 
-        for data_point_id in state.dpid_iter() {
+        for data_point_id in state.data_point_iter() {
             let data_point_pin = DataPointPin::open_pin(path, data_point_id)?;
             let data_point_journal = data_point_pin.read_journal()?;
 
@@ -179,7 +179,7 @@ impl Reader {
         let mut new_number_of_embeddings = 0;
         let mut new_data_points = Vec::new();
 
-        for data_point_id in state.dpid_iter() {
+        for data_point_id in state.data_point_iter() {
             let data_point_pin = DataPointPin::open_pin(path, data_point_id)?;
             let data_point_journal = data_point_pin.read_journal()?;
 
@@ -242,11 +242,34 @@ impl Reader {
         Ok(ffsv.into())
     }
 
+    pub fn keys(&self) -> VectorR<Vec<String>> {
+        let mut keys = vec![];
+        for data_point_pin in self.data_points.iter() {
+            let data_point = data_point::open(data_point_pin)?;
+            let data_point_journal = data_point.journal();
+            let delete_log = TimeSensitiveDLog {
+                time: data_point_journal.time(),
+                dlog: &self.delete_log,
+            };
+            let mut results = data_point.get_keys(&delete_log);
+            keys.append(&mut results);
+        }
+        Ok(keys)
+    }
+
+    pub fn size(&self) -> usize {
+        self.number_of_embeddings
+    }
+
     pub fn location(&self) -> &Path {
         &self.path
     }
 
     pub fn metadata(&self) -> &IndexMetadata {
         &self.metadata
+    }
+
+    pub fn embedding_dimension(&self) -> Option<u64> {
+        self.dimension
     }
 }
