@@ -346,6 +346,14 @@ pub struct Paragraph {
     /// Optional, as a computed value
     #[prost(string, tag="9")]
     pub text: ::prost::alloc::string::String,
+    #[prost(uint32, tag="10")]
+    pub page: u32,
+    #[prost(bool, tag="11")]
+    pub page_with_table: bool,
+    #[prost(bool, tag="12")]
+    pub is_a_table: bool,
+    #[prost(string, tag="13")]
+    pub reference_file: ::prost::alloc::string::String,
 }
 /// Nested message and enum types in `Paragraph`.
 pub mod paragraph {

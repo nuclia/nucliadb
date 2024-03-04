@@ -234,6 +234,10 @@ message Paragraph {
     repeated Sentence sentences = 7;
     string key = 8;
     string text = 9;  // Optional, as a computed value
+    uint32 page = 10;
+    bool page_with_table = 11;
+    bool is_a_table = 12;
+    string reference_file = 13;
 }
 
 message Position {

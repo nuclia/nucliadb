@@ -907,6 +907,10 @@ class Paragraph(google.protobuf.message.Message):
     SENTENCES_FIELD_NUMBER: builtins.int
     KEY_FIELD_NUMBER: builtins.int
     TEXT_FIELD_NUMBER: builtins.int
+    PAGE_FIELD_NUMBER: builtins.int
+    PAGE_WITH_TABLE_FIELD_NUMBER: builtins.int
+    IS_A_TABLE_FIELD_NUMBER: builtins.int
+    REFERENCE_FILE_FIELD_NUMBER: builtins.int
     start: builtins.int
     end: builtins.int
     @property
@@ -921,6 +925,10 @@ class Paragraph(google.protobuf.message.Message):
     key: builtins.str
     text: builtins.str
     """Optional, as a computed value"""
+    page: builtins.int
+    page_with_table: builtins.bool
+    is_a_table: builtins.bool
+    reference_file: builtins.str
     def __init__(
         self,
         *,
@@ -933,8 +941,12 @@ class Paragraph(google.protobuf.message.Message):
         sentences: collections.abc.Iterable[global___Sentence] | None = ...,
         key: builtins.str = ...,
         text: builtins.str = ...,
+        page: builtins.int = ...,
+        page_with_table: builtins.bool = ...,
+        is_a_table: builtins.bool = ...,
+        reference_file: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["classifications", b"classifications", "end", b"end", "end_seconds", b"end_seconds", "key", b"key", "kind", b"kind", "sentences", b"sentences", "start", b"start", "start_seconds", b"start_seconds", "text", b"text"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["classifications", b"classifications", "end", b"end", "end_seconds", b"end_seconds", "is_a_table", b"is_a_table", "key", b"key", "kind", b"kind", "page", b"page", "page_with_table", b"page_with_table", "reference_file", b"reference_file", "sentences", b"sentences", "start", b"start", "start_seconds", b"start_seconds", "text", b"text"]) -> None: ...
 
 global___Paragraph = Paragraph
 
