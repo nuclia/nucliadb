@@ -21,7 +21,11 @@ import asyncio
 from unittest import mock
 from unittest.mock import AsyncMock, Mock
 
-from nucliadb.metrics_exporter import run_exporter, run_exporter_task
+from nucliadb.metrics_exporter import (
+    run_exporter,
+    run_exporter_task,
+    update_migration_metrics,
+)
 
 
 async def test_run_exporter_task():
@@ -48,3 +52,25 @@ async def test_run_exporter():
             update_migration_metrics.assert_called()
 
             task.cancel()
+
+
+async def test_update_migration_metrics():
+
+    async def iter_kbids(context):
+        yield "foo"
+        yield "bar"
+
+    with mock.patch("nucliadb.metrics_exporter.iter_kbids", new=iter_kbids):
+        with mock.patch("nucliadb.metrics_exporter.MIGRATION_COUNT") as migration_count:
+            with mock.patch(
+                "nucliadb.metrics_exporter.MigrationsDataManager", autospec=True
+            ) as mdm:
+                mdm.get_global_info = AsyncMock(return_value=Mock(current_version="1"))
+                mdm.get_kb_info = AsyncMock(return_value=Mock(current_version="2"))
+
+                driver = Mock()
+                context = Mock(kv_driver=driver)
+
+                await update_migration_metrics(context)
+
+                assert migration_count.set.call_count == 2

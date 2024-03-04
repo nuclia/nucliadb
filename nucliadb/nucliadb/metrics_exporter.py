@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import functools
-from typing import Callable, Coroutine
+from typing import AsyncGenerator, Callable
 
 from nucliadb import logger
 from nucliadb.common.cluster import manager as cluster_manager
@@ -51,6 +51,15 @@ async def update_node_metrics():
         SHARD_COUNT.set(node.shard_count, labels=dict(node=node.id))
 
 
+async def iter_kbids(context: ApplicationContext) -> AsyncGenerator[str, None]:
+    """
+    Return a list of all KB ids.
+    """
+    async with context.kv_driver.transaction() as txn:
+        async for kbid, _ in KnowledgeBoxORM.get_kbs(txn, slug=""):
+            yield kbid
+
+
 async def update_migration_metrics(context: ApplicationContext):
     """
     Report the global migration version and the number of KBs per migration version.
@@ -61,13 +70,14 @@ async def update_migration_metrics(context: ApplicationContext):
         MIGRATION_COUNT.set(
             1, labels=dict(type="global", version=str(global_info.current_version))
         )
+
     version_count: dict[str, int] = {}
-    async with context.kv_driver.transaction() as txn:
-        async for kbid, _ in KnowledgeBoxORM.get_kbs(txn, slug=""):
-            kb_info = await mdm.get_kb_info(kbid)
-            if kb_info is not None:
-                version_count.setdefault(str(kb_info.current_version), 0)
-                version_count[str(kb_info.current_version)] += 1
+    async for kbid in iter_kbids(context):
+        kb_info = await mdm.get_kb_info(kbid)
+        if kb_info is not None:
+            version_count.setdefault(str(kb_info.current_version), 0)
+            version_count[str(kb_info.current_version)] += 1
+
     for version, count in version_count.items():
         MIGRATION_COUNT.set(count, labels=dict(type="kb", version=version))
 
