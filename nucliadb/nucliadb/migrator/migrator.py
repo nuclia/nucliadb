@@ -81,28 +81,55 @@ async def run_kb_migrations(
 
 
 async def run_all_kb_migrations(context: ExecutionContext, target_version: int) -> None:
-    failures: list[str] = []
-    while True:
-        kbids = [
-            kid
-            for kid in await context.data_manager.get_kb_migrations(
-                limit=1 + len(failures)
-            )
-            if kid not in failures
-        ]
-        if len(kbids) == 0:
-            break
+    """
+    Schedule all KB migrations to run in parallel. Only a certain number of migrations will run at the same time.
+    If any of the migrations fail, the whole process will fail.
+    """
+    to_migrate = await context.data_manager.get_kb_migrations(limit=-1)
 
-        kbid = kbids[0]
+    if len(to_migrate) == 0:
+        return
+
+    max_concurrent = context.settings.max_concurrent_migrations
+    semaphore = asyncio.Semaphore(max_concurrent)
+
+    logger.info(
+        f"Scheduling {len(to_migrate)} KB migrations. Max concurrent: {max_concurrent}",
+        extra={"target_version": target_version},
+    )
+
+    tasks = [
+        asyncio.create_task(
+            run_kb_migrations_in_parallel(context, kbid, target_version, semaphore),
+            name=f"migrate_kb_{kbid}",
+        )
+        for kbid in to_migrate
+    ]
+
+    failures = 0
+    for future in asyncio.as_completed(tasks):
+        try:
+            await future
+        except Exception:
+            failures += 1
+
+    if failures > 0:
+        raise Exception(f"Failed to migrate KBs. Failures: {failures}")
+
+
+async def run_kb_migrations_in_parallel(
+    context: ExecutionContext,
+    kbid: str,
+    target_version: int,
+    max_concurrent: asyncio.Semaphore,
+) -> None:
+    async with max_concurrent:
         try:
             await run_kb_migrations(context, kbid, target_version)
         except Exception as exc:
             errors.capture_exception(exc)
             logger.exception("Failed to migrate KB", extra={"kbid": kbid})
-            failures.append(kbid)
-
-    if len(failures) > 0:
-        raise Exception("Failed to migrate KBs")
+            raise
 
 
 async def run_global_migrations(context: ExecutionContext, target_version: int) -> None:

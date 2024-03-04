@@ -61,3 +61,7 @@ async def test_migrate_kb(execution_context: ExecutionContext, knowledgebox):
     assert kb_info.current_version == 1
     global_info = await execution_context.data_manager.get_global_info()
     assert global_info.current_version == 1
+
+
+async def test_run_all_kb_migrations(execution_context: ExecutionContext):
+    pass
