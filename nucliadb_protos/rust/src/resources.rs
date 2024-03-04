@@ -326,6 +326,20 @@ pub struct Sentence {
     pub key: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PageInformation {
+    #[prost(uint32, tag="1")]
+    pub page: u32,
+    #[prost(bool, tag="2")]
+    pub page_with_table: bool,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct Representation {
+    #[prost(bool, tag="1")]
+    pub is_a_table: bool,
+    #[prost(string, tag="2")]
+    pub reference_file: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Paragraph {
     #[prost(uint32, tag="1")]
     pub start: u32,
@@ -346,14 +360,10 @@ pub struct Paragraph {
     /// Optional, as a computed value
     #[prost(string, tag="9")]
     pub text: ::prost::alloc::string::String,
-    #[prost(uint32, tag="10")]
-    pub page: u32,
-    #[prost(bool, tag="11")]
-    pub page_with_table: bool,
-    #[prost(bool, tag="12")]
-    pub is_a_table: bool,
-    #[prost(string, tag="13")]
-    pub reference_file: ::prost::alloc::string::String,
+    #[prost(message, optional, tag="10")]
+    pub page: ::core::option::Option<PageInformation>,
+    #[prost(message, optional, tag="11")]
+    pub representation: ::core::option::Option<Representation>,
 }
 /// Nested message and enum types in `Paragraph`.
 pub mod paragraph {

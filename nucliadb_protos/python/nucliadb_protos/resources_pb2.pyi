@@ -874,6 +874,42 @@ class Sentence(google.protobuf.message.Message):
 global___Sentence = Sentence
 
 @typing_extensions.final
+class PageInformation(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    PAGE_FIELD_NUMBER: builtins.int
+    PAGE_WITH_TABLE_FIELD_NUMBER: builtins.int
+    page: builtins.int
+    page_with_table: builtins.bool
+    def __init__(
+        self,
+        *,
+        page: builtins.int = ...,
+        page_with_table: builtins.bool = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["page", b"page", "page_with_table", b"page_with_table"]) -> None: ...
+
+global___PageInformation = PageInformation
+
+@typing_extensions.final
+class Representation(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    IS_A_TABLE_FIELD_NUMBER: builtins.int
+    REFERENCE_FILE_FIELD_NUMBER: builtins.int
+    is_a_table: builtins.bool
+    reference_file: builtins.str
+    def __init__(
+        self,
+        *,
+        is_a_table: builtins.bool = ...,
+        reference_file: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["is_a_table", b"is_a_table", "reference_file", b"reference_file"]) -> None: ...
+
+global___Representation = Representation
+
+@typing_extensions.final
 class Paragraph(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -908,9 +944,7 @@ class Paragraph(google.protobuf.message.Message):
     KEY_FIELD_NUMBER: builtins.int
     TEXT_FIELD_NUMBER: builtins.int
     PAGE_FIELD_NUMBER: builtins.int
-    PAGE_WITH_TABLE_FIELD_NUMBER: builtins.int
-    IS_A_TABLE_FIELD_NUMBER: builtins.int
-    REFERENCE_FILE_FIELD_NUMBER: builtins.int
+    REPRESENTATION_FIELD_NUMBER: builtins.int
     start: builtins.int
     end: builtins.int
     @property
@@ -925,10 +959,10 @@ class Paragraph(google.protobuf.message.Message):
     key: builtins.str
     text: builtins.str
     """Optional, as a computed value"""
-    page: builtins.int
-    page_with_table: builtins.bool
-    is_a_table: builtins.bool
-    reference_file: builtins.str
+    @property
+    def page(self) -> global___PageInformation: ...
+    @property
+    def representation(self) -> global___Representation: ...
     def __init__(
         self,
         *,
@@ -941,12 +975,11 @@ class Paragraph(google.protobuf.message.Message):
         sentences: collections.abc.Iterable[global___Sentence] | None = ...,
         key: builtins.str = ...,
         text: builtins.str = ...,
-        page: builtins.int = ...,
-        page_with_table: builtins.bool = ...,
-        is_a_table: builtins.bool = ...,
-        reference_file: builtins.str = ...,
+        page: global___PageInformation | None = ...,
+        representation: global___Representation | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["classifications", b"classifications", "end", b"end", "end_seconds", b"end_seconds", "is_a_table", b"is_a_table", "key", b"key", "kind", b"kind", "page", b"page", "page_with_table", b"page_with_table", "reference_file", b"reference_file", "sentences", b"sentences", "start", b"start", "start_seconds", b"start_seconds", "text", b"text"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["page", b"page", "representation", b"representation"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["classifications", b"classifications", "end", b"end", "end_seconds", b"end_seconds", "key", b"key", "kind", b"kind", "page", b"page", "representation", b"representation", "sentences", b"sentences", "start", b"start", "start_seconds", b"start_seconds", "text", b"text"]) -> None: ...
 
 global___Paragraph = Paragraph
 
