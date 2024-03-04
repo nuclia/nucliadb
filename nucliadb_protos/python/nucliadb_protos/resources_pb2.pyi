@@ -878,16 +878,16 @@ class PageInformation(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     PAGE_FIELD_NUMBER: builtins.int
-    PAGE_WITH_TABLE_FIELD_NUMBER: builtins.int
+    PAGE_WITH_VISUAL_FIELD_NUMBER: builtins.int
     page: builtins.int
-    page_with_table: builtins.bool
+    page_with_visual: builtins.bool
     def __init__(
         self,
         *,
         page: builtins.int = ...,
-        page_with_table: builtins.bool = ...,
+        page_with_visual: builtins.bool = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["page", b"page", "page_with_table", b"page_with_table"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["page", b"page", "page_with_visual", b"page_with_visual"]) -> None: ...
 
 global___PageInformation = PageInformation
 

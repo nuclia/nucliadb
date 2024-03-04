@@ -330,7 +330,7 @@ pub struct PageInformation {
     #[prost(uint32, tag="1")]
     pub page: u32,
     #[prost(bool, tag="2")]
-    pub page_with_table: bool,
+    pub page_with_visual: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Representation {

@@ -217,7 +217,7 @@ message Sentence {
 
 message PageInformation {
     uint32 page = 1;
-    bool page_with_table = 2;
+    bool page_with_visual = 2;
 }
 
 message Representation {
