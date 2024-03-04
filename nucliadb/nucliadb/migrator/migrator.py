@@ -126,9 +126,16 @@ async def run_kb_migrations_in_parallel(
     async with max_concurrent:
         try:
             await run_kb_migrations(context, kbid, target_version)
+            logger.info(
+                f"Finished KB migration",
+                extra={"kbid": kbid, "target_version": target_version},
+            )
         except Exception as exc:
             errors.capture_exception(exc)
-            logger.exception("Failed to migrate KB", extra={"kbid": kbid})
+            logger.exception(
+                "Failed to migrate KB",
+                extra={"kbid": kbid, "target_version": target_version},
+            )
             raise
 
 

@@ -18,7 +18,9 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import types
-from unittest.mock import patch
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
 
 from nucliadb.migrator import migrator
 
@@ -42,3 +44,20 @@ def test_get_migration_with_filtering():
         assert len(migrations) == 1
         assert migrations[0].version == 3
         assert migrations[0].module.__name__ == "m3"
+
+
+async def test_run_all_kb_migrations_raises_on_failure():
+    execution_context = Mock()
+    execution_context.data_manager = Mock()
+    execution_context.data_manager.get_kb_migrations = AsyncMock(
+        return_value=["foo", "bar"]
+    )
+    execution_context.settings = Mock(max_concurrent_migrations=1)
+    with patch(
+        "nucliadb.migrator.migrator.run_kb_migrations_in_parallel",
+        side_effect=[None, Exception("Boom")],
+    ) as mock:
+        with pytest.raises(Exception) as exc_info:
+            await migrator.run_all_kb_migrations(execution_context, 1)
+        assert "Failed to migrate KBs. Failures: 1" in str(exc_info.value)
+        assert mock.call_count == 2
