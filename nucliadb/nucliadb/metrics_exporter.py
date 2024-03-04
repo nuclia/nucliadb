@@ -43,6 +43,9 @@ async def update_node_metrics(context: ApplicationContext):
     """
     Report the number of shards in each node.
     """
+    # Clear previoulsy set values so that we report only the current state
+    SHARD_COUNT.gauge.clear()
+
     all_nodes = cluster_manager.get_index_nodes()
     for node in all_nodes:
         if node.primary_id is not None:
@@ -63,6 +66,9 @@ async def update_migration_metrics(context: ApplicationContext):
     """
     Report the global migration version and the number of KBs per migration version.
     """
+    # Clear previoulsy set values so that we report only the current state
+    MIGRATION_COUNT.gauge.clear()
+
     mdm = MigrationsDataManager(context.kv_driver)
     global_info = await mdm.get_global_info()
     if global_info is not None:
