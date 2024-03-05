@@ -38,6 +38,10 @@ logger = logging.getLogger(SERVICE_NAME)
 WHITELISTED_HEADERS = {
     "x-stf-roles",
     "x-stf-user",
+    "x-forwarded-for",
+    "x-forwarded-host",
+    "x-forwarded-proto",
+    "x-forwarded-port",
 }
 
 
