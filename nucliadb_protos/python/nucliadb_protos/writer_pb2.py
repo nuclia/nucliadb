@@ -39,6 +39,7 @@ _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'nucliadb_protos.writer_pb2', _globals)
 if _descriptor._USE_C_DESCRIPTORS == False:
+
   DESCRIPTOR._options = None
   _globals['_BROKERMESSAGE_CONVERSATIONSENTRY']._options = None
   _globals['_BROKERMESSAGE_CONVERSATIONSENTRY']._serialized_options = b'8\001'

@@ -285,6 +285,10 @@ class PriorityIndexer:
                 while not self.work_queue.empty():
                     pending_work.append(self.work_queue.get_nowait())
 
+                # Wait for some time before nak'ing the messages to avoid
+                # flooding stdout with logs in case of an unhandled error.
+                await asyncio.sleep(1)
+
                 await work.nats_msg.nak()
                 await work.mpu.end()
 
@@ -377,8 +381,21 @@ class PriorityIndexer:
             status = await self._set_resource(pb)
         elif pb.typemessage == TypeMessage.DELETION:
             status = await self._delete_resource(pb)
-
         if status is not None and status.status != OpStatus.Status.OK:
+            if (
+                status.status == OpStatus.Status.ERROR
+                and "Shard not found" in status.detail
+            ):
+                logger.warning(
+                    f"Shard does not exist {pb.shard}. This message will be ignored",
+                    extra={
+                        "kbid": pb.kbid,
+                        "shard": pb.shard,
+                        "rid": pb.resource,
+                        "storage_key": pb.storage_key,
+                    },
+                )
+                return
             raise IndexNodeError(status.detail)
 
     async def _set_resource(self, pb: IndexMessage) -> Optional[OpStatus]:

@@ -33,6 +33,7 @@ use tonic::{Request, Response, Status};
 
 use crate::analytics::payload::AnalyticsEvent;
 use crate::analytics::sync::send_analytics_event;
+use crate::merge::{global_merger, MergePriority, MergeRequest, MergeWaiter};
 use crate::settings::Settings;
 use crate::shards::errors::ShardNotFoundError;
 use crate::shards::metadata::ShardMetadata;
@@ -365,15 +366,15 @@ impl NodeWriter for NodeWriterGRPCDriver {
 
     async fn merge(&self, request: Request<ShardId>) -> Result<Response<MergeResponse>, Status> {
         let shard_id = request.into_inner().id;
-        let shards = Arc::clone(&self.shards);
-        let span = info_span!(parent: Span::current(), "merge");
-        let task = || {
-            let shard = obtain_shard(shards, shard_id)?;
-            run_with_telemetry(span, move || shard.merge())
+
+        let merger = global_merger();
+        let merge_request = MergeRequest {
+            shard_id,
+            priority: MergePriority::High,
+            waiter: MergeWaiter::Async,
         };
-        let result = tokio::task::spawn_blocking(task)
-            .await
-            .map_err(|error| tonic::Status::internal(format!("Blocking task panicked: {error:?}")))?;
+        let handle = merger.schedule(merge_request);
+        let result = handle.wait().await;
 
         match result {
             Ok(metrics) => Ok(tonic::Response::new(MergeResponse {

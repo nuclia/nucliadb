@@ -24,6 +24,7 @@ def test_chat_on_kb(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
     result = sdk.chat(
         kbid=docs_dataset,
         query="Nuclia loves Semantic Search",
+        generative_model="everest",
         prompt="Given this context: {context}. Answer this {question} in a concise way using the provided context",
         extra_context=[
             "Nuclia is a powerful AI search platform",

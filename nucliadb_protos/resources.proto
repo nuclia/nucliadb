@@ -215,6 +215,16 @@ message Sentence {
     string key = 3;
 }
 
+message PageInformation {
+    uint32 page = 1;
+    bool page_with_visual = 2;
+}
+
+message Representation {
+    bool is_a_table = 1;
+    string reference_file = 2;
+}
+
 message Paragraph {
     uint32 start = 1;
     uint32 end = 2;
@@ -234,6 +244,8 @@ message Paragraph {
     repeated Sentence sentences = 7;
     string key = 8;
     string text = 9;  // Optional, as a computed value
+    PageInformation page = 10;
+    Representation representation = 11;
 }
 
 message Position {

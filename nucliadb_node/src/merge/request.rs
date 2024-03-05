@@ -18,27 +18,27 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-// #![warn(missing_docs)]
+use crate::shards::ShardId;
 
-//! NucliaDB Index Node component
-//!
-//! This module provides the top level NucliaDB's indexing funcionality. It
-//! allows indexing, searching and deleting indexed contents.
-//!
-//! As a high level interface, it provides a gRPC server to deploy the index in
-//! a distributed fashion. The API allows building other interfaces, as the
-//! already built PyO3 bindings.
+pub struct MergeRequest {
+    pub shard_id: ShardId,
+    pub priority: MergePriority,
+    pub waiter: MergeWaiter,
+}
 
-pub mod analytics;
-pub mod grpc;
-pub mod http_server;
-pub mod lifecycle;
-pub mod merge;
-pub mod node_metadata;
-pub mod replication;
-pub mod settings;
-pub mod shards;
-pub mod telemetry;
-pub mod utils;
+#[derive(Copy, Clone, Default)]
+pub enum MergeWaiter {
+    #[default]
+    None,
+    Async,
+}
 
-mod disk_structure;
+#[derive(Copy, Clone, Default, Hash, PartialEq, Eq)]
+pub enum MergePriority {
+    WhenFree,
+    #[default]
+    Low,
+    High,
+}
+
+pub const MERGE_PRIORITIES: [MergePriority; 3] = [MergePriority::High, MergePriority::Low, MergePriority::WhenFree];

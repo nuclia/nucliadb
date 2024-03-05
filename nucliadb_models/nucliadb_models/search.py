@@ -729,6 +729,11 @@ class ChatModel(BaseModel):
     citations: bool = Field(
         default=False, description="Whether to include the citations in the answer"
     )
+    generative_model: Optional[str] = Field(
+        default=None,
+        title="Generative model",
+        description="The generative model to use for the predict chat endpoint. If not provided, the model configured for the Knowledge Box is used.",
+    )
 
 
 class RephraseModel(BaseModel):
@@ -736,6 +741,11 @@ class RephraseModel(BaseModel):
     chat_history: List[ChatContextMessage] = []
     user_id: str
     user_context: List[str] = []
+    generative_model: Optional[str] = Field(
+        default=None,
+        title="Generative model",
+        description="The generative model to use for the rephrase endpoint. If not provided, the model configured for the Knowledge Box is used.",
+    )
 
 
 class AskDocumentModel(BaseModel):
@@ -874,6 +884,12 @@ class ChatRequest(BaseModel):
     )
     debug: bool = SearchParamDefaults.debug.to_pydantic_field()
 
+    generative_model: Optional[str] = Field(
+        default=None,
+        title="Generative model",
+        description="The generative model to use for the chat endpoint. If not provided, the model configured for the Knowledge Box is used.",
+    )
+
     @root_validator(pre=True)
     def rag_features_validator(cls, values):
         chosen_strategies = [s.get("name") for s in values.get("rag_strategies") or []]
@@ -909,6 +925,7 @@ class SummarizeModel(BaseModel):
     """
 
     resources: Dict[str, SummarizeResourceModel] = {}
+    generative_model: Optional[str] = None
     user_prompt: Optional[str] = None
     summary_kind: SummaryKind = SummaryKind.SIMPLE
 
@@ -917,6 +934,12 @@ class SummarizeRequest(BaseModel):
     """
     Model for the request payload of the summarize endpoint
     """
+
+    generative_model: Optional[str] = Field(
+        default=None,
+        title="Generative model",
+        description="The generative model to use for the summarization. If not provided, the model configured for the Knowledge Box is used.",
+    )
 
     user_prompt: Optional[str] = Field(
         default=None,

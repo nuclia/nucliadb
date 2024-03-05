@@ -18,27 +18,12 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-// #![warn(missing_docs)]
+pub mod errors;
+mod global;
+mod request;
+mod scheduler;
+mod work;
 
-//! NucliaDB Index Node component
-//!
-//! This module provides the top level NucliaDB's indexing funcionality. It
-//! allows indexing, searching and deleting indexed contents.
-//!
-//! As a high level interface, it provides a gRPC server to deploy the index in
-//! a distributed fashion. The API allows building other interfaces, as the
-//! already built PyO3 bindings.
-
-pub mod analytics;
-pub mod grpc;
-pub mod http_server;
-pub mod lifecycle;
-pub mod merge;
-pub mod node_metadata;
-pub mod replication;
-pub mod settings;
-pub mod shards;
-pub mod telemetry;
-pub mod utils;
-
-mod disk_structure;
+pub use global::{global_merger, install_global, stop_global_merger};
+pub use request::{MergePriority, MergeRequest, MergeWaiter};
+pub use scheduler::MergeScheduler;

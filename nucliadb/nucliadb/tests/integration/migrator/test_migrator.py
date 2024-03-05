@@ -17,6 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import uuid
+
 import pytest
 
 from nucliadb.migrator import migrator
@@ -61,3 +63,47 @@ async def test_migrate_kb(execution_context: ExecutionContext, knowledgebox):
     assert kb_info.current_version == 1
     global_info = await execution_context.data_manager.get_global_info()
     assert global_info.current_version == 1
+
+
+@pytest.fixture(scope="function")
+async def two_knowledgeboxes(nucliadb_manager):
+    kbs = []
+    for _ in range(2):
+        resp = await nucliadb_manager.post("/kbs", json={"slug": uuid.uuid4().hex})
+        assert resp.status_code == 201
+        kbs.append(resp.json().get("uuid"))
+
+    yield kbs
+
+    for kb in kbs:
+        resp = await nucliadb_manager.delete(f"/kb/{kb}")
+        assert resp.status_code == 200
+
+
+async def test_run_all_kb_migrations(
+    execution_context: ExecutionContext, two_knowledgeboxes
+):
+    # Set migration version to -1 for all knowledgeboxes
+    for kbid in two_knowledgeboxes:
+        await execution_context.data_manager.update_kb_info(
+            kbid=kbid, current_version=-1
+        )
+        await execution_context.data_manager.update_global_info(current_version=0)
+
+        kb_info = await execution_context.data_manager.get_kb_info(kbid=kbid)
+        assert kb_info is not None
+        assert kb_info.current_version == -1
+        global_info = await execution_context.data_manager.get_global_info()
+        assert global_info.current_version == 0
+
+    # only run first noop migration
+    # other tests can be so slow and cumbersome to maintain
+    await migrator.run(execution_context, target_version=1)
+
+    # Assert that all knowledgeboxes are now at version 1
+    for kbid in two_knowledgeboxes:
+        kb_info = await execution_context.data_manager.get_kb_info(kbid=kbid)
+        assert kb_info is not None
+        assert kb_info.current_version == 1
+        global_info = await execution_context.data_manager.get_global_info()
+        assert global_info.current_version == 1

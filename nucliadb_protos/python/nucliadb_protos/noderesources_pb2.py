@@ -23,6 +23,7 @@ _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'nucliadb_protos.noderesources_pb2', _globals)
 if _descriptor._USE_C_DESCRIPTORS == False:
+
   DESCRIPTOR._options = None
   _globals['_INDEXPARAGRAPH_SENTENCESENTRY']._options = None
   _globals['_INDEXPARAGRAPH_SENTENCESENTRY']._serialized_options = b'8\001'
