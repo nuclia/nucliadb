@@ -19,6 +19,7 @@
 //
 
 use std::fs;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Condvar;
 use std::time::Duration;
 use std::{
@@ -39,7 +40,9 @@ use nucliadb_core::NodeResult;
 use super::work::WorkQueue;
 use crate::merge::{MergePriority, MergeRequest, MergeWaiter};
 
-// Time between scheduler being idle and scheduling all shards for merge
+// Time between scheduler being idle and scheduling all shards for merge.
+//
+// This value also affects shutdown reaction time
 #[cfg(not(test))]
 const SCHEDULE_ALL_SHARDS_DELAY: Duration = Duration::from_secs(10);
 #[cfg(test)]
@@ -53,7 +56,7 @@ pub struct MergeScheduler {
     shard_cache: Arc<ShardWriterCache>,
     settings: Settings,
     condvar: Condvar,
-    shutdown: Mutex<bool>,
+    shutdown: AtomicBool,
 }
 
 impl MergeScheduler {
@@ -63,7 +66,7 @@ impl MergeScheduler {
             shard_cache,
             settings,
             condvar: Condvar::default(),
-            shutdown: Mutex::new(false),
+            shutdown: AtomicBool::new(false),
         }
     }
 
@@ -83,64 +86,53 @@ impl MergeScheduler {
     }
 
     /// Runs the scheduler until stopped
-    pub fn run(&self) {
-        let mut shutdown = self.shutdown.lock().expect("Poisoned merger shutdown signal");
-        *shutdown = false;
-        drop(shutdown);
+    pub fn run_forever(&self) {
+        self.shutdown.store(false, Ordering::Relaxed);
 
         loop {
-            let merge = self.process();
-            if let Err(error) = merge {
-                warn!("An error occurred while merging: {}", error);
+            self.run();
+
+            if self.shutdown.load(Ordering::Relaxed) {
+                break;
             }
         }
     }
 
     /// Signals the scheduler to stop
     pub fn stop(&self) {
-        let mut shutdown = self.shutdown.lock().expect("Poisoned merger shutdown signal");
-        *shutdown = true;
+        self.shutdown.store(true, Ordering::Relaxed);
     }
 
-    /// Take the most prioritary work from the scheduler queue and perform a
-    /// merge
-    fn process(&self) -> NodeResult<()> {
-        let request = self.blocking_next();
-        let result = self.merge_shard(&request.shard_id);
+    fn run(&self) {
+        let work = self.wait_for_work(SCHEDULE_ALL_SHARDS_DELAY);
 
-        // When a notifier is requested, send the merge result and let the
-        // caller be responsible to handle errors
-        match request.notifier {
-            Some(notifier) => {
-                let _ = notifier.send(result);
-            }
-            None => {
-                result?;
-            }
-        }
-
-        Ok(())
-    }
-
-    // Get the next merge request. If there's no more available, wait until
-    // someone requests or, after a timeout, schedule all shards for merge and
-    // get 1 request
-    fn blocking_next(&self) -> InternalMergeRequest {
-        let mut queue = self.work_queue.lock().expect("Poisoned merger scheduler mutex");
-        while queue.is_empty() {
-            let wait;
-            (queue, wait) =
-                self.condvar.wait_timeout(queue, SCHEDULE_ALL_SHARDS_DELAY).expect("Poisoned merger scheduler mutex");
-
-            if wait.timed_out() {
-                // Nobody requested a merge and it's been a while since last,
-                // let's schedule all shards for a merge
-                for (request, priority) in self.all_shards_requests() {
-                    queue.push(request, priority);
+        match work {
+            Some(request) => {
+                let merge = self.process(request);
+                if let Err(error) = merge {
+                    warn!("An error occurred while merging: {}", error);
                 }
             }
+            None => {
+                self.schedule_free_time_work();
+            }
         }
-        queue.pop().unwrap()
+    }
+
+    fn wait_for_work(&self, timeout: Duration) -> Option<InternalMergeRequest> {
+        let mut queue = self.work_queue.lock().expect("Poisoned merger scheduler mutex");
+        if !queue.is_empty() {
+            return Some(queue.pop().unwrap());
+        }
+
+        let wait;
+        (queue, wait) = self.condvar.wait_timeout(queue, timeout).expect("Poisoned merger scheduler mutex");
+
+        if wait.timed_out() {
+            return None;
+        }
+
+        Some(queue.pop().unwrap())
     }
 
     fn prepare(&self, request: MergeRequest) -> (InternalMergeRequest, MergePriority, WorkHandle) {
@@ -164,6 +156,35 @@ impl MergeScheduler {
         (internal_request, request.priority, handle)
     }
 
+    fn process(&self, request: InternalMergeRequest) -> NodeResult<()> {
+        let result = self.merge_shard(&request.shard_id);
+
+        // When a notifier is requested, send the merge result and let the
+        // caller be responsible to handle errors
+        match request.notifier {
+            Some(notifier) => {
+                let _ = notifier.send(result);
+            }
+            None => {
+                result?;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn merge_shard(&self, shard_id: &ShardId) -> NodeResult<MergeMetrics> {
+        let shard = self.shard_cache.get(shard_id)?;
+        shard.merge()
+    }
+
+    fn schedule_free_time_work(&self) {
+        let mut queue = self.work_queue.lock().expect("Poisoned merger scheduler mutex");
+        for (request, priority) in self.all_shards_requests() {
+            queue.push(request, priority);
+        }
+    }
+
     fn all_shards_requests(&self) -> impl Iterator<Item = (InternalMergeRequest, MergePriority)> + '_ {
         iter_shards(self.settings.shards_path())
             .map(|shard_id| MergeRequest {
@@ -175,11 +196,6 @@ impl MergeScheduler {
                 let (request, priority, _handle) = self.prepare(request);
                 (request, priority)
             })
-    }
-
-    fn merge_shard(&self, shard_id: &ShardId) -> NodeResult<MergeMetrics> {
-        let shard = self.shard_cache.get(shard_id)?;
-        shard.merge()
     }
 
     #[cfg(test)]
@@ -228,8 +244,12 @@ fn iter_shards(shards_path: PathBuf) -> impl Iterator<Item = String> {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+    use std::thread;
     use tempfile::{self, TempDir};
     use tokio;
+
+    use crate::disk_structure;
 
     use super::*;
 
@@ -237,30 +257,66 @@ mod tests {
         let temp_dir = tempfile::tempdir().unwrap();
         let settings = Settings::builder().data_path(temp_dir.path()).build().unwrap();
         let shard_cache = Arc::new(ShardWriterCache::new(settings.clone()));
+        fs::create_dir_all(settings.shards_path()).unwrap();
+
         (MergeScheduler::new(shard_cache, settings), temp_dir)
     }
 
     #[test]
-    fn test_merge_scheduler() {
+    fn test_schedule_merge_requests() {
         let (merger, _guards) = merge_scheduler();
-
         assert_eq!(merger.pending_work(), 0);
 
-        merger.schedule(MergeRequest {
-            shard_id: "shard-id".to_string(),
-            priority: MergePriority::default(),
-            waiter: MergeWaiter::None,
-        });
-        assert_eq!(merger.pending_work(), 1);
+        for i in 0..5 {
+            merger.schedule(MergeRequest {
+                shard_id: format!("shard-{i}"),
+                priority: MergePriority::default(),
+                waiter: MergeWaiter::None,
+            });
+        }
+        assert_eq!(merger.pending_work(), 5);
+    }
 
-        // shard is fake, so this fails but work is done
-        let result = merger.process();
-        assert!(result.is_err());
+    #[test]
+    fn test_request_dedup() {
+        let (merger, _guards) = merge_scheduler();
+        assert_eq!(merger.pending_work(), 0);
+
+        for _ in 0..2 {
+            merger.schedule(MergeRequest {
+                shard_id: "shard-id".to_string(),
+                priority: MergePriority::default(),
+                waiter: MergeWaiter::None,
+            });
+        }
+        // repeated requests are deduplicated
+        assert_eq!(merger.pending_work(), 1);
+    }
+
+    #[test]
+    fn test_request_processing() {
+        let (merger, _guards) = merge_scheduler();
+
+        const TOTAL: usize = 3;
+        for i in 0..TOTAL {
+            merger.schedule(MergeRequest {
+                shard_id: format!("shard-{i}"),
+                priority: MergePriority::default(),
+                waiter: MergeWaiter::None,
+            });
+        }
+
+        assert_eq!(merger.pending_work(), TOTAL);
+        for i in 0..TOTAL {
+            // shard is fake, so it will fail but work will be done
+            merger.run();
+            assert_eq!(merger.pending_work(), TOTAL - i - 1);
+        }
         assert_eq!(merger.pending_work(), 0);
     }
 
     #[tokio::test]
-    async fn test_merger_with_waiter() {
+    async fn test_merge_and_wait_results() {
         let (merger, _guards) = merge_scheduler();
 
         let handle = merger.schedule(MergeRequest {
@@ -275,20 +331,38 @@ mod tests {
     }
 
     #[test]
-    fn test_merger_schedules_all_shards_when_idle() {
+    fn test_free_time_work_scheduling() {
         let (merger, _guards) = merge_scheduler();
 
         // create two fake shards
         let shards_path = merger.settings.shards_path();
-        fs::create_dir_all(shards_path.join("shard-a")).unwrap();
-        fs::create_dir_all(shards_path.join("shard-b")).unwrap();
+        fs::create_dir_all(disk_structure::shard_path_by_id(&shards_path, "shard-a")).unwrap();
+        fs::create_dir_all(disk_structure::shard_path_by_id(&shards_path, "shard-b")).unwrap();
 
-        // this call will block, wait and schedule all shards
-        merger.blocking_next();
-        assert_eq!(merger.pending_work(), 1);
-
-        // now it'll get without blocking
-        merger.blocking_next();
         assert_eq!(merger.pending_work(), 0);
+        merger.schedule_free_time_work();
+        assert_eq!(merger.pending_work(), 2);
+    }
+
+    #[test]
+    fn test_scheduler_shutdown() {
+        let (merger, _guards) = merge_scheduler();
+        let merger = Arc::new(merger);
+        let merger_run = Arc::clone(&merger);
+        let merger_stop = Arc::clone(&merger);
+
+        let t_run = thread::spawn(move || {
+            merger_run.run_forever();
+        });
+        let t_stop = thread::spawn(move || {
+            thread::sleep(Duration::from_millis(1));
+            merger_stop.stop();
+        });
+
+        // We wait for t_run first so we can't end the test without executing
+        // it. After 1 ms, t_stop will stop the merger and finish, unblocking
+        // t_run and this test will finish too
+        t_run.join().unwrap();
+        t_stop.join().unwrap();
     }
 }
