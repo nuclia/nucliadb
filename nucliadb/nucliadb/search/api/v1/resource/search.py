@@ -132,6 +132,7 @@ async def resource_search(
         field_type_filter=field_type_filter,
         extracted=extracted,
         highlight_split=highlight,
+        min_score=0.0,
     )
 
     response.status_code = 206 if incomplete_results else 200

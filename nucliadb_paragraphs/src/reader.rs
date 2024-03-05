@@ -112,6 +112,7 @@ impl ParagraphReader for ParagraphReaderService {
             page_number: 1,
             results_per_page: 10,
             searcher,
+            min_score: 0.0,
         }))
     }
 
@@ -174,15 +175,15 @@ impl ParagraphReader for ParagraphReaderService {
             text: &text,
             only_faceted: request.only_faceted,
         };
-        let mut response = searcher.do_search(termc.clone(), original, self)?;
+        let mut response = searcher.do_search(termc.clone(), original, self, request.min_score)?;
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Searching: ends at {v} ms");
 
-        if response.results.is_empty() && request.result_per_page > 0 {
+        if response.results.is_empty() && request.result_per_page > 0 && request.min_score == 0 as f32 {
             let v = time.elapsed().as_millis();
             debug!("{id:?} - Applying fuzzy: starts at {v} ms");
 
-            let fuzzied = searcher.do_search(termc, fuzzied, self)?;
+            let fuzzied = searcher.do_search(termc, fuzzied, self, request.min_score)?;
             response = fuzzied;
             response.fuzzy_distance = FUZZY_DISTANCE as i32;
             let v = time.elapsed().as_millis();
@@ -192,12 +193,29 @@ impl ParagraphReader for ParagraphReaderService {
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Producing results: starts at {v} ms");
 
+        let mut results_above_min_score = vec![];
         let total = response.results.len() as f32;
-        response.results.iter_mut().enumerate().for_each(|(i, r)| {
-            if let Some(sc) = &mut r.score {
-                sc.booster = total - (i as f32);
+        let mut some_below_min_score: bool = false;
+
+        for (i, r) in response.results.iter_mut().enumerate() {
+            let Some(sc) = &mut r.score else {
+                continue;
+            };
+            if sc.bm25 < request.min_score {
+                // We can break here because the results are sorted by score
+                some_below_min_score = true;
+                break;
             }
-        });
+            sc.booster = total - (i as f32);
+            results_above_min_score.push(r.clone());
+        }
+
+        response.results = results_above_min_score.clone();
+        if some_below_min_score {
+            // We set next_page to false so that the client stops asking for more results
+            response.next_page = false;
+        }
+
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Producing results: starts at {v} ms");
 
@@ -344,6 +362,7 @@ impl<'a> Searcher<'a> {
         termc: SharedTermC,
         query: Box<dyn Query>,
         service: &ParagraphReaderService,
+        min_score: f32,
     ) -> NodeResult<ProtosResponse> {
         let searcher = service.reader.searcher();
         let facet_collector =
@@ -395,6 +414,7 @@ impl<'a> Searcher<'a> {
                         page_number: self.request.page_number,
                         results_per_page: self.results as i32,
                         searcher,
+                        min_score,
                     }))
                 }
             }
@@ -434,6 +454,7 @@ impl<'a> Searcher<'a> {
                         page_number: self.request.page_number,
                         results_per_page: self.results as i32,
                         searcher,
+                        min_score,
                     }))
                 }
             }
@@ -779,6 +800,26 @@ mod tests {
         };
         let result = paragraph_reader_service.search(&search, &empty_context).unwrap();
         assert_eq!(result.total, 4);
+
+        // Search and filter by min_score
+        let search = ProtosRequest {
+            id: "shard1".to_string(),
+            uuid: UUID.to_string(),
+            body: "should enough".to_string(),
+            fields: vec![],
+            filter: None,
+            faceted: None,
+            order: None,
+            page_number: 0,
+            result_per_page: 20,
+            timestamps: None,
+            with_duplicates: false,
+            only_faceted: false,
+            min_score: 30.0,
+            ..Default::default()
+        };
+        let result = paragraph_reader_service.search(&search, &empty_context).unwrap();
+        assert_eq!(result.results.len(), 0);
 
         // Search on all paragraphs in resource with typo
         let search = ProtosRequest {

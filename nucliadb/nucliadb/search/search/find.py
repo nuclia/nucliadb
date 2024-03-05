@@ -22,7 +22,10 @@ from time import time
 from nucliadb.search.requesters.utils import Method, debug_nodes_info, node_query
 from nucliadb.search.search.find_merge import find_merge_results
 from nucliadb.search.search.query import QueryParser
-from nucliadb.search.search.utils import should_disable_vector_search
+from nucliadb.search.search.utils import (
+    min_score_from_payload,
+    should_disable_vector_search,
+)
 from nucliadb_models.search import (
     FindRequest,
     KnowledgeboxFindResults,
@@ -41,6 +44,8 @@ async def find(
 ) -> tuple[KnowledgeboxFindResults, bool]:
     audit = get_audit()
     start_time = time()
+
+    item.min_score = min_score_from_payload(item.min_score)
 
     if SearchOptions.VECTOR in item.features:
         if should_disable_vector_search(item):
@@ -85,7 +90,8 @@ async def find(
         field_type_filter=item.field_type_filter,
         extracted=item.extracted,
         requested_relations=pb_query.relation_subgraph,
-        min_score=query_parser.min_score,
+        min_score_bm25=query_parser.min_score.bm25,
+        min_score_semantic=query_parser.min_score.semantic,
         highlight=item.highlight,
     )
 

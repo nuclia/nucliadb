@@ -357,7 +357,12 @@ impl TextReaderService {
         }
     }
 
-    fn convert_bm25_order(&self, response: SearchResponse<f32>, searcher: &Searcher) -> DocumentSearchResponse {
+    fn convert_bm25_order(
+        &self,
+        response: SearchResponse<f32>,
+        searcher: &Searcher,
+        min_score: f32,
+    ) -> DocumentSearchResponse {
         let total = response.total as i32;
         let retrieved_results = (response.page_number + 1) * response.results_per_page;
         let next_page = total > retrieved_results;
@@ -366,6 +371,9 @@ impl TextReaderService {
 
         let mut results = Vec::with_capacity(results_per_page);
         for (id, (score, doc_address)) in result_stream {
+            if score < min_score {
+                continue;
+            }
             match searcher.doc(doc_address) {
                 Ok(doc) => {
                     let score = Some(ResultScore {
@@ -515,6 +523,7 @@ impl TextReaderService {
                         results_per_page: results as i32,
                     },
                     &searcher,
+                    request.min_score,
                 );
                 Ok(result)
             }

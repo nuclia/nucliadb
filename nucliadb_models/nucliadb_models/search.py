@@ -47,11 +47,6 @@ class ModelParamDefaults:
         title="Autofilters",
         description="List of filters automatically applied to the search query",
     )
-    min_score = ParamDefault(
-        default=...,
-        title="Minimum score",
-        description="Minimum similarity score used to filter vector index search. Results with a lower score will be ignored.",  # noqa
-    )
 
 
 class ResourceProperties(str, Enum):
@@ -140,7 +135,10 @@ class Sentences(BaseModel):
     facets: FacetsResult
     page_number: int = 0
     page_size: int = 20
-    min_score: float = ModelParamDefaults.min_score.to_pydantic_field()
+    min_score: float = Field(
+        title="Minimum score",
+        description="Minimum similarity score used to filter vector index search. Results with a lower score have been ignored.",  # noqa
+    )
 
 
 class Paragraph(BaseModel):
@@ -164,6 +162,10 @@ class Paragraphs(BaseModel):
     page_number: int = 0
     page_size: int = 20
     next_page: bool = False
+    min_score: float = Field(
+        title="Minimum score",
+        description="Minimum bm25 score used to filter bm25 index search. Results with a lower score have been ignored.",  # noqa
+    )
 
 
 class ResourceResult(BaseModel):
@@ -182,6 +184,10 @@ class Resources(BaseModel):
     page_number: int = 0
     page_size: int = 20
     next_page: bool = False
+    min_score: float = Field(
+        title="Minimum score",
+        description="Minimum bm25 score used to filter bm25 index search. Results with a lower score have been ignored.",  # noqa
+    )
 
 
 class RelationDirection(str, Enum):
@@ -415,11 +421,6 @@ class SearchParamDefaults:
         description="The list of facets to calculate. The facets follow the same syntax as filters: https://docs.nuclia.dev/docs/docs/using/search/#filters",  # noqa: E501
         max_items=50,
     )
-    min_score = ParamDefault(
-        default=None,
-        title="Minimum result score",
-        description="The minimum score to consider a vector index result as valid. Results with a lower score will not be returned. If not set, the default minimum value associated to the Knowledge box's semantic model is used.",  # noqa: E501
-    )
     autofilter = ParamDefault(
         default=False,
         title="Automatic search filtering",
@@ -613,6 +614,20 @@ class CatalogRequest(BaseModel):
         return validate_facets(facets)
 
 
+class MinScore(BaseModel):
+    semantic: Optional[float] = Field(
+        default=None,
+        title="Minimum semantic score",
+        description="Minimum semantic similarity score used to filter vector index search. If not specified, the default minimum score of the semantic model associated to the Knowledge Box will be used. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/docs/using/search/#minimum-score",  # noqa: E501
+    )
+    bm25: float = Field(
+        default=0,
+        title="Minimum bm25 score",
+        description="Minimum score used to filter bm25 index search. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/docs/using/search/#minimum-score",
+        ge=0,
+    )
+
+
 class BaseSearchRequest(BaseModel):
     query: str = SearchParamDefaults.query.to_pydantic_field()
     fields: List[str] = SearchParamDefaults.fields.to_pydantic_field()
@@ -623,7 +638,11 @@ class BaseSearchRequest(BaseModel):
     )
     page_number: int = SearchParamDefaults.page_number.to_pydantic_field()
     page_size: int = SearchParamDefaults.page_size.to_pydantic_field()
-    min_score: Optional[float] = SearchParamDefaults.min_score.to_pydantic_field()
+    min_score: Optional[Union[float, MinScore]] = Field(
+        default=None,
+        title="Minimum score",
+        description="Minimum score to filter search results. Results with a lower score will be ignored. Accepts either a float or a dictionary with the minimum scores for the bm25 and vector indexes. If a float is provided, it is interpreted as the minimum score for vector index search.",  # noqa
+    )
     range_creation_start: Optional[
         datetime
     ] = SearchParamDefaults.range_creation_start.to_pydantic_field()
@@ -829,7 +848,11 @@ class ChatRequest(BaseModel):
         title="Filters",
         description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/docs/using/search/#filters",  # noqa: E501
     )
-    min_score: Optional[float] = SearchParamDefaults.min_score.to_pydantic_field()
+    min_score: Optional[Union[float, MinScore]] = Field(
+        default=None,
+        title="Minimum score",
+        description="Minimum score to filter search results. Results with a lower score will be ignored. Accepts either a float or a dictionary with the minimum scores for the bm25 and vector indexes. If a float is provided, it is interpreted as the minimum score for vector index search.",  # noqa
+    )
     features: List[ChatOptions] = SearchParamDefaults.chat_features.to_pydantic_field()
     range_creation_start: Optional[
         datetime
@@ -1067,7 +1090,10 @@ class KnowledgeboxFindResults(JsonBaseModel):
         description="The list of shard replica ids used for the search.",
     )
     autofilters: List[str] = ModelParamDefaults.applied_autofilters.to_pydantic_field()
-    min_score: float = ModelParamDefaults.min_score.to_pydantic_field()
+    min_score: MinScore = Field(
+        title="Minimum result score",
+        description="The minimum scores that have been used for the search operation.",
+    )
     best_matches: List[str] = Field(
         default=[],
         title="Best matches",

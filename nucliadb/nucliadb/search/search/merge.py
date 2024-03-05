@@ -50,6 +50,7 @@ from nucliadb_models.search import (
     EntitySubgraph,
     KnowledgeboxSearchResults,
     KnowledgeboxSuggestResults,
+    MinScore,
     Paragraph,
     Paragraphs,
     RelatedEntities,
@@ -121,6 +122,7 @@ async def merge_documents_results(
     page: int,
     kbid: str,
     sort: SortOptions,
+    min_score: float,
 ) -> Resources:
     raw_resource_list: list[tuple[DocumentResult, Score]] = []
     facets: dict[str, Any] = {}
@@ -182,6 +184,7 @@ async def merge_documents_results(
         page_number=page,
         page_size=count,
         next_page=next_page,
+        min_score=min_score,
     )
 
 
@@ -251,7 +254,7 @@ async def merge_suggest_paragraph_results(
                     new_paragraph.start_seconds = seconds_positions[0]
                     new_paragraph.end_seconds = seconds_positions[1]
             result_paragraph_list.append(new_paragraph)
-        return Paragraphs(results=result_paragraph_list, query=query)
+        return Paragraphs(results=result_paragraph_list, query=query, min_score=0)
     finally:
         etcache.clear()
         rcache.clear()
@@ -263,14 +266,14 @@ async def merge_vectors_results(
     kbid: str,
     count: int,
     page: int,
-    min_score: float,
+    min_score: Optional[float] = None,
 ):
     facets: dict[str, Any] = {}
     raw_vectors_list: list[DocumentScored] = []
 
     for vector_response in vector_responses:
         for document in vector_response.documents:
-            if document.score < min_score:
+            if min_score is not None and document.score < min_score:
                 continue
             if math.isnan(document.score):
                 continue
@@ -334,7 +337,7 @@ async def merge_vectors_results(
         facets=facets,
         page_number=page,
         page_size=count,
-        min_score=round(min_score, ndigits=3),
+        min_score=round(min_score or 0, ndigits=3),
     )
 
 
@@ -346,6 +349,7 @@ async def merge_paragraph_results(
     page: int,
     highlight: bool,
     sort: SortOptions,
+    min_score: float,
 ):
     raw_paragraph_list: list[tuple[ParagraphResult, Score]] = []
     facets: dict[str, Any] = {}
@@ -442,6 +446,7 @@ async def merge_paragraph_results(
             page_number=page,
             page_size=count,
             next_page=next_page,
+            min_score=min_score,
         )
     finally:
         etcache.clear()
@@ -509,7 +514,7 @@ async def merge_results(
     extracted: list[ExtractedDataTypeName],
     sort: SortOptions,
     requested_relations: EntitiesSubgraphRequest,
-    min_score: float,
+    min_score: MinScore,
     highlight: bool = False,
 ) -> KnowledgeboxSearchResults:
     paragraphs = []
@@ -529,7 +534,7 @@ async def merge_results(
     try:
         resources: list[str] = list()
         api_results.fulltext = await merge_documents_results(
-            documents, resources, count, page, kbid, sort
+            documents, resources, count, page, kbid, sort, min_score=min_score.bm25
         )
 
         api_results.paragraphs = await merge_paragraph_results(
@@ -540,10 +545,11 @@ async def merge_results(
             page,
             highlight,
             sort,
+            min_score=min_score.bm25,
         )
 
         api_results.sentences = await merge_vectors_results(
-            vectors, resources, kbid, count, page, min_score=min_score
+            vectors, resources, kbid, count, page, min_score=min_score.semantic
         )
 
         api_results.relations = await merge_relations_results(
@@ -567,6 +573,7 @@ async def merge_paragraphs_results(
     field_type_filter: list[FieldTypeName],
     extracted: list[ExtractedDataTypeName],
     highlight_split: bool,
+    min_score: float,
 ) -> ResourceSearchResults:
     paragraphs = []
     for result in paragraph_responses:
@@ -589,6 +596,7 @@ async def merge_paragraphs_results(
                 order=SortOrder.DESC,
                 limit=None,
             ),
+            min_score=min_score,
         )
         return api_results
     finally:

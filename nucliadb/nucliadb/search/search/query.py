@@ -50,6 +50,7 @@ from nucliadb_models.labels import translate_system_to_alias_label
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import (
     Filter,
+    MinScore,
     SearchOptions,
     SortField,
     SortFieldMap,
@@ -96,8 +97,8 @@ class QueryParser:
         filters: Union[list[str], list[Filter]],
         page_number: int,
         page_size: int,
+        min_score: MinScore,
         faceted: Optional[list[str]] = None,
-        min_score: Optional[float] = None,
         sort: Optional[SortOptions] = None,
         range_creation_start: Optional[datetime] = None,
         range_creation_end: Optional[datetime] = None,
@@ -195,7 +196,7 @@ class QueryParser:
             self.flat_filter_labels
         ):
             asyncio.ensure_future(self._get_classification_labels())
-        if self.min_score is None:
+        if self.min_score.semantic is None:
             asyncio.ensure_future(self._get_default_min_score())
         if SearchOptions.VECTOR in self.features and self.user_vector is None:
             asyncio.ensure_future(self._get_converted_vectors())
@@ -324,9 +325,10 @@ class QueryParser:
             request.order.type = SortOrderMap[self.sort.order]  # type: ignore
 
     async def parse_min_score(self, request: nodereader_pb2.SearchRequest) -> None:
-        if self.min_score is None:
-            self.min_score = await self._get_default_min_score()
-        request.min_score = self.min_score
+        if self.min_score.semantic is None:
+            self.min_score.semantic = await self._get_default_min_score()
+        request.min_score_semantic = self.min_score.semantic
+        request.min_score_bm25 = self.min_score.bm25
 
     def parse_document_search(self, request: nodereader_pb2.SearchRequest) -> None:
         if SearchOptions.DOCUMENT in self.features:

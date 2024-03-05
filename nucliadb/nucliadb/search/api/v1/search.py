@@ -22,7 +22,7 @@ from datetime import datetime
 from time import time
 from typing import Optional, Union
 
-from fastapi import Body, Header, Request, Response
+from fastapi import Body, Header, Query, Request, Response
 from fastapi.openapi.models import Example
 from fastapi_versioning import version
 from pydantic.error_wrappers import ValidationError
@@ -36,13 +36,18 @@ from nucliadb.search.requesters.utils import Method, debug_nodes_info, node_quer
 from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.merge import merge_results
 from nucliadb.search.search.query import QueryParser
-from nucliadb.search.search.utils import should_disable_vector_search
+from nucliadb.search.search.utils import (
+    min_score_from_payload,
+    min_score_from_query_params,
+    should_disable_vector_search,
+)
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
     CatalogRequest,
     KnowledgeboxSearchResults,
+    MinScore,
     NucliaDBClientType,
     ResourceProperties,
     SearchOptions,
@@ -103,7 +108,20 @@ async def search_knowledgebox(
     sort_order: SortOrder = fastapi_query(SearchParamDefaults.sort_order),
     page_number: int = fastapi_query(SearchParamDefaults.page_number),
     page_size: int = fastapi_query(SearchParamDefaults.page_size),
-    min_score: float = fastapi_query(SearchParamDefaults.min_score),
+    min_score: Optional[float] = Query(
+        default=None,
+        description="Minimum similarity score to filter vector index results. If not specified, the default minimum score of the semantic model associated to the Knowledge Box will be used. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/docs/using/search/#minimum-score",  # noqa: E501
+        deprecated=True,
+    ),
+    min_score_semantic: Optional[float] = Query(
+        default=None,
+        description="Minimum semantic similarity score to filter vector index results. If not specified, the default minimum score of the semantic model associated to the Knowledge Box will be used. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/docs/using/search/#minimum-score",  # noqa: E501
+    ),
+    min_score_bm25: float = Query(
+        default=0,
+        description="Minimum bm25 score to filter paragraph and document index results",
+        ge=0,
+    ),
     range_creation_start: Optional[datetime] = fastapi_query(
         SearchParamDefaults.range_creation_start
     ),
@@ -158,7 +176,9 @@ async def search_knowledgebox(
             ),
             page_number=page_number,
             page_size=page_size,
-            min_score=min_score,
+            min_score=min_score_from_query_params(
+                min_score_bm25, min_score_semantic, min_score
+            ),
             range_creation_end=range_creation_end,
             range_creation_start=range_creation_start,
             range_modification_end=range_modification_end,
@@ -265,10 +285,6 @@ async def catalog(
                 limit=None,
             )
 
-        # Min score is not relevant here, as catalog endpoint
-        # only returns bm25 results on titles
-        min_score = 0.0
-
         query_parser = QueryParser(
             kbid=kbid,
             features=[SearchOptions.DOCUMENT],
@@ -278,7 +294,7 @@ async def catalog(
             sort=sort,
             page_number=item.page_number,
             page_size=item.page_size,
-            min_score=min_score,
+            min_score=MinScore(bm25=0, semantic=0),
             fields=["a/title"],
             with_status=item.with_status,
         )
@@ -392,6 +408,8 @@ async def search(
 ) -> tuple[KnowledgeboxSearchResults, bool]:
     audit = get_audit()
     start_time = time()
+
+    item.min_score = min_score_from_payload(item.min_score)
 
     if SearchOptions.VECTOR in item.features:
         if should_disable_vector_search(item):

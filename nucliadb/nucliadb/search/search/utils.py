@@ -17,7 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb_models.search import BaseSearchRequest
+from typing import Optional, Union
+
+from nucliadb_models.search import BaseSearchRequest, MinScore
 
 
 def is_empty_query(request: BaseSearchRequest) -> bool:
@@ -48,3 +50,25 @@ def should_disable_vector_search(request: BaseSearchRequest) -> bool:
         return True
 
     return False
+
+
+def min_score_from_query_params(
+    min_score_bm25: float,
+    min_score_semantic: Optional[float],
+    deprecated_min_score: Optional[float],
+) -> MinScore:
+    # Keep backward compatibility with the deprecated min_score parameter
+    semantic = (
+        deprecated_min_score if min_score_semantic is None else min_score_semantic
+    )
+    return MinScore(bm25=min_score_bm25, semantic=semantic)
+
+
+def min_score_from_payload(min_score: Optional[Union[float, MinScore]]) -> MinScore:
+    # Keep backward compatibility with the deprecated
+    # min_score payload parameter being a float
+    if min_score is None:
+        return MinScore(bm25=0, semantic=None)
+    elif isinstance(min_score, float):
+        return MinScore(bm25=0, semantic=min_score)
+    return min_score

@@ -84,6 +84,7 @@ message DocumentSearchRequest {
     optional noderesources.Resource.ResourceStatus with_status = 16;
     optional string advanced_query = 17;
 
+    float min_score = 18;
 }
 
 
@@ -112,6 +113,8 @@ message ParagraphSearchRequest {
     bool only_faceted = 15;
     optional string advanced_query = 16;
     repeated string key_filters = 17;
+
+    float min_score = 18;
 }
 
 message ResultScore {
@@ -334,7 +337,8 @@ message SearchRequest {
     EntitiesSubgraphRequest relation_subgraph = 21;
     repeated string key_filters = 22;
 
-    float min_score = 23;
+    float min_score_semantic = 23;
+    float min_score_bm25 = 25;
 
     optional utils.Security security = 24;
 }

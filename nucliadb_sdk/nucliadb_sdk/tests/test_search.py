@@ -26,7 +26,7 @@ from sentence_transformers import SentenceTransformer  # type: ignore
 
 import nucliadb_sdk
 from nucliadb_models.resource import KnowledgeBoxObj
-from nucliadb_models.search import ResourceProperties, SearchOptions
+from nucliadb_models.search import MinScore, ResourceProperties, SearchOptions
 
 TESTING_IN_CI = os.environ.get("CI") == "true"
 
@@ -397,7 +397,7 @@ def test_standard_examples(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaDB):
         kbid=kb.uuid,
         vector=encoder.encode(["To be in love"])[0].tolist(),
         vectorset="all-MiniLM-L6-v2",
-        min_score=0.25,
+        min_score=MinScore(semantic=0.25),
         features=[SearchOptions.VECTOR],
         show=[ResourceProperties.BASIC, ResourceProperties.VALUES],
     )
