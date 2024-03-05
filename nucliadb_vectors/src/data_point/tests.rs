@@ -57,8 +57,6 @@ fn simple_flow() {
     }
     let pin = DataPointPin::create_pin(temp_dir.path()).unwrap();
     let reader = data_point::create(&pin, elems, None, SIMILARITY).unwrap();
-    let id = reader.get_id();
-    let reader = data_point::open(&pin).unwrap();
     let query = vec![rand::random::<f32>(); 8];
     let no_results = 10;
     let formula = queries[..20].iter().fold(Formula::new(), |mut acc, i| {
