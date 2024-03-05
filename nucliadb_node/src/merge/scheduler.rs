@@ -40,14 +40,6 @@ use nucliadb_core::NodeResult;
 use super::work::WorkQueue;
 use crate::merge::{MergePriority, MergeRequest, MergeWaiter};
 
-// Time between scheduler being idle and scheduling all shards for merge.
-//
-// This value also affects shutdown reaction time
-#[cfg(not(test))]
-const SCHEDULE_ALL_SHARDS_DELAY: Duration = Duration::from_secs(10);
-#[cfg(test)]
-const SCHEDULE_ALL_SHARDS_DELAY: Duration = Duration::from_millis(50);
-
 /// Merge scheduler is the responsible for scheduling merges in the vectors
 /// index. When running, it takes the most prioritary merge request, takes a
 /// shard writer and executes the merge.
@@ -104,7 +96,7 @@ impl MergeScheduler {
     }
 
     fn run(&self) {
-        let work = self.wait_for_work(SCHEDULE_ALL_SHARDS_DELAY);
+        let work = self.wait_for_work(self.settings.merge_scheduler_free_time_work_scheduling_delay());
 
         match work {
             Some(request) => {
@@ -114,6 +106,8 @@ impl MergeScheduler {
                 }
             }
             None => {
+                // Nobody requested a merge and it's been a while since last
+                // merge, let's schedule some work to do in our free time
                 self.schedule_free_time_work();
             }
         }
@@ -255,7 +249,11 @@ mod tests {
 
     fn merge_scheduler() -> (MergeScheduler, TempDir) {
         let temp_dir = tempfile::tempdir().unwrap();
-        let settings = Settings::builder().data_path(temp_dir.path()).build().unwrap();
+        let settings = Settings::builder()
+            .data_path(temp_dir.path())
+            .merge_scheduler_free_time_work_scheduling_delay(Duration::from_millis(5))
+            .build()
+            .unwrap();
         let shard_cache = Arc::new(ShardWriterCache::new(settings.clone()));
         fs::create_dir_all(settings.shards_path()).unwrap();
 
