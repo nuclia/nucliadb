@@ -24,7 +24,13 @@ from httpx import AsyncClient
 
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.query import QueryParser
-from nucliadb_models.search import SearchOptions, SortField, SortOptions, SortOrder
+from nucliadb_models.search import (
+    MinScore,
+    SearchOptions,
+    SortField,
+    SortOptions,
+    SortOrder,
+)
 
 
 @pytest.mark.asyncio
@@ -42,7 +48,7 @@ async def test_vector_result_metadata(
         faceted=[],
         page_number=0,
         page_size=20,
-        min_score=-1,
+        min_score=MinScore(bm25=0, semantic=-1),
         sort=SortOptions(
             field=SortField.SCORE,
             order=SortOrder.DESC,

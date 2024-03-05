@@ -33,6 +33,7 @@ from nucliadb.search.search.query import (
     get_kb_model_default_min_score,
     parse_entities_to_filters,
 )
+from nucliadb_models.search import MinScore
 
 QUERY_MODULE = "nucliadb.search.search.query"
 
@@ -146,7 +147,7 @@ class TestApplySynonymsToRequest:
             faceted=[],
             page_number=0,
             page_size=10,
-            min_score=0.5,
+            min_score=MinScore(vector=0.5),
             with_synonyms=True,
         )
         with patch("nucliadb.search.search.query.get_kb_synonyms", get_synonyms):

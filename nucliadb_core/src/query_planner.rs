@@ -266,6 +266,7 @@ fn compute_paragraphs_request(search_request: &SearchRequest) -> Option<Paragrap
         id: String::default(),
         filter: None,
         reload: search_request.reload,
+        min_score: search_request.min_score_bm25,
     })
 }
 
@@ -289,6 +290,7 @@ fn compute_texts_request(search_request: &SearchRequest) -> Option<DocumentSearc
         with_status: search_request.with_status,
         filter: search_request.filter.clone(),
         reload: search_request.reload,
+        min_score: search_request.min_score_bm25,
     })
 }
 
@@ -306,7 +308,7 @@ fn compute_vectors_request(search_request: &SearchRequest) -> Option<VectorSearc
         result_per_page: search_request.result_per_page,
         with_duplicates: search_request.with_duplicates,
         key_filters: search_request.key_filters.clone(),
-        min_score: search_request.min_score,
+        min_score: search_request.min_score_semantic,
         field_labels: Vec::with_capacity(0),
         paragraph_labels: Vec::with_capacity(0),
         reload: search_request.reload,

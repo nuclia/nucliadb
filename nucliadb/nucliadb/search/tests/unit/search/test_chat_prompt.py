@@ -29,6 +29,7 @@ from nucliadb_models.search import (
     FindParagraph,
     FindResource,
     KnowledgeboxFindResults,
+    MinScore,
 )
 from nucliadb_protos import resources_pb2
 
@@ -189,7 +190,7 @@ async def test_default_prompt_context(kb):
                         "both_id/c/conv/ident", result_text, SCORE_TYPE.BOTH, order=0
                     ),
                 },
-                min_score=-1,
+                min_score=MinScore(semantic=-1),
             ),
         )
         prompt_result = context.output
@@ -215,7 +216,7 @@ def find_results():
                 "resource2/a/title", "Resource 2", SCORE_TYPE.VECTOR, order=2
             ),
         },
-        min_score=-1,
+        min_score=MinScore(semantic=-1),
     )
 
 

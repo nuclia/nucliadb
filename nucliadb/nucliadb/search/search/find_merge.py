@@ -41,6 +41,7 @@ from nucliadb_models.search import (
     FindParagraph,
     FindResource,
     KnowledgeboxFindResults,
+    MinScore,
     ResourceProperties,
     TempFindParagraph,
     TextPosition,
@@ -54,6 +55,10 @@ FIND_FETCH_OPS_DISTRIBUTION = metrics.Histogram(
     "nucliadb_find_fetch_operations",
     buckets=[1, 5, 10, 20, 30, 40, 50, 60, 80, 100, 200],
 )
+
+
+def _round(x: float) -> float:
+    return round(x, ndigits=3)
 
 
 @merge_observer.wrap({"type": "set_text_value"})
@@ -266,33 +271,37 @@ def merge_paragraphs_vectors(
     nextpos = 1
     for vectors_shard in vectors_shards:
         for vector in vectors_shard:
-            if vector.score >= min_score:
-                doc_id_split = vector.doc_id.id.split("/")
-                split = None
-                if len(doc_id_split) == 5:
-                    rid, field_type, field, index, position = doc_id_split
-                    paragraph_id = f"{rid}/{field_type}/{field}/{position}"
-                elif len(doc_id_split) == 6:
-                    rid, field_type, field, split, index, position = doc_id_split
-                    paragraph_id = f"{rid}/{field_type}/{field}/{split}/{position}"
-                else:
-                    logger.warning(f"Skipping invalid doc_id: {vector.doc_id.id}")
-                    continue
-                start, end = position.split("-")
-                merged_paragrahs.insert(
-                    nextpos,
-                    TempFindParagraph(
-                        vector_index=vector,
-                        rid=rid,
-                        field=f"/{field_type}/{field}",
-                        score=vector.score,
-                        start=int(start),
-                        end=int(end),
-                        split=split,
-                        id=paragraph_id,
-                    ),
+            if vector.score < min_score:
+                logger.warning(
+                    f"Skipping low score vector: {vector.doc_id.id}. This should not happen"
                 )
-                nextpos += 3
+                continue
+            doc_id_split = vector.doc_id.id.split("/")
+            split = None
+            if len(doc_id_split) == 5:
+                rid, field_type, field, index, position = doc_id_split
+                paragraph_id = f"{rid}/{field_type}/{field}/{position}"
+            elif len(doc_id_split) == 6:
+                rid, field_type, field, split, index, position = doc_id_split
+                paragraph_id = f"{rid}/{field_type}/{field}/{split}/{position}"
+            else:
+                logger.warning(f"Skipping invalid doc_id: {vector.doc_id.id}")
+                continue
+            start, end = position.split("-")
+            merged_paragrahs.insert(
+                nextpos,
+                TempFindParagraph(
+                    vector_index=vector,
+                    rid=rid,
+                    field=f"/{field_type}/{field}",
+                    score=vector.score,
+                    start=int(start),
+                    end=int(end),
+                    split=split,
+                    id=paragraph_id,
+                ),
+            )
+            nextpos += 3
 
     # merged_paragrahs.sort(key=lambda r: r.score, reverse=True)
     init_position = count * page
@@ -361,7 +370,8 @@ async def find_merge_results(
     field_type_filter: list[FieldTypeName],
     extracted: list[ExtractedDataTypeName],
     requested_relations: EntitiesSubgraphRequest,
-    min_score: float,
+    min_score_bm25: float,
+    min_score_semantic: float,
     highlight: bool = False,
 ) -> KnowledgeboxFindResults:
     # force getting transaction on current asyncio task
@@ -393,7 +403,7 @@ async def find_merge_results(
     rcache = get_resource_cache(clear=True)
     try:
         result_paragraphs, merged_next_page = merge_paragraphs_vectors(
-            paragraphs, vectors, count, page, min_score
+            paragraphs, vectors, count, page, min_score_semantic
         )
         next_page = next_page or merged_next_page
 
@@ -404,7 +414,9 @@ async def find_merge_results(
             page_number=page,
             page_size=count,
             next_page=next_page,
-            min_score=round(min_score, ndigits=3),
+            min_score=MinScore(
+                bm25=_round(min_score_bm25), semantic=_round(min_score_semantic)
+            ),
             best_matches=[],
         )
 
