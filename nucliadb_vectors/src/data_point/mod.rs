@@ -59,7 +59,6 @@ pub struct DataPointPin {
     data_point_id: DpId,
     data_point_path: PathBuf,
     journal_path: PathBuf,
-    workspace: PathBuf,
     #[allow(unused)]
     pin: File,
 }
@@ -122,10 +121,16 @@ impl DataPointPin {
             journal_path,
             data_point_path,
             pin: pin_file,
-            workspace: dir.into(),
             data_point_id: id,
         })
     }
+}
+
+pub fn delete(dir: &Path, uid: DpId) -> VectorR<()> {
+    let uid = uid.to_string();
+    let id = dir.join(uid);
+    fs::remove_dir_all(id)?;
+    Ok(())
 }
 
 pub fn open(pin: &DataPointPin) -> VectorR<OpenDataPoint> {
@@ -152,11 +157,14 @@ pub fn open(pin: &DataPointPin) -> VectorR<OpenDataPoint> {
     })
 }
 
-pub fn merge<Dlog>(pin: &DataPointPin, operants: &[(Dlog, DpId)], similarity: Similarity) -> VectorR<OpenDataPoint>
+pub fn merge<Dlog>(
+    pin: &DataPointPin,
+    operants: &[(Dlog, OpenDataPoint)],
+    similarity: Similarity,
+) -> VectorR<OpenDataPoint>
 where
     Dlog: DeleteLog,
 {
-    let workspace = &pin.workspace;
     let data_point_id = pin.data_point_id;
     let data_point_path = &pin.data_point_path;
 
@@ -181,13 +189,8 @@ where
     hnsw_file_options.create(true);
     let mut hnsw_file = hnsw_file_options.open(hnsw_path)?;
 
-    let operants = operants
-        .iter()
-        .map(|(dlog, dp_id)| OpenDataPoint::open(workspace, *dp_id).map(|v| (dlog, v)))
-        .collect::<VectorR<Vec<_>>>()?;
-
     // Creating the node store
-    let node_producers: Vec<_> = operants.iter().map(|dp| ((dp.0, Node), dp.1.nodes.as_ref())).collect();
+    let node_producers: Vec<_> = operants.iter().map(|dp| ((&dp.0, Node), dp.1.nodes.as_ref())).collect();
     data_store::merge(&mut nodes_file, &node_producers)?;
     let nodes = unsafe { Mmap::map(&nodes_file)? };
     let no_nodes = data_store::stored_elements(&nodes);
@@ -623,196 +626,5 @@ impl OpenDataPoint {
         let neighbours = ops.search(Address(self.journal.nodes), self.index.as_ref(), results, filter, with_duplicates);
 
         neighbours.into_iter().map(|(address, dist)| (Neighbour::new(address, &self.nodes, dist))).take(results)
-    }
-
-    pub fn merge<Dlog>(dir: &Path, operants: &[(Dlog, DpId)], similarity: Similarity) -> VectorR<OpenDataPoint>
-    where
-        Dlog: DeleteLog,
-    {
-        let uid = DpId::new_v4().to_string();
-        let id = dir.join(&uid);
-        fs::create_dir(&id)?;
-        let mut nodes = fs::OpenOptions::new().read(true).write(true).create(true).open(id.join(file_names::NODES))?;
-        let mut journalf =
-            fs::OpenOptions::new().read(true).write(true).create(true).open(id.join(file_names::JOURNAL))?;
-        let mut hnswf = fs::OpenOptions::new().read(true).write(true).create(true).open(id.join(file_names::HNSW))?;
-        let operants = operants
-            .iter()
-            .map(|(dlog, dp_id)| OpenDataPoint::open(dir, *dp_id).map(|v| (dlog, v)))
-            .collect::<VectorR<Vec<_>>>()?;
-
-        // Creating the node store
-        let node_producers: Vec<_> = operants.iter().map(|dp| ((dp.0, Node), dp.1.nodes.as_ref())).collect();
-        data_store::merge(&mut nodes, &node_producers)?;
-        let nodes = unsafe { Mmap::map(&nodes)? };
-        let no_nodes = data_store::stored_elements(&nodes);
-
-        // Creating the hnsw for the new node store.
-        let tracker = Retriever::new(&[], &nodes, &NoDLog, similarity, -1.0);
-        let mut ops = HnswOps::new(&tracker);
-        let mut index = RAMHnsw::new();
-        for id in 0..no_nodes {
-            ops.insert(Address(id), &mut index)
-        }
-
-        {
-            let mut hnswf_buffer = BufWriter::new(&mut hnswf);
-            DiskHnsw::serialize_into(&mut hnswf_buffer, no_nodes, index)?;
-            hnswf_buffer.flush()?;
-        }
-
-        let index = unsafe { Mmap::map(&hnswf)? };
-
-        let journal = Journal {
-            nodes: no_nodes,
-            uid: DpId::parse_str(&uid).unwrap(),
-            ctime: SystemTime::now(),
-        };
-
-        {
-            let mut journalf_buffer = BufWriter::new(&mut journalf);
-            journalf_buffer.write_all(&serde_json::to_vec(&journal)?)?;
-            journalf_buffer.flush()?;
-        }
-
-        // Telling the OS our expected access pattern
-        #[cfg(not(target_os = "windows"))]
-        {
-            nodes.advise(memmap2::Advice::WillNeed)?;
-            index.advise(memmap2::Advice::Sequential)?;
-        }
-
-        Ok(OpenDataPoint {
-            journal,
-            nodes,
-            index,
-        })
-    }
-    pub fn delete(dir: &Path, uid: DpId) -> VectorR<()> {
-        let uid = uid.to_string();
-        let id = dir.join(uid);
-        fs::remove_dir_all(id)?;
-        Ok(())
-    }
-    pub fn open(dir: &Path, uid: DpId) -> VectorR<OpenDataPoint> {
-        let uid = uid.to_string();
-        let id = dir.join(uid);
-        let nodes = fs::OpenOptions::new().read(true).open(id.join(file_names::NODES))?;
-        let journal = fs::OpenOptions::new().read(true).open(id.join(file_names::JOURNAL))?;
-        let hnswf = fs::OpenOptions::new().read(true).open(id.join(file_names::HNSW))?;
-
-        let nodes = unsafe { Mmap::map(&nodes)? };
-        let index = unsafe { Mmap::map(&hnswf)? };
-        let journal: Journal = serde_json::from_reader(BufReader::new(journal))?;
-
-        // Telling the OS our expected access pattern
-        #[cfg(not(target_os = "windows"))]
-        {
-            nodes.advise(memmap2::Advice::WillNeed)?;
-            index.advise(memmap2::Advice::Sequential)?;
-        }
-
-        Ok(OpenDataPoint {
-            journal,
-            nodes,
-            index,
-        })
-    }
-
-    pub fn new(
-        dir: &Path,
-        elems: Vec<Elem>,
-        time: Option<SystemTime>,
-        similarity: Similarity,
-    ) -> VectorR<OpenDataPoint> {
-        let data_point_id = DpId::new_v4();
-        let data_point_path = dir.join(data_point_id.to_string());
-        fs::create_dir(&data_point_path)?;
-        OpenDataPoint::new_with_id(&data_point_path, data_point_id, elems, time, similarity)
-    }
-
-    pub fn new_from_pin(
-        data_point_pin: &DataPointPin,
-        elems: Vec<Elem>,
-        time: Option<SystemTime>,
-        similarity: Similarity,
-    ) -> VectorR<OpenDataPoint> {
-        let data_point_id = data_point_pin.data_point_id;
-        let data_point_path = &data_point_pin.data_point_path;
-        OpenDataPoint::new_with_id(data_point_path, data_point_id, elems, time, similarity)
-    }
-
-    fn new_with_id(
-        data_point_path: &Path,
-        data_point_id: DpId,
-        elems: Vec<Elem>,
-        time: Option<SystemTime>,
-        similarity: Similarity,
-    ) -> VectorR<OpenDataPoint> {
-        let mut nodes_file_options = OpenOptions::new();
-        nodes_file_options.read(true);
-        nodes_file_options.write(true);
-        nodes_file_options.create(true);
-        let mut nodesf = nodes_file_options.open(data_point_path.join(file_names::NODES))?;
-
-        let mut journal_file_options = OpenOptions::new();
-        journal_file_options.read(true);
-        journal_file_options.write(true);
-        journal_file_options.create(true);
-        let mut journalf = journal_file_options.open(data_point_path.join(file_names::JOURNAL))?;
-
-        let mut hnsw_file_options = OpenOptions::new();
-        hnsw_file_options.read(true);
-        hnsw_file_options.write(true);
-        hnsw_file_options.create(true);
-        let mut hnswf = hnsw_file_options.open(data_point_path.join(file_names::HNSW))?;
-
-        // Serializing nodes on disk
-        // Nodes are stored on disk and mmaped.
-        data_store::create_key_value(&mut nodesf, elems)?;
-        let nodes = unsafe { Mmap::map(&nodesf)? };
-        let no_nodes = data_store::stored_elements(&nodes);
-
-        // Creating the HNSW using the mmaped nodes
-        let tracker = Retriever::new(&[], &nodes, &NoDLog, similarity, -1.0);
-        let mut ops = HnswOps::new(&tracker);
-        let mut index = RAMHnsw::new();
-        for id in 0..no_nodes {
-            ops.insert(Address(id), &mut index)
-        }
-
-        {
-            // The HNSW is on RAM
-            // Serializing the HNSW into disk
-            let mut hnswf_buffer = BufWriter::new(&mut hnswf);
-            DiskHnsw::serialize_into(&mut hnswf_buffer, no_nodes, index)?;
-            hnswf_buffer.flush()?;
-        }
-        let index = unsafe { Mmap::map(&hnswf)? };
-
-        let journal = Journal {
-            nodes: no_nodes,
-            uid: data_point_id,
-            ctime: time.unwrap_or_else(SystemTime::now),
-        };
-        {
-            // Saving the journal
-            let mut journalf_buffer = BufWriter::new(&mut journalf);
-            journalf_buffer.write_all(&serde_json::to_vec(&journal)?)?;
-            journalf_buffer.flush()?;
-        }
-
-        // Telling the OS our expected access pattern
-        #[cfg(not(target_os = "windows"))]
-        {
-            nodes.advise(memmap2::Advice::WillNeed)?;
-            index.advise(memmap2::Advice::Sequential)?;
-        }
-
-        Ok(OpenDataPoint {
-            journal,
-            nodes,
-            index,
-        })
     }
 }

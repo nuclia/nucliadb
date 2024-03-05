@@ -124,9 +124,9 @@ impl Writer {
                     time: data_point_journal.time(),
                     dlog: &self.delete_log,
                 };
-                let data_point_id = data_point_pin.id();
+                let open_data_point = data_point::open(&data_point_pin)?;
                 being_merged.push(data_point_pin);
-                buffer.push((delete_log, data_point_id));
+                buffer.push((delete_log, open_data_point));
             }
         }
 
