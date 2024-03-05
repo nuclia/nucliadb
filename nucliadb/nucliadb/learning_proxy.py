@@ -35,13 +35,7 @@ from nucliadb_utils.settings import is_onprem_nucliadb, nuclia_settings
 SERVICE_NAME = "nucliadb.learning_proxy"
 logger = logging.getLogger(SERVICE_NAME)
 
-
-NUCLIA_ONPREM_AUTH_HEADER = "X-NUCLIA-NUAKEY"
-
-
 WHITELISTED_HEADERS = {
-    "x-nucliadb-user",
-    "x-nucliadb-roles",
     "x-stf-roles",
     "x-stf-user",
 }
