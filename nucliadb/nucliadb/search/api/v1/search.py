@@ -41,6 +41,7 @@ from nucliadb_models.common import FieldTypeName
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
+    CatalogRequest,
     KnowledgeboxSearchResults,
     NucliaDBClientType,
     ResourceProperties,
@@ -193,7 +194,7 @@ async def search_knowledgebox(
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def catalog(
+async def catalog_get(
     request: Request,
     response: Response,
     kbid: str,
@@ -211,31 +212,75 @@ async def catalog(
     ),
     debug: bool = fastapi_query(SearchParamDefaults.debug),
 ) -> Union[KnowledgeboxSearchResults, HTTPClientError]:
-    sort_options = SortOptions(  # default
-        field=SortField.CREATED,
-        order=SortOrder.DESC,
-        limit=None,
+    item = CatalogRequest(
+        query=query,
+        filters=filters,
+        faceted=faceted,
+        page_number=page_number,
+        page_size=page_size,
+        shards=shards,
+        debug=debug,
+        with_status=with_status,
     )
     if sort_field:
-        sort_options = SortOptions(field=sort_field, limit=sort_limit, order=sort_order)
+        item.sort = SortOptions(field=sort_field, limit=sort_limit, order=sort_order)
+    return await catalog(kbid, item)
+
+
+@api.post(
+    f"/{KB_PREFIX}/{{kbid}}/catalog",
+    status_code=200,
+    name="List resources of a Knowledge Box",
+    description="List resources of a Knowledge Box",
+    response_model=KnowledgeboxSearchResults,
+    response_model_exclude_unset=True,
+    tags=["Search"],
+)
+@requires(NucliaDBRoles.READER)
+@version(1)
+async def catalog_post(
+    request: Request,
+    kbid: str,
+    item: CatalogRequest,
+) -> Union[KnowledgeboxSearchResults, HTTPClientError]:
+    return await catalog(kbid, item)
+
+
+async def catalog(
+    kbid: str,
+    item: CatalogRequest,
+):
+    """
+    Catalog endpoint is a simplified version of the search endpoint, it only
+    returns bm25 results on titles and it does not support vector search.
+    It is useful for listing resources in a knowledge box.
+    """
     try:
+        sort = item.sort
+        if item.sort is None:
+            # By default we sort by creation date (most recent first)
+            sort = SortOptions(
+                field=SortField.CREATED,
+                order=SortOrder.DESC,
+                limit=None,
+            )
+
         # Min score is not relevant here, as catalog endpoint
         # only returns bm25 results on titles
         min_score = 0.0
 
-        # We need to query all nodes
         query_parser = QueryParser(
             kbid=kbid,
             features=[SearchOptions.DOCUMENT],
-            query=query,
-            filters=filters,
-            faceted=faceted,
-            sort=sort_options,
-            page_number=page_number,
-            page_size=page_size,
+            query=item.query,
+            filters=item.filters,
+            faceted=item.faceted,
+            sort=sort,
+            page_number=item.page_number,
+            page_size=item.page_size,
             min_score=min_score,
             fields=["a/title"],
-            with_status=with_status,
+            with_status=item.with_status,
         )
         pb_query, _, _ = await query_parser.parse()
 
@@ -243,7 +288,7 @@ async def catalog(
             kbid,
             Method.SEARCH,
             pb_query,
-            target_shard_replicas=shards,
+            target_shard_replicas=item.shards,
             # Catalog should not go to read replicas because we want it to be
             # consistent and most up to date results
             use_read_replica_nodes=False,
@@ -252,22 +297,30 @@ async def catalog(
         # We need to merge
         search_results = await merge_results(
             results,
-            count=page_size,
-            page=page_number,
+            count=item.page_size,
+            page=item.page_number,
             kbid=kbid,
             show=[ResourceProperties.BASIC],
             field_type_filter=[],
             extracted=[],
-            sort=sort_options,
+            sort=sort,
             requested_relations=pb_query.relation_subgraph,
             min_score=query_parser.min_score,
             highlight=False,
         )
-        if debug:
+        # We don't need sentences, paragraphs or relations on the catalog
+        # response, so we set to None so that fastapi doesn't include them
+        # in the response payload
+        search_results.sentences = None
+        search_results.paragraphs = None
+        search_results.relations = None
+        if item.debug:
             search_results.nodes = debug_nodes_info(queried_nodes)
         queried_shards = [shard_id for _, shard_id in queried_nodes]
         search_results.shards = queried_shards
         return search_results
+    except InvalidQueryError as exc:
+        return HTTPClientError(status_code=412, detail=str(exc))
     except KnowledgeBoxNotFound:
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
     except LimitsExceededError as exc:

@@ -33,7 +33,7 @@ from pydantic import BaseModel, Field, root_validator, validator
 from typing_extensions import Annotated
 
 from nucliadb_models.common import FieldTypeName, ParamDefault
-from nucliadb_models.metadata import RelationType
+from nucliadb_models.metadata import RelationType, ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.security import RequestSecurity
 from nucliadb_models.vectors import SemanticModelMetadata, VectorSimilarity
@@ -589,6 +589,30 @@ class Filter(BaseModel):
         return values
 
 
+class CatalogRequest(BaseModel):
+    query: str = SearchParamDefaults.query.to_pydantic_field()
+    filters: Union[List[str], List[Filter]] = Field(
+        default=[],
+        title="Filters",
+        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/docs/using/search/#filters",  # noqa: E501
+    )
+    faceted: List[str] = SearchParamDefaults.faceted.to_pydantic_field()
+    sort: Optional[SortOptions] = SearchParamDefaults.sort.to_pydantic_field()
+    page_number: int = SearchParamDefaults.page_number.to_pydantic_field()
+    page_size: int = SearchParamDefaults.page_size.to_pydantic_field()
+    shards: List[str] = SearchParamDefaults.shards.to_pydantic_field()
+    debug: bool = SearchParamDefaults.debug.to_pydantic_field()
+    with_status: Optional[ResourceProcessingStatus] = Field(
+        default=None,
+        title="With processing status",
+        description="Filter results by resource processing status",
+    )
+
+    @validator("faceted")
+    def nested_facets_not_supported(cls, facets):
+        return validate_facets(facets)
+
+
 class BaseSearchRequest(BaseModel):
     query: str = SearchParamDefaults.query.to_pydantic_field()
     fields: List[str] = SearchParamDefaults.fields.to_pydantic_field()
@@ -650,35 +674,7 @@ class SearchRequest(BaseSearchRequest):
 
     @validator("faceted")
     def nested_facets_not_supported(cls, facets):
-        """
-        Raises ValueError if provided facets contains nested facets, like:
-        ["/a/b", "/a/b/c"]
-        """
-        if len(facets) < 2:
-            return facets
-
-        # Sort facets alphabetically to make sure that nested facets appear right after their parents
-        sorted_facets = sorted(facets)
-        facet = sorted_facets.pop(0)
-        while True:
-            try:
-                next_facet = sorted_facets.pop(0)
-            except IndexError:
-                # No more facets to check
-                break
-            if next_facet == facet:
-                raise ValueError(
-                    f"Facet {next_facet} is already present in facets. Faceted list must be unique."
-                )
-            if next_facet.startswith(facet):
-                if next_facet.replace(facet, "").startswith("/"):
-                    raise ValueError(
-                        "Nested facets are not allowed: {child} is a child of {parent}".format(
-                            child=next_facet, parent=facet
-                        )
-                    )
-            facet = next_facet
-        return facets
+        return validate_facets(facets)
 
 
 class Author(str, Enum):
@@ -1114,3 +1110,35 @@ class AskResponse(BaseModel):
         title="Answer",
         description="Answer to the question received from the generative AI model",
     )
+
+
+def validate_facets(facets):
+    """
+    Raises ValueError if provided facets contains nested facets, like:
+    ["/a/b", "/a/b/c"]
+    """
+    if len(facets) < 2:
+        return facets
+
+    # Sort facets alphabetically to make sure that nested facets appear right after their parents
+    sorted_facets = sorted(facets)
+    facet = sorted_facets.pop(0)
+    while True:
+        try:
+            next_facet = sorted_facets.pop(0)
+        except IndexError:
+            # No more facets to check
+            break
+        if next_facet == facet:
+            raise ValueError(
+                f"Facet {next_facet} is already present in facets. Faceted list must be unique."
+            )
+        if next_facet.startswith(facet):
+            if next_facet.replace(facet, "").startswith("/"):
+                raise ValueError(
+                    "Nested facets are not allowed: {child} is a child of {parent}".format(
+                        child=next_facet, parent=facet
+                    )
+                )
+        facet = next_facet
+    return facets

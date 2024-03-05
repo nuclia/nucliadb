@@ -1639,3 +1639,25 @@ async def test_catalog_returns_shard_and_node_data(
     )
     assert resp.status_code == 200
     assert len(resp.json()["nodes"]) > 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_catalog_post(
+    nucliadb_reader: AsyncClient,
+    knowledgebox,
+):
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/catalog",
+        json={
+            "query": "",
+            "filters": [
+                {"any": ["/foo", "/bar"]},
+            ],
+            "with_status": "PROCESSED",
+            "sort": {
+                "field": "created",
+            },
+        },
+    )
+    assert resp.status_code == 200
