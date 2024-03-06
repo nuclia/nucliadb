@@ -699,6 +699,8 @@ pub struct FieldLink {
     pub language: ::prost::alloc::string::String,
     #[prost(map="string, string", tag="6")]
     pub localstorage: ::std::collections::HashMap<::prost::alloc::string::String, ::prost::alloc::string::String>,
+    #[prost(string, tag="7")]
+    pub css_selector: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Keyword {
@@ -731,6 +733,8 @@ pub struct FieldFile {
     pub headers: ::std::collections::HashMap<::prost::alloc::string::String, ::prost::alloc::string::String>,
     #[prost(map="string, string", tag="7")]
     pub cookies: ::std::collections::HashMap<::prost::alloc::string::String, ::prost::alloc::string::String>,
+    #[prost(string, tag="8")]
+    pub css_selector: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Entity {

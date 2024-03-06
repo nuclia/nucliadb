@@ -42,6 +42,7 @@ TEST_LINK_PAYLOAD = {
     "uri": "http://some-link.com",
     "language": "en",
     "localstorage": {},
+    "css_selector":"main",
 }
 TEST_KEYWORDSETS_PAYLOAD = {"keywords": [{"value": "kw1"}, {"value": "kw2"}]}
 TEST_DATETIMES_PAYLOAD = {"value": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")}

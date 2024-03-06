@@ -42,6 +42,7 @@ class FieldLink(BaseModel):
     uri: Optional[str]
     language: Optional[str]
     localstorage: Optional[Dict[str, str]]
+    css_selector: Optional[str]
 
     @classmethod
     def from_message(cls: Type[_T], message: resources_pb2.FieldLink) -> _T:
@@ -74,3 +75,4 @@ class LinkUpload(BaseModel):
     headers: Dict[str, str] = {}
     cookies: Dict[str, str] = {}
     localstorage: Dict[str, str] = {}
+    css_selector: str = None
