@@ -21,7 +21,7 @@ from datetime import datetime
 from typing import Dict, Optional, Type, TypeVar
 
 from google.protobuf.json_format import MessageToDict
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from nucliadb_protos import resources_pb2
 
@@ -42,6 +42,7 @@ class FieldLink(BaseModel):
     uri: Optional[str]
     language: Optional[str]
     localstorage: Optional[Dict[str, str]]
+    css_selector: Optional[str]
 
     @classmethod
     def from_message(cls: Type[_T], message: resources_pb2.FieldLink) -> _T:
@@ -63,6 +64,7 @@ class LinkField(BaseModel):
     uri: str
     language: Optional[str] = None
     localstorage: Optional[Dict[str, str]] = {}
+    css_selector: Optional[str] = None
 
 
 # Processing classes (Those used to sent to push endpoints)
@@ -73,3 +75,8 @@ class LinkUpload(BaseModel):
     headers: Dict[str, str] = {}
     cookies: Dict[str, str] = {}
     localstorage: Dict[str, str] = {}
+    css_selector: Optional[str] = Field(
+        None,
+        title="Css selector",
+        description="Css selector to parse the link",
+    )

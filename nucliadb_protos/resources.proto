@@ -450,6 +450,7 @@ message FieldLink {
     string uri = 4;
     string language = 5;
     map<string, string> localstorage = 6;
+    string css_selector = 7;
 }
 
 message Keyword {
@@ -471,7 +472,6 @@ message FieldFile {
     string password = 4;
     string url = 5;
     map<string, string> headers = 6;
-    map<string, string> cookies = 7;
 }
 
 
