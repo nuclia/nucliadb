@@ -931,3 +931,37 @@ async def test_question_answer_annotations(
     data = resp.json()
     resource = Resource.parse_obj(data)
     assert resource.fieldmetadata[0].question_answers[0] == qa_annotation  # type: ignore
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_link_fields_store_css_selector(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox,
+):
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/resources",
+        json={
+            "title": "My title",
+            "slug": "myresource",
+            "texts": {"text1": {"body": "My text"}},
+            "links": {
+                "link": {
+                    "uri": "https://www.example.com",
+                    "css_selector": "main",
+                },
+            },
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/resource/{rid}?show=values",
+        timeout=None,
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    resource = Resource.parse_obj(data)
+    assert resource.data.links["link"].value.css_selector == "main"
