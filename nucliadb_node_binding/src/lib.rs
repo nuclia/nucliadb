@@ -19,13 +19,13 @@
 
 mod errors;
 mod reader;
+mod update;
 mod writer;
-
-use std::env;
 
 use nucliadb_core::tracing::{error, Level};
 use nucliadb_node::utils::parse_log_levels;
 use pyo3::prelude::*;
+use std::env;
 use tracing_subscriber::filter::Targets;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;

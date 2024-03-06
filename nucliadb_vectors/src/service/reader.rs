@@ -17,9 +17,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use std::fmt::Debug;
-use std::time::Instant;
-
+use crate::data_point_provider::reader::Reader;
+use crate::data_point_provider::*;
+use crate::formula::{AtomClause, BooleanOperator, Clause, CompoundClause, Formula};
+use crate::indexset::ReaderSet;
+use crate::service::query_io;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::prost::Message;
 use nucliadb_core::protos::{
@@ -28,12 +30,8 @@ use nucliadb_core::protos::{
 use nucliadb_core::tracing::{self, *};
 use nucliadb_core::vectors::*;
 use nucliadb_procs::measure;
-
-use crate::data_point_provider::reader::Reader;
-use crate::data_point_provider::*;
-use crate::formula::{AtomClause, BooleanOperator, Clause, CompoundClause, Formula};
-use crate::indexset::ReaderSet;
-use crate::service::query_io;
+use std::fmt::Debug;
+use std::time::Instant;
 
 impl<'a> SearchRequest for (usize, &'a VectorSearchRequest, Formula) {
     fn with_duplicates(&self) -> bool {
@@ -64,6 +62,13 @@ impl Debug for VectorReaderService {
 }
 
 impl VectorReader for VectorReaderService {
+    #[tracing::instrument(skip_all)]
+    fn update(&mut self) -> NodeResult<()> {
+        self.index.update()?;
+        self.indexset.update()?;
+        Ok(())
+    }
+
     #[tracing::instrument(skip_all)]
     fn count(&self, vectorset: &str) -> NodeResult<usize> {
         if vectorset.is_empty() {
@@ -185,12 +190,6 @@ impl TryFrom<Neighbour> for DocumentScored {
 }
 
 impl VectorReaderService {
-    pub fn update(&mut self) -> NodeResult<()> {
-        self.index.update()?;
-        self.indexset.update()?;
-        Ok(())
-    }
-
     #[tracing::instrument(skip_all)]
     pub fn start(config: &VectorConfig) -> NodeResult<Self> {
         if !config.path.exists() {

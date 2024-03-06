@@ -26,6 +26,7 @@
 pub mod grpc_reader;
 pub mod grpc_writer;
 pub mod middleware;
+pub mod update;
 
 pub use grpc_reader::NodeReaderGRPCDriver;
 pub use grpc_writer::NodeWriterGRPCDriver;

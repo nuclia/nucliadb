@@ -109,11 +109,14 @@ impl ReaderSet {
     }
     pub fn update(&self) -> VectorR<()> {
         let disk_v = fs_state::crnt_version(&self.location)?;
-        let new_state = fs_state::load_state(&self.location)?;
-        let mut state = self.state.write().unwrap();
-        let mut date = self.date.write().unwrap();
-        *state = new_state;
-        *date = disk_v;
+        let current_v = *self.date.read().unwrap_or_else(|e| e.into_inner());
+        if disk_v != current_v {
+            let new_state = fs_state::load_state(&self.location)?;
+            let mut state = self.state.write().unwrap();
+            let mut date = self.date.write().unwrap();
+            *state = new_state;
+            *date = disk_v;
+        }
         Ok(())
     }
     pub fn index_keys<C: IndexKeyCollector>(&self, c: &mut C) {
