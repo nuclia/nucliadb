@@ -75,4 +75,4 @@ class LinkUpload(BaseModel):
     headers: Dict[str, str] = {}
     cookies: Dict[str, str] = {}
     localstorage: Dict[str, str] = {}
-    css_selector: str = None
+    css_selector: Optional[str] = None
