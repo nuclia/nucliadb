@@ -63,6 +63,7 @@ class LinkField(BaseModel):
     uri: str
     language: Optional[str] = None
     localstorage: Optional[Dict[str, str]] = {}
+    css_selector: Optional[str] = None
 
 
 # Processing classes (Those used to sent to push endpoints)
