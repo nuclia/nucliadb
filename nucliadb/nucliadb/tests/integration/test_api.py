@@ -964,4 +964,12 @@ async def test_link_fields_store_css_selector(
     assert resp.status_code == 200
     data = resp.json()
     resource = Resource.parse_obj(data)
-    assert resource.data.links["link"].value.css_selector == "main"
+    css_selector = None
+    if (
+        resource.data is not None
+        and resource.data.links is not None
+        and resource.data.links["link"].value is not None
+    ):
+        css_selector = resource.data.links["link"].value.css_selector
+
+    assert css_selector == "main"

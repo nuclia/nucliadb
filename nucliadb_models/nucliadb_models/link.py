@@ -21,7 +21,7 @@ from datetime import datetime
 from typing import Dict, Optional, Type, TypeVar
 
 from google.protobuf.json_format import MessageToDict
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from nucliadb_protos import resources_pb2
 
@@ -75,4 +75,8 @@ class LinkUpload(BaseModel):
     headers: Dict[str, str] = {}
     cookies: Dict[str, str] = {}
     localstorage: Dict[str, str] = {}
-    css_selector: Optional[str] = None
+    css_selector: Optional[str] = Field(
+        None,
+        title="Css selector",
+        description="Css selector to parse the link",
+    )
