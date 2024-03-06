@@ -472,8 +472,6 @@ message FieldFile {
     string password = 4;
     string url = 5;
     map<string, string> headers = 6;
-    map<string, string> cookies = 7;
-    string css_selector = 8;
 }
 
 
