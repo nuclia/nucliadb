@@ -29,7 +29,7 @@ from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.query import (
     QueryParser,
     check_supported_filters,
-    get_default_min_score,
+    get_default_semantic_min_score,
     get_kb_model_default_min_score,
     parse_entities_to_filters,
 )
@@ -57,32 +57,36 @@ def get_kb_model_default_min_score_mock():
         yield mock
 
 
-async def test_get_default_min_score(get_kb_model_default_min_score_mock):
+async def test_get_default_semantic_min_score(get_kb_model_default_min_score_mock):
     get_kb_model_default_min_score_mock.return_value = 1.5
 
-    assert await get_default_min_score("kbid") == 1.5
+    assert await get_default_semantic_min_score("kbid") == 1.5
 
-    get_default_min_score.cache_clear()
+    get_default_semantic_min_score.cache_clear()
 
 
-async def test_get_default_min_score_default_value(get_kb_model_default_min_score_mock):
+async def test_get_default_semantic_min_score_default_value(
+    get_kb_model_default_min_score_mock,
+):
     get_kb_model_default_min_score_mock.return_value = None
 
-    assert await get_default_min_score("kbid") == 0.7
+    assert await get_default_semantic_min_score("kbid") == 0.7
 
-    get_default_min_score.cache_clear()
+    get_default_semantic_min_score.cache_clear()
 
 
-async def test_get_default_min_score_is_cached(get_kb_model_default_min_score_mock):
-    await get_default_min_score("kbid1")
-    await get_default_min_score("kbid1")
-    await get_default_min_score("kbid1")
+async def test_get_default_semantic_min_score_is_cached(
+    get_kb_model_default_min_score_mock,
+):
+    await get_default_semantic_min_score("kbid1")
+    await get_default_semantic_min_score("kbid1")
+    await get_default_semantic_min_score("kbid1")
 
-    await get_default_min_score("kbid2")
+    await get_default_semantic_min_score("kbid2")
 
     assert get_kb_model_default_min_score_mock.call_count == 2
 
-    get_default_min_score.cache_clear()
+    get_default_semantic_min_score.cache_clear()
 
 
 @pytest.fixture()

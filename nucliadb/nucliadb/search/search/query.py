@@ -142,9 +142,11 @@ class QueryParser:
             self.filters = translate_label_filters(self.filters)
             self.flat_filter_labels = flat_filter_labels(self.filters)
 
-    def _get_default_min_score(self) -> Awaitable[float]:
+    def _get_default_semantic_min_score(self) -> Awaitable[float]:
         if self._min_score_task is None:  # pragma: no cover
-            self._min_score_task = asyncio.create_task(get_default_min_score(self.kbid))
+            self._min_score_task = asyncio.create_task(
+                get_default_semantic_min_score(self.kbid)
+            )
         return self._min_score_task
 
     def _get_converted_vectors(self) -> Awaitable[list[float]]:
@@ -197,7 +199,7 @@ class QueryParser:
         ):
             asyncio.ensure_future(self._get_classification_labels())
         if self.min_score.semantic is None:
-            asyncio.ensure_future(self._get_default_min_score())
+            asyncio.ensure_future(self._get_default_semantic_min_score())
         if SearchOptions.VECTOR in self.features and self.user_vector is None:
             asyncio.ensure_future(self._get_converted_vectors())
         if (SearchOptions.RELATIONS in self.features or self.autofilter) and len(
@@ -326,7 +328,7 @@ class QueryParser:
 
     async def parse_min_score(self, request: nodereader_pb2.SearchRequest) -> None:
         if self.min_score.semantic is None:
-            self.min_score.semantic = await self._get_default_min_score()
+            self.min_score.semantic = await self._get_default_semantic_min_score()
         request.min_score_semantic = self.min_score.semantic
         request.min_score_bm25 = self.min_score.bm25
 
@@ -635,7 +637,7 @@ async def get_kb_model_default_min_score(kbid: str) -> Optional[float]:
 
 
 @alru_cache(maxsize=None)
-async def get_default_min_score(kbid: str) -> float:
+async def get_default_semantic_min_score(kbid: str) -> float:
     fallback = 0.7
     model_min_score = await get_kb_model_default_min_score(kbid)
     if model_min_score is not None:
