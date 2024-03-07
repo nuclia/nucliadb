@@ -19,6 +19,7 @@
 #
 import contextlib
 import json
+import backoff
 import logging
 from collections.abc import AsyncIterator
 from enum import Enum
@@ -125,6 +126,12 @@ def is_white_listed_header(header: str) -> bool:
     return header.lower() in WHITELISTED_HEADERS
 
 
+@backoff.on_exception(
+    backoff.expo,
+    (Exception,),  # retry all unhandled http client/server errors right now
+    jitter=backoff.random_jitter,
+    max_tries=3,
+)
 async def proxy(
     service: LearningService,
     request: Request,
@@ -153,23 +160,13 @@ async def proxy(
         base_url=get_base_url(service=service),
         headers=get_auth_headers(),
     ) as client:
-        try:
-            response = await client.request(
-                method=method.upper(),
-                url=url,
-                params=request.query_params,
-                content=await request.body(),
-                headers=proxied_headers,
-            )
-        except Exception as exc:
-            errors.capture_exception(exc)
-            msg = f"Unexpected error while trying to proxy the request to the learning {service.value} API."
-            logger.exception(msg, exc_info=True)
-            return Response(
-                content=msg.encode(),
-                status_code=503,
-                media_type="text/plain",
-            )
+        response = await client.request(
+            method=method.upper(),
+            url=url,
+            params=request.query_params,
+            content=await request.body(),
+            headers=proxied_headers,
+        )
         if response.headers.get("Transfer-Encoding") == "chunked":
             return StreamingResponse(
                 content=response.aiter_bytes(),
