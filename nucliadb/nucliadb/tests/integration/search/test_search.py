@@ -1353,11 +1353,15 @@ async def test_search_two_logic_shards(
     # Check that search returns the same results
     resp1 = await nucliadb_reader.post(
         f"/kb/{kbid1}/search",
-        json=dict(query="dummy", vector=V1, min_score=-1, with_duplicates=True),
+        json=dict(
+            query="dummy", vector=V1, min_score={"semantic": -1}, with_duplicates=True
+        ),
     )
     resp2 = await nucliadb_reader.post(
         f"/kb/{kbid2}/search",
-        json=dict(query="dummy", vector=V1, min_score=-1, with_duplicates=True),
+        json=dict(
+            query="dummy", vector=V1, min_score={"semantic": -1}, with_duplicates=True
+        ),
     )
     assert resp1.status_code == resp2.status_code == 200
     content1 = resp1.json()
@@ -1391,10 +1395,14 @@ async def test_search_min_score(
 
     # If we specify a min score, it should be used
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/search", json={"query": "dummy", "min_score": 0.5}
+        f"/kb/{knowledgebox}/search",
+        json={"query": "dummy", "min_score": {"bm25": 10, "semantic": 0.5}},
     )
     assert resp.status_code == 200
-    assert resp.json()["sentences"]["min_score"] == 0.5
+    body = resp.json()
+    assert body["sentences"]["min_score"] == 0.5
+    assert body["paragraphs"]["min_score"] == 10
+    assert body["fulltext"]["min_score"] == 10
 
 
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)

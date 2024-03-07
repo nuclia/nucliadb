@@ -107,6 +107,8 @@ pub struct DocumentSearchRequest {
     pub with_status: ::core::option::Option<i32>,
     #[prost(string, optional, tag="17")]
     pub advanced_query: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(float, tag="18")]
+    pub min_score: f32,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ParagraphSearchRequest {
@@ -143,6 +145,8 @@ pub struct ParagraphSearchRequest {
     pub advanced_query: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, repeated, tag="17")]
     pub key_filters: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(float, tag="18")]
+    pub min_score: f32,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ResultScore {
@@ -436,7 +440,9 @@ pub struct SearchRequest {
     #[prost(string, repeated, tag="22")]
     pub key_filters: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(float, tag="23")]
-    pub min_score: f32,
+    pub min_score_semantic: f32,
+    #[prost(float, tag="25")]
+    pub min_score_bm25: f32,
     #[prost(message, optional, tag="24")]
     pub security: ::core::option::Option<super::utils::Security>,
 }

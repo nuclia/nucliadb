@@ -67,6 +67,7 @@ pub struct SearchBm25Response<'a> {
     pub results_per_page: i32,
     pub termc: TermCollector,
     pub searcher: tantivy::LeasedItem<tantivy::Searcher>,
+    pub min_score: f32,
 }
 
 pub struct SearchIntResponse<'a> {

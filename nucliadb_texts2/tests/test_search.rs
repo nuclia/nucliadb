@@ -260,4 +260,29 @@ fn test_quote_fixing() {
     query(&reader, "\"enough test");
 }
 
+#[test]
+fn test_search_with_min_score() {
+    fn query(reader: &TextReaderService, query: impl Into<String>, min_score: f32, expected: i32) {
+        let query = query.into();
+        let request = DocumentSearchRequest {
+            id: "shard".to_string(),
+            body: query.clone(),
+            page_number: 0,
+            result_per_page: 20,
+            min_score,
+            ..Default::default()
+        };
+
+        let response = reader.search(&request).unwrap();
+        assert_eq!(response.results.len() as i32, expected, "Failed query: '{}'", query);
+        assert!(!response.next_page);
+    }
+
+    let reader = common::test_reader();
+
+    // Check that the min score is being used to filter the results
+    query(&reader, "should", 0.0, 1);
+    query(&reader, "should", 100.0, 0);
+}
+
 // TODO: order, timestamp filter, only_faceted, with_status
