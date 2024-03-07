@@ -139,7 +139,7 @@ async def _retriable_proxied_request(
     url: str,
     content: bytes,
     headers: dict[str, str],
-    params: Optional[dict[str, Any]] = None,
+    params: dict[str, Any],
 ) -> httpx.Response:
     return await client.request(
         method=method.upper(),
@@ -183,7 +183,7 @@ async def proxy(
                 client=client,
                 method=method.upper(),
                 url=url,
-                params=request.query_params,
+                params=dict(request.query_params),
                 content=await request.body(),
                 headers=proxied_headers,
             )
