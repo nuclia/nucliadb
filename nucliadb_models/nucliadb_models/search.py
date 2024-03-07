@@ -643,48 +643,48 @@ class BaseSearchRequest(BaseModel):
         title="Minimum score",
         description="Minimum score to filter search results. Results with a lower score will be ignored. Accepts either a float or a dictionary with the minimum scores for the bm25 and vector indexes. If a float is provided, it is interpreted as the minimum score for vector index search.",  # noqa
     )
-    range_creation_start: Optional[datetime] = (
-        SearchParamDefaults.range_creation_start.to_pydantic_field()
-    )
-    range_creation_end: Optional[datetime] = (
-        SearchParamDefaults.range_creation_end.to_pydantic_field()
-    )
-    range_modification_start: Optional[datetime] = (
-        SearchParamDefaults.range_modification_start.to_pydantic_field()
-    )
-    range_modification_end: Optional[datetime] = (
-        SearchParamDefaults.range_modification_end.to_pydantic_field()
-    )
-    features: List[SearchOptions] = (
-        SearchParamDefaults.search_features.to_pydantic_field(
-            default=[
-                SearchOptions.PARAGRAPH,
-                SearchOptions.DOCUMENT,
-                SearchOptions.VECTOR,
-            ]
-        )
+    range_creation_start: Optional[
+        datetime
+    ] = SearchParamDefaults.range_creation_start.to_pydantic_field()
+    range_creation_end: Optional[
+        datetime
+    ] = SearchParamDefaults.range_creation_end.to_pydantic_field()
+    range_modification_start: Optional[
+        datetime
+    ] = SearchParamDefaults.range_modification_start.to_pydantic_field()
+    range_modification_end: Optional[
+        datetime
+    ] = SearchParamDefaults.range_modification_end.to_pydantic_field()
+    features: List[
+        SearchOptions
+    ] = SearchParamDefaults.search_features.to_pydantic_field(
+        default=[
+            SearchOptions.PARAGRAPH,
+            SearchOptions.DOCUMENT,
+            SearchOptions.VECTOR,
+        ]
     )
     debug: bool = SearchParamDefaults.debug.to_pydantic_field()
     highlight: bool = SearchParamDefaults.highlight.to_pydantic_field()
     show: List[ResourceProperties] = SearchParamDefaults.show.to_pydantic_field()
-    field_type_filter: List[FieldTypeName] = (
-        SearchParamDefaults.field_type_filter.to_pydantic_field()
-    )
-    extracted: List[ExtractedDataTypeName] = (
-        SearchParamDefaults.extracted.to_pydantic_field()
-    )
+    field_type_filter: List[
+        FieldTypeName
+    ] = SearchParamDefaults.field_type_filter.to_pydantic_field()
+    extracted: List[
+        ExtractedDataTypeName
+    ] = SearchParamDefaults.extracted.to_pydantic_field()
     shards: List[str] = SearchParamDefaults.shards.to_pydantic_field()
     vector: Optional[List[float]] = SearchParamDefaults.vector.to_pydantic_field()
     vectorset: Optional[str] = SearchParamDefaults.vectorset.to_pydantic_field()
     with_duplicates: bool = SearchParamDefaults.with_duplicates.to_pydantic_field()
     with_synonyms: bool = SearchParamDefaults.with_synonyms.to_pydantic_field()
     autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
-    resource_filters: List[str] = (
-        SearchParamDefaults.resource_filters.to_pydantic_field()
-    )
-    security: Optional[RequestSecurity] = (
-        SearchParamDefaults.security.to_pydantic_field()
-    )
+    resource_filters: List[
+        str
+    ] = SearchParamDefaults.resource_filters.to_pydantic_field()
+    security: Optional[
+        RequestSecurity
+    ] = SearchParamDefaults.security.to_pydantic_field()
 
 
 class SearchRequest(BaseSearchRequest):
@@ -854,29 +854,29 @@ class ChatRequest(BaseModel):
         description="Minimum score to filter search results. Results with a lower score will be ignored. Accepts either a float or a dictionary with the minimum scores for the bm25 and vector indexes. If a float is provided, it is interpreted as the minimum score for vector index search.",  # noqa
     )
     features: List[ChatOptions] = SearchParamDefaults.chat_features.to_pydantic_field()
-    range_creation_start: Optional[datetime] = (
-        SearchParamDefaults.range_creation_start.to_pydantic_field()
-    )
-    range_creation_end: Optional[datetime] = (
-        SearchParamDefaults.range_creation_end.to_pydantic_field()
-    )
-    range_modification_start: Optional[datetime] = (
-        SearchParamDefaults.range_modification_start.to_pydantic_field()
-    )
-    range_modification_end: Optional[datetime] = (
-        SearchParamDefaults.range_modification_end.to_pydantic_field()
-    )
+    range_creation_start: Optional[
+        datetime
+    ] = SearchParamDefaults.range_creation_start.to_pydantic_field()
+    range_creation_end: Optional[
+        datetime
+    ] = SearchParamDefaults.range_creation_end.to_pydantic_field()
+    range_modification_start: Optional[
+        datetime
+    ] = SearchParamDefaults.range_modification_start.to_pydantic_field()
+    range_modification_end: Optional[
+        datetime
+    ] = SearchParamDefaults.range_modification_end.to_pydantic_field()
     show: List[ResourceProperties] = SearchParamDefaults.show.to_pydantic_field()
-    field_type_filter: List[FieldTypeName] = (
-        SearchParamDefaults.field_type_filter.to_pydantic_field()
-    )
-    extracted: List[ExtractedDataTypeName] = (
-        SearchParamDefaults.extracted.to_pydantic_field()
-    )
+    field_type_filter: List[
+        FieldTypeName
+    ] = SearchParamDefaults.field_type_filter.to_pydantic_field()
+    extracted: List[
+        ExtractedDataTypeName
+    ] = SearchParamDefaults.extracted.to_pydantic_field()
     shards: List[str] = SearchParamDefaults.shards.to_pydantic_field()
-    context: Optional[List[ChatContextMessage]] = (
-        SearchParamDefaults.chat_context.to_pydantic_field()
-    )
+    context: Optional[
+        List[ChatContextMessage]
+    ] = SearchParamDefaults.chat_context.to_pydantic_field()
     extra_context: Optional[List[str]] = Field(
         default=None,
         title="Extra query context",
@@ -885,17 +885,17 @@ class ChatRequest(BaseModel):
     )
     autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
     highlight: bool = SearchParamDefaults.highlight.to_pydantic_field()
-    resource_filters: List[str] = (
-        SearchParamDefaults.resource_filters.to_pydantic_field()
-    )
+    resource_filters: List[
+        str
+    ] = SearchParamDefaults.resource_filters.to_pydantic_field()
     prompt: Optional[str] = SearchParamDefaults.prompt.to_pydantic_field()
     citations: bool = Field(
         default=False,
         description="Whether to include the citations for the answer in the response",
     )
-    security: Optional[RequestSecurity] = (
-        SearchParamDefaults.security.to_pydantic_field()
-    )
+    security: Optional[
+        RequestSecurity
+    ] = SearchParamDefaults.security.to_pydantic_field()
     rag_strategies: list[RagStrategies] = Field(
         default=[],
         title="RAG context building strategies",
@@ -1000,13 +1000,13 @@ class SummarizedResponse(BaseModel):
 
 
 class FindRequest(BaseSearchRequest):
-    features: List[SearchOptions] = (
-        SearchParamDefaults.search_features.to_pydantic_field(
-            default=[
-                SearchOptions.PARAGRAPH,
-                SearchOptions.VECTOR,
-            ]
-        )
+    features: List[
+        SearchOptions
+    ] = SearchParamDefaults.search_features.to_pydantic_field(
+        default=[
+            SearchOptions.PARAGRAPH,
+            SearchOptions.VECTOR,
+        ]
     )
 
     @validator("features")
