@@ -70,11 +70,6 @@ class EntitiesManager:
         txn: Transaction,
         use_read_replica_nodes: bool = False,
     ):
-        """
-        Args:
-        - use_read_replica_nodes: when True, use read replica nodes for querying the relation
-          index. Otherwise, primary nodes are used.
-        """
         self.kb = knowledgebox
         self.txn = txn
         self.kbid = self.kb.kbid
