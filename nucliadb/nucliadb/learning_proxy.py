@@ -19,12 +19,12 @@
 #
 import contextlib
 import json
-import backoff
 import logging
 from collections.abc import AsyncIterator
 from enum import Enum
 from typing import Any, Optional, Union
 
+import backoff
 import httpx
 from fastapi import Request, Response
 from fastapi.responses import StreamingResponse
