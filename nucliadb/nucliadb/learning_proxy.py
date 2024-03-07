@@ -92,7 +92,6 @@ async def delete_configuration(
         resp.raise_for_status()
 
 
-@backoff.on_exception(backoff.expo, jitter=backoff.random_jitter, max_tries=3)
 async def learning_config_proxy(
     request: Request,
     method: str,
