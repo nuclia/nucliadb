@@ -40,7 +40,6 @@ from nucliadb_protos.nodereader_pb2 import (
     StreamRequest,
     SuggestRequest,
     SuggestResponse,
-    TypeList,
 )
 from nucliadb_protos.noderesources_pb2 import (
     EmptyQuery,
@@ -250,16 +249,6 @@ class StandaloneReaderWrapper:
         edge_list.ParseFromString(pb_bytes)
         return edge_list
 
-    async def RelationTypes(self, request: ShardId):
-        loop = asyncio.get_running_loop()
-        result = await loop.run_in_executor(
-            self.executor, self.reader.relation_types, request.SerializeToString()
-        )
-        pb_bytes = bytes(result)
-        type_list = TypeList()
-        type_list.ParseFromString(pb_bytes)
-        return type_list
-
 
 async def Search(self, request: SearchRequest, retry: bool = False) -> SearchResponse:
     try:
@@ -398,7 +387,6 @@ READER_METHODS = {
     "GetShard": (GetShardRequest, NodeResourcesShard),
     "Suggest": (SuggestRequest, SuggestResponse),
     "RelationEdges": (ShardId, EdgeList),
-    "RelationTypes": (ShardId, TypeList),
 }
 WRITER_METHODS = {
     "NewShard": (ShardMetadata, ShardCreated),

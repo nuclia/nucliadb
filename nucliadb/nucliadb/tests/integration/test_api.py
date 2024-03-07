@@ -356,16 +356,11 @@ async def test_entitygroups(
     assert groups["group1"]["color"] == "blue"
     assert groups["group1"]["custom"] is True
 
-    # But they can be included with show_entities=true
+    # show_entities=true returns a http 400
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/entitiesgroups?show_entities=true"
     )
-    groups = resp.json()["groups"]
-    assert len(groups) == 1
-    assert groups["group1"]["entities"] != {}
-    assert groups["group1"]["title"] == "Kitchen"
-    assert groups["group1"]["color"] == "blue"
-    assert groups["group1"]["custom"] is True
+    assert resp.status_code == 400
 
 
 @pytest.mark.asyncio

@@ -94,10 +94,6 @@ class NodeReaderStub:
         nucliadb_protos.noderesources_pb2.ShardId,
         nucliadb_protos.nodereader_pb2.EdgeList,
     ]
-    RelationTypes: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.noderesources_pb2.ShardId,
-        nucliadb_protos.nodereader_pb2.TypeList,
-    ]
     Search: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.nodereader_pb2.SearchRequest,
         nucliadb_protos.nodereader_pb2.SearchResponse,
@@ -188,12 +184,6 @@ class NodeReaderServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.noderesources_pb2.ShardId,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.nodereader_pb2.EdgeList: ...
-    @abc.abstractmethod
-    def RelationTypes(
-        self,
-        request: nucliadb_protos.noderesources_pb2.ShardId,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.nodereader_pb2.TypeList: ...
     @abc.abstractmethod
     def Search(
         self,

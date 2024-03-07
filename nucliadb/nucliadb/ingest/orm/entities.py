@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import asyncio
 from typing import AsyncGenerator, Optional
 
 from nucliadb_protos.knowledgebox_pb2 import (
@@ -27,13 +28,14 @@ from nucliadb_protos.knowledgebox_pb2 import (
     Entity,
 )
 from nucliadb_protos.nodereader_pb2 import (
+    Faceted,
     RelationNodeFilter,
     RelationPrefixSearchRequest,
     RelationSearchRequest,
     RelationSearchResponse,
-    TypeList,
+    SearchRequest,
+    SearchResponse,
 )
-from nucliadb_protos.noderesources_pb2 import ShardId
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import GetEntitiesResponse
 
@@ -66,10 +68,17 @@ class EntitiesManager:
         self,
         knowledgebox: KnowledgeBox,
         txn: Transaction,
+        use_read_replica_nodes: bool = False,
     ):
+        """
+        Args:
+        - use_read_replica_nodes: when True, use read replica nodes for querying the relation
+          index. Otherwise, primary nodes are used.
+        """
         self.kb = knowledgebox
         self.txn = txn
         self.kbid = self.kb.kbid
+        self.use_read_replica_nodes = use_read_replica_nodes
 
     async def create_entities_group(self, group: str, entities: EntitiesGroup):
         if await self.entities_group_exists(group):
@@ -95,16 +104,28 @@ class EntitiesManager:
 
     async def list_entities_groups(self) -> dict[str, EntitiesGroupSummary]:
         groups = {}
-        async for group in self.iterate_entities_groups_names(exclude_deleted=True):
-            stored = await self.get_stored_entities_group(group)
-            if stored is not None:
-                groups[group] = EntitiesGroupSummary(
-                    title=stored.title, color=stored.color, custom=stored.custom
+        max_simultaneous = asyncio.Semaphore(10)
+
+        async def _composition(group: str):
+            async with max_simultaneous:
+                stored = await self.get_stored_entities_group(group)
+                if stored is not None:
+                    groups[group] = EntitiesGroupSummary(
+                        title=stored.title, color=stored.color, custom=stored.custom
+                    )
+                else:
+                    # We don't want to search for each indexed group, as we are
+                    # providing a quick summary
+                    groups[group] = EntitiesGroupSummary()
+
+        await asyncio.gather(
+            *[
+                _composition(group)
+                async for group in self.iterate_entities_groups_names(
+                    exclude_deleted=True
                 )
-            else:
-                # We don't want to search for each indexed group, as we are
-                # providing a quick summary
-                groups[group] = EntitiesGroupSummary()
+            ]
+        )
         return groups
 
     async def update_entities(self, group: str, entities: dict[str, Entity]):
@@ -260,8 +281,12 @@ class EntitiesManager:
             yield group, eg
 
     async def iterate_entities_groups_names(
-        self, exclude_deleted: bool
+        self,
+        exclude_deleted: bool,
     ) -> AsyncGenerator[str, None]:
+        # Start the task to get indexed groups
+        indexed_task = asyncio.create_task(self.get_indexed_entities_groups_names())
+
         if exclude_deleted:
             deleted_groups = await self.get_deleted_entities_groups()
 
@@ -277,39 +302,48 @@ class EntitiesManager:
             visited_groups.add(group)
 
         # indexed groups
-        indexed_groups = await self.get_indexed_entities_groups_names()
+        indexed_groups = await indexed_task
         for group in indexed_groups:
             if (exclude_deleted and group in deleted_groups) or group in visited_groups:
                 continue
             yield group
             visited_groups.add(group)
 
-    async def get_indexed_entities_groups_names(self) -> set[str]:
+    async def get_indexed_entities_groups_names(
+        self,
+    ) -> set[str]:
         shard_manager = get_shard_manager()
 
         async def query_indexed_entities_group_names(
             node: AbstractIndexNode, shard_id: str
-        ) -> TypeList:
-            return await node.reader.RelationTypes(ShardId(id=shard_id))  # type: ignore
+        ) -> set[str]:
+            request = SearchRequest(
+                shard=shard_id,
+                result_per_page=0,
+                body="",
+                document=True,
+                paragraph=False,
+                faceted=Faceted(labels=["/e"]),
+            )
+            response: SearchResponse = await node.reader.Search(request)  # type: ignore
+            try:
+                facetresults = response.document.facets["/e"].facetresults
+                return {facet.tag.split("/")[-1] for facet in facetresults}
+            except KeyError:
+                # No entities found
+                return set()
 
         results = await shard_manager.apply_for_all_shards(
             self.kbid,
             query_indexed_entities_group_names,
             settings.relation_types_timeout,
+            use_read_replica_nodes=self.use_read_replica_nodes,
         )
         for result in results:
             if isinstance(result, Exception):
                 errors.capture_exception(result)
                 raise NodeError("Error while looking for relations types")
-
-        indexed_groups = set()
-        for relation_types in results:
-            for item in relation_types.list:
-                if item.with_type != RelationNode.NodeType.ENTITY:
-                    continue
-                group = item.with_subtype
-                indexed_groups.add(group)
-        return indexed_groups
+        return set.union(*results)
 
     async def store_entities_group(self, group: str, eg: EntitiesGroup):
         meta_cache = await EntitiesDataManager.get_entities_meta_cache(

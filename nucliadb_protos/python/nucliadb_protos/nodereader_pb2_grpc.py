@@ -67,11 +67,6 @@ class NodeReaderStub(object):
                 request_serializer=nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_nodereader__pb2.EdgeList.FromString,
                 )
-        self.RelationTypes = channel.unary_unary(
-                '/nodereader.NodeReader/RelationTypes',
-                request_serializer=nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_nodereader__pb2.TypeList.FromString,
-                )
         self.Search = channel.unary_unary(
                 '/nodereader.NodeReader/Search',
                 request_serializer=nucliadb__protos_dot_nodereader__pb2.SearchRequest.SerializeToString,
@@ -169,12 +164,6 @@ class NodeReaderServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def RelationTypes(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
     def Search(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -265,11 +254,6 @@ def add_NodeReaderServicer_to_server(servicer, server):
                     servicer.RelationEdges,
                     request_deserializer=nucliadb__protos_dot_noderesources__pb2.ShardId.FromString,
                     response_serializer=nucliadb__protos_dot_nodereader__pb2.EdgeList.SerializeToString,
-            ),
-            'RelationTypes': grpc.unary_unary_rpc_method_handler(
-                    servicer.RelationTypes,
-                    request_deserializer=nucliadb__protos_dot_noderesources__pb2.ShardId.FromString,
-                    response_serializer=nucliadb__protos_dot_nodereader__pb2.TypeList.SerializeToString,
             ),
             'Search': grpc.unary_unary_rpc_method_handler(
                     servicer.Search,
@@ -480,23 +464,6 @@ class NodeReader(object):
         return grpc.experimental.unary_unary(request, target, '/nodereader.NodeReader/RelationEdges',
             nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
             nucliadb__protos_dot_nodereader__pb2.EdgeList.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def RelationTypes(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/nodereader.NodeReader/RelationTypes',
-            nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
-            nucliadb__protos_dot_nodereader__pb2.TypeList.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 

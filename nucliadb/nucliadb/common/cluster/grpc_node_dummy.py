@@ -23,7 +23,6 @@ from nucliadb_protos.nodereader_pb2 import (
     EdgeList,
     RelationEdge,
     RelationSearchResponse,
-    TypeList,
 )
 from nucliadb_protos.noderesources_pb2 import EmptyResponse
 from nucliadb_protos.noderesources_pb2 import Shard as NodeResourcesShard
@@ -97,9 +96,4 @@ class DummyReaderStub:  # pragma: no cover
         result.list.append(
             RelationEdge(edge_type=Relation.RelationType.ENTITY, property="dummy")
         )
-        return result
-
-    async def RelationTypes(self, data):  # pragma: no cover
-        self.calls.setdefault("RelationTypes", []).append(data)
-        result = TypeList()
         return result
