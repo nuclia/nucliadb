@@ -1090,7 +1090,7 @@ class KnowledgeboxFindResults(JsonBaseModel):
         description="The list of shard replica ids used for the search.",
     )
     autofilters: List[str] = ModelParamDefaults.applied_autofilters.to_pydantic_field()
-    min_score: MinScore = Field(
+    min_score: Optional[Union[float, MinScore]] = Field(
         title="Minimum result score",
         description="The minimum scores that have been used for the search operation.",
     )
