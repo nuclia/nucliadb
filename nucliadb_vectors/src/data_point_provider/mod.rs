@@ -318,7 +318,7 @@ impl Index {
         let mut state = self.write_state();
         let mut date = self.write_date();
 
-        if state.work_stack_len() < 1 {
+        if state.work_stack_len() <= 1 {
             fs_state::persist_state::<State>(&self.location, &state)?;
             *date = fs_state::crnt_version(&self.location)?;
             return Ok(());
