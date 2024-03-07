@@ -266,7 +266,7 @@ impl NodeWriter {
         send_analytics_event(AnalyticsEvent::GarbageCollect);
         let shard_id = ShardId::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
         let shard = self.obtain_shard(shard_id.id)?;
-        let result = shard.gc();
+        let result = shard.collect_garbage();
         match result {
             Ok(_) => {
                 let response = EmptyResponse {};

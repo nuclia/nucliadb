@@ -169,18 +169,16 @@ impl Reader {
             return Ok(());
         }
 
-        let path = &self.path;
-        let state_path = path.join(STATE);
         let state_file = File::open(state_path)?;
         let mut state: State = bincode::deserialize_from(BufReader::new(state_file))?;
 
         let new_delete_log = mem::take(&mut state.delete_log);
-        let mut new_dimension = None;
+        let mut new_dimension = self.dimension;
         let mut new_number_of_embeddings = 0;
         let mut new_data_points = Vec::new();
 
         for data_point_id in state.data_point_iter() {
-            let data_point_pin = DataPointPin::open_pin(path, data_point_id)?;
+            let data_point_pin = DataPointPin::open_pin(&self.path, data_point_id)?;
             let data_point_journal = data_point_pin.read_journal()?;
 
             if new_dimension.is_none() {

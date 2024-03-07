@@ -18,27 +18,37 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use crate::shards::providers::shard_cache::ShardWriterCache;
 use nucliadb_core::tracing::*;
-use nucliadb_node::shards::providers::shard_cache::ShardReaderCache;
 use std::fs::read_dir;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-pub struct UpdateParameters {
-    pub shards_path: PathBuf,
-    pub refresh_rate: Duration,
+fn collect_garbage(shard_id: String, cache: Arc<ShardWriterCache>) {
+    let Ok(shard) = cache.get(&shard_id) else {
+        return;
+    };
+    if let Err(err) = shard.collect_garbage() {
+        error!("Garbage could not be collected from {shard_id} : {err:?}");
+    }
 }
 
-pub fn update_loop(parameters: UpdateParameters, cache: Arc<ShardReaderCache>) {
+pub struct GCParameters {
+    pub shards_path: PathBuf,
+    pub loop_interval: Duration,
+}
+
+pub async fn garbage_collection_loop(parameters: GCParameters, cache: Arc<ShardWriterCache>) {
     loop {
-        std::thread::sleep(parameters.refresh_rate);
+        tokio::time::sleep(parameters.loop_interval).await;
 
         let Ok(shards_dir_iterator) = read_dir(&parameters.shards_path) else {
-            error!("Updater can not read shards directory");
+            error!("Garbage collection loop can not read shards directory");
             break;
         };
 
+        let mut handles = vec![];
         for entry in shards_dir_iterator {
             let Ok(entry_path) = entry.map(|entry| entry.path()) else {
                 continue;
@@ -54,13 +64,15 @@ pub fn update_loop(parameters: UpdateParameters, cache: Arc<ShardReaderCache>) {
             let Some(shard_id) = shard_folder.to_str().map(String::from) else {
                 continue;
             };
-            let Ok(shard) = cache.get(&shard_id) else {
-                return;
-            };
+            let cache_task_copy = Arc::clone(&cache);
+            let handle = tokio::task::spawn_blocking(move || {
+                collect_garbage(shard_id, cache_task_copy);
+            });
+            handles.push(handle);
+        }
 
-            if let Err(err) = shard.update() {
-                error!("Shard {shard_id} could not be updated: {err:?}");
-            }
+        for handle in handles {
+            let _ = handle.await;
         }
     }
 }

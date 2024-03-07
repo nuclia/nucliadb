@@ -422,7 +422,7 @@ impl ShardWriter {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn gc(&self) -> NodeResult<GarbageCollectorStatus> {
+    pub fn collect_garbage(&self) -> NodeResult<GarbageCollectorStatus> {
         let _lock = self.gc_lock.blocking_lock();
         let result = write_rw_lock(&self.vector_writer).garbage_collection();
         match result {

@@ -36,15 +36,15 @@ fn update_shard(shard_id: String, cache: Arc<ShardReaderCache>) {
 
 pub struct UpdateParameters {
     pub shards_path: PathBuf,
-    pub update_interval: Duration,
+    pub refresh_rate: Duration,
 }
 
 pub async fn update_loop(parameters: UpdateParameters, cache: Arc<ShardReaderCache>) {
     loop {
-        tokio::time::sleep(parameters.update_interval).await;
+        tokio::time::sleep(parameters.refresh_rate).await;
 
         let Ok(shards_dir_iterator) = read_dir(&parameters.shards_path) else {
-            error!("Updater can not read shards directory");
+            error!("Update loop can not read shards directory");
             break;
         };
 

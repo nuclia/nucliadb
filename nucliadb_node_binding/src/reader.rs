@@ -39,7 +39,7 @@ use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-const UPDATE_INTERVAL: Duration = Duration::from_millis(10);
+const REFRESH_RATE: Duration = Duration::from_millis(10);
 
 #[pyclass]
 pub struct PyParagraphProducer {
@@ -95,7 +95,7 @@ impl NodeReader {
         let shards_update_loop_copy = Arc::clone(&shards);
         let update_parameters = UpdateParameters {
             shards_path: settings.shards_path(),
-            update_interval: UPDATE_INTERVAL,
+            refresh_rate: REFRESH_RATE,
         };
         let update_loop_handle = std::thread::spawn(|| {
             update_loop(update_parameters, shards_update_loop_copy);

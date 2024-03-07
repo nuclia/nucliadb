@@ -18,21 +18,9 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::sync::Arc;
-
-use nucliadb_core::protos::node_writer_server::NodeWriter;
-use nucliadb_core::protos::{
-    garbage_collector_response, merge_response, op_status, EmptyQuery, GarbageCollectorResponse, MergeResponse,
-    NewShardRequest, NewVectorSetRequest, NodeMetadata, OpStatus, Resource, ResourceId, ShardCreated, ShardId,
-    ShardIds, VectorSetId, VectorSetList,
-};
-use nucliadb_core::tracing::{self, Span, *};
-use nucliadb_core::Channel;
-use tokio::sync::mpsc::UnboundedSender;
-use tonic::{Request, Response, Status};
-
 use crate::analytics::payload::AnalyticsEvent;
 use crate::analytics::sync::send_analytics_event;
+use crate::grpc::collect_garbage::{garbage_collection_loop, GCParameters};
 use crate::merge::{global_merger, MergePriority, MergeRequest, MergeWaiter};
 use crate::settings::Settings;
 use crate::shards::errors::ShardNotFoundError;
@@ -41,8 +29,25 @@ use crate::shards::providers::shard_cache::ShardWriterCache;
 use crate::shards::writer::ShardWriter;
 use crate::telemetry::run_with_telemetry;
 use crate::utils::{get_primary_node_id, list_shards, read_host_key};
+use nucliadb_core::protos::node_writer_server::NodeWriter;
+use nucliadb_core::protos::{
+    garbage_collector_response, merge_response, op_status, EmptyQuery, GarbageCollectorResponse, MergeResponse,
+    NewShardRequest, NewVectorSetRequest, NodeMetadata, OpStatus, Resource, ResourceId, ShardCreated, ShardId,
+    ShardIds, VectorSetId, VectorSetList,
+};
+use nucliadb_core::tracing::{self, Span, *};
+use nucliadb_core::Channel;
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::sync::mpsc::UnboundedSender;
+use tokio::task::JoinHandle;
+use tonic::{Request, Response, Status};
+
+const GC_LOOP_INTERVAL: Duration = Duration::from_secs(60);
 
 pub struct NodeWriterGRPCDriver {
+    #[allow(unused)]
+    gc_loop_handle: JoinHandle<()>,
     shards: Arc<ShardWriterCache>,
     sender: Option<UnboundedSender<NodeWriterEvent>>,
     settings: Settings,
@@ -56,15 +61,25 @@ pub enum NodeWriterEvent {
 
 impl NodeWriterGRPCDriver {
     pub fn new(settings: Settings, shard_cache: Arc<ShardWriterCache>) -> Self {
-        Self {
+        let cache_gc_copy = Arc::clone(&shard_cache);
+        let gc_parameters = GCParameters {
+            shards_path: settings.shards_path(),
+            loop_interval: GC_LOOP_INTERVAL,
+        };
+        let gc_loop_handle = tokio::spawn(async move {
+            garbage_collection_loop(gc_parameters, cache_gc_copy).await;
+        });
+
+        NodeWriterGRPCDriver {
             settings,
+            gc_loop_handle,
             shards: shard_cache,
             sender: None,
         }
     }
 
     pub fn with_sender(self, sender: UnboundedSender<NodeWriterEvent>) -> Self {
-        Self {
+        NodeWriterGRPCDriver {
             sender: Some(sender),
             ..self
         }
@@ -351,7 +366,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let info = info_span!(parent: &span, "garbage collection");
         let task = || {
             let shard = obtain_shard(shards, shard_id_clone)?;
-            run_with_telemetry(info, move || shard.gc())
+            run_with_telemetry(info, move || shard.collect_garbage())
         };
         let result = tokio::task::spawn_blocking(task)
             .await
