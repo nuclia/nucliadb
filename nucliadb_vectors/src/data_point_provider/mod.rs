@@ -39,8 +39,7 @@ use crate::{VectorErr, VectorR};
 pub type TemporalMark = SystemTime;
 
 const METADATA: &str = "metadata.json";
-const MAX_NODES_PER_SEGMENT_VAR: &str = "MAX_NODES_PER_SEGMENT";
-const MAX_SEGMENTS_MERGE_ON_COMMIT_VAR: &str = "MAX_SEGMENTS_MERGE_ON_COMMIT";
+const MAX_NODES_IN_MERGE: &str = "MAX_NODES_IN_MERGE";
 
 pub trait SearchRequest {
     fn get_query(&self) -> &[f32];
@@ -87,8 +86,7 @@ impl IndexMetadata {
 }
 
 pub struct Index {
-    max_nodes_per_segment: usize,
-    max_segments_in_merge: usize,
+    max_nodes_in_merge: usize,
     metadata: IndexMetadata,
     state: RwLock<State>,
     date: RwLock<Version>,
@@ -142,24 +140,19 @@ impl Index {
             let metadata = IndexMetadata::default();
             metadata.write(path).map(|_| metadata)
         })?;
-        let max_nodes_per_segment: usize = match std::env::var(MAX_NODES_PER_SEGMENT_VAR) {
+        let max_nodes_in_merge: usize = match std::env::var(MAX_NODES_IN_MERGE) {
             Ok(v) => v.parse().unwrap_or(50_000),
             Err(_) => 50_000,
         };
-        let max_segments_in_merge: usize = match std::env::var(MAX_SEGMENTS_MERGE_ON_COMMIT_VAR) {
-            Ok(v) => v.parse().unwrap_or(10),
-            Err(_) => 10,
-        };
-        let index = Index {
+
+        Ok(Index {
             metadata,
-            max_nodes_per_segment,
-            max_segments_in_merge,
+            max_nodes_in_merge,
             dimension: RwLock::new(dimension_used),
             state: RwLock::new(state),
             date: RwLock::new(date),
             location: path.to_path_buf(),
-        };
-        Ok(index)
+        })
     }
 
     pub fn new(path: &Path, metadata: IndexMetadata) -> VectorR<Index> {
@@ -169,24 +162,19 @@ impl Index {
 
         let state = fs_state::load_state::<State>(path)?;
         let date = fs_state::crnt_version(path)?;
-        let max_nodes_per_segment: usize = match std::env::var(MAX_NODES_PER_SEGMENT_VAR) {
+        let max_nodes_in_merge: usize = match std::env::var(MAX_NODES_IN_MERGE) {
             Ok(v) => v.parse().unwrap_or(50_000),
             Err(_) => 50_000,
         };
-        let max_segments_in_merge: usize = match std::env::var(MAX_SEGMENTS_MERGE_ON_COMMIT_VAR) {
-            Ok(v) => v.parse().unwrap_or(10),
-            Err(_) => 10,
-        };
-        let index = Index {
+
+        Ok(Index {
             metadata,
-            max_nodes_per_segment,
-            max_segments_in_merge,
+            max_nodes_in_merge,
             dimension: RwLock::new(None),
             state: RwLock::new(state),
             date: RwLock::new(date),
             location: path.to_path_buf(),
-        };
-        Ok(index)
+        })
     }
 
     pub fn delete(&self, prefix: impl AsRef<str>, temporal_mark: SystemTime, _: &Lock) {
@@ -255,22 +243,39 @@ impl Index {
         Ok(())
     }
 
-    fn merge(&self, state: &State, max_nodes_per_segment: usize, capacity: usize) -> VectorR<Merge> {
+    fn merge(&self, state: &State, max_nodes_in_merge: usize) -> VectorR<Option<Merge>> {
         let location = self.location.clone();
         let similarity = self.metadata.similarity;
         let mut live_segments: Vec<_> = state.dpid_iter().collect();
         let mut blocked_segments = vec![];
-        let mut buffer = Vec::with_capacity(capacity);
+        let mut nodes_in_merge = 0;
+        let mut buffer = Vec::new();
+        let mut live_segments_are_sorted = false;
 
-        while buffer.len() < capacity {
+        if live_segments.len() < 1000 {
+            live_segments.sort_by_cached_key(|journal| journal.no_nodes());
+            live_segments_are_sorted = true;
+        }
+
+        while nodes_in_merge < max_nodes_in_merge {
             let Some(journal) = live_segments.pop() else {
                 break;
             };
-            if journal.no_nodes() >= max_nodes_per_segment {
+            if nodes_in_merge + journal.no_nodes() > max_nodes_in_merge {
                 blocked_segments.push(journal);
-            } else {
-                buffer.push((state.delete_log(journal), journal.id()));
+                if live_segments_are_sorted {
+                    break;
+                } else {
+                    continue;
+                }
             }
+
+            nodes_in_merge += journal.no_nodes();
+            buffer.push((state.delete_log(journal), journal.id()));
+        }
+
+        if buffer.len() < 2 {
+            return Ok(None);
         }
 
         let new_dp = DataPoint::merge(&location, &buffer, similarity)?;
@@ -287,28 +292,24 @@ impl Index {
             new_data_points: live_segments,
         };
 
-        Ok(merge)
+        Ok(Some(merge))
     }
 
     /// Returns the number of segments that have been merged.
     pub fn force_merge(&mut self, _lock: &Lock) -> VectorR<MergeMetrics> {
         let mut state = self.write_state();
         let mut date = self.write_date();
+        let mut metrics = MergeMetrics {
+            merged: 0,
+            segments_left: state.work_stack_len(),
+        };
 
-        if state.work_stack_len() <= 1 {
-            return Ok(MergeMetrics {
-                merged: 0,
-                segments_left: state.work_stack_len(),
-            });
-        }
-
-        let merge = self.merge(&state, 50_000, 100)?;
-        let live_segments = merge.new_data_points;
-        let metrics = merge.metrics;
-
-        state.rebuilt_work_stack_with(live_segments);
-        fs_state::persist_state::<State>(&self.location, &state)?;
-        *date = fs_state::crnt_version(&self.location)?;
+        if let Some(merge) = self.merge(&state, 50_000)? {
+            metrics = merge.metrics;
+            state.rebuilt_work_stack_with(merge.new_data_points);
+            fs_state::persist_state::<State>(&self.location, &state)?;
+            *date = fs_state::crnt_version(&self.location)?;
+        };
 
         Ok(metrics)
     }
@@ -317,10 +318,13 @@ impl Index {
         let mut state = self.write_state();
         let mut date = self.write_date();
 
-        if state.work_stack_len() > 1 {
-            let max_nodes_per_segment = self.max_nodes_per_segment;
-            let max_segments_in_merge = self.max_segments_in_merge;
-            let merge = self.merge(&state, max_nodes_per_segment, max_segments_in_merge)?;
+        if state.work_stack_len() < 1 {
+            fs_state::persist_state::<State>(&self.location, &state)?;
+            *date = fs_state::crnt_version(&self.location)?;
+            return Ok(());
+        }
+
+        if let Some(merge) = self.merge(&state, self.max_nodes_in_merge)? {
             let data_points = merge.new_data_points;
             state.rebuilt_work_stack_with(data_points);
         }
@@ -358,30 +362,6 @@ mod test {
 
     use super::*;
     use crate::data_point::{Elem, LabelDictionary, Similarity};
-
-    #[test]
-    fn force_merge_more_than_limit() -> NodeResult<()> {
-        let dir = tempfile::tempdir()?;
-        let vectors_path = dir.path().join("vectors");
-        let mut index = Index::new(&vectors_path, IndexMetadata::default())?;
-        let lock = index.get_elock()?;
-
-        let mut journals = vec![];
-        for _ in 0..200 {
-            let similarity = Similarity::Cosine;
-            let embeddings = vec![];
-            let time = Some(SystemTime::now());
-            let data_point = DataPoint::new(&vectors_path, embeddings, time, similarity).unwrap();
-            journals.push(data_point.journal());
-        }
-
-        index.write_state().rebuilt_work_stack_with(journals);
-
-        let metrics = index.force_merge(&lock).unwrap();
-        assert_eq!(metrics.merged, 100);
-        assert_eq!(metrics.segments_left, 101);
-        Ok(())
-    }
 
     #[test]
     fn force_merge_less_than_limit() -> NodeResult<()> {
