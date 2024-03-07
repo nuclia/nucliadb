@@ -381,6 +381,9 @@ impl NodeWriter for NodeWriterGRPCDriver {
 
     async fn merge(&self, request: Request<ShardId>) -> Result<Response<MergeResponse>, Status> {
         let shard_id = request.into_inner().id;
+
+        // The merging task can only work with already opened shards. Before
+        // sending this work we make ensure that the shard will be loaded by loading it.
         let shard_id_copy = shard_id.clone();
         let shards_tasks_copy = Arc::clone(&self.shards);
         let load_shard_task = || obtain_shard(shards_tasks_copy, shard_id_copy);

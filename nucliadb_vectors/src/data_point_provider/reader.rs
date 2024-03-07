@@ -165,9 +165,9 @@ impl Reader {
         let state_path = self.path.join(STATE);
         let disk_version = last_modified(&state_path)?;
 
-        // if disk_version == self.version {
-        //     return Ok(());
-        // }
+        if disk_version == self.version {
+            return Ok(());
+        }
 
         let state_file = File::open(state_path)?;
         let mut state: State = bincode::deserialize_from(BufReader::new(state_file))?;
