@@ -32,7 +32,6 @@ use nucliadb_core::vectors::MergeMetrics;
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::{Receiver, Sender};
 
-use crate::shards::ShardId;
 use crate::{settings::Settings, shards::providers::shard_cache::ShardWriterCache};
 use nucliadb_core::tracing::warn;
 use nucliadb_core::NodeResult;
@@ -151,7 +150,12 @@ impl MergeScheduler {
     }
 
     fn process(&self, request: InternalMergeRequest) -> NodeResult<()> {
-        let result = self.merge_shard(&request.shard_id);
+        let Some(shard) = self.shard_cache.get(&request.shard_id) else {
+            // Only shards that are already cached will be
+            // processed.
+            return Ok(());
+        };
+        let result = shard.merge();
 
         // When a notifier is requested, send the merge result and let the
         // caller be responsible to handle errors
@@ -165,11 +169,6 @@ impl MergeScheduler {
         }
 
         Ok(())
-    }
-
-    fn merge_shard(&self, shard_id: &ShardId) -> NodeResult<MergeMetrics> {
-        let shard = self.shard_cache.get(shard_id)?;
-        shard.merge()
     }
 
     fn schedule_free_time_work(&self) {

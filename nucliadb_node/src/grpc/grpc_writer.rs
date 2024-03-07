@@ -96,7 +96,7 @@ impl NodeWriterGRPCDriver {
 fn obtain_shard(shards: Arc<ShardWriterCache>, id: impl Into<String>) -> Result<Arc<ShardWriter>, tonic::Status> {
     let id = id.into();
 
-    let shard = shards.get(&id).map_err(|error| {
+    let shard = shards.get_or_load(&id).map_err(|error| {
         if error.is::<ShardNotFoundError>() {
             tonic::Status::not_found(error.to_string())
         } else {
@@ -381,6 +381,16 @@ impl NodeWriter for NodeWriterGRPCDriver {
 
     async fn merge(&self, request: Request<ShardId>) -> Result<Response<MergeResponse>, Status> {
         let shard_id = request.into_inner().id;
+        let shard_id_copy = shard_id.clone();
+        let shards_tasks_copy = Arc::clone(&self.shards);
+        let load_shard_task = || obtain_shard(shards_tasks_copy, shard_id_copy);
+        let load_shard_result = tokio::task::spawn_blocking(load_shard_task)
+            .await
+            .map_err(|error| tonic::Status::internal(format!("Blocking task panicked: {error:?}")))?;
+
+        if let Err(error) = load_shard_result {
+            return Err(tonic::Status::internal(error.to_string()));
+        }
 
         let merger = global_merger();
         let merge_request = MergeRequest {

@@ -54,7 +54,7 @@ pub fn update_loop(parameters: UpdateParameters, cache: Arc<ShardReaderCache>) {
             let Some(shard_id) = shard_folder.to_str().map(String::from) else {
                 continue;
             };
-            let Ok(shard) = cache.get(&shard_id) else {
+            let Some(shard) = cache.get(&shard_id) else {
                 return;
             };
 

@@ -81,8 +81,8 @@ async fn test_search_replicated_data(
     assert_eq!(response.vector.unwrap().documents.len(), 1);
 
     // Validate generation id is the same
-    let primary_shard = Arc::downgrade(&fixture.primary_shard_cache().get(&shard.id)?);
-    let secondary_shard = Arc::downgrade(&fixture.secondary_shard_cache().get(&shard.id)?);
+    let primary_shard = Arc::downgrade(&fixture.primary_shard_cache().get_or_load(&shard.id)?);
+    let secondary_shard = Arc::downgrade(&fixture.secondary_shard_cache().get_or_load(&shard.id)?);
 
     assert_eq!(
         primary_shard.upgrade().unwrap().metadata.get_generation_id(),

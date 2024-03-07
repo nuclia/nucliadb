@@ -54,6 +54,7 @@ impl NodeReaderGRPCDriver {
         let update_loop_handle = tokio::spawn(async move {
             update_loop(update_parameters, shards_update_loop_copy).await;
         });
+
         NodeReaderGRPCDriver {
             shards,
             update_loop_handle,
@@ -73,7 +74,7 @@ impl NodeReaderGRPCDriver {
 
 fn obtain_shard(shards: Arc<ShardReaderCache>, id: impl Into<String>) -> Result<Arc<ShardReader>, tonic::Status> {
     let id = id.into();
-    let shard = shards.get(&id).map_err(|error| {
+    let shard = shards.get_or_load(&id).map_err(|error| {
         if error.is::<ShardNotFoundError>() {
             tonic::Status::not_found(error.to_string())
         } else {

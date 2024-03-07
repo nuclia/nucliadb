@@ -79,7 +79,7 @@ pub struct NodeReader {
 impl NodeReader {
     fn obtain_shard(&self, shard_id: String) -> Result<Arc<ShardReader>, PyErr> {
         self.shards
-            .get(&shard_id)
+            .get_or_load(&shard_id)
             .map_err(|error| LoadShardError::new_err(format!("Error loading shard {}: {}", shard_id, error)))
     }
 }

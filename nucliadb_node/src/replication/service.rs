@@ -257,7 +257,7 @@ impl replication::replication_service_server::ReplicationService for Replication
         let id = request.shard_id;
         let id_clone = id.clone();
         let shards = self.shards.clone();
-        let shard_lookup = tokio::task::spawn_blocking(move || shards.get(&id_clone))
+        let shard_lookup = tokio::task::spawn_blocking(move || shards.get_or_load(&id_clone))
             .await
             .map_err(|error| tonic::Status::internal(format!("Error lazy loading shard {id}: {error:?}")))?;
 
