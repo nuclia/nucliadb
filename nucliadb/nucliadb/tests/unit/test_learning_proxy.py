@@ -219,7 +219,8 @@ async def test_proxy_error(async_client):
     )
     assert response.media_type == "text/plain"
 
-    async_client.request.assert_called_once_with(
+    assert len(async_client.request.mock_calls) == 3
+    async_client.request.assert_called_with(
         method="GET",
         url="url",
         params={"some": "data"},
