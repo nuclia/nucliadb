@@ -30,7 +30,6 @@ from fastapi import Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from nucliadb_telemetry import errors
 from nucliadb_utils.settings import is_onprem_nucliadb, nuclia_settings
 
 SERVICE_NAME = "nucliadb.learning_proxy"
