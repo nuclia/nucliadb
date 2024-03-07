@@ -113,14 +113,12 @@ class EntitiesManager:
                     # providing a quick summary
                     groups[group] = EntitiesGroupSummary()
 
-        await asyncio.gather(
-            *[
-                _composition(group)
-                async for group in self.iterate_entities_groups_names(
-                    exclude_deleted=True
-                )
-            ]
-        )
+        tasks = [
+            asyncio.create_task(_composition(group))
+            async for group in self.iterate_entities_groups_names(exclude_deleted=True)
+        ]
+        if tasks:
+            await asyncio.wait(tasks)
         return groups
 
     async def update_entities(self, group: str, entities: dict[str, Entity]):
@@ -341,6 +339,9 @@ class EntitiesManager:
             if isinstance(result, Exception):
                 errors.capture_exception(result)
                 raise NodeError("Error while looking for relations types")
+
+        if not results:
+            return set()
         return set.union(*results)
 
     async def store_entities_group(self, group: str, eg: EntitiesGroup):

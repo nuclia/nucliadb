@@ -65,6 +65,7 @@ async def test_entities_service(
     assert resp.status_code == 200
 
     resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{knowledgebox_one}/entitiesgroups")
+    assert resp.status_code == 200
     assert len(resp.json()["groups"]) == 0
 
 
