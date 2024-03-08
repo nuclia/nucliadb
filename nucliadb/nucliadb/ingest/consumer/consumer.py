@@ -28,7 +28,9 @@ import nats.js.api
 from nats.aio.client import Msg
 from nucliadb_protos.writer_pb2 import BrokerMessage, BrokerMessageBlobReference
 
+from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.exceptions import ShardsNotFound
+from nucliadb.common.cluster.manager import get_index_nodes
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.exceptions import ConflictError
 from nucliadb.ingest import logger
@@ -63,6 +65,14 @@ consumer_observer = metrics.Observer(
     ],
     error_mappings={"deadlettered": DeadletteredError, "shardnotfound": ShardsNotFound},
 )
+
+
+class CannotProcessError(Exception):
+    """
+    Raised when the consumer is not able to process messages at the moment
+    """
+
+    pass
 
 
 class IngestConsumer:
@@ -141,6 +151,10 @@ class IngestConsumer:
             except Exception:  # pragma: no cover
                 logger.warning("Could not delete blob reference", exc_info=True)
 
+    async def can_process(self) -> bool:
+        # Ingest consumer should always be able to process messages
+        return True
+
     async def subscription_worker(self, msg: Msg):
         subject = msg.subject
         reply = msg.reply
@@ -155,6 +169,9 @@ class IngestConsumer:
                 f"Message processing: subject:{subject}, seqid: {seqid}, reply: {reply}"
             )
             try:
+                if not await self.can_process():
+                    raise CannotProcessError()
+
                 pb = await self.get_broker_message(msg)
                 if pb.source == pb.MessageSource.PROCESSOR:
                     message_source = "processing"
@@ -200,6 +217,15 @@ class IngestConsumer:
                                 nucliadb seqid: {seqid}, partition: {self.partition} as {audit_time}, \
                                     total time: {time_to_process:.2f}s",
                     )
+            except CannotProcessError:
+                # We are not able to process messages right now
+                # This is a temporary situation and we should retry
+                sleep_time = nats_consumer_settings.consumer_cannot_process_delay
+                logger.error(
+                    f"Cannot process message from {message_source}. Will retry later. Sleeping for {sleep_time} seconds"
+                )
+                await asyncio.sleep(sleep_time)
+                await msg.nak()
             except DeadletteredError as e:
                 # Messages that have been sent to deadletter at some point
                 # We don't want to process it again so it's ack'd
@@ -278,3 +304,26 @@ class IngestProcessedConsumer(IngestConsumer):
         transaction ids from regular ingest writes and writes coming from processor.
         """
         await self.processor.process(pb, seqid, self.partition, transaction_check=False)
+
+    async def can_process(self) -> bool:
+        # Stop processing if the indexing queues are too full
+        max_pending_to_index = nats_consumer_settings.max_node_pending_to_index
+        some_node_is_full = False
+        node: AbstractIndexNode
+        for node in get_index_nodes(include_secondary=False):
+            pending_to_index = await self.get_pending_to_index(node.id)
+            if pending_to_index > max_pending_to_index:
+                logger.warning(
+                    "Node queue is full",
+                    extra={"node": node.id, "pending": pending_to_index},
+                )
+                some_node_is_full = True
+        return not some_node_is_full
+
+    async def get_pending_to_index(self, node_id: str) -> int:
+        nats_manager = self.nats_connection_manager
+        js = nats_manager.js
+        consumer_info = await js.consumer_info(
+            const.Streams.INDEX.name, const.Streams.INDEX.group.format(node=node_id)
+        )
+        return consumer_info.num_pending
