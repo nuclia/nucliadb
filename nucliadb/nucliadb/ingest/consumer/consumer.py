@@ -312,7 +312,7 @@ class IngestProcessedConsumer(IngestConsumer):
         node: AbstractIndexNode
         for node in get_index_nodes(include_secondary=False):
             pending_to_index = await self.get_pending_to_index(node.id)
-            if pending_to_index > max_pending_to_index:
+            if pending_to_index is not None and pending_to_index > max_pending_to_index:
                 logger.warning(
                     "Node queue is full",
                     extra={"node": node.id, "pending": pending_to_index},
@@ -324,18 +324,27 @@ class IngestProcessedConsumer(IngestConsumer):
             return False
         return not any(over_max)
 
-    async def get_pending_to_index(self, node_id: str) -> int:
-        nats_manager: NatsConnectionManager = self.nats_connection_manager
-        # get raw js client
-        js = getattr(nats_manager.js, "js", nats_manager.js)
+    async def get_pending_to_index(self, node_id: str) -> Optional[int]:
         try:
-            consumer_info = await js.consumer_info(
-                const.Streams.INDEX.name, const.Streams.INDEX.group.format(node=node_id)
+            nats_manager: NatsConnectionManager = self.nats_connection_manager
+            # get raw js client
+            js = getattr(nats_manager.js, "js", nats_manager.js)
+            try:
+                consumer_info = await js.consumer_info(
+                    const.Streams.INDEX.name,
+                    const.Streams.INDEX.group.format(node=node_id),
+                )
+                return consumer_info.num_pending
+            except nats.js.errors.NotFoundError:
+                logger.warning(
+                    "Consumer not found",
+                    extra={"stream": const.Streams.INDEX.name, "node_id": node_id},
+                )
+                return 0
+        except Exception as exc:
+            errors.capture_exception(exc)
+            logger.error(
+                "Error getting pending to index",
+                extra={"node": node_id, "error": str(exc)},
             )
-            return consumer_info.num_pending
-        except nats.js.errors.NotFoundError:
-            logger.warning(
-                "Consumer not found",
-                extra={"stream": const.Streams.INDEX.name, "node_id": node_id},
-            )
-            return 0
+            return None
