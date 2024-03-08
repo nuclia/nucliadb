@@ -258,8 +258,7 @@ pub async fn connect_to_primary_and_replicate(
             if existing_shards.contains(&shard_id) {
                 let shard_cache_clone = shard_cache.clone();
                 let shard_id_clone = shard_id.clone();
-                shard_lookup =
-                    tokio::task::spawn_blocking(move || shard_cache_clone.get_or_load(&shard_id_clone)).await?;
+                shard_lookup = tokio::task::spawn_blocking(move || shard_cache_clone.get(&shard_id_clone)).await?;
             } else {
                 let metadata = ShardMetadata::new(
                     shards_path.join(shard_id.clone()),

@@ -26,7 +26,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 fn collect_garbage(shard_id: String, cache: Arc<ShardWriterCache>) {
-    let Some(shard) = cache.get(&shard_id) else {
+    let Some(shard) = cache.peek(&shard_id) else {
         return;
     };
     if let Err(err) = shard.collect_garbage() {

@@ -18,21 +18,19 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use fs2::FileExt;
-use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
-use std::fs::File;
-use std::io::{self, BufReader};
-use std::mem;
-use std::path::{Path, PathBuf};
-use std::time::SystemTime;
-
 use crate::data_point::{self, DataPointPin};
-use crate::data_point_provider::state::*;
+use crate::data_point_provider::state::load_state;
 use crate::data_point_provider::{IndexMetadata, SearchRequest, OPENING_FLAG, STATE};
 use crate::data_types::dtrie_ram::DTrie;
 use crate::data_types::DeleteLog;
 use crate::{VectorErr, VectorR};
+use fs2::FileExt;
+use std::cmp::Ordering;
+use std::collections::{HashMap, HashSet};
+use std::fs::File;
+use std::io;
+use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 
 pub use crate::data_point::Neighbour;
 
@@ -118,7 +116,7 @@ pub struct Reader {
 impl Reader {
     pub fn open(path: &Path) -> VectorR<Reader> {
         let lock_path = path.join(OPENING_FLAG);
-        let lock_file = File::open(lock_path)?;
+        let lock_file = File::create(lock_path)?;
         lock_file.lock_shared()?;
 
         let metadata = IndexMetadata::open(path)?.map(Ok).unwrap_or_else(|| {
@@ -131,13 +129,14 @@ impl Reader {
         let state_path = path.join(STATE);
         let state_file = File::open(&state_path)?;
         let version = last_modified(&state_path)?;
-        let mut state: State = bincode::deserialize_from(BufReader::new(state_file))?;
-        let delete_log = mem::take(&mut state.delete_log);
+        let state = load_state(&state_file)?;
+        let data_point_list = state.data_point_list;
+        let delete_log = state.delete_log;
         let mut dimension = None;
         let mut data_points = Vec::new();
         let mut number_of_embeddings = 0;
 
-        for data_point_id in state.data_point_iter() {
+        for data_point_id in data_point_list {
             let data_point_pin = DataPointPin::open_pin(path, data_point_id)?;
             let data_point_journal = data_point_pin.read_journal()?;
 
@@ -170,14 +169,14 @@ impl Reader {
         }
 
         let state_file = File::open(state_path)?;
-        let mut state: State = bincode::deserialize_from(BufReader::new(state_file))?;
-
-        let new_delete_log = mem::take(&mut state.delete_log);
+        let state = load_state(&state_file)?;
+        let data_point_list = state.data_point_list;
+        let new_delete_log = state.delete_log;
         let mut new_dimension = self.dimension;
         let mut new_number_of_embeddings = 0;
         let mut new_data_points = Vec::new();
 
-        for data_point_id in state.data_point_iter() {
+        for data_point_id in data_point_list {
             let data_point_pin = DataPointPin::open_pin(&self.path, data_point_id)?;
             let data_point_journal = data_point_pin.read_journal()?;
 

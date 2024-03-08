@@ -150,7 +150,7 @@ impl MergeScheduler {
     }
 
     fn process(&self, request: InternalMergeRequest) -> NodeResult<()> {
-        let Some(shard) = self.shard_cache.get(&request.shard_id) else {
+        let Some(shard) = self.shard_cache.peek(&request.shard_id) else {
             // Only shards that are already cached will be
             // processed.
             return Ok(());

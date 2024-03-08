@@ -76,7 +76,7 @@ impl DataPointPin {
         let pin_path = data_point_path.join(file_names::DATA_POINT_PIN);
 
         if !pin_path.is_file() {
-            return Err(io::Error::new(ErrorKind::InvalidData, "Data point without pin"));
+            return Ok(false);
         }
 
         let pin_file = File::open(pin_path)?;
@@ -100,20 +100,33 @@ impl DataPointPin {
 
     pub fn create_pin(dir: &Path) -> io::Result<DataPointPin> {
         let id = DpId::new_v4();
-        std::fs::create_dir(dir.join(id.to_string()))?;
-        DataPointPin::open_pin(dir, id)
+        let folder_name = id.to_string();
+        let temp_dir = format!("{folder_name}.tmp");
+        let data_point_path = dir.join(folder_name);
+        let temp_data_point_path = dir.join(temp_dir);
+        let journal_path = data_point_path.join(file_names::JOURNAL);
+
+        std::fs::create_dir(&temp_data_point_path)?;
+
+        let temp_pin_path = temp_data_point_path.join(file_names::DATA_POINT_PIN);
+        let pin_file = File::create(&temp_pin_path)?;
+        pin_file.lock_shared()?;
+
+        std::fs::rename(&temp_data_point_path, &data_point_path)?;
+
+        Ok(DataPointPin {
+            journal_path,
+            data_point_path,
+            pin: pin_file,
+            data_point_id: id,
+        })
     }
 
     pub fn open_pin(dir: &Path, id: DpId) -> io::Result<DataPointPin> {
         let data_point_path = dir.join(id.to_string());
         let pin_path = data_point_path.join(file_names::DATA_POINT_PIN);
         let journal_path = data_point_path.join(file_names::JOURNAL);
-
-        let mut options = OpenOptions::new();
-        options.create(true);
-        options.read(true);
-        options.write(true);
-        let pin_file = options.open(pin_path)?;
+        let pin_file = File::create(pin_path)?;
 
         pin_file.lock_shared()?;
 

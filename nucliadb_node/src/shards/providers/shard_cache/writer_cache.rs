@@ -50,7 +50,7 @@ impl InnerCache {
         }
     }
 
-    pub fn get(&mut self, id: &ShardId) -> Option<Arc<ShardWriter>> {
+    pub fn peek(&mut self, id: &ShardId) -> Option<Arc<ShardWriter>> {
         if self.blocked_shards.contains(id) {
             return None;
         }
@@ -58,7 +58,7 @@ impl InnerCache {
         self.active_shards.get_cached(id)
     }
 
-    pub fn get_or_load(&mut self, id: &ShardId) -> NodeResult<CacheResult<ShardId, ShardWriter>> {
+    pub fn get(&mut self, id: &ShardId) -> NodeResult<CacheResult<ShardId, ShardWriter>> {
         if self.blocked_shards.contains(id) {
             return Err(node_error!(ShardNotFoundError("Shard {shard_path:?} is not on disk")));
         }
@@ -127,13 +127,13 @@ impl ShardWriterCache {
         Ok(shard)
     }
 
-    pub fn get(&self, id: &ShardId) -> Option<Arc<ShardWriter>> {
-        self.cache().get(id)
+    pub fn peek(&self, id: &ShardId) -> Option<Arc<ShardWriter>> {
+        self.cache().peek(id)
     }
 
-    pub fn get_or_load(&self, id: &ShardId) -> NodeResult<Arc<ShardWriter>> {
+    pub fn get(&self, id: &ShardId) -> NodeResult<Arc<ShardWriter>> {
         loop {
-            let cached = { self.cache().get_or_load(id) }?;
+            let cached = { self.cache().get(id) }?;
             match cached {
                 CacheResult::Cached(shard) => return Ok(shard),
                 CacheResult::Wait(waiter) => waiter.wait(),
@@ -250,7 +250,7 @@ mod tests {
         let shard_meta = ShardMetadata::new(shard_0_path.clone(), shard_id_0.clone(), None, Similarity::Cosine, None);
         cache.create(shard_meta).unwrap();
 
-        let shard_0 = cache.get_or_load(&shard_id_0).unwrap();
+        let shard_0 = cache.get(&shard_id_0).unwrap();
 
         scope(|scope| {
             let cache_clone = cache.clone();
@@ -261,7 +261,7 @@ mod tests {
             });
 
             // I should still be able to get the shard before deletion starts
-            assert!(cache.get_or_load(&shard_id_0).is_ok());
+            assert!(cache.get(&shard_id_0).is_ok());
 
             // The other thread will try to delete the shard
             // we will keep using it for a while, making sure
@@ -272,7 +272,7 @@ mod tests {
             }
 
             // Shard is under deletion, I should not be able to get it
-            assert!(cache.get_or_load(&shard_id_0).is_err());
+            assert!(cache.get(&shard_id_0).is_err());
 
             // Drop the shard Arc so it can be deleted
             drop(shard_0);
@@ -284,12 +284,12 @@ mod tests {
         .unwrap();
 
         // Shard is deleted, getting it should fail to load
-        assert!(cache.get_or_load(&shard_id_0).is_err());
+        assert!(cache.get(&shard_id_0).is_err());
 
         // Recreating the shard should work (i.e: it's not stuck in the deletion state)
         let shard_meta = ShardMetadata::new(shard_0_path.clone(), shard_id_0.clone(), None, Similarity::Cosine, None);
         cache.create(shard_meta).unwrap();
 
-        assert!(cache.get_or_load(&shard_id_0).is_ok());
+        assert!(cache.get(&shard_id_0).is_ok());
     }
 }
