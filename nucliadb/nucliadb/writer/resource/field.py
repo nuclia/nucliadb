@@ -314,11 +314,15 @@ def parse_link_field(
         for local, value in link_field.localstorage.items():
             writer.links[key].localstorage[local] = value
 
+    if link_field.css_selector is not None:
+        writer.links[key].css_selector = link_field.css_selector
+
     toprocess.linkfield[key] = models.LinkUpload(
         link=link_field.uri,
         headers=link_field.headers or {},
         cookies=link_field.cookies or {},
         localstorage=link_field.localstorage or {},
+        css_selector=link_field.css_selector,
     )
 
 

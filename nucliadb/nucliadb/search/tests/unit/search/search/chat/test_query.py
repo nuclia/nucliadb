@@ -31,6 +31,7 @@ from nucliadb_models.search import (
     ChatOptions,
     ChatRequest,
     KnowledgeboxFindResults,
+    MinScore,
     NucliaDBClientType,
     SearchOptions,
 )
@@ -49,7 +50,7 @@ async def test_chat_does_not_call_predict_if_no_find_results(
     predict,
 ):
     find_results = KnowledgeboxFindResults(
-        total=0, min_score=0.7, resources={}, facets=[]
+        total=0, min_score=MinScore(semantic=0.7), resources={}, facets=[]
     )
     chat_request = ChatRequest(query="query")
 
@@ -124,7 +125,7 @@ async def test_get_find_results_vector_search_is_optional(
     predict, chat_features, find_features
 ):
     find_results = KnowledgeboxFindResults(
-        total=0, min_score=0.7, resources={}, facets=[]
+        total=0, min_score=MinScore(semantic=0.7), resources={}, facets=[]
     )
 
     chat_request = ChatRequest(query="query")

@@ -41,6 +41,7 @@ from nucliadb.common.cluster import rollover
 from nucliadb.common.context import ApplicationContext
 from nucliadb.tests.utils import broker_resource, inject_message
 from nucliadb_models.labels import LabelSetKind
+from nucliadb_models.search import MinScore
 from nucliadb_protos import writer_pb2
 
 RELEASE_CHANNELS = (
@@ -366,7 +367,7 @@ async def _test_filtering(nucliadb_reader: AsyncClient, kbid: str, filters):
             filters=filters,
             features=["paragraph", "vector"],
             vector=[0.5, 0.5, 0.5],
-            min_score=-1,
+            min_score=MinScore(semantic=-1).dict(),
         ),
         timeout=None,
     )

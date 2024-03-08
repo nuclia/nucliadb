@@ -1819,6 +1819,7 @@ class FieldLink(google.protobuf.message.Message):
     URI_FIELD_NUMBER: builtins.int
     LANGUAGE_FIELD_NUMBER: builtins.int
     LOCALSTORAGE_FIELD_NUMBER: builtins.int
+    CSS_SELECTOR_FIELD_NUMBER: builtins.int
     @property
     def added(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     @property
@@ -1829,6 +1830,7 @@ class FieldLink(google.protobuf.message.Message):
     language: builtins.str
     @property
     def localstorage(self) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
+    css_selector: builtins.str
     def __init__(
         self,
         *,
@@ -1838,9 +1840,10 @@ class FieldLink(google.protobuf.message.Message):
         uri: builtins.str = ...,
         language: builtins.str = ...,
         localstorage: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
+        css_selector: builtins.str = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["added", b"added"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["added", b"added", "cookies", b"cookies", "headers", b"headers", "language", b"language", "localstorage", b"localstorage", "uri", b"uri"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["added", b"added", "cookies", b"cookies", "css_selector", b"css_selector", "headers", b"headers", "language", b"language", "localstorage", b"localstorage", "uri", b"uri"]) -> None: ...
 
 global___FieldLink = FieldLink
 
@@ -1912,29 +1915,12 @@ class FieldFile(google.protobuf.message.Message):
         ) -> None: ...
         def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
 
-    @typing_extensions.final
-    class CookiesEntry(google.protobuf.message.Message):
-        DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-        KEY_FIELD_NUMBER: builtins.int
-        VALUE_FIELD_NUMBER: builtins.int
-        key: builtins.str
-        value: builtins.str
-        def __init__(
-            self,
-            *,
-            key: builtins.str = ...,
-            value: builtins.str = ...,
-        ) -> None: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
-
     ADDED_FIELD_NUMBER: builtins.int
     FILE_FIELD_NUMBER: builtins.int
     LANGUAGE_FIELD_NUMBER: builtins.int
     PASSWORD_FIELD_NUMBER: builtins.int
     URL_FIELD_NUMBER: builtins.int
     HEADERS_FIELD_NUMBER: builtins.int
-    COOKIES_FIELD_NUMBER: builtins.int
     @property
     def added(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     @property
@@ -1944,8 +1930,6 @@ class FieldFile(google.protobuf.message.Message):
     url: builtins.str
     @property
     def headers(self) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
-    @property
-    def cookies(self) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
     def __init__(
         self,
         *,
@@ -1955,10 +1939,9 @@ class FieldFile(google.protobuf.message.Message):
         password: builtins.str = ...,
         url: builtins.str = ...,
         headers: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
-        cookies: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["added", b"added", "file", b"file"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["added", b"added", "cookies", b"cookies", "file", b"file", "headers", b"headers", "language", b"language", "password", b"password", "url", b"url"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["added", b"added", "file", b"file", "headers", b"headers", "language", b"language", "password", b"password", "url", b"url"]) -> None: ...
 
 global___FieldFile = FieldFile
 

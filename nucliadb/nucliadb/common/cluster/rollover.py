@@ -155,7 +155,11 @@ async def wait_for_node(app_context: ApplicationContext, node_id: str) -> None:
             f"Waiting for node to consume messages. {consumer_info.num_pending} messages left.",
             extra={"node": node_id},
         )
-        await asyncio.sleep(2)
+        # usually we consume around 3-4 messages/s with some eventual peaks of
+        # 10-30. If there are too many pending messages, we can wait more.
+        # We suppose 5 messages/s and don't wait more than 60s
+        sleep = min(max(2, consumer_info.num_pending / 5), 60)
+        await asyncio.sleep(sleep)
 
 
 @backoff.on_exception(

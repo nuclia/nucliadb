@@ -185,19 +185,28 @@ async def test_find_min_score(
     nucliadb_reader: AsyncClient,
     knowledgebox,
 ):
-    # When not specifying the min score on the request, it should default to 0.7
+    # When not specifying the min score on the request
+    # it should default to 0 for bm25 and 0.7 for semantic
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/find", json={"query": "dummy"}
     )
     assert resp.status_code == 200
-    assert resp.json()["min_score"] == 0.7
+    assert resp.json()["min_score"] == {"bm25": 0, "semantic": 0.7}
 
-    # If we specify a min score, it should be used
+    # When specifying the min score on the request
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/find",
+        json={"query": "dummy", "min_score": {"bm25": 10, "semantic": 0.5}},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["min_score"] == {"bm25": 10, "semantic": 0.5}
+
+    # Check that old api still works
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/find", json={"query": "dummy", "min_score": 0.5}
     )
     assert resp.status_code == 200
-    assert resp.json()["min_score"] == 0.5
+    assert resp.json()["min_score"] == {"bm25": 0, "semantic": 0.5}
 
 
 @pytest.mark.asyncio
@@ -205,7 +214,6 @@ async def test_find_min_score(
 async def test_story_7286(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
     knowledgebox,
     caplog,
 ):

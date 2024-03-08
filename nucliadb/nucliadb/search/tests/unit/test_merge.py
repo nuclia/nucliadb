@@ -24,11 +24,11 @@ from nucliadb.search.search.merge import ResourceSearchResults, merge_paragraphs
 
 async def test_str_model():
     # make sure __str__ works as advertised
-    res = await merge_paragraphs_results([], 1, 1, "kbid", [], [], [], False)
+    res = await merge_paragraphs_results([], 1, 1, "kbid", [], [], [], False, 1)
     assert str(res) == res.json()
 
 
 async def test_str_model_fallback():
     with patch.object(ResourceSearchResults, "json", side_effect=Exception("ERROR")):
-        res = await merge_paragraphs_results([], 1, 1, "kbid", [], [], [], False)
+        res = await merge_paragraphs_results([], 1, 1, "kbid", [], [], [], False, 1)
         assert "sentences=None" in str(res)
