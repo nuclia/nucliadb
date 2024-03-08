@@ -325,8 +325,9 @@ class IngestProcessedConsumer(IngestConsumer):
         return not any(over_max)
 
     async def get_pending_to_index(self, node_id: str) -> int:
-        nats_manager = self.nats_connection_manager
-        js = nats_manager.js
+        nats_manager: NatsConnectionManager = self.nats_connection_manager
+        # get raw js client
+        js = getattr(nats_manager.js, "js", nats_manager.js)
         try:
             consumer_info = await js.consumer_info(
                 const.Streams.INDEX.name, const.Streams.INDEX.group.format(node=node_id)
