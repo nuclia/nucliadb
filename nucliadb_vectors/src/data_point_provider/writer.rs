@@ -118,7 +118,8 @@ impl Writer {
         let mut nodes_in_merge = 0;
         let mut buffer = Vec::new();
 
-        live_segments.sort_unstable_by_key(|i| i.journal.no_nodes());
+        // Order smallest segments last (first to be pop()), so they are merged first
+        live_segments.sort_unstable_by_key(|i| std::cmp::Reverse(i.journal.no_nodes()));
 
         while nodes_in_merge < self.max_nodes_in_merge {
             let Some(online_data_point) = live_segments.pop() else {
