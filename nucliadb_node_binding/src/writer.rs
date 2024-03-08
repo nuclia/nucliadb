@@ -22,6 +22,9 @@ use std::io::Cursor;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use crate::collect_garbage::{garbage_collection_loop, GCParameters};
+use crate::errors::{IndexNodeException, LoadShardError};
+use crate::RawProtos;
 use nucliadb_core::protos::*;
 use nucliadb_core::Channel;
 use nucliadb_node::analytics::blocking::send_analytics_event;
@@ -37,12 +40,15 @@ use prost::Message;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
+use std::thread::JoinHandle;
+use std::time::Duration;
 
-use crate::errors::{IndexNodeException, LoadShardError};
-use crate::RawProtos;
+const GC_LOOP_INTERVAL: Duration = Duration::from_secs(60);
 
 #[pyclass]
 pub struct NodeWriter {
+    #[allow(unused)]
+    gc_loop_handle: JoinHandle<()>,
     shards: Arc<ShardWriterCache>,
     shards_path: PathBuf,
 }
@@ -61,6 +67,14 @@ impl NodeWriter {
     pub fn new() -> PyResult<Self> {
         let settings: Settings = EnvSettingsProvider::generate_settings().unwrap();
         let shard_cache = Arc::new(ShardWriterCache::new(settings.clone()));
+        let shards_gc_loop_copy = Arc::clone(&shard_cache);
+        let gc_parameters = GCParameters {
+            shards_path: settings.shards_path(),
+            loop_interval: GC_LOOP_INTERVAL,
+        };
+        let gc_loop_handle = std::thread::spawn(|| {
+            garbage_collection_loop(gc_parameters, shards_gc_loop_copy);
+        });
 
         if let Err(error) = lifecycle::initialize_writer(settings.clone()) {
             return Err(IndexNodeException::new_err(format!("Unable to initialize writer: {error}")));
@@ -70,6 +84,7 @@ impl NodeWriter {
         }
         let shards_path = settings.shards_path();
         Ok(Self {
+            gc_loop_handle,
             shards: shard_cache,
             shards_path,
         })
