@@ -23,12 +23,12 @@ use crate::data_types::dtrie_ram::DTrie;
 use bincode::deserialize_from;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
-use std::io::BufReader;
+use std::io::{BufReader, Seek};
 
 pub fn load_state(state_file: &File) -> bincode::Result<State> {
-    let state_buffer = BufReader::new(state_file);
-    let Ok(state) = deserialize_from(state_buffer) else {
-        let state_buffer = BufReader::new(state_file);
+    let mut state_buffer = BufReader::new(state_file);
+    let Ok(state) = deserialize_from(&mut state_buffer) else {
+        state_buffer.rewind()?;
         let deprecated_state: deprecated::State = deserialize_from(state_buffer)?;
 
         return Ok(State {
