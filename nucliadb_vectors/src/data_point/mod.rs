@@ -109,7 +109,7 @@ impl DataPointPin {
         std::fs::create_dir(&temp_data_point_path)?;
 
         let temp_pin_path = temp_data_point_path.join(file_names::DATA_POINT_PIN);
-        let pin_file = File::create(&temp_pin_path)?;
+        let pin_file = File::create(temp_pin_path)?;
         pin_file.lock_shared()?;
 
         std::fs::rename(&temp_data_point_path, &data_point_path)?;

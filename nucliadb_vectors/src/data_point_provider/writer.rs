@@ -198,7 +198,7 @@ impl Writer {
         let added_data_points = mem::take(&mut self.added_data_points);
         let current_data_points = mem::take(&mut self.online_data_points);
 
-        let mut state = State::default();
+        let mut state = State::new();
         state.delete_log = self.delete_log.clone();
 
         for pin in current_data_points.iter().map(|i| &i.pin) {
