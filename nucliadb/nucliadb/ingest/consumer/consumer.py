@@ -323,7 +323,14 @@ class IngestProcessedConsumer(IngestConsumer):
     async def get_pending_to_index(self, node_id: str) -> int:
         nats_manager = self.nats_connection_manager
         js = nats_manager.js
-        consumer_info = await js.consumer_info(
-            const.Streams.INDEX.name, const.Streams.INDEX.group.format(node=node_id)
-        )
-        return consumer_info.num_pending
+        try:
+            consumer_info = await js.consumer_info(
+                const.Streams.INDEX.name, const.Streams.INDEX.group.format(node=node_id)
+            )
+            return consumer_info.num_pending
+        except nats.js.errors.NotFoundError:
+            logger.warning(
+                "Consumer not found",
+                extra={"stream": const.Streams.INDEX.name, "node_id": node_id},
+            )
+            return 0
