@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     dm_redis_port: Optional[int] = None
 
 
-class RateLimitSettings(BaseSettings):
+class BackPressureSettings(BaseSettings):
     estimation_indexing_rate: float = Field(
         default=2,
         description="Estimation of the indexing rate in messages per second. This is used to calculate the try again in time",  # noqa
@@ -41,4 +41,4 @@ class RateLimitSettings(BaseSettings):
 
 settings = Settings()
 
-rate_limit_settings = RateLimitSettings()
+back_pressure_settings = BackPressureSettings()

@@ -38,6 +38,7 @@ from nucliadb.export_import.utils import IteratorExportStream
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.writer import logger
 from nucliadb.writer.api.v1.router import KB_PREFIX, api
+from nucliadb.writer.back_pressure import maybe_back_pressure
 from nucliadb_models.export_import import (
     CreateExportResponse,
     CreateImportResponse,
@@ -85,6 +86,8 @@ async def start_kb_import_endpoint(request: Request, kbid: str):
     context = get_app_context(request.app)
     if not await exists_kb(context, kbid):
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
+
+    await maybe_back_pressure(request, kbid)
 
     import_id = uuid4().hex
     if in_standalone_mode():
