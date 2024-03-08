@@ -124,6 +124,12 @@ impl VectorWriter for VectorWriterService {
         Ok(())
     }
 
+    #[measure(actor = "vectors", metric = "reload")]
+    #[tracing::instrument(skip_all)]
+    fn reload(&mut self) -> NodeResult<()> {
+        Ok(self.index.reload()?)
+    }
+
     #[measure(actor = "vectors", metric = "count")]
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {

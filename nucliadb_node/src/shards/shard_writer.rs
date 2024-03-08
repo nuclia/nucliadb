@@ -442,6 +442,13 @@ impl ShardWriter {
         result
     }
 
+    /// This must be used only by replication and should be
+    /// deleted as soon as possible.
+    #[tracing::instrument(skip_all)]
+    pub fn reload(&self) -> NodeResult<()> {
+        write_rw_lock(&self.vector_writer).reload()
+    }
+
     pub async fn block_shard(&self) -> BlockingToken {
         let mutex_guard = self.write_lock.lock().expect("Poisoned write lock");
         BlockingToken(mutex_guard)

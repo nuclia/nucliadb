@@ -356,6 +356,48 @@ impl Writer {
         })
     }
 
+    /// This must be used only by replication and should be
+    /// deleted as soon as possible.
+    pub fn reload(&mut self) -> VectorR<()> {
+        if self.has_uncommitted_changes {
+            return Err(VectorErr::UncommittedChangesError);
+        }
+
+        let state_path = self.path.join(STATE);
+        let state_file = File::open(state_path)?;
+        let state = load_state(&state_file)?;
+        let data_point_list = state.data_point_list;
+        let new_delete_log = state.delete_log;
+        let mut new_dimension = self.dimension;
+        let mut new_number_of_embeddings = 0;
+        let mut new_data_points = Vec::new();
+
+        for data_point_id in data_point_list {
+            let data_point_pin = DataPointPin::open_pin(&self.path, data_point_id)?;
+            let data_point_journal = data_point_pin.read_journal()?;
+
+            if new_dimension.is_none() {
+                let data_point = data_point::open(&data_point_pin)?;
+                new_dimension = data_point.stored_len();
+            }
+
+            let online_data_point = OnlineDataPoint {
+                pin: data_point_pin,
+                journal: data_point_journal,
+            };
+
+            new_number_of_embeddings += data_point_journal.no_nodes();
+            new_data_points.push(online_data_point);
+        }
+
+        self.delete_log = new_delete_log;
+        self.online_data_points = new_data_points;
+        self.dimension = new_dimension;
+        self.number_of_embeddings = new_number_of_embeddings;
+
+        Ok(())
+    }
+
     pub fn location(&self) -> &Path {
         &self.path
     }
