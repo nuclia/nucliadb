@@ -308,7 +308,7 @@ class IngestProcessedConsumer(IngestConsumer):
     async def can_process(self) -> bool:
         # Stop processing if the indexing queues are too full
         max_pending_to_index = nats_consumer_settings.max_node_pending_to_index
-        some_node_is_full = False
+        over_max = []
         node: AbstractIndexNode
         for node in get_index_nodes(include_secondary=False):
             pending_to_index = await self.get_pending_to_index(node.id)
@@ -317,8 +317,12 @@ class IngestProcessedConsumer(IngestConsumer):
                     "Node queue is full",
                     extra={"node": node.id, "pending": pending_to_index},
                 )
-                some_node_is_full = True
-        return not some_node_is_full
+                over_max.append(True)
+            else:
+                over_max.append(False)
+        if len(over_max) == 0:
+            return False
+        return not any(over_max)
 
     async def get_pending_to_index(self, node_id: str) -> int:
         nats_manager = self.nats_connection_manager
