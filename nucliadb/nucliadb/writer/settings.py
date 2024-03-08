@@ -19,7 +19,7 @@
 #
 from typing import Optional
 
-from pydantic import BaseSettings
+from pydantic import BaseSettings, Field
 
 
 class Settings(BaseSettings):
@@ -28,4 +28,17 @@ class Settings(BaseSettings):
     dm_redis_port: Optional[int] = None
 
 
+class RateLimitSettings(BaseSettings):
+    estimation_indexing_rate: float = Field(
+        default=2,
+        description="Estimation of the indexing rate in messages per second. This is used to calculate the try again in time",  # noqa
+    )
+    max_node_indexing_pending: int = Field(
+        default=100,
+        description="Max number of messages pending to index in a node queue before rate limiting writes",
+    )
+
+
 settings = Settings()
+
+rate_limit_settings = RateLimitSettings()
