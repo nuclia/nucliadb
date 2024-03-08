@@ -269,7 +269,8 @@ impl Index {
         }
 
         if live_segments.len() < 1000 {
-            live_segments.sort_by_cached_key(|journal| journal.no_nodes());
+            // Order smallest segments last (first to be pop()), so they are merged first
+            live_segments.sort_unstable_by_key(|i| std::cmp::Reverse(i.no_nodes()));
             live_segments_are_sorted = true;
         }
 
