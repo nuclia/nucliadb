@@ -205,15 +205,6 @@ class NATSConsumerSettings(BaseSettings):
     nats_ack_wait: int = 10 * 60
     nats_idle_heartbeat: float = 5.0
 
-    consumer_cannot_process_delay: int = Field(
-        default=10,
-        description="Delay in seconds before nacking a message when consumer cannot process",
-    )
-    max_node_pending_to_index: int = Field(
-        default=100,
-        description="Max number of pending messages per node before consumer stops consuming",
-    )
-
 
 nats_consumer_settings = NATSConsumerSettings()
 

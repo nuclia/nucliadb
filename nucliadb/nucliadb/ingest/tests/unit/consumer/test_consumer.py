@@ -17,13 +17,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
 from nucliadb_protos.writer_pb2 import BrokerMessage, BrokerMessageBlobReference
 
-from nucliadb.ingest.consumer.consumer import IngestConsumer, IngestProcessedConsumer
+from nucliadb.ingest.consumer.consumer import IngestConsumer
 
 
 @pytest.fixture()
@@ -68,51 +67,3 @@ async def test_clean_broker_message_proxied(consumer: IngestConsumer, storage):
     await consumer.clean_broker_message(msg)
 
     storage.del_stream_message.assert_awaited_once_with("storage_key")
-
-
-async def test_can_process_ingest_consumer():
-    consumer = IngestConsumer(None, "partition", None, None)
-    assert await consumer.can_process() is True
-
-
-@pytest.fixture(scope="function")
-def nats_consumer_settings():
-    with mock.patch(
-        "nucliadb.ingest.consumer.consumer.nats_consumer_settings"
-    ) as settings_mock:
-        settings_mock.max_node_pending_to_index = 10
-        settings_mock.consumer_cannot_process_delay = 1
-        yield settings_mock
-
-
-async def test_can_process_processed_consumer(nats_consumer_settings):
-    nats_consumer_settings.max_node_pending_to_index = 10
-    consumer = IngestProcessedConsumer(None, "partition", None, None)
-    nodes = [Mock(id="node1"), Mock(id="node2")]
-    with mock.patch(
-        "nucliadb.ingest.consumer.consumer.get_index_nodes", return_value=nodes
-    ):
-        with mock.patch.object(consumer, "get_pending_to_index", return_value=12):
-            assert await consumer.can_process() is False
-        with mock.patch.object(consumer, "get_pending_to_index", return_value=8):
-            assert await consumer.can_process() is True
-
-
-@pytest.fixture(scope="function")
-def nats_progress_updater():
-    with mock.patch(
-        "nucliadb.ingest.consumer.consumer.MessageProgressUpdater"
-    ) as progress_updater_mock:
-        yield progress_updater_mock
-
-
-async def test_processed_consumer_handles_cannot_process_error(
-    nats_consumer_settings, nats_progress_updater
-):
-    nats_consumer_settings.consumer_cannot_process_delay = 0.1
-    consumer = IngestProcessedConsumer(None, "partition", None, None)
-    with mock.patch.object(consumer, "can_process", return_value=False):
-        msg = MagicMock()
-        msg.nak = AsyncMock()
-        await consumer.subscription_worker(msg)
-        msg.nak.assert_awaited_once()
