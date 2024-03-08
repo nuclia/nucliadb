@@ -142,6 +142,16 @@ impl Writer {
             }
         }
 
+        if buffer.len() < 2 {
+            self.online_data_points.extend(blocked_segments);
+            self.online_data_points.extend(being_merged);
+            self.online_data_points.extend(live_segments);
+            return Ok(MergeMetrics {
+                merged: 0,
+                segments_left: self.online_data_points.len(),
+            });
+        }
+
         let merged_pin = DataPointPin::create_pin(self.location())?;
 
         if let Err(err) = data_point::merge(&merged_pin, &buffer, similarity) {
