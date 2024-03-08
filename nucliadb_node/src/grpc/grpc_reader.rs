@@ -34,7 +34,7 @@ use std::time::Duration;
 use tokio::task::JoinHandle;
 use Shard as ShardPB;
 
-const REFRESH_RATE: Duration = Duration::from_millis(10);
+const UPDATE_REFRESH_RATE: &str = "UPDATE_REFRESH_RATE_MILLIS";
 
 pub struct NodeReaderGRPCDriver {
     #[allow(unused)]
@@ -47,9 +47,13 @@ impl NodeReaderGRPCDriver {
         let cache_settings = settings.clone();
         let shards = Arc::new(ShardReaderCache::new(cache_settings));
         let shards_update_loop_copy = Arc::clone(&shards);
+        let update_refresh_rate = match std::env::var(UPDATE_REFRESH_RATE) {
+            Ok(v) => Duration::from_millis(v.parse().unwrap_or(100)),
+            Err(_) => Duration::from_millis(100),
+        };
         let update_parameters = UpdateParameters {
             shards_path: settings.shards_path(),
-            refresh_rate: REFRESH_RATE,
+            refresh_rate: update_refresh_rate,
         };
         let update_loop_handle = tokio::spawn(async move {
             update_loop(update_parameters, shards_update_loop_copy).await;

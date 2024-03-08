@@ -43,7 +43,7 @@ use tokio::sync::mpsc::UnboundedSender;
 use tokio::task::JoinHandle;
 use tonic::{Request, Response, Status};
 
-const GC_LOOP_INTERVAL: Duration = Duration::from_secs(60);
+const GC_LOOP_INTERVAL: &str = "GC_INTERVAL_SECS";
 
 pub struct NodeWriterGRPCDriver {
     #[allow(unused)]
@@ -62,9 +62,13 @@ pub enum NodeWriterEvent {
 impl NodeWriterGRPCDriver {
     pub fn new(settings: Settings, shard_cache: Arc<ShardWriterCache>) -> Self {
         let cache_gc_copy = Arc::clone(&shard_cache);
+        let gc_loop_interval = match std::env::var(GC_LOOP_INTERVAL) {
+            Ok(v) => Duration::from_secs(v.parse().unwrap_or(1)),
+            Err(_) => Duration::from_secs(1),
+        };
         let gc_parameters = GCParameters {
             shards_path: settings.shards_path(),
-            loop_interval: GC_LOOP_INTERVAL,
+            loop_interval: gc_loop_interval,
         };
         let gc_loop_handle = tokio::spawn(async move {
             garbage_collection_loop(gc_parameters, cache_gc_copy).await;
