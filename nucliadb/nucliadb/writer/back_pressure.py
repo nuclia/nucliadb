@@ -24,7 +24,9 @@ from collections.abc import AsyncGenerator
 from typing import Optional
 
 import nats
+from async_lru import alru_cache
 from fastapi import HTTPException, Request
+from nucliadb_protos.writer_pb2 import ShardObject
 
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.context.fastapi import get_app_context
@@ -152,11 +154,12 @@ async def iter_nodes_to_check(
 async def iter_nodes_for_kb_active_shards(
     context: ApplicationContext, kbid: str
 ) -> AsyncGenerator[str, None]:
-    async with context.kv_driver.transaction() as txn:
-        active_shard = await context.shard_manager.get_current_active_shard(txn, kbid)
-        if active_shard is None:
-            logger.warning("No active shard found for KB", extra={"kbid": kbid})
-            return
+    active_shard = await get_kb_active_shard(context, kbid)
+    if active_shard is None:
+        # KB doesn't exist or has been deleted
+        logger.debug("No active shard found for KB", extra={"kbid": kbid})
+        return
+
     for replica in active_shard.replicas:
         yield replica.node
 
@@ -164,29 +167,16 @@ async def iter_nodes_for_kb_active_shards(
 async def iter_nodes_for_resource_shard(
     context: ApplicationContext, kbid: str, resource_uuid: str
 ) -> AsyncGenerator[str, None]:
-    rdm = ResourcesDataManager(driver=context.kv_driver, storage=context.blob_storage)
-    shard_id = await rdm.get_resource_shard_id(kbid, resource_uuid)
+    resource_shard = await get_resource_shard(context, kbid, resource_uuid)
+    if resource_shard is None:
+        # Resource doesn't exist or KB has been deleted
+        return
 
-    async with context.kv_driver.transaction() as txn:
-        all_shards = await context.shard_manager.get_all_shards(txn, kbid)
-        if all_shards is None:
-            logger.warning("No shards found for KB", extra={"kbid": kbid})
-            return
-
-    shard_found = False
-    for shard in all_shards.shards:
-        if shard.shard == shard_id:
-            shard_found = True
-            for replica in shard.replicas:
-                yield replica.node
-
-    if not shard_found:
-        logger.warning(
-            "Resource shard not found",
-            extra={"kbid": kbid, "resource_uuid": resource_uuid},
-        )
+    for replica in resource_shard.replicas:
+        yield replica.node
 
 
+@alru_cache(maxsize=None, ttl=10)
 async def get_node_pending_messages(
     context: ApplicationContext, node_id: str
 ) -> tuple[str, int]:
@@ -207,3 +197,46 @@ async def get_node_pending_messages(
             extra={"stream": const.Streams.INDEX.name, "node_id": node_id},
         )
         return node_id, 0
+
+
+@alru_cache(maxsize=128, ttl=60 * 15)
+async def get_kb_active_shard(
+    context: ApplicationContext, kbid: str
+) -> Optional[ShardObject]:
+    async with context.kv_driver.transaction() as txn:
+        return await context.shard_manager.get_current_active_shard(txn, kbid)
+
+
+@alru_cache(maxsize=1024, ttl=60 * 60)
+async def get_resource_shard(
+    context: ApplicationContext, kbid: str, resource_uuid: str
+):
+    rdm = ResourcesDataManager(driver=context.kv_driver, storage=context.blob_storage)
+    shard_id = await rdm.get_resource_shard_id(kbid, resource_uuid)
+    if shard_id is None:
+        # Resource does not exist
+        logger.debug(
+            "Resource shard not found",
+            extra={"kbid": kbid, "resource_uuid": resource_uuid},
+        )
+        return
+
+    async with context.kv_driver.transaction() as txn:
+        all_shards = await context.shard_manager.get_all_shards(txn, kbid)
+        if all_shards is None:
+            # KB doesn't exist or has been deleted
+            logger.debug("No shards found for KB", extra={"kbid": kbid})
+            return
+
+    found_shard = False
+    for shard in all_shards.shards:
+        if shard.shard == shard_id:
+            found_shard = True
+            return shard
+
+    if not found_shard:
+        logger.error(
+            "Resource shard not found",
+            extra={"kbid": kbid, "resource_uuid": resource_uuid, "shard_id": shard_id},
+        )
+        return
