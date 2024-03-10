@@ -23,10 +23,10 @@ Allow targeted rollover of KBs
 """
 
 import logging
+import os
 
 from nucliadb.common.cluster.rollover import rollover_kb_shards
 from nucliadb.migrator.context import ExecutionContext
-import os
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,8 @@ AFFECTED_KBS = [
 ]
 
 
-async def migrate(context: ExecutionContext) -> None: ...
+async def migrate(context: ExecutionContext) -> None:
+    ...
 
 
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
