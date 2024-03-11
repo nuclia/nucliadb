@@ -19,9 +19,8 @@
 #
 
 import pytest
-from nucliadb_protos.writer_pb2 import Shards as PBShards
 
-from nucliadb.common.cluster.manager import KBShardManager
+from nucliadb.common.datamanagers import cluster as shards_data_manager
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.local import LocalDriver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -67,13 +66,6 @@ async def list_all_kb_slugs(driver: Driver) -> list[str]:
         async for _, slug in KnowledgeBox.get_kbs(txn, slug=""):
             slugs.append(slug)
     return slugs
-
-
-async def get_kb_shards(txn, kbid) -> PBShards:
-    shard_manager = KBShardManager()
-    shards = await shard_manager.get_all_shards(txn, kbid)
-    assert shards, "Shards object not found!"
-    return shards
 
 
 async def get_kb_config(txn, kbid) -> knowledgebox_pb2.KnowledgeBoxConfig:
@@ -134,6 +126,6 @@ async def test_create_knowledgebox_release_channel(
 
     driver = grpc_servicer.servicer.driver
     async with driver.transaction() as txn:
-        shards = await get_kb_shards(txn, kbid)
+        shards = await shards_data_manager.get_kb_shards(txn, kbid)
         config = await get_kb_config(txn, kbid)
         assert shards.release_channel == config.release_channel == release_channel

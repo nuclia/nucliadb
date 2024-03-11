@@ -37,6 +37,7 @@ from nucliadb.common.cluster.exceptions import (
     ShardNotFound,
     ShardsNotFound,
 )
+from nucliadb.common.datamanagers import cluster as shards_data_manager
 from nucliadb.common.datamanagers.cluster import ClusterDataManager
 from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
 from nucliadb.common.maindb.driver import Transaction
@@ -166,18 +167,6 @@ class KBShardManager:
 
         return results
 
-    async def get_all_shards(
-        self, txn: Transaction, kbid: str
-    ) -> Optional[writer_pb2.Shards]:
-        key = KB_SHARDS.format(kbid=kbid)
-        kb_shards_bytes: Optional[bytes] = await txn.get(key)
-        if kb_shards_bytes:
-            kb_shards = writer_pb2.Shards()
-            kb_shards.ParseFromString(kb_shards_bytes)
-            return kb_shards
-        else:
-            return None
-
     async def get_current_active_shard(
         self, txn: Transaction, kbid: str
     ) -> Optional[writer_pb2.ShardObject]:
@@ -207,10 +196,8 @@ class KBShardManager:
             )
             raise
 
-        kb_shards_key = KB_SHARDS.format(kbid=kbid)
-        kb_shards: Optional[writer_pb2.Shards] = None
-        kb_shards_binary = await txn.get(kb_shards_key)
-        if not kb_shards_binary:
+        kb_shards = await shards_data_manager.get_kb_shards(txn, kbid)
+        if kb_shards is None:
             # First logic shard on the index
             kb_shards = writer_pb2.Shards()
             kb_shards.kbid = kbid
@@ -219,8 +206,7 @@ class KBShardManager:
             kb_shards.model.CopyFrom(semantic_model)
         else:
             # New logic shard on an existing index
-            kb_shards = writer_pb2.Shards()
-            kb_shards.ParseFromString(kb_shards_binary)
+            pass
 
         kb_shards.release_channel = release_channel
         existing_kb_nodes = [
@@ -270,7 +256,7 @@ class KBShardManager:
         kb_shards.shards.append(shard)
         kb_shards.actual += 1
 
-        await txn.set(kb_shards_key, kb_shards.SerializeToString())
+        await shards_data_manager.update_kb_shards(txn, kbid, kb_shards)
 
         return shard
 

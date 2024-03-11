@@ -21,7 +21,7 @@ from uuid import uuid4
 
 import pytest
 
-from nucliadb.common.cluster.manager import KBShardManager
+from nucliadb.common.datamanagers.cluster import ClusterDataManager
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb_protos import knowledgebox_pb2, writer_pb2_grpc
 
@@ -38,8 +38,6 @@ async def test_create_cleansup_on_error(grpc_servicer, fake_node):
 
     # Get current shards object
     driver = get_driver()
-    shard_manager = KBShardManager()
-    txn = await driver.begin()
-    shards_object = await shard_manager.get_all_shards(txn, kbid)
-    await txn.abort()
+    data_manager = ClusterDataManager(driver)
+    shards_object = await data_manager.get_kb_shards(kbid)
     assert shards_object

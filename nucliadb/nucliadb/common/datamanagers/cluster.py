@@ -60,6 +60,8 @@ async def get_kb_shards(txn: Transaction, kbid: str) -> Optional[writer_pb2.Shar
     return await get_kv_pb(txn, key, writer_pb2.Shards)
 
 
-async def update_kb_shards(txn: Transaction, kbid: str, shards: writer_pb2.Shards) -> None:
+async def update_kb_shards(
+    txn: Transaction, kbid: str, shards: writer_pb2.Shards
+) -> None:
     key = KB_SHARDS.format(kbid=kbid)
     await txn.set(key, shards.SerializeToString())
