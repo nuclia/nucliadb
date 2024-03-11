@@ -44,6 +44,7 @@ from nucliadb_utils.settings import is_onprem_nucliadb
 TODO:
 - In the event of an unexpected error (tikv, nats, etc),
   should we fail hard or should we allow the write to go through?
+- Make sure I didn't miss any endpoint to protect
 - Add tests
 - Add metrics / alerts
 - Double check default values!
