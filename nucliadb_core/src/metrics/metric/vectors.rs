@@ -65,8 +65,16 @@ impl VectorsMetrics {
         };
 
         registry.register("merge_time_seconds", "Vectors merge operation time", metrics.merge_time.clone());
-        registry.register("merge_input_segment_size", "Vectors per segment to merge", metrics.merge_time.clone());
-        registry.register("merge_output_segment_size", "Vectors per merged segment", metrics.merge_time.clone());
+        registry.register(
+            "merge_input_segment_size",
+            "Vectors per segment to merge",
+            metrics.input_segment_size.clone(),
+        );
+        registry.register(
+            "merge_output_segment_size",
+            "Vectors per merged segment",
+            metrics.output_segment_size.clone(),
+        );
 
         metrics
     }
@@ -88,7 +96,7 @@ impl VectorsMetrics {
     }
 
     pub fn record_output_segment(&self, source: MergeSource, vectors: usize) {
-        self.input_segment_size
+        self.output_segment_size
             .get_or_create(&MergeLabels {
                 source,
             })

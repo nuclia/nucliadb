@@ -17,7 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use nucliadb_core::metrics::vectors::{MergeLabels, MergeSource};
+use nucliadb_core::metrics::vectors::MergeSource;
 use nucliadb_core::metrics::{get_metrics, request_time};
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::prost::Message;
