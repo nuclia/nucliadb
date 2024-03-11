@@ -26,6 +26,7 @@ use crate::data_point_provider::{IndexMetadata, OPENING_FLAG, STATE, TEMP_STATE,
 use crate::data_types::dtrie_ram::DTrie;
 use crate::{VectorErr, VectorR};
 use fs2::FileExt;
+use nucliadb_core::tracing;
 use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Write};
 use std::mem;
@@ -267,7 +268,12 @@ impl Writer {
         self.has_uncommitted_changes = false;
         self.number_of_embeddings = number_of_embeddings;
 
-        self.merge()
+        let merge_result = self.merge();
+        if let Err(merge_error) = &merge_result {
+            tracing::error!("Merge error: {merge_error:?}")
+        }
+
+        merge_result
     }
 
     pub fn new(path: &Path, metadata: IndexMetadata) -> VectorR<Writer> {
