@@ -351,7 +351,7 @@ async def test_entitygroups(
     # Entities are not returned by default
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/entitiesgroups")
     groups = resp.json()["groups"]
-    assert groups["group1"]["entities"] == {}
+    assert "entities" not in groups["group1"]
     assert groups["group1"]["title"] == "Kitchen"
     assert groups["group1"]["color"] == "blue"
     assert groups["group1"]["custom"] is True
