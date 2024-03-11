@@ -193,24 +193,25 @@ impl ParagraphReader for ParagraphReaderService {
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Producing results: starts at {v} ms");
 
-        let mut results_above_min_score = vec![];
         let total = response.results.len() as f32;
         let mut some_below_min_score: bool = false;
+        let response_results = std::mem::take(&mut response.results);
 
-        for (i, r) in response.results.iter_mut().enumerate() {
-            let Some(sc) = &mut r.score else {
-                continue;
-            };
-            if sc.bm25 < request.min_score {
-                // We can break here because the results are sorted by score
-                some_below_min_score = true;
-                break;
+        for (i, mut r) in response_results.into_iter().enumerate() {
+            match &mut r.score {
+                None => continue,
+                Some(sc) if sc.bm25 < request.min_score => {
+                    // We can break here because the results are sorted by score
+                    some_below_min_score = true;
+                    break;
+                }
+                Some(sc) => {
+                    sc.booster = total - (i as f32);
+                    response.results.push(r);
+                }
             }
-            sc.booster = total - (i as f32);
-            results_above_min_score.push(r.clone());
         }
 
-        response.results = results_above_min_score.clone();
         if some_below_min_score {
             // We set next_page to false so that the client stops asking for more results
             response.next_page = false;
