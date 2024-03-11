@@ -26,6 +26,7 @@ use crate::data_point_provider::{IndexMetadata, OPENING_FLAG, STATE, TEMP_STATE,
 use crate::data_types::dtrie_ram::DTrie;
 use crate::{VectorErr, VectorR};
 use fs2::FileExt;
+use nucliadb_core::tracing;
 use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Write};
 use std::mem;
@@ -255,6 +256,10 @@ impl Writer {
         self.delete_log = updated_delete_log;
         self.has_uncommitted_changes = false;
         self.number_of_embeddings = number_of_embeddings;
+
+        if let Err(merge_error) = self.merge() {
+            tracing::error!("Merge error: {merge_error:?}")
+        }
 
         Ok(())
     }
