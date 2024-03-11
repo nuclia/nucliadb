@@ -27,7 +27,16 @@ from nucliadb_protos.knowledgebox_pb2 import (
     EntitiesGroupSummary,
     Entity,
 )
-from nucliadb_protos.nodereader_pb2 import Faceted, SearchRequest, SearchResponse
+from nucliadb_protos.nodereader_pb2 import (
+    Faceted,
+    RelationNodeFilter,
+    RelationPrefixSearchRequest,
+    RelationSearchRequest,
+    RelationSearchResponse,
+    SearchRequest,
+    SearchResponse,
+)
+from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import GetEntitiesResponse
 
 from nucliadb.common.cluster.base import AbstractIndexNode
@@ -199,37 +208,38 @@ class EntitiesManager:
     async def get_indexed_entities_group(self, group: str) -> Optional[EntitiesGroup]:
         shard_manager = get_shard_manager()
 
-        async def do_faceted_search(node: AbstractIndexNode, shard_id: str) -> set[str]:
-            request = SearchRequest(
-                shard=shard_id,
-                result_per_page=0,
-                body="",
-                document=True,
-                paragraph=False,
-                faceted=Faceted(labels=[f"/e/{group}"]),
+        async def do_entities_search(
+            node: AbstractIndexNode, shard_id: str
+        ) -> RelationSearchResponse:
+            request = RelationSearchRequest(
+                shard_id=shard_id,
+                prefix=RelationPrefixSearchRequest(
+                    prefix="",
+                    node_filters=[
+                        RelationNodeFilter(
+                            node_type=RelationNode.NodeType.ENTITY, node_subtype=group
+                        )
+                    ],
+                ),
             )
-            response: SearchResponse = await node.reader.Search(request)  # type: ignore
-            try:
-                facetresults = response.document.facets["/e"].facetresults
-                return {facet.tag.split("/")[-1] for facet in facetresults}
-            except KeyError:
-                # No entities found
-                return set()
+            return await node.reader.RelationSearch(request)  # type: ignore
 
         results = await shard_manager.apply_for_all_shards(
             self.kbid,
-            do_faceted_search,
+            do_entities_search,
             settings.relation_search_timeout,
             use_read_replica_nodes=self.use_read_replica_nodes,
         )
         for result in results:
             if isinstance(result, Exception):
                 errors.capture_exception(result)
-                raise NodeError("Error while looking for indexed entities group")
+                raise NodeError("Error while querying relation index")
 
         entities = {}
         for result in results:
-            entities.update({ner: Entity(value=ner) for ner in result})
+            entities.update(
+                {node.value: Entity(value=node.value) for node in result.prefix.nodes}
+            )
 
         if not entities:
             return None
