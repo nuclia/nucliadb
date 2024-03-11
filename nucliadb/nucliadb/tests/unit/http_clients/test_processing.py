@@ -96,3 +96,11 @@ class TestProcessingHTTPClient:
         response.text.return_value = response_data.json()
 
         assert await client.pull(partition="1") == response_data
+
+    @pytest.mark.asyncio
+    async def test_stats(self, client: processing.ProcessingHTTPClient, response):
+        response_data = processing.StatsResponse(incomplete=1, scheduled=1)
+        response.status = 200
+        response.text.return_value = response_data.json()
+
+        assert await client.stats() == response_data

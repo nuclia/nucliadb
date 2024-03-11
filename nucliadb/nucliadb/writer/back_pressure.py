@@ -20,7 +20,6 @@
 
 import asyncio
 import threading
-import time
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -72,7 +71,7 @@ class TryAfterCache:
             if try_after is None:
                 return None
 
-            if time.time() >= try_after:
+            if datetime.utcnow() >= try_after:
                 # The key has expired, so remove it from the cache
                 self._cache.pop(key, None)
                 return None
@@ -107,7 +106,7 @@ async def maybe_back_pressure(
 
     context = get_app_context(request.app)
     await check_processing_behind()
-    await check_nodes_indexing_behind(context, kbid, resource_uuid)
+    await check_indexing_behind(context, kbid, resource_uuid)
 
 
 async def check_processing_behind():
@@ -135,7 +134,9 @@ async def check_processing_behind():
 
     pending = await get_pending_to_process()
     if pending > max_pending:
-        try_after = estimate_try_after(pending_to_process=pending)
+        try_after = estimate_try_after_from_rate(
+            rate=settings.processing_rate, pending=pending
+        )
         try_after_cache.set("processing", try_after)
         raise HTTPException(
             status_code=429,
@@ -161,7 +162,7 @@ async def get_pending_to_process() -> int:
             return 0
 
 
-async def check_nodes_indexing_behind(
+async def check_indexing_behind(
     context: ApplicationContext, kbid: str, resource_uuid: Optional[str] = None
 ):
     """
@@ -195,7 +196,9 @@ async def check_nodes_indexing_behind(
 
     highest_pending = max(pending_by_node.items(), key=lambda x: x[1])[1]
     if highest_pending > max_pending:
-        try_after = estimate_try_after(pending_to_index=highest_pending)
+        try_after = estimate_try_after_from_rate(
+            rate=settings.indexing_rate, pending=highest_pending
+        )
         try_after_cache.set(f"{kbid}::{resource_uuid}", try_after)
         raise HTTPException(
             status_code=429,
@@ -250,20 +253,11 @@ async def get_nodes_pending_to_index(
     return results
 
 
-def estimate_try_after(
-    *, pending_to_index: Optional[int] = None, pending_to_process: Optional[int] = None
-) -> datetime:
+def estimate_try_after_from_rate(rate: float, pending: int) -> datetime:
     """
-    This function estimates the time to try again based on the number of pending messages to index or process.
+    This function estimates the time to try again based on the rate and the number of pending messages.
     """
-    if pending_to_index is not None:
-        delta_seconds = pending_to_index / settings.indexing_rate
-    elif pending_to_process is not None:
-        delta_seconds = pending_to_process / settings.processing_rate
-    else:
-        raise ValueError(
-            "You must provide either pending_to_index or pending_to_process"
-        )
+    delta_seconds = pending / rate
     return datetime.utcnow() + timedelta(seconds=delta_seconds)
 
 
