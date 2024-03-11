@@ -512,18 +512,6 @@ pub struct EdgeList {
     pub list: ::prost::alloc::vec::Vec<RelationEdge>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct RelationTypeListMember {
-    #[prost(enumeration="super::utils::relation_node::NodeType", tag="1")]
-    pub with_type: i32,
-    #[prost(string, tag="2")]
-    pub with_subtype: ::prost::alloc::string::String,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct TypeList {
-    #[prost(message, repeated, tag="1")]
-    pub list: ::prost::alloc::vec::Vec<RelationTypeListMember>,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetShardRequest {
     #[prost(message, optional, tag="1")]
     pub shard_id: ::core::option::Option<super::noderesources::ShardId>,
@@ -850,25 +838,6 @@ pub mod node_reader_client {
             );
             self.inner.unary(request.into_request(), path, codec).await
         }
-        pub async fn relation_types(
-            &mut self,
-            request: impl tonic::IntoRequest<super::super::noderesources::ShardId>,
-        ) -> Result<tonic::Response<super::TypeList>, tonic::Status> {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::new(
-                        tonic::Code::Unknown,
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/nodereader.NodeReader/RelationTypes",
-            );
-            self.inner.unary(request.into_request(), path, codec).await
-        }
         pub async fn search(
             &mut self,
             request: impl tonic::IntoRequest<super::SearchRequest>,
@@ -1043,10 +1012,6 @@ pub mod node_reader_server {
             &self,
             request: tonic::Request<super::super::noderesources::ShardId>,
         ) -> Result<tonic::Response<super::EdgeList>, tonic::Status>;
-        async fn relation_types(
-            &self,
-            request: tonic::Request<super::super::noderesources::ShardId>,
-        ) -> Result<tonic::Response<super::TypeList>, tonic::Status>;
         async fn search(
             &self,
             request: tonic::Request<super::SearchRequest>,
@@ -1524,46 +1489,6 @@ pub mod node_reader_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = RelationEdgesSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/nodereader.NodeReader/RelationTypes" => {
-                    #[allow(non_camel_case_types)]
-                    struct RelationTypesSvc<T: NodeReader>(pub Arc<T>);
-                    impl<
-                        T: NodeReader,
-                    > tonic::server::UnaryService<super::super::noderesources::ShardId>
-                    for RelationTypesSvc<T> {
-                        type Response = super::TypeList;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::super::noderesources::ShardId>,
-                        ) -> Self::Future {
-                            let inner = self.0.clone();
-                            let fut = async move {
-                                (*inner).relation_types(request).await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let inner = inner.0;
-                        let method = RelationTypesSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

@@ -23,7 +23,7 @@ use std::fmt::Debug;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::{
     EdgeList, EntitiesSubgraphResponse, RelationEdge, RelationNode, RelationPrefixSearchResponse,
-    RelationSearchResponse, RelationTypeListMember, TypeList,
+    RelationSearchResponse,
 };
 use nucliadb_core::relations::*;
 use nucliadb_core::tracing::{self, *};
@@ -86,39 +86,6 @@ impl RelationsReader for RelationsReaderService {
             })
             .collect();
         Ok(EdgeList {
-            list,
-        })
-    }
-
-    #[measure(actor = "relations", metric = "get_node_types")]
-    #[tracing::instrument(skip_all)]
-    fn get_node_types(&self) -> NodeResult<TypeList> {
-        let schema = &self.schema;
-        let searcher = self.reader.searcher();
-        let all_docs = searcher.search(&AllQuery, &DocSetCollector)?;
-        let mut collector = HashSet::new();
-
-        for doc_address in all_docs {
-            let doc = searcher.doc(doc_address)?;
-
-            let source_type: i32 = io_maps::u64_to_node_type(schema.source_type(&doc));
-            let source_subtype = schema.source_subtype(&doc);
-            let source = (source_type, source_subtype);
-            collector.insert(source);
-
-            let target_type: i32 = io_maps::u64_to_node_type(schema.target_type(&doc));
-            let target_subtype = schema.target_subtype(&doc);
-            let target = (target_type, target_subtype);
-            collector.insert(target);
-        }
-        let list: Vec<_> = collector
-            .into_iter()
-            .map(|raw_type| RelationTypeListMember {
-                with_type: raw_type.0,
-                with_subtype: raw_type.1,
-            })
-            .collect();
-        Ok(TypeList {
             list,
         })
     }

@@ -229,37 +229,6 @@ impl RelationsReader for RelationsReaderService {
         })
     }
 
-    #[measure(actor = "relations", metric = "get_node_types")]
-    #[tracing::instrument(skip_all)]
-    fn get_node_types(&self) -> NodeResult<TypeList> {
-        let time = Instant::now();
-
-        let id: Option<String> = None;
-        let mut found = HashSet::new();
-        let mut types = Vec::new();
-        let reader = self.index.start_reading()?;
-        let iter = reader.iter_node_ids()?;
-        for id in iter {
-            let id = id?;
-            let node = reader.get_node(id)?;
-            let xtype = node.xtype();
-            let subtype = node.subtype().map_or_else(String::default, |s| s.to_string());
-            let hash = relations_io::compute_hash(&[xtype.as_bytes(), subtype.as_bytes()]);
-            if found.insert(hash) {
-                types.push(RelationTypeListMember {
-                    with_type: string_to_node_type(xtype) as i32,
-                    with_subtype: subtype,
-                });
-            }
-        }
-        let v = time.elapsed().as_millis();
-        debug!("{id:?} - Ending at {v} ms");
-
-        Ok(TypeList {
-            list: types,
-        })
-    }
-
     #[measure(actor = "relations", metric = "search")]
     #[tracing::instrument(skip_all)]
     fn search(&self, request: &ProtosRequest) -> NodeResult<ProtosResponse> {

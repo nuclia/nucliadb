@@ -476,7 +476,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 response.status = ListEntitiesGroupsResponse.Status.NOTFOUND
                 return response
 
-            entities_manager = EntitiesManager(kbobj, txn)
+            entities_manager = EntitiesManager(kbobj, txn, use_read_replica_nodes=True)
             try:
                 entities_groups = await entities_manager.list_entities_groups()
             except Exception as e:
@@ -496,7 +496,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         response = GetEntitiesGroupResponse()
         async with self.driver.transaction() as txn:
             kbobj = await self.proc.get_kb_obj(txn, request.kb)
-
             if kbobj is None:
                 response.status = GetEntitiesGroupResponse.Status.KB_NOT_FOUND
                 return response
@@ -511,12 +510,12 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 logger.error("Error in ingest gRPC servicer", exc_info=True)
                 response.status = GetEntitiesGroupResponse.Status.ERROR
             else:
+                response.kb.uuid = kbobj.kbid
                 if entities_group is None:
                     response.status = (
                         GetEntitiesGroupResponse.Status.ENTITIES_GROUP_NOT_FOUND
                     )
                 else:
-                    response.kb.uuid = kbobj.kbid
                     response.status = GetEntitiesGroupResponse.Status.OK
                     response.group.CopyFrom(entities_group)
 

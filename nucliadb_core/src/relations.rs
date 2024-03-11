@@ -40,7 +40,6 @@ pub trait RelationsReader: std::fmt::Debug + Send + Sync {
     fn search(&self, request: &ProtosRequest) -> NodeResult<ProtosResponse>;
     fn stored_ids(&self) -> NodeResult<Vec<String>>;
     fn get_edges(&self) -> NodeResult<EdgeList>;
-    fn get_node_types(&self) -> NodeResult<TypeList>;
     fn count(&self) -> NodeResult<usize>;
 }
 
