@@ -28,8 +28,6 @@ from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxID
 from nucliadb_protos.writer_pb2 import (
     GetEntitiesGroupRequest,
     GetEntitiesGroupResponse,
-    GetEntitiesRequest,
-    GetEntitiesResponse,
     GetLabelSetRequest,
     GetLabelSetResponse,
     GetLabelsRequest,
@@ -54,7 +52,11 @@ from nucliadb.models.responses import HTTPClientError
 from nucliadb.reader import SERVICE_NAME
 from nucliadb.reader.api.v1.router import KB_PREFIX, api
 from nucliadb.reader.reader.notifications import kb_notifications_stream
-from nucliadb_models.entities import EntitiesGroup, KnowledgeBoxEntities
+from nucliadb_models.entities import (
+    EntitiesGroup,
+    EntitiesGroupSummary,
+    KnowledgeBoxEntities,
+)
 from nucliadb_models.labels import KnowledgeBoxLabels, LabelSet
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.synonyms import KnowledgeBoxSynonyms
@@ -74,39 +76,13 @@ from nucliadb_utils.utilities import get_ingest, get_storage
 @version(1)
 async def get_entities(
     request: Request, kbid: str, show_entities: bool = False
-) -> KnowledgeBoxEntities:
+) -> Union[KnowledgeBoxEntities, HTTPClientError]:
     if show_entities:
-        return await get_all_entities(kbid)
-    else:
-        return await list_entities_groups(kbid)
-
-
-async def get_all_entities(kbid: str):
-    """WARNING: this function is really costly due to how entities are retrieved
-    from the node."""
-    ingest = get_ingest()
-    e_request: GetEntitiesRequest = GetEntitiesRequest()
-    e_request.kb.uuid = kbid
-
-    kbobj: GetEntitiesResponse = await ingest.GetEntities(e_request)  # type: ignore
-    if kbobj.status == GetEntitiesResponse.Status.OK:
-        response = KnowledgeBoxEntities(uuid=kbid)
-        for key, group in kbobj.groups.items():
-            entities_group = EntitiesGroup.from_message(group)
-            if "" in entities_group.entities:
-                del entities_group.entities[""]
-            response.groups[key] = entities_group
-        return response
-    elif kbobj.status == GetEntitiesResponse.Status.NOTFOUND:
-        raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
-    elif kbobj.status == GetEntitiesResponse.Status.ERROR:
-        raise HTTPException(
-            status_code=500, detail="Error while getting entities groups"
+        return HTTPClientError(
+            status_code=400,
+            detail="show_entities param is not supported. Please use /entitiesgroup/{group} instead.",
         )
-    else:
-        raise HTTPException(
-            status_code=500, detail="Error on getting Knowledge box entities"
-        )
+    return await list_entities_groups(kbid)
 
 
 async def list_entities_groups(kbid: str):
@@ -118,7 +94,7 @@ async def list_entities_groups(kbid: str):
     if entities_groups.status == ListEntitiesGroupsResponse.Status.OK:
         response = KnowledgeBoxEntities(uuid=kbid)
         for key, eg_summary in entities_groups.groups.items():
-            entities_group = EntitiesGroup.from_summary_message(eg_summary)
+            entities_group = EntitiesGroupSummary.from_message(eg_summary)
             response.groups[key] = entities_group
         return response
     elif entities_groups.status == ListEntitiesGroupsResponse.Status.NOTFOUND:

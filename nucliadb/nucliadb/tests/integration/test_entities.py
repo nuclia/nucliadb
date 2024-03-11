@@ -36,7 +36,14 @@ import asyncio
 import pytest
 from httpx import AsyncClient
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxID
-from nucliadb_protos.resources_pb2 import Relation, RelationNode
+from nucliadb_protos.resources_pb2 import (
+    FieldID,
+    FieldType,
+    Relation,
+    RelationNode,
+    TokenSplit,
+    UserFieldMetadata,
+)
 from nucliadb_protos.writer_pb2 import GetEntitiesGroupRequest, GetEntitiesGroupResponse
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
@@ -94,6 +101,11 @@ async def processing_entities(nucliadb_grpc: WriterStub, knowledgebox: str):
         "dolphin": {"value": "dolphin"},
     }
     bm = broker_resource(knowledgebox, slug="automatic-entities")
+    ufm = UserFieldMetadata(
+        field=FieldID(field_type=FieldType.GENERIC, field="title"),
+        token=[TokenSplit(token="cat", start=0, end=3, klass="ANIMALS")],
+    )
+    bm.basic.fieldmetadata.append(ufm)
     relations = []
 
     for entity in entities.values():
@@ -211,30 +223,21 @@ async def test_get_entities_groups(
 ):
     kbid = knowledgebox
 
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroups?show_entities=true")
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroup/ANIMALS")
     assert resp.status_code == 200
     body = resp.json()
 
-    assert body["groups"].keys() == {"ANIMALS"}
-    assert body["groups"]["ANIMALS"]["entities"].keys() == {
+    assert body["entities"].keys() == {
         "bird",
         "cat",
         "dog",
         "dolphin",
         "domestic-cat",
     }
-    assert body["groups"]["ANIMALS"]["entities"]["cat"]["merged"] is False
-    assert body["groups"]["ANIMALS"]["entities"]["cat"]["represents"] == [
-        "domestic-cat"
-    ]
-    assert body["groups"]["ANIMALS"]["entities"]["domestic-cat"]["merged"] is True
-    assert body["groups"]["ANIMALS"]["entities"]["domestic-cat"]["represents"] == []
-    animals = body["groups"]["ANIMALS"]
-
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroup/ANIMALS")
-    assert resp.status_code == 200
-    body = resp.json()
-    assert animals == body
+    assert body["entities"]["cat"]["merged"] is False
+    assert body["entities"]["cat"]["represents"] == ["domestic-cat"]
+    assert body["entities"]["domestic-cat"]["merged"] is True
+    assert body["entities"]["domestic-cat"]["represents"] == []
 
     resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroup/I-DO-NOT-EXIST")
     assert resp.status_code == 404
@@ -256,7 +259,7 @@ async def test_list_entities_groups(
     body = resp.json()
 
     assert body["groups"].keys() == {"ANIMALS"}
-    assert len(body["groups"]["ANIMALS"]["entities"]) == 0
+    assert "entities" not in body["groups"]["ANIMALS"]
 
 
 @pytest.mark.asyncio

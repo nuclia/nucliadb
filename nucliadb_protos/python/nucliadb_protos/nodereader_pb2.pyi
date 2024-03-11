@@ -1224,40 +1224,6 @@ class EdgeList(google.protobuf.message.Message):
 global___EdgeList = EdgeList
 
 @typing_extensions.final
-class RelationTypeListMember(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    WITH_TYPE_FIELD_NUMBER: builtins.int
-    WITH_SUBTYPE_FIELD_NUMBER: builtins.int
-    with_type: nucliadb_protos.utils_pb2.RelationNode.NodeType.ValueType
-    with_subtype: builtins.str
-    def __init__(
-        self,
-        *,
-        with_type: nucliadb_protos.utils_pb2.RelationNode.NodeType.ValueType = ...,
-        with_subtype: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["with_subtype", b"with_subtype", "with_type", b"with_type"]) -> None: ...
-
-global___RelationTypeListMember = RelationTypeListMember
-
-@typing_extensions.final
-class TypeList(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    LIST_FIELD_NUMBER: builtins.int
-    @property
-    def list(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___RelationTypeListMember]: ...
-    def __init__(
-        self,
-        *,
-        list: collections.abc.Iterable[global___RelationTypeListMember] | None = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["list", b"list"]) -> None: ...
-
-global___TypeList = TypeList
-
-@typing_extensions.final
 class GetShardRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

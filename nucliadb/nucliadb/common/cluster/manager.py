@@ -141,12 +141,15 @@ class KBShardManager:
         kbid: str,
         aw: Callable[[AbstractIndexNode, str], Awaitable[Any]],
         timeout: float,
+        use_read_replica_nodes: bool = False,
     ) -> list[Any]:
         shards = await self.get_shards_by_kbid(kbid)
         ops = []
 
         for shard_obj in shards:
-            node, shard_id = choose_node(shard_obj)
+            node, shard_id = choose_node(
+                shard_obj, use_read_replica_nodes=use_read_replica_nodes
+            )
             if shard_id is None:
                 raise ShardNotFound("Found a node but not a shard")
 
