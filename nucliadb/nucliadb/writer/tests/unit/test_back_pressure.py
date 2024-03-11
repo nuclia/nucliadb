@@ -22,11 +22,16 @@ from datetime import datetime, timedelta
 from unittest import mock
 
 import pytest
+from fastapi import HTTPException
 
 from nucliadb.writer.back_pressure import (
     TryAfterCache,
+    check_indexing_behind,
+    check_ingest_behind,
+    check_processing_behind,
     estimate_try_after_from_rate,
     maybe_back_pressure,
+    try_after_cache,
 )
 
 MODULE = "nucliadb.writer.back_pressure"
@@ -110,29 +115,177 @@ async def test_maybe_back_pressure_skip_conditions(
         check_indexing_behind_mock.assert_awaited_once()
 
 
-async def test_check_processing_behind():
+@pytest.fixture(scope="function")
+def get_pending_to_process():
+    with mock.patch(f"{MODULE}.get_pending_to_process", return_value=10) as mock_:
+        yield mock_
+
+
+@pytest.fixture(scope="function")
+def get_pending_to_index():
+    with mock.patch(
+        f"{MODULE}.get_pending_to_index", return_value={"node1": 10, "node2": 2}
+    ) as mock_:
+        yield mock_
+
+
+@pytest.fixture(scope="function")
+def get_pending_to_ingest():
+    with mock.patch(f"{MODULE}.get_pending_to_ingest", return_value=10) as mock_:
+        yield mock_
+
+
+@pytest.fixture(scope="function")
+def settings():
+    settings = mock.Mock(
+        max_ingest_pending=10,
+        max_processing_pending=10,
+        max_indexing_pending=10,
+        processing_rate=2,
+        indexing_rate=2,
+        ingest_rate=2,
+    )
+    with mock.patch(f"{MODULE}.settings", settings):
+        yield settings
+
+
+@pytest.fixture(scope="function")
+def cache():
+    try_after_cache._cache.clear()
+    yield try_after_cache
+
+
+async def test_check_processing_behind(get_pending_to_process, settings, cache):
     # Check that it raises the http 429 exception
+    settings.max_processing_pending = 5
+    get_pending_to_process.return_value = 10
+
+    with pytest.raises(HTTPException) as exc:
+        await check_processing_behind()
+    assert exc.value.status_code == 429
+    assert exc.value.detail["back_pressure_type"] == "processing"
+
+    get_pending_to_process.assert_awaited()
+
     # Check that it saves the try after in the cache
-    pass
+    cache.get("processing") is not None
 
 
-async def test_check_processing_behind_does_not_run_if_configured_max_is_zero():
-    pass
-
-
-async def test_check_processing_behind_does_not_run_on_cache_hit():
-    pass
-
-
-async def test_check_indexing_behind():
+async def test_check_processing_behind_does_not_run_if_configured_max_is_zero(
+    get_pending_to_process, settings, cache
+):
     # Check that it raises the http 429 exception
+    settings.max_processing_pending = 0
+    get_pending_to_process.return_value = 100
+
+    await check_processing_behind()
+
+    get_pending_to_process.assert_not_called()
+
+
+async def test_check_processing_behind_does_not_run_on_cache_hit(
+    get_pending_to_process, settings, cache
+):
+    settings.max_processing_pending = 1
+    get_pending_to_process.return_value = 10
+
+    cache.set("processing", datetime.utcnow() + timedelta(seconds=2))
+
+    with pytest.raises(HTTPException) as exc:
+        await check_processing_behind()
+    assert exc.value.status_code == 429
+    assert exc.value.detail["back_pressure_type"] == "processing"
+
+    get_pending_to_process.assert_not_called()
+
+
+async def test_check_indexing_behind(get_pending_to_index, settings, cache):
+    # Check that it raises the http 429 exception
+    settings.max_indexing_pending = 5
+    get_pending_to_index.return_value = {"node1": 10, "node2": 9}
+
+    with pytest.raises(HTTPException) as exc:
+        await check_indexing_behind(mock.Mock(), "kbid", resource_uuid="rid")
+
+    assert exc.value.status_code == 429
+    assert exc.value.detail["back_pressure_type"] == "indexing"
+
+    get_pending_to_index.assert_awaited()
+
     # Check that it saves the try after in the cache
-    pass
+    cache.get("kbid::rid") is not None
 
 
-async def test_check_indexing_behind_does_not_run_if_configured_max_is_zero():
-    pass
+async def test_check_indexing_behind_does_not_run_if_configured_max_is_zero(
+    get_pending_to_index, settings
+):
+    # Check that it raises the http 429 exception
+    settings.max_indexing_pending = 0
+    get_pending_to_index.return_value = 100
+
+    await check_indexing_behind(mock.Mock(), "kbid", resource_uuid="rid")
+
+    get_pending_to_index.assert_not_called()
 
 
-async def test_check_indexing_behind_does_not_run_on_cache_hit():
-    pass
+async def test_check_indexing_behind_does_not_run_on_cache_hit(
+    get_pending_to_index, settings, cache
+):
+    settings.max_indexing_pending = 1
+    get_pending_to_index.return_value = 10
+
+    cache.set("kbid::rid", datetime.utcnow() + timedelta(seconds=2))
+
+    with pytest.raises(HTTPException) as exc:
+        await check_indexing_behind(mock.Mock(), "kbid", resource_uuid="rid")
+
+    assert exc.value.status_code == 429
+    assert exc.value.detail["back_pressure_type"] == "indexing"
+
+    get_pending_to_index.assert_not_called()
+
+
+async def test_check_ingest_behind(get_pending_to_ingest, settings, cache):
+    # Check that it raises the http 429 exception
+    settings.max_ingest_pending = 5
+    get_pending_to_ingest.return_value = 10
+
+    with pytest.raises(HTTPException) as exc:
+        await check_ingest_behind(mock.Mock())
+
+    assert exc.value.status_code == 429
+    assert exc.value.detail["back_pressure_type"] == "ingest"
+
+    get_pending_to_ingest.assert_awaited()
+
+    # Check that it saves the try after in the cache
+    cache.get("ingest") is not None
+
+
+async def test_check_ingest_behind_does_not_run_if_configured_max_is_zero(
+    get_pending_to_ingest, settings
+):
+    # Check that it raises the http 429 exception
+    settings.max_ingest_pending = 0
+    get_pending_to_ingest.return_value = 100
+
+    await check_ingest_behind(mock.Mock())
+
+    get_pending_to_ingest.assert_not_called()
+
+
+async def test_check_ingest_behind_does_not_run_on_cache_hit(
+    get_pending_to_ingest, settings, cache
+):
+    settings.max_ingest_pending = 1
+    get_pending_to_ingest.return_value = 10
+
+    cache.set("ingest", datetime.utcnow() + timedelta(seconds=2))
+
+    with pytest.raises(HTTPException) as exc:
+        await check_ingest_behind(mock.Mock())
+
+    assert exc.value.status_code == 429
+    assert exc.value.detail["back_pressure_type"] == "ingest"
+
+    get_pending_to_ingest.assert_not_called()

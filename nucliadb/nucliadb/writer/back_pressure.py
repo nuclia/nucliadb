@@ -105,8 +105,12 @@ async def maybe_back_pressure(
         return
 
     context = get_app_context(request.app)
-    await check_processing_behind()
-    await check_indexing_behind(context, kbid, resource_uuid)
+    tasks = [
+        asyncio.create_task(check_processing_behind()),
+        asyncio.create_task(check_ingest_behind(context)),
+        asyncio.create_task(check_indexing_behind(context, kbid, resource_uuid)),
+    ]
+    await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
 
 
 async def check_processing_behind():
@@ -188,7 +192,7 @@ async def check_indexing_behind(
             },
         )
 
-    pending_by_node = await get_nodes_pending_to_index(
+    pending_by_node = await get_pending_to_index(
         context, kbid, resource_uuid=resource_uuid
     )
     if len(pending_by_node) == 0:
@@ -210,7 +214,7 @@ async def check_indexing_behind(
         )
 
 
-async def get_nodes_pending_to_index(
+async def get_pending_to_index(
     context: ApplicationContext, kbid: str, resource_uuid: Optional[str] = None
 ) -> dict[str, int]:
     """
@@ -253,6 +257,44 @@ async def get_nodes_pending_to_index(
     return results
 
 
+async def check_ingest_behind(context: ApplicationContext):
+    """
+    Checks if the ingest processed consumer is behind and may raise a 429
+    """
+    max_pending = settings.max_ingest_pending
+    if max_pending <= 0:
+        # Indexing back pressure is disabled
+        return
+
+    # If we have already applied back pressure, we don't need to check again
+    # until the try again in time has expired
+    try_after = try_after_cache.get("ingest")
+    if try_after is not None:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "message": f"Too many messages pending to ingest. Retry after {try_after}",
+                "try_after": try_after.timestamp(),
+                "back_pressure_type": "ingest",
+            },
+        )
+
+    pending = await get_pending_to_ingest(context)
+    if pending > max_pending:
+        try_after = estimate_try_after_from_rate(
+            rate=settings.ingest_rate, pending=pending
+        )
+        try_after_cache.set("ingest", try_after)
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "message": f"Too many messages pending to ingest. Retry after {try_after}",
+                "try_after": try_after.timestamp(),
+                "back_pressure_type": "ingest",
+            },
+        )
+
+
 def estimate_try_after_from_rate(rate: float, pending: int) -> datetime:
     """
     This function estimates the time to try again based on the rate and the number of pending messages.
@@ -288,15 +330,13 @@ async def get_nodes_for_resource_shard(
 async def get_node_pending_messages(
     context: ApplicationContext, node_id: str
 ) -> tuple[str, int]:
-    nats_manager: NatsConnectionManager = context.nats_manager
-    # get raw js client
-    js = getattr(nats_manager.js, "js", nats_manager.js)
     try:
-        consumer_info = await js.consumer_info(
-            const.Streams.INDEX.name,
-            const.Streams.INDEX.group.format(node=node_id),
+        num_pending = await get_nats_consumer_pending_messages(
+            context,
+            stream=const.Streams.INDEX.name,
+            consumer=const.Streams.INDEX.group.format(node=node_id),
         )
-        return node_id, consumer_info.num_pending
+        return node_id, num_pending
     except nats.js.errors.NotFoundError:
         # These handles the case for when the node is added to
         # the cluster but it doesn't have a consumer yet.
@@ -305,6 +345,32 @@ async def get_node_pending_messages(
             extra={"stream": const.Streams.INDEX.name, "node_id": node_id},
         )
         return node_id, 0
+
+
+@alru_cache(maxsize=None, ttl=30)
+async def get_pending_to_ingest(context: ApplicationContext) -> int:
+    try:
+        return await get_nats_consumer_pending_messages(
+            context,
+            stream=const.Streams.INGEST_PROCESSED.name,
+            consumer=const.Streams.INGEST_PROCESSED.subject,
+        )
+    except nats.js.errors.NotFoundError:
+        logger.warning(
+            "Ingest processed consumer not found",
+            extra={"stream": const.Streams.INGEST_PROCESSED.name},
+        )
+        return 0
+
+
+async def get_nats_consumer_pending_messages(
+    context: ApplicationContext, *, stream: str, consumer: str
+) -> int:
+    nats_manager: NatsConnectionManager = context.nats_manager
+    # get raw js client
+    js = getattr(nats_manager.js, "js", nats_manager.js)
+    consumer_info = await js.consumer_info(stream, consumer)
+    return consumer_info.num_pending
 
 
 async def get_kb_active_shard(

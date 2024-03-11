@@ -37,6 +37,10 @@ class BackPressureSettings(BaseSettings):
         default=2,
         description="Estimation of the indexing rate in messages per second. This is used to calculate the try again in time",  # noqa
     )
+    ingest_rate: float = Field(
+        default=4,
+        description="Estimation of the ingest processed consumer rate in messages per second. This is used to calculate the try again in time",  # noqa
+    )
     processing_rate: float = Field(
         default=1,
         description="Estimation of the processing rate in messages per second. This is used to calculate the try again in time",  # noqa
@@ -44,6 +48,10 @@ class BackPressureSettings(BaseSettings):
     max_indexing_pending: int = Field(
         default=100,
         description="Max number of messages pending to index in a node queue before rate limiting writes. Set to 0 to disable indexing back pressure checks",  # noqa
+    )
+    max_ingest_pending: int = Field(
+        default=1_000,
+        description="Max number of messages pending to be ingested by processed consumers before rate limiting writes. Set to 0 to disable indexing back pressure checks",  # noqa
     )
     max_processing_pending: int = Field(
         default=10_000,
