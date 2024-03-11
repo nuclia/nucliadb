@@ -152,20 +152,6 @@ async def check_processing_behind():
         )
 
 
-@alru_cache(maxsize=1024, ttl=60)
-async def get_pending_to_process() -> int:
-    async with ProcessingHTTPClient() as processing_http_client:
-        try:
-            response = await processing_http_client.stats()
-            return response.incomplete + response.scheduled
-        except Exception:
-            logger.exception(
-                "Error getting pending messages to process. Global processing back pressure will not be applied.",  # noqa
-                exc_info=True,
-            )
-            return 0
-
-
 async def check_indexing_behind(
     context: ApplicationContext, kbid: str, resource_uuid: Optional[str] = None
 ):
@@ -214,49 +200,6 @@ async def check_indexing_behind(
         )
 
 
-async def get_pending_to_index(
-    context: ApplicationContext, kbid: str, resource_uuid: Optional[str] = None
-) -> dict[str, int]:
-    """
-    This function gets the number of pending messages to index for all involved nodes.
-    """
-    results: dict[str, int] = {}
-
-    # Schedule the tasks
-    if resource_uuid is not None:
-        nodes_to_check = await get_nodes_for_resource_shard(
-            context, kbid, resource_uuid
-        )
-    else:
-        nodes_to_check = await get_nodes_for_kb_active_shards(context, kbid)
-
-    tasks = []
-    for node in nodes_to_check:
-        tasks.append(asyncio.create_task(get_node_pending_messages(context, node)))
-
-    if not tasks:
-        return results
-
-    # Wait for all tasks to finish
-    done_tasks, pending_tasks = await asyncio.wait(tasks)
-
-    # Process the results
-    assert len(pending_tasks) == 0
-    for done_task in done_tasks:
-        exception = done_task.exception()
-        if exception is not None:
-            errors.capture_exception(exception)
-            logger.error(
-                f"Error getting pending messages to index: {exception}",
-                extra={"kbid": kbid},
-            )
-            continue
-        node, pending_messages = done_task.result()
-        results[node] = pending_messages
-
-    return results
-
-
 async def check_ingest_behind(context: ApplicationContext):
     """
     Checks if the ingest processed consumer is behind and may raise a 429
@@ -303,6 +246,79 @@ def estimate_try_after_from_rate(rate: float, pending: int) -> datetime:
     return datetime.utcnow() + timedelta(seconds=delta_seconds)
 
 
+@alru_cache(maxsize=1024, ttl=60)
+async def get_pending_to_process() -> int:
+    async with ProcessingHTTPClient() as processing_http_client:
+        try:
+            response = await processing_http_client.stats()
+            return response.incomplete + response.scheduled
+        except Exception:
+            logger.exception(
+                "Error getting pending messages to process. Global processing back pressure will not be applied.",  # noqa
+                exc_info=True,
+            )
+            return 0
+
+
+async def get_pending_to_index(
+    context: ApplicationContext, kbid: str, resource_uuid: Optional[str] = None
+) -> dict[str, int]:
+    """
+    This function gets the number of pending messages to index for all involved nodes.
+    """
+    results: dict[str, int] = {}
+
+    # Schedule the tasks
+    if resource_uuid is not None:
+        nodes_to_check = await get_nodes_for_resource_shard(
+            context, kbid, resource_uuid
+        )
+    else:
+        nodes_to_check = await get_nodes_for_kb_active_shards(context, kbid)
+
+    tasks = []
+    for node in nodes_to_check:
+        tasks.append(asyncio.create_task(get_node_pending_messages(context, node)))
+
+    if not tasks:
+        return results
+
+    # Wait for all tasks to finish
+    done_tasks, pending_tasks = await asyncio.wait(tasks)
+
+    # Process the results
+    assert len(pending_tasks) == 0
+    for done_task in done_tasks:
+        exception = done_task.exception()
+        if exception is not None:
+            errors.capture_exception(exception)
+            logger.error(
+                f"Error getting pending messages to index: {exception}",
+                extra={"kbid": kbid},
+            )
+            continue
+        node, pending_messages = done_task.result()
+        results[node] = pending_messages
+
+    return results
+
+
+@alru_cache(maxsize=None, ttl=30)
+async def get_pending_to_ingest(context: ApplicationContext) -> int:
+    try:
+        return await get_nats_consumer_pending_messages(
+            context,
+            stream=const.Streams.INGEST_PROCESSED.name,
+            consumer=const.Streams.INGEST_PROCESSED.subject,
+        )
+    except nats.js.errors.NotFoundError:
+        logger.warning(
+            "Ingest processed consumer not found",
+            extra={"stream": const.Streams.INGEST_PROCESSED.name},
+        )
+        return 0
+
+
 @alru_cache(maxsize=1024, ttl=60 * 15)
 async def get_nodes_for_kb_active_shards(
     context: ApplicationContext, kbid: str
@@ -345,22 +361,6 @@ async def get_node_pending_messages(
             extra={"stream": const.Streams.INDEX.name, "node_id": node_id},
         )
         return node_id, 0
-
-
-@alru_cache(maxsize=None, ttl=30)
-async def get_pending_to_ingest(context: ApplicationContext) -> int:
-    try:
-        return await get_nats_consumer_pending_messages(
-            context,
-            stream=const.Streams.INGEST_PROCESSED.name,
-            consumer=const.Streams.INGEST_PROCESSED.subject,
-        )
-    except nats.js.errors.NotFoundError:
-        logger.warning(
-            "Ingest processed consumer not found",
-            extra={"stream": const.Streams.INGEST_PROCESSED.name},
-        )
-        return 0
 
 
 async def get_nats_consumer_pending_messages(
