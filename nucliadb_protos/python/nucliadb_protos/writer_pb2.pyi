@@ -1566,20 +1566,23 @@ class ShardObject(google.protobuf.message.Message):
     SHARD_FIELD_NUMBER: builtins.int
     REPLICAS_FIELD_NUMBER: builtins.int
     TIMESTAMP_FIELD_NUMBER: builtins.int
+    READ_ONLY_FIELD_NUMBER: builtins.int
     shard: builtins.str
     @property
     def replicas(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ShardReplica]: ...
     @property
     def timestamp(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
+    read_only: builtins.bool
     def __init__(
         self,
         *,
         shard: builtins.str = ...,
         replicas: collections.abc.Iterable[global___ShardReplica] | None = ...,
         timestamp: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        read_only: builtins.bool = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["timestamp", b"timestamp"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["replicas", b"replicas", "shard", b"shard", "timestamp", b"timestamp"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["read_only", b"read_only", "replicas", b"replicas", "shard", b"shard", "timestamp", b"timestamp"]) -> None: ...
 
 global___ShardObject = ShardObject
 
@@ -1606,7 +1609,6 @@ class Shards(google.protobuf.message.Message):
     SHARDS_FIELD_NUMBER: builtins.int
     KBID_FIELD_NUMBER: builtins.int
     ACTUAL_FIELD_NUMBER: builtins.int
-    ACTIVE_FIELD_NUMBER: builtins.int
     SIMILARITY_FIELD_NUMBER: builtins.int
     MODEL_FIELD_NUMBER: builtins.int
     RELEASE_CHANNEL_FIELD_NUMBER: builtins.int
@@ -1615,10 +1617,9 @@ class Shards(google.protobuf.message.Message):
     def shards(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ShardObject]: ...
     kbid: builtins.str
     actual: builtins.int
-    """DEPRECATED a KB know can have multiple alive shards"""
-    @property
-    def active(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
-        """active shards are those where resources can be indexed"""
+    """DEPRECATED a KB know can have multiple alive shards and is tracked in
+    each ShardObject
+    """
     similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType
     """DEPRECATED in favor of `model` to include more data"""
     @property
@@ -1632,14 +1633,13 @@ class Shards(google.protobuf.message.Message):
         shards: collections.abc.Iterable[global___ShardObject] | None = ...,
         kbid: builtins.str = ...,
         actual: builtins.int = ...,
-        active: collections.abc.Iterable[builtins.int] | None = ...,
         similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType = ...,
         model: nucliadb_protos.knowledgebox_pb2.SemanticModelMetadata | None = ...,
         release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType = ...,
         extra: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["model", b"model"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["active", b"active", "actual", b"actual", "extra", b"extra", "kbid", b"kbid", "model", b"model", "release_channel", b"release_channel", "shards", b"shards", "similarity", b"similarity"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["actual", b"actual", "extra", b"extra", "kbid", b"kbid", "model", b"model", "release_channel", b"release_channel", "shards", b"shards", "similarity", b"similarity"]) -> None: ...
 
 global___Shards = Shards
 

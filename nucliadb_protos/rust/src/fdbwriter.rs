@@ -569,6 +569,8 @@ pub struct ShardObject {
     #[deprecated]
     #[prost(message, optional, tag="4")]
     pub timestamp: ::core::option::Option<::prost_types::Timestamp>,
+    #[prost(bool, tag="5")]
+    pub read_only: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Shards {
@@ -576,13 +578,11 @@ pub struct Shards {
     pub shards: ::prost::alloc::vec::Vec<ShardObject>,
     #[prost(string, tag="2")]
     pub kbid: ::prost::alloc::string::String,
-    /// DEPRECATED a KB know can have multiple alive shards
+    /// DEPRECATED a KB know can have multiple alive shards and is tracked in
+    /// each ShardObject
     #[deprecated]
     #[prost(int32, tag="3")]
     pub actual: i32,
-    /// active shards are those where resources can be indexed
-    #[prost(uint32, repeated, tag="8")]
-    pub active: ::prost::alloc::vec::Vec<u32>,
     /// DEPRECATED in favor of `model` to include more data
     #[deprecated]
     #[prost(enumeration="super::utils::VectorSimilarity", tag="4")]

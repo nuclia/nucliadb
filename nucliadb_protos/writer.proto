@@ -415,16 +415,16 @@ message ShardObject {
     string shard = 1;
     repeated ShardReplica replicas = 3;
     google.protobuf.Timestamp timestamp = 4 [deprecated = true];
+    bool read_only = 5;
 }
 
 message Shards {
     repeated ShardObject shards = 1;
     string kbid = 2;
 
-    // DEPRECATED a KB know can have multiple alive shards
+    // DEPRECATED a KB know can have multiple alive shards and is tracked in
+    // each ShardObject
     int32 actual = 3 [deprecated = true];
-    // active shards are those where resources can be indexed
-    repeated uint32 active = 8;
 
     // DEPRECATED in favor of `model` to include more data
     utils.VectorSimilarity similarity = 4 [deprecated = true];
