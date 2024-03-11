@@ -18,19 +18,22 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-
 import asyncio
-from collections.abc import AsyncGenerator
+import threading
+import time
+from datetime import datetime, timedelta
 from typing import Optional
 
 import nats
 from async_lru import alru_cache
+from cachetools import TTLCache
 from fastapi import HTTPException, Request
 from nucliadb_protos.writer_pb2 import ShardObject
 
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.context.fastapi import get_app_context
 from nucliadb.common.datamanagers.resources import ResourcesDataManager
+from nucliadb.common.http_clients.processing import ProcessingHTTPClient
 from nucliadb.writer import logger
 from nucliadb.writer.settings import back_pressure_settings as settings
 from nucliadb_telemetry import errors
@@ -40,35 +43,122 @@ from nucliadb_utils.settings import is_onprem_nucliadb
 
 """
 TODO:
-- Add caching
+- In the event of an unexpected error (tikv, nats, etc),
+  should we fail hard or should we allow the write to go through?
 - Add tests
+- Add metrics / alerts
+- Double check default values!
 """
+
+
+__all__ = ["maybe_back_pressure"]
+
+
+class TryAfterCache:
+    """
+    Global cache for storing already computed try again in times.
+
+    It allows us to avoid making the same calculations multiple
+    times if back pressure has been applied.
+    """
+
+    def __init__(self):
+        self._cache = TTLCache(maxsize=1024, ttl=5 * 60)
+        self._lock = threading.Lock()
+
+    def get(self, key: str) -> Optional[datetime]:
+        with self._lock:
+            try_after = self._cache.get(key, None)
+            if try_after is None:
+                return None
+
+            if time.time() >= try_after:
+                # The key has expired, so remove it from the cache
+                self._cache.pop(key, None)
+                return None
+
+            return try_after
+
+    def set(self, key: str, try_after: datetime):
+        with self._lock:
+            self._cache[key] = try_after
+
+
+try_after_cache = TryAfterCache()
+
+
+def is_back_pressure_enabled() -> bool:
+    return settings.enabled
 
 
 async def maybe_back_pressure(
     request: Request, kbid: str, resource_uuid: Optional[str] = None
-):
-    context = get_app_context(request.app)
-    await maybe_back_pressure_kb_writes(context, kbid, resource_uuid=resource_uuid)
-
-
-async def maybe_back_pressure_kb_writes(
-    context: ApplicationContext, kbid: str, resource_uuid: Optional[str] = None
-):
+) -> None:
     """
     This function does system checks to see if we need to put back pressure on writes.
     Back pressure is applied when the system is processing behind or when the nodes are indexing behind.
     In that case, a HTTP 429 will be raised with the estimated time to try again.
-
     """
-    await check_processing_behind(context, kbid)
-    if not is_onprem_nucliadb():
-        await check_nodes_indexing_behind(context, kbid, resource_uuid)
+    if not is_back_pressure_enabled():
+        return
+
+    if is_onprem_nucliadb():
+        return
+
+    context = get_app_context(request.app)
+    await check_processing_behind()
+    await check_nodes_indexing_behind(context, kbid, resource_uuid)
 
 
-async def check_processing_behind(context: ApplicationContext, kbid: str):
-    # TODO
-    pass
+async def check_processing_behind():
+    """
+    This function checks if the processing engine is behind and may raise a 429
+    if it is further behind than the configured threshold.
+    """
+    max_pending = settings.max_processing_pending
+    if max_pending <= 0:
+        # Processing back pressure is disabled
+        return
+
+    # If we have already applied back pressure, we don't need to check
+    # again until the try again in time has expired
+    try_after = try_after_cache.get(key="processing")
+    if try_after is not None:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "message": f"Too many messages pending to ingest. Retry after {try_after}",
+                "try_after": try_after.timestamp(),
+                "back_pressure_type": "processing",
+            },
+        )
+
+    pending = await get_pending_to_process()
+    if pending > max_pending:
+        try_after = estimate_try_after(pending_to_process=pending)
+        try_after_cache.set("processing", try_after)
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "message": f"Too many messages pending to ingest. Retry after {try_after}",
+                "try_after": try_after.timestamp(),
+                "back_pressure_type": "processing",
+            },
+        )
+
+
+@alru_cache(maxsize=1024, ttl=60)
+async def get_pending_to_process() -> int:
+    async with ProcessingHTTPClient() as processing_http_client:
+        try:
+            response = await processing_http_client.stats()
+            return response.incomplete + response.scheduled
+        except Exception:
+            logger.exception(
+                "Error getting pending messages to process. Global processing back pressure will not be applied.",  # noqa
+                exc_info=True,
+            )
+            return 0
 
 
 async def check_nodes_indexing_behind(
@@ -79,8 +169,25 @@ async def check_nodes_indexing_behind(
     of the resource's shard, otherwise it will check the nodes of all active shards
     for the KnowledgeBox.
     """
+    max_pending = settings.max_node_indexing_pending
+    if max_pending <= 0:
+        # Indexing back pressure is disabled
+        return
 
-    pending_by_node = await get_pending_to_index(
+    # If we have already applied back pressure, we don't need to check again
+    # until the try again in time has expired
+    try_after = try_after_cache.get(f"{kbid}::{resource_uuid}")
+    if try_after is not None:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "message": f"Too many messages pending to ingest. Retry after {try_after}",
+                "try_after": try_after.timestamp(),
+                "back_pressure_type": "indexing",
+            },
+        )
+
+    pending_by_node = await get_nodes_pending_to_index(
         context, kbid, resource_uuid=resource_uuid
     )
     if len(pending_by_node) == 0:
@@ -88,28 +195,38 @@ async def check_nodes_indexing_behind(
 
     max_pending = max(pending_by_node.items(), key=lambda x: x[1])[1]
     if max_pending > settings.max_node_indexing_pending:
+        try_after = estimate_try_after(pending_to_index=max_pending)
+        try_after_cache.set(f"{kbid}::{resource_uuid}", try_after)
         raise HTTPException(
             status_code=429,
             detail={
-                "message": "Too many pending to index",
-                "pending": max_pending,
-                "try_again_in": estimate_try_again_in(max_pending),
+                "message": f"Too many messages pending to ingest. Retry after {try_after}",
+                "try_after": try_after.timestamp(),
+                "back_pressure_type": "indexing",
             },
         )
 
 
-async def get_pending_to_index(
+async def get_nodes_pending_to_index(
     context: ApplicationContext, kbid: str, resource_uuid: Optional[str] = None
 ) -> dict[str, int]:
     """
-    This function asynchronously gets the number of pending messages to index for all involved nodes.
+    This function gets the number of pending messages to index for all involved nodes.
     """
     results: dict[str, int] = {}
-    tasks = []
 
     # Schedule the tasks
-    async for node in iter_nodes_to_check(context, kbid, resource_uuid=resource_uuid):
+    if resource_uuid is not None:
+        nodes_to_check = await get_nodes_for_resource_shard(
+            context, kbid, resource_uuid
+        )
+    else:
+        nodes_to_check = await get_nodes_for_kb_active_shards(context, kbid)
+
+    tasks = []
+    for node in nodes_to_check:
         tasks.append(asyncio.create_task(get_node_pending_messages(context, node)))
+
     if not tasks:
         return results
 
@@ -133,50 +250,47 @@ async def get_pending_to_index(
     return results
 
 
-def estimate_try_again_in(pending: int) -> float:
+def estimate_try_after(
+    *, pending_to_index: Optional[int] = None, pending_to_process: Optional[int] = None
+) -> datetime:
     """
-    This function estimates the time in seconds to try again based on the pending messages to index
+    This function estimates the time to try again based on the number of pending messages to index or process.
     """
-    return pending / settings.estimation_indexing_rate
-
-
-async def iter_nodes_to_check(
-    context: ApplicationContext, kbid: str, resource_uuid: Optional[str] = None
-) -> AsyncGenerator[str, None]:
-    if resource_uuid is not None:
-        async for node in iter_nodes_for_resource_shard(context, kbid, resource_uuid):
-            yield node
+    if pending_to_index is not None:
+        delta_seconds = pending_to_index / settings.indexing_rate
+    elif pending_to_process is not None:
+        delta_seconds = pending_to_process / settings.processing_rate
     else:
-        async for node in iter_nodes_for_kb_active_shards(context, kbid):
-            yield node
+        raise ValueError(
+            "You must provide either pending_to_index or pending_to_process"
+        )
+    return datetime.utcnow() + timedelta(seconds=delta_seconds)
 
 
-async def iter_nodes_for_kb_active_shards(
+@alru_cache(maxsize=1024, ttl=60 * 15)
+async def get_nodes_for_kb_active_shards(
     context: ApplicationContext, kbid: str
-) -> AsyncGenerator[str, None]:
+) -> list[str]:
     active_shard = await get_kb_active_shard(context, kbid)
     if active_shard is None:
         # KB doesn't exist or has been deleted
         logger.debug("No active shard found for KB", extra={"kbid": kbid})
-        return
-
-    for replica in active_shard.replicas:
-        yield replica.node
+        return []
+    return [replica.node for replica in active_shard.replicas]
 
 
-async def iter_nodes_for_resource_shard(
+@alru_cache(maxsize=1024, ttl=60 * 60)
+async def get_nodes_for_resource_shard(
     context: ApplicationContext, kbid: str, resource_uuid: str
-) -> AsyncGenerator[str, None]:
+) -> list[str]:
     resource_shard = await get_resource_shard(context, kbid, resource_uuid)
     if resource_shard is None:
         # Resource doesn't exist or KB has been deleted
-        return
-
-    for replica in resource_shard.replicas:
-        yield replica.node
+        return []
+    return [replica.node for replica in resource_shard.replicas]
 
 
-@alru_cache(maxsize=None, ttl=10)
+@alru_cache(maxsize=None, ttl=30)
 async def get_node_pending_messages(
     context: ApplicationContext, node_id: str
 ) -> tuple[str, int]:
@@ -199,7 +313,6 @@ async def get_node_pending_messages(
         return node_id, 0
 
 
-@alru_cache(maxsize=128, ttl=60 * 15)
 async def get_kb_active_shard(
     context: ApplicationContext, kbid: str
 ) -> Optional[ShardObject]:
@@ -207,10 +320,9 @@ async def get_kb_active_shard(
         return await context.shard_manager.get_current_active_shard(txn, kbid)
 
 
-@alru_cache(maxsize=1024, ttl=60 * 60)
 async def get_resource_shard(
     context: ApplicationContext, kbid: str, resource_uuid: str
-):
+) -> Optional[ShardObject]:
     rdm = ResourcesDataManager(driver=context.kv_driver, storage=context.blob_storage)
     shard_id = await rdm.get_resource_shard_id(kbid, resource_uuid)
     if shard_id is None:
@@ -219,24 +331,21 @@ async def get_resource_shard(
             "Resource shard not found",
             extra={"kbid": kbid, "resource_uuid": resource_uuid},
         )
-        return
+        return None
 
     async with context.kv_driver.transaction() as txn:
         all_shards = await context.shard_manager.get_all_shards(txn, kbid)
         if all_shards is None:
             # KB doesn't exist or has been deleted
             logger.debug("No shards found for KB", extra={"kbid": kbid})
-            return
+            return None
 
-    found_shard = False
     for shard in all_shards.shards:
         if shard.shard == shard_id:
-            found_shard = True
             return shard
-
-    if not found_shard:
+    else:
         logger.error(
             "Resource shard not found",
             extra={"kbid": kbid, "resource_uuid": resource_uuid, "shard_id": shard_id},
         )
-        return
+        return None

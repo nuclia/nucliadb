@@ -132,6 +132,11 @@ class RequestsResults(pydantic.BaseModel):
     )
 
 
+class StatsResponse(pydantic.BaseModel):
+    incomplete: int
+    scheduled: int
+
+
 class ProcessingHTTPClient:
     def __init__(self):
         self.session = aiohttp.ClientSession()
@@ -178,3 +183,10 @@ class ProcessingHTTPClient:
             resp_text = await resp.text()
             check_status(resp, resp_text)
             return RequestsResults.parse_raw(resp_text)
+
+    async def stats(self) -> StatsResponse:
+        url = self.base_url + "/stats"
+        async with self.session.get(url, headers=self.headers) as resp:
+            resp_text = await resp.text()
+            check_status(resp, resp_text)
+            return StatsResponse.parse_raw(resp_text)

@@ -29,13 +29,25 @@ class Settings(BaseSettings):
 
 
 class BackPressureSettings(BaseSettings):
-    estimation_indexing_rate: float = Field(
+    enabled: bool = Field(
+        default=True,
+        description="Enable or disable back pressure.",
+    )
+    indexing_rate: float = Field(
         default=2,
         description="Estimation of the indexing rate in messages per second. This is used to calculate the try again in time",  # noqa
     )
+    processing_rate: float = Field(
+        default=1,
+        description="Estimation of the processing rate in messages per second. This is used to calculate the try again in time",  # noqa
+    )
     max_node_indexing_pending: int = Field(
         default=100,
-        description="Max number of messages pending to index in a node queue before rate limiting writes",
+        description="Max number of messages pending to index in a node queue before rate limiting writes. Set to 0 to disable indexing back pressure checks",  # noqa
+    )
+    max_processing_pending: int = Field(
+        default=10_000,
+        description="Global max number of messages pending to process before rate limiting writes. Set to 0 to disable processing back pressure checks",  # noqa
     )
 
 
