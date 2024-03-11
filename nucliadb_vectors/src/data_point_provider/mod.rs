@@ -40,6 +40,7 @@ pub type TemporalMark = SystemTime;
 
 const METADATA: &str = "metadata.json";
 const MAX_NODES_IN_MERGE: &str = "MAX_NODES_IN_MERGE";
+const SEGMENTS_BEFORE_MERGE: &str = "SEGMENTS_BEFORE_MERGE";
 
 pub trait SearchRequest {
     fn get_query(&self) -> &[f32];
@@ -87,6 +88,7 @@ impl IndexMetadata {
 
 pub struct Index {
     max_nodes_in_merge: usize,
+    segments_before_merge: usize,
     metadata: IndexMetadata,
     state: RwLock<State>,
     date: RwLock<Version>,
@@ -144,10 +146,15 @@ impl Index {
             Ok(v) => v.parse().unwrap_or(50_000),
             Err(_) => 50_000,
         };
+        let segments_before_merge: usize = match std::env::var(SEGMENTS_BEFORE_MERGE) {
+            Ok(v) => v.parse().unwrap_or(100),
+            Err(_) => 100,
+        };
 
         Ok(Index {
             metadata,
             max_nodes_in_merge,
+            segments_before_merge,
             dimension: RwLock::new(dimension_used),
             state: RwLock::new(state),
             date: RwLock::new(date),
@@ -166,10 +173,15 @@ impl Index {
             Ok(v) => v.parse().unwrap_or(50_000),
             Err(_) => 50_000,
         };
+        let segments_before_merge: usize = match std::env::var(SEGMENTS_BEFORE_MERGE) {
+            Ok(v) => v.parse().unwrap_or(100),
+            Err(_) => 100,
+        };
 
         Ok(Index {
             metadata,
             max_nodes_in_merge,
+            segments_before_merge,
             dimension: RwLock::new(None),
             state: RwLock::new(state),
             date: RwLock::new(date),
@@ -252,8 +264,13 @@ impl Index {
         let mut buffer = Vec::new();
         let mut live_segments_are_sorted = false;
 
+        if live_segments.len() < self.segments_before_merge {
+            return Ok(None);
+        }
+
         if live_segments.len() < 1000 {
-            live_segments.sort_by_cached_key(|journal| journal.no_nodes());
+            // Order smallest segments last (first to be pop()), so they are merged first
+            live_segments.sort_unstable_by_key(|i| std::cmp::Reverse(i.no_nodes()));
             live_segments_are_sorted = true;
         }
 
@@ -318,12 +335,6 @@ impl Index {
         let mut state = self.write_state();
         let mut date = self.write_date();
 
-        if state.work_stack_len() <= 1 {
-            fs_state::persist_state::<State>(&self.location, &state)?;
-            *date = fs_state::crnt_version(&self.location)?;
-            return Ok(());
-        }
-
         if let Some(merge) = self.merge(&state, self.max_nodes_in_merge)? {
             let data_points = merge.new_data_points;
             state.rebuilt_work_stack_with(data_points);
@@ -369,6 +380,8 @@ mod test {
         let vectors_path = dir.path().join("vectors");
         let mut index = Index::new(&vectors_path, IndexMetadata::default())?;
         let lock = index.get_elock()?;
+
+        index.segments_before_merge = 5;
 
         let mut journals = vec![];
         for _ in 0..50 {

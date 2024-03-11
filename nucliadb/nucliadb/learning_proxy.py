@@ -24,6 +24,7 @@ from collections.abc import AsyncIterator
 from enum import Enum
 from typing import Any, Optional, Union
 
+import backoff
 import httpx
 from fastapi import Request, Response
 from fastapi.responses import StreamingResponse
@@ -125,6 +126,30 @@ def is_white_listed_header(header: str) -> bool:
     return header.lower() in WHITELISTED_HEADERS
 
 
+@backoff.on_exception(
+    backoff.expo,
+    (Exception,),  # retry all unhandled http client/server errors right now
+    jitter=backoff.random_jitter,
+    max_tries=3,
+)
+async def _retriable_proxied_request(
+    *,
+    client: httpx.AsyncClient,
+    method: str,
+    url: str,
+    content: bytes,
+    headers: dict[str, str],
+    params: dict[str, Any],
+) -> httpx.Response:
+    return await client.request(
+        method=method.upper(),
+        url=url,
+        params=params,
+        content=content,
+        headers=headers,
+    )
+
+
 async def proxy(
     service: LearningService,
     request: Request,
@@ -154,10 +179,11 @@ async def proxy(
         headers=get_auth_headers(),
     ) as client:
         try:
-            response = await client.request(
+            response = await _retriable_proxied_request(
+                client=client,
                 method=method.upper(),
                 url=url,
-                params=request.query_params,
+                params=dict(request.query_params),
                 content=await request.body(),
                 headers=proxied_headers,
             )
