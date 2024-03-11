@@ -28,7 +28,14 @@ use crate::VectorR;
 const SIMILARITY: Similarity = Similarity::Cosine;
 
 fn create_query() -> Vec<f32> {
-    vec![rand::random::<f32>; 178].into_iter().map(|f| f()).collect()
+    let v: Vec<_> = vec![rand::random::<f32>; 178].into_iter().map(|f| f()).collect();
+    let mut modulus = 0.0;
+    for w in &v {
+        modulus += w * w;
+    }
+    modulus = f32::powf(modulus, 0.5);
+
+    v.into_iter().map(|w| w / modulus).collect()
 }
 
 impl DeleteLog for HashSet<String> {
@@ -227,7 +234,7 @@ fn fast_data_merge() -> VectorR<()> {
         (0..100).map(|k| Elem::new(format!("trash_{k}"), create_query(), LabelDictionary::default(), None)).collect();
     elems.push(Elem::new("search_0".into(), search_vectors[0].clone(), LabelDictionary::default(), None));
     elems.push(Elem::new("search_1".into(), search_vectors[1].clone(), LabelDictionary::default(), None));
-    let big_segment = data_point::create(&big_segment_pin, elems, None, Similarity::Cosine)?;
+    let big_segment = data_point::create(&big_segment_pin, elems, None, Similarity::Dot)?;
 
     let small_segment_dir = tempfile::tempdir()?;
     let small_segment_pin = DataPointPin::create_pin(small_segment_dir.path())?;
@@ -238,7 +245,7 @@ fn fast_data_merge() -> VectorR<()> {
             Elem::new("search_3".into(), search_vectors[3].clone(), LabelDictionary::default(), None),
         ],
         None,
-        Similarity::Cosine,
+        Similarity::Dot,
     )?;
 
     // Merge without deletions
@@ -246,12 +253,12 @@ fn fast_data_merge() -> VectorR<()> {
     let output_dir = tempfile::tempdir()?;
     let dp_pin = DataPointPin::create_pin(output_dir.path())?;
     let t = Instant::now();
-    let dp = data_point::merge(&dp_pin, &work, Similarity::Cosine)?;
+    let dp = data_point::merge(&dp_pin, &work, Similarity::Dot)?;
     let fast_merge_time = t.elapsed();
 
     for (i, v) in search_vectors.iter().enumerate() {
         let formula = Formula::new();
-        let result: Vec<_> = dp.search(&HashSet::new(), v, &formula, true, 1, Similarity::Cosine, 0.999).collect();
+        let result: Vec<_> = dp.search(&HashSet::new(), v, &formula, true, 1, Similarity::Dot, 0.999).collect();
         assert_eq!(result.len(), 1);
         assert!(result[0].score() >= 0.999);
         assert!(result[0].id() == format!("search_{i}").as_bytes());
@@ -263,12 +270,12 @@ fn fast_data_merge() -> VectorR<()> {
     let output_dir = tempfile::tempdir()?;
     let dp_pin = DataPointPin::create_pin(output_dir.path())?;
     let t = Instant::now();
-    let dp = data_point::merge(&dp_pin, &work, Similarity::Cosine)?;
+    let dp = data_point::merge(&dp_pin, &work, Similarity::Dot)?;
     let slow_merge_time = t.elapsed();
 
     for (i, v) in search_vectors.iter().enumerate() {
         let formula = Formula::new();
-        let result: Vec<_> = dp.search(&HashSet::new(), v, &formula, true, 1, Similarity::Cosine, 0.999).collect();
+        let result: Vec<_> = dp.search(&HashSet::new(), v, &formula, true, 1, Similarity::Dot, 0.999).collect();
         if i == 0 || i == 2 {
             assert_eq!(result.len(), 0);
         } else {
