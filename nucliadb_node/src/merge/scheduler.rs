@@ -28,6 +28,7 @@ use std::{
 };
 
 use anyhow::anyhow;
+use nucliadb_core::metrics::vectors::MergeSource;
 use nucliadb_core::vectors::MergeMetrics;
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::{Receiver, Sender};
@@ -129,9 +130,16 @@ impl MergeScheduler {
     }
 
     fn prepare(&self, request: MergeRequest) -> (InternalMergeRequest, MergePriority, WorkHandle) {
+        let metrics_source = match request.priority {
+            MergePriority::WhenFree => MergeSource::Idle,
+            MergePriority::Low => MergeSource::Low,
+            MergePriority::High => MergeSource::High,
+        };
+
         let mut internal_request = InternalMergeRequest {
             shard_id: request.shard_id,
             notifier: None,
+            metrics_source,
         };
         let mut handle = WorkHandle {
             waiter: None,
@@ -155,7 +163,7 @@ impl MergeScheduler {
             // processed.
             return Ok(());
         };
-        let result = shard.merge();
+        let result = shard.merge(request.metrics_source);
 
         // When a notifier is requested, send the merge result and let the
         // caller be responsible to handle errors
@@ -200,6 +208,7 @@ impl MergeScheduler {
 struct InternalMergeRequest {
     shard_id: String,
     notifier: Option<Sender<NodeResult<MergeMetrics>>>,
+    metrics_source: MergeSource,
 }
 
 impl PartialEq for InternalMergeRequest {

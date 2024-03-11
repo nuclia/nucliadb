@@ -35,4 +35,4 @@ test-cov:
 
 .PHONY: build
 build:
-	export RUSTFLAGS="--cfg=prometheus_metrics" && cargo build --locked
+	cargo build --locked

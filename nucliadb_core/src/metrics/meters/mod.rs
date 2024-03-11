@@ -17,30 +17,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-mod noop;
 mod prometheus;
 
-pub use noop::NoOpMeter;
-#[cfg(any(prometheus_metrics, test))]
 pub use prometheus::PrometheusMeter;
-
-use crate::metrics::metric::grpc_ops::{GrpcOpKey, GrpcOpValue};
-use crate::metrics::metric::replication;
-use crate::metrics::metric::request_time::{RequestTimeKey, RequestTimeValue};
-use crate::metrics::task_monitor::{Monitor, TaskId};
-use crate::NodeResult;
-
-pub trait Meter: Send + Sync {
-    fn record_request_time(&self, metric: RequestTimeKey, value: RequestTimeValue);
-    fn record_grpc_op(&self, method: GrpcOpKey, value: GrpcOpValue);
-
-    fn export(&self) -> NodeResult<String>;
-
-    fn task_monitor(&self, _task_id: TaskId) -> Option<Monitor> {
-        None
-    }
-    fn record_replicated_bytes(&self, value: u64);
-    fn record_replication_op(&self, key: replication::ReplicationOpsKey);
-    fn set_shard_cache_gauge(&self, value: i64);
-    fn record_shard_cache_eviction(&self);
-}

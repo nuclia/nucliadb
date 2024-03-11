@@ -30,7 +30,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Write};
 use std::mem;
 use std::path::{Path, PathBuf};
-use std::time::SystemTime;
+use std::time::{Instant, SystemTime};
 
 const MAX_NODES_IN_MERGE: &str = "MAX_NODES_IN_MERGE";
 const SEGMENTS_BEFORE_MERGE: &str = "SEGMENTS_BEFORE_MERGE";
@@ -53,10 +53,13 @@ fn persist_state(path: &Path, state: &State) -> VectorR<()> {
     Ok(())
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Default)]
 pub struct MergeMetrics {
+    pub seconds_elapsed: f64,
     pub merged: usize,
     pub segments_left: usize,
+    pub input_segment_sizes: Vec<usize>,
+    pub output_segment_size: usize,
 }
 
 struct OnlineDataPoint {
@@ -106,11 +109,12 @@ impl Writer {
 
         if self.online_data_points.len() < self.segments_before_merge {
             return Ok(MergeMetrics {
-                merged: 0,
                 segments_left: self.online_data_points.len(),
+                ..Default::default()
             });
         }
 
+        let start = Instant::now();
         let similarity = self.metadata.similarity;
         let mut blocked_segments = Vec::new();
         let mut being_merged = Vec::new();
@@ -121,6 +125,7 @@ impl Writer {
         // Order smallest segments last (first to be pop()), so they are merged first
         live_segments.sort_unstable_by_key(|i| std::cmp::Reverse(i.journal.no_nodes()));
 
+        let mut input_segment_sizes = vec![];
         while nodes_in_merge < self.max_nodes_in_merge {
             let Some(online_data_point) = live_segments.pop() else {
                 break;
@@ -139,6 +144,7 @@ impl Writer {
                 being_merged.push(online_data_point);
                 buffer.push((delete_log, open_data_point));
                 nodes_in_merge += data_point_size;
+                input_segment_sizes.push(data_point_size);
             }
         }
 
@@ -147,8 +153,8 @@ impl Writer {
             self.online_data_points.extend(being_merged);
             self.online_data_points.extend(live_segments);
             return Ok(MergeMetrics {
-                merged: 0,
                 segments_left: self.online_data_points.len(),
+                ..Default::default()
             });
         }
 
@@ -165,6 +171,8 @@ impl Writer {
             journal: merged_pin.read_journal()?,
             pin: merged_pin,
         };
+        let output_segment_size = new_online_data_point.journal.no_nodes();
+
         blocked_segments.extend(live_segments);
         blocked_segments.push(new_online_data_point);
         let online_data_points = blocked_segments;
@@ -172,6 +180,9 @@ impl Writer {
         let metrics = MergeMetrics {
             merged: buffer.len(),
             segments_left: online_data_points.len(),
+            input_segment_sizes,
+            output_segment_size,
+            seconds_elapsed: start.elapsed().as_secs_f64(),
         };
 
         let mut oldest_age = SystemTime::now();
@@ -200,9 +211,9 @@ impl Writer {
         self.added_data_points.clear();
     }
 
-    pub fn commit(&mut self) -> VectorR<()> {
+    pub fn commit(&mut self) -> VectorR<MergeMetrics> {
         if !self.has_uncommitted_changes {
-            return Ok(());
+            return Ok(MergeMetrics::default());
         }
 
         let added_to_delete_log = mem::take(&mut self.added_to_delete_log);
@@ -256,7 +267,7 @@ impl Writer {
         self.has_uncommitted_changes = false;
         self.number_of_embeddings = number_of_embeddings;
 
-        Ok(())
+        self.merge()
     }
 
     pub fn new(path: &Path, metadata: IndexMetadata) -> VectorR<Writer> {

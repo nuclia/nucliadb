@@ -17,7 +17,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use nucliadb_core::metrics::request_time;
+use nucliadb_core::metrics::vectors::{MergeLabels, MergeSource};
+use nucliadb_core::metrics::{get_metrics, request_time};
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::prost::Message;
 use nucliadb_core::protos::resource::ResourceStatus;
@@ -59,14 +60,28 @@ impl Debug for VectorWriterService {
     }
 }
 
+fn record_merge_metrics(source: MergeSource, data: &crate::data_point_provider::writer::MergeMetrics) {
+    if data.merged == 0 {
+        return;
+    }
+
+    let metrics = &get_metrics().vectors_metrics;
+    metrics.record_time(source, data.seconds_elapsed);
+    for input in &data.input_segment_sizes {
+        metrics.record_input_segment(source, *input);
+    }
+    metrics.record_output_segment(source, data.output_segment_size);
+}
+
 impl VectorWriter for VectorWriterService {
     #[measure(actor = "vectors", metric = "merge")]
     #[tracing::instrument(skip_all)]
-    fn merge(&mut self) -> NodeResult<MergeMetrics> {
+    fn merge(&mut self, source: MergeSource) -> NodeResult<MergeMetrics> {
         let time = Instant::now();
         let inner_metrics = self.index.merge()?;
         let took = time.elapsed().as_secs_f64();
         debug!("Merge took: {took} s");
+        record_merge_metrics(source, &inner_metrics);
 
         Ok(MergeMetrics {
             merged: inner_metrics.merged,
@@ -145,7 +160,8 @@ impl VectorWriter for VectorWriterService {
         let temporal_mark = SystemTime::now();
         let resource_uuid_bytes = resource_id.uuid.as_bytes();
         self.index.record_delete(resource_uuid_bytes, temporal_mark);
-        self.index.commit()?;
+        let merge_metrics = self.index.commit()?;
+        record_merge_metrics(MergeSource::OnCommit, &merge_metrics);
 
         let took = time.elapsed().as_secs_f64();
         debug!("{id:?} - Ending at {took} ms");
@@ -209,7 +225,8 @@ impl VectorWriter for VectorWriterService {
             self.index.record_delete(key_as_bytes, temporal_mark);
         }
 
-        self.index.commit()?;
+        let merge_metrics = self.index.commit()?;
+        record_merge_metrics(MergeSource::OnCommit, &merge_metrics);
 
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Main index set resource: ends {v} ms");
@@ -258,7 +275,8 @@ impl VectorWriter for VectorWriterService {
         }
 
         for (_, mut writer) in writer_sets {
-            writer.commit()?;
+            let merge_metrics = writer.commit()?;
+            record_merge_metrics(MergeSource::OnCommit, &merge_metrics);
         }
 
         let v = time.elapsed().as_millis();
