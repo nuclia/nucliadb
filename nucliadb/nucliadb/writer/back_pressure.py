@@ -169,7 +169,7 @@ async def check_nodes_indexing_behind(
     of the resource's shard, otherwise it will check the nodes of all active shards
     for the KnowledgeBox.
     """
-    max_pending = settings.max_node_indexing_pending
+    max_pending = settings.max_indexing_pending
     if max_pending <= 0:
         # Indexing back pressure is disabled
         return
@@ -193,9 +193,9 @@ async def check_nodes_indexing_behind(
     if len(pending_by_node) == 0:
         return
 
-    max_pending = max(pending_by_node.items(), key=lambda x: x[1])[1]
-    if max_pending > settings.max_node_indexing_pending:
-        try_after = estimate_try_after(pending_to_index=max_pending)
+    highest_pending = max(pending_by_node.items(), key=lambda x: x[1])[1]
+    if highest_pending > max_pending:
+        try_after = estimate_try_after(pending_to_index=highest_pending)
         try_after_cache.set(f"{kbid}::{resource_uuid}", try_after)
         raise HTTPException(
             status_code=429,
