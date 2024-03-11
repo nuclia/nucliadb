@@ -54,17 +54,6 @@ class ClusterDataManager:
             await update_kb_shards(txn, kbid, kb_shards)
             await txn.commit()
 
-    async def get_kb_shard(
-        self, kbid: str, shard_id: str
-    ) -> Optional[writer_pb2.ShardObject]:
-        shards = await self.get_kb_shards(kbid)
-        if shards is not None:
-            for shard in shards.shards:
-                if shard.shard == shard_id:
-                    return shard
-
-        return None
-
 
 async def get_kb_shards(txn: Transaction, kbid: str) -> Optional[writer_pb2.Shards]:
     key = KB_SHARDS.format(kbid=kbid)
