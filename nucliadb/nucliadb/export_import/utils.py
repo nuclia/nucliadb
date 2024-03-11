@@ -400,18 +400,44 @@ class ExportStreamReader:
             raise WrongExportStreamFormat() from ex
         return labels
 
-    async def iter_items(self) -> AsyncGenerator[ExportItem, None]:
+    async def seek_to_next_item(self):
+        buf = b""
         while True:
             try:
-                item_type = await self.read_type()
+                buf += await self.stream.read(1)
+                if len(buf) < 3:
+                    continue
+                try:
+                    return ExportedItemType(buf.decode())
+                except ValueError:
+                    buf = buf[1:]
+                    continue
+            except EOFError:
+                raise ExportStreamExhausted()
+
+    async def iter_items(self) -> AsyncGenerator[ExportItem, None]:
+        item_type = None
+        while True:
+            try:
+                try:
+                    if item_type is None:
+                        item_type = await self.read_type()
+                except WrongExportStreamFormat:
+                    item_type = await self.seek_to_next_item()
+                    pass
                 read_data_func = {
                     ExportedItemType.RESOURCE: self.read_bm,
                     ExportedItemType.BINARY: self.read_binary,
                     ExportedItemType.ENTITIES: self.read_entities,
                     ExportedItemType.LABELS: self.read_labels,
                 }[item_type]
-                data = await read_data_func()  # type: ignore
+                try:
+                    data = await read_data_func()  # type: ignore
+                except WrongExportStreamFormat:
+                    item_type = await self.seek_to_next_item()
+                    continue
                 yield item_type, data
+                item_type = None
             except ExportStreamExhausted:
                 break
 
