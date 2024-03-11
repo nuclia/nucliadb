@@ -202,17 +202,32 @@ where
     hnsw_file_options.create(true);
     let mut hnsw_file = hnsw_file_options.open(hnsw_path)?;
 
+    // Sort largest operant first so we reuse as much of the HNSW as possible
+    let mut operants = operants.iter().collect::<Vec<_>>();
+    operants.sort_unstable_by_key(|o| std::cmp::Reverse(o.1.journal().no_nodes()));
+
     // Creating the node store
     let node_producers: Vec<_> = operants.iter().map(|dp| ((&dp.0, Node), dp.1.nodes.as_ref())).collect();
-    data_store::merge(&mut nodes_file, &node_producers)?;
+    let has_deletions = data_store::merge(&mut nodes_file, &node_producers)?;
     let nodes = unsafe { Mmap::map(&nodes_file)? };
     let no_nodes = data_store::stored_elements(&nodes);
+
+    let mut index;
+    let start_node_index;
+    if has_deletions {
+        index = RAMHnsw::new();
+        start_node_index = 0;
+    } else {
+        // If there are no deletions, we can reuse the first segment
+        // HNSW since its indexes will match the the ones in data_store
+        index = DiskHnsw::deserialize(&operants[0].1.index);
+        start_node_index = data_store::stored_elements(&operants[0].1.nodes);
+    }
 
     // Creating the hnsw for the new node store.
     let tracker = Retriever::new(&[], &nodes, &NoDLog, similarity, -1.0);
     let mut ops = HnswOps::new(&tracker);
-    let mut index = RAMHnsw::new();
-    for id in 0..no_nodes {
+    for id in start_node_index..no_nodes {
         ops.insert(Address(id), &mut index)
     }
 

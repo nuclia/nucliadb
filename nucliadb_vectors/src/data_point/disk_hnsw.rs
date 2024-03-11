@@ -47,7 +47,7 @@ use std::collections::HashMap;
 use std::io;
 
 use super::ops_hnsw::{Hnsw, Layer};
-use super::ram_hnsw::{Edge, EntryPoint, RAMHnsw};
+use super::ram_hnsw::{Edge, EntryPoint, RAMHnsw, RAMLayer};
 use super::Address;
 use crate::data_types::usize_utils::*;
 
@@ -209,6 +209,54 @@ impl DiskHnsw {
         let node_end = usize_from_slice_le(&hnsw[pos..(pos + USIZE_LEN)]);
         &hnsw[..node_end]
     }
+
+    pub fn deserialize(hnsw: &[u8]) -> RAMHnsw {
+        let mut ram = RAMHnsw::new();
+        if hnsw.is_empty() {
+            return ram;
+        }
+
+        let end = hnsw.len();
+        ram.entry_point = Self::get_entry_point(hnsw);
+
+        let mut node_index = 0;
+        loop {
+            let indexing_pos = end - (node_index + 3) * USIZE_LEN;
+            let node_end = usize_from_slice_le(&hnsw[indexing_pos..indexing_pos + USIZE_LEN]);
+            let mut layer_index = 0;
+            loop {
+                if ram.layers.len() == layer_index {
+                    ram.layers.push(RAMLayer::default());
+                }
+                let ram_edges = ram.layers[layer_index].out.entry(Address(node_index)).or_default();
+
+                let layer_pos = node_end - (layer_index + 1) * USIZE_LEN;
+                let edges_start = usize_from_slice_le(&hnsw[layer_pos..layer_pos + USIZE_LEN]);
+                let number_edges = usize_from_slice_le(&hnsw[edges_start..edges_start + USIZE_LEN]);
+                let cnx_start = edges_start + USIZE_LEN;
+                let cnx_end = cnx_start + number_edges * CNX_LEN;
+                let edges = EdgeIter {
+                    crnt: 0,
+                    buf: &hnsw[cnx_start..cnx_end],
+                };
+                for (to, weight) in edges {
+                    ram_edges.push((to, weight));
+                }
+
+                if cnx_end == layer_pos {
+                    break;
+                };
+                layer_index += 1;
+            }
+
+            if node_end == indexing_pos {
+                break;
+            }
+            node_index += 1;
+        }
+
+        ram
+    }
 }
 
 #[cfg(test)]
@@ -264,5 +312,36 @@ mod tests {
         layer_check(layer1, no_nodes, &cnx1);
         let layer2 = buf.as_slice().get_layer(2);
         layer_check(layer2, no_nodes, &cnx2);
+    }
+
+    #[test]
+    fn hnsw_deserialize_test() {
+        let no_nodes = 3;
+        let cnx0 = vec![vec![(Address(1), 1.0)], vec![(Address(2), 2.0)], vec![(Address(3), 3.0)]];
+        let layer0 = RAMLayer {
+            out: cnx0.iter().enumerate().map(|(i, c)| (Address(i), c.clone())).collect(),
+        };
+        let cnx1 = vec![vec![(Address(1), 4.0)], vec![(Address(2), 5.0)]];
+        let layer1 = RAMLayer {
+            out: cnx1.iter().enumerate().map(|(i, c)| (Address(i), c.clone())).collect(),
+        };
+        let cnx2 = vec![vec![(Address(1), 6.0)]];
+        let layer2 = RAMLayer {
+            out: cnx2.iter().enumerate().map(|(i, c)| (Address(i), c.clone())).collect(),
+        };
+        let entry_point = EntryPoint {
+            node: Address(0),
+            layer: 2,
+        };
+        let mut hnsw = RAMHnsw::new();
+        hnsw.entry_point = Some(entry_point);
+        hnsw.layers = vec![layer0, layer1, layer2];
+        let mut buf = vec![];
+        DiskHnsw::serialize_into(&mut buf, no_nodes, hnsw).unwrap();
+        let ram = DiskHnsw::deserialize(&buf);
+        let mut buf2 = vec![];
+        DiskHnsw::serialize_into(&mut buf2, no_nodes, ram).unwrap();
+
+        assert_eq!(buf, buf2);
     }
 }
