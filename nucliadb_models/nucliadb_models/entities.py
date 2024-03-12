@@ -55,6 +55,12 @@ class EntitiesGroupSummary(BaseModel):
         default=False, description="Denotes if it has been created by the user"
     )
 
+    entities: Dict[str, Entity] = Field(
+        default={},
+        title="[Deprecated] Entities in the group",
+        description="This field is deprecated and will be removed in future versions. It will always be empty. Use the /api/v1/kb/{kbid}/entitiesgroup/{group} endpoint to get the entities of a group.",  # noqa: E501
+    )
+
     @classmethod
     def from_message(
         cls: Type[_T],
