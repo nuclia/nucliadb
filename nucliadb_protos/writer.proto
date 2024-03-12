@@ -414,7 +414,7 @@ message ShardReplica {
 message ShardObject {
     string shard = 1;
     repeated ShardReplica replicas = 3;
-    google.protobuf.Timestamp timestamp = 4;
+    google.protobuf.Timestamp timestamp = 4 [deprecated = true];
 }
 
 message Shards {

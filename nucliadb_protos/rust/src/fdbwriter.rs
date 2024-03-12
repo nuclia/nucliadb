@@ -566,6 +566,7 @@ pub struct ShardObject {
     pub shard: ::prost::alloc::string::String,
     #[prost(message, repeated, tag="3")]
     pub replicas: ::prost::alloc::vec::Vec<ShardReplica>,
+    #[deprecated]
     #[prost(message, optional, tag="4")]
     pub timestamp: ::core::option::Option<::prost_types::Timestamp>,
 }
