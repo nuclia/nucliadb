@@ -55,6 +55,7 @@ class KnowledgeBoxDataManager:
             response.ParseFromString(payload)
             return response
 
+    # TODO: remove, it's duplicated by datamanager.cluster
     async def get_shards_object(self, kbid: str) -> writer_pb2.Shards:
         key = KB_SHARDS.format(kbid=kbid)
         async with self.read_only_transaction() as txn:

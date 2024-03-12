@@ -50,7 +50,6 @@ from nucliadb_protos import (
     writer_pb2,
 )
 from nucliadb_telemetry import errors
-from nucliadb_utils.keys import KB_SHARDS
 from nucliadb_utils.utilities import get_indexing, get_storage
 
 from .index_node import IndexNode
@@ -124,6 +123,7 @@ def remove_index_node(node_id: str, primary_id: Optional[str] = None) -> None:
 
 
 class KBShardManager:
+    # TODO: move to data manager
     async def get_shards_by_kbid_inner(self, kbid: str) -> writer_pb2.Shards:
         cdm = ClusterDataManager(get_driver())
         result = await cdm.get_kb_shards(kbid)
@@ -133,6 +133,7 @@ class KBShardManager:
             raise ShardsNotFound(kbid)
         return result
 
+    # TODO: move to data manager
     async def get_shards_by_kbid(self, kbid: str) -> list[writer_pb2.ShardObject]:
         shards = await self.get_shards_by_kbid_inner(kbid)
         return [x for x in shards.shards]
@@ -167,18 +168,33 @@ class KBShardManager:
 
         return results
 
+    # TODO: move to data manager
     async def get_current_active_shard(
         self, txn: Transaction, kbid: str
     ) -> Optional[writer_pb2.ShardObject]:
-        key = KB_SHARDS.format(kbid=kbid)
-        kb_shards_bytes: Optional[bytes] = await txn.get(key)
-        if kb_shards_bytes:
-            kb_shards = writer_pb2.Shards()
-            kb_shards.ParseFromString(kb_shards_bytes)
-            shard: writer_pb2.ShardObject = kb_shards.shards[kb_shards.actual]
-            return shard
-        else:
+        kb_shards = await shards_data_manager.get_kb_shards(txn, kbid)
+        if kb_shards is None:
             return None
+
+        active_shards = [shard for shard in kb_shards.shards if not shard.read_only]
+
+        # B/c with Shards.actual
+        if len(active_shards) == 0:
+            # already not migrated
+            shard = kb_shards.shards[kb_shards.actual]
+        elif len(active_shards) == 1:
+            # migrated correctly
+            shard = active_shards[0]
+        else:
+            # more than one active shard is not yet supported!
+            with errors.push_scope() as scope:
+                scope.set_extra("kbid", kbid)
+                errors.capture_message(
+                    "KB with more than one active shard!", "error", scope
+                )
+            shard = active_shards[0]
+
+        return shard
 
     async def create_shard_by_kbid(
         self,
@@ -201,6 +217,7 @@ class KBShardManager:
             # First logic shard on the index
             kb_shards = writer_pb2.Shards()
             kb_shards.kbid = kbid
+            # B/c with Shards.actual
             kb_shards.actual = -1
             kb_shards.similarity = semantic_model.similarity_function
             kb_shards.model.CopyFrom(semantic_model)
@@ -214,8 +231,8 @@ class KBShardManager:
         ]
         nodes = sorted_primary_nodes(avoid_nodes=existing_kb_nodes)
 
-        sharduuid = uuid.uuid4().hex
-        shard = writer_pb2.ShardObject(shard=sharduuid)
+        shard_uuid = uuid.uuid4().hex
+        shard = writer_pb2.ShardObject(shard=shard_uuid, read_only=False)
         try:
             # Attempt to create configured number of replicas
             replicas_created = 0
@@ -252,8 +269,11 @@ class KBShardManager:
             await self.rollback_shard(shard)
             raise e
 
+        # Previous active shard is no longer writtable
+        kb_shards.shards[-1].read_only = True
         # Append the created shard and make `actual` point to it.
         kb_shards.shards.append(shard)
+        # B/c with Shards.actual
         kb_shards.actual += 1
 
         await shards_data_manager.update_kb_shards(txn, kbid, kb_shards)

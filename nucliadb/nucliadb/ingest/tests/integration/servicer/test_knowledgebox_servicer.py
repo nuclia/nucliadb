@@ -127,5 +127,6 @@ async def test_create_knowledgebox_release_channel(
     driver = grpc_servicer.servicer.driver
     async with driver.transaction() as txn:
         shards = await shards_data_manager.get_kb_shards(txn, kbid)
+        assert shards is not None
         config = await get_kb_config(txn, kbid)
         assert shards.release_channel == config.release_channel == release_channel
