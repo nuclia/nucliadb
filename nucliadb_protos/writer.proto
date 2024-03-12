@@ -420,9 +420,16 @@ message ShardObject {
 message Shards {
     repeated ShardObject shards = 1;
     string kbid = 2;
-    int32 actual = 3;  // current shard that resources index to
+
+    // DEPRECATED a KB know can have multiple alive shards
+    int32 actual = 3 [deprecated = true];
+    // active shards are those where resources can be indexed
+    repeated uint32 active = 8;
+
+    // DEPRECATED in favor of `model` to include more data
     utils.VectorSimilarity similarity = 4 [deprecated = true];
     knowledgebox.SemanticModelMetadata model = 5;
+
     utils.ReleaseChannel release_channel = 6;
     map<string, string> extra = 7;
 }

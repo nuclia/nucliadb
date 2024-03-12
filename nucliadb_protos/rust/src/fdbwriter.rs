@@ -576,9 +576,14 @@ pub struct Shards {
     pub shards: ::prost::alloc::vec::Vec<ShardObject>,
     #[prost(string, tag="2")]
     pub kbid: ::prost::alloc::string::String,
-    /// current shard that resources index to
+    /// DEPRECATED a KB know can have multiple alive shards
+    #[deprecated]
     #[prost(int32, tag="3")]
     pub actual: i32,
+    /// active shards are those where resources can be indexed
+    #[prost(uint32, repeated, tag="8")]
+    pub active: ::prost::alloc::vec::Vec<u32>,
+    /// DEPRECATED in favor of `model` to include more data
     #[deprecated]
     #[prost(enumeration="super::utils::VectorSimilarity", tag="4")]
     pub similarity: i32,
