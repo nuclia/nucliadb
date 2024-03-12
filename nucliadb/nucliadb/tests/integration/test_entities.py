@@ -259,7 +259,8 @@ async def test_list_entities_groups(
     body = resp.json()
 
     assert body["groups"].keys() == {"ANIMALS"}
-    assert "entities" not in body["groups"]["ANIMALS"]
+    assert "entities" in body["groups"]["ANIMALS"]
+    assert len(body["groups"]["ANIMALS"]["entities"]) == 0
 
 
 @pytest.mark.asyncio
