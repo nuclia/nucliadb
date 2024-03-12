@@ -55,7 +55,7 @@ pub fn update_loop(parameters: UpdateParameters, cache: Arc<ShardReaderCache>) {
                 continue;
             };
             let Some(shard) = cache.peek(&shard_id) else {
-                return;
+                continue;
             };
 
             if let Err(err) = shard.update() {
