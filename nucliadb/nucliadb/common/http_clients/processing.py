@@ -186,7 +186,9 @@ class ProcessingHTTPClient:
 
     async def stats(self, kbid: str) -> StatsResponse:
         url = self.base_url + "/stats"
-        async with self.session.get(url, headers=self.headers, params={"kbid", kbid}) as resp:
+        async with self.session.get(
+            url, headers=self.headers, params={"kbid", kbid}
+        ) as resp:
             resp_text = await resp.text()
             check_status(resp, resp_text)
             return StatsResponse.parse_raw(resp_text)

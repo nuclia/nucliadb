@@ -19,24 +19,23 @@
 #
 
 import asyncio
+import contextlib
 import threading
 from datetime import datetime, timedelta
 from typing import Optional
 
-import nats
 from async_lru import alru_cache
 from cachetools import TTLCache
 from fastapi import HTTPException, Request
-from nucliadb.common.cluster.manager import get_index_nodes
 from nucliadb_protos.writer_pb2 import ShardObject
 
+from nucliadb.common.cluster.manager import get_index_nodes
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.context.fastapi import get_app_context
 from nucliadb.common.datamanagers.resources import ResourcesDataManager
 from nucliadb.common.http_clients.processing import ProcessingHTTPClient
 from nucliadb.writer import logger
 from nucliadb.writer.settings import back_pressure_settings as settings
-from nucliadb_telemetry import errors
 from nucliadb_utils import const
 from nucliadb_utils.nats import NatsConnectionManager
 from nucliadb_utils.settings import is_onprem_nucliadb
@@ -92,17 +91,47 @@ class TryAfterCache:
 try_after_cache = TryAfterCache()
 
 
+@contextlib.contextmanager
+def cached_try_after(key: str, back_pressure_type: str):
+    """
+    Context manager that handles the caching of the try again in time so that
+    we don't recompute try again times if we have already applied back pressure.
+    """
+
+    cached_value: Optional[datetime] = try_after_cache.get(key)
+    if cached_value is not None:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "message": f"Too many messages pending to ingest. Retry after {cached_value}",
+                "try_after": cached_value.timestamp(),
+                "back_pressure_type": back_pressure_type,
+            },
+        )
+
+    try:
+        yield
+    except HTTPException as http_exception:
+        # If we get a 429, we store the try again in time in the cache
+        if http_exception.status_code == 429:
+            try_after = datetime.fromtimestamp(http_exception.detail["try_after"])
+            try_after_cache.set(key, try_after)
+        raise
+
+
 class BackPressureSingleton:
     """
     Singleton class that will run in the background gatheringthe different stats to apply back pressure.
     This allows us to do back pressure checks and calculations at request time without blocking the request too much.
     """
+
     def __init__(self, nats_manager: NatsConnectionManager, check_interval: int = 30):
         self.nats_manager = nats_manager
         self.check_interval = check_interval
         self._tasks = []
         self.ingest_pending: int = 0
         self.indexing_pending: dict[str, int] = {}
+        self.processing_http_client = ProcessingHTTPClient()
 
     async def start(self):
         self._tasks.append(asyncio.create_task(self._check_nodes_indexing_consumers()))
@@ -112,13 +141,21 @@ class BackPressureSingleton:
         for task in self._tasks:
             task.cancel()
         self._tasks.clear()
+        await self.processing_http_client.close()
+
+    @alru_cache(maxsize=1024, ttl=60)
+    async def get_kb_pending_to_process(self, kbid: str) -> int:
+        response = await self.processing_http_client.stats(kbid=kbid)
+        return response.incomplete + response.scheduled
 
     async def _check_nodes_indexing_consumers(self):
         try:
             while True:
                 for node_id in get_index_nodes():
                     try:
-                        self.indexing_pending[node_id] = await get_nats_consumer_pending_messages(
+                        self.indexing_pending[
+                            node_id
+                        ] = await get_nats_consumer_pending_messages(
                             self.nats_manager,
                             stream=const.Streams.INDEX.name,
                             consumer=const.Streams.INDEX.group.format(node=node_id),
@@ -163,7 +200,6 @@ async def maybe_back_pressure(
 ) -> None:
     """
     This function does system checks to see if we need to put back pressure on writes.
-    Back pressure is applied when the system is processing behind or when the nodes are indexing behind.
     In that case, a HTTP 429 will be raised with the estimated time to try again.
     """
     if not is_back_pressure_enabled() or is_onprem_nucliadb():
@@ -171,16 +207,24 @@ async def maybe_back_pressure(
     await back_pressure_checks(request, kbid, resource_uuid)
 
 
-async def back_pressure_checks(request: Request, kbid: str, resource_uuid: Optional[str] = None):
+async def back_pressure_checks(
+    request: Request, kbid: str, resource_uuid: Optional[str] = None
+):
+    """
+    Will raise a 429 if back pressure is needed:
+    - If the processing engine is behind.
+    - If the indexing on nodes affected by the request (kbid, and resource_uuid) is behind.
+    """
     context = get_app_context(request.app)
     back_pressure = context.back_pressure_singleton
     if back_pressure is None:
         logger.error("Back pressure singleton not found")
         return
 
+    await check_processing_behind(back_pressure, kbid)
+
     indexing_pending = back_pressure.get_values()["indexing_pending"]
     await check_indexing_behind(context, kbid, resource_uuid, indexing_pending)
-    await check_processing_behind(back_pressure, kbid)
 
 
 async def check_processing_behind(back_pressure: BackPressureSingleton, kbid: str):
@@ -193,38 +237,27 @@ async def check_processing_behind(back_pressure: BackPressureSingleton, kbid: st
         # Processing back pressure is disabled
         return
 
-    # If we have already applied back pressure, we don't need to check
-    # again until the try again in time has expired
-    cache_key = f"processing::{kbid}"
-    try_after = try_after_cache.get(cache_key)
-    if try_after is not None:
-        raise HTTPException(
-            status_code=429,
-            detail={
-                "message": f"Too many messages pending to ingest. Retry after {try_after}",
-                "try_after": try_after.timestamp(),
-                "back_pressure_type": "processing",
-            },
-        )
-
-    kb_pending = await back_pressure.get_kb_pending_to_process(kbid)
-    if kb_pending > max_pending:
-        try_after = estimate_try_after_from_rate(
-            rate=settings.processing_rate, pending=kb_pending
-        )
-        try_after_cache.set(cache_key, try_after)
-        raise HTTPException(
-            status_code=429,
-            detail={
-                "message": f"Too many messages pending to ingest. Retry after {try_after}",
-                "try_after": try_after.timestamp(),
-                "back_pressure_type": "processing",
-            },
-        )
+    with cached_try_after(f"processing::{kbid}", "processing"):
+        kb_pending = await back_pressure.get_kb_pending_to_process(kbid)
+        if kb_pending > max_pending:
+            try_after = estimate_try_after(
+                rate=settings.processing_rate, pending=kb_pending
+            )
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "message": f"Too many messages pending to ingest. Retry after {try_after}",
+                    "try_after": try_after.timestamp(),
+                    "back_pressure_type": "processing",
+                },
+            )
 
 
 async def check_indexing_behind(
-    context: ApplicationContext, kbid: str, resource_uuid: Optional[str], pending_by_node: dict[str, int]
+    context: ApplicationContext,
+    kbid: str,
+    resource_uuid: Optional[str],
+    pending_by_node: dict[str, int],
 ):
     """
     If a resource uuid is provided, it will check the nodes that have the replicas
@@ -236,139 +269,57 @@ async def check_indexing_behind(
         # Indexing back pressure is disabled
         return
 
-    # If we have already applied back pressure, we don't need to check again
-    # until the try again in time has expired
-    cache_key = f"indexing::{kbid}::{resource_uuid}"
-    try_after = try_after_cache.get(cache_key)
-    if try_after is not None:
-        raise HTTPException(
-            status_code=429,
-            detail={
-                "message": f"Too many messages pending to ingest. Retry after {try_after}",
-                "try_after": try_after.timestamp(),
-                "back_pressure_type": "indexing",
-            },
-        )
+    with cached_try_after(f"indexing::{kbid}::{resource_uuid}", "indexing"):
+        if len(pending_by_node) == 0:
+            logger.warning("No nodes found to check for pending messages")
+            return
 
-    if len(pending_by_node) == 0:
-        logger.warning("No nodes found to check for pending messages")
-        return
+        # Get nodes that are involved in the indexing of the request
+        if resource_uuid is not None:
+            nodes_to_check = await get_nodes_for_resource_shard(
+                context, kbid, resource_uuid
+            )
+        else:
+            nodes_to_check = await get_nodes_for_kb_active_shards(context, kbid)
 
-    # Get nodes that are involved in the indexing of the request
-    if resource_uuid is not None:
-        nodes_to_check = await get_nodes_for_resource_shard(
-            context, kbid, resource_uuid
-        )
-    else:
-        nodes_to_check = await get_nodes_for_kb_active_shards(context, kbid)
+        if len(nodes_to_check) == 0:
+            logger.warning(
+                "No nodes found to check for pending messages",
+                extra={"kbid": kbid, "resource_uuid": resource_uuid},
+            )
+            return
 
-    if len(nodes_to_check) == 0:
-        logger.warning("No nodes found to check for pending messages", extra={"kbid": kbid, "resource_uuid": resource_uuid})
-        return
+        # Get the highest pending value
+        highest_pending = 0
+        for node in nodes_to_check:
+            if node not in pending_by_node:
+                logger.warning(
+                    "Node not found in pending messages", extra={"node": node}
+                )
+                continue
+            if pending_by_node[node] > highest_pending:
+                highest_pending = pending_by_node[node]
 
-    # Get the highest pending value
-    highest_pending = 0
-    for node in nodes_to_check:
-        if node not in pending_by_node:
-            logger.warning("Node not found in pending messages", extra={"node": node})
-            continue
-        if pending_by_node[node] > highest_pending:
-            highest_pending = pending_by_node[node]
-
-    if highest_pending > max_pending:
-        try_after = estimate_try_after_from_rate(
-            rate=settings.indexing_rate, pending=highest_pending
-        )
-        try_after_cache.set(cache_key, try_after)
-        raise HTTPException(
-            status_code=429,
-            detail={
-                "message": f"Too many messages pending to ingest. Retry after {try_after}",
-                "try_after": try_after.timestamp(),
-                "back_pressure_type": "indexing",
-            },
-        )
+        if highest_pending > max_pending:
+            try_after = estimate_try_after(
+                rate=settings.indexing_rate, pending=highest_pending
+            )
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "message": f"Too many messages pending to ingest. Retry after {try_after}",
+                    "try_after": try_after.timestamp(),
+                    "back_pressure_type": "indexing",
+                },
+            )
 
 
-def estimate_try_after_from_rate(rate: float, pending: int) -> datetime:
+def estimate_try_after(rate: float, pending: int) -> datetime:
     """
     This function estimates the time to try again based on the rate and the number of pending messages.
     """
     delta_seconds = pending / rate
     return datetime.utcnow() + timedelta(seconds=delta_seconds)
-
-
-@alru_cache(maxsize=1024, ttl=60)
-async def get_pending_to_process(kbid: str) -> int:
-    async with ProcessingHTTPClient() as processing_http_client:
-        try:
-            response = await processing_http_client.stats(kbid=kbid)
-            return response.incomplete + response.scheduled
-        except Exception:
-            logger.exception(
-                "Error getting pending messages to process. Global processing back pressure will not be applied.",  # noqa
-                exc_info=True,
-            )
-            return 0
-
-
-async def get_pending_to_index(
-    context: ApplicationContext, kbid: str, resource_uuid: Optional[str] = None
-) -> dict[str, int]:
-    """
-    This function gets the number of pending messages to index for all involved nodes.
-    """
-    results: dict[str, int] = {}
-
-    # Schedule the tasks
-    if resource_uuid is not None:
-        nodes_to_check = await get_nodes_for_resource_shard(
-            context, kbid, resource_uuid
-        )
-    else:
-        nodes_to_check = await get_nodes_for_kb_active_shards(context, kbid)
-
-    tasks = []
-    for node in nodes_to_check:
-        tasks.append(asyncio.create_task(get_node_pending_messages(context, node)))
-
-    if not tasks:
-        return results
-
-    # Wait for all tasks to finish
-    done_tasks, pending_tasks = await asyncio.wait(tasks)
-
-    # Process the results
-    assert len(pending_tasks) == 0
-    for done_task in done_tasks:
-        exception = done_task.exception()
-        if exception is not None:
-            errors.capture_exception(exception)
-            logger.error(
-                f"Error getting pending messages to index: {exception}",
-                extra={"kbid": kbid},
-            )
-            continue
-        node, pending_messages = done_task.result()
-        results[node] = pending_messages
-
-    return results
-
-
-@alru_cache(maxsize=None, ttl=30)
-async def get_pending_to_ingest(context: ApplicationContext) -> int:
-    try:
-        return await get_nats_consumer_pending_messages(
-            context,
-            stream=const.Streams.INGEST_PROCESSED.name,
-            consumer=const.Streams.INGEST_PROCESSED.subject,
-        )
-    except nats.js.errors.NotFoundError:
-        logger.warning(
-            "Ingest processed consumer not found",
-            extra={"stream": const.Streams.INGEST_PROCESSED.name},
-        )
-        return 0
 
 
 @alru_cache(maxsize=1024, ttl=60 * 15)
@@ -392,27 +343,6 @@ async def get_nodes_for_resource_shard(
         # Resource doesn't exist or KB has been deleted
         return []
     return [replica.node for replica in resource_shard.replicas]
-
-
-@alru_cache(maxsize=None, ttl=30)
-async def get_node_pending_messages(
-    context: ApplicationContext, node_id: str
-) -> tuple[str, int]:
-    try:
-        num_pending = await get_nats_consumer_pending_messages(
-            context,
-            stream=const.Streams.INDEX.name,
-            consumer=const.Streams.INDEX.group.format(node=node_id),
-        )
-        return node_id, num_pending
-    except nats.js.errors.NotFoundError:
-        # These handles the case for when the node is added to
-        # the cluster but it doesn't have a consumer yet.
-        logger.warning(
-            "Consumer not found",
-            extra={"stream": const.Streams.INDEX.name, "node_id": node_id},
-        )
-        return node_id, 0
 
 
 async def get_nats_consumer_pending_messages(

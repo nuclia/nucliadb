@@ -29,7 +29,7 @@ from nucliadb.writer.back_pressure import (
     check_indexing_behind,
     check_ingest_behind,
     check_processing_behind,
-    estimate_try_after_from_rate,
+    estimate_try_after,
     maybe_back_pressure,
     try_after_cache,
 )
@@ -56,9 +56,9 @@ def is_onprem_nucliadb():
         (10, 10, 1),
     ],
 )
-def test_estimate_try_after_from_rate(rate, pending, delta):
+def test_estimate_try_after(rate, pending, delta):
     now = datetime.utcnow()
-    try_after = estimate_try_after_from_rate(rate, pending)
+    try_after = estimate_try_after(rate, pending)
     assert int(try_after.timestamp()) == int(now.timestamp() + delta)
 
 
