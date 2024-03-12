@@ -269,12 +269,14 @@ class KBShardManager:
             await self.rollback_shard(shard)
             raise e
 
-        # Previous active shard is no longer writtable
-        kb_shards.shards[-1].read_only = True
+
         # Append the created shard and make `actual` point to it.
         kb_shards.shards.append(shard)
         # B/c with Shards.actual
         kb_shards.actual += 1
+        # set previous writable shard as read only
+        if len(kb_shards.shards) > 1:
+            kb_shards.shards[-1].read_only = True
 
         await shards_data_manager.update_kb_shards(txn, kbid, kb_shards)
 
