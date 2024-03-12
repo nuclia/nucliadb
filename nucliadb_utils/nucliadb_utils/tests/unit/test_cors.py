@@ -17,21 +17,19 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Callable
-from typing import Any
-from typing import Literal
+import functools
+from typing import Any, Callable, Literal
+
+import pytest
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
-from nucliadb_utils.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 from starlette.routing import Route
 from starlette.testclient import TestClient
 from starlette.types import ASGIApp
 
-import functools
-import pytest
-
+from nucliadb_utils.cors import CORSMiddleware
 
 TestClientFactory = Callable[[ASGIApp], TestClient]
 
@@ -53,6 +51,7 @@ def test_client_factory(
         backend=anyio_backend_name,
         backend_options=anyio_backend_options,
     )
+
 
 def test_cors_allow_all(
     test_client_factory: TestClientFactory,
@@ -601,7 +600,12 @@ def test_cors_vary_header_is_properly_set_when_allow_origins_is_not_wildcard_2(
 ) -> None:
     def homepage(request: Request) -> PlainTextResponse:
         return PlainTextResponse(
-            "Homepage", status_code=200, headers={"Vary": "Accept-Encoding","x-nucliadb-cors-allowed-domains": "https://example-a.org,https://example-b.org"}
+            "Homepage",
+            status_code=200,
+            headers={
+                "Vary": "Accept-Encoding",
+                "x-nucliadb-cors-allowed-domains": "https://example-a.org,https://example-b.org",
+            },
         )
 
     app = Starlette(
