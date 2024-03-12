@@ -54,3 +54,5 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
 
         # just ensure we're writing it correctly
         assert [shard_object.read_only for shard_object in shards.shards].count(False) == 1
+
+        await txn.commit()
