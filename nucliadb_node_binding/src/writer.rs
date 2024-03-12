@@ -30,6 +30,7 @@ use nucliadb_core::Channel;
 use nucliadb_node::analytics::blocking::send_analytics_event;
 use nucliadb_node::analytics::payload::AnalyticsEvent;
 use nucliadb_node::lifecycle;
+use nucliadb_node::merge::errors::MergerError;
 use nucliadb_node::settings::providers::env::EnvSettingsProvider;
 use nucliadb_node::settings::providers::SettingsProvider;
 use nucliadb_node::settings::Settings;
@@ -79,9 +80,12 @@ impl NodeWriter {
         if let Err(error) = lifecycle::initialize_writer(settings.clone()) {
             return Err(IndexNodeException::new_err(format!("Unable to initialize writer: {error}")));
         };
-        if let Err(error) = lifecycle::initialize_merger(Arc::clone(&shard_cache), settings.clone()) {
-            return Err(IndexNodeException::new_err(format!("Unable to initialize merger: {error}")));
+
+        match lifecycle::initialize_merger(Arc::clone(&shard_cache), settings.clone()) {
+            Ok(()) => (),
+            Err(MergerError::GlobalMergerAlreadyInstalled) => (),
         }
+
         let shards_path = settings.shards_path();
         Ok(Self {
             gc_loop_handle,

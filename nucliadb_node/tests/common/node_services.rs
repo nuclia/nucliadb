@@ -189,13 +189,7 @@ impl NodeFixture {
             lifecycle::initialize_writer(settings.clone()).expect("Writer initialization has failed");
             let merger = lifecycle::initialize_merger(Arc::clone(&shards_cache), settings.clone());
             // ignore merger init errors as initialize twice will report an error
-            if merger.as_ref().is_err_and(|error| {
-                error.is::<MergerError>()
-                    && matches!(
-                        *error.downcast_ref::<MergerError>().unwrap(),
-                        MergerError::GlobalMergerAlreadyInstalled
-                    )
-            }) {
+            if merger.as_ref().is_err_and(|error| matches!(*error, MergerError::GlobalMergerAlreadyInstalled)) {
                 // ignore
             } else {
                 merger.expect("Merger initialization has failed");
