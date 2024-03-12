@@ -269,7 +269,6 @@ class KBShardManager:
             await self.rollback_shard(shard)
             raise e
 
-
         # Append the created shard and make `actual` point to it.
         kb_shards.shards.append(shard)
         # B/c with Shards.actual
