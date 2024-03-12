@@ -36,8 +36,10 @@ from opentelemetry.trace import Span  # type: ignore
 from opentelemetry.trace import format_trace_id, set_span_in_context
 from opentelemetry.trace.status import Status, StatusCode
 from opentelemetry.util.http import (
+    OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SANITIZE_FIELDS,
     OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SERVER_REQUEST,
     OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SERVER_RESPONSE,
+    SanitizeValue,
     get_custom_headers,
     normalise_request_header_name,
     normalise_response_header_name,
@@ -91,7 +93,7 @@ class ASGIGetter(Getter[dict]):
 
     def keys(self, carrier: dict) -> typing.List[str]:
         headers = carrier.get("headers") or []
-        return [_key.decode("utf8") for (_key, _value) in headers]
+        return [_key.decode("utf8") for (_key, _) in headers]
 
 
 asgi_getter = ASGIGetter()
@@ -368,3 +370,32 @@ class OpenTelemetryMiddleware:
             await send(message)
 
         return otel_send
+
+
+class CaptureTraceIdMiddleware(BaseHTTPMiddleware):
+    def capture_trace_id(self, response):
+        span = trace.get_current_span()
+        if span is None:
+            return
+        trace_id = format_trace_id(span.get_span_context().trace_id)
+        response.headers[NUCLIA_TRACE_ID_HEADER] = trace_id
+
+    def expose_trace_id_header(self, response):
+        exposed_headers = []
+        if ACCESS_CONTROL_EXPOSE_HEADER in response.headers:
+            exposed_headers = response.headers[ACCESS_CONTROL_EXPOSE_HEADER].split(",")
+        if NUCLIA_TRACE_ID_HEADER not in exposed_headers:
+            exposed_headers.append(NUCLIA_TRACE_ID_HEADER)
+            response.headers[ACCESS_CONTROL_EXPOSE_HEADER] = ",".join(exposed_headers)
+
+    async def dispatch(
+        self, request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
+        response = None
+        try:
+            response = await call_next(request)
+        finally:
+            if response is not None:
+                self.capture_trace_id(response)
+                self.expose_trace_id_header(response)
+                return response
