@@ -103,4 +103,4 @@ class TestProcessingHTTPClient:
         response.status = 200
         response.text.return_value = response_data.json()
 
-        assert await client.stats() == response_data
+        assert await client.stats("kbid") == response_data
