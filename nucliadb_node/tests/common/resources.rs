@@ -27,6 +27,7 @@ use nucliadb_core::protos::relation_node::NodeType;
 use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{
     IndexMetadata, IndexParagraph, IndexParagraphs, Relation, RelationNode, Resource, ResourceId, TextInformation,
+    VectorSentence,
 };
 use uuid::Uuid;
 
@@ -104,6 +105,13 @@ pub fn little_prince(shard_id: impl Into<String>) -> Resource {
             start: 0,
             end: 150,
             field: "a/summary".to_string(),
+            sentences: HashMap::from([(
+                format!("{rid}/a/summary/0-150"),
+                VectorSentence {
+                    vector: vec![0.5, 0.5, 0.5],
+                    metadata: None,
+                },
+            )]),
             ..Default::default()
         },
     );
