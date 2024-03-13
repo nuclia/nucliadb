@@ -19,7 +19,7 @@
 //
 
 use crate::data_point::{self, DataPointPin};
-use crate::data_point_provider::state::load_state;
+use crate::data_point_provider::state::read_state;
 use crate::data_point_provider::{IndexMetadata, SearchRequest, OPENING_FLAG, STATE};
 use crate::data_types::dtrie_ram::DTrie;
 use crate::data_types::DeleteLog;
@@ -129,7 +129,7 @@ impl Reader {
         let state_path = path.join(STATE);
         let state_file = File::open(&state_path)?;
         let version = last_modified(&state_path)?;
-        let state = load_state(&state_file)?;
+        let state = read_state(&state_file)?;
         let data_point_list = state.data_point_list;
         let delete_log = state.delete_log;
         let mut dimension = None;
@@ -169,7 +169,7 @@ impl Reader {
         }
 
         let state_file = File::open(state_path)?;
-        let state = load_state(&state_file)?;
+        let state = read_state(&state_file)?;
         let data_point_list = state.data_point_list;
         let new_delete_log = state.delete_log;
         let mut new_dimension = self.dimension;

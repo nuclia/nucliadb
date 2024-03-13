@@ -19,8 +19,8 @@
 //
 
 use crate::data_point::{self, DataPointPin, Journal};
-use crate::data_point_provider::state::load_state;
 use crate::data_point_provider::state::*;
+use crate::data_point_provider::state::{read_state, write_state};
 use crate::data_point_provider::TimeSensitiveDLog;
 use crate::data_point_provider::{IndexMetadata, OPENING_FLAG, STATE, TEMP_STATE, WRITING_FLAG};
 use crate::data_types::dtrie_ram::DTrie;
@@ -28,7 +28,6 @@ use crate::{VectorErr, VectorR};
 use fs2::FileExt;
 use nucliadb_core::tracing;
 use std::fs::{File, OpenOptions};
-use std::io::{BufWriter, Write};
 use std::mem;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -44,11 +43,9 @@ fn persist_state(path: &Path, state: &State) -> VectorR<()> {
     temporal_options.write(true);
     temporal_options.create(true);
     temporal_options.truncate(true);
-    let temporal_file = temporal_options.open(&temporal_path)?;
+    let mut temporal_file = temporal_options.open(&temporal_path)?;
 
-    let mut temporal_buffer = BufWriter::new(temporal_file);
-    bincode::serialize_into(&mut temporal_buffer, state)?;
-    temporal_buffer.flush()?;
+    write_state(&mut temporal_file, state)?;
     std::fs::rename(&temporal_path, state_path)?;
 
     Ok(())
@@ -331,7 +328,7 @@ impl Writer {
 
         let state_path = path.join(STATE);
         let state_file = File::open(state_path)?;
-        let state = load_state(&state_file)?;
+        let state = read_state(&state_file)?;
         let data_point_list = state.data_point_list;
         let delete_log = state.delete_log;
         let mut dimension = None;
@@ -381,7 +378,7 @@ impl Writer {
 
         let state_path = self.path.join(STATE);
         let state_file = File::open(state_path)?;
-        let state = load_state(&state_file)?;
+        let state = read_state(&state_file)?;
         let data_point_list = state.data_point_list;
         let new_delete_log = state.delete_log;
         let mut new_dimension = self.dimension;

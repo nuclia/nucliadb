@@ -20,24 +20,38 @@
 
 use crate::data_point::DpId;
 use crate::data_types::dtrie_ram::DTrie;
-use bincode::deserialize_from;
+use bincode::{deserialize_from, serialize_into};
 use serde::{Deserialize, Serialize};
 use std::fs::File;
-use std::io::{BufReader, Seek};
+use std::io::{BufReader, BufWriter, Read, Seek, Write};
 
-pub fn load_state(state_file: &File) -> bincode::Result<State> {
-    let mut state_buffer = BufReader::new(state_file);
-    let Ok(state) = deserialize_from(&mut state_buffer) else {
-        state_buffer.rewind()?;
-        let deprecated_state: deprecated::State = deserialize_from(state_buffer)?;
+const MAGIC_NUMBER_STATE_2: &[u8; 7] = b"STATE_2";
 
-        return Ok(State {
-            data_point_list: deprecated_state.data_point_iter().collect(),
-            delete_log: deprecated_state.delete_log,
-        });
-    };
+pub fn write_state(state_file: &mut File, state: &State) -> bincode::Result<()> {
+    let mut writer = BufWriter::new(state_file);
+    writer.write_all(MAGIC_NUMBER_STATE_2)?;
+    writer.flush()?;
+    serialize_into(&mut writer, state)
+}
 
-    Ok(state)
+pub fn read_state(state_file: &File) -> bincode::Result<State> {
+    let mut reader = BufReader::new(state_file);
+    let mut magic_number = [0; 7];
+    reader.read_exact(&mut magic_number)?;
+
+    match &magic_number {
+        MAGIC_NUMBER_STATE_2 => deserialize_from(&mut reader),
+        _ => {
+            let Ok(deprecated_state) = deserialize_from::<_, deprecated::State>(&mut reader) else {
+                reader.rewind()?;
+                return deserialize_from(&mut reader);
+            };
+            Ok(State {
+                data_point_list: deprecated_state.data_point_iter().collect(),
+                delete_log: deprecated_state.delete_log,
+            })
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Default)]
