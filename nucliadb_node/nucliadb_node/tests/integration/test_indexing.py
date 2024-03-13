@@ -270,6 +270,8 @@ class TestConcurrentIndexingFailureRecovery:
             elapsed = datetime.now() - start
             assert elapsed.seconds < 60, "too much time waiting"
 
+        await asyncio.sleep(0.5)
+
         # check all messages have been indexed
         expected_messages = len(bunch_of_shards) * resources_per_shard * 2
         assert len(index_log) == expected_messages
