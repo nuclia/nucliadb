@@ -17,15 +17,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use clap::Parser;
-use kv::*;
-use nucliadb_vectors::data_point_provider::reader::Reader;
-use nucliadb_vectors::data_point_provider::*;
-use nucliadb_vectors::formula::*;
-use serde_json::{json, Map};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+
+use clap::Parser;
+use kv::*;
+use nucliadb_vectors::data_point_provider::*;
+use nucliadb_vectors::formula::*;
+use serde_json::{json, Map};
 use vectors_benchmark::downloader::download_shard;
 use vectors_benchmark::json_writer::write_json;
 use vectors_benchmark::predict::{get_vector, PredictResults};
@@ -160,14 +160,16 @@ fn create_request(
 }
 
 fn get_num_dimensions(vectors_path: &Path) -> usize {
-    let reader = Reader::open(vectors_path).unwrap();
-    reader.embedding_dimension().unwrap() as usize
+    let reader = Index::open(vectors_path).unwrap();
+    reader.get_dimension().unwrap() as usize
 }
 
 fn test_search(dataset: &Dataset, cycles: usize) -> Vec<(String, Vec<u128>)> {
     println!("Opening vectors located at {:?}", dataset.vectors_path);
-    let reader = Reader::open(dataset.vectors_path.as_path()).unwrap();
+    let reader = Index::open(dataset.vectors_path.as_path()).unwrap();
     let mut results: Vec<(String, Vec<u128>)> = vec![];
+
+    let lock = reader.get_slock().unwrap();
 
     for (i, query) in dataset.queries.iter().enumerate() {
         let mut elapsed_times: Vec<u128> = vec![];
@@ -179,7 +181,7 @@ fn test_search(dataset: &Dataset, cycles: usize) -> Vec<(String, Vec<u128>)> {
             let search_result;
 
             let (_, elapsed_time) = measure_time!(microseconds {
-                search_result = reader.search(&query.request).unwrap();
+                search_result = reader.search(&query.request, &lock).unwrap();
 
             });
 
@@ -211,6 +213,7 @@ fn test_search(dataset: &Dataset, cycles: usize) -> Vec<(String, Vec<u128>)> {
         results.push((query.name.clone(), elapsed_times));
     }
     println!();
+    std::mem::drop(lock);
     results
 }
 

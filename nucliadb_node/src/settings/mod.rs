@@ -188,10 +188,6 @@ impl Settings {
     pub fn num_global_rayon_threads(&self) -> usize {
         self.inner.num_global_rayon_threads
     }
-
-    pub fn merge_scheduler_free_time_work_scheduling_delay(&self) -> Duration {
-        self.inner.merge_scheduler_free_time_work_scheduling_delay
-    }
 }
 
 #[cfg(test)]

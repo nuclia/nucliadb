@@ -50,14 +50,6 @@ impl InnerCache {
         }
     }
 
-    pub fn peek(&mut self, id: &ShardId) -> Option<Arc<ShardWriter>> {
-        if self.blocked_shards.contains(id) {
-            return None;
-        }
-
-        self.active_shards.get_cached(id)
-    }
-
     pub fn get(&mut self, id: &ShardId) -> NodeResult<CacheResult<ShardId, ShardWriter>> {
         if self.blocked_shards.contains(id) {
             return Err(node_error!(ShardNotFoundError("Shard {shard_path:?} is not on disk")));
@@ -125,10 +117,6 @@ impl ShardWriterCache {
         self.cache().add_active_shard(&shard_id, &shard);
 
         Ok(shard)
-    }
-
-    pub fn peek(&self, id: &ShardId) -> Option<Arc<ShardWriter>> {
-        self.cache().peek(id)
     }
 
     pub fn get(&self, id: &ShardId) -> NodeResult<Arc<ShardWriter>> {

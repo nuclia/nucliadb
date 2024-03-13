@@ -18,13 +18,11 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use super::VectorEngine;
-use nucliadb_vectors::data_point::{self, DataPointPin, Elem, LabelDictionary, Similarity};
-use nucliadb_vectors::data_point_provider::reader::Reader;
-use nucliadb_vectors::data_point_provider::writer::Writer;
+use nucliadb_vectors::data_point::{DataPoint, Elem, LabelDictionary, Similarity};
 use nucliadb_vectors::data_point_provider::*;
 use nucliadb_vectors::formula::Formula;
-use std::time::SystemTime;
+
+use super::VectorEngine;
 
 lazy_static::lazy_static! {
     static ref FORMULA: Formula = Formula::new();
@@ -50,37 +48,24 @@ impl<'a> SearchRequest for Request<'a> {
         -1.0
     }
 }
-
-impl VectorEngine for Writer {
+impl VectorEngine for Index {
     fn add_batch(&mut self, batch_id: String, keys: Vec<String>, embeddings: Vec<Vec<f32>>) {
-        let temporal_mark = SystemTime::now();
+        let temporal_mark = TemporalMark::now();
         let similarity = Similarity::Cosine;
-
         let mut elems = vec![];
         for (key, vector) in keys.into_iter().zip(embeddings.into_iter()) {
             let elem = Elem::new(key, vector, LabelDictionary::new(vec![]), None);
             elems.push(elem);
         }
-
-        let data_point_pin = DataPointPin::create_pin(self.location()).unwrap();
-        data_point::create(&data_point_pin, elems, Some(temporal_mark), similarity).unwrap();
-
-        self.add_data_point(data_point_pin).unwrap();
-        self.record_delete(batch_id.as_bytes(), temporal_mark);
-        self.commit().unwrap();
-    }
-
-    fn search(&self, _no_results: usize, _query: &[f32]) {
-        unimplemented!()
-    }
-}
-
-impl VectorEngine for Reader {
-    fn add_batch(&mut self, _batch_id: String, _keys: Vec<String>, _embeddings: Vec<Vec<f32>>) {
-        unimplemented!()
+        let new_dp = DataPoint::new(self.location(), elems, Some(temporal_mark), similarity).unwrap();
+        let lock = self.get_slock().unwrap();
+        self.add(new_dp, &lock).unwrap();
+        self.delete(batch_id, temporal_mark, &lock);
+        self.commit(&lock).unwrap();
     }
 
     fn search(&self, no_results: usize, query: &[f32]) {
-        self.search(&Request(no_results, query)).unwrap();
+        let lock = self.get_slock().unwrap();
+        self.search(&Request(no_results, query), &lock).unwrap();
     }
 }

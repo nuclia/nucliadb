@@ -17,16 +17,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use byte_unit::Byte;
-use nucliadb_vectors::data_point_provider::reader::Reader;
-use nucliadb_vectors::data_point_provider::writer::Writer;
-use nucliadb_vectors::data_point_provider::IndexMetadata;
-use serde_json::json;
 use std::error::Error;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::{fs, thread};
+
+use byte_unit::Byte;
+use nucliadb_vectors::data_point_provider::{Index, IndexMetadata};
+use serde_json::json;
 use vectors_benchmark::cli_interface::*;
 use vectors_benchmark::json_writer::write_json;
 
@@ -68,14 +67,14 @@ fn main() -> std::io::Result<()> {
     let location = at.path().join("vectors");
     println!("Vector location: {:?}", location);
 
-    let writer = Writer::new(&location, IndexMetadata::default()).unwrap();
+    let writer = Index::new(&location, IndexMetadata::default()).unwrap();
     let batch_size = args.batch_size();
     let plotw = PlotWriter::new(args.writer_plot().unwrap());
     let vector_it = RandomVectors::new(args.embedding_dim()).take(args.index_len());
     let writer_handler = thread::spawn(move || writer::write_benchmark(batch_size, writer, plotw, vector_it));
 
     let stop = stop_point.clone();
-    let reader = Reader::open(&location).unwrap();
+    let reader = Index::open(&location).unwrap();
     let no_results = args.neighbours();
     let plotw = PlotWriter::new(args.reader_plot().unwrap());
     let query_it = RandomVectors::new(args.embedding_dim());

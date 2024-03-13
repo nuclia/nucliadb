@@ -145,9 +145,8 @@ pub async fn replicate_shard(
     // GC after replication to clean up old segments
     // We only do this here because GC will not be done otherwise on a secondary
     // XXX this should be removed once we refactor gc/merging
-    shard.reload()?;
     let sshard = Arc::clone(&shard); // moved shard for gc
-    tokio::task::spawn_blocking(move || sshard.collect_garbage()).await?.expect("GC failed");
+    tokio::task::spawn_blocking(move || sshard.gc()).await?.expect("GC failed");
 
     Ok(())
 }
