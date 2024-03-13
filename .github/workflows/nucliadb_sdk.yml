@@ -54,6 +54,7 @@ jobs:
               - 'nucliadb_core/**'
               - 'nucliadb_node/src/**'
               - 'nucliadb_paragraphs/**'
+              - 'nucliadb_paragraphs/**'
               - 'nucliadb_procs/**'
               - 'nucliadb_relations/**'
               - 'nucliadb_relations2/**'
