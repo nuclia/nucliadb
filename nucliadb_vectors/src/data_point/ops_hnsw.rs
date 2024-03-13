@@ -21,6 +21,7 @@
 use std::cmp::{Ordering, Reverse};
 use std::collections::{BinaryHeap, HashMap, HashSet};
 
+use bit_set::BitSet;
 use ram_hnsw::*;
 use rand::distributions::Uniform;
 use rand::prelude::*;
@@ -28,35 +29,6 @@ use rand::rngs::SmallRng;
 
 use super::*;
 use crate::data_point::params;
-
-#[derive(Default)]
-struct BitField(Vec<u32>);
-
-impl BitField {
-    fn set(&mut self, pos: usize) {
-        let index = pos / 32;
-        let elem = match self.0.get(index) {
-            Some(e) => *e,
-            None => {
-                let add = 1 + index - self.0.len();
-                self.0.extend((0..add).map(|_| 0));
-                0
-            }
-        };
-        let bit = pos % 32;
-        let mask = 1 << bit;
-        self.0[index] = elem | mask;
-    }
-
-    fn get(&self, pos: usize) -> bool {
-        let Some(elem) = self.0.get(pos / 32) else {
-            return false;
-        };
-        let bit = pos % 32;
-        let mask = 1 << bit;
-        elem & mask > 0
-    }
-}
 
 /// Implementors of this trait can guide the hnsw search
 pub trait DataRetriever: std::marker::Sync {
@@ -168,7 +140,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         // We just need to perform BFS, the replacement is the closest node to the actual
         // best solution. This algorithm takes a lazy approach to computing the similarity of
         // candidates.
-        let mut visited = BitField::default();
+        let mut visited = BitSet::new();
         let mut candidates = BinaryHeap::new();
         let mut results = BinaryHeap::new();
 
@@ -189,8 +161,8 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                 // Evaluate a candidate
                 (Some(Cnx(cn, _)), mut worst_result) => {
                     for (y, _) in layer.get_out_edges(cn) {
-                        if !visited.get(y.0) {
-                            visited.set(y.0);
+                        if !visited.contains(y.0) {
+                            visited.insert(y.0);
                             let similarity = self.similarity(query, y);
 
                             let better = worst_result.map(|Reverse(Cnx(_, ws))| similarity > ws).unwrap_or(true);
