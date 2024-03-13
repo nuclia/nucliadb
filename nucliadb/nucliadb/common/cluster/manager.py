@@ -196,6 +196,7 @@ class KBShardManager:
 
         return shard
 
+    # TODO: logic about creation and read-only shards should be decoupled
     async def create_shard_by_kbid(
         self,
         txn: Transaction,
@@ -269,13 +270,15 @@ class KBShardManager:
             await self.rollback_shard(shard)
             raise e
 
+        # set previous shard as read only, we only have one writable shard at a
+        # time
+        if len(kb_shards.shards) > 0:
+            kb_shards.shards[-1].read_only = True
+
         # Append the created shard and make `actual` point to it.
         kb_shards.shards.append(shard)
         # B/c with Shards.actual
         kb_shards.actual += 1
-        # set previous writable shard as read only
-        if len(kb_shards.shards) > 1:
-            kb_shards.shards[-1].read_only = True
 
         await shards_data_manager.update_kb_shards(txn, kbid, kb_shards)
 

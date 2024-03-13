@@ -23,10 +23,9 @@ from unittest import mock
 import pytest
 
 from nucliadb.common.cluster import manager
-from nucliadb.common.cluster.exceptions import NodeClusterSmall
+from nucliadb.common.cluster.exceptions import NodeClusterSmall, NoHealthyNodeAvailable
 from nucliadb.common.cluster.index_node import IndexNode
 from nucliadb.common.cluster.settings import settings
-from nucliadb.common.cluster.exceptions import NoHealthyNodeAvailable
 from nucliadb_protos import writer_pb2
 
 
