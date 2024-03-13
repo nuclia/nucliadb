@@ -29,7 +29,7 @@ use nucliadb_core::protos::{
     DocumentSearchRequest, DocumentSearchResponse, EdgeList, GetShardRequest, ParagraphSearchRequest,
     ParagraphSearchResponse, RelationPrefixSearchRequest, RelationSearchRequest, RelationSearchResponse, SearchRequest,
     SearchResponse, Shard, ShardFile, ShardFileChunk, ShardFileList, StreamRequest, SuggestFeatures, SuggestRequest,
-    SuggestResponse, TypeList, VectorSearchRequest, VectorSearchResponse,
+    SuggestResponse, VectorSearchRequest, VectorSearchResponse,
 };
 use nucliadb_core::query_planner;
 use nucliadb_core::relations::*;
@@ -214,11 +214,6 @@ impl ShardReader {
     #[tracing::instrument(skip_all)]
     pub fn get_relations_edges(&self) -> NodeResult<EdgeList> {
         read_rw_lock(&self.relation_reader).get_edges()
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub fn get_relations_types(&self) -> NodeResult<TypeList> {
-        read_rw_lock(&self.relation_reader).get_node_types()
     }
 
     #[measure(actor = "shard", metric = "new")]

@@ -28,7 +28,6 @@ use std::{
 };
 
 use anyhow::anyhow;
-use nucliadb_core::metrics::vectors::MergeSource;
 use nucliadb_core::vectors::MergeMetrics;
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::{Receiver, Sender};

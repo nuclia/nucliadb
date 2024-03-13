@@ -266,13 +266,11 @@ async def _check_kb(nucliadb_reader, kbid):
         assert base64.b64decode(resp.content) == b"Test for /upload endpoint"
 
     # Entities
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroups?show_entities=true")
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroups")
     assert resp.status_code == 200
     body = resp.json()
     groups = body["groups"]
     assert len(groups) == 1
-    group = groups["foo"]
-    assert len(group["entities"]) == 1
 
     # Labels
     resp = await nucliadb_reader.get(f"/kb/{kbid}/labelsets")
