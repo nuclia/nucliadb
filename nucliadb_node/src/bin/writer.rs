@@ -84,6 +84,9 @@ async fn main() -> NodeResult<()> {
     if !data_path.exists() {
         std::fs::create_dir(data_path.clone())?;
     }
+
+    lifecycle::initialize_writer(settings.clone())?;
+
     let node_metadata = NodeMetadata::new(settings.clone()).await?;
     let (metadata_sender, metadata_receiver) = tokio::sync::mpsc::unbounded_channel();
 
@@ -95,7 +98,6 @@ async fn main() -> NodeResult<()> {
     let (shutdown_notifier, shutdown_notified) = get_shutdown_notifier();
     let shard_cache = Arc::new(ShardWriterCache::new(settings.clone()));
 
-    lifecycle::initialize_writer(settings.clone())?;
     lifecycle::initialize_merger(Arc::clone(&shard_cache), settings.clone())?;
 
     let mut replication_task = None;
