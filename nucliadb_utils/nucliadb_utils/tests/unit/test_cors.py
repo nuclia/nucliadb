@@ -595,7 +595,7 @@ def test_cors_allowed_origin_does_not_leak_between_credentialed_requests(
     assert "access-control-allow-credentials" not in response.headers
 
 
-def test_cors_vary_header_is_properly_set_when_allow_origins_is_not_wildcard_2(
+def test_cors_x_nucliadb_cors_allowed_domains(
     test_client_factory: TestClientFactory,
 ) -> None:
     def homepage(request: Request) -> PlainTextResponse:
@@ -617,13 +617,17 @@ def test_cors_vary_header_is_properly_set_when_allow_origins_is_not_wildcard_2(
     client = test_client_factory(app)
 
     response = client.get("/", headers={"Origin": "https://example.org"})
+
     assert response.status_code == 200
     assert response.headers["vary"] == "Accept-Encoding"
+    assert "access-control-allow-origin" not in response.headers
 
     response = client.get("/", headers={"Origin": "https://example-a.org"})
     assert response.status_code == 200
     assert response.headers["vary"] == "Accept-Encoding, Origin"
+    assert response.headers["access-control-allow-origin"] == "https://example-a.org"
 
     response = client.get("/", headers={"Origin": "https://example-b.org"})
     assert response.status_code == 200
     assert response.headers["vary"] == "Accept-Encoding, Origin"
+    assert response.headers["access-control-allow-origin"] == "https://example-b.org"
