@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb.common.cluster.rollover import rollover_kb_shards
 from nucliadb.migrator.context import ExecutionContext
 
 
@@ -26,8 +25,4 @@ async def migrate(context: ExecutionContext) -> None:
 
 
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
-    """
-    We only need 1 rollover migration defined at a time; otherwise, we will
-    possibly run many for a kb when we only ever need to run one
-    """
-    await rollover_kb_shards(context, kbid)
+    ...

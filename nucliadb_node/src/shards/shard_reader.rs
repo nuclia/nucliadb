@@ -106,16 +106,16 @@ pub struct ShardReader {
     paragraph_reader: ParagraphsReaderPointer,
     vector_reader: VectorsReaderPointer,
     relation_reader: RelationsReaderPointer,
-    document_service_version: i32,
-    paragraph_service_version: i32,
-    vector_service_version: i32,
-    relation_service_version: i32,
+    document_version: i32,
+    paragraph_version: i32,
+    vector_version: i32,
+    relation_version: i32,
 }
 
 impl ShardReader {
     #[tracing::instrument(skip_all)]
     pub fn text_version(&self) -> DocumentService {
-        match self.document_service_version {
+        match self.document_version {
             0 => DocumentService::DocumentV0,
             1 => DocumentService::DocumentV1,
             2 => DocumentService::DocumentV2,
@@ -125,16 +125,17 @@ impl ShardReader {
 
     #[tracing::instrument(skip_all)]
     pub fn paragraph_version(&self) -> ParagraphService {
-        match self.paragraph_service_version {
+        match self.paragraph_version {
             0 => ParagraphService::ParagraphV0,
             1 => ParagraphService::ParagraphV1,
+            2 => ParagraphService::ParagraphV2,
             i => panic!("Unknown paragraph version {i}"),
         }
     }
 
     #[tracing::instrument(skip_all)]
     pub fn vector_version(&self) -> VectorService {
-        match self.vector_service_version {
+        match self.vector_version {
             0 => VectorService::VectorV0,
             1 => VectorService::VectorV1,
             i => panic!("Unknown vector version {i}"),
@@ -143,7 +144,7 @@ impl ShardReader {
 
     #[tracing::instrument(skip_all)]
     pub fn relation_version(&self) -> RelationService {
-        match self.relation_service_version {
+        match self.relation_version {
             0 => RelationService::RelationV0,
             1 => RelationService::RelationV1,
             2 => RelationService::RelationV2,
@@ -283,10 +284,10 @@ impl ShardReader {
             paragraph_reader: paragraphs.unwrap(),
             vector_reader: vectors.unwrap(),
             relation_reader: relations.unwrap(),
-            document_service_version: versions.version_texts() as i32,
-            paragraph_service_version: versions.version_paragraphs() as i32,
-            vector_service_version: versions.version_vectors() as i32,
-            relation_service_version: versions.version_relations() as i32,
+            document_version: versions.version_texts() as i32,
+            paragraph_version: versions.version_paragraphs() as i32,
+            vector_version: versions.version_vectors() as i32,
+            relation_version: versions.version_relations() as i32,
         })
     }
 
@@ -402,7 +403,7 @@ impl ShardReader {
     #[measure(actor = "shard", metric = "request/search")]
     #[tracing::instrument(skip_all)]
     pub fn search(&self, search_request: SearchRequest) -> NodeResult<SearchResponse> {
-        let query_plan = query_planner::build_query_plan(search_request)?;
+        let query_plan = query_planner::build_query_plan(self.paragraph_version, search_request)?;
 
         let search_id = uuid::Uuid::new_v4().to_string();
         let span = tracing::Span::current();
