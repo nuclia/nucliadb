@@ -117,7 +117,7 @@ async def find(
     search_results.shards = queried_shards
     search_results.autofilters = autofilters
 
-    if search_time > settings.slow_query_log_threshold:
+    if search_time > settings.slow_find_log_threshold:
         logger.warning(
             "Slow query",
             extra={

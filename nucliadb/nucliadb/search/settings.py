@@ -30,7 +30,7 @@ class Settings(DriverSettings):
         title="Max prompt context chars",
         description="The maximum number of characters to use for prompt context",
     )
-    slow_query_log_threshold: float = Field(
+    slow_find_log_threshold: float = Field(
         default=3.0,
         title="Slow query log threshold",
         description="The threshold in seconds for logging slow queries",
