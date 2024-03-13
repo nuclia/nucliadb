@@ -19,6 +19,7 @@
 #
 from nucliadb.common.cluster.rollover import rollover_kb_shards
 from nucliadb.migrator.context import ExecutionContext
+from nucliadb_utils.settings import running_settings
 
 
 async def migrate(context: ExecutionContext) -> None:
@@ -30,4 +31,5 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
     We only need 1 rollover migration defined at a time; otherwise, we will
     possibly run many for a kb when we only ever need to run one
     """
-    await rollover_kb_shards(context, kbid)
+    if running_settings.running_environment == "stage":
+        await rollover_kb_shards(context, kbid)
