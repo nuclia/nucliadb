@@ -18,369 +18,137 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet, LinkedList};
-use std::mem;
-use std::path::{Path, PathBuf};
-use std::time::SystemTime;
-
-use serde::{Deserialize, Serialize};
-
-use super::{SearchRequest, VectorR};
-use crate::data_point::{DataPoint, DpId, Journal, Neighbour, Similarity};
+use crate::data_point::DpId;
 use crate::data_types::dtrie_ram::DTrie;
-use crate::data_types::DeleteLog;
+use bincode::deserialize_from;
+use serde::{Deserialize, Serialize};
+use std::fs::File;
+use std::io::{BufReader, Seek};
 
-const BUFFER_CAP: usize = 5;
+pub fn load_state(state_file: &File) -> bincode::Result<State> {
+    let mut state_buffer = BufReader::new(state_file);
+    let Ok(state) = deserialize_from(&mut state_buffer) else {
+        state_buffer.rewind()?;
+        let deprecated_state: deprecated::State = deserialize_from(state_buffer)?;
 
-#[derive(Serialize, Deserialize)]
-struct WorkUnit {
-    // This field is deprecated.
-    pub age: SystemTime,
-    pub load: Vec<Journal>,
-}
-impl Default for WorkUnit {
-    fn default() -> Self {
-        WorkUnit::new()
-    }
-}
-impl WorkUnit {
-    pub fn new() -> WorkUnit {
-        WorkUnit {
-            age: SystemTime::now(),
-            load: vec![],
-        }
-    }
-    pub fn add_unit(&mut self, dp: Journal) {
-        self.load.push(dp);
-    }
-    pub fn size(&self) -> usize {
-        self.load.len()
-    }
+        return Ok(State {
+            data_point_list: deprecated_state.data_point_iter().collect(),
+            delete_log: deprecated_state.delete_log,
+        });
+    };
+
+    Ok(state)
 }
 
-#[derive(Clone, Copy)]
-struct TimeSensitiveDLog<'a> {
-    dlog: &'a DTrie,
-    time: SystemTime,
-}
-impl<'a> DeleteLog for TimeSensitiveDLog<'a> {
-    fn is_deleted(&self, key: &[u8]) -> bool {
-        self.dlog.get(key).map(|t| t > self.time).unwrap_or_default()
-    }
-}
-
-// Fixed-sized sorted collection
-struct Fssc {
-    size: usize,
-    with_duplicates: bool,
-    seen: HashSet<Vec<u8>>,
-    buff: HashMap<Neighbour, f32>,
-}
-impl From<Fssc> for Vec<Neighbour> {
-    fn from(fssv: Fssc) -> Self {
-        let mut result: Vec<_> = fssv.buff.into_keys().collect();
-        result.sort_by(|a, b| b.score().partial_cmp(&a.score()).unwrap_or(Ordering::Less));
-        result
-    }
-}
-impl Fssc {
-    fn is_full(&self) -> bool {
-        self.buff.len() == self.size
-    }
-    fn new(size: usize, with_duplicates: bool) -> Fssc {
-        Fssc {
-            size,
-            with_duplicates,
-            seen: HashSet::new(),
-            buff: HashMap::with_capacity(size),
-        }
-    }
-    fn add(&mut self, candidate: Neighbour) {
-        if !self.with_duplicates && self.seen.contains(candidate.vector()) {
-            return;
-        } else if !self.with_duplicates {
-            let vector = candidate.vector().to_vec();
-            self.seen.insert(vector);
-        }
-
-        let score = candidate.score();
-        if self.is_full() {
-            let smallest_bigger = self
-                .buff
-                .iter()
-                .map(|(key, score)| (key.clone(), *score))
-                .filter(|(_, v)| score > *v)
-                .min_by(|(_, v0), (_, v1)| v0.partial_cmp(v1).unwrap())
-                .map(|(key, _)| key);
-            if let Some(key) = smallest_bigger {
-                self.buff.remove_entry(&key);
-                self.buff.insert(candidate, score);
-            }
-        } else {
-            self.buff.insert(candidate, score);
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Default)]
 pub struct State {
-    // Deprecated, location must be passed as an argument.
-    // WARNING: Can not use serde::skip nor move this field due to a bug in serde.
-    #[allow(unused)]
-    #[deprecated]
-    location: PathBuf,
-
-    // Total number of nodes stored. Some
-    // may be marked as deleted but are waiting
-    // for a merge to be fully removed.
-    no_nodes: usize,
-
-    // Current work unit
-    current: WorkUnit,
-
     // Trie containing the deleted keys and the
     // time when they were deleted
-    delete_log: DTrie,
+    pub delete_log: DTrie,
 
-    // Already closed WorkUnits waiting to be merged
-    work_stack: LinkedList<WorkUnit>,
-
-    // This field is deprecated and is only
-    // used for old states. Always use
-    // the data_point journal for time references
-    data_points: HashMap<DpId, SystemTime>,
-
-    // Deprecated field, not all vector clusters are
-    // identified by a resource.
-    #[serde(skip)]
-    #[allow(unused)]
-    #[deprecated]
-    resources: HashMap<String, usize>,
+    // Available data points
+    #[serde(default)]
+    pub data_point_list: Vec<DpId>,
 }
 impl State {
-    fn data_point_iterator(&self) -> impl Iterator<Item = &Journal> {
-        self.work_stack.iter().flat_map(|u| u.load.iter()).chain(self.current.load.iter())
-    }
-    fn close_work_unit(&mut self) {
-        let prev = mem::replace(&mut self.current, WorkUnit::new());
-        self.work_stack.push_front(prev);
-    }
-    fn creation_time(&self, journal: Journal) -> SystemTime {
-        self.data_points
-            // if data_points contains a value for the id,
-            // this data point is older than the refactor.
-            .get(&journal.id())
-            .cloned()
-            // In the case the data_point was created
-            // after the refactor, no entry for it appears.
-            // Is safe to use the journal time.
-            .unwrap_or_else(|| journal.time())
-    }
-    #[allow(deprecated)]
     pub fn new() -> State {
-        State {
-            location: PathBuf::default(),
-            no_nodes: usize::default(),
-            current: WorkUnit::default(),
-            delete_log: DTrie::default(),
-            work_stack: LinkedList::default(),
-            data_points: HashMap::default(),
-            resources: HashMap::default(),
-        }
-    }
-    pub fn search(
-        &self,
-        location: &Path,
-        request: &dyn SearchRequest,
-        similarity: Similarity,
-    ) -> VectorR<Vec<Neighbour>> {
-        let query = request.get_query();
-        let filter = request.get_filter();
-        let with_duplicates = request.with_duplicates();
-        let no_results = request.no_results();
-        let min_score = request.min_score();
-        let mut ffsv = Fssc::new(request.no_results(), with_duplicates);
-        for journal in self.data_point_iterator().copied() {
-            let delete_log = self.delete_log(journal);
-            let data_point = DataPoint::open(location, journal.id())?;
-            let partial_solution =
-                data_point.search(&delete_log, query, filter, with_duplicates, no_results, similarity, min_score);
-            for candidate in partial_solution {
-                ffsv.add(candidate);
-            }
-        }
-        Ok(ffsv.into())
-    }
-    pub fn remove(&mut self, id: &str, deleted_since: SystemTime) {
-        self.delete_log.insert(id.as_bytes(), deleted_since);
-    }
-    pub fn add(&mut self, journal: Journal) {
-        self.no_nodes += journal.no_nodes();
-        self.current.add_unit(journal);
-        if self.current.size() == BUFFER_CAP {
-            self.close_work_unit();
-        }
-    }
-
-    /// The [`WorkUnit`] type is a bad abstraction, and this function is
-    /// a result of it. This is the only way of giving fine grained control
-    /// of merges to [State] clients.
-    /// In the future, the state should just hold a list of journals.
-    pub fn rebuilt_work_stack_with(&mut self, journals: Vec<Journal>) {
-        let mut work_stack = LinkedList::new();
-        let mut current_work_unit = WorkUnit::new();
-        let mut number_of_nodes = 0;
-        let mut age_cap = SystemTime::now();
-
-        for journal in journals {
-            number_of_nodes += journal.no_nodes();
-            age_cap = std::cmp::min(age_cap, journal.time());
-            current_work_unit.add_unit(journal);
-            if current_work_unit.size() == BUFFER_CAP {
-                let closed_work_unit = mem::take(&mut current_work_unit);
-                work_stack.push_back(closed_work_unit);
-            }
-        }
-        if current_work_unit.size() > 0 {
-            work_stack.push_back(current_work_unit);
-        }
-
-        self.delete_log.prune(age_cap);
-        self.no_nodes = number_of_nodes;
-        self.work_stack = work_stack;
-        self.current = WorkUnit::new();
-    }
-
-    pub fn dpid_iter(&self) -> impl Iterator<Item = Journal> + '_ {
-        self.data_point_iterator().copied()
-    }
-
-    pub fn keys(&self, location: &Path) -> VectorR<Vec<String>> {
-        let mut keys = vec![];
-        for journal in self.data_point_iterator().copied() {
-            let delete_log = self.delete_log(journal);
-            let dp_id = journal.id();
-            let data_point = DataPoint::open(location, dp_id)?;
-            let mut results = data_point.get_keys(&delete_log);
-            keys.append(&mut results);
-        }
-        Ok(keys)
-    }
-    pub fn delete_log(&self, journal: Journal) -> impl DeleteLog + '_ {
-        TimeSensitiveDLog {
-            time: self.creation_time(journal),
-            dlog: &self.delete_log,
-        }
-    }
-    pub fn no_nodes(&self) -> usize {
-        self.no_nodes
-    }
-    pub fn work_stack_len(&self) -> usize {
-        self.work_stack.len()
-    }
-    pub fn stored_len(&self, location: &Path) -> VectorR<Option<u64>> {
-        let Some(journal) = self.data_point_iterator().next() else {
-            return Ok(None);
-        };
-        let data_point = DataPoint::open(location, journal.id())?;
-        Ok(data_point.stored_len())
+        State::default()
     }
 }
 
-impl Default for State {
-    fn default() -> Self {
-        Self::new()
+mod deprecated {
+    use crate::data_point::{DpId, Journal};
+    use crate::data_types::dtrie_ram::DTrie;
+    use serde::{Deserialize, Serialize};
+    use std::collections::{HashMap, LinkedList};
+    use std::path::PathBuf;
+    use std::time::SystemTime;
+
+    #[derive(Serialize, Deserialize)]
+    struct WorkUnit {
+        // This field is deprecated.
+        pub age: SystemTime,
+        pub load: Vec<Journal>,
     }
-}
-
-#[cfg(test)]
-mod test {
-    use std::path::Path;
-
-    use rand::random;
-    use uuid::Uuid;
-
-    use super::*;
-    use crate::data_point::{Elem, LabelDictionary, Similarity};
-
-    #[test]
-    fn fssv_test() {
-        let values: &[Neighbour] = &[
-            Neighbour::dummy_neighbour(b"k0", 4.0),
-            Neighbour::dummy_neighbour(b"k1", 3.0),
-            Neighbour::dummy_neighbour(b"k2", 2.0),
-            Neighbour::dummy_neighbour(b"k3", 1.0),
-            Neighbour::dummy_neighbour(b"k4", 0.0),
-        ];
-
-        let mut fssv = Fssc::new(2, true);
-        values.iter().for_each(|i| fssv.add(i.clone()));
-        let result: Vec<_> = fssv.into();
-        assert_eq!(result[0], values[0]);
-        assert_eq!(result[0].score(), values[0].score());
-        assert_eq!(result[1], values[1]);
-        assert_eq!(result[1].score(), values[1].score());
+    impl Default for WorkUnit {
+        fn default() -> Self {
+            WorkUnit::new()
+        }
     }
-
-    #[test]
-    fn fssv_test_no_duplicates() {
-        let values: &[Neighbour] = &[
-            Neighbour::dummy_neighbour(b"k0", 4.0),
-            Neighbour::dummy_neighbour(b"k1", 3.0),
-            Neighbour::dummy_neighbour(b"k2", 2.0),
-            Neighbour::dummy_neighbour(b"k3", 1.0),
-            Neighbour::dummy_neighbour(b"k4", 0.0),
-        ];
-
-        let mut fssv = Fssc::new(2, false);
-        values.iter().for_each(|i| fssv.add(i.clone()));
-        let result: Vec<_> = fssv.into();
-        assert_eq!(result.len(), 1);
-    }
-
-    struct DataPointProducer<'a> {
-        dimension: usize,
-        path: &'a Path,
-    }
-    impl<'a> DataPointProducer<'a> {
-        pub fn new(path: &'a Path) -> DataPointProducer<'a> {
-            DataPointProducer {
-                dimension: 12,
-                path,
+    impl WorkUnit {
+        pub fn new() -> WorkUnit {
+            WorkUnit {
+                age: SystemTime::now(),
+                load: vec![],
             }
         }
     }
-    impl<'a> Iterator for DataPointProducer<'a> {
-        type Item = DataPoint;
-        fn next(&mut self) -> Option<Self::Item> {
-            let no_vectors = random::<usize>() % 20;
-            let mut elems = vec![];
-            for _ in 0..no_vectors {
-                let key = Uuid::new_v4().to_string();
-                let labels = LabelDictionary::new(vec![]);
-                let vector = (0..self.dimension).map(|_| random::<f32>()).collect::<Vec<_>>();
-                elems.push(Elem::new(key, vector, labels, None));
-            }
-            Some(DataPoint::new(self.path, elems, None, Similarity::Cosine).unwrap())
+
+    #[derive(Serialize, Deserialize)]
+    pub struct State {
+        // Deprecated, location must be passed as an argument.
+        // WARNING: Can not use serde::skip nor move this field due to a bug in serde.
+        #[allow(unused)]
+        #[deprecated]
+        location: PathBuf,
+
+        // Total number of nodes stored. Some
+        // may be marked as deleted but are waiting
+        // for a merge to be fully removed.
+        no_nodes: usize,
+
+        // Current work unit
+        current: WorkUnit,
+
+        // Trie containing the deleted keys and the
+        // time when they were deleted
+        pub delete_log: DTrie,
+
+        // Already closed WorkUnits waiting to be merged
+        // Consider this field deprecated in favor of data_points.
+        // WorkUnit is a bad abstraction that adds to much complexity.
+        // The goal is to remove it in a future refactor.
+        work_stack: LinkedList<WorkUnit>,
+
+        // This field is deprecated and is only
+        // used for old states. Always use
+        // the data_point journal for time references
+        data_points: HashMap<DpId, SystemTime>,
+
+        // Deprecated field, not all vector clusters are
+        // identified by a resource.
+        #[serde(skip)]
+        #[allow(unused)]
+        #[deprecated]
+        resources: HashMap<String, usize>,
+    }
+
+    impl Default for State {
+        fn default() -> Self {
+            Self::new()
         }
     }
 
-    #[test]
-    fn state_test() {
-        let dir = tempfile::TempDir::new().unwrap();
-        let mut state = State::new();
-        let no_nodes = DataPointProducer::new(dir.path())
-            .take(5)
-            .map(|dp| {
-                let journal = dp.journal();
-                let no_nodes = journal.no_nodes();
-                state.add(journal);
-                no_nodes
-            })
-            .sum::<usize>();
-        assert_eq!(state.no_nodes(), no_nodes);
-        assert_eq!(state.work_stack.len(), 1);
-        assert_eq!(state.current.size(), 0);
+    impl State {
+        fn work_stack_iterator(&self) -> impl Iterator<Item = &Journal> {
+            self.work_stack.iter().flat_map(|u| u.load.iter()).chain(self.current.load.iter())
+        }
+
+        #[allow(deprecated)]
+        pub fn new() -> State {
+            State {
+                location: PathBuf::default(),
+                no_nodes: usize::default(),
+                current: WorkUnit::default(),
+                delete_log: DTrie::default(),
+                work_stack: LinkedList::default(),
+                data_points: HashMap::default(),
+                resources: HashMap::default(),
+            }
+        }
+
+        pub fn data_point_iter(&self) -> impl Iterator<Item = DpId> + '_ {
+            self.work_stack_iterator().map(|journal| journal.id())
+        }
     }
 }

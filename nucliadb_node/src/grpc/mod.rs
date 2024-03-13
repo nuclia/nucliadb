@@ -23,9 +23,11 @@
 //! This is a high level interface that gives access to the index node
 //! functionalities
 
+pub mod collect_garbage;
 pub mod grpc_reader;
 pub mod grpc_writer;
 pub mod middleware;
+pub mod update;
 
 pub use grpc_reader::NodeReaderGRPCDriver;
 pub use grpc_writer::NodeWriterGRPCDriver;

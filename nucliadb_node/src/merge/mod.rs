@@ -16,14 +16,14 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
+//
 
-use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
-use std::path::PathBuf;
+pub mod errors;
+mod global;
+mod request;
+mod scheduler;
+mod work;
 
-#[derive(Serialize, Deserialize, Default)]
-pub struct State {
-    #[allow(unused)]
-    location: PathBuf,
-    pub indexes: HashSet<String>,
-}
+pub use global::{global_merger, install_global, stop_global_merger};
+pub use request::{MergePriority, MergeRequest, MergeWaiter};
+pub use scheduler::MergeScheduler;

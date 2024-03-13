@@ -16,6 +16,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use crate::disk_structure::*;
+use crate::shards::metadata::ShardMetadata;
+use crate::shards::versions::Versions;
+use crate::telemetry::run_with_telemetry;
 use crossbeam_utils::thread as crossbeam_thread;
 use nucliadb_core::paragraphs::*;
 use nucliadb_core::prelude::*;
@@ -41,11 +45,7 @@ use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
-
-use crate::disk_structure::*;
-use crate::shards::metadata::ShardMetadata;
-use crate::shards::versions::Versions;
-use crate::telemetry::run_with_telemetry;
+use std::sync::Arc;
 
 const MAX_SUGGEST_COMPOUND_WORDS: usize = 3;
 const MIN_VIABLE_PREFIX_SUGGEST: usize = 1;
@@ -161,11 +161,11 @@ impl ShardReader {
         let texts = self.text_reader.clone();
 
         let info = info_span!(parent: &span, "text count");
-        let text_task = || run_with_telemetry(info, move || texts.count());
+        let text_task = || run_with_telemetry(info, move || read_rw_lock(&texts).count());
         let info = info_span!(parent: &span, "paragraph count");
-        let paragraph_task = || run_with_telemetry(info, move || paragraphs.count());
+        let paragraph_task = || run_with_telemetry(info, move || read_rw_lock(&paragraphs).count());
         let info = info_span!(parent: &span, "vector count");
-        let vector_task = || run_with_telemetry(info, move || vectors.count(&request.vectorset));
+        let vector_task = || run_with_telemetry(info, move || read_rw_lock(&vectors).count(&request.vectorset));
 
         let mut text_result = Ok(0);
         let mut paragraph_result = Ok(0);
@@ -193,27 +193,27 @@ impl ShardReader {
 
     #[tracing::instrument(skip_all)]
     pub fn get_text_keys(&self) -> NodeResult<Vec<String>> {
-        self.text_reader.stored_ids()
+        read_rw_lock(&self.text_reader).stored_ids()
     }
 
     #[tracing::instrument(skip_all)]
     pub fn get_paragraphs_keys(&self) -> NodeResult<Vec<String>> {
-        self.paragraph_reader.stored_ids()
+        read_rw_lock(&self.paragraph_reader).stored_ids()
     }
 
     #[tracing::instrument(skip_all)]
     pub fn get_vectors_keys(&self) -> NodeResult<Vec<String>> {
-        self.vector_reader.stored_ids()
+        read_rw_lock(&self.vector_reader).stored_ids()
     }
 
     #[tracing::instrument(skip_all)]
     pub fn get_relations_keys(&self) -> NodeResult<Vec<String>> {
-        self.relation_reader.stored_ids()
+        read_rw_lock(&self.relation_reader).stored_ids()
     }
 
     #[tracing::instrument(skip_all)]
     pub fn get_relations_edges(&self) -> NodeResult<EdgeList> {
-        self.relation_reader.get_edges()
+        read_rw_lock(&self.relation_reader).get_edges()
     }
 
     #[measure(actor = "shard", metric = "new")]
@@ -324,7 +324,7 @@ impl ShardReader {
         let prefixes = Self::split_suggest_query(request.body.clone(), MAX_SUGGEST_COMPOUND_WORDS);
 
         let suggest_paragraphs_task = suggest_paragraphs.then(|| {
-            let paragraph_task = move || paragraphs_reader_service.suggest(&request);
+            let paragraph_task = move || read_rw_lock(&paragraphs_reader_service).suggest(&request);
             let info = info_span!(parent: &span, "paragraph suggest");
             || run_with_telemetry(info, paragraph_task)
         });
@@ -345,7 +345,9 @@ impl ShardReader {
                         },
                     );
 
-                let responses = requests.map(|request| relations_reader_service.search(&request)).collect::<Vec<_>>();
+                let responses = requests
+                    .map(|request| read_rw_lock(&relations_reader_service).search(&request))
+                    .collect::<Vec<_>>();
 
                 let entities = responses
                     .into_iter()
@@ -410,7 +412,7 @@ impl ShardReader {
 
         // Apply pre-filtering to the query plan
         if let Some(prefilter) = &query_plan.prefilter {
-            let prefiltered = self.text_reader.prefilter(prefilter)?;
+            let prefiltered = read_rw_lock(&self.text_reader).prefilter(prefilter)?;
             index_queries.apply_prefilter(prefiltered);
         }
 
@@ -419,7 +421,7 @@ impl ShardReader {
             request.id = search_id.clone();
             let text_reader_service = self.text_reader.clone();
             let info = info_span!(parent: &span, "text search");
-            let task = move || text_reader_service.search(&request);
+            let task = move || read_rw_lock(&text_reader_service).search(&request);
             || run_with_telemetry(info, task)
         });
 
@@ -428,7 +430,7 @@ impl ShardReader {
             let paragraphs_context = &index_queries.paragraphs_context;
             let paragraph_reader_service = self.paragraph_reader.clone();
             let info = info_span!(parent: &span, "paragraph search");
-            let task = move || paragraph_reader_service.search(&request, paragraphs_context);
+            let task = move || read_rw_lock(&paragraph_reader_service).search(&request, paragraphs_context);
             || run_with_telemetry(info, task)
         });
 
@@ -437,14 +439,14 @@ impl ShardReader {
             let vectors_context = &index_queries.vectors_context;
             let vector_reader_service = self.vector_reader.clone();
             let info = info_span!(parent: &span, "vector search");
-            let task = move || vector_reader_service.search(&request, vectors_context);
+            let task = move || read_rw_lock(&vector_reader_service).search(&request, vectors_context);
             || run_with_telemetry(info, task)
         });
 
         let relation_task = index_queries.relations_request.map(|request| {
             let relation_reader_service = self.relation_reader.clone();
             let info = info_span!(parent: &span, "relations search");
-            let task = move || relation_reader_service.search(&request);
+            let task = move || read_rw_lock(&relation_reader_service).search(&request);
             || run_with_telemetry(info, task)
         });
 
@@ -480,15 +482,19 @@ impl ShardReader {
     #[tracing::instrument(skip_all)]
     pub fn paragraph_iterator(&self, request: StreamRequest) -> NodeResult<ParagraphIterator> {
         let span = tracing::Span::current();
+        let paragraph_task_copy = Arc::clone(&self.paragraph_reader);
         run_with_telemetry(info_span!(parent: &span, "paragraph iteration"), || {
-            self.paragraph_reader.iterator(&request)
+            read_rw_lock(&paragraph_task_copy).iterator(&request)
         })
     }
 
     #[tracing::instrument(skip_all)]
     pub fn document_iterator(&self, request: StreamRequest) -> NodeResult<DocumentIterator> {
         let span = tracing::Span::current();
-        run_with_telemetry(info_span!(parent: &span, "field iteration"), || self.text_reader.iterator(&request))
+        let text_task_copy = Arc::clone(&self.text_reader);
+        run_with_telemetry(info_span!(parent: &span, "field iteration"), || {
+            read_rw_lock(&text_task_copy).iterator(&request)
+        })
     }
 
     #[tracing::instrument(skip_all)]
@@ -539,50 +545,60 @@ impl ShardReader {
     #[tracing::instrument(skip_all)]
     pub fn paragraph_search(&self, search_request: ParagraphSearchRequest) -> NodeResult<ParagraphSearchResponse> {
         let span = tracing::Span::current();
+        let paragraph_task_copy = Arc::clone(&self.paragraph_reader);
+
         run_with_telemetry(info_span!(parent: &span, "paragraph reader search"), || {
-            self.paragraph_reader.search(&search_request, &ParagraphsContext::default())
+            read_rw_lock(&paragraph_task_copy).search(&search_request, &ParagraphsContext::default())
         })
     }
 
     #[tracing::instrument(skip_all)]
     pub fn document_search(&self, search_request: DocumentSearchRequest) -> NodeResult<DocumentSearchResponse> {
         let span = tracing::Span::current();
+        let text_task_copy = Arc::clone(&self.text_reader);
 
         run_with_telemetry(info_span!(parent: &span, "field reader search"), || {
-            self.text_reader.search(&search_request)
+            read_rw_lock(&text_task_copy).search(&search_request)
         })
     }
 
     #[tracing::instrument(skip_all)]
     pub fn vector_search(&self, search_request: VectorSearchRequest) -> NodeResult<VectorSearchResponse> {
         let span = tracing::Span::current();
+        let vector_task_copy = Arc::clone(&self.vector_reader);
 
         run_with_telemetry(info_span!(parent: &span, "vector reader search"), || {
-            self.vector_reader.search(&search_request, &VectorsContext::default())
+            read_rw_lock(&vector_task_copy).search(&search_request, &VectorsContext::default())
         })
     }
     #[tracing::instrument(skip_all)]
     pub fn relation_search(&self, search_request: RelationSearchRequest) -> NodeResult<RelationSearchResponse> {
         let span = tracing::Span::current();
+        let relation_task_copy = Arc::clone(&self.relation_reader);
 
         run_with_telemetry(info_span!(parent: &span, "relation reader search"), || {
-            self.relation_reader.search(&search_request)
+            read_rw_lock(&relation_task_copy).search(&search_request)
         })
     }
 
     #[tracing::instrument(skip_all)]
     pub fn paragraph_count(&self) -> NodeResult<usize> {
-        self.paragraph_reader.count()
+        read_rw_lock(&self.paragraph_reader).count()
     }
 
     #[tracing::instrument(skip_all)]
     pub fn vector_count(&self, vector_set: &str) -> NodeResult<usize> {
-        self.vector_reader.count(vector_set)
+        read_rw_lock(&self.vector_reader).count(vector_set)
     }
 
     #[tracing::instrument(skip_all)]
     pub fn text_count(&self) -> NodeResult<usize> {
-        self.text_reader.count()
+        read_rw_lock(&self.text_reader).count()
+    }
+
+    #[tracing::instrument(skip_all)]
+    pub fn update(&self) -> NodeResult<()> {
+        write_rw_lock(&self.vector_reader).update()
     }
 }
 

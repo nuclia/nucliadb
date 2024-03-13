@@ -216,7 +216,7 @@ impl ShardWriter {
         let field_resource = resource.clone();
         let text_task = move || {
             debug!("Field service starts set_resource");
-            let mut writer = text_write(&text_writer_service);
+            let mut writer = write_rw_lock(&text_writer_service);
             let result = writer.set_resource(&field_resource);
             debug!("Field service ends set_resource");
             result
@@ -226,7 +226,7 @@ impl ShardWriter {
         let paragraph_writer_service = self.paragraph_writer.clone();
         let paragraph_task = move || {
             debug!("Paragraph service starts set_resource");
-            let mut writer = paragraph_write(&paragraph_writer_service);
+            let mut writer = write_rw_lock(&paragraph_writer_service);
             let result = writer.set_resource(&paragraph_resource);
             debug!("Paragraph service ends set_resource");
             result
@@ -236,7 +236,7 @@ impl ShardWriter {
         let vector_resource = resource.clone();
         let vector_task = move || {
             debug!("Vector service starts set_resource");
-            let mut writer = vector_write(&vector_writer_service);
+            let mut writer = write_rw_lock(&vector_writer_service);
             let result = writer.set_resource(&vector_resource);
             debug!("Vector service ends set_resource");
             result
@@ -246,7 +246,7 @@ impl ShardWriter {
         let relation_resource = resource.clone();
         let relation_task = move || {
             debug!("Relation service starts set_resource");
-            let mut writer = relation_write(&relation_writer_service);
+            let mut writer = write_rw_lock(&relation_writer_service);
             let result = writer.set_resource(&relation_resource);
             debug!("Relation service ends set_resource");
             result
@@ -290,25 +290,25 @@ impl ShardWriter {
         let text_writer_service = self.text_writer.clone();
         let field_resource = resource.clone();
         let text_task = move || {
-            let mut writer = text_write(&text_writer_service);
+            let mut writer = write_rw_lock(&text_writer_service);
             writer.delete_resource(&field_resource)
         };
         let paragraph_resource = resource.clone();
         let paragraph_writer_service = self.paragraph_writer.clone();
         let paragraph_task = move || {
-            let mut writer = paragraph_write(&paragraph_writer_service);
+            let mut writer = write_rw_lock(&paragraph_writer_service);
             writer.delete_resource(&paragraph_resource)
         };
         let vector_writer_service = self.vector_writer.clone();
         let vector_resource = resource.clone();
         let vector_task = move || {
-            let mut writer = vector_write(&vector_writer_service);
+            let mut writer = write_rw_lock(&vector_writer_service);
             writer.delete_resource(&vector_resource)
         };
         let relation_writer_service = self.relation_writer.clone();
         let relation_resource = resource.clone();
         let relation_task = move || {
-            let mut writer = relation_write(&relation_writer_service);
+            let mut writer = write_rw_lock(&relation_writer_service);
             writer.delete_resource(&relation_resource)
         };
 
@@ -354,14 +354,12 @@ impl ShardWriter {
         let texts = self.text_writer.clone();
 
         let count_fields =
-            || run_with_telemetry(info_span!(parent: &span, "field count"), move || text_read(&texts).count());
+            || run_with_telemetry(info_span!(parent: &span, "field count"), move || read_rw_lock(&texts).count());
         let count_paragraphs = || {
-            run_with_telemetry(info_span!(parent: &span, "paragraph count"), move || {
-                paragraph_read(&paragraphs).count()
-            })
+            run_with_telemetry(info_span!(parent: &span, "paragraph count"), move || read_rw_lock(&paragraphs).count())
         };
         let count_vectors =
-            || run_with_telemetry(info_span!(parent: &span, "vector count"), move || vector_read(&vectors).count());
+            || run_with_telemetry(info_span!(parent: &span, "vector count"), move || read_rw_lock(&vectors).count());
 
         let mut field_count = Ok(0);
         let mut paragraph_count = Ok(0);
@@ -383,14 +381,14 @@ impl ShardWriter {
 
     #[tracing::instrument(skip_all)]
     pub fn list_vectorsets(&self) -> NodeResult<Vec<String>> {
-        let reader = vector_read(&self.vector_writer);
+        let reader = read_rw_lock(&self.vector_writer);
         let keys = reader.list_vectorsets()?;
         Ok(keys)
     }
 
     #[tracing::instrument(skip_all)]
     pub fn add_vectorset(&self, setid: &VectorSetId, similarity: VectorSimilarity) -> NodeResult<()> {
-        let mut writer = vector_write(&self.vector_writer);
+        let mut writer = write_rw_lock(&self.vector_writer);
         writer.add_vectorset(setid, similarity)?;
 
         self.metadata.new_generation_id();
@@ -400,7 +398,7 @@ impl ShardWriter {
 
     #[tracing::instrument(skip_all)]
     pub fn remove_vectorset(&self, setid: &VectorSetId) -> NodeResult<()> {
-        let mut writer = vector_write(&self.vector_writer);
+        let mut writer = write_rw_lock(&self.vector_writer);
         writer.remove_vectorset(setid)?;
 
         self.metadata.new_generation_id();
@@ -410,23 +408,23 @@ impl ShardWriter {
 
     #[tracing::instrument(skip_all)]
     pub fn paragraph_count(&self) -> NodeResult<usize> {
-        paragraph_read(&self.paragraph_writer).count()
+        read_rw_lock(&self.paragraph_writer).count()
     }
 
     #[tracing::instrument(skip_all)]
     pub fn vector_count(&self) -> NodeResult<usize> {
-        vector_read(&self.vector_writer).count()
+        read_rw_lock(&self.vector_writer).count()
     }
 
     #[tracing::instrument(skip_all)]
     pub fn text_count(&self) -> NodeResult<usize> {
-        text_read(&self.text_writer).count()
+        read_rw_lock(&self.text_writer).count()
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn gc(&self) -> NodeResult<GarbageCollectorStatus> {
+    pub fn collect_garbage(&self) -> NodeResult<GarbageCollectorStatus> {
         let _lock = self.gc_lock.blocking_lock();
-        let result = vector_write(&self.vector_writer).garbage_collection();
+        let result = write_rw_lock(&self.vector_writer).garbage_collection();
         match result {
             Ok(()) => Ok(GarbageCollectorStatus::GarbageCollected),
             Err(error) => match error.downcast_ref::<VectorErr>() {
@@ -438,10 +436,17 @@ impl ShardWriter {
 
     #[tracing::instrument(skip_all)]
     pub fn merge(&self) -> NodeResult<MergeMetrics> {
-        let result = vector_write(&self.vector_writer).merge();
+        let result = write_rw_lock(&self.vector_writer).merge();
         self.metadata.new_generation_id();
 
         result
+    }
+
+    /// This must be used only by replication and should be
+    /// deleted as soon as possible.
+    #[tracing::instrument(skip_all)]
+    pub fn reload(&self) -> NodeResult<()> {
+        write_rw_lock(&self.vector_writer).reload()
     }
 
     pub async fn block_shard(&self) -> BlockingToken {
@@ -452,10 +457,10 @@ impl ShardWriter {
     pub fn get_shard_segments(&self) -> NodeResult<HashMap<String, Vec<String>>> {
         let mut segments = HashMap::new();
 
-        segments.insert("paragraph".to_string(), paragraph_read(&self.paragraph_writer).get_segment_ids()?);
-        segments.insert("text".to_string(), text_read(&self.text_writer).get_segment_ids()?);
-        segments.insert("vector".to_string(), vector_read(&self.vector_writer).get_segment_ids()?);
-        segments.insert("relation".to_string(), relation_read(&self.relation_writer).get_segment_ids()?);
+        segments.insert("paragraph".to_string(), read_rw_lock(&self.paragraph_writer).get_segment_ids()?);
+        segments.insert("text".to_string(), read_rw_lock(&self.text_writer).get_segment_ids()?);
+        segments.insert("vector".to_string(), read_rw_lock(&self.vector_writer).get_segment_ids()?);
+        segments.insert("relation".to_string(), read_rw_lock(&self.relation_writer).get_segment_ids()?);
 
         Ok(segments)
     }
@@ -466,13 +471,13 @@ impl ShardWriter {
     ) -> NodeResult<Vec<(PathBuf, IndexFiles)>> {
         let mut files = Vec::new();
         let _lock = self.write_lock.lock().expect("Poisoned write lock"); // need to make sure more writes don't happen while we are reading
-        let paragraph_files = paragraph_read(&self.paragraph_writer)
+        let paragraph_files = read_rw_lock(&self.paragraph_writer)
             .get_index_files(ignored_segement_ids.get("paragraph").unwrap_or(&Vec::new()))?;
         let text_files =
-            text_read(&self.text_writer).get_index_files(ignored_segement_ids.get("text").unwrap_or(&Vec::new()))?;
-        let vector_files = vector_read(&self.vector_writer)
+            read_rw_lock(&self.text_writer).get_index_files(ignored_segement_ids.get("text").unwrap_or(&Vec::new()))?;
+        let vector_files = read_rw_lock(&self.vector_writer)
             .get_index_files(ignored_segement_ids.get("vector").unwrap_or(&Vec::new()))?;
-        let relation_files = relation_read(&self.relation_writer)
+        let relation_files = read_rw_lock(&self.relation_writer)
             .get_index_files(ignored_segement_ids.get("relation").unwrap_or(&Vec::new()))?;
         files.push((PathBuf::from(PARAGRAPHS_DIR), paragraph_files));
         files.push((PathBuf::from(TEXTS_DIR), text_files));

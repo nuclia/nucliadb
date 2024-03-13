@@ -1,13 +1,16 @@
-use std::io::Write;
-use std::path::Path;
-
 use clap::Parser;
-use nucliadb_vectors::data_point::{DataPoint, Elem, LabelDictionary, Similarity};
+use nucliadb_vectors::data_point::{self, DataPointPin, Elem, LabelDictionary, Similarity};
+use nucliadb_vectors::data_point_provider::garbage_collector;
+use nucliadb_vectors::data_point_provider::reader::Reader;
+use nucliadb_vectors::data_point_provider::writer::Writer;
 use nucliadb_vectors::data_point_provider::*;
 use nucliadb_vectors::formula::*;
 use rand::seq::SliceRandom;
 use rand::Rng;
 use serde_json::json;
+use std::io::Write;
+use std::path::Path;
+use std::time::SystemTime;
 use vectors_benchmark::json_writer::write_json;
 use vectors_benchmark::random_vectors::RandomVectors;
 use vectors_benchmark::stats::Stats;
@@ -126,18 +129,19 @@ fn random_labels(batch_no: usize, key: String, index_size: usize) -> LabelDictio
     LabelDictionary::new(labels)
 }
 
-fn add_batch(batch_no: usize, writer: &mut Index, elems: Vec<(String, Vec<f32>)>, index_size: usize) {
-    let temporal_mark = TemporalMark::now();
+fn add_batch(batch_no: usize, writer: &mut Writer, elems: Vec<(String, Vec<f32>)>, index_size: usize) {
+    let new_data_point_pin = DataPointPin::create_pin(writer.location()).unwrap();
+    let temporal_mark = SystemTime::now();
     let similarity = Similarity::Cosine;
     let elems = elems
         .into_iter()
         .map(|(key, vector)| Elem::new(key.clone(), vector, random_labels(batch_no, key.clone(), index_size), None))
         .collect();
 
-    let new_dp = DataPoint::new(writer.location(), elems, Some(temporal_mark), similarity).unwrap();
-    let lock = writer.get_slock().unwrap();
-    writer.add(new_dp, &lock).unwrap();
-    writer.commit(&lock).unwrap();
+    data_point::create(&new_data_point_pin, elems, Some(temporal_mark), similarity).unwrap();
+
+    writer.add_data_point(new_data_point_pin).unwrap();
+    writer.commit().unwrap();
 }
 
 fn vector_random_subset<T: Clone>(vector: Vec<T>) -> Vec<T> {
@@ -160,7 +164,7 @@ fn generate_vecs(count: usize) -> Vec<RandomVectors> {
 
 fn create_db(db_location: &Path, index_size: usize, batch_size: usize, vecs: &[RandomVectors]) -> f64 {
     println!("Writing starts..");
-    let mut writer = Index::new(db_location, IndexMetadata::default()).unwrap();
+    let mut writer = Writer::new(db_location, IndexMetadata::default()).unwrap();
     let mut writing_time: f64 = 0.0;
     for (i, vec) in vecs.iter().enumerate().take(index_size / batch_size) {
         let elems = vec.take(batch_size).enumerate().map(|(i, q)| (i.to_string(), q)).collect();
@@ -174,9 +178,9 @@ fn create_db(db_location: &Path, index_size: usize, batch_size: usize, vecs: &[R
         let _ = std::io::stdout().flush();
     }
     println!("\nCleaning garbage..");
-    let exclusive = writer.get_elock().unwrap();
-    writer.collect_garbage(&exclusive).unwrap();
-    std::mem::drop(exclusive);
+
+    garbage_collector::collect_garbage(writer.location()).unwrap();
+
     println!("Garbage cleaned");
     writing_time
 }
@@ -214,15 +218,14 @@ fn test_datapoint(
 
     stats.writing_time = create_db(&db_location, index_size, batch_size, vecs) as u128;
 
-    let reader = Index::open(&db_location).unwrap();
-    let lock = reader.get_slock().unwrap();
+    let reader = Reader::open(&db_location).unwrap();
 
     for cycle in 0..cycles {
         print!("Unfiltered Search => cycle {} of {}      \r", (cycle + 1), cycles);
         let _ = std::io::stdout().flush();
 
         let (_, elapsed_time) = measure_time!(microseconds {
-            reader.search(unfiltered_request, &lock).unwrap();
+            reader.search(unfiltered_request).unwrap();
         });
         stats.read_time += elapsed_time as u128;
     }
@@ -235,14 +238,13 @@ fn test_datapoint(
         let _ = std::io::stdout().flush();
 
         let (_, elapsed_time) = measure_time!(microseconds {
-            reader.search(filtered_request, &lock).unwrap();
+            reader.search(filtered_request).unwrap();
         });
         stats.tagged_time += elapsed_time as u128;
     }
 
     println!();
     stats.tagged_time /= cycles as u128;
-    std::mem::drop(lock);
     stats
 }
 
