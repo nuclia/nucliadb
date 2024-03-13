@@ -128,6 +128,7 @@ impl ShardReader {
         match self.paragraph_service_version {
             0 => ParagraphService::ParagraphV0,
             1 => ParagraphService::ParagraphV1,
+            2 => ParagraphService::ParagraphV2,
             i => panic!("Unknown paragraph version {i}"),
         }
     }

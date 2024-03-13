@@ -226,6 +226,7 @@ def validate_node_query_results(results: list[Any]) -> Optional[HTTPException]:
 
     for result in results:
         if isinstance(result, Exception):
+            breakpoint()
             status_code = 500
             reason = "Error while querying shard data."
             if isinstance(result, AioRpcError):

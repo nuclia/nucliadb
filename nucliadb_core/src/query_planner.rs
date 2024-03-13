@@ -269,6 +269,7 @@ fn compute_paragraphs_request(search_request: &SearchRequest) -> Option<Paragrap
         filter: None,
         reload: search_request.reload,
         min_score: search_request.min_score_bm25,
+        security: search_request.security.clone(),
     })
 }
 

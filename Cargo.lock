@@ -1743,6 +1743,7 @@ dependencies = [
  "md5",
  "nucliadb_core",
  "nucliadb_paragraphs",
+ "nucliadb_paragraphs2",
  "nucliadb_procs",
  "nucliadb_protos",
  "nucliadb_relations",
@@ -1806,6 +1807,24 @@ dependencies = [
 
 [[package]]
 name = "nucliadb_paragraphs"
+version = "0.1.0"
+dependencies = [
+ "itertools",
+ "lazy_static",
+ "levenshtein_automata",
+ "nucliadb_core",
+ "nucliadb_procs",
+ "once_cell",
+ "regex",
+ "serde_json",
+ "tantivy 0.17.0 (git+https://github.com/nuclia/tantivy.git?branch=original-17)",
+ "tantivy-common 0.2.0",
+ "tantivy-fst",
+ "tempfile",
+]
+
+[[package]]
+name = "nucliadb_paragraphs2"
 version = "0.1.0"
 dependencies = [
  "itertools",
