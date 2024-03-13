@@ -37,7 +37,8 @@ from nucliadb_protos.utils_pb2 import Relation
 
 
 class DummyWriterStub:  # pragma: no cover
-    calls: dict[str, list[Any]] = {}
+    def __init__(self):
+        self.calls: dict[str, list[Any]] = {}
 
     async def NewShard(self, data):  # pragma: no cover
         self.calls.setdefault("NewShard", []).append(data)
@@ -79,7 +80,8 @@ class DummyWriterStub:  # pragma: no cover
 
 
 class DummyReaderStub:  # pragma: no cover
-    calls: dict[str, list[Any]] = {}
+    def __init__(self):
+        self.calls: dict[str, list[Any]] = {}
 
     async def GetShard(self, data):  # pragma: no cover
         self.calls.setdefault("GetShard", []).append(data)
