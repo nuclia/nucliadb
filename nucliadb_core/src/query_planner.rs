@@ -82,6 +82,7 @@ pub struct PreFilterResponse {
 /// The queries a [`QueryPlan`] has decided to send to each index.
 #[derive(Default, Clone)]
 pub struct IndexQueries {
+    pub paragraphs_version: i32,
     pub vectors_context: VectorsContext,
     pub paragraphs_context: ParagraphsContext,
     pub vectors_request: Option<VectorSearchRequest>,
@@ -114,6 +115,22 @@ impl IndexQueries {
         let ValidFieldCollector::Some(valid_fields) = &response.valid_fields else {
             return;
         };
+
+        // Add key filters
+        for valid_field in valid_fields {
+            let resource_id = &valid_field.resource_id;
+            let field_id = &valid_field.field_id;
+            let unique_field_key = format!("{resource_id}{field_id}");
+            request.key_filters.push(unique_field_key);
+        }
+    }
+
+    fn apply_to_paragraphs2(request: &mut ParagraphSearchRequest, response: &PreFilterResponse) {
+        if matches!(response.valid_fields, ValidFieldCollector::All) {
+            // Since all the fields are matching there is no need to use this filter.
+            request.timestamps = None;
+            request.security = None;
+        }
     }
 
     /// When a pre-filter is run, the result can be used to modify the queries
@@ -131,9 +148,12 @@ impl IndexQueries {
         if let Some(vectors_request) = self.vectors_request.as_mut() {
             IndexQueries::apply_to_vectors(vectors_request, &prefiltered);
         };
-        if let Some(paragraph_request) = self.paragraphs_request.as_mut() {
-            IndexQueries::apply_to_paragraphs(paragraph_request, &prefiltered);
-        };
+
+        match (self.paragraphs_version, self.paragraphs_request.as_mut()) {
+            (1, Some(paragraph_request)) => IndexQueries::apply_to_paragraphs(paragraph_request, &prefiltered),
+            (2, Some(paragraph_request)) => IndexQueries::apply_to_paragraphs2(paragraph_request, &prefiltered),
+            _ => (),
+        }
     }
 }
 
@@ -156,7 +176,7 @@ fn analyze_filter(search_request: &SearchRequest) -> NodeResult<QueryAnalysis> {
     query_language::translate(&filter.expression, &context)
 }
 
-pub fn build_query_plan(search_request: SearchRequest) -> NodeResult<QueryPlan> {
+pub fn build_query_plan(paragraphs_version: i32, search_request: SearchRequest) -> NodeResult<QueryPlan> {
     let vectors_request = compute_vectors_request(&search_request);
     let paragraphs_request = compute_paragraphs_request(&search_request);
     let texts_request = compute_texts_request(&search_request);
@@ -167,8 +187,8 @@ pub fn build_query_plan(search_request: SearchRequest) -> NodeResult<QueryPlan> 
     let vectors_context = VectorsContext {
         filtering_formula: search_query.clone(),
     };
-
     let filtering_formula = match (search_query, prefilter_query.clone()) {
+        (search_query, _) if paragraphs_version != 2 => search_query,
         (None, None) => None,
         (Some(formula), None) | (None, Some(formula)) => Some(formula),
         (Some(search), Some(prefilter)) => Some(BooleanExpression::Operation(BooleanOperation {
@@ -176,7 +196,6 @@ pub fn build_query_plan(search_request: SearchRequest) -> NodeResult<QueryPlan> 
             operands: vec![search, prefilter],
         })),
     };
-
     let paragraphs_context = ParagraphsContext {
         filtering_formula,
     };
@@ -185,6 +204,7 @@ pub fn build_query_plan(search_request: SearchRequest) -> NodeResult<QueryPlan> 
     Ok(QueryPlan {
         prefilter,
         index_queries: IndexQueries {
+            paragraphs_version,
             vectors_context,
             paragraphs_context,
             vectors_request,
@@ -354,7 +374,7 @@ mod tests {
             }),
             ..Default::default()
         };
-        let query_plan = build_query_plan(request).unwrap();
+        let query_plan = build_query_plan(1, request).unwrap();
         let Some(prefilter) = query_plan.prefilter else {
             panic!("There should be a prefilter");
         };
