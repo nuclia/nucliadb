@@ -21,12 +21,13 @@
 import asyncio
 import contextlib
 import threading
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Optional
 
 from async_lru import alru_cache
 from cachetools import TTLCache
-from fastapi import HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request
 from nucliadb_protos.writer_pb2 import ShardObject
 
 from nucliadb.common.cluster.manager import get_index_nodes
@@ -42,8 +43,6 @@ from nucliadb_utils.settings import is_onprem_nucliadb
 
 """
 TODO:
-- In the event of an unexpected error (tikv, nats, etc),
-  should we fail hard or should we allow the write to go through?
 - Make sure I didn't miss any endpoint to protect
 - Add tests
 - Add metrics / alerts
@@ -54,11 +53,22 @@ TODO:
 __all__ = ["maybe_back_pressure"]
 
 
+@dataclass
+class BackPressureData:
+    type: str
+    try_after: datetime
+
+
+class BackPressureException(Exception):
+    def __init__(self, data: BackPressureData):
+        self.data = data
+
+
 def is_back_pressure_enabled() -> bool:
     return settings.enabled
 
 
-class TryAfterCache:
+class BackPressureCache:
     """
     Global cache for storing already computed try again in times.
 
@@ -70,85 +80,119 @@ class TryAfterCache:
         self._cache = TTLCache(maxsize=1024, ttl=5 * 60)
         self._lock = threading.Lock()
 
-    def get(self, key: str) -> Optional[datetime]:
+    def get(self, key: str) -> Optional[BackPressureData]:
         with self._lock:
-            try_after = self._cache.get(key, None)
-            if try_after is None:
+            data = self._cache.get(key, None)
+            if data is None:
                 return None
 
-            if datetime.utcnow() >= try_after:
+            if datetime.utcnow() >= data.try_after:
                 # The key has expired, so remove it from the cache
                 self._cache.pop(key, None)
                 return None
 
-            return try_after
+            return data
 
-    def set(self, key: str, try_after: datetime):
+    def set(self, key: str, data: BackPressureData):
         with self._lock:
-            self._cache[key] = try_after
+            self._cache[key] = data
 
 
-try_after_cache = TryAfterCache()
+_cache = BackPressureCache()
 
 
 @contextlib.contextmanager
-def cached_try_after(key: str, back_pressure_type: str):
+def cached_back_pressure(*args):
     """
     Context manager that handles the caching of the try again in time so that
     we don't recompute try again times if we have already applied back pressure.
     """
 
-    cached_value: Optional[datetime] = try_after_cache.get(key)
-    if cached_value is not None:
+    cache_key = "-".join(args)
+
+    data: Optional[BackPressureData] = _cache.get(cache_key)
+    if data is not None:
         raise HTTPException(
             status_code=429,
             detail={
-                "message": f"Too many messages pending to ingest. Retry after {cached_value}",
-                "try_after": cached_value.timestamp(),
-                "back_pressure_type": back_pressure_type,
+                "message": f"Too many messages pending to ingest. Retry after {data.try_after}",
+                "try_after": data.try_after.timestamp(),
+                "back_pressure_type": data.type,
+            },
+        )
+    try:
+        yield
+    except BackPressureException as exc:
+        _cache.set(cache_key, exc.data)
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "message": f"Too many messages pending to ingest. Retry after {exc.data.try_after}",
+                "try_after": exc.data.try_after.timestamp(),
+                "back_pressure_type": exc.data.type,
             },
         )
 
-    try:
-        yield
-    except HTTPException as http_exception:
-        # If we get a 429, we store the try again in time in the cache
-        if http_exception.status_code == 429:
-            try_after = datetime.fromtimestamp(http_exception.detail["try_after"])
-            try_after_cache.set(key, try_after)
-        raise
 
-
-class BackPressureSingleton:
+class Materializer:
     """
-    Singleton class that will run in the background gatheringthe different stats to apply back pressure.
-    This allows us to do back pressure checks and calculations at request time without blocking the request too much.
+    Singleton class that will run in the background gatheringthe different stats to
+    apply back pressure and materializing it in memory. This allows us to do
+    stale-reads when checking if back pressure is needed for a particular
+    request - thus not slowing it down.
     """
 
-    def __init__(self, nats_manager: NatsConnectionManager, check_interval: int = 30):
+    def __init__(
+        self,
+        nats_manager: NatsConnectionManager,
+        indexing_check_interval: int = 30,
+        ingest_check_interval: int = 30,
+    ):
         self.nats_manager = nats_manager
-        self.check_interval = check_interval
-        self._tasks = []
-        self.ingest_pending: int = 0
-        self.indexing_pending: dict[str, int] = {}
         self.processing_http_client = ProcessingHTTPClient()
 
+        self.indexing_check_interval = indexing_check_interval
+        self.ingest_check_interval = ingest_check_interval
+
+        self.ingest_pending: int = 0
+        self.indexing_pending: dict[str, int] = {}
+
+        self._tasks: list[asyncio.Task] = []
+        self._running = False
+
     async def start(self):
-        self._tasks.append(asyncio.create_task(self._check_nodes_indexing_consumers()))
-        self._tasks.append(asyncio.create_task(self._check_ingest_processed_consumer()))
+        self._tasks.append(asyncio.create_task(self._get_indexing_pending_task()))
+        self._tasks.append(asyncio.create_task(self._get_ingest_pending_task()))
+        self._running = True
 
     async def stop(self):
         for task in self._tasks:
             task.cancel()
         self._tasks.clear()
         await self.processing_http_client.close()
+        self._running = False
+
+    @property
+    def running(self) -> bool:
+        return self._running
 
     @alru_cache(maxsize=1024, ttl=60)
-    async def get_kb_pending_to_process(self, kbid: str) -> int:
+    async def get_processing_pending(self, kbid: str) -> int:
+        # TODO: turn it into a settigns-configurabe ttl cache !!!!
+
+        """
+        We won't materialize the pending messages for every KB, but we will cache the result some time.
+        """
         response = await self.processing_http_client.stats(kbid=kbid)
         return response.incomplete + response.scheduled
 
-    async def _check_nodes_indexing_consumers(self):
+    def get_indexing_pending(self) -> dict[str, int]:
+        return self.indexing_pending
+
+    def get_ingest_pending(self) -> int:
+        return self.ingest_pending
+
+    async def _get_indexing_pending_task(self):
         try:
             while True:
                 for node_id in get_index_nodes():
@@ -166,11 +210,11 @@ class BackPressureSingleton:
                             exc_info=True,
                             extra={"node_id": node_id},
                         )
-                await asyncio.sleep(self.check_interval)
+                await asyncio.sleep(self.indexing_check_interval)
         except asyncio.CancelledError:
             pass
 
-    async def _check_ingest_processed_consumer(self):
+    async def _get_ingest_pending_task(self):
         try:
             while True:
                 try:
@@ -188,12 +232,6 @@ class BackPressureSingleton:
         except asyncio.CancelledError:
             pass
 
-    def get_values(self) -> dict:
-        return {
-            "ingest_pending": self.ingest_pending,
-            "indexing_pending": self.indexing_pending,
-        }
-
 
 async def maybe_back_pressure(
     request: Request, kbid: str, resource_uuid: Optional[str] = None
@@ -207,27 +245,35 @@ async def maybe_back_pressure(
     await back_pressure_checks(request, kbid, resource_uuid)
 
 
+def get_back_pressure_materializer(app: FastAPI) -> Optional[Materializer]:
+    context = get_app_context(app)
+    return getattr(context, "back_pressure_materializer", None)
+
+
 async def back_pressure_checks(
     request: Request, kbid: str, resource_uuid: Optional[str] = None
 ):
     """
     Will raise a 429 if back pressure is needed:
     - If the processing engine is behind.
+    - If ingest processed consumer is behind.
     - If the indexing on nodes affected by the request (kbid, and resource_uuid) is behind.
     """
     context = get_app_context(request.app)
-    back_pressure = context.back_pressure_singleton
-    if back_pressure is None:
-        logger.error("Back pressure singleton not found")
+    materializer = get_back_pressure_materializer(request.app)
+    if materializer is None or not materializer.running:
+        logger.error("Back pressure materializer is not initialized")
         return
 
-    await check_processing_behind(back_pressure, kbid)
+    with cached_back_pressure(kbid, resource_uuid):
+        check_ingest_behind(materializer.get_ingest_pending())
+        await check_indexing_behind(
+            context, kbid, resource_uuid, materializer.get_indexing_pending()
+        )
+        await check_processing_behind(materializer, kbid)
 
-    indexing_pending = back_pressure.get_values()["indexing_pending"]
-    await check_indexing_behind(context, kbid, resource_uuid, indexing_pending)
 
-
-async def check_processing_behind(back_pressure: BackPressureSingleton, kbid: str):
+async def check_processing_behind(materializer: Materializer, kbid: str):
     """
     This function checks if the processing engine is behind and may raise a 429
     if it is further behind than the configured threshold.
@@ -237,20 +283,13 @@ async def check_processing_behind(back_pressure: BackPressureSingleton, kbid: st
         # Processing back pressure is disabled
         return
 
-    with cached_try_after(f"processing::{kbid}", "processing"):
-        kb_pending = await back_pressure.get_kb_pending_to_process(kbid)
-        if kb_pending > max_pending:
-            try_after = estimate_try_after(
-                rate=settings.processing_rate, pending=kb_pending
-            )
-            raise HTTPException(
-                status_code=429,
-                detail={
-                    "message": f"Too many messages pending to ingest. Retry after {try_after}",
-                    "try_after": try_after.timestamp(),
-                    "back_pressure_type": "processing",
-                },
-            )
+    kb_pending = await materializer.get_processing_pending(kbid)
+    if kb_pending > max_pending:
+        try_after = estimate_try_after(
+            rate=settings.processing_rate, pending=kb_pending
+        )
+        data = BackPressureData(type="processing", try_after=try_after)
+        raise BackPressureException(data)
 
 
 async def check_indexing_behind(
@@ -269,49 +308,54 @@ async def check_indexing_behind(
         # Indexing back pressure is disabled
         return
 
-    with cached_try_after(f"indexing::{kbid}::{resource_uuid}", "indexing"):
-        if len(pending_by_node) == 0:
-            logger.warning("No nodes found to check for pending messages")
-            return
+    if len(pending_by_node) == 0:
+        logger.warning("No nodes found to check for pending messages")
+        return
 
-        # Get nodes that are involved in the indexing of the request
-        if resource_uuid is not None:
-            nodes_to_check = await get_nodes_for_resource_shard(
-                context, kbid, resource_uuid
-            )
-        else:
-            nodes_to_check = await get_nodes_for_kb_active_shards(context, kbid)
+    # Get nodes that are involved in the indexing of the request
+    if resource_uuid is not None:
+        nodes_to_check = await get_nodes_for_resource_shard(
+            context, kbid, resource_uuid
+        )
+    else:
+        nodes_to_check = await get_nodes_for_kb_active_shards(context, kbid)
 
-        if len(nodes_to_check) == 0:
-            logger.warning(
-                "No nodes found to check for pending messages",
-                extra={"kbid": kbid, "resource_uuid": resource_uuid},
-            )
-            return
+    if len(nodes_to_check) == 0:
+        logger.warning(
+            "No nodes found to check for pending messages",
+            extra={"kbid": kbid, "resource_uuid": resource_uuid},
+        )
+        return
 
-        # Get the highest pending value
-        highest_pending = 0
-        for node in nodes_to_check:
-            if node not in pending_by_node:
-                logger.warning(
-                    "Node not found in pending messages", extra={"node": node}
-                )
-                continue
-            if pending_by_node[node] > highest_pending:
-                highest_pending = pending_by_node[node]
+    # Get the highest pending value
+    highest_pending = 0
+    for node in nodes_to_check:
+        if node not in pending_by_node:
+            logger.warning("Node not found in pending messages", extra={"node": node})
+            continue
+        if pending_by_node[node] > highest_pending:
+            highest_pending = pending_by_node[node]
 
-        if highest_pending > max_pending:
-            try_after = estimate_try_after(
-                rate=settings.indexing_rate, pending=highest_pending
-            )
-            raise HTTPException(
-                status_code=429,
-                detail={
-                    "message": f"Too many messages pending to ingest. Retry after {try_after}",
-                    "try_after": try_after.timestamp(),
-                    "back_pressure_type": "indexing",
-                },
-            )
+    if highest_pending > max_pending:
+        try_after = estimate_try_after(
+            rate=settings.indexing_rate, pending=highest_pending
+        )
+        data = BackPressureData(type="indexing", try_after=try_after)
+        raise BackPressureException(data)
+
+
+def check_ingest_behind(ingest_pending: int):
+    max_pending = settings.max_ingest_pending
+    if max_pending <= 0:
+        # Ingest back pressure is disabled
+        return
+
+    if ingest_pending > max_pending:
+        try_after = estimate_try_after(
+            rate=settings.ingest_rate, pending=ingest_pending
+        )
+        data = BackPressureData(type="ingest", try_after=try_after)
+        raise BackPressureException(data)
 
 
 def estimate_try_after(rate: float, pending: int) -> datetime:

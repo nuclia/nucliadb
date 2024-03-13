@@ -32,6 +32,7 @@ class BackPressureSettings(BaseSettings):
     enabled: bool = Field(
         default=True,
         description="Enable or disable back pressure.",
+        env=["back_pressure_enabled"],
     )
     indexing_rate: float = Field(
         default=2,
@@ -51,11 +52,19 @@ class BackPressureSettings(BaseSettings):
     )
     max_ingest_pending: int = Field(
         default=1_000,
-        description="Max number of messages pending to be ingested by processed consumers before rate limiting writes. Set to 0 to disable indexing back pressure checks",  # noqa
+        description="Max number of messages pending to be ingested by processed consumers before rate limiting writes. Set to 0 to disable ingest back pressure checks",  # noqa
     )
     max_processing_pending: int = Field(
-        default=10_000,
-        description="Global max number of messages pending to process before rate limiting writes. Set to 0 to disable processing back pressure checks",  # noqa
+        default=100,
+        description="Max number of messages pending to process per Knowledge Box before rate limiting writes. Set to 0 to disable processing back pressure checks",  # noqa
+    )
+    indexing_check_interval: int = Field(
+        default=30,
+        description="Interval in seconds to check the indexing pending messages",
+    )
+    ingest_check_interval: int = Field(
+        default=30,
+        description="Interval in seconds to check the ingest pending messages",
     )
 
 

@@ -25,13 +25,18 @@ import pytest
 from fastapi import HTTPException
 
 from nucliadb.writer.back_pressure import (
-    TryAfterCache,
+    BackPressureCache,
+    BackPressureData,
+    BackPressureException,
+)
+from nucliadb.writer.back_pressure import _cache as back_pressure_cache
+from nucliadb.writer.back_pressure import (
+    cached_back_pressure,
     check_indexing_behind,
     check_ingest_behind,
     check_processing_behind,
     estimate_try_after,
     maybe_back_pressure,
-    try_after_cache,
 )
 
 MODULE = "nucliadb.writer.back_pressure"
@@ -62,8 +67,8 @@ def test_estimate_try_after(rate, pending, delta):
     assert int(try_after.timestamp()) == int(now.timestamp() + delta)
 
 
-def test_try_after_cache():
-    cache = TryAfterCache()
+def test_back_pressure_cache():
+    cache = BackPressureCache()
 
     key = "key"
     assert cache.get(key) is None
@@ -71,10 +76,13 @@ def test_try_after_cache():
     # Set a value and get it
     now = datetime.utcnow()
     try_after = now + timedelta(seconds=0.5)
-    cache.set(key, try_after)
+    data = BackPressureData(try_after=try_after, type="indexing")
 
-    assert cache.get(key) == try_after
+    cache.set(key, data)
 
+    assert cache.get(key) == data
+
+    # Check that after try after has passed, it returns None
     time.sleep(0.6)
     assert cache.get(key) is None
 
@@ -82,19 +90,14 @@ def test_try_after_cache():
 async def test_maybe_back_pressure_skip_conditions(
     is_back_pressure_enabled, is_onprem_nucliadb
 ):
-    with mock.patch(
-        f"{MODULE}.check_processing_behind"
-    ) as check_processing_behind_mock, mock.patch(
-        f"{MODULE}.check_indexing_behind", return_value=False
-    ) as check_indexing_behind_mock:
+    with mock.patch(f"{MODULE}.back_pressure_checks") as back_pressure_checks_mock:
         # Check that if back pressure is not enabled, it should not run
         is_back_pressure_enabled.return_value = False
         is_onprem_nucliadb.return_value = False
 
         await maybe_back_pressure(mock.Mock(), "kbid")
 
-        check_processing_behind_mock.assert_not_called()
-        check_indexing_behind_mock.assert_not_called()
+        back_pressure_checks_mock.assert_not_called()
 
         # Even if enabled, it should not run if not on-prem
         is_back_pressure_enabled.return_value = True
@@ -102,8 +105,7 @@ async def test_maybe_back_pressure_skip_conditions(
 
         await maybe_back_pressure(mock.Mock(), "kbid")
 
-        check_processing_behind_mock.assert_not_called()
-        check_indexing_behind_mock.assert_not_called()
+        back_pressure_checks_mock.assert_not_called()
 
         # It should run only if not on-prem and enabled
         is_back_pressure_enabled.return_value = True
@@ -111,28 +113,19 @@ async def test_maybe_back_pressure_skip_conditions(
 
         await maybe_back_pressure(mock.Mock(), "kbid")
 
-        check_processing_behind_mock.assert_awaited_once()
-        check_indexing_behind_mock.assert_awaited_once()
+        back_pressure_checks_mock.assert_awaited_once()
 
 
 @pytest.fixture(scope="function")
-def get_pending_to_process():
-    with mock.patch(f"{MODULE}.get_pending_to_process", return_value=10) as mock_:
-        yield mock_
-
-
-@pytest.fixture(scope="function")
-def get_pending_to_index():
-    with mock.patch(
-        f"{MODULE}.get_pending_to_index", return_value={"node1": 10, "node2": 2}
-    ) as mock_:
-        yield mock_
-
-
-@pytest.fixture(scope="function")
-def get_pending_to_ingest():
-    with mock.patch(f"{MODULE}.get_pending_to_ingest", return_value=10) as mock_:
-        yield mock_
+def materializer():
+    materializer = mock.Mock()
+    materializer.running = True
+    materializer.get_processing_pending = mock.AsyncMock(return_value=10)
+    materializer.get_indexing_pending = mock.Mock(
+        return_value={"node1": 10, "node2": 2}
+    )
+    materializer.get_ingest_pending = mock.Mock(return_value=10)
+    yield materializer
 
 
 @pytest.fixture(scope="function")
@@ -151,141 +144,114 @@ def settings():
 
 @pytest.fixture(scope="function")
 def cache():
-    try_after_cache._cache.clear()
-    yield try_after_cache
+    back_pressure_cache._cache.clear()
+    yield back_pressure_cache
 
 
-async def test_check_processing_behind(get_pending_to_process, settings, cache):
-    # Check that it raises the http 429 exception
+async def test_check_processing_behind(materializer, settings, cache):
     settings.max_processing_pending = 5
-    get_pending_to_process.return_value = 10
 
-    with pytest.raises(HTTPException) as exc:
-        await check_processing_behind()
-    assert exc.value.status_code == 429
-    assert exc.value.detail["back_pressure_type"] == "processing"
+    # Check that it runs and does not raise an exception if the pending is low
+    materializer.get_processing_pending.return_value = 1
+    await check_processing_behind(materializer, "kbid")
+    materializer.get_processing_pending.assert_awaited_once_with("kbid")
 
-    get_pending_to_process.assert_awaited()
-
-    # Check that it saves the try after in the cache
-    cache.get("processing") is not None
+    # Check that it raises an exception if the pending is too high
+    materializer.get_processing_pending.reset_mock()
+    materializer.get_processing_pending.return_value = 10
+    with pytest.raises(BackPressureException):
+        await check_processing_behind(materializer, "kbid")
+    materializer.get_processing_pending.assert_awaited_once_with("kbid")
 
 
 async def test_check_processing_behind_does_not_run_if_configured_max_is_zero(
-    get_pending_to_process, settings, cache
+    materializer, settings, cache
 ):
-    # Check that it raises the http 429 exception
     settings.max_processing_pending = 0
-    get_pending_to_process.return_value = 100
+    materializer.get_processing_pending.return_value = 100
 
-    await check_processing_behind()
+    await check_processing_behind(materializer, "kbid")
 
-    get_pending_to_process.assert_not_called()
-
-
-async def test_check_processing_behind_does_not_run_on_cache_hit(
-    get_pending_to_process, settings, cache
-):
-    settings.max_processing_pending = 1
-    get_pending_to_process.return_value = 10
-
-    cache.set("processing", datetime.utcnow() + timedelta(seconds=2))
-
-    with pytest.raises(HTTPException) as exc:
-        await check_processing_behind()
-    assert exc.value.status_code == 429
-    assert exc.value.detail["back_pressure_type"] == "processing"
-
-    get_pending_to_process.assert_not_called()
+    materializer.get_processing_pending.assert_not_called()
 
 
-async def test_check_indexing_behind(get_pending_to_index, settings, cache):
-    # Check that it raises the http 429 exception
+@pytest.fixture(scope="function")
+def get_nodes_for_resource_shard():
+    with mock.patch(
+        f"{MODULE}.get_nodes_for_resource_shard", return_value=["node1", "node2"]
+    ) as mock_:
+        yield mock_
+
+
+async def test_check_indexing_behind(get_nodes_for_resource_shard, settings, cache):
     settings.max_indexing_pending = 5
-    get_pending_to_index.return_value = {"node1": 10, "node2": 9}
+    context = mock.Mock()
 
-    with pytest.raises(HTTPException) as exc:
-        await check_indexing_behind(mock.Mock(), "kbid", resource_uuid="rid")
+    # Check that it runs and does not raise an exception if the pending is low
+    await check_indexing_behind(context, "kbid", "rid", {"node1": 0, "node2": 2})
+    get_nodes_for_resource_shard.assert_awaited_once_with(context, "kbid", "rid")
 
-    assert exc.value.status_code == 429
-    assert exc.value.detail["back_pressure_type"] == "indexing"
-
-    get_pending_to_index.assert_awaited()
-
-    # Check that it saves the try after in the cache
-    cache.get("kbid::rid") is not None
+    # Check that it raises an exception if the pending is too high
+    get_nodes_for_resource_shard.reset_mock()
+    with pytest.raises(BackPressureException):
+        await check_indexing_behind(context, "kbid", "rid", {"node1": 10, "node2": 2})
+    get_nodes_for_resource_shard.assert_awaited_once_with(context, "kbid", "rid")
 
 
 async def test_check_indexing_behind_does_not_run_if_configured_max_is_zero(
-    get_pending_to_index, settings
+    get_nodes_for_resource_shard, settings
 ):
-    # Check that it raises the http 429 exception
     settings.max_indexing_pending = 0
-    get_pending_to_index.return_value = 100
 
-    await check_indexing_behind(mock.Mock(), "kbid", resource_uuid="rid")
+    await check_indexing_behind(mock.Mock(), "kbid", "rid", {"node1": 100})
 
-    get_pending_to_index.assert_not_called()
-
-
-async def test_check_indexing_behind_does_not_run_on_cache_hit(
-    get_pending_to_index, settings, cache
-):
-    settings.max_indexing_pending = 1
-    get_pending_to_index.return_value = 10
-
-    cache.set("kbid::rid", datetime.utcnow() + timedelta(seconds=2))
-
-    with pytest.raises(HTTPException) as exc:
-        await check_indexing_behind(mock.Mock(), "kbid", resource_uuid="rid")
-
-    assert exc.value.status_code == 429
-    assert exc.value.detail["back_pressure_type"] == "indexing"
-
-    get_pending_to_index.assert_not_called()
+    get_nodes_for_resource_shard.assert_not_called()
 
 
-async def test_check_ingest_behind(get_pending_to_ingest, settings, cache):
-    # Check that it raises the http 429 exception
+def test_check_ingest_behind(settings, cache):
     settings.max_ingest_pending = 5
-    get_pending_to_ingest.return_value = 10
 
-    with pytest.raises(HTTPException) as exc:
-        await check_ingest_behind(mock.Mock())
+    check_ingest_behind(2)
 
-    assert exc.value.status_code == 429
-    assert exc.value.detail["back_pressure_type"] == "ingest"
-
-    get_pending_to_ingest.assert_awaited()
-
-    # Check that it saves the try after in the cache
-    cache.get("ingest") is not None
+    with pytest.raises(BackPressureException):
+        check_ingest_behind(10)
 
 
-async def test_check_ingest_behind_does_not_run_if_configured_max_is_zero(
-    get_pending_to_ingest, settings
-):
-    # Check that it raises the http 429 exception
+def test_check_ingest_behind_does_not_raise_if_configured_max_is_zero(settings):
     settings.max_ingest_pending = 0
-    get_pending_to_ingest.return_value = 100
 
-    await check_ingest_behind(mock.Mock())
-
-    get_pending_to_ingest.assert_not_called()
+    check_ingest_behind(1000)
 
 
-async def test_check_ingest_behind_does_not_run_on_cache_hit(
-    get_pending_to_ingest, settings, cache
-):
-    settings.max_ingest_pending = 1
-    get_pending_to_ingest.return_value = 10
+def test_cached_back_pressure_context_manager(cache):
+    func = mock.Mock()
 
-    cache.set("ingest", datetime.utcnow() + timedelta(seconds=2))
+    with cached_back_pressure("foo", "bar"):
+        func()
+
+    func.assert_called_once()
+
+    func.reset_mock()
+    func.side_effect = Exception("Boom")
+
+    with pytest.raises(Exception):
+        with cached_back_pressure("foo", "bar"):
+            func()
+
+    func.reset_mock()
+
+    data = BackPressureData(
+        try_after=datetime.now() + timedelta(seconds=10), type="indexing"
+    )
+    func.side_effect = BackPressureException(data)
 
     with pytest.raises(HTTPException) as exc:
-        await check_ingest_behind(mock.Mock())
+        with cached_back_pressure("foo", "bar"):
+            func()
 
     assert exc.value.status_code == 429
-    assert exc.value.detail["back_pressure_type"] == "ingest"
-
-    get_pending_to_ingest.assert_not_called()
+    assert exc.value.detail["message"].startswith(
+        "Too many messages pending to ingest. Retry after"
+    )
+    assert exc.value.detail["try_after"]
+    assert exc.value.detail["back_pressure_type"] == "indexing"
