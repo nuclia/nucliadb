@@ -95,9 +95,10 @@ class ShardCreatorHandler:
             current_shard = await self.shard_manager.get_current_active_shard(txn, kbid)
 
         if kb_shards is None or current_shard is None:
-            msg = "Processing a notification for a nonexistent"
-            logger.error(msg, extra={"kbid": kbid})
-            raise Exception(msg)
+            logger.error(
+                "Processing a notification for a nonexistent", extra={"kbid": kbid}
+            )
+            return
 
         # TODO: when multiple shards are allowed, this should either handle the
         # written shard or attempt to rebalance everything
