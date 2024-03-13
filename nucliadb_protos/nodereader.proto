@@ -397,15 +397,6 @@ message EdgeList {
     repeated RelationEdge list = 1;
 }
 
-message RelationTypeListMember {
-    utils.RelationNode.NodeType with_type = 1;
-    string with_subtype = 2;
-}
-
-message TypeList {
-    repeated RelationTypeListMember list = 1;
-}
-
 message GetShardRequest {
     noderesources.ShardId shard_id = 1;
     string vectorset = 2;
@@ -467,7 +458,6 @@ service NodeReader {
     rpc RelationIds(noderesources.ShardId) returns (IdCollection) {}
 
     rpc RelationEdges(noderesources.ShardId) returns (EdgeList) {}
-    rpc RelationTypes(noderesources.ShardId) returns (TypeList) {}
 
     rpc Search(SearchRequest) returns (SearchResponse) {}
     rpc Suggest(SuggestRequest) returns (SuggestResponse) {}

@@ -412,27 +412,6 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
-    async fn relation_types(
-        &self,
-        request: tonic::Request<ShardId>,
-    ) -> Result<tonic::Response<TypeList>, tonic::Status> {
-        let span = Span::current();
-        let shard_id = request.into_inner().id;
-        let info = info_span!(parent: &span, "relation types");
-        let shards = Arc::clone(&self.shards);
-        let task = move || {
-            let shard = obtain_shard(shards, shard_id)?;
-            run_with_telemetry(info, move || shard.get_relations_types())
-        };
-        let response = tokio::task::spawn_blocking(task)
-            .await
-            .map_err(|error| tonic::Status::internal(format!("Blocking task panicked: {error:?}")))?;
-        match response {
-            Ok(response) => Ok(tonic::Response::new(response)),
-            Err(error) => Err(tonic::Status::internal(error.to_string())),
-        }
-    }
-
     async fn get_shard_files(
         &self,
         request: tonic::Request<GetShardFilesRequest>,

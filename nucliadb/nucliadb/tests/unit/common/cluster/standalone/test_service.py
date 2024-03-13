@@ -50,13 +50,6 @@ def self_node(cluster_settings):
     self_node.writer = AsyncMock()
     self_node.reader.Search.return_value = nodereader_pb2.SearchResponse()
 
-    relation_types = nodereader_pb2.TypeList()
-    member = nodereader_pb2.RelationTypeListMember(
-        with_type=RelationNode.NodeType.ENTITY, with_subtype="foo"
-    )
-    relation_types.list.append(member)
-    self_node.reader.RelationTypes.return_value = relation_types
-
     relation_edges = nodereader_pb2.EdgeList()
     edge = nodereader_pb2.RelationEdge(
         edge_type=RelationNode.NodeType.ENTITY, property="foo"
@@ -97,18 +90,6 @@ async def test_reader_node_action_relations(
     self_node,
     cluster_settings,
 ):
-    resp = await servicer.NodeAction(
-        standalone_pb2.NodeActionRequest(
-            service="reader",
-            action="RelationTypes",
-            payload=ShardId(id="test").SerializeToString(),
-        ),
-        None,
-    )
-    assert resp == standalone_pb2.NodeActionResponse(
-        payload=self_node.reader.RelationTypes.return_value.SerializeToString()
-    )
-
     resp = await servicer.NodeAction(
         standalone_pb2.NodeActionRequest(
             service="reader",

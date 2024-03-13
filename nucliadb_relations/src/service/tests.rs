@@ -48,22 +48,6 @@ lazy_static! {
         ntype: NodeType::Entity as i32,
         subtype: "Propaganda".to_string(),
     };
-    static ref NODE_TYPES: TypeList = TypeList {
-        list: vec![
-            RelationTypeListMember {
-                with_type: NodeType::Entity as i32,
-                with_subtype: "Official".to_string(),
-            },
-            RelationTypeListMember {
-                with_type: NodeType::Entity as i32,
-                with_subtype: "".to_string(),
-            },
-            RelationTypeListMember {
-                with_type: NodeType::Entity as i32,
-                with_subtype: "Propaganda".to_string(),
-            },
-        ]
-    };
     static ref REQUEST_BONES: RelationSearchRequest = RelationSearchRequest {
         shard_id: SHARD_ID.clone(),
         prefix: None,
@@ -327,25 +311,6 @@ fn just_prefix_querying() -> NodeResult<()> {
     };
     assert!(prefix_response.nodes.is_empty());
 
-    Ok(())
-}
-
-#[test]
-fn getting_node_types() -> NodeResult<()> {
-    let dir = tempfile::tempdir().unwrap();
-    let (mut writer, reader) = simple_graph(dir.path());
-    let mut resource = create_empty_resource("f56c58ac-b4f9-4d61-a077-ffccaadd0001".to_string());
-    let graph = entities(empty_graph());
-    resource.relations = graph;
-    writer.set_resource(&resource).unwrap();
-    reader.reload();
-    let node_types = reader.get_node_types().unwrap();
-    assert_eq!(node_types.list.len(), NODE_TYPES.list.len());
-    assert!(node_types.list.iter().all(|member| NODE_TYPES.list.contains(member)));
-
-    let edges = reader.get_edges().unwrap();
-    assert_eq!(edges.list.len(), EDGE_LIST.list.len(),);
-    assert!(edges.list.iter().all(|member| EDGE_LIST.list.contains(member)));
     Ok(())
 }
 

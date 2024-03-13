@@ -43,14 +43,49 @@ class Entity(BaseModel):
         return cls(**entity)
 
 
-class EntitiesGroup(BaseModel):
-    entities: Dict[str, Entity] = {}
-    title: Optional[str] = None
-    color: Optional[str] = None
-
+class EntitiesGroupSummary(BaseModel):
+    title: Optional[str] = Field(
+        default=None, description="Title of the entities group"
+    )
+    color: Optional[str] = Field(
+        default=None,
+        description="Color of the entities group. This is for display purposes only.",
+    )
     custom: bool = Field(
         default=False, description="Denotes if it has been created by the user"
     )
+
+    entities: Dict[str, Entity] = Field(
+        default={},
+        title="[Deprecated] Entities in the group",
+        description="This field is deprecated and will be removed in future versions. It will always be empty. Use the /api/v1/kb/{kbid}/entitiesgroup/{group} endpoint to get the entities of a group.",  # noqa: E501
+    )
+
+    @classmethod
+    def from_message(
+        cls: Type[_T],
+        message: knowledgebox_pb2.EntitiesGroupSummary,
+    ) -> _T:
+        entitiesgroup = MessageToDict(
+            message,
+            preserving_proto_field_name=True,
+            including_default_value_fields=True,
+        )
+        return cls(**entitiesgroup)
+
+
+class EntitiesGroup(BaseModel):
+    title: Optional[str] = Field(
+        default=None, description="Title of the entities group"
+    )
+    color: Optional[str] = Field(
+        default=None,
+        description="Color of the entities group. This is for display purposes only.",
+    )
+    custom: bool = Field(
+        default=False, description="Denotes if it has been created by the user"
+    )
+    entities: Dict[str, Entity] = {}
 
     @classmethod
     def from_message(
@@ -70,22 +105,10 @@ class EntitiesGroup(BaseModel):
 
         return cls(**entities_group)
 
-    @classmethod
-    def from_summary_message(
-        cls: Type[_T],
-        message: knowledgebox_pb2.EntitiesGroupSummary,
-    ) -> _T:
-        entitiesgroup = MessageToDict(
-            message,
-            preserving_proto_field_name=True,
-            including_default_value_fields=True,
-        )
-        return cls(**entitiesgroup)
-
 
 class KnowledgeBoxEntities(BaseModel):
     uuid: str
-    groups: Dict[str, EntitiesGroup] = {}
+    groups: Dict[str, EntitiesGroupSummary] = {}
 
 
 class CreateEntitiesGroupPayload(BaseModel):
