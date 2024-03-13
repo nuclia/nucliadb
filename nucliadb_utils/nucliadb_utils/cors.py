@@ -112,6 +112,9 @@ class CORSMiddleware:
     def is_allowed_origin(
         self, origin: str, allowed_domains: typing.Optional[str]
     ) -> bool:
+        if allowed_domains:
+            return origin in allowed_domains.split(",")
+
         if self.allow_all_origins:
             return True
 
@@ -119,9 +122,6 @@ class CORSMiddleware:
             origin
         ):
             return True
-
-        if allowed_domains:
-            return origin in allowed_domains.split(",")
 
         return origin in self.allow_origins
 
