@@ -23,7 +23,7 @@ pub use crate::protos::prost_types::Timestamp as ProtoTimestamp;
 use crate::protos::{
     DocumentSearchRequest, ParagraphSearchRequest, RelationSearchRequest, SearchRequest, VectorSearchRequest,
 };
-use crate::query_language::{self, BooleanExpression, BooleanOperation, Operator, QueryAnalysis, QueryContext};
+use crate::query_language::{self, BooleanExpression, BooleanOperation, QueryAnalysis, QueryContext};
 use crate::vectors::VectorsContext;
 use crate::NodeResult;
 use nucliadb_protos::utils::Security;
