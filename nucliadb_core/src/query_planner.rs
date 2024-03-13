@@ -23,10 +23,11 @@ pub use crate::protos::prost_types::Timestamp as ProtoTimestamp;
 use crate::protos::{
     DocumentSearchRequest, ParagraphSearchRequest, RelationSearchRequest, SearchRequest, VectorSearchRequest,
 };
-use crate::query_language::{self, BooleanExpression, QueryAnalysis, QueryContext};
+use crate::query_language::{self, BooleanExpression, BooleanOperation, Operator, QueryAnalysis, QueryContext};
 use crate::vectors::VectorsContext;
 use crate::NodeResult;
 use nucliadb_protos::utils::Security;
+use rayon::vec;
 
 /// A field has two dates
 #[derive(Debug, Clone, Copy)]
@@ -114,14 +115,6 @@ impl IndexQueries {
         let ValidFieldCollector::Some(valid_fields) = &response.valid_fields else {
             return;
         };
-
-        // Add key filters
-        for valid_field in valid_fields {
-            let resource_id = &valid_field.resource_id;
-            let field_id = &valid_field.field_id;
-            let unique_field_key = format!("{resource_id}{field_id}");
-            request.key_filters.push(unique_field_key);
-        }
     }
 
     /// When a pre-filter is run, the result can be used to modify the queries
@@ -175,8 +168,18 @@ pub fn build_query_plan(search_request: SearchRequest) -> NodeResult<QueryPlan> 
     let vectors_context = VectorsContext {
         filtering_formula: search_query.clone(),
     };
+
+    let filtering_formula = match (search_query, prefilter_query.clone()) {
+        (None, None) => None,
+        (Some(formula), None) | (None, Some(formula)) => Some(formula),
+        (Some(search), Some(prefilter)) => Some(BooleanExpression::Operation(BooleanOperation {
+            operator: query_language::Operator::And,
+            operands: vec![search, prefilter],
+        })),
+    };
+
     let paragraphs_context = ParagraphsContext {
-        filtering_formula: search_query,
+        filtering_formula,
     };
     let prefilter = compute_prefilters(&search_request, prefilter_query);
 
