@@ -30,8 +30,9 @@ const MAGIC_NUMBER_STATE_2: &[u8; 7] = b"STATE_2";
 pub fn write_state(state_file: &mut File, state: &State) -> bincode::Result<()> {
     let mut writer = BufWriter::new(state_file);
     writer.write_all(MAGIC_NUMBER_STATE_2)?;
+    serialize_into(&mut writer, state)?;
     writer.flush()?;
-    serialize_into(&mut writer, state)
+    Ok(())
 }
 
 pub fn read_state(state_file: &File) -> bincode::Result<State> {
@@ -42,10 +43,13 @@ pub fn read_state(state_file: &File) -> bincode::Result<State> {
     match &magic_number {
         MAGIC_NUMBER_STATE_2 => deserialize_from(&mut reader),
         _ => {
+            reader.rewind()?;
+
             let Ok(deprecated_state) = deserialize_from::<_, deprecated::State>(&mut reader) else {
                 reader.rewind()?;
                 return deserialize_from(&mut reader);
             };
+
             Ok(State {
                 data_point_list: deprecated_state.data_point_iter().collect(),
                 delete_log: deprecated_state.delete_log,
