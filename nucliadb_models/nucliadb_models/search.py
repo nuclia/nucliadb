@@ -332,6 +332,7 @@ class DocumentServiceEnum(str, Enum):
 class ParagraphServiceEnum(str, Enum):
     PARAGRAPH_V0 = "PARAGRAPH_V0"
     PARAGRAPH_V1 = "PARAGRAPH_V1"
+    PARAGRAPH_V2 = "PARAGRAPH_V2"
 
 
 class VectorServiceEnum(str, Enum):

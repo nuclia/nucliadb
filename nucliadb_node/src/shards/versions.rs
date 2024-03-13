@@ -29,7 +29,7 @@ use nucliadb_core::Channel;
 use serde::{Deserialize, Serialize};
 
 const VECTORS_VERSION: u32 = 1;
-const PARAGRAPHS_VERSION: u32 = 1;
+const PARAGRAPHS_VERSION: u32 = 2;
 const RELATIONS_VERSION: u32 = 2;
 const TEXTS_VERSION: u32 = 2;
 const DEPRECATED_CONFIG: &str = "config.json";
@@ -110,6 +110,8 @@ impl Versions {
         match self.version_paragraphs {
             Some(1) => nucliadb_paragraphs::reader::ParagraphReaderService::start(config)
                 .map(|i| encapsulate_reader(i) as ParagraphsReaderPointer),
+            Some(2) => nucliadb_paragraphs2::reader::ParagraphReaderService::start(config)
+                .map(|i| encapsulate_reader(i) as ParagraphsReaderPointer),
             Some(v) => Err(node_error!("Invalid paragraphs version {v}")),
             None => Err(node_error!("Corrupted version file")),
         }
@@ -148,6 +150,8 @@ impl Versions {
     pub fn get_paragraphs_writer(&self, config: &ParagraphConfig) -> NodeResult<ParagraphsWriterPointer> {
         match self.version_paragraphs {
             Some(1) => nucliadb_paragraphs::writer::ParagraphWriterService::start(config)
+                .map(|i| encapsulate_writer(i) as ParagraphsWriterPointer),
+            Some(2) => nucliadb_paragraphs2::writer::ParagraphWriterService::start(config)
                 .map(|i| encapsulate_writer(i) as ParagraphsWriterPointer),
             Some(v) => Err(node_error!("Invalid paragraphs version {v}")),
             None => Err(node_error!("Corrupted version file")),
