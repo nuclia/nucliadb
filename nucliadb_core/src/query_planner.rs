@@ -27,7 +27,6 @@ use crate::query_language::{self, BooleanExpression, BooleanOperation, QueryAnal
 use crate::vectors::VectorsContext;
 use crate::NodeResult;
 use nucliadb_protos::utils::Security;
-use rayon::vec;
 
 /// A field has two dates
 #[derive(Debug, Clone, Copy)]
