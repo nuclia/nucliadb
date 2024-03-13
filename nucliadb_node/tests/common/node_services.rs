@@ -30,7 +30,6 @@ use nucliadb_core::protos::node_writer_server::NodeWriterServer;
 use nucliadb_node::grpc::reader::NodeReaderGRPCDriver;
 use nucliadb_node::grpc::writer::NodeWriterGRPCDriver;
 use nucliadb_node::lifecycle;
-use nucliadb_node::merge::errors::MergerError;
 use nucliadb_node::replication::replicator::connect_to_primary_and_replicate;
 use nucliadb_node::replication::service::ReplicationServiceGRPCDriver;
 use nucliadb_node::settings::*;
@@ -187,14 +186,6 @@ impl NodeFixture {
         let notifier = Arc::clone(&self.shutdown_notifier);
         self.writer_server_task = Some(tokio::spawn(async move {
             lifecycle::initialize_writer(settings.clone()).expect("Writer initialization has failed");
-            let merger = lifecycle::initialize_merger(Arc::clone(&shards_cache), settings.clone());
-            // ignore merger init errors as initialize twice will report an error
-            if merger.as_ref().is_err_and(|error| matches!(*error, MergerError::GlobalMergerAlreadyInstalled)) {
-                // ignore
-            } else {
-                merger.expect("Merger initialization has failed");
-            }
-
             let writer_server =
                 NodeWriterServer::new(NodeWriterGRPCDriver::new(settings.clone(), Arc::clone(&shards_cache)));
             let replication_server = replication::replication_service_server::ReplicationServiceServer::new(

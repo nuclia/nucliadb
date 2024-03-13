@@ -151,7 +151,7 @@ where
         self.live.pop(k);
     }
 
-    pub fn get_cached(&mut self, id: &K) -> Option<Arc<V>> {
+    fn get_cached(&mut self, id: &K) -> Option<Arc<V>> {
         if let Some(v) = self.eviction.get(id).and_then(Weak::upgrade) {
             self.insert(id, &v);
             return Some(v);

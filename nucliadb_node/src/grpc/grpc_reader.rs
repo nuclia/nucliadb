@@ -18,50 +18,30 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::grpc::update::{update_loop, UpdateParameters};
-use crate::settings::Settings;
-use crate::shards::errors::ShardNotFoundError;
-use crate::shards::providers::shard_cache::ShardReaderCache;
-use crate::shards::reader::{ShardFileChunkIterator, ShardReader};
-use crate::telemetry::run_with_telemetry;
+use std::sync::Arc;
+
 use nucliadb_core::paragraphs::ParagraphIterator;
 use nucliadb_core::protos::node_reader_server::NodeReader;
 use nucliadb_core::protos::*;
 use nucliadb_core::texts::DocumentIterator;
 use nucliadb_core::tracing::{info_span, Span};
-use std::sync::Arc;
-use std::time::Duration;
-use tokio::task::JoinHandle;
 use Shard as ShardPB;
 
-const UPDATE_REFRESH_RATE: &str = "UPDATE_REFRESH_RATE_MILLIS";
+use crate::settings::Settings;
+use crate::shards::errors::ShardNotFoundError;
+use crate::shards::providers::shard_cache::ShardReaderCache;
+use crate::shards::reader::{ShardFileChunkIterator, ShardReader};
+use crate::telemetry::run_with_telemetry;
 
 pub struct NodeReaderGRPCDriver {
-    #[allow(unused)]
-    update_loop_handle: JoinHandle<()>,
     shards: Arc<ShardReaderCache>,
 }
 
 impl NodeReaderGRPCDriver {
     pub fn new(settings: Settings) -> Self {
         let cache_settings = settings.clone();
-        let shards = Arc::new(ShardReaderCache::new(cache_settings));
-        let shards_update_loop_copy = Arc::clone(&shards);
-        let update_refresh_rate = match std::env::var(UPDATE_REFRESH_RATE) {
-            Ok(v) => Duration::from_millis(v.parse().unwrap_or(100)),
-            Err(_) => Duration::from_millis(100),
-        };
-        let update_parameters = UpdateParameters {
-            shards_path: settings.shards_path(),
-            refresh_rate: update_refresh_rate,
-        };
-        let update_loop_handle = tokio::spawn(async move {
-            update_loop(update_parameters, shards_update_loop_copy).await;
-        });
-
-        NodeReaderGRPCDriver {
-            shards,
-            update_loop_handle,
+        Self {
+            shards: Arc::new(ShardReaderCache::new(cache_settings)),
         }
     }
 

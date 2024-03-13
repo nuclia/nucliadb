@@ -115,6 +115,7 @@ pub struct InnerSettings {
     pub replication_delay: Duration,
     #[builder(default = "3")]
     pub replication_max_concurrency: u64,
+
     // time since last replication for node to be considered healthy
     #[builder(default = "Duration::from_secs(30)")]
     pub replication_healthy_delay: Duration,
@@ -126,14 +127,7 @@ pub struct InnerSettings {
     // number of threads to use for rayon
     #[builder(default = "10")]
     pub num_global_rayon_threads: usize,
-
-    // merging
-    /// Time between scheduler being idle and scheduling free time work. This
-    /// setting also affects merge scheduler reaction time
-    #[builder(default = "Duration::from_secs(10)")]
-    pub merge_scheduler_free_time_work_scheduling_delay: Duration,
 }
-
 impl InnerSettings {
     pub fn builder() -> InnerSettingsBuilder {
         InnerSettingsBuilder::default()

@@ -18,17 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::analytics::payload::AnalyticsEvent;
-use crate::analytics::sync::send_analytics_event;
-use crate::grpc::collect_garbage::{garbage_collection_loop, GCParameters};
-use crate::merge::{global_merger, MergePriority, MergeRequest, MergeWaiter};
-use crate::settings::Settings;
-use crate::shards::errors::ShardNotFoundError;
-use crate::shards::metadata::ShardMetadata;
-use crate::shards::providers::shard_cache::ShardWriterCache;
-use crate::shards::writer::ShardWriter;
-use crate::telemetry::run_with_telemetry;
-use crate::utils::{get_primary_node_id, list_shards, read_host_key};
+use std::sync::Arc;
+
 use nucliadb_core::protos::node_writer_server::NodeWriter;
 use nucliadb_core::protos::{
     garbage_collector_response, merge_response, op_status, EmptyQuery, GarbageCollectorResponse, MergeResponse,
@@ -37,17 +28,20 @@ use nucliadb_core::protos::{
 };
 use nucliadb_core::tracing::{self, Span, *};
 use nucliadb_core::Channel;
-use std::sync::Arc;
-use std::time::Duration;
 use tokio::sync::mpsc::UnboundedSender;
-use tokio::task::JoinHandle;
 use tonic::{Request, Response, Status};
 
-const GC_LOOP_INTERVAL: &str = "GC_INTERVAL_SECS";
+use crate::analytics::payload::AnalyticsEvent;
+use crate::analytics::sync::send_analytics_event;
+use crate::settings::Settings;
+use crate::shards::errors::ShardNotFoundError;
+use crate::shards::metadata::ShardMetadata;
+use crate::shards::providers::shard_cache::ShardWriterCache;
+use crate::shards::writer::ShardWriter;
+use crate::telemetry::run_with_telemetry;
+use crate::utils::{get_primary_node_id, list_shards, read_host_key};
 
 pub struct NodeWriterGRPCDriver {
-    #[allow(unused)]
-    gc_loop_handle: JoinHandle<()>,
     shards: Arc<ShardWriterCache>,
     sender: Option<UnboundedSender<NodeWriterEvent>>,
     settings: Settings,
@@ -61,29 +55,15 @@ pub enum NodeWriterEvent {
 
 impl NodeWriterGRPCDriver {
     pub fn new(settings: Settings, shard_cache: Arc<ShardWriterCache>) -> Self {
-        let cache_gc_copy = Arc::clone(&shard_cache);
-        let gc_loop_interval = match std::env::var(GC_LOOP_INTERVAL) {
-            Ok(v) => Duration::from_secs(v.parse().unwrap_or(1)),
-            Err(_) => Duration::from_secs(1),
-        };
-        let gc_parameters = GCParameters {
-            shards_path: settings.shards_path(),
-            loop_interval: gc_loop_interval,
-        };
-        let gc_loop_handle = tokio::spawn(async move {
-            garbage_collection_loop(gc_parameters, cache_gc_copy).await;
-        });
-
-        NodeWriterGRPCDriver {
+        Self {
             settings,
-            gc_loop_handle,
             shards: shard_cache,
             sender: None,
         }
     }
 
     pub fn with_sender(self, sender: UnboundedSender<NodeWriterEvent>) -> Self {
-        NodeWriterGRPCDriver {
+        Self {
             sender: Some(sender),
             ..self
         }
@@ -370,7 +350,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let info = info_span!(parent: &span, "garbage collection");
         let task = || {
             let shard = obtain_shard(shards, shard_id_clone)?;
-            run_with_telemetry(info, move || shard.collect_garbage())
+            run_with_telemetry(info, move || shard.gc())
         };
         let result = tokio::task::spawn_blocking(task)
             .await
@@ -385,28 +365,15 @@ impl NodeWriter for NodeWriterGRPCDriver {
 
     async fn merge(&self, request: Request<ShardId>) -> Result<Response<MergeResponse>, Status> {
         let shard_id = request.into_inner().id;
-
-        // The merging task can only work with already opened shards. Before
-        // sending this work we make ensure that the shard will be loaded by loading it.
-        let shard_id_copy = shard_id.clone();
-        let shards_tasks_copy = Arc::clone(&self.shards);
-        let load_shard_task = || obtain_shard(shards_tasks_copy, shard_id_copy);
-        let load_shard_result = tokio::task::spawn_blocking(load_shard_task)
+        let shards = Arc::clone(&self.shards);
+        let span = info_span!(parent: Span::current(), "merge");
+        let task = || {
+            let shard = obtain_shard(shards, shard_id)?;
+            run_with_telemetry(span, move || shard.merge())
+        };
+        let result = tokio::task::spawn_blocking(task)
             .await
             .map_err(|error| tonic::Status::internal(format!("Blocking task panicked: {error:?}")))?;
-
-        if let Err(error) = load_shard_result {
-            return Err(tonic::Status::internal(error.to_string()));
-        }
-
-        let merger = global_merger();
-        let merge_request = MergeRequest {
-            shard_id,
-            priority: MergePriority::High,
-            waiter: MergeWaiter::Async,
-        };
-        let handle = merger.schedule(merge_request);
-        let result = handle.wait().await;
 
         match result {
             Ok(metrics) => Ok(tonic::Response::new(MergeResponse {
