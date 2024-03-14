@@ -55,7 +55,7 @@ class BackPressureSettings(BaseSettings):
         description="Max number of messages pending to be ingested by processed consumers before rate limiting writes. Set to 0 to disable ingest back pressure checks",  # noqa
     )
     max_processing_pending: int = Field(
-        default=100,
+        default=1000,
         description="Max number of messages pending to process per Knowledge Box before rate limiting writes. Set to 0 to disable processing back pressure checks",  # noqa
     )
     indexing_check_interval: int = Field(
