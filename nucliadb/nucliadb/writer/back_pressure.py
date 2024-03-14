@@ -275,13 +275,13 @@ async def get_materializer(request: Request) -> Optional[Materializer]:
         if MATERIALIZER is not None:
             return MATERIALIZER
 
+        logger.info("Initializing materializer")
         try:
             context = get_app_context(request.app)
             nats_manager = context.nats_manager
         except AttributeError:
             logger.warning("Application context not found or not initialized")
             return None
-
         materializer = Materializer(
             nats_manager,
             indexing_check_interval=settings.indexing_check_interval,
