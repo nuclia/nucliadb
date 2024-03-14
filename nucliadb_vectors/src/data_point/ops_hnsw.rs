@@ -291,14 +291,13 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         let Some(entry_point) = hnsw.get_entry_point() else {
             return Neighbours::default();
         };
-        let mut crnt_layer = entry_point.layer;
+
         let mut neighbours = vec![(entry_point.node, 0.)];
-        while crnt_layer != 0 {
+        for crnt_layer in (0..=entry_point.layer).rev() {
             let layer = hnsw.get_layer(crnt_layer);
             let entry_points: Vec<_> = neighbours.into_iter().map(|(node, _)| node).collect();
             let layer_res = self.layer_search(query, layer, 1, &entry_points);
             neighbours = layer_res;
-            crnt_layer -= 1;
         }
 
         let Some(best_node) = neighbours.first() else {
