@@ -24,6 +24,10 @@ jobs:
   migrations-validation:
     runs-on: ubuntu-latest
 
+    strategy:
+      matrix:
+        python-version: ["3.11"]
+
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v3
