@@ -135,7 +135,11 @@ class ResourceBrain:
                     start_seconds=paragraph.start_seconds,
                     end_seconds=paragraph.end_seconds,
                 )
-                if page_positions:
+                page_with_visual = False
+                if paragraph.HasField("page"):
+                    position.page_number = paragraph.page.page
+                    page_with_visual = paragraph.page.page_with_visual
+                elif page_positions:
                     position.page_number = get_page_number(
                         paragraph.start, page_positions
                     )
@@ -151,7 +155,9 @@ class ResourceBrain:
                         unique_paragraphs,
                         split=subfield,
                     ),
-                    metadata=ParagraphMetadata(position=position),
+                    metadata=ParagraphMetadata(
+                        position=position, page_with_visual=page_with_visual
+                    ),
                 )
                 for classification in paragraph.classifications:
                     label = f"/l/{classification.labelset}/{classification.label}"
@@ -173,8 +179,13 @@ class ResourceBrain:
                 start_seconds=paragraph.start_seconds,
                 end_seconds=paragraph.end_seconds,
             )
-            if page_positions:
+            page_with_visual = False
+            if paragraph.HasField("page"):
+                position.page_number = paragraph.page.page
+                page_with_visual = paragraph.page.page_with_visual
+            elif page_positions:
                 position.page_number = get_page_number(paragraph.start, page_positions)
+
             p = BrainParagraph(
                 start=paragraph.start,
                 end=paragraph.end,
@@ -183,7 +194,9 @@ class ResourceBrain:
                 repeated_in_field=is_paragraph_repeated_in_field(
                     paragraph, extracted_text, unique_paragraphs
                 ),
-                metadata=ParagraphMetadata(position=position),
+                metadata=ParagraphMetadata(
+                    position=position, page_with_visual=page_with_visual
+                ),
             )
             for classification in paragraph.classifications:
                 label = f"/l/{classification.labelset}/{classification.label}"
@@ -611,6 +624,9 @@ def get_page_number(start_index: int, page_positions: FilePagePositions) -> int:
         if start_index <= page_end:
             logger.info("There is a wrong page start")
             return int(page_number)
+    import pdb
+
+    pdb.set_trace()
     logger.error("Could not found a page")
     return int(page_number)
 

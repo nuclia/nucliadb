@@ -342,15 +342,18 @@ class ParagraphMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     POSITION_FIELD_NUMBER: builtins.int
+    PAGE_WITH_VISUAL_FIELD_NUMBER: builtins.int
     @property
     def position(self) -> global___Position: ...
+    page_with_visual: builtins.bool
     def __init__(
         self,
         *,
         position: global___Position | None = ...,
+        page_with_visual: builtins.bool = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["position", b"position"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["position", b"position"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["page_with_visual", b"page_with_visual", "position", b"position"]) -> None: ...
 
 global___ParagraphMetadata = ParagraphMetadata
 

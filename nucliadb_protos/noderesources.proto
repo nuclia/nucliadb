@@ -93,6 +93,7 @@ message VectorSentence {
 
 message ParagraphMetadata {
     Position position = 1;
+    bool page_with_visual = 2;
 }
 
 message IndexParagraph {

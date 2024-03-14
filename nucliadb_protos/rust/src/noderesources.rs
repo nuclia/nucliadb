@@ -126,6 +126,8 @@ pub struct VectorSentence {
 pub struct ParagraphMetadata {
     #[prost(message, optional, tag="1")]
     pub position: ::core::option::Option<Position>,
+    #[prost(bool, tag="2")]
+    pub page_with_visual: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IndexParagraph {
