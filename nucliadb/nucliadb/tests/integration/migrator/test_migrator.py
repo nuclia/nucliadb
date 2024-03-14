@@ -107,3 +107,19 @@ async def test_run_all_kb_migrations(
         assert kb_info.current_version == 1
         global_info = await execution_context.data_manager.get_global_info()
         assert global_info.current_version == 1
+
+
+async def test_run_kb_rollovers(
+    execution_context: ExecutionContext, two_knowledgeboxes
+):
+    # Set migration version to -1 for all knowledgeboxes
+    for kbid in two_knowledgeboxes:
+        await execution_context.data_manager.add_kb_rollover(kbid=kbid)
+
+    assert set(await execution_context.data_manager.get_kbs_to_rollover()) == set(
+        two_knowledgeboxes
+    )
+
+    await migrator.run(execution_context, target_version=0)
+
+    assert len(await execution_context.data_manager.get_kbs_to_rollover()) == 0

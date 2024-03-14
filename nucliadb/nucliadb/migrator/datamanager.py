@@ -37,6 +37,8 @@ _UNSET = _Unset()
 MIGRATIONS_CONTAINER_KEY = "migrations/"
 MIGRATIONS_KEY = "migrations/{kbid}"
 MIGRATION_INFO_KEY = "migration/info"
+ROLLOVER_CONTAINER_KEY = "rollover/"
+ROLLOVER_KEY = "rollover/{kbid}"
 
 
 class MigrationsDataManager:
@@ -109,4 +111,22 @@ class MigrationsDataManager:
                     pb.ClearField("target_version")
             await txn.set(MIGRATION_INFO_KEY, pb.SerializeToString())
 
+            await txn.commit()
+
+    async def get_kbs_to_rollover(self) -> list[str]:
+        keys = []
+        async with self.driver.transaction() as txn:
+            async for key in txn.keys(ROLLOVER_CONTAINER_KEY):
+                keys.append(key.split("/")[-1])
+
+        return keys
+
+    async def add_kb_rollover(self, kbid: str) -> None:
+        async with self.driver.transaction() as txn:
+            await txn.set(ROLLOVER_KEY.format(kbid=kbid), b"")
+            await txn.commit()
+
+    async def delete_kb_rollover(self, kbid: str) -> None:
+        async with self.driver.transaction() as txn:
+            await txn.delete(ROLLOVER_KEY.format(kbid=kbid))
             await txn.commit()
