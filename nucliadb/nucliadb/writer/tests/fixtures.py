@@ -19,6 +19,7 @@
 #
 from enum import Enum
 from typing import AsyncIterator, Callable, Optional
+from unittest import mock
 
 import pytest
 from httpx import AsyncClient
@@ -26,7 +27,7 @@ from pytest_lazy_fixtures import lazy_fixture
 from redis import asyncio as aioredis
 
 from nucliadb.ingest.tests.fixtures import IngestFixture
-from nucliadb.writer import API_PREFIX
+from nucliadb.writer import API_PREFIX, back_pressure
 from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX
 from nucliadb.writer.settings import settings
 from nucliadb.writer.tus import clear_storage
@@ -42,7 +43,16 @@ from nucliadb_utils.utilities import Utility, clean_utility, set_utility
 
 
 @pytest.fixture(scope="function")
+def disabled_back_pressure():
+    with mock.patch(
+        "nucliadb.writer.back_pressure.is_back_pressure_enabled", return_value=False
+    ) as mocked:
+        yield mocked
+
+
+@pytest.fixture(scope="function")
 async def writer_api(
+    disabled_back_pressure,
     redis,
     storage_writer,
     grpc_servicer: IngestFixture,

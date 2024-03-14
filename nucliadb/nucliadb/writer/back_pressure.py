@@ -97,13 +97,13 @@ _cache = BackPressureCache()
 
 
 @contextlib.contextmanager
-def cached_back_pressure(*args):
+def cached_back_pressure(kbid: str, resource_uuid: Optional[str] = None):
     """
     Context manager that handles the caching of the try again in time so that
     we don't recompute try again times if we have already applied back pressure.
     """
 
-    cache_key = "-".join(args)
+    cache_key = "-".join([kbid, resource_uuid or ""])
 
     data: Optional[BackPressureData] = _cache.get(cache_key)
     if data is not None:
