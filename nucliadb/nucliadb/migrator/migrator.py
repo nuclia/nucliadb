@@ -48,9 +48,6 @@ async def run_kb_migrations(
             from_version=kb_info.current_version, to_version=target_version
         )
 
-        if len(migrations) == 0:
-            return
-
         for migration in migrations:
             migration_info = {
                 "from_version": kb_info.current_version,
