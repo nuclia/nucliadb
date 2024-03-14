@@ -120,6 +120,6 @@ async def test_run_kb_rollovers(
         two_knowledgeboxes
     )
 
-    await migrator.run(execution_context, target_version=0)
+    await migrator.run_rollovers(execution_context)
 
     assert len(await execution_context.data_manager.get_kbs_to_rollover()) == 0
