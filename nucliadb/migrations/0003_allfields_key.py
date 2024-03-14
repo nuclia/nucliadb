@@ -53,7 +53,7 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
             # Migrate resource
             logger.warning(f"kb={kbid} rid={resource_id}: migrating...")
             all_fields = AllFieldIDs()
-            async for field_type, field_id in resource._deprecated_scan_fields_ids():
+            async for (field_type, field_id) in resource._deprecated_scan_fields_ids():
                 fid = FieldID(field_type=field_type, field=field_id)
                 all_fields.fields.append(fid)
             await resource.set_all_field_ids(all_fields)
