@@ -37,6 +37,7 @@ from nucliadb.common.datamanagers.resources import ResourcesDataManager
 from nucliadb.common.http_clients.processing import ProcessingHTTPClient
 from nucliadb.writer import logger
 from nucliadb.writer.settings import back_pressure_settings as settings
+from nucliadb_telemetry import metrics
 from nucliadb_utils import const
 from nucliadb_utils.nats import NatsConnectionManager
 from nucliadb_utils.settings import is_onprem_nucliadb
@@ -44,13 +45,15 @@ from nucliadb_utils.settings import is_onprem_nucliadb
 """
 TODO:
 - Make sure I didn't miss any endpoint to protect
-- Add tests
-- Add metrics / alerts
-- Double check default values!
 """
 
 
 __all__ = ["maybe_back_pressure"]
+
+
+RATE_LIMITED_REQUESTS = metrics.Counter(
+    "nucliadb_rate_limited_requests", labels={"type": "", "cached": ""}
+)
 
 
 @dataclass
@@ -110,6 +113,7 @@ def cached_back_pressure(*args):
 
     data: Optional[BackPressureData] = _cache.get(cache_key)
     if data is not None:
+        RATE_LIMITED_REQUESTS.inc({"type": data.type, "cached": "true"})
         raise HTTPException(
             status_code=429,
             detail={
@@ -121,6 +125,7 @@ def cached_back_pressure(*args):
     try:
         yield
     except BackPressureException as exc:
+        RATE_LIMITED_REQUESTS.inc({"type": data.type, "cached": "false"})
         _cache.set(cache_key, exc.data)
         raise HTTPException(
             status_code=429,
