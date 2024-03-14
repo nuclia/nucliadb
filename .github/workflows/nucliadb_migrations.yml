@@ -38,5 +38,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
 
+      - name: Install the package
+        run: make -C nucliadb/ install-dev
+
       - name: Validate migrations
         run: nucliadb-validate-migrations
