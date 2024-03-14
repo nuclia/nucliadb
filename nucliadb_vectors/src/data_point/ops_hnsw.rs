@@ -157,7 +157,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                 // Our best candidate is worse than the min score
                 (Some(Cnx(_, cs)), _) if cs < self.tracker.min_score() => break,
                 // Our best candidate is worse than the worst result
-                (Some(Cnx(_, cs)), Some(Reverse(Cnx(_, ws)))) if cs < ws && results.len() == k_neighbours => {
+                (Some(Cnx(_, cs)), Some(Reverse(Cnx(_, ws)))) if cs < ws && results.len() >= k_neighbours => {
                     break;
                 }
                 // Evaluate a candidate
