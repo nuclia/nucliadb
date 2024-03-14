@@ -103,9 +103,9 @@ build-node:
 	docker build -t europe-west4-docker.pkg.dev/nuclia-internal/private/node:latest -f Dockerfile.node .
 
 build-node-debug:
-	./scripts/download-build.sh && echo "Using build server build" && docker build -t europe-west4-docker.pkg.dev/nuclia-internal/private/node:latest -f Dockerfile.node_prebuilt . || ( \
+	./scripts/download-build.sh && echo "Using build server build" && docker build -t europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node:latest -f Dockerfile.node_prebuilt . || ( \
 		echo "Failed to download build from build server. Manually running build." && \
-		docker build -t europe-west4-docker.pkg.dev/nuclia-internal/private/node:latest --build-arg CARGO_PROFILE=debug -f Dockerfile.node . \
+		docker build -t europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node:latest --build-arg CARGO_PROFILE=debug -f Dockerfile.node . \
 	)
 
 
