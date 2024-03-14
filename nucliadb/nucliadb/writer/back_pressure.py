@@ -27,7 +27,7 @@ from typing import Optional
 
 from async_lru import alru_cache
 from cachetools import TTLCache
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import HTTPException, Request
 from nucliadb_protos.writer_pb2 import ShardObject
 
 from nucliadb.common.cluster.manager import get_index_nodes
@@ -107,26 +107,30 @@ def cached_back_pressure(*args):
 
     data: Optional[BackPressureData] = _cache.get(cache_key)
     if data is not None:
-        RATE_LIMITED_REQUESTS.inc({"type": data.type, "cached": "true"})
+        try_after = data.try_after
+        back_pressure_type = data.type
+        RATE_LIMITED_REQUESTS.inc({"type": back_pressure_type, "cached": "true"})
         raise HTTPException(
             status_code=429,
             detail={
-                "message": f"Too many messages pending to ingest. Retry after {data.try_after}",
-                "try_after": data.try_after.timestamp(),
-                "back_pressure_type": data.type,
+                "message": f"Too many messages pending to ingest. Retry after {try_after}",
+                "try_after": try_after.timestamp(),
+                "back_pressure_type": back_pressure_type,
             },
         )
     try:
         yield
     except BackPressureException as exc:
-        RATE_LIMITED_REQUESTS.inc({"type": data.type, "cached": "false"})
+        try_after = exc.data.try_after
+        back_pressure_type = exc.data.type
+        RATE_LIMITED_REQUESTS.inc({"type": back_pressure_type, "cached": "false"})
         _cache.set(cache_key, exc.data)
         raise HTTPException(
             status_code=429,
             detail={
-                "message": f"Too many messages pending to ingest. Retry after {exc.data.try_after}",
-                "try_after": exc.data.try_after.timestamp(),
-                "back_pressure_type": exc.data.type,
+                "message": f"Too many messages pending to ingest. Retry after {try_after}",
+                "try_after": try_after.timestamp(),
+                "back_pressure_type": back_pressure_type,
             },
         )
 
@@ -257,6 +261,37 @@ class Materializer:
             pass
 
 
+MATERIALIZER: Optional[Materializer] = None
+set_materializer_lock = threading.Lock()
+
+
+async def get_materializer(request: Request) -> Optional[Materializer]:
+    global MATERIALIZER
+
+    if MATERIALIZER is not None:
+        return MATERIALIZER
+
+    with set_materializer_lock:
+        if MATERIALIZER is not None:
+            return MATERIALIZER
+
+        try:
+            context = get_app_context(request.app)
+            nats_manager = context.nats_manager
+        except AttributeError:
+            logger.warning("Application context not found or not initialized")
+            return None
+
+        materializer = Materializer(
+            nats_manager,
+            indexing_check_interval=settings.indexing_check_interval,
+            ingest_check_interval=settings.ingest_check_interval,
+        )
+        await materializer.start()
+        MATERIALIZER = materializer
+        return materializer
+
+
 async def maybe_back_pressure(
     request: Request, kbid: str, resource_uuid: Optional[str] = None
 ) -> None:
@@ -269,11 +304,6 @@ async def maybe_back_pressure(
     await back_pressure_checks(request, kbid, resource_uuid)
 
 
-def get_back_pressure_materializer(app: FastAPI) -> Optional[Materializer]:
-    context = get_app_context(app)
-    return getattr(context, "back_pressure_materializer", None)
-
-
 async def back_pressure_checks(
     request: Request, kbid: str, resource_uuid: Optional[str] = None
 ):
@@ -284,11 +314,9 @@ async def back_pressure_checks(
     - If the indexing on nodes affected by the request (kbid, and resource_uuid) is behind.
     """
     context = get_app_context(request.app)
-    materializer = get_back_pressure_materializer(request.app)
-    if materializer is None or not materializer.running:
-        logger.error("Back pressure materializer is not initialized")
+    materializer = await get_materializer(request)
+    if materializer is None:
         return
-
     with cached_back_pressure(kbid, resource_uuid):
         check_ingest_behind(materializer.get_ingest_pending())
         await check_indexing_behind(
