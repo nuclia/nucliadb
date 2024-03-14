@@ -23,7 +23,7 @@ pub use crate::protos::prost_types::Timestamp as ProtoTimestamp;
 use crate::protos::{
     DocumentSearchRequest, ParagraphSearchRequest, RelationSearchRequest, SearchRequest, VectorSearchRequest,
 };
-use crate::query_language::{self, BooleanExpression, QueryAnalysis, QueryContext};
+use crate::query_language::{self, BooleanExpression, BooleanOperation, QueryAnalysis, QueryContext};
 use crate::vectors::VectorsContext;
 use crate::NodeResult;
 use nucliadb_protos::utils::Security;
@@ -82,6 +82,7 @@ pub struct PreFilterResponse {
 /// The queries a [`QueryPlan`] has decided to send to each index.
 #[derive(Default, Clone)]
 pub struct IndexQueries {
+    pub paragraphs_version: i32,
     pub vectors_context: VectorsContext,
     pub paragraphs_context: ParagraphsContext,
     pub vectors_request: Option<VectorSearchRequest>,
@@ -124,6 +125,14 @@ impl IndexQueries {
         }
     }
 
+    fn apply_to_paragraphs2(request: &mut ParagraphSearchRequest, response: &PreFilterResponse) {
+        if matches!(response.valid_fields, ValidFieldCollector::All) {
+            // Since all the fields are matching there is no need to use this filter.
+            request.timestamps = None;
+            request.security = None;
+        }
+    }
+
     /// When a pre-filter is run, the result can be used to modify the queries
     /// that the indexes must resolve.
     pub fn apply_prefilter(&mut self, prefiltered: PreFilterResponse) {
@@ -139,9 +148,12 @@ impl IndexQueries {
         if let Some(vectors_request) = self.vectors_request.as_mut() {
             IndexQueries::apply_to_vectors(vectors_request, &prefiltered);
         };
-        if let Some(paragraph_request) = self.paragraphs_request.as_mut() {
-            IndexQueries::apply_to_paragraphs(paragraph_request, &prefiltered);
-        };
+
+        match (self.paragraphs_version, self.paragraphs_request.as_mut()) {
+            (1, Some(paragraph_request)) => IndexQueries::apply_to_paragraphs(paragraph_request, &prefiltered),
+            (2, Some(paragraph_request)) => IndexQueries::apply_to_paragraphs2(paragraph_request, &prefiltered),
+            _ => (),
+        }
     }
 }
 
@@ -164,7 +176,7 @@ fn analyze_filter(search_request: &SearchRequest) -> NodeResult<QueryAnalysis> {
     query_language::translate(&filter.expression, &context)
 }
 
-pub fn build_query_plan(search_request: SearchRequest) -> NodeResult<QueryPlan> {
+pub fn build_query_plan(paragraphs_version: i32, search_request: SearchRequest) -> NodeResult<QueryPlan> {
     let vectors_request = compute_vectors_request(&search_request);
     let paragraphs_request = compute_paragraphs_request(&search_request);
     let texts_request = compute_texts_request(&search_request);
@@ -175,14 +187,24 @@ pub fn build_query_plan(search_request: SearchRequest) -> NodeResult<QueryPlan> 
     let vectors_context = VectorsContext {
         filtering_formula: search_query.clone(),
     };
+    let filtering_formula = match (search_query, prefilter_query.clone()) {
+        (search_query, _) if paragraphs_version != 2 => search_query,
+        (None, None) => None,
+        (Some(formula), None) | (None, Some(formula)) => Some(formula),
+        (Some(search), Some(prefilter)) => Some(BooleanExpression::Operation(BooleanOperation {
+            operator: query_language::Operator::And,
+            operands: vec![search, prefilter],
+        })),
+    };
     let paragraphs_context = ParagraphsContext {
-        filtering_formula: search_query,
+        filtering_formula,
     };
     let prefilter = compute_prefilters(&search_request, prefilter_query);
 
     Ok(QueryPlan {
         prefilter,
         index_queries: IndexQueries {
+            paragraphs_version,
             vectors_context,
             paragraphs_context,
             vectors_request,
@@ -267,6 +289,7 @@ fn compute_paragraphs_request(search_request: &SearchRequest) -> Option<Paragrap
         filter: None,
         reload: search_request.reload,
         min_score: search_request.min_score_bm25,
+        security: search_request.security.clone(),
     })
 }
 
@@ -351,7 +374,7 @@ mod tests {
             }),
             ..Default::default()
         };
-        let query_plan = build_query_plan(request).unwrap();
+        let query_plan = build_query_plan(1, request).unwrap();
         let Some(prefilter) = query_plan.prefilter else {
             panic!("There should be a prefilter");
         };

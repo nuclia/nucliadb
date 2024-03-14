@@ -103,6 +103,7 @@ class AbstractIndexNode(metaclass=ABCMeta):
         req = NewShardRequest(
             kbid=kbid, similarity=similarity, release_channel=release_channel
         )
+
         resp = await self.writer.NewShard(req)  # type: ignore
         return resp
 
