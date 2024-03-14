@@ -42,12 +42,6 @@ from nucliadb_utils import const
 from nucliadb_utils.nats import NatsConnectionManager
 from nucliadb_utils.settings import is_onprem_nucliadb
 
-"""
-TODO:
-- Make sure I didn't miss any endpoint to protect
-"""
-
-
 __all__ = ["maybe_back_pressure"]
 
 
