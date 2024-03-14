@@ -30,7 +30,7 @@ class Settings(BaseSettings):
 
 class BackPressureSettings(BaseSettings):
     enabled: bool = Field(
-        default=True,
+        default=False,
         description="Enable or disable back pressure.",
         env=["back_pressure_enabled"],
     )
