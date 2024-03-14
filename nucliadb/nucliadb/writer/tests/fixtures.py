@@ -27,7 +27,7 @@ from pytest_lazy_fixtures import lazy_fixture
 from redis import asyncio as aioredis
 
 from nucliadb.ingest.tests.fixtures import IngestFixture
-from nucliadb.writer import API_PREFIX, back_pressure
+from nucliadb.writer import API_PREFIX
 from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX
 from nucliadb.writer.settings import settings
 from nucliadb.writer.tus import clear_storage
