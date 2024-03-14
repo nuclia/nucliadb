@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 import time
 from datetime import datetime, timedelta
 from unittest import mock
@@ -28,6 +29,7 @@ from nucliadb.writer.back_pressure import (
     BackPressureCache,
     BackPressureData,
     BackPressureException,
+    Materializer,
 )
 from nucliadb.writer.back_pressure import _cache as back_pressure_cache
 from nucliadb.writer.back_pressure import (
@@ -255,3 +257,79 @@ def test_cached_back_pressure_context_manager(cache):
     )
     assert exc.value.detail["try_after"]
     assert exc.value.detail["back_pressure_type"] == "indexing"
+
+
+@pytest.fixture(scope="function")
+def js():
+    consumer_info = mock.Mock(num_pending=10)
+    js = mock.Mock()
+    js.consumer_info = mock.AsyncMock(return_value=consumer_info)
+    yield js
+
+
+@pytest.fixture(scope="function")
+def nats_conn(js):
+    ncm = mock.Mock()
+    ncm.js = mock.Mock(js=js)
+    yield ncm
+
+
+@pytest.fixture(scope="function")
+def get_index_nodes():
+    with mock.patch(
+        f"{MODULE}.get_index_nodes", return_value=["node1", "node2"]
+    ) as mock_:
+        yield mock_
+
+
+@pytest.fixture(scope="function")
+def processing_client():
+    processing_client = mock.Mock()
+    resp = mock.Mock(incomplete=10)
+    processing_client.stats = mock.AsyncMock(return_value=resp)
+    processing_client.close = mock.AsyncMock()
+    yield processing_client
+
+
+async def test_materializer(nats_conn, get_index_nodes, js, processing_client):
+    materializer = Materializer(
+        nats_conn,
+        indexing_check_interval=0.5,
+        ingest_check_interval=0.5,
+    )
+    materializer.processing_http_client = processing_client
+
+    assert not materializer.running
+    await materializer.start()
+
+    # Make sure the tasks are running
+    assert materializer.running
+    assert len(materializer._tasks) == 2
+
+    await asyncio.sleep(0.1)
+
+    assert len(js.consumer_info.call_args_list) == 3
+
+    # Wait for the next check
+    await asyncio.sleep(0.5)
+
+    assert len(js.consumer_info.call_args_list) == 6
+
+    # Make sure the values are materialized
+    assert materializer.get_indexing_pending() == {"node1": 10, "node2": 10}
+    assert materializer.get_ingest_pending() == 10
+
+    # Make sure processing pending are cached
+    assert await materializer.get_processing_pending("kbid") == 10
+    assert await materializer.get_processing_pending("kbid") == 10
+    materializer.processing_http_client.stats.assert_awaited_once_with(
+        kbid="kbid", timeout=0.5
+    )
+
+    await materializer.stop()
+
+    # Make sure tasks are cancelled
+    assert materializer._tasks == []
+
+    # Make sure the processing client is closed
+    materializer.processing_http_client.close.assert_awaited_once()

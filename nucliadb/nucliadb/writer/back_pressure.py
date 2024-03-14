@@ -85,12 +85,10 @@ class BackPressureCache:
             data = self._cache.get(key, None)
             if data is None:
                 return None
-
             if datetime.utcnow() >= data.try_after:
                 # The key has expired, so remove it from the cache
                 self._cache.pop(key, None)
                 return None
-
             return data
 
     def set(self, key: str, data: BackPressureData):
@@ -160,6 +158,9 @@ class Materializer:
         self._tasks: list[asyncio.Task] = []
         self._running = False
 
+        self.processing_pending_cache = TTLCache(maxsize=1024, ttl=60)  # type: ignore
+        self.processing_pending_locks: dict[str, asyncio.Lock] = {}
+
     async def start(self):
         self._tasks.append(asyncio.create_task(self._get_indexing_pending_task()))
         self._tasks.append(asyncio.create_task(self._get_ingest_pending_task()))
@@ -176,15 +177,39 @@ class Materializer:
     def running(self) -> bool:
         return self._running
 
-    @alru_cache(maxsize=1024, ttl=60)
     async def get_processing_pending(self, kbid: str) -> int:
-        # TODO: turn it into a settigns-configurabe ttl cache !!!!
+        """
+        We don't materialize the pending messages for every kbid, but values are cached for some time.
+        """
+        cached = self.processing_pending_cache.get(kbid)
+        if cached is not None:
+            return cached
 
-        """
-        We won't materialize the pending messages for every KB, but we will cache the result some time.
-        """
-        response = await self.processing_http_client.stats(kbid=kbid)
-        return response.incomplete + response.scheduled
+        lock = self.processing_pending_locks.setdefault(kbid, asyncio.Lock())
+        async with lock:
+            # Check again if the value has been cached while we were waiting for the lock
+            cached = self.processing_pending_cache.get(kbid)
+            if cached is not None:
+                return cached
+
+            # Get the pending messages and cache the result
+            try:
+                pending = await self._get_processing_pending(kbid)
+            except Exception:
+                # Do not cache if there was an error
+                logger.exception(
+                    "Error getting pending messages to process. Back pressure on proccessing for KB can't be applied.",
+                    exc_info=True,
+                    extra={"kbid": kbid},
+                )
+                return 0
+
+            self.processing_pending_cache[kbid] = pending
+            return pending
+
+    async def _get_processing_pending(self, kbid: str) -> int:
+        response = await self.processing_http_client.stats(kbid=kbid, timeout=0.5)
+        return response.incomplete
 
     def get_indexing_pending(self) -> dict[str, int]:
         return self.indexing_pending
@@ -228,7 +253,7 @@ class Materializer:
                         "Error getting pending messages to ingest",
                         exc_info=True,
                     )
-                await asyncio.sleep(self.check_interval)
+                await asyncio.sleep(self.ingest_check_interval)
         except asyncio.CancelledError:
             pass
 

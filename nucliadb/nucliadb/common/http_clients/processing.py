@@ -184,10 +184,13 @@ class ProcessingHTTPClient:
             check_status(resp, resp_text)
             return RequestsResults.parse_raw(resp_text)
 
-    async def stats(self, kbid: str) -> StatsResponse:
+    async def stats(self, kbid: str, timeout: Optional[float] = 1.0) -> StatsResponse:
         url = self.base_url + "/stats"
         async with self.session.get(
-            url, headers=self.headers, params={"kbid", kbid}
+            url,
+            headers=self.headers,
+            params={"kbid", kbid},
+            timeout=aiohttp.ClientTimeout(total=timeout),
         ) as resp:
             resp_text = await resp.text()
             check_status(resp, resp_text)
