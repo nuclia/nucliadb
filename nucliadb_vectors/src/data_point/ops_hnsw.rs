@@ -18,13 +18,13 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::cmp::{Ordering, Reverse};
-use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
-
+use bit_set::BitSet;
 use ram_hnsw::*;
 use rand::distributions::Uniform;
 use rand::prelude::*;
 use rand::rngs::SmallRng;
+use std::cmp::{Ordering, Reverse};
+use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 
 use super::*;
 use crate::data_point::params;
@@ -141,14 +141,11 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         // candidates.
 
         let mut results = Vec::new();
-        let mut visited_nodes: HashSet<_> = HashSet::from_iter(entry_points.iter().copied());
+        let inner_entry_points_iter = entry_points.iter().map(|Address(inner)| *inner);
+        let mut visited_nodes: BitSet = BitSet::from_iter(inner_entry_points_iter);
         let mut candidates = VecDeque::from(entry_points);
 
         loop {
-            if results.len() == number_of_results {
-                return results;
-            }
-
             let Some(candidate) = candidates.pop_front() else {
                 break;
             };
@@ -165,12 +162,16 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                 results.push((candidate, candidate_similarity));
             }
 
+            if results.len() == number_of_results {
+                return results;
+            }
+
             let mut sorted_out: Vec<_> = layer.get_out_edges(candidate).collect();
             sorted_out.sort_by(|a, b| b.1.total_cmp(&a.1));
             sorted_out.into_iter().for_each(|(new_candidate, _)| {
-                if !visited_nodes.contains(&new_candidate) {
+                if !visited_nodes.contains(new_candidate.0) {
+                    visited_nodes.insert(new_candidate.0);
                     candidates.push_back(new_candidate);
-                    visited_nodes.insert(new_candidate);
                 }
             });
         }
