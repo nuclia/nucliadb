@@ -604,7 +604,7 @@ def test_cors_x_nucliadb_cors_allowed_domains(
             status_code=200,
             headers={
                 "Vary": "Accept-Encoding",
-                "x-nucliadb-cors-allowed-domains": "https://example-a.org,https://example-b.org",
+                "x-nucliadb-cors-allowed-origins": "https://example-a.org,https://example-b.org",
             },
         )
 
