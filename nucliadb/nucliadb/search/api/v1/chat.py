@@ -172,6 +172,7 @@ async def create_chat_response(
 
         relations_results = None
         if ChatOptions.RELATIONS in chat_request.features:
+            # XXX should use query parser here
             relations_results = await get_relations_results(
                 kbid=kbid, chat_request=chat_request, text_answer=answer
             )
@@ -210,6 +211,7 @@ async def create_chat_response(
 
             yield END_OF_STREAM.encode()
             if ChatOptions.RELATIONS in chat_request.features:
+                # XXX should use query parser here
                 relations_results = await get_relations_results(
                     kbid=kbid, chat_request=chat_request, text_answer=answer
                 )
