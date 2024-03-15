@@ -51,6 +51,7 @@ from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import (
     Filter,
     MinScore,
+    QueryInfo,
     SearchOptions,
     SortField,
     SortFieldMap,
@@ -81,6 +82,7 @@ class QueryParser:
     """
 
     _min_score_task: Optional[asyncio.Task] = None
+    _query_information_task: Optional[asyncio.Task] = None
     _convert_vectors_task: Optional[asyncio.Task] = None
     _detected_entities_task: Optional[asyncio.Task] = None
     _entities_meta_cache_task: Optional[asyncio.Task] = None
@@ -137,6 +139,7 @@ class QueryParser:
         self.autofilter = autofilter
         self.key_filters = key_filters
         self.security = security
+        self.query_feature = True
 
         if len(self.filters) > 0:
             self.filters = translate_label_filters(self.filters)
@@ -155,6 +158,13 @@ class QueryParser:
                 convert_vectors(self.kbid, self.query)
             )
         return self._convert_vectors_task
+
+    def _get_query_information(self) -> Awaitable[Optional[QueryInfo]]:
+        if self._query_information_task is None:  # pragma: no cover
+            self._query_information_task = asyncio.create_task(
+                query_information(self.kbid, self.query)
+            )
+        return self._query_information_task
 
     def _get_detected_entities(self) -> Awaitable[list[utils_pb2.RelationNode]]:
         if self._detected_entities_task is None:  # pragma: no cover
@@ -354,14 +364,32 @@ class QueryParser:
             node_features.inc({"type": "vectorset"})
 
         if self.user_vector is None:
-            try:
-                request.vector.extend(await self._get_converted_vectors())
-            except SendToPredictError as err:
-                logger.warning(f"Errors on predict api trying to embedd query: {err}")
-                incomplete = True
-            except PredictVectorMissing:
-                logger.warning("Predict api returned an empty vector")
-                incomplete = True
+            if self.query_feature:
+                try:
+                    query_info = await self._get_query_information()
+                    if query_info and query_info.sentence:
+                        request.vector.extend(query_info.sentence.data)
+                    else:
+                        incomplete = True
+                except SendToPredictError as err:
+                    logger.warning(
+                        f"Errors on predict api trying to embedd query: {err}"
+                    )
+                    incomplete = True
+                except PredictVectorMissing:
+                    logger.warning("Predict api returned an empty vector")
+                    incomplete = True
+            else:
+                try:
+                    request.vector.extend(await self._get_converted_vectors())
+                except SendToPredictError as err:
+                    logger.warning(
+                        f"Errors on predict api trying to embedd query: {err}"
+                    )
+                    incomplete = True
+                except PredictVectorMissing:
+                    logger.warning("Predict api returned an empty vector")
+                    incomplete = True
         else:
             request.vector.extend(self.user_vector)
         return incomplete
@@ -493,9 +521,15 @@ async def paragraph_query_to_pb(
 
 
 @query_parse_dependency_observer.wrap({"type": "convert_vectors"})
-async def convert_vectors(kbid: str, query: str) -> list[utils_pb2.RelationNode]:
+async def convert_vectors(kbid: str, query: str) -> list[float]:
     predict = get_predict()
     return await predict.convert_sentence_to_vector(kbid, query)
+
+
+@query_parse_dependency_observer.wrap({"type": "query_information"})
+async def query_information(kbid: str, query: str) -> Optional[QueryInfo]:
+    predict = get_predict()
+    return await predict.query(kbid, query)
 
 
 @query_parse_dependency_observer.wrap({"type": "detect_entities"})
