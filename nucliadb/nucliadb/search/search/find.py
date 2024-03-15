@@ -45,7 +45,7 @@ async def find(
     x_ndb_client: NucliaDBClientType,
     x_nucliadb_user: str,
     x_forwarded_for: str,
-) -> tuple[KnowledgeboxFindResults, bool]:
+) -> tuple[KnowledgeboxFindResults, bool, QueryParser]:
     audit = get_audit()
     start_time = time()
 
@@ -130,4 +130,4 @@ async def find(
             },
         )
 
-    return search_results, incomplete_results
+    return search_results, incomplete_results, query_parser

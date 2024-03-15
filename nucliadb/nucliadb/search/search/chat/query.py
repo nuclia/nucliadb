@@ -30,6 +30,7 @@ from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.chat.prompt import PromptContextBuilder
 from nucliadb.search.search.exceptions import IncompleteFindResultsError
 from nucliadb.search.search.find import find
+from nucliadb.search.search.query import QueryParser
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.settings import settings
 from nucliadb.search.utilities import get_predict
@@ -137,7 +138,7 @@ async def get_find_results(
     ndb_client: NucliaDBClientType,
     user: str,
     origin: str,
-) -> KnowledgeboxFindResults:
+) -> tuple[KnowledgeboxFindResults, QueryParser]:
     find_request = FindRequest()
     find_request.resource_filters = chat_request.resource_filters
     find_request.features = []
@@ -164,10 +165,12 @@ async def get_find_results(
     find_request.security = chat_request.security
     find_request.debug = chat_request.debug
 
-    find_results, incomplete = await find(kbid, find_request, ndb_client, user, origin)
+    find_results, incomplete, query_parser = await find(
+        kbid, find_request, ndb_client, user, origin
+    )
     if incomplete:
         raise IncompleteFindResultsError()
-    return find_results
+    return find_results, query_parser
 
 
 async def get_relations_results(
@@ -232,7 +235,7 @@ async def chat(
             generative_model=chat_request.generative_model,
         )
 
-    find_results: KnowledgeboxFindResults = await get_find_results(
+    find_results, query_parser = await get_find_results(
         kbid=kbid,
         query=rephrased_query or user_query,
         chat_request=chat_request,
@@ -253,6 +256,7 @@ async def chat(
             user_context=user_context,
             strategies=chat_request.rag_strategies,
             max_context_size=settings.max_prompt_context_chars,
+            visual_llm=await query_parser.get_visual_llm_enabled(),
         )
         prompt_context, prompt_context_order = await prompt_context_builder.build()
         user_prompt = None
