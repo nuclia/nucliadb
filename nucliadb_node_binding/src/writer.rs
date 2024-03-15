@@ -22,11 +22,15 @@ use std::io::Cursor;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use crate::collect_garbage::{garbage_collection_loop, GCParameters};
+use crate::errors::{IndexNodeException, LoadShardError};
+use crate::RawProtos;
 use nucliadb_core::protos::*;
 use nucliadb_core::Channel;
 use nucliadb_node::analytics::blocking::send_analytics_event;
 use nucliadb_node::analytics::payload::AnalyticsEvent;
 use nucliadb_node::lifecycle;
+use nucliadb_node::merge::errors::MergerError;
 use nucliadb_node::settings::providers::env::EnvSettingsProvider;
 use nucliadb_node::settings::providers::SettingsProvider;
 use nucliadb_node::settings::Settings;
@@ -37,13 +41,16 @@ use prost::Message;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
+use std::thread::JoinHandle;
+use std::time::Duration;
 
-use crate::errors::{IndexNodeException, LoadShardError};
-use crate::RawProtos;
+const GC_LOOP_INTERVAL: Duration = Duration::from_secs(60);
 
 #[pyclass]
 pub struct NodeWriter {
-    shards: ShardWriterCache,
+    #[allow(unused)]
+    gc_loop_handle: JoinHandle<()>,
+    shards: Arc<ShardWriterCache>,
     shards_path: PathBuf,
 }
 
@@ -60,13 +67,29 @@ impl NodeWriter {
     #[new]
     pub fn new() -> PyResult<Self> {
         let settings: Settings = EnvSettingsProvider::generate_settings().unwrap();
+        let shard_cache = Arc::new(ShardWriterCache::new(settings.clone()));
+        let shards_gc_loop_copy = Arc::clone(&shard_cache);
+        let gc_parameters = GCParameters {
+            shards_path: settings.shards_path(),
+            loop_interval: GC_LOOP_INTERVAL,
+        };
+        let gc_loop_handle = std::thread::spawn(|| {
+            garbage_collection_loop(gc_parameters, shards_gc_loop_copy);
+        });
 
         if let Err(error) = lifecycle::initialize_writer(settings.clone()) {
             return Err(IndexNodeException::new_err(format!("Unable to initialize writer: {error}")));
         };
+
+        match lifecycle::initialize_merger(Arc::clone(&shard_cache), settings.clone()) {
+            Ok(()) => (),
+            Err(MergerError::GlobalMergerAlreadyInstalled) => (),
+        }
+
         let shards_path = settings.shards_path();
         Ok(Self {
-            shards: ShardWriterCache::new(settings),
+            gc_loop_handle,
+            shards: shard_cache,
             shards_path,
         })
     }
@@ -262,7 +285,7 @@ impl NodeWriter {
         send_analytics_event(AnalyticsEvent::GarbageCollect);
         let shard_id = ShardId::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
         let shard = self.obtain_shard(shard_id.id)?;
-        let result = shard.gc();
+        let result = shard.collect_garbage();
         match result {
             Ok(_) => {
                 let response = EmptyResponse {};

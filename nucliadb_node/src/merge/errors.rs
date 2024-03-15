@@ -16,14 +16,12 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
+//
 
-use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
-use std::path::PathBuf;
+use thiserror::Error;
 
-#[derive(Serialize, Deserialize, Default)]
-pub struct State {
-    #[allow(unused)]
-    location: PathBuf,
-    pub indexes: HashSet<String>,
+#[derive(Debug, Error)]
+pub enum MergerError {
+    #[error("Global merger is already installed")]
+    GlobalMergerAlreadyInstalled,
 }

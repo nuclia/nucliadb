@@ -17,9 +17,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Cursor;
-use std::sync::Arc;
-
+use crate::errors::{IndexNodeException, LoadShardError};
+use crate::update::{update_loop, UpdateParameters};
+use crate::RawProtos;
 use nucliadb_core::paragraphs::ParagraphIterator;
 use nucliadb_core::protos::*;
 use nucliadb_core::texts::DocumentIterator;
@@ -34,9 +34,12 @@ use pyo3::exceptions::{PyStopIteration, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 use pyo3::PyErr;
+use std::io::Cursor;
+use std::sync::Arc;
+use std::thread::JoinHandle;
+use std::time::Duration;
 
-use crate::errors::{IndexNodeException, LoadShardError};
-use crate::RawProtos;
+const REFRESH_RATE: Duration = Duration::from_millis(10);
 
 #[pyclass]
 pub struct PyParagraphProducer {
@@ -68,7 +71,9 @@ impl PyDocumentProducer {
 
 #[pyclass]
 pub struct NodeReader {
-    shards: ShardReaderCache,
+    #[allow(unused)]
+    update_loop_handle: JoinHandle<()>,
+    shards: Arc<ShardReaderCache>,
 }
 
 impl NodeReader {
@@ -85,8 +90,20 @@ impl NodeReader {
     pub fn new() -> Self {
         let settings: Settings = EnvSettingsProvider::generate_settings().unwrap();
         lifecycle::initialize_reader(settings.clone());
-        Self {
-            shards: ShardReaderCache::new(settings),
+
+        let shards = Arc::new(ShardReaderCache::new(settings.clone()));
+        let shards_update_loop_copy = Arc::clone(&shards);
+        let update_parameters = UpdateParameters {
+            shards_path: settings.shards_path(),
+            refresh_rate: REFRESH_RATE,
+        };
+        let update_loop_handle = std::thread::spawn(|| {
+            update_loop(update_parameters, shards_update_loop_copy);
+        });
+
+        NodeReader {
+            shards,
+            update_loop_handle,
         }
     }
 

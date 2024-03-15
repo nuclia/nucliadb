@@ -47,6 +47,10 @@ impl ShardReaderCache {
         self.cache.lock().expect("Poisoned cache lock")
     }
 
+    pub fn peek(&self, id: &ShardId) -> Option<Arc<ShardReader>> {
+        self.cache().get_cached(id)
+    }
+
     pub fn get(&self, id: &ShardId) -> NodeResult<Arc<ShardReader>> {
         loop {
             let cached = { self.cache().get(id) };
