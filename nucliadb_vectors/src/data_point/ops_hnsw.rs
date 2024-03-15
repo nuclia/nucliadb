@@ -18,13 +18,13 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::cmp::{Ordering, Reverse};
-use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
-
+use bit_set::BitSet;
 use ram_hnsw::*;
 use rand::distributions::Uniform;
 use rand::prelude::*;
 use rand::rngs::SmallRng;
+use std::cmp::{Ordering, Reverse};
+use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 
 use super::*;
 use crate::data_point::params;
@@ -79,12 +79,11 @@ impl PartialOrd for Cnx {
 pub type Neighbours = Vec<(Address, f32)>;
 
 /// Guides an algorithm to the valid nodes.
-#[derive(Clone, Copy)]
 struct NodeFilter<'a, DR> {
     tracker: &'a DR,
     filter: &'a FormulaFilter<'a>,
     blocked_addresses: &'a HashSet<Address>,
-    vec_counter: &'a RepCounter<'a>,
+    vec_counter: RepCounter<'a>,
 }
 
 impl<'a, DR: DataRetriever> NodeFilter<'a, DR> {
@@ -129,37 +128,55 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         let picked_level = -sample.ln() * params::level_factor();
         picked_level.round() as usize
     }
-    fn closest_up_node<L: Layer>(
+    fn closest_up_nodes<L: Layer>(
         &'a self,
-        x: Address,
+        entry_points: Vec<Address>,
         query: Address,
         layer: L,
-        filter: NodeFilter<'a, DR>,
-    ) -> Option<(Address, f32)> {
+        number_of_results: usize,
+        mut filter: NodeFilter<'a, DR>,
+    ) -> Vec<(Address, f32)> {
         // We just need to perform BFS, the replacement is the closest node to the actual
         // best solution. This algorithm takes a lazy approach to computing the similarity of
         // candidates.
-        let mut visited_nodes = HashSet::new();
-        let mut candidates = VecDeque::from([x]);
-        loop {
-            let best_so_far = candidates.pop_front();
 
-            match best_so_far.map(|n| (n, self.similarity(n, query))) {
-                None => break None,
-                Some((_, score)) if score < self.tracker.min_score() => break None,
-                Some((n, score)) if filter.is_valid(n, score) && filter.passes_formula(n) => break Some((n, score)),
-                Some((down, _)) => {
-                    let mut sorted_out: Vec<_> = layer.get_out_edges(down).collect();
-                    sorted_out.sort_by(|a, b| b.1.total_cmp(&a.1));
-                    sorted_out.into_iter().for_each(|(new_candidate, _)| {
-                        if !visited_nodes.contains(&new_candidate) {
-                            candidates.push_back(new_candidate);
-                            visited_nodes.insert(new_candidate);
-                        }
-                    });
-                }
+        let mut results = Vec::new();
+        let inner_entry_points_iter = entry_points.iter().map(|Address(inner)| *inner);
+        let mut visited_nodes: BitSet = BitSet::from_iter(inner_entry_points_iter);
+        let mut candidates = VecDeque::from(entry_points);
+
+        loop {
+            let Some(candidate) = candidates.pop_front() else {
+                break;
+            };
+
+            let candidate_similarity = self.similarity(query, candidate);
+
+            if candidate_similarity < self.tracker.min_score() {
+                break;
             }
+
+            if filter.is_valid(candidate, candidate_similarity) && filter.passes_formula(candidate) {
+                let candidate_vector = self.tracker.get_vector(candidate);
+                filter.vec_counter.add(candidate_vector);
+                results.push((candidate, candidate_similarity));
+            }
+
+            if results.len() == number_of_results {
+                return results;
+            }
+
+            let mut sorted_out: Vec<_> = layer.get_out_edges(candidate).collect();
+            sorted_out.sort_by(|a, b| b.1.total_cmp(&a.1));
+            sorted_out.into_iter().for_each(|(new_candidate, _)| {
+                if !visited_nodes.contains(new_candidate.0) {
+                    visited_nodes.insert(new_candidate.0);
+                    candidates.push_back(new_candidate);
+                }
+            });
         }
+
+        results
     }
     fn layer_search<L: Layer>(
         &self,
@@ -259,8 +276,10 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         let Some(entry_point) = hnsw.get_entry_point() else {
             return Neighbours::default();
         };
+
         let mut crnt_layer = entry_point.layer;
         let mut neighbours = vec![(entry_point.node, 0.)];
+
         while crnt_layer != 0 {
             let layer = hnsw.get_layer(crnt_layer);
             let entry_points: Vec<_> = neighbours.into_iter().map(|(node, _)| node).collect();
@@ -268,32 +287,21 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
             neighbours = layer_res;
             crnt_layer -= 1;
         }
+
         let entry_points: Vec<_> = neighbours.into_iter().map(|(node, _)| node).collect();
         let layer = hnsw.get_layer(crnt_layer);
-        let result = self.layer_search(query, layer, k_neighbours, &entry_points);
-        let mut sol_addresses = HashSet::new();
-        let mut vec_counter = RepCounter::new(!with_duplicates);
-        let mut filtered_result = Vec::new();
-        result.iter().copied().for_each(|(addr, _)| {
-            sol_addresses.insert(addr);
-            vec_counter.add(self.tracker.get_vector(addr));
-        });
-        for (addr, _) in result {
-            sol_addresses.remove(&addr);
-            vec_counter.sub(self.tracker.get_vector(addr));
-            let node_filter = NodeFilter {
-                filter: &with_filter,
-                tracker: self.tracker,
-                blocked_addresses: &sol_addresses,
-                vec_counter: &vec_counter,
-            };
-            let Some((addr, score)) = self.closest_up_node(addr, query, hnsw.get_layer(0), node_filter) else {
-                continue;
-            };
-            filtered_result.push((addr, score));
-            sol_addresses.insert(addr);
-            vec_counter.add(self.tracker.get_vector(addr));
-        }
+        let neighbors = self.layer_search(query, layer, k_neighbours, &entry_points);
+
+        let filter = NodeFilter {
+            filter: &with_filter,
+            tracker: self.tracker,
+            blocked_addresses: &HashSet::new(),
+            vec_counter: RepCounter::new(!with_duplicates),
+        };
+        let layer_zero = hnsw.get_layer(0);
+        let entry_points: Vec<_> = neighbors.into_iter().map(|(node, _)| node).collect();
+        let mut filtered_result = self.closest_up_nodes(entry_points, query, layer_zero, k_neighbours, filter);
+
         // order may be lost
         filtered_result.sort_by(|a, b| b.1.total_cmp(&a.1));
         filtered_result
@@ -325,11 +333,6 @@ impl<'a> RepCounter<'a> {
     fn add(&mut self, x: &'a [u8]) {
         if self.enabled {
             *self.counter.entry(x).or_insert(0) += 1;
-        }
-    }
-    fn sub(&mut self, x: &'a [u8]) {
-        if self.enabled {
-            *self.counter.entry(x).or_insert(1) -= 1;
         }
     }
     fn get(&self, x: &[u8]) -> usize {
