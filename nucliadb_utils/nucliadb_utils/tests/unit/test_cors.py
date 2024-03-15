@@ -595,7 +595,7 @@ def test_cors_allowed_origin_does_not_leak_between_credentialed_requests(
     assert "access-control-allow-credentials" not in response.headers
 
 
-def test_cors_x_nucliadb_cors_allowed_domains(
+def test_cors_x_nucliadb_cors_allowed_origins(
     test_client_factory: TestClientFactory,
 ) -> None:
     def homepage(request: Request) -> PlainTextResponse:
