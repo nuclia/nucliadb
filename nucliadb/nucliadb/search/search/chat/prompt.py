@@ -342,12 +342,14 @@ class PromptContextBuilder:
         user_context: Optional[list[str]] = None,
         strategies: Optional[Sequence[RagStrategy]] = None,
         max_context_size: Optional[int] = None,
+        visual_llm: bool = False,
     ):
         self.kbid = kbid
         self.find_results = find_results
         self.user_context = user_context
         self.strategies = strategies
         self.max_context_size = max_context_size
+        self.visual_llm = visual_llm
 
     def prepend_user_context(self, context: CappedPromptContext):
         # Chat extra context passed by the user is the most important, therefore

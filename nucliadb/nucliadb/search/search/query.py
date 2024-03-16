@@ -20,6 +20,7 @@
 import asyncio
 import json
 from datetime import datetime
+from nucliadb_utils import const
 from typing import Any, Awaitable, Optional, Union
 
 from async_lru import alru_cache
@@ -64,6 +65,7 @@ from nucliadb_models.security import RequestSecurity
 from nucliadb_protos import knowledgebox_pb2, nodereader_pb2, utils_pb2
 
 from .exceptions import InvalidQueryError
+from nucliadb_utils.utilities import has_feature
 
 INDEX_SORTABLE_FIELDS = [
     SortField.CREATED,
@@ -139,7 +141,11 @@ class QueryParser:
         self.autofilter = autofilter
         self.key_filters = key_filters
         self.security = security
-        self.query_feature = True
+        self.query_endpoint_enabled = has_feature(
+            const.Features.PREDICT_QUERY_ENDPOINT,
+            default=False,
+            context={"kbid": self.kbid},
+        )
 
         if len(self.filters) > 0:
             self.filters = translate_label_filters(self.filters)
@@ -210,12 +216,20 @@ class QueryParser:
             asyncio.ensure_future(self._get_classification_labels())
         if self.min_score.semantic is None:
             asyncio.ensure_future(self._get_default_semantic_min_score())
+
         if SearchOptions.VECTOR in self.features and self.user_vector is None:
-            asyncio.ensure_future(self._get_converted_vectors())
+            if self.query_endpoint_enabled:
+                asyncio.ensure_future(self._get_converted_vectors())
+            else:
+                asyncio.ensure_future(self._get_query_information())
+
         if (SearchOptions.RELATIONS in self.features or self.autofilter) and len(
             self.query
         ) > 0:
-            asyncio.ensure_future(self._get_detected_entities())
+            if self.query_endpoint_enabled:
+                asyncio.ensure_future(self._get_detected_entities())
+            else:
+                asyncio.ensure_future(self._get_query_information())
             asyncio.ensure_future(self._get_entities_meta_cache())
             asyncio.ensure_future(self._get_deleted_entity_groups())
         if self.with_synonyms and self.query:
@@ -364,7 +378,7 @@ class QueryParser:
             node_features.inc({"type": "vectorset"})
 
         if self.user_vector is None:
-            if self.query_feature:
+            if self.query_endpoint_enabled:
                 try:
                     query_info = await self._get_query_information()
                     if query_info and query_info.sentence:
@@ -400,7 +414,11 @@ class QueryParser:
         autofilters = []
         relations_search = SearchOptions.RELATIONS in self.features
         if relations_search or self.autofilter:
-            detected_entities = await self._get_detected_entities()
+            if self.query_endpoint_enabled:
+                detected_entities = await self._get_detected_entities()
+            else:
+                query_info_result = await self._get_query_information()
+                detected_entities = query_info_result.entities
             meta_cache = await self._get_entities_meta_cache()
             detected_entities = expand_entities(meta_cache, detected_entities)
             if relations_search:
@@ -458,6 +476,9 @@ class QueryParser:
         if len(synonyms_found):
             request.advanced_query = " OR ".join(advanced_query + synonyms_found)
             request.ClearField("body")
+
+    async def get_visual_llm_enabled(self) -> bool:
+        return (await self._get_query_information()).visual_llm
 
 
 async def paragraph_query_to_pb(

@@ -76,3 +76,4 @@ class Features:
     EXPERIMENTAL_KB = "nucliadb_experimental_kb"
     READ_REPLICA_SEARCHES = "nucliadb_read_replica_searches"
     VERSIONED_PRIVATE_PREDICT = "nucliadb_versioned_private_predict"
+    PREDICT_QUERY_ENDPOINT = "nucliadb_predict_query_endpoint"
