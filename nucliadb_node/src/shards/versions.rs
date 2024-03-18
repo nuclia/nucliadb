@@ -102,6 +102,8 @@ impl Versions {
         match self.version_vectors {
             Some(1) => nucliadb_vectors::service::VectorReaderService::start(config)
                 .map(|i| Arc::new(RwLock::new(i)) as VectorsReaderPointer),
+            Some(2) => nucliadb_vectors2::service::VectorReaderService::start(config)
+                .map(|i| Arc::new(RwLock::new(i)) as VectorsReaderPointer),
             Some(v) => Err(node_error!("Invalid vectors version {v}")),
             None => Err(node_error!("Corrupted version file")),
         }
@@ -142,6 +144,8 @@ impl Versions {
     pub fn get_vectors_writer(&self, config: &VectorConfig) -> NodeResult<VectorsWriterPointer> {
         match self.version_vectors {
             Some(1) => nucliadb_vectors::service::VectorWriterService::start(config)
+                .map(|i| Arc::new(RwLock::new(i)) as VectorsWriterPointer),
+            Some(2) => nucliadb_vectors2::service::VectorWriterService::start(config)
                 .map(|i| Arc::new(RwLock::new(i)) as VectorsWriterPointer),
             Some(v) => Err(node_error!("Invalid vectors version {v}")),
             None => Err(node_error!("Corrupted version file")),

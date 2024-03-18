@@ -16,11 +16,6 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
-use std::collections::HashMap;
-use std::fmt::Debug;
-use std::fs;
-use std::path::PathBuf;
-use std::time::Instant;
 
 use nucliadb_core::metrics::request_time;
 use nucliadb_core::prelude::*;
@@ -32,11 +27,19 @@ use nucliadb_core::vectors::MergeMetrics;
 use nucliadb_core::vectors::*;
 use nucliadb_core::{metrics, IndexFiles, RawReplicaState};
 use nucliadb_procs::measure;
+use std::collections::HashMap;
+use std::fmt::Debug;
+use std::fs;
+use std::path::Path;
+use std::time::Instant;
+use std::time::SystemTime;
 
-use crate::data_point::{DataPoint, Elem, LabelDictionary};
+use crate::data_point::{self, DataPointPin, Elem, LabelDictionary};
+use crate::data_point_provider::garbage_collector;
+use crate::data_point_provider::writer::Writer;
 use crate::data_point_provider::*;
-use crate::indexset::{IndexKeyCollector, IndexSet};
-use crate::VectorErr;
+use crate::indexset::IndexKeyCollector;
+use crate::indexset::WriterSet;
 
 impl IndexKeyCollector for Vec<String> {
     fn add_key(&mut self, key: String) {
@@ -45,8 +48,8 @@ impl IndexKeyCollector for Vec<String> {
 }
 
 pub struct VectorWriterService {
-    index: Index,
-    indexset: IndexSet,
+    index: Writer,
+    indexset: WriterSet,
     config: VectorConfig,
 }
 
@@ -57,22 +60,14 @@ impl Debug for VectorWriterService {
 }
 
 impl VectorWriter for VectorWriterService {
-    #[measure(actor = "vectors", metric = "reload")]
-    #[tracing::instrument(skip_all)]
-    fn reload(&mut self) -> NodeResult<()> {
-        Ok(())
-    }
-
     #[measure(actor = "vectors", metric = "merge")]
     #[tracing::instrument(skip_all)]
     fn merge(&mut self) -> NodeResult<MergeMetrics> {
         let time = Instant::now();
-
-        let lock = self.index.get_slock()?;
-        let inner_metrics = self.index.force_merge(&lock)?;
-
+        let inner_metrics = self.index.merge()?;
         let took = time.elapsed().as_secs_f64();
-        debug!("Forcing a merge took: {took} s");
+        debug!("Merge took: {took} s");
+
         Ok(MergeMetrics {
             merged: inner_metrics.merged,
             left: inner_metrics.segments_left,
@@ -86,8 +81,7 @@ impl VectorWriter for VectorWriterService {
 
         let id: Option<String> = None;
         let mut collector = Vec::new();
-        let indexset_slock = self.indexset.get_slock()?;
-        self.indexset.index_keys(&mut collector, &indexset_slock);
+        self.indexset.index_keys(&mut collector);
 
         let took = time.elapsed().as_secs_f64();
         debug!("{id:?} - Ending at {took} ms");
@@ -104,9 +98,8 @@ impl VectorWriter for VectorWriterService {
         let set = &setid.vectorset;
         let indexid = setid.vectorset.as_str();
         let similarity = similarity.into();
-        let indexset_elock = self.indexset.get_elock()?;
-        self.indexset.get_or_create(indexid, similarity, &indexset_elock)?;
-        self.indexset.commit(indexset_elock)?;
+        self.indexset.create_index(indexid, similarity)?;
+        self.indexset.commit()?;
 
         let took = time.elapsed().as_secs_f64();
         debug!("{id:?}/{set} - Ending at {took} ms");
@@ -121,10 +114,9 @@ impl VectorWriter for VectorWriterService {
 
         let id = setid.shard.as_ref().map(|s| &s.id);
         let set = &setid.vectorset;
-        let indexid = &setid.vectorset;
-        let indexset_elock = self.indexset.get_elock()?;
-        self.indexset.remove_index(indexid, &indexset_elock)?;
-        self.indexset.commit(indexset_elock)?;
+        let index_id = &setid.vectorset;
+        self.indexset.remove_index(index_id);
+        self.indexset.commit()?;
 
         let took = time.elapsed().as_secs_f64();
         debug!("{id:?}/{set} - Ending at {took} ms");
@@ -132,20 +124,16 @@ impl VectorWriter for VectorWriterService {
         Ok(())
     }
 
+    #[measure(actor = "vectors", metric = "reload")]
+    #[tracing::instrument(skip_all)]
+    fn reload(&mut self) -> NodeResult<()> {
+        Ok(self.index.reload()?)
+    }
+
     #[measure(actor = "vectors", metric = "count")]
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
-        let time = Instant::now();
-
-        let id: Option<String> = None;
-        let lock = self.index.get_slock()?;
-        let no_nodes = self.index.no_nodes(&lock);
-        std::mem::drop(lock);
-
-        let took = time.elapsed().as_secs_f64();
-        debug!("{id:?} - Ending at {took} ms");
-
-        Ok(no_nodes)
+        Ok(self.index.size())
     }
 
     #[measure(actor = "vectors", metric = "delete_resource")]
@@ -154,10 +142,10 @@ impl VectorWriter for VectorWriterService {
         let time = Instant::now();
 
         let id = Some(&resource_id.shard_id);
-        let temporal_mark = TemporalMark::now();
-        let lock = self.index.get_slock()?;
-        self.index.delete(&resource_id.uuid, temporal_mark, &lock);
-        self.index.commit(&lock)?;
+        let temporal_mark = SystemTime::now();
+        let resource_uuid_bytes = resource_id.uuid.as_bytes();
+        self.index.record_delete(resource_uuid_bytes, temporal_mark);
+        self.index.commit()?;
 
         let took = time.elapsed().as_secs_f64();
         debug!("{id:?} - Ending at {took} ms");
@@ -175,16 +163,16 @@ impl VectorWriter for VectorWriterService {
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Creating elements for the main index: starts {v} ms");
 
-        let temporal_mark = TemporalMark::now();
+        let temporal_mark = SystemTime::now();
         let mut lengths: HashMap<usize, Vec<_>> = HashMap::new();
         let mut elems = Vec::new();
         if resource.status != ResourceStatus::Delete as i32 {
             for (paragraph_field, paragraph) in resource.paragraphs.iter() {
-                let field = &[paragraph_field.clone()];
                 for index in paragraph.paragraphs.values() {
-                    let labels = LabelDictionary::new(
-                        resource.labels.iter().chain(index.labels.iter()).chain(field.iter()).cloned().collect(),
-                    );
+                    let mut inner_labels = index.labels.clone();
+                    inner_labels.push(paragraph_field.clone());
+                    let labels = LabelDictionary::new(inner_labels);
+
                     for (key, sentence) in index.sentences.iter().clone() {
                         let key = key.to_string();
                         let labels = labels.clone();
@@ -201,108 +189,80 @@ impl VectorWriter for VectorWriterService {
         debug!("{id:?} - Creating elements for the main index: ends {v} ms");
 
         let v = time.elapsed().as_millis();
-        debug!("{id:?} - Datapoint creation: starts {v} ms");
+        debug!("{id:?} - Main index set resource: starts {v} ms");
 
         if lengths.len() > 1 {
             return Ok(tracing::error!("{}", self.dimensions_report(lengths)));
         }
 
-        let new_dp = if !elems.is_empty() {
+        if !elems.is_empty() {
             let location = self.index.location();
             let time = Some(temporal_mark);
             let similarity = self.index.metadata().similarity;
-            Some(DataPoint::new(location, elems, time, similarity)?)
-        } else {
-            None
-        };
-
-        let v = time.elapsed().as_millis();
-        debug!("{id:?} - Datapoint creation: ends {v} ms");
-
-        let lock = self.index.get_slock()?;
-        let v = time.elapsed().as_millis();
-        debug!("{id:?} - Processing Sentences to delete: starts {v} ms");
+            let data_point_pin = DataPointPin::create_pin(location)?;
+            data_point::create(&data_point_pin, elems, time, similarity)?;
+            self.index.add_data_point(data_point_pin)?;
+        }
 
         for to_delete in &resource.sentences_to_delete {
-            self.index.delete(to_delete, temporal_mark, &lock)
+            let key_as_bytes = to_delete.as_bytes();
+            self.index.record_delete(key_as_bytes, temporal_mark);
         }
-        let v = time.elapsed().as_millis();
-        debug!("{id:?} - Processing Sentences to delete: ends {v} ms");
+
+        self.index.commit()?;
 
         let v = time.elapsed().as_millis();
-        debug!("{id:?} - Indexing datapoint: starts {v} ms");
+        debug!("{id:?} - Main index set resource: ends {v} ms");
 
-        match new_dp.map(|i| self.index.add(i, &lock)).unwrap_or(Ok(())) {
-            Ok(_) => self.index.commit(&lock)?,
-            Err(e) => tracing::error!("{id:?}/default could insert vectors: {e:?}"),
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Set resource in vector sets: starts {v} ms");
+
+        let mut writer_sets = HashMap::new();
+        for (index_key, vectors_to_delete) in resource.vectors_to_delete.iter() {
+            let Some(mut writer) = self.indexset.get(index_key)? else {
+                continue;
+            };
+
+            for vector_key in &vectors_to_delete.vectors {
+                writer.record_delete(vector_key.as_bytes(), temporal_mark);
+            }
+
+            writer_sets.insert(index_key.clone(), writer);
         }
-        std::mem::drop(lock);
-        let v = time.elapsed().as_millis();
-        debug!("{id:?} - Indexing datapoint: ends {v} ms");
 
-        // Updating existing indexes
-        // Perform delete operations over the vector set
-        let v = time.elapsed().as_millis();
-        debug!("{id:?} - Delete requests for indexes in the set: starts {v} ms");
+        for (index_key, vectors_to_add) in resource.vectors.iter() {
+            if !writer_sets.contains_key(index_key) {
+                let Some(writer) = self.indexset.get(index_key)? else {
+                    continue;
+                };
+                writer_sets.insert(index_key.clone(), writer);
+            }
 
-        let indexset_slock = self.indexset.get_slock()?;
-        let index_iter = resource
-            .vectors_to_delete
-            .iter()
-            .flat_map(|(k, v)| self.indexset.get(k, &indexset_slock).transpose().map(|i| (v, i)));
-        for (vectorlist, index) in index_iter {
-            let mut index = index?;
-            let index_lock = index.get_slock()?;
-            vectorlist.vectors.iter().for_each(|vector| {
-                index.delete(vector, temporal_mark, &index_lock);
-            });
-            index.commit(&index_lock)?;
-        }
-        std::mem::drop(indexset_slock);
-        let v = time.elapsed().as_millis();
-        debug!("{id:?} - Delete requests for indexes in the set: ends {v} ms");
-
-        // Perform add operations over the vector set
-        // New indexes may be created.
-        let v = time.elapsed().as_millis();
-        debug!("{id:?} - Creating and geting indexes in the set: starts {v} ms");
-
-        let indexset_elock = self.indexset.get_elock()?;
-        let indexes = resource
-            .vectors
-            .keys()
-            .map(|k| (k, self.indexset.get(k, &indexset_elock)))
-            .map(|(key, index)| index.map(|index| (key, index)))
-            .collect::<Result<HashMap<_, _>, _>>()?;
-        self.indexset.commit(indexset_elock)?;
-
-        // Inner indexes are updated
-        for (index_key, mut index) in indexes.into_iter().flat_map(|i| i.1.map(|j| (i.0, j))) {
+            let writer = writer_sets.get_mut(index_key).unwrap();
             let mut lengths: HashMap<usize, Vec<_>> = HashMap::new();
-            let mut elems = vec![];
-            for (vectorset, user_vector) in resource.vectors[index_key].vectors.iter() {
-                let key = vectorset.clone();
-                let vector = user_vector.vector.clone();
+            let mut elems = Vec::new();
+            for (vector_key, vector_data) in &vectors_to_add.vectors {
+                let vector = vector_data.vector.clone();
                 let bucket = lengths.entry(vector.len()).or_default();
-                let labels = LabelDictionary::new(user_vector.labels.clone());
-                elems.push(Elem::new(key, vector, labels, None));
-                bucket.push(vectorset);
+                let labels = LabelDictionary::new(vector_data.labels.clone());
+                elems.push(Elem::new(vector_key.clone(), vector, labels, None));
+                bucket.push(vector_key.clone());
             }
-            if lengths.len() > 1 {
-                tracing::error!("vectorsets report: {}", self.dimensions_report(lengths));
-            } else if !elems.is_empty() {
-                let similarity = index.metadata().similarity;
-                let location = index.location();
-                let new_dp = DataPoint::new(location, elems, Some(temporal_mark), similarity)?;
-                let lock = index.get_slock()?;
-                match index.add(new_dp, &lock) {
-                    Ok(_) => index.commit(&lock)?,
-                    Err(e) => tracing::error!("Could not insert at {id:?}/{index_key}: {e:?}"),
-                }
+            if !elems.is_empty() {
+                let similarity = writer.metadata().similarity;
+                let location = writer.location();
+                let new_data_point_pin = DataPointPin::create_pin(location)?;
+                data_point::create(&new_data_point_pin, elems, Some(temporal_mark), similarity)?;
+                writer.add_data_point(new_data_point_pin)?;
             }
         }
+
+        for (_, mut writer) in writer_sets {
+            writer.commit()?;
+        }
+
         let v = time.elapsed().as_millis();
-        debug!("{id:?} - Creating and geting indexes in the set: ends {v} ms");
+        debug!("{id:?} - Set resource in vector sets: ends {v} ms");
 
         let metrics = metrics::get_metrics();
         let took = time.elapsed().as_secs_f64();
@@ -318,24 +278,16 @@ impl VectorWriter for VectorWriterService {
     fn garbage_collection(&mut self) -> NodeResult<()> {
         let time = Instant::now();
 
-        let lock = match self.index.try_elock() {
-            Ok(lock) => lock,
-            Err(VectorErr::FsError(fs_error)) => {
-                warn!("Garbage collection error: {fs_error}");
-                return Err(VectorErr::WorkDelayed.into());
-            }
-            Err(error) => return NodeResult::Err(error.into()),
-        };
-        self.index.collect_garbage(&lock)?;
+        garbage_collector::collect_garbage(self.index.location())?;
 
         let took = time.elapsed().as_secs_f64();
         debug!("Garbage collection {took} ms");
-
         Ok(())
     }
 
     fn get_segment_ids(&self) -> NodeResult<Vec<String>> {
-        let mut seg_ids = self.get_segment_ids_for_vectorset(&self.index.location)?;
+        let location = self.index.location();
+        let mut seg_ids = self.get_segment_ids_for_vectorset(location)?;
         let vectorsets = self.list_vectorsets()?;
         for vs in vectorsets {
             let vs_seg_ids = self.get_segment_ids_for_vectorset(&self.config.vectorset.join(vs))?;
@@ -350,9 +302,9 @@ impl VectorWriter for VectorWriterService {
         metadata_files.insert("vectors/state.bincode".to_string(), fs::read(self.config.path.join("state.bincode"))?);
         metadata_files.insert("vectors/metadata.json".to_string(), fs::read(self.config.path.join("metadata.json"))?);
 
+        let location = self.index.location();
         let mut files = Vec::new();
-
-        for segment_id in self.get_segment_ids_for_vectorset(&self.index.location)? {
+        for segment_id in self.get_segment_ids_for_vectorset(location)? {
             if ignored_segment_ids.contains(&segment_id) {
                 continue;
             }
@@ -438,15 +390,13 @@ impl VectorWriterService {
             let Some(similarity) = config.similarity.map(|i| i.into()) else {
                 return Err(node_error!("A similarity must be specified, {:?}", config.similarity));
             };
+            let index_metadata = IndexMetadata {
+                similarity,
+                channel: config.channel,
+            };
             Ok(VectorWriterService {
-                index: Index::new(
-                    path,
-                    IndexMetadata {
-                        similarity,
-                        channel: config.channel,
-                    },
-                )?,
-                indexset: IndexSet::new(indexset)?,
+                index: Writer::new(path, index_metadata)?,
+                indexset: WriterSet::new(indexset)?,
                 config: config.clone(),
             })
         }
@@ -460,14 +410,14 @@ impl VectorWriterService {
             Err(node_error!("Shard does not exist".to_string()))
         } else {
             Ok(VectorWriterService {
-                index: Index::open(path)?,
-                indexset: IndexSet::new(indexset)?,
+                index: Writer::open(path)?,
+                indexset: WriterSet::new(indexset)?,
                 config: config.clone(),
             })
         }
     }
 
-    fn get_segment_ids_for_vectorset(&self, location: &PathBuf) -> NodeResult<Vec<String>> {
+    fn get_segment_ids_for_vectorset(&self, location: &Path) -> NodeResult<Vec<String>> {
         let mut ids = Vec::new();
         for dir_entry in std::fs::read_dir(location)? {
             let entry = dir_entry?;
@@ -535,7 +485,7 @@ mod tests {
         let index_keys: HashSet<_> = writer.list_vectorsets().unwrap().into_iter().collect();
         assert_eq!(index_keys, keys);
 
-        let reader = VectorReaderService::start(&vsc).unwrap();
+        let mut reader = VectorReaderService::start(&vsc).unwrap();
         let mut request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "4".to_string(),
@@ -577,6 +527,8 @@ mod tests {
         // Now vectorset 4 is no longer available
         request.vector_set = "4".to_string();
         request.field_labels = vec!["4/label".to_string()];
+
+        reader.update().unwrap();
         let results = reader.search(&request, &context).unwrap();
         assert_eq!(results.documents.len(), 0);
     }
