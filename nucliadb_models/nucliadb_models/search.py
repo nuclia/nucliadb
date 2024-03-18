@@ -789,8 +789,8 @@ class ChatModel(BaseModel):
 
     query_context_images: Dict[str, Image] = Field(
         default={},
-        description="The information retrieval context for the current query",
-    )  # base64.b64encode(image_file.read()).decode('utf-8')
+        description="The information retrieval context for the current query, each image is a base64 encoded string",
+    )
 
 
 class RephraseModel(BaseModel):
@@ -887,10 +887,16 @@ class PageImageStrategy(ImageRagStrategy):
     name: Literal["page_image"]
 
 
+class ParagraphImageStrategy(ImageRagStrategy):
+    name: Literal["paragraph_image"]
+
+
 RagStrategies = Annotated[
     Union[FieldExtensionStrategy, FullResourceStrategy], Field(discriminator="name")
 ]
-RagImagesStrategies = Annotated[PageImageStrategy, Field(discriminator="name")]
+RagImagesStrategies = Annotated[
+    Union[PageImageStrategy, ParagraphImageStrategy], Field(discriminator="name")
+]
 PromptContext = dict[str, str]
 PromptContextOrder = dict[str, int]
 PromptContextImages = dict[str, Image]
