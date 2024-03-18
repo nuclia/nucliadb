@@ -333,11 +333,11 @@ class ResourceBrain:
             )
             sentence.metadata.page_with_visual = paragraph.metadata.page_with_visual
 
-            ssentence.metadata.representation.file = (
-                sparagraph.metadata.representation.file
+            sentence.metadata.representation.file = (
+                paragraph.metadata.representation.file
             )
-            ssentence.metadata.representation.is_a_table = (
-                sparagraph.metadata.representation.is_a_table
+            sentence.metadata.representation.is_a_table = (
+                paragraph.metadata.representation.is_a_table
             )
 
             sentence.metadata.position.index = paragraph.metadata.position.index

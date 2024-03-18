@@ -252,8 +252,7 @@ async def get_labels(context: ApplicationContext, kbid: str) -> kb_pb2.Labels:
     return await ldm.get_labels(kbid)
 
 
-class EndOfStream(Exception):
-    ...
+class EndOfStream(Exception): ...
 
 
 class ExportStream:
