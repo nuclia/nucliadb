@@ -38,17 +38,22 @@ async def migrate(context: ExecutionContext) -> None:
             slug = key.replace(KB_SLUGS_BASE, "")
             value = await txn.get(key)
             if value is None:
-                logger.error(f"KB with slug ({slug}) but without uuid?")
+                # KB with slug but without uuid? Seems wrong, let's remove it too
+                logger.info(
+                    "Removing /kbslugs with empty value", extra={"maindb_key": key}
+                )
+                await txn.delete(key)
                 continue
 
             kbid = value.decode()
-            if not KnowledgeBox.exist_kb(txn, kbid):
+            if not (await KnowledgeBox.exist_kb(txn, kbid)):
                 # log data too just in case
                 logger.info(
                     "Removing orphan /kbslugs key",
                     extra={"kbid": kbid, "kb_slug": slug, "maindb_key": key},
                 )
                 await txn.delete(key)
+        await txn.commit()
 
 
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
