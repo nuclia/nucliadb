@@ -75,13 +75,10 @@ class RolloverDataManager:
                 await txn.set(key, b"")
             await txn.commit()
 
-    async def get_to_index(self, kbid: str) -> Optional[str]:
+    async def get_to_index(self, kbid: str, n: int = 1) -> list[str]:
         key = KB_ROLLOVER_RESOURCES_TO_INDEX.format(kbid=kbid, resource="")
         async with self.driver.transaction(wait_for_abort=False) as txn:
-            found = [key async for key in txn.keys(key, count=1)]
-            if found:
-                return found[0].split("/")[-1]
-        return None
+            return [key.split("/")[-1] async for key in txn.keys(key, count=n)]
 
     async def remove_to_index(self, kbid: str, resource: str) -> None:
         to_index = KB_ROLLOVER_RESOURCES_TO_INDEX.format(kbid=kbid, resource=resource)

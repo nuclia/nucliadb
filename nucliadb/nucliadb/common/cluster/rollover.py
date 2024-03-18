@@ -31,6 +31,7 @@ from nucliadb.common.context import ApplicationContext
 from nucliadb.common.datamanagers.cluster import ClusterDataManager
 from nucliadb.common.datamanagers.resources import ResourcesDataManager
 from nucliadb.common.datamanagers.rollover import RolloverDataManager
+from nucliadb.tests.unit.common.cluster.test_rollover import rollover_datamanager
 from nucliadb_protos import noderesources_pb2, writer_pb2
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
@@ -242,9 +243,6 @@ async def index_rollover_shards(app_context: ApplicationContext, kbid: str) -> N
     """
     Indexes all data in a kb in rollover shards
     """
-    resources_datamanager = ResourcesDataManager(
-        app_context.kv_driver, app_context.blob_storage
-    )
     rollover_datamanager = RolloverDataManager(app_context.kv_driver)
 
     rollover_shards = await rollover_datamanager.get_kb_rollover_shards(kbid)
@@ -257,58 +255,75 @@ async def index_rollover_shards(app_context: ApplicationContext, kbid: str) -> N
 
     logger.warning("Indexing rollover shards", extra={"kbid": kbid})
 
-    wait_index_batch: list[writer_pb2.ShardObject] = []
     # now index on all new shards only
+    batch_size = 10
     while True:
-        resource_id = await rollover_datamanager.get_to_index(kbid)
-        if resource_id is None:
+        resource_ids = await rollover_datamanager.get_to_index(kbid, n=batch_size)
+        if len(resource_ids) == 0:
+            # no more resources to index
             break
 
-        shard_id = await resources_datamanager.get_resource_shard_id(kbid, resource_id)
-        if shard_id is None:
-            logger.error(
-                "Shard id not found for resource",
-                extra={"kbid": kbid, "resource_id": resource_id},
+        index_tasks = [
+            asyncio.create_task(
+                index_rollover_resource(app_context, kbid, resource_id, rollover_shards)
             )
-            raise UnexpectedRolloverError("Shard id not found for resource")
+            for resource_id in resource_ids
+        ]
 
-        shard = _get_shard(rollover_shards, shard_id)
-        if shard is None:  # pragma: no cover
-            logger.error(
-                "Shard not found for resource",
-                extra={"kbid": kbid, "resource_id": resource_id, "shard_id": shard_id},
-            )
-            raise UnexpectedRolloverError(
-                f"Shard {shard_id} not found. Was a new one created during migration?"
-            )
-
-        resource_index_message = await index_resource(
-            app_context, kbid, resource_id, shard
-        )
-        if resource_index_message is None:
-            # resource no longer existing, remove indexing and carry on
-            await rollover_datamanager.remove_to_index(kbid, resource_id)
-            continue
-
-        await rollover_datamanager.add_indexed(
-            kbid,
-            resource_id,
-            shard_id,
-            _to_ts(resource_index_message.metadata.modified.ToDatetime()),
-        )
-        wait_index_batch.append(shard)
-
-        if len(wait_index_batch) > 10:
-            node_ids = set()
-            for shard_batch in wait_index_batch:
-                for replica in shard_batch.replicas:
-                    node_ids.add(replica.node)
-            for node_id in node_ids:
-                await wait_for_node(app_context, node_id)
-            wait_index_batch = []
+        await asyncio.wait(index_tasks)
 
     _set_rollover_status(rollover_shards, RolloverStatus.RESOURCES_INDEXED)
     await rollover_datamanager.update_kb_rollover_shards(kbid, rollover_shards)
+
+
+async def index_rollover_resource(app_context: ApplicationContext, kbid: str, resource_id: str, rollover_shards: writer_pb2.Shards) -> None:
+    resources_datamanager = ResourcesDataManager(
+        app_context.kv_driver, app_context.blob_storage
+    )
+    rollover_datamanager = RolloverDataManager(app_context.kv_driver)
+    shard_id = await resources_datamanager.get_resource_shard_id(kbid, resource_id)
+    if shard_id is None:
+        logger.error(
+            "Shard id not found for resource",
+            extra={"kbid": kbid, "resource_id": resource_id},
+        )
+        raise UnexpectedRolloverError("Shard id not found for resource")
+
+    shard = _get_shard(rollover_shards, shard_id)
+    if shard is None:  # pragma: no cover
+        logger.error(
+            "Shard not found for resource",
+            extra={"kbid": kbid, "resource_id": resource_id, "shard_id": shard_id},
+        )
+        raise UnexpectedRolloverError(
+            f"Shard {shard_id} not found. Was a new one created during migration?"
+        )
+
+    resource_index_message = await index_resource(
+        app_context, kbid, resource_id, shard
+    )
+    if resource_index_message is None:
+        # resource no longer existing, remove indexing and carry on
+        await rollover_datamanager.remove_to_index(kbid, resource_id)
+        return
+
+    await rollover_datamanager.add_indexed(
+        kbid,
+        resource_id,
+        shard_id,
+        _to_ts(resource_index_message.metadata.modified.ToDatetime()),
+    )
+    wait_index_batch.append(shard)
+
+    if len(wait_index_batch) > 10:
+        node_ids = set()
+        for shard_batch in wait_index_batch:
+            for replica in shard_batch.replicas:
+                node_ids.add(replica.node)
+        for node_id in node_ids:
+            await wait_for_node(app_context, node_id)
+        wait_index_batch = []
+
 
 
 async def cutover_shards(app_context: ApplicationContext, kbid: str) -> None:
