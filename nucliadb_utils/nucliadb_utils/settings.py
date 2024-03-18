@@ -40,7 +40,7 @@ running_settings = RunningSettings()
 
 
 class HTTPSettings(BaseSettings):
-    cors_origins: List[str] = ["http://localhost:4200"]
+    cors_origins: List[str] = ["*"]
 
 
 http_settings = HTTPSettings()
