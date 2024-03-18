@@ -24,20 +24,24 @@ Due to a bug on backend services, some kbslugs were not properly deleted and got
 orphan. Let's delete them!
 
 """
+import logging
 
-from nucliadb.ingest.orm.knowledgebox import KB_SLUGS, KB_SLUGS_BASE, KnowledgeBox
+from nucliadb.ingest.orm.knowledgebox import KB_SLUGS_BASE, KnowledgeBox
 from nucliadb.migrator.context import ExecutionContext
+
+logger = logging.getLogger(__name__)
 
 
 async def migrate(context: ExecutionContext) -> None:
     async with context.kv_driver.transaction() as txn:
-        async for key in txn.keys(KB_SLUGS.format(slug=slug), count=-1):
+        async for key in txn.keys(KB_SLUGS_BASE, count=-1):
             slug = key.replace(KB_SLUGS_BASE, "")
-            kbid = await txn.get(key)
-            if kbid is None:
+            value = await txn.get(key)
+            if value is None:
                 logger.error(f"KB with slug ({slug}) but without uuid?")
                 continue
 
+            kbid = value.decode()
             if not KnowledgeBox.exist_kb(txn, kbid):
                 # log data too just in case
                 logger.info(
