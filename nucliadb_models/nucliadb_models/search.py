@@ -957,7 +957,7 @@ class ChatRequest(BaseModel):
         title="RAG context building strategies",
         description="Options for tweaking how the context for the LLM model is crafted. `full_resource` will add the full text of the matching resources to the context. `field_extension` will add the text of the matching resource's specified fields to the context. If empty, the default strategy is used.",  # noqa
     )
-    rag_strategies_images: list[RagImagesStrategies] = Field(
+    rag_images_strategies: list[RagImagesStrategies] = Field(
         default=[],
         title="RAG image context building strategies",
         description="Options for tweaking how the image based context for the LLM model is crafted. `page_image` will add the full page image of the matching resources to the context. If empty, the default strategy is used with the image of the paragraph.",  # noqa
