@@ -888,7 +888,7 @@ class ChatRequest(BaseModel):
         default=None,
         title="Prompt",
         description="Input here your prompt with the words {context} and {question} in brackets where you want those fields to be placed, in case you want them in your prompt. Context will be the data returned by the retrieval step.",  # noqa
-        gt=0,
+        min_length=1,
     )
     citations: bool = Field(
         default=False,
