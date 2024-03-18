@@ -279,15 +279,18 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     async def delete_kb(self, request: KnowledgeBoxID) -> None:
         kbid = request.uuid
         await self.proc.delete_kb(kbid, request.slug)
-        try:
-            await learning_proxy.delete_configuration(kbid)
-            logger.info("Learning configuration deleted", extra={"kbid": kbid})
-        except Exception:
-            logger.exception(
-                "Unexpected error deleting learning configuration",
-                exc_info=True,
-                extra={"kbid": kbid},
-            )
+        # learning configuration is automatically removed in nuclia backend for
+        # hosted users, we only need to remove it for onprem
+        if is_onprem_nucliadb():
+            try:
+                await learning_proxy.delete_configuration(kbid)
+                logger.info("Learning configuration deleted", extra={"kbid": kbid})
+            except Exception:
+                logger.exception(
+                    "Unexpected error deleting learning configuration",
+                    exc_info=True,
+                    extra={"kbid": kbid},
+                )
 
     async def GCKnowledgeBox(  # type: ignore
         self, request: KnowledgeBoxID, context=None
