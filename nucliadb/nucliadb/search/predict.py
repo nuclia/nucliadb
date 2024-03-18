@@ -334,14 +334,15 @@ class PredictEngine:
         return await resp.text()
 
     @predict_observer.wrap({"type": "query"})
-    async def query(self, kbid: str, sentence: str) -> Optional[QueryInfo]:
+    async def query(self, kbid: str, sentence: str) -> QueryInfo:
         try:
             self.check_nua_key_is_configured_for_onprem()
         except NUAKeyMissingError:
-            logger.warning(
-                "Nuclia Service account is not defined so could not retrieve vectors for the query"
+            error = (
+                "Nuclia Service account is not defined so could not ask query endpoint"
             )
-            return None
+            logger.warning(error)
+            raise SendToPredictError(error)
 
         resp = await self.make_request(
             "GET",

@@ -30,9 +30,8 @@ from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.chat.prompt import PromptContextBuilder
 from nucliadb.search.search.exceptions import IncompleteFindResultsError
 from nucliadb.search.search.find import find
-from nucliadb.search.search.query import QueryParser
 from nucliadb.search.search.merge import merge_relations_results
-from nucliadb.search.settings import settings
+from nucliadb.search.search.query import QueryParser
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import (
     Author,
@@ -255,10 +254,14 @@ async def chat(
             find_results=find_results,
             user_context=user_context,
             strategies=chat_request.rag_strategies,
-            max_context_size=settings.max_prompt_context_chars,
+            max_context_size=await query_parser.get_max_context(),
             visual_llm=await query_parser.get_visual_llm_enabled(),
         )
-        prompt_context, prompt_context_order = await prompt_context_builder.build()
+        (
+            prompt_context,
+            prompt_context_order,
+            prompt_context_images,
+        ) = await prompt_context_builder.build()
         user_prompt = None
         if chat_request.prompt is not None:
             user_prompt = UserPrompt(prompt=chat_request.prompt)
@@ -273,6 +276,8 @@ async def chat(
             user_prompt=user_prompt,
             citations=chat_request.citations,
             generative_model=chat_request.generative_model,
+            max_tokens=chat_request.max_tokens,
+            query_context_images=prompt_context_images,
         )
         predict = get_predict()
         nuclia_learning_id, predict_generator = await predict.chat_query(

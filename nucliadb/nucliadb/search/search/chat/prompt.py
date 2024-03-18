@@ -26,11 +26,15 @@ from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.middleware.transaction import get_read_only_transaction
 from nucliadb.search import logger
+from nucliadb.search.search.chat.images import get_page_image, get_paragraph_image
 from nucliadb_models.search import (
     SCORE_TYPE,
     FindParagraph,
+    ImageRagStrategy,
+    ImageRagStrategyName,
     KnowledgeboxFindResults,
     PromptContext,
+    PromptContextImages,
     PromptContextOrder,
     RagStrategy,
     RagStrategyName,
@@ -59,6 +63,7 @@ class CappedPromptContext:
 
     def __init__(self, max_size: Optional[int]):
         self.output: PromptContext = {}
+        self.images: PromptContextImages = {}
         self.max_size = max_size
         self._size = 0
 
@@ -341,6 +346,7 @@ class PromptContextBuilder:
         find_results: KnowledgeboxFindResults,
         user_context: Optional[list[str]] = None,
         strategies: Optional[Sequence[RagStrategy]] = None,
+        image_strategies: Optional[Sequence[ImageRagStrategy]] = None,
         max_context_size: Optional[int] = None,
         visual_llm: bool = False,
     ):
@@ -348,6 +354,7 @@ class PromptContextBuilder:
         self.find_results = find_results
         self.user_context = user_context
         self.strategies = strategies
+        self.image_strategies = image_strategies
         self.max_context_size = max_context_size
         self.visual_llm = visual_llm
 
@@ -357,7 +364,9 @@ class PromptContextBuilder:
         for i, text_block in enumerate(self.user_context or []):
             context[f"USER_CONTEXT_{i}"] = text_block
 
-    async def build(self) -> tuple[PromptContext, PromptContextOrder]:
+    async def build(
+        self,
+    ) -> tuple[PromptContext, PromptContextOrder, PromptContextImages]:
         ccontext = CappedPromptContext(max_size=self.max_context_size)
         try:
             self.prepend_user_context(ccontext)
@@ -367,11 +376,34 @@ class PromptContextBuilder:
                 f"Prompt context size exceeded: {ccontext.size}."
                 f"The context will be truncated to the maximum size: {self.max_context_size}."
             )
+
+        if self.visual_llm:
+            await self._build_context_images(ccontext)
+
         context = ccontext.output
+        context_images = ccontext.images
         context_order = {
             text_block_id: order for order, text_block_id in enumerate(context.keys())
         }
-        return context, context_order
+        return context, context_order, context_images
+
+    async def _build_context_images(self, context: CappedPromptContext) -> None:
+        ordered_paras = get_ordered_paragraphs(self.find_results)
+        for paragraph in ordered_paras:
+            if paragraph.page_with_visual and paragraph.position:
+                if (
+                    self.image_strategies == ImageRagStrategyName.PAGE_IMAGE
+                    and paragraph.position.page_number
+                ):
+                    page = paragraph.position.page_number
+                    context.images[paragraph.id] = await get_page_image(
+                        self.kbid, paragraph.id, page
+                    )
+                elif paragraph.reference is not None:
+                    image = paragraph.reference
+                    context.images[paragraph.id] = await get_paragraph_image(
+                        self.kbid, paragraph.id, image
+                    )
 
     async def _build_context(self, context: CappedPromptContext) -> None:
         if self.strategies is None or len(self.strategies) == 0:

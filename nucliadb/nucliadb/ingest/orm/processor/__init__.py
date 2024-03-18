@@ -292,9 +292,11 @@ class Processor:
                     seqid=seqid,
                     multi=multi,
                     message=message,
-                    write_type=writer_pb2.Notification.WriteType.CREATED
-                    if created
-                    else writer_pb2.Notification.WriteType.MODIFIED,
+                    write_type=(
+                        writer_pb2.Notification.WriteType.CREATED
+                        if created
+                        else writer_pb2.Notification.WriteType.MODIFIED
+                    ),
                 )
             elif resource and resource.modified is False:
                 await txn.abort()

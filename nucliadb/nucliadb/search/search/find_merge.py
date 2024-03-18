@@ -263,6 +263,9 @@ def merge_paragraphs_vectors(
                     end=paragraph.end,
                     id=paragraph.paragraph,
                     fuzzy_result=fuzzy_result,
+                    page_with_visual=paragraph.metadata.page_with_visual,
+                    reference=paragraph.metadata.representation.file,
+                    is_a_table=paragraph.metadata.representation.is_a_table,
                 )
             )
 
@@ -316,6 +319,9 @@ def merge_paragraphs_vectors(
                 score_type=SCORE_TYPE.VECTOR,
                 text="",
                 labels=[],  # TODO: Get labels from index
+                page_with_visual=merged_paragraph.vector_index.metadata.page_with_visual,
+                reference=merged_paragraph.vector_index.metadata.representation.file,
+                is_a_table=merged_paragraph.vector_index.metadata.representation.is_a_table,
                 position=TextPosition(
                     page_number=merged_paragraph.vector_index.metadata.position.page_number,
                     index=merged_paragraph.vector_index.metadata.position.index,
@@ -340,6 +346,9 @@ def merge_paragraphs_vectors(
                 score_type=SCORE_TYPE.BM25,
                 text="",
                 labels=[x for x in merged_paragraph.paragraph_index.labels],
+                page_with_visual=merged_paragraph.paragraph_index.metadata.page_with_visual,
+                reference=merged_paragraph.paragraph_index.metadata.representation.file,
+                is_a_table=merged_paragraph.paragraph_index.metadata.representation.is_a_table,
                 position=TextPosition(
                     page_number=merged_paragraph.paragraph_index.metadata.position.page_number,
                     index=merged_paragraph.paragraph_index.metadata.position.index,
@@ -401,6 +410,7 @@ async def find_merge_results(
         relations.append(response.relation)
 
     rcache = get_resource_cache(clear=True)
+
     try:
         result_paragraphs, merged_next_page = merge_paragraphs_vectors(
             paragraphs, vectors, count, page, min_score_semantic

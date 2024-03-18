@@ -247,13 +247,13 @@ class TokenSearch(BaseModel):
 
 
 class QueryInfo(BaseModel):
-    language: str
-    stop_words: List[str]
-    semantic_threshold: float
+    language: Optional[str] = None
+    stop_words: List[str] = []
+    semantic_threshold: Optional[float] = None
     visual_llm: bool
     max_context: int
-    entities: Optional[TokenSearch]
-    sentence: Optional[SentenceSearch]
+    entities: TokenSearch
+    sentence: SentenceSearch
 
 
 class Relations(BaseModel):
@@ -742,6 +742,11 @@ class UserPrompt(BaseModel):
     prompt: str
 
 
+class Image(BaseModel):
+    content_type: str
+    b64encoded: str
+
+
 class ChatModel(BaseModel):
     """
     This is the model for the predict request payload on the chat endpoint
@@ -778,6 +783,15 @@ class ChatModel(BaseModel):
         description="The generative model to use for the predict chat endpoint. If not provided, the model configured for the Knowledge Box is used.",
     )
 
+    max_tokens: Optional[int] = Field(
+        default=None, description="Maximum characters to generate"
+    )
+
+    query_context_images: Dict[str, Image] = Field(
+        default={},
+        description="The information retrieval context for the current query",
+    )  # base64.b64encode(image_file.read()).decode('utf-8')
+
 
 class RephraseModel(BaseModel):
     question: str
@@ -804,7 +818,15 @@ class RagStrategyName:
     FULL_RESOURCE = "full_resource"
 
 
+class ImageRagStrategyName:
+    PAGE_IMAGE = "page_image"
+
+
 class RagStrategy(BaseModel):
+    name: str
+
+
+class ImageRagStrategy(BaseModel):
     name: str
 
 
@@ -866,6 +888,7 @@ RagStrategies = Annotated[
 ]
 PromptContext = dict[str, str]
 PromptContextOrder = dict[str, int]
+PromptContextImages = dict[str, Image]
 
 
 class ChatRequest(BaseModel):
@@ -935,6 +958,12 @@ class ChatRequest(BaseModel):
         default=None,
         title="Generative model",
         description="The generative model to use for the chat endpoint. If not provided, the model configured for the Knowledge Box is used.",
+    )
+
+    max_tokens: Optional[int] = Field(
+        default=None,
+        title="Maximum tokens to generate",
+        description="The maximum amount of tokens to generate by the LLM",
     )
 
     @root_validator(pre=True)
@@ -1068,6 +1097,9 @@ class FindParagraph(BaseModel):
     labels: Optional[List[str]] = []
     position: Optional[TextPosition] = None
     fuzzy_result: bool = False
+    page_with_visual: bool = False
+    reference: Optional[str] = None
+    is_a_table: bool = False
 
 
 @dataclass
@@ -1083,6 +1115,9 @@ class TempFindParagraph:
     vector_index: Optional[DocumentScored] = None
     paragraph_index: Optional[PBParagraphResult] = None
     fuzzy_result: bool = False
+    page_with_visual: bool = False
+    reference: Optional[str] = None
+    is_a_table: bool = False
 
 
 class FindField(BaseModel):

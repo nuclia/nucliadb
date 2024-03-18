@@ -300,19 +300,44 @@ class Position(google.protobuf.message.Message):
 global___Position = Position
 
 @typing_extensions.final
+class Representation(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    IS_A_TABLE_FIELD_NUMBER: builtins.int
+    FILE_FIELD_NUMBER: builtins.int
+    is_a_table: builtins.bool
+    file: builtins.str
+    def __init__(
+        self,
+        *,
+        is_a_table: builtins.bool = ...,
+        file: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["file", b"file", "is_a_table", b"is_a_table"]) -> None: ...
+
+global___Representation = Representation
+
+@typing_extensions.final
 class SentenceMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     POSITION_FIELD_NUMBER: builtins.int
+    PAGE_WITH_VISUAL_FIELD_NUMBER: builtins.int
+    REPRESENTATION_FIELD_NUMBER: builtins.int
     @property
     def position(self) -> global___Position: ...
+    page_with_visual: builtins.bool
+    @property
+    def representation(self) -> global___Representation: ...
     def __init__(
         self,
         *,
         position: global___Position | None = ...,
+        page_with_visual: builtins.bool = ...,
+        representation: global___Representation | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["position", b"position"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["position", b"position"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["position", b"position", "representation", b"representation"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["page_with_visual", b"page_with_visual", "position", b"position", "representation", b"representation"]) -> None: ...
 
 global___SentenceMetadata = SentenceMetadata
 
@@ -343,17 +368,21 @@ class ParagraphMetadata(google.protobuf.message.Message):
 
     POSITION_FIELD_NUMBER: builtins.int
     PAGE_WITH_VISUAL_FIELD_NUMBER: builtins.int
+    REPRESENTATION_FIELD_NUMBER: builtins.int
     @property
     def position(self) -> global___Position: ...
     page_with_visual: builtins.bool
+    @property
+    def representation(self) -> global___Representation: ...
     def __init__(
         self,
         *,
         position: global___Position | None = ...,
         page_with_visual: builtins.bool = ...,
+        representation: global___Representation | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["position", b"position"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["page_with_visual", b"page_with_visual", "position", b"position"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["position", b"position", "representation", b"representation"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["page_with_visual", b"page_with_visual", "position", b"position", "representation", b"representation"]) -> None: ...
 
 global___ParagraphMetadata = ParagraphMetadata
 

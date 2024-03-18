@@ -20,7 +20,6 @@
 import asyncio
 import json
 from datetime import datetime
-from nucliadb_utils import const
 from typing import Any, Awaitable, Optional, Union
 
 from async_lru import alru_cache
@@ -33,7 +32,11 @@ from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.synonyms import Synonyms
 from nucliadb.middleware.transaction import get_read_only_transaction
 from nucliadb.search import logger
-from nucliadb.search.predict import PredictVectorMissing, SendToPredictError
+from nucliadb.search.predict import (
+    PredictVectorMissing,
+    SendToPredictError,
+    convert_relations,
+)
 from nucliadb.search.search.filters import (
     convert_to_node_filters,
     flat_filter_labels,
@@ -46,6 +49,7 @@ from nucliadb.search.search.metrics import (
     node_features,
     query_parse_dependency_observer,
 )
+from nucliadb.search.settings import settings
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.labels import translate_system_to_alias_label
 from nucliadb_models.metadata import ResourceProcessingStatus
@@ -54,18 +58,21 @@ from nucliadb_models.search import (
     MinScore,
     QueryInfo,
     SearchOptions,
+    SentenceSearch,
     SortField,
     SortFieldMap,
     SortOptions,
     SortOrder,
     SortOrderMap,
     SuggestOptions,
+    TokenSearch,
 )
 from nucliadb_models.security import RequestSecurity
 from nucliadb_protos import knowledgebox_pb2, nodereader_pb2, utils_pb2
+from nucliadb_utils import const
+from nucliadb_utils.utilities import has_feature
 
 from .exceptions import InvalidQueryError
-from nucliadb_utils.utilities import has_feature
 
 INDEX_SORTABLE_FIELDS = [
     SortField.CREATED,
@@ -165,7 +172,18 @@ class QueryParser:
             )
         return self._convert_vectors_task
 
-    def _get_query_information(self) -> Awaitable[Optional[QueryInfo]]:
+    def _get_query_information(self) -> Awaitable[QueryInfo]:
+        if self.query_endpoint_enabled is False:
+
+            async def static_query():
+                return QueryInfo(
+                    visual_llm=False,
+                    max_context=settings.max_prompt_context_chars,  # noqa
+                    entities=TokenSearch(tokens=[], time=0.0),
+                    sentence=SentenceSearch(data=[], time=0.0),
+                )
+
+            return static_query()
         if self._query_information_task is None:  # pragma: no cover
             self._query_information_task = asyncio.create_task(
                 query_information(self.kbid, self.query)
@@ -418,7 +436,12 @@ class QueryParser:
                 detected_entities = await self._get_detected_entities()
             else:
                 query_info_result = await self._get_query_information()
-                detected_entities = query_info_result.entities
+                if query_info_result.entities:
+                    detected_entities = convert_relations(
+                        query_info_result.entities.dict()
+                    )
+                else:
+                    detected_entities = []
             meta_cache = await self._get_entities_meta_cache()
             detected_entities = expand_entities(meta_cache, detected_entities)
             if relations_search:
@@ -479,6 +502,9 @@ class QueryParser:
 
     async def get_visual_llm_enabled(self) -> bool:
         return (await self._get_query_information()).visual_llm
+
+    async def get_max_context(self) -> int:
+        return (await self._get_query_information()).max_context
 
 
 async def paragraph_query_to_pb(
@@ -548,7 +574,7 @@ async def convert_vectors(kbid: str, query: str) -> list[float]:
 
 
 @query_parse_dependency_observer.wrap({"type": "query_information"})
-async def query_information(kbid: str, query: str) -> Optional[QueryInfo]:
+async def query_information(kbid: str, query: str) -> QueryInfo:
     predict = get_predict()
     return await predict.query(kbid, query)
 

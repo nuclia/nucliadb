@@ -81,9 +81,15 @@ message Position {
     repeated uint32 end_seconds = 6;
 }
 
+message Representation {
+    bool is_a_table = 1;
+    string file = 2;
+}
 
 message SentenceMetadata {
     Position position = 1;
+    bool page_with_visual = 2;
+    Representation representation = 3;
 }
 
 message VectorSentence {
@@ -94,6 +100,7 @@ message VectorSentence {
 message ParagraphMetadata {
     Position position = 1;
     bool page_with_visual = 2;
+    Representation representation = 3;
 }
 
 message IndexParagraph {

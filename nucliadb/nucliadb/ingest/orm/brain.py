@@ -26,6 +26,7 @@ from google.protobuf.internal.containers import MessageMap
 from nucliadb_protos.noderesources_pb2 import IndexParagraph as BrainParagraph
 from nucliadb_protos.noderesources_pb2 import ParagraphMetadata
 from nucliadb_protos.noderesources_pb2 import Position as TextPosition
+from nucliadb_protos.noderesources_pb2 import Representation
 from nucliadb_protos.noderesources_pb2 import Resource as PBBrainResource
 from nucliadb_protos.noderesources_pb2 import ResourceID
 from nucliadb_protos.resources_pb2 import (
@@ -143,6 +144,12 @@ class ResourceBrain:
                     position.page_number = get_page_number(
                         paragraph.start, page_positions
                     )
+
+                representation = Representation()
+                if paragraph.HasField("representation"):
+                    representation.file = paragraph.representation.reference_file
+                    representation.is_a_table = paragraph.representation.is_a_table
+
                 p = BrainParagraph(
                     start=paragraph.start,
                     end=paragraph.end,
@@ -156,7 +163,9 @@ class ResourceBrain:
                         split=subfield,
                     ),
                     metadata=ParagraphMetadata(
-                        position=position, page_with_visual=page_with_visual
+                        position=position,
+                        page_with_visual=page_with_visual,
+                        representation=representation,
                     ),
                 )
                 for classification in paragraph.classifications:
@@ -186,6 +195,11 @@ class ResourceBrain:
             elif page_positions:
                 position.page_number = get_page_number(paragraph.start, page_positions)
 
+            representation = Representation()
+            if paragraph.HasField("representation"):
+                representation.file = paragraph.representation.reference_file
+                representation.is_a_table = paragraph.representation.is_a_table
+
             p = BrainParagraph(
                 start=paragraph.start,
                 end=paragraph.end,
@@ -195,7 +209,9 @@ class ResourceBrain:
                     paragraph, extracted_text, unique_paragraphs
                 ),
                 metadata=ParagraphMetadata(
-                    position=position, page_with_visual=page_with_visual
+                    position=position,
+                    page_with_visual=page_with_visual,
+                    representation=representation,
                 ),
             )
             for classification in paragraph.classifications:
@@ -282,6 +298,19 @@ class ResourceBrain:
                 ssentence.metadata.position.page_number = (
                     sparagraph.metadata.position.page_number
                 )
+                ssentence.metadata.position.page_number = (
+                    sparagraph.metadata.position.page_number
+                )
+                ssentence.metadata.page_with_visual = (
+                    sparagraph.metadata.page_with_visual
+                )
+
+                ssentence.metadata.representation.file = (
+                    sparagraph.metadata.representation.file
+                )
+                ssentence.metadata.representation.is_a_table = (
+                    sparagraph.metadata.representation.is_a_table
+                )
                 ssentence.metadata.position.index = sparagraph.metadata.position.index
 
         for index, vector in enumerate(vo.vectors.vectors):
@@ -302,6 +331,15 @@ class ResourceBrain:
             sentence.metadata.position.page_number = (
                 paragraph.metadata.position.page_number
             )
+            sentence.metadata.page_with_visual = paragraph.metadata.page_with_visual
+
+            ssentence.metadata.representation.file = (
+                sparagraph.metadata.representation.file
+            )
+            ssentence.metadata.representation.is_a_table = (
+                sparagraph.metadata.representation.is_a_table
+            )
+
             sentence.metadata.position.index = paragraph.metadata.position.index
 
         for split in replace_splits:
@@ -624,9 +662,6 @@ def get_page_number(start_index: int, page_positions: FilePagePositions) -> int:
         if start_index <= page_end:
             logger.info("There is a wrong page start")
             return int(page_number)
-    import pdb
-
-    pdb.set_trace()
     logger.error("Could not found a page")
     return int(page_number)
 
