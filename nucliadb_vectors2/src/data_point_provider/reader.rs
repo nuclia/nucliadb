@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::data_point::{self, DataPointPin};
+use crate::data_point::{self, DataPointPin, OpenDataPoint};
 use crate::data_point_provider::state::read_state;
 use crate::data_point_provider::{IndexMetadata, SearchRequest, OPENING_FLAG, STATE};
 use crate::data_types::dtrie_ram::DTrie;
@@ -106,7 +106,8 @@ fn last_modified(path: &Path) -> io::Result<SystemTime> {
 pub struct Reader {
     metadata: IndexMetadata,
     path: PathBuf,
-    data_points: Vec<DataPointPin>,
+    open_data_points: Vec<OpenDataPoint>,
+    data_point_pins: Vec<DataPointPin>,
     delete_log: DTrie,
     number_of_embeddings: usize,
     version: SystemTime,
@@ -133,26 +134,29 @@ impl Reader {
         let data_point_list = state.data_point_list;
         let delete_log = state.delete_log;
         let mut dimension = None;
-        let mut data_points = Vec::new();
+        let mut data_point_pins = Vec::new();
+        let mut open_data_points = Vec::new();
         let mut number_of_embeddings = 0;
 
         for data_point_id in data_point_list {
             let data_point_pin = DataPointPin::open_pin(path, data_point_id)?;
-            let data_point_journal = data_point_pin.read_journal()?;
+            let open_data_point = data_point::open(&data_point_pin)?;
+            let data_point_journal = open_data_point.journal();
 
             if dimension.is_none() {
-                let data_point = data_point::open(&data_point_pin)?;
-                dimension = data_point.stored_len();
+                dimension = open_data_point.stored_len();
             }
 
             number_of_embeddings += data_point_journal.no_nodes();
-            data_points.push(data_point_pin);
+            data_point_pins.push(data_point_pin);
+            open_data_points.push(open_data_point);
         }
 
         Ok(Reader {
             metadata,
             version,
-            data_points,
+            data_point_pins,
+            open_data_points,
             delete_log,
             number_of_embeddings,
             dimension,
@@ -175,25 +179,28 @@ impl Reader {
         let mut new_dimension = self.dimension;
         let mut new_number_of_embeddings = 0;
         let mut new_data_points = Vec::new();
+        let mut new_open_data_points = Vec::new();
 
         for data_point_id in data_point_list {
             let data_point_pin = DataPointPin::open_pin(&self.path, data_point_id)?;
-            let data_point_journal = data_point_pin.read_journal()?;
+            let open_data_point = data_point::open(&data_point_pin)?;
+            let data_point_journal = open_data_point.journal();
 
             if new_dimension.is_none() {
-                let data_point = data_point::open(&data_point_pin)?;
-                new_dimension = data_point.stored_len();
+                new_dimension = open_data_point.stored_len();
             }
 
             new_number_of_embeddings += data_point_journal.no_nodes();
             new_data_points.push(data_point_pin);
+            new_open_data_points.push(open_data_point);
         }
 
         self.version = disk_version;
         self.delete_log = new_delete_log;
-        self.data_points = new_data_points;
+        self.data_point_pins = new_data_points;
         self.dimension = new_dimension;
         self.number_of_embeddings = new_number_of_embeddings;
+        self.open_data_points = new_open_data_points;
 
         Ok(())
     }
@@ -214,15 +221,14 @@ impl Reader {
         let min_score = request.min_score();
         let mut ffsv = Fssc::new(request.no_results(), with_duplicates);
 
-        for data_point_pin in self.data_points.iter() {
-            let data_point = data_point::open(data_point_pin)?;
-            let data_point_journal = data_point.journal();
+        for open_data_point in self.open_data_points.iter() {
+            let data_point_journal = open_data_point.journal();
             let delete_log = TimeSensitiveDLog {
                 time: data_point_journal.time(),
                 dlog: &self.delete_log,
             };
             // Skipping the formatter only because the search interface is quite bad right now.
-            #[rustfmt::skip] let partial_solution = data_point.search(
+            #[rustfmt::skip] let partial_solution = open_data_point.search(
                 &delete_log,
                 query,
                 filter,
@@ -241,14 +247,13 @@ impl Reader {
 
     pub fn keys(&self) -> VectorR<Vec<String>> {
         let mut keys = vec![];
-        for data_point_pin in self.data_points.iter() {
-            let data_point = data_point::open(data_point_pin)?;
-            let data_point_journal = data_point.journal();
+        for open_data_point in self.open_data_points.iter() {
+            let data_point_journal = open_data_point.journal();
             let delete_log = TimeSensitiveDLog {
                 time: data_point_journal.time(),
                 dlog: &self.delete_log,
             };
-            let mut results = data_point.get_keys(&delete_log);
+            let mut results = open_data_point.get_keys(&delete_log);
             keys.append(&mut results);
         }
         Ok(keys)
