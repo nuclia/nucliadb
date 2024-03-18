@@ -12,8 +12,8 @@ thiserror = "1.0.31"
 serde_json = "1.0.82"
 serde = { version = "1.0", features = ["derive"] }
 clap = { version = "3.1.18", features = ["derive"] }
-nucliadb_vectors = {path= "../nucliadb_vectors"}
-nucliadb_core = {path= "../nucliadb_core"}
+nucliadb_vectors = { path = "../nucliadb_vectors2", package = "nucliadb_vectors2" }
+nucliadb_core = { path = "../nucliadb_core" }
 lazy_static = "1.4.0"
 memory-stats = "1.0.0"
 byte-unit = "4.0.19"

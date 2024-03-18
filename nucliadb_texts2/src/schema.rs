@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 use nucliadb_core::protos::*;
-use tantivy::chrono::{DateTime, NaiveDateTime, Utc};
+use tantivy::chrono::{DateTime, Utc};
 use tantivy::schema::{Cardinality, FacetOptions, Field, NumericOptions, Schema, STORED, STRING, TEXT};
 
 #[derive(Debug, Clone)]
@@ -43,8 +43,7 @@ pub struct TextSchema {
 }
 
 pub fn timestamp_to_datetime_utc(timestamp: &prost_types::Timestamp) -> DateTime<Utc> {
-    let naive = NaiveDateTime::from_timestamp_opt(timestamp.seconds, timestamp.nanos as u32).unwrap();
-    DateTime::from_naive_utc_and_offset(naive, tantivy::chrono::Utc)
+    DateTime::from_timestamp(timestamp.seconds, timestamp.nanos as u32).unwrap()
 }
 
 impl TextSchema {

@@ -43,14 +43,11 @@ pub mod thread {
 }
 
 pub mod prelude {
-    pub use crate::{
-        encapsulate_reader, encapsulate_writer, node_error, paragraph_read, paragraph_write, relation_read,
-        relation_write, text_read, text_write, vector_read, vector_write, Context, NodeResult,
-    };
+    pub use crate::{node_error, read_rw_lock, write_rw_lock, Context, NodeResult};
 }
 
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 pub use anyhow::{anyhow as node_error, Context, Error};
 use serde::{Deserialize, Serialize};
@@ -74,54 +71,6 @@ impl From<i32> for Channel {
     }
 }
 
-pub fn paragraph_write(
-    x: &paragraphs::ParagraphsWriterPointer,
-) -> RwLockWriteGuard<'_, dyn paragraphs::ParagraphWriter + 'static> {
-    x.write().unwrap_or_else(|l| l.into_inner())
-}
-
-pub fn text_write(x: &texts::TextsWriterPointer) -> RwLockWriteGuard<'_, dyn texts::FieldWriter + 'static> {
-    x.write().unwrap_or_else(|l| l.into_inner())
-}
-
-pub fn vector_write(x: &vectors::VectorsWriterPointer) -> RwLockWriteGuard<'_, dyn vectors::VectorWriter + 'static> {
-    x.write().unwrap_or_else(|l| l.into_inner())
-}
-
-pub fn relation_write(
-    x: &relations::RelationsWriterPointer,
-) -> RwLockWriteGuard<'_, dyn relations::RelationsWriter + 'static> {
-    x.write().unwrap_or_else(|l| l.into_inner())
-}
-
-pub fn paragraph_read(
-    x: &paragraphs::ParagraphsWriterPointer,
-) -> RwLockReadGuard<'_, dyn paragraphs::ParagraphWriter + 'static> {
-    x.read().unwrap_or_else(|l| l.into_inner())
-}
-
-pub fn text_read(x: &texts::TextsWriterPointer) -> RwLockReadGuard<'_, dyn texts::FieldWriter + 'static> {
-    x.read().unwrap_or_else(|l| l.into_inner())
-}
-
-pub fn vector_read(x: &vectors::VectorsWriterPointer) -> RwLockReadGuard<'_, dyn vectors::VectorWriter + 'static> {
-    x.read().unwrap_or_else(|l| l.into_inner())
-}
-
-pub fn relation_read(
-    x: &relations::RelationsWriterPointer,
-) -> RwLockReadGuard<'_, dyn relations::RelationsWriter + 'static> {
-    x.read().unwrap_or_else(|l| l.into_inner())
-}
-
-pub fn encapsulate_reader<T>(reader: T) -> Arc<T> {
-    Arc::new(reader)
-}
-
-pub fn encapsulate_writer<T>(writer: T) -> Arc<RwLock<T>> {
-    Arc::new(RwLock::new(writer))
-}
-
 #[derive(Debug)]
 pub struct RawReplicaState {
     pub metadata_files: HashMap<String, Vec<u8>>,
@@ -131,4 +80,12 @@ pub struct RawReplicaState {
 pub enum IndexFiles {
     Tantivy(TantivyReplicaState),
     Other(RawReplicaState),
+}
+
+pub fn read_rw_lock<T: ?Sized>(rw_lock: &RwLock<T>) -> RwLockReadGuard<'_, T> {
+    rw_lock.read().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+pub fn write_rw_lock<T: ?Sized>(rw_lock: &RwLock<T>) -> RwLockWriteGuard<'_, T> {
+    rw_lock.write().unwrap_or_else(|poisoned| poisoned.into_inner())
 }

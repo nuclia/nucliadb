@@ -20,7 +20,7 @@
 use nucliadb_core::protos::prost::Message;
 use nucliadb_core::protos::prost_types::Timestamp;
 use nucliadb_core::protos::ParagraphMetadata;
-use tantivy::chrono::{DateTime, NaiveDateTime, Utc};
+use tantivy::chrono::{DateTime, Utc};
 use tantivy::schema::{Cardinality, FacetOptions, Field, NumericOptions, Schema, STORED, STRING, TEXT};
 use tantivy::Document;
 
@@ -60,8 +60,7 @@ pub struct ParagraphSchema {
 }
 
 pub fn timestamp_to_datetime_utc(timestamp: &Timestamp) -> DateTime<Utc> {
-    let naive = NaiveDateTime::from_timestamp_opt(timestamp.seconds, timestamp.nanos as u32).unwrap();
-    DateTime::from_naive_utc_and_offset(naive, tantivy::chrono::Utc)
+    DateTime::from_timestamp(timestamp.seconds, timestamp.nanos as u32).unwrap()
 }
 
 impl ParagraphSchema {
@@ -79,7 +78,7 @@ impl Default for ParagraphSchema {
     fn default() -> Self {
         let mut sb = Schema::builder();
         let num_options: NumericOptions = NumericOptions::default().set_stored().set_fast(Cardinality::SingleValue);
-        
+
         let date_options = NumericOptions::default().set_indexed().set_stored().set_fast(Cardinality::SingleValue);
         let repeated_options = NumericOptions::default().set_indexed().set_stored().set_fast(Cardinality::SingleValue);
         let facet_options = FacetOptions::default().set_stored();
@@ -107,7 +106,8 @@ impl Default for ParagraphSchema {
         let metadata = sb.add_bytes_field("metadata", STORED);
 
         // Security
-        let groups_public_options: NumericOptions = NumericOptions::default().set_indexed().set_fast(Cardinality::SingleValue);
+        let groups_public_options: NumericOptions =
+            NumericOptions::default().set_indexed().set_fast(Cardinality::SingleValue);
         let groups_with_access_options = FacetOptions::default().set_stored();
 
         let groups_public = sb.add_u64_field("groups_public", groups_public_options);
