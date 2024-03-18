@@ -41,7 +41,7 @@ middleware = [
     Middleware(
         CORSMiddleware,
         allow_origins=http_settings.cors_origins,
-        allow_methods=["PUT", "DELETE", "POST", "PATCH", "HEAD", "OPTIONS"],
+        allow_methods=["*"],
         # Authorization will be exluded from * in the future, (CORS non-wildcard request-header).
         # Browsers already showing deprecation notices, so it needs to be specified explicitly
         allow_headers=["*", "Authorization"],
