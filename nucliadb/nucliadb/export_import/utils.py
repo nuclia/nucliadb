@@ -72,8 +72,7 @@ async def import_broker_message(
 ) -> None:
     bm.kbid = kbid
     partition = context.partitioning.generate_partition(kbid, bm.uuid)
-    for pb in [get_writer_bm(bm), get_processor_bm(bm)]:
-        await transaction_commit(context, pb, partition)
+    await transaction_commit(context, bm, partition)
 
 
 async def transaction_commit(
@@ -105,26 +104,6 @@ async def transaction_commit(
             # consumer to download from storage
             headers={"X-MESSAGE-TYPE": "PROXY"},
         )
-
-
-def get_writer_bm(bm: writer_pb2.BrokerMessage) -> writer_pb2.BrokerMessage:
-    wbm = writer_pb2.BrokerMessage()
-    wbm.CopyFrom(bm)
-    for field in PROCESSING_BM_FIELDS:
-        wbm.ClearField(field)  # type: ignore
-    wbm.type = writer_pb2.BrokerMessage.MessageType.AUTOCOMMIT
-    wbm.source = writer_pb2.BrokerMessage.MessageSource.WRITER
-    return wbm
-
-
-def get_processor_bm(bm: writer_pb2.BrokerMessage) -> writer_pb2.BrokerMessage:
-    pbm = writer_pb2.BrokerMessage()
-    pbm.CopyFrom(bm)
-    for field in WRITER_BM_FIELDS:
-        pbm.ClearField(field)  # type: ignore
-    pbm.type = writer_pb2.BrokerMessage.MessageType.AUTOCOMMIT
-    pbm.source = writer_pb2.BrokerMessage.MessageSource.PROCESSOR
-    return pbm
 
 
 async def import_binary(
