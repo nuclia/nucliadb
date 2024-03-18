@@ -110,10 +110,10 @@ class CORSMiddleware:
         await self.simple_response(scope, receive, send, request_headers=headers)
 
     def is_allowed_origin(
-        self, origin: str, allowed_domains: typing.Optional[str]
+        self, origin: str, allowed_origins: typing.Optional[str]
     ) -> bool:
-        if allowed_domains:
-            return origin in allowed_domains.split(",")
+        if allowed_origins:
+            return origin in allowed_origins.split(",")
 
         if self.allow_all_origins:
             return True
@@ -133,9 +133,9 @@ class CORSMiddleware:
         headers = dict(self.preflight_headers)
         failures = []
 
-        allowed_domains = request_headers.get("x-nucliadb-cors-allowed-domains")
+        allowed_origins = request_headers.get("x-nucliadb-cors-allowed-origins")
         if self.is_allowed_origin(
-            origin=requested_origin, allowed_domains=allowed_domains
+            origin=requested_origin, allowed_origins=allowed_origins
         ):
             if self.preflight_explicit_allow_origin:
                 # The "else" case is already accounted for in self.preflight_headers
@@ -194,7 +194,7 @@ class CORSMiddleware:
         # the Origin header in the response.
         elif not self.allow_all_origins and self.is_allowed_origin(
             origin=origin,
-            allowed_domains=headers.get("x-nucliadb-cors-allowed-domains"),
+            allowed_origins=headers.get("x-nucliadb-cors-allowed-origins"),
         ):
             self.allow_explicit_origin(headers, origin)
 
