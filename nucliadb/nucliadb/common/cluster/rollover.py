@@ -35,7 +35,7 @@ from nucliadb_protos import noderesources_pb2, writer_pb2
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
 
-from .manager import get_index_node
+from .manager import get_index_node, get_index_nodes
 from .settings import settings
 
 logger = logging.getLogger(__name__)
@@ -142,24 +142,75 @@ def _get_shard(
 
 async def wait_for_node(app_context: ApplicationContext, node_id: str) -> None:
     while True:
-        # get raw js client
-        js = getattr(app_context.nats_manager.js, "js", app_context.nats_manager.js)
-        consumer_info = await js.consumer_info(
-            const.Streams.INDEX.name, const.Streams.INDEX.group.format(node=node_id)
-        )
-        if consumer_info.num_pending < 5:
+        num_pending = await get_node_pending(app_context, node_id)
+        if num_pending < 5:
             logger.info(f"Node is ready to consume messages.", extra={"node": node_id})
             return
 
         logger.info(
-            f"Waiting for node to consume messages. {consumer_info.num_pending} messages left.",
+            f"Waiting for node to consume messages. {num_pending} messages left.",
             extra={"node": node_id},
         )
         # usually we consume around 3-4 messages/s with some eventual peaks of
         # 10-30. If there are too many pending messages, we can wait more.
         # We suppose 5 messages/s and don't wait more than 60s
-        sleep = min(max(2, consumer_info.num_pending / 5), 60)
+        sleep = min(max(2, num_pending / 5), 60)
         await asyncio.sleep(sleep)
+
+
+async def get_node_pending(app_context: ApplicationContext, node_id: str) -> int:
+    js = getattr(app_context.nats_manager.js, "js", app_context.nats_manager.js)
+    consumer_info = await js.consumer_info(
+        const.Streams.INDEX.name, const.Streams.INDEX.group.format(node=node_id)
+    )
+    return consumer_info.num_pending
+
+
+class NodesReady:
+    """
+    This class is used to check if the nodes are ready to consume messages.
+    It schedules a task for each node to check if it's ready to consume messages.
+    """
+
+    def __init__(self, context: ApplicationContext):
+        self.context = context
+        self.events = {}
+        self.tasks = []
+
+    def _check_node_readiness(self, node: str):
+        ready = self.events.setdefault(node, asyncio.Event())
+        task = asyncio.create_task(self._check_node_ready(node, ready))
+        self.tasks.append(task)
+
+    async def _check_node_ready(self, node: str, ready: asyncio.Event):
+        rate = 4
+        try:
+            while True:
+                pending = await get_node_pending(self.context, node)
+                if pending > 10:
+                    # Node is not ready, clear the event and wait for a while
+                    ready.clear()
+                    await asyncio.sleep(pending // rate)
+                else:
+                    # Node is ready, set the event and wait 10 seconds until the next check
+                    ready.set()
+                    await asyncio.sleep(10)
+        except asyncio.CancelledError:
+            pass
+
+    async def start(self):
+        for node in get_index_nodes():
+            self._check_node_readiness(node)
+
+    async def stop(self):
+        for task in self.tasks:
+            task.cancel()
+        await asyncio.gather(*self.tasks)
+
+    async def wait_ready(self, node: str):
+        if node not in self.events:
+            self._check_node_readiness(node)
+        await self.events[node].wait()
 
 
 @backoff.on_exception(
@@ -242,9 +293,6 @@ async def index_rollover_shards(app_context: ApplicationContext, kbid: str) -> N
     """
     Indexes all data in a kb in rollover shards
     """
-    resources_datamanager = ResourcesDataManager(
-        app_context.kv_driver, app_context.blob_storage
-    )
     rollover_datamanager = RolloverDataManager(app_context.kv_driver)
 
     rollover_shards = await rollover_datamanager.get_kb_rollover_shards(kbid)
@@ -257,13 +305,51 @@ async def index_rollover_shards(app_context: ApplicationContext, kbid: str) -> N
 
     logger.warning("Indexing rollover shards", extra={"kbid": kbid})
 
-    wait_index_batch: list[writer_pb2.ShardObject] = []
+    max_concurrent_resources = asyncio.Semaphore(10)
+    resource_tasks = []
+
+    nodes_ready = NodesReady(app_context)
+    await nodes_ready.start()
+
     # now index on all new shards only
     while True:
         resource_id = await rollover_datamanager.get_to_index(kbid)
         if resource_id is None:
             break
+        resource_tasks.append(
+            asyncio.create_task(
+                rollover_resource(
+                    app_context,
+                    kbid,
+                    resource_id,
+                    rollover_shards,
+                    max_concurrent_resources,
+                    nodes_ready,
+                )
+            )
+        )
 
+    # All have been scheduled. Wait for them to finish
+    if len(resource_tasks) > 0:
+        await asyncio.gather(*resource_tasks)
+
+    _set_rollover_status(rollover_shards, RolloverStatus.RESOURCES_INDEXED)
+    await rollover_datamanager.update_kb_rollover_shards(kbid, rollover_shards)
+
+
+async def rollover_resource(
+    app_context: ApplicationContext,
+    kbid: str,
+    resource_id: str,
+    rollover_shards: writer_pb2.Shards,
+    max_concurrent_resources: asyncio.Semaphore,
+    nodes_ready: NodesReady,
+):
+    async with max_concurrent_resources:
+        rollover_datamanager = RolloverDataManager(app_context.kv_driver)
+        resources_datamanager = ResourcesDataManager(
+            app_context.kv_driver, app_context.blob_storage
+        )
         shard_id = await resources_datamanager.get_resource_shard_id(kbid, resource_id)
         if shard_id is None:
             logger.error(
@@ -282,13 +368,17 @@ async def index_rollover_shards(app_context: ApplicationContext, kbid: str) -> N
                 f"Shard {shard_id} not found. Was a new one created during migration?"
             )
 
+        # Wait until all nodes are ready to consume messages
+        for replica in shard.replicas:
+            await nodes_ready.wait_ready(replica.node)
+
         resource_index_message = await index_resource(
             app_context, kbid, resource_id, shard
         )
         if resource_index_message is None:
             # resource no longer existing, remove indexing and carry on
             await rollover_datamanager.remove_to_index(kbid, resource_id)
-            continue
+            return
 
         await rollover_datamanager.add_indexed(
             kbid,
@@ -296,19 +386,6 @@ async def index_rollover_shards(app_context: ApplicationContext, kbid: str) -> N
             shard_id,
             _to_ts(resource_index_message.metadata.modified.ToDatetime()),
         )
-        wait_index_batch.append(shard)
-
-        if len(wait_index_batch) > 10:
-            node_ids = set()
-            for shard_batch in wait_index_batch:
-                for replica in shard_batch.replicas:
-                    node_ids.add(replica.node)
-            for node_id in node_ids:
-                await wait_for_node(app_context, node_id)
-            wait_index_batch = []
-
-    _set_rollover_status(rollover_shards, RolloverStatus.RESOURCES_INDEXED)
-    await rollover_datamanager.update_kb_rollover_shards(kbid, rollover_shards)
 
 
 async def cutover_shards(app_context: ApplicationContext, kbid: str) -> None:
