@@ -31,6 +31,7 @@ SAFELISTED_HEADERS = {"Accept", "Accept-Language", "Content-Language", "Content-
 
 logger = logging.getLogger("cors_debug")
 
+
 class CORSMiddleware:
     def __init__(
         self,
