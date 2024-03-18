@@ -45,7 +45,10 @@ from nucliadb_utils.settings import is_onprem_nucliadb
 __all__ = ["maybe_back_pressure"]
 
 
-RATE_LIMITED_REQUESTS = metrics.Counter(
+back_pressure_observer = metrics.Observer("nucliadb_back_pressure", labels={"type": ""})
+
+
+rate_limited_requests_counter = metrics.Counter(
     "nucliadb_rate_limited_requests", labels={"type": "", "cached": ""}
 )
 
@@ -109,7 +112,9 @@ def cached_back_pressure(kbid: str, resource_uuid: Optional[str] = None):
     if data is not None:
         try_after = data.try_after
         back_pressure_type = data.type
-        RATE_LIMITED_REQUESTS.inc({"type": back_pressure_type, "cached": "true"})
+        rate_limited_requests_counter.inc(
+            {"type": back_pressure_type, "cached": "true"}
+        )
         raise HTTPException(
             status_code=429,
             detail={
@@ -123,7 +128,9 @@ def cached_back_pressure(kbid: str, resource_uuid: Optional[str] = None):
     except BackPressureException as exc:
         try_after = exc.data.try_after
         back_pressure_type = exc.data.type
-        RATE_LIMITED_REQUESTS.inc({"type": back_pressure_type, "cached": "false"})
+        rate_limited_requests_counter.inc(
+            {"type": back_pressure_type, "cached": "false"}
+        )
         _cache.set(cache_key, exc.data)
         raise HTTPException(
             status_code=429,
@@ -197,7 +204,8 @@ class Materializer:
 
             # Get the pending messages and cache the result
             try:
-                pending = await self._get_processing_pending(kbid)
+                with back_pressure_observer({"type": "get_processing_pending"}):
+                    pending = await self._get_processing_pending(kbid)
             except Exception:
                 # Do not cache if there was an error
                 logger.exception(
@@ -225,13 +233,14 @@ class Materializer:
             while True:
                 for node_id in get_index_nodes():
                     try:
-                        self.indexing_pending[
-                            node_id
-                        ] = await get_nats_consumer_pending_messages(
-                            self.nats_manager,
-                            stream=const.Streams.INDEX.name,
-                            consumer=const.Streams.INDEX.group.format(node=node_id),
-                        )
+                        with back_pressure_observer({"type": "get_indexing_pending"}):
+                            self.indexing_pending[
+                                node_id
+                            ] = await get_nats_consumer_pending_messages(
+                                self.nats_manager,
+                                stream=const.Streams.INDEX.name,
+                                consumer=const.Streams.INDEX.group.format(node=node_id),
+                            )
                     except Exception:
                         logger.exception(
                             "Error getting pending messages to index",
@@ -246,11 +255,12 @@ class Materializer:
         try:
             while True:
                 try:
-                    self.ingest_pending = await get_nats_consumer_pending_messages(
-                        self.nats_manager,
-                        stream=const.Streams.INGEST_PROCESSED.name,
-                        consumer=const.Streams.INGEST_PROCESSED.subject,
-                    )
+                    with back_pressure_observer({"type": "get_ingest_pending"}):
+                        self.ingest_pending = await get_nats_consumer_pending_messages(
+                            self.nats_manager,
+                            stream=const.Streams.INGEST_PROCESSED.name,
+                            consumer=const.Streams.INGEST_PROCESSED.subject,
+                        )
                 except Exception:
                     logger.exception(
                         "Error getting pending messages to ingest",
@@ -262,26 +272,25 @@ class Materializer:
 
 
 MATERIALIZER: Optional[Materializer] = None
-set_materializer_lock = threading.Lock()
+materializer_lock = threading.Lock()
 
 
-async def get_materializer(request: Request) -> Optional[Materializer]:
+async def start_materializer(context: ApplicationContext):
     global MATERIALIZER
-
     if MATERIALIZER is not None:
-        return MATERIALIZER
-
-    with set_materializer_lock:
+        logger.info("Materializer already started")
+        return
+    with materializer_lock:
         if MATERIALIZER is not None:
-            return MATERIALIZER
-
+            return
         logger.info("Initializing materializer")
         try:
-            context = get_app_context(request.app)
             nats_manager = context.nats_manager
         except AttributeError:
-            logger.warning("Application context not found or not initialized")
-            return None
+            logger.warning(
+                "Could not initialize materializer. Nats manager not found or not initialized yet"
+            )
+            return
         materializer = Materializer(
             nats_manager,
             indexing_check_interval=settings.indexing_check_interval,
@@ -289,7 +298,26 @@ async def get_materializer(request: Request) -> Optional[Materializer]:
         )
         await materializer.start()
         MATERIALIZER = materializer
-        return materializer
+
+
+async def stop_materializer():
+    global MATERIALIZER
+    if MATERIALIZER is None or not MATERIALIZER.running:
+        logger.info("Materializer already stopped")
+        return
+    with materializer_lock:
+        if MATERIALIZER is None:
+            return
+        logger.info("Stopping materializer")
+        await MATERIALIZER.stop()
+        MATERIALIZER = None
+
+
+def get_materializer() -> Materializer:
+    global MATERIALIZER
+    if MATERIALIZER is None:
+        raise RuntimeError("Materializer not initialized")
+    return MATERIALIZER
 
 
 async def maybe_back_pressure(
@@ -314,9 +342,7 @@ async def back_pressure_checks(
     - If the indexing on nodes affected by the request (kbid, and resource_uuid) is behind.
     """
     context = get_app_context(request.app)
-    materializer = await get_materializer(request)
-    if materializer is None:
-        return
+    materializer = get_materializer()
     with cached_back_pressure(kbid, resource_uuid):
         check_ingest_behind(materializer.get_ingest_pending())
         await check_indexing_behind(
@@ -422,7 +448,8 @@ def estimate_try_after(rate: float, pending: int) -> datetime:
 async def get_nodes_for_kb_active_shards(
     context: ApplicationContext, kbid: str
 ) -> list[str]:
-    active_shard = await get_kb_active_shard(context, kbid)
+    with back_pressure_observer({"type": "get_kb_active_shard"}):
+        active_shard = await get_kb_active_shard(context, kbid)
     if active_shard is None:
         # KB doesn't exist or has been deleted
         logger.debug("No active shard found for KB", extra={"kbid": kbid})
@@ -434,7 +461,8 @@ async def get_nodes_for_kb_active_shards(
 async def get_nodes_for_resource_shard(
     context: ApplicationContext, kbid: str, resource_uuid: str
 ) -> list[str]:
-    resource_shard = await get_resource_shard(context, kbid, resource_uuid)
+    with back_pressure_observer({"type": "get_resource_shard"}):
+        resource_shard = await get_resource_shard(context, kbid, resource_uuid)
     if resource_shard is None:
         # Resource doesn't exist or KB has been deleted
         return []
