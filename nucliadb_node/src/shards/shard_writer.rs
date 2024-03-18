@@ -436,6 +436,19 @@ impl ShardWriter {
     }
 
     #[tracing::instrument(skip_all)]
+    pub fn force_garbage_collection(&self) -> NodeResult<GarbageCollectorStatus> {
+        let _lock = self.gc_lock.blocking_lock();
+        let result = write_rw_lock(&self.vector_writer).force_garbage_collection();
+        match result {
+            Ok(()) => Ok(GarbageCollectorStatus::GarbageCollected),
+            Err(error) => match error.downcast_ref::<VectorErr>() {
+                Some(VectorErr::WorkDelayed) => Ok(GarbageCollectorStatus::TryLater),
+                _ => Err(error),
+            },
+        }
+    }
+
+    #[tracing::instrument(skip_all)]
     pub fn merge(&self) -> NodeResult<MergeMetrics> {
         let result = write_rw_lock(&self.vector_writer).merge();
         self.metadata.new_generation_id();

@@ -316,6 +316,12 @@ impl VectorWriter for VectorWriterService {
     #[measure(actor = "vectors", metric = "garbage_collection")]
     #[tracing::instrument(skip_all)]
     fn garbage_collection(&mut self) -> NodeResult<()> {
+        Ok(())
+    }
+
+    #[measure(actor = "vectors", metric = "force_garbage_collection")]
+    #[tracing::instrument(skip_all)]
+    fn force_garbage_collection(&mut self) -> NodeResult<()> {
         let time = Instant::now();
 
         let lock = match self.index.try_elock() {

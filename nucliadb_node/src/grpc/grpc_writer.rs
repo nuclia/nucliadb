@@ -370,7 +370,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let info = info_span!(parent: &span, "garbage collection");
         let task = || {
             let shard = obtain_shard(shards, shard_id_clone)?;
-            run_with_telemetry(info, move || shard.collect_garbage())
+            run_with_telemetry(info, move || shard.force_garbage_collection())
         };
         let result = tokio::task::spawn_blocking(task)
             .await

@@ -60,6 +60,12 @@ impl Debug for VectorWriterService {
 }
 
 impl VectorWriter for VectorWriterService {
+    #[measure(actor = "vectors", metric = "force_garbage_collection")]
+    #[tracing::instrument(skip_all)]
+    fn force_garbage_collection(&mut self) -> NodeResult<()> {
+        Ok(())
+    }
+
     #[measure(actor = "vectors", metric = "merge")]
     #[tracing::instrument(skip_all)]
     fn merge(&mut self) -> NodeResult<MergeMetrics> {
