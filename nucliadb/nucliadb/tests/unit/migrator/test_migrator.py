@@ -22,7 +22,9 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from nucliadb.migrator import migrator
+from nucliadb.migrator import command, migrator
+from nucliadb.migrator.exceptions import MigrationValidationError
+from nucliadb.migrator.models import Migration
 
 
 def test_get_migrations():
@@ -61,3 +63,25 @@ async def test_run_all_kb_migrations_raises_on_failure():
             await migrator.run_all_kb_migrations(execution_context, 1)
         assert "Failed to migrate KBs. Failures: 1" in str(exc_info.value)
         assert mock.call_count == 2
+
+
+async def test_migrations_validation():
+    migrations = [
+        Migration(version=1, module=Mock()),
+        Migration(version=2, module=Mock()),
+        Migration(version=3, module=Mock()),
+    ]
+    with patch("nucliadb.migrator.command.get_migrations", return_value=migrations):
+        command.validate()
+
+
+async def test_migrations_validation_with_errors():
+    migrations = [
+        Migration(version=1, module=Mock()),
+        Migration(version=2, module=Mock()),
+        Migration(version=2, module=Mock()),
+        Migration(version=3, module=Mock()),
+    ]
+    with patch("nucliadb.migrator.command.get_migrations", return_value=migrations):
+        with pytest.raises(MigrationValidationError):
+            command.validate()
