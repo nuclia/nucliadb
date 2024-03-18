@@ -28,6 +28,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 ALL_METHODS = ("DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT")
 SAFELISTED_HEADERS = {"Accept", "Accept-Language", "Content-Language", "Content-Type"}
 
+logger = logging.getLogger("cors_debug")
 
 class CORSMiddleware:
     def __init__(
@@ -126,6 +127,7 @@ class CORSMiddleware:
         return origin in self.allow_origins
 
     def preflight_response(self, request_headers: Headers) -> Response:
+        logger.info(f"CORS DEBUG REQUEST: {str(request_headers)}")
         requested_origin = request_headers["origin"]
         requested_method = request_headers["access-control-request-method"]
         requested_headers = request_headers.get("access-control-request-headers")
