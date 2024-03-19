@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-"""Migration #15
+"""Migration #17
 
 Change how we track active (writable) shrads for a KB. Right now we use the
 `writer_pb2.Shards.actual` to point the position of the current shard in the
