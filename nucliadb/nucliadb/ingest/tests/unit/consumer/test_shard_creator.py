@@ -57,14 +57,17 @@ def kbdm():
 def shard_manager(reader):
     sm = MagicMock()
     node = MagicMock(reader=reader)
-    shards = Shards(shards=[ShardObject()], actual=0)
-    sm.get_shards_by_kbid_inner = AsyncMock(return_value=shards)
+    shards = Shards(shards=[ShardObject(read_only=False)], actual=0)
+    sm.get_current_active_shard = AsyncMock(return_value=shards.shards[0])
     sm.maybe_create_new_shard = AsyncMock()
     with patch(
         "nucliadb.ingest.consumer.shard_creator.get_shard_manager", return_value=sm
     ), patch(
         "nucliadb.ingest.consumer.shard_creator.choose_node",
         return_value=(node, "shard_id"),
+    ), patch(
+        "nucliadb.ingest.consumer.shard_creator.shards_data_manager.get_kb_shards",
+        AsyncMock(return_value=shards),
     ):
         yield sm
 

@@ -17,27 +17,3 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from uuid import uuid4
-
-import pytest
-
-from nucliadb.common.datamanagers.cluster import ClusterDataManager
-from nucliadb.common.maindb.utils import get_driver
-from nucliadb_protos import knowledgebox_pb2, writer_pb2_grpc
-
-
-@pytest.mark.asyncio
-async def test_create_cleansup_on_error(grpc_servicer, fake_node):
-    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
-    # Create a KB
-    kbid = str(uuid4())
-    pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test", forceuuid=kbid)
-    pb.config.title = "My Title"
-    result = await stub.NewKnowledgeBox(pb)
-    assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
-
-    # Get current shards object
-    driver = get_driver()
-    data_manager = ClusterDataManager(driver)
-    shards_object = await data_manager.get_kb_shards(kbid)
-    assert shards_object

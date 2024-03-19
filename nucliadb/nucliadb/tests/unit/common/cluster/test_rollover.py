@@ -56,6 +56,7 @@ def shards():
                     writer_pb2.ShardReplica(shard=writer_pb2.ShardCreated(id="1")),
                     writer_pb2.ShardReplica(shard=writer_pb2.ShardCreated(id="2")),
                 ],
+                read_only=True,
             ),
             writer_pb2.ShardObject(
                 shard="2",
@@ -63,6 +64,7 @@ def shards():
                     writer_pb2.ShardReplica(shard=writer_pb2.ShardCreated(id="3")),
                     writer_pb2.ShardReplica(shard=writer_pb2.ShardCreated(id="4")),
                 ],
+                read_only=False,
             ),
         ],
         kbid="kbid",
@@ -164,9 +166,9 @@ async def test_create_rollover_shards(
     new_shards = await rollover.create_rollover_shards(app_context, "kbid")
 
     assert new_shards.kbid == "kbid"
-    assert len(available_nodes["0"].writer.calls["NewShard"]) == sum(
-        [len(s.replicas) for s in shards.shards]
-    )
+    assert sum(
+        [len(node.writer.calls["NewShard"]) for node in available_nodes.values()]
+    ) == sum([len(s.replicas) for s in shards.shards])
     rollover_datamanager.update_kb_rollover_shards.assert_called_with(
         "kbid", new_shards
     )

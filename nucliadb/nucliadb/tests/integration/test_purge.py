@@ -25,7 +25,7 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb.common.cluster import manager
-from nucliadb.common.cluster.manager import KBShardManager
+from nucliadb.common.datamanagers.cluster import ClusterDataManager
 from nucliadb.common.datamanagers.rollover import RolloverDataManager
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.knowledgebox import (
@@ -155,10 +155,9 @@ async def test_purge_orphan_shards(
 
     # We have removed the shards in maindb but left them orphan in the index
     # nodes
-    shard_manager = KBShardManager()
-    async with maindb_driver.transaction(read_only=True) as txn:
-        maindb_shards = await shard_manager.get_all_shards(txn, kbid)
-        assert maindb_shards is None
+    data_manager = ClusterDataManager(maindb_driver)
+    maindb_shards = await data_manager.get_kb_shards(kbid)
+    assert maindb_shards is None
 
     shards = []
     for node in manager.get_index_nodes():

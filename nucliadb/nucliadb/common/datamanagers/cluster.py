@@ -46,23 +46,22 @@ class ClusterDataManager:
                 yield txn
 
     async def get_kb_shards(self, kbid: str) -> Optional[writer_pb2.Shards]:
-        key = KB_SHARDS.format(kbid=kbid)
         async with self.read_only_transaction(wait_for_abort=False) as txn:
-            return await get_kv_pb(txn, key, writer_pb2.Shards)
+            return await get_kb_shards(txn, kbid)
 
     async def update_kb_shards(self, kbid: str, kb_shards: writer_pb2.Shards) -> None:
-        key = KB_SHARDS.format(kbid=kbid)
         async with self.driver.transaction() as txn:
-            await txn.set(key, kb_shards.SerializeToString())
+            await update_kb_shards(txn, kbid, kb_shards)
             await txn.commit()
 
-    async def get_kb_shard(
-        self, kbid: str, shard_id: str
-    ) -> Optional[writer_pb2.ShardObject]:
-        shards = await self.get_kb_shards(kbid)
-        if shards is not None:
-            for shard in shards.shards:
-                if shard.shard == shard_id:
-                    return shard
 
-        return None
+async def get_kb_shards(txn: Transaction, kbid: str) -> Optional[writer_pb2.Shards]:
+    key = KB_SHARDS.format(kbid=kbid)
+    return await get_kv_pb(txn, key, writer_pb2.Shards)
+
+
+async def update_kb_shards(
+    txn: Transaction, kbid: str, shards: writer_pb2.Shards
+) -> None:
+    key = KB_SHARDS.format(kbid=kbid)
+    await txn.set(key, shards.SerializeToString())
