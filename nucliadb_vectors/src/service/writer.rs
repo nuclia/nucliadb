@@ -23,6 +23,7 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use nucliadb_core::metrics::request_time;
+use nucliadb_core::metrics::vectors::MergeSource;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::prost::Message;
 use nucliadb_core::protos::resource::ResourceStatus;
@@ -65,9 +66,8 @@ impl VectorWriter for VectorWriterService {
 
     #[measure(actor = "vectors", metric = "merge")]
     #[tracing::instrument(skip_all)]
-    fn merge(&mut self) -> NodeResult<MergeMetrics> {
+    fn merge(&mut self, _source: MergeSource) -> NodeResult<MergeMetrics> {
         let time = Instant::now();
-
         let lock = self.index.get_slock()?;
         let inner_metrics = self.index.force_merge(&lock)?;
 

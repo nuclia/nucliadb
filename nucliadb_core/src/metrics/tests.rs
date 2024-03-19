@@ -19,7 +19,7 @@
 
 use tokio;
 
-use crate::metrics::meters::{Meter, PrometheusMeter};
+use crate::metrics::meters::PrometheusMeter;
 
 #[tokio::test(flavor = "current_thread")]
 async fn test_export_metric_name() {

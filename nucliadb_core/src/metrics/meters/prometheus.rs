@@ -20,12 +20,11 @@
 use prometheus_client::encoding;
 use prometheus_client::registry::Registry;
 
-use crate::metrics::meters::Meter;
 use crate::metrics::metric::grpc_ops::{GrpcOpKey, GrpcOpMetric, GrpcOpValue};
 use crate::metrics::metric::request_time::{RequestTimeKey, RequestTimeMetric, RequestTimeValue};
 use crate::metrics::metric::tokio_runtime::TokioRuntimeObserver;
 use crate::metrics::metric::tokio_tasks::TokioTasksObserver;
-use crate::metrics::metric::{grpc_ops, replication, request_time, shard_cache};
+use crate::metrics::metric::{grpc_ops, replication, request_time, shard_cache, vectors};
 use crate::metrics::task_monitor::{Monitor, TaskId};
 use crate::tracing::{debug, error};
 use crate::NodeResult;
@@ -40,6 +39,8 @@ pub struct PrometheusMeter {
     replication_ops_metric: replication::ReplicationOpsMetric,
     open_shards_metric: shard_cache::OpenShardsMetric,
     evicted_shards_metric: shard_cache::EvictedShardsMetric,
+
+    pub vectors_metrics: vectors::VectorsMetrics,
 }
 
 impl Default for PrometheusMeter {
@@ -48,8 +49,8 @@ impl Default for PrometheusMeter {
     }
 }
 
-impl Meter for PrometheusMeter {
-    fn export(&self) -> NodeResult<String> {
+impl PrometheusMeter {
+    pub fn export(&self) -> NodeResult<String> {
         self.tokio_tasks_observer.observe();
         let runtime_observation = self.tokio_runtime_observer.observe();
         if let Err(error) = runtime_observation {
@@ -61,31 +62,31 @@ impl Meter for PrometheusMeter {
         Ok(buf)
     }
 
-    fn record_request_time(&self, metric: RequestTimeKey, value: RequestTimeValue) {
+    pub fn record_request_time(&self, metric: RequestTimeKey, value: RequestTimeValue) {
         debug!("{metric:?} : {value:?}");
         self.request_time_metric.get_or_create(&metric).observe(value);
     }
 
-    fn record_grpc_op(&self, method: GrpcOpKey, value: GrpcOpValue) {
+    pub fn record_grpc_op(&self, method: GrpcOpKey, value: GrpcOpValue) {
         self.grpc_op_metric.get_or_create(&method).observe(value);
     }
 
-    fn task_monitor(&self, task_id: TaskId) -> Option<Monitor> {
+    pub fn task_monitor(&self, task_id: TaskId) -> Option<Monitor> {
         Some(self.tokio_tasks_observer.get_monitor(task_id))
     }
 
-    fn record_replicated_bytes(&self, value: u64) {
+    pub fn record_replicated_bytes(&self, value: u64) {
         self.replicated_bytes_metric.get_or_create(&replication::ReplicatedBytesKey {}).inc_by(value);
     }
-    fn record_replication_op(&self, key: replication::ReplicationOpsKey) {
+    pub fn record_replication_op(&self, key: replication::ReplicationOpsKey) {
         self.replication_ops_metric.get_or_create(&key).inc();
     }
 
-    fn set_shard_cache_gauge(&self, value: i64) {
+    pub fn set_shard_cache_gauge(&self, value: i64) {
         self.open_shards_metric.get_or_create(&()).set(value);
     }
 
-    fn record_shard_cache_eviction(&self) {
+    pub fn record_shard_cache_eviction(&self) {
         self.evicted_shards_metric.get_or_create(&()).inc();
     }
 }
@@ -101,6 +102,8 @@ impl PrometheusMeter {
         let open_shards_metric = shard_cache::register_open_shards_metric(&mut registry);
         let evicted_shards_metric = shard_cache::register_evicted_shards_metric(&mut registry);
 
+        let vectors_metrics = vectors::VectorsMetrics::new(registry.sub_registry_with_prefix("nucliadb_vectors"));
+
         let prefixed_subregistry = registry.sub_registry_with_prefix("nucliadb_node");
         let tokio_tasks_observer = TokioTasksObserver::new(prefixed_subregistry);
         let tokio_runtime_observer = TokioRuntimeObserver::new(prefixed_subregistry);
@@ -115,6 +118,7 @@ impl PrometheusMeter {
             replication_ops_metric,
             open_shards_metric,
             evicted_shards_metric,
+            vectors_metrics,
         }
     }
 }

@@ -20,6 +20,7 @@
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
+use crate::metrics::vectors::MergeSource;
 use crate::prelude::*;
 use crate::protos::*;
 use crate::query_language::BooleanExpression;
@@ -66,7 +67,7 @@ pub trait VectorWriter: std::fmt::Debug + Send + Sync {
     fn get_index_files(&self, ignored_segment_ids: &[String]) -> NodeResult<IndexFiles>;
     fn list_vectorsets(&self) -> NodeResult<Vec<String>>;
 
-    fn merge(&mut self) -> NodeResult<MergeMetrics>;
+    fn merge(&mut self, source: MergeSource) -> NodeResult<MergeMetrics>;
     fn set_resource(&mut self, resource: &Resource) -> NodeResult<()>;
     fn delete_resource(&mut self, resource_id: &ResourceId) -> NodeResult<()>;
     fn garbage_collection(&mut self) -> NodeResult<()>;

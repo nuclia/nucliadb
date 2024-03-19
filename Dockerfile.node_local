@@ -67,8 +67,6 @@ FROM base as builder
 ARG CARGO_FEATURES=release-feature-set
 ARG CARGO_PROFILE=release
 
-ENV RUSTFLAGS="--cfg prometheus_metrics --cfg tokio_unstable"
-
 COPY --from=planner /nucliadb/recipe.json recipe.json
 
 # Build dependencies (this is the cached docker layer)

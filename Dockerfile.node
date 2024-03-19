@@ -32,7 +32,6 @@ FROM europe-west4-docker.pkg.dev/nuclia-internal/nuclia/basenode:latest as build
 
 ARG CARGO_FEATURES=release-feature-set
 ARG CARGO_PROFILE=release
-ENV RUSTFLAGS="--cfg prometheus_metrics --cfg tokio_unstable"
 
 # Install system dependencies
 COPY scripts/install-system-deps.sh /tmp/
