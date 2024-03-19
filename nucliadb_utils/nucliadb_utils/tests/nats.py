@@ -203,7 +203,7 @@ def start_gnatsd(gnatsd: Gnatsd):  # pragma: no cover
 @pytest.fixture(scope="session")
 def natsd_server():  # pragma: no cover
     if not os.path.isfile("nats-server"):
-        version = "v2.9.16"
+        version = "v2.10.12"
         arch = platform.machine()
         if arch == "x86_64":
             arch = "amd64"
@@ -236,7 +236,7 @@ def natsd(natsd_server: Gnatsd):  # pragma: no cover
 
 images.settings["nats"] = {
     "image": "nats",
-    "version": "2.9.16",
+    "version": "2.10.12",
     "options": {"command": ["-js"], "ports": {"4222": None}},
 }
 
