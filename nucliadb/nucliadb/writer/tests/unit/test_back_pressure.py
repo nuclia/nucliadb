@@ -40,6 +40,7 @@ from nucliadb.writer.back_pressure import (
     estimate_try_after,
     get_materializer,
     maybe_back_pressure,
+    start_materializer,
 )
 
 MODULE = "nucliadb.writer.back_pressure"
@@ -336,12 +337,12 @@ async def test_materializer(nats_conn, get_index_nodes, js, processing_client):
     materializer.processing_http_client.close.assert_awaited_once()
 
 
-async def test_get_materializer():
+async def test_start_materializer():
     nats_mgr = mock.Mock()
     context = mock.Mock(nats_manager=nats_mgr)
-    request = mock.Mock(app=mock.Mock(state=mock.Mock(context=context)))
 
-    mat = await get_materializer(request)
+    await start_materializer(context)
+    mat = get_materializer()
     assert isinstance(mat, Materializer)
     assert mat.nats_manager == nats_mgr
 
@@ -350,6 +351,6 @@ async def test_get_materializer():
     # Make sure the singleton is set
     from nucliadb.writer.back_pressure import MATERIALIZER
 
-    assert MATERIALIZER is not None
+    assert MATERIALIZER is mat
 
     await mat.stop()
