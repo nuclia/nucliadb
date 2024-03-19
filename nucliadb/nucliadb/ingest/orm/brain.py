@@ -610,9 +610,7 @@ class PagePositions:
     def _materialize_page_numbers(self, page_positions: FilePagePositions) -> list[int]:
         page_numbers_by_index = []
         for page_number, (page_start, page_end) in page_positions.items():
-            page_numbers_by_index.extend(
-                [int(page_number)] * (page_end - page_start + 1)
-            )
+            page_numbers_by_index.extend([page_number] * (page_end - page_start + 1))
         return page_numbers_by_index
 
     def get_page_number(self, start_index: int) -> int:
