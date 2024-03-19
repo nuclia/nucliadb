@@ -620,7 +620,7 @@ class PagePositions:
             return self.materialized[start_index]
         except IndexError:
             logger.error(
-                f"Could not find a page for the given index: {start_index}. Page positions: {self.page_positions}"
+                f"Could not find a page for the given index: {start_index}. Page positions: {self.page_positions}"  # noqa
             )
             if len(self.materialized) > 0:
                 return self.materialized[-1]
