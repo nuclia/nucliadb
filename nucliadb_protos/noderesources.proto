@@ -34,6 +34,7 @@ message ShardCreated {
     enum ParagraphService {
         PARAGRAPH_V0 = 0;
         PARAGRAPH_V1 = 1;
+        PARAGRAPH_V2 = 2;
     }
     ParagraphService paragraph_service = 3;
     enum VectorService {

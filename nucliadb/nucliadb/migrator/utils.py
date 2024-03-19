@@ -49,7 +49,9 @@ def get_migration_modules() -> list[tuple[types.ModuleType, int]]:
     return output
 
 
-def get_migrations(from_version: int = 0, to_version: int = 99999999):
+def get_migrations(
+    from_version: int = 0, to_version: int = 99999999
+) -> list[Migration]:
     migrations: list[Migration] = []
     for module, version in get_migration_modules():
         migrations.append(Migration(version=version, module=module))

@@ -115,6 +115,8 @@ message ParagraphSearchRequest {
     repeated string key_filters = 17;
 
     float min_score = 18;
+
+    optional utils.Security security = 19;
 }
 
 message ResultScore {

@@ -38,14 +38,10 @@ pub enum VectorErr {
     IoErr(#[from] std::io::Error),
     #[error("Error in fs: {0}")]
     FsError(#[from] nucliadb_core::fs_state::FsError),
-    #[error("This index does not have an alive writer")]
-    NoWriterError,
-    #[error("Only one writer can be open at the same time")]
-    MultipleWritersError,
-    #[error("Writer has uncommitted changes, please commit or abort")]
-    UncommittedChangesError,
     #[error("Garbage collection delayed")]
     WorkDelayed,
+    #[error("Several writers are open at the same time ")]
+    MultipleWriters,
     #[error("Merger is already initialized")]
     MergerAlreadyInitialized,
     #[error("Can not merge zero datapoints")]

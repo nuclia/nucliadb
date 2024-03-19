@@ -99,7 +99,7 @@ mod test {
         writing_flag.lock_exclusive().unwrap();
 
         let lock_path = index_path.join(OPENING_FLAG);
-        File::create(&lock_path).unwrap();
+        File::create(lock_path).unwrap();
 
         DataPointPin::create_pin(index_path).unwrap();
         DataPointPin::create_pin(index_path).unwrap();
@@ -122,7 +122,7 @@ mod test {
         writing_flag.lock_exclusive().unwrap();
 
         let lock_path = index_path.join(OPENING_FLAG);
-        File::create(&lock_path).unwrap();
+        File::create(lock_path).unwrap();
 
         DataPointPin::create_pin(index_path).unwrap();
         DataPointPin::create_pin(index_path).unwrap();
@@ -144,7 +144,7 @@ mod test {
         writing_flag.lock_exclusive().unwrap();
 
         let lock_path = index_path.join(OPENING_FLAG);
-        File::create(&lock_path).unwrap();
+        File::create(lock_path).unwrap();
 
         let pin_0 = DataPointPin::create_pin(index_path).unwrap();
         let pin_1 = DataPointPin::create_pin(index_path).unwrap();
@@ -169,7 +169,7 @@ mod test {
         writing_flag.lock_exclusive().unwrap();
 
         let lock_path = index_path.join(OPENING_FLAG);
-        File::create(&lock_path).unwrap();
+        File::create(lock_path).unwrap();
 
         let metrics = collect_garbage(index_path).unwrap();
 

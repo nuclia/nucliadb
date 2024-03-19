@@ -26,7 +26,6 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
-from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import HTMLResponse
 from starlette.routing import Mount
 
@@ -40,6 +39,7 @@ from nucliadb.standalone.lifecycle import finalize, initialize
 from nucliadb.train.api.v1.router import api as api_train_v1
 from nucliadb.writer.api.v1.router import api as api_writer_v1
 from nucliadb_telemetry.fastapi import metrics_endpoint
+from nucliadb_utils.cors import CORSMiddleware
 from nucliadb_utils.fastapi.openapi import extend_openapi
 from nucliadb_utils.fastapi.versioning import VersionedFastAPI
 from nucliadb_utils.settings import http_settings, running_settings

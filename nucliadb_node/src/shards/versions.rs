@@ -29,7 +29,7 @@ use std::path::Path;
 use std::sync::{Arc, RwLock};
 
 const VECTORS_VERSION: u32 = 1;
-const PARAGRAPHS_VERSION: u32 = 1;
+const PARAGRAPHS_VERSION: u32 = 2;
 const RELATIONS_VERSION: u32 = 2;
 const TEXTS_VERSION: u32 = 2;
 const DEPRECATED_CONFIG: &str = "config.json";
@@ -102,6 +102,8 @@ impl Versions {
         match self.version_vectors {
             Some(1) => nucliadb_vectors::service::VectorReaderService::start(config)
                 .map(|i| Arc::new(RwLock::new(i)) as VectorsReaderPointer),
+            Some(2) => nucliadb_vectors2::service::VectorReaderService::start(config)
+                .map(|i| Arc::new(RwLock::new(i)) as VectorsReaderPointer),
             Some(v) => Err(node_error!("Invalid vectors version {v}")),
             None => Err(node_error!("Corrupted version file")),
         }
@@ -109,6 +111,8 @@ impl Versions {
     pub fn get_paragraphs_reader(&self, config: &ParagraphConfig) -> NodeResult<ParagraphsReaderPointer> {
         match self.version_paragraphs {
             Some(1) => nucliadb_paragraphs::reader::ParagraphReaderService::start(config)
+                .map(|i| Arc::new(RwLock::new(i)) as ParagraphsReaderPointer),
+            Some(2) => nucliadb_paragraphs2::reader::ParagraphReaderService::start(config)
                 .map(|i| Arc::new(RwLock::new(i)) as ParagraphsReaderPointer),
             Some(v) => Err(node_error!("Invalid paragraphs version {v}")),
             None => Err(node_error!("Corrupted version file")),
@@ -141,6 +145,8 @@ impl Versions {
         match self.version_vectors {
             Some(1) => nucliadb_vectors::service::VectorWriterService::start(config)
                 .map(|i| Arc::new(RwLock::new(i)) as VectorsWriterPointer),
+            Some(2) => nucliadb_vectors2::service::VectorWriterService::start(config)
+                .map(|i| Arc::new(RwLock::new(i)) as VectorsWriterPointer),
             Some(v) => Err(node_error!("Invalid vectors version {v}")),
             None => Err(node_error!("Corrupted version file")),
         }
@@ -148,6 +154,8 @@ impl Versions {
     pub fn get_paragraphs_writer(&self, config: &ParagraphConfig) -> NodeResult<ParagraphsWriterPointer> {
         match self.version_paragraphs {
             Some(1) => nucliadb_paragraphs::writer::ParagraphWriterService::start(config)
+                .map(|i| Arc::new(RwLock::new(i)) as ParagraphsWriterPointer),
+            Some(2) => nucliadb_paragraphs2::writer::ParagraphWriterService::start(config)
                 .map(|i| Arc::new(RwLock::new(i)) as ParagraphsWriterPointer),
             Some(v) => Err(node_error!("Invalid paragraphs version {v}")),
             None => Err(node_error!("Corrupted version file")),

@@ -20,7 +20,7 @@
 use nucliadb_core::protos::prost::Message;
 use nucliadb_core::protos::prost_types::Timestamp;
 use nucliadb_core::protos::ParagraphMetadata;
-use tantivy::chrono::{DateTime, NaiveDateTime, Utc};
+use tantivy::chrono::{DateTime, Utc};
 use tantivy::schema::{Cardinality, FacetOptions, Field, NumericOptions, Schema, STORED, STRING, TEXT};
 use tantivy::Document;
 
@@ -56,8 +56,7 @@ pub struct ParagraphSchema {
 }
 
 pub fn timestamp_to_datetime_utc(timestamp: &Timestamp) -> DateTime<Utc> {
-    let naive = NaiveDateTime::from_timestamp_opt(timestamp.seconds, timestamp.nanos as u32).unwrap();
-    DateTime::from_naive_utc_and_offset(naive, tantivy::chrono::Utc)
+    DateTime::from_timestamp(timestamp.seconds, timestamp.nanos as u32).unwrap()
 }
 
 impl ParagraphSchema {

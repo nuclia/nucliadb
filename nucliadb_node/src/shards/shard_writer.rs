@@ -128,6 +128,7 @@ impl ShardWriter {
         match self.paragraph_service_version {
             0 => ParagraphService::ParagraphV0,
             1 => ParagraphService::ParagraphV1,
+            2 => ParagraphService::ParagraphV2,
             i => panic!("Unknown paragraph version {i}"),
         }
     }
@@ -425,6 +426,19 @@ impl ShardWriter {
     pub fn collect_garbage(&self) -> NodeResult<GarbageCollectorStatus> {
         let _lock = self.gc_lock.blocking_lock();
         let result = write_rw_lock(&self.vector_writer).garbage_collection();
+        match result {
+            Ok(()) => Ok(GarbageCollectorStatus::GarbageCollected),
+            Err(error) => match error.downcast_ref::<VectorErr>() {
+                Some(VectorErr::WorkDelayed) => Ok(GarbageCollectorStatus::TryLater),
+                _ => Err(error),
+            },
+        }
+    }
+
+    #[tracing::instrument(skip_all)]
+    pub fn force_garbage_collection(&self) -> NodeResult<GarbageCollectorStatus> {
+        let _lock = self.gc_lock.blocking_lock();
+        let result = write_rw_lock(&self.vector_writer).force_garbage_collection();
         match result {
             Ok(()) => Ok(GarbageCollectorStatus::GarbageCollected),
             Err(error) => match error.downcast_ref::<VectorErr>() {
