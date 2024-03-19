@@ -605,9 +605,9 @@ def is_paragraph_repeated_in_field(
 class PagePositions:
     def __init__(self, page_positions: FilePagePositions):
         self.page_positions = page_positions
-        self.materialized = self.materialize_page_numbers(page_positions)
+        self.materialized = self._materialize_page_numbers(page_positions)
 
-    def materialize_page_numbers(self, page_positions: FilePagePositions) -> list[int]:
+    def _materialize_page_numbers(self, page_positions: FilePagePositions) -> list[int]:
         page_numbers_by_index = []
         for page_number, (page_start, page_end) in page_positions.items():
             page_numbers_by_index.extend(
@@ -625,13 +625,6 @@ class PagePositions:
             if len(self.materialized) > 0:
                 return self.materialized[-1]
             return 0
-
-    def get_page_number_slow(self, start_index: int) -> int:
-        page_number = 0
-        for page_number, (page_start, page_end) in self.page_positions.items():
-            if page_start <= start_index <= page_end:
-                return page_number
-        return page_number
 
 
 def extend_unique(a: list, b: list):
