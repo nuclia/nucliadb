@@ -57,6 +57,7 @@ async def import_kb(
     dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
     stream_reader = ExportStreamReader(stream)
 
+    import_id = metadata.id if metadata is not None else None
     if metadata is not None and metadata.processed > 0:
         # Resuming task in a retry
         await stream_reader.seek(metadata.processed)
@@ -82,7 +83,10 @@ async def import_kb(
             await set_labels(context, kbid, labels)
 
         else:
-            logger.warning(f"Unknown exporteed item type: {item_type}")
+            logger.warning(
+                f"Unknown exported item type: {item_type}",
+                extra={"kbid": kbid, "import_id": import_id},
+            )
             continue
 
         if metadata is not None and items_count % 10 == 0:
