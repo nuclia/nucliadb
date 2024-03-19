@@ -22,7 +22,7 @@ pub mod garbage_collector;
 pub mod reader;
 pub mod writer;
 
-mod state;
+pub mod state;
 
 use crate::data_point::Similarity;
 use crate::data_types::dtrie_ram::DTrie;

@@ -30,14 +30,14 @@ use nucliadb_procs::measure;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fs;
-use std::path::Path;
+use std::io::Cursor;
 use std::time::Instant;
 use std::time::SystemTime;
 
 use crate::data_point::{self, DataPointPin, Elem, LabelDictionary};
-use crate::data_point_provider::garbage_collector;
 use crate::data_point_provider::writer::Writer;
 use crate::data_point_provider::*;
+use crate::data_point_provider::{self, garbage_collector};
 use crate::indexset::IndexKeyCollector;
 use crate::indexset::WriterSet;
 
@@ -292,25 +292,29 @@ impl VectorWriter for VectorWriterService {
     }
 
     fn get_segment_ids(&self) -> NodeResult<Vec<String>> {
-        let location = self.index.location();
-        let mut seg_ids = self.get_segment_ids_for_vectorset(location)?;
+        let state_data = fs::read(self.config.path.join("state.bincode"))?;
+        let state = data_point_provider::state::read_state(Cursor::new(&state_data))?;
+        let mut seg_ids = state.data_point_list;
         let vectorsets = self.list_vectorsets()?;
         for vs in vectorsets {
-            let vs_seg_ids = self.get_segment_ids_for_vectorset(&self.config.vectorset.join(vs))?;
-            seg_ids.extend(vs_seg_ids);
+            let state_data = fs::read(self.config.vectorset.join(format!("{}/state.bincode", vs)))?;
+            let state = data_point_provider::state::read_state(Cursor::new(&state_data))?;
+            seg_ids.extend(state.data_point_list);
         }
-        Ok(seg_ids)
+        Ok(seg_ids.into_iter().map(|d| d.to_string()).collect())
     }
 
     fn get_index_files(&self, ignored_segment_ids: &[String]) -> NodeResult<IndexFiles> {
         // Should be called along with a lock at a higher level to be safe
         let mut metadata_files = HashMap::new();
-        metadata_files.insert("vectors/state.bincode".to_string(), fs::read(self.config.path.join("state.bincode"))?);
+        let state_data = fs::read(self.config.path.join("state.bincode"))?;
+        let state = data_point_provider::state::read_state(Cursor::new(&state_data))?;
+        metadata_files.insert("vectors/state.bincode".to_string(), state_data);
         metadata_files.insert("vectors/metadata.json".to_string(), fs::read(self.config.path.join("metadata.json"))?);
 
-        let location = self.index.location();
         let mut files = Vec::new();
-        for segment_id in self.get_segment_ids_for_vectorset(location)? {
+        for segment_id in state.data_point_list {
+            let segment_id = segment_id.to_string();
             if ignored_segment_ids.contains(&segment_id) {
                 continue;
             }
@@ -324,7 +328,10 @@ impl VectorWriter for VectorWriterService {
             metadata_files
                 .insert("vectorset/state.bincode".to_string(), fs::read(self.config.vectorset.join("state.bincode"))?);
             for vs in vectorsets {
-                for segment_id in self.get_segment_ids_for_vectorset(&self.config.vectorset.join(vs.clone()))? {
+                let state_data = fs::read(self.config.vectorset.join(format!("{}/state.bincode", vs)))?;
+                let state = data_point_provider::state::read_state(Cursor::new(&state_data))?;
+                for segment_id in state.data_point_list {
+                    let segment_id = segment_id.to_string();
                     if ignored_segment_ids.contains(&segment_id) {
                         continue;
                     }
@@ -332,10 +339,7 @@ impl VectorWriter for VectorWriterService {
                     files.push(format!("vectorset/{}/{}/journal.json", vs, segment_id));
                     files.push(format!("vectorset/{}/{}/nodes.kv", vs, segment_id));
                 }
-                metadata_files.insert(
-                    format!("vectorset/{}/state.bincode", vs),
-                    fs::read(self.config.vectorset.join(format!("{}/state.bincode", vs)))?,
-                );
+                metadata_files.insert(format!("vectorset/{}/state.bincode", vs), state_data);
                 metadata_files.insert(
                     format!("vectorset/{}/metadata.json", vs),
                     fs::read(self.config.vectorset.join(format!("{}/metadata.json", vs)))?,
@@ -421,20 +425,6 @@ impl VectorWriterService {
                 config: config.clone(),
             })
         }
-    }
-
-    fn get_segment_ids_for_vectorset(&self, location: &Path) -> NodeResult<Vec<String>> {
-        let mut ids = Vec::new();
-        for dir_entry in std::fs::read_dir(location)? {
-            let entry = dir_entry?;
-            let path = entry.path();
-            let name = entry.file_name().to_string_lossy().to_string();
-            if path.is_file() {
-                continue;
-            }
-            ids.push(name);
-        }
-        Ok(ids)
     }
 }
 
