@@ -18,6 +18,7 @@ on:
       - "nucliadb_protos/**"
       - "nucliadb_node/**"
       - "nucliadb_vectors/**"
+      - "nucliadb_vectors2/**"
       - "nucliadb_texts/**"
       - "nucliadb_texts2/**"
       - "nucliadb_paragraphs/**"
@@ -117,6 +118,7 @@ jobs:
               - 'nucliadb_telemetry/**'
               - 'nucliadb_texts/**'
               - 'nucliadb_vectors/**'
+              - 'nucliadb_vectors2/**'
             sidecar_modified:
               - 'nucliadb_node/nucliadb_node/**'
 
