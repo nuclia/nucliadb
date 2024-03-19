@@ -1113,9 +1113,21 @@ class FindParagraph(BaseModel):
     labels: Optional[List[str]] = []
     position: Optional[TextPosition] = None
     fuzzy_result: bool = False
-    page_with_visual: bool = False
-    reference: Optional[str] = None
-    is_a_table: bool = False
+    page_with_visual: bool = Field(
+        default=False,
+        title="Page where this paragraph belongs is a visual page",
+        description="This flag informs if the page may have information that has not been extracted",
+    )
+    reference: Optional[str] = Field(
+        default=None,
+        title="Reference to the image that represents this text",
+        description="Reference to the extracted image that represents this paragraph",
+    )
+    is_a_table: bool = Field(
+        default=False,
+        title="Is a table",
+        description="The referenced image of the paragraph is table",
+    )
 
 
 @dataclass
