@@ -33,6 +33,7 @@ from nucliadb_protos.writer_pb2 import ShardObject
 from nucliadb.common.cluster.manager import get_index_nodes
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.context.fastapi import get_app_context
+from nucliadb.common.datamanagers import cluster as shards_data_manager
 from nucliadb.common.datamanagers.resources import ResourcesDataManager
 from nucliadb.common.http_clients.processing import ProcessingHTTPClient
 from nucliadb.writer import logger
@@ -499,7 +500,7 @@ async def get_resource_shard(
         return None
 
     async with context.kv_driver.transaction() as txn:
-        all_shards = await context.shard_manager.get_all_shards(txn, kbid)
+        all_shards = await shards_data_manager.get_kb_shards(txn, kbid)
         if all_shards is None:
             # KB doesn't exist or has been deleted
             logger.debug("No shards found for KB", extra={"kbid": kbid})
