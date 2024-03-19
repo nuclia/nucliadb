@@ -54,6 +54,7 @@ from nucliadb.writer.api.v1.router import (
     RSLUG_PREFIX,
     api,
 )
+from nucliadb.writer.back_pressure import maybe_back_pressure
 from nucliadb.writer.exceptions import IngestNotAvailable
 from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.basic import (
@@ -108,6 +109,8 @@ async def create_resource(
     x_skip_store: bool = SKIP_STORE_DEFAULT,
     x_synchronous: bool = SYNC_CALL,
 ):
+    await maybe_back_pressure(request, kbid)
+
     transaction = get_transaction_utility()
     partitioning = get_partitioning()
 
@@ -265,6 +268,9 @@ async def modify_resource_endpoint(
     path_rslug: Optional[str] = None,
 ):
     resource_uuid = await get_rid_from_params_or_raise_error(kbid, path_rid, path_rslug)
+
+    await maybe_back_pressure(request, kbid, resource_uuid=resource_uuid)
+
     if item.slug is None:
         return await modify_resource(
             request,
@@ -413,7 +419,9 @@ async def reprocess_resource_rslug_prefix(
     rslug: str,
     x_nucliadb_user: str = X_NUCLIADB_USER,
 ):
-    return await _reprocess_resource(kbid, rslug=rslug, x_nucliadb_user=x_nucliadb_user)
+    return await _reprocess_resource(
+        request, kbid, rslug=rslug, x_nucliadb_user=x_nucliadb_user
+    )
 
 
 @api.post(
@@ -431,10 +439,13 @@ async def reprocess_resource_rid_prefix(
     rid: str,
     x_nucliadb_user: str = X_NUCLIADB_USER,
 ):
-    return await _reprocess_resource(kbid, rid=rid, x_nucliadb_user=x_nucliadb_user)
+    return await _reprocess_resource(
+        request, kbid, rid=rid, x_nucliadb_user=x_nucliadb_user
+    )
 
 
 async def _reprocess_resource(
+    request: Request,
     kbid: str,
     x_nucliadb_user: str,
     rid: Optional[str] = None,
@@ -444,6 +455,8 @@ async def _reprocess_resource(
     partitioning = get_partitioning()
 
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
+
+    await maybe_back_pressure(request, kbid, resource_uuid=rid)
 
     partition = partitioning.generate_partition(kbid, rid)
 
@@ -567,7 +580,9 @@ async def reindex_resource_rslug_prefix(
     rslug: str,
     reindex_vectors: bool = Query(False),
 ):
-    return await _reindex_resource(kbid, rslug=rslug, reindex_vectors=reindex_vectors)
+    return await _reindex_resource(
+        request, kbid, rslug=rslug, reindex_vectors=reindex_vectors
+    )
 
 
 @api.post(
@@ -584,16 +599,21 @@ async def reindex_resource_rid_prefix(
     rid: str,
     reindex_vectors: bool = Query(False),
 ):
-    return await _reindex_resource(kbid, rid=rid, reindex_vectors=reindex_vectors)
+    return await _reindex_resource(
+        request, kbid, rid=rid, reindex_vectors=reindex_vectors
+    )
 
 
 async def _reindex_resource(
+    request: Request,
     kbid: str,
     reindex_vectors: bool,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
 ):
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
+
+    await maybe_back_pressure(request, kbid, resource_uuid=rid)
 
     ingest = get_ingest()
     index_req = IndexResource()

@@ -18,6 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import functools
+
 import pkg_resources
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -26,7 +28,7 @@ from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.requests import ClientDisconnect, Request
 from starlette.responses import HTMLResponse
 
-from nucliadb.common.context.fastapi import set_app_context
+from nucliadb.common.context.fastapi import get_app_context, set_app_context
 from nucliadb.writer import API_PREFIX
 from nucliadb.writer.api.v1.router import api as api_v1
 from nucliadb.writer.lifecycle import finalize, initialize
@@ -108,7 +110,18 @@ def create_application() -> FastAPI:
     # Use raw starlette routes to avoid unnecessary overhead
     application.add_route("/", homepage)
 
-    # Inject application context into the fastapi app's state
     set_app_context(application)
-
+    maybe_configure_back_pressure(application)
     return application
+
+
+def maybe_configure_back_pressure(application: FastAPI):
+    from nucliadb.writer.back_pressure import start_materializer, stop_materializer
+    from nucliadb.writer.settings import back_pressure_settings
+    from nucliadb_utils.settings import is_onprem_nucliadb
+
+    if back_pressure_settings.enabled and not is_onprem_nucliadb():
+        context = get_app_context(application)
+        start_materializer_with_context = functools.partial(start_materializer, context)
+        application.add_event_handler("startup", start_materializer_with_context)
+        application.add_event_handler("shutdown", stop_materializer)
