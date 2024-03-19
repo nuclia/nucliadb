@@ -122,6 +122,7 @@ class ResourceBrain:
         )
 
         # We should set paragraphs and labels
+        page_positions = materialize_page_numbers(page_positions) if page_positions else None
         for subfield, metadata_split in metadata.split_metadata.items():
             # For each split of this field
             for index, paragraph in enumerate(metadata_split.paragraphs):
@@ -603,16 +604,30 @@ def is_paragraph_repeated_in_field(
     return repeated_in_field
 
 
-def get_page_number(start_index: int, page_positions: FilePagePositions) -> int:
+def _get_page_number(start_index: int, page_positions: FilePagePositions) -> int:
     page_number = 0
     for page_number, (page_start, page_end) in page_positions.items():
         if page_start <= start_index <= page_end:
             return int(page_number)
         if start_index <= page_end:
-            logger.info("There is a wrong page start")
+            logger.warning("There is a wrong page start")
             return int(page_number)
     logger.error("Could not found a page")
     return int(page_number)
+
+
+def materialize_page_numbers(page_positions: FilePagePositions) -> list[int]:
+    page_numbers_by_index = []
+    for page_number, (page_start, page_end) in page_positions.items():
+        page_numbers_by_index.extend([int(page_number)] * (page_end - page_start + 1))
+    return page_numbers_by_index
+
+
+def get_page_number(start_index, page_positions: list[int]):
+    try:
+        return page_positions[start_index]
+    except IndexError:
+        return 0
 
 
 def extend_unique(a: list, b: list):
