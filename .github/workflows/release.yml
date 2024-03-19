@@ -107,7 +107,7 @@ jobs:
           wait-interval: 10
 
       - name: Upload to pypi
-        run: twine upload dist/*
+        run: twine upload --verbose dist/*
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
