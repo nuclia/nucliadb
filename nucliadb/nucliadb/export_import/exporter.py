@@ -97,7 +97,7 @@ async def export_resources(
     async for rid in iter_kb_resource_uuids(context, kbid):
         bm = await get_broker_message(context, kbid, rid)
         if bm is None:
-            logger.warning(f"No resource found for rid {rid}")
+            logger.warning(f"No resource found for rid {rid}", extra={"kbid": kbid})
             continue
         async for chunk in export_resource_with_binaries(context, bm):
             yield chunk
@@ -109,20 +109,39 @@ async def export_resources_resumable(
     dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
 
     kbid = metadata.kbid
+    export_id = metadata.id
     if len(metadata.resources_to_export) == 0:
         # Starting an export from scratch
+        logger.info(
+            "Starting export from scratch", extra={"kbid": kbid, "export_id": export_id}
+        )
         metadata.exported_resources = []
         async for rid in iter_kb_resource_uuids(context, kbid):
             metadata.resources_to_export.append(rid)
         metadata.resources_to_export.sort()
         metadata.total = len(metadata.resources_to_export)
         await dm.set_metadata("export", metadata)
+    else:
+        logger.info(
+            f"Resuming export of {metadata.processed}/{metadata.total} resources",
+            extra={"kbid": kbid, "export_id": export_id},
+        )
 
     try:
         for rid in metadata.resources_to_export:
+            if rid in metadata.exported_resources:
+                logger.info(
+                    f"Skipping resource {rid} as it was already exported",
+                    extra={"kbid": kbid, "export_id": export_id},
+                )
+                continue
+
             bm = await get_broker_message(context, kbid, rid)
             if bm is None:
-                logger.warning(f"Skipping resource {rid} as it was deleted")
+                logger.warning(
+                    f"Skipping resource {rid} as it was deleted",
+                    extra={"kbid": kbid, "export_id": export_id},
+                )
                 continue
 
             async for chunk in export_resource_with_binaries(context, bm):
@@ -134,7 +153,10 @@ async def export_resources_resumable(
 
     except Exception as e:
         errors.capture_exception(e)
-        logger.error(f"Error exporting resource {rid}: {e}")
+        logger.error(
+            f"Error exporting resource {rid}: {e}",
+            extra={"kbid": kbid, "export_id": export_id},
+        )
         # Start from scracth next time.
         # TODO: try to resume from the last resource
         metadata.exported_resources = []
