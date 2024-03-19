@@ -122,7 +122,7 @@ class ResourceBrain:
         )
 
         # We should set paragraphs and labels
-        page_positions = materialize_page_numbers(page_positions) if page_positions else None
+        positions = PagePositions(page_positions) if page_positions else None
         for subfield, metadata_split in metadata.split_metadata.items():
             # For each split of this field
             for index, paragraph in enumerate(metadata_split.paragraphs):
@@ -136,10 +136,8 @@ class ResourceBrain:
                     start_seconds=paragraph.start_seconds,
                     end_seconds=paragraph.end_seconds,
                 )
-                if page_positions:
-                    position.page_number = get_page_number(
-                        paragraph.start, page_positions
-                    )
+                if positions:
+                    position.page_number = positions.get_page_number(paragraph.start)
                 p = BrainParagraph(
                     start=paragraph.start,
                     end=paragraph.end,
@@ -174,8 +172,8 @@ class ResourceBrain:
                 start_seconds=paragraph.start_seconds,
                 end_seconds=paragraph.end_seconds,
             )
-            if page_positions:
-                position.page_number = get_page_number(paragraph.start, page_positions)
+            if positions:
+                position.page_number = positions.get_page_number(paragraph.start)
             p = BrainParagraph(
                 start=paragraph.start,
                 end=paragraph.end,
@@ -604,30 +602,36 @@ def is_paragraph_repeated_in_field(
     return repeated_in_field
 
 
-def _get_page_number(start_index: int, page_positions: FilePagePositions) -> int:
-    page_number = 0
-    for page_number, (page_start, page_end) in page_positions.items():
-        if page_start <= start_index <= page_end:
-            return int(page_number)
-        if start_index <= page_end:
-            logger.warning("There is a wrong page start")
-            return int(page_number)
-    logger.error("Could not found a page")
-    return int(page_number)
+class PagePositions:
+    def __init__(self, page_positions: FilePagePositions):
+        self.page_positions = page_positions
+        self.materialized = self.materialize_page_numbers(page_positions)
 
+    def materialize_page_numbers(self, page_positions: FilePagePositions) -> list[int]:
+        page_numbers_by_index = []
+        for page_number, (page_start, page_end) in page_positions.items():
+            page_numbers_by_index.extend(
+                [int(page_number)] * (page_end - page_start + 1)
+            )
+        return page_numbers_by_index
 
-def materialize_page_numbers(page_positions: FilePagePositions) -> list[int]:
-    page_numbers_by_index = []
-    for page_number, (page_start, page_end) in page_positions.items():
-        page_numbers_by_index.extend([int(page_number)] * (page_end - page_start + 1))
-    return page_numbers_by_index
+    def get_page_number(self, start_index: int) -> int:
+        try:
+            return self.materialized[start_index]
+        except IndexError:
+            logger.error(
+                f"Could not find a page for the given index: {start_index}. Page positions: {self.page_positions}"
+            )
+            if len(self.materialized) > 0:
+                return self.materialized[-1]
+            return 0
 
-
-def get_page_number(start_index, page_positions: list[int]):
-    try:
-        return page_positions[start_index]
-    except IndexError:
-        return 0
+    def get_page_number_slow(self, start_index: int) -> int:
+        page_number = 0
+        for page_number, (page_start, page_end) in self.page_positions.items():
+            if page_start <= start_index <= page_end:
+                return page_number
+        return page_number
 
 
 def extend_unique(a: list, b: list):
