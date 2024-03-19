@@ -31,7 +31,6 @@ from nucliadb_protos.resources_pb2 import (
     Paragraph,
     Sentence,
 )
-from responses import start
 
 from nucliadb.ingest.orm.brain import PagePositions, ResourceBrain
 from nucliadb_protos import resources_pb2
