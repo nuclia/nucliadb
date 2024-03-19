@@ -147,6 +147,8 @@ pub struct ParagraphSearchRequest {
     pub key_filters: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(float, tag="18")]
     pub min_score: f32,
+    #[prost(message, optional, tag="19")]
+    pub security: ::core::option::Option<super::utils::Security>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ResultScore {

@@ -140,10 +140,12 @@ class ShardCreated(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         PARAGRAPH_V0: ShardCreated._ParagraphService.ValueType  # 0
         PARAGRAPH_V1: ShardCreated._ParagraphService.ValueType  # 1
+        PARAGRAPH_V2: ShardCreated._ParagraphService.ValueType  # 2
 
     class ParagraphService(_ParagraphService, metaclass=_ParagraphServiceEnumTypeWrapper): ...
     PARAGRAPH_V0: ShardCreated.ParagraphService.ValueType  # 0
     PARAGRAPH_V1: ShardCreated.ParagraphService.ValueType  # 1
+    PARAGRAPH_V2: ShardCreated.ParagraphService.ValueType  # 2
 
     class _VectorService:
         ValueType = typing.NewType("ValueType", builtins.int)

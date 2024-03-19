@@ -47,6 +47,7 @@ COPY nucliadb_core /nucliadb/nucliadb_core
 COPY nucliadb_node /nucliadb/nucliadb_node
 COPY nucliadb_node_binding /nucliadb/nucliadb_node_binding
 COPY nucliadb_paragraphs /nucliadb/nucliadb_paragraphs
+COPY nucliadb_paragraphs2 /nucliadb/nucliadb_paragraphs2
 COPY nucliadb_procs /nucliadb/nucliadb_procs
 COPY nucliadb_protos /nucliadb/nucliadb_protos
 COPY nucliadb_relations /nucliadb/nucliadb_relations
@@ -54,6 +55,7 @@ COPY nucliadb_relations2 /nucliadb/nucliadb_relations2
 COPY nucliadb_texts /nucliadb/nucliadb_texts
 COPY nucliadb_texts2 /nucliadb/nucliadb_texts2
 COPY nucliadb_vectors /nucliadb/nucliadb_vectors
+COPY nucliadb_vectors2 /nucliadb/nucliadb_vectors2
 COPY vectors_benchmark /nucliadb/vectors_benchmark
 
 RUN cargo chef prepare --recipe-path recipe.json
@@ -83,6 +85,7 @@ COPY nucliadb_core /nucliadb/nucliadb_core
 COPY nucliadb_node /nucliadb/nucliadb_node
 COPY nucliadb_node_binding /nucliadb/nucliadb_node_binding
 COPY nucliadb_paragraphs /nucliadb/nucliadb_paragraphs
+COPY nucliadb_paragraphs2 /nucliadb/nucliadb_paragraphs2
 COPY nucliadb_procs /nucliadb/nucliadb_procs
 COPY nucliadb_protos /nucliadb/nucliadb_protos
 COPY nucliadb_relations /nucliadb/nucliadb_relations
@@ -90,6 +93,7 @@ COPY nucliadb_relations2 /nucliadb/nucliadb_relations2
 COPY nucliadb_texts /nucliadb/nucliadb_texts
 COPY nucliadb_texts2 /nucliadb/nucliadb_texts2
 COPY nucliadb_vectors /nucliadb/nucliadb_vectors
+COPY nucliadb_vectors2 /nucliadb/nucliadb_vectors2
 COPY vectors_benchmark /nucliadb/vectors_benchmark
 
 # Build application (only run when sources are modified)

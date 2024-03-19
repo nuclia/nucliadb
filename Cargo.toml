@@ -5,6 +5,7 @@ members = [
   "nucliadb_node",
   "nucliadb_node_binding",
   "nucliadb_paragraphs",
+  "nucliadb_paragraphs2",
   "nucliadb_procs",
   "nucliadb_protos/rust",
   "nucliadb_relations",
@@ -12,5 +13,6 @@ members = [
   "nucliadb_texts",
   "nucliadb_texts2",
   "nucliadb_vectors",
+  "nucliadb_vectors2",
   "vectors_benchmark",
 ]

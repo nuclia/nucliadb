@@ -33,6 +33,7 @@ use tokio::sync::oneshot;
 use tokio::sync::oneshot::{Receiver, Sender};
 
 use crate::{settings::Settings, shards::providers::shard_cache::ShardWriterCache};
+use nucliadb_core::metrics::vectors::MergeSource;
 use nucliadb_core::tracing::warn;
 use nucliadb_core::NodeResult;
 

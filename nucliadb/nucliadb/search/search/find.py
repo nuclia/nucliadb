@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import logging
 from time import time
 
 from nucliadb.search.requesters.utils import Method, debug_nodes_info, node_query
@@ -26,6 +27,7 @@ from nucliadb.search.search.utils import (
     min_score_from_payload,
     should_disable_vector_search,
 )
+from nucliadb.search.settings import settings
 from nucliadb_models.search import (
     FindRequest,
     KnowledgeboxFindResults,
@@ -33,6 +35,8 @@ from nucliadb_models.search import (
     SearchOptions,
 )
 from nucliadb_utils.utilities import get_audit
+
+logger = logging.getLogger(__name__)
 
 
 async def find(
@@ -95,6 +99,7 @@ async def find(
         highlight=item.highlight,
     )
 
+    search_time = time() - start_time
     if audit is not None:
         await audit.search(
             kbid,
@@ -102,7 +107,7 @@ async def find(
             x_ndb_client.to_proto(),
             x_forwarded_for,
             pb_query,
-            time() - start_time,
+            search_time,
             len(search_results.resources),
         )
     if item.debug:
@@ -111,4 +116,18 @@ async def find(
     queried_shards = [shard_id for _, shard_id in queried_nodes]
     search_results.shards = queried_shards
     search_results.autofilters = autofilters
+
+    if search_time > settings.slow_find_log_threshold:
+        logger.warning(
+            "Slow query",
+            extra={
+                "kbid": kbid,
+                "user": x_nucliadb_user,
+                "client": x_ndb_client,
+                "query": item.json(),
+                "time": search_time,
+                "nodes": debug_nodes_info(queried_nodes),
+            },
+        )
+
     return search_results, incomplete_results

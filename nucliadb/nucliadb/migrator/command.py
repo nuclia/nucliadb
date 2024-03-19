@@ -25,7 +25,9 @@ from nucliadb_utils.fastapi.run import serve_metrics
 
 from . import migrator
 from .context import ExecutionContext
+from .exceptions import MigrationValidationError
 from .settings import Settings
+from .utils import get_migrations
 
 
 async def run(forever: bool = False):
@@ -44,6 +46,17 @@ async def run(forever: bool = False):
     finally:
         await context.finalize()
         await metrics_server.shutdown()
+
+
+def validate():
+    migrations = get_migrations()
+    versions = set()
+    for migration in migrations:
+        if migration.version in versions:
+            raise MigrationValidationError(
+                f"Migration {migration.version} is duplicated"
+            )
+        versions.add(migration.version)
 
 
 def main():

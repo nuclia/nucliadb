@@ -21,6 +21,7 @@ bincode = "1.3.3"
 
 nucliadb_core = { path = "../nucliadb_core" }
 nucliadb_procs = { path = "../nucliadb_procs" }
+bit-set = "0.5.3"
 
 [dev-dependencies]
 lazy_static = "1.4.0"

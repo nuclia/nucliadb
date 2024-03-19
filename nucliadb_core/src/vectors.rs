@@ -71,6 +71,7 @@ pub trait VectorWriter: std::fmt::Debug + Send + Sync {
     fn set_resource(&mut self, resource: &Resource) -> NodeResult<()>;
     fn delete_resource(&mut self, resource_id: &ResourceId) -> NodeResult<()>;
     fn garbage_collection(&mut self) -> NodeResult<()>;
+    fn force_garbage_collection(&mut self) -> NodeResult<()>;
     fn remove_vectorset(&mut self, setid: &VectorSetId) -> NodeResult<()>;
     fn add_vectorset(&mut self, setid: &VectorSetId, similarity: VectorSimilarity) -> NodeResult<()>;
     fn reload(&mut self) -> NodeResult<()>;

@@ -37,6 +37,7 @@ jobs:
               - 'nucliadb_core/**'
               - 'nucliadb_node/src/**'
               - 'nucliadb_paragraphs/**'
+              - 'nucliadb_paragraphs/**'
               - 'nucliadb_procs/**'
               - 'nucliadb_relations/**'
               - 'nucliadb_relations2/**'
@@ -44,6 +45,7 @@ jobs:
               - 'nucliadb_texts/**'
               - 'nucliadb_texts2/**'
               - 'nucliadb_vectors/**'
+              - 'nucliadb_vectors2/**'
 
       - name: Repository Dispatch
         uses: peter-evans/repository-dispatch@v2
