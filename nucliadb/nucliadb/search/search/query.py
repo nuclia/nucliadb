@@ -124,6 +124,7 @@ class QueryParser:
         autofilter: bool = False,
         key_filters: Optional[list[str]] = None,
         security: Optional[RequestSecurity] = None,
+        generative_model: Optional[str] = None,
     ):
         self.kbid = kbid
         self.features = features
@@ -148,6 +149,7 @@ class QueryParser:
         self.autofilter = autofilter
         self.key_filters = key_filters
         self.security = security
+        self.generative_model = generative_model
         self.query_endpoint_enabled = has_feature(
             const.Features.PREDICT_QUERY_ENDPOINT,
             default=False,
@@ -186,7 +188,7 @@ class QueryParser:
             return static_query()
         if self._query_information_task is None:  # pragma: no cover
             self._query_information_task = asyncio.create_task(
-                query_information(self.kbid, self.query)
+                query_information(self.kbid, self.query, self.generative_model)
             )
         return self._query_information_task
 
@@ -504,7 +506,7 @@ class QueryParser:
         return (await self._get_query_information()).visual_llm
 
     async def get_max_context(self) -> int:
-        return (await self._get_query_information()).max_context
+        return (await self._get_query_information()).max_context * 3
 
 
 async def paragraph_query_to_pb(
@@ -574,9 +576,11 @@ async def convert_vectors(kbid: str, query: str) -> list[float]:
 
 
 @query_parse_dependency_observer.wrap({"type": "query_information"})
-async def query_information(kbid: str, query: str) -> QueryInfo:
+async def query_information(
+    kbid: str, query: str, generative_model: Optional[str] = None
+) -> QueryInfo:
     predict = get_predict()
-    return await predict.query(kbid, query)
+    return await predict.query(kbid, query, generative_model)
 
 
 @query_parse_dependency_observer.wrap({"type": "detect_entities"})

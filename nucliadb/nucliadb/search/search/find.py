@@ -19,6 +19,7 @@
 #
 import logging
 from time import time
+from typing import Optional
 
 from nucliadb.search.requesters.utils import Method, debug_nodes_info, node_query
 from nucliadb.search.search.find_merge import find_merge_results
@@ -45,6 +46,7 @@ async def find(
     x_ndb_client: NucliaDBClientType,
     x_nucliadb_user: str,
     x_forwarded_for: str,
+    generative_model: Optional[str] = None,
 ) -> tuple[KnowledgeboxFindResults, bool, QueryParser]:
     audit = get_audit()
     start_time = time()
@@ -77,6 +79,7 @@ async def find(
         autofilter=item.autofilter,
         key_filters=item.resource_filters,
         security=item.security,
+        generative_model=generative_model,
     )
     pb_query, incomplete_results, autofilters = await query_parser.parse()
     results, query_incomplete_results, queried_nodes = await node_query(

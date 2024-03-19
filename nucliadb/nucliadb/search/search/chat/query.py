@@ -165,7 +165,12 @@ async def get_find_results(
     find_request.debug = chat_request.debug
 
     find_results, incomplete, query_parser = await find(
-        kbid, find_request, ndb_client, user, origin
+        kbid,
+        find_request,
+        ndb_client,
+        user,
+        origin,
+        generative_model=chat_request.generative_model,
     )
     if incomplete:
         raise IncompleteFindResultsError()
@@ -254,6 +259,7 @@ async def chat(
             find_results=find_results,
             user_context=user_context,
             strategies=chat_request.rag_strategies,
+            image_strategies=chat_request.rag_images_strategies,
             max_context_size=await query_parser.get_max_context(),
             visual_llm=await query_parser.get_visual_llm_enabled(),
         )

@@ -259,6 +259,7 @@ async def full_resource_prompt_context(
     context: CappedPromptContext,
     kbid: str,
     results: KnowledgeboxFindResults,
+    number_of_full_resources: Optional[int] = None,
 ) -> None:
     """
     Algorithm steps:
@@ -278,7 +279,7 @@ async def full_resource_prompt_context(
     resource_extracted_texts = await run_concurrently(
         [
             get_resource_extracted_texts(kbid, resource_uuid)
-            for resource_uuid in ordered_resources
+            for resource_uuid in ordered_resources[:number_of_full_resources]
         ],
         max_concurrent=MAX_RESOURCE_TASKS,
     )
@@ -389,37 +390,62 @@ class PromptContextBuilder:
 
     async def _build_context_images(self, context: CappedPromptContext) -> None:
         ordered_paras = get_ordered_paragraphs(self.find_results)
+        flatten_strategies = []
+        page_count = 5
+        gather_pages = False
+        gather_tables = False
+        if self.image_strategies is not None:
+            for strategy in self.image_strategies:
+                flatten_strategies.append(strategy.name)
+                if strategy.name == ImageRagStrategyName.PAGE_IMAGE:
+                    gather_pages = True
+                    if strategy.count is not None:  # type: ignore
+                        page_count = strategy.count  # type: ignore
+                if strategy.name == ImageRagStrategyName.TABLES:
+                    gather_tables = True
+
         for paragraph in ordered_paras:
             if paragraph.page_with_visual and paragraph.position:
                 if (
-                    self.image_strategies == ImageRagStrategyName.PAGE_IMAGE
+                    gather_pages
                     and paragraph.position.page_number
+                    and len(context.images) < page_count
                 ):
+                    field = "/".join(paragraph.id.split("/")[:3])
                     page = paragraph.position.page_number
-                    context.images[paragraph.id] = await get_page_image(
-                        self.kbid, paragraph.id, page
-                    )
-                elif paragraph.reference is not None:
-                    image = paragraph.reference
-                    context.images[paragraph.id] = await get_paragraph_image(
-                        self.kbid, paragraph.id, image
-                    )
+                    page_id = f"{field}/{page}"
+                    if page_id not in context.images:
+                        context.images[page_id] = await get_page_image(
+                            self.kbid, paragraph.id, page
+                        )
+            if (
+                gather_tables
+                and paragraph.is_a_table
+                and paragraph.reference
+                and paragraph.reference != ""
+            ):
+                image = paragraph.reference
+                context.images[paragraph.id] = await get_paragraph_image(
+                    self.kbid, paragraph.id, image
+                )
 
     async def _build_context(self, context: CappedPromptContext) -> None:
         if self.strategies is None or len(self.strategies) == 0:
             await default_prompt_context(context, self.kbid, self.find_results)
             return
 
-        full_resource = False
+        number_of_full_resources = 0
         extend_with_fields = []
         for strategy in self.strategies:
             if strategy.name == RagStrategyName.FIELD_EXTENSION:
                 extend_with_fields.extend(strategy.fields)  # type: ignore
             elif strategy.name == RagStrategyName.FULL_RESOURCE:
-                full_resource = True
+                number_of_full_resources = strategy.count  # type: ignore
 
-        if full_resource:
-            await full_resource_prompt_context(context, self.kbid, self.find_results)
+        if number_of_full_resources:
+            await full_resource_prompt_context(
+                context, self.kbid, self.find_results, number_of_full_resources
+            )
             return
 
         await composed_prompt_context(

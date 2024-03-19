@@ -820,6 +820,7 @@ class RagStrategyName:
 
 class ImageRagStrategyName:
     PAGE_IMAGE = "page_image"
+    TABLES = "tables"
 
 
 class RagStrategy(BaseModel):
@@ -881,10 +882,24 @@ class FieldExtensionStrategy(RagStrategy):
 
 class FullResourceStrategy(RagStrategy):
     name: Literal["full_resource"]
+    count: Optional[int] = Field(
+        title="Resources",
+        default=None,
+        description="How many full documents to retrieve",
+    )
+
+
+class TableImageStrategy(ImageRagStrategy):
+    name: Literal["tables"]
 
 
 class PageImageStrategy(ImageRagStrategy):
     name: Literal["page_image"]
+    count: Optional[int] = Field(
+        title="Images",
+        default=None,
+        description="How many images to retrieve",
+    )
 
 
 class ParagraphImageStrategy(ImageRagStrategy):
@@ -1126,7 +1141,7 @@ class FindParagraph(BaseModel):
     is_a_table: bool = Field(
         default=False,
         title="Is a table",
-        description="The referenced image of the paragraph is table",
+        description="The referenced image of the paragraph is a table",
     )
 
 

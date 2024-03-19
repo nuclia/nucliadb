@@ -126,6 +126,10 @@ class Orderer:
     def add_boosted(self, key: Any):
         self.boosted_items.append(key)
 
+    def sorted_by_score(self) -> Iterator[Any]:
+        for key in sorted(self.items, key=lambda value: value[3], reverse=True):
+            yield key
+
     def sorted_by_insertion(self) -> Iterator[Any]:
         returned = set()
         for key in self.boosted_items:
@@ -170,26 +174,37 @@ async def fetch_find_metadata(
 
             if result_paragraph.paragraph.id in find_field.paragraphs:
                 # Its a multiple match, push the score
-                find_field.paragraphs[result_paragraph.paragraph.id].score = 25
-                find_field.paragraphs[
-                    result_paragraph.paragraph.id
-                ].score_type = SCORE_TYPE.BOTH
-                orderer.add_boosted(
-                    (
-                        result_paragraph.rid,
-                        result_paragraph.field,
-                        result_paragraph.paragraph.id,
+                # find_field.paragraphs[result_paragraph.paragraph.id].score = 25
+                if (
+                    find_field.paragraphs[result_paragraph.paragraph.id].score
+                    < result_paragraph.paragraph.score
+                ):
+                    # Use Vector score if there are both
+                    find_field.paragraphs[result_paragraph.paragraph.id].score = (
+                        result_paragraph.paragraph.score
                     )
+                    orderer.add(
+                        (
+                            result_paragraph.rid,
+                            result_paragraph.field,
+                            result_paragraph.paragraph.id,
+                            result_paragraph.paragraph.score,
+                        )
+                    )
+                find_field.paragraphs[result_paragraph.paragraph.id].score_type = (
+                    SCORE_TYPE.BOTH
                 )
+
             else:
-                find_field.paragraphs[
-                    result_paragraph.paragraph.id
-                ] = result_paragraph.paragraph
+                find_field.paragraphs[result_paragraph.paragraph.id] = (
+                    result_paragraph.paragraph
+                )
                 orderer.add(
                     (
                         result_paragraph.rid,
                         result_paragraph.field,
                         result_paragraph.paragraph.id,
+                        result_paragraph.paragraph.score,
                     )
                 )
 
@@ -208,9 +223,7 @@ async def fetch_find_metadata(
             resources.add(result_paragraph.rid)
     etcache.clear()
 
-    for order, (rid, field_id, paragraph_id) in enumerate(
-        orderer.sorted_by_insertion()
-    ):
+    for order, (rid, field_id, paragraph_id, _) in enumerate(orderer.sorted_by_score()):
         find_resources[rid].fields[field_id].paragraphs[paragraph_id].order = order
         best_matches.append(paragraph_id)
 
