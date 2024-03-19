@@ -32,7 +32,7 @@ from nucliadb_protos.resources_pb2 import (
     Sentence,
 )
 
-from nucliadb.ingest.orm.brain import PagePositions, ResourceBrain
+from nucliadb.ingest.orm.brain import ParagraphPages, ResourceBrain
 from nucliadb_protos import resources_pb2
 
 
@@ -121,16 +121,16 @@ def test_apply_field_metadata_marks_duplicated_paragraphs_on_split_metadata():
 
 
 def test_get_page_number():
-    positions = PagePositions(
+    page_numbers = ParagraphPages(
         {
             0: (0, 99),
             1: (100, 199),
             2: (200, 299),
         }
     )
-    assert positions.get_page_number(10) == 0
-    assert positions.get_page_number(100) == 1
-    assert positions.get_page_number(500) == 2
+    assert page_numbers.get(10) == 0
+    assert page_numbers.get(100) == 1
+    assert page_numbers.get(500) == 2
 
 
 @pytest.mark.parametrize(
