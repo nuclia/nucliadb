@@ -350,12 +350,6 @@ impl Writer {
         for data_point_id in data_point_list {
             let data_point_pin = DataPointPin::open_pin(path, data_point_id)?;
             let data_point_journal = data_point_pin.read_journal()?;
-
-            if dimension.is_none() {
-                let data_point = data_point::open(&data_point_pin)?;
-                dimension = data_point.stored_len();
-            }
-
             let online_data_point = OnlineDataPoint {
                 pin: data_point_pin,
                 journal: data_point_journal,
