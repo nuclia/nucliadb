@@ -24,7 +24,6 @@ from fastapi.datastructures import QueryParams
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from nucliadb.common import datamanagers
-from nucliadb.middleware.transaction import get_read_only_transaction
 from nucliadb.search.predict import PredictEngine
 from nucliadb.search.utilities import get_predict
 
@@ -46,10 +45,9 @@ async def predict_proxy(
     params: QueryParams,
     json: Optional[Any] = None,
 ) -> Union[JSONResponse, StreamingResponse]:
-    if not await datamanagers.kb.exists_kb(
-        await get_read_only_transaction(), kbid=kbid
-    ):
-        raise datamanagers.exceptions.KnowledgeBoxNotFound()
+    async with datamanagers.with_transaction(read_only=True) as txn:
+        if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
+            raise datamanagers.exceptions.KnowledgeBoxNotFound()
 
     predict: PredictEngine = get_predict()
 

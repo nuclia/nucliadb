@@ -35,7 +35,6 @@ from nucliadb.export_import.models import (
 )
 from nucliadb.export_import.tasks import get_exports_producer, get_imports_producer
 from nucliadb.export_import.utils import IteratorExportStream
-from nucliadb.middleware.transaction import get_read_only_transaction
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.writer import logger
 from nucliadb.writer.api.v1.router import KB_PREFIX, api
@@ -61,10 +60,9 @@ from nucliadb_utils.authentication import requires_one
 @version(1)
 async def start_kb_export_endpoint(request: Request, kbid: str):
     context = get_app_context(request.app)
-    if not await datamanagers.kb.exists_kb(
-        await get_read_only_transaction(), kbid=kbid
-    ):
-        return HTTPClientError(status_code=404, detail="Knowledge Box not found")
+    async with datamanagers.with_transaction(read_only=True) as txn:
+        if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
+            return HTTPClientError(status_code=404, detail="Knowledge Box not found")
 
     export_id = uuid4().hex
     if in_standalone_mode():
@@ -87,10 +85,9 @@ async def start_kb_export_endpoint(request: Request, kbid: str):
 @version(1)
 async def start_kb_import_endpoint(request: Request, kbid: str):
     context = get_app_context(request.app)
-    if not await datamanagers.kb.exists_kb(
-        await get_read_only_transaction(), kbid=kbid
-    ):
-        return HTTPClientError(status_code=404, detail="Knowledge Box not found")
+    async with datamanagers.with_transaction(read_only=True) as txn:
+        if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
+            return HTTPClientError(status_code=404, detail="Knowledge Box not found")
 
     await maybe_back_pressure(request, kbid)
 

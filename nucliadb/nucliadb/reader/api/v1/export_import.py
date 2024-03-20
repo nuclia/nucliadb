@@ -31,7 +31,6 @@ from nucliadb.export_import import exceptions as export_exceptions
 from nucliadb.export_import import exporter
 from nucliadb.export_import.datamanager import ExportImportDataManager
 from nucliadb.export_import.exceptions import MetadataNotFound
-from nucliadb.middleware.transaction import get_read_only_transaction
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.reader.api.v1.router import KB_PREFIX, api
 from nucliadb_models.export_import import Status, StatusResponse
@@ -50,9 +49,7 @@ from nucliadb_utils.authentication import requires_one
 @version(1)
 async def download_export_kb_endpoint(request: Request, kbid: str, export_id: str):
     context = get_app_context(request.app)
-    if not await datamanagers.kb.exists_kb(
-        await get_read_only_transaction(), kbid=kbid
-    ):
+    if not await exists_kb(kbid):
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
 
     if in_standalone_mode():
@@ -113,9 +110,7 @@ async def get_export_status_endpoint(
     request: Request, kbid: str, export_id: str
 ) -> Union[StatusResponse, HTTPClientError]:
     context = get_app_context(request.app)
-    if not await datamanagers.kb.exists_kb(
-        await get_read_only_transaction(), kbid=kbid
-    ):
+    if not await exists_kb(kbid):
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
 
     return await _get_status(context, "export", kbid, export_id)
@@ -134,9 +129,7 @@ async def get_import_status_endpoint(
     request: Request, kbid: str, import_id: str
 ) -> Union[StatusResponse, HTTPClientError]:
     context = get_app_context(request.app)
-    if not await datamanagers.kb.exists_kb(
-        await get_read_only_transaction(), kbid=kbid
-    ):
+    if not await exists_kb(kbid):
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
 
     return await _get_status(context, "import", kbid, import_id)
@@ -164,3 +157,8 @@ async def _get_status(
         )
     except MetadataNotFound:
         return HTTPClientError(status_code=404, detail=f"{type.capitalize()} not found")
+
+
+async def exists_kb(kbid: str) -> bool:
+    async with datamanagers.with_transaction(read_only=True) as txn:
+        return await datamanagers.kb.exists_kb(txn, kbid=kbid)

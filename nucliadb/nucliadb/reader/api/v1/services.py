@@ -47,7 +47,6 @@ from nucliadb.common.context.fastapi import get_app_context
 from nucliadb.common.http_clients import processing
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.middleware.transaction import get_read_only_transaction
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.reader import SERVICE_NAME
 from nucliadb.reader.api.v1.router import KB_PREFIX, api
@@ -286,9 +285,7 @@ async def notifications_endpoint(
 
     context = get_app_context(request.app)
 
-    if not await datamanagers.kb.exists_kb(
-        await get_read_only_transaction(), kbid=kbid
-    ):
+    if not await exists_kb(kbid=kbid):
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
 
     response = StreamingResponse(
@@ -298,6 +295,11 @@ async def notifications_endpoint(
     )
 
     return response
+
+
+async def exists_kb(kbid: str) -> bool:
+    async with datamanagers.with_transaction(read_only=True) as txn:
+        return await datamanagers.kb.exists_kb(txn, kbid=kbid)
 
 
 @api.get(
@@ -320,9 +322,7 @@ async def processing_status(
     scheduled: Optional[bool] = None,
     limit: int = 20,
 ) -> Union[processing.RequestsResults, HTTPClientError]:
-    if not await datamanagers.kb.exists_kb(
-        await get_read_only_transaction(), kbid=kbid
-    ):
+    if not await exists_kb(kbid=kbid):
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
 
     async with processing.ProcessingHTTPClient() as client:

@@ -24,8 +24,6 @@ from nucliadb_protos.resources_pb2 import Basic
 
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
-from nucliadb.ingest.orm.knowledgebox import KB_RESOURCE_SHARD
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 
 # These should be refactored
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG, KB_RESOURCE_SLUG_BASE
@@ -37,6 +35,7 @@ from nucliadb_utils.utilities import get_storage
 from .utils import with_transaction
 
 KB_MATERIALIZED_RESOURCES_COUNT = "/kbs/{kbid}/materialized/resources/count"
+KB_RESOURCE_SHARD = "/kbs/{kbid}/r/{uuid}/shard"
 
 
 @backoff.on_exception(
@@ -106,6 +105,9 @@ async def get_resource(
 
     At least this isolated that dependency here.
     """
+    # prevent circulat imports -- this is not ideal that we have the ORM mix here.
+    from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
+
     kb_orm = KnowledgeBoxORM(txn, await get_storage(), kbid)
     return await kb_orm.get(rid)
 
@@ -116,6 +118,9 @@ async def get_resource(
 async def get_resource_index_message(
     txn: Transaction, *, kbid: str, rid: str
 ) -> Optional[noderesources_pb2.Resource]:
+    # prevent circulat imports -- this is not ideal that we have the ORM mix here.
+    from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
+
     kb_orm = KnowledgeBoxORM(txn, await get_storage(), kbid)
     res = await kb_orm.get(rid)
     if res is None:
