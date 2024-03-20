@@ -22,10 +22,10 @@ from uuid import uuid4
 from fastapi_versioning import version
 from starlette.requests import Request
 
+from nucliadb.common import datamanagers
 from nucliadb.common.cluster.settings import in_standalone_mode
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.context.fastapi import get_app_context
-from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
 from nucliadb.export_import import importer
 from nucliadb.export_import.datamanager import ExportImportDataManager
 from nucliadb.export_import.models import (
@@ -60,8 +60,9 @@ from nucliadb_utils.authentication import requires_one
 @version(1)
 async def start_kb_export_endpoint(request: Request, kbid: str):
     context = get_app_context(request.app)
-    if not await exists_kb(context, kbid):
-        return HTTPClientError(status_code=404, detail="Knowledge Box not found")
+    async with datamanagers.with_transaction(read_only=True) as txn:
+        if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
+            return HTTPClientError(status_code=404, detail="Knowledge Box not found")
 
     export_id = uuid4().hex
     if in_standalone_mode():
@@ -84,8 +85,9 @@ async def start_kb_export_endpoint(request: Request, kbid: str):
 @version(1)
 async def start_kb_import_endpoint(request: Request, kbid: str):
     context = get_app_context(request.app)
-    if not await exists_kb(context, kbid):
-        return HTTPClientError(status_code=404, detail="Knowledge Box not found")
+    async with datamanagers.with_transaction(read_only=True) as txn:
+        if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
+            return HTTPClientError(status_code=404, detail="Knowledge Box not found")
 
     await maybe_back_pressure(request, kbid)
 
@@ -165,8 +167,3 @@ class FastAPIExportStream(IteratorExportStream):
     def __init__(self, request: Request):
         iterator = request.stream().__aiter__()
         super().__init__(iterator)
-
-
-async def exists_kb(context: ApplicationContext, kbid: str) -> bool:
-    dm = KnowledgeBoxDataManager(context.kv_driver)
-    return await dm.exists_kb(kbid)

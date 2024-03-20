@@ -31,7 +31,7 @@ future multiple writable shards will be possible.
 
 import logging
 
-from nucliadb.common.datamanagers import cluster as shards_data_manager
+from nucliadb.common import datamanagers
 from nucliadb.migrator.context import ExecutionContext
 
 logger = logging.getLogger(__name__)
@@ -43,7 +43,7 @@ async def migrate(context: ExecutionContext) -> None:
 
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
     async with context.kv_driver.transaction() as txn:
-        shards = await shards_data_manager.get_kb_shards(txn, kbid)
+        shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
         if shards is None:
             logger.error("KB without shards", extra={"kbid": kbid})
             return
@@ -57,5 +57,5 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
             False
         ) == 1
 
-        await shards_data_manager.update_kb_shards(txn, kbid, shards)
+        await datamanagers.cluster.update_kb_shards(txn, kbid=kbid, shards=shards)
         await txn.commit()
