@@ -17,6 +17,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use crate::data_point::{self, DataPointPin, Elem, LabelDictionary};
+use crate::data_point_provider::garbage_collector;
+use crate::data_point_provider::writer::MergeParameters;
+use crate::data_point_provider::writer::Writer;
+use crate::data_point_provider::*;
+use crate::indexset::IndexKeyCollector;
+use crate::indexset::WriterSet;
 use nucliadb_core::metrics::{get_metrics, request_time, vectors::MergeSource};
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::prost::Message;
@@ -33,13 +40,6 @@ use std::fs;
 use std::path::Path;
 use std::time::Instant;
 use std::time::SystemTime;
-
-use crate::data_point::{self, DataPointPin, Elem, LabelDictionary};
-use crate::data_point_provider::garbage_collector;
-use crate::data_point_provider::writer::Writer;
-use crate::data_point_provider::*;
-use crate::indexset::IndexKeyCollector;
-use crate::indexset::WriterSet;
 
 impl IndexKeyCollector for Vec<String> {
     fn add_key(&mut self, key: String) {
@@ -81,12 +81,16 @@ impl VectorWriter for VectorWriterService {
 
     #[measure(actor = "vectors", metric = "merge")]
     #[tracing::instrument(skip_all)]
-    fn merge(&mut self, source: MergeSource) -> NodeResult<MergeMetrics> {
+    fn merge(&mut self, context: MergeContext) -> NodeResult<MergeMetrics> {
         let time = Instant::now();
-        let inner_metrics = self.index.merge()?;
+        let merge_on_demand_parameters = MergeParameters {
+            max_nodes_in_merge: context.max_nodes_in_merge,
+            segments_before_merge: context.segments_before_merge,
+        };
+        let inner_metrics = self.index.merge(merge_on_demand_parameters)?;
         let took = time.elapsed().as_secs_f64();
         debug!("Merge took: {took} s");
-        record_merge_metrics(source, &inner_metrics);
+        record_merge_metrics(context.source, &inner_metrics);
 
         Ok(MergeMetrics {
             merged: inner_metrics.merged,

@@ -35,15 +35,21 @@ use tokio::sync::oneshot::{Receiver, Sender};
 use crate::{settings::Settings, shards::providers::shard_cache::ShardWriterCache};
 use nucliadb_core::metrics::vectors::MergeSource;
 use nucliadb_core::tracing::warn;
+use nucliadb_core::vectors::MergeContext;
 use nucliadb_core::NodeResult;
 
 use super::work::WorkQueue;
 use crate::merge::{MergePriority, MergeRequest, MergeWaiter};
 
+const MAX_NODES_IN_MERGE: &str = "SCHEDULER_MAX_NODES_IN_MERGE";
+const SEGMENTS_BEFORE_MERGE: &str = "SCHEDULER_SEGMENTS_BEFORE_MERGE";
+
 /// Merge scheduler is the responsible for scheduling merges in the vectors
 /// index. When running, it takes the most prioritary merge request, takes a
 /// shard writer and executes the merge.
 pub struct MergeScheduler {
+    max_nodes_in_merge: usize,
+    segments_before_merge: usize,
     work_queue: Mutex<WorkQueue<InternalMergeRequest>>,
     shard_cache: Arc<ShardWriterCache>,
     settings: Settings,
@@ -54,11 +60,19 @@ pub struct MergeScheduler {
 impl MergeScheduler {
     pub fn new(shard_cache: Arc<ShardWriterCache>, settings: Settings) -> Self {
         Self {
-            work_queue: Mutex::new(WorkQueue::new()),
             shard_cache,
             settings,
+            work_queue: Mutex::new(WorkQueue::new()),
             condvar: Condvar::default(),
             shutdown: AtomicBool::new(false),
+            max_nodes_in_merge: match std::env::var(MAX_NODES_IN_MERGE) {
+                Ok(v) => v.parse().unwrap_or(50_000),
+                Err(_) => 50_000,
+            },
+            segments_before_merge: match std::env::var(SEGMENTS_BEFORE_MERGE) {
+                Ok(v) => v.parse().unwrap_or(2),
+                Err(_) => 2,
+            },
         }
     }
 
@@ -163,7 +177,12 @@ impl MergeScheduler {
             // processed.
             return Ok(());
         };
-        let result = shard.merge(request.metrics_source);
+        let merge_context = MergeContext {
+            source: request.metrics_source,
+            max_nodes_in_merge: self.max_nodes_in_merge,
+            segments_before_merge: self.segments_before_merge,
+        };
+        let result = shard.merge(merge_context);
 
         // When a notifier is requested, send the merge result and let the
         // caller be responsible to handle errors

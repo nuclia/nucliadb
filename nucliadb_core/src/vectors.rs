@@ -32,6 +32,13 @@ pub type VectorsWriterPointer = Arc<RwLock<dyn VectorWriter>>;
 pub type ProtosRequest = VectorSearchRequest;
 pub type ProtosResponse = VectorSearchResponse;
 
+#[derive(Debug, Clone, Copy)]
+pub struct MergeContext {
+    pub max_nodes_in_merge: usize,
+    pub segments_before_merge: usize,
+    pub source: MergeSource,
+}
+
 #[derive(Clone)]
 pub struct VectorConfig {
     pub similarity: Option<VectorSimilarity>,
@@ -67,7 +74,7 @@ pub trait VectorWriter: std::fmt::Debug + Send + Sync {
     fn get_index_files(&self, ignored_segment_ids: &[String]) -> NodeResult<IndexFiles>;
     fn list_vectorsets(&self) -> NodeResult<Vec<String>>;
 
-    fn merge(&mut self, source: MergeSource) -> NodeResult<MergeMetrics>;
+    fn merge(&mut self, context: MergeContext) -> NodeResult<MergeMetrics>;
     fn set_resource(&mut self, resource: &Resource) -> NodeResult<()>;
     fn delete_resource(&mut self, resource_id: &ResourceId) -> NodeResult<()>;
     fn garbage_collection(&mut self) -> NodeResult<()>;
