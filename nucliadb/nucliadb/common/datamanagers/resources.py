@@ -146,7 +146,7 @@ async def calculate_number_of_resources(txn: Transaction, *, kbid: str) -> int:
     return await txn.count(KB_RESOURCE_SLUG_BASE.format(kbid=kbid))
 
 
-async def get_number_of_resources(txn: Transaction, kbid: str) -> int:
+async def get_number_of_resources(txn: Transaction, *, kbid: str) -> int:
     """
     Return cached number of resources in a knowledgebox.
     """

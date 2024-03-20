@@ -54,13 +54,19 @@ async def test_materialize_kb_data(
     )
     await mz.initialize()
 
-    assert (
-        await datamanagers.resources.get_number_of_resources(knowledgebox_ingest) == -1
-    )
-    assert (
-        await datamanagers.resources.calculate_number_of_resources(knowledgebox_ingest)
-        == count
-    )
+    async with datamanagers.with_transaction() as txn:
+        assert (
+            await datamanagers.resources.get_number_of_resources(
+                txn, kbid=knowledgebox_ingest
+            )
+            == -1
+        )
+        assert (
+            await datamanagers.resources.calculate_number_of_resources(
+                txn, kbid=knowledgebox_ingest
+            )
+            == count
+        )
 
     await pubsub.publish(
         const.PubSubChannels.RESOURCE_NOTIFY.format(kbid=knowledgebox_ingest),
@@ -72,9 +78,12 @@ async def test_materialize_kb_data(
 
     await asyncio.sleep(0.2)
 
-    assert (
-        await datamanagers.resources.get_number_of_resources(knowledgebox_ingest)
-        == count
-    )
+    async with datamanagers.with_transaction() as txn:
+        assert (
+            await datamanagers.resources.get_number_of_resources(
+                txn, kbid=knowledgebox_ingest
+            )
+            == count
+        )
 
     await mz.finalize()
