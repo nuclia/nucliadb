@@ -53,6 +53,11 @@ async def test_migration_0018_global(maindb_driver: Driver):
             assert not failed
             assert await KnowledgeBox.exist_kb(txn, real_kb_id)
 
+            await txn.commit()
+
+            # in tikv, we need a second transaction to read values written in
+            # another
+        async with maindb_driver.transaction(read_only=True) as txn:
             kb_slugs = [
                 kb_slug async for kbid, kb_slug in KnowledgeBox.get_kbs(txn, slug="")
             ]
