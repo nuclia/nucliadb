@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 // Copyright (C) 2021 Bosutech XXI S.L.
 //
 // nucliadb is offered under the AGPL v3.0 and as commercial software.
@@ -19,6 +20,8 @@
 //
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
+
+use uuid::Uuid;
 
 use crate::metrics::vectors::MergeSource;
 use crate::prelude::*;
@@ -53,6 +56,17 @@ pub struct MergeMetrics {
     pub left: usize,
 }
 
+pub trait MergeResults {
+    fn inputs(&self) -> &HashSet<Uuid>;
+    fn output(&self) -> Uuid;
+    fn record_metrics(&self, source: MergeSource);
+    fn get_metrics(&self) -> MergeMetrics;
+}
+
+pub trait MergeRunner {
+    fn run(&mut self) -> NodeResult<Box<dyn MergeResults>>;
+}
+
 pub trait VectorReader: std::fmt::Debug + Send + Sync {
     fn search(&self, request: &ProtosRequest, context: &VectorsContext) -> NodeResult<ProtosResponse>;
     fn stored_ids(&self) -> NodeResult<Vec<String>>;
@@ -67,7 +81,8 @@ pub trait VectorWriter: std::fmt::Debug + Send + Sync {
     fn get_index_files(&self, ignored_segment_ids: &[String]) -> NodeResult<IndexFiles>;
     fn list_vectorsets(&self) -> NodeResult<Vec<String>>;
 
-    fn merge(&mut self, source: MergeSource) -> NodeResult<MergeMetrics>;
+    fn prepare_merge(&self) -> NodeResult<Option<Box<dyn MergeRunner>>>;
+    fn finish_merge(&mut self, merge_result: Box<dyn MergeResults>, source: MergeSource) -> NodeResult<MergeMetrics>;
     fn set_resource(&mut self, resource: &Resource) -> NodeResult<()>;
     fn delete_resource(&mut self, resource_id: &ResourceId) -> NodeResult<()>;
     fn garbage_collection(&mut self) -> NodeResult<()>;

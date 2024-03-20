@@ -16,7 +16,7 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::fs;
 use std::path::PathBuf;
@@ -57,6 +57,32 @@ impl Debug for VectorWriterService {
     }
 }
 
+struct DummyPreparedMerge();
+impl MergeRunner for DummyPreparedMerge {
+    fn run(&mut self) -> NodeResult<Box<dyn MergeResults>> {
+        Ok(Box::new(DummyMergeResults()))
+    }
+}
+
+struct DummyMergeResults();
+impl MergeResults for DummyMergeResults {
+    fn inputs(&self) -> &std::collections::HashSet<uuid::Uuid> {
+        todo!()
+    }
+
+    fn output(&self) -> uuid::Uuid {
+        todo!()
+    }
+
+    fn record_metrics(&self, source: MergeSource) {
+        // nop
+    }
+
+    fn get_metrics(&self) -> MergeMetrics {
+        todo!()
+    }
+}
+
 impl VectorWriter for VectorWriterService {
     #[measure(actor = "vectors", metric = "reload")]
     #[tracing::instrument(skip_all)]
@@ -64,19 +90,24 @@ impl VectorWriter for VectorWriterService {
         Ok(())
     }
 
-    #[measure(actor = "vectors", metric = "merge")]
+    fn prepare_merge(&self) -> NodeResult<Option<Box<dyn MergeRunner>>> {
+        Ok(Some(Box::new(DummyPreparedMerge())))
+    }
+
+    #[measure(actor = "vectors", metric = "finish_merge")]
     #[tracing::instrument(skip_all)]
-    fn merge(&mut self, _source: MergeSource) -> NodeResult<MergeMetrics> {
+    fn finish_merge(&mut self, _merge_result: Box<dyn MergeResults>, _source: MergeSource) -> NodeResult<MergeMetrics> {
         let time = Instant::now();
         let lock = self.index.get_slock()?;
         let inner_metrics = self.index.force_merge(&lock)?;
 
         let took = time.elapsed().as_secs_f64();
-        debug!("Forcing a merge took: {took} s");
-        Ok(MergeMetrics {
+        debug!("A merge took: {took} s");
+        let metrics = MergeMetrics {
             merged: inner_metrics.merged,
             left: inner_metrics.segments_left,
-        })
+        };
+        Ok(metrics)
     }
 
     #[measure(actor = "vectors", metric = "list_vectorsets")]

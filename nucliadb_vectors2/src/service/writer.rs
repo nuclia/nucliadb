@@ -41,6 +41,8 @@ use crate::data_point_provider::*;
 use crate::indexset::IndexKeyCollector;
 use crate::indexset::WriterSet;
 
+use self::writer::PreparedMergeResults;
+
 impl IndexKeyCollector for Vec<String> {
     fn add_key(&mut self, key: String) {
         self.push(key);
@@ -59,19 +61,6 @@ impl Debug for VectorWriterService {
     }
 }
 
-fn record_merge_metrics(source: MergeSource, data: &crate::data_point_provider::writer::MergeMetrics) {
-    if data.merged == 0 {
-        return;
-    }
-
-    let metrics = &get_metrics().vectors_metrics;
-    metrics.record_time(source, data.seconds_elapsed);
-    for input in &data.input_segment_sizes {
-        metrics.record_input_segment(source, *input);
-    }
-    metrics.record_output_segment(source, data.output_segment_size);
-}
-
 impl VectorWriter for VectorWriterService {
     #[measure(actor = "vectors", metric = "force_garbage_collection")]
     #[tracing::instrument(skip_all)]
@@ -79,19 +68,18 @@ impl VectorWriter for VectorWriterService {
         Ok(())
     }
 
-    #[measure(actor = "vectors", metric = "merge")]
+    #[measure(actor = "vectors", metric = "prepare_merge")]
     #[tracing::instrument(skip_all)]
-    fn merge(&mut self, source: MergeSource) -> NodeResult<MergeMetrics> {
-        let time = Instant::now();
-        let inner_metrics = self.index.merge()?;
-        let took = time.elapsed().as_secs_f64();
-        debug!("Merge took: {took} s");
-        record_merge_metrics(source, &inner_metrics);
+    fn prepare_merge(&self) -> NodeResult<Option<Box<dyn MergeRunner>>> {
+        Ok(self.index.prepare_merge()?)
+    }
 
-        Ok(MergeMetrics {
-            merged: inner_metrics.merged,
-            left: inner_metrics.segments_left,
-        })
+    #[measure(actor = "vectors", metric = "finish_merge")]
+    #[tracing::instrument(skip_all)]
+    fn finish_merge(&mut self, merge_result: Box<dyn MergeResults>, source: MergeSource) -> NodeResult<MergeMetrics> {
+        self.index.record_merge(merge_result.as_ref())?;
+        merge_result.record_metrics(source);
+        Ok(merge_result.get_metrics())
     }
 
     #[measure(actor = "vectors", metric = "list_vectorsets")]
@@ -165,8 +153,7 @@ impl VectorWriter for VectorWriterService {
         let temporal_mark = SystemTime::now();
         let resource_uuid_bytes = resource_id.uuid.as_bytes();
         self.index.record_delete(resource_uuid_bytes, temporal_mark);
-        let merge_metrics = self.index.commit()?;
-        record_merge_metrics(MergeSource::OnCommit, &merge_metrics);
+        self.index.commit()?;
 
         let took = time.elapsed().as_secs_f64();
         debug!("{id:?} - Ending at {took} ms");
@@ -230,8 +217,7 @@ impl VectorWriter for VectorWriterService {
             self.index.record_delete(key_as_bytes, temporal_mark);
         }
 
-        let merge_metrics = self.index.commit()?;
-        record_merge_metrics(MergeSource::OnCommit, &merge_metrics);
+        self.index.commit()?;
 
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Main index set resource: ends {v} ms");
@@ -280,8 +266,7 @@ impl VectorWriter for VectorWriterService {
         }
 
         for (_, mut writer) in writer_sets {
-            let merge_metrics = writer.commit()?;
-            record_merge_metrics(MergeSource::OnCommit, &merge_metrics);
+            writer.commit()?;
         }
 
         let v = time.elapsed().as_millis();

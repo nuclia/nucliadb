@@ -451,10 +451,18 @@ impl ShardWriter {
 
     #[tracing::instrument(skip_all)]
     pub fn merge(&self, source: MergeSource) -> NodeResult<MergeMetrics> {
-        let result = write_rw_lock(&self.vector_writer).merge(source);
+        let runner = read_rw_lock(&self.vector_writer).prepare_merge()?;
+        let Some(mut runner) = runner else {
+            return Ok(MergeMetrics {
+                merged: 0,
+                left: 0,
+            });
+        };
+        let merge_result = runner.run()?;
+        let metrics = write_rw_lock(&self.vector_writer).finish_merge(merge_result, source)?;
         self.metadata.new_generation_id();
 
-        result
+        Ok(metrics)
     }
 
     /// This must be used only by replication and should be

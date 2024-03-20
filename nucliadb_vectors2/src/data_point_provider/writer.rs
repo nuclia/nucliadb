@@ -26,7 +26,9 @@ use crate::data_point_provider::{IndexMetadata, OPENING_FLAG, STATE, TEMP_STATE,
 use crate::data_types::dtrie_ram::DTrie;
 use crate::{VectorErr, VectorR};
 use fs2::FileExt;
-use nucliadb_core::tracing;
+use nucliadb_core::metrics::get_metrics;
+use nucliadb_core::vectors::{MergeResults, MergeRunner};
+use nucliadb_core::{tracing, NodeResult};
 use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
 use std::mem;
@@ -67,28 +69,76 @@ pub struct PreparedMergeResults {
     metrics: MergeMetrics,
 }
 
-pub struct PreparedMerge<'a> {
-    destination: DataPointPin,
-    inputs: Vec<(TimeSensitiveDLog<'a>, OpenDataPoint)>,
-    similarity: Similarity,
+impl MergeResults for PreparedMergeResults {
+    fn inputs(&self) -> &HashSet<DpId> {
+        &self.inputs
+    }
+
+    fn output(&self) -> DpId {
+        self.destination.id()
+    }
+
+    fn record_metrics(&self, source: nucliadb_core::metrics::vectors::MergeSource) {
+        if self.metrics.merged == 0 {
+            return;
+        }
+
+        let metrics = &get_metrics().vectors_metrics;
+        metrics.record_time(source, self.metrics.seconds_elapsed);
+        for input in &self.metrics.input_segment_sizes {
+            metrics.record_input_segment(source, *input);
+        }
+        metrics.record_output_segment(source, self.metrics.output_segment_size);
+    }
+
+    fn get_metrics(&self) -> nucliadb_core::vectors::MergeMetrics {
+        nucliadb_core::vectors::MergeMetrics {
+            merged: self.metrics.merged,
+            left: self.metrics.segments_left,
+        }
+    }
 }
 
-impl<'a> PreparedMerge<'a> {
-    pub fn run(self) -> VectorR<PreparedMergeResults> {
+pub struct PreparedMerge {
+    dtrie_copy: DTrie,
+    destination: Option<DataPointPin>,
+    inputs: Vec<OpenDataPoint>,
+    similarity: Similarity,
+    segments_left: usize,
+}
+
+impl MergeRunner for PreparedMerge {
+    fn run(&mut self) -> NodeResult<Box<dyn nucliadb_core::vectors::MergeResults>> {
         let start = Instant::now();
-        let merged = data_point::merge(&self.destination, &self.inputs, self.similarity)?;
+        let merged = data_point::merge(
+            self.destination.as_ref().unwrap(),
+            self.inputs
+                .iter()
+                .map(|dp| {
+                    (
+                        TimeSensitiveDLog {
+                            time: dp.journal().time(),
+                            dlog: &self.dtrie_copy,
+                        },
+                        dp,
+                    )
+                })
+                .collect::<Vec<_>>()
+                .as_slice(),
+            self.similarity,
+        )?;
         let metrics = MergeMetrics {
             seconds_elapsed: start.elapsed().as_secs_f64(),
             merged: self.inputs.len(),
-            segments_left: 0, // Filled by `record_merge`
-            input_segment_sizes: self.inputs.iter().map(|(_, dp)| dp.journal().no_nodes()).collect(),
+            segments_left: self.segments_left,
+            input_segment_sizes: self.inputs.iter().map(|dp| dp.journal().no_nodes()).collect(),
             output_segment_size: merged.journal().no_nodes(),
         };
-        Ok(PreparedMergeResults {
-            inputs: self.inputs.into_iter().map(|d| d.1.journal().id()).collect(),
-            destination: self.destination,
+        Ok(Box::new(PreparedMergeResults {
+            inputs: self.inputs.iter().map(|d| d.journal().id()).collect(),
+            destination: self.destination.take().unwrap(),
             metrics,
-        })
+        }))
     }
 }
 
@@ -132,7 +182,7 @@ impl Writer {
         self.has_uncommitted_changes = true;
     }
 
-    pub fn prepare_merge(&self) -> VectorR<Option<PreparedMerge>> {
+    pub fn prepare_merge(&self) -> VectorR<Option<Box<dyn MergeRunner>>> {
         if self.has_uncommitted_changes {
             return Err(VectorErr::UncommittedChangesError);
         }
@@ -148,6 +198,7 @@ impl Writer {
         // Order smallest segments last (first to be pop()), so they are merged first
         live_segments.sort_unstable_by_key(|i| std::cmp::Reverse(i.journal.no_nodes()));
 
+        let dtrie_copy = self.delete_log.clone();
         while nodes_in_merge < self.max_nodes_in_merge {
             let Some(online_data_point) = live_segments.pop() else {
                 break;
@@ -158,12 +209,8 @@ impl Writer {
                 break;
             }
 
-            let delete_log = TimeSensitiveDLog {
-                time: online_data_point.journal.time(),
-                dlog: &self.delete_log,
-            };
             let open_data_point = data_point::open(&online_data_point.pin)?;
-            inputs.push((delete_log, open_data_point));
+            inputs.push(open_data_point);
             nodes_in_merge += data_point_size;
         }
 
@@ -172,26 +219,28 @@ impl Writer {
         }
 
         let destination = DataPointPin::create_pin(self.location())?;
-        Ok(Some(PreparedMerge {
-            destination,
+        Ok(Some(Box::new(PreparedMerge {
+            dtrie_copy,
+            destination: Some(destination),
             inputs,
             similarity: self.metadata.similarity,
-        }))
+            segments_left: live_segments.len() + 1,
+        })))
     }
 
-    pub fn record_merge(&mut self, merge: PreparedMergeResults) -> VectorR<MergeMetrics> {
+    pub fn record_merge(&mut self, merge: &dyn MergeResults) -> VectorR<()> {
         let online_data_points = mem::take(&mut self.online_data_points);
         let (merged, mut keep): (Vec<_>, Vec<_>) =
-            online_data_points.into_iter().partition(|dp| merge.inputs.contains(&dp.journal.id()));
+            online_data_points.into_iter().partition(|dp| merge.inputs().contains(&dp.journal.id()));
 
-        if merged.len() != merge.inputs.len() {
+        if merged.len() != merge.inputs().len() {
             tracing::error!("Failed to merge {:?}, some merged segments are not present", self.location());
             keep.extend(merged);
             self.online_data_points = keep;
             return Err(VectorErr::MissingMergedSegments);
         }
 
-        let merged_pin = merge.destination;
+        let merged_pin = DataPointPin::open_pin(self.location(), merge.output())?;
         let new_online_data_point = OnlineDataPoint {
             journal: merged_pin.read_journal()?,
             pin: merged_pin,
@@ -199,18 +248,20 @@ impl Writer {
         keep.push(new_online_data_point);
         self.online_data_points = keep;
 
-        let mut metrics = merge.metrics;
-        metrics.segments_left = self.online_data_points.len();
-        Ok(metrics)
+        Ok(())
     }
 
-    pub fn merge(&mut self) -> VectorR<MergeMetrics> {
+    pub fn merge(&mut self) -> NodeResult<nucliadb_core::vectors::MergeMetrics> {
         let prepared = self.prepare_merge()?;
-        let Some(prepared) = prepared else {
-            return Ok(MergeMetrics::default());
+        let Some(mut prepared) = prepared else {
+            return Ok(nucliadb_core::vectors::MergeMetrics {
+                merged: 0,
+                left: self.online_data_points.len(),
+            });
         };
         let result = prepared.run()?;
-        self.record_merge(result)
+        self.record_merge(result.as_ref())?;
+        Ok(result.get_metrics())
     }
 
     pub fn abort(&mut self) {
@@ -218,9 +269,9 @@ impl Writer {
         self.added_data_points.clear();
     }
 
-    pub fn commit(&mut self) -> VectorR<MergeMetrics> {
+    pub fn commit(&mut self) -> VectorR<()> {
         if !self.has_uncommitted_changes {
-            return Ok(MergeMetrics::default());
+            return Ok(());
         }
 
         let added_to_delete_log = mem::take(&mut self.added_to_delete_log);
@@ -274,12 +325,9 @@ impl Writer {
         self.has_uncommitted_changes = false;
         self.number_of_embeddings = number_of_embeddings;
 
-        let merge_result = self.merge();
-        if let Err(merge_error) = &merge_result {
-            tracing::error!("Merge error: {merge_error:?}")
-        }
+        // TODO: Enqueue merge job
 
-        merge_result
+        Ok(())
     }
 
     pub fn new(path: &Path, metadata: IndexMetadata) -> VectorR<Writer> {
@@ -479,7 +527,7 @@ mod test {
 
         let metrics = writer.merge().unwrap();
         assert_eq!(metrics.merged, 100);
-        assert_eq!(metrics.segments_left, 1);
+        assert_eq!(metrics.left, 1);
     }
 
     #[test]
@@ -509,7 +557,7 @@ mod test {
 
         let metrics = writer.merge().unwrap();
         assert_eq!(metrics.merged, 0);
-        assert_eq!(metrics.segments_left, 50);
+        assert_eq!(metrics.left, 50);
     }
 
     #[test]
@@ -538,10 +586,10 @@ mod test {
 
         let metrics = writer.merge().unwrap();
         assert_eq!(metrics.merged, 100);
-        assert_eq!(metrics.segments_left, 1);
+        assert_eq!(metrics.left, 1);
 
         let metrics = writer.merge().unwrap();
         assert_eq!(metrics.merged, 0);
-        assert_eq!(metrics.segments_left, 1);
+        assert_eq!(metrics.left, 1);
     }
 }

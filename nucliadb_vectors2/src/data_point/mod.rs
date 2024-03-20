@@ -172,7 +172,7 @@ pub fn open(pin: &DataPointPin) -> VectorR<OpenDataPoint> {
 
 pub fn merge<Dlog>(
     pin: &DataPointPin,
-    operants: &[(Dlog, OpenDataPoint)],
+    operants: &[(Dlog, &OpenDataPoint)],
     similarity: Similarity,
 ) -> VectorR<OpenDataPoint>
 where
