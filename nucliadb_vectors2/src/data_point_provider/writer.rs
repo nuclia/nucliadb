@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::data_point::{self, DataPointPin, Journal};
+use crate::data_point::{self, DataPointPin, DpId, Journal, OpenDataPoint, Similarity};
 use crate::data_point_provider::state::*;
 use crate::data_point_provider::state::{read_state, write_state};
 use crate::data_point_provider::TimeSensitiveDLog;
@@ -27,6 +27,7 @@ use crate::data_types::dtrie_ram::DTrie;
 use crate::{VectorErr, VectorR};
 use fs2::FileExt;
 use nucliadb_core::tracing;
+use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
 use std::mem;
 use std::path::{Path, PathBuf};
@@ -58,6 +59,37 @@ pub struct MergeMetrics {
     pub segments_left: usize,
     pub input_segment_sizes: Vec<usize>,
     pub output_segment_size: usize,
+}
+
+pub struct PreparedMergeResults {
+    inputs: HashSet<DpId>,
+    destination: DataPointPin,
+    metrics: MergeMetrics,
+}
+
+pub struct PreparedMerge<'a> {
+    destination: DataPointPin,
+    inputs: Vec<(TimeSensitiveDLog<'a>, OpenDataPoint)>,
+    similarity: Similarity,
+}
+
+impl<'a> PreparedMerge<'a> {
+    pub fn run(self) -> VectorR<PreparedMergeResults> {
+        let start = Instant::now();
+        let merged = data_point::merge(&self.destination, &self.inputs, self.similarity)?;
+        let metrics = MergeMetrics {
+            seconds_elapsed: start.elapsed().as_secs_f64(),
+            merged: self.inputs.len(),
+            segments_left: 0, // Filled by `record_merge`
+            input_segment_sizes: self.inputs.iter().map(|(_, dp)| dp.journal().no_nodes()).collect(),
+            output_segment_size: merged.journal().no_nodes(),
+        };
+        Ok(PreparedMergeResults {
+            inputs: self.inputs.into_iter().map(|d| d.1.journal().id()).collect(),
+            destination: self.destination,
+            metrics,
+        })
+    }
 }
 
 struct OnlineDataPoint {
@@ -100,30 +132,22 @@ impl Writer {
         self.has_uncommitted_changes = true;
     }
 
-    pub fn merge(&mut self) -> VectorR<MergeMetrics> {
+    pub fn prepare_merge(&self) -> VectorR<Option<PreparedMerge>> {
         if self.has_uncommitted_changes {
             return Err(VectorErr::UncommittedChangesError);
         }
 
         if self.online_data_points.len() < self.segments_before_merge {
-            return Ok(MergeMetrics {
-                segments_left: self.online_data_points.len(),
-                ..Default::default()
-            });
+            return Ok(None);
         }
 
-        let start = Instant::now();
-        let similarity = self.metadata.similarity;
-        let mut blocked_segments = Vec::new();
-        let mut being_merged = Vec::new();
-        let mut live_segments = mem::take(&mut self.online_data_points);
+        let mut live_segments: Vec<_> = self.online_data_points.iter().collect();
         let mut nodes_in_merge = 0;
-        let mut buffer = Vec::new();
+        let mut inputs = Vec::new();
 
         // Order smallest segments last (first to be pop()), so they are merged first
         live_segments.sort_unstable_by_key(|i| std::cmp::Reverse(i.journal.no_nodes()));
 
-        let mut input_segment_sizes = vec![];
         while nodes_in_merge < self.max_nodes_in_merge {
             let Some(online_data_point) = live_segments.pop() else {
                 break;
@@ -131,77 +155,62 @@ impl Writer {
             let data_point_size = online_data_point.journal.no_nodes();
 
             if data_point_size + nodes_in_merge > self.max_nodes_in_merge {
-                blocked_segments.push(online_data_point);
                 break;
-            } else {
-                let delete_log = TimeSensitiveDLog {
-                    time: online_data_point.journal.time(),
-                    dlog: &self.delete_log,
-                };
-                let open_data_point = data_point::open(&online_data_point.pin)?;
-                being_merged.push(online_data_point);
-                buffer.push((delete_log, open_data_point));
-                nodes_in_merge += data_point_size;
-                input_segment_sizes.push(data_point_size);
             }
+
+            let delete_log = TimeSensitiveDLog {
+                time: online_data_point.journal.time(),
+                dlog: &self.delete_log,
+            };
+            let open_data_point = data_point::open(&online_data_point.pin)?;
+            inputs.push((delete_log, open_data_point));
+            nodes_in_merge += data_point_size;
         }
 
-        if buffer.len() < 2 {
-            self.online_data_points.extend(blocked_segments);
-            self.online_data_points.extend(being_merged);
-            self.online_data_points.extend(live_segments);
-            return Ok(MergeMetrics {
-                segments_left: self.online_data_points.len(),
-                ..Default::default()
-            });
+        if inputs.len() < 2 {
+            return Ok(None);
         }
 
-        let merged_pin = DataPointPin::create_pin(self.location())?;
+        let destination = DataPointPin::create_pin(self.location())?;
+        Ok(Some(PreparedMerge {
+            destination,
+            inputs,
+            similarity: self.metadata.similarity,
+        }))
+    }
 
-        if let Err(err) = data_point::merge(&merged_pin, &buffer, similarity) {
-            self.online_data_points.extend(blocked_segments);
-            self.online_data_points.extend(being_merged);
-            self.online_data_points.extend(live_segments);
-            return Err(err);
+    pub fn record_merge(&mut self, merge: PreparedMergeResults) -> VectorR<MergeMetrics> {
+        let online_data_points = mem::take(&mut self.online_data_points);
+        let (merged, mut keep): (Vec<_>, Vec<_>) =
+            online_data_points.into_iter().partition(|dp| merge.inputs.contains(&dp.journal.id()));
+
+        if merged.len() != merge.inputs.len() {
+            tracing::error!("Failed to merge {:?}, some merged segments are not present", self.location());
+            keep.extend(merged);
+            self.online_data_points = keep;
+            return Err(VectorErr::MissingMergedSegments);
         }
 
+        let merged_pin = merge.destination;
         let new_online_data_point = OnlineDataPoint {
             journal: merged_pin.read_journal()?,
             pin: merged_pin,
         };
-        let output_segment_size = new_online_data_point.journal.no_nodes();
+        keep.push(new_online_data_point);
+        self.online_data_points = keep;
 
-        blocked_segments.extend(live_segments);
-        blocked_segments.push(new_online_data_point);
-        let online_data_points = blocked_segments;
-
-        let metrics = MergeMetrics {
-            merged: buffer.len(),
-            segments_left: online_data_points.len(),
-            input_segment_sizes,
-            output_segment_size,
-            seconds_elapsed: start.elapsed().as_secs_f64(),
-        };
-
-        let mut oldest_age = SystemTime::now();
-        let mut persisted_data_points = Vec::new();
-
-        for data_point in online_data_points.iter() {
-            let data_point_id = data_point.pin.id();
-            let data_point_time = data_point.journal.time();
-            persisted_data_points.push(data_point_id);
-            oldest_age = std::cmp::min(oldest_age, data_point_time);
-        }
-
-        let mut state = State::new();
-        state.data_point_list = persisted_data_points;
-        state.delete_log = self.delete_log.clone();
-        persist_state(self.location(), &state)?;
-
-        self.delete_log.prune(oldest_age);
-        self.online_data_points = online_data_points;
-
+        let mut metrics = merge.metrics;
+        metrics.segments_left = self.online_data_points.len();
         Ok(metrics)
+    }
+
+    pub fn merge(&mut self) -> VectorR<MergeMetrics> {
+        let prepared = self.prepare_merge()?;
+        let Some(prepared) = prepared else {
+            return Ok(MergeMetrics::default());
+        };
+        let result = prepared.run()?;
+        self.record_merge(result)
     }
 
     pub fn abort(&mut self) {
