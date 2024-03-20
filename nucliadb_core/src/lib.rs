@@ -71,10 +71,17 @@ impl From<i32> for Channel {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct RawReplicaState {
     pub metadata_files: HashMap<String, Vec<u8>>,
     pub files: Vec<String>,
+}
+
+impl RawReplicaState {
+    pub fn extend(&mut self, other: RawReplicaState) {
+        self.metadata_files.extend(other.metadata_files);
+        self.files.extend(other.files);
+    }
 }
 
 pub enum IndexFiles {
