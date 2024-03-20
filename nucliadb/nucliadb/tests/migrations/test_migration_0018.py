@@ -24,17 +24,13 @@ import pytest
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.knowledgebox import KB_SLUGS, KnowledgeBox
 from nucliadb.migrator.models import Migration
-from nucliadb.migrator.utils import get_migrations
+from nucliadb.tests.migrations import get_migration
 
-MIGRATION_UNDER_TEST = 18
-migration: Migration = get_migrations(
-    from_version=MIGRATION_UNDER_TEST - 1, to_version=MIGRATION_UNDER_TEST
-)[0]
-assert migration.version == MIGRATION_UNDER_TEST
+migration: Migration = get_migration(18)
 
 
 @pytest.mark.asyncio
-async def test_migration_0017_global(maindb_driver: Driver):
+async def test_migration_0018_global(maindb_driver: Driver):
     execution_context = Mock()
     execution_context.kv_driver = maindb_driver
 
