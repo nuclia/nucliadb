@@ -22,6 +22,7 @@ import asyncio
 
 import pytest
 
+from nucliadb.common import datamanagers
 from nucliadb.ingest.consumer import materializer
 from nucliadb.ingest.tests.fixtures import create_resource
 from nucliadb_protos import writer_pb2
@@ -54,13 +55,10 @@ async def test_materialize_kb_data(
     await mz.initialize()
 
     assert (
-        await mz.resources_data_manager.get_number_of_resources(knowledgebox_ingest)
-        == -1
+        await datamanagers.resources.get_number_of_resources(knowledgebox_ingest) == -1
     )
     assert (
-        await mz.resources_data_manager.calculate_number_of_resources(
-            knowledgebox_ingest
-        )
+        await datamanagers.resources.calculate_number_of_resources(knowledgebox_ingest)
         == count
     )
 
@@ -75,7 +73,7 @@ async def test_materialize_kb_data(
     await asyncio.sleep(0.2)
 
     assert (
-        await mz.resources_data_manager.get_number_of_resources(knowledgebox_ingest)
+        await datamanagers.resources.get_number_of_resources(knowledgebox_ingest)
         == count
     )
 
