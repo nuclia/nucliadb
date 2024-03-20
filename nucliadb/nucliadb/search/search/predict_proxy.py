@@ -23,9 +23,8 @@ from typing import Any, Optional, Union
 from fastapi.datastructures import QueryParams
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
-from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
-from nucliadb.common.maindb.utils import get_driver
+from nucliadb.common import datamanagers
+from nucliadb.middleware.transaction import get_read_only_transaction
 from nucliadb.search.predict import PredictEngine
 from nucliadb.search.utilities import get_predict
 
@@ -47,8 +46,10 @@ async def predict_proxy(
     params: QueryParams,
     json: Optional[Any] = None,
 ) -> Union[JSONResponse, StreamingResponse]:
-    if not await exists_kb(kbid):
-        raise KnowledgeBoxNotFound()
+    if not await datamanagers.kb.exists_kb(
+        await get_read_only_transaction(), kbid=kbid
+    ):
+        raise datamanagers.exceptions.KnowledgeBoxNotFound()
 
     predict: PredictEngine = get_predict()
 
@@ -83,9 +84,3 @@ async def predict_proxy(
         response.headers["NUCLIA-LEARNING-ID"] = nuclia_learning_id
         response.headers["Access-Control-Expose-Headers"] = "NUCLIA-LEARNING-ID"
     return response
-
-
-async def exists_kb(kbid: str) -> bool:
-    driver = get_driver()
-    kbdm = KnowledgeBoxDataManager(driver)
-    return await kbdm.exists_kb(kbid)

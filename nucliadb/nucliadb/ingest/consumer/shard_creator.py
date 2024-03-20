@@ -22,9 +22,9 @@ import logging
 import uuid
 from functools import partial
 
+from nucliadb.common import datamanagers
 from nucliadb.common.cluster.manager import choose_node
 from nucliadb.common.cluster.utils import get_shard_manager
-from nucliadb.common.datamanagers import cluster as shards_data_manager
 from nucliadb.common.maindb.driver import Driver
 from nucliadb_protos import nodereader_pb2, noderesources_pb2, writer_pb2
 from nucliadb_utils import const
@@ -91,7 +91,7 @@ class ShardCreatorHandler:
     async def process_kb(self, kbid: str) -> None:
         logger.info({"message": "Processing notification for kbid", "kbid": kbid})
         async with self.driver.transaction(read_only=True) as txn:
-            kb_shards = await shards_data_manager.get_kb_shards(txn, kbid)
+            kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
             current_shard = await self.shard_manager.get_current_active_shard(txn, kbid)
 
         if kb_shards is None or current_shard is None:

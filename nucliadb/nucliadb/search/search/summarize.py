@@ -22,8 +22,7 @@ from typing import Optional
 
 from nucliadb_protos.utils_pb2 import ExtractedText
 
-from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
-from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
+from nucliadb.common import datamanagers
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -72,15 +71,14 @@ async def get_extracted_texts(
     driver = get_driver()
     storage = await get_storage()
 
-    kbm = KnowledgeBoxDataManager(driver)
-    if not await kbm.exists_kb(kbid):
-        raise KnowledgeBoxNotFound(kbid)
-
     max_tasks = asyncio.Semaphore(MAX_GET_EXTRACTED_TEXT_OPS)
     tasks = []
 
     # Schedule getting extracted text for each field of each resource
     async with driver.transaction() as txn:
+        if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
+            raise datamanagers.exceptions.KnowledgeBoxNotFound(kbid)
+
         kb_orm = KnowledgeBox(txn, storage, kbid)
         for uuid_or_slug in set(resource_uuids_or_slugs):
             uuid = await get_resource_uuid(kb_orm, uuid_or_slug)

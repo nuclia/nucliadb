@@ -178,7 +178,7 @@ async def test_serialize_notification_caches_resource_titles(get_resource_title_
 @pytest.fixture(scope="function")
 def get_resource_basic():
     with mock.patch(
-        "nucliadb.reader.reader.notifications.ResourcesDataManager.get_resource_basic"
+        "nucliadb.reader.reader.notifications.datamanagers.resources.get_resource_basic"
     ) as m:
         yield m
 

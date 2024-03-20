@@ -17,67 +17,44 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import contextlib
 from typing import Optional
 
-from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
-from nucliadb.common.maindb.driver import Driver, Transaction
-from nucliadb_protos import knowledgebox_pb2, writer_pb2
-from nucliadb_utils.keys import KB_SHARDS, KB_UUID
+from nucliadb.common.maindb.driver import Transaction
+from nucliadb_protos import knowledgebox_pb2
+
+from . import cluster
+
+KB_UUID = "/kbs/{kbid}/config"
 
 
-class KnowledgeBoxDataManager:
-    def __init__(self, driver: Driver, *, read_only_txn: Optional[Transaction] = None):
-        self.driver = driver
-        self._read_only_txn = read_only_txn
+async def exists_kb(txn: Transaction, *, kbid: str) -> bool:
+    return await get_config(txn, kbid=kbid) is not None
 
-    @contextlib.asynccontextmanager
-    async def read_only_transaction(self):
-        if self._read_only_txn is not None:
-            yield self._read_only_txn
-        else:
-            async with self.driver.transaction(read_only=True) as txn:
-                yield txn
 
-    async def exists_kb(self, kbid: str) -> bool:
-        return await self.get_config(kbid) is not None
+async def get_config(
+    txn: Transaction, *, kbid: str
+) -> Optional[knowledgebox_pb2.KnowledgeBoxConfig]:
+    key = KB_UUID.format(kbid=kbid)
+    payload = await txn.get(key)
+    if payload is None:
+        return None
+    response = knowledgebox_pb2.KnowledgeBoxConfig()
+    response.ParseFromString(payload)
+    return response
 
-    async def get_config(
-        self, kbid: str
-    ) -> Optional[knowledgebox_pb2.KnowledgeBoxConfig]:
-        async with self.read_only_transaction() as txn:
-            key = KB_UUID.format(kbid=kbid)
-            payload = await txn.get(key)
-            if payload is None:
-                return None
-            response = knowledgebox_pb2.KnowledgeBoxConfig()
-            response.ParseFromString(payload)
-            return response
 
-    # TODO: remove, it's duplicated by datamanager.cluster
-    async def get_shards_object(self, kbid: str) -> writer_pb2.Shards:
-        key = KB_SHARDS.format(kbid=kbid)
-        async with self.read_only_transaction() as txn:
-            payload = await txn.get(key)
-            if not payload:
-                raise ShardsNotFound(kbid)
-            pb = writer_pb2.Shards()
-            pb.ParseFromString(payload)
-            return pb
-
-    async def get_model_metadata(
-        self, kbid: str
-    ) -> knowledgebox_pb2.SemanticModelMetadata:
-        try:
-            shards_obj = await self.get_shards_object(kbid)
-        except ShardsNotFound:
-            raise KnowledgeBoxNotFound(kbid)
-        if shards_obj.HasField("model"):
-            return shards_obj.model
-        else:
-            # B/c code for old KBs that do not have the `model` attribute set in the Shards object.
-            # Cleanup this code after a migration is done unifying all fields under `model` (on-prem and cloud).
-            return knowledgebox_pb2.SemanticModelMetadata(
-                similarity_function=shards_obj.similarity
-            )
+async def get_model_metadata(
+    txn: Transaction, *, kbid: str
+) -> knowledgebox_pb2.SemanticModelMetadata:
+    shards_obj = await cluster.get_kb_shards(txn, kbid=kbid)
+    if shards_obj is None:
+        raise KnowledgeBoxNotFound(kbid)
+    if shards_obj.HasField("model"):
+        return shards_obj.model
+    else:
+        # B/c code for old KBs that do not have the `model` attribute set in the Shards object.
+        # Cleanup this code after a migration is done unifying all fields under `model` (on-prem and cloud).
+        return knowledgebox_pb2.SemanticModelMetadata(
+            similarity_function=shards_obj.similarity
+        )

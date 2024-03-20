@@ -24,9 +24,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from nucliadb.common import datamanagers
 from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.settings import settings
-from nucliadb.common.datamanagers import cluster as shards_data_manager
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb_protos import knowledgebox_pb2, utils_pb2, writer_pb2
 
@@ -103,13 +103,13 @@ async def test_shard_creation(fake_index_nodes: list[str], txn: Transaction):
     release_channel = utils_pb2.ReleaseChannel.STABLE
     sm = manager.KBShardManager()
 
-    shards = await shards_data_manager.get_kb_shards(txn, kbid)
+    shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
     assert shards is None
 
     # create first shard
     await sm.create_shard_by_kbid(txn, kbid, semantic_model, release_channel)
 
-    shards = await shards_data_manager.get_kb_shards(txn, kbid)
+    shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
     assert shards is not None
     assert len(shards.shards) == 1
     assert shards.shards[0].read_only is False
@@ -120,7 +120,7 @@ async def test_shard_creation(fake_index_nodes: list[str], txn: Transaction):
     # adding a second shard will mark the first as read only
     await sm.create_shard_by_kbid(txn, kbid, semantic_model, release_channel)
 
-    shards = await shards_data_manager.get_kb_shards(txn, kbid)
+    shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
     assert shards is not None
     assert len(shards.shards) == 2
     assert shards.shards[0].read_only is True
@@ -132,7 +132,7 @@ async def test_shard_creation(fake_index_nodes: list[str], txn: Transaction):
     # adding a third one will be equivalent
     await sm.create_shard_by_kbid(txn, kbid, semantic_model, release_channel)
 
-    shards = await shards_data_manager.get_kb_shards(txn, kbid)
+    shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
     assert shards is not None
     assert len(shards.shards) == 3
     assert shards.shards[0].read_only is True

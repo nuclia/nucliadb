@@ -21,7 +21,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from nucliadb.common.datamanagers import cluster as shards_data_manager
+from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.migrator.models import Migration
 from nucliadb.migrator.utils import get_migrations
@@ -64,13 +64,13 @@ async def test_migration_0017_kb(maindb_driver: Driver):
             # writable shard
             actual=1,
         )
-        await shards_data_manager.update_kb_shards(txn, kbid, shards)
+        await datamanagers.cluster.update_kb_shards(txn, kbid=kbid, shards=shards)
         await txn.commit()
 
     await migration.module.migrate_kb(execution_context, kbid)
 
     async with maindb_driver.transaction(read_only=True) as txn:
-        migrated = await shards_data_manager.get_kb_shards(txn, kbid)
+        migrated = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
         assert migrated is not None
 
         # actual is the same

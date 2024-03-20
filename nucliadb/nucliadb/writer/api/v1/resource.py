@@ -38,8 +38,8 @@ from nucliadb_protos.writer_pb2 import (
 )
 from starlette.requests import Request
 
+from nucliadb.common import datamanagers
 from nucliadb.common.context.fastapi import get_app_context
-from nucliadb.common.datamanagers.resources import ResourcesDataManager
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
 from nucliadb.common.maindb.utils import get_driver
@@ -397,8 +397,8 @@ async def update_resource_slug(
     new_slug: str,
 ):
     async with driver.transaction() as txn:
-        old_slug = await ResourcesDataManager.modify_slug(
-            txn, kbid, rid=rid, new_slug=new_slug
+        old_slug = await datamanagers.resources.modify_slug(
+            txn, kbid=kbid, rid=rid, new_slug=new_slug
         )
         await txn.commit()
         return old_slug

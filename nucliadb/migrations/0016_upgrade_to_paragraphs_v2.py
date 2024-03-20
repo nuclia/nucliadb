@@ -27,9 +27,8 @@ import logging
 
 from nucliadb_protos.noderesources_pb2 import ShardCreated
 
-from nucliadb.common.cluster.manager import KBShardManager
+from nucliadb.common import datamanagers
 from nucliadb.common.cluster.rollover import rollover_kb_shards
-from nucliadb.common.datamanagers import cluster as shards_data_manager
 from nucliadb.migrator.context import ExecutionContext
 
 logger = logging.getLogger(__name__)
@@ -59,7 +58,7 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
 
 async def has_old_paragraphs_index(context: ExecutionContext, kbid: str) -> bool:
     async with context.kv_driver.transaction(read_only=True) as txn:
-        shards_object = await shards_data_manager.get_kb_shards(txn, kbid)
+        shards_object = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
         if not shards_object:
             raise ShardsObjectNotFound()
         for shard in shards_object.shards:

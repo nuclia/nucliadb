@@ -30,11 +30,10 @@ from cachetools import TTLCache
 from fastapi import HTTPException, Request
 from nucliadb_protos.writer_pb2 import ShardObject
 
+from nucliadb.common import datamanagers
 from nucliadb.common.cluster.manager import get_index_nodes
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.context.fastapi import get_app_context
-from nucliadb.common.datamanagers import cluster as shards_data_manager
-from nucliadb.common.datamanagers.resources import ResourcesDataManager
 from nucliadb.common.http_clients.processing import ProcessingHTTPClient
 from nucliadb.writer import logger
 from nucliadb.writer.settings import back_pressure_settings as settings
@@ -489,18 +488,19 @@ async def get_kb_active_shard(
 async def get_resource_shard(
     context: ApplicationContext, kbid: str, resource_uuid: str
 ) -> Optional[ShardObject]:
-    rdm = ResourcesDataManager(driver=context.kv_driver, storage=context.blob_storage)
-    shard_id = await rdm.get_resource_shard_id(kbid, resource_uuid)
-    if shard_id is None:
-        # Resource does not exist
-        logger.debug(
-            "Resource shard not found",
-            extra={"kbid": kbid, "resource_uuid": resource_uuid},
+    async with datamanagers.with_transaction(read_only=True) as txn:
+        shard_id = await datamanagers.resources.get_resource_shard_id(
+            txn, kbid=kbid, rid=resource_uuid
         )
-        return None
+        if shard_id is None:
+            # Resource does not exist
+            logger.debug(
+                "Resource shard not found",
+                extra={"kbid": kbid, "resource_uuid": resource_uuid},
+            )
+            return None
 
-    async with context.kv_driver.transaction() as txn:
-        all_shards = await shards_data_manager.get_kb_shards(txn, kbid)
+        all_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
         if all_shards is None:
             # KB doesn't exist or has been deleted
             logger.debug("No shards found for KB", extra={"kbid": kbid})

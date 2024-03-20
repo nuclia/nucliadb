@@ -23,10 +23,10 @@ from typing import Optional
 
 import aiohttp.client_exceptions
 
+from nucliadb.common import datamanagers
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
-from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.common.maindb.exceptions import ConflictError
 from nucliadb.ingest.orm.exceptions import (
@@ -114,7 +114,6 @@ class Processor:
         self.partition = partition
         self.pubsub = pubsub
         self.shard_manager = get_shard_manager()
-        self.kb_data_manager = KnowledgeBoxDataManager(driver)
 
     async def process(
         self,
@@ -292,9 +291,11 @@ class Processor:
                     seqid=seqid,
                     multi=multi,
                     message=message,
-                    write_type=writer_pb2.Notification.WriteType.CREATED
-                    if created
-                    else writer_pb2.Notification.WriteType.MODIFIED,
+                    write_type=(
+                        writer_pb2.Notification.WriteType.CREATED
+                        if created
+                        else writer_pb2.Notification.WriteType.MODIFIED
+                    ),
                 )
             elif resource and resource.modified is False:
                 await txn.abort()
@@ -382,7 +383,7 @@ class Processor:
             shard = await self.shard_manager.get_current_active_shard(txn, kbid)
             if shard is None:
                 # no shard available, create a new one
-                model = await self.kb_data_manager.get_model_metadata(kbid)
+                model = await datamanagers.kb.get_model_metadata(txn, kbid=kbid)
                 config = await kb.get_config()
                 if config is not None:
                     release_channel = config.release_channel

@@ -109,9 +109,7 @@ def driver(read_only_txn):
 @pytest.fixture()
 def kbdm(read_only_txn, driver):
     kbdm = unittest.mock.AsyncMock()
-    with unittest.mock.patch(
-        f"{QUERY_MODULE}.KnowledgeBoxDataManager", return_value=kbdm
-    ):
+    with unittest.mock.patch(f"{QUERY_MODULE}.datamanagers.kb", return_value=kbdm):
         yield kbdm
 
 

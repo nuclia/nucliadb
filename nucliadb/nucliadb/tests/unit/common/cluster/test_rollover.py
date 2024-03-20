@@ -102,7 +102,7 @@ def resources_datamanager(resource_ids):
     mock.get_resource_index_message.return_value = metadata
 
     with patch(
-        "nucliadb.common.cluster.rollover.ResourcesDataManager", return_value=mock
+        "nucliadb.common.cluster.rollover.datamanagers.resources", return_value=mock
     ):
         yield mock
 
@@ -115,7 +115,7 @@ def cluster_datamanager(resource_ids, shards):
     mock.update_kb_shards = AsyncMock()
 
     with patch(
-        "nucliadb.common.cluster.rollover.ClusterDataManager", return_value=mock
+        "nucliadb.common.cluster.rollover.datamanagers.cluster", return_value=mock
     ):
         yield mock
 
@@ -140,7 +140,7 @@ def rollover_datamanager(resource_ids, cluster_datamanager):
     mock.iter_indexed_keys = _mock_indexed_keys
 
     with patch(
-        "nucliadb.common.cluster.rollover.RolloverDataManager", return_value=mock
+        "nucliadb.common.cluster.rollover.datamanagers.rollover", return_value=mock
     ):
         yield mock
 

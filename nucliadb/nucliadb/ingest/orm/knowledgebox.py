@@ -34,15 +34,15 @@ from nucliadb_protos.knowledgebox_pb2 import VectorSet, VectorSets
 from nucliadb_protos.resources_pb2 import Basic
 from nucliadb_protos.utils_pb2 import ReleaseChannel
 
+from nucliadb.common import datamanagers
 from nucliadb.common.cluster.base import AbstractIndexNode
-from nucliadb.common.cluster.exceptions import ShardNotFound
+from nucliadb.common.cluster.exceptions import ShardNotFound, ShardsNotFound
 from nucliadb.common.cluster.manager import get_index_node
 from nucliadb.common.cluster.utils import get_shard_manager
+from nucliadb.common.datamanagers.cluster import KB_SHARDS
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
-from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
-from nucliadb.common.datamanagers.labels import LabelsDataManager
+from nucliadb.common.datamanagers.kb import KB_UUID
 from nucliadb.common.maindb.driver import Driver, Transaction
-from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict
 from nucliadb.ingest.orm.resource import (
@@ -54,7 +54,6 @@ from nucliadb.ingest.orm.synonyms import Synonyms
 from nucliadb.ingest.orm.utils import compute_paragraph_key, get_basic, set_basic
 from nucliadb.migrator.utils import get_latest_version
 from nucliadb_protos import writer_pb2
-from nucliadb_utils.keys import KB_SHARDS, KB_UUID
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_audit, get_storage
 
@@ -81,14 +80,11 @@ class KnowledgeBox:
         self.kbid = kbid
         self._config: Optional[KnowledgeBoxConfig] = None
         self.synonyms = Synonyms(self.txn, self.kbid)
-        # b/w compatible, long term this class would change dramatically
-        self.data_manager = KnowledgeBoxDataManager(
-            get_driver(), read_only_txn=self.txn
-        )
 
     async def get_config(self) -> Optional[KnowledgeBoxConfig]:
         if self._config is None:
-            config = await self.data_manager.get_config(self.kbid)
+            async with datamanagers.with_transaction() as txn:
+                config = await datamanagers.kb.get_config(txn, kbid=self.kbid)
             if config is not None:
                 self._config = config
                 return config
@@ -275,7 +271,10 @@ class KnowledgeBox:
         return uuid
 
     async def iterate_kb_nodes(self) -> AsyncIterator[tuple[AbstractIndexNode, str]]:
-        shards_obj = await self.data_manager.get_shards_object(self.kbid)
+        async with datamanagers.with_transaction() as txn:
+            shards_obj = await datamanagers.cluster.get_kb_shards(txn, kbid=self.kbid)
+            if shards_obj is None:
+                raise ShardsNotFound(self.kbid)
 
         for shard in shards_obj.shards:
             for replica in shard.replicas:
@@ -318,20 +317,28 @@ class KnowledgeBox:
 
     # Labels
     async def set_labelset(self, id: str, labelset: LabelSet):
-        await LabelsDataManager.set_labelset(self.kbid, id, labelset, self.txn)
+        await datamanagers.labels.set_labelset(
+            self.txn, kbid=self.kbid, labelset_id=id, labelset=labelset
+        )
 
     async def get_labels(self) -> Labels:
-        return await LabelsDataManager.inner_get_labels(self.kbid, self.txn)
+        return await datamanagers.labels.get_labels(self.txn, kbid=self.kbid)
 
     async def get_labelset(
         self, labelset: str, labelset_response: writer_pb2.GetLabelSetResponse
     ):
-        ls = await LabelsDataManager.inner_get_labelset(self.kbid, labelset, self.txn)
+        ls = await datamanagers.labels.get_labelset(
+            self.txn,
+            kbid=self.kbid,
+            labelset_id=labelset,
+        )
         if ls is not None:
             labelset_response.labelset.CopyFrom(ls)
 
     async def del_labelset(self, id: str):
-        await LabelsDataManager.delete_labelset(self.kbid, id, self.txn)
+        await datamanagers.labels.delete_labelset(
+            self.txn, kbid=self.kbid, labelset_id=id
+        )
 
     async def get_synonyms(self, synonyms: PBSynonyms):
         pbsyn = await self.synonyms.get()
@@ -425,7 +432,11 @@ class KnowledgeBox:
     async def get_resource_shard(
         self, shard_id: str
     ) -> Optional[writer_pb2.ShardObject]:
-        pb = await self.data_manager.get_shards_object(self.kbid)
+        async with datamanagers.with_transaction() as txn:
+            pb = await datamanagers.cluster.get_kb_shards(txn, kbid=self.kbid)
+            if pb is None:
+                logger.warning("Shards not found for kbid", extra={"kbid": self.kbid})
+                return None
         for shard in pb.shards:
             if shard.shard == shard_id:
                 return shard

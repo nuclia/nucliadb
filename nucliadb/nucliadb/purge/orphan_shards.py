@@ -25,12 +25,12 @@ from typing import Optional
 import pkg_resources
 from grpc.aio import AioRpcError  # type: ignore
 
+from nucliadb.common import datamanagers
 from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
-from nucliadb.common.datamanagers.rollover import RolloverDataManager
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.utils import setup_driver, teardown_driver
 from nucliadb.ingest import logger
@@ -87,24 +87,26 @@ async def detect_orphan_shards(driver: Driver) -> dict[str, ShardLocation]:
     orphan_shard_ids = indexed_shards.keys() - stored_shards.keys()
     orphan_shards: dict[str, ShardLocation] = {}
     unavailable_nodes: set[str] = set()
-    rollover_dm = RolloverDataManager(driver)
-    for shard_id in orphan_shard_ids:
-        node_id = indexed_shards[shard_id].node_id
-        node = manager.get_index_node(node_id)  # type: ignore
-        if node is None:
-            unavailable_nodes.add(node_id)
-            kbid = UNKNOWN_KB
-        else:
-            kbid = await _get_kbid(node, shard_id) or UNKNOWN_KB
+    async with datamanagers.with_transaction() as txn:
+        for shard_id in orphan_shard_ids:
+            node_id = indexed_shards[shard_id].node_id
+            node = manager.get_index_node(node_id)  # type: ignore
+            if node is None:
+                unavailable_nodes.add(node_id)
+                kbid = UNKNOWN_KB
+            else:
+                kbid = await _get_kbid(node, shard_id) or UNKNOWN_KB
 
-        # Shards with knwon KB ids can be checked and ignore those comming from
-        # an ongoing migration/rollover
-        if kbid != UNKNOWN_KB:
-            skip = await rollover_dm.is_rollover_shard(kbid, shard_id)
-            if skip:
-                continue
+            # Shards with knwon KB ids can be checked and ignore those comming from
+            # an ongoing migration/rollover
+            if kbid != UNKNOWN_KB:
+                skip = await datamanagers.rollover.is_rollover_shard(
+                    txn, kbid=kbid, shard_id=shard_id
+                )
+                if skip:
+                    continue
 
-        orphan_shards[shard_id] = ShardLocation(kbid=kbid, node_id=node_id)
+            orphan_shards[shard_id] = ShardLocation(kbid=kbid, node_id=node_id)
 
     if len(unavailable_nodes) > 0:
         logger.info(
