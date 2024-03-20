@@ -23,6 +23,7 @@ import random
 import shelve
 import statistics
 import time
+import traceback
 from functools import cache
 from typing import Optional
 
@@ -231,9 +232,9 @@ async def make_kbid_request(session, kbid, method, path, params=None, json=None)
         endpoint = path.split("/")[-1]
         append_error(kbid, endpoint, err.status, detail)
         raise
-    except Exception as err:
+    except Exception:
         endpoint = path.split("/")[-1]
-        append_error(kbid, endpoint, -1, str(err))
+        append_error(kbid, endpoint, -1, traceback.format_exc())
         raise
 
 
