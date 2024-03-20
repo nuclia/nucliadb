@@ -121,7 +121,7 @@ pub fn create_key_value<D: IntoBuffer>(recipient: &mut File, slots: Vec<D>) -> i
 }
 
 // Merge algorithm. Returns the number of elements merged into the file.
-pub fn merge<S: Interpreter + Copy>(recipient: &mut File, producers: &[(S, &[u8])]) -> io::Result<usize> {
+pub fn merge<S: Interpreter + Copy>(recipient: &mut File, producers: &[(S, &[u8])]) -> io::Result<bool> {
     // Number of elements, deleted or alive.
     let mut prologue_section_size = HEADER_LEN;
     // To know the range of valid ids per producer
@@ -152,6 +152,8 @@ pub fn merge<S: Interpreter + Copy>(recipient: &mut File, producers: &[(S, &[u8]
     // Pointer to the next unused id slot
     let mut id_section_cursor = HEADER_LEN;
 
+    let mut has_deletions = false;
+
     while producer_cursor < producers.len() {
         // If the end of the current producer was reached we move
         // to the start of the next producer.
@@ -177,6 +179,8 @@ pub fn merge<S: Interpreter + Copy>(recipient: &mut File, producers: &[(S, &[u8]
             recipient_buffer.write_all(&element_pointer.to_le_bytes())?;
             id_section_cursor += POINTER_LEN;
             written_elements += 1;
+        } else {
+            has_deletions = true;
         }
 
         // Moving to the next element of this producer.
@@ -188,7 +192,7 @@ pub fn merge<S: Interpreter + Copy>(recipient: &mut File, producers: &[(S, &[u8]
     recipient_buffer.write_all(&written_elements.to_le_bytes())?;
     recipient_buffer.seek(SeekFrom::Start(0))?;
     recipient_buffer.flush()?;
-    Ok(written_elements)
+    Ok(has_deletions)
 }
 
 #[cfg(test)]

@@ -19,14 +19,23 @@
 //
 
 use std::collections::HashSet;
+use std::time::Instant;
 
 use crate::data_point::{self, DataPointPin, DeleteLog, Elem, LabelDictionary, Similarity};
 use crate::formula::{AtomClause, Formula};
+use crate::VectorR;
 
 const SIMILARITY: Similarity = Similarity::Cosine;
 
 fn create_query() -> Vec<f32> {
-    vec![rand::random::<f32>; 178].into_iter().map(|f| f()).collect()
+    let v: Vec<_> = vec![rand::random::<f32>; 178].into_iter().map(|f| f()).collect();
+    let mut modulus = 0.0;
+    for w in &v {
+        modulus += w * w;
+    }
+    modulus = f32::powf(modulus, 0.5);
+
+    v.into_iter().map(|w| w / modulus).collect()
 }
 
 impl DeleteLog for HashSet<String> {
@@ -213,4 +222,72 @@ fn prefiltering_test() {
             .collect::<Vec<_>>();
         assert_eq!(result_with_deleted.len(), 0);
     }
+}
+
+#[test]
+fn fast_data_merge() -> VectorR<()> {
+    let search_vectors = [create_query(), create_query(), create_query(), create_query()];
+
+    let big_segment_dir = tempfile::tempdir()?;
+    let big_segment_pin = DataPointPin::create_pin(big_segment_dir.path())?;
+    let mut elems: Vec<_> =
+        (0..100).map(|k| Elem::new(format!("trash_{k}"), create_query(), LabelDictionary::default(), None)).collect();
+    elems.push(Elem::new("search_0".into(), search_vectors[0].clone(), LabelDictionary::default(), None));
+    elems.push(Elem::new("search_1".into(), search_vectors[1].clone(), LabelDictionary::default(), None));
+    let big_segment = data_point::create(&big_segment_pin, elems, None, Similarity::Dot)?;
+
+    let small_segment_dir = tempfile::tempdir()?;
+    let small_segment_pin = DataPointPin::create_pin(small_segment_dir.path())?;
+    let small_segment = data_point::create(
+        &small_segment_pin,
+        vec![
+            Elem::new("search_2".into(), search_vectors[2].clone(), LabelDictionary::default(), None),
+            Elem::new("search_3".into(), search_vectors[3].clone(), LabelDictionary::default(), None),
+        ],
+        None,
+        Similarity::Dot,
+    )?;
+
+    // Merge without deletions
+    let mut work = [(HashSet::default(), big_segment), (HashSet::default(), small_segment)];
+    let output_dir = tempfile::tempdir()?;
+    let dp_pin = DataPointPin::create_pin(output_dir.path())?;
+    let t = Instant::now();
+    let dp = data_point::merge(&dp_pin, &work, Similarity::Dot)?;
+    let fast_merge_time = t.elapsed();
+
+    for (i, v) in search_vectors.iter().enumerate() {
+        let formula = Formula::new();
+        let result: Vec<_> = dp.search(&HashSet::new(), v, &formula, true, 1, Similarity::Dot, 0.999).collect();
+        assert_eq!(result.len(), 1);
+        assert!(result[0].score() >= 0.999);
+        assert!(result[0].id() == format!("search_{i}").as_bytes());
+    }
+
+    // Merge with deletions
+    work[0].0.insert("search_0".into());
+    work[1].0.insert("search_2".into());
+    let output_dir = tempfile::tempdir()?;
+    let dp_pin = DataPointPin::create_pin(output_dir.path())?;
+    let t = Instant::now();
+    let dp = data_point::merge(&dp_pin, &work, Similarity::Dot)?;
+    let slow_merge_time = t.elapsed();
+
+    for (i, v) in search_vectors.iter().enumerate() {
+        let formula = Formula::new();
+        let result: Vec<_> = dp.search(&HashSet::new(), v, &formula, true, 1, Similarity::Dot, 0.999).collect();
+        if i == 0 || i == 2 {
+            // These were deleted, they should not be in the merge
+            assert_eq!(result.len(), 0);
+        } else {
+            assert_eq!(result.len(), 1);
+            assert!(result[0].score() >= 0.999);
+            assert!(result[0].id() == format!("search_{i}").as_bytes());
+        }
+    }
+
+    // If there are deletions, we cannot reuse the HNSW, and we are much slower
+    assert!(slow_merge_time.as_secs_f64() > 10.0 * fast_merge_time.as_secs_f64());
+
+    Ok(())
 }

@@ -26,7 +26,14 @@ use crate::formula::{AtomClause, Formula};
 const SIMILARITY: Similarity = Similarity::Cosine;
 
 fn create_query() -> Vec<f32> {
-    vec![rand::random::<f32>; 178].into_iter().map(|f| f()).collect()
+    let v: Vec<_> = vec![rand::random::<f32>; 178].into_iter().map(|f| f()).collect();
+    let mut modulus = 0.0;
+    for w in &v {
+        modulus += w * w;
+    }
+    modulus = f32::powf(modulus, 0.5);
+
+    v.into_iter().map(|w| w / modulus).collect()
 }
 
 impl DeleteLog for HashSet<String> {
