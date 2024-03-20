@@ -45,9 +45,8 @@ async def predict_proxy(
     params: QueryParams,
     json: Optional[Any] = None,
 ) -> Union[JSONResponse, StreamingResponse]:
-    async with datamanagers.with_transaction(read_only=True) as txn:
-        if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
-            raise datamanagers.exceptions.KnowledgeBoxNotFound()
+    if not await exists_kb(kbid=kbid):
+        raise datamanagers.exceptions.KnowledgeBoxNotFound()
 
     predict: PredictEngine = get_predict()
 
@@ -82,3 +81,8 @@ async def predict_proxy(
         response.headers["NUCLIA-LEARNING-ID"] = nuclia_learning_id
         response.headers["Access-Control-Expose-Headers"] = "NUCLIA-LEARNING-ID"
     return response
+
+
+async def exists_kb(kbid: str) -> bool:
+    async with datamanagers.with_transaction(read_only=True) as txn:
+        return await datamanagers.kb.exists_kb(txn, kbid=kbid)

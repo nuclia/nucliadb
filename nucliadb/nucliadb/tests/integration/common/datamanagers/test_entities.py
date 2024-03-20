@@ -31,7 +31,9 @@ async def test_set_duplicate_entities_index(maindb_driver):
         }
     }
     async with maindb_driver.transaction() as txn:
-        meta_cache = await datamanagers.entities.get_entities_meta_cache(txn, "kbid")
+        meta_cache = await datamanagers.entities.get_entities_meta_cache(
+            txn, kbid="kbid"
+        )
         meta_cache.set_duplicates("ORG", duplicates["ORG"])
         await datamanagers.entities.set_entities_meta_cache(
             txn, kbid="kbid", cache=meta_cache
