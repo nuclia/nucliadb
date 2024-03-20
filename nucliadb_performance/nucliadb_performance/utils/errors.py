@@ -45,5 +45,10 @@ def append_error(kbid: str, endpoint: str, status_code: str, error: str):
 def print_errors():
     print("Errors summary:")
     for error in ERRORS:
-        print(error)
+        print(
+            f"KB id {error.kbid} failed calling endpoint '{error.endpoint}' returning status code {error.status_code}"
+        )
+        formatted_error = " | " + error.error.replace("\n", "\n | ")
+        print(formatted_error)
+        print()
     print("=" * 50)
