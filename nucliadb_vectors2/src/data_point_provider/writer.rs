@@ -35,6 +35,12 @@ use std::time::{Instant, SystemTime};
 const MAX_NODES_IN_MERGE: &str = "MAX_NODES_IN_MERGE";
 const SEGMENTS_BEFORE_MERGE: &str = "SEGMENTS_BEFORE_MERGE";
 
+#[derive(Debug, Clone, Copy)]
+pub struct MergeParameters {
+    pub max_nodes_in_merge: usize,
+    pub segments_before_merge: usize,
+}
+
 fn persist_state(path: &Path, state: &State) -> VectorR<()> {
     let temporal_path = path.join(TEMP_STATE);
     let state_path = path.join(STATE);
@@ -66,8 +72,7 @@ struct OnlineDataPoint {
 }
 
 pub struct Writer {
-    max_nodes_in_merge: usize,
-    segments_before_merge: usize,
+    on_commit_merge_parameters: MergeParameters,
     has_uncommitted_changes: bool,
     metadata: IndexMetadata,
     path: PathBuf,
@@ -100,12 +105,12 @@ impl Writer {
         self.has_uncommitted_changes = true;
     }
 
-    pub fn merge(&mut self) -> VectorR<MergeMetrics> {
+    pub fn merge(&mut self, parameters: MergeParameters) -> VectorR<MergeMetrics> {
         if self.has_uncommitted_changes {
             return Err(VectorErr::UncommittedChangesError);
         }
 
-        if self.online_data_points.len() < self.segments_before_merge {
+        if self.online_data_points.len() < parameters.segments_before_merge {
             return Ok(MergeMetrics {
                 segments_left: self.online_data_points.len(),
                 ..Default::default()
@@ -124,13 +129,13 @@ impl Writer {
         live_segments.sort_unstable_by_key(|i| std::cmp::Reverse(i.journal.no_nodes()));
 
         let mut input_segment_sizes = vec![];
-        while nodes_in_merge < self.max_nodes_in_merge {
+        while nodes_in_merge < parameters.max_nodes_in_merge {
             let Some(online_data_point) = live_segments.pop() else {
                 break;
             };
             let data_point_size = online_data_point.journal.no_nodes();
 
-            if data_point_size + nodes_in_merge > self.max_nodes_in_merge {
+            if data_point_size + nodes_in_merge > parameters.max_nodes_in_merge {
                 blocked_segments.push(online_data_point);
                 break;
             } else {
@@ -265,7 +270,7 @@ impl Writer {
         self.has_uncommitted_changes = false;
         self.number_of_embeddings = number_of_embeddings;
 
-        let merge_result = self.merge();
+        let merge_result = self.merge(self.on_commit_merge_parameters);
         if let Err(merge_error) = &merge_result {
             tracing::error!("Merge error: {merge_error:?}")
         }
@@ -287,6 +292,10 @@ impl Writer {
             Ok(v) => v.parse().unwrap_or(100),
             Err(_) => 100,
         };
+        let on_commit_merge_parameters = MergeParameters {
+            max_nodes_in_merge,
+            segments_before_merge,
+        };
 
         if writing_file.try_lock_exclusive().is_err() {
             return Err(VectorErr::MultipleWritersError);
@@ -297,8 +306,7 @@ impl Writer {
 
         Ok(Writer {
             metadata,
-            segments_before_merge,
-            max_nodes_in_merge,
+            on_commit_merge_parameters,
             path: path.to_path_buf(),
             added_data_points: Vec::new(),
             added_to_delete_log: Vec::new(),
@@ -337,6 +345,10 @@ impl Writer {
             Ok(v) => v.parse().unwrap_or(100),
             Err(_) => 100,
         };
+        let on_commit_merge_parameters = MergeParameters {
+            max_nodes_in_merge,
+            segments_before_merge,
+        };
 
         let state_path = path.join(STATE);
         let state_file = File::open(state_path)?;
@@ -371,8 +383,7 @@ impl Writer {
             delete_log,
             dimension,
             number_of_embeddings,
-            max_nodes_in_merge,
-            segments_before_merge,
+            on_commit_merge_parameters,
             added_data_points: Vec::new(),
             added_to_delete_log: Vec::new(),
             path: path.to_path_buf(),
@@ -450,7 +461,10 @@ mod test {
 
         let mut writer = Writer::new(&vectors_path, IndexMetadata::default()).unwrap();
         let mut data_points = vec![];
-        writer.segments_before_merge = 10;
+        let merge_parameters = MergeParameters {
+            segments_before_merge: 10,
+            ..writer.on_commit_merge_parameters
+        };
 
         for _ in 0..100 {
             let similarity = Similarity::Cosine;
@@ -468,7 +482,7 @@ mod test {
 
         writer.online_data_points = data_points;
 
-        let metrics = writer.merge().unwrap();
+        let metrics = writer.merge(merge_parameters).unwrap();
         assert_eq!(metrics.merged, 100);
         assert_eq!(metrics.segments_left, 1);
     }
@@ -480,7 +494,10 @@ mod test {
 
         let mut writer = Writer::new(&vectors_path, IndexMetadata::default()).unwrap();
         let mut data_points = vec![];
-        writer.segments_before_merge = 1000;
+        let merge_parameters = MergeParameters {
+            segments_before_merge: 1000,
+            ..writer.on_commit_merge_parameters
+        };
 
         for _ in 0..50 {
             let similarity = Similarity::Cosine;
@@ -498,7 +515,7 @@ mod test {
 
         writer.online_data_points = data_points;
 
-        let metrics = writer.merge().unwrap();
+        let metrics = writer.merge(merge_parameters).unwrap();
         assert_eq!(metrics.merged, 0);
         assert_eq!(metrics.segments_left, 50);
     }
@@ -510,6 +527,7 @@ mod test {
 
         let mut writer = Writer::new(&vectors_path, IndexMetadata::default()).unwrap();
         let mut data_points = vec![];
+        let merge_parameters = writer.on_commit_merge_parameters;
 
         for _ in 0..100 {
             let similarity = Similarity::Cosine;
@@ -527,11 +545,11 @@ mod test {
 
         writer.online_data_points = data_points;
 
-        let metrics = writer.merge().unwrap();
+        let metrics = writer.merge(merge_parameters).unwrap();
         assert_eq!(metrics.merged, 100);
         assert_eq!(metrics.segments_left, 1);
 
-        let metrics = writer.merge().unwrap();
+        let metrics = writer.merge(merge_parameters).unwrap();
         assert_eq!(metrics.merged, 0);
         assert_eq!(metrics.segments_left, 1);
     }
