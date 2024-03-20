@@ -1972,6 +1972,7 @@ dependencies = [
  "crossbeam",
  "fs2",
  "fst",
+ "fxhash",
  "lazy_static",
  "memmap2",
  "nucliadb_core",
