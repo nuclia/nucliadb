@@ -208,6 +208,11 @@ class JetStreamContextTelemetry:
                     },
                 )
 
+    async def consumer_info(
+        self, stream: str, consumer: str, timeout: Optional[float] = None
+    ):
+        return await self.js.consumer_info(stream, consumer, timeout)
+
 
 class NatsClientTelemetry:
     def __init__(self, nc: Client, service_name: str, tracer_provider: TracerProvider):
