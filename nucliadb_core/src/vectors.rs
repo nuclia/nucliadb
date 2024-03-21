@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 // Copyright (C) 2021 Bosutech XXI S.L.
 //
 // nucliadb is offered under the AGPL v3.0 and as commercial software.
@@ -18,6 +17,8 @@ use std::collections::HashSet;
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+
+use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
