@@ -37,7 +37,6 @@ use nucliadb_procs::measure;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fs;
-use std::path::Path;
 use std::time::Instant;
 use std::time::SystemTime;
 
@@ -313,69 +312,38 @@ impl VectorWriter for VectorWriterService {
     }
 
     fn get_segment_ids(&self) -> NodeResult<Vec<String>> {
-        let location = self.index.location();
-        let mut seg_ids = self.get_segment_ids_for_vectorset(location)?;
-        let vectorsets = self.list_vectorsets()?;
-        for vs in vectorsets {
-            let vs_seg_ids = self.get_segment_ids_for_vectorset(&self.config.vectorset.join(vs))?;
-            seg_ids.extend(vs_seg_ids);
+        let mut segment_ids = replication::get_segment_ids(&self.config.path)?;
+        for vs in self.list_vectorsets()? {
+            segment_ids.extend(replication::get_segment_ids(&self.config.vectorset.join(vs))?);
         }
-        Ok(seg_ids)
+        Ok(segment_ids)
     }
 
     fn get_index_files(&self, ignored_segment_ids: &[String]) -> NodeResult<IndexFiles> {
         // Should be called along with a lock at a higher level to be safe
-        let mut metadata_files = HashMap::new();
-        metadata_files.insert("vectors/state.bincode".to_string(), fs::read(self.config.path.join("state.bincode"))?);
-        metadata_files.insert("vectors/metadata.json".to_string(), fs::read(self.config.path.join("metadata.json"))?);
-
-        let location = self.index.location();
-        let mut files = Vec::new();
-        for segment_id in self.get_segment_ids_for_vectorset(location)? {
-            if ignored_segment_ids.contains(&segment_id) {
-                continue;
-            }
-            files.push(format!("vectors/{}/index.hnsw", segment_id));
-            files.push(format!("vectors/{}/journal.json", segment_id));
-            files.push(format!("vectors/{}/nodes.kv", segment_id));
-        }
+        let mut replica_state = replication::get_index_files(&self.config.path, "vectors", ignored_segment_ids)?;
 
         let vectorsets = self.list_vectorsets()?;
         if !vectorsets.is_empty() {
-            metadata_files
+            replica_state
+                .metadata_files
                 .insert("vectorset/state.bincode".to_string(), fs::read(self.config.vectorset.join("state.bincode"))?);
             for vs in vectorsets {
-                for segment_id in self.get_segment_ids_for_vectorset(&self.config.vectorset.join(vs.clone()))? {
-                    if ignored_segment_ids.contains(&segment_id) {
-                        continue;
-                    }
-                    files.push(format!("vectorset/{}/{}/index.hnsw", vs, segment_id));
-                    files.push(format!("vectorset/{}/{}/journal.json", vs, segment_id));
-                    files.push(format!("vectorset/{}/{}/nodes.kv", vs, segment_id));
-                }
-                metadata_files.insert(
-                    format!("vectorset/{}/state.bincode", vs),
-                    fs::read(self.config.vectorset.join(format!("{}/state.bincode", vs)))?,
-                );
-                metadata_files.insert(
-                    format!("vectorset/{}/metadata.json", vs),
-                    fs::read(self.config.vectorset.join(format!("{}/metadata.json", vs)))?,
-                );
+                let vectorset_replica_state = replication::get_index_files(
+                    &self.config.vectorset.join(&vs),
+                    &format!("vectorset/{vs}"),
+                    ignored_segment_ids,
+                )?;
+                replica_state.extend(vectorset_replica_state);
             }
         }
 
-        if files.is_empty() {
+        if replica_state.files.is_empty() {
             // exit with no changes
-            return Ok(IndexFiles::Other(RawReplicaState {
-                metadata_files: HashMap::new(),
-                files,
-            }));
+            return Ok(IndexFiles::Other(RawReplicaState::default()));
         }
 
-        Ok(IndexFiles::Other(RawReplicaState {
-            metadata_files,
-            files,
-        }))
+        Ok(IndexFiles::Other(replica_state))
     }
 }
 
@@ -442,20 +410,6 @@ impl VectorWriterService {
                 config: config.clone(),
             })
         }
-    }
-
-    fn get_segment_ids_for_vectorset(&self, location: &Path) -> NodeResult<Vec<String>> {
-        let mut ids = Vec::new();
-        for dir_entry in std::fs::read_dir(location)? {
-            let entry = dir_entry?;
-            let path = entry.path();
-            let name = entry.file_name().to_string_lossy().to_string();
-            if path.is_file() {
-                continue;
-            }
-            ids.push(name);
-        }
-        Ok(ids)
     }
 }
 

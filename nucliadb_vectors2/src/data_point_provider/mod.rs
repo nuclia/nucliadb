@@ -22,6 +22,7 @@ pub mod garbage_collector;
 pub mod reader;
 pub mod writer;
 
+pub mod replication;
 mod state;
 
 use crate::data_point::Similarity;

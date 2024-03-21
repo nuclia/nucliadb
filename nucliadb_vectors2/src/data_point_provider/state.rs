@@ -35,7 +35,7 @@ pub fn write_state(state_file: &mut File, state: &State) -> bincode::Result<()> 
     Ok(())
 }
 
-pub fn read_state(state_file: &File) -> bincode::Result<State> {
+pub fn read_state(state_file: impl Read + Seek) -> bincode::Result<State> {
     let mut reader = BufReader::new(state_file);
     let mut magic_number = [0; 7];
     reader.read_exact(&mut magic_number)?;

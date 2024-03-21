@@ -277,7 +277,7 @@ impl NodeFixture {
             self.with_secondary_writer().await?;
         }
 
-        let settings = self.settings.clone();
+        let settings = self.secondary_settings.clone();
         let addr = self.secondary_reader_addr;
         let notifier = Arc::clone(&self.shutdown_notifier);
 

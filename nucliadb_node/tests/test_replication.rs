@@ -48,14 +48,14 @@ async fn test_search_replicated_data(
     let shard = create_shard(&mut writer, release_channel).await;
 
     let mut query = create_search_request(&shard.id, "prince");
-    query.vector = vec![1.0, 2.0, 3.0];
+    query.vector = vec![0.5, 0.5, 0.5];
     let response = run_search(&mut reader, query.clone()).await;
     assert!(response.vector.is_some());
     assert!(response.document.is_some());
     assert!(response.paragraph.is_some());
     assert_eq!(response.document.unwrap().results.len(), 2);
     assert_eq!(response.paragraph.unwrap().results.len(), 2);
-    assert_eq!(response.vector.unwrap().documents.len(), 0);
+    assert_eq!(response.vector.unwrap().documents.len(), 1);
 
     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
@@ -64,18 +64,17 @@ async fn test_search_replicated_data(
     let healthy = repl_health_mng.healthy();
     assert!(healthy);
 
+    // Validate search against secondary
     let response = run_search(&mut secondary_reader, query.clone()).await;
     assert!(response.vector.is_some());
     assert!(response.document.is_some());
     assert!(response.paragraph.is_some());
     assert_eq!(response.document.unwrap().results.len(), 2);
     assert_eq!(response.paragraph.unwrap().results.len(), 2);
-    assert_eq!(response.vector.unwrap().documents.len(), 0);
+    assert_eq!(response.vector.unwrap().documents.len(), 1);
 
     query.vectorset = "test_vector_set".to_string();
     query.vector = vec![1.0, 2.0, 3.0];
-
-    // Validate search against secondary
     let response = run_search(&mut secondary_reader, query.clone()).await;
     assert!(response.vector.is_some());
     assert_eq!(response.vector.unwrap().documents.len(), 1);
