@@ -21,7 +21,7 @@ import asyncio
 import logging
 import time
 from functools import cached_property
-from typing import Any, Awaitable, Callable, Optional
+from typing import Any, Awaitable, Callable, Optional, Union
 
 import nats
 import nats.errors
@@ -37,7 +37,9 @@ from nucliadb_telemetry.utils import get_telemetry
 logger = logging.getLogger(__name__)
 
 
-def get_traced_jetstream(nc: NATSClient, service_name: str) -> JetStreamContext:
+def get_traced_jetstream(
+    nc: NATSClient, service_name: str
+) -> Union[JetStreamContext, JetStreamContextTelemetry]:
     jetstream = nc.jetstream()
     tracer_provider = get_telemetry(service_name)
 
@@ -203,7 +205,7 @@ class NatsConnectionManager:
         return self._nc
 
     @cached_property
-    def js(self) -> JetStreamContext:
+    def js(self) -> Union[JetStreamContext, JetStreamContextTelemetry]:
         return get_traced_jetstream(self._nc, self._service_name)
 
     async def subscribe(

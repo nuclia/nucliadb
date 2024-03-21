@@ -473,7 +473,7 @@ async def get_nats_consumer_pending_messages(
     nats_manager: NatsConnectionManager, *, stream: str, consumer: str
 ) -> int:
     # get raw js client
-    js = getattr(nats_manager.js, "js", nats_manager.js)
+    js = nats_manager.js
     consumer_info = await js.consumer_info(stream, consumer)
     return consumer_info.num_pending
 

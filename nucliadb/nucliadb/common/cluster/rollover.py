@@ -145,7 +145,7 @@ def _get_shard(
 async def wait_for_node(app_context: ApplicationContext, node_id: str) -> None:
     while True:
         # get raw js client
-        js = getattr(app_context.nats_manager.js, "js", app_context.nats_manager.js)
+        js = app_context.nats_manager.js
         consumer_info = await js.consumer_info(
             const.Streams.INDEX.name, const.Streams.INDEX.group.format(node=node_id)
         )
