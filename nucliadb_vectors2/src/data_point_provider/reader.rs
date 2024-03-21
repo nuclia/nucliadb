@@ -179,23 +179,25 @@ impl Reader {
         let new_delete_log = state.delete_log;
         let mut new_dimension = self.dimension;
         let mut new_number_of_embeddings = 0;
-        let mut new_data_points = Vec::new();
+        let mut new_data_point_pins = Vec::new();
         let mut new_open_data_points = Vec::new();
         let mut data_points_to_eject: FxHashSet<_> = self.open_data_points.keys().copied().collect();
 
         for data_point_id in data_point_list {
             let data_point_pin = DataPointPin::open_pin(&self.path, data_point_id)?;
-            let open_data_point = data_point::open(&data_point_pin)?;
-            let data_point_journal = open_data_point.journal();
 
-            if self.open_data_points.contains_key(&data_point_id) {
+            if let Some(open_data_point) = self.open_data_points.get(&data_point_id) {
+                let data_point_journal = open_data_point.journal();
+                new_number_of_embeddings += data_point_journal.no_nodes();
                 data_points_to_eject.remove(&data_point_id);
             } else {
+                let open_data_point = data_point::open(&data_point_pin)?;
+                let data_point_journal = open_data_point.journal();
+                new_number_of_embeddings += data_point_journal.no_nodes();
                 new_open_data_points.push(open_data_point);
             }
 
-            new_number_of_embeddings += data_point_journal.no_nodes();
-            new_data_points.push(data_point_pin);
+            new_data_point_pins.push(data_point_pin);
         }
 
         for open_data_point in new_open_data_points {
@@ -216,7 +218,7 @@ impl Reader {
 
         self.version = disk_version;
         self.delete_log = new_delete_log;
-        self.data_point_pins = new_data_points;
+        self.data_point_pins = new_data_point_pins;
         self.dimension = new_dimension;
         self.number_of_embeddings = new_number_of_embeddings;
 
