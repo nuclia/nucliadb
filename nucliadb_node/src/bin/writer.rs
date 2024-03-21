@@ -132,11 +132,16 @@ async fn main() -> NodeResult<()> {
             None => tokio::spawn(task),
         };
     }
-    let metrics_task = tokio::spawn(run_http_server(settings.clone()));
 
+    let metrics_task = tokio::spawn(run_http_server(settings.clone()));
     info!("Bootstrap complete in: {:?}", start_bootstrap.elapsed());
 
-    wait_for_sigkill(Arc::clone(&shutdown_notifier)).await?;
+    wait_for_sigkill().await?;
+
+    shutdown_notifier.notify_waiters();
+    if settings.node_role() == NodeRole::Primary {
+        lifecycle::finalize_merger();
+    }
 
     info!("Shutting down NucliaDB Writer Node...");
     metrics_task.abort();
@@ -150,7 +155,7 @@ async fn main() -> NodeResult<()> {
     Ok(())
 }
 
-async fn wait_for_sigkill(shutdown_notifier: Arc<Notify>) -> NodeResult<()> {
+async fn wait_for_sigkill() -> NodeResult<()> {
     let mut sigterm = unix::signal(SignalKind::terminate())?;
     let mut sigquit = unix::signal(SignalKind::quit())?;
 
@@ -159,10 +164,6 @@ async fn wait_for_sigkill(shutdown_notifier: Arc<Notify>) -> NodeResult<()> {
         _ = sigquit.recv() => println!("Terminating on SIGQUIT"),
         _ = ctrl_c() => println!("Terminating on ctrl-c"),
     }
-
-    shutdown_notifier.notify_waiters();
-    lifecycle::finalize_merger();
-
     Ok(())
 }
 
