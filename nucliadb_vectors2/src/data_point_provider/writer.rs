@@ -360,7 +360,7 @@ impl Writer {
         }
 
         if dimension.is_none() {
-            if let Some(online_data_point) = online_data_points.get(0) {
+            if let Some(online_data_point) = online_data_points.first() {
                 let open_data_point = data_point::open(&online_data_point.pin)?;
                 dimension = open_data_point.stored_len();
             }

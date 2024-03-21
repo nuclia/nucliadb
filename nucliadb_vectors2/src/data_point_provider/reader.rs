@@ -148,7 +148,7 @@ impl Reader {
             open_data_points.insert(data_point_id, open_data_point);
         }
 
-        if let Some(data_point_pin) = data_point_pins.get(0) {
+        if let Some(data_point_pin) = data_point_pins.first() {
             let open_data_point = &open_data_points[&data_point_pin.id()];
             dimension = open_data_point.stored_len();
         }
@@ -208,7 +208,7 @@ impl Reader {
         }
 
         if new_dimension.is_none() {
-            if let Some(data_point_pin) = self.data_point_pins.get(0) {
+            if let Some(data_point_pin) = self.data_point_pins.first() {
                 let open_data_point = &self.open_data_points[&data_point_pin.id()];
                 new_dimension = open_data_point.stored_len();
             }
