@@ -279,7 +279,8 @@ def nats_conn(js):
 @pytest.fixture(scope="function")
 def get_index_nodes():
     with mock.patch(
-        f"{MODULE}.get_index_nodes", return_value=[mock.Mock(id="node1"), mock.Mock(id="node2")]
+        f"{MODULE}.get_index_nodes",
+        return_value=[mock.Mock(id="node1"), mock.Mock(id="node2")],
     ) as mock_:
         yield mock_
 
