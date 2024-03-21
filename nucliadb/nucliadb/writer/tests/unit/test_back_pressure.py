@@ -272,7 +272,7 @@ def js():
 @pytest.fixture(scope="function")
 def nats_conn(js):
     ncm = mock.Mock()
-    ncm.js = mock.Mock(js=js)
+    ncm.js = js
     yield ncm
 
 
