@@ -24,6 +24,7 @@ import shelve
 import statistics
 import traceback
 from functools import cache
+from json import dumps
 
 from faker import Faker
 
@@ -186,6 +187,8 @@ async def _make_kbid_request(client, kbid, method, path, params=None, json=None)
         detail = (
             err.content and err.content.get("detail", None) if err.content else err.text
         )
+        if isinstance(detail, dict):
+            detail = dumps(detail)
         endpoint = path.split("/")[-1]
         append_error(kbid, endpoint, err.status, detail)
         raise
