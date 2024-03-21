@@ -17,7 +17,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use nucliadb_core::metrics::{get_metrics, request_time, vectors::MergeSource};
+use crate::data_point::{self, DataPointPin, Elem, LabelDictionary};
+use crate::data_point_provider::garbage_collector;
+use crate::data_point_provider::writer::Writer;
+use crate::data_point_provider::*;
+use crate::indexset::IndexKeyCollector;
+use crate::indexset::WriterSet;
+use nucliadb_core::metrics::{request_time, vectors::MergeSource};
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::prost::Message;
 use nucliadb_core::protos::resource::ResourceStatus;
@@ -33,15 +39,6 @@ use std::fs;
 use std::path::Path;
 use std::time::Instant;
 use std::time::SystemTime;
-
-use crate::data_point::{self, DataPointPin, Elem, LabelDictionary};
-use crate::data_point_provider::garbage_collector;
-use crate::data_point_provider::writer::Writer;
-use crate::data_point_provider::*;
-use crate::indexset::IndexKeyCollector;
-use crate::indexset::WriterSet;
-
-use self::writer::PreparedMergeResults;
 
 impl IndexKeyCollector for Vec<String> {
     fn add_key(&mut self, key: String) {
@@ -70,13 +67,13 @@ impl VectorWriter for VectorWriterService {
 
     #[measure(actor = "vectors", metric = "prepare_merge")]
     #[tracing::instrument(skip_all)]
-    fn prepare_merge(&self) -> NodeResult<Option<Box<dyn MergeRunner>>> {
-        Ok(self.index.prepare_merge()?)
+    fn prepare_merge(&self, parameters: MergeParameters) -> NodeResult<Option<Box<dyn MergeRunner>>> {
+        Ok(self.index.prepare_merge(parameters)?)
     }
 
-    #[measure(actor = "vectors", metric = "finish_merge")]
+    #[measure(actor = "vectors", metric = "record_merge")]
     #[tracing::instrument(skip_all)]
-    fn finish_merge(&mut self, merge_result: Box<dyn MergeResults>, source: MergeSource) -> NodeResult<MergeMetrics> {
+    fn record_merge(&mut self, merge_result: Box<dyn MergeResults>, source: MergeSource) -> NodeResult<MergeMetrics> {
         self.index.record_merge(merge_result.as_ref())?;
         merge_result.record_metrics(source);
         Ok(merge_result.get_metrics())

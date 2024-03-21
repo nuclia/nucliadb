@@ -22,8 +22,8 @@ import logging
 import uuid
 from functools import partial
 
+from nucliadb.common import datamanagers
 from nucliadb.common.cluster.utils import get_shard_manager
-from nucliadb.common.datamanagers.resources import ResourcesDataManager
 from nucliadb.common.maindb.driver import Driver
 from nucliadb_protos import writer_pb2
 from nucliadb_utils import const
@@ -58,7 +58,6 @@ class MaterializerHandler:
         storage: Storage,
         check_delay: float = 30.0,
     ):
-        self.resources_data_manager = ResourcesDataManager(driver, storage)
         self.pubsub = pubsub
         self.shard_manager = get_shard_manager()
         self.task_handler = DelayedTaskHandler(check_delay)
@@ -96,6 +95,12 @@ class MaterializerHandler:
 
     async def process(self, kbid: str) -> None:
         logger.info(f"Materializing knowledgebox", extra={"kbid": kbid})
-        await self.resources_data_manager.set_number_of_resources(
-            kbid, await self.resources_data_manager.calculate_number_of_resources(kbid)
-        )
+        async with datamanagers.with_transaction(read_only=True) as txn:
+            value = await datamanagers.resources.calculate_number_of_resources(
+                txn, kbid=kbid
+            )
+        async with datamanagers.with_transaction() as txn:
+            await datamanagers.resources.set_number_of_resources(
+                txn, kbid=kbid, value=value
+            )
+            await txn.commit()

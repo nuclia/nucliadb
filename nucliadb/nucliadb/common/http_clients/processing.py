@@ -189,7 +189,7 @@ class ProcessingHTTPClient:
         async with self.session.get(
             url,
             headers=self.headers,
-            params={"kbid", kbid},
+            params={"kbid": kbid},
             timeout=aiohttp.ClientTimeout(total=timeout),
         ) as resp:
             resp_text = await resp.text()

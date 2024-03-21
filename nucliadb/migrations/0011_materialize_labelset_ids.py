@@ -26,7 +26,7 @@ Tikv doesn't really like scanning a lot of keys, so we need to materialize the l
 
 import logging
 
-from nucliadb.common.datamanagers.labels import LabelsDataManager
+from nucliadb.common import datamanagers
 from nucliadb.migrator.context import ExecutionContext
 
 logger = logging.getLogger(__name__)
@@ -38,12 +38,16 @@ async def migrate(context: ExecutionContext) -> None:
 
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
     async with context.kv_driver.transaction() as txn:
-        labelset_list = await LabelsDataManager._get_labelset_ids(kbid, txn)
+        labelset_list = await datamanagers.labels._get_labelset_ids(txn, kbid=kbid)
         if labelset_list is not None:
             logger.info("No need for labelset list migration", extra={"kbid": kbid})
             return
 
-        labelset_list = await LabelsDataManager._deprecated_scan_labelset_ids(kbid, txn)
-        await LabelsDataManager._set_labelset_ids(kbid, txn, labelset_list)
+        labelset_list = await datamanagers.labels._deprecated_scan_labelset_ids(
+            txn, kbid=kbid
+        )
+        await datamanagers.labels._set_labelset_ids(
+            txn, kbid=kbid, labelsets=labelset_list
+        )
         logger.info("Labelset list migrated", extra={"kbid": kbid})
         await txn.commit()

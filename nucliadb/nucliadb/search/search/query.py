@@ -25,10 +25,7 @@ from typing import Any, Awaitable, Optional, Union
 from async_lru import alru_cache
 from nucliadb_protos.noderesources_pb2 import Resource
 
-from nucliadb.common.datamanagers.entities import EntitiesDataManager, EntitiesMetaCache
-from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
-from nucliadb.common.datamanagers.labels import LabelsDataManager
-from nucliadb.common.maindb.utils import get_driver
+from nucliadb.common import datamanagers
 from nucliadb.ingest.orm.synonyms import Synonyms
 from nucliadb.middleware.transaction import get_read_only_transaction
 from nucliadb.search import logger
@@ -163,7 +160,9 @@ class QueryParser:
             )
         return self._detected_entities_task
 
-    def _get_entities_meta_cache(self) -> Awaitable[EntitiesMetaCache]:
+    def _get_entities_meta_cache(
+        self,
+    ) -> Awaitable[datamanagers.entities.EntitiesMetaCache]:
         if self._entities_meta_cache_task is None:
             self._entities_meta_cache_task = asyncio.create_task(
                 get_entities_meta_cache(self.kbid)
@@ -509,7 +508,7 @@ async def detect_entities(kbid: str, query: str) -> list[utils_pb2.RelationNode]
 
 
 def expand_entities(
-    meta_cache: EntitiesMetaCache,
+    meta_cache: datamanagers.entities.EntitiesMetaCache,
     detected_entities: list[utils_pb2.RelationNode],
 ) -> list[utils_pb2.RelationNode]:
     """
@@ -628,8 +627,7 @@ PROCESSING_STATUS_TO_PB_MAP = {
 @query_parse_dependency_observer.wrap({"type": "min_score"})
 async def get_kb_model_default_min_score(kbid: str) -> Optional[float]:
     txn = await get_read_only_transaction()
-    kbdm = KnowledgeBoxDataManager(get_driver(), read_only_txn=txn)
-    model = await kbdm.get_model_metadata(kbid)
+    model = await datamanagers.kb.get_model_metadata(txn, kbid=kbid)
     if model.HasField("default_min_score"):
         return model.default_min_score
     else:
@@ -652,23 +650,23 @@ async def get_kb_synonyms(kbid: str) -> Optional[knowledgebox_pb2.Synonyms]:
 
 
 @query_parse_dependency_observer.wrap({"type": "entities_meta_cache"})
-async def get_entities_meta_cache(kbid: str) -> EntitiesMetaCache:
+async def get_entities_meta_cache(kbid: str) -> datamanagers.entities.EntitiesMetaCache:
     txn = await get_read_only_transaction()
-    return await EntitiesDataManager.get_entities_meta_cache(kbid, txn)
+    return await datamanagers.entities.get_entities_meta_cache(txn, kbid=kbid)
 
 
 @query_parse_dependency_observer.wrap({"type": "deleted_entities_groups"})
 async def get_deleted_entity_groups(kbid: str) -> list[str]:
     txn = await get_read_only_transaction()
     return list(
-        (await EntitiesDataManager.get_deleted_groups(kbid, txn)).entities_groups
+        (await datamanagers.entities.get_deleted_groups(txn, kbid=kbid)).entities_groups
     )
 
 
 @query_parse_dependency_observer.wrap({"type": "classification_labels"})
 async def get_classification_labels(kbid: str) -> knowledgebox_pb2.Labels:
     txn = await get_read_only_transaction()
-    return await LabelsDataManager.inner_get_labels(kbid, txn)
+    return await datamanagers.labels.get_labels(txn, kbid=kbid)
 
 
 def check_supported_filters(filters: dict[str, Any], paragraph_labels: list[str]):

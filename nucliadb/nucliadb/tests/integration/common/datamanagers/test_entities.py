@@ -19,7 +19,7 @@
 #
 import pytest
 
-from nucliadb.common.datamanagers.entities import EntitiesDataManager
+from nucliadb.common import datamanagers
 
 pytestmark = pytest.mark.asyncio
 
@@ -31,12 +31,16 @@ async def test_set_duplicate_entities_index(maindb_driver):
         }
     }
     async with maindb_driver.transaction() as txn:
-        meta_cache = await EntitiesDataManager.get_entities_meta_cache("kbid", txn)
+        meta_cache = await datamanagers.entities.get_entities_meta_cache(
+            txn, kbid="kbid"
+        )
         meta_cache.set_duplicates("ORG", duplicates["ORG"])
-        await EntitiesDataManager.set_entities_meta_cache("kbid", meta_cache, txn)
+        await datamanagers.entities.set_entities_meta_cache(
+            txn, kbid="kbid", cache=meta_cache
+        )
         await txn.commit()
 
     async with maindb_driver.transaction() as txn:
         assert (
-            await EntitiesDataManager.get_entities_meta_cache("kbid", txn)
+            await datamanagers.entities.get_entities_meta_cache(txn, kbid="kbid")
         ).duplicate_entities == duplicates

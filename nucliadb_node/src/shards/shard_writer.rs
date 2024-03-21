@@ -20,7 +20,6 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use nucliadb_core::metrics::vectors::MergeSource;
 use nucliadb_core::paragraphs::*;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::shard_created::{DocumentService, ParagraphService, RelationService, VectorService};
@@ -450,8 +449,8 @@ impl ShardWriter {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn merge(&self, source: MergeSource) -> NodeResult<MergeMetrics> {
-        let runner = read_rw_lock(&self.vector_writer).prepare_merge()?;
+    pub fn merge(&self, context: MergeContext) -> NodeResult<MergeMetrics> {
+        let runner = read_rw_lock(&self.vector_writer).prepare_merge(context.parameters)?;
         let Some(mut runner) = runner else {
             return Ok(MergeMetrics {
                 merged: 0,
@@ -459,7 +458,7 @@ impl ShardWriter {
             });
         };
         let merge_result = runner.run()?;
-        let metrics = write_rw_lock(&self.vector_writer).finish_merge(merge_result, source)?;
+        let metrics = write_rw_lock(&self.vector_writer).record_merge(merge_result, context.source)?;
         self.metadata.new_generation_id();
 
         Ok(metrics)

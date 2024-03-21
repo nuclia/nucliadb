@@ -28,11 +28,10 @@ from nucliadb_protos.noderesources_pb2 import Shard
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb_protos.writer_pb2 import Shards
 
+from nucliadb.common import datamanagers
 from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.cluster.manager import choose_node
 from nucliadb.common.cluster.utils import get_shard_manager
-from nucliadb.common.datamanagers.resources import ResourcesDataManager
-from nucliadb.common.maindb.utils import get_driver
 from nucliadb.search import logger
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
@@ -46,7 +45,6 @@ from nucliadb_models.search import (
 )
 from nucliadb_telemetry import errors
 from nucliadb_utils.authentication import requires, requires_one
-from nucliadb_utils.utilities import get_storage
 
 AVG_PARAGRAPH_SIZE_BYTES = 10_000
 
@@ -157,21 +155,31 @@ async def knowledgebox_counters(
         paragraph_count += shard.paragraphs
         sentence_count += shard.sentences
 
-    res_dm = ResourcesDataManager(get_driver(), await get_storage())
-    try:
-        if len(shard_groups) <= 1:
-            # for smaller kbs, this is faster and more up to date
-            resource_count = await res_dm.calculate_number_of_resources(kbid)
-        else:
-            resource_count = await res_dm.get_number_of_resources(kbid)
-            if resource_count == -1:
-                # WARNING: standalone, this value will never be cached
-                resource_count = await res_dm.calculate_number_of_resources(kbid)
-    except Exception as exc:
-        errors.capture_exception(exc)
-        raise HTTPException(
-            status_code=500, detail="Couldn't retrieve counters right now"
-        )
+    async with datamanagers.with_transaction() as txn:
+        try:
+            if len(shard_groups) <= 1:
+                # for smaller kbs, this is faster and more up to date
+                resource_count = (
+                    await datamanagers.resources.calculate_number_of_resources(
+                        txn, kbid=kbid
+                    )
+                )
+            else:
+                resource_count = await datamanagers.resources.get_number_of_resources(
+                    txn, kbid=kbid
+                )
+                if resource_count == -1:
+                    # WARNING: standalone, this value will never be cached
+                    resource_count = (
+                        await datamanagers.resources.calculate_number_of_resources(
+                            txn, kbid=kbid
+                        )
+                    )
+        except Exception as exc:
+            errors.capture_exception(exc)
+            raise HTTPException(
+                status_code=500, detail="Couldn't retrieve counters right now"
+            )
 
     counters = KnowledgeboxCounters(
         resources=resource_count,

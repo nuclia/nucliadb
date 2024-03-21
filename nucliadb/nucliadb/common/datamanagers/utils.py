@@ -17,11 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import contextlib
 from typing import Optional, Type, TypeVar
 
 from google.protobuf.message import Message
 
 from nucliadb.common.maindb.driver import Transaction
+from nucliadb.common.maindb.utils import get_driver
 
 PB_TYPE = TypeVar("PB_TYPE", bound=Message)
 
@@ -36,3 +38,12 @@ async def get_kv_pb(
         return kb_shards
     else:
         return None
+
+
+@contextlib.asynccontextmanager
+async def with_transaction(read_only: bool = False, wait_for_abort: bool = True):
+    driver = get_driver()
+    async with driver.transaction(
+        read_only=read_only, wait_for_abort=wait_for_abort
+    ) as txn:
+        yield txn

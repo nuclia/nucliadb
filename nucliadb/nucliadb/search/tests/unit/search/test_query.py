@@ -99,19 +99,9 @@ def read_only_txn():
 
 
 @pytest.fixture()
-def driver(read_only_txn):
-    driver = unittest.mock.MagicMock()
-    driver.transaction.return_value.__aenter__.return_value = read_only_txn
-    with unittest.mock.patch(f"{QUERY_MODULE}.get_driver", return_value=driver):
-        yield driver
-
-
-@pytest.fixture()
-def kbdm(read_only_txn, driver):
+def kbdm(read_only_txn):
     kbdm = unittest.mock.AsyncMock()
-    with unittest.mock.patch(
-        f"{QUERY_MODULE}.KnowledgeBoxDataManager", return_value=kbdm
-    ):
+    with unittest.mock.patch(f"{QUERY_MODULE}.datamanagers.kb", kbdm):
         yield kbdm
 
 

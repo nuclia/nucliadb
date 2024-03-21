@@ -27,16 +27,13 @@ use crate::data_types::dtrie_ram::DTrie;
 use crate::{VectorErr, VectorR};
 use fs2::FileExt;
 use nucliadb_core::metrics::get_metrics;
-use nucliadb_core::vectors::{MergeResults, MergeRunner};
+use nucliadb_core::vectors::{MergeParameters, MergeResults, MergeRunner};
 use nucliadb_core::{tracing, NodeResult};
 use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
 use std::mem;
 use std::path::{Path, PathBuf};
 use std::time::{Instant, SystemTime};
-
-const MAX_NODES_IN_MERGE: &str = "MAX_NODES_IN_MERGE";
-const SEGMENTS_BEFORE_MERGE: &str = "SEGMENTS_BEFORE_MERGE";
 
 fn persist_state(path: &Path, state: &State) -> VectorR<()> {
     let temporal_path = path.join(TEMP_STATE);
@@ -148,8 +145,6 @@ struct OnlineDataPoint {
 }
 
 pub struct Writer {
-    max_nodes_in_merge: usize,
-    segments_before_merge: usize,
     has_uncommitted_changes: bool,
     metadata: IndexMetadata,
     path: PathBuf,
@@ -182,12 +177,12 @@ impl Writer {
         self.has_uncommitted_changes = true;
     }
 
-    pub fn prepare_merge(&self) -> VectorR<Option<Box<dyn MergeRunner>>> {
+    pub fn prepare_merge(&self, parameters: MergeParameters) -> VectorR<Option<Box<dyn MergeRunner>>> {
         if self.has_uncommitted_changes {
             return Err(VectorErr::UncommittedChangesError);
         }
 
-        if self.online_data_points.len() < self.segments_before_merge {
+        if self.online_data_points.len() < parameters.segments_before_merge {
             return Ok(None);
         }
 
@@ -199,13 +194,13 @@ impl Writer {
         live_segments.sort_unstable_by_key(|i| std::cmp::Reverse(i.journal.no_nodes()));
 
         let dtrie_copy = self.delete_log.clone();
-        while nodes_in_merge < self.max_nodes_in_merge {
+        while nodes_in_merge < parameters.max_nodes_in_merge {
             let Some(online_data_point) = live_segments.pop() else {
                 break;
             };
             let data_point_size = online_data_point.journal.no_nodes();
 
-            if data_point_size + nodes_in_merge > self.max_nodes_in_merge {
+            if data_point_size + nodes_in_merge > parameters.max_nodes_in_merge {
                 break;
             }
 
@@ -249,19 +244,6 @@ impl Writer {
         self.online_data_points = keep;
 
         Ok(())
-    }
-
-    pub fn merge(&mut self) -> NodeResult<nucliadb_core::vectors::MergeMetrics> {
-        let prepared = self.prepare_merge()?;
-        let Some(mut prepared) = prepared else {
-            return Ok(nucliadb_core::vectors::MergeMetrics {
-                merged: 0,
-                left: self.online_data_points.len(),
-            });
-        };
-        let result = prepared.run()?;
-        self.record_merge(result.as_ref())?;
-        Ok(result.get_metrics())
     }
 
     pub fn abort(&mut self) {
@@ -336,14 +318,6 @@ impl Writer {
 
         let writing_path = path.join(WRITING_FLAG);
         let writing_file = File::create(writing_path)?;
-        let max_nodes_in_merge: usize = match std::env::var(MAX_NODES_IN_MERGE) {
-            Ok(v) => v.parse().unwrap_or(50_000),
-            Err(_) => 50_000,
-        };
-        let segments_before_merge: usize = match std::env::var(SEGMENTS_BEFORE_MERGE) {
-            Ok(v) => v.parse().unwrap_or(100),
-            Err(_) => 100,
-        };
 
         if writing_file.try_lock_exclusive().is_err() {
             return Err(VectorErr::MultipleWritersError);
@@ -354,8 +328,6 @@ impl Writer {
 
         Ok(Writer {
             metadata,
-            segments_before_merge,
-            max_nodes_in_merge,
             path: path.to_path_buf(),
             added_data_points: Vec::new(),
             added_to_delete_log: Vec::new(),
@@ -386,14 +358,6 @@ impl Writer {
             let metadata = IndexMetadata::default();
             metadata.write(path).map(|_| metadata)
         })?;
-        let max_nodes_in_merge: usize = match std::env::var(MAX_NODES_IN_MERGE) {
-            Ok(v) => v.parse().unwrap_or(50_000),
-            Err(_) => 50_000,
-        };
-        let segments_before_merge: usize = match std::env::var(SEGMENTS_BEFORE_MERGE) {
-            Ok(v) => v.parse().unwrap_or(100),
-            Err(_) => 100,
-        };
 
         let state_path = path.join(STATE);
         let state_file = File::open(state_path)?;
@@ -428,8 +392,6 @@ impl Writer {
             delete_log,
             dimension,
             number_of_embeddings,
-            max_nodes_in_merge,
-            segments_before_merge,
             added_data_points: Vec::new(),
             added_to_delete_log: Vec::new(),
             path: path.to_path_buf(),
@@ -507,7 +469,10 @@ mod test {
 
         let mut writer = Writer::new(&vectors_path, IndexMetadata::default()).unwrap();
         let mut data_points = vec![];
-        writer.segments_before_merge = 10;
+        let merge_parameters = MergeParameters {
+            segments_before_merge: 10,
+            max_nodes_in_merge: 50_000,
+        };
 
         for _ in 0..100 {
             let similarity = Similarity::Cosine;
@@ -525,7 +490,8 @@ mod test {
 
         writer.online_data_points = data_points;
 
-        let metrics = writer.merge().unwrap();
+        let metrics = writer.prepare_merge(merge_parameters).unwrap().unwrap().run().unwrap().get_metrics();
+
         assert_eq!(metrics.merged, 100);
         assert_eq!(metrics.left, 1);
     }
@@ -537,7 +503,10 @@ mod test {
 
         let mut writer = Writer::new(&vectors_path, IndexMetadata::default()).unwrap();
         let mut data_points = vec![];
-        writer.segments_before_merge = 1000;
+        let merge_parameters = MergeParameters {
+            segments_before_merge: 1000,
+            max_nodes_in_merge: 50_000,
+        };
 
         for _ in 0..50 {
             let similarity = Similarity::Cosine;
@@ -555,9 +524,8 @@ mod test {
 
         writer.online_data_points = data_points;
 
-        let metrics = writer.merge().unwrap();
-        assert_eq!(metrics.merged, 0);
-        assert_eq!(metrics.left, 50);
+        let merge_proposal = writer.prepare_merge(merge_parameters).unwrap();
+        assert!(merge_proposal.is_none());
     }
 
     #[test]
@@ -567,6 +535,10 @@ mod test {
 
         let mut writer = Writer::new(&vectors_path, IndexMetadata::default()).unwrap();
         let mut data_points = vec![];
+        let merge_parameters = MergeParameters {
+            segments_before_merge: 100,
+            max_nodes_in_merge: 50_000,
+        };
 
         for _ in 0..100 {
             let similarity = Similarity::Cosine;
@@ -584,12 +556,13 @@ mod test {
 
         writer.online_data_points = data_points;
 
-        let metrics = writer.merge().unwrap();
+        let result = writer.prepare_merge(merge_parameters).unwrap().unwrap().run().unwrap();
+        writer.record_merge(result.as_ref()).unwrap();
+        let metrics = result.get_metrics();
         assert_eq!(metrics.merged, 100);
         assert_eq!(metrics.left, 1);
 
-        let metrics = writer.merge().unwrap();
-        assert_eq!(metrics.merged, 0);
-        assert_eq!(metrics.left, 1);
+        let merge_proposal = writer.prepare_merge(merge_parameters).unwrap();
+        assert!(merge_proposal.is_none());
     }
 }

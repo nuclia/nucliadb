@@ -20,7 +20,7 @@
 
 import pytest
 
-from nucliadb.common.datamanagers import cluster as shards_data_manager
+from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.local import LocalDriver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -126,7 +126,7 @@ async def test_create_knowledgebox_release_channel(
 
     driver = grpc_servicer.servicer.driver
     async with driver.transaction() as txn:
-        shards = await shards_data_manager.get_kb_shards(txn, kbid)
+        shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
         assert shards is not None
         config = await get_kb_config(txn, kbid)
         assert shards.release_channel == config.release_channel == release_channel

@@ -27,6 +27,7 @@ import backoff
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata  # type: ignore
 from nucliadb_protos.nodewriter_pb2 import IndexMessage, IndexMessageSource, TypeMessage
 
+from nucliadb.common import datamanagers
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.exceptions import (
     ExhaustedNodesError,
@@ -37,11 +38,7 @@ from nucliadb.common.cluster.exceptions import (
     ShardNotFound,
     ShardsNotFound,
 )
-from nucliadb.common.datamanagers import cluster as shards_data_manager
-from nucliadb.common.datamanagers.cluster import ClusterDataManager
-from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
 from nucliadb.common.maindb.driver import Transaction
-from nucliadb.common.maindb.utils import get_driver
 from nucliadb_protos import (
     nodereader_pb2,
     noderesources_pb2,
@@ -125,13 +122,13 @@ def remove_index_node(node_id: str, primary_id: Optional[str] = None) -> None:
 class KBShardManager:
     # TODO: move to data manager
     async def get_shards_by_kbid_inner(self, kbid: str) -> writer_pb2.Shards:
-        cdm = ClusterDataManager(get_driver())
-        result = await cdm.get_kb_shards(kbid)
-        if result is None:
-            # could be None because /shards doesn't exist, or beacause the
-            # whole KB does not exist. In any case, this should not happen
-            raise ShardsNotFound(kbid)
-        return result
+        async with datamanagers.with_transaction(read_only=True) as txn:
+            result = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+            if result is None:
+                # could be None because /shards doesn't exist, or beacause the
+                # whole KB does not exist. In any case, this should not happen
+                raise ShardsNotFound(kbid)
+            return result
 
     # TODO: move to data manager
     async def get_shards_by_kbid(self, kbid: str) -> list[writer_pb2.ShardObject]:
@@ -172,7 +169,7 @@ class KBShardManager:
     async def get_current_active_shard(
         self, txn: Transaction, kbid: str
     ) -> Optional[writer_pb2.ShardObject]:
-        kb_shards = await shards_data_manager.get_kb_shards(txn, kbid)
+        kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
         if kb_shards is None:
             return None
 
@@ -213,7 +210,7 @@ class KBShardManager:
             )
             raise
 
-        kb_shards = await shards_data_manager.get_kb_shards(txn, kbid)
+        kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
         if kb_shards is None:
             # First logic shard on the index
             kb_shards = writer_pb2.Shards()
@@ -280,7 +277,7 @@ class KBShardManager:
         # B/c with Shards.actual
         kb_shards.actual += 1
 
-        await shards_data_manager.update_kb_shards(txn, kbid, kb_shards)
+        await datamanagers.cluster.update_kb_shards(txn, kbid=kbid, shards=kb_shards)
 
         return shard
 
@@ -399,11 +396,9 @@ class KBShardManager:
             return
 
         logger.warning({"message": "Adding shard", "kbid": kbid})
-        driver = get_driver()
-        kbdm = KnowledgeBoxDataManager(driver)
-        model = await kbdm.get_model_metadata(kbid)
 
-        async with driver.transaction() as txn:
+        async with datamanagers.with_transaction() as txn:
+            model = await datamanagers.kb.get_model_metadata(txn, kbid=kbid)
             await self.create_shard_by_kbid(
                 txn,
                 kbid,

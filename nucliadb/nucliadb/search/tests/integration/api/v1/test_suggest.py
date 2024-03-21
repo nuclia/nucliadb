@@ -25,10 +25,10 @@ from nucliadb_protos.nodereader_pb2 import SuggestFeatures, SuggestRequest
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 
 from nucliadb.common.cluster.manager import INDEX_NODES
+from nucliadb.common.datamanagers.cluster import KB_SHARDS
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_utils.keys import KB_SHARDS
 
 
 @pytest.mark.flaky(reruns=5)

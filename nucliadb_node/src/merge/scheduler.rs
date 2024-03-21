@@ -28,17 +28,23 @@ use std::{
 };
 
 use anyhow::anyhow;
-use nucliadb_core::vectors::MergeMetrics;
+use nucliadb_core::vectors::{MergeMetrics, MergeParameters};
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::{Receiver, Sender};
 
 use crate::{settings::Settings, shards::providers::shard_cache::ShardWriterCache};
 use nucliadb_core::metrics::vectors::MergeSource;
 use nucliadb_core::tracing::warn;
+use nucliadb_core::vectors::MergeContext;
 use nucliadb_core::NodeResult;
 
 use super::work::WorkQueue;
 use crate::merge::{MergePriority, MergeRequest, MergeWaiter};
+
+const SCHEDULER_MAX_NODES_IN_MERGE: &str = "SCHEDULER_MAX_NODES_IN_MERGE";
+const SCHEDULER_SEGMENTS_BEFORE_MERGE: &str = "SCHEDULER_SEGMENTS_BEFORE_MERGE";
+const ON_COMMIT_MAX_NODES_IN_MERGE: &str = "MAX_NODES_IN_MERGE";
+const ON_COMMIT_SEGMENTS_BEFORE_MERGE: &str = "SEGMENTS_BEFORE_MERGE";
 
 /// Merge scheduler is the responsible for scheduling merges in the vectors
 /// index. When running, it takes the most prioritary merge request, takes a
@@ -49,16 +55,42 @@ pub struct MergeScheduler {
     settings: Settings,
     condvar: Condvar,
     shutdown: AtomicBool,
+    on_commit_parameters: MergeParameters,
+    scheduler_parameters: MergeParameters,
 }
 
 impl MergeScheduler {
     pub fn new(shard_cache: Arc<ShardWriterCache>, settings: Settings) -> Self {
+        let idle_parameters = MergeParameters {
+            max_nodes_in_merge: match std::env::var(SCHEDULER_MAX_NODES_IN_MERGE) {
+                Ok(v) => v.parse().unwrap_or(50_000),
+                Err(_) => 50_000,
+            },
+            segments_before_merge: match std::env::var(SCHEDULER_SEGMENTS_BEFORE_MERGE) {
+                Ok(v) => v.parse().unwrap_or(2),
+                Err(_) => 2,
+            },
+        };
+
+        let on_commit_parameters = MergeParameters {
+            max_nodes_in_merge: match std::env::var(ON_COMMIT_MAX_NODES_IN_MERGE) {
+                Ok(v) => v.parse().unwrap_or(50_000),
+                Err(_) => 50_000,
+            },
+            segments_before_merge: match std::env::var(ON_COMMIT_SEGMENTS_BEFORE_MERGE) {
+                Ok(v) => v.parse().unwrap_or(2),
+                Err(_) => 100,
+            },
+        };
+
         Self {
-            work_queue: Mutex::new(WorkQueue::new()),
             shard_cache,
             settings,
+            work_queue: Mutex::new(WorkQueue::new()),
             condvar: Condvar::default(),
             shutdown: AtomicBool::new(false),
+            on_commit_parameters,
+            scheduler_parameters: idle_parameters,
         }
     }
 
@@ -163,7 +195,15 @@ impl MergeScheduler {
             // processed.
             return Ok(());
         };
-        let result = shard.merge(request.metrics_source);
+        let merge_context = MergeContext {
+            source: request.metrics_source,
+            parameters: if request.metrics_source == MergeSource::OnCommit {
+                self.on_commit_parameters
+            } else {
+                self.scheduler_parameters
+            },
+        };
+        let result = shard.merge(merge_context);
 
         // When a notifier is requested, send the merge result and let the
         // caller be responsible to handle errors

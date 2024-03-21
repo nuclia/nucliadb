@@ -16,7 +16,7 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fs;
 use std::path::PathBuf;
@@ -74,8 +74,8 @@ impl MergeResults for DummyMergeResults {
         todo!()
     }
 
-    fn record_metrics(&self, source: MergeSource) {
-        // nop
+    fn record_metrics(&self, _source: MergeSource) {
+        todo!()
     }
 
     fn get_metrics(&self) -> MergeMetrics {
@@ -90,13 +90,13 @@ impl VectorWriter for VectorWriterService {
         Ok(())
     }
 
-    fn prepare_merge(&self) -> NodeResult<Option<Box<dyn MergeRunner>>> {
+    fn prepare_merge(&self, _parameters: MergeParameters) -> NodeResult<Option<Box<dyn MergeRunner>>> {
         Ok(Some(Box::new(DummyPreparedMerge())))
     }
 
     #[measure(actor = "vectors", metric = "finish_merge")]
     #[tracing::instrument(skip_all)]
-    fn finish_merge(&mut self, _merge_result: Box<dyn MergeResults>, _source: MergeSource) -> NodeResult<MergeMetrics> {
+    fn record_merge(&mut self, _merge_result: Box<dyn MergeResults>, _source: MergeSource) -> NodeResult<MergeMetrics> {
         let time = Instant::now();
         let lock = self.index.get_slock()?;
         let inner_metrics = self.index.force_merge(&lock)?;

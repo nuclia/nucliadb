@@ -98,7 +98,9 @@ async fn main() -> NodeResult<()> {
     let (shutdown_notifier, shutdown_notified) = get_shutdown_notifier();
     let shard_cache = Arc::new(ShardWriterCache::new(settings.clone()));
 
-    lifecycle::initialize_merger(Arc::clone(&shard_cache), settings.clone())?;
+    if settings.node_role() == NodeRole::Primary {
+        lifecycle::initialize_merger(Arc::clone(&shard_cache), settings.clone())?;
+    }
 
     let mut replication_task = None;
     if settings.node_role() == NodeRole::Secondary {

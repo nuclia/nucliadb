@@ -25,8 +25,8 @@ from typing import Optional
 
 import async_timeout
 
+from nucliadb.common import datamanagers
 from nucliadb.common.context import ApplicationContext
-from nucliadb.common.datamanagers.resources import ResourcesDataManager
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.reader import logger
 from nucliadb_models.notifications import (
@@ -220,7 +220,9 @@ async def get_resource_title(
     kv_driver: Driver, kbid: str, resource_uuid: str
 ) -> Optional[str]:
     async with kv_driver.transaction(read_only=True) as txn:
-        basic = await ResourcesDataManager.get_resource_basic(txn, kbid, resource_uuid)
+        basic = await datamanagers.resources.get_resource_basic(
+            txn, kbid=kbid, rid=resource_uuid
+        )
         if basic is None:
             return None
         return basic.title

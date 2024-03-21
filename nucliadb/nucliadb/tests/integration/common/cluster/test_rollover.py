@@ -20,9 +20,9 @@
 import pytest
 from httpx import AsyncClient
 
+from nucliadb.common import datamanagers
 from nucliadb.common.cluster import rollover
 from nucliadb.common.context import ApplicationContext
-from nucliadb.common.datamanagers.cluster import ClusterDataManager
 
 pytestmark = pytest.mark.asyncio
 
@@ -88,9 +88,8 @@ async def test_rollover_kb_shards_does_a_clean_cutover(
     knowledgebox,
 ):
     async def get_kb_shards(kbid: str):
-        driver = app_context.kv_driver
-        cluster_data_manager = ClusterDataManager(driver)
-        return await cluster_data_manager.get_kb_shards(kbid)
+        async with app_context.kv_driver.transaction() as txn:
+            return await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
 
     shards1 = await get_kb_shards(knowledgebox)
     assert shards1.extra == {}

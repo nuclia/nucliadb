@@ -17,3 +17,27 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+# ==============================================================================
+# Rules for datamanagers:
+#   - Try to be consistent
+#   - All datamanagers should be imported in __init__.py
+#   - Manage keys of K/V Storage and try not to leak them
+#   - Transactions are managed OUTSIDE of the datamanagers module
+#   - There shouldn't be ANY db commits in the datamanagers module, that is handled outside right now.
+#   - Module level functions only
+#   - First argument is always a transaction, all other arguments are keyword arguments and must be explicit
+#     (better for readability and code editors)
+# ==============================================================================
+from . import cluster, entities, exceptions, kb, labels, resources, rollover
+from .utils import with_transaction
+
+__all__ = (
+    "cluster",
+    "kb",
+    "entities",
+    "labels",
+    "resources",
+    "rollover",
+    "exceptions",
+    "with_transaction",
+)
