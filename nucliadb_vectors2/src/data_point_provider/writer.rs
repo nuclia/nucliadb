@@ -362,12 +362,6 @@ impl Writer {
         for data_point_id in data_point_list {
             let data_point_pin = DataPointPin::open_pin(path, data_point_id)?;
             let data_point_journal = data_point_pin.read_journal()?;
-
-            if dimension.is_none() {
-                let data_point = data_point::open(&data_point_pin)?;
-                dimension = data_point.stored_len();
-            }
-
             let online_data_point = OnlineDataPoint {
                 pin: data_point_pin,
                 journal: data_point_journal,
@@ -375,6 +369,13 @@ impl Writer {
 
             number_of_embeddings += online_data_point.journal.no_nodes();
             online_data_points.push(online_data_point);
+        }
+
+        if dimension.is_none() {
+            if let Some(online_data_point) = online_data_points.first() {
+                let open_data_point = data_point::open(&online_data_point.pin)?;
+                dimension = open_data_point.stored_len();
+            }
         }
 
         Ok(Writer {
