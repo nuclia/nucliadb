@@ -28,6 +28,7 @@ use std::{
 };
 
 use anyhow::anyhow;
+use nucliadb_core::merge::MergeRequester;
 use nucliadb_core::vectors::{MergeMetrics, MergeParameters};
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::{Receiver, Sender};
@@ -242,6 +243,12 @@ impl MergeScheduler {
     #[cfg(test)]
     pub fn pending_work(&self) -> usize {
         self.work_queue.lock().unwrap().len()
+    }
+}
+
+impl MergeRequester for MergeScheduler {
+    fn request_merge(&self, request: MergeRequest) {
+        self.schedule(request);
     }
 }
 

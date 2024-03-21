@@ -68,7 +68,7 @@ fn main() -> std::io::Result<()> {
     let location = at.path().join("vectors");
     println!("Vector location: {:?}", location);
 
-    let writer = Writer::new(&location, IndexMetadata::default()).unwrap();
+    let writer = Writer::new(&location, IndexMetadata::default(), "abc".into()).unwrap();
     let batch_size = args.batch_size();
     let plotw = PlotWriter::new(args.writer_plot().unwrap());
     let vector_it = RandomVectors::new(args.embedding_dim()).take(args.index_len());

@@ -52,6 +52,7 @@ pub struct VectorConfig {
     pub path: PathBuf,
     pub vectorset: PathBuf,
     pub channel: Channel,
+    pub shard_id: String,
 }
 
 // In an ideal world this should be part of the actual request, but since

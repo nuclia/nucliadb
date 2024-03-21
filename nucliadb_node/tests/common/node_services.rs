@@ -23,6 +23,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::Duration;
 
+use nucliadb_core::merge::MergerError;
 use nucliadb_core::protos::node_reader_client::NodeReaderClient;
 use nucliadb_core::protos::node_reader_server::NodeReaderServer;
 use nucliadb_core::protos::node_writer_client::NodeWriterClient;
@@ -30,7 +31,6 @@ use nucliadb_core::protos::node_writer_server::NodeWriterServer;
 use nucliadb_node::grpc::reader::NodeReaderGRPCDriver;
 use nucliadb_node::grpc::writer::NodeWriterGRPCDriver;
 use nucliadb_node::lifecycle;
-use nucliadb_node::merge::errors::MergerError;
 use nucliadb_node::replication::replicator::connect_to_primary_and_replicate;
 use nucliadb_node::replication::service::ReplicationServiceGRPCDriver;
 use nucliadb_node::settings::*;

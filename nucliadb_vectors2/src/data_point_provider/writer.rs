@@ -26,6 +26,7 @@ use crate::data_point_provider::{IndexMetadata, OPENING_FLAG, STATE, TEMP_STATE,
 use crate::data_types::dtrie_ram::DTrie;
 use crate::{VectorErr, VectorR};
 use fs2::FileExt;
+use nucliadb_core::merge::{send_merge_request, MergePriority, MergeRequest};
 use nucliadb_core::metrics::get_metrics;
 use nucliadb_core::vectors::{MergeParameters, MergeResults, MergeRunner};
 use nucliadb_core::{tracing, NodeResult};
@@ -156,6 +157,7 @@ pub struct Writer {
     number_of_embeddings: usize,
     #[allow(unused)]
     writing: File,
+    shard_id: String,
 }
 
 impl Writer {
@@ -243,6 +245,10 @@ impl Writer {
         keep.push(new_online_data_point);
         self.online_data_points = keep;
 
+        if let Some(oldest_age) = self.online_data_points.iter().map(|dp| dp.journal.time()).reduce(std::cmp::min) {
+            self.delete_log.prune(oldest_age);
+        }
+
         Ok(())
     }
 
@@ -307,12 +313,16 @@ impl Writer {
         self.has_uncommitted_changes = false;
         self.number_of_embeddings = number_of_embeddings;
 
-        // TODO: Enqueue merge job
+        let _ = send_merge_request(MergeRequest {
+            shard_id: self.shard_id.clone(),
+            priority: MergePriority::Low,
+            waiter: nucliadb_core::merge::MergeWaiter::None,
+        });
 
         Ok(())
     }
 
-    pub fn new(path: &Path, metadata: IndexMetadata) -> VectorR<Writer> {
+    pub fn new(path: &Path, metadata: IndexMetadata, shard_id: String) -> VectorR<Writer> {
         std::fs::create_dir(path)?;
         File::create(path.join(OPENING_FLAG))?;
 
@@ -337,10 +347,11 @@ impl Writer {
             dimension: None,
             number_of_embeddings: 0,
             writing: writing_file,
+            shard_id,
         })
     }
 
-    pub fn open(path: &Path) -> VectorR<Writer> {
+    pub fn open(path: &Path, shard_id: String) -> VectorR<Writer> {
         let writing_path = path.join(WRITING_FLAG);
         let writing_file = File::create(writing_path)?;
 
@@ -397,6 +408,7 @@ impl Writer {
             path: path.to_path_buf(),
             has_uncommitted_changes: false,
             writing: writing_file,
+            shard_id,
         })
     }
 
@@ -467,7 +479,7 @@ mod test {
         let dir = tempfile::tempdir().unwrap();
         let vectors_path = dir.path().join("vectors");
 
-        let mut writer = Writer::new(&vectors_path, IndexMetadata::default()).unwrap();
+        let mut writer = Writer::new(&vectors_path, IndexMetadata::default(), "abc".into()).unwrap();
         let mut data_points = vec![];
         let merge_parameters = MergeParameters {
             segments_before_merge: 10,
@@ -501,7 +513,7 @@ mod test {
         let dir = tempfile::tempdir().unwrap();
         let vectors_path = dir.path().join("vectors");
 
-        let mut writer = Writer::new(&vectors_path, IndexMetadata::default()).unwrap();
+        let mut writer = Writer::new(&vectors_path, IndexMetadata::default(), "abc".into()).unwrap();
         let mut data_points = vec![];
         let merge_parameters = MergeParameters {
             segments_before_merge: 1000,
@@ -533,7 +545,7 @@ mod test {
         let dir = tempfile::tempdir().unwrap();
         let vectors_path = dir.path().join("vectors");
 
-        let mut writer = Writer::new(&vectors_path, IndexMetadata::default()).unwrap();
+        let mut writer = Writer::new(&vectors_path, IndexMetadata::default(), "abc".into()).unwrap();
         let mut data_points = vec![];
         let merge_parameters = MergeParameters {
             segments_before_merge: 100,

@@ -400,8 +400,8 @@ impl VectorWriterService {
                 channel: config.channel,
             };
             Ok(VectorWriterService {
-                index: Writer::new(path, index_metadata)?,
-                indexset: WriterSet::new(indexset)?,
+                index: Writer::new(path, index_metadata, config.shard_id.clone())?,
+                indexset: WriterSet::new(indexset, config.shard_id.clone())?,
                 config: config.clone(),
             })
         }
@@ -415,8 +415,8 @@ impl VectorWriterService {
             Err(node_error!("Shard does not exist".to_string()))
         } else {
             Ok(VectorWriterService {
-                index: Writer::open(path)?,
-                indexset: WriterSet::new(indexset)?,
+                index: Writer::open(path, config.shard_id.clone())?,
+                indexset: WriterSet::new(indexset, config.shard_id.clone())?,
                 config: config.clone(),
             })
         }
@@ -477,6 +477,7 @@ mod tests {
             path: dir.path().join("vectors"),
             vectorset: dir.path().join("vectorsets"),
             channel: Channel::EXPERIMENTAL,
+            shard_id: "abc".into(),
         };
 
         let mut writer = VectorWriterService::start(&vsc).expect("Error starting vector writer");
@@ -546,6 +547,7 @@ mod tests {
             path: dir.path().join("vectors"),
             vectorset: dir.path().join("vectorset"),
             channel: Channel::EXPERIMENTAL,
+            shard_id: "abc".into(),
         };
         let raw_sentences = [
             ("DOC/KEY/1/1".to_string(), vec![1.0, 3.0, 4.0]),
@@ -612,6 +614,7 @@ mod tests {
             path: dir.path().join("vectors"),
             vectorset: dir.path().join("vectorset"),
             channel: Channel::EXPERIMENTAL,
+            shard_id: "abc".into(),
         };
         let resource_id = ResourceId {
             shard_id: "DOC".to_string(),

@@ -559,6 +559,7 @@ mod tests {
             path: dir.path().join("vectors"),
             vectorset: dir.path().join("vectorsets"),
             channel: Channel::EXPERIMENTAL,
+            shard_id: "abc".into(),
         };
 
         let mut writer = VectorWriterService::start(&vsc).expect("Error starting vector writer");
@@ -626,6 +627,7 @@ mod tests {
             path: dir.path().join("vectors"),
             vectorset: dir.path().join("vectorset"),
             channel: Channel::EXPERIMENTAL,
+            shard_id: "abc".into(),
         };
         let raw_sentences = [
             ("DOC/KEY/1/1".to_string(), vec![1.0, 3.0, 4.0]),
@@ -692,6 +694,7 @@ mod tests {
             path: dir.path().join("vectors"),
             vectorset: dir.path().join("vectorset"),
             channel: Channel::EXPERIMENTAL,
+            shard_id: "abc".into(),
         };
         let resource_id = ResourceId {
             shard_id: "DOC".to_string(),
