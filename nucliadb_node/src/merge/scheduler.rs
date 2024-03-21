@@ -198,7 +198,7 @@ impl MergeScheduler {
         };
         let merge_context = MergeContext {
             source: request.metrics_source,
-            parameters: if request.metrics_source == MergeSource::OnCommit {
+            parameters: if request.metrics_source == MergeSource::Low {
                 self.on_commit_parameters
             } else {
                 self.scheduler_parameters
