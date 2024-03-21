@@ -144,9 +144,9 @@ def cached_back_pressure(kbid: str, resource_uuid: Optional[str] = None):
 
 class Materializer:
     """
-    Singleton class that will run in the background gatheringthe different stats to
-    apply back pressure and materializing it in memory. This allows us to do
-    stale-reads when checking if back pressure is needed for a particular
+    Singleton class that will run in the background gathering the different
+    stats to apply back pressure and materializing it in memory. This allows us
+    to do stale-reads when checking if back pressure is needed for a particular
     request - thus not slowing it down.
     """
 
