@@ -231,21 +231,21 @@ class Materializer:
     async def _get_indexing_pending_task(self):
         try:
             while True:
-                for node_id in get_index_nodes():
+                for node in get_index_nodes():
                     try:
                         with back_pressure_observer({"type": "get_indexing_pending"}):
                             self.indexing_pending[
-                                node_id
+                                node.id
                             ] = await get_nats_consumer_pending_messages(
                                 self.nats_manager,
                                 stream=const.Streams.INDEX.name,
-                                consumer=const.Streams.INDEX.group.format(node=node_id),
+                                consumer=const.Streams.INDEX.group.format(node=node.id),
                             )
                     except Exception:
                         logger.exception(
                             "Error getting pending messages to index",
                             exc_info=True,
-                            extra={"node_id": node_id},
+                            extra={"node_id": node.id},
                         )
                 await asyncio.sleep(self.indexing_check_interval)
         except asyncio.CancelledError:
