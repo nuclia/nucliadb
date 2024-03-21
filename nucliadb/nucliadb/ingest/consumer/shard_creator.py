@@ -22,7 +22,7 @@ import logging
 import uuid
 from functools import partial
 
-from nucliadb.common import datamanagers
+from nucliadb.common import datamanagers, locking
 from nucliadb.common.cluster.manager import choose_node
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.maindb.driver import Driver
@@ -102,13 +102,16 @@ class ShardCreatorHandler:
 
         # TODO: when multiple shards are allowed, this should either handle the
         # written shard or attempt to rebalance everything
-        node, shard_id = choose_node(current_shard)
-        shard: nodereader_pb2.Shard = await node.reader.GetShard(
-            nodereader_pb2.GetShardRequest(shard_id=noderesources_pb2.ShardId(id=shard_id))  # type: ignore
-        )
-        await self.shard_manager.maybe_create_new_shard(
-            kbid,
-            shard.paragraphs,
-            shard.fields,
-            kb_shards.release_channel,
-        )
+        async with locking.distributed_lock(locking.NEW_SHARD_LOCK.format(kbid=kbid)):
+            # remember, a lock will do at least 1+ reads and 1 write.
+            # with heavy writes, this adds some simple k/v pressure
+            node, shard_id = choose_node(current_shard)
+            shard: nodereader_pb2.Shard = await node.reader.GetShard(
+                nodereader_pb2.GetShardRequest(shard_id=noderesources_pb2.ShardId(id=shard_id))  # type: ignore
+            )
+            await self.shard_manager.maybe_create_new_shard(
+                kbid,
+                shard.paragraphs,
+                shard.fields,
+                kb_shards.release_channel,
+            )

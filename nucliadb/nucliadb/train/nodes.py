@@ -31,6 +31,7 @@ from nucliadb_protos.train_pb2 import (
 )
 from nucliadb_protos.writer_pb2 import ShardObject
 
+from nucliadb.common import datamanagers
 from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.maindb.driver import Driver, Transaction
@@ -62,7 +63,7 @@ class TrainShardManager(manager.KBShardManager):
         if kbid is None:
             return None
 
-        if not (await KnowledgeBox.exist_kb(txn, kbid)):
+        if not (await datamanagers.kb.exists_kb(txn, kbid=kbid)):
             return None
 
         kbobj = KnowledgeBox(txn, self.storage, kbid)

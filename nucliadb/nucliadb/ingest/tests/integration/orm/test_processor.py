@@ -21,9 +21,9 @@ import pytest
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig, SemanticModelMetadata
 from nucliadb_protos.utils_pb2 import VectorSimilarity
 
+from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.tests.fixtures import IngestFixture
 
 
@@ -68,6 +68,6 @@ async def test_create_knowledgebox(
 async def count_all_kbs(driver: Driver):
     count = 0
     async with driver.transaction(read_only=True) as txn:
-        async for _ in KnowledgeBox.get_kbs(txn, slug=""):
+        async for _ in datamanagers.kb.get_kbs(txn):
             count += 1
     return count

@@ -17,13 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from httpx import AsyncClient
 
-from nucliadb.common import datamanagers
-from nucliadb.common.cluster import rollover
+from nucliadb.common.cluster import rebalance
+from nucliadb.common.cluster.settings import settings
 from nucliadb.common.context import ApplicationContext
 
 pytestmark = pytest.mark.asyncio
@@ -33,21 +33,20 @@ pytestmark = pytest.mark.asyncio
 async def app_context(natsd, storage, nucliadb):
     ctx = ApplicationContext()
     await ctx.initialize()
-    ctx.nats_manager = MagicMock()
+    ctx.nats_manager = AsyncMock()
     ctx.nats_manager.js.consumer_info = AsyncMock(return_value=MagicMock(num_pending=1))
     yield ctx
     await ctx.finalize()
 
 
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_rollover_kb_shards(
+async def test_rebalance_kb_shards(
     app_context,
     knowledgebox,
     nucliadb_writer: AsyncClient,
-    nucliadb_reader: AsyncClient,
     nucliadb_manager: AsyncClient,
 ):
-    count = 20
+    count = 50
     for i in range(count):
         resp = await nucliadb_writer.post(
             f"/kb/{knowledgebox}/resources",
@@ -56,49 +55,32 @@ async def test_rollover_kb_shards(
                 "title": f"My Title {i}",
                 "summary": f"My summary {i}",
                 "icon": "text/plain",
+                "texts": {
+                    "textfield1": {"body": f"Some text {i}", "format": "PLAIN"},
+                    "textfield2": {"body": f"Some other text {i}", "format": "PLAIN"},
+                },
             },
         )
         assert resp.status_code == 201
 
-    resp = await nucliadb_manager.get(f"/kb/{knowledgebox}/shards")
-    assert resp.status_code == 200, resp.text
-    shards_body1 = resp.json()
+    counters1_resp = await nucliadb_manager.get(f"/kb/{knowledgebox}/counters")
+    shards1_resp = await nucliadb_manager.get(f"/kb/{knowledgebox}/shards")
+    counters1 = counters1_resp.json()
+    shards1 = shards1_resp.json()
 
-    await rollover.rollover_kb_shards(app_context, knowledgebox)
+    assert len(shards1["shards"]) == 1
 
-    resp = await nucliadb_manager.get(f"/kb/{knowledgebox}/shards")
-    assert resp.status_code == 200, resp.text
-    shards_body2 = resp.json()
-    # check that shards have changed
-    assert (
-        shards_body1["shards"][0]["replicas"][0]["shard"]["id"]
-        != shards_body2["shards"][0]["replicas"][0]["shard"]["id"]
-    )
+    with patch.object(settings, "max_shard_paragraphs", counters1["paragraphs"] / 2):
+        await rebalance.rebalance_kb(app_context, knowledgebox)
 
-    resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/find",
-        json={
-            "query": "title",
-        },
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert len(body["resources"]) == count
+    shards2_resp = await nucliadb_manager.get(f"/kb/{knowledgebox}/shards")
+    shards2 = shards2_resp.json()
+    assert len(shards2["shards"]) == 2
 
+    # if we run it again, we should get another shard
+    with patch.object(settings, "max_shard_paragraphs", counters1["paragraphs"] / 2):
+        await rebalance.rebalance_kb(app_context, knowledgebox)
 
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_rollover_kb_shards_does_a_clean_cutover(
-    app_context,
-    knowledgebox,
-):
-    async def get_kb_shards(kbid: str):
-        async with app_context.kv_driver.transaction() as txn:
-            return await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
-
-    shards1 = await get_kb_shards(knowledgebox)
-    assert shards1.extra == {}
-
-    await rollover.rollover_kb_shards(app_context, knowledgebox)
-
-    shards2 = await get_kb_shards(knowledgebox)
-    assert shards2.extra == {}
+    shards3_resp = await nucliadb_manager.get(f"/kb/{knowledgebox}/shards")
+    shards3 = shards3_resp.json()
+    assert len(shards3["shards"]) == 3

@@ -23,7 +23,7 @@ from typing import Optional
 
 import aiohttp.client_exceptions
 
-from nucliadb.common import datamanagers
+from nucliadb.common import datamanagers, locking
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
@@ -171,7 +171,14 @@ class Processor:
         kb = KnowledgeBox(txn, self.storage, message.kbid)
 
         uuid = await self.get_resource_uuid(kb, message)
-        shard_id = await kb.get_resource_shard_id(uuid)
+        async with locking.distributed_lock(
+            locking.RESOURCE_INDEX_LOCK.format(kbid=message.kbid, resource_id=uuid)
+        ):
+            # we need to have a lock at indexing time because we don't know if
+            # a resource was in the process of being moved when a delete occurred
+            shard_id = await datamanagers.resources.get_resource_shard_id(
+                txn, kbid=message.kbid, rid=uuid
+            )
         if shard_id is None:
             logger.warning(f"Resource {uuid} does not exist")
         else:
@@ -233,7 +240,7 @@ class Processor:
 
         txn = await self.driver.begin()
         kbid = messages[0].kbid
-        if not await KnowledgeBox.exist_kb(txn, kbid):
+        if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
             logger.warning(f"KB {kbid} is deleted: skiping txn")
             if transaction_check:
                 await sequence_manager.set_last_seqid(txn, partition, seqid)
@@ -371,7 +378,14 @@ class Processor:
     ) -> None:
         validate_indexable_resource(resource.indexer.brain)
 
-        shard_id = await kb.get_resource_shard_id(uuid)
+        async with locking.distributed_lock(
+            locking.RESOURCE_INDEX_LOCK.format(kbid=kbid, resource_id=uuid)
+        ):
+            # we need to have a lock at indexing time because we don't know if
+            # a resource was move to another shard while it was being indexed
+            shard_id = await datamanagers.resources.get_resource_shard_id(
+                txn, kbid=kbid, rid=uuid
+            )
 
         shard = None
         if shard_id is not None:
@@ -396,7 +410,9 @@ class Processor:
                     semantic_model=model,
                     release_channel=release_channel,
                 )
-            await kb.set_resource_shard_id(uuid, shard.shard)
+            await datamanagers.resources.set_resource_shard_id(
+                txn, kbid=kbid, rid=uuid, shard=shard.shard
+            )
 
         if shard is not None:
             index_message = resource.indexer.brain
@@ -582,7 +598,9 @@ class Processor:
             async with self.driver.transaction() as txn:
                 kb.txn = resource.txn = txn
 
-                shard_id = await kb.get_resource_shard_id(resource.uuid)
+                shard_id = await datamanagers.resources.get_resource_shard_id(
+                    txn, kbid=kb.kbid, rid=resource.uuid
+                )
                 shard = None
                 if shard_id is not None:
                     shard = await kb.get_resource_shard(shard_id)
@@ -613,12 +631,12 @@ class Processor:
     ) -> Optional[KnowledgeBox]:
         uuid: Optional[str] = kbid.uuid
         if uuid == "":
-            uuid = await KnowledgeBox.get_kb_uuid(txn, kbid.slug)
+            uuid = await datamanagers.kb.get_kb_uuid(txn, slug=kbid.slug)
 
         if uuid is None:
             return None
 
-        if not (await KnowledgeBox.exist_kb(txn, uuid)):
+        if not (await datamanagers.kb.exists_kb(txn, kbid=uuid)):
             return None
 
         storage = await get_storage()

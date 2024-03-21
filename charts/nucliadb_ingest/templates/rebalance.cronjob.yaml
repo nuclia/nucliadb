@@ -1,0 +1,60 @@
+kind: CronJob
+apiVersion: batch/v1
+metadata:
+  name: nucliadb-rebalance
+  labels:
+    app: "{{ .Chart.Name }}"
+    version: "{{ .Values.hash }}"
+    chart: "{{ .Chart.Name }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+spec:
+  schedule: "0 */6 * * *"
+  jobTemplate:
+    metadata:
+      name: nucliadb-rebalance
+      annotations:
+        sidecar.istio.io/inject: "false"      
+      labels:
+        app: {{ .Chart.Name }}
+        role: cronjobs
+        version: "{{ .Values.hash }}"
+        chart: "{{ .Chart.Name }}"
+        release: "{{ .Release.Name }}"
+    spec:
+      backoffLimit: 0
+      template:
+        metadata:
+          labels:
+            app: "{{ .Chart.Name }}"
+            metrics: "enabled"
+            role: cronjobs
+            version: "{{ .Values.hash }}"
+            release: "{{ .Release.Name }}"
+          annotations:
+            sidecar.istio.io/inject: "false"
+            {{- if hasKey .Values "extra_pod_annotations" }}
+{{ toYaml .Values.extra_pod_annotations | indent 12 }}
+            {{- end }}
+        spec:
+          serviceAccount: {{ ((.Values.purgeCron).serviceAccount) | default "default" }}
+          nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 12 }}
+          topologySpreadConstraints:
+{{ toYaml .Values.topologySpreadConstraints | indent 12 }}
+          affinity:
+{{ toYaml .Values.affinity | indent 12 }}
+          tolerations:
+{{ toYaml .Values.tolerations | indent 12 }}
+          dnsPolicy: ClusterFirst
+          restartPolicy: Never
+          containers:
+          - name: nucliadb-rebalance
+            image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
+            envFrom:
+            - configMapRef:
+                name: nucliadb-config
+            - configMapRef:
+                name: {{ .Release.Name }}-config
+            imagePullPolicy: Always
+            command: ["nucliadb-rebalance"]

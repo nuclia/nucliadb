@@ -49,6 +49,7 @@ from nucliadb_protos.resources_pb2 import Origin, Paragraph, QuestionAnswer
 from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
+from nucliadb.common import datamanagers
 from nucliadb.ingest import SERVICE_NAME
 from nucliadb.ingest.consumer.auditing import (
     IndexAuditHandler,
@@ -477,7 +478,7 @@ async def test_ingest_audit_stream_files_only(
     # Test 5: Delete knowledgebox
 
     txn = await maindb_driver.begin()
-    kb = await KnowledgeBox.get_kb(txn, knowledgebox_ingest)
+    kb = await datamanagers.kb.get_config(txn, kbid=knowledgebox_ingest)
 
     set_utility(Utility.AUDIT, stream_audit)
     await KnowledgeBox.delete_kb(txn, kb.slug, knowledgebox_ingest)  # type: ignore

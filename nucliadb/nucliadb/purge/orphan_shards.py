@@ -34,7 +34,6 @@ from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.utils import setup_driver, teardown_driver
 from nucliadb.ingest import logger
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.logs import setup_logging
 
@@ -130,7 +129,7 @@ async def _get_stored_shards(driver: Driver) -> dict[str, ShardLocation]:
     shards_manager = KBShardManager()
 
     async with driver.transaction(read_only=True) as txn:
-        async for kbid, _ in KnowledgeBox.get_kbs(txn, slug=""):
+        async for kbid, _ in datamanagers.kb.get_kbs(txn):
             try:
                 kb_shards = await shards_manager.get_shards_by_kbid(kbid)
             except ShardsNotFound:
@@ -175,7 +174,7 @@ async def report_orphan_shards(driver: Driver):
             if location.kbid == UNKNOWN_KB:
                 msg = "Found orphan shard but could not get KB info"
             else:
-                kb_exists = await KnowledgeBox.exist_kb(txn, location.kbid)
+                kb_exists = await datamanagers.kb.exists_kb(txn, kbid=location.kbid)
                 if kb_exists:
                     msg = "Found orphan shard for existing KB"
                 else:

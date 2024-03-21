@@ -66,6 +66,9 @@ def shard_manager(reader):
     ), patch(
         "nucliadb.ingest.consumer.shard_creator.datamanagers.cluster.get_kb_shards",
         AsyncMock(return_value=shards),
+    ), patch(
+        "nucliadb.ingest.consumer.shard_creator.locking.distributed_lock",
+        return_value=AsyncMock(),
     ):
         yield sm
 
