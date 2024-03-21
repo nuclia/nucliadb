@@ -279,7 +279,7 @@ def nats_conn(js):
 @pytest.fixture(scope="function")
 def get_index_nodes():
     with mock.patch(
-        f"{MODULE}.get_index_nodes", return_value=["node1", "node2"]
+        f"{MODULE}.get_index_nodes", return_value=[mock.Mock(id="node1"), mock.Mock(id="node2")]
     ) as mock_:
         yield mock_
 
@@ -310,6 +310,7 @@ async def test_materializer(nats_conn, get_index_nodes, js, processing_client):
 
     await asyncio.sleep(0.1)
 
+    # two index nodes and ingest streams are queried
     assert len(js.consumer_info.call_args_list) == 3
 
     # Wait for the next check
