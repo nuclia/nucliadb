@@ -138,6 +138,9 @@ def rollover_datamanager(resource_ids, cluster_datamanager):
     with patch("nucliadb.common.cluster.rollover.datamanagers.rollover", mock), patch(
         "nucliadb.common.cluster.rollover.datamanagers.with_transaction",
         return_value=AsyncMock(),
+    ), patch(
+        "nucliadb.ingest.consumer.shard_creator.locking.distributed_lock",
+        return_value=AsyncMock(),
     ):
         yield mock
 
