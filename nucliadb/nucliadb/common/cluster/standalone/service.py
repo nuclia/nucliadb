@@ -28,11 +28,15 @@ from nucliadb.common.cluster.standalone import grpc_node_binding
 from nucliadb.common.cluster.standalone.utils import get_self
 from nucliadb_protos import standalone_pb2, standalone_pb2_grpc
 from nucliadb_utils.grpc import get_traced_grpc_server
+import backoff
+from grpc.aio import AioRpcError
 
 
 class StandaloneClusterServiceServicer(
     standalone_pb2_grpc.StandaloneClusterServiceServicer
 ):
+
+    @backoff.on_exception(backoff.expo, (AioRpcError,), max_time=60)
     async def NodeAction(  # type: ignore
         self, request: standalone_pb2.NodeActionRequest, context
     ) -> standalone_pb2.NodeActionResponse:
