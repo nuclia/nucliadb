@@ -56,8 +56,8 @@ async def send_feedback_endpoint(
         )
     except predict.ProxiedPredictAPIError as err:
         return HTTPClientError(
-            status_code=503,
-            detail=f"Feedback service unavailable. {err.status}: {err.detail}",
+            status_code=err.status,
+            detail=err.detail,
         )
     except Exception as ex:
         errors.capture_exception(ex)
