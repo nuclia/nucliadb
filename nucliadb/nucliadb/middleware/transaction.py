@@ -111,7 +111,8 @@ async def get_read_only_transaction() -> Transaction:
     """
     manager: Optional[ReadOnlyTransactionManager] = txn_manager.get()
     if manager is None:
-        raise TransactionNotFoundException(  # RunTimeErrors are used for things like io loops errors. Do not use for not exc handling
+        # RunTimeErrors are used for things like io loops errors. Do not use for not exc handling
+        raise TransactionNotFoundException(
             "Context var is not set. Did you forget to add the ReadOnlyTransactionMiddleware to the app?"
         )
     return await manager.get_transaction()
