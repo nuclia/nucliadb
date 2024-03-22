@@ -57,29 +57,29 @@ impl Debug for VectorWriterService {
     }
 }
 
-struct DummyPreparedMerge();
+struct DummyPreparedMerge;
 impl MergeRunner for DummyPreparedMerge {
     fn run(&mut self) -> NodeResult<Box<dyn MergeResults>> {
-        Ok(Box::new(DummyMergeResults()))
+        Ok(Box::new(DummyMergeResults))
     }
 }
 
-struct DummyMergeResults();
+struct DummyMergeResults;
 impl MergeResults for DummyMergeResults {
     fn inputs(&self) -> &std::collections::HashSet<uuid::Uuid> {
-        todo!()
+        unreachable!()
     }
 
     fn output(&self) -> uuid::Uuid {
-        todo!()
+        unreachable!()
     }
 
     fn record_metrics(&self, _source: MergeSource) {
-        todo!()
+        unreachable!()
     }
 
     fn get_metrics(&self) -> MergeMetrics {
-        todo!()
+        unreachable!()
     }
 }
 
@@ -91,7 +91,7 @@ impl VectorWriter for VectorWriterService {
     }
 
     fn prepare_merge(&self, _parameters: MergeParameters) -> NodeResult<Option<Box<dyn MergeRunner>>> {
-        Ok(Some(Box::new(DummyPreparedMerge())))
+        Ok(Some(Box::new(DummyPreparedMerge)))
     }
 
     #[measure(actor = "vectors", metric = "finish_merge")]
