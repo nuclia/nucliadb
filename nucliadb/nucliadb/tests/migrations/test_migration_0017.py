@@ -24,14 +24,10 @@ import pytest
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.migrator.models import Migration
-from nucliadb.migrator.utils import get_migrations
+from nucliadb.tests.migrations import get_migration
 from nucliadb_protos import writer_pb2
 
-MIGRATION_UNDER_TEST = 17
-migration: Migration = get_migrations(
-    from_version=MIGRATION_UNDER_TEST - 1, to_version=MIGRATION_UNDER_TEST
-)[0]
-assert migration.version == MIGRATION_UNDER_TEST
+migration: Migration = get_migration(17)
 
 
 @pytest.mark.asyncio
