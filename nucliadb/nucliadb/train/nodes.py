@@ -82,64 +82,63 @@ class TrainShardManager(manager.KBShardManager):
     async def kb_sentences(
         self, request: GetSentencesRequest
     ) -> AsyncIterator[TrainSentence]:
-        txn = await self.driver.begin()
-        kb = KnowledgeBox(txn, self.storage, request.kb.uuid)
-        if request.uuid != "":
-            # Filter by uuid
-            resource = await kb.get(request.uuid)
-            if resource:
-                async for sentence in resource.iterate_sentences(request.metadata):
-                    yield sentence
-        else:
-            async for resource in kb.iterate_resources():
-                async for sentence in resource.iterate_sentences(request.metadata):
-                    yield sentence
-        await txn.abort()
+        async with self.driver.transaction() as txn:
+            kb = KnowledgeBox(txn, self.storage, request.kb.uuid)
+            if request.uuid != "":
+                # Filter by uuid
+                resource = await kb.get(request.uuid)
+                if resource:
+                    async for sentence in resource.iterate_sentences(request.metadata):
+                        yield sentence
+            else:
+                async for resource in kb.iterate_resources():
+                    async for sentence in resource.iterate_sentences(request.metadata):
+                        yield sentence
 
     async def kb_paragraphs(
         self, request: GetParagraphsRequest
     ) -> AsyncIterator[TrainParagraph]:
-        txn = await self.driver.begin()
-        kb = KnowledgeBox(txn, self.storage, request.kb.uuid)
-        if request.uuid != "":
-            # Filter by uuid
-            resource = await kb.get(request.uuid)
-            if resource:
-                async for paragraph in resource.iterate_paragraphs(request.metadata):
-                    yield paragraph
-        else:
-            async for resource in kb.iterate_resources():
-                async for paragraph in resource.iterate_paragraphs(request.metadata):
-                    yield paragraph
-        await txn.abort()
+        async with self.driver.transaction() as txn:
+            kb = KnowledgeBox(txn, self.storage, request.kb.uuid)
+            if request.uuid != "":
+                # Filter by uuid
+                resource = await kb.get(request.uuid)
+                if resource:
+                    async for paragraph in resource.iterate_paragraphs(
+                        request.metadata
+                    ):
+                        yield paragraph
+            else:
+                async for resource in kb.iterate_resources():
+                    async for paragraph in resource.iterate_paragraphs(
+                        request.metadata
+                    ):
+                        yield paragraph
 
     async def kb_fields(self, request: GetFieldsRequest) -> AsyncIterator[TrainField]:
-        txn = await self.driver.begin()
-        kb = KnowledgeBox(txn, self.storage, request.kb.uuid)
-        if request.uuid != "":
-            # Filter by uuid
-            resource = await kb.get(request.uuid)
-            if resource:
-                async for field in resource.iterate_fields(request.metadata):
-                    yield field
-        else:
-            async for resource in kb.iterate_resources():
-                async for field in resource.iterate_fields(request.metadata):
-                    yield field
-        await txn.abort()
+        async with self.driver.transaction() as txn:
+            kb = KnowledgeBox(txn, self.storage, request.kb.uuid)
+            if request.uuid != "":
+                # Filter by uuid
+                resource = await kb.get(request.uuid)
+                if resource:
+                    async for field in resource.iterate_fields(request.metadata):
+                        yield field
+            else:
+                async for resource in kb.iterate_resources():
+                    async for field in resource.iterate_fields(request.metadata):
+                        yield field
 
     async def kb_resources(
         self, request: GetResourcesRequest
     ) -> AsyncIterator[TrainResource]:
-        txn = await self.driver.begin()
-        kb = KnowledgeBox(txn, self.storage, request.kb.uuid)
-        base = KB_RESOURCE_SLUG_BASE.format(kbid=request.kb.uuid)
-        async for key in txn.keys(match=base, count=-1):
-            # Fetch and Add wanted item
-            rid = await txn.get(key)
-            if rid is not None:
-                resource = await kb.get(rid.decode())
-                if resource is not None:
-                    yield await resource.generate_train_resource(request.metadata)
-
-        await txn.abort()
+        async with self.driver.transaction() as txn:
+            kb = KnowledgeBox(txn, self.storage, request.kb.uuid)
+            base = KB_RESOURCE_SLUG_BASE.format(kbid=request.kb.uuid)
+            async for key in txn.keys(match=base, count=-1):
+                # Fetch and Add wanted item
+                rid = await txn.get(key)
+                if rid is not None:
+                    resource = await kb.get(rid.decode())
+                    if resource is not None:
+                        yield await resource.generate_train_resource(request.metadata)

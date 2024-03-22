@@ -51,8 +51,7 @@ class UploadServicer:
         pubsub = await get_pubsub()
         self.proc = Processor(driver=driver, storage=storage, pubsub=pubsub)
 
-    async def finalize(self):
-        ...
+    async def finalize(self): ...
 
     async def GetSentences(self, request: GetSentencesRequest, context=None):
         async for sentence in self.proc.kb_sentences(request):
@@ -75,30 +74,29 @@ class UploadServicer:
     ) -> GetEntitiesResponse:
         kbid = request.kb.uuid
         response = GetEntitiesResponse()
-        txn = await self.proc.driver.begin()
-        kbobj = await self.proc.get_kb_obj(txn, request.kb)
+        async with self.proc.driver.transaction() as txn:
+            kbobj = await self.proc.get_kb_obj(txn, request.kb)
 
-        if kbobj is None:
-            await txn.abort()
-            response.status = GetEntitiesResponse.Status.NOTFOUND
-            return response
+            if kbobj is None:
+                await txn.abort()
+                response.status = GetEntitiesResponse.Status.NOTFOUND
+                return response
 
-        entities_manager = EntitiesManager(kbobj, txn)
-        await entities_manager.get_entities(response)
-        response.kb.uuid = kbid
-        response.status = GetEntitiesResponse.Status.OK
-        await txn.abort()
+            entities_manager = EntitiesManager(kbobj, txn)
+            await entities_manager.get_entities(response)
+            response.kb.uuid = kbid
+            response.status = GetEntitiesResponse.Status.OK
         return response
 
     async def GetOntology(  # type: ignore
         self, request: GetLabelsRequest, context=None
     ) -> GetLabelsResponse:
-        txn = await self.proc.driver.begin()
-        kbobj = await self.proc.get_kb_obj(txn, request.kb)
-        labels: Optional[Labels] = None
-        if kbobj is not None:
-            labels = await kbobj.get_labels()
-        await txn.abort()
+        async with self.proc.driver.transaction() as txn:
+            kbobj = await self.proc.get_kb_obj(txn, request.kb)
+            labels: Optional[Labels] = None
+            if kbobj is not None:
+                labels = await kbobj.get_labels()
+
         response = GetLabelsResponse()
         if kbobj is None:
             response.status = GetLabelsResponse.Status.NOTFOUND

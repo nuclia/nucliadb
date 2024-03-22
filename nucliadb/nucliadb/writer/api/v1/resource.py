@@ -474,17 +474,14 @@ async def _reprocess_resource(
     storage = await get_storage(service_name=SERVICE_NAME)
     driver = get_driver()
 
-    txn = await driver.begin()
-    kb = KnowledgeBox(txn, storage, kbid)
+    async with driver.transaction() as txn:
+        kb = KnowledgeBox(txn, storage, kbid)
 
-    resource = await kb.get(rid)
-    if resource is None:
-        raise HTTPException(status_code=404, detail="Resource does not exist")
+        resource = await kb.get(rid)
+        if resource is None:
+            raise HTTPException(status_code=404, detail="Resource does not exist")
 
-    await extract_fields(resource=resource, toprocess=toprocess)
-
-    if txn.open:
-        await txn.abort()
+        await extract_fields(resource=resource, toprocess=toprocess)
 
     processing_info = await send_to_process(toprocess, partition)
 
