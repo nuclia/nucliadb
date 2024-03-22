@@ -344,8 +344,6 @@ async def _get_resource_field(
     storage = await get_storage(service_name=SERVICE_NAME)
     driver = get_driver()
 
-    txn = await driver.begin()
-
     pb_field_id = FIELD_NAMES_TO_PB_TYPE_MAP[field_type]
 
     async with driver.transaction() as txn:

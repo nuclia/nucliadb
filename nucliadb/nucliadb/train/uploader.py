@@ -51,7 +51,8 @@ class UploadServicer:
         pubsub = await get_pubsub()
         self.proc = Processor(driver=driver, storage=storage, pubsub=pubsub)
 
-    async def finalize(self): ...
+    async def finalize(self):
+        ...
 
     async def GetSentences(self, request: GetSentencesRequest, context=None):
         async for sentence in self.proc.kb_sentences(request):
@@ -78,7 +79,6 @@ class UploadServicer:
             kbobj = await self.proc.get_kb_obj(txn, request.kb)
 
             if kbobj is None:
-                await txn.abort()
                 response.status = GetEntitiesResponse.Status.NOTFOUND
                 return response
 
