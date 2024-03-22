@@ -21,7 +21,7 @@
 import logging
 import os
 
-from nucliadb.standalone.settings import Settings, StandaloneDiscoveryMode
+from nucliadb.standalone.settings import Settings, StandaloneDiscoveryMode, NodeRole
 
 logger = logging.getLogger(__name__)
 
@@ -117,6 +117,10 @@ def config_nucliadb(nucliadb_args: Settings):
 
     if nucliadb_args.nua_api_key:
         nuclia_settings.nuclia_service_account = nucliadb_args.nua_api_key
+        if nucliadb_args.node_role == NodeRole.API:
+            ingest_settings.disable_pull_worker = True
+        else:
+            ingest_settings.disable_pull_worker = False
     else:
         ingest_settings.disable_pull_worker = True
         nuclia_settings.dummy_processing = True
