@@ -41,6 +41,7 @@ from nucliadb_telemetry import metrics
 from nucliadb_utils import const
 from nucliadb_utils.nats import NatsConnectionManager
 from nucliadb_utils.settings import is_onprem_nucliadb
+from nucliadb_utils.utilities import has_feature
 
 __all__ = ["maybe_back_pressure"]
 
@@ -327,9 +328,10 @@ async def maybe_back_pressure(
     This function does system checks to see if we need to put back pressure on writes.
     In that case, a HTTP 429 will be raised with the estimated time to try again.
     """
-    if not is_back_pressure_enabled() or is_onprem_nucliadb():
-        return
-    await back_pressure_checks(request, kbid, resource_uuid)
+    if has_feature(const.Features.BACK_PRESSURE, context={"kbid": kbid}):
+        if not is_back_pressure_enabled() or is_onprem_nucliadb():
+            return
+        await back_pressure_checks(request, kbid, resource_uuid)
 
 
 async def back_pressure_checks(
