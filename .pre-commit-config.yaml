@@ -7,6 +7,7 @@ repos:
         language: system
         files: (^nucliadb/)
         types: ["python"]
+        pass_filenames: false
 
       - id: lint_nucliadb_dataset
         name: Lint nucliadb_dataset
@@ -14,6 +15,7 @@ repos:
         language: system
         files: (^nucliadb_dataset/)
         types: ["python"]
+        pass_filenames: false
 
       - id: lint_nucliadb_models
         name: Lint nucliadb_models
@@ -21,6 +23,7 @@ repos:
         language: system
         files: (^nucliadb_models/)
         types: ["python"]
+        pass_filenames: false
 
       - id: lint_nucliadb_node
         name: Lint nucliadb_node
@@ -28,6 +31,7 @@ repos:
         language: system
         files: (^nucliadb_node/)
         types: ["python"]
+        pass_filenames: false
 
       - id: lint_nucliadb_node_binding
         name: Lint nucliadb_node_binding
@@ -35,6 +39,7 @@ repos:
         language: system
         files: (^nucliadb_node_binding/)
         types: ["python"]
+        pass_filenames: false
 
       - id: lint_nucliadb_performance
         name: Lint nucliadb_performance
@@ -42,6 +47,7 @@ repos:
         language: system
         files: (^nucliadb_performance/)
         types: ["python"]
+        pass_filenames: false
 
       - id: lint_nucliadb_sdk
         name: Lint nucliadb_sdk
@@ -49,6 +55,7 @@ repos:
         language: system
         files: (^nucliadb_sdk/)
         types: ["python"]
+        pass_filenames: false
 
       - id: lint_nucliadb_telemetry
         name: Lint nucliadb_telemetry
@@ -56,6 +63,7 @@ repos:
         language: system
         files: (^nucliadb_telemetry/)
         types: ["python"]
+        pass_filenames: false
 
       - id: lint_nucliadb_utils
         name: Lint nucliadb_utils
@@ -63,6 +71,7 @@ repos:
         language: system
         files: (^nucliadb_utils/)
         types: ["python"]
+        pass_filenames: false
 
       - id: rustfmt_nucliadb
         name: fmt
