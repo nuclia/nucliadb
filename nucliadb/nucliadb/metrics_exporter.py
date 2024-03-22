@@ -23,9 +23,9 @@ import asyncio
 from typing import AsyncGenerator, Callable
 
 from nucliadb import logger
+from nucliadb.common import datamanagers
 from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.common.context import ApplicationContext
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.migrator.datamanager import MigrationsDataManager
 from nucliadb_telemetry import metrics
 from nucliadb_telemetry.logs import setup_logging
@@ -58,7 +58,7 @@ async def iter_kbids(context: ApplicationContext) -> AsyncGenerator[str, None]:
     Return a list of all KB ids.
     """
     async with context.kv_driver.transaction() as txn:
-        async for kbid, _ in KnowledgeBoxORM.get_kbs(txn, slug=""):
+        async for kbid, _ in datamanagers.kb.get_kbs(txn):
             yield kbid
 
 

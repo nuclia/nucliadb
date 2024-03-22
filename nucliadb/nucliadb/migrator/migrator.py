@@ -21,6 +21,7 @@ import asyncio
 import logging
 from typing import Optional
 
+from nucliadb.common import locking
 from nucliadb.common.cluster.rollover import rollover_kb_shards
 from nucliadb.migrator.context import ExecutionContext
 from nucliadb.migrator.utils import get_migrations
@@ -37,7 +38,7 @@ logger = logging.getLogger(__name__)
 async def run_kb_migrations(
     context: ExecutionContext, kbid: str, target_version: int
 ) -> None:
-    async with context.maybe_distributed_lock(f"migration-{kbid}"):
+    async with locking.distributed_lock(f"migration-{kbid}"):
         kb_info = await context.data_manager.get_kb_info(kbid)
         if kb_info is None:
             logger.warning("KB not found", extra={"kbid": kbid})
@@ -218,7 +219,7 @@ async def run_rollovers(context: ExecutionContext) -> None:
 
 
 async def run(context: ExecutionContext, target_version: Optional[int] = None) -> None:
-    async with context.maybe_distributed_lock("migration"):
+    async with locking.distributed_lock("migration"):
         # before we move to managed migrations, see if there are any rollovers
         # scheduled and run them
         await run_rollovers(context)

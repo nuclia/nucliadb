@@ -19,6 +19,7 @@
 #
 from typing import Optional, Union
 
+from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.knowledgebox import (
     KnowledgeBox as KnowledgeBoxORM,  # probably bad that we are using this here but I didn't want to copy the logic
@@ -47,7 +48,7 @@ class MigrationsDataManager:
 
     async def schedule_all_kbs(self, target_version: int) -> None:
         async with self.driver.transaction() as txn:
-            async for kbid, _ in KnowledgeBoxORM.get_kbs(txn, slug=""):
+            async for kbid, _ in datamanagers.kb.get_kbs(txn):
                 await txn.set(
                     MIGRATIONS_KEY.format(kbid=kbid), str(target_version).encode()
                 )
@@ -68,14 +69,14 @@ class MigrationsDataManager:
 
     async def get_kb_info(self, kbid: str) -> Optional[KnowledgeBoxInfo]:
         async with self.driver.transaction() as txn:
-            kb_config = await KnowledgeBoxORM.get_kb(txn, kbid)
+            kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
             if kb_config is None:
                 return None
         return KnowledgeBoxInfo(current_version=kb_config.migration_version)
 
     async def update_kb_info(self, *, kbid: str, current_version: int) -> None:
         async with self.driver.transaction() as txn:
-            kb_config = await KnowledgeBoxORM.get_kb(txn, kbid)
+            kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
             if kb_config is None:
                 raise Exception(f"KB {kbid} does not exist")
             kb_config.migration_version = current_version

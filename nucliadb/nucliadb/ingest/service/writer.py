@@ -93,7 +93,6 @@ from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxObj
 from nucliadb.ingest.orm.processor import Processor, sequence_manager
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.settings import settings
@@ -667,7 +666,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         logger.info("Status Call")
         response = WriterStatusResponse()
         async with self.driver.transaction() as txn:
-            async for _, slug in KnowledgeBoxObj.get_kbs(txn, slug="", count=-1):
+            async for _, slug in datamanagers.kb.get_kbs(txn):
                 response.knowledgeboxes.append(slug)
 
             for partition in settings.partitions:
@@ -736,7 +735,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 return response
 
             if request.kbid != "":
-                config = await KnowledgeBoxORM.get_kb(txn, request.kbid)
+                config = await datamanagers.kb.get_config(txn, kbid=request.kbid)
                 if config is not None:
                     response.found = True
                 else:
@@ -766,7 +765,9 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 resobj.disable_vectors = not request.reindex_vectors
 
                 brain = await resobj.generate_index_message()
-                shard_id = await kbobj.get_resource_shard_id(request.rid)
+                shard_id = await datamanagers.resources.get_resource_shard_id(
+                    txn, kbid=request.kbid, rid=request.rid
+                )
                 shard: Optional[writer_pb2.ShardObject] = None
                 if shard_id is not None:
                     shard = await kbobj.get_resource_shard(shard_id)
@@ -784,7 +785,9 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                             txn, request.kbid, semantic_model=model
                         )
 
-                    await kbobj.set_resource_shard_id(request.rid, shard.shard)
+                    await datamanagers.resources.set_resource_shard_id(
+                        txn, kbid=request.kbid, rid=request.rid, shard=shard.shard
+                    )
 
                 if shard is not None:
                     await self.shards_manager.add_resource(

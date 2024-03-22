@@ -24,17 +24,15 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-import backoff
-
-from nucliadb.common import datamanagers
+from nucliadb.common import datamanagers, locking
 from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.common.context import ApplicationContext
-from nucliadb_protos import noderesources_pb2, writer_pb2
+from nucliadb_protos import writer_pb2
 from nucliadb_telemetry import errors
-from nucliadb_utils import const
 
 from .manager import get_index_node
 from .settings import settings
+from .utils import delete_resource_from_shard, index_resource_to_shard, wait_for_node
 
 logger = logging.getLogger(__name__)
 
@@ -142,64 +140,6 @@ def _get_shard(
     return None
 
 
-async def wait_for_node(app_context: ApplicationContext, node_id: str) -> None:
-    while True:
-        # get raw js client
-        js = app_context.nats_manager.js
-        consumer_info = await js.consumer_info(
-            const.Streams.INDEX.name, const.Streams.INDEX.group.format(node=node_id)
-        )
-        if consumer_info.num_pending < 5:
-            logger.info(f"Node is ready to consume messages.", extra={"node": node_id})
-            return
-
-        logger.info(
-            f"Waiting for node to consume messages. {consumer_info.num_pending} messages left.",
-            extra={"node": node_id},
-        )
-        # usually we consume around 3-4 messages/s with some eventual peaks of
-        # 10-30. If there are too many pending messages, we can wait more.
-        # We suppose 5 messages/s and don't wait more than 60s
-        sleep = min(max(2, consumer_info.num_pending / 5), 60)
-        await asyncio.sleep(sleep)
-
-
-@backoff.on_exception(
-    backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=8
-)
-async def index_resource(
-    app_context: ApplicationContext,
-    kbid: str,
-    resource_id: str,
-    shard: writer_pb2.ShardObject,
-) -> Optional[noderesources_pb2.Resource]:
-    logger.warning(
-        "Indexing resource", extra={"kbid": kbid, "resource_id": resource_id}
-    )
-
-    sm = app_context.shard_manager
-    partitioning = app_context.partitioning
-
-    async with datamanagers.with_transaction() as txn:
-        resource_index_message = (
-            await datamanagers.resources.get_resource_index_message(
-                txn, kbid=kbid, rid=resource_id
-            )
-        )
-
-    if resource_index_message is None:
-        logger.warning(
-            "Resource index message not found while indexing, skipping",
-            extra={"kbid": kbid, "resource_id": resource_id},
-        )
-        return None
-    partition = partitioning.generate_partition(kbid, resource_id)
-    await sm.add_resource(
-        shard, resource_index_message, txid=-1, partition=str(partition), kb=kbid
-    )
-    return resource_index_message
-
-
 async def schedule_resource_indexing(
     app_context: ApplicationContext, kbid: str
 ) -> None:
@@ -297,7 +237,7 @@ async def index_rollover_shards(app_context: ApplicationContext, kbid: str) -> N
                 f"Shard {shard_id} not found. Was a new one created during migration?"
             )
 
-        resource_index_message = await index_resource(
+        resource_index_message = await index_resource_to_shard(
             app_context, kbid, resource_id, shard
         )
         if resource_index_message is None:
@@ -379,8 +319,6 @@ async def validate_indexed_data(
 
     If a resource was removed during the rollover, it will be removed as well.
     """
-    sm = app_context.shard_manager
-    partitioning = app_context.partitioning
 
     async with datamanagers.with_transaction() as txn:
         rolled_over_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
@@ -456,7 +394,7 @@ async def validate_indexed_data(
             continue
 
         # resource was modified or added during rollover, reindex
-        resource_index_message = await index_resource(
+        resource_index_message = await index_resource_to_shard(
             app_context, kbid, resource_id, shard
         )
         if resource_index_message is not None:
@@ -482,12 +420,8 @@ async def validate_indexed_data(
             shard = _get_shard(rolled_over_shards, shard_id)
             if shard is None:
                 raise UnexpectedRolloverError("Shard not found. This should not happen")
-            logger.warning(
-                "Deleting resource from index",
-                extra={"kbid": kbid, "resource_id": resource_id},
-            )
-            partition = partitioning.generate_partition(kbid, resource_id)
-            await sm.delete_resource(shard, resource_id, -1, str(partition), kbid)
+
+            await delete_resource_from_shard(app_context, kbid, resource_id, shard)
 
     _set_rollover_status(rolled_over_shards, RolloverStatus.RESOURCES_VALIDATED)
     async with datamanagers.with_transaction() as txn:
@@ -555,14 +489,15 @@ async def rollover_kb_shards(app_context: ApplicationContext, kbid: str) -> None
 
     logger.warning("Rolling over shards", extra={"kbid": kbid})
 
-    await create_rollover_shards(app_context, kbid)
-    await schedule_resource_indexing(app_context, kbid)
-    await index_rollover_shards(app_context, kbid)
-    await cutover_shards(app_context, kbid)
-    # we need to cut over BEFORE we validate the data
-    await validate_indexed_data(app_context, kbid)
-    await clean_indexed_data(app_context, kbid)
-    await clean_rollover_status(app_context, kbid)
+    async with locking.distributed_lock(locking.KB_SHARDS_LOCK.format(kbid=kbid)):
+        await create_rollover_shards(app_context, kbid)
+        await schedule_resource_indexing(app_context, kbid)
+        await index_rollover_shards(app_context, kbid)
+        await cutover_shards(app_context, kbid)
+        # we need to cut over BEFORE we validate the data
+        await validate_indexed_data(app_context, kbid)
+        await clean_indexed_data(app_context, kbid)
+        await clean_rollover_status(app_context, kbid)
 
     logger.warning("Finished rolling over shards", extra={"kbid": kbid})
 

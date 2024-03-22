@@ -17,7 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional
+import logging
+from typing import AsyncIterator, Optional
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.maindb.driver import Transaction
@@ -26,6 +27,10 @@ from nucliadb_protos import knowledgebox_pb2
 from . import cluster
 
 KB_UUID = "/kbs/{kbid}/config"
+KB_SLUGS_BASE = "/kbslugs/"
+KB_SLUGS = KB_SLUGS_BASE + "{slug}"
+
+logger = logging.getLogger(__name__)
 
 
 async def exists_kb(txn: Transaction, *, kbid: str) -> bool:
@@ -58,3 +63,23 @@ async def get_model_metadata(
         return knowledgebox_pb2.SemanticModelMetadata(
             similarity_function=shards_obj.similarity
         )
+
+
+async def get_kb_uuid(txn: Transaction, *, slug: str) -> Optional[str]:
+    uuid = await txn.get(KB_SLUGS.format(slug=slug))
+    if uuid is not None:
+        return uuid.decode()
+    else:
+        return None
+
+
+async def get_kbs(
+    txn: Transaction, *, prefix: str = ""
+) -> AsyncIterator[tuple[str, str]]:
+    async for key in txn.keys(KB_SLUGS.format(slug=prefix), count=-1):
+        slug = key.replace(KB_SLUGS_BASE, "")
+        uuid = await get_kb_uuid(txn, slug=slug)
+        if uuid is None:
+            logger.error(f"KB with slug ({slug}) but without uuid?")
+            continue
+        yield (uuid, slug)

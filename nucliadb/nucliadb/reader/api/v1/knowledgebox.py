@@ -21,8 +21,8 @@ from fastapi import HTTPException
 from fastapi_versioning import version  # type: ignore
 from starlette.requests import Request
 
+from nucliadb.common import datamanagers
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.reader.api.v1.router import KB_PREFIX, KBS_PREFIX, api
 from nucliadb_models.resource import (
     KnowledgeBoxConfig,
@@ -48,7 +48,7 @@ async def get_kbs(request: Request, prefix: str = "") -> KnowledgeBoxList:
     driver = get_driver()
     async with driver.transaction() as txn:
         response = KnowledgeBoxList()
-        async for kbid, slug in KnowledgeBox.get_kbs(txn, prefix):
+        async for kbid, slug in datamanagers.kb.get_kbs(txn, prefix=prefix):
             response.kbs.append(KnowledgeBoxObjSummary(slug=slug or None, uuid=kbid))  # type: ignore
         return response
 
@@ -65,7 +65,7 @@ async def get_kbs(request: Request, prefix: str = "") -> KnowledgeBoxList:
 async def get_kb(request: Request, kbid: str) -> KnowledgeBoxObj:
     driver = get_driver()
     async with driver.transaction() as txn:
-        kb_config = await KnowledgeBox.get_kb(txn, kbid)
+        kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
         if kb_config is None:
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
@@ -88,11 +88,11 @@ async def get_kb(request: Request, kbid: str) -> KnowledgeBoxObj:
 async def get_kb_by_slug(request: Request, slug: str) -> KnowledgeBoxObj:
     driver = get_driver()
     async with driver.transaction() as txn:
-        kbid = await KnowledgeBox.get_kb_uuid(txn, slug)
+        kbid = await datamanagers.kb.get_kb_uuid(txn, slug=slug)
         if kbid is None:
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
-        kb_config = await KnowledgeBox.get_kb(txn, kbid)
+        kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
         if kb_config is None:
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 

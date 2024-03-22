@@ -215,3 +215,7 @@ async def modify_slug(txn: Transaction, *, kbid: str, rid: str, new_slug: str) -
     basic.slug = new_slug
     await set_basic(txn, kbid, rid, basic)
     return old_slug
+
+
+async def set_resource_shard_id(txn: Transaction, *, kbid: str, rid: str, shard: str):
+    await txn.set(KB_RESOURCE_SHARD.format(kbid=kbid, uuid=rid), shard.encode())

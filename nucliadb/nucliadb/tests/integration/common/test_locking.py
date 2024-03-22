@@ -18,31 +18,40 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+import os
+import uuid
 
 import pytest
 
-from nucliadb_utils.cache import locking
+from nucliadb.common import locking
+
+TESTING_MAINDB_DRIVERS = os.environ.get("TESTING_MAINDB_DRIVERS", "tikv,pg").split(",")
 
 
 @pytest.mark.asyncio
-async def test_redis_distributed_lock(redis):
-    url = f"redis://{redis[0]}:{redis[1]}"
-    dist_lock_manager = locking.RedisDistributedLockManager(url, timeout=1)
+async def test_distributed_lock(maindb_driver):
+    if maindb_driver.__module__.split(".")[-1] not in ("pg", "tikv"):
+        pytest.skip(f"maindb driver {maindb_driver} does not support distributed locks")
+        return
 
-    async def test_lock_works():
-        async with dist_lock_manager.lock("test_lock"):
-            await asyncio.sleep(1.1)
+    test_lock_key = uuid.uuid4().hex
 
-    async def test_locked():
-        async with dist_lock_manager.lock("test_lock"):
-            ...
+    async def test_lock(for_seconds: float, lock_timeout: float = 1.0):
+        async with locking.distributed_lock(
+            test_lock_key,
+            lock_timeout=lock_timeout,
+            expire_timeout=0.5,
+            refresh_timeout=0.2,
+        ):
+            await asyncio.sleep(for_seconds)
 
-    task = asyncio.create_task(test_lock_works())
+    task = asyncio.create_task(test_lock(1.5))
     await asyncio.sleep(0.05)
     with pytest.raises(locking.ResourceLocked):
-        await test_locked()
+        # should raise
+        await test_lock(0.0)
 
     await task
 
     # get lock again now that it is free
-    await test_locked()
+    await test_lock(0.0)
