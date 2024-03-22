@@ -107,7 +107,7 @@ async def chat_knowledgebox_endpoint(
     x_forwarded_for: str = Header(""),
     x_synchronous: bool = Header(
         False,
-        description="Output response as JSON in a non-streaming way. "
+        description="When enabled, outputs response as JSON in a non-streaming way. "
         "This is slower and requires waiting for entire answer to be ready.",
     ),
 ) -> Union[StreamingResponse, HTTPClientError, Response]:
