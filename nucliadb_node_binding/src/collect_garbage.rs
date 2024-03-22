@@ -55,7 +55,7 @@ pub fn garbage_collection_loop(parameters: GCParameters, cache: Arc<ShardWriterC
                 continue;
             };
             let Some(shard) = cache.peek(&shard_id) else {
-                return;
+                continue;
             };
 
             if let Err(err) = shard.collect_garbage() {
