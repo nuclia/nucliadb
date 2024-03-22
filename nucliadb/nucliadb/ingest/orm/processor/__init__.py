@@ -26,7 +26,6 @@ import aiohttp.client_exceptions
 from nucliadb.common import datamanagers, locking
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.cluster.utils import get_shard_manager
-from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.common.maindb.exceptions import ConflictError
 from nucliadb.ingest.orm.exceptions import (
@@ -168,44 +167,46 @@ class Processor:
         transaction_check: bool = True,
     ) -> None:
         txn = await self.driver.begin()
-        kb = KnowledgeBox(txn, self.storage, message.kbid)
+        try:
+            kb = KnowledgeBox(txn, self.storage, message.kbid)
 
-        uuid = await self.get_resource_uuid(kb, message)
-        async with locking.distributed_lock(
-            locking.RESOURCE_INDEX_LOCK.format(kbid=message.kbid, resource_id=uuid)
-        ):
-            # we need to have a lock at indexing time because we don't know if
-            # a resource was in the process of being moved when a delete occurred
-            shard_id = await datamanagers.resources.get_resource_shard_id(
-                txn, kbid=message.kbid, rid=uuid
-            )
-        if shard_id is None:
-            logger.warning(f"Resource {uuid} does not exist")
-        else:
-            shard = await kb.get_resource_shard(shard_id)
-            if shard is None:
-                raise AttributeError("Shard not available")
-
-            await self.shard_manager.delete_resource(
-                shard, message.uuid, seqid, partition, message.kbid
-            )
-            try:
-                await kb.delete_resource(message.uuid)
-            except Exception as exc:
-                await txn.abort()
-                await self.notify_abort(
-                    partition=partition,
-                    seqid=seqid,
-                    multi=message.multiid,
-                    kbid=message.kbid,
-                    rid=message.uuid,
-                    source=message.source,
+            uuid = await self.get_resource_uuid(kb, message)
+            async with locking.distributed_lock(
+                locking.RESOURCE_INDEX_LOCK.format(kbid=message.kbid, resource_id=uuid)
+            ):
+                # we need to have a lock at indexing time because we don't know if
+                # a resource was in the process of being moved when a delete occurred
+                shard_id = await datamanagers.resources.get_resource_shard_id(
+                    txn, kbid=message.kbid, rid=uuid
                 )
-                raise exc
-        if txn.open:
-            if transaction_check:
-                await sequence_manager.set_last_seqid(txn, partition, seqid)
-            await txn.commit()
+            if shard_id is None:
+                logger.warning(f"Resource {uuid} does not exist")
+            else:
+                shard = await kb.get_resource_shard(shard_id)
+                if shard is None:
+                    raise AttributeError("Shard not available")
+
+                await self.shard_manager.delete_resource(
+                    shard, message.uuid, seqid, partition, message.kbid
+                )
+                try:
+                    await kb.delete_resource(message.uuid)
+                except Exception as exc:
+                    await txn.abort()
+                    await self.notify_abort(
+                        partition=partition,
+                        seqid=seqid,
+                        multi=message.multiid,
+                        kbid=message.kbid,
+                        rid=message.uuid,
+                        source=message.source,
+                    )
+                    raise exc
+        finally:
+            if txn.open:
+                if transaction_check:
+                    await sequence_manager.set_last_seqid(txn, partition, seqid)
+                await txn.commit()
         await self.notify_commit(
             partition=partition,
             seqid=seqid,
@@ -247,14 +248,14 @@ class Processor:
             await txn.commit()
             return None
 
-        multi = messages[0].multiid
-        kb = KnowledgeBox(txn, self.storage, kbid)
-        uuid = await self.get_resource_uuid(kb, messages[0])
-        resource: Optional[Resource] = None
-        handled_exception = None
-        created = False
-
         try:
+            multi = messages[0].multiid
+            kb = KnowledgeBox(txn, self.storage, kbid)
+            uuid = await self.get_resource_uuid(kb, messages[0])
+            resource: Optional[Resource] = None
+            handled_exception = None
+            created = False
+
             for message in messages:
                 if resource is not None:
                     assert resource.uuid == message.uuid
@@ -678,23 +679,15 @@ class Processor:
         slug: str,
         config: Optional[knowledgebox_pb2.KnowledgeBoxConfig],
     ) -> str:
-        txn = await self.driver.begin()
-        try:
+        async with self.driver.transaction() as txn:
             uuid = await KnowledgeBox.update(txn, kbid, slug, config=config)
-        except Exception as e:
-            await txn.abort()
-            raise e
-        await txn.commit()
+            await txn.commit()
         return uuid
 
     async def delete_kb(self, kbid: str = "", slug: str = "") -> str:
-        txn = await self.driver.begin()
-        try:
+        async with self.driver.transaction() as txn:
             uuid = await KnowledgeBox.delete_kb(txn, kbid=kbid, slug=slug)
-        except (AttributeError, KeyError, KnowledgeBoxNotFound) as exc:
-            await txn.abort()
-            raise exc
-        await txn.commit()
+            await txn.commit()
         return uuid
 
 

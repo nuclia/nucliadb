@@ -344,82 +344,80 @@ async def _get_resource_field(
     storage = await get_storage(service_name=SERVICE_NAME)
     driver = get_driver()
 
-    txn = await driver.begin()
-
     pb_field_id = FIELD_NAMES_TO_PB_TYPE_MAP[field_type]
 
-    kb = ORMKnowledgeBox(txn, storage, kbid)
+    async with driver.transaction() as txn:
+        kb = ORMKnowledgeBox(txn, storage, kbid)
 
-    if rid is None:
-        assert rslug is not None, "Either rid or rslug must be defined"
-        rid = await kb.get_resource_uuid_by_slug(rslug)
         if rid is None:
-            await txn.abort()
-            raise HTTPException(status_code=404, detail="Resource does not exist")
+            assert rslug is not None, "Either rid or rslug must be defined"
+            rid = await kb.get_resource_uuid_by_slug(rslug)
+            if rid is None:
+                raise HTTPException(status_code=404, detail="Resource does not exist")
 
-    resource = ORMResource(txn, storage, kb, rid)
-    field = await resource.get_field(field_id, pb_field_id, load=True)
-    if field is None:
-        await txn.abort()
-        raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
+        resource = ORMResource(txn, storage, kb, rid)
+        field = await resource.get_field(field_id, pb_field_id, load=True)
+        if field is None:
+            raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
-    resource_field = ResourceField(field_id=field_id, field_type=field_type)  # type: ignore
+        resource_field = ResourceField(field_id=field_id, field_type=field_type)  # type: ignore
 
-    if ResourceFieldProperties.VALUE in show:
-        value = await field.get_value()
-
-        if isinstance(value, resources_pb2.FieldText):
+        if ResourceFieldProperties.VALUE in show:
             value = await field.get_value()
-            resource_field.value = models.FieldText.from_message(value)
 
-        if isinstance(value, resources_pb2.FieldFile):
-            value = await field.get_value()
-            resource_field.value = models.FieldFile.from_message(value)
+            if isinstance(value, resources_pb2.FieldText):
+                value = await field.get_value()
+                resource_field.value = models.FieldText.from_message(value)
 
-        if isinstance(value, resources_pb2.FieldLink):
-            value = await field.get_value()
-            resource_field.value = models.FieldLink.from_message(value)
+            if isinstance(value, resources_pb2.FieldFile):
+                value = await field.get_value()
+                resource_field.value = models.FieldFile.from_message(value)
 
-        if isinstance(value, resources_pb2.FieldLayout):
-            value = await field.get_value()
-            resource_field.value = models.FieldLayout.from_message(value)
+            if isinstance(value, resources_pb2.FieldLink):
+                value = await field.get_value()
+                resource_field.value = models.FieldLink.from_message(value)
 
-        if isinstance(value, resources_pb2.FieldDatetime):
-            value = await field.get_value()
-            resource_field.value = models.FieldDatetime.from_message(value)
+            if isinstance(value, resources_pb2.FieldLayout):
+                value = await field.get_value()
+                resource_field.value = models.FieldLayout.from_message(value)
 
-        if isinstance(value, resources_pb2.FieldKeywordset):
-            value = await field.get_value()
-            resource_field.value = models.FieldKeywordset.from_message(value)
+            if isinstance(value, resources_pb2.FieldDatetime):
+                value = await field.get_value()
+                resource_field.value = models.FieldDatetime.from_message(value)
 
-        if isinstance(field, Conversation):
-            if page == "first":
-                page_to_fetch = 1
-            elif page == "last":
-                conversation_metadata = await field.get_metadata()
-                page_to_fetch = conversation_metadata.pages
-            else:
-                page_to_fetch = int(page)
+            if isinstance(value, resources_pb2.FieldKeywordset):
+                value = await field.get_value()
+                resource_field.value = models.FieldKeywordset.from_message(value)
 
-            value = await field.get_value(page=page_to_fetch)
-            if value is not None:
-                resource_field.value = models.Conversation.from_message(value)
+            if isinstance(field, Conversation):
+                if page == "first":
+                    page_to_fetch = 1
+                elif page == "last":
+                    conversation_metadata = await field.get_metadata()
+                    page_to_fetch = conversation_metadata.pages
+                else:
+                    page_to_fetch = int(page)
 
-    if ResourceFieldProperties.EXTRACTED in show and extracted:
-        resource_field.extracted = FIELD_NAME_TO_EXTRACTED_DATA_FIELD_MAP[field_type]()
-        await set_resource_field_extracted_data(
-            field,
-            resource_field.extracted,
-            field_type,
-            extracted,
-        )
+                value = await field.get_value(page=page_to_fetch)
+                if value is not None:
+                    resource_field.value = models.Conversation.from_message(value)
 
-    if ResourceFieldProperties.ERROR in show:
-        error = await field.get_error()
-        if error is not None:
-            resource_field.error = Error(body=error.error, code=error.code)
+        if ResourceFieldProperties.EXTRACTED in show and extracted:
+            resource_field.extracted = FIELD_NAME_TO_EXTRACTED_DATA_FIELD_MAP[
+                field_type
+            ]()
+            await set_resource_field_extracted_data(
+                field,
+                resource_field.extracted,
+                field_type,
+                extracted,
+            )
 
-    await txn.abort()
+        if ResourceFieldProperties.ERROR in show:
+            error = await field.get_error()
+            if error is not None:
+                resource_field.error = Error(body=error.error, code=error.code)
+
     return Response(
         content=resource_field.json(exclude_unset=True, by_alias=True),
         media_type="application/json",
