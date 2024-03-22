@@ -50,7 +50,7 @@ from nucliadb_telemetry import errors
 from nucliadb_utils.utilities import get_indexing, get_storage
 
 from .index_node import IndexNode
-from .settings import settings
+from .settings import StandaloneNodeRole, settings
 from .standalone.index_node import ProxyStandaloneIndexNode
 from .standalone.utils import get_self, get_standalone_node_id
 
@@ -85,7 +85,10 @@ def add_index_node(
     primary_id: Optional[str] = None,
 ) -> AbstractIndexNode:
     if settings.standalone_mode:
-        if id == get_standalone_node_id():
+        if id == get_standalone_node_id() and settings.standalone_node_role in (
+            StandaloneNodeRole.ALL,
+            StandaloneNodeRole.API,
+        ):
             node = get_self()
         else:
             node = ProxyStandaloneIndexNode(

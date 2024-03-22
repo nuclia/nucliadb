@@ -22,6 +22,7 @@ from typing import Optional
 
 import pydantic
 
+from nucliadb.common.cluster.settings import StandaloneNodeRole
 from nucliadb.ingest.settings import DriverSettings
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_telemetry.settings import LogFormatType, LogLevel, LogOutputType
@@ -40,12 +41,6 @@ class AuthPolicy(str, Enum):
     UPSTREAM_AUTH_HEADER = "upstream_auth_header"
     UPSTREAM_OAUTH2 = "upstream_oauth2"
     UPSTREAM_BASICAUTH = "upstream_basicauth"
-
-
-class NodeRole(str, Enum):
-    ALL = "all"
-    API = "api"
-    WORKER = "ingest"
 
 
 class Settings(DriverSettings, StorageSettings):
@@ -95,10 +90,11 @@ class Settings(DriverSettings, StorageSettings):
         description="Default role to assign to user that is authenticated \
                     upstream. Not used with `upstream_naive` auth policy.",
     )
-    auth_policy_role_mapping: Optional[dict[str, dict[str, list[NucliaDBRoles]]]] = (
-        pydantic.Field(
-            default=None,
-            description="""
+    auth_policy_role_mapping: Optional[
+        dict[str, dict[str, list[NucliaDBRoles]]]
+    ] = pydantic.Field(
+        default=None,
+        description="""
 Role mapping for `upstream_auth_header`, `upstream_oauth2` and `upstream_basicauth` auth policies.
 Allows mapping different properties from the auth request to a role.
 Available roles are: `READER`, `WRITER`, `MANAGER`.
@@ -108,7 +104,6 @@ Examples:
 - `{"group": {"managers": "MANAGER"}}` will map the users that have a `group` claim of
   `managers` on the jwt provided by upstream to the role `MANAGER` on `upstream_oauth2` policies.
 """,
-        )
     )
 
     jwk_key: Optional[str] = pydantic.Field(
@@ -131,4 +126,4 @@ Examples:
     log_format_type: LogFormatType = LogFormatType.PLAIN
     log_level: LogLevel = LogLevel.INFO
 
-    node_role: NodeRole = NodeRole.ALL
+    node_role: StandaloneNodeRole = StandaloneNodeRole.ALL

@@ -21,7 +21,8 @@
 import logging
 import os
 
-from nucliadb.standalone.settings import Settings, StandaloneDiscoveryMode, NodeRole
+from nucliadb.common.cluster.settings import StandaloneNodeRole
+from nucliadb.standalone.settings import Settings, StandaloneDiscoveryMode
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +95,7 @@ def config_nucliadb(nucliadb_args: Settings):
     cluster_settings.standalone_mode = True
     cluster_settings.data_path = nucliadb_args.data_path
     cluster_settings.standalone_node_port = nucliadb_args.standalone_node_port
+    cluster_settings.standalone_node_role = nucliadb_args.node_role
 
     if nucliadb_args.cluster_discovery_mode == StandaloneDiscoveryMode.DEFAULT:
         # default for standalone is single node
@@ -117,7 +119,7 @@ def config_nucliadb(nucliadb_args: Settings):
 
     if nucliadb_args.nua_api_key:
         nuclia_settings.nuclia_service_account = nucliadb_args.nua_api_key
-        if nucliadb_args.node_role == NodeRole.API:
+        if nucliadb_args.node_role == StandaloneNodeRole.API:
             ingest_settings.disable_pull_worker = True
         else:
             ingest_settings.disable_pull_worker = False

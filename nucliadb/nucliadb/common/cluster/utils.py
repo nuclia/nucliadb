@@ -28,7 +28,7 @@ from nucliadb.common.cluster.discovery.utils import (
     teardown_cluster_discovery,
 )
 from nucliadb.common.cluster.manager import KBShardManager, StandaloneKBShardManager
-from nucliadb.common.cluster.settings import settings
+from nucliadb.common.cluster.settings import StandaloneNodeRole, settings
 from nucliadb.common.cluster.standalone.service import (
     start_grpc as start_standalone_grpc,
 )
@@ -58,8 +58,12 @@ async def setup_cluster() -> Union[KBShardManager, StandaloneKBShardManager]:
         await setup_cluster_discovery()
         mng: Union[KBShardManager, StandaloneKBShardManager]
         if settings.standalone_mode:
-            server = await start_standalone_grpc()
-            set_utility(_STANDALONE_SERVER, server)
+            if settings.standalone_node_role in (
+                StandaloneNodeRole.ALL,
+                StandaloneNodeRole.API,
+            ):
+                server = await start_standalone_grpc()
+                set_utility(_STANDALONE_SERVER, server)
             mng = StandaloneKBShardManager()
         else:
             mng = KBShardManager()
