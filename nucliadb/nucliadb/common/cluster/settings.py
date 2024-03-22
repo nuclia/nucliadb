@@ -31,7 +31,7 @@ class ClusterDiscoveryMode(str, enum.Enum):
 class StandaloneNodeRole(str, enum.Enum):
     ALL = "all"
     API = "api"
-    WORKER = "ingest"
+    WORKER = "worker"
 
 
 class Settings(BaseSettings):
