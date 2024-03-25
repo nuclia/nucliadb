@@ -438,6 +438,7 @@ async def search(
         with_synonyms=item.with_synonyms,
         autofilter=item.autofilter,
         security=item.security,
+        rephrase=item.rephrase,
     )
     pb_query, incomplete_results, autofilters = await query_parser.parse()
 

@@ -181,7 +181,7 @@ async def fetch_find_metadata(
                 ):
                     # Use Vector score if there are both
                     find_field.paragraphs[result_paragraph.paragraph.id].score = (
-                        result_paragraph.paragraph.score
+                        result_paragraph.paragraph.score * 2
                     )
                     orderer.add(
                         (

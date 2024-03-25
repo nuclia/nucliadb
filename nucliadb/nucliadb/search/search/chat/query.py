@@ -163,6 +163,7 @@ async def get_find_results(
     find_request.highlight = chat_request.highlight
     find_request.security = chat_request.security
     find_request.debug = chat_request.debug
+    find_request.rephrase = chat_request.rephrase
 
     find_results, incomplete, query_parser = await find(
         kbid,

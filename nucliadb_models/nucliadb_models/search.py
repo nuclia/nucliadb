@@ -254,6 +254,7 @@ class QueryInfo(BaseModel):
     max_context: int
     entities: TokenSearch
     sentence: SentenceSearch
+    query: str
 
 
 class Relations(BaseModel):
@@ -603,6 +604,11 @@ class SearchParamDefaults:
         title="Security groups",
         description="List of security groups to filter search results for. Only resources matching the query and containing the specified security groups will be returned. If empty, all resources will be considered for the search.",  # noqa
     )
+    rephrase = ParamDefault(
+        default=False,
+        title="Rephrase query consuming LLMs",
+        description="Rephrase query consuming LLMs - it will make the query slower",  # noqa
+    )
 
 
 class Filter(BaseModel):
@@ -714,6 +720,12 @@ class BaseSearchRequest(BaseModel):
         SearchParamDefaults.security.to_pydantic_field()
     )
 
+    rephrase: Optional[bool] = Field(
+        default=False,
+        title="Rephrase the query to improve search",
+        description="Consume LLM tokens to rephrase the query so the semantic search is better",
+    )
+
 
 class SearchRequest(BaseSearchRequest):
     faceted: List[str] = SearchParamDefaults.faceted.to_pydantic_field()
@@ -816,6 +828,7 @@ class AskDocumentModel(BaseModel):
 class RagStrategyName:
     FIELD_EXTENSION = "field_extension"
     FULL_RESOURCE = "full_resource"
+    HIERARCHY = "hierarchy"
 
 
 class ImageRagStrategyName:
@@ -889,6 +902,15 @@ class FullResourceStrategy(RagStrategy):
     )
 
 
+class HierarchyResourceStrategy(RagStrategy):
+    name: Literal["hierarchy"]
+    count: Optional[int] = Field(
+        title="Resources",
+        default=None,
+        description="Levels of distance that is added to the context",
+    )
+
+
 class TableImageStrategy(ImageRagStrategy):
     name: Literal["tables"]
 
@@ -907,7 +929,8 @@ class ParagraphImageStrategy(ImageRagStrategy):
 
 
 RagStrategies = Annotated[
-    Union[FieldExtensionStrategy, FullResourceStrategy], Field(discriminator="name")
+    Union[FieldExtensionStrategy, FullResourceStrategy, HierarchyResourceStrategy],
+    Field(discriminator="name"),
 ]
 RagImagesStrategies = Annotated[
     Union[PageImageStrategy, ParagraphImageStrategy], Field(discriminator="name")
@@ -995,6 +1018,12 @@ class ChatRequest(BaseModel):
         default=None,
         title="Maximum tokens to generate",
         description="The maximum amount of tokens to generate by the LLM",
+    )
+
+    rephrase: Optional[bool] = Field(
+        default=False,
+        title="Rephrase the query to improve search",
+        description="Consume LLM tokens to rephrase the query so the semantic search is better",
     )
 
     @root_validator(pre=True)

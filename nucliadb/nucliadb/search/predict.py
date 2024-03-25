@@ -335,7 +335,11 @@ class PredictEngine:
 
     @predict_observer.wrap({"type": "query"})
     async def query(
-        self, kbid: str, sentence: str, generative_model: Optional[str] = None
+        self,
+        kbid: str,
+        sentence: str,
+        generative_model: Optional[str] = None,
+        rephrase: Optional[bool] = False,
     ) -> QueryInfo:
         try:
             self.check_nua_key_is_configured_for_onprem()
@@ -349,7 +353,11 @@ class PredictEngine:
         resp = await self.make_request(
             "GET",
             url=self.get_predict_url(QUERY, kbid),
-            params={"text": sentence, "generative_model": generative_model},
+            params={
+                "text": sentence,
+                "generative_model": generative_model,
+                "rephrase": str(rephrase),
+            },
             headers=self.get_predict_headers(kbid),
         )
         await self.check_response(resp, expected_status=200)

@@ -42,6 +42,7 @@ from nucliadb_models.search import (
 from nucliadb_protos import resources_pb2
 from nucliadb_utils.asyncio_utils import ConcurrentRunner, run_concurrently
 from nucliadb_utils.utilities import get_storage
+from nucliadb.search.search import paragraphs
 
 MAX_RESOURCE_TASKS = 5
 MAX_RESOURCE_FIELD_TASKS = 4
@@ -70,11 +71,10 @@ class CappedPromptContext:
     def _check_size(self, size_delta: int = 0):
         if self.max_size is None:
             # No limit on the size of the context
-            return
+            return size_delta
         if self._size + size_delta > self.max_size:
-            raise MaxContextSizeExceeded(
-                f"Prompt context size exceeded: {self.max_size}"
-            )
+            size_delta = self.max_size - self._size
+        return size_delta
 
     def __setitem__(self, key, value):
         try:
@@ -83,9 +83,11 @@ class CappedPromptContext:
         except KeyError:
             # New key
             size_delta = len(value)
-        self._check_size(size_delta)
+        size_delta = self._check_size(size_delta)
         self._size += size_delta
-        self.output[key] = value
+        self.output[key] = value[:size_delta]
+        if size_delta == 0:
+            raise MaxContextSizeExceeded()
 
     @property
     def size(self):
@@ -435,17 +437,25 @@ class PromptContextBuilder:
             return
 
         number_of_full_resources = 0
+        distance = 0
         extend_with_fields = []
         for strategy in self.strategies:
             if strategy.name == RagStrategyName.FIELD_EXTENSION:
                 extend_with_fields.extend(strategy.fields)  # type: ignore
             elif strategy.name == RagStrategyName.FULL_RESOURCE:
                 number_of_full_resources = strategy.count  # type: ignore
+            elif strategy.name == RagStrategyName.HIERARCHY:
+                distance = strategy.count  # type: ignore
 
         if number_of_full_resources:
             await full_resource_prompt_context(
                 context, self.kbid, self.find_results, number_of_full_resources
             )
+            return
+
+        if distance > 0:
+            await get_extra_chars(self.kbid, self.find_results, distance)
+            await default_prompt_context(context, self.kbid, self.find_results)
             return
 
         await composed_prompt_context(
@@ -455,6 +465,69 @@ class PromptContextBuilder:
             extend_with_fields=extend_with_fields,
         )
         return
+
+
+async def get_extra_chars(
+    kbid: str, find_results: KnowledgeboxFindResults, distance: int
+):
+    etcache = paragraphs.ExtractedTextCache()
+    resources = {}
+    for paragraph in get_ordered_paragraphs(find_results):
+        rid, field_type, field = paragraph.id.split("/")[:3]
+        field_path = "/".join([rid, field_type, field])
+        position = paragraph.id.split("/")[-1]
+        start, end = position.split("-")
+        int_start = int(start)
+        int_end = int(end) + distance
+
+        new_text = await paragraphs.get_paragraph_text(
+            kbid=kbid,
+            rid=rid,
+            field=field_path,
+            start=int_start,
+            end=int_end,
+            extracted_text_cache=etcache,
+        )
+        if rid not in resources:
+            title_text = await paragraphs.get_paragraph_text(
+                kbid=kbid,
+                rid=rid,
+                field="/a/title",
+                start=0,
+                end=500,
+                extracted_text_cache=etcache,
+            )
+            summary_text = await paragraphs.get_paragraph_text(
+                kbid=kbid,
+                rid=rid,
+                field="/a/summary",
+                start=0,
+                end=1000,
+                extracted_text_cache=etcache,
+            )
+            resources[rid] = {
+                "title": title_text,
+                "summary": summary_text,
+                "paragraphs": [{"paragraph": paragraph, "text": new_text}],
+            }
+        else:
+            resources[rid]["paragraphs"].append(  # type: ignore
+                {"text": new_text, "paragraph": paragraph}
+            )
+
+    for key, values in resources.items():
+        title_text = values["title"]
+        summary_text = values["summary"]
+        first_paragraph = None
+        text = ""
+        for paragraph in values["paragraphs"]:
+            if first_paragraph is None:
+                first_paragraph = paragraph["paragraph"]
+            text += "EXTRACTED BLOCK: \n " + paragraph["text"] + " \n\n "
+            paragraph["paragraph"].text = ""
+
+        if first_paragraph is not None:
+            first_paragraph.text = f"DOCUMENT: {title_text} \n SUMMARY: {summary_text} \n RESOURCE CONTENT: {text}"
 
 
 def _clean_paragraph_text(paragraph: FindParagraph) -> str:

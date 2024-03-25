@@ -80,6 +80,7 @@ async def find(
         key_filters=item.resource_filters,
         security=item.security,
         generative_model=generative_model,
+        rephrase=item.rephrase,
     )
     pb_query, incomplete_results, autofilters = await query_parser.parse()
     results, query_incomplete_results, queried_nodes = await node_query(
