@@ -83,6 +83,8 @@ class CappedPromptContext:
         except KeyError:
             # New key
             size_delta = len(value)
+        if size_delta == 0:
+            return
         size_delta = self._check_size(size_delta)
         self._size += size_delta
         self.output[key] = value[:size_delta]
