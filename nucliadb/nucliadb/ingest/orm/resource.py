@@ -264,7 +264,10 @@ class Resource:
                     )
                     field_metadata = await field_obj.get_field_metadata()
                     if field_metadata is not None:
-                        page_positions = await maybe_get_file_page_positions(field_obj)
+                        page_positions: Optional[FilePagePositions] = None
+                        if isinstance(field_obj, File):
+                            page_positions = await get_file_page_positions(field_obj)
+
                         self.indexer.apply_field_metadata(
                             field_id,
                             field_metadata,
@@ -389,7 +392,10 @@ class Resource:
             field_metadata = await field.get_field_metadata()
             field_key = self.generate_field_id(fieldid)
             if field_metadata is not None:
-                page_positions = await maybe_get_file_page_positions(field)
+                page_positions: Optional[FilePagePositions] = None
+                if type_id == FieldType.FILE and isinstance(field, File):
+                    page_positions = await get_file_page_positions(field)
+
                 user_field_metadata = None
                 if basic is not None:
                     user_field_metadata = next(
@@ -973,7 +979,13 @@ class Resource:
             replace_splits,
         ) = await field_obj.set_field_metadata(field_metadata)
         field_key = self.generate_field_id(field_metadata.field)
-        page_positions = await maybe_get_file_page_positions(field_obj)
+
+        page_positions: Optional[FilePagePositions] = None
+        if field_metadata.field.field_type == FieldType.FILE and isinstance(
+            field_obj, File
+        ):
+            page_positions = await get_file_page_positions(field_obj)
+
         user_field_metadata = next(
             (
                 fm
@@ -1434,19 +1446,13 @@ class Resource:
         return pb_resource
 
 
-async def maybe_get_file_page_positions(field: Field) -> Optional[FilePagePositions]:
-    if not isinstance(field, File):
-        return None
-
+async def get_file_page_positions(field: File) -> FilePagePositions:
+    positions: FilePagePositions = {}
     file_extracted_data = await field.get_file_extracted_data()
     if file_extracted_data is None:
-        return None
-
-    positions = FilePagePositions()
-    for index, position in enumerate(
-        sorted(file_extracted_data.file_pages_previews.positions, key=lambda x: x.start)
-    ):
-        positions.set(index, position.start, position.end)
+        return positions
+    for index, position in enumerate(file_extracted_data.file_pages_previews.positions):
+        positions[index] = (position.start, position.end)
     return positions
 
 
