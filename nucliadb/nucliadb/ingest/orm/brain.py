@@ -59,8 +59,6 @@ if TYPE_CHECKING:  # pragma: no cover
 else:
     StatusValue = int
 
-FilePagePositions = dict[int, tuple[int, int]]
-
 
 METADATA_STATUS_PB_TYPE_TO_NAME_MAP = {
     Metadata.Status.ERROR: ResourceProcessingStatus.ERROR.name,
@@ -69,6 +67,39 @@ METADATA_STATUS_PB_TYPE_TO_NAME_MAP = {
     Metadata.Status.BLOCKED: ResourceProcessingStatus.BLOCKED.name,
     Metadata.Status.EXPIRED: ResourceProcessingStatus.EXPIRED.name,
 }
+
+
+class FilePagePositions:
+    """
+    Class to get the file page numbers for a given paragraph in an optimized way.
+    """
+
+    def __init__(self):
+        self._positions: list[Union[int, None]] = []
+
+    def set(self, page_number: int, start: int, end: int):
+        current_length = len(self._positions)
+        if start < current_length:
+            raise ValueError(
+                f"Trying to set a page number for a paragraph that has already been set: {start}"
+            )
+        if current_length < start:
+            # In case there are some in-between pages missing,
+            # we fill the materialized list with None
+            self._positions.extend([None] * (start - len(self._positions)))
+        self._positions.extend([page_number] * (end - start + 1))
+
+    def get(self, paragraph_start_index: int) -> int:
+        page_number = None
+        try:
+            page_number = self._positions[paragraph_start_index]
+        except IndexError:
+            pass
+        if page_number is None:
+            logger.error(
+                f"Could not find a page for the paragraph starting at position: {paragraph_start_index}"
+            )
+        return page_number or 0
 
 
 @dataclass
@@ -122,7 +153,6 @@ class ResourceBrain:
         )
 
         # We should set paragraphs and labels
-        paragraph_pages = ParagraphPages(page_positions) if page_positions else None
         for subfield, metadata_split in metadata.split_metadata.items():
             # For each split of this field
             for index, paragraph in enumerate(metadata_split.paragraphs):
@@ -136,8 +166,12 @@ class ResourceBrain:
                     start_seconds=paragraph.start_seconds,
                     end_seconds=paragraph.end_seconds,
                 )
-                if paragraph_pages:
-                    position.page_number = paragraph_pages.get(paragraph.start)
+                if paragraph.HasField("page"):
+                    position.page_number = paragraph.page.page
+                elif page_positions:
+                    # Backward compatible code for broker messages that don't have the page at the paragraph level and
+                    # we need to get the page number from the paragraph start position
+                    position.page_number = page_positions.get(paragraph.start)
                 p = BrainParagraph(
                     start=paragraph.start,
                     end=paragraph.end,
@@ -172,8 +206,12 @@ class ResourceBrain:
                 start_seconds=paragraph.start_seconds,
                 end_seconds=paragraph.end_seconds,
             )
-            if paragraph_pages:
-                position.page_number = paragraph_pages.get(paragraph.start)
+            if paragraph.HasField("page"):
+                position.page_number = paragraph.page.page
+            elif page_positions:
+                # Backward compatible code for broker messages that don't have the page at the paragraph level and
+                # we need to get the page number from the paragraph start position
+                position.page_number = page_positions.get(paragraph.start)
             p = BrainParagraph(
                 start=paragraph.start,
                 end=paragraph.end,
@@ -600,33 +638,6 @@ def is_paragraph_repeated_in_field(
         repeated_in_field = False
         unique_paragraphs.add(paragraph_text)
     return repeated_in_field
-
-
-class ParagraphPages:
-    """
-    Class to get the page number for a given paragraph in an optimized way.
-    """
-
-    def __init__(self, positions: FilePagePositions):
-        self.positions = positions
-        self._materialized = self._materialize_page_numbers(positions)
-
-    def _materialize_page_numbers(self, positions: FilePagePositions) -> list[int]:
-        page_numbers_by_index = []
-        for page_number, (page_start, page_end) in positions.items():
-            page_numbers_by_index.extend([page_number] * (page_end - page_start + 1))
-        return page_numbers_by_index
-
-    def get(self, paragraph_start_index: int) -> int:
-        try:
-            return self._materialized[paragraph_start_index]
-        except IndexError:
-            logger.error(
-                f"Could not find a page for the given index: {paragraph_start_index}. Page positions: {self.positions}"  # noqa
-            )
-            if len(self._materialized) > 0:
-                return self._materialized[-1]
-            return 0
 
 
 def extend_unique(a: list, b: list):
