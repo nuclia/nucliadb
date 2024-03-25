@@ -595,7 +595,7 @@ def test_cors_allowed_origin_does_not_leak_between_credentialed_requests(
     assert "access-control-allow-credentials" not in response.headers
 
 
-def test_cors_x_nucliadb_cors_allowed_domains(
+def test_cors_x_nucliadb_cors_allowed_origins(
     test_client_factory: TestClientFactory,
 ) -> None:
     def homepage(request: Request) -> PlainTextResponse:
@@ -604,7 +604,7 @@ def test_cors_x_nucliadb_cors_allowed_domains(
             status_code=200,
             headers={
                 "Vary": "Accept-Encoding",
-                "x-nucliadb-cors-allowed-domains": "https://example-a.org,https://example-b.org",
+                "x-nucliadb-cors-allowed-origins": "https://example-a.org,https://example-b.org",
             },
         )
 

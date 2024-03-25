@@ -20,6 +20,7 @@ COPY nucliadb_relations2 /nucliadb/nucliadb_relations2
 COPY nucliadb_texts /nucliadb/nucliadb_texts
 COPY nucliadb_texts2 /nucliadb/nucliadb_texts2
 COPY nucliadb_vectors /nucliadb/nucliadb_vectors
+COPY nucliadb_vectors2 /nucliadb/nucliadb_vectors2
 COPY vectors_benchmark /nucliadb/vectors_benchmark
 
 WORKDIR /nucliadb
@@ -31,7 +32,6 @@ FROM europe-west4-docker.pkg.dev/nuclia-internal/nuclia/basenode:latest as build
 
 ARG CARGO_FEATURES=release-feature-set
 ARG CARGO_PROFILE=release
-ENV RUSTFLAGS="--cfg prometheus_metrics --cfg tokio_unstable"
 
 # Install system dependencies
 COPY scripts/install-system-deps.sh /tmp/
@@ -63,6 +63,7 @@ COPY nucliadb_relations2 /nucliadb/nucliadb_relations2
 COPY nucliadb_texts /nucliadb/nucliadb_texts
 COPY nucliadb_texts2 /nucliadb/nucliadb_texts2
 COPY nucliadb_vectors /nucliadb/nucliadb_vectors
+COPY nucliadb_vectors2 /nucliadb/nucliadb_vectors2
 COPY vectors_benchmark /nucliadb/vectors_benchmark
 
 RUN mkdir -p /nucliadb/tmp

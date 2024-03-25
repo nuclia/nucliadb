@@ -24,9 +24,8 @@ from unittest.mock import AsyncMock
 import pytest
 from httpx import AsyncClient
 
+from nucliadb.common import datamanagers
 from nucliadb.common.cluster import manager
-from nucliadb.common.cluster.manager import KBShardManager
-from nucliadb.common.datamanagers.rollover import RolloverDataManager
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.knowledgebox import (
     KB_TO_DELETE_BASE,
@@ -155,9 +154,8 @@ async def test_purge_orphan_shards(
 
     # We have removed the shards in maindb but left them orphan in the index
     # nodes
-    shard_manager = KBShardManager()
-    async with maindb_driver.transaction(read_only=True) as txn:
-        maindb_shards = await shard_manager.get_all_shards(txn, kbid)
+    async with maindb_driver.transaction() as txn:
+        maindb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
         assert maindb_shards is None
 
     shards = []
@@ -215,12 +213,14 @@ async def test_purge_orphan_shard_detection(
     orphan_shard_id = orphan_shard.id
 
     # Rollover shard
-    rollover_dm = RolloverDataManager(maindb_driver)
-    rollover_shards = writer_pb2.Shards(
-        shards=[writer_pb2.ShardObject(shard="rollover-shard")],
-        kbid=kbid,
-    )
-    await rollover_dm.update_kb_rollover_shards(kbid, rollover_shards)
+    async with maindb_driver.transaction() as txn:
+        rollover_shards = writer_pb2.Shards(
+            shards=[writer_pb2.ShardObject(shard="rollover-shard")],
+            kbid=kbid,
+        )
+        await datamanagers.rollover.update_kb_rollover_shards(
+            txn, kbid=kbid, kb_shards=rollover_shards
+        )
 
     orphan_shards = await detect_orphan_shards(maindb_driver)
     assert len(orphan_shards) == 1

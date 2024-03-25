@@ -38,6 +38,7 @@ from nucliadb.writer.api.constants import (
 )
 from nucliadb.writer.api.v1.resource import get_rid_from_params_or_raise_error
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
+from nucliadb.writer.back_pressure import maybe_back_pressure
 from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.basic import set_processing_info
 from nucliadb.writer.resource.field import (
@@ -187,6 +188,8 @@ async def _add_resource_field_text(
 ) -> ResourceFieldAdded:
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
+    await maybe_back_pressure(request, kbid, resource_uuid=rid)
+
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
     parse_text_field(field_id, field_payload, writer, toprocess)
     try:
@@ -253,6 +256,8 @@ async def _add_resource_field_link(
     rslug: Optional[str] = None,
 ) -> ResourceFieldAdded:
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
+
+    await maybe_back_pressure(request, kbid, resource_uuid=rid)
 
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
     parse_link_field(field_id, field_payload, writer, toprocess)
@@ -321,6 +326,8 @@ async def _add_resource_field_keywordset(
 ) -> ResourceFieldAdded:
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
+    await maybe_back_pressure(request, kbid, resource_uuid=rid)
+
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
     parse_keywordset_field(field_id, field_payload, writer, toprocess)
     try:
@@ -387,6 +394,8 @@ async def _add_resource_field_datetime(
     rslug: Optional[str] = None,
 ) -> ResourceFieldAdded:
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
+
+    await maybe_back_pressure(request, kbid, resource_uuid=rid)
 
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
     parse_datetime_field(field_id, field_payload, writer, toprocess)
@@ -460,6 +469,8 @@ async def _add_resource_field_layout(
 ) -> ResourceFieldAdded:
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
+    await maybe_back_pressure(request, kbid, resource_uuid=rid)
+
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
     await parse_layout_field(field_id, field_payload, writer, toprocess, kbid, rid)
     try:
@@ -526,6 +537,8 @@ async def _add_resource_field_conversation(
     rslug: Optional[str] = None,
 ) -> ResourceFieldAdded:
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
+
+    await maybe_back_pressure(request, kbid, resource_uuid=rid)
 
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
     await parse_conversation_field(
@@ -605,6 +618,8 @@ async def _add_resource_field_file(
 ) -> ResourceFieldAdded:
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
+    await maybe_back_pressure(request, kbid, resource_uuid=rid)
+
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
     await parse_file_field(
         field_id, field_payload, writer, toprocess, kbid, rid, skip_store=x_skip_store
@@ -680,6 +695,8 @@ async def _append_messages_to_conversation_field(
     partitioning = get_partitioning()
 
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
+
+    await maybe_back_pressure(request, kbid, resource_uuid=rid)
 
     partition = partitioning.generate_partition(kbid, rid)
 
@@ -776,6 +793,8 @@ async def _append_blocks_to_layout_field(
     partitioning = get_partitioning()
 
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
+
+    await maybe_back_pressure(request, kbid, resource_uuid=rid)
 
     partition = partitioning.generate_partition(kbid, rid)
 
@@ -911,6 +930,8 @@ async def reprocess_file_field(
     x_nucliadb_user: str = X_NUCLIADB_USER,
     x_file_password: Optional[str] = X_FILE_PASSWORD,
 ) -> ResourceUpdated:
+    await maybe_back_pressure(request, kbid, resource_uuid=rid)
+
     transaction = get_transaction_utility()
     processing = get_processing()
     partitioning = get_partitioning()

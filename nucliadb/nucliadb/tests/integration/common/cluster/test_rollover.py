@@ -17,12 +17,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
 from httpx import AsyncClient
 
+from nucliadb.common import datamanagers
 from nucliadb.common.cluster import rollover
 from nucliadb.common.context import ApplicationContext
-from nucliadb.common.datamanagers.cluster import ClusterDataManager
 
 pytestmark = pytest.mark.asyncio
 
@@ -31,6 +33,8 @@ pytestmark = pytest.mark.asyncio
 async def app_context(natsd, storage, nucliadb):
     ctx = ApplicationContext()
     await ctx.initialize()
+    ctx.nats_manager = MagicMock()
+    ctx.nats_manager.js.consumer_info = AsyncMock(return_value=MagicMock(num_pending=1))
     yield ctx
     await ctx.finalize()
 
@@ -43,7 +47,7 @@ async def test_rollover_kb_shards(
     nucliadb_reader: AsyncClient,
     nucliadb_manager: AsyncClient,
 ):
-    count = 10
+    count = 20
     for i in range(count):
         resp = await nucliadb_writer.post(
             f"/kb/{knowledgebox}/resources",
@@ -88,9 +92,8 @@ async def test_rollover_kb_shards_does_a_clean_cutover(
     knowledgebox,
 ):
     async def get_kb_shards(kbid: str):
-        driver = app_context.kv_driver
-        cluster_data_manager = ClusterDataManager(driver)
-        return await cluster_data_manager.get_kb_shards(kbid)
+        async with app_context.kv_driver.transaction() as txn:
+            return await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
 
     shards1 = await get_kb_shards(knowledgebox)
     assert shards1.extra == {}

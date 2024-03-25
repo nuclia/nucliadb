@@ -1,33 +1,77 @@
 repos:
   - repo: local
     hooks:
-      - id: isort_nucliadb
-        name: Isort
-        entry: isort --profile black -c
+      - id: lint_nucliadb
+        name: Lint nucliadb
+        entry: make -C nucliadb lint
         language: system
-        files: (^nucliadb_utils/)|(^nucliadb_node/)|(^nucliadb_telemetry/)|(^nucliadb_dataset/)|(^nucliadb_sdk/)|(^nucliadb_models/)|(^nucliadb/)(^nucliadb_performace/)
+        files: (^nucliadb/)
         types: ["python"]
+        pass_filenames: false
 
-      - id: black_nucliadb
-        name: Black
-        entry: black --check --verbose
+      - id: lint_nucliadb_dataset
+        name: Lint nucliadb_dataset
+        entry: make -C nucliadb_dataset lint
         language: system
-        files: (^nucliadb_utils/)|(^nucliadb_node/)|(^nucliadb_telemetry/)|(^nucliadb_dataset/)|(^nucliadb_sdk/)|(^nucliadb_models/)|(^nucliadb/)(^nucliadb_performace/)
+        files: (^nucliadb_dataset/)
         types: ["python"]
+        pass_filenames: false
 
-      - id: flake8_nucliadb
-        name: Flake8
-        entry: flake8 --config=nucliadb/setup.cfg
+      - id: lint_nucliadb_models
+        name: Lint nucliadb_models
+        entry: make -C nucliadb_models lint
         language: system
-        files: (^nucliadb_utils/)|(^nucliadb_node/)|(^nucliadb_telemetry/)|(^nucliadb_dataset/)|(^nucliadb_sdk/)|(^nucliadb_models/)|(^nucliadb/)(^nucliadb_performace/)
+        files: (^nucliadb_models/)
         types: ["python"]
+        pass_filenames: false
 
-      - id: mypy_nucliadb
-        name: mypy
-        entry: env MYPYPATH=mypy_stubs/ mypy --config-file=mypy.ini --show-traceback
+      - id: lint_nucliadb_node
+        name: Lint nucliadb_node
+        entry: make -C nucliadb_node lint
         language: system
-        files: (^nucliadb_utils/)|(^nucliadb_node/)|(^nucliadb_telemetry/)|(^nucliadb_dataset/)|(^nucliadb_sdk/)|(^nucliadb_models/)|(^nucliadb/)(^nucliadb_performace/)
+        files: (^nucliadb_node/)
         types: ["python"]
+        pass_filenames: false
+
+      - id: lint_nucliadb_node_binding
+        name: Lint nucliadb_node_binding
+        entry: make -C nucliadb_node_binding lint
+        language: system
+        files: (^nucliadb_node_binding/)
+        types: ["python"]
+        pass_filenames: false
+
+      - id: lint_nucliadb_performance
+        name: Lint nucliadb_performance
+        entry: make -C nucliadb_performance lint
+        language: system
+        files: (^nucliadb_performance/)
+        types: ["python"]
+        pass_filenames: false
+
+      - id: lint_nucliadb_sdk
+        name: Lint nucliadb_sdk
+        entry: make -C nucliadb_sdk lint
+        language: system
+        files: (^nucliadb_sdk/)
+        types: ["python"]
+        pass_filenames: false
+
+      - id: lint_nucliadb_telemetry
+        name: Lint nucliadb_telemetry
+        entry: make -C nucliadb_telemetry lint
+        language: system
+        files: (^nucliadb_telemetry/)
+        types: ["python"]
+        pass_filenames: false
+
+      - id: lint_nucliadb_utils
+        name: Lint nucliadb_utils
+        entry: make -C nucliadb_utils lint
+        language: system
+        files: (^nucliadb_utils/)
+        types: ["python"]
+        pass_filenames: false
 
       - id: rustfmt_nucliadb
         name: fmt

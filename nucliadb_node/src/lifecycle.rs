@@ -20,10 +20,14 @@
 
 //! Application initialization and finalization utilities
 
+use std::sync::Arc;
+
+use crate::merge::errors::MergerError;
+use crate::merge::{self, MergeScheduler};
+use crate::settings::Settings;
+use crate::shards::providers::shard_cache::ShardWriterCache;
 use nucliadb_core::prelude::*;
 use nucliadb_core::thread::ThreadPoolBuilder;
-
-use crate::settings::Settings;
 
 /// Initialize the index node writer. This function must be called before using
 /// a writer
@@ -42,6 +46,20 @@ pub fn initialize_writer(settings: Settings) -> NodeResult<()> {
     let _ = ThreadPoolBuilder::new().num_threads(settings.num_global_rayon_threads()).build_global();
 
     Ok(())
+}
+
+/// Initialize the global merge scheduler. This function must be called if merge
+/// scheduler should run
+pub fn initialize_merger(shard_cache: Arc<ShardWriterCache>, settings: Settings) -> Result<(), MergerError> {
+    let merger = MergeScheduler::new(shard_cache, settings);
+    let _ = merge::install_global(merger).map(std::thread::spawn)?;
+    Ok(())
+}
+
+/// Finalizes the global merge scheduler. This function should be called before
+/// finishing the process that started the merge
+pub fn finalize_merger() {
+    merge::stop_global_merger();
 }
 
 /// Initialize the index node reader. This function must be called before using

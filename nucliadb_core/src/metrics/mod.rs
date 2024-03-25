@@ -21,7 +21,7 @@ mod meters;
 mod metric;
 mod task_monitor;
 
-pub use metric::{grpc_ops, replication, request_time};
+pub use metric::{grpc_ops, replication, request_time, vectors};
 
 #[cfg(test)]
 mod tests;
@@ -30,22 +30,16 @@ use std::sync::Arc;
 
 use lazy_static::lazy_static;
 
-use self::meters::Meter;
+use self::meters::PrometheusMeter;
 
 lazy_static! {
-    static ref METRICS: Arc<dyn Meter> = create_metrics();
+    static ref METRICS: Arc<PrometheusMeter> = create_metrics();
 }
 
-#[cfg(prometheus_metrics)]
-fn create_metrics() -> Arc<dyn Meter> {
+fn create_metrics() -> Arc<PrometheusMeter> {
     Arc::new(meters::PrometheusMeter::new())
 }
 
-#[cfg(not(prometheus_metrics))]
-fn create_metrics() -> Arc<dyn Meter> {
-    Arc::new(meters::NoOpMeter)
-}
-
-pub fn get_metrics() -> Arc<dyn Meter> {
+pub fn get_metrics() -> Arc<PrometheusMeter> {
     Arc::clone(&METRICS)
 }

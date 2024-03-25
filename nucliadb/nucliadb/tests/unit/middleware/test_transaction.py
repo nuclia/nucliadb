@@ -27,6 +27,7 @@ from starlette.testclient import TestClient
 from nucliadb.middleware.transaction import (
     ReadOnlyTransactionManager,
     ReadOnlyTransactionMiddleware,
+    TransactionNotFoundException,
     get_read_only_transaction,
 )
 
@@ -82,14 +83,14 @@ class TestCaseReadOnlyTransactionMiddleware:
 
 
 async def test_get_read_only_transaction_runtime_error_if_not_configured():
-    with pytest.raises(RuntimeError):
+    with pytest.raises(TransactionNotFoundException):
         await get_read_only_transaction()
 
 
 async def test_transaction_manager_raises_on_aborted():
     mgr = ReadOnlyTransactionManager()
     mgr.aborted = True
-    with pytest.raises(RuntimeError):
+    with pytest.raises(TransactionNotFoundException):
         await mgr.get_transaction()
 
 

@@ -46,6 +46,7 @@ from nucliadb.ingest.processing import PushPayload, Source
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.writer import SERVICE_NAME
 from nucliadb.writer.api.v1.resource import get_rid_from_params_or_raise_error
+from nucliadb.writer.back_pressure import maybe_back_pressure
 from nucliadb.writer.exceptions import (
     ConflictError,
     IngestNotAvailable,
@@ -206,6 +207,8 @@ async def _tus_post(
         path_rid = await get_rid_from_params_or_raise_error(kbid, slug=rslug)
 
     implies_resource_creation = path_rid is None
+
+    await maybe_back_pressure(request, kbid, resource_uuid=path_rid)
 
     deferred_length = False
     if request.headers.get("upload-defer-length") == "1":
@@ -712,6 +715,8 @@ async def _upload(
 ) -> ResourceFileUploaded:
     if rslug is not None:
         path_rid = await get_rid_from_params_or_raise_error(kbid, slug=rslug)
+
+    await maybe_back_pressure(request, kbid, resource_uuid=path_rid)
 
     md5_user = x_md5[0] if x_md5 is not None and len(x_md5) > 0 else None
     try:

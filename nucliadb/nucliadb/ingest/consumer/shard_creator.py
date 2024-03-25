@@ -22,6 +22,7 @@ import logging
 import uuid
 from functools import partial
 
+from nucliadb.common import datamanagers, locking
 from nucliadb.common.cluster.manager import choose_node
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.maindb.driver import Driver
@@ -89,16 +90,28 @@ class ShardCreatorHandler:
     @metrics.handler_histo.wrap({"type": "shard_creator"})
     async def process_kb(self, kbid: str) -> None:
         logger.info({"message": "Processing notification for kbid", "kbid": kbid})
-        kb_shards = await self.shard_manager.get_shards_by_kbid_inner(kbid)
-        current_shard: writer_pb2.ShardObject = kb_shards.shards[kb_shards.actual]
+        async with self.driver.transaction(read_only=True) as txn:
+            kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+            current_shard = await self.shard_manager.get_current_active_shard(txn, kbid)
 
-        node, shard_id = choose_node(current_shard)
-        shard: nodereader_pb2.Shard = await node.reader.GetShard(
-            nodereader_pb2.GetShardRequest(shard_id=noderesources_pb2.ShardId(id=shard_id))  # type: ignore
-        )
-        await self.shard_manager.maybe_create_new_shard(
-            kbid,
-            shard.paragraphs,
-            shard.fields,
-            kb_shards.release_channel,
-        )
+        if kb_shards is None or current_shard is None:
+            logger.error(
+                "Processing a notification for a nonexistent", extra={"kbid": kbid}
+            )
+            return
+
+        # TODO: when multiple shards are allowed, this should either handle the
+        # written shard or attempt to rebalance everything
+        async with locking.distributed_lock(locking.NEW_SHARD_LOCK.format(kbid=kbid)):
+            # remember, a lock will do at least 1+ reads and 1 write.
+            # with heavy writes, this adds some simple k/v pressure
+            node, shard_id = choose_node(current_shard)
+            shard: nodereader_pb2.Shard = await node.reader.GetShard(
+                nodereader_pb2.GetShardRequest(shard_id=noderesources_pb2.ShardId(id=shard_id))  # type: ignore
+            )
+            await self.shard_manager.maybe_create_new_shard(
+                kbid,
+                shard.paragraphs,
+                shard.fields,
+                kb_shards.release_channel,
+            )

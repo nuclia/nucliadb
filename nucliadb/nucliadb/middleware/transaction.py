@@ -65,6 +65,10 @@ class ReadOnlyTransactionMiddleware(BaseHTTPMiddleware):
             txn_manager.set(None)
 
 
+class TransactionNotFoundException(Exception):
+    pass
+
+
 class ReadOnlyTransactionManager:
     def __init__(self):
         self._transaction: Optional[Transaction] = None
@@ -73,7 +77,7 @@ class ReadOnlyTransactionManager:
 
     async def get_transaction(self) -> Transaction:
         if self.aborted:
-            raise RuntimeError("Transaction was aborted")
+            raise TransactionNotFoundException("Transaction was aborted")
 
         if self._transaction is not None:
             return self._transaction
@@ -107,7 +111,7 @@ async def get_read_only_transaction() -> Transaction:
     """
     manager: Optional[ReadOnlyTransactionManager] = txn_manager.get()
     if manager is None:
-        raise RuntimeError(
+        raise TransactionNotFoundException(
             "Context var is not set. Did you forget to add the ReadOnlyTransactionMiddleware to the app?"
         )
     return await manager.get_transaction()

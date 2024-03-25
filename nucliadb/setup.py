@@ -75,6 +75,8 @@ setup(
             "nucliadb-purge = nucliadb.purge:run",
             "nucliadb-orphan-shards = nucliadb.purge.orphan_shards:run",
             "nucliadb-migrate = nucliadb.migrator.command:main",
+            "nucliadb-rebalance = nucliadb.common.cluster.rebalance:main",
+            "nucliadb-validate-migrations = nucliadb.migrator.command:validate",
             "nucliadb-migration-runner = nucliadb.migrator.command:main_forever",
             "nucliadb-metrics-exporter = nucliadb.metrics_exporter:main",
             "nucliadb-rollover-kbid = nucliadb.common.cluster.rollover:rollover_kbid_command",

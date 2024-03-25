@@ -19,10 +19,6 @@ spec:
           uri:
             regex: '^/api/v\d+/kb/[^/]+/(entitiesgroup|labelset|vectorset|custom-synonyms|export|import|notifications|processing-status)s?.*'
         - method:
-            regex: OPTIONS
-          uri:
-            regex: ^/api/v\d+/kb/[^/]+/(upload)?.*
-        - method:
             regex: "GET|OPTIONS"
           uri:
             regex: '^/api/v\d+/kb/[^/]+/(resource|slug)/[^/]+$'
@@ -58,18 +54,3 @@ spec:
             port:
               number: {{.Values.serving.port}}
             host: "reader.{{ .Release.Namespace }}.svc.cluster.local"
-      corsPolicy:
-        allowOrigins:
-          - exact: "*"
-        allowHeaders:
-          - "*"
-          # Authorization will be exluded from * in the future, (CORS non-wildcard request-header).
-          # Browsers already showing deprecation notices, so it needs to be specified explicitly
-          - "Authorization"
-        allowMethods:
-          - GET
-          - OPTIONS
-          - POST
-          - PATCH
-          - PUT
-          - DELETE

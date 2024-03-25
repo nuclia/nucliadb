@@ -39,6 +39,7 @@ from nucliadb_protos.nodereader_pb2 import (
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import GetEntitiesResponse
 
+from nucliadb.common import datamanagers
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.exceptions import (
     AlreadyExists,
@@ -50,7 +51,6 @@ from nucliadb.common.datamanagers.entities import (
     KB_DELETED_ENTITIES_GROUPS,
     KB_ENTITIES,
     KB_ENTITIES_GROUP,
-    EntitiesDataManager,
 )
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -203,7 +203,9 @@ class EntitiesManager:
         return entities_group
 
     async def get_stored_entities_group(self, group: str) -> Optional[EntitiesGroup]:
-        return await EntitiesDataManager.get_entities_group(self.kbid, group, self.txn)
+        return await datamanagers.entities.get_entities_group(
+            self.txn, kbid=self.kbid, group=group
+        )
 
     async def get_indexed_entities_group(self, group: str) -> Optional[EntitiesGroup]:
         shard_manager = get_shard_manager()
@@ -345,8 +347,8 @@ class EntitiesManager:
         return set.union(*results)
 
     async def store_entities_group(self, group: str, eg: EntitiesGroup):
-        meta_cache = await EntitiesDataManager.get_entities_meta_cache(
-            self.kbid, self.txn
+        meta_cache = await datamanagers.entities.get_entities_meta_cache(
+            self.txn, kbid=self.kbid
         )
         duplicates = {}
         deleted = []
@@ -371,11 +373,13 @@ class EntitiesManager:
 
         meta_cache.set_duplicates(group, duplicates)
         meta_cache.set_deleted(group, deleted)
-        await EntitiesDataManager.set_entities_meta_cache(
-            self.kbid, meta_cache, self.txn
+        await datamanagers.entities.set_entities_meta_cache(
+            self.txn, kbid=self.kbid, cache=meta_cache
         )
 
-        await EntitiesDataManager.set_entities_group(self.kbid, group, eg, self.txn)
+        await datamanagers.entities.set_entities_group(
+            self.txn, kbid=self.kbid, group_id=group, entities=eg
+        )
         # if it was preivously deleted, we must unmark it
         await self.unmark_entities_group_as_deleted(group)
 
@@ -388,10 +392,14 @@ class EntitiesManager:
         await self.txn.delete(entities_key)
 
     async def mark_entities_group_as_deleted(self, group: str):
-        await EntitiesDataManager.mark_group_as_deleted(self.kbid, group, self.txn)
+        await datamanagers.entities.mark_group_as_deleted(
+            self.txn, kbid=self.kbid, group=group
+        )
 
     async def unmark_entities_group_as_deleted(self, group: str):
-        await EntitiesDataManager.unmark_group_as_deleted(self.kbid, group, self.txn)
+        await datamanagers.entities.unmark_group_as_deleted(
+            self.txn, kbid=self.kbid, group=group
+        )
 
     @staticmethod
     def merge_entities_groups(indexed: EntitiesGroup, stored: EntitiesGroup):

@@ -16,25 +16,29 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
+//
 
-use crate::metrics::meters::Meter;
-use crate::metrics::metric::grpc_ops::{GrpcOpKey, GrpcOpValue};
-use crate::metrics::metric::replication;
-use crate::metrics::metric::request_time::{RequestTimeKey, RequestTimeValue};
-use crate::NodeResult;
+use crate::shards::ShardId;
 
-pub struct NoOpMeter;
-impl Meter for NoOpMeter {
-    fn record_request_time(&self, _metric: RequestTimeKey, _value: RequestTimeValue) {}
-
-    fn record_grpc_op(&self, _method: GrpcOpKey, _value: GrpcOpValue) {}
-
-    fn export(&self) -> NodeResult<String> {
-        Ok(Default::default())
-    }
-    fn record_replicated_bytes(&self, _value: u64) {}
-    fn record_replication_op(&self, _key: replication::ReplicationOpsKey) {}
-
-    fn set_shard_cache_gauge(&self, _value: i64) {}
-    fn record_shard_cache_eviction(&self) {}
+pub struct MergeRequest {
+    pub shard_id: ShardId,
+    pub priority: MergePriority,
+    pub waiter: MergeWaiter,
 }
+
+#[derive(Copy, Clone, Default)]
+pub enum MergeWaiter {
+    #[default]
+    None,
+    Async,
+}
+
+#[derive(Copy, Clone, Default, Hash, PartialEq, Eq)]
+pub enum MergePriority {
+    WhenFree,
+    #[default]
+    Low,
+    High,
+}
+
+pub const MERGE_PRIORITIES: [MergePriority; 3] = [MergePriority::High, MergePriority::Low, MergePriority::WhenFree];

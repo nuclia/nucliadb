@@ -24,10 +24,8 @@ from typing import AsyncGenerator, AsyncIterator, Callable, Optional
 import nats.errors
 from google.protobuf.message import DecodeError as ProtobufDecodeError
 
+from nucliadb.common import datamanagers
 from nucliadb.common.context import ApplicationContext
-from nucliadb.common.datamanagers.entities import EntitiesDataManager
-from nucliadb.common.datamanagers.labels import LabelsDataManager
-from nucliadb.common.datamanagers.resources import ResourcesDataManager
 from nucliadb.export_import import logger
 from nucliadb.export_import.datamanager import ExportImportDataManager
 from nucliadb.export_import.exceptions import (
@@ -152,30 +150,33 @@ async def import_binary(
 async def set_entities_groups(
     context: ApplicationContext, kbid: str, entities_groups: kb_pb2.EntitiesGroups
 ) -> None:
-    edm = EntitiesDataManager(context.kv_driver)
-    await edm.set_entities_groups(kbid, entities_groups)
+    async with datamanagers.with_transaction() as txn:
+        await datamanagers.entities.set_entities_groups(
+            txn, kbid=kbid, entities_groups=entities_groups
+        )
+        await txn.commit()
 
 
 async def set_labels(
     context: ApplicationContext, kbid: str, labels: kb_pb2.Labels
 ) -> None:
-    ldm = LabelsDataManager(context.kv_driver)
-    await ldm.set_labels(kbid, labels)
+    async with datamanagers.with_transaction() as txn:
+        await datamanagers.labels.set_labels(txn, kbid=kbid, labels=labels)
+        await txn.commit()
 
 
 async def iter_kb_resource_uuids(
     context: ApplicationContext, kbid: str
 ) -> AsyncGenerator[str, None]:
-    rdm = ResourcesDataManager(context.kv_driver, context.blob_storage)
-    async for rid in rdm.iterate_resource_ids(kbid):
+    async for rid in datamanagers.resources.iterate_resource_ids(kbid=kbid):
         yield rid
 
 
 async def get_broker_message(
     context: ApplicationContext, kbid: str, rid: str
 ) -> Optional[writer_pb2.BrokerMessage]:
-    rdm = ResourcesDataManager(context.kv_driver, context.blob_storage)
-    return await rdm.get_broker_message(kbid, rid)
+    async with datamanagers.with_transaction() as txn:
+        return await datamanagers.resources.get_broker_message(txn, kbid=kbid, rid=rid)
 
 
 def get_cloud_files(bm: writer_pb2.BrokerMessage) -> list[resources_pb2.CloudFile]:
@@ -243,13 +244,13 @@ async def download_binary(
 
 
 async def get_entities(context: ApplicationContext, kbid: str) -> kb_pb2.EntitiesGroups:
-    edm = EntitiesDataManager(context.kv_driver)
-    return await edm.get_entities_groups(kbid)
+    async with datamanagers.with_transaction() as txn:
+        return await datamanagers.entities.get_entities_groups(txn, kbid=kbid)
 
 
 async def get_labels(context: ApplicationContext, kbid: str) -> kb_pb2.Labels:
-    ldm = LabelsDataManager(context.kv_driver)
-    return await ldm.get_labels(kbid)
+    async with datamanagers.with_transaction() as txn:
+        return await datamanagers.labels.get_labels(txn, kbid=kbid)
 
 
 class EndOfStream(Exception): ...

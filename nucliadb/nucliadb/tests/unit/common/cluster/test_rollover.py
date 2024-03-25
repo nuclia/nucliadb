@@ -56,6 +56,7 @@ def shards():
                     writer_pb2.ShardReplica(shard=writer_pb2.ShardCreated(id="1")),
                     writer_pb2.ShardReplica(shard=writer_pb2.ShardCreated(id="2")),
                 ],
+                read_only=True,
             ),
             writer_pb2.ShardObject(
                 shard="2",
@@ -63,6 +64,7 @@ def shards():
                     writer_pb2.ShardReplica(shard=writer_pb2.ShardCreated(id="3")),
                     writer_pb2.ShardReplica(shard=writer_pb2.ShardCreated(id="4")),
                 ],
+                read_only=False,
             ),
         ],
         kbid="kbid",
@@ -99,9 +101,7 @@ def resources_datamanager(resource_ids):
     metadata.modified.ToDatetime.return_value = datetime.now()
     mock.get_resource_index_message.return_value = metadata
 
-    with patch(
-        "nucliadb.common.cluster.rollover.ResourcesDataManager", return_value=mock
-    ):
+    with patch("nucliadb.common.cluster.rollover.datamanagers.resources", mock):
         yield mock
 
 
@@ -112,9 +112,7 @@ def cluster_datamanager(resource_ids, shards):
     mock.get_kb_shards.return_value = shards
     mock.update_kb_shards = AsyncMock()
 
-    with patch(
-        "nucliadb.common.cluster.rollover.ClusterDataManager", return_value=mock
-    ):
+    with patch("nucliadb.common.cluster.rollover.datamanagers.cluster", mock):
         yield mock
 
 
@@ -137,8 +135,12 @@ def rollover_datamanager(resource_ids, cluster_datamanager):
 
     mock.iter_indexed_keys = _mock_indexed_keys
 
-    with patch(
-        "nucliadb.common.cluster.rollover.RolloverDataManager", return_value=mock
+    with patch("nucliadb.common.cluster.rollover.datamanagers.rollover", mock), patch(
+        "nucliadb.common.cluster.rollover.datamanagers.with_transaction",
+        return_value=AsyncMock(),
+    ), patch(
+        "nucliadb.ingest.consumer.shard_creator.locking.distributed_lock",
+        return_value=AsyncMock(),
     ):
         yield mock
 
@@ -164,11 +166,11 @@ async def test_create_rollover_shards(
     new_shards = await rollover.create_rollover_shards(app_context, "kbid")
 
     assert new_shards.kbid == "kbid"
-    assert len(available_nodes["0"].writer.calls["NewShard"]) == sum(
-        [len(s.replicas) for s in shards.shards]
-    )
+    assert sum(
+        [len(node.writer.calls["NewShard"]) for node in available_nodes.values()]
+    ) == sum([len(s.replicas) for s in shards.shards])
     rollover_datamanager.update_kb_rollover_shards.assert_called_with(
-        "kbid", new_shards
+        ANY, kbid="kbid", kb_shards=new_shards
     )
 
 
@@ -189,7 +191,9 @@ async def test_index_rollover_shards(
     rollover_datamanager.get_kb_rollover_shards.return_value = shards
 
     await rollover.index_rollover_shards(app_context, "kbid")
-    rollover_datamanager.add_indexed.assert_called_with("kbid", "1", "1", 1)
+    rollover_datamanager.add_indexed.assert_called_with(
+        ANY, kbid="kbid", resource_id="1", shard_id="1", modification_time=1
+    )
 
 
 async def test_index_rollover_shards_handles_missing_shards(
@@ -217,7 +221,9 @@ async def test_index_rollover_shards_handles_missing_res(
 
     await rollover.index_rollover_shards(app_context, "kbid")
 
-    rollover_datamanager.remove_to_index.assert_called_with("kbid", "1")
+    rollover_datamanager.remove_to_index.assert_called_with(
+        ANY, kbid="kbid", resource="1"
+    )
 
 
 async def test_cutover_shards(
@@ -227,7 +233,9 @@ async def test_cutover_shards(
 
     await rollover.cutover_shards(app_context, "kbid")
 
-    cluster_datamanager.update_kb_shards.assert_called_with("kbid", ANY)
+    cluster_datamanager.update_kb_shards.assert_called_with(
+        ANY, kbid="kbid", shards=ANY
+    )
     [
         app_context.shard_manager.rollback_shard.assert_any_call(shard)
         for shard in shards.shards
@@ -249,7 +257,9 @@ async def test_validate_indexed_data(
     indexed_res = await rollover.validate_indexed_data(app_context, "kbid")
     assert len(indexed_res) == len(resource_ids)
     [
-        resources_datamanager.get_resource_index_message.assert_any_call("kbid", res_id)
+        resources_datamanager.get_resource_index_message.assert_any_call(
+            ANY, kbid="kbid", rid=res_id
+        )
         for res_id in resource_ids
     ]
 

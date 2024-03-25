@@ -80,6 +80,11 @@ impl VectorReader for VectorReaderService {
         }
     }
 
+    #[tracing::instrument(skip_all)]
+    fn update(&mut self) -> NodeResult<()> {
+        Ok(())
+    }
+
     #[measure(actor = "vectors", metric = "search")]
     #[tracing::instrument(skip_all)]
     fn search(&self, request: &ProtosRequest, context: &VectorsContext) -> NodeResult<ProtosResponse> {

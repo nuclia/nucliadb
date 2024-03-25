@@ -25,7 +25,7 @@ use crate::protos::*;
 use crate::query_language::BooleanExpression;
 use crate::IndexFiles;
 
-pub type ParagraphsReaderPointer = Arc<dyn ParagraphReader>;
+pub type ParagraphsReaderPointer = Arc<RwLock<dyn ParagraphReader>>;
 pub type ParagraphsWriterPointer = Arc<RwLock<dyn ParagraphWriter>>;
 pub type ProtosRequest = ParagraphSearchRequest;
 pub type ProtosResponse = ParagraphSearchResponse;

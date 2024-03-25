@@ -13,5 +13,6 @@ members = [
   "nucliadb_texts",
   "nucliadb_texts2",
   "nucliadb_vectors",
+  "nucliadb_vectors2",
   "vectors_benchmark",
 ]

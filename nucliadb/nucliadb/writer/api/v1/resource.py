@@ -38,8 +38,8 @@ from nucliadb_protos.writer_pb2 import (
 )
 from starlette.requests import Request
 
+from nucliadb.common import datamanagers
 from nucliadb.common.context.fastapi import get_app_context
-from nucliadb.common.datamanagers.resources import ResourcesDataManager
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
 from nucliadb.common.maindb.utils import get_driver
@@ -54,6 +54,7 @@ from nucliadb.writer.api.v1.router import (
     RSLUG_PREFIX,
     api,
 )
+from nucliadb.writer.back_pressure import maybe_back_pressure
 from nucliadb.writer.exceptions import IngestNotAvailable
 from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.basic import (
@@ -108,6 +109,8 @@ async def create_resource(
     x_skip_store: bool = SKIP_STORE_DEFAULT,
     x_synchronous: bool = SYNC_CALL,
 ):
+    await maybe_back_pressure(request, kbid)
+
     transaction = get_transaction_utility()
     partitioning = get_partitioning()
 
@@ -265,6 +268,9 @@ async def modify_resource_endpoint(
     path_rslug: Optional[str] = None,
 ):
     resource_uuid = await get_rid_from_params_or_raise_error(kbid, path_rid, path_rslug)
+
+    await maybe_back_pressure(request, kbid, resource_uuid=resource_uuid)
+
     if item.slug is None:
         return await modify_resource(
             request,
@@ -391,8 +397,8 @@ async def update_resource_slug(
     new_slug: str,
 ):
     async with driver.transaction() as txn:
-        old_slug = await ResourcesDataManager.modify_slug(
-            txn, kbid, rid=rid, new_slug=new_slug
+        old_slug = await datamanagers.resources.modify_slug(
+            txn, kbid=kbid, rid=rid, new_slug=new_slug
         )
         await txn.commit()
         return old_slug
@@ -413,7 +419,9 @@ async def reprocess_resource_rslug_prefix(
     rslug: str,
     x_nucliadb_user: str = X_NUCLIADB_USER,
 ):
-    return await _reprocess_resource(kbid, rslug=rslug, x_nucliadb_user=x_nucliadb_user)
+    return await _reprocess_resource(
+        request, kbid, rslug=rslug, x_nucliadb_user=x_nucliadb_user
+    )
 
 
 @api.post(
@@ -431,10 +439,13 @@ async def reprocess_resource_rid_prefix(
     rid: str,
     x_nucliadb_user: str = X_NUCLIADB_USER,
 ):
-    return await _reprocess_resource(kbid, rid=rid, x_nucliadb_user=x_nucliadb_user)
+    return await _reprocess_resource(
+        request, kbid, rid=rid, x_nucliadb_user=x_nucliadb_user
+    )
 
 
 async def _reprocess_resource(
+    request: Request,
     kbid: str,
     x_nucliadb_user: str,
     rid: Optional[str] = None,
@@ -444,6 +455,8 @@ async def _reprocess_resource(
     partitioning = get_partitioning()
 
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
+
+    await maybe_back_pressure(request, kbid, resource_uuid=rid)
 
     partition = partitioning.generate_partition(kbid, rid)
 
@@ -461,17 +474,14 @@ async def _reprocess_resource(
     storage = await get_storage(service_name=SERVICE_NAME)
     driver = get_driver()
 
-    txn = await driver.begin()
-    kb = KnowledgeBox(txn, storage, kbid)
+    async with driver.transaction() as txn:
+        kb = KnowledgeBox(txn, storage, kbid)
 
-    resource = await kb.get(rid)
-    if resource is None:
-        raise HTTPException(status_code=404, detail="Resource does not exist")
+        resource = await kb.get(rid)
+        if resource is None:
+            raise HTTPException(status_code=404, detail="Resource does not exist")
 
-    await extract_fields(resource=resource, toprocess=toprocess)
-
-    if txn.open:
-        await txn.abort()
+        await extract_fields(resource=resource, toprocess=toprocess)
 
     processing_info = await send_to_process(toprocess, partition)
 
@@ -567,7 +577,9 @@ async def reindex_resource_rslug_prefix(
     rslug: str,
     reindex_vectors: bool = Query(False),
 ):
-    return await _reindex_resource(kbid, rslug=rslug, reindex_vectors=reindex_vectors)
+    return await _reindex_resource(
+        request, kbid, rslug=rslug, reindex_vectors=reindex_vectors
+    )
 
 
 @api.post(
@@ -584,16 +596,21 @@ async def reindex_resource_rid_prefix(
     rid: str,
     reindex_vectors: bool = Query(False),
 ):
-    return await _reindex_resource(kbid, rid=rid, reindex_vectors=reindex_vectors)
+    return await _reindex_resource(
+        request, kbid, rid=rid, reindex_vectors=reindex_vectors
+    )
 
 
 async def _reindex_resource(
+    request: Request,
     kbid: str,
     reindex_vectors: bool,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
 ):
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
+
+    await maybe_back_pressure(request, kbid, resource_uuid=rid)
 
     ingest = get_ingest()
     index_req = IndexResource()

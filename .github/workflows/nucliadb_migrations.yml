@@ -1,0 +1,45 @@
+name: nucliadb migrations validation
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/nucliadb_migrations.yml"
+      - "nucliadb/migrations/**"
+      - "nucliadb/nucliadb/migrator/**"
+
+  push:
+    branches:
+      - main
+      - ".github/workflows/nucliadb_migrations.yml"
+      - "nucliadb/migrations/**"
+      - "nucliadb/nucliadb/migrator/**"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  migrations-validation:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: ["3.11"]
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: Install the package
+        run: make -C nucliadb/ install-dev
+
+      - name: Validate migrations
+        run: nucliadb-validate-migrations

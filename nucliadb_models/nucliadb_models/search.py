@@ -581,11 +581,6 @@ class SearchParamDefaults:
         title="Chat features",
         description="Features enabled for the chat endpoint. Semantic search is done if `vectors` is included. If `paragraphs` is included, the results will include matching paragraphs from the bm25 index. If `relations` is included, a graph of entities related to the answer is returned.",  # noqa
     )
-    prompt = ParamDefault(
-        default=None,
-        title="Prompt",
-        description="Input here your prompt with the words {context} and {question} in brackets where you want those fields to be placed, in case you want them in your prompt. Context will be the data returned by the retrieval step.",  # noqa
-    )
     suggest_features = ParamDefault(
         default=[
             SuggestOptions.PARAGRAPH,

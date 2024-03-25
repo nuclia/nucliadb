@@ -55,6 +55,7 @@ COPY nucliadb_relations2 /nucliadb/nucliadb_relations2
 COPY nucliadb_texts /nucliadb/nucliadb_texts
 COPY nucliadb_texts2 /nucliadb/nucliadb_texts2
 COPY nucliadb_vectors /nucliadb/nucliadb_vectors
+COPY nucliadb_vectors2 /nucliadb/nucliadb_vectors2
 COPY vectors_benchmark /nucliadb/vectors_benchmark
 
 RUN cargo chef prepare --recipe-path recipe.json
@@ -65,8 +66,6 @@ FROM base as builder
 
 ARG CARGO_FEATURES=release-feature-set
 ARG CARGO_PROFILE=release
-
-ENV RUSTFLAGS="--cfg prometheus_metrics --cfg tokio_unstable"
 
 COPY --from=planner /nucliadb/recipe.json recipe.json
 
@@ -94,6 +93,7 @@ COPY nucliadb_relations2 /nucliadb/nucliadb_relations2
 COPY nucliadb_texts /nucliadb/nucliadb_texts
 COPY nucliadb_texts2 /nucliadb/nucliadb_texts2
 COPY nucliadb_vectors /nucliadb/nucliadb_vectors
+COPY nucliadb_vectors2 /nucliadb/nucliadb_vectors2
 COPY vectors_benchmark /nucliadb/vectors_benchmark
 
 # Build application (only run when sources are modified)

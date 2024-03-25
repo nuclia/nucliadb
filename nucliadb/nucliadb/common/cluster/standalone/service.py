@@ -20,7 +20,9 @@
 import os
 import shutil
 
+import backoff
 from grpc import aio
+from grpc.aio import AioRpcError
 
 from nucliadb.common.cluster.settings import settings
 from nucliadb.common.cluster.settings import settings as cluster_settings
@@ -33,6 +35,7 @@ from nucliadb_utils.grpc import get_traced_grpc_server
 class StandaloneClusterServiceServicer(
     standalone_pb2_grpc.StandaloneClusterServiceServicer
 ):
+    @backoff.on_exception(backoff.expo, (AioRpcError,), max_time=60)
     async def NodeAction(  # type: ignore
         self, request: standalone_pb2.NodeActionRequest, context
     ) -> standalone_pb2.NodeActionResponse:

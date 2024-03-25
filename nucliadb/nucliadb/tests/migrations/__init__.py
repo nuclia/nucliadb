@@ -17,32 +17,3 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
-
-import pytest
-
-from nucliadb_utils.cache import locking
-
-
-@pytest.mark.asyncio
-async def test_redis_distributed_lock(redis):
-    url = f"redis://{redis[0]}:{redis[1]}"
-    dist_lock_manager = locking.RedisDistributedLockManager(url, timeout=1)
-
-    async def test_lock_works():
-        async with dist_lock_manager.lock("test_lock"):
-            await asyncio.sleep(1.1)
-
-    async def test_locked():
-        async with dist_lock_manager.lock("test_lock"):
-            ...
-
-    task = asyncio.create_task(test_lock_works())
-    await asyncio.sleep(0.05)
-    with pytest.raises(locking.ResourceLocked):
-        await test_locked()
-
-    await task
-
-    # get lock again now that it is free
-    await test_locked()

@@ -19,12 +19,10 @@
 #
 
 import pytest
-from nucliadb_protos.writer_pb2 import Shards as PBShards
 
-from nucliadb.common.cluster.manager import KBShardManager
+from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.local import LocalDriver
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.tests.fixtures import IngestFixture
 from nucliadb_protos import knowledgebox_pb2, utils_pb2, writer_pb2, writer_pb2_grpc
 
@@ -64,20 +62,13 @@ async def test_create_knowledgebox(grpc_servicer: IngestFixture, maindb_driver):
 async def list_all_kb_slugs(driver: Driver) -> list[str]:
     slugs = []
     async with driver.transaction(read_only=True) as txn:
-        async for _, slug in KnowledgeBox.get_kbs(txn, slug=""):
+        async for _, slug in datamanagers.kb.get_kbs(txn):
             slugs.append(slug)
     return slugs
 
 
-async def get_kb_shards(txn, kbid) -> PBShards:
-    shard_manager = KBShardManager()
-    shards = await shard_manager.get_all_shards(txn, kbid)
-    assert shards, "Shards object not found!"
-    return shards
-
-
 async def get_kb_config(txn, kbid) -> knowledgebox_pb2.KnowledgeBoxConfig:
-    config = await KnowledgeBox.get_kb(txn, kbid)
+    config = await datamanagers.kb.get_config(txn, kbid=kbid)
     assert config, "Config object not found!"
     return config
 
@@ -134,6 +125,7 @@ async def test_create_knowledgebox_release_channel(
 
     driver = grpc_servicer.servicer.driver
     async with driver.transaction() as txn:
-        shards = await get_kb_shards(txn, kbid)
+        shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+        assert shards is not None
         config = await get_kb_config(txn, kbid)
         assert shards.release_channel == config.release_channel == release_channel

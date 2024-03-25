@@ -41,10 +41,9 @@ from nucliadb_protos.writer_pb2 import (
 )
 from starlette.requests import Request
 
+from nucliadb.common import datamanagers
 from nucliadb.common.cluster.settings import in_standalone_mode
-from nucliadb.common.context import ApplicationContext
 from nucliadb.common.context.fastapi import get_app_context
-from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
 from nucliadb.common.http_clients import processing
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -286,7 +285,7 @@ async def notifications_endpoint(
 
     context = get_app_context(request.app)
 
-    if not await exists_kb(context, kbid):
+    if not await exists_kb(kbid=kbid):
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
 
     response = StreamingResponse(
@@ -298,9 +297,9 @@ async def notifications_endpoint(
     return response
 
 
-async def exists_kb(context: ApplicationContext, kbid: str) -> bool:
-    dm = KnowledgeBoxDataManager(context.kv_driver)
-    return await dm.exists_kb(kbid)
+async def exists_kb(kbid: str) -> bool:
+    async with datamanagers.with_transaction(read_only=True) as txn:
+        return await datamanagers.kb.exists_kb(txn, kbid=kbid)
 
 
 @api.get(
@@ -323,9 +322,7 @@ async def processing_status(
     scheduled: Optional[bool] = None,
     limit: int = 20,
 ) -> Union[processing.RequestsResults, HTTPClientError]:
-    context = get_app_context(request.app)
-
-    if not await exists_kb(context, kbid):
+    if not await exists_kb(kbid=kbid):
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
 
     async with processing.ProcessingHTTPClient() as client:

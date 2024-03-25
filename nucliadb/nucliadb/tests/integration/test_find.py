@@ -215,7 +215,6 @@ async def test_story_7286(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     knowledgebox,
-    caplog,
 ):
     resp = await nucliadb_writer.post(
         f"/kb/{knowledgebox}/resources",
@@ -270,7 +269,6 @@ async def test_story_7286(
         assert resp.status_code == 200
     body = resp.json()
     assert len(body["resources"]) == 0
-    assert caplog.record_tuples[0][2] == f"Resource {rid} not found in {knowledgebox}"
 
 
 @pytest.mark.asyncio

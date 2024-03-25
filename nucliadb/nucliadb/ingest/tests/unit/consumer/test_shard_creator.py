@@ -47,9 +47,7 @@ def reader():
 def kbdm():
     mock = MagicMock()
     mock.get_model_metadata = AsyncMock(return_value="model")
-    with patch(
-        "nucliadb.common.cluster.manager.KnowledgeBoxDataManager", return_value=mock
-    ):
+    with patch("nucliadb.common.cluster.manager.datamanagers.kb", return_value=mock):
         yield mock
 
 
@@ -57,14 +55,20 @@ def kbdm():
 def shard_manager(reader):
     sm = MagicMock()
     node = MagicMock(reader=reader)
-    shards = Shards(shards=[ShardObject()], actual=0)
-    sm.get_shards_by_kbid_inner = AsyncMock(return_value=shards)
+    shards = Shards(shards=[ShardObject(read_only=False)], actual=0)
+    sm.get_current_active_shard = AsyncMock(return_value=shards.shards[0])
     sm.maybe_create_new_shard = AsyncMock()
     with patch(
         "nucliadb.ingest.consumer.shard_creator.get_shard_manager", return_value=sm
     ), patch(
         "nucliadb.ingest.consumer.shard_creator.choose_node",
         return_value=(node, "shard_id"),
+    ), patch(
+        "nucliadb.ingest.consumer.shard_creator.datamanagers.cluster.get_kb_shards",
+        AsyncMock(return_value=shards),
+    ), patch(
+        "nucliadb.ingest.consumer.shard_creator.locking.distributed_lock",
+        return_value=AsyncMock(),
     ):
         yield sm
 

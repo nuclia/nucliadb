@@ -34,15 +34,12 @@ from nucliadb_protos.knowledgebox_pb2 import VectorSet, VectorSets
 from nucliadb_protos.resources_pb2 import Basic
 from nucliadb_protos.utils_pb2 import ReleaseChannel
 
+from nucliadb.common import datamanagers
 from nucliadb.common.cluster.base import AbstractIndexNode
-from nucliadb.common.cluster.exceptions import ShardNotFound
+from nucliadb.common.cluster.exceptions import ShardNotFound, ShardsNotFound
 from nucliadb.common.cluster.manager import get_index_node
 from nucliadb.common.cluster.utils import get_shard_manager
-from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
-from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
-from nucliadb.common.datamanagers.labels import LabelsDataManager
 from nucliadb.common.maindb.driver import Driver, Transaction
-from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict
 from nucliadb.ingest.orm.resource import (
@@ -54,18 +51,15 @@ from nucliadb.ingest.orm.synonyms import Synonyms
 from nucliadb.ingest.orm.utils import compute_paragraph_key, get_basic, set_basic
 from nucliadb.migrator.utils import get_latest_version
 from nucliadb_protos import writer_pb2
-from nucliadb_utils.keys import KB_SHARDS, KB_UUID
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_audit, get_storage
 
+# XXX Eventually all these keys should be moved to datamanagers.kb
 KB_RESOURCE = "/kbs/{kbid}/r/{uuid}"
 
 KB_KEYS = "/kbs/{kbid}/"
 
 KB_VECTORSET = "/kbs/{kbid}/vectorsets"
-KB_RESOURCE_SHARD = "/kbs/{kbid}/r/{uuid}/shard"
-KB_SLUGS_BASE = "/kbslugs/"
-KB_SLUGS = KB_SLUGS_BASE + "{slug}"
 
 KB_TO_DELETE_BASE = "/kbtodelete/"
 KB_TO_DELETE_STORAGE_BASE = "/storagetodelete/"
@@ -81,14 +75,11 @@ class KnowledgeBox:
         self.kbid = kbid
         self._config: Optional[KnowledgeBoxConfig] = None
         self.synonyms = Synonyms(self.txn, self.kbid)
-        # b/w compatible, long term this class would change dramatically
-        self.data_manager = KnowledgeBoxDataManager(
-            get_driver(), read_only_txn=self.txn
-        )
 
     async def get_config(self) -> Optional[KnowledgeBoxConfig]:
         if self._config is None:
-            config = await self.data_manager.get_config(self.kbid)
+            async with datamanagers.with_transaction() as txn:
+                config = await datamanagers.kb.get_config(txn, kbid=self.kbid)
             if config is not None:
                 self._config = config
                 return config
@@ -98,47 +89,31 @@ class KnowledgeBox:
             return self._config
 
     @classmethod
-    async def get_kb(cls, txn: Transaction, uuid: str) -> Optional[KnowledgeBoxConfig]:
-        payload = await txn.get(KB_UUID.format(kbid=uuid))
-        if payload is not None:
-            response = KnowledgeBoxConfig()
-            response.ParseFromString(payload)
-            return response
-        else:
-            return None
-
-    @classmethod
-    async def exist_kb(cls, txn: Transaction, uuid: str) -> bool:
-        payload = await txn.get(KB_UUID.format(kbid=uuid))
-        if payload is not None:
-            return True
-        else:
-            return False
-
-    @classmethod
     async def delete_kb(cls, txn: Transaction, slug: str = "", kbid: str = ""):
         # Mark storage to be deleted
         # Mark keys to be deleted
+        logger.info(f"Deleting KB kbid={kbid} slug={slug}")
         if not kbid and not slug:
             raise AttributeError()
 
         if slug and not kbid:
-            kbid_bytes = await txn.get(KB_SLUGS.format(slug=slug))
+            kbid_bytes = await txn.get(datamanagers.kb.KB_SLUGS.format(slug=slug))
             if kbid_bytes is None:
-                raise KnowledgeBoxNotFound()
+                raise datamanagers.exceptions.KnowledgeBoxNotFound()
             kbid = kbid_bytes.decode()
 
         if kbid and not slug:
-            kbconfig_bytes = await txn.get(KB_UUID.format(kbid=kbid))
+            kbconfig_bytes = await txn.get(datamanagers.kb.KB_UUID.format(kbid=kbid))
             if kbconfig_bytes is None:
-                raise KnowledgeBoxNotFound()
+                raise datamanagers.exceptions.KnowledgeBoxNotFound()
             pbconfig = KnowledgeBoxConfig()
             pbconfig.ParseFromString(kbconfig_bytes)
             slug = pbconfig.slug
 
         # Delete main anchor
         async with txn.driver.transaction() as subtxn:
-            key_match = KB_SLUGS.format(slug=slug)
+            key_match = datamanagers.kb.KB_SLUGS.format(slug=slug)
+            logger.info(f"Deleting KB with slug: {slug}")
             await subtxn.delete(key_match)
 
             when = datetime.now().isoformat()
@@ -151,26 +126,6 @@ class KnowledgeBox:
         return kbid
 
     @classmethod
-    async def get_kb_uuid(cls, txn: Transaction, slug: str) -> Optional[str]:
-        uuid = await txn.get(KB_SLUGS.format(slug=slug))
-        if uuid is not None:
-            return uuid.decode()
-        else:
-            return None
-
-    @classmethod
-    async def get_kbs(
-        cls, txn: Transaction, slug: str, count: int = -1
-    ) -> AsyncIterator[tuple[str, str]]:
-        async for key in txn.keys(KB_SLUGS.format(slug=slug), count=count):
-            slug = key.replace(KB_SLUGS_BASE, "")
-            uuid = await cls.get_kb_uuid(txn, slug)
-            if uuid is None:
-                logger.error(f"KB with slug ({slug}) but without uuid?")
-                continue
-            yield (uuid, slug)
-
-    @classmethod
     async def create(
         cls,
         txn: Transaction,
@@ -181,7 +136,7 @@ class KnowledgeBox:
         release_channel: ReleaseChannel.ValueType = ReleaseChannel.STABLE,
     ) -> tuple[str, bool]:
         failed = False
-        exist = await cls.get_kb_uuid(txn, slug)
+        exist = await datamanagers.kb.get_kb_uuid(txn, slug=slug)
         if exist:
             raise KnowledgeBoxConflict()
         if uuid is None or uuid == "":
@@ -191,9 +146,7 @@ class KnowledgeBox:
             slug = uuid
 
         await txn.set(
-            KB_SLUGS.format(
-                slug=slug,
-            ),
+            datamanagers.kb.KB_SLUGS.format(slug=slug),
             uuid.encode(),
         )
         if config is None:
@@ -202,9 +155,7 @@ class KnowledgeBox:
         config.migration_version = get_latest_version()
         config.slug = slug
         await txn.set(
-            KB_UUID.format(
-                kbid=uuid,
-            ),
+            datamanagers.kb.KB_UUID.format(kbid=uuid),
             config.SerializeToString(),
         )
         # Create Storage
@@ -241,20 +192,14 @@ class KnowledgeBox:
         slug: Optional[str] = None,
         config: Optional[KnowledgeBoxConfig] = None,
     ) -> str:
-        exist = await cls.get_kb(txn, uuid)
+        exist = await datamanagers.kb.get_config(txn, kbid=uuid)
         if not exist:
-            raise KnowledgeBoxNotFound()
+            raise datamanagers.exceptions.KnowledgeBoxNotFound()
 
         if slug:
-            await txn.delete(
-                KB_SLUGS.format(
-                    slug=exist.slug,
-                )
-            )
+            await txn.delete(datamanagers.kb.KB_SLUGS.format(slug=exist.slug))
             await txn.set(
-                KB_SLUGS.format(
-                    slug=slug,
-                ),
+                datamanagers.kb.KB_SLUGS.format(slug=slug),
                 uuid.encode(),
             )
             if config:
@@ -266,14 +211,17 @@ class KnowledgeBox:
             exist.MergeFrom(config)
 
         await txn.set(
-            KB_UUID.format(kbid=uuid),
+            datamanagers.kb.KB_UUID.format(kbid=uuid),
             exist.SerializeToString(),
         )
 
         return uuid
 
     async def iterate_kb_nodes(self) -> AsyncIterator[tuple[AbstractIndexNode, str]]:
-        shards_obj = await self.data_manager.get_shards_object(self.kbid)
+        async with datamanagers.with_transaction() as txn:
+            shards_obj = await datamanagers.cluster.get_kb_shards(txn, kbid=self.kbid)
+            if shards_obj is None:
+                raise ShardsNotFound(self.kbid)
 
         for shard in shards_obj.shards:
             for replica in shard.replicas:
@@ -316,20 +264,28 @@ class KnowledgeBox:
 
     # Labels
     async def set_labelset(self, id: str, labelset: LabelSet):
-        await LabelsDataManager.set_labelset(self.kbid, id, labelset, self.txn)
+        await datamanagers.labels.set_labelset(
+            self.txn, kbid=self.kbid, labelset_id=id, labelset=labelset
+        )
 
     async def get_labels(self) -> Labels:
-        return await LabelsDataManager.inner_get_labels(self.kbid, self.txn)
+        return await datamanagers.labels.get_labels(self.txn, kbid=self.kbid)
 
     async def get_labelset(
         self, labelset: str, labelset_response: writer_pb2.GetLabelSetResponse
     ):
-        ls = await LabelsDataManager.inner_get_labelset(self.kbid, labelset, self.txn)
+        ls = await datamanagers.labels.get_labelset(
+            self.txn,
+            kbid=self.kbid,
+            labelset_id=labelset,
+        )
         if ls is not None:
             labelset_response.labelset.CopyFrom(ls)
 
     async def del_labelset(self, id: str):
-        await LabelsDataManager.delete_labelset(self.kbid, id, self.txn)
+        await datamanagers.labels.delete_labelset(
+            self.txn, kbid=self.kbid, labelset_id=id
+        )
 
     async def get_synonyms(self, synonyms: PBSynonyms):
         pbsyn = await self.synonyms.get()
@@ -367,7 +323,7 @@ class KnowledgeBox:
             await txn.set(storage_to_delete, b"")
 
             # Delete KB Shards
-            shards_match = KB_SHARDS.format(kbid=kbid)
+            shards_match = datamanagers.cluster.KB_SHARDS.format(kbid=kbid)
             payload = await txn.get(shards_match)
 
             if payload is None:
@@ -423,7 +379,11 @@ class KnowledgeBox:
     async def get_resource_shard(
         self, shard_id: str
     ) -> Optional[writer_pb2.ShardObject]:
-        pb = await self.data_manager.get_shards_object(self.kbid)
+        async with datamanagers.with_transaction() as txn:
+            pb = await datamanagers.cluster.get_kb_shards(txn, kbid=self.kbid)
+            if pb is None:
+                logger.warning("Shards not found for kbid", extra={"kbid": self.kbid})
+                return None
         for shard in pb.shards:
             if shard.shard == shard_id:
                 return shard
@@ -463,18 +423,6 @@ class KnowledgeBox:
                 pass
 
         await self.storage.delete_resource(self.kbid, uuid)
-
-    async def set_resource_shard_id(self, uuid: str, shard: str):
-        await self.txn.set(
-            KB_RESOURCE_SHARD.format(kbid=self.kbid, uuid=uuid), shard.encode()
-        )
-
-    async def get_resource_shard_id(self, uuid: str) -> Optional[str]:
-        shard = await self.txn.get(KB_RESOURCE_SHARD.format(kbid=self.kbid, uuid=uuid))
-        if shard is not None:
-            return shard.decode()
-        else:
-            return None
 
     async def get_resource_uuid_by_slug(self, slug: str) -> Optional[str]:
         uuid = await self.txn.get(KB_RESOURCE_SLUG.format(kbid=self.kbid, slug=slug))

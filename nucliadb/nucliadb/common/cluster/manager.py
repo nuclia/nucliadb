@@ -27,6 +27,7 @@ import backoff
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata  # type: ignore
 from nucliadb_protos.nodewriter_pb2 import IndexMessage, IndexMessageSource, TypeMessage
 
+from nucliadb.common import datamanagers
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.exceptions import (
     ExhaustedNodesError,
@@ -37,10 +38,7 @@ from nucliadb.common.cluster.exceptions import (
     ShardNotFound,
     ShardsNotFound,
 )
-from nucliadb.common.datamanagers.cluster import ClusterDataManager
-from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
 from nucliadb.common.maindb.driver import Transaction
-from nucliadb.common.maindb.utils import get_driver
 from nucliadb_protos import (
     nodereader_pb2,
     noderesources_pb2,
@@ -49,7 +47,6 @@ from nucliadb_protos import (
     writer_pb2,
 )
 from nucliadb_telemetry import errors
-from nucliadb_utils.keys import KB_SHARDS
 from nucliadb_utils.utilities import get_indexing, get_storage
 
 from .index_node import IndexNode
@@ -123,15 +120,17 @@ def remove_index_node(node_id: str, primary_id: Optional[str] = None) -> None:
 
 
 class KBShardManager:
+    # TODO: move to data manager
     async def get_shards_by_kbid_inner(self, kbid: str) -> writer_pb2.Shards:
-        cdm = ClusterDataManager(get_driver())
-        result = await cdm.get_kb_shards(kbid)
-        if result is None:
-            # could be None because /shards doesn't exist, or beacause the
-            # whole KB does not exist. In any case, this should not happen
-            raise ShardsNotFound(kbid)
-        return result
+        async with datamanagers.with_transaction(read_only=True) as txn:
+            result = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+            if result is None:
+                # could be None because /shards doesn't exist, or beacause the
+                # whole KB does not exist. In any case, this should not happen
+                raise ShardsNotFound(kbid)
+            return result
 
+    # TODO: move to data manager
     async def get_shards_by_kbid(self, kbid: str) -> list[writer_pb2.ShardObject]:
         shards = await self.get_shards_by_kbid_inner(kbid)
         return [x for x in shards.shards]
@@ -166,31 +165,35 @@ class KBShardManager:
 
         return results
 
-    async def get_all_shards(
-        self, txn: Transaction, kbid: str
-    ) -> Optional[writer_pb2.Shards]:
-        key = KB_SHARDS.format(kbid=kbid)
-        kb_shards_bytes: Optional[bytes] = await txn.get(key)
-        if kb_shards_bytes:
-            kb_shards = writer_pb2.Shards()
-            kb_shards.ParseFromString(kb_shards_bytes)
-            return kb_shards
-        else:
-            return None
-
+    # TODO: move to data manager
     async def get_current_active_shard(
         self, txn: Transaction, kbid: str
     ) -> Optional[writer_pb2.ShardObject]:
-        key = KB_SHARDS.format(kbid=kbid)
-        kb_shards_bytes: Optional[bytes] = await txn.get(key)
-        if kb_shards_bytes:
-            kb_shards = writer_pb2.Shards()
-            kb_shards.ParseFromString(kb_shards_bytes)
-            shard: writer_pb2.ShardObject = kb_shards.shards[kb_shards.actual]
-            return shard
-        else:
+        kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+        if kb_shards is None:
             return None
 
+        active_shards = [shard for shard in kb_shards.shards if not shard.read_only]
+
+        # B/c with Shards.actual
+        if len(active_shards) == 0:
+            # already not migrated
+            shard = kb_shards.shards[kb_shards.actual]
+        elif len(active_shards) == 1:
+            # migrated correctly
+            shard = active_shards[0]
+        else:
+            # more than one active shard is not yet supported!
+            with errors.push_scope() as scope:
+                scope.set_extra("kbid", kbid)
+                errors.capture_message(
+                    "KB with more than one active shard!", "error", scope
+                )
+            shard = active_shards[0]
+
+        return shard
+
+    # TODO: logic about creation and read-only shards should be decoupled
     async def create_shard_by_kbid(
         self,
         txn: Transaction,
@@ -207,20 +210,18 @@ class KBShardManager:
             )
             raise
 
-        kb_shards_key = KB_SHARDS.format(kbid=kbid)
-        kb_shards: Optional[writer_pb2.Shards] = None
-        kb_shards_binary = await txn.get(kb_shards_key)
-        if not kb_shards_binary:
+        kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+        if kb_shards is None:
             # First logic shard on the index
             kb_shards = writer_pb2.Shards()
             kb_shards.kbid = kbid
+            # B/c with Shards.actual
             kb_shards.actual = -1
             kb_shards.similarity = semantic_model.similarity_function
             kb_shards.model.CopyFrom(semantic_model)
         else:
             # New logic shard on an existing index
-            kb_shards = writer_pb2.Shards()
-            kb_shards.ParseFromString(kb_shards_binary)
+            pass
 
         kb_shards.release_channel = release_channel
         existing_kb_nodes = [
@@ -228,8 +229,8 @@ class KBShardManager:
         ]
         nodes = sorted_primary_nodes(avoid_nodes=existing_kb_nodes)
 
-        sharduuid = uuid.uuid4().hex
-        shard = writer_pb2.ShardObject(shard=sharduuid)
+        shard_uuid = uuid.uuid4().hex
+        shard = writer_pb2.ShardObject(shard=shard_uuid, read_only=False)
         try:
             # Attempt to create configured number of replicas
             replicas_created = 0
@@ -266,11 +267,17 @@ class KBShardManager:
             await self.rollback_shard(shard)
             raise e
 
+        # set previous shard as read only, we only have one writable shard at a
+        # time
+        if len(kb_shards.shards) > 0:
+            kb_shards.shards[-1].read_only = True
+
         # Append the created shard and make `actual` point to it.
         kb_shards.shards.append(shard)
+        # B/c with Shards.actual
         kb_shards.actual += 1
 
-        await txn.set(kb_shards_key, kb_shards.SerializeToString())
+        await datamanagers.cluster.update_kb_shards(txn, kbid=kbid, shards=kb_shards)
 
         return shard
 
@@ -389,11 +396,9 @@ class KBShardManager:
             return
 
         logger.warning({"message": "Adding shard", "kbid": kbid})
-        driver = get_driver()
-        kbdm = KnowledgeBoxDataManager(driver)
-        model = await kbdm.get_model_metadata(kbid)
 
-        async with driver.transaction() as txn:
+        async with datamanagers.with_transaction() as txn:
+            model = await datamanagers.kb.get_model_metadata(txn, kbid=kbid)
             await self.create_shard_by_kbid(
                 txn,
                 kbid,

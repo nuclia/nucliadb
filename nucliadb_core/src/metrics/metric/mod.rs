@@ -30,3 +30,4 @@ pub mod request_time;
 pub mod shard_cache;
 pub mod tokio_runtime;
 pub mod tokio_tasks;
+pub mod vectors;

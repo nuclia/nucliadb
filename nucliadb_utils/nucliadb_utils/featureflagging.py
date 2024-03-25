@@ -57,6 +57,14 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
         "rollout": 0,
         "variants": {"environment": ["local"]},
     },
+    const.Features.BACK_PRESSURE: {
+        "rollout": 0,
+        "variants": {"environment": ["local"]},
+    },
+    const.Features.REBALANCE_KB: {
+        "rollout": 0,
+        "variants": {"environment": ["local"]},
+    },
 }
 
 

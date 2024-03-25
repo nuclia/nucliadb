@@ -57,11 +57,16 @@ impl Debug for VectorWriterService {
 }
 
 impl VectorWriter for VectorWriterService {
+    #[measure(actor = "vectors", metric = "reload")]
+    #[tracing::instrument(skip_all)]
+    fn reload(&mut self) -> NodeResult<()> {
+        Ok(())
+    }
+
     #[measure(actor = "vectors", metric = "merge")]
     #[tracing::instrument(skip_all)]
-    fn merge(&mut self) -> NodeResult<MergeMetrics> {
+    fn merge(&mut self, _context: MergeContext) -> NodeResult<MergeMetrics> {
         let time = Instant::now();
-
         let lock = self.index.get_slock()?;
         let inner_metrics = self.index.force_merge(&lock)?;
 
@@ -310,6 +315,12 @@ impl VectorWriter for VectorWriterService {
     #[measure(actor = "vectors", metric = "garbage_collection")]
     #[tracing::instrument(skip_all)]
     fn garbage_collection(&mut self) -> NodeResult<()> {
+        Ok(())
+    }
+
+    #[measure(actor = "vectors", metric = "force_garbage_collection")]
+    #[tracing::instrument(skip_all)]
+    fn force_garbage_collection(&mut self) -> NodeResult<()> {
         let time = Instant::now();
 
         let lock = match self.index.try_elock() {
