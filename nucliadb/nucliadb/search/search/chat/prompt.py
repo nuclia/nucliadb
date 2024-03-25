@@ -26,6 +26,7 @@ from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.middleware.transaction import get_read_only_transaction
 from nucliadb.search import logger
+from nucliadb.search.search import paragraphs
 from nucliadb.search.search.chat.images import get_page_image, get_paragraph_image
 from nucliadb_models.search import (
     SCORE_TYPE,
@@ -42,7 +43,6 @@ from nucliadb_models.search import (
 from nucliadb_protos import resources_pb2
 from nucliadb_utils.asyncio_utils import ConcurrentRunner, run_concurrently
 from nucliadb_utils.utilities import get_storage
-from nucliadb.search.search import paragraphs
 
 MAX_RESOURCE_TASKS = 5
 MAX_RESOURCE_FIELD_TASKS = 4
