@@ -141,7 +141,7 @@ class ResourceBrain:
                 if paragraph.HasField("page"):
                     position.page_number = paragraph.page.page
                     page_with_visual = paragraph.page.page_with_visual
-                elif page_positions:
+                elif paragraph_pages:
                     position.page_number = paragraph_pages.get(paragraph.start)
 
                 representation = Representation()
@@ -191,7 +191,7 @@ class ResourceBrain:
             if paragraph.HasField("page"):
                 position.page_number = paragraph.page.page
                 page_with_visual = paragraph.page.page_with_visual
-            elif page_positions:
+            elif paragraph_pages:
                 position.page_number = paragraph_pages.get(paragraph.start)
 
             representation = Representation()

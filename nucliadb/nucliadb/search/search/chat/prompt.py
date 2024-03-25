@@ -17,7 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional, Sequence
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Sequence, Tuple
 
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
@@ -469,11 +470,18 @@ class PromptContextBuilder:
         return
 
 
+@dataclass
+class ExtraCharsParagraph:
+    title: str
+    summary: str
+    paragraphs: List[Tuple[FindParagraph, str]]
+
+
 async def get_extra_chars(
     kbid: str, find_results: KnowledgeboxFindResults, distance: int
 ):
     etcache = paragraphs.ExtractedTextCache()
-    resources = {}
+    resources: Dict[str, ExtraCharsParagraph] = {}
     for paragraph in get_ordered_paragraphs(find_results):
         rid, field_type, field = paragraph.id.split("/")[:3]
         field_path = "/".join([rid, field_type, field])
@@ -507,26 +515,24 @@ async def get_extra_chars(
                 end=1000,
                 extracted_text_cache=etcache,
             )
-            resources[rid] = {
-                "title": title_text,
-                "summary": summary_text,
-                "paragraphs": [{"paragraph": paragraph, "text": new_text}],
-            }
-        else:
-            resources[rid]["paragraphs"].append(  # type: ignore
-                {"text": new_text, "paragraph": paragraph}
+            resources[rid] = ExtraCharsParagraph(
+                title=title_text,
+                summary=summary_text,
+                paragraphs=[(paragraph, new_text)],
             )
+        else:
+            resources[rid].paragraphs.append((paragraph, new_text))  # type: ignore
 
     for key, values in resources.items():
-        title_text = values["title"]
-        summary_text = values["summary"]
+        title_text = values.title
+        summary_text = values.summary
         first_paragraph = None
         text = ""
-        for paragraph in values["paragraphs"]:
+        for paragraph, text in values.paragraphs:
             if first_paragraph is None:
-                first_paragraph = paragraph["paragraph"]
-            text += "EXTRACTED BLOCK: \n " + paragraph["text"] + " \n\n "
-            paragraph["paragraph"].text = ""
+                first_paragraph = paragraph
+            text += "EXTRACTED BLOCK: \n " + text + " \n\n "
+            paragraph.text = ""
 
         if first_paragraph is not None:
             first_paragraph.text = f"DOCUMENT: {title_text} \n SUMMARY: {summary_text} \n RESOURCE CONTENT: {text}"

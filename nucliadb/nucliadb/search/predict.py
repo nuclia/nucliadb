@@ -502,6 +502,7 @@ class DummyPredictEngine(PredictEngine):
                     tokens=[Ner(text="text", ner="PERSON", start=0, end=2)], time=0.0
                 ),
                 sentence=SentenceSearch(data=Qm2023, time=0.0),
+                query=sentence,
             )
         else:
             return QueryInfo(
@@ -514,6 +515,7 @@ class DummyPredictEngine(PredictEngine):
                     tokens=[Ner(text="text", ner="PERSON", start=0, end=2)], time=0.0
                 ),
                 sentence=SentenceSearch(data=Q, time=0.0),
+                query=sentence,
             )
 
     async def convert_sentence_to_vector(self, kbid: str, sentence: str) -> list[float]:
