@@ -35,6 +35,7 @@ from nucliadb_protos.nodewriter_pb2 import (
 )
 
 from nucliadb_node import SERVICE_NAME, logger, signals
+from nucliadb_node.settings import settings
 from nucliadb_node.signals import SuccessfulIndexingPayload
 from nucliadb_node.writer import Writer
 from nucliadb_telemetry import errors, metrics
@@ -287,7 +288,7 @@ class PriorityIndexer:
 
                 # Wait for some time before nak'ing the messages to avoid
                 # flooding stdout with logs in case of an unhandled error.
-                await asyncio.sleep(1)
+                await asyncio.sleep(settings.indexer_delay_after_error)
 
                 await work.nats_msg.nak()
                 await work.mpu.end()

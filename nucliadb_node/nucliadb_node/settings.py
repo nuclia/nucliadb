@@ -34,6 +34,9 @@ class Settings(BaseSettings):
 
     max_resources_before_gc: int = 1000
 
+    # Delay waited by indexers after an error ocurred before resuming indexing
+    indexer_delay_after_error: float = 5.0
+
 
 settings = Settings()
 indexing_settings = utils_settings.IndexingSettings()
