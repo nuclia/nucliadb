@@ -32,7 +32,7 @@ from nucliadb_protos.resources_pb2 import (
     Sentence,
 )
 
-from nucliadb.ingest.orm.brain import ParagraphPages, ResourceBrain
+from nucliadb.ingest.orm.brain import FilePagePositions, ResourceBrain
 from nucliadb_protos import resources_pb2
 
 
@@ -120,17 +120,24 @@ def test_apply_field_metadata_marks_duplicated_paragraphs_on_split_metadata():
             assert paragraph.repeated_in_field is True
 
 
-def test_get_page_number():
-    page_numbers = ParagraphPages(
-        {
-            0: (0, 99),
-            1: (100, 199),
-            2: (200, 299),
-        }
-    )
-    assert page_numbers.get(10) == 0
-    assert page_numbers.get(100) == 1
-    assert page_numbers.get(500) == 2
+def test_get_file_page_number():
+    page_positions = FilePagePositions()
+    page_positions.set(0, 0, 99)
+    page_positions.set(1, 100, 199)
+    page_positions.set(2, 200, 299)
+    page_positions.set(10, 1000, 1099)
+
+    assert page_positions.get(10) == 0
+    assert page_positions.get(100) == 1
+    assert page_positions.get(200) == 2
+    assert page_positions.get(299) == 2
+    assert page_positions.get(1000) == 10
+
+    # No page defined for paragraph starting at positionb between 299 and 1000
+    assert page_positions.get(500) == 0
+
+    # No page defined for paragraphs start index >= 1099, so we return zero
+    assert page_positions.get(1100) == 0
 
 
 @pytest.mark.parametrize(
@@ -198,11 +205,10 @@ def test_apply_field_metadata_populates_page_number():
     # Add it to the split too
     fcmw.metadata.split_metadata["subfield"].paragraphs.append(p1)
 
-    page_positions = {
-        0: (0, 20),
-        1: (21, 39),
-        2: (40, 100),
-    }
+    page_positions = FilePagePositions()
+    page_positions.set(0, 0, 20)
+    page_positions.set(1, 21, 39)
+    page_positions.set(2, 40, 100)
     br.apply_field_metadata(
         field_key,
         fcmw.metadata,
