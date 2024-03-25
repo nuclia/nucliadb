@@ -22,6 +22,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
+from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import ClientDisconnect, Request
 from starlette.responses import HTMLResponse
 
@@ -31,7 +32,6 @@ from nucliadb.train.api.v1.router import api
 from nucliadb.train.lifecycle import finalize, initialize
 from nucliadb_telemetry import errors
 from nucliadb_utils.authentication import NucliaCloudAuthenticationBackend
-from nucliadb_utils.cors import CORSMiddleware
 from nucliadb_utils.fastapi.openapi import extend_openapi
 from nucliadb_utils.fastapi.versioning import VersionedFastAPI
 from nucliadb_utils.settings import http_settings, running_settings
