@@ -260,7 +260,7 @@ class Materializer:
                         self.ingest_pending = await get_nats_consumer_pending_messages(
                             self.nats_manager,
                             stream=const.Streams.INGEST_PROCESSED.name,
-                            consumer=const.Streams.INGEST_PROCESSED.subject,
+                            consumer=const.Streams.INGEST_PROCESSED.group,
                         )
                 except Exception:
                     logger.exception(
