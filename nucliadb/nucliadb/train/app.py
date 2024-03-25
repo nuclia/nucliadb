@@ -31,6 +31,7 @@ from nucliadb.train import API_PREFIX
 from nucliadb.train.api.v1.router import api
 from nucliadb.train.lifecycle import finalize, initialize
 from nucliadb_telemetry import errors
+from nucliadb_utils import const
 from nucliadb_utils.authentication import NucliaCloudAuthenticationBackend
 from nucliadb_utils.fastapi.openapi import extend_openapi
 from nucliadb_utils.fastapi.versioning import VersionedFastAPI
@@ -39,7 +40,7 @@ from nucliadb_utils.utilities import has_feature
 
 middleware = []
 
-if has_feature("nucliadb_cors_middleware_enabled", default=True):
+if has_feature(const.Features.CORS_MIDDLEWARE, default=True):
     middleware.append(
         Middleware(
             CORSMiddleware,
