@@ -130,6 +130,7 @@ PB_TEXT_FORMAT_TO_MIMETYPE = {
     FieldText.Format.RST: "text/x-rst",
     FieldText.Format.MARKDOWN: "text/markdown",
     FieldText.Format.JSON: "application/json",
+    FieldText.Format.KEEP_MARKDOWN: "text/markdown",
 }
 
 BASIC_IMMUTABLE_FIELDS = ("icon",)
@@ -1158,9 +1159,9 @@ class Resource:
                 for fieldmetadata in self.basic.fieldmetadata:
                     field_id = self.generate_field_id(fieldmetadata.field)
                     for annotationparagraph in fieldmetadata.paragraphs:
-                        userdefinedparagraphclass[
-                            annotationparagraph.key
-                        ] = annotationparagraph
+                        userdefinedparagraphclass[annotationparagraph.key] = (
+                            annotationparagraph
+                        )
 
         for (type_id, field_id), field in fields.items():
             fieldid = FieldID(field_type=type_id, field=field_id)  # type: ignore
@@ -1272,9 +1273,9 @@ class Resource:
                 for fieldmetadata in self.basic.fieldmetadata:
                     field_id = self.generate_field_id(fieldmetadata.field)
                     for annotationparagraph in fieldmetadata.paragraphs:
-                        userdefinedparagraphclass[
-                            annotationparagraph.key
-                        ] = annotationparagraph
+                        userdefinedparagraphclass[annotationparagraph.key] = (
+                            annotationparagraph
+                        )
 
         for (type_id, field_id), field in fields.items():
             fieldid = FieldID(field_type=type_id, field=field_id)  # type: ignore

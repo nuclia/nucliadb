@@ -158,6 +158,7 @@ pub mod message_content {
         Html = 1,
         Markdown = 2,
         Rst = 3,
+        KeepMarkdown = 4,
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -532,6 +533,8 @@ pub mod field_text {
         Rst = 2,
         Markdown = 3,
         Json = 4,
+        /// Markdown to be kept
+        KeepMarkdown = 5,
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
