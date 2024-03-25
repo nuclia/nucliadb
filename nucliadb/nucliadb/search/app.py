@@ -54,10 +54,10 @@ if has_feature("nucliadb_cors_middleware_enabled", default=True):
         )
     )
 
-middleware.extend[
+middleware.extend([
     Middleware(AuthenticationMiddleware, backend=NucliaCloudAuthenticationBackend()),
     Middleware(ReadOnlyTransactionMiddleware),
-]
+])
 
 if running_settings.debug:
     middleware.append(Middleware(ProcessTimeHeaderMiddleware))

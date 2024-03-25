@@ -54,7 +54,7 @@ if has_feature("nucliadb_cors_middleware_enabled", default=True):
         )
     )
 
-middleware.exend(
+middleware.extend(
     [Middleware(AuthenticationMiddleware, backend=NucliaCloudAuthenticationBackend())]
 )
 
