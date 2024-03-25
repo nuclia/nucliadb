@@ -245,9 +245,25 @@ impl Writer {
         keep.push(new_online_data_point);
         self.online_data_points = keep;
 
+        let mut new_delete_log = self.delete_log.clone();
         if let Some(oldest_age) = self.online_data_points.iter().map(|dp| dp.journal.time()).reduce(std::cmp::min) {
-            self.delete_log.prune(oldest_age);
+            new_delete_log.prune(oldest_age);
         }
+
+        let state = State {
+            delete_log: new_delete_log,
+            data_point_list: self.online_data_points.iter().map(|dp| dp.journal.id()).collect(),
+        };
+
+        if let Err(err) = persist_state(&self.path, &state) {
+            // Restore state
+            self.online_data_points.pop().unwrap(); // Remove merged segment
+            self.online_data_points.extend(merged); // Add input segments
+            return Err(err);
+        } else {
+            // Apply state
+            self.delete_log = state.delete_log;
+        };
 
         Ok(())
     }
