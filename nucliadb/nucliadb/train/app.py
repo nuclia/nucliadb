@@ -35,23 +35,26 @@ from nucliadb_utils.cors import CORSMiddleware
 from nucliadb_utils.fastapi.openapi import extend_openapi
 from nucliadb_utils.fastapi.versioning import VersionedFastAPI
 from nucliadb_utils.settings import http_settings, running_settings
+from nucliadb_utils.utilities import has_feature
 
-middleware = [
-    Middleware(
-        CORSMiddleware,
-        allow_origins=http_settings.cors_origins,
-        allow_methods=["*"],
-        # Authorization will be exluded from * in the future, (CORS non-wildcard request-header).
-        # Browsers already showing deprecation notices, so it needs to be specified explicitly
-        allow_headers=["*", "Authorization"],
-    ),
-    Middleware(
-        AuthenticationMiddleware,
-        backend=NucliaCloudAuthenticationBackend(),
-    ),
+middleware = []
+
+if has_feature("nucliadb_cors_middleware_enabled", default=True):
+    middleware.append(
+        Middleware(
+            CORSMiddleware,
+            allow_origins=http_settings.cors_origins,
+            allow_methods=["*"],
+            # Authorization will be exluded from * in the future, (CORS non-wildcard request-header).
+            # Browsers already showing deprecation notices, so it needs to be specified explicitly
+            allow_headers=["*", "Authorization"],
+        )
+    )
+
+middleware.extend[
+    Middleware(AuthenticationMiddleware, backend=NucliaCloudAuthenticationBackend()),
     Middleware(ReadOnlyTransactionMiddleware),
 ]
-
 
 errors.setup_error_handling(pkg_resources.get_distribution("nucliadb").version)
 
