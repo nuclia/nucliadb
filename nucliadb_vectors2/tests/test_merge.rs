@@ -44,7 +44,6 @@ fn test_concurrent_merge_delete() -> NodeResult<()> {
 
     let now = SystemTime::now();
     let past = now - Duration::from_secs(5);
-    let recent_past = now - Duration::from_secs(1);
 
     // Create two segments
     let data_point_pin = DataPointPin::create_pin(&index_path)?;
@@ -67,7 +66,7 @@ fn test_concurrent_merge_delete() -> NodeResult<()> {
         .unwrap();
 
     // This can be thought as concurrent, since `merge.run()` does not touch the index writer
-    writer.record_delete(&to_delete.key, recent_past);
+    writer.record_delete(&to_delete.key, SystemTime::now());
     writer.commit()?;
     let results = merge.run()?;
 

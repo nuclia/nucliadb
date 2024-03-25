@@ -103,6 +103,7 @@ pub struct PreparedMerge {
     inputs: Vec<OpenDataPoint>,
     similarity: Similarity,
     segments_left: usize,
+    merge_time: SystemTime,
 }
 
 impl MergeRunner for PreparedMerge {
@@ -124,6 +125,7 @@ impl MergeRunner for PreparedMerge {
                 .collect::<Vec<_>>()
                 .as_slice(),
             self.similarity,
+            self.merge_time,
         )?;
         let metrics = MergeMetrics {
             seconds_elapsed: start.elapsed().as_secs_f64(),
@@ -222,6 +224,7 @@ impl Writer {
             inputs,
             similarity: self.metadata.similarity,
             segments_left: live_segments.len() + 1,
+            merge_time: SystemTime::now(),
         })))
     }
 
