@@ -41,7 +41,7 @@ from nucliadb_utils.utilities import has_feature
 
 middleware = []
 
-if has_feature(const.Features.CORS_MIDDLEWARE, default=True):
+if has_feature(const.Features.CORS_MIDDLEWARE, default=False):
     middleware.append(
         Middleware(
             CORSMiddleware,
