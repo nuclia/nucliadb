@@ -37,11 +37,11 @@ def resource_id(kbid: str):
             "x-ndb-client": "web",
         },
         json={
-            "links": {"link": {"uri": "https://en.wikipedia.org/wiki/Cricket"}},
             "usermetadata": {"classifications": []},
-            "title": "https://en.wikipedia.org/wiki/Cricket",
-            "icon": "application/stf-link",
-            "origin": {"url": "https://en.wikipedia.org/wiki/Cricket"},
+            "title": "Soccer",
+            "texts": {
+                "text1": """The term "soccer" is derived from the words "association" and "-er". The formal name of the sport is "association football", but students at Oxford University in the 1870s began to shorten the name by removing the first and last three syllables, and adding "-er". For example, "breakfast" became "brekker" and "rugby" became "rugger". The term "soccer" was first recorded in 1891."""  # noqa
+            },
         },
     )
 
@@ -123,7 +123,7 @@ def test_search(kbid: str, resource_id: str):
             "x-ndb-client": "web",
         },
         json={
-            "query": "What is Cricket?",
+            "query": "Why is soccer called soccer?",
             "context": [],
             "show": ["basic", "values", "origin"],
             "features": ["paragraphs", "relations"],
