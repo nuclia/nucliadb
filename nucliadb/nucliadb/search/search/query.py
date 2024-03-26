@@ -250,9 +250,12 @@ class QueryParser:
         if (SearchOptions.RELATIONS in self.features or self.autofilter) and len(
             self.query
         ) > 0:
-            if self.query_endpoint_enabled:
-                asyncio.ensure_future(self._get_query_information())
-            else:
+            if (
+                not self.query_endpoint_enabled
+                or SearchOptions.VECTOR not in self.features
+                or self.user_vector is not None
+            ):
+                self.query_endpoint_enabled = False
                 asyncio.ensure_future(self._get_detected_entities())
             asyncio.ensure_future(self._get_entities_meta_cache())
             asyncio.ensure_future(self._get_deleted_entity_groups())
