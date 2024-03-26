@@ -141,8 +141,12 @@ class ResourceBrain:
                 if paragraph.HasField("page"):
                     position.page_number = paragraph.page.page
                     page_with_visual = paragraph.page.page_with_visual
+                    position.in_page = True
                 elif paragraph_pages:
                     position.page_number = paragraph_pages.get(paragraph.start)
+                    position.in_page = True
+                else:
+                    position.in_page = False
 
                 representation = Representation()
                 if paragraph.HasField("representation"):
@@ -190,9 +194,13 @@ class ResourceBrain:
             page_with_visual = False
             if paragraph.HasField("page"):
                 position.page_number = paragraph.page.page
+                position.in_page = True
                 page_with_visual = paragraph.page.page_with_visual
             elif paragraph_pages:
                 position.page_number = paragraph_pages.get(paragraph.start)
+                position.in_page = True
+            else:
+                position.in_page = False
 
             representation = Representation()
             if paragraph.HasField("representation"):
@@ -297,8 +305,8 @@ class ResourceBrain:
                 ssentence.metadata.position.page_number = (
                     sparagraph.metadata.position.page_number
                 )
-                ssentence.metadata.position.page_number = (
-                    sparagraph.metadata.position.page_number
+                ssentence.metadata.position.in_page = (
+                    sparagraph.metadata.position.in_page
                 )
                 ssentence.metadata.page_with_visual = (
                     sparagraph.metadata.page_with_visual
@@ -330,6 +338,8 @@ class ResourceBrain:
             sentence.metadata.position.page_number = (
                 paragraph.metadata.position.page_number
             )
+            sentence.metadata.position.in_page = paragraph.metadata.position.in_page
+
             sentence.metadata.page_with_visual = paragraph.metadata.page_with_visual
 
             sentence.metadata.representation.file = (

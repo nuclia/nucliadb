@@ -273,6 +273,7 @@ class Position(google.protobuf.message.Message):
     START_FIELD_NUMBER: builtins.int
     END_FIELD_NUMBER: builtins.int
     PAGE_NUMBER_FIELD_NUMBER: builtins.int
+    IN_PAGE_FIELD_NUMBER: builtins.int
     START_SECONDS_FIELD_NUMBER: builtins.int
     END_SECONDS_FIELD_NUMBER: builtins.int
     index: builtins.int
@@ -280,6 +281,7 @@ class Position(google.protobuf.message.Message):
     end: builtins.int
     page_number: builtins.int
     """For pdfs/documents only"""
+    in_page: builtins.bool
     @property
     def start_seconds(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
         """For multimedia only"""
@@ -292,10 +294,11 @@ class Position(google.protobuf.message.Message):
         start: builtins.int = ...,
         end: builtins.int = ...,
         page_number: builtins.int = ...,
+        in_page: builtins.bool = ...,
         start_seconds: collections.abc.Iterable[builtins.int] | None = ...,
         end_seconds: collections.abc.Iterable[builtins.int] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["end", b"end", "end_seconds", b"end_seconds", "index", b"index", "page_number", b"page_number", "start", b"start", "start_seconds", b"start_seconds"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["end", b"end", "end_seconds", b"end_seconds", "in_page", b"in_page", "index", b"index", "page_number", b"page_number", "start", b"start", "start_seconds", b"start_seconds"]) -> None: ...
 
 global___Position = Position
 

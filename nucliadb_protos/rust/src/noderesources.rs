@@ -104,6 +104,8 @@ pub struct Position {
     /// For pdfs/documents only
     #[prost(uint64, tag="4")]
     pub page_number: u64,
+    #[prost(bool, tag="7")]
+    pub in_page: bool,
     /// For multimedia only
     #[prost(uint32, repeated, tag="5")]
     pub start_seconds: ::prost::alloc::vec::Vec<u32>,
