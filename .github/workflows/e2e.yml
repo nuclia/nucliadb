@@ -79,7 +79,7 @@ jobs:
             microk8s inspect &&
             kubectl logs -n nucliadb pod/nucliadb-0 &&
             kubectl logs -n nucliadb pod/nucliadb-1 &&
-            kubectl get pods -n nucliadb -l app=nucliadb-worker -o name | while read pod; do kubectl logs $pod; done &&
+            kubectl get pods -n nucliadb -l app=nucliadb-worker -o name | while read pod; do kubectl logs -n nucliadb $pod; done &&
             exit 1)
           kubectl -n nucliadb wait --timeout=1m --for=condition=Ready pod -l statefulset.kubernetes.io/pod-name=nucliadb-1
       
@@ -101,7 +101,7 @@ jobs:
               microk8s inspect &&
               kubectl logs -n nucliadb pod/nucliadb-0 &&
               kubectl logs -n nucliadb pod/nucliadb-1 &&
-              kubectl get pods -n nucliadb -l app=nucliadb-worker -o name | while read pod; do kubectl logs $pod; done &&
+              kubectl get pods -n nucliadb -l app=nucliadb-worker -o name | while read pod; do kubectl -n nucliadb logs $pod; done &&
               exit 1)
 
   e2e-vm-cluster:
