@@ -79,3 +79,4 @@ class Features:
     PREDICT_QUERY_ENDPOINT = "nucliadb_predict_query_endpoint"
     BACK_PRESSURE = "nucliadb_back_pressure"
     REBALANCE_KB = "nucliadb_rebalance_kb"
+    CORS_MIDDLEWARE = "nucliadb_cors_middleware_enabled"

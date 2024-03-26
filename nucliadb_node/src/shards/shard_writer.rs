@@ -267,7 +267,7 @@ impl ShardWriter {
         let mut vector_result = Ok(());
         let mut relation_result = Ok(());
 
-        let _lock = self.write_lock.lock().expect("Poisoned write lock");
+        let _lock = self.write_lock.lock().unwrap_or_else(|e| e.into_inner());
         thread::scope(|s| {
             s.spawn(|_| text_result = text_task());
             s.spawn(|_| paragraph_result = paragraph_task());
@@ -327,7 +327,7 @@ impl ShardWriter {
         let mut vector_result = Ok(());
         let mut relation_result = Ok(());
 
-        let _lock = self.write_lock.lock().expect("Poisoned write lock");
+        let _lock = self.write_lock.lock().unwrap_or_else(|e| e.into_inner());
         thread::scope(|s| {
             s.spawn(|_| text_result = text_task());
             s.spawn(|_| paragraph_result = paragraph_task());
@@ -464,7 +464,7 @@ impl ShardWriter {
     }
 
     pub async fn block_shard(&self) -> BlockingToken {
-        let mutex_guard = self.write_lock.lock().expect("Poisoned write lock");
+        let mutex_guard = self.write_lock.lock().unwrap_or_else(|e| e.into_inner());
         BlockingToken(mutex_guard)
     }
 
@@ -484,7 +484,7 @@ impl ShardWriter {
         ignored_segement_ids: &HashMap<String, Vec<String>>,
     ) -> NodeResult<Vec<(PathBuf, IndexFiles)>> {
         let mut files = Vec::new();
-        let _lock = self.write_lock.lock().expect("Poisoned write lock"); // need to make sure more writes don't happen while we are reading
+        let _lock = self.write_lock.lock().unwrap_or_else(|e| e.into_inner()); // need to make sure more writes don't happen while we are reading
         let paragraph_files = read_rw_lock(&self.paragraph_writer)
             .get_index_files(ignored_segement_ids.get("paragraph").unwrap_or(&Vec::new()))?;
         let text_files =
