@@ -53,8 +53,8 @@ spec:
             path: /api/v1/health/ready
             port: 8080
           initialDelaySeconds: 1
-          timeoutSeconds: 10
-          periodSeconds: 20
+          timeoutSeconds: 30
+          periodSeconds: 30
         command: [
           "nucliadb"
         ]

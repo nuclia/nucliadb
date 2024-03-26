@@ -90,6 +90,10 @@ def test_config_check(kbid: str):
     assert data["nua_api_key"]["valid"]
 
 
+@pytest.mark.skip(
+    reason="We can not count on this test working "
+    "because anyone using the NUA key can pull the data from the queue"
+)
 def test_resource_processed(kbid: str, resource_id: str):
     start = time.time()
     while True:
