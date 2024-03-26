@@ -71,6 +71,10 @@ async def run_concurrently(
     """
     if len(tasks) == 0:
         return []
+
+    if len(tasks) == 1:
+        return [await tasks[0]]
+
     runner = ConcurrentRunner(max_tasks=max_concurrent)
     for task in tasks:
         runner.schedule(task)
