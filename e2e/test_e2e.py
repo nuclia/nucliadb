@@ -40,7 +40,10 @@ def resource_id(kbid: str):
             "usermetadata": {"classifications": []},
             "title": "Soccer",
             "texts": {
-                "text1": """The term "soccer" is derived from the words "association" and "-er". The formal name of the sport is "association football", but students at Oxford University in the 1870s began to shorten the name by removing the first and last three syllables, and adding "-er". For example, "breakfast" became "brekker" and "rugby" became "rugger". The term "soccer" was first recorded in 1891."""  # noqa
+                "text1": {
+                    "body": """The term "soccer" is derived from the words "association" and "-er". The formal name of the sport is "association football", but students at Oxford University in the 1870s began to shorten the name by removing the first and last three syllables, and adding "-er". For example, "breakfast" became "brekker" and "rugby" became "rugger". The term "soccer" was first recorded in 1891.""",  # noqa
+                    "format": "PLAIN",
+                }
             },
         },
     )
