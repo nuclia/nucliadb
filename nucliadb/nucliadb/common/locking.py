@@ -22,10 +22,11 @@ import logging
 import time
 import uuid
 from dataclasses import dataclass
-from nucliadb.common.maindb.exceptions import ConflictError
 from typing import Optional
 
 import orjson
+
+from nucliadb.common.maindb.exceptions import ConflictError
 
 from .maindb.driver import Transaction
 from .maindb.utils import get_driver
@@ -37,7 +38,8 @@ RESOURCE_INDEX_LOCK = "resource-index-{kbid}-{resource_id}"
 KB_SHARDS_LOCK = "shards-kb-{kbid}"
 
 
-class ResourceLocked(Exception): ...
+class ResourceLocked(Exception):
+    ...
 
 
 @dataclass
