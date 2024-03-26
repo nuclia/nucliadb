@@ -176,7 +176,7 @@ class KBShardManager:
         active_shards = [shard for shard in kb_shards.shards if not shard.read_only]
 
         # B/c with Shards.actual
-        if len(active_shards) == 0:
+        if len(active_shards) == len(kb_shards.shards):
             # already not migrated
             shard = kb_shards.shards[kb_shards.actual]
         elif len(active_shards) == 1:
