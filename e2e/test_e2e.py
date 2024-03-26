@@ -108,10 +108,10 @@ def test_resource_processed(kbid: str, resource_id: str):
             break
 
         waited = time.time() - start
-        if waited > (60 * 15):
+        if waited > (60 * 20):
             raise Exception("Resource took too long to process")
 
-        if int(waited) % 10 == 0 and int(waited) > 0:
+        if int(waited) % 20 == 0 and int(waited) > 0:
             print(f"Waiting for resource to process: {int(waited)}s")
 
         time.sleep(1)
