@@ -64,7 +64,7 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
     const.Features.CORS_MIDDLEWARE: {
         "rollout": 0,
         "variants": {"environment": ["local"]},
-    }
+    },
 }
 
 
