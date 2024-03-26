@@ -95,7 +95,7 @@ def config_nucliadb(nucliadb_args: Settings):
     cluster_settings.standalone_mode = True
     cluster_settings.data_path = nucliadb_args.data_path
     cluster_settings.standalone_node_port = nucliadb_args.standalone_node_port
-    cluster_settings.standalone_node_role = nucliadb_args.node_role
+    cluster_settings.standalone_node_role = nucliadb_args.standalone_node_role
 
     if nucliadb_args.cluster_discovery_mode == StandaloneDiscoveryMode.DEFAULT:
         # default for standalone is single node
@@ -119,7 +119,7 @@ def config_nucliadb(nucliadb_args: Settings):
 
     if nucliadb_args.nua_api_key:
         nuclia_settings.nuclia_service_account = nucliadb_args.nua_api_key
-        if nucliadb_args.node_role == StandaloneNodeRole.INDEX:
+        if nucliadb_args.standalone_node_role == StandaloneNodeRole.INDEX:
             ingest_settings.disable_pull_worker = True
         else:
             ingest_settings.disable_pull_worker = False

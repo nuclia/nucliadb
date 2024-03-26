@@ -126,4 +126,4 @@ Examples:
     log_format_type: LogFormatType = LogFormatType.PLAIN
     log_level: LogLevel = LogLevel.INFO
 
-    node_role: StandaloneNodeRole = StandaloneNodeRole.ALL
+    standalone_node_role: StandaloneNodeRole = StandaloneNodeRole.ALL
