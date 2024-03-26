@@ -56,5 +56,39 @@ spec:
                 name: nucliadb-config
             - configMapRef:
                 name: {{ .Release.Name }}-config
+            env:
+              - name: VERSION
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.labels['version']
+            {{- range $key, $value := .Values.env }}
+              - name: "{{ $key }}"
+                value: {{ tpl $value $ | toJson }}
+            {{- end }}
             imagePullPolicy: Always
             command: ["nucliadb-rebalance"]
+            ports:
+            - name: metrics
+              containerPort: {{ .Values.serving.metricsPort }}
+{{- if .Values.nats.secretName }}
+            volumeMounts:
+              - name: nats-creds
+                readOnly: true
+                mountPath: /appsecrets
+{{- end }}
+{{- if .Values.nats.regionalSecretName }}
+              - name: regional-nats-creds
+                readOnly: true
+                mountPath: /regioncreds
+{{- end }}
+{{- if .Values.nats.secretName }}
+          volumes:
+          - name: nats-creds
+            secret:
+              secretName: {{ .Values.nats.secretName }}
+{{- end }}
+{{- if .Values.nats.regionalSecretName }}
+          - name: regional-nats-creds
+            secret:
+              secretName: {{ .Values.nats.regionalSecretName }}
+{{- end }}
