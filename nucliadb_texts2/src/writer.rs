@@ -73,7 +73,9 @@ impl FieldWriter for TextWriterService {
     #[tracing::instrument(skip_all)]
     fn set_resource(&mut self, resource: &Resource) -> NodeResult<()> {
         let id = Some(&resource.shard_id);
-        let resource_id = resource.resource.as_ref().expect("Missing resource ID");
+        let Some(resource_id) = resource.resource.as_ref() else {
+            return Err(node_error!("Missing resource ID"));
+        };
 
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Delete existing uuid: starts at {v} ms");
@@ -88,7 +90,7 @@ impl FieldWriter for TextWriterService {
         debug!("{id:?} - Indexing document: starts at {v} ms");
 
         if resource.status != ResourceStatus::Delete as i32 {
-            self.index_document(resource);
+            self.index_document(resource)?;
         }
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Indexing document: ends at {v} ms");
@@ -220,11 +222,19 @@ impl TextWriterService {
         Ok(())
     }
 
-    fn index_document(&mut self, resource: &Resource) {
-        let resource_id = resource.resource.as_ref().expect("Missing resource ID").uuid.as_str();
-        let metadata = resource.metadata.as_ref().expect("Missing resource metadata");
-        let modified = metadata.modified.as_ref().expect("Missing resource modified date in metadata");
-        let created = metadata.created.as_ref().expect("Missing resource created date in metadata");
+    fn index_document(&mut self, resource: &Resource) -> NodeResult<()> {
+        let Some(resource_id) = resource.resource.as_ref().map(|r| r.uuid.as_str()) else {
+            return Err(node_error!("Missing resource ID"));
+        };
+        let Some(metadata) = resource.metadata.as_ref() else {
+            return Err(node_error!("Missing resource metadata"));
+        };
+        let Some(modified) = metadata.modified.as_ref() else {
+            return Err(node_error!("Missing resource modified date in metadata"));
+        };
+        let Some(created) = metadata.created.as_ref() else {
+            return Err(node_error!("Missing resource created date in metadata"));
+        };
 
         let mut base_doc = doc!(
             self.schema.uuid => resource_id,
@@ -268,5 +278,7 @@ impl TextWriterService {
             }
             self.writer.add_document(field_doc).unwrap();
         }
+
+        Ok(())
     }
 }

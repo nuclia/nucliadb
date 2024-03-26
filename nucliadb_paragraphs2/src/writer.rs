@@ -213,10 +213,16 @@ impl ParagraphWriterService {
         })
     }
 
-    fn index_paragraph(&mut self, resource: &Resource) -> tantivy::Result<()> {
-        let metadata = resource.metadata.as_ref().expect("Missing resource metadata");
-        let modified = metadata.modified.as_ref().expect("Missing resource modified date in metadata");
-        let created = metadata.created.as_ref().expect("Missing resource created date in metadata");
+    fn index_paragraph(&mut self, resource: &Resource) -> NodeResult<()> {
+        let Some(metadata) = resource.metadata.as_ref() else {
+            return Err(node_error!("Missing resource metadata"));
+        };
+        let Some(modified) = metadata.modified.as_ref() else {
+            return Err(node_error!("Missing resource modified date in metadata"));
+        };
+        let Some(created) = metadata.created.as_ref() else {
+            return Err(node_error!("Missing resource created date in metadata"));
+        };
 
         let empty_paragraph = HashMap::with_capacity(0);
         let inspect_paragraph =
