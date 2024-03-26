@@ -37,11 +37,14 @@ def resource_id(kbid: str):
             "x-ndb-client": "web",
         },
         json={
-            "links": {"link": {"uri": "https://en.wikipedia.org/wiki/Cricket"}},
             "usermetadata": {"classifications": []},
-            "title": "https://en.wikipedia.org/wiki/Cricket",
-            "icon": "application/stf-link",
-            "origin": {"url": "https://en.wikipedia.org/wiki/Cricket"},
+            "title": "Soccer",
+            "texts": {
+                "text1": {
+                    "body": """The term "soccer" is derived from the words "association" and "-er". The formal name of the sport is "association football", but students at Oxford University in the 1870s began to shorten the name by removing the first and last three syllables, and adding "-er". For example, "breakfast" became "brekker" and "rugby" became "rugger". The term "soccer" was first recorded in 1891.""",  # noqa
+                    "format": "PLAIN",
+                }
+            },
         },
     )
 
@@ -87,6 +90,10 @@ def test_config_check(kbid: str):
     assert data["nua_api_key"]["valid"]
 
 
+@pytest.mark.skip(
+    reason="We can not count on this test working "
+    "because anyone using the NUA key can pull the data from the queue"
+)
 def test_resource_processed(kbid: str, resource_id: str):
     start = time.time()
     while True:
@@ -104,17 +111,14 @@ def test_resource_processed(kbid: str, resource_id: str):
         if resp.json()["metadata"]["status"] == "PROCESSED":
             break
 
-        # takes too long to process, skip for now
-        return
+        waited = time.time() - start
+        if waited > (60 * 20):
+            raise Exception("Resource took too long to process")
 
-        # waited = time.time() - start
-        # if waited > (60 * 10):
-        #     raise Exception("Resource took too long to process")
+        if int(waited) % 20 == 0 and int(waited) > 0:
+            print(f"Waiting for resource to process: {int(waited)}s")
 
-        # if int(waited) % 10 == 0 and int(waited) > 0:
-        #     print(f"Waiting for resource to process: {int(waited)}s")
-
-        # time.sleep(1)
+        time.sleep(5)
 
 
 def test_search(kbid: str, resource_id: str):
@@ -126,7 +130,7 @@ def test_search(kbid: str, resource_id: str):
             "x-ndb-client": "web",
         },
         json={
-            "query": "What is Cricket?",
+            "query": "Why is soccer called soccer?",
             "context": [],
             "show": ["basic", "values", "origin"],
             "features": ["paragraphs", "relations"],

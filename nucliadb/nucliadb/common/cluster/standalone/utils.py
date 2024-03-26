@@ -23,6 +23,7 @@ import shutil
 import uuid
 from socket import gethostname
 
+from nucliadb.common.cluster.settings import StandaloneNodeRole
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.cluster.standalone.index_node import StandaloneIndexNode
 
@@ -30,6 +31,9 @@ logger = logging.getLogger(__name__)
 
 
 def get_standalone_node_id() -> str:
+    if not is_index_node():
+        return "_invalid_node_id_"
+
     if not os.path.exists(cluster_settings.data_path):
         os.makedirs(cluster_settings.data_path, exist_ok=True)
     host_key_path = f"{cluster_settings.data_path}/node.key"
@@ -46,6 +50,15 @@ _SELF_INDEX_NODE = None
 
 
 def get_self() -> StandaloneIndexNode:
+    """
+    This returns an instance of the standalone index node
+    so when API requests come into this mode, we don't
+    make another grpc request since this node can service it directly.
+    """
+    if not is_index_node():
+        raise Exception(
+            "This node is not an Index Node. You should not reach this code path."
+        )
     global _SELF_INDEX_NODE
     node_id = get_standalone_node_id()
     if _SELF_INDEX_NODE is None or node_id != _SELF_INDEX_NODE.id:
@@ -75,3 +88,10 @@ def get_self() -> StandaloneIndexNode:
     except FileNotFoundError:  # pragma: no cover
         ...
     return _SELF_INDEX_NODE
+
+
+def is_index_node() -> bool:
+    return cluster_settings.standalone_node_role in (
+        StandaloneNodeRole.ALL,
+        StandaloneNodeRole.INDEX,
+    )

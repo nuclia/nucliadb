@@ -100,6 +100,7 @@ def run():
         "Node port": cluster_settings.standalone_node_port,
         "Auth policy": settings.auth_policy,
         "Log output type": settings.log_output_type,
+        "Node role": cluster_settings.standalone_node_role,
     }
     if settings.log_output_type == LogOutputType.FILE:
         log_folder = os.path.realpath(os.path.dirname(LogSettings().access_log))

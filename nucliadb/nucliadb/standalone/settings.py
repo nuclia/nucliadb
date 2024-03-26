@@ -22,6 +22,7 @@ from typing import Optional
 
 import pydantic
 
+from nucliadb.common.cluster.settings import StandaloneNodeRole
 from nucliadb.ingest.settings import DriverSettings
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_telemetry.settings import LogFormatType, LogLevel, LogOutputType
@@ -124,3 +125,5 @@ Examples:
     log_output_type: LogOutputType = LogOutputType.FILE
     log_format_type: LogFormatType = LogFormatType.PLAIN
     log_level: LogLevel = LogLevel.INFO
+
+    standalone_node_role: StandaloneNodeRole = StandaloneNodeRole.ALL

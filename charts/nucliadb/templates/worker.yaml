@@ -1,71 +1,60 @@
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
-  name: nucliadb
+  name: nucliadb-worker
   labels:
-    app: nucliadb
-    appType: node
+    app: nucliadb-worker
     version: "{{ .Chart.Version | replace "+" "_" }}"
     chart: "{{ .Chart.Name }}"
     release: "{{ .Release.Name }}"
     heritage: "{{ .Release.Service }}"
 spec:
-  replicas: {{ .Values.replicas }}
-  podManagementPolicy: Parallel
-  serviceName: nucliadb
+  replicas: {{ .Values.workerReplicas }}
+  revisionHistoryLimit: 3
   selector:
     matchLabels:
-      app: nucliadb
+      app: nucliadb-worker
       release: "{{ .Release.Name }}"
       heritage: "{{ .Release.Service }}"
   template:
     metadata:
-      {{- with .Values.podAnnotations }}
-      annotations:
-{{ toYaml . | indent 8 }}
-      {{- end }}
-      name: nucliadb
+      name: nucliadb-worker
       labels:
-        app: nucliadb
-        app.kubernetes.io/name: node
-        appType: node
+        app: nucliadb-worker
         version: "{{ .Chart.Version | replace "+" "_" }}"
         chart: "{{ .Chart.Name }}"
         release: "{{ .Release.Name }}"
         heritage: "{{ .Release.Service }}"
     spec:
-      nodeSelector:
-{{ toYaml .Values.nodeSelector | indent 8 }}
       topologySpreadConstraints:
 {{ toYaml .Values.topologySpreadConstraints | indent 8 }}
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 8 }}
       affinity:
 {{ toYaml .Values.affinity | indent 8 }}
       tolerations:
 {{ toYaml .Values.tolerations | indent 8 }}
       dnsPolicy: ClusterFirst
-      serviceAccount:  {{ .Values.serviceAccount | default "default" }}
       containers:
-      - name: app
+      - name: worker
         image: "{{ .Values.image }}:{{ .Values.imageVersion | default .Chart.AppVersion }}"
-        securityContext:
-          privileged: false
         imagePullPolicy: {{ .Values.imagePullPolicy }}
         livenessProbe:
           failureThreshold: 5
           httpGet:
             path: /api/v1/health/alive
             port: 8080
-          initialDelaySeconds: 20
-          timeoutSeconds: 30
-          periodSeconds: 30
+          initialDelaySeconds: 30
+          timeoutSeconds: 60
+          periodSeconds: 60
         readinessProbe:
           failureThreshold: 5
           httpGet:
             path: /api/v1/health/ready
             port: 8080
           initialDelaySeconds: 1
-          timeoutSeconds: 10
-          periodSeconds: 20
+          timeoutSeconds: 30
+          periodSeconds: 30
         command: [
           "nucliadb"
         ]
@@ -84,7 +73,7 @@ spec:
           - name: DATA_PATH
             value: "/data"
           - name: standalone_node_role
-            value: "index"
+            value: "worker"
           - name: NAMESPACE
             valueFrom:
               fieldRef:
@@ -96,21 +85,5 @@ spec:
           containerPort: 8040
         - name: grpc
           containerPort: 8060
-        - name: node
-          containerPort: 10009
         resources:
-{{ toYaml .Values.resources | indent 10 }}
-        volumeMounts:
-        - name: ndb-pv
-          mountPath: /data
-  volumeClaimTemplates:
-  - apiVersion: v1
-    kind: PersistentVolumeClaim
-    metadata:
-      name: ndb-pv
-    spec:
-      accessModes: [ "ReadWriteOnce" ]
-      storageClassName: {{ .Values.storage.class }}
-      resources:
-        requests:
-          storage: {{ .Values.storage.size }}
+{{ toYaml .Values.workerResources | indent 10 }}

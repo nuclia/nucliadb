@@ -52,7 +52,7 @@ from nucliadb_utils.utilities import get_indexing, get_storage
 from .index_node import IndexNode
 from .settings import settings
 from .standalone.index_node import ProxyStandaloneIndexNode
-from .standalone.utils import get_self, get_standalone_node_id
+from .standalone.utils import get_self, get_standalone_node_id, is_index_node
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +85,7 @@ def add_index_node(
     primary_id: Optional[str] = None,
 ) -> AbstractIndexNode:
     if settings.standalone_mode:
-        if id == get_standalone_node_id():
+        if is_index_node() and id == get_standalone_node_id():
             node = get_self()
         else:
             node = ProxyStandaloneIndexNode(

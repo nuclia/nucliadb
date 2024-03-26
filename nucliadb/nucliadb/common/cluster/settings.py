@@ -28,6 +28,12 @@ class ClusterDiscoveryMode(str, enum.Enum):
     SINGLE_NODE = "single_node"
 
 
+class StandaloneNodeRole(str, enum.Enum):
+    ALL = "all"
+    INDEX = "index"
+    WORKER = "worker"
+
+
 class Settings(BaseSettings):
     data_path: str = "./data/node"
     standalone_mode: bool = False
@@ -36,6 +42,7 @@ class Settings(BaseSettings):
         title="Standalone node port",
         description="Port to use for standalone nodes to communication with each other through",
     )
+    standalone_node_role: StandaloneNodeRole = StandaloneNodeRole.ALL
 
     node_replicas: int = 2
 
