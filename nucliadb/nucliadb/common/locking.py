@@ -22,6 +22,7 @@ import logging
 import time
 import uuid
 from dataclasses import dataclass
+from nucliadb.common.maindb.exceptions import ConflictError
 from typing import Optional
 
 import orjson
@@ -36,8 +37,7 @@ RESOURCE_INDEX_LOCK = "resource-index-{kbid}-{resource_id}"
 KB_SHARDS_LOCK = "shards-kb-{kbid}"
 
 
-class ResourceLocked(Exception):
-    ...
+class ResourceLocked(Exception): ...
 
 
 @dataclass
@@ -67,23 +67,27 @@ class _Lock:
     async def __aenter__(self) -> "_Lock":
         start = time.time()
         while True:
-            async with self.driver.transaction() as txn:
-                lock_data = await self.get_lock_data(txn)
-                if lock_data is None:
-                    await self._set_lock_value(txn)
-                    await txn.commit()
-                    break
-                else:
-                    if time.time() > lock_data.expires_at:
-                        # if current time is greater than when it expires, take it over
+            try:
+                async with self.driver.transaction() as txn:
+                    lock_data = await self.get_lock_data(txn)
+                    if lock_data is None:
                         await self._set_lock_value(txn)
                         await txn.commit()
                         break
+                    else:
+                        if time.time() > lock_data.expires_at:
+                            # if current time is greater than when it expires, take it over
+                            await self._set_lock_value(txn)
+                            await txn.commit()
+                            break
 
-                    if time.time() > start + self.lock_timeout:
-                        # if current time > start time + lock timeout
-                        # we've waited too long, raise exception that, we can't get the lock
-                        raise ResourceLocked()
+                        if time.time() > start + self.lock_timeout:
+                            # if current time > start time + lock timeout
+                            # we've waited too long, raise exception that, we can't get the lock
+                            raise ResourceLocked()
+            except ConflictError:
+                # if we get a conflict error, retry
+                pass
             await asyncio.sleep(0.1)  # sleep before trying againt
         self.task = asyncio.create_task(self._refresh_task())
         return self
