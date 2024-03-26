@@ -83,7 +83,7 @@ spec:
           {{- end }}
           - name: DATA_PATH
             value: "/data"
-          - name: node_role
+          - name: standalone_node_role
             value: "index"
           - name: NAMESPACE
             valueFrom:
