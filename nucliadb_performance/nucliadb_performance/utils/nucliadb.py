@@ -65,7 +65,7 @@ def get_kbid(ndb, slug_or_kbid) -> str:
 
 
 class APIClient:
-    valid_status_codes: tuple[int] = (200, 201, 204)
+    valid_status_codes: list[int] = [200, 201, 204]
 
     def __init__(self, session, base_url, headers: Optional[dict[str, str]] = None):
         self.session = session
@@ -98,7 +98,7 @@ class APIClient:
 
 
 class SearchClient(APIClient):
-    valid_status_codes: tuple[int] = (200,)
+    valid_status_codes: list[int] = [200]
     headers: dict[str, str] = {"X-NUCLIADB-ROLES": "READER"}
 
     def __init__(self, session, headers: Optional[dict[str, str]] = None):
