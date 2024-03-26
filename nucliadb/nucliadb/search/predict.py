@@ -487,7 +487,13 @@ class DummyPredictEngine(PredictEngine):
         answer = os.environ.get("TEST_ASK_DOCUMENT") or "Answer to your question"
         return answer
 
-    async def query(self, kbid: str, sentence: str) -> Optional[QueryInfo]:
+    async def query(
+        self,
+        kbid: str,
+        sentence: str,
+        generative_model: Optional[str] = None,
+        rephrase: Optional[bool] = False,
+    ) -> QueryInfo:
         self.calls.append(("query", sentence))
         if (
             os.environ.get("TEST_SENTENCE_ENCODER") == "multilingual-2023-02-21"
