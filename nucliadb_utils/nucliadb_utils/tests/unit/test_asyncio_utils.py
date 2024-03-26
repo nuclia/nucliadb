@@ -30,7 +30,8 @@ async def test_run_concurrently():
         await asyncio.sleep(random.uniform(0.0, 0.5))
         return value
 
-    results = await run_concurrently(mycoro(i) for i in range(10))
+    tasks = [mycoro(i) for i in range(10)]
+    results = await run_concurrently(tasks)
     assert results == list(range(10))
 
 
