@@ -54,13 +54,11 @@ MAX_RESOURCE_FIELD_TASKS = 4
 CONVERSATION_MESSAGE_CONTEXT_EXPANSION = 15
 
 
-class MaxContextSizeExceeded(Exception):
-    pass
-
-
 class CappedPromptContext:
     """
     Class to keep track of the size of the prompt context and raise an exception if it exceeds the configured limit.
+
+    This class will automatically trim data that exceeds the limit when it's being set on the dictionary.
     """
 
     def __init__(self, max_size: Optional[int]):
@@ -69,28 +67,16 @@ class CappedPromptContext:
         self.max_size = max_size
         self._size = 0
 
-    def _check_size(self, size_delta: int = 0):
-        if self.max_size is None:
-            # No limit on the size of the context
-            return size_delta
-        if self._size + size_delta > self.max_size:
-            size_delta = self.max_size - self._size
-        return size_delta
-
     def __setitem__(self, key, value):
-        try:
-            # Existing key
-            size_delta = len(value) - len(self.output[key])
-        except KeyError:
-            # New key
-            size_delta = len(value)
-        if size_delta == 0:
-            return
-        size_delta = self._check_size(size_delta)
-        self._size += size_delta
-        self.output[key] = value[:size_delta]
-        if size_delta == 0:
-            raise MaxContextSizeExceeded()
+        if self.max_size is None:
+            self.output[key] = value
+        else:
+            existing_len = len(self.output.get(key, ""))
+            self._size -= existing_len
+            size_available = self.max_size - self._size
+            if size_available > 0:
+                self.output[key] = value[:size_available]
+                self._size += len(self.output[key])
 
     @property
     def size(self):
@@ -374,14 +360,8 @@ class PromptContextBuilder:
         self,
     ) -> tuple[PromptContext, PromptContextOrder, PromptContextImages]:
         ccontext = CappedPromptContext(max_size=self.max_context_size)
-        try:
-            self.prepend_user_context(ccontext)
-            await self._build_context(ccontext)
-        except MaxContextSizeExceeded:
-            logger.warning(
-                f"Prompt context size exceeded: {ccontext.size}."
-                f"The context will be truncated to the maximum size: {self.max_context_size}."
-            )
+        self.prepend_user_context(ccontext)
+        await self._build_context(ccontext)
 
         if self.visual_llm:
             await self._build_context_images(ccontext)

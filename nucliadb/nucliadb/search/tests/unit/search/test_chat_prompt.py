@@ -248,29 +248,19 @@ async def test_prompt_context_builder_prepends_user_context(
 def test_capped_prompt_context():
     context = chat_prompt.CappedPromptContext(max_size=2)
 
-    # Check that the exception is raised
-    with pytest.raises(chat_prompt.MaxContextSizeExceeded):
-        context["key1"] = "123"
+    # Check that output is trimmed
+    context["key1"] = "123"
 
-    assert context.output == {}
-    assert context.size == 0
-
-    # Add a new value
-    context["key1"] = "f"
-    assert context.output == {"key1": "f"}
-    assert context.size == 1
-
-    # Update existing value
-    context["key1"] = "fo"
-    assert context.output == {"key1": "fo"}
+    assert context.output == {"key1": "12"}
     assert context.size == 2
 
-    # It should not accept new values now
-    with pytest.raises(chat_prompt.MaxContextSizeExceeded):
-        context["key1"] = "foo"
-    with pytest.raises(chat_prompt.MaxContextSizeExceeded):
-        context["key2"] = "f"
+    # Update existing value
+    context["key1"] = "foobar"
+    assert context.output == {"key1": "fo"}
+    assert context.size == 2
 
     # Check without limits
     context = chat_prompt.CappedPromptContext(max_size=None)
     context["key1"] = "foo" * int(1e6)
+
+    assert context.output == {"key1": "foo" * int(1e6)}

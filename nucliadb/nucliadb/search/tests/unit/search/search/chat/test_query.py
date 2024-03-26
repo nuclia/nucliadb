@@ -46,16 +46,15 @@ def predict():
         yield predict
 
 
-async def test_chat_does_not_call_predict_if_no_find_results(
-    predict,
-):
+async def test_chat_does_not_call_predict_if_no_find_results(predict):
     find_results = KnowledgeboxFindResults(
         total=0, min_score=MinScore(semantic=0.7), resources={}, facets=[]
     )
     chat_request = ChatRequest(query="query")
 
     with mock.patch(
-        "nucliadb.search.search.chat.query.get_find_results", return_value=find_results
+        "nucliadb.search.search.chat.query.get_find_results",
+        return_value=(find_results, None),
     ):
         await chat(
             "kbid",
