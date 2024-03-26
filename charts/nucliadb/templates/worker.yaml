@@ -18,6 +18,10 @@ spec:
       heritage: "{{ .Release.Service }}"
   template:
     metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+{{ toYaml . | indent 8 }}
+      {{- end }}
       name: nucliadb-worker
       labels:
         app: nucliadb-worker
