@@ -114,7 +114,7 @@ def test_resource_processed(kbid: str, resource_id: str):
         if int(waited) % 20 == 0 and int(waited) > 0:
             print(f"Waiting for resource to process: {int(waited)}s")
 
-        time.sleep(1)
+        time.sleep(5)
 
 
 def test_search(kbid: str, resource_id: str):

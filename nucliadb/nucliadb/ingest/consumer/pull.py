@@ -153,7 +153,7 @@ class PullWorker:
                             )
                             raise e
                     elif data.status == "empty":
-                        logger_activity.debug(
+                        logger_activity.info(
                             f"No messages waiting in partition #{self.partition}"
                         )
                         await asyncio.sleep(self.pull_time_empty_backoff)
