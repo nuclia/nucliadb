@@ -78,3 +78,4 @@ class Features:
     VERSIONED_PRIVATE_PREDICT = "nucliadb_versioned_private_predict"
     BACK_PRESSURE = "nucliadb_back_pressure"
     REBALANCE_KB = "nucliadb_rebalance_kb"
+    CORS_MIDDLEWARE = "nucliadb_cors_middleware_enabled"
