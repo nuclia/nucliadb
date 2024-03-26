@@ -173,7 +173,7 @@ async def test_default_prompt_context(kb):
     with patch("nucliadb.search.search.chat.prompt.get_read_only_transaction"), patch(
         "nucliadb.search.search.chat.prompt.get_storage"
     ), patch("nucliadb.search.search.chat.prompt.KnowledgeBoxORM", return_value=kb):
-        context = chat_prompt.CappedPromptContext(max_size=1e6)
+        context = chat_prompt.CappedPromptContext(max_size=int(1e6))
         await chat_prompt.default_prompt_context(
             context,
             "kbid",

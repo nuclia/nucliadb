@@ -67,7 +67,7 @@ class CappedPromptContext:
         self.max_size = max_size
         self._size = 0
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: str, value: str) -> None:
         if self.max_size is None:
             self.output[key] = value
         else:
@@ -79,7 +79,7 @@ class CappedPromptContext:
                 self._size += len(self.output[key])
 
     @property
-    def size(self):
+    def size(self) -> int:
         return self._size
 
 
