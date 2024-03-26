@@ -132,8 +132,11 @@ async def test_get_find_results_vector_search_is_optional(
     if chat_features is not None:
         chat_request.features = chat_features
 
+    query_parser = mock.AsyncMock()
+
     with mock.patch(
-        "nucliadb.search.search.chat.query.find", return_value=(find_results, False)
+        "nucliadb.search.search.chat.query.find",
+        return_value=(find_results, False, query_parser),
     ) as find_mock:
         await get_find_results(
             kbid="kbid",
