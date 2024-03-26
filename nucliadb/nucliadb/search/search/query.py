@@ -243,17 +243,17 @@ class QueryParser:
 
         if SearchOptions.VECTOR in self.features and self.user_vector is None:
             if self.query_endpoint_enabled:
-                asyncio.ensure_future(self._get_converted_vectors())
-            else:
                 asyncio.ensure_future(self._get_query_information())
+            else:
+                asyncio.ensure_future(self._get_converted_vectors())
 
         if (SearchOptions.RELATIONS in self.features or self.autofilter) and len(
             self.query
         ) > 0:
             if self.query_endpoint_enabled:
-                asyncio.ensure_future(self._get_detected_entities())
-            else:
                 asyncio.ensure_future(self._get_query_information())
+            else:
+                asyncio.ensure_future(self._get_detected_entities())
             asyncio.ensure_future(self._get_entities_meta_cache())
             asyncio.ensure_future(self._get_deleted_entity_groups())
         if self.with_synonyms and self.query:
@@ -438,7 +438,7 @@ class QueryParser:
         autofilters = []
         relations_search = SearchOptions.RELATIONS in self.features
         if relations_search or self.autofilter:
-            if self.query_endpoint_enabled:
+            if not self.query_endpoint_enabled:
                 detected_entities = await self._get_detected_entities()
             else:
                 query_info_result = await self._get_query_information()

@@ -426,7 +426,7 @@ class PromptContextBuilder:
             if strategy.name == RagStrategyName.FIELD_EXTENSION:
                 extend_with_fields.extend(strategy.fields)  # type: ignore
             elif strategy.name == RagStrategyName.FULL_RESOURCE:
-                number_of_full_resources = strategy.count  # type: ignore
+                number_of_full_resources = strategy.count or self.find_results.total  # type: ignore
             elif strategy.name == RagStrategyName.HIERARCHY:
                 distance = strategy.count  # type: ignore
 
