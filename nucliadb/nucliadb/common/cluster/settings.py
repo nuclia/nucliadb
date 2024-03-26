@@ -30,7 +30,7 @@ class ClusterDiscoveryMode(str, enum.Enum):
 
 class StandaloneNodeRole(str, enum.Enum):
     ALL = "all"
-    API = "api"
+    INDEX = "index"
     WORKER = "worker"
 
 
