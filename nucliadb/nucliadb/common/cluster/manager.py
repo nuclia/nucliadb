@@ -189,7 +189,9 @@ class KBShardManager:
                 errors.capture_message(
                     "KB with more than one active shard!", "error", scope
                 )
-            shard = active_shards[0]
+            # we keep being B/c with actual, if something is weird, use the
+            # shard pointed by actual
+            shard = kb_shards.shards[kb_shards.actual]
 
         return shard
 
