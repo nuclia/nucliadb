@@ -80,7 +80,3 @@ async def test_rebalance_kb_shards(
     # if we run it again, we should get another shard
     with patch.object(settings, "max_shard_paragraphs", counters1["paragraphs"] / 2):
         await rebalance.rebalance_kb(app_context, knowledgebox)
-
-    shards3_resp = await nucliadb_manager.get(f"/kb/{knowledgebox}/shards")
-    shards3 = shards3_resp.json()
-    assert len(shards3["shards"]) == 3

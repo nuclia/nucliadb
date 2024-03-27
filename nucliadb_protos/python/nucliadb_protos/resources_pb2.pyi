@@ -369,12 +369,14 @@ class MessageContent(google.protobuf.message.Message):
         HTML: MessageContent._Format.ValueType  # 1
         MARKDOWN: MessageContent._Format.ValueType  # 2
         RST: MessageContent._Format.ValueType  # 3
+        KEEP_MARKDOWN: MessageContent._Format.ValueType  # 4
 
     class Format(_Format, metaclass=_FormatEnumTypeWrapper): ...
     PLAIN: MessageContent.Format.ValueType  # 0
     HTML: MessageContent.Format.ValueType  # 1
     MARKDOWN: MessageContent.Format.ValueType  # 2
     RST: MessageContent.Format.ValueType  # 3
+    KEEP_MARKDOWN: MessageContent.Format.ValueType  # 4
 
     TEXT_FIELD_NUMBER: builtins.int
     FORMAT_FIELD_NUMBER: builtins.int
@@ -1371,6 +1373,8 @@ class FieldText(google.protobuf.message.Message):
         RST: FieldText._Format.ValueType  # 2
         MARKDOWN: FieldText._Format.ValueType  # 3
         JSON: FieldText._Format.ValueType  # 4
+        KEEP_MARKDOWN: FieldText._Format.ValueType  # 5
+        """Markdown to be kept"""
 
     class Format(_Format, metaclass=_FormatEnumTypeWrapper): ...
     PLAIN: FieldText.Format.ValueType  # 0
@@ -1378,6 +1382,8 @@ class FieldText(google.protobuf.message.Message):
     RST: FieldText.Format.ValueType  # 2
     MARKDOWN: FieldText.Format.ValueType  # 3
     JSON: FieldText.Format.ValueType  # 4
+    KEEP_MARKDOWN: FieldText.Format.ValueType  # 5
+    """Markdown to be kept"""
 
     BODY_FIELD_NUMBER: builtins.int
     FORMAT_FIELD_NUMBER: builtins.int

@@ -52,7 +52,7 @@ from nucliadb_utils.utilities import get_indexing, get_storage
 from .index_node import IndexNode
 from .settings import settings
 from .standalone.index_node import ProxyStandaloneIndexNode
-from .standalone.utils import get_self, get_standalone_node_id
+from .standalone.utils import get_self, get_standalone_node_id, is_index_node
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +85,7 @@ def add_index_node(
     primary_id: Optional[str] = None,
 ) -> AbstractIndexNode:
     if settings.standalone_mode:
-        if id == get_standalone_node_id():
+        if is_index_node() and id == get_standalone_node_id():
             node = get_self()
         else:
             node = ProxyStandaloneIndexNode(
@@ -176,20 +176,37 @@ class KBShardManager:
         active_shards = [shard for shard in kb_shards.shards if not shard.read_only]
 
         # B/c with Shards.actual
-        if len(active_shards) == 0:
-            # already not migrated
+        if len(active_shards) == len(kb_shards.shards):
+            # if there's only one shard, might be a migrated KB or not, but as
+            # we only have a shard, that's the current one already not migrated.
+            #
+            # if there's more than one active shard, the KB has not migrated
+            # yet, so we use the old way
             shard = kb_shards.shards[kb_shards.actual]
         elif len(active_shards) == 1:
-            # migrated correctly
+            # KB with multiple shards migrated correctly
             shard = active_shards[0]
-        else:
-            # more than one active shard is not yet supported!
+        elif len(active_shards) == 0:
+            # migrated with no active shards? That's a bug! We keep being B/c
+            # and report the error
             with errors.push_scope() as scope:
                 scope.set_extra("kbid", kbid)
+                scope.set_extra("total_shards", len(kb_shards.shards))
                 errors.capture_message(
-                    "KB with more than one active shard!", "error", scope
+                    "Migrated KB with no active shard!", "error", scope
                 )
-            shard = active_shards[0]
+            shard = kb_shards.shards[kb_shards.actual]
+        else:
+            # more than one active shard for migrated KBs is not yet supported!
+            # We keep being B/c with actual
+            with errors.push_scope() as scope:
+                scope.set_extra("kbid", kbid)
+                scope.set_extra("total_shards", len(kb_shards.shards))
+                scope.set_extra("active_shards", len(active_shards))
+                errors.capture_message(
+                    "Migrated KB with more than one active shard!", "error", scope
+                )
+            shard = kb_shards.shards[kb_shards.actual]
 
         return shard
 

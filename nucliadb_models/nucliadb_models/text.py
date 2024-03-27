@@ -44,6 +44,7 @@ class TextFormat(Enum):  # type: ignore
     RST = "RST"
     MARKDOWN = "MARKDOWN"
     JSON = "JSON"
+    KEEP_MARKDOWN = "KEEP_MARKDOWN"
 
 
 TEXT_FORMAT_TO_MIMETYPE = {
@@ -97,6 +98,7 @@ class PushTextFormat(TextFormatValue, Enum):  # type: ignore
     MARKDOWN = 2
     RST = 3
     JSON = 4
+    KEEP_MARKDOWN = 5
 
 
 class Text(BaseModel):

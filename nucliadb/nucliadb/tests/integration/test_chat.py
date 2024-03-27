@@ -401,6 +401,26 @@ async def test_chat_rag_options_validation(nucliadb_reader):
     )
     assert resp.status_code == 422
 
+    # Invalid strategy as a string
+    resp = await nucliadb_reader.post(
+        f"/kb/kbid/chat",
+        json={
+            "query": "title",
+            "rag_strategies": ["full_resource"],
+        },
+    )
+    assert resp.status_code == 422
+
+    # Invalid strategy without name
+    resp = await nucliadb_reader.post(
+        f"/kb/kbid/chat",
+        json={
+            "query": "title",
+            "rag_strategies": [{"fields": ["a/summary"]}],
+        },
+    )
+    assert resp.status_code == 422
+
     # full_resource cannot be combined with other strategies
     resp = await nucliadb_reader.post(
         f"/kb/kbid/chat",

@@ -101,7 +101,7 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
             for container_status in container_statuses:
                 if container_status.name not in ("reader", "writer"):
                     continue
-                if not container_status.ready:
+                if not container_status.ready or status.pod_ip is None:
                     ready = False
                     break
 
@@ -284,16 +284,18 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
         that the cluster is ready when the number of nodes is stable for 3 consecutive checks.
         """
         ready = False
-        probes = []
+        success = 0
         start = time.monotonic()
         logger.info("Waiting for cluster to be ready.")
         while time.monotonic() - start < max_wait:
             await asyncio.sleep(0.25)
-            probes.append(len(manager.get_index_nodes()))
-            if len(probes) >= 3:
-                if probes[-1] == probes[-2] == probes[-3] != 0:
-                    ready = True
-                    break
+            if len(manager.get_index_nodes()) > 0:
+                success += 1
+            else:
+                success = 0
+            if success >= 3:
+                ready = True
+                break
         if not ready:
             logger.warning(f"Cluster not ready after {max_wait} seconds.")
 

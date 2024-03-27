@@ -105,6 +105,7 @@ message MessageContent {
         HTML = 1;
         MARKDOWN = 2;
         RST = 3;
+        KEEP_MARKDOWN = 4;
     }
     string text = 1;
     Format format = 2;
@@ -338,6 +339,7 @@ message FieldText {
         RST = 2;
         MARKDOWN = 3;
         JSON = 4;
+        KEEP_MARKDOWN = 5;  // Markdown to be kept
     }
     string body = 1;
     Format format = 2;

@@ -1028,7 +1028,14 @@ class ChatRequest(BaseModel):
 
     @root_validator(pre=True)
     def rag_features_validator(cls, values):
-        chosen_strategies = [s.get("name") for s in values.get("rag_strategies") or []]
+        chosen_strategies = []
+        for s in values.get("rag_strategies") or []:
+            if not isinstance(s, dict):
+                raise ValueError("RAG strategies must be defined using an object")
+            strategy = s.get("name", None)
+            if strategy is None:
+                raise ValueError(f"Invalid strategy '{s}'")
+            chosen_strategies.append(strategy)
 
         # There must be at most one strategy of each type
         if len(chosen_strategies) > len(set(chosen_strategies)):
