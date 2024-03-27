@@ -438,6 +438,7 @@ class DummyPredictEngine(PredictEngine):
             b" to",
             AnswerStatusCode.SUCCESS.encode(),
         ]
+        self.max_context = 1000
 
     async def initialize(self):
         pass
@@ -503,7 +504,7 @@ class DummyPredictEngine(PredictEngine):
                 stop_words=[],
                 semantic_threshold=0.7,
                 visual_llm=True,
-                max_context=1000,
+                max_context=self.max_context,
                 entities=TokenSearch(
                     tokens=[Ner(text="text", ner="PERSON", start=0, end=2)], time=0.0
                 ),
@@ -516,7 +517,7 @@ class DummyPredictEngine(PredictEngine):
                 stop_words=[],
                 semantic_threshold=0.7,
                 visual_llm=True,
-                max_context=1000,
+                max_context=self.max_context,
                 entities=TokenSearch(
                     tokens=[Ner(text="text", ner="PERSON", start=0, end=2)], time=0.0
                 ),

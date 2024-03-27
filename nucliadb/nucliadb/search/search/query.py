@@ -175,11 +175,11 @@ class QueryParser:
 
     def _get_query_information(self) -> Awaitable[QueryInfo]:
         if self.query_endpoint_enabled is False:
-
+            # XXX Can be removed once query endpoint is fully enabled
             async def static_query():
                 return QueryInfo(
                     visual_llm=False,
-                    max_context=settings.max_prompt_context_chars,  # noqa
+                    max_context=300_000,
                     entities=TokenSearch(tokens=[], time=0.0),
                     sentence=SentenceSearch(data=[], time=0.0),
                     query=self.query,
@@ -513,6 +513,9 @@ class QueryParser:
         return (await self._get_query_information()).visual_llm
 
     async def get_max_context(self) -> int:
+        # Multiple by 3 is to have a good margin and guess
+        # between characters and tokens. This will be fully properly
+        # cut at the NUA API.
         return (await self._get_query_information()).max_context * 3
 
 

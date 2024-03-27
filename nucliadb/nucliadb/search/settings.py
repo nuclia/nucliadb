@@ -25,11 +25,6 @@ from nucliadb.ingest.settings import DriverSettings
 
 class Settings(DriverSettings):
     search_timeout: float = 10.0
-    max_prompt_context_chars: int = Field(
-        default=300_000,
-        title="Max prompt context chars",
-        description="The maximum number of characters to use for prompt context",
-    )
     slow_find_log_threshold: float = Field(
         default=3.0,
         title="Slow query log threshold",

@@ -515,24 +515,25 @@ async def test_chat_capped_context(
     # Try now setting a smaller max size. It should be respected
     max_size = 28
     assert total_size > max_size * 3
-    from nucliadb.search.settings import settings
 
-    with mock.patch.object(settings, "max_prompt_context_chars", max_size):
-        resp = await nucliadb_reader.post(
-            f"/kb/{knowledgebox}/chat",
-            json={
-                "query": "title",
-                "rag_strategies": [{"name": "full_resource"}],
-                "debug": True,
-            },
-            headers={"X-Synchronous": "True"},
-            timeout=None,
-        )
-        assert resp.status_code == 200
-        resp_data = SyncChatResponse.parse_raw(resp.content)
-        assert resp_data.prompt_context is not None
-        total_size = sum(len(v) for v in resp_data.prompt_context.values())
-        assert total_size <= max_size * 3
+    predict = get_predict()
+    predict.max_context = max_size  # type: ignore
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/chat",
+        json={
+            "query": "title",
+            "rag_strategies": [{"name": "full_resource"}],
+            "debug": True,
+        },
+        headers={"X-Synchronous": "True"},
+        timeout=None,
+    )
+    assert resp.status_code == 200, resp.text
+    resp_data = SyncChatResponse.parse_raw(resp.content)
+    assert resp_data.prompt_context is not None
+    total_size = sum(len(v) for v in resp_data.prompt_context.values())
+    assert total_size <= max_size * 3
 
 
 @pytest.mark.asyncio()
