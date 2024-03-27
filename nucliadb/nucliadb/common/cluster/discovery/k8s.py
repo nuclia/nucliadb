@@ -101,7 +101,7 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
             for container_status in container_statuses:
                 if container_status.name not in ("reader", "writer"):
                     continue
-                if not container_status.ready:
+                if not container_status.ready or status.pod_ip is None:
                     ready = False
                     break
 
@@ -259,11 +259,11 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
                             continue
                         existing = self.node_id_cache[pod_name]
                         try:
-                            self.node_id_cache[
-                                pod_name
-                            ] = await self._query_node_metadata(
-                                existing.address,
-                                read_replica=existing.primary_id is not None,
+                            self.node_id_cache[pod_name] = (
+                                await self._query_node_metadata(
+                                    existing.address,
+                                    read_replica=existing.primary_id is not None,
+                                )
                             )
                         except NodeConnectionError:  # pragma: no cover
                             self._maybe_remove_stale_node(pod_name)
