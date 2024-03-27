@@ -158,4 +158,4 @@ async def delete_resource_from_shard(
     partitioning = app_context.partitioning
     partition = partitioning.generate_partition(kbid, resource_id)
 
-    await sm.delete_resource(shard, resource_id, -1, partition, kbid)
+    await sm.delete_resource(shard, resource_id, 0, partition, kbid)
