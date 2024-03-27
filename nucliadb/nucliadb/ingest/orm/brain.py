@@ -171,6 +171,9 @@ class ResourceBrain:
                         representation=representation,
                     ),
                 )
+                p.labels.append(
+                    f"/k/{Paragraph.TypeParagraph.Name(paragraph.kind).lower()}"
+                )
                 for classification in paragraph.classifications:
                     label = f"/l/{classification.labelset}/{classification.label}"
                     if label not in denied_classifications:
@@ -221,6 +224,10 @@ class ResourceBrain:
                     representation=representation,
                 ),
             )
+            p.labels.append(
+                f"/k/{Paragraph.TypeParagraph.Name(paragraph.kind).lower()}"
+            )
+
             for classification in paragraph.classifications:
                 label = f"/l/{classification.labelset}/{classification.label}"
                 if label not in denied_classifications:
