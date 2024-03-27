@@ -101,7 +101,7 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
             for container_status in container_statuses:
                 if container_status.name not in ("reader", "writer"):
                     continue
-                if not container_status.ready:
+                if not container_status.ready or status.pod_ip is None:
                     ready = False
                     break
 
