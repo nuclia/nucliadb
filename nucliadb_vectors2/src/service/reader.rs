@@ -62,7 +62,6 @@ impl Debug for VectorReaderService {
 }
 
 impl VectorReader for VectorReaderService {
-    #[tracing::instrument(skip_all)]
     fn update(&mut self) -> NodeResult<()> {
         self.index.update()?;
         self.indexset.update()?;
