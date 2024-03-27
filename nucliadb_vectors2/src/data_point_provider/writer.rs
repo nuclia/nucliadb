@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::data_point::{self, DataPointPin, Journal};
+use crate::data_point::{self, DataPointPin, DpId, Journal, OpenDataPoint, Similarity};
 use crate::data_point_provider::state::*;
 use crate::data_point_provider::state::{read_state, write_state};
 use crate::data_point_provider::TimeSensitiveDLog;
@@ -26,20 +26,15 @@ use crate::data_point_provider::{IndexMetadata, OPENING_FLAG, STATE, TEMP_STATE,
 use crate::data_types::dtrie_ram::DTrie;
 use crate::{VectorErr, VectorR};
 use fs2::FileExt;
-use nucliadb_core::tracing;
+use nucliadb_core::merge::{send_merge_request, MergePriority, MergeRequest};
+use nucliadb_core::metrics::get_metrics;
+use nucliadb_core::vectors::{MergeParameters, MergeResults, MergeRunner};
+use nucliadb_core::{tracing, NodeResult};
+use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
 use std::mem;
 use std::path::{Path, PathBuf};
 use std::time::{Instant, SystemTime};
-
-const MAX_NODES_IN_MERGE: &str = "MAX_NODES_IN_MERGE";
-const SEGMENTS_BEFORE_MERGE: &str = "SEGMENTS_BEFORE_MERGE";
-
-#[derive(Debug, Clone, Copy)]
-pub struct MergeParameters {
-    pub max_nodes_in_merge: usize,
-    pub segments_before_merge: usize,
-}
 
 fn persist_state(path: &Path, state: &State) -> VectorR<()> {
     let temporal_path = path.join(TEMP_STATE);
@@ -66,13 +61,93 @@ pub struct MergeMetrics {
     pub output_segment_size: usize,
 }
 
+pub struct PreparedMergeResults {
+    inputs: HashSet<DpId>,
+    destination: DataPointPin,
+    metrics: MergeMetrics,
+}
+
+impl MergeResults for PreparedMergeResults {
+    fn inputs(&self) -> &HashSet<DpId> {
+        &self.inputs
+    }
+
+    fn output(&self) -> DpId {
+        self.destination.id()
+    }
+
+    fn record_metrics(&self, source: nucliadb_core::metrics::vectors::MergeSource) {
+        if self.metrics.merged == 0 {
+            return;
+        }
+
+        let metrics = &get_metrics().vectors_metrics;
+        metrics.record_time(source, self.metrics.seconds_elapsed);
+        for input in &self.metrics.input_segment_sizes {
+            metrics.record_input_segment(source, *input);
+        }
+        metrics.record_output_segment(source, self.metrics.output_segment_size);
+    }
+
+    fn get_metrics(&self) -> nucliadb_core::vectors::MergeMetrics {
+        nucliadb_core::vectors::MergeMetrics {
+            merged: self.metrics.merged,
+            left: self.metrics.segments_left,
+        }
+    }
+}
+
+pub struct PreparedMerge {
+    dtrie_copy: DTrie,
+    destination: Option<DataPointPin>,
+    inputs: Vec<OpenDataPoint>,
+    similarity: Similarity,
+    segments_left: usize,
+    merge_time: SystemTime,
+}
+
+impl MergeRunner for PreparedMerge {
+    fn run(&mut self) -> NodeResult<Box<dyn nucliadb_core::vectors::MergeResults>> {
+        let start = Instant::now();
+        let merged = data_point::merge(
+            self.destination.as_ref().unwrap(),
+            self.inputs
+                .iter()
+                .map(|dp| {
+                    (
+                        TimeSensitiveDLog {
+                            time: dp.journal().time(),
+                            dlog: &self.dtrie_copy,
+                        },
+                        dp,
+                    )
+                })
+                .collect::<Vec<_>>()
+                .as_slice(),
+            self.similarity,
+            self.merge_time,
+        )?;
+        let metrics = MergeMetrics {
+            seconds_elapsed: start.elapsed().as_secs_f64(),
+            merged: self.inputs.len(),
+            segments_left: self.segments_left,
+            input_segment_sizes: self.inputs.iter().map(|dp| dp.journal().no_nodes()).collect(),
+            output_segment_size: merged.journal().no_nodes(),
+        };
+        Ok(Box::new(PreparedMergeResults {
+            inputs: self.inputs.iter().map(|d| d.journal().id()).collect(),
+            destination: self.destination.take().unwrap(),
+            metrics,
+        }))
+    }
+}
+
 struct OnlineDataPoint {
     pin: DataPointPin,
     journal: Journal,
 }
 
 pub struct Writer {
-    on_commit_merge_parameters: MergeParameters,
     has_uncommitted_changes: bool,
     metadata: IndexMetadata,
     path: PathBuf,
@@ -84,6 +159,7 @@ pub struct Writer {
     number_of_embeddings: usize,
     #[allow(unused)]
     writing: File,
+    shard_id: String,
 }
 
 impl Writer {
@@ -105,30 +181,23 @@ impl Writer {
         self.has_uncommitted_changes = true;
     }
 
-    pub fn merge(&mut self, parameters: MergeParameters) -> VectorR<MergeMetrics> {
+    pub fn prepare_merge(&self, parameters: MergeParameters) -> VectorR<Option<Box<dyn MergeRunner>>> {
         if self.has_uncommitted_changes {
             return Err(VectorErr::UncommittedChangesError);
         }
 
         if self.online_data_points.len() < parameters.segments_before_merge {
-            return Ok(MergeMetrics {
-                segments_left: self.online_data_points.len(),
-                ..Default::default()
-            });
+            return Ok(None);
         }
 
-        let start = Instant::now();
-        let similarity = self.metadata.similarity;
-        let mut blocked_segments = Vec::new();
-        let mut being_merged = Vec::new();
-        let mut live_segments = mem::take(&mut self.online_data_points);
+        let mut live_segments: Vec<_> = self.online_data_points.iter().collect();
         let mut nodes_in_merge = 0;
-        let mut buffer = Vec::new();
+        let mut inputs = Vec::new();
 
         // Order smallest segments last (first to be pop()), so they are merged first
         live_segments.sort_unstable_by_key(|i| std::cmp::Reverse(i.journal.no_nodes()));
 
-        let mut input_segment_sizes = vec![];
+        let dtrie_copy = self.delete_log.clone();
         while nodes_in_merge < parameters.max_nodes_in_merge {
             let Some(online_data_point) = live_segments.pop() else {
                 break;
@@ -136,77 +205,70 @@ impl Writer {
             let data_point_size = online_data_point.journal.no_nodes();
 
             if data_point_size + nodes_in_merge > parameters.max_nodes_in_merge {
-                blocked_segments.push(online_data_point);
                 break;
-            } else {
-                let delete_log = TimeSensitiveDLog {
-                    time: online_data_point.journal.time(),
-                    dlog: &self.delete_log,
-                };
-                let open_data_point = data_point::open(&online_data_point.pin)?;
-                being_merged.push(online_data_point);
-                buffer.push((delete_log, open_data_point));
-                nodes_in_merge += data_point_size;
-                input_segment_sizes.push(data_point_size);
             }
+
+            let open_data_point = data_point::open(&online_data_point.pin)?;
+            inputs.push(open_data_point);
+            nodes_in_merge += data_point_size;
         }
 
-        if buffer.len() < 2 {
-            self.online_data_points.extend(blocked_segments);
-            self.online_data_points.extend(being_merged);
-            self.online_data_points.extend(live_segments);
-            return Ok(MergeMetrics {
-                segments_left: self.online_data_points.len(),
-                ..Default::default()
-            });
+        if inputs.len() < 2 {
+            return Ok(None);
         }
 
-        let merged_pin = DataPointPin::create_pin(self.location())?;
+        let destination = DataPointPin::create_pin(self.location())?;
+        Ok(Some(Box::new(PreparedMerge {
+            dtrie_copy,
+            destination: Some(destination),
+            inputs,
+            similarity: self.metadata.similarity,
+            segments_left: live_segments.len() + 1,
+            merge_time: SystemTime::now(),
+        })))
+    }
 
-        if let Err(err) = data_point::merge(&merged_pin, &buffer, similarity) {
-            self.online_data_points.extend(blocked_segments);
-            self.online_data_points.extend(being_merged);
-            self.online_data_points.extend(live_segments);
-            return Err(err);
+    pub fn record_merge(&mut self, merge: &dyn MergeResults) -> VectorR<()> {
+        let online_data_points = mem::take(&mut self.online_data_points);
+        let (merged, mut keep): (Vec<_>, Vec<_>) =
+            online_data_points.into_iter().partition(|dp| merge.inputs().contains(&dp.journal.id()));
+
+        if merged.len() != merge.inputs().len() {
+            tracing::error!("Failed to merge {:?}, some merged segments are not present", self.location());
+            keep.extend(merged);
+            self.online_data_points = keep;
+            return Err(VectorErr::MissingMergedSegments);
         }
 
+        let merged_pin = DataPointPin::open_pin(self.location(), merge.output())?;
         let new_online_data_point = OnlineDataPoint {
             journal: merged_pin.read_journal()?,
             pin: merged_pin,
         };
-        let output_segment_size = new_online_data_point.journal.no_nodes();
+        keep.push(new_online_data_point);
+        self.online_data_points = keep;
 
-        blocked_segments.extend(live_segments);
-        blocked_segments.push(new_online_data_point);
-        let online_data_points = blocked_segments;
-
-        let metrics = MergeMetrics {
-            merged: buffer.len(),
-            segments_left: online_data_points.len(),
-            input_segment_sizes,
-            output_segment_size,
-            seconds_elapsed: start.elapsed().as_secs_f64(),
-        };
-
-        let mut oldest_age = SystemTime::now();
-        let mut persisted_data_points = Vec::new();
-
-        for data_point in online_data_points.iter() {
-            let data_point_id = data_point.pin.id();
-            let data_point_time = data_point.journal.time();
-            persisted_data_points.push(data_point_id);
-            oldest_age = std::cmp::min(oldest_age, data_point_time);
+        let mut new_delete_log = self.delete_log.clone();
+        if let Some(oldest_age) = self.online_data_points.iter().map(|dp| dp.journal.time()).reduce(std::cmp::min) {
+            new_delete_log.prune(oldest_age);
         }
 
-        let mut state = State::new();
-        state.data_point_list = persisted_data_points;
-        state.delete_log = self.delete_log.clone();
-        persist_state(self.location(), &state)?;
+        let state = State {
+            delete_log: new_delete_log,
+            data_point_list: self.online_data_points.iter().map(|dp| dp.journal.id()).collect(),
+        };
 
-        self.delete_log.prune(oldest_age);
-        self.online_data_points = online_data_points;
+        if let Err(err) = persist_state(&self.path, &state) {
+            // Restore state
+            self.online_data_points.pop().unwrap(); // Remove merged segment
+            self.online_data_points.extend(merged); // Add input segments
+            return Err(err);
+        } else {
+            // Apply state
+            self.delete_log = state.delete_log;
+        };
 
-        Ok(metrics)
+        Ok(())
     }
 
     pub fn abort(&mut self) {
@@ -214,9 +276,9 @@ impl Writer {
         self.added_data_points.clear();
     }
 
-    pub fn commit(&mut self) -> VectorR<MergeMetrics> {
+    pub fn commit(&mut self) -> VectorR<()> {
         if !self.has_uncommitted_changes {
-            return Ok(MergeMetrics::default());
+            return Ok(());
         }
 
         let added_to_delete_log = mem::take(&mut self.added_to_delete_log);
@@ -270,32 +332,21 @@ impl Writer {
         self.has_uncommitted_changes = false;
         self.number_of_embeddings = number_of_embeddings;
 
-        let merge_result = self.merge(self.on_commit_merge_parameters);
-        if let Err(merge_error) = &merge_result {
-            tracing::error!("Merge error: {merge_error:?}")
-        }
+        let _ = send_merge_request(MergeRequest {
+            shard_id: self.shard_id.clone(),
+            priority: MergePriority::Low,
+            waiter: nucliadb_core::merge::MergeWaiter::None,
+        });
 
-        merge_result
+        Ok(())
     }
 
-    pub fn new(path: &Path, metadata: IndexMetadata) -> VectorR<Writer> {
+    pub fn new(path: &Path, metadata: IndexMetadata, shard_id: String) -> VectorR<Writer> {
         std::fs::create_dir(path)?;
         File::create(path.join(OPENING_FLAG))?;
 
         let writing_path = path.join(WRITING_FLAG);
         let writing_file = File::create(writing_path)?;
-        let max_nodes_in_merge: usize = match std::env::var(MAX_NODES_IN_MERGE) {
-            Ok(v) => v.parse().unwrap_or(50_000),
-            Err(_) => 50_000,
-        };
-        let segments_before_merge: usize = match std::env::var(SEGMENTS_BEFORE_MERGE) {
-            Ok(v) => v.parse().unwrap_or(100),
-            Err(_) => 100,
-        };
-        let on_commit_merge_parameters = MergeParameters {
-            max_nodes_in_merge,
-            segments_before_merge,
-        };
 
         if writing_file.try_lock_exclusive().is_err() {
             return Err(VectorErr::MultipleWritersError);
@@ -306,7 +357,6 @@ impl Writer {
 
         Ok(Writer {
             metadata,
-            on_commit_merge_parameters,
             path: path.to_path_buf(),
             added_data_points: Vec::new(),
             added_to_delete_log: Vec::new(),
@@ -316,10 +366,11 @@ impl Writer {
             dimension: None,
             number_of_embeddings: 0,
             writing: writing_file,
+            shard_id,
         })
     }
 
-    pub fn open(path: &Path) -> VectorR<Writer> {
+    pub fn open(path: &Path, shard_id: String) -> VectorR<Writer> {
         let writing_path = path.join(WRITING_FLAG);
         let writing_file = File::create(writing_path)?;
 
@@ -337,18 +388,6 @@ impl Writer {
             let metadata = IndexMetadata::default();
             metadata.write(path).map(|_| metadata)
         })?;
-        let max_nodes_in_merge: usize = match std::env::var(MAX_NODES_IN_MERGE) {
-            Ok(v) => v.parse().unwrap_or(50_000),
-            Err(_) => 50_000,
-        };
-        let segments_before_merge: usize = match std::env::var(SEGMENTS_BEFORE_MERGE) {
-            Ok(v) => v.parse().unwrap_or(100),
-            Err(_) => 100,
-        };
-        let on_commit_merge_parameters = MergeParameters {
-            max_nodes_in_merge,
-            segments_before_merge,
-        };
 
         let state_path = path.join(STATE);
         let state_file = File::open(state_path)?;
@@ -384,12 +423,12 @@ impl Writer {
             delete_log,
             dimension,
             number_of_embeddings,
-            on_commit_merge_parameters,
             added_data_points: Vec::new(),
             added_to_delete_log: Vec::new(),
             path: path.to_path_buf(),
             has_uncommitted_changes: false,
             writing: writing_file,
+            shard_id,
         })
     }
 
@@ -460,11 +499,11 @@ mod test {
         let dir = tempfile::tempdir().unwrap();
         let vectors_path = dir.path().join("vectors");
 
-        let mut writer = Writer::new(&vectors_path, IndexMetadata::default()).unwrap();
+        let mut writer = Writer::new(&vectors_path, IndexMetadata::default(), "abc".into()).unwrap();
         let mut data_points = vec![];
         let merge_parameters = MergeParameters {
             segments_before_merge: 10,
-            ..writer.on_commit_merge_parameters
+            max_nodes_in_merge: 50_000,
         };
 
         for _ in 0..100 {
@@ -483,9 +522,10 @@ mod test {
 
         writer.online_data_points = data_points;
 
-        let metrics = writer.merge(merge_parameters).unwrap();
+        let metrics = writer.prepare_merge(merge_parameters).unwrap().unwrap().run().unwrap().get_metrics();
+
         assert_eq!(metrics.merged, 100);
-        assert_eq!(metrics.segments_left, 1);
+        assert_eq!(metrics.left, 1);
     }
 
     #[test]
@@ -493,11 +533,11 @@ mod test {
         let dir = tempfile::tempdir().unwrap();
         let vectors_path = dir.path().join("vectors");
 
-        let mut writer = Writer::new(&vectors_path, IndexMetadata::default()).unwrap();
+        let mut writer = Writer::new(&vectors_path, IndexMetadata::default(), "abc".into()).unwrap();
         let mut data_points = vec![];
         let merge_parameters = MergeParameters {
             segments_before_merge: 1000,
-            ..writer.on_commit_merge_parameters
+            max_nodes_in_merge: 50_000,
         };
 
         for _ in 0..50 {
@@ -516,9 +556,8 @@ mod test {
 
         writer.online_data_points = data_points;
 
-        let metrics = writer.merge(merge_parameters).unwrap();
-        assert_eq!(metrics.merged, 0);
-        assert_eq!(metrics.segments_left, 50);
+        let merge_proposal = writer.prepare_merge(merge_parameters).unwrap();
+        assert!(merge_proposal.is_none());
     }
 
     #[test]
@@ -526,9 +565,12 @@ mod test {
         let dir = tempfile::tempdir().unwrap();
         let vectors_path = dir.path().join("vectors");
 
-        let mut writer = Writer::new(&vectors_path, IndexMetadata::default()).unwrap();
+        let mut writer = Writer::new(&vectors_path, IndexMetadata::default(), "abc".into()).unwrap();
         let mut data_points = vec![];
-        let merge_parameters = writer.on_commit_merge_parameters;
+        let merge_parameters = MergeParameters {
+            segments_before_merge: 100,
+            max_nodes_in_merge: 50_000,
+        };
 
         for _ in 0..100 {
             let similarity = Similarity::Cosine;
@@ -546,12 +588,13 @@ mod test {
 
         writer.online_data_points = data_points;
 
-        let metrics = writer.merge(merge_parameters).unwrap();
+        let result = writer.prepare_merge(merge_parameters).unwrap().unwrap().run().unwrap();
+        writer.record_merge(result.as_ref()).unwrap();
+        let metrics = result.get_metrics();
         assert_eq!(metrics.merged, 100);
-        assert_eq!(metrics.segments_left, 1);
+        assert_eq!(metrics.left, 1);
 
-        let metrics = writer.merge(merge_parameters).unwrap();
-        assert_eq!(metrics.merged, 0);
-        assert_eq!(metrics.segments_left, 1);
+        let merge_proposal = writer.prepare_merge(merge_parameters).unwrap();
+        assert!(merge_proposal.is_none());
     }
 }

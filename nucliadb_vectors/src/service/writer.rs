@@ -23,6 +23,7 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use nucliadb_core::metrics::request_time;
+use nucliadb_core::metrics::vectors::MergeSource;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::prost::Message;
 use nucliadb_core::protos::resource::ResourceStatus;
@@ -56,6 +57,32 @@ impl Debug for VectorWriterService {
     }
 }
 
+struct DummyPreparedMerge;
+impl MergeRunner for DummyPreparedMerge {
+    fn run(&mut self) -> NodeResult<Box<dyn MergeResults>> {
+        Ok(Box::new(DummyMergeResults))
+    }
+}
+
+struct DummyMergeResults;
+impl MergeResults for DummyMergeResults {
+    fn inputs(&self) -> &std::collections::HashSet<uuid::Uuid> {
+        unreachable!()
+    }
+
+    fn output(&self) -> uuid::Uuid {
+        unreachable!()
+    }
+
+    fn record_metrics(&self, _source: MergeSource) {
+        unreachable!()
+    }
+
+    fn get_metrics(&self) -> MergeMetrics {
+        unreachable!()
+    }
+}
+
 impl VectorWriter for VectorWriterService {
     #[measure(actor = "vectors", metric = "reload")]
     #[tracing::instrument(skip_all)]
@@ -63,19 +90,24 @@ impl VectorWriter for VectorWriterService {
         Ok(())
     }
 
-    #[measure(actor = "vectors", metric = "merge")]
+    fn prepare_merge(&self, _parameters: MergeParameters) -> NodeResult<Option<Box<dyn MergeRunner>>> {
+        Ok(Some(Box::new(DummyPreparedMerge)))
+    }
+
+    #[measure(actor = "vectors", metric = "finish_merge")]
     #[tracing::instrument(skip_all)]
-    fn merge(&mut self, _context: MergeContext) -> NodeResult<MergeMetrics> {
+    fn record_merge(&mut self, _merge_result: Box<dyn MergeResults>, _source: MergeSource) -> NodeResult<MergeMetrics> {
         let time = Instant::now();
         let lock = self.index.get_slock()?;
         let inner_metrics = self.index.force_merge(&lock)?;
 
         let took = time.elapsed().as_secs_f64();
-        debug!("Forcing a merge took: {took} s");
-        Ok(MergeMetrics {
+        debug!("A merge took: {took} s");
+        let metrics = MergeMetrics {
             merged: inner_metrics.merged,
             left: inner_metrics.segments_left,
-        })
+        };
+        Ok(metrics)
     }
 
     #[measure(actor = "vectors", metric = "list_vectorsets")]
@@ -527,6 +559,7 @@ mod tests {
             path: dir.path().join("vectors"),
             vectorset: dir.path().join("vectorsets"),
             channel: Channel::EXPERIMENTAL,
+            shard_id: "abc".into(),
         };
 
         let mut writer = VectorWriterService::start(&vsc).expect("Error starting vector writer");
@@ -594,6 +627,7 @@ mod tests {
             path: dir.path().join("vectors"),
             vectorset: dir.path().join("vectorset"),
             channel: Channel::EXPERIMENTAL,
+            shard_id: "abc".into(),
         };
         let raw_sentences = [
             ("DOC/KEY/1/1".to_string(), vec![1.0, 3.0, 4.0]),
@@ -660,6 +694,7 @@ mod tests {
             path: dir.path().join("vectors"),
             vectorset: dir.path().join("vectorset"),
             channel: Channel::EXPERIMENTAL,
+            shard_id: "abc".into(),
         };
         let resource_id = ResourceId {
             shard_id: "DOC".to_string(),

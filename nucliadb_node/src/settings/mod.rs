@@ -65,6 +65,15 @@ impl Clone for Settings {
     }
 }
 
+macro_rules! delegate {
+    ($(#[$attr:meta])* $name:ident: $type:ty) => {
+        $(#[$attr])*
+        pub fn $name(&self) -> $type {
+            self.inner.$name
+        }
+    };
+}
+
 impl Settings {
     pub fn builder() -> InnerSettingsBuilder {
         InnerSettingsBuilder::default()
@@ -90,10 +99,10 @@ impl Settings {
         self.inner.shards_path.clone()
     }
 
-    /// Maximum number of shards an index node will store
-    pub fn max_shards_per_node(&self) -> usize {
-        self.inner.max_shards_per_node
-    }
+    delegate!(
+        /// Maximum number of shards an index node will store
+        max_shards_per_node: usize
+    );
 
     // TODO: rename to `node_id_path` or similar
     /// Path to index node UUID file
@@ -101,44 +110,44 @@ impl Settings {
         self.inner.node_id_path.clone()
     }
 
-    /// Host public IP
-    pub fn public_ip(&self) -> IpAddr {
-        self.inner.public_ip
-    }
+    delegate!(
+        /// Host public IP
+        public_ip: IpAddr
+    );
 
-    /// When enabled, sentry will be activated
-    pub fn sentry_enabled(&self) -> bool {
-        self.inner.sentry_enabled
-    }
+    delegate!(
+        /// When enabled, sentry will be activated
+        sentry_enabled: bool
+    );
 
     pub fn sentry_url(&self) -> String {
         self.inner.sentry_url.clone()
     }
 
-    /// Sentry environment to report errors
-    pub fn sentry_env(&self) -> &'static str {
-        self.inner.sentry_env
-    }
+    delegate!(
+        /// Sentry environment to report errors
+        sentry_env: &'static str
+    );
 
     /// Log levels. Every element is a crate-level pair
     pub fn log_levels(&self) -> &[(String, Level)] {
         &self.inner.log_levels
     }
 
-    /// When enabled, stdout logs are formatted as plain compact
-    pub fn plain_logs(&self) -> bool {
-        self.inner.plain_logs
-    }
+    delegate!(
+        /// When enabled, stdout logs are formatted as plain compact
+        plain_logs: bool
+    );
 
     /// Span levels. Every element is a crate-level pair
     pub fn span_levels(&self) -> &[(String, Level)] {
         &self.inner.span_levels
     }
 
-    /// When enabled, traces will be exported to Jaeger
-    pub fn jaeger_enabled(&self) -> bool {
-        self.inner.jaeger_enabled
-    }
+    delegate!(
+        /// When enabled, traces will be exported to Jaeger
+        jaeger_enabled: bool
+    );
 
     /// Jaeger Agent address used to export traces
     pub fn jaeger_agent_address(&self) -> String {
@@ -147,51 +156,80 @@ impl Settings {
         format!("{}:{}", host, port)
     }
 
-    /// Address where index node read will listen to
-    pub fn reader_listen_address(&self) -> SocketAddr {
-        self.inner.reader_listen_address
-    }
+    delegate!(
+        /// Address where index node reader will listen to
+        reader_listen_address: SocketAddr
+    );
 
-    /// Address where index node read will listen to
-    pub fn writer_listen_address(&self) -> SocketAddr {
-        self.inner.writer_listen_address
-    }
+    delegate!(
+        /// Address where index node writer will listen to
+        writer_listen_address: SocketAddr
+    );
 
-    pub fn metrics_port(&self) -> u16 {
-        self.inner.metrics_port
-    }
+    delegate!(
+        /// Port where metrics endpoint listens
+        metrics_port: u16
+    );
 
     /// Address where secondary node read will connect to primary node through
     pub fn primary_address(&self) -> String {
         self.inner.primary_address.clone()
     }
 
-    pub fn node_role(&self) -> NodeRole {
-        self.inner.node_role
-    }
-    pub fn replication_delay(&self) -> Duration {
-        self.inner.replication_delay
-    }
+    delegate!(
+        /// Replication role (Primary/Secondary)
+        node_role: NodeRole
+    );
 
-    pub fn replication_max_concurrency(&self) -> u64 {
-        self.inner.replication_max_concurrency
-    }
+    delegate!(
+        /// Delay between replications runs
+        replication_delay: Duration
+    );
 
-    pub fn replication_healthy_delay(&self) -> Duration {
-        self.inner.replication_healthy_delay
-    }
+    delegate!(
+        /// Max concurrency during replication
+        replication_max_concurrency: u64
+    );
 
-    pub fn max_node_replicas(&self) -> u64 {
-        self.inner.max_node_replicas
-    }
+    delegate!(
+        /// Delay for updating replication healthy status
+        replication_healthy_delay: Duration
+    );
 
-    pub fn num_global_rayon_threads(&self) -> usize {
-        self.inner.num_global_rayon_threads
-    }
+    delegate!(
+        /// Maximum replicas per node
+        max_node_replicas: u64
+    );
 
-    pub fn merge_scheduler_free_time_work_scheduling_delay(&self) -> Duration {
-        self.inner.merge_scheduler_free_time_work_scheduling_delay
-    }
+    delegate!(
+        /// Number of threads in threadpool
+        num_global_rayon_threads: usize
+    );
+
+    delegate!(
+        /// Delay before idle merge scheduler runs
+        merge_scheduler_free_time_work_scheduling_delay: Duration
+    );
+
+    delegate!(
+        /// Max nodes in merged segments (idle)
+        merge_scheduler_max_nodes_in_merge: usize
+    );
+
+    delegate!(
+        /// Min segments before idle merger runs
+        merge_scheduler_segments_before_merge: usize
+    );
+
+    delegate!(
+        /// Max nodes in merged segments (on commit)
+        merge_on_commit_max_nodes_in_merge: usize
+    );
+
+    delegate!(
+        /// Min segments before on-commit merger runs
+        merge_on_commit_segments_before_merge: usize
+    );
 }
 
 #[cfg(test)]

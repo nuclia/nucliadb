@@ -238,6 +238,7 @@ impl ShardReader {
             path: shard_path.join(VECTORS_DIR),
             vectorset: shard_path.join(VECTORSET_DIR),
             channel,
+            shard_id: id.clone(),
         };
         let rsc = RelationConfig {
             path: shard_path.join(RELATIONS_DIR),

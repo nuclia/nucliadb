@@ -172,8 +172,9 @@ pub fn open(pin: &DataPointPin) -> VectorR<OpenDataPoint> {
 
 pub fn merge<Dlog>(
     pin: &DataPointPin,
-    operants: &[(Dlog, OpenDataPoint)],
+    operants: &[(Dlog, &OpenDataPoint)],
     similarity: Similarity,
+    merge_time: SystemTime,
 ) -> VectorR<OpenDataPoint>
 where
     Dlog: DeleteLog,
@@ -242,7 +243,7 @@ where
     let journal = Journal {
         nodes: no_nodes,
         uid: data_point_id,
-        ctime: SystemTime::now(),
+        ctime: merge_time,
     };
 
     {

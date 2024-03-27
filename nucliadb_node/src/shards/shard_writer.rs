@@ -168,6 +168,7 @@ impl ShardWriter {
             path: path.join(VECTORS_DIR),
             vectorset: path.join(VECTORSET_DIR),
             channel,
+            shard_id: metadata.id(),
         };
         let rsc = RelationConfig {
             path: path.join(RELATIONS_DIR),
@@ -199,6 +200,7 @@ impl ShardWriter {
             path: path.join(VECTORS_DIR),
             vectorset: path.join(VECTORSET_DIR),
             channel,
+            shard_id: metadata.id(),
         };
         let rsc = RelationConfig {
             path: path.join(RELATIONS_DIR),
@@ -450,10 +452,18 @@ impl ShardWriter {
 
     #[tracing::instrument(skip_all)]
     pub fn merge(&self, context: MergeContext) -> NodeResult<MergeMetrics> {
-        let result = write_rw_lock(&self.vector_writer).merge(context);
+        let runner = read_rw_lock(&self.vector_writer).prepare_merge(context.parameters)?;
+        let Some(mut runner) = runner else {
+            return Ok(MergeMetrics {
+                merged: 0,
+                left: 0,
+            });
+        };
+        let merge_result = runner.run()?;
+        let metrics = write_rw_lock(&self.vector_writer).record_merge(merge_result, context.source)?;
         self.metadata.new_generation_id();
 
-        result
+        Ok(metrics)
     }
 
     /// This must be used only by replication and should be

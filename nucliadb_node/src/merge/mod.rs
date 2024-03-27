@@ -18,12 +18,10 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-pub mod errors;
 mod global;
-mod request;
 mod scheduler;
 mod work;
 
 pub use global::{global_merger, install_global, stop_global_merger};
-pub use request::{MergePriority, MergeRequest, MergeWaiter};
+pub use nucliadb_core::merge::{MergePriority, MergeRequest, MergeWaiter, MERGE_PRIORITIES};
 pub use scheduler::MergeScheduler;
