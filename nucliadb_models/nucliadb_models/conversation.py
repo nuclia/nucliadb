@@ -44,6 +44,7 @@ class MessageFormat(Enum):  # type: ignore
     HTML = "HTML"
     RST = "RST"
     MARKDOWN = "MARKDOWN"
+    KEEP_MARKDOWN = "KEEP_MARKDOWN"
 
 
 # Visualization classes (Those used on reader endpoints)

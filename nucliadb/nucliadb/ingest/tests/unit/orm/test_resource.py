@@ -123,6 +123,7 @@ def test_maybe_update_basic_thumbnail(basic, thumbnail, updated):
         (FieldText.Format.HTML, "text/html"),
         (FieldText.Format.RST, "text/x-rst"),
         (FieldText.Format.MARKDOWN, "text/markdown"),
+        (FieldText.Format.KEEP_MARKDOWN, "text/markdown"),
     ],
 )
 def test_get_text_field_mimetype(text_format, mimetype):
