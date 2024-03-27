@@ -26,6 +26,7 @@ from google.protobuf.internal.containers import MessageMap
 from nucliadb_protos.noderesources_pb2 import IndexParagraph as BrainParagraph
 from nucliadb_protos.noderesources_pb2 import ParagraphMetadata
 from nucliadb_protos.noderesources_pb2 import Position as TextPosition
+from nucliadb_protos.noderesources_pb2 import Representation
 from nucliadb_protos.noderesources_pb2 import Resource as PBBrainResource
 from nucliadb_protos.noderesources_pb2 import ResourceID
 from nucliadb_protos.resources_pb2 import (
@@ -136,8 +137,22 @@ class ResourceBrain:
                     start_seconds=paragraph.start_seconds,
                     end_seconds=paragraph.end_seconds,
                 )
-                if paragraph_pages:
+                page_with_visual = False
+                if paragraph.HasField("page"):
+                    position.page_number = paragraph.page.page
+                    page_with_visual = paragraph.page.page_with_visual
+                    position.in_page = True
+                elif paragraph_pages:
                     position.page_number = paragraph_pages.get(paragraph.start)
+                    position.in_page = True
+                else:
+                    position.in_page = False
+
+                representation = Representation()
+                if paragraph.HasField("representation"):
+                    representation.file = paragraph.representation.reference_file
+                    representation.is_a_table = paragraph.representation.is_a_table
+
                 p = BrainParagraph(
                     start=paragraph.start,
                     end=paragraph.end,
@@ -150,7 +165,14 @@ class ResourceBrain:
                         unique_paragraphs,
                         split=subfield,
                     ),
-                    metadata=ParagraphMetadata(position=position),
+                    metadata=ParagraphMetadata(
+                        position=position,
+                        page_with_visual=page_with_visual,
+                        representation=representation,
+                    ),
+                )
+                p.labels.append(
+                    f"/k/{Paragraph.TypeParagraph.Name(paragraph.kind).lower()}"
                 )
                 for classification in paragraph.classifications:
                     label = f"/l/{classification.labelset}/{classification.label}"
@@ -172,8 +194,22 @@ class ResourceBrain:
                 start_seconds=paragraph.start_seconds,
                 end_seconds=paragraph.end_seconds,
             )
-            if paragraph_pages:
+            page_with_visual = False
+            if paragraph.HasField("page"):
+                position.page_number = paragraph.page.page
+                position.in_page = True
+                page_with_visual = paragraph.page.page_with_visual
+            elif paragraph_pages:
                 position.page_number = paragraph_pages.get(paragraph.start)
+                position.in_page = True
+            else:
+                position.in_page = False
+
+            representation = Representation()
+            if paragraph.HasField("representation"):
+                representation.file = paragraph.representation.reference_file
+                representation.is_a_table = paragraph.representation.is_a_table
+
             p = BrainParagraph(
                 start=paragraph.start,
                 end=paragraph.end,
@@ -182,8 +218,16 @@ class ResourceBrain:
                 repeated_in_field=is_paragraph_repeated_in_field(
                     paragraph, extracted_text, unique_paragraphs
                 ),
-                metadata=ParagraphMetadata(position=position),
+                metadata=ParagraphMetadata(
+                    position=position,
+                    page_with_visual=page_with_visual,
+                    representation=representation,
+                ),
             )
+            p.labels.append(
+                f"/k/{Paragraph.TypeParagraph.Name(paragraph.kind).lower()}"
+            )
+
             for classification in paragraph.classifications:
                 label = f"/l/{classification.labelset}/{classification.label}"
                 if label not in denied_classifications:
@@ -268,6 +312,19 @@ class ResourceBrain:
                 ssentence.metadata.position.page_number = (
                     sparagraph.metadata.position.page_number
                 )
+                ssentence.metadata.position.in_page = (
+                    sparagraph.metadata.position.in_page
+                )
+                ssentence.metadata.page_with_visual = (
+                    sparagraph.metadata.page_with_visual
+                )
+
+                ssentence.metadata.representation.file = (
+                    sparagraph.metadata.representation.file
+                )
+                ssentence.metadata.representation.is_a_table = (
+                    sparagraph.metadata.representation.is_a_table
+                )
                 ssentence.metadata.position.index = sparagraph.metadata.position.index
 
         for index, vector in enumerate(vo.vectors.vectors):
@@ -288,6 +345,17 @@ class ResourceBrain:
             sentence.metadata.position.page_number = (
                 paragraph.metadata.position.page_number
             )
+            sentence.metadata.position.in_page = paragraph.metadata.position.in_page
+
+            sentence.metadata.page_with_visual = paragraph.metadata.page_with_visual
+
+            sentence.metadata.representation.file = (
+                paragraph.metadata.representation.file
+            )
+            sentence.metadata.representation.is_a_table = (
+                paragraph.metadata.representation.is_a_table
+            )
+
             sentence.metadata.position.index = paragraph.metadata.position.index
 
         for split in replace_splits:

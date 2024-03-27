@@ -229,6 +229,34 @@ class EntitySubgraph(BaseModel):
 #     path: List[DirectionalRelation]
 
 
+class SentenceSearch(BaseModel):
+    data: List[float] = []
+    time: float
+
+
+class Ner(BaseModel):
+    text: str
+    ner: str
+    start: int
+    end: int
+
+
+class TokenSearch(BaseModel):
+    tokens: List[Ner] = []
+    time: float
+
+
+class QueryInfo(BaseModel):
+    language: Optional[str] = None
+    stop_words: List[str] = []
+    semantic_threshold: Optional[float] = None
+    visual_llm: bool
+    max_context: int
+    entities: TokenSearch
+    sentence: SentenceSearch
+    query: str
+
+
 class Relations(BaseModel):
     entities: Dict[str, EntitySubgraph]
     # TODO: implement in the next iteration of knowledge graph search
@@ -571,6 +599,11 @@ class SearchParamDefaults:
         title="Security groups",
         description="List of security groups to filter search results for. Only resources matching the query and containing the specified security groups will be returned. If empty, all resources will be considered for the search.",  # noqa
     )
+    rephrase = ParamDefault(
+        default=False,
+        title="Rephrase query consuming LLMs",
+        description="Rephrase query consuming LLMs - it will make the query slower",  # noqa
+    )
 
 
 class Filter(BaseModel):
@@ -682,6 +715,12 @@ class BaseSearchRequest(BaseModel):
         RequestSecurity
     ] = SearchParamDefaults.security.to_pydantic_field()
 
+    rephrase: Optional[bool] = Field(
+        default=False,
+        title="Rephrase the query to improve search",
+        description="Consume LLM tokens to rephrase the query so the semantic search is better",
+    )
+
 
 class SearchRequest(BaseSearchRequest):
     faceted: List[str] = SearchParamDefaults.faceted.to_pydantic_field()
@@ -708,6 +747,11 @@ Message = ChatContextMessage
 
 class UserPrompt(BaseModel):
     prompt: str
+
+
+class Image(BaseModel):
+    content_type: str
+    b64encoded: str
 
 
 class ChatModel(BaseModel):
@@ -746,6 +790,15 @@ class ChatModel(BaseModel):
         description="The generative model to use for the predict chat endpoint. If not provided, the model configured for the Knowledge Box is used.",
     )
 
+    max_tokens: Optional[int] = Field(
+        default=None, description="Maximum characters to generate"
+    )
+
+    query_context_images: Dict[str, Image] = Field(
+        default={},
+        description="The information retrieval context for the current query, each image is a base64 encoded string",
+    )
+
 
 class RephraseModel(BaseModel):
     question: str
@@ -770,9 +823,19 @@ class AskDocumentModel(BaseModel):
 class RagStrategyName:
     FIELD_EXTENSION = "field_extension"
     FULL_RESOURCE = "full_resource"
+    HIERARCHY = "hierarchy"
+
+
+class ImageRagStrategyName:
+    PAGE_IMAGE = "page_image"
+    TABLES = "tables"
 
 
 class RagStrategy(BaseModel):
+    name: str
+
+
+class ImageRagStrategy(BaseModel):
     name: str
 
 
@@ -827,13 +890,49 @@ class FieldExtensionStrategy(RagStrategy):
 
 class FullResourceStrategy(RagStrategy):
     name: Literal["full_resource"]
+    count: Optional[int] = Field(
+        title="Resources",
+        default=None,
+        description="How many full documents to retrieve",
+    )
+
+
+class HierarchyResourceStrategy(RagStrategy):
+    name: Literal["hierarchy"]
+    count: Optional[int] = Field(
+        title="Resources",
+        default=None,
+        description="Levels of distance that is added to the context",
+    )
+
+
+class TableImageStrategy(ImageRagStrategy):
+    name: Literal["tables"]
+
+
+class PageImageStrategy(ImageRagStrategy):
+    name: Literal["page_image"]
+    count: Optional[int] = Field(
+        title="Images",
+        default=None,
+        description="How many images to retrieve",
+    )
+
+
+class ParagraphImageStrategy(ImageRagStrategy):
+    name: Literal["paragraph_image"]
 
 
 RagStrategies = Annotated[
-    Union[FieldExtensionStrategy, FullResourceStrategy], Field(discriminator="name")
+    Union[FieldExtensionStrategy, FullResourceStrategy, HierarchyResourceStrategy],
+    Field(discriminator="name"),
+]
+RagImagesStrategies = Annotated[
+    Union[PageImageStrategy, ParagraphImageStrategy], Field(discriminator="name")
 ]
 PromptContext = dict[str, str]
 PromptContextOrder = dict[str, int]
+PromptContextImages = dict[str, Image]
 
 
 class ChatRequest(BaseModel):
@@ -902,12 +1001,29 @@ class ChatRequest(BaseModel):
         title="RAG context building strategies",
         description="Options for tweaking how the context for the LLM model is crafted. `full_resource` will add the full text of the matching resources to the context. `field_extension` will add the text of the matching resource's specified fields to the context. If empty, the default strategy is used.",  # noqa
     )
+    rag_images_strategies: list[RagImagesStrategies] = Field(
+        default=[],
+        title="RAG image context building strategies",
+        description="Options for tweaking how the image based context for the LLM model is crafted. `page_image` will add the full page image of the matching resources to the context. If empty, the default strategy is used with the image of the paragraph.",  # noqa
+    )
     debug: bool = SearchParamDefaults.debug.to_pydantic_field()
 
     generative_model: Optional[str] = Field(
         default=None,
         title="Generative model",
         description="The generative model to use for the chat endpoint. If not provided, the model configured for the Knowledge Box is used.",
+    )
+
+    max_tokens: Optional[int] = Field(
+        default=None,
+        title="Maximum tokens to generate",
+        description="The maximum amount of tokens to generate by the LLM",
+    )
+
+    rephrase: Optional[bool] = Field(
+        default=False,
+        title="Rephrase the query to improve search",
+        description="Consume LLM tokens to rephrase the query so the semantic search is better",
     )
 
     @root_validator(pre=True)
@@ -1048,6 +1164,21 @@ class FindParagraph(BaseModel):
     labels: Optional[List[str]] = []
     position: Optional[TextPosition] = None
     fuzzy_result: bool = False
+    page_with_visual: bool = Field(
+        default=False,
+        title="Page where this paragraph belongs is a visual page",
+        description="This flag informs if the page may have information that has not been extracted",
+    )
+    reference: Optional[str] = Field(
+        default=None,
+        title="Reference to the image that represents this text",
+        description="Reference to the extracted image that represents this paragraph",
+    )
+    is_a_table: bool = Field(
+        default=False,
+        title="Is a table",
+        description="The referenced image of the paragraph is a table",
+    )
 
 
 @dataclass
@@ -1063,6 +1194,9 @@ class TempFindParagraph:
     vector_index: Optional[DocumentScored] = None
     paragraph_index: Optional[PBParagraphResult] = None
     fuzzy_result: bool = False
+    page_with_visual: bool = False
+    reference: Optional[str] = None
+    is_a_table: bool = False
 
 
 class FindField(BaseModel):

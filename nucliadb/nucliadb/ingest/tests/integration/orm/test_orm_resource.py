@@ -156,6 +156,68 @@ async def test_iterate_paragraphs(
 
 
 @pytest.mark.asyncio
+async def test_paragraphs_with_page(
+    storage, txn, cache, fake_node, knowledgebox_ingest: str
+):
+    # Create a resource
+    basic = PBBasic(
+        icon="text/plain",
+        title="My title",
+        summary="My summary",
+        thumbnail="/file",
+        layout="basic",
+    )
+    basic.metadata.metadata["key"] = "value"
+    basic.metadata.language = "ca"
+    basic.metadata.useful = True
+    basic.metadata.status = PBMetadata.Status.PROCESSED
+
+    uuid = str(uuid4())
+    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
+    r = await kb_obj.add_resource(uuid=uuid, slug="slug", basic=basic)
+    assert r is not None
+
+    # Add some labelled paragraphs to it
+    bm = BrokerMessage()
+    field1_if = FieldID()
+    field1_if.field = "field1"
+    field1_if.field_type = FieldType.TEXT
+    fcmw = FieldComputedMetadataWrapper()
+    fcmw.field.CopyFrom(field1_if)
+    p1 = Paragraph()
+    p1.start = 0
+    p1.end = 82
+    p1.classifications.append(Classification(labelset="ls1", label="label1"))
+    p1.page.page = 3
+    p1.page.page_with_visual = True
+    p1.representation.is_a_table = True
+    p1.representation.reference_file = "myfile"
+    p2 = Paragraph()
+    p2.start = 84
+    p2.end = 103
+    p2.classifications.append(Classification(labelset="ls1", label="label2"))
+    fcmw.metadata.metadata.paragraphs.append(p1)
+    fcmw.metadata.metadata.paragraphs.append(p2)
+    bm.field_metadata.append(fcmw)
+    await r.apply_extracted(bm)
+    resource_brain = await r.generate_index_message()
+    for metadata in resource_brain.brain.paragraphs["t/field1"].paragraphs.values():
+        if metadata.start == 84:
+            assert metadata.metadata.position.in_page is False
+            assert metadata.metadata.position.page_number == 0
+            assert metadata.metadata.page_with_visual is False
+            assert metadata.metadata.representation.is_a_table is False
+            assert metadata.metadata.representation.file == ""
+
+        if metadata.start == 0:
+            assert metadata.metadata.position.in_page is True
+            assert metadata.metadata.position.page_number == 3
+            assert metadata.metadata.page_with_visual is True
+            assert metadata.metadata.representation.is_a_table is True
+            assert metadata.metadata.representation.file == "myfile"
+
+
+@pytest.mark.asyncio
 async def test_vector_duplicate_fields(
     storage, txn, cache, fake_node, knowledgebox_ingest: str
 ):

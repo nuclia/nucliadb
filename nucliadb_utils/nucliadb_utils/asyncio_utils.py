@@ -69,6 +69,12 @@ async def run_concurrently(
     Runs a list of coroutines concurrently, with a maximum number of tasks running.
     Returns the results of the coroutines in the order they were scheduled.
     """
+    if len(tasks) == 0:
+        return []
+
+    if len(tasks) == 1:
+        return [await tasks[0]]
+
     runner = ConcurrentRunner(max_tasks=max_concurrent)
     for task in tasks:
         runner.schedule(task)

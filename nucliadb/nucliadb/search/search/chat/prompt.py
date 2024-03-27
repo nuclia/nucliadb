@@ -17,7 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional, Sequence
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Sequence, Tuple
 
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
@@ -26,11 +27,16 @@ from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.middleware.transaction import get_read_only_transaction
 from nucliadb.search import logger
+from nucliadb.search.search import paragraphs
+from nucliadb.search.search.chat.images import get_page_image, get_paragraph_image
 from nucliadb_models.search import (
     SCORE_TYPE,
     FindParagraph,
+    ImageRagStrategy,
+    ImageRagStrategyName,
     KnowledgeboxFindResults,
     PromptContext,
+    PromptContextImages,
     PromptContextOrder,
     RagStrategy,
     RagStrategyName,
@@ -48,42 +54,32 @@ MAX_RESOURCE_FIELD_TASKS = 4
 CONVERSATION_MESSAGE_CONTEXT_EXPANSION = 15
 
 
-class MaxContextSizeExceeded(Exception):
-    pass
-
-
 class CappedPromptContext:
     """
     Class to keep track of the size of the prompt context and raise an exception if it exceeds the configured limit.
+
+    This class will automatically trim data that exceeds the limit when it's being set on the dictionary.
     """
 
     def __init__(self, max_size: Optional[int]):
         self.output: PromptContext = {}
+        self.images: PromptContextImages = {}
         self.max_size = max_size
         self._size = 0
 
-    def _check_size(self, size_delta: int = 0):
+    def __setitem__(self, key: str, value: str) -> None:
         if self.max_size is None:
-            # No limit on the size of the context
-            return
-        if self._size + size_delta > self.max_size:
-            raise MaxContextSizeExceeded(
-                f"Prompt context size exceeded: {self.max_size}"
-            )
-
-    def __setitem__(self, key, value):
-        try:
-            # Existing key
-            size_delta = len(value) - len(self.output[key])
-        except KeyError:
-            # New key
-            size_delta = len(value)
-        self._check_size(size_delta)
-        self._size += size_delta
-        self.output[key] = value
+            self.output[key] = value
+        else:
+            existing_len = len(self.output.get(key, ""))
+            self._size -= existing_len
+            size_available = self.max_size - self._size
+            if size_available > 0:
+                self.output[key] = value[:size_available]
+                self._size += len(self.output[key])
 
     @property
-    def size(self):
+    def size(self) -> int:
         return self._size
 
 
@@ -254,6 +250,7 @@ async def full_resource_prompt_context(
     context: CappedPromptContext,
     kbid: str,
     results: KnowledgeboxFindResults,
+    number_of_full_resources: Optional[int] = None,
 ) -> None:
     """
     Algorithm steps:
@@ -273,7 +270,7 @@ async def full_resource_prompt_context(
     resource_extracted_texts = await run_concurrently(
         [
             get_resource_extracted_texts(kbid, resource_uuid)
-            for resource_uuid in ordered_resources
+            for resource_uuid in ordered_resources[:number_of_full_resources]
         ],
         max_concurrent=MAX_RESOURCE_TASKS,
     )
@@ -341,13 +338,17 @@ class PromptContextBuilder:
         find_results: KnowledgeboxFindResults,
         user_context: Optional[list[str]] = None,
         strategies: Optional[Sequence[RagStrategy]] = None,
+        image_strategies: Optional[Sequence[ImageRagStrategy]] = None,
         max_context_size: Optional[int] = None,
+        visual_llm: bool = False,
     ):
         self.kbid = kbid
         self.find_results = find_results
         self.user_context = user_context
         self.strategies = strategies
+        self.image_strategies = image_strategies
         self.max_context_size = max_context_size
+        self.visual_llm = visual_llm
 
     def prepend_user_context(self, context: CappedPromptContext):
         # Chat extra context passed by the user is the most important, therefore
@@ -355,37 +356,89 @@ class PromptContextBuilder:
         for i, text_block in enumerate(self.user_context or []):
             context[f"USER_CONTEXT_{i}"] = text_block
 
-    async def build(self) -> tuple[PromptContext, PromptContextOrder]:
+    async def build(
+        self,
+    ) -> tuple[PromptContext, PromptContextOrder, PromptContextImages]:
         ccontext = CappedPromptContext(max_size=self.max_context_size)
-        try:
-            self.prepend_user_context(ccontext)
-            await self._build_context(ccontext)
-        except MaxContextSizeExceeded:
-            logger.warning(
-                f"Prompt context size exceeded: {ccontext.size}."
-                f"The context will be truncated to the maximum size: {self.max_context_size}."
-            )
+        self.prepend_user_context(ccontext)
+        await self._build_context(ccontext)
+
+        if self.visual_llm:
+            await self._build_context_images(ccontext)
+
         context = ccontext.output
+        context_images = ccontext.images
         context_order = {
             text_block_id: order for order, text_block_id in enumerate(context.keys())
         }
-        return context, context_order
+        return context, context_order, context_images
+
+    async def _build_context_images(self, context: CappedPromptContext) -> None:
+        ordered_paras = get_ordered_paragraphs(self.find_results)
+        flatten_strategies = []
+        page_count = 5
+        gather_pages = False
+        gather_tables = False
+        if self.image_strategies is not None:
+            for strategy in self.image_strategies:
+                flatten_strategies.append(strategy.name)
+                if strategy.name == ImageRagStrategyName.PAGE_IMAGE:
+                    gather_pages = True
+                    if strategy.count is not None:  # type: ignore
+                        page_count = strategy.count  # type: ignore
+                if strategy.name == ImageRagStrategyName.TABLES:
+                    gather_tables = True
+
+        for paragraph in ordered_paras:
+            if paragraph.page_with_visual and paragraph.position:
+                if (
+                    gather_pages
+                    and paragraph.position.page_number
+                    and len(context.images) < page_count
+                ):
+                    field = "/".join(paragraph.id.split("/")[:3])
+                    page = paragraph.position.page_number
+                    page_id = f"{field}/{page}"
+                    if page_id not in context.images:
+                        context.images[page_id] = await get_page_image(
+                            self.kbid, paragraph.id, page
+                        )
+            if (
+                gather_tables
+                and paragraph.is_a_table
+                and paragraph.reference
+                and paragraph.reference != ""
+            ):
+                image = paragraph.reference
+                context.images[paragraph.id] = await get_paragraph_image(
+                    self.kbid, paragraph.id, image
+                )
 
     async def _build_context(self, context: CappedPromptContext) -> None:
         if self.strategies is None or len(self.strategies) == 0:
             await default_prompt_context(context, self.kbid, self.find_results)
             return
 
-        full_resource = False
+        number_of_full_resources = 0
+        distance = 0
         extend_with_fields = []
         for strategy in self.strategies:
             if strategy.name == RagStrategyName.FIELD_EXTENSION:
                 extend_with_fields.extend(strategy.fields)  # type: ignore
             elif strategy.name == RagStrategyName.FULL_RESOURCE:
-                full_resource = True
+                number_of_full_resources = strategy.count or self.find_results.total  # type: ignore
+            elif strategy.name == RagStrategyName.HIERARCHY:
+                distance = strategy.count  # type: ignore
 
-        if full_resource:
-            await full_resource_prompt_context(context, self.kbid, self.find_results)
+        if number_of_full_resources:
+            await full_resource_prompt_context(
+                context, self.kbid, self.find_results, number_of_full_resources
+            )
+            return
+
+        if distance > 0:
+            await get_extra_chars(self.kbid, self.find_results, distance)
+            await default_prompt_context(context, self.kbid, self.find_results)
             return
 
         await composed_prompt_context(
@@ -395,6 +448,74 @@ class PromptContextBuilder:
             extend_with_fields=extend_with_fields,
         )
         return
+
+
+@dataclass
+class ExtraCharsParagraph:
+    title: str
+    summary: str
+    paragraphs: List[Tuple[FindParagraph, str]]
+
+
+async def get_extra_chars(
+    kbid: str, find_results: KnowledgeboxFindResults, distance: int
+):
+    etcache = paragraphs.ExtractedTextCache()
+    resources: Dict[str, ExtraCharsParagraph] = {}
+    for paragraph in get_ordered_paragraphs(find_results):
+        rid, field_type, field = paragraph.id.split("/")[:3]
+        field_path = "/".join([rid, field_type, field])
+        position = paragraph.id.split("/")[-1]
+        start, end = position.split("-")
+        int_start = int(start)
+        int_end = int(end) + distance
+
+        new_text = await paragraphs.get_paragraph_text(
+            kbid=kbid,
+            rid=rid,
+            field=field_path,
+            start=int_start,
+            end=int_end,
+            extracted_text_cache=etcache,
+        )
+        if rid not in resources:
+            title_text = await paragraphs.get_paragraph_text(
+                kbid=kbid,
+                rid=rid,
+                field="/a/title",
+                start=0,
+                end=500,
+                extracted_text_cache=etcache,
+            )
+            summary_text = await paragraphs.get_paragraph_text(
+                kbid=kbid,
+                rid=rid,
+                field="/a/summary",
+                start=0,
+                end=1000,
+                extracted_text_cache=etcache,
+            )
+            resources[rid] = ExtraCharsParagraph(
+                title=title_text,
+                summary=summary_text,
+                paragraphs=[(paragraph, new_text)],
+            )
+        else:
+            resources[rid].paragraphs.append((paragraph, new_text))  # type: ignore
+
+    for key, values in resources.items():
+        title_text = values.title
+        summary_text = values.summary
+        first_paragraph = None
+        text = ""
+        for paragraph, text in values.paragraphs:
+            if first_paragraph is None:
+                first_paragraph = paragraph
+            text += "EXTRACTED BLOCK: \n " + text + " \n\n "
+            paragraph.text = ""
+
+        if first_paragraph is not None:
+            first_paragraph.text = f"DOCUMENT: {title_text} \n SUMMARY: {summary_text} \n RESOURCE CONTENT: {text}"
 
 
 def _clean_paragraph_text(paragraph: FindParagraph) -> str:

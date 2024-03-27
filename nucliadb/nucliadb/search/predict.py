@@ -33,10 +33,14 @@ from nucliadb_models.search import (
     AskDocumentModel,
     ChatModel,
     FeedbackRequest,
+    Ner,
+    QueryInfo,
     RephraseModel,
+    SentenceSearch,
     SummarizedResource,
     SummarizedResponse,
     SummarizeModel,
+    TokenSearch,
 )
 from nucliadb_telemetry import metrics
 from nucliadb_utils import const
@@ -87,6 +91,7 @@ PRIVATE_PREDICT = "/api/internal/predict"
 VERSIONED_PRIVATE_PREDICT = "/api/v1/internal/predict"
 SENTENCE = "/sentence"
 TOKENS = "/tokens"
+QUERY = "/query"
 SUMMARIZE = "/summarize"
 CHAT = "/chat"
 ASK_DOCUMENT = "/ask_document"
@@ -328,6 +333,37 @@ class PredictEngine:
         await self.check_response(resp, expected_status=200)
         return await resp.text()
 
+    @predict_observer.wrap({"type": "query"})
+    async def query(
+        self,
+        kbid: str,
+        sentence: str,
+        generative_model: Optional[str] = None,
+        rephrase: Optional[bool] = False,
+    ) -> QueryInfo:
+        try:
+            self.check_nua_key_is_configured_for_onprem()
+        except NUAKeyMissingError:
+            error = (
+                "Nuclia Service account is not defined so could not ask query endpoint"
+            )
+            logger.warning(error)
+            raise SendToPredictError(error)
+
+        resp = await self.make_request(
+            "GET",
+            url=self.get_predict_url(QUERY, kbid),
+            params={
+                "text": sentence,
+                "generative_model": generative_model,
+                "rephrase": str(rephrase),
+            },
+            headers=self.get_predict_headers(kbid),
+        )
+        await self.check_response(resp, expected_status=200)
+        data = await resp.json()
+        return QueryInfo(**data)
+
     @predict_observer.wrap({"type": "sentence"})
     async def convert_sentence_to_vector(self, kbid: str, sentence: str) -> list[float]:
         try:
@@ -402,6 +438,7 @@ class DummyPredictEngine(PredictEngine):
             b" to",
             AnswerStatusCode.SUCCESS.encode(),
         ]
+        self.max_context = 1000
 
     async def initialize(self):
         pass
@@ -450,6 +487,43 @@ class DummyPredictEngine(PredictEngine):
         self.calls.append(("ask_document", (query, blocks, user_id)))
         answer = os.environ.get("TEST_ASK_DOCUMENT") or "Answer to your question"
         return answer
+
+    async def query(
+        self,
+        kbid: str,
+        sentence: str,
+        generative_model: Optional[str] = None,
+        rephrase: Optional[bool] = False,
+    ) -> QueryInfo:
+        self.calls.append(("query", sentence))
+        if (
+            os.environ.get("TEST_SENTENCE_ENCODER") == "multilingual-2023-02-21"
+        ):  # pragma: no cover
+            return QueryInfo(
+                language="en",
+                stop_words=[],
+                semantic_threshold=0.7,
+                visual_llm=True,
+                max_context=self.max_context,
+                entities=TokenSearch(
+                    tokens=[Ner(text="text", ner="PERSON", start=0, end=2)], time=0.0
+                ),
+                sentence=SentenceSearch(data=Qm2023, time=0.0),
+                query=sentence,
+            )
+        else:
+            return QueryInfo(
+                language="en",
+                stop_words=[],
+                semantic_threshold=0.7,
+                visual_llm=True,
+                max_context=self.max_context,
+                entities=TokenSearch(
+                    tokens=[Ner(text="text", ner="PERSON", start=0, end=2)], time=0.0
+                ),
+                sentence=SentenceSearch(data=Q, time=0.0),
+                query=sentence,
+            )
 
     async def convert_sentence_to_vector(self, kbid: str, sentence: str) -> list[float]:
         self.calls.append(("convert_sentence_to_vector", sentence))

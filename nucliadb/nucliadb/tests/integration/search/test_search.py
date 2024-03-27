@@ -1203,7 +1203,7 @@ async def test_search_endpoints_handle_predict_errors(
         AsyncMock(side_effect=PredictVectorMissing()),
         AsyncMock(side_effect=SendToPredictError()),
     ):
-        predict_mock.convert_sentence_to_vector = convert_sentence_to_vector_mock
+        predict_mock.query = convert_sentence_to_vector_mock
         resp = await nucliadb_reader.post(
             f"/kb/{kbid}/{endpoint}",
             json={
@@ -1211,21 +1211,9 @@ async def test_search_endpoints_handle_predict_errors(
                 "query": "something",
             },
         )
-        assert resp.status_code == 206
+        assert resp.status_code == 206, resp.text
         assert resp.reason_phrase == "Partial Content"
-        predict_mock.convert_sentence_to_vector.assert_awaited_once()
-
-    for detect_entities_mock in (AsyncMock(side_effect=SendToPredictError()),):
-        predict_mock.detect_entities = detect_entities_mock
-        resp = await nucliadb_reader.post(
-            f"/kb/{kbid}/{endpoint}",
-            json={
-                "features": ["relations"],
-                "query": "something",
-            },
-        )
-        assert resp.status_code == 200
-        predict_mock.detect_entities.assert_awaited_once()
+        predict_mock.query.assert_awaited_once()
 
 
 async def create_dummy_resources(

@@ -60,7 +60,8 @@ async def test_chat(
 @pytest.fixture(scope="function")
 def find_incomplete_results():
     with mock.patch(
-        "nucliadb.search.search.chat.query.find", return_value=(mock.MagicMock(), True)
+        "nucliadb.search.search.chat.query.find",
+        return_value=(mock.MagicMock(), True, None),
     ):
         yield
 
@@ -510,28 +511,29 @@ async def test_chat_capped_context(
     resp_data = SyncChatResponse.parse_raw(resp.content)
     assert resp_data.prompt_context is not None
     assert len(resp_data.prompt_context) == 6
-
+    total_size = sum(len(v) for v in resp_data.prompt_context.values())
     # Try now setting a smaller max size. It should be respected
-    max_size = 30
-    from nucliadb.search.settings import settings
+    max_size = 28
+    assert total_size > max_size * 3
 
-    with mock.patch.object(settings, "max_prompt_context_chars", max_size):
-        resp = await nucliadb_reader.post(
-            f"/kb/{knowledgebox}/chat",
-            json={
-                "query": "title",
-                "rag_strategies": [{"name": "full_resource"}],
-                "debug": True,
-            },
-            headers={"X-Synchronous": "True"},
-            timeout=None,
-        )
-        assert resp.status_code == 200
-        resp_data = SyncChatResponse.parse_raw(resp.content)
-        assert resp_data.prompt_context is not None
-        assert len(resp_data.prompt_context) < 6
-        total_size = sum(len(v) for v in resp_data.prompt_context.values())
-        assert total_size <= max_size
+    predict = get_predict()
+    predict.max_context = max_size  # type: ignore
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/chat",
+        json={
+            "query": "title",
+            "rag_strategies": [{"name": "full_resource"}],
+            "debug": True,
+        },
+        headers={"X-Synchronous": "True"},
+        timeout=None,
+    )
+    assert resp.status_code == 200, resp.text
+    resp_data = SyncChatResponse.parse_raw(resp.content)
+    assert resp_data.prompt_context is not None
+    total_size = sum(len(v) for v in resp_data.prompt_context.values())
+    assert total_size <= max_size * 3
 
 
 @pytest.mark.asyncio()

@@ -201,7 +201,7 @@ async def _find_endpoint(
     x_forwarded_for: str,
 ) -> Union[KnowledgeboxFindResults, HTTPClientError]:
     try:
-        results, incomplete = await find(
+        results, incomplete, _ = await find(
             kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
         )
         response.status_code = 206 if incomplete else 200

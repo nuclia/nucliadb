@@ -24,6 +24,7 @@ from nucliadb_protos.noderesources_pb2 import (
     NodeMetadata as NodeMetadata,
     ParagraphMetadata as ParagraphMetadata,
     Position as Position,
+    Representation as Representation,
     Resource as Resource,
     ResourceID as ResourceID,
     SentenceMetadata as SentenceMetadata,

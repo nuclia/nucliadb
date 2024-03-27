@@ -29,7 +29,11 @@ from nucliadb.common import datamanagers
 from nucliadb.ingest.orm.synonyms import Synonyms
 from nucliadb.middleware.transaction import get_read_only_transaction
 from nucliadb.search import logger
-from nucliadb.search.predict import PredictVectorMissing, SendToPredictError
+from nucliadb.search.predict import (
+    PredictVectorMissing,
+    SendToPredictError,
+    convert_relations,
+)
 from nucliadb.search.search.filters import (
     convert_to_node_filters,
     flat_filter_labels,
@@ -48,16 +52,21 @@ from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import (
     Filter,
     MinScore,
+    QueryInfo,
     SearchOptions,
+    SentenceSearch,
     SortField,
     SortFieldMap,
     SortOptions,
     SortOrder,
     SortOrderMap,
     SuggestOptions,
+    TokenSearch,
 )
 from nucliadb_models.security import RequestSecurity
 from nucliadb_protos import knowledgebox_pb2, nodereader_pb2, utils_pb2
+from nucliadb_utils import const
+from nucliadb_utils.utilities import has_feature
 
 from .exceptions import InvalidQueryError
 
@@ -78,6 +87,7 @@ class QueryParser:
     """
 
     _min_score_task: Optional[asyncio.Task] = None
+    _query_information_task: Optional[asyncio.Task] = None
     _convert_vectors_task: Optional[asyncio.Task] = None
     _detected_entities_task: Optional[asyncio.Task] = None
     _entities_meta_cache_task: Optional[asyncio.Task] = None
@@ -110,6 +120,8 @@ class QueryParser:
         autofilter: bool = False,
         key_filters: Optional[list[str]] = None,
         security: Optional[RequestSecurity] = None,
+        generative_model: Optional[str] = None,
+        rephrase: Optional[bool] = False,
     ):
         self.kbid = kbid
         self.features = features
@@ -134,6 +146,13 @@ class QueryParser:
         self.autofilter = autofilter
         self.key_filters = key_filters
         self.security = security
+        self.generative_model = generative_model
+        self.rephrase = rephrase
+        self.query_endpoint_enabled = has_feature(
+            const.Features.PREDICT_QUERY_ENDPOINT,
+            default=False,
+            context={"kbid": self.kbid},
+        )
 
         if len(self.filters) > 0:
             self.filters = translate_label_filters(self.filters)
@@ -152,6 +171,27 @@ class QueryParser:
                 convert_vectors(self.kbid, self.query)
             )
         return self._convert_vectors_task
+
+    def _get_query_information(self) -> Awaitable[QueryInfo]:
+        if self.query_endpoint_enabled is False:
+            # XXX Can be removed once query endpoint is fully enabled
+            async def static_query():
+                return QueryInfo(
+                    visual_llm=False,
+                    max_context=300_000,
+                    entities=TokenSearch(tokens=[], time=0.0),
+                    sentence=SentenceSearch(data=[], time=0.0),
+                    query=self.query,
+                )
+
+            return static_query()
+        if self._query_information_task is None:  # pragma: no cover
+            self._query_information_task = asyncio.create_task(
+                query_information(
+                    self.kbid, self.query, self.generative_model, self.rephrase
+                )
+            )
+        return self._query_information_task
 
     def _get_detected_entities(self) -> Awaitable[list[utils_pb2.RelationNode]]:
         if self._detected_entities_task is None:  # pragma: no cover
@@ -199,12 +239,23 @@ class QueryParser:
             asyncio.ensure_future(self._get_classification_labels())
         if self.min_score.semantic is None:
             asyncio.ensure_future(self._get_default_semantic_min_score())
+
         if SearchOptions.VECTOR in self.features and self.user_vector is None:
-            asyncio.ensure_future(self._get_converted_vectors())
+            if self.query_endpoint_enabled:
+                asyncio.ensure_future(self._get_query_information())
+            else:
+                asyncio.ensure_future(self._get_converted_vectors())
+
         if (SearchOptions.RELATIONS in self.features or self.autofilter) and len(
             self.query
         ) > 0:
-            asyncio.ensure_future(self._get_detected_entities())
+            if (
+                not self.query_endpoint_enabled
+                or SearchOptions.VECTOR not in self.features
+                or self.user_vector is not None
+            ):
+                self.query_endpoint_enabled = False
+                asyncio.ensure_future(self._get_detected_entities())
             asyncio.ensure_future(self._get_entities_meta_cache())
             asyncio.ensure_future(self._get_deleted_entity_groups())
         if self.with_synonyms and self.query:
@@ -353,14 +404,32 @@ class QueryParser:
             node_features.inc({"type": "vectorset"})
 
         if self.user_vector is None:
-            try:
-                request.vector.extend(await self._get_converted_vectors())
-            except SendToPredictError as err:
-                logger.warning(f"Errors on predict api trying to embedd query: {err}")
-                incomplete = True
-            except PredictVectorMissing:
-                logger.warning("Predict api returned an empty vector")
-                incomplete = True
+            if self.query_endpoint_enabled:
+                try:
+                    query_info = await self._get_query_information()
+                    if query_info and query_info.sentence:
+                        request.vector.extend(query_info.sentence.data)
+                    else:
+                        incomplete = True
+                except SendToPredictError as err:
+                    logger.warning(
+                        f"Errors on predict api trying to embedd query: {err}"
+                    )
+                    incomplete = True
+                except PredictVectorMissing:
+                    logger.warning("Predict api returned an empty vector")
+                    incomplete = True
+            else:
+                try:
+                    request.vector.extend(await self._get_converted_vectors())
+                except SendToPredictError as err:
+                    logger.warning(
+                        f"Errors on predict api trying to embedd query: {err}"
+                    )
+                    incomplete = True
+                except PredictVectorMissing:
+                    logger.warning("Predict api returned an empty vector")
+                    incomplete = True
         else:
             request.vector.extend(self.user_vector)
         return incomplete
@@ -371,7 +440,16 @@ class QueryParser:
         autofilters = []
         relations_search = SearchOptions.RELATIONS in self.features
         if relations_search or self.autofilter:
-            detected_entities = await self._get_detected_entities()
+            if not self.query_endpoint_enabled:
+                detected_entities = await self._get_detected_entities()
+            else:
+                query_info_result = await self._get_query_information()
+                if query_info_result.entities:
+                    detected_entities = convert_relations(
+                        query_info_result.entities.dict()
+                    )
+                else:
+                    detected_entities = []
             meta_cache = await self._get_entities_meta_cache()
             detected_entities = expand_entities(meta_cache, detected_entities)
             if relations_search:
@@ -429,6 +507,15 @@ class QueryParser:
         if len(synonyms_found):
             request.advanced_query = " OR ".join(advanced_query + synonyms_found)
             request.ClearField("body")
+
+    async def get_visual_llm_enabled(self) -> bool:
+        return (await self._get_query_information()).visual_llm
+
+    async def get_max_context(self) -> int:
+        # Multiple by 3 is to have a good margin and guess
+        # between characters and tokens. This will be fully properly
+        # cut at the NUA API.
+        return (await self._get_query_information()).max_context * 3
 
 
 async def paragraph_query_to_pb(
@@ -492,9 +579,20 @@ async def paragraph_query_to_pb(
 
 
 @query_parse_dependency_observer.wrap({"type": "convert_vectors"})
-async def convert_vectors(kbid: str, query: str) -> list[utils_pb2.RelationNode]:
+async def convert_vectors(kbid: str, query: str) -> list[float]:
     predict = get_predict()
     return await predict.convert_sentence_to_vector(kbid, query)
+
+
+@query_parse_dependency_observer.wrap({"type": "query_information"})
+async def query_information(
+    kbid: str,
+    query: str,
+    generative_model: Optional[str] = None,
+    rephrase: bool = False,
+) -> QueryInfo:
+    predict = get_predict()
+    return await predict.query(kbid, query, generative_model, rephrase)
 
 
 @query_parse_dependency_observer.wrap({"type": "detect_entities"})

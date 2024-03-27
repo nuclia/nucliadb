@@ -104,6 +104,8 @@ pub struct Position {
     /// For pdfs/documents only
     #[prost(uint64, tag="4")]
     pub page_number: u64,
+    #[prost(bool, tag="7")]
+    pub in_page: bool,
     /// For multimedia only
     #[prost(uint32, repeated, tag="5")]
     pub start_seconds: ::prost::alloc::vec::Vec<u32>,
@@ -111,9 +113,20 @@ pub struct Position {
     pub end_seconds: ::prost::alloc::vec::Vec<u32>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct Representation {
+    #[prost(bool, tag="1")]
+    pub is_a_table: bool,
+    #[prost(string, tag="2")]
+    pub file: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SentenceMetadata {
     #[prost(message, optional, tag="1")]
     pub position: ::core::option::Option<Position>,
+    #[prost(bool, tag="2")]
+    pub page_with_visual: bool,
+    #[prost(message, optional, tag="3")]
+    pub representation: ::core::option::Option<Representation>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct VectorSentence {
@@ -126,6 +139,10 @@ pub struct VectorSentence {
 pub struct ParagraphMetadata {
     #[prost(message, optional, tag="1")]
     pub position: ::core::option::Option<Position>,
+    #[prost(bool, tag="2")]
+    pub page_with_visual: bool,
+    #[prost(message, optional, tag="3")]
+    pub representation: ::core::option::Option<Representation>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IndexParagraph {
