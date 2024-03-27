@@ -191,6 +191,7 @@ class KBShardManager:
             # and report the error
             with errors.push_scope() as scope:
                 scope.set_extra("kbid", kbid)
+                scope.set_extra("total_shards", len(kb_shards.shards))
                 errors.capture_message(
                     "Migrated KB with no active shard!", "error", scope
                 )
@@ -200,6 +201,8 @@ class KBShardManager:
             # We keep being B/c with actual
             with errors.push_scope() as scope:
                 scope.set_extra("kbid", kbid)
+                scope.set_extra("total_shards", len(kb_shards.shards))
+                scope.set_extra("active_shards", len(active_shards))
                 errors.capture_message(
                     "Migrated KB with more than one active shard!", "error", scope
                 )
