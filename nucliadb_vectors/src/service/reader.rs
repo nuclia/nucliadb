@@ -80,7 +80,6 @@ impl VectorReader for VectorReaderService {
         }
     }
 
-    #[tracing::instrument(skip_all)]
     fn update(&mut self) -> NodeResult<()> {
         Ok(())
     }

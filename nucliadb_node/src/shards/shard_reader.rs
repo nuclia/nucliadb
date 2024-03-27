@@ -597,7 +597,6 @@ impl ShardReader {
         read_rw_lock(&self.text_reader).count()
     }
 
-    #[tracing::instrument(skip_all)]
     pub fn update(&self) -> NodeResult<()> {
         write_rw_lock(&self.vector_reader).update()
     }
