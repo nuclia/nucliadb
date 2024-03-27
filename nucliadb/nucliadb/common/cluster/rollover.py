@@ -221,11 +221,16 @@ async def index_rollover_shards(app_context: ApplicationContext, kbid: str) -> N
                 txn, kbid=kbid, rid=resource_id
             )
         if shard_id is None:
-            logger.error(
-                "Shard id not found for resource",
+            logger.warning(
+                "This resource has been deleted, skipping indexing",
                 extra={"kbid": kbid, "resource_id": resource_id},
             )
-            raise UnexpectedRolloverError("Shard id not found for resource")
+            async with datamanagers.with_transaction() as txn:
+                await datamanagers.rollover.remove_to_index(
+                    txn, kbid=kbid, resource=resource_id
+                )
+                await txn.commit()
+            continue
 
         shard = _get_shard(rollover_shards, shard_id)
         if shard is None:  # pragma: no cover
