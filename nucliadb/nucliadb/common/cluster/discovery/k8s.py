@@ -259,11 +259,11 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
                             continue
                         existing = self.node_id_cache[pod_name]
                         try:
-                            self.node_id_cache[pod_name] = (
-                                await self._query_node_metadata(
-                                    existing.address,
-                                    read_replica=existing.primary_id is not None,
-                                )
+                            self.node_id_cache[
+                                pod_name
+                            ] = await self._query_node_metadata(
+                                existing.address,
+                                read_replica=existing.primary_id is not None,
                             )
                         except NodeConnectionError:  # pragma: no cover
                             self._maybe_remove_stale_node(pod_name)
