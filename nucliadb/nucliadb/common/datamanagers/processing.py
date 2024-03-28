@@ -21,9 +21,6 @@ import logging
 from typing import Optional
 
 from nucliadb.common.maindb.driver import Transaction
-from nucliadb_protos import writer_pb2
-
-from .utils import get_kv_pb
 
 logger = logging.getLogger(__name__)
 
