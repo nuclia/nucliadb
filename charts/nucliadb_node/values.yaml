@@ -87,6 +87,7 @@ indexing:
 
 readReplicas:
   count: 0 # number of read replicas to deploy per node, by default, no read replicas
+  zoneAwarePlacement: false # Adds pod affinity rule for zone aware placement.
   affinity: {}
   nodeSelector: {}
   tolerations: []

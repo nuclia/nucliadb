@@ -57,6 +57,31 @@ spec:
 {{- if $values.readReplicas.affinity }}
       affinity:
 {{ toYaml $values.readReplicas.affinity | indent 8 }}
+{{- with $values.readReplicas.zoneAwarePlacement }}
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: statefulset.kubernetes.io/pod-name
+                operator: In
+                values:
+                - node-{{ $i }}
+            topologyKey: topology.kubernetes.io/zone
+{{- end }}
+{{- end }}
+{{- if not $values.readReplicas.affinity }}
+{{- with $values.readReplicas.zoneAwarePlacement }}
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: statefulset.kubernetes.io/pod-name
+                operator: In
+                values:
+                - node-{{ $i }}
+            topologyKey: topology.kubernetes.io/zone
+{{- end }}
 {{- end }}
 {{- if $values.readReplicas.tolerations }}
       tolerations:
