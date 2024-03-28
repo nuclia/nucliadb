@@ -146,7 +146,7 @@ class PullWorker:
                         )
 
                     data = await processing_http_client.pull(
-                        self.partition, cursor=cursor, timeout=2
+                        self.partition, cursor=cursor, timeout=5
                     )
                     if data.status == "ok":
                         logger.info(
