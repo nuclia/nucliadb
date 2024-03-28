@@ -47,7 +47,9 @@ def get_processing_api_url() -> str:
 class PullResponse(pydantic.BaseModel):
     status: str
     payload: Optional[str] = None
-    msgid: Optional[int] = None
+    payloads: list[bytes] = []
+    msgid: Optional[str] = None
+    cursor: Optional[int] = None
 
 
 class RequestsResult(pydantic.BaseModel):
@@ -156,9 +158,15 @@ class ProcessingHTTPClient:
     async def close(self):
         await self.session.close()
 
-    async def pull(self, partition: str) -> PullResponse:
-        url = self.base_url + "/pull?partition=" + partition
-        async with self.session.get(url, headers=self.headers) as resp:
+    async def pull(
+        self, partition: str, cursor: Optional[int] = None, limit: int = 3
+    ) -> PullResponse:
+        url = self.base_url + "/pull"
+        params = {"partition": partition, "limit": limit}
+        if cursor is not None:
+            params["from_cursor"] = cursor
+
+        async with self.session.get(url, headers=self.headers, params=params) as resp:
             resp_text = await resp.text()
             check_status(resp, resp_text)
             return PullResponse.parse_raw(resp_text)

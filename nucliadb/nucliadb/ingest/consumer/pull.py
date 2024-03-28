@@ -26,6 +26,7 @@ import nats.errors
 from aiohttp.client_exceptions import ClientConnectorError
 from nucliadb_protos.writer_pb2 import BrokerMessage, BrokerMessageBlobReference
 
+from nucliadb.common import datamanagers
 from nucliadb.common.http_clients.processing import ProcessingHTTPClient
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest import logger, logger_activity
@@ -138,20 +139,38 @@ class PullWorker:
         async with ProcessingHTTPClient() as processing_http_client:
             logger.info(f"Collecting from NucliaDB Cloud {self.partition} partition")
             while True:
+                async with datamanagers.with_transaction() as txn:
+                    cursor = await datamanagers.processing.get_pull_offset(
+                        txn, partition=self.partition
+                    )
+
                 try:
-                    data = await processing_http_client.pull(self.partition)
+                    data = await processing_http_client.pull(
+                        self.partition, cursor=cursor
+                    )
                     if data.status == "ok":
                         logger.info(
-                            f"Message {data.msgid} received from proxy, partition: {self.partition}"
+                            "Message received from proxy",
+                            extra={"partition": self.partition, "cursor": data.cursor},
                         )
                         try:
-                            await self.handle_message(data.payload)
+                            if data.payload is not None:
+                                await self.handle_message(data.payload)
+                            for payload in data.payloads:
+                                # If using cursors and multiple messages are returned, it will be in the
+                                # `payloads` property
+                                await self.handle_message(payload)
                         except Exception as e:
                             errors.capture_exception(e)
                             logger.exception(
-                                "Error while pulling and processing message"
+                                "Error while pulling and processing message/s"
                             )
                             raise e
+                        async with datamanagers.with_transaction() as txn:
+                            await datamanagers.processing.set_pull_offset(
+                                txn, partition=self.partition, offset=data.cursor
+                            )
+                        cursor = data.cursor
                     elif data.status == "empty":
                         logger_activity.debug(
                             f"No messages waiting in partition #{self.partition}"
