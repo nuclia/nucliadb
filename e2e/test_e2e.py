@@ -27,7 +27,24 @@ def kbid():
 
 
 @pytest.fixture(scope="session")
-def resource_id(kbid: str):
+def pull_offset():
+    """
+    Setup our pull consumer to start at end of queue and use ephemeral consumers
+    """
+    resp = requests.get(os.path.join(BASE_URL, "api/v1/pull/position"))
+    raise_for_status(resp)
+    end_offset = resp.json()["end_offset"]
+    resp = requests.patch(
+        os.path.join(BASE_URL, "api/v1/pull/position"),
+        headers={"content-type": "application/json"},
+        json={"cursor": end_offset},
+    )
+    raise_for_status(resp)
+    yield end_offset
+
+
+@pytest.fixture(scope="session")
+def resource_id(kbid: str, pull_offset: int):
     resp = requests.post(
         os.path.join(BASE_URL, f"api/v1/kb/{kbid}/resources"),
         headers={
@@ -90,11 +107,11 @@ def test_config_check(kbid: str):
     assert data["nua_api_key"]["valid"]
 
 
-@pytest.mark.skip(
-    reason="We can not count on this test working "
-    "because anyone using the NUA key can pull the data from the queue"
-)
-def test_resource_processed(kbid: str, resource_id: str):
+# @pytest.mark.skip(
+#     reason="We can not count on this test working "
+#     "because anyone using the NUA key can pull the data from the queue"
+# )
+def test_resource_processed(kbid: str, resource_id: str, pull_offset: int):
     start = time.time()
     while True:
         resp = requests.get(
@@ -112,7 +129,7 @@ def test_resource_processed(kbid: str, resource_id: str):
             break
 
         waited = time.time() - start
-        if waited > (60 * 20):
+        if waited > (60 * 10):
             raise Exception("Resource took too long to process")
 
         if int(waited) % 20 == 0 and int(waited) > 0:

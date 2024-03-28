@@ -52,6 +52,10 @@ class PullResponse(pydantic.BaseModel):
     cursor: Optional[int] = None
 
 
+class PullPosition(pydantic.BaseModel):
+    cursor: int
+
+
 class RequestsResult(pydantic.BaseModel):
     processing_id: str = pydantic.Field(
         ...,
@@ -159,10 +163,14 @@ class ProcessingHTTPClient:
         await self.session.close()
 
     async def pull(
-        self, partition: str, cursor: Optional[int] = None, limit: int = 3
+        self,
+        partition: str,
+        cursor: Optional[int] = None,
+        limit: int = 3,
+        timeout: int = 1,
     ) -> PullResponse:
         url = self.base_url + "/pull"
-        params = {"partition": partition, "limit": limit}
+        params = {"partition": partition, "limit": limit, "timeout": timeout}
         if cursor is not None:
             params["from_cursor"] = cursor
 
@@ -170,6 +178,15 @@ class ProcessingHTTPClient:
             resp_text = await resp.text()
             check_status(resp, resp_text)
             return PullResponse.parse_raw(resp_text)
+
+    async def pull_position(self, partition: str) -> int:
+        url = self.base_url + "/pull/position"
+        params = {"partition": partition}
+        async with self.session.get(url, headers=self.headers, params=params) as resp:
+            resp_text = await resp.text()
+            check_status(resp, resp_text)
+            data = PullPosition.parse_raw(resp_text)
+            return data.cursor
 
     async def requests(
         self,

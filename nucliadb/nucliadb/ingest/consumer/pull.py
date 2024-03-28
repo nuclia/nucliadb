@@ -139,14 +139,14 @@ class PullWorker:
         async with ProcessingHTTPClient() as processing_http_client:
             logger.info(f"Collecting from NucliaDB Cloud {self.partition} partition")
             while True:
-                async with datamanagers.with_transaction() as txn:
-                    cursor = await datamanagers.processing.get_pull_offset(
-                        txn, partition=self.partition
-                    )
-
                 try:
+                    async with datamanagers.with_transaction() as txn:
+                        cursor = await datamanagers.processing.get_pull_offset(
+                            txn, partition=self.partition
+                        )
+
                     data = await processing_http_client.pull(
-                        self.partition, cursor=cursor
+                        self.partition, cursor=cursor, timeout=2
                     )
                     if data.status == "ok":
                         logger.info(
@@ -170,7 +170,7 @@ class PullWorker:
                             await datamanagers.processing.set_pull_offset(
                                 txn, partition=self.partition, offset=data.cursor
                             )
-                        cursor = data.cursor
+                            await txn.commit()
                     elif data.status == "empty":
                         logger_activity.debug(
                             f"No messages waiting in partition #{self.partition}"
