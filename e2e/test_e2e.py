@@ -15,6 +15,8 @@ BASE_URL = os.environ.get("NUCLIADB_URL", "http://localhost:8080")
 def pull_offset():
     """
     Setup our pull consumer to start at end of queue and use ephemeral consumers
+
+    This allows us to pull data for the resource we're creating in this test
     """
     resp = requests.get(os.path.join(BASE_URL, "api/v1/pull/position"))
     raise_for_status(resp)
@@ -107,10 +109,6 @@ def test_config_check(kbid: str):
     assert data["nua_api_key"]["valid"]
 
 
-# @pytest.mark.skip(
-#     reason="We can not count on this test working "
-#     "because anyone using the NUA key can pull the data from the queue"
-# )
 def test_resource_processed(kbid: str, resource_id: str):
     start = time.time()
     while True:
