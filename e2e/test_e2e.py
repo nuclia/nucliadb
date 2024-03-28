@@ -12,7 +12,26 @@ BASE_URL = os.environ.get("NUCLIADB_URL", "http://localhost:8080")
 
 
 @pytest.fixture(scope="session")
-def kbid():
+def pull_offset():
+    """
+    Setup our pull consumer to start at end of queue and use ephemeral consumers
+
+    This allows us to pull data for the resource we're creating in this test
+    """
+    resp = requests.get(os.path.join(BASE_URL, "api/v1/pull/position"))
+    raise_for_status(resp)
+    end_offset = resp.json()["end_offset"]
+    resp = requests.patch(
+        os.path.join(BASE_URL, "api/v1/pull/position"),
+        headers={"content-type": "application/json"},
+        json={"cursor": end_offset - 1},
+    )
+    raise_for_status(resp)
+    yield end_offset
+
+
+@pytest.fixture(scope="session")
+def kbid(pull_offset: int):
     # generate random slug
     slug = "".join(random.choices("abcdefghijklmnopqrstuvwxyz", k=10))
     resp = requests.post(
@@ -90,10 +109,6 @@ def test_config_check(kbid: str):
     assert data["nua_api_key"]["valid"]
 
 
-@pytest.mark.skip(
-    reason="We can not count on this test working "
-    "because anyone using the NUA key can pull the data from the queue"
-)
 def test_resource_processed(kbid: str, resource_id: str):
     start = time.time()
     while True:
@@ -112,7 +127,7 @@ def test_resource_processed(kbid: str, resource_id: str):
             break
 
         waited = time.time() - start
-        if waited > (60 * 20):
+        if waited > (60 * 10):
             raise Exception("Resource took too long to process")
 
         if int(waited) % 20 == 0 and int(waited) > 0:
