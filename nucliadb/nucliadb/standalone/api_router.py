@@ -166,7 +166,7 @@ async def pull_status(request: Request) -> JSONResponse:
     async with datamanagers.with_transaction() as txn:
         # standalone assumes 1 partition
         current_offset = await datamanagers.processing.get_pull_offset(
-            txn, partition="1"
+            txn, pull_type_id=processing.get_nua_api_id(), partition="1"
         )
 
     async with processing.ProcessingHTTPClient() as client:
@@ -186,7 +186,10 @@ async def update_pull_position(
     async with datamanagers.with_transaction() as txn:
         # standalone assumes 1 partition
         await datamanagers.processing.set_pull_offset(
-            txn, partition="1", offset=item.cursor
+            txn,
+            pull_type_id=processing.get_nua_api_id(),
+            partition="1",
+            offset=item.cursor,
         )
         await txn.commit()
     return JSONResponse({})

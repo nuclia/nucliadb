@@ -27,7 +27,7 @@ from aiohttp.client_exceptions import ClientConnectorError
 from nucliadb_protos.writer_pb2 import BrokerMessage, BrokerMessageBlobReference
 
 from nucliadb.common import datamanagers
-from nucliadb.common.http_clients.processing import ProcessingHTTPClient
+from nucliadb.common.http_clients.processing import ProcessingHTTPClient, get_nua_api_id
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest import logger, logger_activity
 from nucliadb.ingest.orm.exceptions import ReallyStopPulling
@@ -135,6 +135,17 @@ class PullWorker:
         data = None
         if nuclia_settings.nuclia_service_account is not None:
             headers["X-STF-NUAKEY"] = f"Bearer {nuclia_settings.nuclia_service_account}"
+            # parse jwt sub to get pull type id
+            try:
+                pull_type_id = get_nua_api_id()
+            except Exception:
+                logger.exception(
+                    "Could not read NUA API Key. Can not start pull worker"
+                )
+                raise
+            nuclia_settings.nuclia_service_account
+        else:
+            pull_type_id = "main"
 
         async with ProcessingHTTPClient() as processing_http_client:
             logger.info(f"Collecting from NucliaDB Cloud {self.partition} partition")
@@ -142,7 +153,7 @@ class PullWorker:
                 try:
                     async with datamanagers.with_transaction() as txn:
                         cursor = await datamanagers.processing.get_pull_offset(
-                            txn, partition=self.partition
+                            txn, pull_type_id=pull_type_id, partition=self.partition
                         )
 
                     data = await processing_http_client.pull(
@@ -168,7 +179,10 @@ class PullWorker:
                             raise e
                         async with datamanagers.with_transaction() as txn:
                             await datamanagers.processing.set_pull_offset(
-                                txn, partition=self.partition, offset=data.cursor
+                                txn,
+                                pull_type_id=pull_type_id,
+                                partition=self.partition,
+                                offset=data.cursor,
                             )
                             await txn.commit()
                     elif data.status == "empty":
