@@ -12,7 +12,24 @@ BASE_URL = os.environ.get("NUCLIADB_URL", "http://localhost:8080")
 
 
 @pytest.fixture(scope="session")
-def kbid():
+def pull_offset():
+    """
+    Setup our pull consumer to start at end of queue and use ephemeral consumers
+    """
+    resp = requests.get(os.path.join(BASE_URL, "api/v1/pull/position"))
+    raise_for_status(resp)
+    end_offset = resp.json()["end_offset"]
+    resp = requests.patch(
+        os.path.join(BASE_URL, "api/v1/pull/position"),
+        headers={"content-type": "application/json"},
+        json={"cursor": end_offset - 1},
+    )
+    raise_for_status(resp)
+    yield end_offset
+
+
+@pytest.fixture(scope="session")
+def kbid(pull_offset: int):
     # generate random slug
     slug = "".join(random.choices("abcdefghijklmnopqrstuvwxyz", k=10))
     resp = requests.post(
@@ -27,24 +44,7 @@ def kbid():
 
 
 @pytest.fixture(scope="session")
-def pull_offset():
-    """
-    Setup our pull consumer to start at end of queue and use ephemeral consumers
-    """
-    resp = requests.get(os.path.join(BASE_URL, "api/v1/pull/position"))
-    raise_for_status(resp)
-    end_offset = resp.json()["end_offset"]
-    resp = requests.patch(
-        os.path.join(BASE_URL, "api/v1/pull/position"),
-        headers={"content-type": "application/json"},
-        json={"cursor": end_offset},
-    )
-    raise_for_status(resp)
-    yield end_offset
-
-
-@pytest.fixture(scope="session")
-def resource_id(kbid: str, pull_offset: int):
+def resource_id(kbid: str):
     resp = requests.post(
         os.path.join(BASE_URL, f"api/v1/kb/{kbid}/resources"),
         headers={
@@ -111,7 +111,7 @@ def test_config_check(kbid: str):
 #     reason="We can not count on this test working "
 #     "because anyone using the NUA key can pull the data from the queue"
 # )
-def test_resource_processed(kbid: str, resource_id: str, pull_offset: int):
+def test_resource_processed(kbid: str, resource_id: str):
     start = time.time()
     while True:
         resp = requests.get(
