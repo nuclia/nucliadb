@@ -26,7 +26,8 @@ import nats.errors
 from aiohttp.client_exceptions import ClientConnectorError
 from nucliadb_protos.writer_pb2 import BrokerMessage, BrokerMessageBlobReference
 
-from nucliadb.common.http_clients.processing import ProcessingHTTPClient
+from nucliadb.common import datamanagers
+from nucliadb.common.http_clients.processing import ProcessingHTTPClient, get_nua_api_id
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest import logger, logger_activity
 from nucliadb.ingest.orm.exceptions import ReallyStopPulling
@@ -134,24 +135,55 @@ class PullWorker:
         data = None
         if nuclia_settings.nuclia_service_account is not None:
             headers["X-STF-NUAKEY"] = f"Bearer {nuclia_settings.nuclia_service_account}"
+            # parse jwt sub to get pull type id
+            try:
+                pull_type_id = get_nua_api_id()
+            except Exception as exc:
+                logger.exception(
+                    "Could not read NUA API Key. Can not start pull worker"
+                )
+                raise ReallyStopPulling() from exc
+        else:
+            pull_type_id = "main"
 
         async with ProcessingHTTPClient() as processing_http_client:
             logger.info(f"Collecting from NucliaDB Cloud {self.partition} partition")
             while True:
                 try:
-                    data = await processing_http_client.pull(self.partition)
+                    async with datamanagers.with_transaction() as txn:
+                        cursor = await datamanagers.processing.get_pull_offset(
+                            txn, pull_type_id=pull_type_id, partition=self.partition
+                        )
+
+                    data = await processing_http_client.pull(
+                        self.partition, cursor=cursor, timeout=5
+                    )
                     if data.status == "ok":
                         logger.info(
-                            f"Message {data.msgid} received from proxy, partition: {self.partition}"
+                            "Message received from proxy",
+                            extra={"partition": self.partition, "cursor": data.cursor},
                         )
                         try:
-                            await self.handle_message(data.payload)
+                            if data.payload is not None:
+                                await self.handle_message(data.payload)
+                            for payload in data.payloads:
+                                # If using cursors and multiple messages are returned, it will be in the
+                                # `payloads` property
+                                await self.handle_message(payload)
                         except Exception as e:
                             errors.capture_exception(e)
                             logger.exception(
-                                "Error while pulling and processing message"
+                                "Error while pulling and processing message/s"
                             )
                             raise e
+                        async with datamanagers.with_transaction() as txn:
+                            await datamanagers.processing.set_pull_offset(
+                                txn,
+                                pull_type_id=pull_type_id,
+                                partition=self.partition,
+                                offset=data.cursor,
+                            )
+                            await txn.commit()
                     elif data.status == "empty":
                         logger_activity.debug(
                             f"No messages waiting in partition #{self.partition}"
@@ -184,10 +216,9 @@ class PullWorker:
                         if data.payload:
                             payload_length = len(base64.b64decode(data.payload))
                         logger.error(
-                            f"Message too big to transaction: {payload_length}"
+                            f"Message too big for transaction: {payload_length}"
                         )
                     raise e
-
                 except Exception:
                     logger.exception("Unhandled error pulling messages from processing")
                     await asyncio.sleep(self.pull_time_error_backoff)

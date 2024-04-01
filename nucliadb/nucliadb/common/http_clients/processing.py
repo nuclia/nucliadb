@@ -22,6 +22,7 @@ from datetime import datetime
 from typing import Optional
 
 import aiohttp
+import jwt
 import pydantic
 
 from nucliadb_utils.settings import nuclia_settings
@@ -29,6 +30,15 @@ from nucliadb_utils.settings import nuclia_settings
 from .utils import check_status
 
 logger = logging.getLogger(__name__)
+
+
+def get_nua_api_id() -> str:
+    assert nuclia_settings.nuclia_service_account is not None
+    claimset = jwt.decode(
+        nuclia_settings.nuclia_service_account,
+        options={"verify_signature": False},
+    )
+    return claimset.get("sub")
 
 
 def get_processing_api_url() -> str:
@@ -47,7 +57,13 @@ def get_processing_api_url() -> str:
 class PullResponse(pydantic.BaseModel):
     status: str
     payload: Optional[str] = None
-    msgid: Optional[int] = None
+    payloads: list[bytes] = []
+    msgid: Optional[str] = None
+    cursor: Optional[int] = None
+
+
+class PullPosition(pydantic.BaseModel):
+    cursor: int
 
 
 class RequestsResult(pydantic.BaseModel):
@@ -156,12 +172,31 @@ class ProcessingHTTPClient:
     async def close(self):
         await self.session.close()
 
-    async def pull(self, partition: str) -> PullResponse:
-        url = self.base_url + "/pull?partition=" + partition
-        async with self.session.get(url, headers=self.headers) as resp:
+    async def pull(
+        self,
+        partition: str,
+        cursor: Optional[int] = None,
+        limit: int = 3,
+        timeout: int = 1,
+    ) -> PullResponse:
+        url = self.base_url + "/pull"
+        params = {"partition": partition, "limit": limit, "timeout": timeout}
+        if cursor is not None:
+            params["from_cursor"] = cursor
+
+        async with self.session.get(url, headers=self.headers, params=params) as resp:
             resp_text = await resp.text()
             check_status(resp, resp_text)
             return PullResponse.parse_raw(resp_text)
+
+    async def pull_position(self, partition: str) -> int:
+        url = self.base_url + "/pull/position"
+        params = {"partition": partition}
+        async with self.session.get(url, headers=self.headers, params=params) as resp:
+            resp_text = await resp.text()
+            check_status(resp, resp_text)
+            data = PullPosition.parse_raw(resp_text)
+            return data.cursor
 
     async def requests(
         self,
