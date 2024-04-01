@@ -20,8 +20,8 @@
 
 use crate::grpc::update::{update_loop, UpdateParameters};
 use crate::settings::Settings;
+use crate::shards::cache::ShardReaderCache;
 use crate::shards::errors::ShardNotFoundError;
-use crate::shards::providers::shard_cache::ShardReaderCache;
 use crate::shards::reader::{ShardFileChunkIterator, ShardReader};
 use crate::telemetry::run_with_telemetry;
 use nucliadb_core::paragraphs::ParagraphIterator;

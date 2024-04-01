@@ -34,7 +34,7 @@ use nucliadb_node::merge::errors::MergerError;
 use nucliadb_node::replication::replicator::connect_to_primary_and_replicate;
 use nucliadb_node::replication::service::ReplicationServiceGRPCDriver;
 use nucliadb_node::settings::*;
-use nucliadb_node::shards::providers::shard_cache::ShardWriterCache;
+use nucliadb_node::shards::cache::ShardWriterCache;
 use nucliadb_node::utils::read_or_create_host_key;
 use nucliadb_protos::replication;
 use tempfile::TempDir;

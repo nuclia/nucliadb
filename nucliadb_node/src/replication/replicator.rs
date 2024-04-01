@@ -34,8 +34,8 @@ use tonic::Request;
 
 use crate::replication::health::ReplicationHealthManager;
 use crate::settings::Settings;
+use crate::shards::cache::ShardWriterCache;
 use crate::shards::metadata::ShardMetadata;
-use crate::shards::providers::shard_cache::ShardWriterCache;
 use crate::shards::writer::ShardWriter;
 use crate::utils::{list_shards, set_primary_node_id};
 
