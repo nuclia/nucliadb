@@ -27,16 +27,16 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use crate::settings::Settings;
+use crate::shards::cache::ShardWriterCache;
 use anyhow::anyhow;
-use nucliadb_core::vectors::MergeMetrics;
-use tokio::sync::oneshot;
-use tokio::sync::oneshot::{Receiver, Sender};
-
-use crate::{settings::Settings, shards::providers::shard_cache::ShardWriterCache};
 use nucliadb_core::metrics::vectors::MergeSource;
 use nucliadb_core::tracing::warn;
 use nucliadb_core::vectors::MergeContext;
+use nucliadb_core::vectors::MergeMetrics;
 use nucliadb_core::NodeResult;
+use tokio::sync::oneshot;
+use tokio::sync::oneshot::{Receiver, Sender};
 
 use super::work::WorkQueue;
 use crate::merge::{MergePriority, MergeRequest, MergeWaiter};

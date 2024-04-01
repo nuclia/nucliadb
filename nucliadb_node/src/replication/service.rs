@@ -32,8 +32,8 @@ use tonic::Response;
 
 use crate::replication::NodeRole;
 use crate::settings::Settings;
+use crate::shards::cache::ShardWriterCache;
 use crate::shards::metadata::Similarity;
-use crate::shards::providers::shard_cache::ShardWriterCache;
 use crate::shards::writer::ShardWriter;
 use crate::utils::{get_primary_node_id, list_shards, read_host_key};
 
