@@ -1742,7 +1742,6 @@ dependencies = [
  "crossbeam-utils",
  "derive_builder",
  "filetime",
- "fs2",
  "futures",
  "futures-core",
  "futures-util",

@@ -99,7 +99,6 @@ md5 = "0.7"
 lazy_static = "1.4.0"
 lru = "0.12.1"
 sysinfo = { version = "0.30.5", default-features = false }
-fs2 = "0.4.3"
 
 
 [build-dependencies]
