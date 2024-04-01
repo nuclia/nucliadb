@@ -138,12 +138,11 @@ class PullWorker:
             # parse jwt sub to get pull type id
             try:
                 pull_type_id = get_nua_api_id()
-            except Exception:
+            except Exception as exc:
                 logger.exception(
                     "Could not read NUA API Key. Can not start pull worker"
                 )
-                raise
-            nuclia_settings.nuclia_service_account
+                raise ReallyStopPulling() from exc
         else:
             pull_type_id = "main"
 
@@ -217,10 +216,9 @@ class PullWorker:
                         if data.payload:
                             payload_length = len(base64.b64decode(data.payload))
                         logger.error(
-                            f"Message too big to transaction: {payload_length}"
+                            f"Message too big for transaction: {payload_length}"
                         )
                     raise e
-
                 except Exception:
                     logger.exception("Unhandled error pulling messages from processing")
                     await asyncio.sleep(self.pull_time_error_backoff)
