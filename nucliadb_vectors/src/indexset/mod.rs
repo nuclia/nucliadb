@@ -21,82 +21,118 @@ mod state;
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 
-use nucliadb_core::fs_state::{self, ELock, Lock, SLock, Version};
+use nucliadb_core::fs_state::{self, Version};
 use state::State;
 
 use crate::data_point::Similarity;
-use crate::data_point_provider::Index;
+use crate::data_point_provider::reader::Reader;
+use crate::data_point_provider::writer::Writer;
+use crate::data_point_provider::IndexMetadata;
 use crate::VectorR;
+
 pub trait IndexKeyCollector {
     fn add_key(&mut self, key: String);
 }
 
-pub struct IndexSet {
-    state: RwLock<State>,
-    date: RwLock<Version>,
+pub struct WriterSet {
+    state: State,
     location: PathBuf,
 }
-impl IndexSet {
-    pub fn new(path: &Path) -> VectorR<IndexSet> {
+impl WriterSet {
+    pub fn new(path: &Path) -> VectorR<WriterSet> {
         if !path.exists() {
             std::fs::create_dir(path)?;
         }
-        fs_state::initialize_disk(path, || State::new(path.to_path_buf()))?;
+        fs_state::initialize_disk(path, State::default)?;
         let state = fs_state::load_state::<State>(path)?;
-        let date = fs_state::crnt_version(path)?;
-        let index = IndexSet {
-            state: RwLock::new(state),
-            date: RwLock::new(date),
+        Ok(WriterSet {
+            state,
             location: path.to_path_buf(),
-        };
-        Ok(index)
+        })
     }
-    pub fn remove_index(&mut self, index: &str, _: &ELock) -> VectorR<()> {
-        let mut write = self.state.write().unwrap();
-        write.remove_index(index)
+    pub fn remove_index(&mut self, index: &str) {
+        self.state.indexes.remove(index);
     }
-    pub fn get_or_create<'a, S>(&'a mut self, index: S, similarity: Similarity, _: &ELock) -> VectorR<Index>
-    where
-        S: Into<std::borrow::Cow<'a, str>>,
-    {
-        let mut write = self.state.write().unwrap();
-        write.get_or_create(index, similarity)
+    pub fn create_index(&mut self, index: &str, similarity: Similarity) -> VectorR<Writer> {
+        if self.state.indexes.contains(index) {
+            let location = self.location.join(index);
+            Writer::open(&location)
+        } else {
+            let metadata = IndexMetadata {
+                similarity,
+                ..Default::default()
+            };
+            let location = self.location.join(index);
+            let index_writer = Writer::new(&location, metadata)?;
+            self.state.indexes.insert(index.to_string());
+            Ok(index_writer)
+        }
     }
-    fn update(&self, _lock: &fs_state::Lock) -> VectorR<()> {
-        let disk_v = fs_state::crnt_version(&self.location)?;
-        let new_state = fs_state::load_state(&self.location)?;
-        let mut state = self.state.write().unwrap();
-        let mut date = self.date.write().unwrap();
-        *state = new_state;
-        *date = disk_v;
-        Ok(())
+    pub fn index_keys<C: IndexKeyCollector>(&self, c: &mut C) {
+        self.state.indexes.iter().cloned().for_each(|s| c.add_key(s))
     }
-    pub fn index_keys<C: IndexKeyCollector>(&self, c: &mut C, _: &Lock) {
-        let read = self.state.read().unwrap();
-        read.index_keys(c);
-    }
-    pub fn get(&self, index: &str, _: &Lock) -> VectorR<Option<Index>> {
-        let read = self.state.read().unwrap();
-        read.get(index)
-    }
-    pub fn get_elock(&self) -> VectorR<ELock> {
-        let lock = fs_state::exclusive_lock(&self.location)?;
-        self.update(&lock)?;
-        Ok(lock)
-    }
-    pub fn get_slock(&self) -> VectorR<SLock> {
-        let lock = fs_state::shared_lock(&self.location)?;
-        self.update(&lock)?;
-        Ok(lock)
+    pub fn get(&self, index: &str) -> VectorR<Option<Writer>> {
+        if self.state.indexes.contains(index) {
+            let location = self.location.join(index);
+            Some(Writer::open(&location)).transpose()
+        } else {
+            Ok(None)
+        }
     }
     pub fn get_location(&self) -> &Path {
         &self.location
     }
-    pub fn commit(&self, _: ELock) -> VectorR<()> {
-        let state = self.state.read().unwrap();
-        let mut date = self.date.write().unwrap();
-        fs_state::persist_state::<State>(&self.location, &state)?;
-        *date = fs_state::crnt_version(&self.location)?;
+    pub fn commit(&self) -> VectorR<()> {
+        fs_state::persist_state::<State>(&self.location, &self.state)?;
         Ok(())
+    }
+}
+
+pub struct ReaderSet {
+    state: RwLock<State>,
+    date: RwLock<Version>,
+    location: PathBuf,
+}
+impl ReaderSet {
+    pub fn new(path: &Path) -> VectorR<ReaderSet> {
+        if !path.exists() {
+            std::fs::create_dir(path)?;
+        }
+        fs_state::initialize_disk(path, State::default)?;
+        let state = fs_state::load_state::<State>(path)?;
+        let date = fs_state::crnt_version(path)?;
+        Ok(ReaderSet {
+            state: RwLock::new(state),
+            date: RwLock::new(date),
+            location: path.to_path_buf(),
+        })
+    }
+    pub fn update(&self) -> VectorR<()> {
+        let disk_v = fs_state::crnt_version(&self.location)?;
+        let current_v = *self.date.read().unwrap_or_else(|e| e.into_inner());
+        if disk_v != current_v {
+            let new_state = fs_state::load_state(&self.location)?;
+            let mut state = self.state.write().unwrap();
+            let mut date = self.date.write().unwrap();
+            *state = new_state;
+            *date = disk_v;
+        }
+        Ok(())
+    }
+    pub fn index_keys<C: IndexKeyCollector>(&self, c: &mut C) {
+        let state = self.state.read().unwrap();
+        state.indexes.iter().cloned().for_each(|s| c.add_key(s))
+    }
+    pub fn get(&self, index: &str) -> VectorR<Option<Reader>> {
+        let state = self.state.read().unwrap();
+        if state.indexes.contains(index) {
+            let location = self.location.join(index);
+            Some(Reader::open(&location)).transpose()
+        } else {
+            Ok(None)
+        }
+    }
+    pub fn get_location(&self) -> &Path {
+        &self.location
     }
 }

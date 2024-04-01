@@ -19,9 +19,11 @@
 //
 
 use std::collections::HashSet;
+use std::time::Instant;
 
-use crate::data_point::{DataPoint, DeleteLog, Elem, LabelDictionary, Similarity};
+use crate::data_point::{self, DataPointPin, DeleteLog, Elem, LabelDictionary, Similarity};
 use crate::formula::{AtomClause, Formula};
+use crate::VectorR;
 
 const SIMILARITY: Similarity = Similarity::Cosine;
 
@@ -62,9 +64,8 @@ fn simple_flow() {
         elems.push(Elem::new(key.clone(), vector, labels, None));
         expected_keys.push(key);
     }
-    let reader = DataPoint::new(temp_dir.path(), elems, None, SIMILARITY).unwrap();
-    let id = reader.get_id();
-    let reader = DataPoint::open(temp_dir.path(), id).unwrap();
+    let pin = DataPointPin::create_pin(temp_dir.path()).unwrap();
+    let reader = data_point::create(&pin, elems, None, SIMILARITY).unwrap();
     let query = vec![rand::random::<f32>(); 8];
     let no_results = 10;
     let formula = queries[..20].iter().fold(Formula::new(), |mut acc, i| {
@@ -95,7 +96,8 @@ fn accuracy_test() {
         let labels = labels_dictionary.clone();
         elems.push(Elem::new(key, vector, labels, None));
     }
-    let reader = DataPoint::new(temp_dir.path(), elems, None, SIMILARITY).unwrap();
+    let pin = DataPointPin::create_pin(temp_dir.path()).unwrap();
+    let reader = data_point::create(&pin, elems, None, SIMILARITY).unwrap();
     let query = create_query();
     let no_results = 10;
     let formula = queries[..20].iter().fold(Formula::new(), |mut acc, i| {
@@ -122,12 +124,14 @@ fn single_graph() {
     let vector = create_query();
 
     let elems = vec![Elem::new(key.clone(), vector.clone(), LabelDictionary::default(), None)];
-    let reader = DataPoint::new(temp_dir.path(), elems.clone(), None, SIMILARITY).unwrap();
+    let pin = DataPointPin::create_pin(temp_dir.path()).unwrap();
+    let reader = data_point::create(&pin, elems.clone(), None, SIMILARITY).unwrap();
     let formula = Formula::new();
     let result = reader.search(&HashSet::from([key.clone()]), &vector, &formula, true, 5, Similarity::Cosine, -1.0);
     assert_eq!(result.count(), 0);
 
-    let reader = DataPoint::new(temp_dir.path(), elems, None, SIMILARITY).unwrap();
+    let pin = DataPointPin::create_pin(temp_dir.path()).unwrap();
+    let reader = data_point::create(&pin, elems, None, SIMILARITY).unwrap();
     let result =
         reader.search(&HashSet::new(), &vector, &formula, true, 5, Similarity::Cosine, -1.0).collect::<Vec<_>>();
     assert_eq!(result.len(), 1);
@@ -145,10 +149,18 @@ fn data_merge() {
     let key1 = "KEY_1".to_string();
     let vector1 = create_query();
     let elems1 = vec![Elem::new(key1.clone(), vector1.clone(), LabelDictionary::default(), None)];
-    let dp_0 = DataPoint::new(temp_dir.path(), elems0, None, SIMILARITY).unwrap();
-    let dp_1 = DataPoint::new(temp_dir.path(), elems1, None, SIMILARITY).unwrap();
-    let work = &[(HashSet::default(), dp_1.get_id()), (HashSet::default(), dp_0.get_id())];
-    let dp = DataPoint::merge(temp_dir.path(), work, Similarity::Cosine).unwrap();
+
+    let dp0_pin = DataPointPin::create_pin(temp_dir.path()).unwrap();
+    let dp0 = data_point::create(&dp0_pin, elems0, None, SIMILARITY).unwrap();
+
+    let dp1_pin = DataPointPin::create_pin(temp_dir.path()).unwrap();
+    let dp1 = data_point::create(&dp1_pin, elems1, None, SIMILARITY).unwrap();
+
+    let work = &[(HashSet::default(), dp1), (HashSet::default(), dp0)];
+
+    let dp_pin = DataPointPin::create_pin(temp_dir.path()).unwrap();
+    let dp = data_point::merge(&dp_pin, work, Similarity::Cosine).unwrap();
+
     let formula = Formula::new();
     let result: Vec<_> = dp.search(&HashSet::new(), &vector1, &formula, true, 1, Similarity::Cosine, -1.0).collect();
     assert_eq!(result.len(), 1);
@@ -159,8 +171,12 @@ fn data_merge() {
     assert!(result[0].score() >= 0.9);
     assert!(result[0].id() == key0.as_bytes());
     let dlog = HashSet::from([key1, key0]);
-    let work = &[(&dlog, dp_1.get_id()), (&dlog, dp_0.get_id())];
-    let dp = DataPoint::merge(temp_dir.path(), work, Similarity::Cosine).unwrap();
+    let dp0 = data_point::open(&dp0_pin).unwrap();
+    let dp1 = data_point::open(&dp1_pin).unwrap();
+    let work = &[(&dlog, dp1), (&dlog, dp0)];
+    let dp_pin = DataPointPin::create_pin(temp_dir.path()).unwrap();
+    let dp = data_point::merge(&dp_pin, work, Similarity::Cosine).unwrap();
+
     assert_eq!(dp.journal().no_nodes(), 0);
 }
 
@@ -183,7 +199,9 @@ fn prefiltering_test() {
         let labels = LabelDictionary::new(vec![format!("LABEL_{}", i)]);
         elems.push(Elem::new(key, vector, labels, None));
     }
-    let reader = DataPoint::new(temp_dir.path(), elems, None, SIMILARITY).unwrap();
+
+    let pin = DataPointPin::create_pin(temp_dir.path()).unwrap();
+    let reader = data_point::create(&pin, elems, None, SIMILARITY).unwrap();
     let query = create_query();
     let no_results = 10;
 
@@ -204,4 +222,72 @@ fn prefiltering_test() {
             .collect::<Vec<_>>();
         assert_eq!(result_with_deleted.len(), 0);
     }
+}
+
+#[test]
+fn fast_data_merge() -> VectorR<()> {
+    let search_vectors = [create_query(), create_query(), create_query(), create_query()];
+
+    let big_segment_dir = tempfile::tempdir()?;
+    let big_segment_pin = DataPointPin::create_pin(big_segment_dir.path())?;
+    let mut elems: Vec<_> =
+        (0..100).map(|k| Elem::new(format!("trash_{k}"), create_query(), LabelDictionary::default(), None)).collect();
+    elems.push(Elem::new("search_0".into(), search_vectors[0].clone(), LabelDictionary::default(), None));
+    elems.push(Elem::new("search_1".into(), search_vectors[1].clone(), LabelDictionary::default(), None));
+    let big_segment = data_point::create(&big_segment_pin, elems, None, Similarity::Dot)?;
+
+    let small_segment_dir = tempfile::tempdir()?;
+    let small_segment_pin = DataPointPin::create_pin(small_segment_dir.path())?;
+    let small_segment = data_point::create(
+        &small_segment_pin,
+        vec![
+            Elem::new("search_2".into(), search_vectors[2].clone(), LabelDictionary::default(), None),
+            Elem::new("search_3".into(), search_vectors[3].clone(), LabelDictionary::default(), None),
+        ],
+        None,
+        Similarity::Dot,
+    )?;
+
+    // Merge without deletions
+    let mut work = [(HashSet::default(), big_segment), (HashSet::default(), small_segment)];
+    let output_dir = tempfile::tempdir()?;
+    let dp_pin = DataPointPin::create_pin(output_dir.path())?;
+    let t = Instant::now();
+    let dp = data_point::merge(&dp_pin, &work, Similarity::Dot)?;
+    let fast_merge_time = t.elapsed();
+
+    for (i, v) in search_vectors.iter().enumerate() {
+        let formula = Formula::new();
+        let result: Vec<_> = dp.search(&HashSet::new(), v, &formula, true, 1, Similarity::Dot, 0.999).collect();
+        assert_eq!(result.len(), 1);
+        assert!(result[0].score() >= 0.999);
+        assert!(result[0].id() == format!("search_{i}").as_bytes());
+    }
+
+    // Merge with deletions
+    work[0].0.insert("search_0".into());
+    work[1].0.insert("search_2".into());
+    let output_dir = tempfile::tempdir()?;
+    let dp_pin = DataPointPin::create_pin(output_dir.path())?;
+    let t = Instant::now();
+    let dp = data_point::merge(&dp_pin, &work, Similarity::Dot)?;
+    let slow_merge_time = t.elapsed();
+
+    for (i, v) in search_vectors.iter().enumerate() {
+        let formula = Formula::new();
+        let result: Vec<_> = dp.search(&HashSet::new(), v, &formula, true, 1, Similarity::Dot, 0.999).collect();
+        if i == 0 || i == 2 {
+            // These were deleted, they should not be in the merge
+            assert_eq!(result.len(), 0);
+        } else {
+            assert_eq!(result.len(), 1);
+            assert!(result[0].score() >= 0.999);
+            assert!(result[0].id() == format!("search_{i}").as_bytes());
+        }
+    }
+
+    // If there are deletions, we cannot reuse the HNSW, and we are much slower
+    assert!(slow_merge_time.as_secs_f64() > 10.0 * fast_merge_time.as_secs_f64());
+
+    Ok(())
 }
