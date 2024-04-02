@@ -210,7 +210,7 @@ impl Reader {
         }
 
         if new_dimension.is_none() {
-            if let Some(data_point_pin) = self.data_point_pins.first() {
+            if let Some(data_point_pin) = new_data_point_pins.first() {
                 let open_data_point = &self.open_data_points[&data_point_pin.id()];
                 new_dimension = open_data_point.stored_len();
             }
