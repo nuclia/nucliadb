@@ -927,6 +927,7 @@ class Paragraph(google.protobuf.message.Message):
         DESCRIPTION: Paragraph._TypeParagraph.ValueType  # 3
         TRANSCRIPT: Paragraph._TypeParagraph.ValueType  # 4
         TITLE: Paragraph._TypeParagraph.ValueType  # 5
+        TABLE: Paragraph._TypeParagraph.ValueType  # 6
 
     class TypeParagraph(_TypeParagraph, metaclass=_TypeParagraphEnumTypeWrapper): ...
     TEXT: Paragraph.TypeParagraph.ValueType  # 0
@@ -935,6 +936,7 @@ class Paragraph(google.protobuf.message.Message):
     DESCRIPTION: Paragraph.TypeParagraph.ValueType  # 3
     TRANSCRIPT: Paragraph.TypeParagraph.ValueType  # 4
     TITLE: Paragraph.TypeParagraph.ValueType  # 5
+    TABLE: Paragraph.TypeParagraph.ValueType  # 6
 
     START_FIELD_NUMBER: builtins.int
     END_FIELD_NUMBER: builtins.int

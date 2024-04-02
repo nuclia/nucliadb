@@ -238,6 +238,7 @@ message Paragraph {
         DESCRIPTION = 3;
         TRANSCRIPT = 4;
         TITLE = 5;
+        TABLE = 6;
     }
     TypeParagraph kind = 5;
 

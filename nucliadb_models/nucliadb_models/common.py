@@ -204,6 +204,16 @@ class Sentence(BaseModel):
     key: Optional[str]
 
 
+class PageInformation(BaseModel):
+    page: Optional[int]
+    page_with_visual: Optional[bool]
+
+
+class Representation(BaseModel):
+    is_a_table: Optional[bool]
+    reference_file: Optional[str]
+
+
 class Paragraph(BaseModel):
     start: Optional[int]
     end: Optional[int]
@@ -217,11 +227,14 @@ class Paragraph(BaseModel):
         DESCRIPTION = "DESCRIPTION"
         TRANSCRIPT = "TRANSCRIPT"
         TITLE = "TITLE"
+        TABLE = "TABLE"
 
     kind: Optional[TypeParagraph]
     classifications: Optional[List[Classification]]
     sentences: Optional[List[Sentence]]
     key: Optional[str]
+    page: Optional[PageInformation]
+    representation: Optional[Representation]
 
 
 class Shards(BaseModel):
