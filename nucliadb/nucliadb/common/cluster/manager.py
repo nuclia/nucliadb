@@ -365,10 +365,7 @@ class KBShardManager:
             await indexing.index(indexpb, node_id)
 
     def should_create_new_shard(self, num_paragraphs: int, num_fields: int) -> bool:
-        return (
-            num_paragraphs > settings.max_shard_paragraphs
-            or num_fields > settings.max_shard_fields
-        )
+        return num_paragraphs > settings.max_shard_paragraphs
 
     async def maybe_create_new_shard(
         self,
