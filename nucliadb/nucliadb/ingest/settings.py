@@ -78,7 +78,7 @@ class Settings(DriverSettings):
     partitions: list[str] = ["1"]
 
     pull_time_error_backoff: int = 30
-    pull_api_timeout: int = 30
+    pull_api_timeout: int = 60
     disable_pull_worker: bool = False
 
     # ingest consumer sts replica settings

@@ -57,7 +57,7 @@ class PullWorker:
         pubsub: Optional[PubSubDriver] = None,
         local_subscriber: bool = False,
         pull_time_empty_backoff: float = 5.0,
-        pull_api_timeout: int = 30,
+        pull_api_timeout: int = 60,
     ):
         self.partition = partition
         self.pull_time_error_backoff = pull_time_error_backoff
