@@ -28,7 +28,9 @@ class RunningSettings(BaseSettings):
     debug: bool = True
     sentry_url: Optional[str] = None
     running_environment: str = Field(
-        default="local", env=["environment", "running_environment"]
+        default="local",
+        env=["environment", "running_environment"],
+        description="Running environment. One of: local, test, stage, prod",
     )
     metrics_port: int = 3030
     metrics_host: str = "0.0.0.0"
