@@ -57,10 +57,12 @@ class PullWorker:
         pubsub: Optional[PubSubDriver] = None,
         local_subscriber: bool = False,
         pull_time_empty_backoff: float = 5.0,
+        pull_api_timeout: int = 30,
     ):
         self.partition = partition
         self.pull_time_error_backoff = pull_time_error_backoff
         self.pull_time_empty_backoff = pull_time_empty_backoff
+        self.pull_api_timeout = pull_api_timeout
         self.local_subscriber = local_subscriber
 
         self.processor = Processor(driver, storage, pubsub, partition)
@@ -156,7 +158,9 @@ class PullWorker:
                         )
 
                     data = await processing_http_client.pull(
-                        self.partition, cursor=cursor, timeout=30
+                        self.partition,
+                        cursor=cursor,
+                        timeout=self.pull_api_timeout,
                     )
                     if data.status == "ok":
                         logger.info(

@@ -72,6 +72,7 @@ async def start_pull_workers(
             pull_time_error_backoff=settings.pull_time_error_backoff,
             pubsub=pubsub,
             local_subscriber=transaction_settings.transaction_local,
+            pull_api_timeout=settings.pull_api_timeout,
         )
         task = asyncio.create_task(worker.loop())
         task.add_done_callback(_handle_task_result)
