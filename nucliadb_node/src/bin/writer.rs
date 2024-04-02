@@ -35,16 +35,17 @@ use nucliadb_node::replication::NodeRole;
 use nucliadb_node::settings::providers::env::EnvSettingsProvider;
 use nucliadb_node::settings::providers::SettingsProvider;
 use nucliadb_node::settings::Settings;
+use nucliadb_node::shards::cache::ShardWriterCache;
 use nucliadb_node::telemetry::init_telemetry;
 use nucliadb_node::{lifecycle, utils};
 use nucliadb_protos::replication;
 use tokio::signal::unix::SignalKind;
 use tokio::signal::{ctrl_c, unix};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
-use tonic::transport::Server;
-type GrpcServer = NodeWriterServer<NodeWriterGRPCDriver>;
-use nucliadb_node::shards::providers::shard_cache::ShardWriterCache;
 use tokio::sync::Notify;
+use tonic::transport::Server;
+
+type GrpcServer = NodeWriterServer<NodeWriterGRPCDriver>;
 
 #[derive(Debug)]
 pub enum NodeUpdate {

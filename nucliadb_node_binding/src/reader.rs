@@ -27,7 +27,7 @@ use nucliadb_node::lifecycle;
 use nucliadb_node::settings::providers::env::EnvSettingsProvider;
 use nucliadb_node::settings::providers::SettingsProvider;
 use nucliadb_node::settings::Settings;
-use nucliadb_node::shards::providers::shard_cache::ShardReaderCache;
+use nucliadb_node::shards::cache::ShardReaderCache;
 use nucliadb_node::shards::reader::ShardReader;
 use prost::Message;
 use pyo3::exceptions::{PyStopIteration, PyValueError};

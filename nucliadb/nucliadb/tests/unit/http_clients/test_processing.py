@@ -91,7 +91,9 @@ class TestProcessingHTTPClient:
 
     @pytest.mark.asyncio
     async def test_pull(self, client: processing.ProcessingHTTPClient, response):
-        response_data = processing.PullResponse(status="ok", payload="foobar", msgid=1)
+        response_data = processing.PullResponse(
+            status="ok", payload="foobar", msgid="1"
+        )
         response.status = 200
         response.text.return_value = response_data.json()
 

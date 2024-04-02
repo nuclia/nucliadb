@@ -28,6 +28,7 @@ from opentelemetry.instrumentation.fastapi import (  # type: ignore
 from prometheus_client import CONTENT_TYPE_LATEST
 from starlette.responses import PlainTextResponse
 
+from nucliadb_telemetry import errors
 from nucliadb_telemetry.fastapi.metrics import PrometheusMiddleware
 from nucliadb_telemetry.fastapi.tracing import (
     CaptureTraceIdMiddleware,
@@ -55,7 +56,6 @@ application_metrics.add_route("/metrics", metrics_endpoint)
 
 
 class ExcludeList:
-
     """Class to exclude certain paths (given as a list of regexes) from tracing requests"""
 
     def __init__(self, excluded_urls: Iterable[str]):
@@ -90,15 +90,17 @@ def instrument_app(
         app.add_middleware(CaptureTraceIdMiddleware)
 
     app.add_middleware(ContextInjectorMiddleware)
-    app.add_middleware(
-        OpenTelemetryMiddleware,
-        excluded_urls=excluded_urls_obj,  # type: ignore
-        default_span_details=_get_default_span_details,
-        server_request_hook=server_request_hook,  # type: ignore
-        tracer_provider=tracer_provider,
-    )
+    if tracer_provider is not None:
+        app.add_middleware(
+            OpenTelemetryMiddleware,
+            excluded_urls=excluded_urls_obj,  # type: ignore
+            default_span_details=_get_default_span_details,
+            server_request_hook=server_request_hook,  # type: ignore
+            tracer_provider=tracer_provider,
+        )
 
-    if SentryAsgiMiddleware is not None:
+    error_settings = errors.ErrorHandlingSettings()
+    if SentryAsgiMiddleware is not None and error_settings.sentry_url is not None:
         # add last to catch all exceptions
         # `add_middleware` always adds to the beginning of the middleware list
         app.add_middleware(SentryAsgiMiddleware)

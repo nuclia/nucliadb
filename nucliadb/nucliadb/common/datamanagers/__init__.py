@@ -28,7 +28,7 @@
 #   - First argument is always a transaction, all other arguments are keyword arguments and must be explicit
 #     (better for readability and code editors)
 # ==============================================================================
-from . import cluster, entities, exceptions, kb, labels, resources, rollover
+from . import cluster, entities, exceptions, kb, labels, processing, resources, rollover
 from .utils import with_transaction
 
 __all__ = (
@@ -38,6 +38,7 @@ __all__ = (
     "labels",
     "resources",
     "rollover",
+    "processing",
     "exceptions",
     "with_transaction",
 )
