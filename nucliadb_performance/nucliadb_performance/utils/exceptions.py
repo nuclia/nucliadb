@@ -17,38 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from dataclasses import dataclass
+
+class RequestError(Exception):
+    def __init__(self, status, content=None, text=None):
+        self.status = status
+        self.content = content
+        self.text = text
 
 
-@dataclass
-class Error:
-    kbid: str
-    endpoint: str
-    status_code: int
-    error: str
-
-
-ERRORS: list[Error] = []
-
-
-def append_error(kbid: str, endpoint: str, status_code: str, error: str):
-    ERRORS.append(
-        Error(
-            kbid=kbid,
-            endpoint=endpoint,
-            status_code=-1,
-            error=error,
-        )
-    )
-
-
-def print_errors():
-    print("Errors summary:")
-    for error in ERRORS:
-        print(
-            f"KB id {error.kbid} failed calling endpoint '{error.endpoint}' returning status code {error.status_code}"
-        )
-        formatted_error = " | " + error.error.replace("\n", "\n | ")
-        print(formatted_error)
-        print()
-    print("=" * 50)
+class CountersError(Exception):
+    ...
