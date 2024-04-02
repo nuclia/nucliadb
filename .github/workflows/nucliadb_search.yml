@@ -43,8 +43,9 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  id-token: write   # This is required for requesting the JWT
-  contents: write   # This is required for actions/checkout
+  id-token: write       # This is required for requesting the JWT
+  contents: write       # This is required for actions/checkout
+  pull-requests: write  # Used by the benchmark action to leave a comment
 
 env:
   IMAGE_NAME: search
