@@ -53,7 +53,7 @@ from nucliadb.writer.exceptions import (
     ResourceNotFound,
 )
 from nucliadb.writer.resource.audit import parse_audit
-from nucliadb.writer.resource.basic import parse_basic, set_processing_info
+from nucliadb.writer.resource.basic import parse_basic
 from nucliadb.writer.resource.field import parse_fields
 from nucliadb.writer.resource.origin import parse_extra, parse_origin
 from nucliadb.writer.tus import TUSUPLOAD, UPLOAD, get_dm, get_storage_manager
@@ -74,6 +74,7 @@ from nucliadb_models.writer import CreateResourcePayload, ResourceFileUploaded
 from nucliadb_utils.authentication import requires_one
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.storages.storage import KB_RESOURCE_FIELD
+from nucliadb_utils.transaction import TransactionCommitTimeoutError
 from nucliadb_utils.utilities import (
     get_ingest,
     get_partitioning,
@@ -938,16 +939,20 @@ async def store_file_on_nuclia_db(
         file_field, storage=storage
     )
 
+    writer.source = BrokerMessage.MessageSource.WRITER
+    try:
+        await transaction.commit(writer, partition, wait=True)
+    except TransactionCommitTimeoutError:
+        raise HTTPException(
+            status_code=501, detail="Inconsistent write. Commit timeout"
+        )
+
     try:
         processing_info = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
     except SendToProcessError:
         raise HTTPException(status_code=500, detail="Error while sending to process")
-
-    writer.source = BrokerMessage.MessageSource.WRITER
-    set_processing_info(writer, processing_info)
-    await transaction.commit(writer, partition, wait=True)
 
     return processing_info.seqid
 

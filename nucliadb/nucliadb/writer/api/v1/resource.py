@@ -60,7 +60,6 @@ from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.basic import (
     parse_basic,
     parse_basic_modify,
-    set_processing_info,
     set_status,
     set_status_modify,
 )
@@ -83,6 +82,7 @@ from nucliadb_models.writer import (
 from nucliadb_telemetry.errors import capture_exception
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
+from nucliadb_utils.transaction import TransactionCommitTimeoutError
 from nucliadb_utils.utilities import (
     get_ingest,
     get_partitioning,
@@ -185,12 +185,19 @@ async def create_resource(
 
     set_status(writer.basic, item)
 
-    seqid = await maybe_send_to_process(writer, toprocess, partition)
-
     writer.source = BrokerMessage.MessageSource.WRITER
-    t0 = time()
-    await transaction.commit(writer, partition, wait=True)
-    return ResourceCreated(seqid=seqid, uuid=uuid, elapsed=time() - t0)
+    try:
+        t0 = time()
+        await transaction.commit(writer, partition, wait=True)
+        txn_time = time() - t0
+    except TransactionCommitTimeoutError:
+        raise HTTPException(
+            status_code=501, detail="Inconsistent write. Commit timeout"
+        )
+
+    seqid = await maybe_send_to_process(toprocess, partition)
+
+    return ResourceCreated(seqid=seqid, uuid=uuid, elapsed=txn_time)
 
 
 @api.patch(
@@ -337,13 +344,19 @@ async def modify_resource(
     set_status_modify(writer.basic, item)
 
     toprocess.title = writer.basic.title
-    seqid = await maybe_send_to_process(writer, toprocess, partition)
 
     writer.source = BrokerMessage.MessageSource.WRITER
 
     maybe_mark_reindex(writer, item)
 
-    await transaction.commit(writer, partition, wait=True)
+    try:
+        await transaction.commit(writer, partition, wait=True)
+    except TransactionCommitTimeoutError:
+        raise HTTPException(
+            status_code=501, detail="Inconsistent write. Commit timeout"
+        )
+
+    seqid = await maybe_send_to_process(toprocess, partition)
 
     return ResourceUpdated(seqid=seqid)
 
@@ -469,16 +482,20 @@ async def _reprocess_resource(
 
         await extract_fields(resource=resource, toprocess=toprocess)
 
-    processing_info = await send_to_process(toprocess, partition)
-
     writer = BrokerMessage()
     writer.kbid = kbid
     writer.uuid = rid
     writer.source = BrokerMessage.MessageSource.WRITER
     writer.basic.metadata.useful = True
     writer.basic.metadata.status = Metadata.Status.PENDING
-    set_processing_info(writer, processing_info)
-    await transaction.commit(writer, partition, wait=False)
+    try:
+        await transaction.commit(writer, partition, wait=False)
+    except TransactionCommitTimeoutError:
+        raise HTTPException(
+            status_code=501, detail="Inconsistent write. Commit timeout"
+        )
+
+    processing_info = await send_to_process(toprocess, partition)
 
     return ResourceUpdated(seqid=processing_info.seqid)
 
@@ -536,7 +553,12 @@ async def _delete_resource(
     parse_audit(writer.audit, request)
 
     # Create processing message
-    await transaction.commit(writer, partition, wait=True)
+    try:
+        await transaction.commit(writer, partition, wait=True)
+    except TransactionCommitTimeoutError:
+        raise HTTPException(
+            status_code=501, detail="Inconsistent write. Commit timeout"
+        )
 
     processing = get_processing()
     asyncio.create_task(processing.delete_from_processing(kbid=kbid, resource_id=rid))
@@ -672,14 +694,11 @@ def needs_resource_reindex(item: UpdateResourcePayload) -> bool:
     )
 
 
-async def maybe_send_to_process(
-    writer: BrokerMessage, toprocess: PushPayload, partition
-) -> Optional[int]:
+async def maybe_send_to_process(toprocess: PushPayload, partition) -> Optional[int]:
     if not needs_reprocess(toprocess):
         return None
 
     processing_info = await send_to_process(toprocess, partition)
-    set_processing_info(writer, processing_info)
     return processing_info.seqid
 
 

@@ -39,7 +39,6 @@ from nucliadb.writer.api.v1.resource import get_rid_from_params_or_raise_error
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
 from nucliadb.writer.back_pressure import maybe_back_pressure
 from nucliadb.writer.resource.audit import parse_audit
-from nucliadb.writer.resource.basic import set_processing_info
 from nucliadb.writer.resource.field import (
     extract_file_field,
     parse_conversation_field,
@@ -55,6 +54,7 @@ from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.writer import ResourceFieldAdded, ResourceUpdated
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
+from nucliadb_utils.transaction import TransactionCommitTimeoutError
 from nucliadb_utils.utilities import (
     get_partitioning,
     get_storage,
@@ -111,14 +111,20 @@ async def finish_field_put(
     # Create processing message
     transaction = get_transaction_utility()
     processing = get_processing()
-
-    processing_info = await processing.send_to_process(toprocess, partition)
-
-    writer.source = BrokerMessage.MessageSource.WRITER
-    set_processing_info(writer, processing_info)
-    await transaction.commit(writer, partition, wait=True)
-
-    return processing_info.seqid
+    try:
+        writer.source = BrokerMessage.MessageSource.WRITER
+        await transaction.commit(writer, partition, wait=True)
+    except TransactionCommitTimeoutError:
+        raise HTTPException(
+            status_code=501, detail="Inconsistent write. Commit timeout"
+        )
+    try:
+        processing_info = await processing.send_to_process(toprocess, partition)
+        return processing_info.seqid
+    except LimitsExceededError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+    except SendToProcessError:
+        raise HTTPException(status_code=500, detail="Error while sending to process")
 
 
 @api.put(
@@ -185,13 +191,7 @@ async def _add_resource_field_text(
 
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
     parse_text_field(field_id, field_payload, writer, toprocess)
-    try:
-        seqid = await finish_field_put(writer, toprocess, partition)
-    except LimitsExceededError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
-    except SendToProcessError:
-        raise HTTPException(status_code=500, detail="Error while sending to process")
-
+    seqid = await finish_field_put(writer, toprocess, partition)
     return ResourceFieldAdded(seqid=seqid)
 
 
@@ -251,13 +251,7 @@ async def _add_resource_field_link(
 
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
     parse_link_field(field_id, field_payload, writer, toprocess)
-    try:
-        seqid = await finish_field_put(writer, toprocess, partition)
-    except LimitsExceededError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
-    except SendToProcessError:
-        raise HTTPException(status_code=500, detail="Error while sending to process")
-
+    seqid = await finish_field_put(writer, toprocess, partition)
     return ResourceFieldAdded(seqid=seqid)
 
 
@@ -317,13 +311,7 @@ async def _add_resource_field_keywordset(
 
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
     parse_keywordset_field(field_id, field_payload, writer, toprocess)
-    try:
-        seqid = await finish_field_put(writer, toprocess, partition)
-    except LimitsExceededError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
-    except SendToProcessError:
-        raise HTTPException(status_code=500, detail="Error while sending to process")
-
+    seqid = await finish_field_put(writer, toprocess, partition)
     return ResourceFieldAdded(seqid=seqid)
 
 
@@ -383,13 +371,7 @@ async def _add_resource_field_datetime(
 
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
     parse_datetime_field(field_id, field_payload, writer, toprocess)
-    try:
-        seqid = await finish_field_put(writer, toprocess, partition)
-    except LimitsExceededError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
-    except SendToProcessError:
-        raise HTTPException(status_code=500, detail="Error while sending to process")
-
+    seqid = await finish_field_put(writer, toprocess, partition)
     return ResourceFieldAdded(seqid=seqid)
 
 
@@ -453,13 +435,7 @@ async def _add_resource_field_layout(
 
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
     await parse_layout_field(field_id, field_payload, writer, toprocess, kbid, rid)
-    try:
-        seqid = await finish_field_put(writer, toprocess, partition)
-    except LimitsExceededError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
-    except SendToProcessError:
-        raise HTTPException(status_code=500, detail="Error while sending to process")
-
+    seqid = await finish_field_put(writer, toprocess, partition)
     return ResourceFieldAdded(seqid=seqid)
 
 
@@ -521,13 +497,7 @@ async def _add_resource_field_conversation(
     await parse_conversation_field(
         field_id, field_payload, writer, toprocess, kbid, rid
     )
-    try:
-        seqid = await finish_field_put(writer, toprocess, partition)
-    except LimitsExceededError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
-    except SendToProcessError:
-        raise HTTPException(status_code=500, detail="Error while sending to process")
-
+    seqid = await finish_field_put(writer, toprocess, partition)
     return ResourceFieldAdded(seqid=seqid)
 
 
@@ -597,14 +567,7 @@ async def _add_resource_field_file(
     await parse_file_field(
         field_id, field_payload, writer, toprocess, kbid, rid, skip_store=x_skip_store
     )
-
-    try:
-        seqid = await finish_field_put(writer, toprocess, partition)
-    except LimitsExceededError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
-    except SendToProcessError:
-        raise HTTPException(status_code=500, detail="Error while sending to process")
-
+    seqid = await finish_field_put(writer, toprocess, partition)
     return ResourceFieldAdded(seqid=seqid)
 
 
@@ -689,16 +652,20 @@ async def _append_messages_to_conversation_field(
 
     await parse_conversation_field(field_id, field, writer, toprocess, kbid, rid)
 
+    writer.source = BrokerMessage.MessageSource.WRITER
+    try:
+        await transaction.commit(writer, partition, wait=True)
+    except TransactionCommitTimeoutError:
+        raise HTTPException(
+            status_code=501, detail="Inconsistent write. Commit timeout"
+        )
+
     try:
         processing_info = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
     except SendToProcessError:
         raise HTTPException(status_code=500, detail="Error while sending to process")
-
-    writer.source = BrokerMessage.MessageSource.WRITER
-    set_processing_info(writer, processing_info)
-    await transaction.commit(writer, partition, wait=True)
 
     return ResourceFieldAdded(seqid=processing_info.seqid)
 
@@ -783,17 +750,19 @@ async def _append_blocks_to_layout_field(
     field.body.blocks.update(blocks)
     await parse_layout_field(field_id, field, writer, toprocess, kbid, rid)
 
+    writer.source = BrokerMessage.MessageSource.WRITER
+    try:
+        await transaction.commit(writer, partition, wait=True)
+    except TransactionCommitTimeoutError:
+        raise HTTPException(
+            status_code=501, detail="Inconsistent write. Commit timeout"
+        )
     try:
         processing_info = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
     except SendToProcessError:
         raise HTTPException(status_code=500, detail="Error while sending to process")
-
-    writer.source = BrokerMessage.MessageSource.WRITER
-    set_processing_info(writer, processing_info)
-    await transaction.commit(writer, partition, wait=True)
-
     return ResourceFieldAdded(seqid=processing_info.seqid)
 
 
@@ -867,7 +836,12 @@ async def _delete_resource_field(
     writer.delete_fields.append(pb_field_id)
     parse_audit(writer.audit, request)
 
-    await transaction.commit(writer, partition, wait=True)
+    try:
+        await transaction.commit(writer, partition, wait=True)
+    except TransactionCommitTimeoutError:
+        raise HTTPException(
+            status_code=501, detail="Inconsistent write. Commit timeout"
+        )
 
     return Response(status_code=204)
 
@@ -931,6 +905,18 @@ async def reprocess_file_field(
         except KeyError:
             raise HTTPException(status_code=404, detail="Field does not exist")
 
+    writer = BrokerMessage()
+    writer.kbid = kbid
+    writer.uuid = rid
+    writer.source = BrokerMessage.MessageSource.WRITER
+    writer.basic.metadata.useful = True
+    writer.basic.metadata.status = Metadata.Status.PENDING
+    try:
+        await transaction.commit(writer, partition, wait=False)
+    except TransactionCommitTimeoutError:
+        raise HTTPException(
+            status_code=501, detail="Inconsistent write. Commit timeout"
+        )
     # Send current resource to reprocess.
     try:
         processing_info = await processing.send_to_process(toprocess, partition)
@@ -938,14 +924,5 @@ async def reprocess_file_field(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
     except SendToProcessError:
         raise HTTPException(status_code=500, detail="Error while sending to process")
-
-    writer = BrokerMessage()
-    writer.kbid = kbid
-    writer.uuid = rid
-    writer.source = BrokerMessage.MessageSource.WRITER
-    writer.basic.metadata.useful = True
-    writer.basic.metadata.status = Metadata.Status.PENDING
-    set_processing_info(writer, processing_info)
-    await transaction.commit(writer, partition, wait=False)
 
     return ResourceUpdated(seqid=processing_info.seqid)

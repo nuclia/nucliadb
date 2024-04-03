@@ -49,6 +49,10 @@ class WaitFor:
         self.seq = seq
 
 
+class TransactionCommitTimeoutError(Exception):
+    pass
+
+
 class LocalTransactionUtility:
     async def commit(
         self,
@@ -204,6 +208,7 @@ class TransactionUtility:
                 await asyncio.wait_for(waiting_event.wait(), timeout=30.0)
             except asyncio.TimeoutError:
                 logger.warning("Took too much to commit")
+                raise TransactionCommitTimeoutError()
             finally:
                 await self.stop_waiting(writer.kbid, request_id=request_id)
 
