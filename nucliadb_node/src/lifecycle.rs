@@ -22,10 +22,10 @@
 
 use std::sync::Arc;
 
-use crate::merge::errors::MergerError;
-use crate::merge::{self, MergeScheduler};
+use crate::merge::{self, global_merger, MergeScheduler};
 use crate::settings::Settings;
 use crate::shards::cache::ShardWriterCache;
+use nucliadb_core::merge::{install_merge_requester, MergerError};
 use nucliadb_core::prelude::*;
 use nucliadb_core::thread::ThreadPoolBuilder;
 
@@ -53,6 +53,7 @@ pub fn initialize_writer(settings: Settings) -> NodeResult<()> {
 pub fn initialize_merger(shard_cache: Arc<ShardWriterCache>, settings: Settings) -> Result<(), MergerError> {
     let merger = MergeScheduler::new(shard_cache, settings);
     let _ = merge::install_global(merger).map(std::thread::spawn)?;
+    install_merge_requester(global_merger())?;
     Ok(())
 }
 

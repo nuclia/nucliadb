@@ -683,7 +683,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bef552e6f588e446098f6ba40d89ac146c8c7b64aade83c051ee00bb5d2bc18d"
 dependencies = [
  "serde",
- "uuid 1.7.0",
+ "uuid 1.8.0",
 ]
 
 [[package]]
@@ -1726,6 +1726,7 @@ dependencies = [
  "tonic",
  "tower",
  "tracing",
+ "uuid 1.8.0",
 ]
 
 [[package]]
@@ -1794,7 +1795,7 @@ dependencies = [
  "tracing-opentelemetry",
  "tracing-subscriber",
  "username",
- "uuid 1.7.0",
+ "uuid 1.8.0",
 ]
 
 [[package]]
@@ -1814,7 +1815,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
- "uuid 1.7.0",
+ "uuid 1.8.0",
 ]
 
 [[package]]
@@ -1894,7 +1895,7 @@ dependencies = [
  "tantivy 0.17.0 (git+https://github.com/nuclia/tantivy.git?rev=2183120aaa565b14fde05aa35342e5c5a3306d3b)",
  "tempfile",
  "thiserror",
- "uuid 1.7.0",
+ "uuid 1.8.0",
 ]
 
 [[package]]
@@ -1916,7 +1917,7 @@ dependencies = [
  "tantivy 0.17.0 (git+https://github.com/nuclia/tantivy.git?branch=original-17)",
  "tempfile",
  "thiserror",
- "uuid 1.7.0",
+ "uuid 1.8.0",
 ]
 
 [[package]]
@@ -1960,7 +1961,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror",
- "uuid 1.7.0",
+ "uuid 1.8.0",
 ]
 
 [[package]]
@@ -3002,7 +3003,7 @@ dependencies = [
  "thiserror",
  "time",
  "url",
- "uuid 1.7.0",
+ "uuid 1.8.0",
 ]
 
 [[package]]
@@ -3019,7 +3020,7 @@ dependencies = [
  "thiserror",
  "time",
  "url",
- "uuid 1.7.0",
+ "uuid 1.8.0",
 ]
 
 [[package]]
@@ -4049,9 +4050,9 @@ dependencies = [
 
 [[package]]
 name = "uuid"
-version = "1.7.0"
+version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f00cc9702ca12d3c81455259621e676d0f7251cec66a21e98fe2e9a37db93b2a"
+checksum = "a183cf7feeba97b4dd1c0d46788634f6221d87fa961b305bed08c851829efcc0"
 dependencies = [
  "getrandom",
  "rand",
@@ -4061,9 +4062,9 @@ dependencies = [
 
 [[package]]
 name = "uuid-macro-internal"
-version = "1.7.0"
+version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7abb14ae1a50dad63eaa768a458ef43d298cd1bd44951677bd10b732a9ba2a2d"
+checksum = "9881bea7cbe687e36c9ab3b778c36cd0487402e270304e8b1296d5085303c1a2"
 dependencies = [
  "proc-macro2",
  "quote",

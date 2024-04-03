@@ -19,7 +19,7 @@
 //
 
 use std::collections::HashSet;
-use std::time::Instant;
+use std::time::{Instant, SystemTime};
 
 use crate::data_point::{self, DataPointPin, DeleteLog, Elem, LabelDictionary, Similarity};
 use crate::formula::{AtomClause, Formula};
@@ -156,10 +156,10 @@ fn data_merge() {
     let dp1_pin = DataPointPin::create_pin(temp_dir.path()).unwrap();
     let dp1 = data_point::create(&dp1_pin, elems1, None, SIMILARITY).unwrap();
 
-    let work = &[(HashSet::default(), dp1), (HashSet::default(), dp0)];
+    let work = &[(HashSet::default(), &dp1), (HashSet::default(), &dp0)];
 
     let dp_pin = DataPointPin::create_pin(temp_dir.path()).unwrap();
-    let dp = data_point::merge(&dp_pin, work, Similarity::Cosine).unwrap();
+    let dp = data_point::merge(&dp_pin, work, Similarity::Cosine, SystemTime::now()).unwrap();
 
     let formula = Formula::new();
     let result: Vec<_> = dp.search(&HashSet::new(), &vector1, &formula, true, 1, Similarity::Cosine, -1.0).collect();
@@ -173,9 +173,9 @@ fn data_merge() {
     let dlog = HashSet::from([key1, key0]);
     let dp0 = data_point::open(&dp0_pin).unwrap();
     let dp1 = data_point::open(&dp1_pin).unwrap();
-    let work = &[(&dlog, dp1), (&dlog, dp0)];
+    let work = &[(&dlog, &dp1), (&dlog, &dp0)];
     let dp_pin = DataPointPin::create_pin(temp_dir.path()).unwrap();
-    let dp = data_point::merge(&dp_pin, work, Similarity::Cosine).unwrap();
+    let dp = data_point::merge(&dp_pin, work, Similarity::Cosine, SystemTime::now()).unwrap();
 
     assert_eq!(dp.journal().no_nodes(), 0);
 }
@@ -249,11 +249,11 @@ fn fast_data_merge() -> VectorR<()> {
     )?;
 
     // Merge without deletions
-    let mut work = [(HashSet::default(), big_segment), (HashSet::default(), small_segment)];
+    let mut work = [(HashSet::default(), &big_segment), (HashSet::default(), &small_segment)];
     let output_dir = tempfile::tempdir()?;
     let dp_pin = DataPointPin::create_pin(output_dir.path())?;
     let t = Instant::now();
-    let dp = data_point::merge(&dp_pin, &work, Similarity::Dot)?;
+    let dp = data_point::merge(&dp_pin, &work, Similarity::Dot, SystemTime::now())?;
     let fast_merge_time = t.elapsed();
 
     for (i, v) in search_vectors.iter().enumerate() {
@@ -270,7 +270,7 @@ fn fast_data_merge() -> VectorR<()> {
     let output_dir = tempfile::tempdir()?;
     let dp_pin = DataPointPin::create_pin(output_dir.path())?;
     let t = Instant::now();
-    let dp = data_point::merge(&dp_pin, &work, Similarity::Dot)?;
+    let dp = data_point::merge(&dp_pin, &work, Similarity::Dot, SystemTime::now())?;
     let slow_merge_time = t.elapsed();
 
     for (i, v) in search_vectors.iter().enumerate() {

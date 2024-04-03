@@ -19,12 +19,11 @@
 
 use crate::data_point::{self, DataPointPin, Elem, LabelDictionary};
 use crate::data_point_provider::garbage_collector;
-use crate::data_point_provider::writer::MergeParameters;
 use crate::data_point_provider::writer::Writer;
 use crate::data_point_provider::*;
 use crate::indexset::IndexKeyCollector;
 use crate::indexset::WriterSet;
-use nucliadb_core::metrics::{get_metrics, request_time, vectors::MergeSource};
+use nucliadb_core::metrics::{request_time, vectors::MergeSource};
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::prost::Message;
 use nucliadb_core::protos::resource::ResourceStatus;
@@ -58,19 +57,6 @@ impl Debug for VectorWriterService {
     }
 }
 
-fn record_merge_metrics(source: MergeSource, data: &crate::data_point_provider::writer::MergeMetrics) {
-    if data.merged == 0 {
-        return;
-    }
-
-    let metrics = &get_metrics().vectors_metrics;
-    metrics.record_time(source, data.seconds_elapsed);
-    for input in &data.input_segment_sizes {
-        metrics.record_input_segment(source, *input);
-    }
-    metrics.record_output_segment(source, data.output_segment_size);
-}
-
 impl VectorWriter for VectorWriterService {
     #[measure(actor = "vectors", metric = "force_garbage_collection")]
     #[tracing::instrument(skip_all)]
@@ -78,23 +64,18 @@ impl VectorWriter for VectorWriterService {
         Ok(())
     }
 
-    #[measure(actor = "vectors", metric = "merge")]
+    #[measure(actor = "vectors", metric = "prepare_merge")]
     #[tracing::instrument(skip_all)]
-    fn merge(&mut self, context: MergeContext) -> NodeResult<MergeMetrics> {
-        let time = Instant::now();
-        let merge_on_demand_parameters = MergeParameters {
-            max_nodes_in_merge: context.max_nodes_in_merge,
-            segments_before_merge: context.segments_before_merge,
-        };
-        let inner_metrics = self.index.merge(merge_on_demand_parameters)?;
-        let took = time.elapsed().as_secs_f64();
-        debug!("Merge took: {took} s");
-        record_merge_metrics(context.source, &inner_metrics);
+    fn prepare_merge(&self, parameters: MergeParameters) -> NodeResult<Option<Box<dyn MergeRunner>>> {
+        Ok(self.index.prepare_merge(parameters)?)
+    }
 
-        Ok(MergeMetrics {
-            merged: inner_metrics.merged,
-            left: inner_metrics.segments_left,
-        })
+    #[measure(actor = "vectors", metric = "record_merge")]
+    #[tracing::instrument(skip_all)]
+    fn record_merge(&mut self, merge_result: Box<dyn MergeResults>, source: MergeSource) -> NodeResult<MergeMetrics> {
+        self.index.record_merge(merge_result.as_ref())?;
+        merge_result.record_metrics(source);
+        Ok(merge_result.get_metrics())
     }
 
     #[measure(actor = "vectors", metric = "list_vectorsets")]
@@ -168,8 +149,7 @@ impl VectorWriter for VectorWriterService {
         let temporal_mark = SystemTime::now();
         let resource_uuid_bytes = resource_id.uuid.as_bytes();
         self.index.record_delete(resource_uuid_bytes, temporal_mark);
-        let merge_metrics = self.index.commit()?;
-        record_merge_metrics(MergeSource::OnCommit, &merge_metrics);
+        self.index.commit()?;
 
         let took = time.elapsed().as_secs_f64();
         debug!("{id:?} - Ending at {took} ms");
@@ -233,8 +213,7 @@ impl VectorWriter for VectorWriterService {
             self.index.record_delete(key_as_bytes, temporal_mark);
         }
 
-        let merge_metrics = self.index.commit()?;
-        record_merge_metrics(MergeSource::OnCommit, &merge_metrics);
+        self.index.commit()?;
 
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Main index set resource: ends {v} ms");
@@ -283,8 +262,7 @@ impl VectorWriter for VectorWriterService {
         }
 
         for (_, mut writer) in writer_sets {
-            let merge_metrics = writer.commit()?;
-            record_merge_metrics(MergeSource::OnCommit, &merge_metrics);
+            writer.commit()?;
         }
 
         let v = time.elapsed().as_millis();
@@ -390,8 +368,8 @@ impl VectorWriterService {
                 channel: config.channel,
             };
             Ok(VectorWriterService {
-                index: Writer::new(path, index_metadata)?,
-                indexset: WriterSet::new(indexset)?,
+                index: Writer::new(path, index_metadata, config.shard_id.clone())?,
+                indexset: WriterSet::new(indexset, config.shard_id.clone())?,
                 config: config.clone(),
             })
         }
@@ -405,8 +383,8 @@ impl VectorWriterService {
             Err(node_error!("Shard does not exist".to_string()))
         } else {
             Ok(VectorWriterService {
-                index: Writer::open(path)?,
-                indexset: WriterSet::new(indexset)?,
+                index: Writer::open(path, config.shard_id.clone())?,
+                indexset: WriterSet::new(indexset, config.shard_id.clone())?,
                 config: config.clone(),
             })
         }
@@ -453,6 +431,7 @@ mod tests {
             path: dir.path().join("vectors"),
             vectorset: dir.path().join("vectorsets"),
             channel: Channel::EXPERIMENTAL,
+            shard_id: "abc".into(),
         };
 
         let mut writer = VectorWriterService::start(&vsc).expect("Error starting vector writer");
@@ -522,6 +501,7 @@ mod tests {
             path: dir.path().join("vectors"),
             vectorset: dir.path().join("vectorset"),
             channel: Channel::EXPERIMENTAL,
+            shard_id: "abc".into(),
         };
         let raw_sentences = [
             ("DOC/KEY/1/1".to_string(), vec![1.0, 3.0, 4.0]),
@@ -588,6 +568,7 @@ mod tests {
             path: dir.path().join("vectors"),
             vectorset: dir.path().join("vectorset"),
             channel: Channel::EXPERIMENTAL,
+            shard_id: "abc".into(),
         };
         let resource_id = ResourceId {
             shard_id: "DOC".to_string(),

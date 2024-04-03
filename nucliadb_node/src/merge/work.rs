@@ -20,8 +20,8 @@
 
 use std::collections::{HashMap, VecDeque};
 
-use super::request::MergePriority;
-use super::request::MERGE_PRIORITIES;
+use super::MergePriority;
+use super::MERGE_PRIORITIES;
 
 /// Work queue structure for merge scheduler. It serves as a priority queue with
 /// deduplication of elements

@@ -30,10 +30,11 @@ use std::{
 use crate::settings::Settings;
 use crate::shards::cache::ShardWriterCache;
 use anyhow::anyhow;
+use nucliadb_core::merge::MergeRequester;
 use nucliadb_core::metrics::vectors::MergeSource;
 use nucliadb_core::tracing::warn;
-use nucliadb_core::vectors::MergeContext;
 use nucliadb_core::vectors::MergeMetrics;
+use nucliadb_core::vectors::{MergeContext, MergeParameters};
 use nucliadb_core::NodeResult;
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::{Receiver, Sender};
@@ -41,38 +42,56 @@ use tokio::sync::oneshot::{Receiver, Sender};
 use super::work::WorkQueue;
 use crate::merge::{MergePriority, MergeRequest, MergeWaiter};
 
-const MAX_NODES_IN_MERGE: &str = "SCHEDULER_MAX_NODES_IN_MERGE";
-const SEGMENTS_BEFORE_MERGE: &str = "SCHEDULER_SEGMENTS_BEFORE_MERGE";
+const SCHEDULER_MAX_NODES_IN_MERGE: &str = "SCHEDULER_MAX_NODES_IN_MERGE";
+const SCHEDULER_SEGMENTS_BEFORE_MERGE: &str = "SCHEDULER_SEGMENTS_BEFORE_MERGE";
+const ON_COMMIT_MAX_NODES_IN_MERGE: &str = "MAX_NODES_IN_MERGE";
+const ON_COMMIT_SEGMENTS_BEFORE_MERGE: &str = "SEGMENTS_BEFORE_MERGE";
 
 /// Merge scheduler is the responsible for scheduling merges in the vectors
 /// index. When running, it takes the most prioritary merge request, takes a
 /// shard writer and executes the merge.
 pub struct MergeScheduler {
-    max_nodes_in_merge: usize,
-    segments_before_merge: usize,
     work_queue: Mutex<WorkQueue<InternalMergeRequest>>,
     shard_cache: Arc<ShardWriterCache>,
     settings: Settings,
     condvar: Condvar,
     shutdown: AtomicBool,
+    on_commit_parameters: MergeParameters,
+    scheduler_parameters: MergeParameters,
 }
 
 impl MergeScheduler {
     pub fn new(shard_cache: Arc<ShardWriterCache>, settings: Settings) -> Self {
+        let idle_parameters = MergeParameters {
+            max_nodes_in_merge: match std::env::var(SCHEDULER_MAX_NODES_IN_MERGE) {
+                Ok(v) => v.parse().unwrap_or(50_000),
+                Err(_) => 50_000,
+            },
+            segments_before_merge: match std::env::var(SCHEDULER_SEGMENTS_BEFORE_MERGE) {
+                Ok(v) => v.parse().unwrap_or(2),
+                Err(_) => 2,
+            },
+        };
+
+        let on_commit_parameters = MergeParameters {
+            max_nodes_in_merge: match std::env::var(ON_COMMIT_MAX_NODES_IN_MERGE) {
+                Ok(v) => v.parse().unwrap_or(50_000),
+                Err(_) => 50_000,
+            },
+            segments_before_merge: match std::env::var(ON_COMMIT_SEGMENTS_BEFORE_MERGE) {
+                Ok(v) => v.parse().unwrap_or(2),
+                Err(_) => 100,
+            },
+        };
+
         Self {
             shard_cache,
             settings,
             work_queue: Mutex::new(WorkQueue::new()),
             condvar: Condvar::default(),
             shutdown: AtomicBool::new(false),
-            max_nodes_in_merge: match std::env::var(MAX_NODES_IN_MERGE) {
-                Ok(v) => v.parse().unwrap_or(50_000),
-                Err(_) => 50_000,
-            },
-            segments_before_merge: match std::env::var(SEGMENTS_BEFORE_MERGE) {
-                Ok(v) => v.parse().unwrap_or(2),
-                Err(_) => 2,
-            },
+            on_commit_parameters,
+            scheduler_parameters: idle_parameters,
         }
     }
 
@@ -179,8 +198,11 @@ impl MergeScheduler {
         };
         let merge_context = MergeContext {
             source: request.metrics_source,
-            max_nodes_in_merge: self.max_nodes_in_merge,
-            segments_before_merge: self.segments_before_merge,
+            parameters: if request.metrics_source == MergeSource::Low {
+                self.on_commit_parameters
+            } else {
+                self.scheduler_parameters
+            },
         };
         let result = shard.merge(merge_context);
 
@@ -221,6 +243,12 @@ impl MergeScheduler {
     #[cfg(test)]
     pub fn pending_work(&self) -> usize {
         self.work_queue.lock().unwrap().len()
+    }
+}
+
+impl MergeRequester for MergeScheduler {
+    fn request_merge(&self, request: MergeRequest) {
+        self.schedule(request);
     }
 }
 

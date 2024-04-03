@@ -30,13 +30,12 @@
 //! The trait `SettingsProvider` makes it easy to extend this module with more
 //! providers (to parse from CLI for example).
 
-use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
-use std::path::PathBuf;
-use std::time::Duration;
-
 use derive_builder::Builder;
 use nucliadb_core::tracing::{error, Level};
 use nucliadb_core::NodeResult;
+use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
+use std::path::PathBuf;
+use std::time::Duration;
 
 use crate::disk_structure::{METADATA_FILE, SHARDS_DIR};
 use crate::replication::NodeRole;
@@ -132,6 +131,19 @@ pub struct InnerSettings {
     /// setting also affects merge scheduler reaction time
     #[builder(default = "Duration::from_secs(10)")]
     pub merge_scheduler_free_time_work_scheduling_delay: Duration,
+
+    // Two pairs of merge settings applied when running a scheduled merge or
+    // a merge triggered after a commit.
+    // - max_nodes_in_merge: maximum merged segment size (in number of vectors)
+    // - segments_before_merge: minimum number of alive segments before considering a merge
+    #[builder(default = "50_000")]
+    pub merge_scheduler_max_nodes_in_merge: usize,
+    #[builder(default = "2")]
+    pub merge_scheduler_segments_before_merge: usize,
+    #[builder(default = "50_000")]
+    pub merge_on_commit_max_nodes_in_merge: usize,
+    #[builder(default = "100")]
+    pub merge_on_commit_segments_before_merge: usize,
 }
 
 impl InnerSettings {
