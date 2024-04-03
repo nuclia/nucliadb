@@ -70,10 +70,12 @@ impl<T: PartialEq> WorkQueue<T> {
         None
     }
 
+    #[allow(unused)]
     pub fn len(&self) -> usize {
         self.queues.values().fold(0, |acc, queue| acc + queue.len())
     }
 
+    #[allow(unused)]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }

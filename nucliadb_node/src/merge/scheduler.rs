@@ -148,18 +148,19 @@ impl MergeScheduler {
 
     fn wait_for_work(&self, timeout: Duration) -> Option<InternalMergeRequest> {
         let mut queue = self.work_queue.lock().expect("Poisoned merger scheduler mutex");
-        if !queue.is_empty() {
-            return Some(queue.pop().unwrap());
+
+        // Wait in a loop because a condvar may get awaken spuriously without new work being inserted
+        loop {
+            if let Some(work) = queue.pop() {
+                return Some(work);
+            }
+
+            let wait;
+            (queue, wait) = self.condvar.wait_timeout(queue, timeout).expect("Poisoned merger scheduler mutex");
+            if wait.timed_out() {
+                return None;
+            }
         }
-
-        let wait;
-        (queue, wait) = self.condvar.wait_timeout(queue, timeout).expect("Poisoned merger scheduler mutex");
-
-        if wait.timed_out() {
-            return None;
-        }
-
-        Some(queue.pop().unwrap())
     }
 
     fn prepare(&self, request: MergeRequest) -> (InternalMergeRequest, MergePriority, WorkHandle) {
