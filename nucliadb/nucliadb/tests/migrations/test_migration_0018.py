@@ -21,8 +21,10 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
+from nucliadb.common import datamanagers
+from nucliadb.common.datamanagers.kb import KB_SLUGS
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.ingest.orm.knowledgebox import KB_SLUGS, KnowledgeBox
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.migrator.models import Migration
 from nucliadb.tests.migrations import get_migration
 
@@ -44,14 +46,14 @@ async def test_migration_0018_global(maindb_driver: Driver):
             fake_kb_id = "fake-kb-id"
             key = KB_SLUGS.format(slug=fake_kb_slug)
             await txn.set(key, fake_kb_id.encode())
-            assert not await KnowledgeBox.exist_kb(txn, fake_kb_id)
+            assert not await datamanagers.kb.exists_kb(txn, kbid=fake_kb_id)
 
             real_kb_slug = "real-kb-slug"
             real_kb_id, failed = await KnowledgeBox.create(
                 txn, slug=real_kb_slug, semantic_model=Mock()
             )
             assert not failed
-            assert await KnowledgeBox.exist_kb(txn, real_kb_id)
+            assert await datamanagers.kb.exists_kb(txn, kbid=fake_kb_id)
 
             await txn.commit()
 
@@ -59,7 +61,8 @@ async def test_migration_0018_global(maindb_driver: Driver):
             # another
         async with maindb_driver.transaction(read_only=True) as txn:
             kb_slugs = [
-                kb_slug async for kbid, kb_slug in KnowledgeBox.get_kbs(txn, slug="")
+                kb_slug
+                async for kbid, kb_slug in datamanagers.kb.get_kbs(txn, prefix="")
             ]
             assert len(kb_slugs) == 2
             assert fake_kb_slug in kb_slugs
@@ -71,8 +74,8 @@ async def test_migration_0018_global(maindb_driver: Driver):
     await migration.module.migrate(execution_context)
 
     async with maindb_driver.transaction(read_only=True) as txn:
-        assert not await KnowledgeBox.exist_kb(txn, fake_kb_id)
-        assert await KnowledgeBox.exist_kb(txn, real_kb_id)
+        assert not await datamanagers.kb.exists_kb(txn, kbid=fake_kb_id)
+        assert await datamanagers.kb.exists_kb(txn, kbid=real_kb_id)
 
         value = await txn.get(KB_SLUGS.format(slug=fake_kb_slug))
         assert value is None
@@ -82,7 +85,7 @@ async def test_migration_0018_global(maindb_driver: Driver):
         assert value.decode() == real_kb_id
 
         kb_slugs = [
-            kb_slug async for kbid, kb_slug in KnowledgeBox.get_kbs(txn, slug="")
+            kb_slug async for kbid, kb_slug in datamanagers.kb.get_kbs(txn, prefix="")
         ]
         assert len(kb_slugs) == 1
         assert real_kb_slug in kb_slugs

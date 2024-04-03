@@ -26,7 +26,9 @@ orphan. Let's delete them!
 """
 import logging
 
-from nucliadb.ingest.orm.knowledgebox import KB_SLUGS_BASE, KnowledgeBox
+from nucliadb.common import datamanagers
+from nucliadb.common.datamanagers.kb import KB_SLUGS_BASE
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.migrator.context import ExecutionContext
 
 logger = logging.getLogger(__name__)
@@ -46,7 +48,7 @@ async def migrate(context: ExecutionContext) -> None:
                 continue
 
             kbid = value.decode()
-            if not (await KnowledgeBox.exist_kb(txn, kbid)):
+            if not (await datamanagers.kb.exists_kb(txn, kbid=kbid)):
                 # log data too just in case
                 logger.info(
                     "Removing orphan /kbslugs key",
