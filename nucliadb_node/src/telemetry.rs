@@ -18,6 +18,9 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::collections::HashMap;
+use std::sync::atomic::AtomicUsize;
+use std::sync::RwLock;
+use std::time::{Duration, Instant};
 
 use nucliadb_core::tracing::{Level, Metadata, Span};
 use nucliadb_core::{Context, NodeResult};
@@ -35,6 +38,24 @@ use crate::settings::Settings;
 use crate::utils::ALL_TARGETS;
 
 const TRACE_ID: &str = "trace-id";
+const TELEMETRY_ERROR_INTERVAL: Duration = Duration::from_secs(5);
+
+fn telemetry_error_handler(error: global::Error) {
+    static LAST_ERROR: RwLock<Option<Instant>> = RwLock::new(None);
+    static ERROR_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+    let report = match *LAST_ERROR.read().unwrap() {
+        None => true,
+        Some(last_error) => last_error.elapsed() > TELEMETRY_ERROR_INTERVAL,
+    };
+    if report {
+        let error_count = ERROR_COUNT.fetch_min(0, std::sync::atomic::Ordering::Relaxed);
+        log::warn!("Open telemetry error {error:?} ({error_count} more since last report)");
+        *LAST_ERROR.write().unwrap() = Some(Instant::now());
+    } else {
+        ERROR_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    }
+}
 
 pub fn init_telemetry(settings: &Settings) -> NodeResult<Option<ClientInitGuard>> {
     let mut layers = Vec::new();
@@ -59,6 +80,8 @@ pub fn init_telemetry(settings: &Settings) -> NodeResult<Option<ClientInitGuard>
     }
 
     tracing_subscriber::registry().with(layers).try_init().with_context(|| "trying to init tracing")?;
+
+    global::set_error_handler(telemetry_error_handler)?;
 
     Ok(sentry_guard)
 }
