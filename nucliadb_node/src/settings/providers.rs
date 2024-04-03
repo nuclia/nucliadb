@@ -27,6 +27,18 @@ pub trait SettingsProvider {
     fn generate_settings() -> NodeResult<Settings>;
 }
 
+macro_rules! from_env {
+    ($builder:ident.$name:ident $(: $parse:ty)?, $env:literal) => {
+        if let Ok(value) = std::env::var($env) {
+            #[allow(unused_labels)]
+            'set: {
+                $(let Ok(value) = value.parse::<$parse>() else { break 'set };)*
+                $builder.$name(value);
+            }
+        }
+    };
+}
+
 pub mod env {
     use std::time::Duration;
 
@@ -50,37 +62,22 @@ pub mod env {
                 }
             }
 
-            if let Ok(data_path) = std::env::var("DATA_PATH") {
-                builder.data_path(data_path);
-            }
-
-            if let Ok(Ok(max_shards)) = std::env::var("MAX_NODE_REPLICAS").map(|v| v.parse::<usize>()) {
-                builder.max_shards_per_node(max_shards);
-            }
-
-            if let Ok(path) = std::env::var("HOST_KEY_PATH") {
-                builder.host_key_path(path);
-            }
-
-            if let Ok(hostname) = std::env::var("HOSTNAME") {
-                builder.hostname(hostname);
-            }
+            from_env!(builder.data_path, "DATA_PATH");
+            from_env!(builder.max_shards_per_node: usize, "MAX_NODE_REPLICAS");
+            from_env!(builder.host_key_path, "HOST_KEY_PATH");
+            from_env!(builder.hostname, "HOSTNAME");
 
             if let Ok(Ok(true)) = std::env::var("DISABLE_SENTRY").map(|v| v.parse::<bool>()) {
                 builder.without_sentry();
             }
 
-            if let Ok(url) = std::env::var("SENTRY_URL") {
-                builder.sentry_url(url);
-            }
-
-            if let Ok(env) = std::env::var("RUNNING_ENVIRONMENT") {
-                builder.sentry_env(env);
-            }
+            from_env!(builder.sentry_url, "SENTRY_URL");
+            from_env!(builder.sentry_env, "RUNNING_ENVIRONMENT");
 
             if let Ok(levels) = std::env::var("RUST_LOG") {
                 builder.log_levels(parse_log_levels(&levels));
             }
+
             // support more standard LOG_LEVELS env var
             if let Ok(levels) = std::env::var("LOG_LEVELS") {
                 builder.log_levels(parse_log_levels(&levels));
@@ -90,33 +87,17 @@ pub mod env {
                 builder.with_jaeger_enabled();
             }
 
-            if let Ok(host) = std::env::var("JAEGER_AGENT_HOST") {
-                builder.jaeger_agent_host(host);
-            }
-
-            if let Ok(Ok(port)) = std::env::var("JAEGER_AGENT_PORT").map(|v| v.parse::<u16>()) {
-                builder.jaeger_agent_port(port);
-            }
-
-            if let Ok(addr) = std::env::var("READER_LISTEN_ADDRESS") {
-                builder.reader_listen_address(addr);
-            }
-
-            if let Ok(addr) = std::env::var("WRITER_LISTEN_ADDRESS") {
-                builder.writer_listen_address(addr);
-            }
-
-            if let Ok(Ok(port)) = std::env::var("METRICS_PORT").map(|v| v.parse::<u16>()) {
-                builder.metrics_port(port);
-            }
+            from_env!(builder.jaeger_agent_host, "JAEGER_AGENT_HOST");
+            from_env!(builder.jaeger_agent_port: u16, "JAEGER_AGENT_PORT");
+            from_env!(builder.reader_listen_address, "READER_LISTEN_ADDRESS");
+            from_env!(builder.writer_listen_address, "WRITER_LISTEN_ADDRESS");
+            from_env!(builder.metrics_port: u16, "METRICS_PORT");
 
             if let Ok(node_role) = std::env::var("NODE_ROLE") {
                 builder.node_role(parse_node_role(node_role.as_str()));
             }
 
-            if let Ok(primary_address) = std::env::var("PRIMARY_ADDRESS") {
-                builder.primary_address(primary_address);
-            }
+            from_env!(builder.primary_address, "PRIMARY_ADDRESS");
 
             if let Ok(Ok(replication_delay_seconds)) =
                 std::env::var("REPLICATION_DELAY_SECONDS").map(|v| v.parse::<u64>())
@@ -124,17 +105,18 @@ pub mod env {
                 builder.replication_delay(Duration::from_secs(replication_delay_seconds));
             }
 
-            if let Ok(Ok(replication_max_concurrency)) =
-                std::env::var("REPLICATION_MAX_CONCURRENCY").map(|v| v.parse::<u64>())
-            {
-                builder.replication_max_concurrency(replication_max_concurrency);
-            }
+            from_env!(builder.replication_max_concurrency: u64, "REPLICATION_MAX_CONCURRENCY");
 
             if let Ok(Ok(replication_healthy_delay)) =
                 std::env::var("REPLICATION_HEALTHY_DELAY").map(|v| v.parse::<u64>())
             {
                 builder.replication_healthy_delay(Duration::from_secs(replication_healthy_delay));
             }
+
+            from_env!(builder.merge_scheduler_max_nodes_in_merge: usize, "SCHEDULER_MAX_NODES_IN_MERGE");
+            from_env!(builder.merge_scheduler_segments_before_merge: usize, "SCHEDULER_SEGMENTS_BEFORE_MERGE");
+            from_env!(builder.merge_on_commit_max_nodes_in_merge: usize, "MAX_NODES_IN_MERGE");
+            from_env!(builder.merge_on_commit_segments_before_merge: usize, "SEGMENTS_BEFORE_MERGE");
 
             builder.build()
         }

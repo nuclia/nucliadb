@@ -37,9 +37,10 @@ pub trait IndexKeyCollector {
 pub struct WriterSet {
     state: State,
     location: PathBuf,
+    shard_id: String,
 }
 impl WriterSet {
-    pub fn new(path: &Path) -> VectorR<WriterSet> {
+    pub fn new(path: &Path, shard_id: String) -> VectorR<WriterSet> {
         if !path.exists() {
             std::fs::create_dir(path)?;
         }
@@ -48,6 +49,7 @@ impl WriterSet {
         Ok(WriterSet {
             state,
             location: path.to_path_buf(),
+            shard_id,
         })
     }
     pub fn remove_index(&mut self, index: &str) {
@@ -56,14 +58,14 @@ impl WriterSet {
     pub fn create_index(&mut self, index: &str, similarity: Similarity) -> VectorR<Writer> {
         if self.state.indexes.contains(index) {
             let location = self.location.join(index);
-            Writer::open(&location)
+            Writer::open(&location, self.shard_id.clone())
         } else {
             let metadata = IndexMetadata {
                 similarity,
                 ..Default::default()
             };
             let location = self.location.join(index);
-            let index_writer = Writer::new(&location, metadata)?;
+            let index_writer = Writer::new(&location, metadata, self.shard_id.clone())?;
             self.state.indexes.insert(index.to_string());
             Ok(index_writer)
         }
@@ -74,7 +76,7 @@ impl WriterSet {
     pub fn get(&self, index: &str) -> VectorR<Option<Writer>> {
         if self.state.indexes.contains(index) {
             let location = self.location.join(index);
-            Some(Writer::open(&location)).transpose()
+            Some(Writer::open(&location, self.shard_id.clone())).transpose()
         } else {
             Ok(None)
         }

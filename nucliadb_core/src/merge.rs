@@ -18,10 +18,14 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::shards::ShardId;
+use anyhow::anyhow;
+use std::sync::OnceLock;
+use tracing::error;
+
+use crate::NodeResult;
 
 pub struct MergeRequest {
-    pub shard_id: ShardId,
+    pub shard_id: String,
     pub priority: MergePriority,
     pub waiter: MergeWaiter,
 }
@@ -42,3 +46,31 @@ pub enum MergePriority {
 }
 
 pub const MERGE_PRIORITIES: [MergePriority; 3] = [MergePriority::High, MergePriority::Low, MergePriority::WhenFree];
+
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum MergerError {
+    #[error("Global merger is already installed")]
+    GlobalMergerAlreadyInstalled,
+}
+
+pub trait MergeRequester: Send + Sync {
+    fn request_merge(&self, request: MergeRequest);
+}
+
+// Interface to send jobs to the scheduler
+static MERGE_REQUEST_SENDER: OnceLock<&dyn MergeRequester> = OnceLock::new();
+
+pub fn install_merge_requester(requester: &'static dyn MergeRequester) -> Result<(), MergerError> {
+    MERGE_REQUEST_SENDER.set(requester).map_err(|_| MergerError::GlobalMergerAlreadyInstalled)
+}
+
+pub fn send_merge_request(request: MergeRequest) -> NodeResult<()> {
+    let Some(sender) = MERGE_REQUEST_SENDER.get() else {
+        error!("Trying to send merge request before initializing scheduler");
+        return Err(anyhow!("Merge scheduler not running"));
+    };
+    sender.request_merge(request);
+    Ok(())
+}

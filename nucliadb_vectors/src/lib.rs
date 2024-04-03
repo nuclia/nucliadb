@@ -54,6 +54,8 @@ pub enum VectorErr {
     InconsistentDimensions,
     #[error("UTF8 decoding error: {0}")]
     FromUtf8Error(#[from] std::string::FromUtf8Error),
+    #[error("Some of the merged segments were not found")]
+    MissingMergedSegments,
 }
 
 pub type VectorR<O> = Result<O, VectorErr>;
