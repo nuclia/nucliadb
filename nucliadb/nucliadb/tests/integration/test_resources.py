@@ -35,7 +35,6 @@ async def test_last_seqid_is_stored_in_resource(
 ):
     resp = await nucliadb_writer.post(
         f"/{KB_PREFIX}/{knowledgebox}/{RESOURCES_PREFIX}",
-        headers={"X-SYNCHRONOUS": "True"},
         json={
             "texts": {
                 "textfield1": {"body": "Some text", "format": "PLAIN"},
@@ -68,7 +67,6 @@ async def test_resource_crud(
 ):
     resp = await nucliadb_writer.post(
         f"/{KB_PREFIX}/{knowledgebox}/{RESOURCES_PREFIX}",
-        headers={"X-Synchronous": "true"},
         json={
             "slug": "mykb",
             "title": "My KB",
@@ -83,7 +81,6 @@ async def test_resource_crud(
 
     resp = await nucliadb_writer.patch(
         f"/{KB_PREFIX}/{knowledgebox}/resource/{rid}",
-        headers={"X-Synchronous": "true"},
         json={
             "title": "My updated KB",
         },
@@ -96,7 +93,6 @@ async def test_resource_crud(
 
     resp = await nucliadb_writer.delete(
         f"/{KB_PREFIX}/{knowledgebox}/resource/{rid}",
-        headers={"X-Synchronous": "true"},
     )
     assert resp.status_code == 204
 
@@ -120,7 +116,6 @@ async def test_list_resources(
     for _ in range(20):
         resp = await nucliadb_writer.post(
             f"/{KB_PREFIX}/{knowledgebox}/{RESOURCES_PREFIX}",
-            headers={"X-Synchronous": "true"},
             json={
                 "title": "My resource",
             },
@@ -158,7 +153,6 @@ async def test_get_resource_field(
 
     resp = await nucliadb_writer.post(
         f"/{KB_PREFIX}/{knowledgebox}/{RESOURCES_PREFIX}",
-        headers={"X-Synchronous": "true"},
         json={
             "slug": slug,
             "title": "My Resource",
@@ -193,7 +187,6 @@ async def test_resource_creation_slug_conflicts(
     resources_path = f"/{KB_PREFIX}/{{knowledgebox}}/{RESOURCES_PREFIX}"
     resp = await nucliadb_writer.post(
         resources_path.format(knowledgebox=knowledgebox),
-        headers={"X-Synchronous": "true"},
         json={
             "slug": slug,
         },
@@ -202,7 +195,6 @@ async def test_resource_creation_slug_conflicts(
 
     resp = await nucliadb_writer.post(
         resources_path.format(knowledgebox=knowledgebox),
-        headers={"X-Synchronous": "true"},
         json={
             "slug": slug,
         },
@@ -212,7 +204,6 @@ async def test_resource_creation_slug_conflicts(
     # Creating it in another KB should not raise conflict error
     resp = await nucliadb_writer.post(
         resources_path.format(knowledgebox=philosophy_books_kb),
-        headers={"X-Synchronous": "true"},
         json={
             "slug": slug,
         },
@@ -229,7 +220,6 @@ async def test_title_is_set_automatically_if_not_provided(
 ):
     resp = await nucliadb_writer.post(
         f"/{KB_PREFIX}/{knowledgebox}/{RESOURCES_PREFIX}",
-        headers={"X-Synchronous": "true"},
         json={
             "texts": {"text-field": {"body": "test1", "format": "PLAIN"}},
         },
@@ -246,18 +236,15 @@ async def test_title_is_set_automatically_if_not_provided(
 @pytest.mark.asyncio
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 @pytest.mark.parametrize("update_by", ["slug", "uuid"])
-@pytest.mark.parametrize("x_synchronous", [True, False])
 async def test_resource_slug_modification(
     nucliadb_reader,
     nucliadb_writer,
     knowledgebox,
     update_by,
-    x_synchronous,
 ):
     old_slug = "my-resource"
     resp = await nucliadb_writer.post(
         f"/{KB_PREFIX}/{knowledgebox}/{RESOURCES_PREFIX}",
-        headers={"X-Synchronous": "true"},
         json={
             "title": "My Resource",
             "slug": old_slug,
@@ -276,7 +263,6 @@ async def test_resource_slug_modification(
         path = f"/{KB_PREFIX}/{knowledgebox}/resource/{rid}"
     resp = await nucliadb_writer.patch(
         path,
-        headers={"X-Synchronous": str(x_synchronous).lower()},
         json={
             "slug": new_slug,
             "title": "New title",
@@ -313,7 +299,6 @@ async def test_resource_slug_modification_rollbacks(
     old_slug = "my-resource"
     resp = await nucliadb_writer.post(
         f"/{KB_PREFIX}/{knowledgebox}/{RESOURCES_PREFIX}",
-        headers={"X-Synchronous": "true"},
         json={
             "title": "Old title",
             "slug": old_slug,
@@ -331,7 +316,6 @@ async def test_resource_slug_modification_rollbacks(
     ):
         resp = await nucliadb_writer.patch(
             f"/{KB_PREFIX}/{knowledgebox}/resource/{rid}",
-            headers={"X-Synchronous": "true"},
             json={
                 "slug": "my-resource-2",
                 "title": "New title",
@@ -358,7 +342,6 @@ async def test_resource_slug_modification_handles_conflicts(
         slugs.append(slug)
         resp = await nucliadb_writer.post(
             f"/{KB_PREFIX}/{knowledgebox}/{RESOURCES_PREFIX}",
-            headers={"X-Synchronous": "true"},
             json={
                 "title": "My Resource",
                 "slug": slug,
@@ -372,7 +355,6 @@ async def test_resource_slug_modification_handles_conflicts(
     path = f"/{KB_PREFIX}/{knowledgebox}/resource/{rids[0]}"
     resp = await nucliadb_writer.patch(
         path,
-        headers={"X-Synchronous": "true"},
         json={
             "slug": slugs[1],
         },
@@ -388,7 +370,6 @@ async def test_resource_slug_modification_handles_unknown_resources(
 ):
     resp = await nucliadb_writer.patch(
         f"/{KB_PREFIX}/{knowledgebox}/resource/foobar",
-        headers={"X-Synchronous": "true"},
         json={
             "slug": "foo",
         },

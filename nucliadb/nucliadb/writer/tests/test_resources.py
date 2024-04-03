@@ -120,7 +120,6 @@ async def test_resource_crud(
         # Test create resource
         resp = await client.post(
             f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
-            headers={"X-SYNCHRONOUS": "True"},
             json={
                 "slug": "resource1",
                 "title": "My resource",
@@ -216,7 +215,6 @@ async def test_resource_crud_sync(
         # Test create resource
         resp = await client.post(
             f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
-            headers={"X-SYNCHRONOUS": "True"},
             json={
                 "slug": "resource1",
                 "title": "My resource",
@@ -294,7 +292,6 @@ async def test_resource_crud_sync(
         # Test update resource
         resp = await client.patch(
             f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}",
-            headers={"X-SYNCHRONOUS": "True"},
             json={},
         )
         assert resp.status_code == 200
@@ -303,14 +300,12 @@ async def test_resource_crud_sync(
 
         resp = await client.delete(
             f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/resource1",
-            headers={"X-SYNCHRONOUS": "True"},
         )
 
         assert resp.status_code == 404
 
         resp = await client.delete(
             f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}",
-            headers={"X-SYNCHRONOUS": "True"},
         )
         assert resp.status_code == 204
 
@@ -397,7 +392,6 @@ async def test_resource_endpoints_by_slug(
         slug = "my-resource"
         resp = await client.post(
             f"/{KB_PREFIX}/{knowledgebox_ingest}/{RESOURCES_PREFIX}",
-            headers={"X-SYNCHRONOUS": "True"},
             json={
                 "slug": slug,
                 "texts": {"text1": {"body": "test1", "format": "PLAIN"}},
@@ -480,7 +474,6 @@ async def test_paragraph_annotations(writer_api, knowledgebox_writer):
         # Must have at least one classification
         resp = await client.post(
             f"/{KB_PREFIX}/{kbid}/resources",
-            headers={"X-SYNCHRONOUS": "True"},
             json={
                 "texts": {"text1": TEST_TEXT_PAYLOAD},
                 "fieldmetadata": [
@@ -504,7 +497,6 @@ async def test_paragraph_annotations(writer_api, knowledgebox_writer):
 
         resp = await client.post(
             f"/{KB_PREFIX}/{kbid}/resources",
-            headers={"X-SYNCHRONOUS": "True"},
             json={
                 "texts": {"text1": TEST_TEXT_PAYLOAD},
                 "fieldmetadata": [
@@ -526,7 +518,6 @@ async def test_paragraph_annotations(writer_api, knowledgebox_writer):
         # Classifications need to be unique
         resp = await client.patch(
             f"/{KB_PREFIX}/{kbid}/resource/{rid}",
-            headers={"X-SYNCHRONOUS": "True"},
             json={
                 "fieldmetadata": [
                     {

@@ -46,7 +46,7 @@ from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.processing import ProcessingInfo, PushPayload, Source
 from nucliadb.writer import SERVICE_NAME, logger
-from nucliadb.writer.api.constants import SKIP_STORE_DEFAULT, SYNC_CALL, X_NUCLIADB_USER
+from nucliadb.writer.api.constants import SKIP_STORE_DEFAULT, X_NUCLIADB_USER
 from nucliadb.writer.api.v1.router import (
     KB_PREFIX,
     RESOURCE_PREFIX,
@@ -107,7 +107,6 @@ async def create_resource(
     item: CreateResourcePayload,
     kbid: str,
     x_skip_store: bool = SKIP_STORE_DEFAULT,
-    x_synchronous: bool = SYNC_CALL,
 ):
     await maybe_back_pressure(request, kbid)
 
@@ -189,14 +188,9 @@ async def create_resource(
     seqid = await maybe_send_to_process(writer, toprocess, partition)
 
     writer.source = BrokerMessage.MessageSource.WRITER
-    if x_synchronous:
-        t0 = time()
-    await transaction.commit(writer, partition, wait=x_synchronous)
-
-    if x_synchronous:
-        return ResourceCreated(seqid=seqid, uuid=uuid, elapsed=time() - t0)
-    else:
-        return ResourceCreated(seqid=seqid, uuid=uuid)
+    t0 = time()
+    await transaction.commit(writer, partition, wait=True)
+    return ResourceCreated(seqid=seqid, uuid=uuid, elapsed=time() - t0)
 
 
 @api.patch(
@@ -214,7 +208,6 @@ async def modify_resource_rslug_prefix(
     rslug: str,
     item: UpdateResourcePayload,
     x_skip_store: bool = SKIP_STORE_DEFAULT,
-    x_synchronous: bool = SYNC_CALL,
     x_nucliadb_user: str = X_NUCLIADB_USER,
 ):
     return await modify_resource_endpoint(
@@ -223,7 +216,6 @@ async def modify_resource_rslug_prefix(
         kbid,
         path_rslug=rslug,
         x_skip_store=x_skip_store,
-        x_synchronous=x_synchronous,
         x_nucliadb_user=x_nucliadb_user,
     )
 
@@ -243,7 +235,6 @@ async def modify_resource_rid_prefix(
     rid: str,
     item: UpdateResourcePayload,
     x_skip_store: bool = SKIP_STORE_DEFAULT,
-    x_synchronous: bool = SYNC_CALL,
     x_nucliadb_user: str = X_NUCLIADB_USER,
 ):
     return await modify_resource_endpoint(
@@ -252,7 +243,6 @@ async def modify_resource_rid_prefix(
         kbid,
         path_rid=rid,
         x_skip_store=x_skip_store,
-        x_synchronous=x_synchronous,
         x_nucliadb_user=x_nucliadb_user,
     )
 
@@ -262,7 +252,6 @@ async def modify_resource_endpoint(
     item: UpdateResourcePayload,
     kbid: str,
     x_skip_store: bool,
-    x_synchronous: bool,
     x_nucliadb_user: str,
     path_rid: Optional[str] = None,
     path_rslug: Optional[str] = None,
@@ -277,7 +266,6 @@ async def modify_resource_endpoint(
             item,
             kbid,
             x_skip_store=x_skip_store,
-            x_synchronous=x_synchronous,
             x_nucliadb_user=x_nucliadb_user,
             rid=resource_uuid,
         )
@@ -290,7 +278,6 @@ async def modify_resource_endpoint(
             item,
             kbid,
             x_skip_store=x_skip_store,
-            x_synchronous=x_synchronous,
             x_nucliadb_user=x_nucliadb_user,
             rid=resource_uuid,
         )
@@ -301,7 +288,6 @@ async def modify_resource(
     item: UpdateResourcePayload,
     kbid: str,
     x_skip_store: bool,
-    x_synchronous: bool,
     x_nucliadb_user: str,
     *,
     rid: str,
@@ -357,7 +343,7 @@ async def modify_resource(
 
     maybe_mark_reindex(writer, item)
 
-    await transaction.commit(writer, partition, wait=x_synchronous)
+    await transaction.commit(writer, partition, wait=True)
 
     return ResourceUpdated(seqid=seqid)
 
@@ -509,11 +495,8 @@ async def delete_resource_rslug_prefix(
     request: Request,
     kbid: str,
     rslug: str,
-    x_synchronous: bool = SYNC_CALL,
 ):
-    return await _delete_resource(
-        request, kbid, rslug=rslug, x_synchronous=x_synchronous
-    )
+    return await _delete_resource(request, kbid, rslug=rslug)
 
 
 @api.delete(
@@ -528,15 +511,13 @@ async def delete_resource_rid_prefix(
     request: Request,
     kbid: str,
     rid: str,
-    x_synchronous: bool = SYNC_CALL,
 ):
-    return await _delete_resource(request, kbid, rid=rid, x_synchronous=x_synchronous)
+    return await _delete_resource(request, kbid, rid=rid)
 
 
 async def _delete_resource(
     request: Request,
     kbid: str,
-    x_synchronous: bool,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
 ):
@@ -555,7 +536,7 @@ async def _delete_resource(
     parse_audit(writer.audit, request)
 
     # Create processing message
-    await transaction.commit(writer, partition, wait=x_synchronous)
+    await transaction.commit(writer, partition, wait=True)
 
     processing = get_processing()
     asyncio.create_task(processing.delete_from_processing(kbid=kbid, resource_id=rid))

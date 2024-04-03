@@ -48,7 +48,6 @@ async def src_kb(nucliadb_writer, nucliadb_manager):
                 "icon": "application/pdf",
                 "slug": f"test-{i}",
             },
-            headers={"X-SYNCHRONOUS": "true"},
             timeout=None,
         )
         assert resp.status_code == 201
@@ -60,7 +59,6 @@ async def src_kb(nucliadb_writer, nucliadb_manager):
             f"/kb/{kbid}/resource/{rid}/file/file/upload",
             headers={
                 "X-Filename": base64.b64encode(b"testfile").decode("utf-8"),
-                "X-Synchronous": "true",
                 "Content-Type": "text/plain",
             },
             content=base64.b64encode(content),
