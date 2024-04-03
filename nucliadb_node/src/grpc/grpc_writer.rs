@@ -194,7 +194,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let write_task = || {
             run_with_telemetry(info, move || {
                 let shard = obtain_shard(shards, shard_id_clone)?;
-                shard.set_resource(&resource).and_then(|()| shard.get_opstatus())
+                shard.set_resource(resource).and_then(|()| shard.get_opstatus())
             })
         };
         let status = tokio::task::spawn_blocking(write_task)

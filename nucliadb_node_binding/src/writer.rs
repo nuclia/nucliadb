@@ -160,7 +160,7 @@ impl NodeWriter {
         let resource = Resource::decode(&mut Cursor::new(resource)).expect("Error decoding arguments");
         let shard_id = resource.shard_id.clone();
         let shard = self.obtain_shard(shard_id.clone())?;
-        let status = shard.set_resource(&resource).and_then(|()| shard.get_opstatus());
+        let status = shard.set_resource(resource).and_then(|()| shard.get_opstatus());
         match status {
             Ok(mut status) => {
                 status.status = 0;
