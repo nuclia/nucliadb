@@ -62,7 +62,6 @@ jobs:
               - 'nucliadb_paragraphs/**'
               - 'nucliadb_paragraphs2/**'
               - 'nucliadb_vectors/**'
-              - 'nucliadb_vectors2/**'
               - 'nucliadb_relations/**'
               - 'nucliadb_relations2/**'
 

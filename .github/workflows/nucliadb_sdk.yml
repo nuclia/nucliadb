@@ -62,7 +62,6 @@ jobs:
               - 'nucliadb_texts/**'
               - 'nucliadb_texts2/**'
               - 'nucliadb_vectors/**'
-              - 'nucliadb_vectors2/**'
 
       - name: Build local NucliaDB for testing
         if: steps.filter.outputs.nucliadb_modified == 'true' && steps.filter.outputs.nucliadb_node_modified == 'false'

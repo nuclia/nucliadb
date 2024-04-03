@@ -151,7 +151,6 @@ pub fn merge<S: Interpreter + Copy>(recipient: &mut File, producers: &[(S, &[u8]
     let mut recipient_buffer = BufWriter::new(recipient);
     // Pointer to the next unused id slot
     let mut id_section_cursor = HEADER_LEN;
-
     let mut has_deletions = false;
 
     while producer_cursor < producers.len() {
