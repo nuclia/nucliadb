@@ -125,7 +125,10 @@ async def finish_field_put(
     except LimitsExceededError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
     except SendToProcessError:
-        raise HTTPException(status_code=500, detail="Error while sending to process")
+        raise HTTPException(
+            status_code=500,
+            detail="Error while sending to process. Try calling /reprocess",
+        )
 
 
 @api.put(
@@ -661,13 +664,15 @@ async def _append_messages_to_conversation_field(
             status_code=501,
             detail="Inconsistent write. This resource will not be processed and may not be stored.",
         )
-
     try:
         processing_info = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
     except SendToProcessError:
-        raise HTTPException(status_code=500, detail="Error while sending to process")
+        raise HTTPException(
+            status_code=500,
+            detail="Error while sending to process. Try calling /reprocess",
+        )
 
     return ResourceFieldAdded(seqid=processing_info.seqid)
 
@@ -765,7 +770,10 @@ async def _append_blocks_to_layout_field(
     except LimitsExceededError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
     except SendToProcessError:
-        raise HTTPException(status_code=500, detail="Error while sending to process")
+        raise HTTPException(
+            status_code=500,
+            detail="Error while sending to process. Try calling /reprocess",
+        )
     return ResourceFieldAdded(seqid=processing_info.seqid)
 
 
@@ -928,6 +936,9 @@ async def reprocess_file_field(
     except LimitsExceededError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
     except SendToProcessError:
-        raise HTTPException(status_code=500, detail="Error while sending to process")
+        raise HTTPException(
+            status_code=500,
+            detail="Error while sending to process. Try calling /reprocess",
+        )
 
     return ResourceUpdated(seqid=processing_info.seqid)

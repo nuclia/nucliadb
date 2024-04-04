@@ -714,7 +714,10 @@ async def send_to_process(toprocess: PushPayload, partition) -> ProcessingInfo:
     except LimitsExceededError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
     except SendToProcessError:
-        raise HTTPException(status_code=500, detail="Error while sending to process")
+        raise HTTPException(
+            status_code=500,
+            detail="Error while sending to process. Try calling /reprocess",
+        )
 
 
 def needs_reprocess(processing_payload: PushPayload) -> bool:
