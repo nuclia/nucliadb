@@ -39,6 +39,29 @@ use crate::telemetry::run_with_telemetry;
 
 pub struct BlockingToken<'a>(MutexGuard<'a, ()>);
 
+const MAX_LABEL_LENGTH: usize = 32768; // Tantivy max is 2^16 - 4
+
+fn remove_invalid_labels(resource: &mut Resource) {
+    resource.labels.retain(|l| {
+        if l.len() > MAX_LABEL_LENGTH {
+            warn!("Label length ({}) longer than maximum, it will not be indexed", l.len());
+            false
+        } else {
+            true
+        }
+    });
+    for text in resource.texts.values_mut() {
+        text.labels.retain(|l| {
+            if l.len() > MAX_LABEL_LENGTH {
+                warn!("Label length ({}) longer than maximum, it will not be indexed", l.len());
+                false
+            } else {
+                true
+            }
+        });
+    }
+}
+
 #[derive(Debug)]
 pub struct ShardWriter {
     pub metadata: Arc<ShardMetadata>,
@@ -212,8 +235,10 @@ impl ShardWriter {
 
     #[measure(actor = "shard", metric = "set_resource")]
     #[tracing::instrument(skip_all)]
-    pub fn set_resource(&self, resource: &Resource) -> NodeResult<()> {
+    pub fn set_resource(&self, mut resource: Resource) -> NodeResult<()> {
         let span = tracing::Span::current();
+
+        remove_invalid_labels(&mut resource);
 
         let text_writer_service = self.text_writer.clone();
         let field_resource = resource.clone();
