@@ -24,10 +24,10 @@
 //! application. Using diferent providers, one can obtain a `global_settings()` objects
 //! using values from different places.
 //!
-//! As an example, a `Envglobal_settings()Provider` collects it's values from environment
+//! As an example, a `EnvProvider` collects it's values from environment
 //! variables.
 //!
-//! The trait `global_settings()Provider` makes it easy to extend this module with more
+//! The trait `Provider` makes it easy to extend this module with more
 //! providers (to parse from CLI for example).
 
 use std::net::SocketAddr;
