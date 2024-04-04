@@ -25,7 +25,7 @@ from pydantic.class_validators import root_validator
 
 
 class RunningSettings(BaseSettings):
-    debug: bool = True
+    debug: bool = False
     sentry_url: Optional[str] = None
     running_environment: str = Field(
         default="local",
