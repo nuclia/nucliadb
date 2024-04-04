@@ -33,7 +33,7 @@
 use std::net::SocketAddr;
 use std::ops::Deref;
 use std::path::PathBuf;
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::anyhow;
@@ -61,16 +61,9 @@ where
     Ok(Duration::from_secs(u64::deserialize(d)?))
 }
 
-static SETTINGS: OnceLock<Settings> = OnceLock::new();
-
-pub fn global_settings() -> Settings {
-    SETTINGS.get().expect("Global settings not initialized").clone()
-}
-
-pub fn initialize_global_settings() -> NodeResult<()> {
+pub fn load_settings() -> NodeResult<Settings> {
     let settings: EnvSettings = envy::from_env().map_err(|e| anyhow!("Configuration error: {e}"))?;
-    let _ = SETTINGS.set(settings.into());
-    Ok(())
+    Ok(settings.into())
 }
 
 // Allowed sentry environments

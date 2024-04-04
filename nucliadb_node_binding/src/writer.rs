@@ -31,7 +31,7 @@ use nucliadb_core::Channel;
 use nucliadb_node::analytics::blocking::send_analytics_event;
 use nucliadb_node::analytics::payload::AnalyticsEvent;
 use nucliadb_node::lifecycle;
-use nucliadb_node::settings::{global_settings, initialize_global_settings};
+use nucliadb_node::settings::load_settings;
 use nucliadb_node::shards::cache::ShardWriterCache;
 use nucliadb_node::shards::metadata::ShardMetadata;
 use nucliadb_node::shards::writer::ShardWriter;
@@ -64,8 +64,7 @@ impl NodeWriter {
 impl NodeWriter {
     #[new]
     pub fn new() -> PyResult<Self> {
-        initialize_global_settings().unwrap();
-        let settings = global_settings();
+        let settings = load_settings().unwrap();
         let shard_cache = Arc::new(ShardWriterCache::new(settings.clone()));
         let shards_gc_loop_copy = Arc::clone(&shard_cache);
         let gc_parameters = GCParameters {

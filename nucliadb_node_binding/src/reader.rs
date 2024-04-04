@@ -24,7 +24,7 @@ use nucliadb_core::paragraphs::ParagraphIterator;
 use nucliadb_core::protos::*;
 use nucliadb_core::texts::DocumentIterator;
 use nucliadb_node::lifecycle;
-use nucliadb_node::settings::{global_settings, initialize_global_settings};
+use nucliadb_node::settings::load_settings;
 use nucliadb_node::shards::cache::ShardReaderCache;
 use nucliadb_node::shards::reader::ShardReader;
 use prost::Message;
@@ -86,8 +86,7 @@ impl NodeReader {
 impl NodeReader {
     #[new]
     pub fn new() -> Self {
-        initialize_global_settings().unwrap();
-        let settings = global_settings();
+        let settings = load_settings().unwrap();
         lifecycle::initialize_reader(settings.clone());
 
         let shards = Arc::new(ShardReaderCache::new(settings.clone()));

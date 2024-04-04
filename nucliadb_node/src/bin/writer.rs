@@ -32,7 +32,7 @@ use nucliadb_node::node_metadata::NodeMetadata;
 use nucliadb_node::replication::replicator::connect_to_primary_and_replicate_forever;
 use nucliadb_node::replication::service::ReplicationServiceGRPCDriver;
 use nucliadb_node::replication::NodeRole;
-use nucliadb_node::settings::{global_settings, initialize_global_settings, Settings};
+use nucliadb_node::settings::{load_settings, Settings};
 use nucliadb_node::shards::cache::ShardWriterCache;
 use nucliadb_node::telemetry::init_telemetry;
 use nucliadb_node::{lifecycle, utils};
@@ -74,8 +74,7 @@ async fn main() -> NodeResult<()> {
     eprintln!("NucliaDB Writer Node starting...");
     let start_bootstrap = Instant::now();
 
-    initialize_global_settings()?;
-    let settings = global_settings();
+    let settings = load_settings()?;
 
     let _guard = init_telemetry(&settings)?;
     let metrics = metrics::get_metrics();

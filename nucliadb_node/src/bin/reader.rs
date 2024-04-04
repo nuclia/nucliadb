@@ -29,7 +29,7 @@ use nucliadb_node::http_server::run_http_server;
 use nucliadb_node::lifecycle;
 use nucliadb_node::replication::health::ReplicationHealthManager;
 use nucliadb_node::replication::NodeRole;
-use nucliadb_node::settings::{global_settings, initialize_global_settings, Settings};
+use nucliadb_node::settings::{load_settings, Settings};
 use nucliadb_node::telemetry::init_telemetry;
 use tokio::signal::unix::SignalKind;
 use tokio::signal::{ctrl_c, unix};
@@ -44,8 +44,7 @@ async fn main() -> NodeResult<()> {
     eprintln!("NucliaDB Reader Node starting...");
     let start_bootstrap = Instant::now();
 
-    initialize_global_settings()?;
-    let settings = global_settings();
+    let settings = load_settings()?;
 
     if !settings.data_path.exists() {
         return Err(node_error!("Data directory missing"));
