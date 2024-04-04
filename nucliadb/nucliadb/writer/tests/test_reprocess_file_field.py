@@ -55,7 +55,6 @@ async def file_field(
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.post(
             f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}",
-            headers={"X-SYNCHRONOUS": "True"},
             json={
                 "slug": "resource",
                 "title": "My resource",

@@ -49,6 +49,10 @@ class WaitFor:
         self.seq = seq
 
 
+class TransactionCommitTimeoutError(Exception):
+    pass
+
+
 class LocalTransactionUtility:
     async def commit(
         self,
@@ -85,9 +89,11 @@ class TransactionUtility:
         self,
         nats_servers: list[str],
         nats_creds: Optional[str] = None,
+        commit_timeout: int = 60,
     ):
         self.nats_creds = nats_creds
         self.nats_servers = nats_servers
+        self.commit_timeout = commit_timeout
 
     async def disconnected_cb(self):
         logger.info("Got disconnected from NATS!")
@@ -201,9 +207,12 @@ class TransactionUtility:
 
         if wait and waiting_event is not None:
             try:
-                await asyncio.wait_for(waiting_event.wait(), timeout=30.0)
+                await asyncio.wait_for(
+                    waiting_event.wait(), timeout=self.commit_timeout
+                )
             except asyncio.TimeoutError:
                 logger.warning("Took too much to commit")
+                raise TransactionCommitTimeoutError()
             finally:
                 await self.stop_waiting(writer.kbid, request_id=request_id)
 

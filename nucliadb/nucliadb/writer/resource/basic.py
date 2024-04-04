@@ -40,7 +40,7 @@ from nucliadb_protos.utils_pb2 import Relation, RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb.ingest.orm.utils import set_title
-from nucliadb.ingest.processing import ProcessingInfo, PushPayload
+from nucliadb.ingest.processing import PushPayload
 from nucliadb_models.common import FIELD_TYPES_MAP_REVERSE
 from nucliadb_models.file import FileField
 from nucliadb_models.link import LinkField
@@ -222,22 +222,6 @@ def set_status(basic: Basic, item: CreateResourcePayload):
 
 def set_status_modify(basic: Basic, item: UpdateResourcePayload):
     basic.metadata.status = Metadata.Status.PENDING
-
-
-def set_processing_info(bm: BrokerMessage, processing_info: ProcessingInfo):
-    """
-    Processing V2 does not have this awkward processing info data field and storage
-    but keeping for b/w compatibility.
-
-    Once V1 is removed, this code can be removed because status checking will be done
-    in a separate API that is not part of NucliaDB.
-    """
-    if processing_info.seqid is not None:
-        bm.basic.last_seqid = processing_info.seqid
-    if processing_info.account_seq is not None:
-        bm.basic.last_account_seq = processing_info.account_seq
-    if processing_info.queue is not None:
-        bm.basic.queue = bm.basic.QueueType.Value(processing_info.queue.name)
 
 
 def validate_classifications(paragraph: ParagraphAnnotation):

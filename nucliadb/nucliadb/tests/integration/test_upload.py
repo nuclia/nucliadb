@@ -37,7 +37,6 @@ async def test_upload(
         f"/kb/{knowledgebox}/{UPLOAD}",
         headers={
             "X-Filename": base64.b64encode(b"testfile").decode("utf-8"),
-            "X-Synchronous": "true",
             "Content-Type": "text/plain",
             "Content-Length": str(len(content)),
         },
@@ -83,7 +82,6 @@ async def test_upload_guesses_content_type(
         f"/kb/{knowledgebox}/{UPLOAD}",
         headers={
             "X-Filename": base64.b64encode(filename.encode()).decode("utf-8"),
-            "X-Synchronous": "true",
         },
         content=base64.b64encode(content),
     )

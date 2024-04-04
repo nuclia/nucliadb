@@ -46,7 +46,7 @@ from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.processing import ProcessingInfo, PushPayload, Source
 from nucliadb.writer import SERVICE_NAME, logger
-from nucliadb.writer.api.constants import SKIP_STORE_DEFAULT, SYNC_CALL, X_NUCLIADB_USER
+from nucliadb.writer.api.constants import SKIP_STORE_DEFAULT, X_NUCLIADB_USER
 from nucliadb.writer.api.v1.router import (
     KB_PREFIX,
     RESOURCE_PREFIX,
@@ -60,7 +60,6 @@ from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.basic import (
     parse_basic,
     parse_basic_modify,
-    set_processing_info,
     set_status,
     set_status_modify,
 )
@@ -83,6 +82,7 @@ from nucliadb_models.writer import (
 from nucliadb_telemetry.errors import capture_exception
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
+from nucliadb_utils.transaction import TransactionCommitTimeoutError
 from nucliadb_utils.utilities import (
     get_ingest,
     get_partitioning,
@@ -107,7 +107,6 @@ async def create_resource(
     item: CreateResourcePayload,
     kbid: str,
     x_skip_store: bool = SKIP_STORE_DEFAULT,
-    x_synchronous: bool = SYNC_CALL,
 ):
     await maybe_back_pressure(request, kbid)
 
@@ -186,17 +185,20 @@ async def create_resource(
 
     set_status(writer.basic, item)
 
-    seqid = await maybe_send_to_process(writer, toprocess, partition)
-
     writer.source = BrokerMessage.MessageSource.WRITER
-    if x_synchronous:
+    try:
         t0 = time()
-    await transaction.commit(writer, partition, wait=x_synchronous)
+        await transaction.commit(writer, partition, wait=True)
+        txn_time = time() - t0
+    except TransactionCommitTimeoutError:
+        raise HTTPException(
+            status_code=501,
+            detail="Inconsistent write. This resource will not be processed and may not be stored.",
+        )
 
-    if x_synchronous:
-        return ResourceCreated(seqid=seqid, uuid=uuid, elapsed=time() - t0)
-    else:
-        return ResourceCreated(seqid=seqid, uuid=uuid)
+    seqid = await maybe_send_to_process(toprocess, partition)
+
+    return ResourceCreated(seqid=seqid, uuid=uuid, elapsed=txn_time)
 
 
 @api.patch(
@@ -214,7 +216,6 @@ async def modify_resource_rslug_prefix(
     rslug: str,
     item: UpdateResourcePayload,
     x_skip_store: bool = SKIP_STORE_DEFAULT,
-    x_synchronous: bool = SYNC_CALL,
     x_nucliadb_user: str = X_NUCLIADB_USER,
 ):
     return await modify_resource_endpoint(
@@ -223,7 +224,6 @@ async def modify_resource_rslug_prefix(
         kbid,
         path_rslug=rslug,
         x_skip_store=x_skip_store,
-        x_synchronous=x_synchronous,
         x_nucliadb_user=x_nucliadb_user,
     )
 
@@ -243,7 +243,6 @@ async def modify_resource_rid_prefix(
     rid: str,
     item: UpdateResourcePayload,
     x_skip_store: bool = SKIP_STORE_DEFAULT,
-    x_synchronous: bool = SYNC_CALL,
     x_nucliadb_user: str = X_NUCLIADB_USER,
 ):
     return await modify_resource_endpoint(
@@ -252,7 +251,6 @@ async def modify_resource_rid_prefix(
         kbid,
         path_rid=rid,
         x_skip_store=x_skip_store,
-        x_synchronous=x_synchronous,
         x_nucliadb_user=x_nucliadb_user,
     )
 
@@ -262,7 +260,6 @@ async def modify_resource_endpoint(
     item: UpdateResourcePayload,
     kbid: str,
     x_skip_store: bool,
-    x_synchronous: bool,
     x_nucliadb_user: str,
     path_rid: Optional[str] = None,
     path_rslug: Optional[str] = None,
@@ -277,7 +274,6 @@ async def modify_resource_endpoint(
             item,
             kbid,
             x_skip_store=x_skip_store,
-            x_synchronous=x_synchronous,
             x_nucliadb_user=x_nucliadb_user,
             rid=resource_uuid,
         )
@@ -290,7 +286,6 @@ async def modify_resource_endpoint(
             item,
             kbid,
             x_skip_store=x_skip_store,
-            x_synchronous=x_synchronous,
             x_nucliadb_user=x_nucliadb_user,
             rid=resource_uuid,
         )
@@ -301,7 +296,6 @@ async def modify_resource(
     item: UpdateResourcePayload,
     kbid: str,
     x_skip_store: bool,
-    x_synchronous: bool,
     x_nucliadb_user: str,
     *,
     rid: str,
@@ -351,13 +345,20 @@ async def modify_resource(
     set_status_modify(writer.basic, item)
 
     toprocess.title = writer.basic.title
-    seqid = await maybe_send_to_process(writer, toprocess, partition)
 
     writer.source = BrokerMessage.MessageSource.WRITER
 
     maybe_mark_reindex(writer, item)
 
-    await transaction.commit(writer, partition, wait=x_synchronous)
+    try:
+        await transaction.commit(writer, partition, wait=True)
+    except TransactionCommitTimeoutError:
+        raise HTTPException(
+            status_code=501,
+            detail="Inconsistent write. This resource will not be processed and may not be stored.",
+        )
+
+    seqid = await maybe_send_to_process(toprocess, partition)
 
     return ResourceUpdated(seqid=seqid)
 
@@ -483,16 +484,21 @@ async def _reprocess_resource(
 
         await extract_fields(resource=resource, toprocess=toprocess)
 
-    processing_info = await send_to_process(toprocess, partition)
-
     writer = BrokerMessage()
     writer.kbid = kbid
     writer.uuid = rid
     writer.source = BrokerMessage.MessageSource.WRITER
     writer.basic.metadata.useful = True
     writer.basic.metadata.status = Metadata.Status.PENDING
-    set_processing_info(writer, processing_info)
-    await transaction.commit(writer, partition, wait=False)
+    try:
+        await transaction.commit(writer, partition, wait=False)
+    except TransactionCommitTimeoutError:
+        raise HTTPException(
+            status_code=501,
+            detail="Inconsistent write. This resource will not be processed and may not be stored.",
+        )
+
+    processing_info = await send_to_process(toprocess, partition)
 
     return ResourceUpdated(seqid=processing_info.seqid)
 
@@ -509,11 +515,8 @@ async def delete_resource_rslug_prefix(
     request: Request,
     kbid: str,
     rslug: str,
-    x_synchronous: bool = SYNC_CALL,
 ):
-    return await _delete_resource(
-        request, kbid, rslug=rslug, x_synchronous=x_synchronous
-    )
+    return await _delete_resource(request, kbid, rslug=rslug)
 
 
 @api.delete(
@@ -528,15 +531,13 @@ async def delete_resource_rid_prefix(
     request: Request,
     kbid: str,
     rid: str,
-    x_synchronous: bool = SYNC_CALL,
 ):
-    return await _delete_resource(request, kbid, rid=rid, x_synchronous=x_synchronous)
+    return await _delete_resource(request, kbid, rid=rid)
 
 
 async def _delete_resource(
     request: Request,
     kbid: str,
-    x_synchronous: bool,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
 ):
@@ -555,7 +556,13 @@ async def _delete_resource(
     parse_audit(writer.audit, request)
 
     # Create processing message
-    await transaction.commit(writer, partition, wait=x_synchronous)
+    try:
+        await transaction.commit(writer, partition, wait=True)
+    except TransactionCommitTimeoutError:
+        raise HTTPException(
+            status_code=501,
+            detail="Inconsistent write. This resource will not be processed and may not be stored.",
+        )
 
     processing = get_processing()
     asyncio.create_task(processing.delete_from_processing(kbid=kbid, resource_id=rid))
@@ -691,14 +698,11 @@ def needs_resource_reindex(item: UpdateResourcePayload) -> bool:
     )
 
 
-async def maybe_send_to_process(
-    writer: BrokerMessage, toprocess: PushPayload, partition
-) -> Optional[int]:
+async def maybe_send_to_process(toprocess: PushPayload, partition) -> Optional[int]:
     if not needs_reprocess(toprocess):
         return None
 
     processing_info = await send_to_process(toprocess, partition)
-    set_processing_info(writer, processing_info)
     return processing_info.seqid
 
 
@@ -710,7 +714,10 @@ async def send_to_process(toprocess: PushPayload, partition) -> ProcessingInfo:
     except LimitsExceededError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
     except SendToProcessError:
-        raise HTTPException(status_code=500, detail="Error while sending to process")
+        raise HTTPException(
+            status_code=500,
+            detail="Error while sending to process. Try calling /reprocess",
+        )
 
 
 def needs_reprocess(processing_payload: PushPayload) -> bool:

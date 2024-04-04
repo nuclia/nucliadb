@@ -92,7 +92,6 @@ async def resource(nucliadb_writer, knowledgebox):
             "summary": "The summary",
             "texts": {"text_field": {"body": "The body of the text field"}},
         },
-        headers={"X-Synchronous": "True"},
     )
     assert resp.status_code in (200, 201)
     rid = resp.json()["uuid"]
@@ -313,7 +312,6 @@ async def resources(nucliadb_writer, knowledgebox):
                 "summary": f"The summary {i}",
                 "texts": {"text_field": {"body": "The body of the text field"}},
             },
-            headers={"X-Synchronous": "True"},
         )
         assert resp.status_code in (200, 201)
         rid = resp.json()["uuid"]

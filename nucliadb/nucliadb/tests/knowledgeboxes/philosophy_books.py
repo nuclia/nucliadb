@@ -192,7 +192,6 @@ async def philosophy_books_kb(
     for payload in payloads:
         resp = await nucliadb_writer.post(
             f"/kb/{kbid}/resources",
-            headers={"X-Synchronous": "true"},
             json=payload,
         )
         assert resp.status_code == 201

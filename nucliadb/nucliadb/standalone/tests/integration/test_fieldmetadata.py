@@ -120,7 +120,6 @@ async def test_fieldmetadata_crud(
 
     resp = await nucliadb_writer.post(
         f"/{KB_PREFIX}/{knowledgebox_one}/resources",
-        headers={"X-SYNCHRONOUS": "True"},
         json={
             "texts": {
                 "textfield1": {"body": "Some text", "format": "PLAIN"},
@@ -141,7 +140,6 @@ async def test_fieldmetadata_crud(
 
     resp = await nucliadb_writer.patch(
         f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}",
-        headers={"X-SYNCHRONOUS": "True"},
         json={"fieldmetadata": [fieldmetadata_1]},
     )
     assert resp.status_code == 200
@@ -162,7 +160,6 @@ async def test_fieldmetadata_crud(
 
     resp = await nucliadb_writer.patch(
         f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}",
-        headers={"X-SYNCHRONOUS": "True"},
         json={"fieldmetadata": [fieldmetadata_2]},
     )
     assert resp.status_code == 200

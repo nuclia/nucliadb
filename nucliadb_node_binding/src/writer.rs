@@ -25,12 +25,12 @@ use std::sync::Arc;
 use crate::collect_garbage::{garbage_collection_loop, GCParameters};
 use crate::errors::{IndexNodeException, LoadShardError};
 use crate::RawProtos;
+use nucliadb_core::merge::MergerError;
 use nucliadb_core::protos::*;
 use nucliadb_core::Channel;
 use nucliadb_node::analytics::blocking::send_analytics_event;
 use nucliadb_node::analytics::payload::AnalyticsEvent;
 use nucliadb_node::lifecycle;
-use nucliadb_node::merge::errors::MergerError;
 use nucliadb_node::settings::providers::env::EnvSettingsProvider;
 use nucliadb_node::settings::providers::SettingsProvider;
 use nucliadb_node::settings::Settings;
@@ -160,7 +160,7 @@ impl NodeWriter {
         let resource = Resource::decode(&mut Cursor::new(resource)).expect("Error decoding arguments");
         let shard_id = resource.shard_id.clone();
         let shard = self.obtain_shard(shard_id.clone())?;
-        let status = shard.set_resource(&resource).and_then(|()| shard.get_opstatus());
+        let status = shard.set_resource(resource).and_then(|()| shard.get_opstatus());
         match status {
             Ok(mut status) => {
                 status.status = 0;

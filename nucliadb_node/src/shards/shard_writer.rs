@@ -39,6 +39,29 @@ use crate::telemetry::run_with_telemetry;
 
 pub struct BlockingToken<'a>(MutexGuard<'a, ()>);
 
+const MAX_LABEL_LENGTH: usize = 32768; // Tantivy max is 2^16 - 4
+
+fn remove_invalid_labels(resource: &mut Resource) {
+    resource.labels.retain(|l| {
+        if l.len() > MAX_LABEL_LENGTH {
+            warn!("Label length ({}) longer than maximum, it will not be indexed", l.len());
+            false
+        } else {
+            true
+        }
+    });
+    for text in resource.texts.values_mut() {
+        text.labels.retain(|l| {
+            if l.len() > MAX_LABEL_LENGTH {
+                warn!("Label length ({}) longer than maximum, it will not be indexed", l.len());
+                false
+            } else {
+                true
+            }
+        });
+    }
+}
+
 #[derive(Debug)]
 pub struct ShardWriter {
     pub metadata: Arc<ShardMetadata>,
@@ -168,6 +191,7 @@ impl ShardWriter {
             path: path.join(VECTORS_DIR),
             vectorset: path.join(VECTORSET_DIR),
             channel,
+            shard_id: metadata.id(),
         };
         let rsc = RelationConfig {
             path: path.join(RELATIONS_DIR),
@@ -199,6 +223,7 @@ impl ShardWriter {
             path: path.join(VECTORS_DIR),
             vectorset: path.join(VECTORSET_DIR),
             channel,
+            shard_id: metadata.id(),
         };
         let rsc = RelationConfig {
             path: path.join(RELATIONS_DIR),
@@ -210,8 +235,10 @@ impl ShardWriter {
 
     #[measure(actor = "shard", metric = "set_resource")]
     #[tracing::instrument(skip_all)]
-    pub fn set_resource(&self, resource: &Resource) -> NodeResult<()> {
+    pub fn set_resource(&self, mut resource: Resource) -> NodeResult<()> {
         let span = tracing::Span::current();
+
+        remove_invalid_labels(&mut resource);
 
         let text_writer_service = self.text_writer.clone();
         let field_resource = resource.clone();
@@ -450,10 +477,18 @@ impl ShardWriter {
 
     #[tracing::instrument(skip_all)]
     pub fn merge(&self, context: MergeContext) -> NodeResult<MergeMetrics> {
-        let result = write_rw_lock(&self.vector_writer).merge(context);
+        let runner = read_rw_lock(&self.vector_writer).prepare_merge(context.parameters)?;
+        let Some(mut runner) = runner else {
+            return Ok(MergeMetrics {
+                merged: 0,
+                left: 0,
+            });
+        };
+        let merge_result = runner.run()?;
+        let metrics = write_rw_lock(&self.vector_writer).record_merge(merge_result, context.source)?;
         self.metadata.new_generation_id();
 
-        result
+        Ok(metrics)
     }
 
     /// This must be used only by replication and should be

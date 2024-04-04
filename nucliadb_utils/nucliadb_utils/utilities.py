@@ -265,6 +265,7 @@ async def start_transaction_utility(
         transaction_utility = TransactionUtility(
             nats_creds=transaction_settings.transaction_jetstream_auth,
             nats_servers=transaction_settings.transaction_jetstream_servers,
+            commit_timeout=transaction_settings.transaction_commit_timeout,
         )
         await transaction_utility.initialize(service_name)
     set_utility(Utility.TRANSACTION, transaction_utility)

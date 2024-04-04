@@ -132,7 +132,6 @@ async def test_resource_field_add(writer_api, knowledgebox_writer):
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.post(
             f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
-            headers={"X-SYNCHRONOUS": "True"},
             json={"slug": "resource1", "title": "My resource"},
         )
         assert resp.status_code == 201
@@ -221,7 +220,6 @@ async def test_resource_field_add(writer_api, knowledgebox_writer):
         resp = await client.put(
             f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/file/externalfile",
             json=TEST_EXTERNAL_FILE_PAYLOAD,
-            headers={"X-SYNCHRONOUS": "True"},
         )
         assert resp.status_code == 201
         data = resp.json()
@@ -234,7 +232,6 @@ async def test_resource_field_append_extra(writer_api, knowledgebox_writer):
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.post(
             f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
-            headers={"X-SYNCHRONOUS": "True"},
             json={
                 "slug": "resource1",
                 "title": "My resource",
@@ -274,7 +271,6 @@ async def test_resource_field_delete(writer_api, knowledgebox_writer):
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.post(
             f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
-            headers={"X-SYNCHRONOUS": "True"},
             json={
                 "slug": "resource1",
                 "title": "My resource",
@@ -353,11 +349,9 @@ async def test_resource_field_delete(writer_api, knowledgebox_writer):
 async def test_sync_ops(writer_api, knowledgebox_writer, endpoint, payload):
     knowledgebox_id = knowledgebox_writer
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        HEADERS = {"X-SYNCHRONOUS": "True"}
         # Create a resource
         resp = await client.post(
             f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
-            headers=HEADERS,
             json={
                 "slug": "resource1",
                 "title": "My resource",
@@ -372,7 +366,6 @@ async def test_sync_ops(writer_api, knowledgebox_writer, endpoint, payload):
         resource_path = f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}"
         resp = await client.put(
             f"{resource_path}/{endpoint}",
-            headers={"X-SYNCHRONOUS": "True"},
             json=payload,
         )
         assert resp.status_code in (201, 200)
@@ -385,7 +378,6 @@ async def test_external_file_field(writer_api, knowledgebox_writer):
         resp = await client.post(
             f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
             json={"slug": "resource1", "title": "My resource"},
-            headers={"X-SYNCHRONOUS": "True"},
         )
         assert resp.status_code == 201
         rid = resp.json()["uuid"]
@@ -394,7 +386,6 @@ async def test_external_file_field(writer_api, knowledgebox_writer):
         resp = await client.put(
             f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/file/externalfile",
             json=TEST_EXTERNAL_FILE_PAYLOAD,
-            headers={"X-SYNCHRONOUS": "True"},
         )
         assert resp.status_code == 201
 
@@ -406,7 +397,6 @@ async def test_file_field_validation(writer_api, knowledgebox_writer):
         resp = await client.post(
             f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
             json={"slug": "resource1", "title": "My resource"},
-            headers={"X-SYNCHRONOUS": "True"},
         )
         assert resp.status_code == 201
         rid = resp.json()["uuid"]
@@ -418,7 +408,6 @@ async def test_file_field_validation(writer_api, knowledgebox_writer):
         resp = await client.put(
             f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/file/file1",
             json=payload,
-            headers={"X-SYNCHRONOUS": "True"},
         )
         assert resp.status_code == 201
 
@@ -451,7 +440,6 @@ async def test_field_endpoints_by_slug(
 
         resp = await client.post(
             f"/{KB_PREFIX}/{knowledgebox_ingest}/{RESOURCES_PREFIX}",
-            headers={"X-SYNCHRONOUS": "True"},
             json={"slug": slug},
         )
         assert resp.status_code == 201

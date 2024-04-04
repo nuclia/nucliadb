@@ -136,6 +136,8 @@ class WorkUnit:
 
 
 class ConcurrentShardIndexer:
+    storage: Storage
+
     def __init__(self, writer: Writer, node_id: str):
         self.writer = writer
         self.node_id = node_id
@@ -383,21 +385,39 @@ class PriorityIndexer:
         elif pb.typemessage == TypeMessage.DELETION:
             status = await self._delete_resource(pb)
         if status is not None and status.status != OpStatus.Status.OK:
-            if (
-                status.status == OpStatus.Status.ERROR
-                and "Shard not found" in status.detail
-            ):
-                logger.warning(
-                    f"Shard does not exist {pb.shard}. This message will be ignored",
-                    extra={
-                        "kbid": pb.kbid,
-                        "shard": pb.shard,
-                        "rid": pb.resource,
-                        "storage_key": pb.storage_key,
-                    },
-                )
-                return
-            raise IndexNodeError(status.detail)
+            self._handle_index_message_error(pb, status)
+
+    def _handle_index_message_error(self, pb: IndexMessage, status: OpStatus):
+        if (
+            status.status == OpStatus.Status.ERROR
+            and "Shard not found" in status.detail
+        ):
+            logger.warning(
+                f"Shard does not exist {pb.shard}. This message will be ignored",
+                extra={
+                    "kbid": pb.kbid,
+                    "shard": pb.shard,
+                    "rid": pb.resource,
+                    "storage_key": pb.storage_key,
+                },
+            )
+            return
+        if (
+            status.status == OpStatus.Status.ERROR
+            and "Missing resource metadata" in status.detail
+        ):
+            logger.error(
+                "Error on indexer worker trying to set a resource without metadata. "
+                "This message will be ignored",
+                extra={
+                    "kbid": pb.kbid,
+                    "shard": pb.shard,
+                    "rid": pb.resource,
+                    "storage_key": pb.storage_key,
+                },
+            )
+            return
+        raise IndexNodeError(status.detail)
 
     async def _set_resource(self, pb: IndexMessage) -> Optional[OpStatus]:
         brain = await self.storage.get_indexing(pb)
