@@ -42,6 +42,7 @@ from nucliadb.train.api.v1.router import api as api_train_v1
 from nucliadb.writer.api.v1.router import api as api_writer_v1
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.fastapi import metrics_endpoint
+from nucliadb_utils.fastapi.openapi import extend_openapi
 from nucliadb_utils.fastapi.versioning import VersionedFastAPI
 from nucliadb_utils.settings import http_settings, running_settings
 
@@ -121,6 +122,10 @@ def application_factory(settings: Settings) -> FastAPI:
         enable_latest=False,
         kwargs=fastapi_settings,
     )
+
+    for route in application.routes:
+        if isinstance(route, Mount):
+            extend_openapi(route)
 
     async def homepage(request):
         return HTMLResponse(HOMEPAGE_HTML)
