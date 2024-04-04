@@ -136,6 +136,8 @@ class WorkUnit:
 
 
 class ConcurrentShardIndexer:
+    storage: Storage
+
     def __init__(self, writer: Writer, node_id: str):
         self.writer = writer
         self.node_id = node_id
