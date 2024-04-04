@@ -22,6 +22,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::RwLock;
 use std::time::{Duration, Instant};
 
+use lazy_static::lazy_static;
 use nucliadb_core::tracing::{Level, Metadata, Span};
 use nucliadb_core::{Context, NodeResult};
 use opentelemetry::global;
@@ -41,17 +42,19 @@ const TRACE_ID: &str = "trace-id";
 const TELEMETRY_ERROR_INTERVAL: Duration = Duration::from_secs(5);
 
 fn telemetry_error_handler(error: global::Error) {
-    static LAST_ERROR: RwLock<Option<Instant>> = RwLock::new(None);
+    lazy_static! {
+        static ref LAST_ERROR: RwLock<Instant> = RwLock::new(Instant::now());
+    };
     static ERROR_COUNT: AtomicUsize = AtomicUsize::new(0);
 
-    let report = match *LAST_ERROR.read().unwrap() {
-        None => true,
-        Some(last_error) => last_error.elapsed() > TELEMETRY_ERROR_INTERVAL,
-    };
+    let report = LAST_ERROR.read().map(|last| last.elapsed() > TELEMETRY_ERROR_INTERVAL).unwrap_or(true);
+
     if report {
         let error_count = ERROR_COUNT.fetch_min(0, std::sync::atomic::Ordering::Relaxed);
         log::warn!("Open telemetry error {error:?} ({error_count} more since last report)");
-        *LAST_ERROR.write().unwrap() = Some(Instant::now());
+        if let Ok(mut last_error) = LAST_ERROR.write() {
+            *last_error = Instant::now()
+        };
     } else {
         ERROR_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
