@@ -912,6 +912,30 @@ class Representation(google.protobuf.message.Message):
 global___Representation = Representation
 
 @typing_extensions.final
+class ParagraphRelations(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    PARENTS_FIELD_NUMBER: builtins.int
+    SIBLINGS_FIELD_NUMBER: builtins.int
+    REPLACEMENTS_FIELD_NUMBER: builtins.int
+    @property
+    def parents(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    @property
+    def siblings(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    @property
+    def replacements(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def __init__(
+        self,
+        *,
+        parents: collections.abc.Iterable[builtins.str] | None = ...,
+        siblings: collections.abc.Iterable[builtins.str] | None = ...,
+        replacements: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["parents", b"parents", "replacements", b"replacements", "siblings", b"siblings"]) -> None: ...
+
+global___ParagraphRelations = ParagraphRelations
+
+@typing_extensions.final
 class Paragraph(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -949,6 +973,7 @@ class Paragraph(google.protobuf.message.Message):
     TEXT_FIELD_NUMBER: builtins.int
     PAGE_FIELD_NUMBER: builtins.int
     REPRESENTATION_FIELD_NUMBER: builtins.int
+    RELATIONS_FIELD_NUMBER: builtins.int
     start: builtins.int
     end: builtins.int
     @property
@@ -967,6 +992,8 @@ class Paragraph(google.protobuf.message.Message):
     def page(self) -> global___PageInformation: ...
     @property
     def representation(self) -> global___Representation: ...
+    @property
+    def relations(self) -> global___ParagraphRelations: ...
     def __init__(
         self,
         *,
@@ -981,9 +1008,10 @@ class Paragraph(google.protobuf.message.Message):
         text: builtins.str = ...,
         page: global___PageInformation | None = ...,
         representation: global___Representation | None = ...,
+        relations: global___ParagraphRelations | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["page", b"page", "representation", b"representation"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["classifications", b"classifications", "end", b"end", "end_seconds", b"end_seconds", "key", b"key", "kind", b"kind", "page", b"page", "representation", b"representation", "sentences", b"sentences", "start", b"start", "start_seconds", b"start_seconds", "text", b"text"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["page", b"page", "relations", b"relations", "representation", b"representation"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["classifications", b"classifications", "end", b"end", "end_seconds", b"end_seconds", "key", b"key", "kind", b"kind", "page", b"page", "relations", b"relations", "representation", b"representation", "sentences", b"sentences", "start", b"start", "start_seconds", b"start_seconds", "text", b"text"]) -> None: ...
 
 global___Paragraph = Paragraph
 

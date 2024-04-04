@@ -341,6 +341,15 @@ pub struct Representation {
     pub reference_file: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ParagraphRelations {
+    #[prost(string, repeated, tag="1")]
+    pub parents: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(string, repeated, tag="2")]
+    pub siblings: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(string, repeated, tag="3")]
+    pub replacements: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Paragraph {
     #[prost(uint32, tag="1")]
     pub start: u32,
@@ -365,6 +374,8 @@ pub struct Paragraph {
     pub page: ::core::option::Option<PageInformation>,
     #[prost(message, optional, tag="11")]
     pub representation: ::core::option::Option<Representation>,
+    #[prost(message, optional, tag="12")]
+    pub relations: ::core::option::Option<ParagraphRelations>,
 }
 /// Nested message and enum types in `Paragraph`.
 pub mod paragraph {

@@ -226,6 +226,12 @@ message Representation {
     string reference_file = 2;
 }
 
+message ParagraphRelations {
+    repeated string parents = 1;
+    repeated string siblings = 2;
+    repeated string replacements = 3;
+}
+
 message Paragraph {
     uint32 start = 1;
     uint32 end = 2;
@@ -248,6 +254,7 @@ message Paragraph {
     string text = 9;  // Optional, as a computed value
     PageInformation page = 10;
     Representation representation = 11;
+    ParagraphRelations relations = 12;
 }
 
 message Position {
