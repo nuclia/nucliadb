@@ -47,7 +47,6 @@ async def test_file_tus_upload_and_download(
     kb_path = f"/{KB_PREFIX}/{knowledgebox_one}"
     resp = await nucliadb_writer.post(
         f"{kb_path}/{RESOURCES_PREFIX}",
-        headers={"X-SYNCHRONOUS": "True"},
         json={
             "slug": "resource1",
             "title": "Resource 1",
@@ -84,7 +83,6 @@ async def test_file_tus_upload_and_download(
             headers = {
                 "upload-offset": f"{offset}",
                 "content-length": f"{len(data)}",
-                "X-SYNCHRONOUS": "True",
             }
             if len(data) < 10000:
                 headers["upload-length"] = f"{offset + len(data)}"

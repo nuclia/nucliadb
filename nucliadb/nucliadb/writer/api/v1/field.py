@@ -32,7 +32,6 @@ from nucliadb.ingest.processing import PushPayload, Source
 from nucliadb.writer import SERVICE_NAME
 from nucliadb.writer.api.constants import (
     SKIP_STORE_DEFAULT,
-    SYNC_CALL,
     X_FILE_PASSWORD,
     X_NUCLIADB_USER,
 )
@@ -40,7 +39,6 @@ from nucliadb.writer.api.v1.resource import get_rid_from_params_or_raise_error
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
 from nucliadb.writer.back_pressure import maybe_back_pressure
 from nucliadb.writer.resource.audit import parse_audit
-from nucliadb.writer.resource.basic import set_processing_info
 from nucliadb.writer.resource.field import (
     extract_file_field,
     parse_conversation_field,
@@ -56,6 +54,7 @@ from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.writer import ResourceFieldAdded, ResourceUpdated
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
+from nucliadb_utils.transaction import TransactionCommitTimeoutError
 from nucliadb_utils.utilities import (
     get_partitioning,
     get_storage,
@@ -108,19 +107,28 @@ async def finish_field_put(
     writer: BrokerMessage,
     toprocess: PushPayload,
     partition: int,
-    wait_on_commit: bool,
 ) -> Optional[int]:
     # Create processing message
     transaction = get_transaction_utility()
     processing = get_processing()
-
-    processing_info = await processing.send_to_process(toprocess, partition)
-
-    writer.source = BrokerMessage.MessageSource.WRITER
-    set_processing_info(writer, processing_info)
-    await transaction.commit(writer, partition, wait=wait_on_commit)
-
-    return processing_info.seqid
+    try:
+        writer.source = BrokerMessage.MessageSource.WRITER
+        await transaction.commit(writer, partition, wait=True)
+    except TransactionCommitTimeoutError:
+        raise HTTPException(
+            status_code=501,
+            detail="Inconsistent write. This resource will not be processed and may not be stored.",
+        )
+    try:
+        processing_info = await processing.send_to_process(toprocess, partition)
+        return processing_info.seqid
+    except LimitsExceededError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+    except SendToProcessError:
+        raise HTTPException(
+            status_code=500,
+            detail="Error while sending to process. Try calling /reprocess",
+        )
 
 
 @api.put(
@@ -138,14 +146,12 @@ async def add_resource_field_text_rslug_prefix(
     rslug: str,
     field_id: str,
     field_payload: models.TextField,
-    x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
     return await _add_resource_field_text(
         request,
         kbid,
         field_id,
         field_payload,
-        x_synchronous,
         rslug=rslug,
     )
 
@@ -165,14 +171,12 @@ async def add_resource_field_text_rid_prefix(
     rid: str,
     field_id: str,
     field_payload: models.TextField,
-    x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
     return await _add_resource_field_text(
         request,
         kbid,
         field_id,
         field_payload,
-        x_synchronous,
         rid=rid,
     )
 
@@ -182,7 +186,6 @@ async def _add_resource_field_text(
     kbid: str,
     field_id: str,
     field_payload: models.TextField,
-    x_synchronous: bool,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
 ) -> ResourceFieldAdded:
@@ -192,13 +195,7 @@ async def _add_resource_field_text(
 
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
     parse_text_field(field_id, field_payload, writer, toprocess)
-    try:
-        seqid = await finish_field_put(writer, toprocess, partition, x_synchronous)
-    except LimitsExceededError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
-    except SendToProcessError:
-        raise HTTPException(status_code=500, detail="Error while sending to process")
-
+    seqid = await finish_field_put(writer, toprocess, partition)
     return ResourceFieldAdded(seqid=seqid)
 
 
@@ -217,10 +214,9 @@ async def add_resource_field_link_rslug_prefix(
     rslug: str,
     field_id: str,
     field_payload: models.LinkField,
-    x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
     return await _add_resource_field_link(
-        request, kbid, field_id, field_payload, x_synchronous, rslug=rslug
+        request, kbid, field_id, field_payload, rslug=rslug
     )
 
 
@@ -239,10 +235,9 @@ async def add_resource_field_link_rid_prefix(
     rid: str,
     field_id: str,
     field_payload: models.LinkField,
-    x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
     return await _add_resource_field_link(
-        request, kbid, field_id, field_payload, x_synchronous, rid=rid
+        request, kbid, field_id, field_payload, rid=rid
     )
 
 
@@ -251,7 +246,6 @@ async def _add_resource_field_link(
     kbid: str,
     field_id: str,
     field_payload: models.LinkField,
-    x_synchronous: bool,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
 ) -> ResourceFieldAdded:
@@ -261,13 +255,7 @@ async def _add_resource_field_link(
 
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
     parse_link_field(field_id, field_payload, writer, toprocess)
-    try:
-        seqid = await finish_field_put(writer, toprocess, partition, x_synchronous)
-    except LimitsExceededError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
-    except SendToProcessError:
-        raise HTTPException(status_code=500, detail="Error while sending to process")
-
+    seqid = await finish_field_put(writer, toprocess, partition)
     return ResourceFieldAdded(seqid=seqid)
 
 
@@ -286,10 +274,9 @@ async def add_resource_field_keywordset_rslug_prefix(
     rslug: str,
     field_id: str,
     field_payload: models.FieldKeywordset,
-    x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
     return await _add_resource_field_keywordset(
-        request, kbid, field_id, field_payload, x_synchronous, rslug=rslug
+        request, kbid, field_id, field_payload, rslug=rslug
     )
 
 
@@ -308,10 +295,9 @@ async def add_resource_field_keywordset_rid_prefix(
     rid: str,
     field_id: str,
     field_payload: models.FieldKeywordset,
-    x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
     return await _add_resource_field_keywordset(
-        request, kbid, field_id, field_payload, x_synchronous, rid=rid
+        request, kbid, field_id, field_payload, rid=rid
     )
 
 
@@ -320,7 +306,6 @@ async def _add_resource_field_keywordset(
     kbid: str,
     field_id: str,
     field_payload: models.FieldKeywordset,
-    x_synchronous: bool,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
 ) -> ResourceFieldAdded:
@@ -330,13 +315,7 @@ async def _add_resource_field_keywordset(
 
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
     parse_keywordset_field(field_id, field_payload, writer, toprocess)
-    try:
-        seqid = await finish_field_put(writer, toprocess, partition, x_synchronous)
-    except LimitsExceededError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
-    except SendToProcessError:
-        raise HTTPException(status_code=500, detail="Error while sending to process")
-
+    seqid = await finish_field_put(writer, toprocess, partition)
     return ResourceFieldAdded(seqid=seqid)
 
 
@@ -355,10 +334,9 @@ async def add_resource_field_datetime_rslug_prefix(
     rslug: str,
     field_id: str,
     field_payload: models.FieldDatetime,
-    x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
     return await _add_resource_field_datetime(
-        request, kbid, field_id, field_payload, x_synchronous, rslug=rslug
+        request, kbid, field_id, field_payload, rslug=rslug
     )
 
 
@@ -377,10 +355,9 @@ async def add_resource_field_datetime_rid_prefix(
     rid: str,
     field_id: str,
     field_payload: models.FieldDatetime,
-    x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
     return await _add_resource_field_datetime(
-        request, kbid, field_id, field_payload, x_synchronous, rid=rid
+        request, kbid, field_id, field_payload, rid=rid
     )
 
 
@@ -389,7 +366,6 @@ async def _add_resource_field_datetime(
     kbid: str,
     field_id: str,
     field_payload: models.FieldDatetime,
-    x_synchronous: bool,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
 ) -> ResourceFieldAdded:
@@ -399,13 +375,7 @@ async def _add_resource_field_datetime(
 
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
     parse_datetime_field(field_id, field_payload, writer, toprocess)
-    try:
-        seqid = await finish_field_put(writer, toprocess, partition, x_synchronous)
-    except LimitsExceededError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
-    except SendToProcessError:
-        raise HTTPException(status_code=500, detail="Error while sending to process")
-
+    seqid = await finish_field_put(writer, toprocess, partition)
     return ResourceFieldAdded(seqid=seqid)
 
 
@@ -424,14 +394,12 @@ async def add_resource_field_layout_rslug_prefix(
     rslug: str,
     field_id: str,
     field_payload: models.InputLayoutField,
-    x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
     return await _add_resource_field_layout(
         request,
         kbid,
         field_id,
         field_payload,
-        x_synchronous,
         rslug=rslug,
     )
 
@@ -451,10 +419,9 @@ async def add_resource_field_layout_rid_prefix(
     rid: str,
     field_id: str,
     field_payload: models.InputLayoutField,
-    x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
     return await _add_resource_field_layout(
-        request, kbid, field_id, field_payload, x_synchronous, rid=rid
+        request, kbid, field_id, field_payload, rid=rid
     )
 
 
@@ -463,7 +430,6 @@ async def _add_resource_field_layout(
     kbid: str,
     field_id: str,
     field_payload: models.InputLayoutField,
-    x_synchronous: bool,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
 ) -> ResourceFieldAdded:
@@ -473,13 +439,7 @@ async def _add_resource_field_layout(
 
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
     await parse_layout_field(field_id, field_payload, writer, toprocess, kbid, rid)
-    try:
-        seqid = await finish_field_put(writer, toprocess, partition, x_synchronous)
-    except LimitsExceededError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
-    except SendToProcessError:
-        raise HTTPException(status_code=500, detail="Error while sending to process")
-
+    seqid = await finish_field_put(writer, toprocess, partition)
     return ResourceFieldAdded(seqid=seqid)
 
 
@@ -498,10 +458,9 @@ async def add_resource_field_conversation_rslug_prefix(
     rslug: str,
     field_id: str,
     field_payload: models.InputConversationField,
-    x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
     return await _add_resource_field_conversation(
-        request, kbid, field_id, field_payload, x_synchronous, rslug=rslug
+        request, kbid, field_id, field_payload, rslug=rslug
     )
 
 
@@ -520,10 +479,9 @@ async def add_resource_field_conversation_rid_prefix(
     rid: str,
     field_id: str,
     field_payload: models.InputConversationField,
-    x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
     return await _add_resource_field_conversation(
-        request, kbid, field_id, field_payload, x_synchronous, rid=rid
+        request, kbid, field_id, field_payload, rid=rid
     )
 
 
@@ -532,7 +490,6 @@ async def _add_resource_field_conversation(
     kbid: str,
     field_id: str,
     field_payload: models.InputConversationField,
-    x_synchronous: bool,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
 ) -> ResourceFieldAdded:
@@ -544,13 +501,7 @@ async def _add_resource_field_conversation(
     await parse_conversation_field(
         field_id, field_payload, writer, toprocess, kbid, rid
     )
-    try:
-        seqid = await finish_field_put(writer, toprocess, partition, x_synchronous)
-    except LimitsExceededError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
-    except SendToProcessError:
-        raise HTTPException(status_code=500, detail="Error while sending to process")
-
+    seqid = await finish_field_put(writer, toprocess, partition)
     return ResourceFieldAdded(seqid=seqid)
 
 
@@ -570,7 +521,6 @@ async def add_resource_field_file_rslug_prefix(
     field_id: str,
     field_payload: models.FileField,
     x_skip_store: bool = SKIP_STORE_DEFAULT,
-    x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
     return await _add_resource_field_file(
         request,
@@ -578,7 +528,6 @@ async def add_resource_field_file_rslug_prefix(
         field_id,
         field_payload,
         x_skip_store,
-        x_synchronous,
         rslug=rslug,
     )
 
@@ -599,10 +548,9 @@ async def add_resource_field_file_rid_prefix(
     field_id: str,
     field_payload: models.FileField,
     x_skip_store: bool = SKIP_STORE_DEFAULT,
-    x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
     return await _add_resource_field_file(
-        request, kbid, field_id, field_payload, x_skip_store, x_synchronous, rid=rid
+        request, kbid, field_id, field_payload, x_skip_store, rid=rid
     )
 
 
@@ -612,7 +560,6 @@ async def _add_resource_field_file(
     field_id: str,
     field_payload: models.FileField,
     x_skip_store: bool,
-    x_synchronous: bool,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
 ) -> ResourceFieldAdded:
@@ -624,16 +571,7 @@ async def _add_resource_field_file(
     await parse_file_field(
         field_id, field_payload, writer, toprocess, kbid, rid, skip_store=x_skip_store
     )
-
-    try:
-        seqid = await finish_field_put(
-            writer, toprocess, partition, wait_on_commit=x_synchronous
-        )
-    except LimitsExceededError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
-    except SendToProcessError:
-        raise HTTPException(status_code=500, detail="Error while sending to process")
-
+    seqid = await finish_field_put(writer, toprocess, partition)
     return ResourceFieldAdded(seqid=seqid)
 
 
@@ -652,10 +590,9 @@ async def append_messages_to_conversation_field_rslug_prefix(
     rslug: str,
     field_id: str,
     messages: list[models.InputMessage],
-    x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
     return await _append_messages_to_conversation_field(
-        request, kbid, field_id, messages, x_synchronous, rslug=rslug
+        request, kbid, field_id, messages, rslug=rslug
     )
 
 
@@ -674,10 +611,9 @@ async def append_messages_to_conversation_field_rid_prefix(
     rid: str,
     field_id: str,
     messages: list[models.InputMessage],
-    x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
     return await _append_messages_to_conversation_field(
-        request, kbid, field_id, messages, x_synchronous, rid=rid
+        request, kbid, field_id, messages, rid=rid
     )
 
 
@@ -686,7 +622,6 @@ async def _append_messages_to_conversation_field(
     kbid: str,
     field_id: str,
     messages: list[models.InputMessage],
-    x_synchronous: bool,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
 ) -> ResourceFieldAdded:
@@ -721,16 +656,23 @@ async def _append_messages_to_conversation_field(
 
     await parse_conversation_field(field_id, field, writer, toprocess, kbid, rid)
 
+    writer.source = BrokerMessage.MessageSource.WRITER
+    try:
+        await transaction.commit(writer, partition, wait=True)
+    except TransactionCommitTimeoutError:
+        raise HTTPException(
+            status_code=501,
+            detail="Inconsistent write. This resource will not be processed and may not be stored.",
+        )
     try:
         processing_info = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
     except SendToProcessError:
-        raise HTTPException(status_code=500, detail="Error while sending to process")
-
-    writer.source = BrokerMessage.MessageSource.WRITER
-    set_processing_info(writer, processing_info)
-    await transaction.commit(writer, partition, wait=x_synchronous)
+        raise HTTPException(
+            status_code=500,
+            detail="Error while sending to process. Try calling /reprocess",
+        )
 
     return ResourceFieldAdded(seqid=processing_info.seqid)
 
@@ -750,10 +692,9 @@ async def append_blocks_to_layout_field_rslug_prefix(
     rslug: str,
     field_id: str,
     blocks: dict[str, models.InputBlock],
-    x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
     return await _append_blocks_to_layout_field(
-        request, kbid, field_id, blocks, x_synchronous, rslug=rslug
+        request, kbid, field_id, blocks, rslug=rslug
     )
 
 
@@ -772,10 +713,9 @@ async def append_blocks_to_layout_field_rid_prefix(
     rid: str,
     field_id: str,
     blocks: dict[str, models.InputBlock],
-    x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
     return await _append_blocks_to_layout_field(
-        request, kbid, field_id, blocks, x_synchronous, rid=rid
+        request, kbid, field_id, blocks, rid=rid
     )
 
 
@@ -784,7 +724,6 @@ async def _append_blocks_to_layout_field(
     kbid: str,
     field_id: str,
     blocks: dict[str, models.InputBlock],
-    x_synchronous: bool,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
 ) -> ResourceFieldAdded:
@@ -818,17 +757,23 @@ async def _append_blocks_to_layout_field(
     field.body.blocks.update(blocks)
     await parse_layout_field(field_id, field, writer, toprocess, kbid, rid)
 
+    writer.source = BrokerMessage.MessageSource.WRITER
+    try:
+        await transaction.commit(writer, partition, wait=True)
+    except TransactionCommitTimeoutError:
+        raise HTTPException(
+            status_code=501,
+            detail="Inconsistent write. This resource will not be processed and may not be stored.",
+        )
     try:
         processing_info = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
     except SendToProcessError:
-        raise HTTPException(status_code=500, detail="Error while sending to process")
-
-    writer.source = BrokerMessage.MessageSource.WRITER
-    set_processing_info(writer, processing_info)
-    await transaction.commit(writer, partition, wait=x_synchronous)
-
+        raise HTTPException(
+            status_code=500,
+            detail="Error while sending to process. Try calling /reprocess",
+        )
     return ResourceFieldAdded(seqid=processing_info.seqid)
 
 
@@ -847,14 +792,12 @@ async def delete_resource_field_rslug_prefix(
     rslug: str,
     field_type: models.FieldTypeName,
     field_id: str,
-    x_synchronous: bool = SYNC_CALL,
 ):
     return await _delete_resource_field(
         request,
         kbid,
         field_type,
         field_id,
-        x_synchronous,
         rslug=rslug,
     )
 
@@ -874,11 +817,8 @@ async def delete_resource_field_rid_prefix(
     rid: str,
     field_type: models.FieldTypeName,
     field_id: str,
-    x_synchronous: bool = SYNC_CALL,
 ):
-    return await _delete_resource_field(
-        request, kbid, field_type, field_id, x_synchronous, rid=rid
-    )
+    return await _delete_resource_field(request, kbid, field_type, field_id, rid=rid)
 
 
 async def _delete_resource_field(
@@ -886,7 +826,6 @@ async def _delete_resource_field(
     kbid: str,
     field_type: models.FieldTypeName,
     field_id: str,
-    x_synchronous: bool,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
 ):
@@ -908,7 +847,13 @@ async def _delete_resource_field(
     writer.delete_fields.append(pb_field_id)
     parse_audit(writer.audit, request)
 
-    await transaction.commit(writer, partition, wait=x_synchronous)
+    try:
+        await transaction.commit(writer, partition, wait=True)
+    except TransactionCommitTimeoutError:
+        raise HTTPException(
+            status_code=501,
+            detail="Inconsistent write. This resource will not be processed and may not be stored.",
+        )
 
     return Response(status_code=204)
 
@@ -972,21 +917,28 @@ async def reprocess_file_field(
         except KeyError:
             raise HTTPException(status_code=404, detail="Field does not exist")
 
-    # Send current resource to reprocess.
-    try:
-        processing_info = await processing.send_to_process(toprocess, partition)
-    except LimitsExceededError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
-    except SendToProcessError:
-        raise HTTPException(status_code=500, detail="Error while sending to process")
-
     writer = BrokerMessage()
     writer.kbid = kbid
     writer.uuid = rid
     writer.source = BrokerMessage.MessageSource.WRITER
     writer.basic.metadata.useful = True
     writer.basic.metadata.status = Metadata.Status.PENDING
-    set_processing_info(writer, processing_info)
-    await transaction.commit(writer, partition, wait=False)
+    try:
+        await transaction.commit(writer, partition, wait=False)
+    except TransactionCommitTimeoutError:
+        raise HTTPException(
+            status_code=501,
+            detail="Inconsistent write. This resource will not be processed and may not be stored.",
+        )
+    # Send current resource to reprocess.
+    try:
+        processing_info = await processing.send_to_process(toprocess, partition)
+    except LimitsExceededError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+    except SendToProcessError:
+        raise HTTPException(
+            status_code=500,
+            detail="Error while sending to process. Try calling /reprocess",
+        )
 
     return ResourceUpdated(seqid=processing_info.seqid)

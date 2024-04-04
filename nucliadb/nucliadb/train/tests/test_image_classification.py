@@ -110,7 +110,6 @@ async def image_classification_resource(
 
     resp = await writer_rest_api.post(
         f"/{API_PREFIX}/v1/{KB_PREFIX}/{knowledgebox}/resources",
-        headers={"x-synchronous": "true"},
         json={
             "title": "My invoice",
             "files": {

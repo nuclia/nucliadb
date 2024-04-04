@@ -164,7 +164,6 @@ async def test_search_with_date_range_filters_origin_dates(
                 "modified": ORIGIN_MODIFICATION.isoformat(),
             },
         },
-        headers={"X-Synchronous": "true"},
     )
     assert resp.status_code == 200
 

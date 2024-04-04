@@ -524,7 +524,6 @@ async def test_extra(
             "title": "Foo",
             "extra": extra,
         },
-        headers={"X-SYNCHRONOUS": "true"},
         timeout=None,
     )
     assert resp.status_code == 201
@@ -575,7 +574,6 @@ async def test_icon_doesnt_change_after_labeling_resource_sc_5625(
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
         json={"title": "Foo", "icon": "application/pdf"},
-        headers={"X-SYNCHRONOUS": "True"},
         timeout=None,
     )
     assert resp.status_code == 201
@@ -590,7 +588,6 @@ async def test_icon_doesnt_change_after_labeling_resource_sc_5625(
         json={
             "usermetadata": {"classifications": [{"labelset": "foo", "label": "bar"}]}
         },
-        headers={"X-SYNCHRONOUS": "True"},
         timeout=None,
     )
     assert resp.status_code == 200
@@ -649,7 +646,6 @@ async def test_icon_doesnt_change_after_adding_file_field_sc_2388(
             "icon": "text/plain",
             "texts": {"text": {"body": "my text"}},
         },
-        headers={"X-SYNCHRONOUS": "True"},
         timeout=None,
     )
     assert resp.status_code == 201
@@ -662,7 +658,6 @@ async def test_icon_doesnt_change_after_adding_file_field_sc_2388(
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resource/{uuid}/file/file/upload",
         content=b"foo" * 200,
-        headers={"X-SYNCHRONOUS": "True"},
         timeout=None,
     )
     assert resp.status_code == 201
@@ -683,7 +678,6 @@ async def test_language_metadata(
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
         json={"title": "My resource"},
-        headers={"X-SYNCHRONOUS": "True"},
         timeout=None,
     )
     assert resp.status_code == 201
@@ -725,7 +719,6 @@ async def test_language_metadata(
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
         json={"metadata": {"language": "en"}},
-        headers={"X-SYNCHRONOUS": "True"},
         timeout=None,
     )
     assert resp.status_code == 201
@@ -742,7 +735,6 @@ async def test_language_metadata(
     resp = await nucliadb_writer.patch(
         f"/kb/{kbid}/resource/{uuid}",
         json={"metadata": {"language": "de"}},
-        headers={"X-SYNCHRONOUS": "True"},
         timeout=None,
     )
     assert resp.status_code == 200

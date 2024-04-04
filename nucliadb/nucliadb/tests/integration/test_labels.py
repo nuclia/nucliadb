@@ -209,7 +209,6 @@ async def test_classification_labels_cancelled_by_the_user(
     }
     resp = await nucliadb_writer.post(
         f"/kb/{knowledgebox}/resources",
-        headers={"X-SYNCHRONOUS": "TRUE"},
         json={
             "title": "My Resource",
             "summary": "My summary",
@@ -350,7 +349,6 @@ async def test_fieldmetadata_classification_labels(
     resp = await nucliadb_writer.post(
         f"/kb/{knowledgebox}/resources",
         data=payload.json(),  # type: ignore
-        headers={"X-SYNCHRONOUS": "True"},
     )
     assert resp.status_code == 201
     rid = resp.json()["uuid"]

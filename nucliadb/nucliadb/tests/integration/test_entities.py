@@ -73,7 +73,6 @@ async def text_field(
 
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
-        headers={"X-Synchronous": "true"},
         json={
             "slug": "entities-test-resource",
             "title": "E2E entities test resource",
@@ -134,7 +133,6 @@ async def annotated_entities(
 
     resp = await nucliadb_writer.patch(
         f"/kb/{kbid}/resource/{rid}",
-        headers={"X-Synchronous": "true"},
         json={
             "fieldmetadata": [
                 {

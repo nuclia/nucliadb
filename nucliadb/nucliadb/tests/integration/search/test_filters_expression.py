@@ -42,7 +42,6 @@ async def test_filtering_expression(nucliadb_reader, nucliadb_writer, knowledgeb
                     "tags": [tag],
                 },
             },
-            headers={"x-synchronous": "true"},
         )
         assert resp.status_code == 201
         slug_to_uuid[slug] = resp.json()["uuid"]

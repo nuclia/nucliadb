@@ -66,7 +66,7 @@ async def create_rollover_shards(
     app_context: ApplicationContext, kbid: str
 ) -> writer_pb2.Shards:
     """
-    Creates shards to to used for a rollover operation
+    Creates shards to be used for a rollover operation
     """
     logger.warning("Creating rollover shards", extra={"kbid": kbid})
     sm = app_context.shard_manager

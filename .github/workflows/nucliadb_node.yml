@@ -63,8 +63,8 @@ env:
   IMAGE_NAME_BASE_NODE: basenode
   IMAGE_NAME_NODE: node
   IMAGE_NAME_NODE_SIDECAR: node_sidecar
-  GCP_WORKLOAD_IDENTITY_PROVIDER: "projects/725951671212/locations/global/workloadIdentityPools/gh-nuclia/providers/gh-nuclia-provider"
-  GCP_SERVICE_ACCOUNT: "github-actions@stashify-218417.iam.gserviceaccount.com"
+  GCP_WORKLOAD_IDENTITY_PROVIDER: "projects/224545243904/locations/global/workloadIdentityPools/gh-nuclia/providers/gh-nuclia-provider"
+  GCP_SERVICE_ACCOUNT: "github-actions@nuclia-internal.iam.gserviceaccount.com"
 
 jobs:
   pre-checks-python:
