@@ -5,8 +5,10 @@ isort:skip_file
 import abc
 import collections.abc
 import grpc
+import grpc.aio
 import nucliadb_protos.nodereader_pb2
 import nucliadb_protos.noderesources_pb2
+import typing
 from nucliadb_protos.noderesources_pb2 import (
     EmptyQuery as EmptyQuery,
     EmptyResponse as EmptyResponse,
@@ -51,10 +53,18 @@ from nucliadb_protos.utils_pb2 import (
     Vectors as Vectors,
 )
 
+_T = typing.TypeVar('_T')
+
+class _MaybeAsyncIterator(collections.abc.AsyncIterator[_T], collections.abc.Iterator[_T], metaclass=abc.ABCMeta):
+    ...
+
+class _ServicerContext(grpc.ServicerContext, grpc.aio.ServicerContext):  # type: ignore
+    ...
+
 class NodeReaderStub:
     """Implemented at nucliadb_object_storage"""
 
-    def __init__(self, channel: grpc.Channel) -> None: ...
+    def __init__(self, channel: typing.Union[grpc.Channel, grpc.aio.Channel]) -> None: ...
     GetShard: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.nodereader_pb2.GetShardRequest,
         nucliadb_protos.noderesources_pb2.Shard,
@@ -122,6 +132,76 @@ class NodeReaderStub:
         nucliadb_protos.nodereader_pb2.ShardFileChunk,
     ]
 
+class NodeReaderAsyncStub:
+    """Implemented at nucliadb_object_storage"""
+
+    GetShard: grpc.aio.UnaryUnaryMultiCallable[
+        nucliadb_protos.nodereader_pb2.GetShardRequest,
+        nucliadb_protos.noderesources_pb2.Shard,
+    ]
+    DocumentSearch: grpc.aio.UnaryUnaryMultiCallable[
+        nucliadb_protos.nodereader_pb2.DocumentSearchRequest,
+        nucliadb_protos.nodereader_pb2.DocumentSearchResponse,
+    ]
+    ParagraphSearch: grpc.aio.UnaryUnaryMultiCallable[
+        nucliadb_protos.nodereader_pb2.ParagraphSearchRequest,
+        nucliadb_protos.nodereader_pb2.ParagraphSearchResponse,
+    ]
+    VectorSearch: grpc.aio.UnaryUnaryMultiCallable[
+        nucliadb_protos.nodereader_pb2.VectorSearchRequest,
+        nucliadb_protos.nodereader_pb2.VectorSearchResponse,
+    ]
+    RelationSearch: grpc.aio.UnaryUnaryMultiCallable[
+        nucliadb_protos.nodereader_pb2.RelationSearchRequest,
+        nucliadb_protos.nodereader_pb2.RelationSearchResponse,
+    ]
+    DocumentIds: grpc.aio.UnaryUnaryMultiCallable[
+        nucliadb_protos.noderesources_pb2.ShardId,
+        nucliadb_protos.nodereader_pb2.IdCollection,
+    ]
+    ParagraphIds: grpc.aio.UnaryUnaryMultiCallable[
+        nucliadb_protos.noderesources_pb2.ShardId,
+        nucliadb_protos.nodereader_pb2.IdCollection,
+    ]
+    VectorIds: grpc.aio.UnaryUnaryMultiCallable[
+        nucliadb_protos.noderesources_pb2.ShardId,
+        nucliadb_protos.nodereader_pb2.IdCollection,
+    ]
+    RelationIds: grpc.aio.UnaryUnaryMultiCallable[
+        nucliadb_protos.noderesources_pb2.ShardId,
+        nucliadb_protos.nodereader_pb2.IdCollection,
+    ]
+    RelationEdges: grpc.aio.UnaryUnaryMultiCallable[
+        nucliadb_protos.noderesources_pb2.ShardId,
+        nucliadb_protos.nodereader_pb2.EdgeList,
+    ]
+    Search: grpc.aio.UnaryUnaryMultiCallable[
+        nucliadb_protos.nodereader_pb2.SearchRequest,
+        nucliadb_protos.nodereader_pb2.SearchResponse,
+    ]
+    Suggest: grpc.aio.UnaryUnaryMultiCallable[
+        nucliadb_protos.nodereader_pb2.SuggestRequest,
+        nucliadb_protos.nodereader_pb2.SuggestResponse,
+    ]
+    Paragraphs: grpc.aio.UnaryStreamMultiCallable[
+        nucliadb_protos.nodereader_pb2.StreamRequest,
+        nucliadb_protos.nodereader_pb2.ParagraphItem,
+    ]
+    """Streams"""
+    Documents: grpc.aio.UnaryStreamMultiCallable[
+        nucliadb_protos.nodereader_pb2.StreamRequest,
+        nucliadb_protos.nodereader_pb2.DocumentItem,
+    ]
+    GetShardFiles: grpc.aio.UnaryUnaryMultiCallable[
+        nucliadb_protos.nodereader_pb2.GetShardFilesRequest,
+        nucliadb_protos.nodereader_pb2.ShardFileList,
+    ]
+    """Shard Download"""
+    DownloadShardFile: grpc.aio.UnaryStreamMultiCallable[
+        nucliadb_protos.nodereader_pb2.DownloadShardFileRequest,
+        nucliadb_protos.nodereader_pb2.ShardFileChunk,
+    ]
+
 class NodeReaderServicer(metaclass=abc.ABCMeta):
     """Implemented at nucliadb_object_storage"""
 
@@ -129,99 +209,99 @@ class NodeReaderServicer(metaclass=abc.ABCMeta):
     def GetShard(
         self,
         request: nucliadb_protos.nodereader_pb2.GetShardRequest,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.noderesources_pb2.Shard: ...
+        context: _ServicerContext,
+    ) -> typing.Union[nucliadb_protos.noderesources_pb2.Shard, collections.abc.Awaitable[nucliadb_protos.noderesources_pb2.Shard]]: ...
     @abc.abstractmethod
     def DocumentSearch(
         self,
         request: nucliadb_protos.nodereader_pb2.DocumentSearchRequest,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.nodereader_pb2.DocumentSearchResponse: ...
+        context: _ServicerContext,
+    ) -> typing.Union[nucliadb_protos.nodereader_pb2.DocumentSearchResponse, collections.abc.Awaitable[nucliadb_protos.nodereader_pb2.DocumentSearchResponse]]: ...
     @abc.abstractmethod
     def ParagraphSearch(
         self,
         request: nucliadb_protos.nodereader_pb2.ParagraphSearchRequest,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.nodereader_pb2.ParagraphSearchResponse: ...
+        context: _ServicerContext,
+    ) -> typing.Union[nucliadb_protos.nodereader_pb2.ParagraphSearchResponse, collections.abc.Awaitable[nucliadb_protos.nodereader_pb2.ParagraphSearchResponse]]: ...
     @abc.abstractmethod
     def VectorSearch(
         self,
         request: nucliadb_protos.nodereader_pb2.VectorSearchRequest,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.nodereader_pb2.VectorSearchResponse: ...
+        context: _ServicerContext,
+    ) -> typing.Union[nucliadb_protos.nodereader_pb2.VectorSearchResponse, collections.abc.Awaitable[nucliadb_protos.nodereader_pb2.VectorSearchResponse]]: ...
     @abc.abstractmethod
     def RelationSearch(
         self,
         request: nucliadb_protos.nodereader_pb2.RelationSearchRequest,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.nodereader_pb2.RelationSearchResponse: ...
+        context: _ServicerContext,
+    ) -> typing.Union[nucliadb_protos.nodereader_pb2.RelationSearchResponse, collections.abc.Awaitable[nucliadb_protos.nodereader_pb2.RelationSearchResponse]]: ...
     @abc.abstractmethod
     def DocumentIds(
         self,
         request: nucliadb_protos.noderesources_pb2.ShardId,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.nodereader_pb2.IdCollection: ...
+        context: _ServicerContext,
+    ) -> typing.Union[nucliadb_protos.nodereader_pb2.IdCollection, collections.abc.Awaitable[nucliadb_protos.nodereader_pb2.IdCollection]]: ...
     @abc.abstractmethod
     def ParagraphIds(
         self,
         request: nucliadb_protos.noderesources_pb2.ShardId,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.nodereader_pb2.IdCollection: ...
+        context: _ServicerContext,
+    ) -> typing.Union[nucliadb_protos.nodereader_pb2.IdCollection, collections.abc.Awaitable[nucliadb_protos.nodereader_pb2.IdCollection]]: ...
     @abc.abstractmethod
     def VectorIds(
         self,
         request: nucliadb_protos.noderesources_pb2.ShardId,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.nodereader_pb2.IdCollection: ...
+        context: _ServicerContext,
+    ) -> typing.Union[nucliadb_protos.nodereader_pb2.IdCollection, collections.abc.Awaitable[nucliadb_protos.nodereader_pb2.IdCollection]]: ...
     @abc.abstractmethod
     def RelationIds(
         self,
         request: nucliadb_protos.noderesources_pb2.ShardId,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.nodereader_pb2.IdCollection: ...
+        context: _ServicerContext,
+    ) -> typing.Union[nucliadb_protos.nodereader_pb2.IdCollection, collections.abc.Awaitable[nucliadb_protos.nodereader_pb2.IdCollection]]: ...
     @abc.abstractmethod
     def RelationEdges(
         self,
         request: nucliadb_protos.noderesources_pb2.ShardId,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.nodereader_pb2.EdgeList: ...
+        context: _ServicerContext,
+    ) -> typing.Union[nucliadb_protos.nodereader_pb2.EdgeList, collections.abc.Awaitable[nucliadb_protos.nodereader_pb2.EdgeList]]: ...
     @abc.abstractmethod
     def Search(
         self,
         request: nucliadb_protos.nodereader_pb2.SearchRequest,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.nodereader_pb2.SearchResponse: ...
+        context: _ServicerContext,
+    ) -> typing.Union[nucliadb_protos.nodereader_pb2.SearchResponse, collections.abc.Awaitable[nucliadb_protos.nodereader_pb2.SearchResponse]]: ...
     @abc.abstractmethod
     def Suggest(
         self,
         request: nucliadb_protos.nodereader_pb2.SuggestRequest,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.nodereader_pb2.SuggestResponse: ...
+        context: _ServicerContext,
+    ) -> typing.Union[nucliadb_protos.nodereader_pb2.SuggestResponse, collections.abc.Awaitable[nucliadb_protos.nodereader_pb2.SuggestResponse]]: ...
     @abc.abstractmethod
     def Paragraphs(
         self,
         request: nucliadb_protos.nodereader_pb2.StreamRequest,
-        context: grpc.ServicerContext,
-    ) -> collections.abc.Iterator[nucliadb_protos.nodereader_pb2.ParagraphItem]:
+        context: _ServicerContext,
+    ) -> typing.Union[collections.abc.Iterator[nucliadb_protos.nodereader_pb2.ParagraphItem], collections.abc.AsyncIterator[nucliadb_protos.nodereader_pb2.ParagraphItem]]:
         """Streams"""
     @abc.abstractmethod
     def Documents(
         self,
         request: nucliadb_protos.nodereader_pb2.StreamRequest,
-        context: grpc.ServicerContext,
-    ) -> collections.abc.Iterator[nucliadb_protos.nodereader_pb2.DocumentItem]: ...
+        context: _ServicerContext,
+    ) -> typing.Union[collections.abc.Iterator[nucliadb_protos.nodereader_pb2.DocumentItem], collections.abc.AsyncIterator[nucliadb_protos.nodereader_pb2.DocumentItem]]: ...
     @abc.abstractmethod
     def GetShardFiles(
         self,
         request: nucliadb_protos.nodereader_pb2.GetShardFilesRequest,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.nodereader_pb2.ShardFileList:
+        context: _ServicerContext,
+    ) -> typing.Union[nucliadb_protos.nodereader_pb2.ShardFileList, collections.abc.Awaitable[nucliadb_protos.nodereader_pb2.ShardFileList]]:
         """Shard Download"""
     @abc.abstractmethod
     def DownloadShardFile(
         self,
         request: nucliadb_protos.nodereader_pb2.DownloadShardFileRequest,
-        context: grpc.ServicerContext,
-    ) -> collections.abc.Iterator[nucliadb_protos.nodereader_pb2.ShardFileChunk]: ...
+        context: _ServicerContext,
+    ) -> typing.Union[collections.abc.Iterator[nucliadb_protos.nodereader_pb2.ShardFileChunk], collections.abc.AsyncIterator[nucliadb_protos.nodereader_pb2.ShardFileChunk]]: ...
 
-def add_NodeReaderServicer_to_server(servicer: NodeReaderServicer, server: grpc.Server) -> None: ...
+def add_NodeReaderServicer_to_server(servicer: NodeReaderServicer, server: typing.Union[grpc.Server, grpc.aio.Server]) -> None: ...

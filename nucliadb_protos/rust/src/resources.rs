@@ -704,6 +704,8 @@ pub struct FieldLink {
     pub localstorage: ::std::collections::HashMap<::prost::alloc::string::String, ::prost::alloc::string::String>,
     #[prost(string, tag="7")]
     pub css_selector: ::prost::alloc::string::String,
+    #[prost(string, tag="8")]
+    pub xpath: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Keyword {
