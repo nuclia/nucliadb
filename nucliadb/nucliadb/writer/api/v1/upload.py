@@ -944,7 +944,8 @@ async def store_file_on_nuclia_db(
         await transaction.commit(writer, partition, wait=True)
     except TransactionCommitTimeoutError:
         raise HTTPException(
-            status_code=501, detail="Inconsistent write. Commit timeout"
+            status_code=501,
+            detail="Inconsistent write. This resource will not be processed and may not be stored.",
         )
 
     try:

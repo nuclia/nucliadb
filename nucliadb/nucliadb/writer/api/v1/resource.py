@@ -192,7 +192,8 @@ async def create_resource(
         txn_time = time() - t0
     except TransactionCommitTimeoutError:
         raise HTTPException(
-            status_code=501, detail="Inconsistent write. Commit timeout"
+            status_code=501,
+            detail="Inconsistent write. This resource will not be processed and may not be stored.",
         )
 
     seqid = await maybe_send_to_process(toprocess, partition)
@@ -353,7 +354,8 @@ async def modify_resource(
         await transaction.commit(writer, partition, wait=True)
     except TransactionCommitTimeoutError:
         raise HTTPException(
-            status_code=501, detail="Inconsistent write. Commit timeout"
+            status_code=501,
+            detail="Inconsistent write. This resource will not be processed and may not be stored.",
         )
 
     seqid = await maybe_send_to_process(toprocess, partition)
@@ -492,7 +494,8 @@ async def _reprocess_resource(
         await transaction.commit(writer, partition, wait=False)
     except TransactionCommitTimeoutError:
         raise HTTPException(
-            status_code=501, detail="Inconsistent write. Commit timeout"
+            status_code=501,
+            detail="Inconsistent write. This resource will not be processed and may not be stored.",
         )
 
     processing_info = await send_to_process(toprocess, partition)
@@ -557,7 +560,8 @@ async def _delete_resource(
         await transaction.commit(writer, partition, wait=True)
     except TransactionCommitTimeoutError:
         raise HTTPException(
-            status_code=501, detail="Inconsistent write. Commit timeout"
+            status_code=501,
+            detail="Inconsistent write. This resource will not be processed and may not be stored.",
         )
 
     processing = get_processing()

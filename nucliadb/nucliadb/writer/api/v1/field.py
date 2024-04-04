@@ -116,7 +116,8 @@ async def finish_field_put(
         await transaction.commit(writer, partition, wait=True)
     except TransactionCommitTimeoutError:
         raise HTTPException(
-            status_code=501, detail="Inconsistent write. Commit timeout"
+            status_code=501,
+            detail="Inconsistent write. This resource will not be processed and may not be stored.",
         )
     try:
         processing_info = await processing.send_to_process(toprocess, partition)
@@ -657,7 +658,8 @@ async def _append_messages_to_conversation_field(
         await transaction.commit(writer, partition, wait=True)
     except TransactionCommitTimeoutError:
         raise HTTPException(
-            status_code=501, detail="Inconsistent write. Commit timeout"
+            status_code=501,
+            detail="Inconsistent write. This resource will not be processed and may not be stored.",
         )
 
     try:
@@ -755,7 +757,8 @@ async def _append_blocks_to_layout_field(
         await transaction.commit(writer, partition, wait=True)
     except TransactionCommitTimeoutError:
         raise HTTPException(
-            status_code=501, detail="Inconsistent write. Commit timeout"
+            status_code=501,
+            detail="Inconsistent write. This resource will not be processed and may not be stored.",
         )
     try:
         processing_info = await processing.send_to_process(toprocess, partition)
@@ -840,7 +843,8 @@ async def _delete_resource_field(
         await transaction.commit(writer, partition, wait=True)
     except TransactionCommitTimeoutError:
         raise HTTPException(
-            status_code=501, detail="Inconsistent write. Commit timeout"
+            status_code=501,
+            detail="Inconsistent write. This resource will not be processed and may not be stored.",
         )
 
     return Response(status_code=204)
@@ -915,7 +919,8 @@ async def reprocess_file_field(
         await transaction.commit(writer, partition, wait=False)
     except TransactionCommitTimeoutError:
         raise HTTPException(
-            status_code=501, detail="Inconsistent write. Commit timeout"
+            status_code=501,
+            detail="Inconsistent write. This resource will not be processed and may not be stored.",
         )
     # Send current resource to reprocess.
     try:
