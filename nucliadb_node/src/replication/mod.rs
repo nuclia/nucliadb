@@ -17,11 +17,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use serde::Deserialize;
+
 pub mod health;
 pub mod replicator;
 pub mod service;
 
-#[derive(Clone, PartialEq, Debug, Copy)]
+#[derive(Clone, PartialEq, Debug, Copy, Deserialize)]
 pub enum NodeRole {
     Primary,
     Secondary,

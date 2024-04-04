@@ -222,7 +222,7 @@ pub async fn connect_to_primary_and_replicate(
 
         let existing_shards = list_shards(settings.shards_path()).await;
         let mut shard_states = Vec::new();
-        let mut worker_pool = ReplicateWorkerPool::new(settings.replication_max_concurrency() as usize);
+        let mut worker_pool = ReplicateWorkerPool::new(settings.replication_max_concurrency as usize);
         for shard_id in existing_shards.clone() {
             if let Some(metadata) = shard_cache.get_metadata(shard_id.clone()) {
                 shard_states.push(replication::SecondaryShardReplicationState {
@@ -325,7 +325,7 @@ pub async fn connect_to_primary_and_replicate(
         // 1. If we're healthy, we'll sleep for a while and check again.
         // 2. If backed up replicating, we'll try replicating again immediately and check again.
         let elapsed = start.elapsed();
-        if elapsed < settings.replication_healthy_delay() {
+        if elapsed < settings.replication_healthy_delay {
             // only update healthy marker if we're up-to-date in the configured healthy time
             repl_health_mng.update_healthy();
         }
@@ -333,7 +333,7 @@ pub async fn connect_to_primary_and_replicate(
         if no_shards_to_sync && no_shards_to_remove {
             // if we have any changes, check again immediately
             // otherwise, wait for a bit
-            tokio::time::sleep(settings.replication_delay()).await;
+            tokio::time::sleep(settings.replication_delay).await;
         }
     }
 }
@@ -361,6 +361,6 @@ pub async fn connect_to_primary_and_replicate_forever(
         }
 
         error!("Error happened during replication. Will retry: {:?}", result);
-        tokio::time::sleep(settings.replication_delay()).await;
+        tokio::time::sleep(settings.replication_delay).await;
     }
 }

@@ -129,7 +129,7 @@ impl MergeScheduler {
     }
 
     fn run(&self) {
-        let work = self.wait_for_work(self.settings.merge_scheduler_free_time_work_scheduling_delay());
+        let work = self.wait_for_work(self.settings.merge_scheduler_free_time_work_scheduling_delay);
 
         match work {
             Some(request) => {
@@ -300,16 +300,16 @@ mod tests {
     use tokio;
 
     use crate::disk_structure;
+    use crate::settings::InnerSettings;
 
     use super::*;
 
     fn merge_scheduler() -> (MergeScheduler, TempDir) {
         let temp_dir = tempfile::tempdir().unwrap();
-        let settings = Settings::builder()
-            .data_path(temp_dir.path())
-            .merge_scheduler_free_time_work_scheduling_delay(Duration::from_millis(5))
-            .build()
-            .unwrap();
+        let mut settings = InnerSettings::default();
+        settings.data_path = temp_dir.path().to_owned();
+        settings.merge_scheduler_free_time_work_scheduling_delay = Duration::from_millis(5);
+        let settings: Settings = settings.into();
         let shard_cache = Arc::new(ShardWriterCache::new(settings.clone()));
         fs::create_dir_all(settings.shards_path()).unwrap();
 

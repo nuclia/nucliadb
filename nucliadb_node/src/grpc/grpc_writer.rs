@@ -343,7 +343,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
     }
 
     async fn get_metadata(&self, _request: Request<EmptyQuery>) -> Result<Response<NodeMetadata>, Status> {
-        let settings = &self.settings.clone();
+        let settings = &self.settings;
         let mut total_disk = 0;
         let mut available_disk = 0;
 

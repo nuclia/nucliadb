@@ -40,11 +40,13 @@ macro_rules! from_env {
 }
 
 pub mod env {
+    use std::sync::Arc;
     use std::time::Duration;
 
     use nucliadb_core::NodeResult;
 
     use crate::settings::providers::SettingsProvider;
+    use crate::settings::InnerSettings;
     use crate::settings::Settings;
     use crate::utils::{parse_log_levels, parse_node_role};
 
@@ -54,77 +56,80 @@ pub mod env {
 
     impl SettingsProvider for EnvSettingsProvider {
         fn generate_settings() -> NodeResult<Settings> {
-            let mut builder = Settings::builder();
+            let inner = envy::from_env::<InnerSettings>()?.into();
+            Ok(inner)
+            // let mut builder = Settings::builder();
 
-            if let Ok(debug) = std::env::var("DEBUG") {
-                if debug == "true" {
-                    builder.with_debug();
-                }
-            }
+            // if let Ok(debug) = std::env::var("DEBUG") {
+            //     if debug == "true" {
+            //         builder.with_debug();
+            //     }
+            // }
 
-            from_env!(builder.data_path, "DATA_PATH");
-            from_env!(builder.max_shards_per_node: usize, "MAX_NODE_REPLICAS");
-            from_env!(builder.host_key_path, "HOST_KEY_PATH");
-            from_env!(builder.hostname, "HOSTNAME");
+            // from_env!(builder.data_path, "DATA_PATH");
+            // from_env!(builder.max_shards_per_node: usize, "MAX_NODE_REPLICAS");
+            // from_env!(builder.host_key_path, "HOST_KEY_PATH");
+            // from_env!(builder.hostname, "HOSTNAME");
 
-            if let Ok(Ok(true)) = std::env::var("DISABLE_SENTRY").map(|v| v.parse::<bool>()) {
-                builder.without_sentry();
-            }
+            // if let Ok(Ok(true)) = std::env::var("DISABLE_SENTRY").map(|v| v.parse::<bool>()) {
+            //     builder.without_sentry();
+            // }
 
-            from_env!(builder.sentry_url, "SENTRY_URL");
-            from_env!(builder.sentry_env, "RUNNING_ENVIRONMENT");
+            // from_env!(builder.sentry_url, "SENTRY_URL");
+            // from_env!(builder.sentry_env, "RUNNING_ENVIRONMENT");
 
-            if let Ok(levels) = std::env::var("RUST_LOG") {
-                builder.log_levels(parse_log_levels(&levels));
-            }
+            // if let Ok(levels) = std::env::var("RUST_LOG") {
+            //     builder.log_levels(parse_log_levels(&levels));
+            // }
 
-            // support more standard LOG_LEVELS env var
-            if let Ok(levels) = std::env::var("LOG_LEVELS") {
-                builder.log_levels(parse_log_levels(&levels));
-            }
+            // // support more standard LOG_LEVELS env var
+            // if let Ok(levels) = std::env::var("LOG_LEVELS") {
+            //     builder.log_levels(parse_log_levels(&levels));
+            // }
 
-            if let Ok(Ok(true)) = std::env::var("JAEGER_ENABLED").map(|v| v.parse::<bool>()) {
-                builder.with_jaeger_enabled();
-            }
+            // if let Ok(Ok(true)) = std::env::var("JAEGER_ENABLED").map(|v| v.parse::<bool>()) {
+            //     builder.with_jaeger_enabled();
+            // }
 
-            from_env!(builder.jaeger_agent_host, "JAEGER_AGENT_HOST");
-            from_env!(builder.jaeger_agent_port: u16, "JAEGER_AGENT_PORT");
-            from_env!(builder.reader_listen_address, "READER_LISTEN_ADDRESS");
-            from_env!(builder.writer_listen_address, "WRITER_LISTEN_ADDRESS");
-            from_env!(builder.metrics_port: u16, "METRICS_PORT");
+            // from_env!(builder.jaeger_agent_host, "JAEGER_AGENT_HOST");
+            // from_env!(builder.jaeger_agent_port: u16, "JAEGER_AGENT_PORT");
+            // from_env!(builder.reader_listen_address, "READER_LISTEN_ADDRESS");
+            // from_env!(builder.writer_listen_address, "WRITER_LISTEN_ADDRESS");
+            // from_env!(builder.metrics_port: u16, "METRICS_PORT");
 
-            if let Ok(node_role) = std::env::var("NODE_ROLE") {
-                builder.node_role(parse_node_role(node_role.as_str()));
-            }
+            // if let Ok(node_role) = std::env::var("NODE_ROLE") {
+            //     builder.node_role(parse_node_role(node_role.as_str()));
+            // }
 
-            from_env!(builder.primary_address, "PRIMARY_ADDRESS");
+            // from_env!(builder.primary_address, "PRIMARY_ADDRESS");
 
-            if let Ok(Ok(replication_delay_seconds)) =
-                std::env::var("REPLICATION_DELAY_SECONDS").map(|v| v.parse::<u64>())
-            {
-                builder.replication_delay(Duration::from_secs(replication_delay_seconds));
-            }
+            // if let Ok(Ok(replication_delay_seconds)) =
+            //     std::env::var("REPLICATION_DELAY_SECONDS").map(|v| v.parse::<u64>())
+            // {
+            //     builder.replication_delay(Duration::from_secs(replication_delay_seconds));
+            // }
 
-            from_env!(builder.replication_max_concurrency: u64, "REPLICATION_MAX_CONCURRENCY");
+            // from_env!(builder.replication_max_concurrency: u64, "REPLICATION_MAX_CONCURRENCY");
 
-            if let Ok(Ok(replication_healthy_delay)) =
-                std::env::var("REPLICATION_HEALTHY_DELAY").map(|v| v.parse::<u64>())
-            {
-                builder.replication_healthy_delay(Duration::from_secs(replication_healthy_delay));
-            }
+            // if let Ok(Ok(replication_healthy_delay)) =
+            //     std::env::var("REPLICATION_HEALTHY_DELAY").map(|v| v.parse::<u64>())
+            // {
+            //     builder.replication_healthy_delay(Duration::from_secs(replication_healthy_delay));
+            // }
 
-            from_env!(builder.merge_scheduler_max_nodes_in_merge: usize, "SCHEDULER_MAX_NODES_IN_MERGE");
-            from_env!(builder.merge_scheduler_segments_before_merge: usize, "SCHEDULER_SEGMENTS_BEFORE_MERGE");
-            from_env!(builder.merge_on_commit_max_nodes_in_merge: usize, "MAX_NODES_IN_MERGE");
-            from_env!(builder.merge_on_commit_segments_before_merge: usize, "SEGMENTS_BEFORE_MERGE");
+            // from_env!(builder.merge_scheduler_max_nodes_in_merge: usize, "SCHEDULER_MAX_NODES_IN_MERGE");
+            // from_env!(builder.merge_scheduler_segments_before_merge: usize, "SCHEDULER_SEGMENTS_BEFORE_MERGE");
+            // from_env!(builder.merge_on_commit_max_nodes_in_merge: usize, "MAX_NODES_IN_MERGE");
+            // from_env!(builder.merge_on_commit_segments_before_merge: usize, "SEGMENTS_BEFORE_MERGE");
 
-            builder.build()
+            // builder.build()
         }
     }
 
     #[cfg(test)]
     mod tests {
         use serial_test::serial;
+        use tracing::Level;
 
         /// Tests playing around with environment variables must run
         /// sequentially to avoid conflicts between them
@@ -172,15 +177,17 @@ pub mod env {
             // Safe current state of DISABLE_SENTRY
             let disable_sentry_copy = std::env::var("DISABLE_SENTRY");
             // set DISABLE_SENTRY for the test
-            std::env::set_var("DISABLE_SENTRY", "true");
+            std::env::set_var("LOG_LEVELS", "nucliadb=INFO");
+            std::env::set_var("REPLICATION_DELAY", "123");
 
-            let settings = EnvSettingsProvider::generate_settings().unwrap();
+            let settings: InnerSettings = envy::from_env().unwrap();
             match disable_sentry_copy {
                 Ok(value) => std::env::set_var("DISABLE_SENTRY", value),
                 Err(_) => std::env::remove_var("DISABLE_SENTRY"),
             }
 
-            assert!(!settings.sentry_enabled());
+            assert_eq!(settings.replication_delay, Duration::from_secs(123));
+            assert_eq!(settings.log_levels, &[("nucliadb".into(), Level::INFO)]);
         }
     }
 }

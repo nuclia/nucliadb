@@ -42,14 +42,14 @@ pub fn init_telemetry(settings: &Settings) -> NodeResult<Option<ClientInitGuard>
     let stdout = stdout_layer(settings);
     layers.push(stdout);
 
-    if settings.jaeger_enabled() {
+    if settings.jaeger_enabled {
         let jaeger = jaeger_layer(settings)?;
         layers.push(jaeger);
     }
 
     let sentry_guard;
 
-    if settings.sentry_enabled() {
+    if settings.sentry_enabled {
         sentry_guard = Some(setup_sentry(settings.sentry_env(), settings.sentry_url()));
         let sentry = sentry_layer();
         layers.push(sentry);
@@ -142,7 +142,7 @@ fn stdout_layer(settings: &Settings) -> Box<dyn Layer<Registry> + Send + Sync> {
 
     let filter = LogLevelsFilter::new(log_levels);
 
-    if settings.plain_logs() || settings.debug() {
+    if settings.plain_logs || settings.debug() {
         layer.event_format(tracing_subscriber::fmt::format().compact()).with_filter(filter).boxed()
     } else {
         layer
@@ -175,7 +175,7 @@ fn jaeger_layer(settings: &Settings) -> NodeResult<Box<dyn Layer<Registry> + Sen
     Ok(tracing_opentelemetry::layer().with_tracer(tracer).with_filter(level_filter).with_filter(span_filter).boxed())
 }
 
-fn setup_sentry(env: &'static str, sentry_url: String) -> ClientInitGuard {
+fn setup_sentry(env: String, sentry_url: String) -> ClientInitGuard {
     sentry::init((
         sentry_url,
         sentry::ClientOptions {
