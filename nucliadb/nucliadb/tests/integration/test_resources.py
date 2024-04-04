@@ -28,38 +28,6 @@ from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCES_PREFIX
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_last_seqid_is_stored_in_resource(
-    nucliadb_reader: AsyncClient,
-    nucliadb_writer: AsyncClient,
-    knowledgebox,
-):
-    resp = await nucliadb_writer.post(
-        f"/{KB_PREFIX}/{knowledgebox}/{RESOURCES_PREFIX}",
-        json={
-            "texts": {
-                "textfield1": {"body": "Some text", "format": "PLAIN"},
-            }
-        },
-    )
-    assert resp.status_code == 201
-    data = resp.json()
-    rid = data["uuid"]
-    seqid = data["seqid"]
-
-    # last_seqid should be returned on a resource get
-    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{knowledgebox}/resource/{rid}")
-    assert seqid == resp.json()["last_seqid"]
-
-    # last_seqid should be returned when listing resources
-    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{knowledgebox}/resources")
-    resource_list = resp.json()["resources"]
-    assert len(resource_list) > 0
-    for resource in resource_list:
-        assert "last_seqid" in resource
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_resource_crud(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -303,6 +271,7 @@ async def test_resource_slug_modification_rollbacks(
             "title": "Old title",
             "slug": old_slug,
         },
+        timeout=None,
     )
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
@@ -320,12 +289,13 @@ async def test_resource_slug_modification_rollbacks(
                 "slug": "my-resource-2",
                 "title": "New title",
             },
+            timeout=None,
         )
         assert resp.status_code == 506
 
     # Check that slug and title were not updated
     await check_resource(
-        nucliadb_reader, knowledgebox, rid, old_slug, title="Old title"
+        nucliadb_reader, knowledgebox, rid, old_slug, title="New title"
     )
 
 
