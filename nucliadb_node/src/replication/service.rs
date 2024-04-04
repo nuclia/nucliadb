@@ -303,7 +303,7 @@ impl replication::replication_service_server::ReplicationService for Replication
         }
         Ok(tonic::Response::new(noderesources::NodeMetadata {
             shard_count: list_shards(settings.shards_path()).await.len().try_into().unwrap(),
-            node_id: read_host_key(settings.host_key_path()).unwrap().to_string(),
+            node_id: read_host_key(&settings.host_key_path).unwrap().to_string(),
             primary_node_id: get_primary_node_id(settings.data_path()),
             total_disk,
             available_disk,

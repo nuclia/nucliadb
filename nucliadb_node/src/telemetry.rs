@@ -47,16 +47,9 @@ pub fn init_telemetry(settings: &Settings) -> NodeResult<Option<ClientInitGuard>
         layers.push(jaeger);
     }
 
-    let sentry_guard;
-
-    if settings.sentry_enabled {
-        sentry_guard = Some(setup_sentry(settings.sentry_env(), settings.sentry_url()));
-        let sentry = sentry_layer();
-        layers.push(sentry);
-    } else {
-        eprintln!("Sentry disabled");
-        sentry_guard = None;
-    }
+    let sentry_guard = Some(setup_sentry(settings.sentry_env(), settings.sentry_url()));
+    let sentry = sentry_layer();
+    layers.push(sentry);
 
     tracing_subscriber::registry().with(layers).try_init().with_context(|| "trying to init tracing")?;
 
@@ -142,7 +135,7 @@ fn stdout_layer(settings: &Settings) -> Box<dyn Layer<Registry> + Send + Sync> {
 
     let filter = LogLevelsFilter::new(log_levels);
 
-    if settings.plain_logs || settings.debug() {
+    if settings.debug {
         layer.event_format(tracing_subscriber::fmt::format().compact()).with_filter(filter).boxed()
     } else {
         layer

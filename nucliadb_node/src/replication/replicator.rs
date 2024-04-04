@@ -333,7 +333,7 @@ pub async fn connect_to_primary_and_replicate(
         if no_shards_to_sync && no_shards_to_remove {
             // if we have any changes, check again immediately
             // otherwise, wait for a bit
-            tokio::time::sleep(settings.replication_delay).await;
+            tokio::time::sleep(settings.replication_delay()).await;
         }
     }
 }
@@ -361,6 +361,6 @@ pub async fn connect_to_primary_and_replicate_forever(
         }
 
         error!("Error happened during replication. Will retry: {:?}", result);
-        tokio::time::sleep(settings.replication_delay).await;
+        tokio::time::sleep(settings.replication_delay()).await;
     }
 }

@@ -300,13 +300,13 @@ mod tests {
     use tokio;
 
     use crate::disk_structure;
-    use crate::settings::InnerSettings;
+    use crate::settings::EnvSettings;
 
     use super::*;
 
     fn merge_scheduler() -> (MergeScheduler, TempDir) {
         let temp_dir = tempfile::tempdir().unwrap();
-        let mut settings = InnerSettings::default();
+        let mut settings = EnvSettings::default();
         settings.data_path = temp_dir.path().to_owned();
         settings.merge_scheduler_free_time_work_scheduling_delay = Duration::from_millis(5);
         let settings: Settings = settings.into();

@@ -32,9 +32,7 @@ use nucliadb_node::node_metadata::NodeMetadata;
 use nucliadb_node::replication::replicator::connect_to_primary_and_replicate_forever;
 use nucliadb_node::replication::service::ReplicationServiceGRPCDriver;
 use nucliadb_node::replication::NodeRole;
-use nucliadb_node::settings::providers::env::EnvSettingsProvider;
-use nucliadb_node::settings::providers::SettingsProvider;
-use nucliadb_node::settings::Settings;
+use nucliadb_node::settings::{global_settings, initialize_global_settings, Settings};
 use nucliadb_node::shards::cache::ShardWriterCache;
 use nucliadb_node::telemetry::init_telemetry;
 use nucliadb_node::{lifecycle, utils};
@@ -76,7 +74,8 @@ async fn main() -> NodeResult<()> {
     eprintln!("NucliaDB Writer Node starting...");
     let start_bootstrap = Instant::now();
 
-    let settings: Settings = EnvSettingsProvider::generate_settings()?;
+    initialize_global_settings()?;
+    let settings = global_settings();
 
     let _guard = init_telemetry(&settings)?;
     let metrics = metrics::get_metrics();
@@ -91,20 +90,19 @@ async fn main() -> NodeResult<()> {
     let node_metadata = NodeMetadata::new(settings.clone()).await?;
     let (metadata_sender, metadata_receiver) = tokio::sync::mpsc::unbounded_channel();
 
-    let host_key_path = settings.host_key_path();
-    let node_id = utils::read_or_create_host_key(host_key_path)?;
+    let node_id = utils::read_or_create_host_key(&settings.host_key_path)?;
 
     nucliadb_node::analytics::sync::start_analytics_loop();
 
     let (shutdown_notifier, shutdown_notified) = get_shutdown_notifier();
     let shard_cache = Arc::new(ShardWriterCache::new(settings.clone()));
 
-    if settings.node_role() == NodeRole::Primary {
+    if settings.node_role == NodeRole::Primary {
         lifecycle::initialize_merger(Arc::clone(&shard_cache), settings.clone())?;
     }
 
     let mut replication_task = None;
-    if settings.node_role() == NodeRole::Secondary {
+    if settings.node_role == NodeRole::Secondary {
         // when it's a secondary server, do not even run the writer GRPC service
         // because nothing should happen through that interface
         replication_task = Some(tokio::spawn(connect_to_primary_and_replicate_forever(
@@ -140,7 +138,7 @@ async fn main() -> NodeResult<()> {
     wait_for_sigkill().await?;
 
     shutdown_notifier.notify_waiters();
-    if settings.node_role() == NodeRole::Primary {
+    if settings.node_role == NodeRole::Primary {
         lifecycle::finalize_merger();
     }
 
@@ -175,7 +173,7 @@ pub async fn start_grpc_service(
     node_id: String,
     shutdown_notifier: Arc<Notify>,
 ) -> NodeResult<()> {
-    let listen_address = settings.writer_listen_address();
+    let listen_address = settings.writer_listen_address;
 
     let tracing_middleware = GrpcInstrumentorLayer;
     let debug_logs_middleware = GrpcDebugLogsLayer;
@@ -190,7 +188,7 @@ pub async fn start_grpc_service(
         .layer(metrics_middleware)
         .add_service(health_service);
 
-    if settings.node_role() == NodeRole::Primary {
+    if settings.node_role == NodeRole::Primary {
         let grpc_driver = NodeWriterGRPCDriver::new(settings.clone(), shard_cache.clone()).with_sender(metadata_sender);
         server_builder = server_builder.add_service(GrpcServer::new(grpc_driver));
     }

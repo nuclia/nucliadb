@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 use std::net::{SocketAddr, ToSocketAddrs};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::time::Duration;
 use std::{fs, thread};
@@ -71,9 +71,9 @@ pub fn parse_log_levels(levels: &str) -> Vec<(String, Level)> {
         .collect()
 }
 
-pub fn read_host_key(hk_path: PathBuf) -> NodeResult<Uuid> {
+pub fn read_host_key(hk_path: &Path) -> NodeResult<Uuid> {
     let host_key_contents =
-        fs::read(hk_path.clone()).with_context(|| format!("Failed to read host key from '{}'", hk_path.display()))?;
+        fs::read(hk_path).with_context(|| format!("Failed to read host key from '{}'", hk_path.display()))?;
 
     let host_key = Uuid::from_slice(host_key_contents.as_slice())
         .with_context(|| format!("Invalid host key from '{}'", hk_path.display()))?;
@@ -84,7 +84,7 @@ pub fn read_host_key(hk_path: PathBuf) -> NodeResult<Uuid> {
 /// Reads the key that makes a node unique from the given file.
 /// If the file does not exist, it generates an ID and writes it to the file
 /// so that it can be reused on reboot.
-pub fn read_or_create_host_key(hk_path: PathBuf) -> NodeResult<Uuid> {
+pub fn read_or_create_host_key(hk_path: &Path) -> NodeResult<Uuid> {
     let host_key;
 
     if hk_path.exists() {
@@ -92,7 +92,7 @@ pub fn read_or_create_host_key(hk_path: PathBuf) -> NodeResult<Uuid> {
         info!(host_key=?host_key, "Read existing host key.");
     } else {
         host_key = Uuid::new_v4();
-        fs::write(hk_path.clone(), host_key.as_bytes())
+        fs::write(hk_path, host_key.as_bytes())
             .with_context(|| format!("Failed to write host key to '{}'", hk_path.display()))?;
         info!(host_key=?host_key, host_key_path=?hk_path, "Create new host key.");
     }
