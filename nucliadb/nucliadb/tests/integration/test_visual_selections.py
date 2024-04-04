@@ -65,7 +65,6 @@ async def annotated_file_field(
 
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
-        headers={"x-synchronous": "true"},
         json={
             "title": "My invoice",
             "files": {

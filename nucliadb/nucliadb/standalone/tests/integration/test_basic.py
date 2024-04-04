@@ -34,7 +34,6 @@ async def test_basic_patch_thumbnail_sc_2390(
             "summary": "A simple summary",
             "thumbnail": "thumbnail-on-creation",
         },
-        headers={"X-Synchronous": "true"},
     )
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
@@ -50,7 +49,6 @@ async def test_basic_patch_thumbnail_sc_2390(
     resp = await nucliadb_writer.patch(
         f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}",
         json={"thumbnail": "thumbnail-modified"},
-        headers={"X-Synchronous": "true"},
     )
     assert resp.status_code == 200
 

@@ -328,7 +328,6 @@ async def test_paragraph_search_with_filters(
             "title": "Mushrooms",
             "summary": "A very good book about mushrooms (aka funghi)",
         },
-        headers={"X-SYNCHRONOUS": "True"},
     )
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
@@ -712,7 +711,6 @@ async def test_processing_status_doesnt_change_on_search_after_processed(
             json={
                 "title": "My new title",
             },
-            headers={"X-SYNCHRONOUS": "True"},
             timeout=None,
         )
     ).status_code == 200
@@ -755,7 +753,6 @@ async def test_search_automatic_relations(
 
     resp = await nucliadb_writer.post(
         f"/kb/{knowledgebox}/resources",
-        headers={"X-Synchronous": "true"},
         json={
             "title": "My resource",
             "slug": "myresource",
@@ -1110,7 +1107,6 @@ async def test_resource_search_pagination(
 
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
-        headers={"X-Synchronous": "true"},
         json={
             "title": "Resource with ",
             "slug": "resource-with-texts",
@@ -1230,7 +1226,6 @@ async def create_dummy_resources(
     for payload in payloads:
         resp = await nucliadb_writer.post(
             f"/kb/{kbid}/resources",
-            headers={"X-Synchronous": "true"},
             json=payload,
         )
         assert resp.status_code == 201
@@ -1512,7 +1507,6 @@ async def test_search_by_path_filter(
     for path in paths:
         resp = await nucliadb_writer.post(
             f"/kb/{knowledgebox}/resources",
-            headers={"X-Synchronous": "true"},
             json={
                 "title": f"My resource: {path}",
                 "summary": "Some summary",

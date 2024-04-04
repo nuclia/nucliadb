@@ -46,7 +46,6 @@ async def test_ask_document(
             "summary": "The summary",
             "texts": {"text_field": {"body": "The body of the text field"}},
         },
-        headers={"X-Synchronous": "True"},
     )
     assert resp.status_code in (200, 201)
     rid = resp.json()["uuid"]

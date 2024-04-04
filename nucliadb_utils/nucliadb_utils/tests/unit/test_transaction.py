@@ -17,12 +17,17 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import asyncio
 from unittest import mock
 
 import pytest
-from nucliadb_protos.writer_pb2 import Notification
+from nucliadb_protos.writer_pb2 import BrokerMessage, Notification
 
-from nucliadb_utils.transaction import TransactionUtility, WaitFor
+from nucliadb_utils.transaction import (
+    TransactionCommitTimeoutError,
+    TransactionUtility,
+    WaitFor,
+)
 
 
 @pytest.fixture()
@@ -100,3 +105,15 @@ async def test_wait_for_commit_stop_waiting(txn: TransactionUtility, pubsub):
     # Unsubscribing twice with the same request_id should raise KeyError
     with pytest.raises(KeyError):
         await txn.stop_waiting(kbid, request_id=request_id)
+
+
+@pytest.mark.asyncio
+async def test_commit_timeout(txn: TransactionUtility, pubsub):
+    txn.js = mock.AsyncMock()
+    bm = BrokerMessage()
+
+    waiting_event = mock.Mock(wait=mock.Mock(side_effect=asyncio.TimeoutError))
+    txn.wait_for_commited = mock.AsyncMock(return_value=waiting_event)  # type: ignore
+
+    with pytest.raises(TransactionCommitTimeoutError):
+        await txn.commit(bm, 1, wait=True, target_subject="foo")
