@@ -88,7 +88,7 @@ SEARCH_EXAMPLES = {
     f"/{KB_PREFIX}/{{kbid}}/search",
     status_code=200,
     name="Search Knowledge Box",
-    description="Search on a Knowledge Box and retrieve separate results for documents, paragraphs, and sentences. Usually, it is better to use `find`",
+    description="Search on a Knowledge Box and retrieve separate results for documents, paragraphs, and sentences. Usually, it is better to use `find`",  # noqa: E501
     response_model=KnowledgeboxSearchResults,
     response_model_exclude_unset=True,
     tags=["Search"],
@@ -347,7 +347,7 @@ async def catalog(
     f"/{KB_PREFIX}/{{kbid}}/search",
     status_code=200,
     name="Search Knowledge Box",
-    description="Search on a Knowledge Box and retrieve separate results for documents, paragraphs, and sentences. Usually, it is better to use `find`",
+    description="Search on a Knowledge Box and retrieve separate results for documents, paragraphs, and sentences. Usually, it is better to use `find`",  # noqa: E501
     response_model=KnowledgeboxSearchResults,
     response_model_exclude_unset=True,
     tags=["Search"],
