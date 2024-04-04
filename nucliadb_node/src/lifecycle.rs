@@ -32,7 +32,7 @@ use nucliadb_core::thread::ThreadPoolBuilder;
 /// Initialize the index node writer. This function must be called before using
 /// a writer
 pub fn initialize_writer(settings: Settings) -> NodeResult<()> {
-    let data_path = settings.data_path();
+    let data_path = &settings.data_path;
     let shards_path = settings.shards_path();
     if !data_path.exists() {
         return Err(node_error!("Data directory ({:?}) should be already created", data_path));

@@ -80,9 +80,9 @@ async fn main() -> NodeResult<()> {
     let _guard = init_telemetry(&settings)?;
     let metrics = metrics::get_metrics();
 
-    let data_path = settings.data_path();
+    let data_path = &settings.data_path;
     if !data_path.exists() {
-        std::fs::create_dir(data_path.clone())?;
+        std::fs::create_dir(data_path)?;
     }
 
     lifecycle::initialize_writer(settings.clone())?;

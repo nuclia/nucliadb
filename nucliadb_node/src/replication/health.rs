@@ -43,7 +43,7 @@ impl ReplicationHealthManager {
     }
 
     fn health_filepath(&self) -> String {
-        format!("{}/{}", self.settings.data_path().to_string_lossy(), REPLICATION_HEALTH_FILE)
+        format!("{}/{}", self.settings.data_path.to_string_lossy(), REPLICATION_HEALTH_FILE)
     }
 
     pub fn update_healthy(&self) {

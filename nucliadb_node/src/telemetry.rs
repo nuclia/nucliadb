@@ -47,7 +47,7 @@ pub fn init_telemetry(settings: &Settings) -> NodeResult<Option<ClientInitGuard>
         layers.push(jaeger);
     }
 
-    let sentry_guard = Some(setup_sentry(settings.sentry_env(), settings.sentry_url()));
+    let sentry_guard = Some(setup_sentry(settings.sentry_env(), settings.sentry_url.clone()));
     let sentry = sentry_layer();
     layers.push(sentry);
 

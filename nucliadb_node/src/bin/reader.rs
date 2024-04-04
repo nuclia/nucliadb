@@ -47,7 +47,7 @@ async fn main() -> NodeResult<()> {
     initialize_global_settings()?;
     let settings = global_settings();
 
-    if !settings.data_path().exists() {
+    if !settings.data_path.exists() {
         return Err(node_error!("Data directory missing"));
     }
 

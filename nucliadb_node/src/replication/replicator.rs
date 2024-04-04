@@ -197,7 +197,7 @@ pub async fn connect_to_primary_and_replicate(
     secondary_id: String,
     shutdown_notified: Arc<AtomicBool>,
 ) -> NodeResult<()> {
-    let mut primary_address = settings.primary_address();
+    let mut primary_address = settings.primary_address.clone();
     if !primary_address.starts_with("http://") {
         primary_address = format!("http://{}", primary_address);
     }
@@ -212,7 +212,7 @@ pub async fn connect_to_primary_and_replicate(
 
     let primary_node_metadata = client.get_metadata(Request::new(EmptyQuery {})).await?.into_inner();
 
-    set_primary_node_id(settings.data_path(), primary_node_metadata.node_id)?;
+    set_primary_node_id(&settings.data_path, primary_node_metadata.node_id)?;
 
     let shards_path = settings.shards_path();
     loop {

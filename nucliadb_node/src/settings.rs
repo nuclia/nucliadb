@@ -156,11 +156,6 @@ pub struct EnvSettings {
 }
 
 impl EnvSettings {
-    /// Path to main directory where all index node data is stored
-    pub fn data_path(&self) -> PathBuf {
-        self.data_path.clone()
-    }
-
     pub fn replication_delay(&self) -> Duration {
         Duration::from_secs(self.replication_delay_seconds)
     }
@@ -173,10 +168,6 @@ impl EnvSettings {
     /// Path where all shards are stored
     pub fn shards_path(&self) -> PathBuf {
         self.data_path.join(SHARDS_DIR)
-    }
-
-    pub fn sentry_url(&self) -> String {
-        self.sentry_url.clone()
     }
 
     pub fn sentry_env(&self) -> String {
@@ -202,11 +193,6 @@ impl EnvSettings {
         let host = &self.jaeger_agent_host;
         let port = &self.jaeger_agent_port;
         format!("{}:{}", host, port)
-    }
-
-    /// Address where secondary node read will connect to primary node through
-    pub fn primary_address(&self) -> String {
-        self.primary_address.clone()
     }
 }
 
@@ -238,5 +224,83 @@ impl Default for EnvSettings {
             merge_on_commit_max_nodes_in_merge: 10_000,
             merge_on_commit_segments_before_merge: 100,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{path::PathBuf, time::Duration};
+
+    use tracing::Level;
+
+    use super::{EnvSettings, Settings};
+
+    fn from_pairs(pairs: &[(&str, &str)]) -> anyhow::Result<Settings> {
+        Ok(envy::from_iter::<_, EnvSettings>(pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())))?.into())
+    }
+
+    #[test]
+    fn test_data_paths() {
+        let settings = from_pairs(&[("DATA_PATH", "my_little_path")]).unwrap();
+        assert_eq!(settings.data_path, PathBuf::from("my_little_path"));
+        assert_eq!(settings.shards_path(), PathBuf::from("my_little_path/shards"));
+        assert_eq!(settings.metadata_path(), PathBuf::from("my_little_path/metadata.json"));
+    }
+
+    #[test]
+    fn test_log_levels() {
+        // Default
+        let settings = from_pairs(&[]).unwrap();
+        assert_eq!(settings.log_levels(), &[(String::from("nucliadb_*"), Level::INFO)]);
+
+        // From RUST_LOG
+        let settings = from_pairs(&[("RUST_LOG", "nucliadb_*=INFO,tantivy=WARN")]).unwrap();
+        assert_eq!(
+            settings.log_levels(),
+            &[(String::from("nucliadb_*"), Level::INFO), (String::from("tantivy"), Level::WARN)]
+        );
+
+        // From LOG_LEVELS
+        let settings = from_pairs(&[("LOG_LEVELS", "nucliadb_*=INFO,tantivy=WARN")]).unwrap();
+        assert_eq!(
+            settings.log_levels(),
+            &[(String::from("nucliadb_*"), Level::INFO), (String::from("tantivy"), Level::WARN)]
+        );
+
+        // Priority goes to LOG_LEVELS
+        let settings = from_pairs(&[("RUST_LOG", "rust_log=INFO"), ("LOG_LEVELS", "log_levels=INFO")]).unwrap();
+        assert_eq!(settings.log_levels(), &[(String::from("log_levels"), Level::INFO)]);
+
+        // Empty variable
+        let settings = from_pairs(&[("LOG_LEVELS", "")]).unwrap();
+        assert_eq!(settings.log_levels(), &[(String::from("nucliadb_*"), Level::INFO)]);
+    }
+
+    #[test]
+    fn test_sentry_env() {
+        let settings = from_pairs(&[("RUNNING_ENVIRONMENT", "stage")]).unwrap();
+        assert_eq!(settings.sentry_env(), "stage");
+
+        let settings = from_pairs(&[("RUNNING_ENVIRONMENT", "prod")]).unwrap();
+        assert_eq!(settings.sentry_env(), "prod");
+
+        let settings = from_pairs(&[("RUNNING_ENVIRONMENT", "random")]).unwrap();
+        assert_eq!(settings.sentry_env(), "stage");
+    }
+
+    #[test]
+    fn test_duration_conversion() {
+        let settings = from_pairs(&[("MERGE_SCHEDULER_FREE_TIME_WORK_SCHEDULING_DELAY", "17")]).unwrap();
+        assert_eq!(settings.merge_scheduler_free_time_work_scheduling_delay, Duration::from_secs(17));
+    }
+
+    #[test]
+    fn test_invalid_type() {
+        let settings = from_pairs(&[("DEBUG", "some_string")]);
+        let Err(e) = settings else {
+            panic!("Expected failure to load settings")
+        };
+        assert!(e.to_string().contains("DEBUG"), "Error `{e}` does not match expected");
+        assert!(e.to_string().contains("`true` or `false`"), "Error `{e}` does not match expected");
     }
 }

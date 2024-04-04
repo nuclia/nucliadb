@@ -132,13 +132,13 @@ impl NodeFixture {
         }
         .into();
 
-        for _setting in [&settings, &secondary_settings] {
-            let data_path = _setting.data_path();
+        for setting in [&settings, &secondary_settings] {
+            let data_path = &setting.data_path;
             if !data_path.exists() {
-                std::fs::create_dir(&data_path).expect("Cannot create data directory");
+                std::fs::create_dir(data_path).expect("Cannot create data directory");
             }
 
-            let shards_path = _setting.shards_path();
+            let shards_path = setting.shards_path();
             if !shards_path.exists() {
                 std::fs::create_dir(&shards_path).expect("Cannot create shards directory");
             }
