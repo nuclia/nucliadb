@@ -90,7 +90,7 @@ class _Lock:
             except ConflictError:
                 # if we get a conflict error, retry
                 pass
-            await asyncio.sleep(0.1)  # sleep before trying againt
+            await asyncio.sleep(0.1)  # sleep before trying again
         self.task = asyncio.create_task(self._refresh_task())
         return self
 
