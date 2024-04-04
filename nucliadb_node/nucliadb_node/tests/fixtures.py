@@ -53,7 +53,6 @@ images.settings["nucliadb_node_reader"] = {
         "READER_LISTEN_ADDRESS": "0.0.0.0:4445",
         "RUST_BACKTRACE": "full",
         "RUST_LOG": "nucliadb_*=DEBUG",  # noqa
-        "DEBUG": "1",
     },
     "options": {
         "command": [
@@ -74,7 +73,6 @@ images.settings["nucliadb_node_writer"] = {
         "WRITER_LISTEN_ADDRESS": "0.0.0.0:4446",
         "RUST_BACKTRACE": "full",
         "RUST_LOG": "nucliadb_*=DEBUG",  # noqa
-        "DEBUG": "1",
     },
     "options": {
         "command": [

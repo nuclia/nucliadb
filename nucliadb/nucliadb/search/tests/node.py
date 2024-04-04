@@ -49,7 +49,6 @@ images.settings["nucliadb_node_reader"] = {
         "READER_LISTEN_ADDRESS": "0.0.0.0:4445",
         "NUCLIADB_DISABLE_ANALYTICS": "True",
         "RUST_BACKTRACE": "full",
-        "DEBUG": "1",
         "RUST_LOG": "nucliadb_*=DEBUG",
     },
     "options": {
@@ -71,7 +70,6 @@ images.settings["nucliadb_node_writer"] = {
         "WRITER_LISTEN_ADDRESS": "0.0.0.0:4446",
         "NUCLIADB_DISABLE_ANALYTICS": "True",
         "RUST_BACKTRACE": "full",
-        "DEBUG": "1",
         "RUST_LOG": "nucliadb_*=DEBUG",
     },
     "options": {
@@ -97,7 +95,6 @@ images.settings["nucliadb_node_sidecar"] = {
         "WRITER_LISTEN_ADDRESS": "0.0.0.0:4446",
         "PYTHONUNBUFFERED": "1",
         "LOG_LEVEL": "DEBUG",
-        "DEBUG": "1",
     },
     "options": {
         "command": [
