@@ -166,6 +166,9 @@ class TransactionSettings(BaseSettings):
     transaction_jetstream_auth: Optional[str] = None
     transaction_jetstream_servers: List[str] = ["nats://localhost:4222"]
     transaction_local: bool = False
+    transaction_commit_timeout: int = Field(
+        default=60, description="Transaction commit timeout in seconds"
+    )
 
 
 transaction_settings = TransactionSettings()
