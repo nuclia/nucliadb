@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::shards::cache::ShardReaderCache;
+use crate::cache::ShardReaderCache;
 use nucliadb_core::tracing::*;
 use std::fs::read_dir;
 use std::path::PathBuf;

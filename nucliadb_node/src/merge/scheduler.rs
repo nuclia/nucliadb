@@ -27,8 +27,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use crate::cache::ShardWriterCache;
 use crate::settings::Settings;
-use crate::shards::cache::ShardWriterCache;
 use anyhow::anyhow;
 use nucliadb_core::merge::MergeRequester;
 use nucliadb_core::metrics::vectors::MergeSource;
