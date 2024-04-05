@@ -240,42 +240,34 @@ impl ShardWriter {
 
         remove_invalid_labels(&mut resource);
 
-        let text_writer_service = self.text_writer.clone();
-        let field_resource = resource.clone();
-        let text_task = move || {
+        let text_task = || {
             debug!("Field service starts set_resource");
-            let mut writer = write_rw_lock(&text_writer_service);
-            let result = writer.set_resource(&field_resource);
+            let mut writer = write_rw_lock(&self.text_writer);
+            let result = writer.set_resource(&resource);
             debug!("Field service ends set_resource");
             result
         };
 
-        let paragraph_resource = resource.clone();
-        let paragraph_writer_service = self.paragraph_writer.clone();
-        let paragraph_task = move || {
+        let paragraph_task = || {
             debug!("Paragraph service starts set_resource");
-            let mut writer = write_rw_lock(&paragraph_writer_service);
-            let result = writer.set_resource(&paragraph_resource);
+            let mut writer = write_rw_lock(&self.paragraph_writer);
+            let result = writer.set_resource(&resource);
             debug!("Paragraph service ends set_resource");
             result
         };
 
-        let vector_writer_service = self.vector_writer.clone();
-        let vector_resource = resource.clone();
-        let vector_task = move || {
+        let vector_task = || {
             debug!("Vector service starts set_resource");
-            let mut writer = write_rw_lock(&vector_writer_service);
-            let result = writer.set_resource(&vector_resource);
+            let mut writer = write_rw_lock(&self.vector_writer);
+            let result = writer.set_resource(&resource);
             debug!("Vector service ends set_resource");
             result
         };
 
-        let relation_writer_service = self.relation_writer.clone();
-        let relation_resource = resource.clone();
-        let relation_task = move || {
+        let relation_task = || {
             debug!("Relation service starts set_resource");
-            let mut writer = write_rw_lock(&relation_writer_service);
-            let result = writer.set_resource(&relation_resource);
+            let mut writer = write_rw_lock(&self.relation_writer);
+            let result = writer.set_resource(&resource);
             debug!("Relation service ends set_resource");
             result
         };
