@@ -961,3 +961,45 @@ async def test_link_fields_store_css_selector(
         css_selector = resource.data.links["link"].value.css_selector
 
     assert css_selector == "main"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_link_fields_store_xpath(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox,
+):
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/resources",
+        json={
+            "title": "My title",
+            "slug": "myresource",
+            "texts": {"text1": {"body": "My text"}},
+            "links": {
+                "link": {
+                    "uri": "https://www.example.com",
+                    "xpath": "my_xpath",
+                },
+            },
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/resource/{rid}?show=values",
+        timeout=None,
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    resource = Resource.parse_obj(data)
+    xpath = None
+    if (
+        resource.data is not None
+        and resource.data.links is not None
+        and resource.data.links["link"].value is not None
+    ):
+        xpath = resource.data.links["link"].value.xpath
+
+    assert xpath == "my_xpath"
