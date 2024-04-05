@@ -31,6 +31,7 @@
 //! providers (to parse from CLI for example).
 
 use std::net::SocketAddr;
+use std::num::NonZeroUsize;
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -147,6 +148,8 @@ pub struct EnvSettings {
     pub merge_scheduler_segments_before_merge: usize,
     pub merge_on_commit_max_nodes_in_merge: usize,
     pub merge_on_commit_segments_before_merge: usize,
+
+    pub max_open_shards: Option<NonZeroUsize>,
 }
 
 impl EnvSettings {
@@ -217,13 +220,14 @@ impl Default for EnvSettings {
             merge_scheduler_segments_before_merge: 2,
             merge_on_commit_max_nodes_in_merge: 10_000,
             merge_on_commit_segments_before_merge: 100,
+            max_open_shards: None,
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{path::PathBuf, time::Duration};
+    use std::{num::NonZeroUsize, path::PathBuf, time::Duration};
 
     use tracing::Level;
 
@@ -310,5 +314,16 @@ mod tests {
 
         let settings = from_pairs(&[("NODE_ROLE", "primary")]).unwrap();
         assert_eq!(settings.node_role, NodeRole::Primary);
+    }
+
+    #[test]
+    fn test_shards() {
+        let settings = from_pairs(&[]).unwrap();
+        assert_eq!(settings.max_open_shards, None);
+
+        let settings = from_pairs(&[("MAX_OPEN_SHARDS", "345")]).unwrap();
+        assert_eq!(settings.max_open_shards, Some(NonZeroUsize::new(345).unwrap()));
+
+        assert!(from_pairs(&[("MAX_OPEN_SHARDS", "0")]).is_err());
     }
 }
