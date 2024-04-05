@@ -127,6 +127,7 @@ pub struct EnvSettings {
     pub replication_delay_seconds: u64,
     pub replication_max_concurrency: u64,
     // time since last replication for node to be considered healthy
+    #[serde(deserialize_with = "parse_duration_seconds")]
     pub replication_healthy_delay: Duration,
 
     // number of threads to use for rayon
@@ -285,6 +286,9 @@ mod tests {
     fn test_duration_conversion() {
         let settings = from_pairs(&[("MERGE_SCHEDULER_FREE_TIME_WORK_SCHEDULING_DELAY", "17")]).unwrap();
         assert_eq!(settings.merge_scheduler_free_time_work_scheduling_delay, Duration::from_secs(17));
+
+        let settings = from_pairs(&[("REPLICATION_HEALTHY_DELAY", "360")]).unwrap();
+        assert_eq!(settings.replication_healthy_delay, Duration::from_secs(360));
     }
 
     #[test]
