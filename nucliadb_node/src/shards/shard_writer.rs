@@ -240,42 +240,34 @@ impl ShardWriter {
 
         remove_invalid_labels(&mut resource);
 
-        let text_writer_service = self.text_writer.clone();
-        let field_resource = resource.clone();
-        let text_task = move || {
+        let text_task = || {
             debug!("Field service starts set_resource");
-            let mut writer = write_rw_lock(&text_writer_service);
-            let result = writer.set_resource(&field_resource);
+            let mut writer = write_rw_lock(&self.text_writer);
+            let result = writer.set_resource(&resource);
             debug!("Field service ends set_resource");
             result
         };
 
-        let paragraph_resource = resource.clone();
-        let paragraph_writer_service = self.paragraph_writer.clone();
-        let paragraph_task = move || {
+        let paragraph_task = || {
             debug!("Paragraph service starts set_resource");
-            let mut writer = write_rw_lock(&paragraph_writer_service);
-            let result = writer.set_resource(&paragraph_resource);
+            let mut writer = write_rw_lock(&self.paragraph_writer);
+            let result = writer.set_resource(&resource);
             debug!("Paragraph service ends set_resource");
             result
         };
 
-        let vector_writer_service = self.vector_writer.clone();
-        let vector_resource = resource.clone();
-        let vector_task = move || {
+        let vector_task = || {
             debug!("Vector service starts set_resource");
-            let mut writer = write_rw_lock(&vector_writer_service);
-            let result = writer.set_resource(&vector_resource);
+            let mut writer = write_rw_lock(&self.vector_writer);
+            let result = writer.set_resource(&resource);
             debug!("Vector service ends set_resource");
             result
         };
 
-        let relation_writer_service = self.relation_writer.clone();
-        let relation_resource = resource.clone();
-        let relation_task = move || {
+        let relation_task = || {
             debug!("Relation service starts set_resource");
-            let mut writer = write_rw_lock(&relation_writer_service);
-            let result = writer.set_resource(&relation_resource);
+            let mut writer = write_rw_lock(&self.relation_writer);
+            let result = writer.set_resource(&resource);
             debug!("Relation service ends set_resource");
             result
         };
@@ -315,29 +307,24 @@ impl ShardWriter {
     pub fn remove_resource(&self, resource: &ResourceId) -> NodeResult<()> {
         let span = tracing::Span::current();
 
-        let text_writer_service = self.text_writer.clone();
-        let field_resource = resource.clone();
-        let text_task = move || {
-            let mut writer = write_rw_lock(&text_writer_service);
-            writer.delete_resource(&field_resource)
+        let text_task = || {
+            let mut writer = write_rw_lock(&self.text_writer);
+            writer.delete_resource(resource)
         };
-        let paragraph_resource = resource.clone();
-        let paragraph_writer_service = self.paragraph_writer.clone();
-        let paragraph_task = move || {
-            let mut writer = write_rw_lock(&paragraph_writer_service);
-            writer.delete_resource(&paragraph_resource)
+
+        let paragraph_task = || {
+            let mut writer = write_rw_lock(&self.paragraph_writer);
+            writer.delete_resource(resource)
         };
-        let vector_writer_service = self.vector_writer.clone();
-        let vector_resource = resource.clone();
-        let vector_task = move || {
-            let mut writer = write_rw_lock(&vector_writer_service);
-            writer.delete_resource(&vector_resource)
+
+        let vector_task = || {
+            let mut writer = write_rw_lock(&self.vector_writer);
+            writer.delete_resource(resource)
         };
-        let relation_writer_service = self.relation_writer.clone();
-        let relation_resource = resource.clone();
+
         let relation_task = move || {
-            let mut writer = write_rw_lock(&relation_writer_service);
-            writer.delete_resource(&relation_resource)
+            let mut writer = write_rw_lock(&self.relation_writer);
+            writer.delete_resource(resource)
         };
 
         let info = info_span!(parent: &span, "text remove");
@@ -377,17 +364,21 @@ impl ShardWriter {
     pub fn get_opstatus(&self) -> NodeResult<OpStatus> {
         let span = tracing::Span::current();
 
-        let paragraphs = self.paragraph_writer.clone();
-        let vectors = self.vector_writer.clone();
-        let texts = self.text_writer.clone();
-
-        let count_fields =
-            || run_with_telemetry(info_span!(parent: &span, "field count"), move || read_rw_lock(&texts).count());
-        let count_paragraphs = || {
-            run_with_telemetry(info_span!(parent: &span, "paragraph count"), move || read_rw_lock(&paragraphs).count())
+        let count_fields = || {
+            run_with_telemetry(info_span!(parent: &span, "field count"), move || {
+                read_rw_lock(&self.text_writer).count()
+            })
         };
-        let count_vectors =
-            || run_with_telemetry(info_span!(parent: &span, "vector count"), move || read_rw_lock(&vectors).count());
+        let count_paragraphs = || {
+            run_with_telemetry(info_span!(parent: &span, "paragraph count"), move || {
+                read_rw_lock(&self.paragraph_writer).count()
+            })
+        };
+        let count_vectors = || {
+            run_with_telemetry(info_span!(parent: &span, "vector count"), move || {
+                read_rw_lock(&self.vector_writer).count()
+            })
+        };
 
         let mut field_count = Ok(0);
         let mut paragraph_count = Ok(0);
