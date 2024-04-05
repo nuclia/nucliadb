@@ -52,6 +52,7 @@ freeze-requirements:
 .PHONY: format
 format:
 	cd .. && isort --profile black nucliadb
+	ruff check --fix --config=../ruff.toml nucliadb/
 	black .
 
 $(format_subpackages_targets):
@@ -60,7 +61,7 @@ $(format_subpackages_targets):
 .PHONY: lint
 lint:
 	flake8 nucliadb --config=setup.cfg
-	ruff nucliadb --config=pyproject.toml
+	ruff check nucliadb --config=../ruff.toml
 	cd .. && isort -c --profile black nucliadb
 	black --check .
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini .
@@ -92,11 +93,12 @@ $(test_cov_subpackages_targets):
 
 format-%:
 	cd .. && isort --profile black nucliadb/nucliadb/$*
+	ruff check --fix nucliadb/$* --config=../ruff.toml
 	black nucliadb/$*
 
 lint-%:
 	flake8 nucliadb/$* --config=setup.cfg
-	ruff nucliadb/$* --config=pyproject.toml
+	ruff check nucliadb/$* --config=../ruff.toml
 	cd .. && isort -c --profile black nucliadb/nucliadb/$*
 	black --check nucliadb/$*
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini nucliadb/$*
