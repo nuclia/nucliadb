@@ -317,12 +317,16 @@ def parse_link_field(
     if link_field.css_selector is not None:
         writer.links[key].css_selector = link_field.css_selector
 
+    if link_field.xpath is not None:
+        writer.links[key].xpath = link_field.xpath
+
     toprocess.linkfield[key] = models.LinkUpload(
         link=link_field.uri,
         headers=link_field.headers or {},
         cookies=link_field.cookies or {},
         localstorage=link_field.localstorage or {},
         css_selector=link_field.css_selector,
+        xpath=link_field.xpath,
     )
 
 

@@ -43,6 +43,7 @@ class FieldLink(BaseModel):
     language: Optional[str]
     localstorage: Optional[Dict[str, str]]
     css_selector: Optional[str]
+    xpath: Optional[str]
 
     @classmethod
     def from_message(cls: Type[_T], message: resources_pb2.FieldLink) -> _T:
@@ -65,6 +66,7 @@ class LinkField(BaseModel):
     language: Optional[str] = None
     localstorage: Optional[Dict[str, str]] = {}
     css_selector: Optional[str] = None
+    xpath: Optional[str] = None
 
 
 # Processing classes (Those used to sent to push endpoints)
@@ -79,4 +81,9 @@ class LinkUpload(BaseModel):
         None,
         title="Css selector",
         description="Css selector to parse the link",
+    )
+    xpath: Optional[str] = Field(
+        None,
+        title="Xpath",
+        description="Xpath to parse the link",
     )

@@ -60,7 +60,7 @@ class Relation(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _RelationTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Relation._RelationType.ValueType], builtins.type):  # noqa: F821
+    class _RelationTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Relation._RelationType.ValueType], builtins.type):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         CHILD: Relation._RelationType.ValueType  # 0
         """Child resource"""
@@ -164,7 +164,7 @@ class RelationNode(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _NodeTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[RelationNode._NodeType.ValueType], builtins.type):  # noqa: F821
+    class _NodeTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[RelationNode._NodeType.ValueType], builtins.type):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         ENTITY: RelationNode._NodeType.ValueType  # 0
         LABEL: RelationNode._NodeType.ValueType  # 1

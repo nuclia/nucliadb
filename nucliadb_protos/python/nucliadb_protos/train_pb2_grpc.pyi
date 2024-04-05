@@ -5,8 +5,10 @@ isort:skip_file
 import abc
 import collections.abc
 import grpc
+import grpc.aio
 import nucliadb_protos.train_pb2
 import nucliadb_protos.writer_pb2
+import typing
 from nucliadb_protos.knowledgebox_pb2 import (
     CONFLICT as CONFLICT,
     DeleteKnowledgeBoxResponse as DeleteKnowledgeBoxResponse,
@@ -170,8 +172,16 @@ from nucliadb_protos.writer_pb2 import (
     WriterStatusResponse as WriterStatusResponse,
 )
 
+_T = typing.TypeVar('_T')
+
+class _MaybeAsyncIterator(collections.abc.AsyncIterator[_T], collections.abc.Iterator[_T], metaclass=abc.ABCMeta):
+    ...
+
+class _ServicerContext(grpc.ServicerContext, grpc.aio.ServicerContext):  # type: ignore
+    ...
+
 class TrainStub:
-    def __init__(self, channel: grpc.Channel) -> None: ...
+    def __init__(self, channel: typing.Union[grpc.Channel, grpc.aio.Channel]) -> None: ...
     GetInfo: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.train_pb2.GetInfoRequest,
         nucliadb_protos.train_pb2.TrainInfo,
@@ -205,54 +215,88 @@ class TrainStub:
         nucliadb_protos.train_pb2.LabelsetsCount,
     ]
 
+class TrainAsyncStub:
+    GetInfo: grpc.aio.UnaryUnaryMultiCallable[
+        nucliadb_protos.train_pb2.GetInfoRequest,
+        nucliadb_protos.train_pb2.TrainInfo,
+    ]
+    GetSentences: grpc.aio.UnaryStreamMultiCallable[
+        nucliadb_protos.train_pb2.GetSentencesRequest,
+        nucliadb_protos.train_pb2.TrainSentence,
+    ]
+    GetParagraphs: grpc.aio.UnaryStreamMultiCallable[
+        nucliadb_protos.train_pb2.GetParagraphsRequest,
+        nucliadb_protos.train_pb2.TrainParagraph,
+    ]
+    GetFields: grpc.aio.UnaryStreamMultiCallable[
+        nucliadb_protos.train_pb2.GetFieldsRequest,
+        nucliadb_protos.train_pb2.TrainField,
+    ]
+    GetResources: grpc.aio.UnaryStreamMultiCallable[
+        nucliadb_protos.train_pb2.GetResourcesRequest,
+        nucliadb_protos.train_pb2.TrainResource,
+    ]
+    GetOntology: grpc.aio.UnaryUnaryMultiCallable[
+        nucliadb_protos.writer_pb2.GetLabelsRequest,
+        nucliadb_protos.writer_pb2.GetLabelsResponse,
+    ]
+    GetEntities: grpc.aio.UnaryUnaryMultiCallable[
+        nucliadb_protos.writer_pb2.GetEntitiesRequest,
+        nucliadb_protos.writer_pb2.GetEntitiesResponse,
+    ]
+    GetOntologyCount: grpc.aio.UnaryUnaryMultiCallable[
+        nucliadb_protos.train_pb2.GetLabelsetsCountRequest,
+        nucliadb_protos.train_pb2.LabelsetsCount,
+    ]
+
 class TrainServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def GetInfo(
         self,
         request: nucliadb_protos.train_pb2.GetInfoRequest,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.train_pb2.TrainInfo: ...
+        context: _ServicerContext,
+    ) -> typing.Union[nucliadb_protos.train_pb2.TrainInfo, collections.abc.Awaitable[nucliadb_protos.train_pb2.TrainInfo]]: ...
     @abc.abstractmethod
     def GetSentences(
         self,
         request: nucliadb_protos.train_pb2.GetSentencesRequest,
-        context: grpc.ServicerContext,
-    ) -> collections.abc.Iterator[nucliadb_protos.train_pb2.TrainSentence]: ...
+        context: _ServicerContext,
+    ) -> typing.Union[collections.abc.Iterator[nucliadb_protos.train_pb2.TrainSentence], collections.abc.AsyncIterator[nucliadb_protos.train_pb2.TrainSentence]]: ...
     @abc.abstractmethod
     def GetParagraphs(
         self,
         request: nucliadb_protos.train_pb2.GetParagraphsRequest,
-        context: grpc.ServicerContext,
-    ) -> collections.abc.Iterator[nucliadb_protos.train_pb2.TrainParagraph]: ...
+        context: _ServicerContext,
+    ) -> typing.Union[collections.abc.Iterator[nucliadb_protos.train_pb2.TrainParagraph], collections.abc.AsyncIterator[nucliadb_protos.train_pb2.TrainParagraph]]: ...
     @abc.abstractmethod
     def GetFields(
         self,
         request: nucliadb_protos.train_pb2.GetFieldsRequest,
-        context: grpc.ServicerContext,
-    ) -> collections.abc.Iterator[nucliadb_protos.train_pb2.TrainField]: ...
+        context: _ServicerContext,
+    ) -> typing.Union[collections.abc.Iterator[nucliadb_protos.train_pb2.TrainField], collections.abc.AsyncIterator[nucliadb_protos.train_pb2.TrainField]]: ...
     @abc.abstractmethod
     def GetResources(
         self,
         request: nucliadb_protos.train_pb2.GetResourcesRequest,
-        context: grpc.ServicerContext,
-    ) -> collections.abc.Iterator[nucliadb_protos.train_pb2.TrainResource]: ...
+        context: _ServicerContext,
+    ) -> typing.Union[collections.abc.Iterator[nucliadb_protos.train_pb2.TrainResource], collections.abc.AsyncIterator[nucliadb_protos.train_pb2.TrainResource]]: ...
     @abc.abstractmethod
     def GetOntology(
         self,
         request: nucliadb_protos.writer_pb2.GetLabelsRequest,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.writer_pb2.GetLabelsResponse: ...
+        context: _ServicerContext,
+    ) -> typing.Union[nucliadb_protos.writer_pb2.GetLabelsResponse, collections.abc.Awaitable[nucliadb_protos.writer_pb2.GetLabelsResponse]]: ...
     @abc.abstractmethod
     def GetEntities(
         self,
         request: nucliadb_protos.writer_pb2.GetEntitiesRequest,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.writer_pb2.GetEntitiesResponse: ...
+        context: _ServicerContext,
+    ) -> typing.Union[nucliadb_protos.writer_pb2.GetEntitiesResponse, collections.abc.Awaitable[nucliadb_protos.writer_pb2.GetEntitiesResponse]]: ...
     @abc.abstractmethod
     def GetOntologyCount(
         self,
         request: nucliadb_protos.train_pb2.GetLabelsetsCountRequest,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.train_pb2.LabelsetsCount: ...
+        context: _ServicerContext,
+    ) -> typing.Union[nucliadb_protos.train_pb2.LabelsetsCount, collections.abc.Awaitable[nucliadb_protos.train_pb2.LabelsetsCount]]: ...
 
-def add_TrainServicer_to_server(servicer: TrainServicer, server: grpc.Server) -> None: ...
+def add_TrainServicer_to_server(servicer: TrainServicer, server: typing.Union[grpc.Server, grpc.aio.Server]) -> None: ...

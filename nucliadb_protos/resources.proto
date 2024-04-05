@@ -453,6 +453,7 @@ message FieldLink {
     string language = 5;
     map<string, string> localstorage = 6;
     string css_selector = 7;
+    string xpath = 8;
 }
 
 message Keyword {
