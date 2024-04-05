@@ -364,17 +364,16 @@ class KBShardManager:
             indexpb.shard = replica_id
             await indexing.index(indexpb, node_id)
 
-    def should_create_new_shard(self, num_paragraphs: int, num_fields: int) -> bool:
+    def should_create_new_shard(self, num_paragraphs: int) -> bool:
         return num_paragraphs > settings.max_shard_paragraphs
 
     async def maybe_create_new_shard(
         self,
         kbid: str,
         num_paragraphs: int,
-        num_fields: int,
         release_channel: utils_pb2.ReleaseChannel.ValueType = utils_pb2.ReleaseChannel.STABLE,
     ):
-        if not self.should_create_new_shard(num_paragraphs, num_fields):
+        if not self.should_create_new_shard(num_paragraphs):
             return
 
         logger.warning({"message": "Adding shard", "kbid": kbid})
@@ -418,7 +417,6 @@ class StandaloneKBShardManager(KBShardManager):
             await self.maybe_create_new_shard(
                 kbid,
                 shard_info.paragraphs,
-                shard_info.fields,
                 shard_info.metadata.release_channel,
             )
             await index_node.writer.GC(noderesources_pb2.ShardId(id=shard_id))  # type: ignore
