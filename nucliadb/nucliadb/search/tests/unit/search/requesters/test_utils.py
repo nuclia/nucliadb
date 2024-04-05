@@ -116,10 +116,11 @@ async def test_node_query_retries_primary_if_secondary_fails(
     secondary fails.
 
     """
+    pb_query = nodereader_pb2.SearchRequest(shard="shard-id", body="question")
     results, incomplete_results, queried_nodes = await utils.node_query(
         kbid="my-kbid",
         method=utils.Method.SEARCH,
-        pb_query=Mock(),
+        pb_query=pb_query,
         use_read_replica_nodes=True,
     )
     # secondary fails, primary is called

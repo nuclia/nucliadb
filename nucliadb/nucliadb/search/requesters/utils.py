@@ -18,10 +18,12 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+import json
 from enum import Enum
 from typing import Any, Optional, TypeVar, Union, overload
 
 from fastapi import HTTPException
+from google.protobuf.json_format import MessageToDict
 from grpc import StatusCode as GrpcStatusCode
 from grpc.aio import AioRpcError
 from nucliadb_protos.nodereader_pb2 import (
@@ -186,6 +188,15 @@ async def node_query(
 
     error = validate_node_query_results(results or [])
     if error is not None:
+        query_dict = MessageToDict(pb_query)
+        query_dict.pop("vector", None)
+        logger.error(
+            "Error while querying nodes",
+            extra={
+                "kbid": kbid,
+                "query": json.dumps(query_dict),
+            },
+        )
         if (
             error.status_code >= 500
             and use_read_replica_nodes
