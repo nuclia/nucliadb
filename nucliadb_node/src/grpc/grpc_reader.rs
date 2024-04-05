@@ -18,9 +18,9 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use crate::cache::ShardReaderCache;
 use crate::grpc::update::{update_loop, UpdateParameters};
 use crate::settings::Settings;
-use crate::shards::cache::ShardReaderCache;
 use crate::shards::errors::ShardNotFoundError;
 use crate::shards::reader::{ShardFileChunkIterator, ShardReader};
 use crate::telemetry::run_with_telemetry;

@@ -22,9 +22,9 @@
 
 use std::sync::Arc;
 
+use crate::cache::ShardWriterCache;
 use crate::merge::{self, global_merger, MergeScheduler};
 use crate::settings::Settings;
-use crate::shards::cache::ShardWriterCache;
 use nucliadb_core::merge::{install_merge_requester, MergerError};
 use nucliadb_core::prelude::*;
 use nucliadb_core::thread::ThreadPoolBuilder;

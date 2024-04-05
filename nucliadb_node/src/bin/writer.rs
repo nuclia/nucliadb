@@ -25,6 +25,7 @@ use std::time::Instant;
 use nucliadb_core::protos::node_writer_server::NodeWriterServer;
 use nucliadb_core::tracing::*;
 use nucliadb_core::{metrics, NodeResult};
+use nucliadb_node::cache::ShardWriterCache;
 use nucliadb_node::grpc::middleware::{GrpcDebugLogsLayer, GrpcInstrumentorLayer, GrpcTasksMetricsLayer};
 use nucliadb_node::grpc::writer::{NodeWriterEvent, NodeWriterGRPCDriver};
 use nucliadb_node::http_server::run_http_server;
@@ -33,7 +34,6 @@ use nucliadb_node::replication::replicator::connect_to_primary_and_replicate_for
 use nucliadb_node::replication::service::ReplicationServiceGRPCDriver;
 use nucliadb_node::replication::NodeRole;
 use nucliadb_node::settings::{load_settings, Settings};
-use nucliadb_node::shards::cache::ShardWriterCache;
 use nucliadb_node::telemetry::init_telemetry;
 use nucliadb_node::{lifecycle, utils};
 use nucliadb_protos::replication;

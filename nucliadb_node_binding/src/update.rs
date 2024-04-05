@@ -19,7 +19,7 @@
 //
 
 use nucliadb_core::tracing::*;
-use nucliadb_node::shards::cache::ShardReaderCache;
+use nucliadb_node::cache::ShardReaderCache;
 use std::fs::read_dir;
 use std::path::PathBuf;
 use std::sync::Arc;

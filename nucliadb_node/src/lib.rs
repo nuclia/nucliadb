@@ -30,6 +30,7 @@
 //! already built PyO3 bindings.
 
 pub mod analytics;
+pub mod cache;
 pub mod grpc;
 pub mod http_server;
 pub mod lifecycle;
