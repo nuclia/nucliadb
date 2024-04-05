@@ -197,7 +197,7 @@ pub async fn connect_to_primary_and_replicate(
     secondary_id: String,
     shutdown_notified: Arc<AtomicBool>,
 ) -> NodeResult<()> {
-    let mut primary_address = settings.primary_address();
+    let mut primary_address = settings.primary_address.clone();
     if !primary_address.starts_with("http://") {
         primary_address = format!("http://{}", primary_address);
     }
@@ -212,7 +212,7 @@ pub async fn connect_to_primary_and_replicate(
 
     let primary_node_metadata = client.get_metadata(Request::new(EmptyQuery {})).await?.into_inner();
 
-    set_primary_node_id(settings.data_path(), primary_node_metadata.node_id)?;
+    set_primary_node_id(&settings.data_path, primary_node_metadata.node_id)?;
 
     let shards_path = settings.shards_path();
     loop {
@@ -222,7 +222,7 @@ pub async fn connect_to_primary_and_replicate(
 
         let existing_shards = list_shards(settings.shards_path()).await;
         let mut shard_states = Vec::new();
-        let mut worker_pool = ReplicateWorkerPool::new(settings.replication_max_concurrency() as usize);
+        let mut worker_pool = ReplicateWorkerPool::new(settings.replication_max_concurrency as usize);
         for shard_id in existing_shards.clone() {
             if let Some(metadata) = shard_cache.get_metadata(shard_id.clone()) {
                 shard_states.push(replication::SecondaryShardReplicationState {
@@ -325,7 +325,7 @@ pub async fn connect_to_primary_and_replicate(
         // 1. If we're healthy, we'll sleep for a while and check again.
         // 2. If backed up replicating, we'll try replicating again immediately and check again.
         let elapsed = start.elapsed();
-        if elapsed < settings.replication_healthy_delay() {
+        if elapsed < settings.replication_healthy_delay {
             // only update healthy marker if we're up-to-date in the configured healthy time
             repl_health_mng.update_healthy();
         }

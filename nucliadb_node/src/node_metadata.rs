@@ -31,8 +31,8 @@ pub struct NodeMetadata {
 pub fn create_node_metadata_pb(settings: Settings, node_metadata: NodeMetadata) -> nucliadb_core::protos::NodeMetadata {
     nucliadb_core::protos::NodeMetadata {
         shard_count: node_metadata.shard_count,
-        node_id: utils::read_host_key(settings.host_key_path()).unwrap().to_string(),
-        primary_node_id: get_primary_node_id(settings.data_path()),
+        node_id: utils::read_host_key(&settings.host_key_path).unwrap().to_string(),
+        primary_node_id: get_primary_node_id(&settings.data_path),
         ..Default::default()
     }
 }

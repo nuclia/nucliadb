@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 use std::net::{SocketAddr, ToSocketAddrs};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::time::Duration;
 use std::{fs, thread};
@@ -66,14 +66,15 @@ pub fn reliable_lookup_host(host: &str) -> SocketAddr {
 pub fn parse_log_levels(levels: &str) -> Vec<(String, Level)> {
     levels
         .split(',')
+        .filter(|s| !s.is_empty())
         .map(|s| s.splitn(2, '=').collect::<Vec<_>>())
         .map(|v| (v[0].to_string(), Level::from_str(v[1]).unwrap()))
         .collect()
 }
 
-pub fn read_host_key(hk_path: PathBuf) -> NodeResult<Uuid> {
+pub fn read_host_key(hk_path: &Path) -> NodeResult<Uuid> {
     let host_key_contents =
-        fs::read(hk_path.clone()).with_context(|| format!("Failed to read host key from '{}'", hk_path.display()))?;
+        fs::read(hk_path).with_context(|| format!("Failed to read host key from '{}'", hk_path.display()))?;
 
     let host_key = Uuid::from_slice(host_key_contents.as_slice())
         .with_context(|| format!("Invalid host key from '{}'", hk_path.display()))?;
@@ -84,7 +85,7 @@ pub fn read_host_key(hk_path: PathBuf) -> NodeResult<Uuid> {
 /// Reads the key that makes a node unique from the given file.
 /// If the file does not exist, it generates an ID and writes it to the file
 /// so that it can be reused on reboot.
-pub fn read_or_create_host_key(hk_path: PathBuf) -> NodeResult<Uuid> {
+pub fn read_or_create_host_key(hk_path: &Path) -> NodeResult<Uuid> {
     let host_key;
 
     if hk_path.exists() {
@@ -92,7 +93,7 @@ pub fn read_or_create_host_key(hk_path: PathBuf) -> NodeResult<Uuid> {
         info!(host_key=?host_key, "Read existing host key.");
     } else {
         host_key = Uuid::new_v4();
-        fs::write(hk_path.clone(), host_key.as_bytes())
+        fs::write(hk_path, host_key.as_bytes())
             .with_context(|| format!("Failed to write host key to '{}'", hk_path.display()))?;
         info!(host_key=?host_key, host_key_path=?hk_path, "Create new host key.");
     }
@@ -100,7 +101,7 @@ pub fn read_or_create_host_key(hk_path: PathBuf) -> NodeResult<Uuid> {
     Ok(host_key)
 }
 
-pub fn set_primary_node_id(data_path: PathBuf, primary_id: String) -> NodeResult<()> {
+pub fn set_primary_node_id(data_path: &Path, primary_id: String) -> NodeResult<()> {
     let filepath = data_path.join("primary_id");
 
     fs::write(filepath.clone(), primary_id)
@@ -109,7 +110,7 @@ pub fn set_primary_node_id(data_path: PathBuf, primary_id: String) -> NodeResult
     Ok(())
 }
 
-pub fn get_primary_node_id(data_path: PathBuf) -> Option<String> {
+pub fn get_primary_node_id(data_path: &Path) -> Option<String> {
     let filepath = data_path.join("primary_id");
     let read_result = fs::read(filepath.clone());
     if read_result.is_err() {
@@ -183,8 +184,8 @@ mod tests {
         let tempdir_path = tempdir.into_path();
         // set env variable
         let primary_id = "test_primary_id".to_string();
-        set_primary_node_id(tempdir_path.clone(), primary_id.clone()).unwrap();
-        let read_primary_id = get_primary_node_id(tempdir_path).unwrap();
+        set_primary_node_id(&tempdir_path, primary_id.clone()).unwrap();
+        let read_primary_id = get_primary_node_id(&tempdir_path).unwrap();
         assert_eq!(primary_id, read_primary_id);
     }
 }

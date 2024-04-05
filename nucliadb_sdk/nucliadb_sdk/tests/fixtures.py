@@ -43,7 +43,7 @@ images.settings["nucliadb"] = {
         "TEST_SENTENCE_ENCODER": "multilingual-2023-02-21",
         "TEST_RELATIONS": """{"tokens": [{"text": "Nuclia", "ner": "ORG"}]}""",
         "LOG_LEVEL": "DEBUG",
-        "DEBUG": "True",
+        "DEBUG": "true",
     },
 }
 

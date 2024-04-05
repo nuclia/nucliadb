@@ -32,7 +32,7 @@ use nucliadb_core::thread::ThreadPoolBuilder;
 /// Initialize the index node writer. This function must be called before using
 /// a writer
 pub fn initialize_writer(settings: Settings) -> NodeResult<()> {
-    let data_path = settings.data_path();
+    let data_path = &settings.data_path;
     let shards_path = settings.shards_path();
     if !data_path.exists() {
         return Err(node_error!("Data directory ({:?}) should be already created", data_path));
@@ -43,7 +43,7 @@ pub fn initialize_writer(settings: Settings) -> NodeResult<()> {
     }
 
     // We shallow the error if the threadpools were already initialized
-    let _ = ThreadPoolBuilder::new().num_threads(settings.num_global_rayon_threads()).build_global();
+    let _ = ThreadPoolBuilder::new().num_threads(settings.num_global_rayon_threads).build_global();
 
     Ok(())
 }
@@ -67,5 +67,5 @@ pub fn finalize_merger() {
 /// a reader
 pub fn initialize_reader(settings: Settings) {
     // We swallow the error if the threadpool was already initialized
-    let _ = ThreadPoolBuilder::new().num_threads(settings.num_global_rayon_threads()).build_global();
+    let _ = ThreadPoolBuilder::new().num_threads(settings.num_global_rayon_threads).build_global();
 }

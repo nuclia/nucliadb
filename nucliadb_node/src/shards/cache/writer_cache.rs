@@ -233,14 +233,18 @@ mod tests {
     use tempfile::tempdir;
 
     use super::ShardWriterCache;
-    use crate::settings::Settings;
+    use crate::settings::{EnvSettings, Settings};
     use crate::shards::metadata::{ShardMetadata, Similarity};
     use crate::shards::ShardId;
 
     #[test]
     fn test_safe_deletion() {
         let data_dir = tempdir().unwrap();
-        let settings = Settings::builder().data_path(data_dir.into_path()).build().unwrap();
+        let settings: Settings = EnvSettings {
+            data_path: data_dir.into_path(),
+            ..Default::default()
+        }
+        .into();
         let cache = Arc::new(ShardWriterCache::new(settings.clone()));
 
         let shard_id_0 = ShardId::from("shard_id_0");

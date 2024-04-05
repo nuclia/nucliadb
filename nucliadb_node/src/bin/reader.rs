@@ -29,9 +29,7 @@ use nucliadb_node::http_server::run_http_server;
 use nucliadb_node::lifecycle;
 use nucliadb_node::replication::health::ReplicationHealthManager;
 use nucliadb_node::replication::NodeRole;
-use nucliadb_node::settings::providers::env::EnvSettingsProvider;
-use nucliadb_node::settings::providers::SettingsProvider;
-use nucliadb_node::settings::Settings;
+use nucliadb_node::settings::{load_settings, Settings};
 use nucliadb_node::telemetry::init_telemetry;
 use tokio::signal::unix::SignalKind;
 use tokio::signal::{ctrl_c, unix};
@@ -46,9 +44,9 @@ async fn main() -> NodeResult<()> {
     eprintln!("NucliaDB Reader Node starting...");
     let start_bootstrap = Instant::now();
 
-    let settings: Settings = EnvSettingsProvider::generate_settings()?;
+    let settings = load_settings()?;
 
-    if !settings.data_path().exists() {
+    if !settings.data_path.exists() {
         return Err(node_error!("Data directory missing"));
     }
 
@@ -91,7 +89,7 @@ async fn wait_for_sigkill(shutdown_notifier: Arc<Notify>) -> NodeResult<()> {
 }
 
 async fn health_checker(mut health_reporter: HealthReporter, settings: Settings) -> NodeResult<()> {
-    if settings.node_role() == NodeRole::Primary {
+    if settings.node_role == NodeRole::Primary {
         // cut out early, this check is for secondaries only right now
         health_reporter.set_serving::<GrpcServer>().await;
         return Ok(());
@@ -109,7 +107,7 @@ async fn health_checker(mut health_reporter: HealthReporter, settings: Settings)
 }
 
 pub async fn start_grpc_service(settings: Settings, shutdown_notifier: Arc<Notify>) -> NodeResult<()> {
-    let listen_address = settings.reader_listen_address();
+    let listen_address = settings.reader_listen_address;
     eprintln!("Reader listening for gRPC requests at: {:?}", listen_address);
 
     let tracing_middleware = GrpcInstrumentorLayer;
