@@ -55,7 +55,8 @@ images.settings["nucliadb_node_reader"] = {
         "command": [
             "/usr/local/bin/node_reader",
         ],
-        "ports": {"4445": None},
+        "ports": {"4445": ("0.0.0.0", 0)},
+        "publish_all_ports": False,
         "mem_limit": "3g",  # default is 1g, need to override
         "platform": "linux/amd64",
     },
@@ -76,7 +77,8 @@ images.settings["nucliadb_node_writer"] = {
         "command": [
             "/usr/local/bin/node_writer",
         ],
-        "ports": {"4446": None},
+        "ports": {"4446": ("0.0.0.0", 0)},
+        "publish_all_ports": False,
         "mem_limit": "3g",  # default is 1g, need to override
         "platform": "linux/amd64",
     },
@@ -100,7 +102,8 @@ images.settings["nucliadb_node_sidecar"] = {
         "command": [
             "node_sidecar",
         ],
-        "ports": {"4447": None},
+        "ports": {"4447": ("0.0.0.0", 0)},
+        "publish_all_ports": False,
         "platform": "linux/amd64",
     },
 }
