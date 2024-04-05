@@ -227,6 +227,8 @@ mod tests {
 
     use tracing::Level;
 
+    use crate::replication::NodeRole;
+
     use super::{EnvSettings, Settings};
 
     fn from_pairs(pairs: &[(&str, &str)]) -> anyhow::Result<Settings> {
@@ -299,5 +301,14 @@ mod tests {
         };
         assert!(e.to_string().contains("DEBUG"), "Error `{e}` does not match expected");
         assert!(e.to_string().contains("`true` or `false`"), "Error `{e}` does not match expected");
+    }
+
+    #[test]
+    fn test_enums() {
+        let settings = from_pairs(&[("NODE_ROLE", "secondary")]).unwrap();
+        assert_eq!(settings.node_role, NodeRole::Secondary);
+
+        let settings = from_pairs(&[("NODE_ROLE", "primary")]).unwrap();
+        assert_eq!(settings.node_role, NodeRole::Primary);
     }
 }

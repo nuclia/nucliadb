@@ -24,6 +24,7 @@ pub mod replicator;
 pub mod service;
 
 #[derive(Clone, PartialEq, Debug, Copy, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum NodeRole {
     Primary,
     Secondary,
