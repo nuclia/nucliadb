@@ -60,7 +60,8 @@ images.settings["nucliadb_node_reader"] = {
         ],
         "platform": "linux/amd64",
         "mem_limit": "3g",
-        "ports": {"4445": None},
+        "ports": {"4445": ("0.0.0.0", 0)},
+        "publish_all_ports": False,
     },
 }
 
@@ -80,7 +81,8 @@ images.settings["nucliadb_node_writer"] = {
         ],
         "platform": "linux/amd64",
         "mem_limit": "3g",
-        "ports": {"4446": None},
+        "ports": {"4446": ("0.0.0.0", 0)},
+        "publish_all_ports": False,
     },
 }
 
