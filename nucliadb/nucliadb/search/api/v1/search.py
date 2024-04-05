@@ -392,8 +392,8 @@ async def _search_endpoint(
         return HTTPClientError(status_code=412, detail=str(exc))
     except predict.ProxiedPredictAPIError as err:
         return HTTPClientError(
-            status_code=503,
-            detail=f"Inference service unavailable. {err.status}: {err.detail}",
+            status_code=err.status,
+            detail=err.detail,
         )
 
 

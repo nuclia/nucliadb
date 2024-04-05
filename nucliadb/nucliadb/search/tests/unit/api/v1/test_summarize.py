@@ -87,7 +87,5 @@ async def test_summarize_endpoint_handles_errors(
         kbid="kbid",
         item=Mock(),
     )
-    if isinstance(predict_error, LimitsExceededError):
-        assert response.status_code == 402
-    else:
-        assert response.status_code == 503
+    assert response.status_code == http_error_response.status_code
+    assert response.body == http_error_response.body

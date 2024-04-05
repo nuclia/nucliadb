@@ -72,8 +72,8 @@ async def resource_chat_endpoint(
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
     except predict.ProxiedPredictAPIError as err:
         return HTTPClientError(
-            status_code=503,
-            detail=f"Chat service unavailable. {err.status}: {err.detail}",
+            status_code=err.status,
+            detail=err.detail,
         )
     except IncompleteFindResultsError:
         return HTTPClientError(
