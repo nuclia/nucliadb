@@ -1651,3 +1651,27 @@ async def test_catalog_post(
         },
     )
     assert resp.status_code == 200
+
+
+@pytest.fixture()
+def not_debug():
+    from nucliadb_utils.settings import running_settings
+
+    prev = running_settings.debug
+    running_settings.debug = False
+    yield
+    running_settings.debug = prev
+
+
+async def test_api_does_not_show_tracebacks_on_api_errors(
+    not_debug, nucliadb_reader: AsyncClient
+):
+    with mock.patch(
+        "nucliadb.search.api.v1.search.search",
+        side_effect=Exception("Something went wrong"),
+    ):
+        resp = await nucliadb_reader.get("/kb/foobar/search", timeout=None)
+        assert resp.status_code == 500
+        assert resp.json() == {
+            "detail": "Something went wrong, please contact your administrator"
+        }

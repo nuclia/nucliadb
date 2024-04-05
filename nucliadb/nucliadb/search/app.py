@@ -102,7 +102,6 @@ fastapi_settings = dict(
 
 
 base_app = FastAPI(title="NucliaDB Search API", **fastapi_settings)  # type: ignore
-
 base_app.include_router(api_v1)
 
 extend_openapi(base_app)
