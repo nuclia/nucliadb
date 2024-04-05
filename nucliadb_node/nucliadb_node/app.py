@@ -25,7 +25,7 @@ from typing import Optional
 import pkg_resources
 
 from nucliadb_node import SERVICE_NAME, logger
-from nucliadb_node.listeners import IndexedPublisher, ShardGcScheduler
+from nucliadb_node.listeners import IndexedPublisher
 from nucliadb_node.pull import Worker
 from nucliadb_node.service import start_grpc
 from nucliadb_node.settings import indexing_settings, settings
@@ -42,7 +42,6 @@ from nucliadb_utils.utilities import get_storage, start_nats_manager, stop_nats_
 async def start_listeners(writer: Writer):
     return [
         await start_indexed_publisher(),
-        await start_shard_gc_scheduler(writer),
     ]
 
 
@@ -50,12 +49,6 @@ async def start_indexed_publisher() -> IndexedPublisher:
     publisher = IndexedPublisher()
     await publisher.initialize()
     return publisher
-
-
-async def start_shard_gc_scheduler(writer: Writer) -> ShardGcScheduler:
-    scheduler = ShardGcScheduler(writer)
-    await scheduler.initialize()
-    return scheduler
 
 
 async def start_worker(

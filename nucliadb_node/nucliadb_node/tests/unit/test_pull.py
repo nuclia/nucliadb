@@ -26,7 +26,6 @@ from nats.aio.client import Msg
 from nucliadb_protos.nodewriter_pb2 import IndexMessage, TypeMessage
 
 from nucliadb_node.listeners import IndexedPublisher
-from nucliadb_node.listeners.gc_scheduler import ShardManager
 from nucliadb_node.pull import Worker
 from nucliadb_utils import const
 
@@ -38,58 +37,6 @@ def pubsub():
         "nucliadb_node.listeners.indexed_publisher.get_pubsub", return_value=pubsub
     ):
         yield pubsub
-
-
-class TestShardManager:
-    @pytest.fixture()
-    def gc_lock(self):
-        yield asyncio.Semaphore(1)
-
-    @pytest.fixture()
-    def writer(self):
-        writer = MagicMock(garbage_collector=AsyncMock())
-        yield writer
-
-    @pytest.fixture()
-    def shard_manager(self, writer, gc_lock):
-        sm = ShardManager("shard_id", writer, gc_lock)
-        sm.target_gc_resources = 5
-        yield sm
-
-    @pytest.mark.asyncio
-    async def test_gc(self, shard_manager: ShardManager, writer):
-        await shard_manager.gc()
-
-        writer.garbage_collector.assert_awaited_once()
-
-    @pytest.mark.asyncio
-    async def test_schedule_gc(self, shard_manager: ShardManager, writer):
-        shard_manager.shard_changed_event(0)
-
-        await asyncio.sleep(0.1)
-
-        writer.garbage_collector.assert_awaited_once()
-
-    @pytest.mark.asyncio
-    async def test_schedule_gc_after_target(self, shard_manager: ShardManager, writer):
-        for _ in range(shard_manager.target_gc_resources):
-            shard_manager.shard_changed_event()
-
-        await asyncio.sleep(0.1)
-
-        writer.garbage_collector.assert_awaited_once()
-
-    @pytest.mark.asyncio
-    async def test_schedule_gc_after_target_multiple_times(
-        self, shard_manager: ShardManager, writer
-    ):
-        for _ in range(shard_manager.target_gc_resources):
-            shard_manager.shard_changed_event()
-            shard_manager.shard_changed_event()
-
-        await asyncio.sleep(0.1)
-
-        writer.garbage_collector.assert_awaited_once()
 
 
 class TestIndexedPublisher:
