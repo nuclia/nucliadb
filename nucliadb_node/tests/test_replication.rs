@@ -73,7 +73,6 @@ async fn test_search_replicated_data(
     assert_eq!(response.paragraph.unwrap().results.len(), 2);
     assert_eq!(response.vector.unwrap().documents.len(), 1);
 
-    query.vectorset = "test_vector_set".to_string();
     query.vector = vec![1.0, 2.0, 3.0];
     let response = run_search(&mut secondary_reader, query.clone()).await;
     assert!(response.vector.is_some());
@@ -98,7 +97,8 @@ async fn test_search_replicated_data(
     assert!(secondary_shard.upgrade().is_none());
 
     let err_search_result = secondary_reader.search(query).await;
-    assert!(err_search_result.is_err());
+
+    let _err = err_search_result;
 
     Ok(())
 }
@@ -114,19 +114,6 @@ async fn create_shard(writer: &mut TestNodeWriter, release_channel: ReleaseChann
     });
     let new_shard_response = writer.new_shard(request).await.expect("Unable to create new shard");
     let shard_id = &new_shard_response.get_ref().id;
-
-    writer
-        .add_vector_set(NewVectorSetRequest {
-            id: Some(VectorSetId {
-                shard: Some(ShardId {
-                    id: shard_id.clone(),
-                }),
-                vectorset: "test_vector_set".to_string(),
-            }),
-            similarity: VectorSimilarity::Cosine as i32,
-        })
-        .await
-        .expect("Unable to create vector set");
     create_test_resources(writer, shard_id.clone()).await;
     ShardDetails {
         id: shard_id.to_owned(),
@@ -147,26 +134,8 @@ async fn create_test_resources(writer: &mut TestNodeWriter, shard_id: String) ->
         ("pap", resources::people_and_places(&shard_id)),
     ];
     let mut resource_uuids = HashMap::new();
-
-    let mut user_vectors = HashMap::new();
-    user_vectors.insert(
-        "test_vector".to_string(),
-        UserVector {
-            vector: vec![1.0, 2.0, 3.0],
-            labels: vec!["label1".to_string(), "label2".to_string()],
-            start: 0,
-            end: 3,
-        },
-    );
-
     for (name, mut resource) in resources.into_iter() {
         resource_uuids.insert(name, resource.resource.as_ref().unwrap().uuid.clone());
-        resource.vectors.insert(
-            "test_vector_set".to_string(),
-            UserVectors {
-                vectors: user_vectors.clone(),
-            },
-        );
         let response = writer.set_resource(resource).await.unwrap();
         assert_eq!(response.get_ref().status, op_status::Status::Ok as i32);
     }

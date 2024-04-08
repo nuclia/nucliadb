@@ -36,7 +36,6 @@ use nucliadb_node::settings::load_settings;
 use nucliadb_node::shards::metadata::ShardMetadata;
 use nucliadb_node::shards::writer::ShardWriter;
 use prost::Message;
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 use std::thread::JoinHandle;
@@ -203,80 +202,18 @@ impl NodeWriter {
     }
 
     // TODO: rename to list_vectorsets
-    pub fn get_vectorset<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let shard_id = ShardId::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
-        let shard = self.obtain_shard(shard_id.id.clone())?;
-        let vector_sets = shard.list_vectorsets();
-        match vector_sets {
-            Ok(vector_sets) => {
-                let response = VectorSetList {
-                    shard: Some(shard_id),
-                    vectorset: vector_sets,
-                };
-                Ok(PyList::new(py, response.encode_to_vec()))
-            }
-            Err(error) => {
-                let message = format!("Error listing vectorsets: {}", error);
-                Err(IndexNodeException::new_err(message))
-            }
-        }
+    pub fn get_vectorset<'p>(&mut self, _request: RawProtos, _py: Python<'p>) -> PyResult<&'p PyAny> {
+        Err(IndexNodeException::new_err("Coming soon.."))
     }
 
     // TODO
-    pub fn set_vectorset<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let request = NewVectorSetRequest::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
-        let Some(ref vectorset_id) = request.id else {
-            return Err(PyValueError::new_err("Missing vectorset id field"));
-        };
-        let Some(ref shard_id) = vectorset_id.shard else {
-            return Err(PyValueError::new_err("Missing shard id field"));
-        };
-        let shard = self.obtain_shard(shard_id.id.clone())?;
-        let status = shard.add_vectorset(vectorset_id, request.similarity()).and_then(|()| shard.get_opstatus());
-        match status {
-            Ok(mut status) => {
-                status.status = 0;
-                status.detail = "Success!".to_string();
-                Ok(PyList::new(py, status.encode_to_vec()))
-            }
-            Err(error) => {
-                let op_status = OpStatus {
-                    status: op_status::Status::Error as i32,
-                    detail: error.to_string(),
-                    field_count: 0_u64,
-                    shard_id: shard_id.id.clone(),
-                    ..Default::default()
-                };
-                Ok(PyList::new(py, op_status.encode_to_vec()))
-            }
-        }
+    pub fn set_vectorset<'p>(&mut self, _request: RawProtos, _py: Python<'p>) -> PyResult<&'p PyAny> {
+        Err(IndexNodeException::new_err("Coming soon.."))
     }
 
     // TODO
-    pub fn del_vectorset<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let vectorset = VectorSetId::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
-        let Some(ref shard_id) = vectorset.shard else {
-            return Err(PyValueError::new_err("Missing shard id field"));
-        };
-        let shard = self.obtain_shard(shard_id.id.clone())?;
-        let status = shard.remove_vectorset(&vectorset).and_then(|()| shard.get_opstatus());
-        match status {
-            Ok(mut status) => {
-                status.status = 0;
-                status.detail = "Success!".to_string();
-                Ok(PyList::new(py, status.encode_to_vec()))
-            }
-            Err(error) => {
-                let op_status = OpStatus {
-                    status: op_status::Status::Error as i32,
-                    detail: error.to_string(),
-                    field_count: 0_u64,
-                    shard_id: shard_id.id.clone(),
-                    ..Default::default()
-                };
-                Ok(PyList::new(py, op_status.encode_to_vec()))
-            }
-        }
+    pub fn del_vectorset<'p>(&mut self, _request: RawProtos, _py: Python<'p>) -> PyResult<&'p PyAny> {
+        Err(IndexNodeException::new_err("Coming soon.."))
     }
 
     pub fn gc<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {

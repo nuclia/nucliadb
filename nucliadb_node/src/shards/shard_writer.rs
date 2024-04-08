@@ -23,7 +23,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use nucliadb_core::paragraphs::*;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::shard_created::{DocumentService, ParagraphService, RelationService, VectorService};
-use nucliadb_core::protos::{OpStatus, Resource, ResourceId, VectorSetId, VectorSimilarity};
+use nucliadb_core::protos::{OpStatus, Resource, ResourceId};
 use nucliadb_core::relations::*;
 use nucliadb_core::texts::*;
 use nucliadb_core::tracing::{self, *};
@@ -189,7 +189,6 @@ impl ShardWriter {
         let vsc = VectorConfig {
             similarity: Some(metadata.similarity()),
             path: path.join(VECTORS_DIR),
-            vectorset: path.join(VECTORSET_DIR),
             channel,
             shard_id: metadata.id(),
         };
@@ -221,7 +220,6 @@ impl ShardWriter {
         let vsc = VectorConfig {
             similarity: None,
             path: path.join(VECTORS_DIR),
-            vectorset: path.join(VECTORSET_DIR),
             channel,
             shard_id: metadata.id(),
         };
@@ -396,33 +394,6 @@ impl ShardWriter {
             sentence_count: vector_count? as u64,
             ..Default::default()
         })
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub fn list_vectorsets(&self) -> NodeResult<Vec<String>> {
-        let reader = read_rw_lock(&self.vector_writer);
-        let keys = reader.list_vectorsets()?;
-        Ok(keys)
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub fn add_vectorset(&self, setid: &VectorSetId, similarity: VectorSimilarity) -> NodeResult<()> {
-        let mut writer = write_rw_lock(&self.vector_writer);
-        writer.add_vectorset(setid, similarity)?;
-
-        self.metadata.new_generation_id();
-
-        Ok(())
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub fn remove_vectorset(&self, setid: &VectorSetId) -> NodeResult<()> {
-        let mut writer = write_rw_lock(&self.vector_writer);
-        writer.remove_vectorset(setid)?;
-
-        self.metadata.new_generation_id();
-
-        Ok(())
     }
 
     #[tracing::instrument(skip_all)]
