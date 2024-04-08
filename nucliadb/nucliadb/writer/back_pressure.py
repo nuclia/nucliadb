@@ -235,12 +235,14 @@ class Materializer:
                 for node in get_index_nodes():
                     try:
                         with back_pressure_observer({"type": "get_indexing_pending"}):
-                            self.indexing_pending[
-                                node.id
-                            ] = await get_nats_consumer_pending_messages(
-                                self.nats_manager,
-                                stream=const.Streams.INDEX.name,
-                                consumer=const.Streams.INDEX.group.format(node=node.id),
+                            self.indexing_pending[node.id] = (
+                                await get_nats_consumer_pending_messages(
+                                    self.nats_manager,
+                                    stream=const.Streams.INDEX.name,
+                                    consumer=const.Streams.INDEX.group.format(
+                                        node=node.id
+                                    ),
+                                )
                             )
                     except Exception:
                         logger.exception(

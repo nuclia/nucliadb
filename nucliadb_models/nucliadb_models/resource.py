@@ -236,8 +236,7 @@ class Error(BaseModel):
     code: int
 
 
-class FieldData(BaseModel):
-    ...
+class FieldData(BaseModel): ...
 
 
 class TextFieldData(BaseModel):

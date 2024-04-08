@@ -1235,9 +1235,9 @@ async def create_dummy_resources(
         message = BrokerMessage()
         message.kbid = kbid
         message.uuid = uuid
-        message.texts[
-            "text"
-        ].body = "My own text Ramon. This is great to be here. \n Where is my beer?"
+        message.texts["text"].body = (
+            "My own text Ramon. This is great to be here. \n Where is my beer?"
+        )
         etw = rpb.ExtractedTextWrapper()
         etw.body.text = (
             "My own text Ramon. This is great to be here. \n Where is my beer?"
