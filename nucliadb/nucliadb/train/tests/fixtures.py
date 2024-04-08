@@ -137,9 +137,9 @@ def broker_simple_resource(knowledgebox: str, number: int) -> BrokerMessage:
     message1.basic.metadata.language = "es"
     message1.basic.created.FromDatetime(datetime.utcnow())
     message1.basic.modified.FromDatetime(datetime.utcnow())
-    message1.texts[
-        "field1"
-    ].body = "My lovely field with some information from Barcelona. This will be the good field. \n\n And then we will go Manresa."  # noqa
+    message1.texts["field1"].body = (
+        "My lovely field with some information from Barcelona. This will be the good field. \n\n And then we will go Manresa."  # noqa
+    )
     message1.source = BrokerMessage.MessageSource.WRITER
     return message1
 

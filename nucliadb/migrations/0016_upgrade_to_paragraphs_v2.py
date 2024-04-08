@@ -34,12 +34,10 @@ from nucliadb.migrator.context import ExecutionContext
 logger = logging.getLogger(__name__)
 
 
-class ShardsObjectNotFound(Exception):
-    ...
+class ShardsObjectNotFound(Exception): ...
 
 
-async def migrate(context: ExecutionContext) -> None:
-    ...
+async def migrate(context: ExecutionContext) -> None: ...
 
 
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:

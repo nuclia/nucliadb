@@ -84,9 +84,9 @@ async def extract_fields(resource: ORMResource, toprocess: PushPayload):
         field_pb = await field.get_value()
 
         if field_type_name is FieldTypeName.FILE:
-            toprocess.filefield[
-                field_id
-            ] = await processing.convert_internal_filefield_to_str(field_pb, storage)
+            toprocess.filefield[field_id] = (
+                await processing.convert_internal_filefield_to_str(field_pb, storage)
+            )
 
         if field_type_name is FieldTypeName.LINK:
             parsed_link = MessageToDict(
@@ -148,10 +148,10 @@ async def extract_fields(resource: ORMResource, toprocess: PushPayload):
                         await processing.convert_internal_cf_to_str(cf, storage)
                         for cf in message.content.attachments
                     ]
-                    parsed_message["content"][
-                        "format"
-                    ] = resources_pb2.MessageContent.Format.Value(
-                        parsed_message["content"]["format"]
+                    parsed_message["content"]["format"] = (
+                        resources_pb2.MessageContent.Format.Value(
+                            parsed_message["content"]["format"]
+                        )
                     )
                     full_conversation.messages.append(
                         models.PushMessage(**parsed_message)

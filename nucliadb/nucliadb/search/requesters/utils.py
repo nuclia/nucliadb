@@ -89,8 +89,7 @@ async def node_query(
     pb_query: SuggestRequest,
     target_shard_replicas: Optional[list[str]] = None,
     use_read_replica_nodes: bool = True,
-) -> tuple[list[SuggestResponse], bool, list[tuple[AbstractIndexNode, str]]]:
-    ...
+) -> tuple[list[SuggestResponse], bool, list[tuple[AbstractIndexNode, str]]]: ...
 
 
 @overload
@@ -100,8 +99,9 @@ async def node_query(
     pb_query: ParagraphSearchRequest,
     target_shard_replicas: Optional[list[str]] = None,
     use_read_replica_nodes: bool = True,
-) -> tuple[list[ParagraphSearchResponse], bool, list[tuple[AbstractIndexNode, str]]]:
-    ...
+) -> tuple[
+    list[ParagraphSearchResponse], bool, list[tuple[AbstractIndexNode, str]]
+]: ...
 
 
 @overload
@@ -111,8 +111,7 @@ async def node_query(
     pb_query: SearchRequest,
     target_shard_replicas: Optional[list[str]] = None,
     use_read_replica_nodes: bool = True,
-) -> tuple[list[SearchResponse], bool, list[tuple[AbstractIndexNode, str]]]:
-    ...
+) -> tuple[list[SearchResponse], bool, list[tuple[AbstractIndexNode, str]]]: ...
 
 
 @overload
@@ -122,8 +121,7 @@ async def node_query(
     pb_query: RelationSearchRequest,
     target_shard_replicas: Optional[list[str]] = None,
     use_read_replica_nodes: bool = True,
-) -> tuple[list[RelationSearchResponse], bool, list[tuple[AbstractIndexNode, str]]]:
-    ...
+) -> tuple[list[RelationSearchResponse], bool, list[tuple[AbstractIndexNode, str]]]: ...
 
 
 async def node_query(

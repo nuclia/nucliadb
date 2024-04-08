@@ -72,11 +72,9 @@ class NoopScope:
     def __enter__(self):
         return self
 
-    def __exit__(self, *args):
-        ...
+    def __exit__(self, *args): ...
 
-    def set_extra(self, key: str, value: Any) -> None:
-        ...
+    def set_extra(self, key: str, value: Any) -> None: ...
 
 
 def push_scope(**kwargs: Any) -> ContextManager[Scope]:

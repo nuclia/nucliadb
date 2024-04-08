@@ -66,8 +66,7 @@ class ExportMetadata(Metadata):
     exported_resources: list[str] = list()
 
 
-class ImportMetadata(Metadata):
-    ...
+class ImportMetadata(Metadata): ...
 
 
 class NatsTaskMessage(BaseModel):

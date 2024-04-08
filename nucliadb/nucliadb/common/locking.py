@@ -38,8 +38,7 @@ RESOURCE_INDEX_LOCK = "resource-index-{kbid}-{resource_id}"
 KB_SHARDS_LOCK = "shards-kb-{kbid}"
 
 
-class ResourceLocked(Exception):
-    ...
+class ResourceLocked(Exception): ...
 
 
 @dataclass

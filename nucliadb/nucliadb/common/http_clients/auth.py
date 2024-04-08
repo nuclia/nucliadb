@@ -49,9 +49,9 @@ class NucliaAuthHTTPClient:
         )
         self.headers = {}
         if nuclia_settings.nuclia_service_account is not None:
-            self.headers[
-                "X-NUCLIA-NUAKEY"
-            ] = f"Bearer {nuclia_settings.nuclia_service_account}"
+            self.headers["X-NUCLIA-NUAKEY"] = (
+                f"Bearer {nuclia_settings.nuclia_service_account}"
+            )
 
     async def __aenter__(self):
         return self

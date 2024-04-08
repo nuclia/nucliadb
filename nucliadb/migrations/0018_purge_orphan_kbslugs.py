@@ -58,5 +58,4 @@ async def migrate(context: ExecutionContext) -> None:
         await txn.commit()
 
 
-async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
-    ...
+async def migrate_kb(context: ExecutionContext, kbid: str) -> None: ...
