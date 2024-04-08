@@ -122,8 +122,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         )
         self.shards_manager = get_shard_manager()
 
-    async def finalize(self):
-        ...
+    async def finalize(self): ...
 
     async def SetVectors(  # type: ignore
         self, request: SetVectorsRequest, context=None

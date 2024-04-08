@@ -39,8 +39,7 @@ AFFECTED_KBS = [
 ]
 
 
-async def migrate(context: ExecutionContext) -> None:
-    ...
+async def migrate(context: ExecutionContext) -> None: ...
 
 
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:

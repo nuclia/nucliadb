@@ -359,9 +359,9 @@ async def managed_serialize(
                             body=error.error, code=error.code
                         )
                 if include_extracted_data:
-                    resource.data.layouts[
-                        field.id
-                    ].extracted = LayoutFieldExtractedData()
+                    resource.data.layouts[field.id].extracted = (
+                        LayoutFieldExtractedData()
+                    )
                     await set_resource_field_extracted_data(
                         field,
                         resource.data.layouts[field.id].extracted,
@@ -381,13 +381,13 @@ async def managed_serialize(
                         )
                 if include_value and isinstance(field, Conversation):
                     value = await field.get_metadata()
-                    resource.data.conversations[
-                        field.id
-                    ].value = models.FieldConversation.from_message(value)
+                    resource.data.conversations[field.id].value = (
+                        models.FieldConversation.from_message(value)
+                    )
                 if include_extracted_data:
-                    resource.data.conversations[
-                        field.id
-                    ].extracted = ConversationFieldExtractedData()
+                    resource.data.conversations[field.id].extracted = (
+                        ConversationFieldExtractedData()
+                    )
                     await set_resource_field_extracted_data(
                         field,
                         resource.data.conversations[field.id].extracted,
@@ -412,9 +412,9 @@ async def managed_serialize(
                         value  # type: ignore
                     )
                 if include_extracted_data:
-                    resource.data.datetimes[
-                        field.id
-                    ].extracted = DatetimeFieldExtractedData()
+                    resource.data.datetimes[field.id].extracted = (
+                        DatetimeFieldExtractedData()
+                    )
                     await set_resource_field_extracted_data(
                         field,
                         resource.data.datetimes[field.id].extracted,
@@ -439,9 +439,9 @@ async def managed_serialize(
                         value  # type: ignore
                     )
                 if include_extracted_data:
-                    resource.data.keywordsets[
-                        field.id
-                    ].extracted = KeywordsetFieldExtractedData()
+                    resource.data.keywordsets[field.id].extracted = (
+                        KeywordsetFieldExtractedData()
+                    )
                     await set_resource_field_extracted_data(
                         field,
                         resource.data.keywordsets[field.id].extracted,

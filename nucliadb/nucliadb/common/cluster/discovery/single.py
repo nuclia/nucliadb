@@ -48,5 +48,4 @@ class SingleNodeDiscovery(AbstractClusterDiscovery):
             ]
         )
 
-    async def finalize(self) -> None:
-        ...
+    async def finalize(self) -> None: ...

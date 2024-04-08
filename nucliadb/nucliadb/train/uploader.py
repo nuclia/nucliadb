@@ -51,8 +51,7 @@ class UploadServicer:
         pubsub = await get_pubsub()
         self.proc = Processor(driver=driver, storage=storage, pubsub=pubsub)
 
-    async def finalize(self):
-        ...
+    async def finalize(self): ...
 
     async def GetSentences(self, request: GetSentencesRequest, context=None):
         async for sentence in self.proc.kb_sentences(request):

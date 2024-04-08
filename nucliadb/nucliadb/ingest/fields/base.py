@@ -399,9 +399,9 @@ class Field:
     ) -> tuple[FieldComputedMetadata, list[str], dict[str, list[str]]]:
         if self.type in SUBFIELDFIELDS:
             try:
-                actual_payload: Optional[
-                    FieldComputedMetadata
-                ] = await self.get_field_metadata(force=True)
+                actual_payload: Optional[FieldComputedMetadata] = (
+                    await self.get_field_metadata(force=True)
+                )
             except KeyError:
                 actual_payload = None
         else:
@@ -471,9 +471,9 @@ class Field:
     async def set_large_field_metadata(self, payload: LargeComputedMetadataWrapper):
         if self.type in SUBFIELDFIELDS:
             try:
-                actual_payload: Optional[
-                    LargeComputedMetadata
-                ] = await self.get_large_field_metadata(force=True)
+                actual_payload: Optional[LargeComputedMetadata] = (
+                    await self.get_large_field_metadata(force=True)
+                )
             except KeyError:
                 actual_payload = None
         else:
