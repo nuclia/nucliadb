@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import json
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -44,11 +45,19 @@ def test_parse_entities_to_filters():
     ]
 
     request = SearchRequest()
+    request.filter.field_labels.append("/e/person/Austin")
+    request.filter.expression = json.dumps({"and": [{"literal": "/e/person/Austin"}]})
     assert parse_entities_to_filters(request, detected_entities) == ["/e/person/John"]
-    assert request.filter.field_labels == ["/e/person/John"]
+    assert request.filter.field_labels == ["/e/person/Austin", "/e/person/John"]
+    assert json.loads(request.filter.expression) == {
+        "and": [
+            {"literal": "/e/person/John"},
+            {"and": [{"literal": "/e/person/Austin"}]},
+        ]
+    }
 
     assert parse_entities_to_filters(request, detected_entities) == []
-    assert request.filter.field_labels == ["/e/person/John"]
+    assert request.filter.field_labels == ["/e/person/Austin", "/e/person/John"]
 
 
 @pytest.fixture()
