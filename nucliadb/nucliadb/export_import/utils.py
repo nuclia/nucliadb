@@ -253,7 +253,8 @@ async def get_labels(context: ApplicationContext, kbid: str) -> kb_pb2.Labels:
         return await datamanagers.labels.get_labels(txn, kbid=kbid)
 
 
-class EndOfStream(Exception): ...
+class EndOfStream(Exception):
+    ...
 
 
 class ExportStream:

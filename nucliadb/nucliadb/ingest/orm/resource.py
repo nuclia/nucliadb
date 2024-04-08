@@ -1111,9 +1111,9 @@ class Resource:
                 for fieldmetadata in self.basic.fieldmetadata:
                     field_id = self.generate_field_id(fieldmetadata.field)
                     for annotationparagraph in fieldmetadata.paragraphs:
-                        userdefinedparagraphclass[annotationparagraph.key] = (
-                            annotationparagraph
-                        )
+                        userdefinedparagraphclass[
+                            annotationparagraph.key
+                        ] = annotationparagraph
 
         for (type_id, field_id), field in fields.items():
             fieldid = FieldID(field_type=type_id, field=field_id)  # type: ignore
@@ -1225,9 +1225,9 @@ class Resource:
                 for fieldmetadata in self.basic.fieldmetadata:
                     field_id = self.generate_field_id(fieldmetadata.field)
                     for annotationparagraph in fieldmetadata.paragraphs:
-                        userdefinedparagraphclass[annotationparagraph.key] = (
-                            annotationparagraph
-                        )
+                        userdefinedparagraphclass[
+                            annotationparagraph.key
+                        ] = annotationparagraph
 
         for (type_id, field_id), field in fields.items():
             fieldid = FieldID(field_type=type_id, field=field_id)  # type: ignore

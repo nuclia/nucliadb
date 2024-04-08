@@ -25,4 +25,5 @@ class RequestError(Exception):
         self.text = text
 
 
-class CountersError(Exception): ...
+class CountersError(Exception):
+    ...

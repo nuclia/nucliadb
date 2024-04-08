@@ -32,7 +32,8 @@ class Message(pydantic.BaseModel):
 def test_create_consumer():
     stream = MagicMock()
 
-    async def callback(): ...
+    async def callback():
+        ...
 
     consumer = create_consumer(
         "foo", stream=stream, msg_type=Message, callback=callback

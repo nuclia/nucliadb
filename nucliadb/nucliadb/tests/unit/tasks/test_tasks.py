@@ -39,7 +39,8 @@ async def test_start_consumer(context):
         await tasks.start_consumer("foo", context)
 
     @tasks.register_task("foo", StreamTest, msg_type=Message)
-    async def some_test_work(context, msg: Message): ...
+    async def some_test_work(context, msg: Message):
+        ...
 
     consumer = await tasks.start_consumer("foo", context)
     assert consumer.initialized
@@ -50,7 +51,8 @@ async def test_get_producer(context):
         await tasks.get_producer("bar", context)
 
     @tasks.register_task("bar", StreamTest, msg_type=Message)
-    async def some_test_work(context, msg: Message): ...
+    async def some_test_work(context, msg: Message):
+        ...
 
     producer = await tasks.get_producer("bar", context)
     assert producer.initialized
