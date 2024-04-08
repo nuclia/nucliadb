@@ -35,22 +35,12 @@ def test_should_create_new_shard():
     sm = manager.KBShardManager()
     low_para_counter = {
         "num_paragraphs": settings.max_shard_paragraphs - 1,
-        "num_fields": 0,
     }
     high_para_counter = {
         "num_paragraphs": settings.max_shard_paragraphs + 1,
-        "num_fields": 0,
     }
     assert sm.should_create_new_shard(**low_para_counter) is False
     assert sm.should_create_new_shard(**high_para_counter) is True
-
-    low_fields_counter = {"num_fields": settings.max_shard_fields, "num_paragraphs": 0}
-    high_fields_counter = {
-        "num_fields": settings.max_shard_fields + 1,
-        "num_paragraphs": 0,
-    }
-    assert sm.should_create_new_shard(**low_fields_counter) is False
-    assert sm.should_create_new_shard(**high_fields_counter) is True
 
 
 @pytest.fixture(scope="function")
