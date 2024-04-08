@@ -670,6 +670,8 @@ def parse_entities_to_filters(
 
     # We need to expand the filter expression with the automatically detected entities.
     if len(added_filters) > 0:
+        # So far, autofilters feature will only yield 'and' expressions with the detected entities.
+        # More complex autofilters can be added here if we leverage the query endpoint.
         expanded_expression = {"and": [{"literal": entity} for entity in added_filters]}
         if request.filter.expression:
             expression = json.loads(request.filter.expression)
