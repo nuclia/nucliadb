@@ -42,36 +42,12 @@ BinaryStream = AsyncGenerator[bytes, None]
 BinaryStreamGenerator = Callable[[int], BinaryStream]
 
 
-# Broker message fields that are populated by the processing pipeline
-PROCESSING_BM_FIELDS = [
-    "link_extracted_data",
-    "file_extracted_data",
-    "extracted_text",
-    "field_metadata",
-    "field_vectors",
-    "field_large_metadata",
-    "user_vectors",
-]
-
-# Broker message fields that are populated by the nucliadb writer component
-WRITER_BM_FIELDS = [
-    "links",
-    "files",
-    "texts",
-    "conversations",
-    "layouts",
-    "keywordsets",
-    "datetimes",
-]
-
-
 async def import_broker_message(
     context: ApplicationContext, kbid: str, bm: writer_pb2.BrokerMessage
 ) -> None:
     bm.kbid = kbid
     partition = context.partitioning.generate_partition(kbid, bm.uuid)
-    for pb in [get_writer_bm(bm), get_processor_bm(bm)]:
-        await transaction_commit(context, pb, partition)
+    await transaction_commit(context, bm, partition)
 
 
 async def transaction_commit(
@@ -105,26 +81,6 @@ async def transaction_commit(
         )
 
 
-def get_writer_bm(bm: writer_pb2.BrokerMessage) -> writer_pb2.BrokerMessage:
-    wbm = writer_pb2.BrokerMessage()
-    wbm.CopyFrom(bm)
-    for field in PROCESSING_BM_FIELDS:
-        wbm.ClearField(field)  # type: ignore
-    wbm.type = writer_pb2.BrokerMessage.MessageType.AUTOCOMMIT
-    wbm.source = writer_pb2.BrokerMessage.MessageSource.WRITER
-    return wbm
-
-
-def get_processor_bm(bm: writer_pb2.BrokerMessage) -> writer_pb2.BrokerMessage:
-    pbm = writer_pb2.BrokerMessage()
-    pbm.CopyFrom(bm)
-    for field in WRITER_BM_FIELDS:
-        pbm.ClearField(field)  # type: ignore
-    pbm.type = writer_pb2.BrokerMessage.MessageType.AUTOCOMMIT
-    pbm.source = writer_pb2.BrokerMessage.MessageSource.PROCESSOR
-    return pbm
-
-
 async def import_binary(
     context: ApplicationContext,
     kbid: str,
@@ -148,7 +104,7 @@ async def import_binary(
 
 
 async def set_entities_groups(
-    context: ApplicationContext, kbid: str, entities_groups: kb_pb2.EntitiesGroups
+    kbid: str, entities_groups: kb_pb2.EntitiesGroups
 ) -> None:
     async with datamanagers.with_transaction() as txn:
         await datamanagers.entities.set_entities_groups(
@@ -157,24 +113,18 @@ async def set_entities_groups(
         await txn.commit()
 
 
-async def set_labels(
-    context: ApplicationContext, kbid: str, labels: kb_pb2.Labels
-) -> None:
+async def set_labels(kbid: str, labels: kb_pb2.Labels) -> None:
     async with datamanagers.with_transaction() as txn:
         await datamanagers.labels.set_labels(txn, kbid=kbid, labels=labels)
         await txn.commit()
 
 
-async def iter_kb_resource_uuids(
-    context: ApplicationContext, kbid: str
-) -> AsyncGenerator[str, None]:
+async def iter_kb_resource_uuids(kbid: str) -> AsyncGenerator[str, None]:
     async for rid in datamanagers.resources.iterate_resource_ids(kbid=kbid):
         yield rid
 
 
-async def get_broker_message(
-    context: ApplicationContext, kbid: str, rid: str
-) -> Optional[writer_pb2.BrokerMessage]:
+async def get_broker_message(kbid: str, rid: str) -> Optional[writer_pb2.BrokerMessage]:
     async with datamanagers.with_transaction() as txn:
         return await datamanagers.resources.get_broker_message(txn, kbid=kbid, rid=rid)
 
@@ -243,12 +193,12 @@ async def download_binary(
         yield data
 
 
-async def get_entities(context: ApplicationContext, kbid: str) -> kb_pb2.EntitiesGroups:
+async def get_entities(kbid: str) -> kb_pb2.EntitiesGroups:
     async with datamanagers.with_transaction() as txn:
         return await datamanagers.entities.get_entities_groups(txn, kbid=kbid)
 
 
-async def get_labels(context: ApplicationContext, kbid: str) -> kb_pb2.Labels:
+async def get_labels(kbid: str) -> kb_pb2.Labels:
     async with datamanagers.with_transaction() as txn:
         return await datamanagers.labels.get_labels(txn, kbid=kbid)
 
