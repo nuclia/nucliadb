@@ -277,6 +277,7 @@ async def chat(
                 prompt_context_order=prompt_context_order,
             )
     else:
+        status_code = FoundStatusCode()
         find_results = KnowledgeboxFindResults(resources={}, min_score=None)
         query_parser = QueryParser(
             kbid=kbid,
