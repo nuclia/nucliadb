@@ -127,15 +127,16 @@ async def test_import_broker_message(broker_message, transaction, partitioning):
 
     await import_broker_message(context, import_kbid, broker_message)
 
-    # Sends two messages
-    assert transaction.commit.call_count == 2
+    # Sends one message
+    assert transaction.commit.call_count == 1
 
-    for call in transaction.commit.call_args_list:
-        # Message contains import kbid
-        assert call[0][0].kbid == import_kbid
+    call = transaction.commit.call_args_list[0]
 
-        # Sends to correct topic
-        assert call[1]["target_subject"] == Streams.INGEST_PROCESSED.subject
+    # Message contains import kbid
+    assert call[0][0].kbid == import_kbid
+
+    # Sends to correct topic
+    assert call[1]["target_subject"] == Streams.INGEST_PROCESSED.subject
 
 
 def test_get_cloud_files(broker_message):
