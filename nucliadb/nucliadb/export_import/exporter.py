@@ -54,7 +54,7 @@ async def export_kb(
     resources_iterator = export_resources(context, kbid)
     if metadata is not None:
         assert metadata.kbid == kbid
-        resources_iterator = export_resources_resumable(context, metadata)
+        resources_iterator = export_resources_with_metadata(context, metadata)
 
     async for chunk in resources_iterator:
         yield chunk
@@ -103,17 +103,19 @@ async def export_resources(
             yield chunk
 
 
-async def export_resources_resumable(
+async def export_resources_with_metadata(
     context, metadata: ExportMetadata
 ) -> AsyncGenerator[bytes, None]:
     dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
 
     kbid = metadata.kbid
+    metadata.exported_resources = []
+    metadata.processed = 0
     if len(metadata.resources_to_export) == 0:
         # Starting an export from scratch
-        metadata.exported_resources = []
         async for rid in iter_kb_resource_uuids(context, kbid):
-            metadata.resources_to_export.append(rid)
+            if rid not in metadata.exported_resources:
+                metadata.resources_to_export.append(rid)
         metadata.resources_to_export.sort()
         metadata.total = len(metadata.resources_to_export)
         await dm.set_metadata("export", metadata)
@@ -136,10 +138,10 @@ async def export_resources_resumable(
         errors.capture_exception(e)
         logger.error(f"Error exporting resource {rid}: {e}")
         # Start from scracth next time.
-        # TODO: try to resume from the last resource
         metadata.exported_resources = []
         metadata.processed = 0
         await dm.set_metadata("export", metadata)
+        await dm.try_delete_from_storage("export", kbid, metadata.id)
         raise
 
 
