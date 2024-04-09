@@ -368,7 +368,7 @@ async def check_processing_behind(materializer: Materializer, kbid: str):
     kb_pending = await materializer.get_processing_pending(kbid)
     if kb_pending > max_pending:
         try_after = estimate_try_after(
-            rate=settings.processing_rate, pending=kb_pending
+            rate=settings.processing_rate, pending=kb_pending, max_pending=max_pending
         )
         data = BackPressureData(type="processing", try_after=try_after)
         raise BackPressureException(data)
@@ -420,7 +420,9 @@ async def check_indexing_behind(
 
     if highest_pending > max_pending:
         try_after = estimate_try_after(
-            rate=settings.indexing_rate, pending=highest_pending
+            rate=settings.indexing_rate,
+            pending=highest_pending,
+            max_pending=max_pending,
         )
         data = BackPressureData(type="indexing", try_after=try_after)
         raise BackPressureException(data)
@@ -434,17 +436,18 @@ def check_ingest_behind(ingest_pending: int):
 
     if ingest_pending > max_pending:
         try_after = estimate_try_after(
-            rate=settings.ingest_rate, pending=ingest_pending
+            rate=settings.ingest_rate, pending=ingest_pending, max_pending=max_pending
         )
         data = BackPressureData(type="ingest", try_after=try_after)
         raise BackPressureException(data)
 
 
-def estimate_try_after(rate: float, pending: int) -> datetime:
+def estimate_try_after(rate: float, pending: int, max_pending: int) -> datetime:
     """
     This function estimates the time to try again based on the rate and the number of pending messages.
     """
-    delta_seconds = pending / rate
+    # We estimate the time to try again when the pending messages are half of the max_pending
+    delta_seconds = abs(pending - (max_pending / 2)) / rate
     return datetime.utcnow() + timedelta(seconds=delta_seconds)
 
 
