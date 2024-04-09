@@ -174,24 +174,26 @@ async def test_default_prompt_context(kb):
         "nucliadb.search.search.chat.prompt.get_storage"
     ), patch("nucliadb.search.search.chat.prompt.KnowledgeBoxORM", return_value=kb):
         context = chat_prompt.CappedPromptContext(max_size=int(1e6))
+        find_results = KnowledgeboxFindResults(
+            facets={},
+            resources={
+                "bmid": _create_find_result(
+                    "bmid/c/conv/ident", result_text, SCORE_TYPE.BM25, order=1
+                ),
+                "vecid": _create_find_result(
+                    "vecid/c/conv/ident", result_text, SCORE_TYPE.VECTOR, order=2
+                ),
+                "both_id": _create_find_result(
+                    "both_id/c/conv/ident", result_text, SCORE_TYPE.BOTH, order=0
+                ),
+            },
+        )
+        ordered_paragraphs = chat_prompt.get_ordered_paragraphs(find_results)
+
         await chat_prompt.default_prompt_context(
             context,
             "kbid",
-            KnowledgeboxFindResults(
-                facets={},
-                resources={
-                    "bmid": _create_find_result(
-                        "bmid/c/conv/ident", result_text, SCORE_TYPE.BM25, order=1
-                    ),
-                    "vecid": _create_find_result(
-                        "vecid/c/conv/ident", result_text, SCORE_TYPE.VECTOR, order=2
-                    ),
-                    "both_id": _create_find_result(
-                        "both_id/c/conv/ident", result_text, SCORE_TYPE.BOTH, order=0
-                    ),
-                },
-                min_score=MinScore(semantic=-1),
-            ),
+            ordered_paragraphs,
         )
         prompt_result = context.output
         # Check that the results are sorted by increasing order and that the extra
