@@ -1962,6 +1962,7 @@ dependencies = [
  "fst",
  "fxhash",
  "lazy_static",
+ "libc",
  "memmap2",
  "nucliadb_core",
  "nucliadb_procs",

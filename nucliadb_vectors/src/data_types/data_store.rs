@@ -89,6 +89,33 @@ pub fn get_value<I: Interpreter>(interpreter: I, src: &[u8], id: usize) -> &[u8]
     interpreter.read_exact(&src[pointer..]).0
 }
 
+use lazy_static::lazy_static;
+use libc;
+
+pub fn will_need(src: &[u8], id: usize, dimension: usize) {
+    lazy_static! {
+        static ref PAGE_SIZE: usize = unsafe { libc::sysconf(libc::_SC_PAGESIZE) } as usize;
+    };
+
+    // Calculate node struct size without reading anything, so make some estimates
+    // Will only load up to the vectors section, it ignores the key/labels because
+    // they are harder to estimate and less useful (only when filtering, similarity is always used)
+    let metadata_len = 16; // Estimate
+    let vector_len = dimension * 4 + 4;
+    let node_size = HEADER_LEN + metadata_len + vector_len;
+
+    // Align node pointer to the start page, as required by madvise
+    let start = src.as_ptr().wrapping_add(get_pointer(src, id));
+    let offset = start.align_offset(*PAGE_SIZE);
+    let (start_page, advise_size) = if offset > 0 {
+        (start.wrapping_add(offset).wrapping_sub(*PAGE_SIZE), node_size + *PAGE_SIZE - offset)
+    } else {
+        (start, node_size)
+    };
+
+    unsafe { libc::madvise(start_page as *mut libc::c_void, advise_size, libc::MADV_WILLNEED) };
+}
+
 pub fn create_key_value<D: IntoBuffer>(recipient: &mut File, slots: Vec<D>) -> io::Result<()> {
     let fixed_size = (HEADER_LEN + (POINTER_LEN * slots.len())) as u64;
     recipient.set_len(fixed_size)?;
