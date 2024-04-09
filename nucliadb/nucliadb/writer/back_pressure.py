@@ -447,7 +447,7 @@ def estimate_try_after(rate: float, pending: int, max_pending: int) -> datetime:
     This function estimates the time to try again based on the rate and the number of pending messages.
     """
     # We estimate the time to try again when the pending messages are half of the max_pending
-    delta_seconds = (pending - max_pending / 2) / rate
+    delta_seconds = abs(pending - (max_pending / 2)) / rate
     return datetime.utcnow() + timedelta(seconds=delta_seconds)
 
 
