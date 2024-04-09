@@ -64,9 +64,14 @@ async def resource_chat_endpoint(
     ),
 ) -> Union[StreamingResponse, HTTPClientError, Response]:
     try:
-        item.resource_filters = [rid]
         return await create_chat_response(
-            kbid, item, x_nucliadb_user, x_ndb_client, x_forwarded_for, x_synchronous
+            kbid,
+            item,
+            x_nucliadb_user,
+            x_ndb_client,
+            x_forwarded_for,
+            x_synchronous,
+            resource=rid,
         )
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)

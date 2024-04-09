@@ -41,6 +41,7 @@ from nucliadb_models.search import (
     ChatRequest,
     FindRequest,
     KnowledgeboxFindResults,
+    MinScore,
     NucliaDBClientType,
     PromptContext,
     PromptContextOrder,
@@ -220,6 +221,7 @@ async def chat(
     user_id: str,
     client_type: NucliaDBClientType,
     origin: str,
+    resource: Optional[str] = None,
 ) -> ChatResult:
     start_time = time()
     nuclia_learning_id: Optional[str] = None
@@ -240,81 +242,110 @@ async def chat(
             generative_model=chat_request.generative_model,
         )
 
-    find_results, query_parser = await get_find_results(
-        kbid=kbid,
-        query=rephrased_query or user_query,
-        chat_request=chat_request,
-        ndb_client=client_type,
-        user=user_id,
-        origin=origin,
-    )
+    # Retrieval is not needed if we are chatting on a specific
+    # resource and the full_resource strategy is enabled
+    needs_retrieval = True
+    if resource is not None:
+        chat_request.resource_filters = [resource]
+        if any(
+            strategy.name == "full_resource" for strategy in chat_request.rag_strategies
+        ):
+            needs_retrieval = False
 
-    status_code = FoundStatusCode()
-    if len(find_results.resources) == 0:
-        answer_stream = format_generated_answer(
-            not_enough_context_generator(), status_code
-        )
-    else:
-        prompt_context_builder = PromptContextBuilder(
+    if needs_retrieval:
+        find_results, query_parser = await get_find_results(
             kbid=kbid,
-            find_results=find_results,
-            user_context=user_context,
-            strategies=chat_request.rag_strategies,
-            image_strategies=chat_request.rag_images_strategies,
-            max_context_size=await query_parser.get_max_context(),
-            visual_llm=await query_parser.get_visual_llm_enabled(),
+            query=rephrased_query or user_query,
+            chat_request=chat_request,
+            ndb_client=client_type,
+            user=user_id,
+            origin=origin,
         )
-        (
-            prompt_context,
-            prompt_context_order,
-            prompt_context_images,
-        ) = await prompt_context_builder.build()
-        user_prompt = None
-        if chat_request.prompt is not None:
-            user_prompt = UserPrompt(prompt=chat_request.prompt)
-
-        chat_model = ChatModel(
-            user_id=user_id,
-            query_context=prompt_context,
-            query_context_order=prompt_context_order,
-            chat_history=chat_history,
-            question=user_query,
-            truncate=True,
-            user_prompt=user_prompt,
-            citations=chat_request.citations,
-            generative_model=chat_request.generative_model,
-            max_tokens=chat_request.max_tokens,
-            query_context_images=prompt_context_images,
-        )
-        predict = get_predict()
-        nuclia_learning_id, predict_generator = await predict.chat_query(
-            kbid, chat_model
-        )
-
-        async def _wrapped_stream():
-            # so we can audit after streamed out answer
-            text_answer = b""
-            async for chunk in format_generated_answer(predict_generator, status_code):
-                text_answer += chunk
-                yield chunk
-
-            await maybe_audit_chat(
-                kbid=kbid,
-                user_id=user_id,
-                client_type=client_type,
-                origin=origin,
-                duration=time() - start_time,
-                user_query=user_query,
-                rephrased_query=rephrased_query,
-                text_answer=text_answer,
-                status_code=status_code.value,
-                chat_history=chat_history,
-                query_context=prompt_context,
-                learning_id=nuclia_learning_id,
+        status_code = FoundStatusCode()
+        if len(find_results.resources) == 0:
+            # If no resources were found on the retrieval, we return
+            # a "Not enough context" answer and skip the llm query
+            answer_stream = format_generated_answer(
+                not_enough_context_generator(), status_code
             )
+            return ChatResult(
+                nuclia_learning_id=nuclia_learning_id,
+                answer_stream=answer_stream,
+                status_code=status_code,
+                find_results=find_results,
+                prompt_context=prompt_context,
+                prompt_context_order=prompt_context_order,
+            )
+    else:
+        find_results = KnowledgeboxFindResults(resources={}, min_score=None)
+        query_parser = QueryParser(
+            kbid=kbid,
+            features=[],
+            query="",
+            filters=chat_request.filters,
+            page_number=0,
+            page_size=0,
+            min_score=MinScore(),
+        )
 
-        answer_stream = _wrapped_stream()
+    prompt_context_builder = PromptContextBuilder(
+        kbid=kbid,
+        find_results=find_results,
+        resource=resource,
+        user_context=user_context,
+        strategies=chat_request.rag_strategies,
+        image_strategies=chat_request.rag_images_strategies,
+        max_context_size=await query_parser.get_max_context(),
+        visual_llm=await query_parser.get_visual_llm_enabled(),
+    )
+    (
+        prompt_context,
+        prompt_context_order,
+        prompt_context_images,
+    ) = await prompt_context_builder.build()
+    user_prompt = None
+    if chat_request.prompt is not None:
+        user_prompt = UserPrompt(prompt=chat_request.prompt)
 
+    chat_model = ChatModel(
+        user_id=user_id,
+        query_context=prompt_context,
+        query_context_order=prompt_context_order,
+        chat_history=chat_history,
+        question=user_query,
+        truncate=True,
+        user_prompt=user_prompt,
+        citations=chat_request.citations,
+        generative_model=chat_request.generative_model,
+        max_tokens=chat_request.max_tokens,
+        query_context_images=prompt_context_images,
+    )
+    predict = get_predict()
+    nuclia_learning_id, predict_generator = await predict.chat_query(kbid, chat_model)
+
+    async def _wrapped_stream():
+        # so we can audit after streamed out answer
+        text_answer = b""
+        async for chunk in format_generated_answer(predict_generator, status_code):
+            text_answer += chunk
+            yield chunk
+
+        await maybe_audit_chat(
+            kbid=kbid,
+            user_id=user_id,
+            client_type=client_type,
+            origin=origin,
+            duration=time() - start_time,
+            user_query=user_query,
+            rephrased_query=rephrased_query,
+            text_answer=text_answer,
+            status_code=status_code.value,
+            chat_history=chat_history,
+            query_context=prompt_context,
+            learning_id=nuclia_learning_id,
+        )
+
+    answer_stream = _wrapped_stream()
     return ChatResult(
         nuclia_learning_id=nuclia_learning_id,
         answer_stream=answer_stream,
