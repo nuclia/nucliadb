@@ -61,5 +61,8 @@ def test_chat_on_resource(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
 
     # Check chatting with the whole resource (no retrieval)
     _ = sdk.chat_on_resource(
-        kbid=docs_dataset, rid=rid, query="Nuclia loves Semantic Search", rag_strategies=[{"name": "full_resource"}]
+        kbid=docs_dataset,
+        rid=rid,
+        query="Nuclia loves Semantic Search",
+        rag_strategies=[{"name": "full_resource"}],
     )
