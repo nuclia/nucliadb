@@ -59,15 +59,15 @@ def is_onprem_nucliadb():
 
 
 @pytest.mark.parametrize(
-    "rate,pending,delta",
+    "rate,pending,max_pending,delta",
     [
-        (2, 10, 5),
-        (10, 10, 1),
+        (2, 10, 10, 2.5),
+        (10, 10, 10, 0.5),
     ],
 )
-def test_estimate_try_after(rate, pending, delta):
+def test_estimate_try_after(rate, pending, max_pending, delta):
     now = datetime.utcnow()
-    try_after = estimate_try_after(rate, pending)
+    try_after = estimate_try_after(rate, pending, max_pending)
     assert int(try_after.timestamp()) == int(now.timestamp() + delta)
 
 
