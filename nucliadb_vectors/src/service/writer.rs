@@ -21,6 +21,8 @@ use crate::data_point::{self, DataPointPin, Elem, LabelDictionary};
 use crate::data_point_provider::garbage_collector;
 use crate::data_point_provider::writer::Writer;
 use crate::data_point_provider::*;
+use nucliadb_core::metrics;
+use nucliadb_core::metrics::request_time;
 use nucliadb_core::metrics::vectors::MergeSource;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::prost::Message;
@@ -154,6 +156,16 @@ impl VectorWriter for VectorWriterService {
         }
 
         self.index.commit()?;
+
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Main index set resource: ends {v} ms");
+
+        let metrics = metrics::get_metrics();
+        let took = time.elapsed().as_secs_f64();
+        let metric = request_time::RequestTimeKey::vectors("set_resource".to_string());
+        metrics.record_request_time(metric, took);
+        debug!("{id:?} - Ending at {took} ms");
+
         Ok(())
     }
 

@@ -24,10 +24,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use common::{resources, NodeFixture, TestNodeReader, TestNodeWriter};
-use nucliadb_core::protos::{
-    op_status, NewShardRequest, NewVectorSetRequest, ReleaseChannel, SearchRequest, SearchResponse, ShardId,
-    UserVector, UserVectors, VectorSetId, VectorSimilarity,
-};
+use nucliadb_core::protos::{op_status, NewShardRequest, ReleaseChannel, SearchRequest, SearchResponse, ShardId};
 use nucliadb_node::replication::health::ReplicationHealthManager;
 use rstest::*;
 use tonic::Request;
@@ -134,7 +131,7 @@ async fn create_test_resources(writer: &mut TestNodeWriter, shard_id: String) ->
         ("pap", resources::people_and_places(&shard_id)),
     ];
     let mut resource_uuids = HashMap::new();
-    for (name, mut resource) in resources.into_iter() {
+    for (name, resource) in resources.into_iter() {
         resource_uuids.insert(name, resource.resource.as_ref().unwrap().uuid.clone());
         let response = writer.set_resource(resource).await.unwrap();
         assert_eq!(response.get_ref().status, op_status::Status::Ok as i32);
