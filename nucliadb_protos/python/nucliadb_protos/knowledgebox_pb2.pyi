@@ -701,18 +701,31 @@ class SemanticModelMetadata(google.protobuf.message.Message):
     SIMILARITY_FUNCTION_FIELD_NUMBER: builtins.int
     VECTOR_DIMENSION_FIELD_NUMBER: builtins.int
     DEFAULT_MIN_SCORE_FIELD_NUMBER: builtins.int
+    MATRYOSHKA_DIMENSIONS_FIELD_NUMBER: builtins.int
+    SELECTED_MATRYOSHKA_DIMENSION_FIELD_NUMBER: builtins.int
     similarity_function: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType
     vector_dimension: builtins.int
     default_min_score: builtins.float
+    @property
+    def matryoshka_dimensions(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
+        """list of possible subdivisions of the matryoshka embeddings (if the model
+        supports it)
+        """
+    selected_matryoshka_dimension: builtins.int
+    """pointer to the used value in `matryoshka_dimensions`. -1 if the
+    embeddings are not matryoshka
+    """
     def __init__(
         self,
         *,
         similarity_function: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType = ...,
         vector_dimension: builtins.int | None = ...,
         default_min_score: builtins.float | None = ...,
+        matryoshka_dimensions: collections.abc.Iterable[builtins.int] | None = ...,
+        selected_matryoshka_dimension: builtins.int = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["_default_min_score", b"_default_min_score", "_vector_dimension", b"_vector_dimension", "default_min_score", b"default_min_score", "vector_dimension", b"vector_dimension"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["_default_min_score", b"_default_min_score", "_vector_dimension", b"_vector_dimension", "default_min_score", b"default_min_score", "similarity_function", b"similarity_function", "vector_dimension", b"vector_dimension"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["_default_min_score", b"_default_min_score", "_vector_dimension", b"_vector_dimension", "default_min_score", b"default_min_score", "matryoshka_dimensions", b"matryoshka_dimensions", "selected_matryoshka_dimension", b"selected_matryoshka_dimension", "similarity_function", b"similarity_function", "vector_dimension", b"vector_dimension"]) -> None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing_extensions.Literal["_default_min_score", b"_default_min_score"]) -> typing_extensions.Literal["default_min_score"] | None: ...
     @typing.overload

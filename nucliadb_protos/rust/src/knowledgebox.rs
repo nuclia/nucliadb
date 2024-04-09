@@ -234,6 +234,14 @@ pub struct SemanticModelMetadata {
     pub vector_dimension: ::core::option::Option<i32>,
     #[prost(float, optional, tag="3")]
     pub default_min_score: ::core::option::Option<f32>,
+    /// list of possible subdivisions of the matryoshka embeddings (if the model
+    /// supports it)
+    #[prost(uint32, repeated, tag="4")]
+    pub matryoshka_dimensions: ::prost::alloc::vec::Vec<u32>,
+    /// pointer to the used value in `matryoshka_dimensions`. -1 if the
+    /// embeddings are not matryoshka
+    #[prost(int32, tag="5")]
+    pub selected_matryoshka_dimension: i32,
 }
 // Do not update this model without confirmation of internal Learning Config API
 

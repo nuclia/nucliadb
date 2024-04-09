@@ -188,6 +188,13 @@ message SemanticModelMetadata {
     utils.VectorSimilarity similarity_function = 1;
     optional int32 vector_dimension = 2;
     optional float default_min_score = 3;
+
+    // list of possible subdivisions of the matryoshka embeddings (if the model
+    // supports it)
+    repeated uint32 matryoshka_dimensions = 4;
+    // pointer to the used value in `matryoshka_dimensions`. -1 if the
+    // embeddings are not matryoshka
+    int32 selected_matryoshka_dimension = 5;
 }
 
 // Do not update this model without confirmation of internal Learning Config API
