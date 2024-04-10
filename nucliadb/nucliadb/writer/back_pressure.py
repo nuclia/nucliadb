@@ -396,9 +396,7 @@ async def check_indexing_behind(
 
     # Get nodes that are involved in the indexing of the request
     if resource_uuid is not None:
-        nodes_to_check = await get_nodes_for_resource_shard(
-            context, kbid, resource_uuid
-        )
+        nodes_to_check = await get_nodes_for_resource_shard(kbid, resource_uuid)
     else:
         nodes_to_check = await get_nodes_for_kb_active_shards(context, kbid)
 
@@ -465,11 +463,9 @@ async def get_nodes_for_kb_active_shards(
 
 
 @alru_cache(maxsize=1024, ttl=60 * 60)
-async def get_nodes_for_resource_shard(
-    context: ApplicationContext, kbid: str, resource_uuid: str
-) -> list[str]:
+async def get_nodes_for_resource_shard(kbid: str, resource_uuid: str) -> list[str]:
     with back_pressure_observer({"type": "get_resource_shard"}):
-        resource_shard = await get_resource_shard(context, kbid, resource_uuid)
+        resource_shard = await get_resource_shard(kbid, resource_uuid)
     if resource_shard is None:
         # Resource doesn't exist or KB has been deleted
         return []
@@ -492,9 +488,7 @@ async def get_kb_active_shard(
         return await context.shard_manager.get_current_active_shard(txn, kbid)
 
 
-async def get_resource_shard(
-    context: ApplicationContext, kbid: str, resource_uuid: str
-) -> Optional[ShardObject]:
+async def get_resource_shard(kbid: str, resource_uuid: str) -> Optional[ShardObject]:
     async with datamanagers.with_transaction(read_only=True) as txn:
         shard_id = await datamanagers.resources.get_resource_shard_id(
             txn, kbid=kbid, rid=resource_uuid
