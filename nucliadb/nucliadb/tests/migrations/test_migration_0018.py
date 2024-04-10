@@ -53,12 +53,12 @@ async def test_migration_0018_global(maindb_driver: Driver):
                 txn, slug=real_kb_slug, semantic_model=Mock()
             )
             assert not failed
-            assert await datamanagers.kb.exists_kb(txn, kbid=fake_kb_id)
+            assert await datamanagers.kb.exists_kb(txn, kbid=real_kb_id)
 
             await txn.commit()
 
-            # in tikv, we need a second transaction to read values written in
-            # another
+        # tikv needs to open a second transaction to be able to read values from
+        # the first one using `scan_keys`
         async with maindb_driver.transaction(read_only=True) as txn:
             kb_slugs = [
                 kb_slug
