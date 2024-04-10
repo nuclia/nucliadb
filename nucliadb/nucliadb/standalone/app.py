@@ -22,12 +22,12 @@ import os
 
 import nucliadb_admin_assets  # type: ignore
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.cors import CORSMiddleware
-from starlette.requests import ClientDisconnect, Request
+from starlette.requests import ClientDisconnect
 from starlette.responses import HTMLResponse
 from starlette.routing import Mount
 
@@ -40,8 +40,11 @@ from nucliadb.search.api.v1.router import api as api_search_v1
 from nucliadb.standalone.lifecycle import finalize, initialize
 from nucliadb.train.api.v1.router import api as api_train_v1
 from nucliadb.writer.api.v1.router import api as api_writer_v1
-from nucliadb_telemetry import errors
 from nucliadb_telemetry.fastapi import metrics_endpoint
+from nucliadb_telemetry.fastapi.utils import (
+    client_disconnect_handler,
+    global_exception_handler,
+)
 from nucliadb_utils.fastapi.openapi import extend_openapi
 from nucliadb_utils.fastapi.versioning import VersionedFastAPI
 from nucliadb_utils.settings import http_settings, running_settings
@@ -159,18 +162,3 @@ def application_factory(settings: Settings) -> FastAPI:
     set_app_context(application)
 
     return application
-
-
-async def global_exception_handler(request: Request, exc: Exception):
-    errors.capture_exception(exc)
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Something went wrong, please contact your administrator"},
-    )
-
-
-async def client_disconnect_handler(request: Request, exc: ClientDisconnect):
-    return JSONResponse(
-        status_code=200,
-        content={"detail": "Client disconnected while an operation was in course"},
-    )
