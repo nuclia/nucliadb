@@ -60,7 +60,6 @@ $(format_subpackages_targets):
 
 .PHONY: lint
 lint:
-	flake8 nucliadb --config=setup.cfg
 	ruff check nucliadb --config=../ruff.toml
 	cd .. && isort -c --profile black nucliadb
 	black --check .
@@ -97,7 +96,6 @@ format-%:
 	black nucliadb/$*
 
 lint-%:
-	flake8 nucliadb/$* --config=setup.cfg
 	ruff check nucliadb/$* --config=../ruff.toml
 	cd .. && isort -c --profile black nucliadb/nucliadb/$*
 	black --check nucliadb/$*
