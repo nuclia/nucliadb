@@ -24,7 +24,6 @@ import uuid
 from typing import Any, Awaitable, Callable, Optional
 
 import backoff
-from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata  # type: ignore
 from nucliadb_protos.nodewriter_pb2 import IndexMessage, IndexMessageSource, TypeMessage
 
 from nucliadb.common import datamanagers
@@ -43,7 +42,6 @@ from nucliadb_protos import (
     nodereader_pb2,
     noderesources_pb2,
     nodewriter_pb2,
-    utils_pb2,
     writer_pb2,
 )
 from nucliadb_telemetry import errors
@@ -183,8 +181,6 @@ class KBShardManager:
         self,
         txn: Transaction,
         kbid: str,
-        semantic_model: SemanticModelMetadata,
-        release_channel: utils_pb2.ReleaseChannel.ValueType,
     ) -> writer_pb2.ShardObject:
         try:
             check_enough_nodes()
@@ -365,7 +361,6 @@ class KBShardManager:
         self,
         kbid: str,
         num_paragraphs: int,
-        release_channel: utils_pb2.ReleaseChannel.ValueType = utils_pb2.ReleaseChannel.STABLE,
     ):
         if not self.should_create_new_shard(num_paragraphs):
             return
@@ -373,13 +368,7 @@ class KBShardManager:
         logger.warning({"message": "Adding shard", "kbid": kbid})
 
         async with datamanagers.with_transaction() as txn:
-            model = await datamanagers.kb.get_model_metadata(txn, kbid=kbid)
-            await self.create_shard_by_kbid(
-                txn,
-                kbid,
-                semantic_model=model,
-                release_channel=release_channel,
-            )
+            await self.create_shard_by_kbid(txn, kbid)
             await txn.commit()
 
 
@@ -411,7 +400,6 @@ class StandaloneKBShardManager(KBShardManager):
             await self.maybe_create_new_shard(
                 kbid,
                 shard_info.paragraphs,
-                shard_info.metadata.release_channel,
             )
             await index_node.writer.GC(noderesources_pb2.ShardId(id=shard_id))  # type: ignore
 

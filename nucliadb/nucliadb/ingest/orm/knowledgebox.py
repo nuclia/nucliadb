@@ -182,12 +182,7 @@ class KnowledgeBox:
 
             shard_manager = get_shard_manager()
             try:
-                await shard_manager.create_shard_by_kbid(
-                    txn,
-                    uuid,
-                    semantic_model=semantic_model,
-                    release_channel=release_channel,
-                )
+                await shard_manager.create_shard_by_kbid(txn, uuid)
             except Exception as e:
                 await storage.delete_kb(uuid)
                 raise e

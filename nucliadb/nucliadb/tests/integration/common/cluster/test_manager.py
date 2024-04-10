@@ -205,9 +205,8 @@ def node_new_shard():
         yield mocked
 
 
-@pytest.mark.parametrize("release_channel", ("EXPERIMENTAL", "STABLE"))
 async def test_create_shard_by_kbid_attempts_on_all_nodes(
-    shards, maindb_driver, fake_kbid, node_new_shard, release_channel
+    shards, maindb_driver, fake_kbid, node_new_shard
 ):
     shard_manager = manager.KBShardManager()
     async with maindb_driver.transaction() as txn:
@@ -215,8 +214,6 @@ async def test_create_shard_by_kbid_attempts_on_all_nodes(
             await shard_manager.create_shard_by_kbid(
                 txn,
                 fake_kbid,
-                semantic_model=mock.MagicMock(),
-                release_channel=release_channel,
             )
 
     assert node_new_shard.await_count == len(manager.get_index_nodes())

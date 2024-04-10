@@ -188,7 +188,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         """
         kbid = request.forceuuid or str(uuid.uuid4())
         release_channel = get_release_channel(request)
-        request.config.release_channel = release_channel
         lconfig = await learning_proxy.get_configuration(kbid)
         lconfig_created = False
         if lconfig is None:
@@ -235,7 +234,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         """
         kbid = request.forceuuid or str(uuid.uuid4())
         release_channel = get_release_channel(request)
-        request.config.release_channel = release_channel
         await self.proc.create_kb(
             request.slug,
             request.config,
@@ -777,11 +775,8 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                     )
                     if shard is None:
                         # no shard currently exists, create one
-                        model = await datamanagers.kb.get_model_metadata(
-                            txn, kbid=request.kbid
-                        )
                         shard = await self.shards_manager.create_shard_by_kbid(
-                            txn, request.kbid, semantic_model=model
+                            txn, request.kbid
                         )
 
                     await datamanagers.resources.set_resource_shard_id(
