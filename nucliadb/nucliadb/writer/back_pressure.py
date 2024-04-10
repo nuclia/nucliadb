@@ -116,6 +116,16 @@ def cached_back_pressure(kbid: str, resource_uuid: Optional[str] = None):
         rate_limited_requests_counter.inc(
             {"type": back_pressure_type, "cached": "true"}
         )
+        logger.warning(
+            "Back pressure applied",
+            extra={
+                "type": back_pressure_type,
+                "try_after": try_after,
+                "cached": True,
+                "kbid": kbid,
+                "resource_uuid": resource_uuid,
+            },
+        )
         raise HTTPException(
             status_code=429,
             detail={
@@ -133,6 +143,16 @@ def cached_back_pressure(kbid: str, resource_uuid: Optional[str] = None):
             {"type": back_pressure_type, "cached": "false"}
         )
         _cache.set(cache_key, exc.data)
+        logger.warning(
+            "Back pressure applied",
+            extra={
+                "type": back_pressure_type,
+                "try_after": try_after,
+                "cached": False,
+                "kbid": kbid,
+                "resource_uuid": resource_uuid,
+            },
+        )
         raise HTTPException(
             status_code=429,
             detail={
@@ -371,6 +391,14 @@ async def check_processing_behind(materializer: Materializer, kbid: str):
             rate=settings.processing_rate, pending=kb_pending, max_pending=max_pending
         )
         data = BackPressureData(type="processing", try_after=try_after)
+        logger.warning(
+            "Processing back pressure applied",
+            extra={
+                "kbid": kbid,
+                "try_after": try_after,
+                "pending": kb_pending,
+            },
+        )
         raise BackPressureException(data)
 
 
@@ -425,6 +453,15 @@ async def check_indexing_behind(
             max_pending=max_pending,
         )
         data = BackPressureData(type="indexing", try_after=try_after)
+        logger.warning(
+            "Indexing back pressure applied",
+            extra={
+                "kbid": kbid,
+                "resource_uuid": resource_uuid,
+                "try_after": try_after,
+                "pending": highest_pending,
+            },
+        )
         raise BackPressureException(data)
 
 
@@ -439,6 +476,10 @@ def check_ingest_behind(ingest_pending: int):
             rate=settings.ingest_rate, pending=ingest_pending, max_pending=max_pending
         )
         data = BackPressureData(type="ingest", try_after=try_after)
+        logger.warning(
+            "Ingest back pressure applied",
+            extra={"try_after": try_after, "pending": ingest_pending},
+        )
         raise BackPressureException(data)
 
 
