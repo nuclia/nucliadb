@@ -197,18 +197,12 @@ class KBShardManager:
 
         kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
         if kb_shards is None:
-            # First logic shard on the index
-            kb_shards = writer_pb2.Shards()
-            kb_shards.kbid = kbid
-            # B/c with Shards.actual
-            kb_shards.actual = -1
-            kb_shards.similarity = semantic_model.similarity_function
-            kb_shards.model.CopyFrom(semantic_model)
-        else:
-            # New logic shard on an existing index
-            pass
+            msg = (
+                "Attempting to create a shard for a KB when it has no stored shards in maindb",
+            )
+            logger.error(msg, extra={"kbid": kbid})
+            raise ShardsNotFound(msg)
 
-        kb_shards.release_channel = release_channel
         existing_kb_nodes = [
             replica.node for shard in kb_shards.shards for replica in shard.replicas
         ]
@@ -259,8 +253,8 @@ class KBShardManager:
 
         # Append the created shard and make `actual` point to it.
         kb_shards.shards.append(shard)
-        # B/c with Shards.actual
-        kb_shards.actual += 1
+        # B/c with Shards.actual - we only use last created shard
+        kb_shards.actual = len(kb_shards.shards) - 1
 
         await datamanagers.cluster.update_kb_shards(txn, kbid=kbid, shards=kb_shards)
 

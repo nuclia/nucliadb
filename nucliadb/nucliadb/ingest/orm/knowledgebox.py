@@ -167,6 +167,19 @@ class KnowledgeBox:
             failed = True
 
         if failed is False:
+            kb_shards = writer_pb2.Shards()
+            kb_shards.kbid = uuid
+            # B/c with Shards.actual
+            kb_shards.actual = -1
+            # B/c with `Shards.similarity`, replaced by `model`
+            kb_shards.similarity = semantic_model.similarity_function
+            kb_shards.model.CopyFrom(semantic_model)
+            kb_shards.release_channel = release_channel
+
+            await datamanagers.cluster.update_kb_shards(
+                txn, kbid=uuid, shards=kb_shards
+            )
+
             shard_manager = get_shard_manager()
             try:
                 await shard_manager.create_shard_by_kbid(
