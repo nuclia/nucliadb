@@ -377,7 +377,9 @@ async def check_processing_behind(materializer: Materializer, kbid: str):
     kb_pending = await materializer.get_processing_pending(kbid)
     if kb_pending > max_pending:
         try_after = estimate_try_after(
-            rate=settings.processing_rate, pending=kb_pending, max_pending=max_pending
+            rate=settings.processing_rate,
+            pending=kb_pending,
+            max_delta=settings.max_try_after_delta,
         )
         data = BackPressureData(type="processing", try_after=try_after)
         logger.warning(
@@ -439,7 +441,7 @@ async def check_indexing_behind(
         try_after = estimate_try_after(
             rate=settings.indexing_rate,
             pending=highest_pending,
-            max_pending=max_pending,
+            max_delta=settings.max_try_after_delta,
         )
         data = BackPressureData(type="indexing", try_after=try_after)
         logger.warning(
@@ -462,7 +464,9 @@ def check_ingest_behind(ingest_pending: int):
 
     if ingest_pending > max_pending:
         try_after = estimate_try_after(
-            rate=settings.ingest_rate, pending=ingest_pending, max_pending=max_pending
+            rate=settings.ingest_rate,
+            pending=ingest_pending,
+            max_delta=settings.max_try_after_delta,
         )
         data = BackPressureData(type="ingest", try_after=try_after)
         logger.warning(
@@ -472,14 +476,12 @@ def check_ingest_behind(ingest_pending: int):
         raise BackPressureException(data)
 
 
-def estimate_try_after(rate: float, pending: int, max_pending: int) -> datetime:
+def estimate_try_after(rate: float, pending: int, max_delta: int) -> datetime:
     """
     This function estimates the time to try again based on the rate and the number of pending messages.
     """
-    # We estimate the time to try again when the pending messages are half of the max_pending
-    try_after_delta = abs(pending - (max_pending / 2)) / rate
-    try_after_delta = min(try_after_delta, settings.max_try_after_delta)
-    return datetime.utcnow() + timedelta(seconds=try_after_delta)
+    delta_seconds = min(pending / rate, max_delta)
+    return datetime.utcnow() + timedelta(seconds=delta_seconds)
 
 
 @alru_cache(maxsize=1024, ttl=60 * 15)
