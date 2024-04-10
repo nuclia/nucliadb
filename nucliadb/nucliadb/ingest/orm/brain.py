@@ -22,7 +22,6 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional, Union
 
-from google.protobuf.internal.containers import MessageMap
 from nucliadb_protos.noderesources_pb2 import IndexParagraph as BrainParagraph
 from nucliadb_protos.noderesources_pb2 import ParagraphMetadata
 from nucliadb_protos.noderesources_pb2 import Position as TextPosition
@@ -41,13 +40,7 @@ from nucliadb_protos.resources_pb2 import (
     UserFieldMetadata,
     UserMetadata,
 )
-from nucliadb_protos.utils_pb2 import (
-    Relation,
-    RelationNode,
-    UserVectorSet,
-    UserVectorsList,
-    VectorObject,
-)
+from nucliadb_protos.utils_pb2 import Relation, RelationNode, VectorObject
 
 from nucliadb.ingest import logger
 from nucliadb.ingest.orm.utils import compute_paragraph_key
@@ -264,24 +257,6 @@ class ResourceBrain:
             self.brain.sentences_to_delete.append(
                 f"{self.rid}/{field_key}/{paragraph.start}-{paragraph.end}"
             )
-
-    def apply_user_vectors(
-        self,
-        field_key: str,
-        user_vectors: UserVectorSet,
-        vectors_to_delete: MessageMap[str, UserVectorsList],
-    ):
-        for vectorset, vectors in user_vectors.vectors.items():
-            for vector_id, user_vector in vectors.vectors.items():
-                self.brain.vectors[vectorset].vectors[
-                    f"{self.rid}/{field_key}/{vector_id}/{user_vector.start}-{user_vector.end}"
-                ].CopyFrom(user_vector)
-
-        for vectorset, vectorslist in vectors_to_delete.items():
-            for vector in vectorslist.vectors:
-                self.brain.vectors_to_delete[vectorset].vectors.append(
-                    f"{self.rid}/{field_key}/{vector}"
-                )
 
     def apply_field_vectors(
         self,
