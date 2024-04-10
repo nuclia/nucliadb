@@ -51,8 +51,9 @@ from nucliadb_models.labels import LabelSet
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.synonyms import KnowledgeBoxSynonyms
 from nucliadb_models.vectors import VectorSet
+from nucliadb_utils import const
 from nucliadb_utils.authentication import requires
-from nucliadb_utils.utilities import get_ingest
+from nucliadb_utils.utilities import get_ingest, has_feature
 
 
 @api.post(
@@ -257,6 +258,11 @@ async def delete_labels(request: Request, kbid: str, labelset: str):
 @requires(NucliaDBRoles.WRITER)
 @version(1)
 async def set_vectorset(request: Request, kbid: str, vectorset: str, item: VectorSet):
+    if not has_feature(const.Features.VECTORSETS_V2, context={"kbid": kbid}):
+        raise HTTPException(
+            status_code=404,
+            detail="Vectorsets API is not yet implemented",
+        )
     await create_vectorset(kbid, vectorset, item.dimension, similarity=item.similarity)
 
 
@@ -270,6 +276,11 @@ async def set_vectorset(request: Request, kbid: str, vectorset: str, item: Vecto
 @requires(NucliaDBRoles.WRITER)
 @version(1)
 async def delete_vectorset(request: Request, kbid: str, vectorset: str):
+    if not has_feature(const.Features.VECTORSETS_V2, context={"kbid": kbid}):
+        raise HTTPException(
+            status_code=404,
+            detail="Vectorsets API is not yet implemented",
+        )
     ingest = get_ingest()
     pbrequest: DelVectorSetRequest = DelVectorSetRequest()
     pbrequest.kb.uuid = kbid
