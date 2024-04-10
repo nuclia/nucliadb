@@ -18,10 +18,14 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 from typing import List, NamedTuple, Optional, Tuple
 
+from fastapi.responses import JSONResponse
 from starlette.applications import Starlette
 from starlette.datastructures import URL
+from starlette.requests import ClientDisconnect, Request
 from starlette.routing import Match, Mount, Route
 from starlette.types import Scope
+
+from nucliadb_telemetry import errors
 
 
 class FoundPathTemplate(NamedTuple):
@@ -60,3 +64,18 @@ def find_route(
             if match == Match.FULL:
                 return route.path, child_scope
     return None, None
+
+
+async def global_exception_handler(request: Request, exc: Exception):
+    errors.capture_exception(exc)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Something went wrong, please contact your administrator"},
+    )
+
+
+async def client_disconnect_handler(request: Request, exc: ClientDisconnect):
+    return JSONResponse(
+        status_code=200,
+        content={"detail": "Client disconnected while an operation was in course"},
+    )

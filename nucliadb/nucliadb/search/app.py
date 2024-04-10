@@ -34,6 +34,10 @@ from nucliadb.search.api.v1.router import api as api_v1
 from nucliadb.search.lifecycle import finalize, initialize
 from nucliadb.search.settings import settings
 from nucliadb_telemetry import errors
+from nucliadb_telemetry.fastapi.utils import (
+    client_disconnect_handler,
+    global_exception_handler,
+)
 from nucliadb_utils import const
 from nucliadb_utils.authentication import NucliaCloudAuthenticationBackend
 from nucliadb_utils.fastapi.openapi import extend_openapi
@@ -72,21 +76,6 @@ errors.setup_error_handling(pkg_resources.get_distribution("nucliadb").version)
 
 on_startup = [initialize]
 on_shutdown = [finalize]
-
-
-async def global_exception_handler(request: Request, exc: Exception):
-    errors.capture_exception(exc)
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Something went wrong, please contact your administrator"},
-    )
-
-
-async def client_disconnect_handler(request: Request, exc: ClientDisconnect):
-    return JSONResponse(
-        status_code=200,
-        content={"detail": "Client disconnected while an operation was in course"},
-    )
 
 
 fastapi_settings = dict(
