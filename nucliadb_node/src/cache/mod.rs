@@ -26,6 +26,8 @@
 //! For faster reads at cost of slower initialization and memory consumption,
 //! all shards can be loaded at initialization time.
 
+mod entity_reader_cache;
+mod entity_writer_cache;
 mod reader_cache;
 mod resource_cache;
 mod writer_cache;
