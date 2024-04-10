@@ -1,0 +1,22 @@
+target-version = "py38"
+line-length = 120
+
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+]
+
+ignore = [
+  "E203",
+  "E252",
+  "E701",
+  "F541",
+  "F901",
+]
+
+exclude = [
+    "*.pyi",
+    "nucliadb_protos/python/*",
+]
