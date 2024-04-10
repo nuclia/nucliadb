@@ -117,11 +117,10 @@ def cached_back_pressure(kbid: str, resource_uuid: Optional[str] = None):
             {"type": back_pressure_type, "cached": "true"}
         )
         logger.warning(
-            "Back pressure applied",
+            "Back pressure applied from cache",
             extra={
                 "type": back_pressure_type,
                 "try_after": try_after,
-                "cached": True,
                 "kbid": kbid,
                 "resource_uuid": resource_uuid,
             },
@@ -143,16 +142,6 @@ def cached_back_pressure(kbid: str, resource_uuid: Optional[str] = None):
             {"type": back_pressure_type, "cached": "false"}
         )
         _cache.set(cache_key, exc.data)
-        logger.warning(
-            "Back pressure applied",
-            extra={
-                "type": back_pressure_type,
-                "try_after": try_after,
-                "cached": False,
-                "kbid": kbid,
-                "resource_uuid": resource_uuid,
-            },
-        )
         raise HTTPException(
             status_code=429,
             detail={
