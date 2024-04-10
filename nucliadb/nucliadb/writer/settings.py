@@ -66,6 +66,10 @@ class BackPressureSettings(BaseSettings):
         default=30,
         description="Interval in seconds to check the ingest pending messages",
     )
+    max_try_after_delta: int = Field(
+        default=60,
+        description="Max time in seconds to wait before trying again after back pressure",
+    )
 
 
 settings = Settings()

@@ -49,7 +49,7 @@ __all__ = ["maybe_back_pressure"]
 back_pressure_observer = metrics.Observer("nucliadb_back_pressure", labels={"type": ""})
 
 
-rate_limited_requests_counter = metrics.Counter(
+RATE_LIMITED_REQUESTS_COUNTER = metrics.Counter(
     "nucliadb_rate_limited_requests", labels={"type": "", "cached": ""}
 )
 
@@ -113,7 +113,7 @@ def cached_back_pressure(kbid: str, resource_uuid: Optional[str] = None):
     if data is not None:
         try_after = data.try_after
         back_pressure_type = data.type
-        rate_limited_requests_counter.inc(
+        RATE_LIMITED_REQUESTS_COUNTER.inc(
             {"type": back_pressure_type, "cached": "true"}
         )
         logger.warning(
@@ -138,7 +138,7 @@ def cached_back_pressure(kbid: str, resource_uuid: Optional[str] = None):
     except BackPressureException as exc:
         try_after = exc.data.try_after
         back_pressure_type = exc.data.type
-        rate_limited_requests_counter.inc(
+        RATE_LIMITED_REQUESTS_COUNTER.inc(
             {"type": back_pressure_type, "cached": "false"}
         )
         _cache.set(cache_key, exc.data)
@@ -477,8 +477,9 @@ def estimate_try_after(rate: float, pending: int, max_pending: int) -> datetime:
     This function estimates the time to try again based on the rate and the number of pending messages.
     """
     # We estimate the time to try again when the pending messages are half of the max_pending
-    delta_seconds = abs(pending - (max_pending / 2)) / rate
-    return datetime.utcnow() + timedelta(seconds=delta_seconds)
+    try_after_delta = abs(pending - (max_pending / 2)) / rate
+    try_after_delta = min(try_after_delta, settings.max_try_after_delta)
+    return datetime.utcnow() + timedelta(seconds=try_after_delta)
 
 
 @alru_cache(maxsize=1024, ttl=60 * 15)
