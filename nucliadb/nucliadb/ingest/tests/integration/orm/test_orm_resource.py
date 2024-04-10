@@ -494,7 +494,8 @@ async def test_generate_index_message_contains_all_metadata(
     # relations
     assert len(index_message.relations) > 0
 
-    # vectors in vectorset
-    assert len(index_message.vectors) == 1
-    vector = index_message.vectors["vectorset1"].vectors.popitem()[1].vector
-    assert len(vector) > 0
+    # TODO: Uncomment when vectorsets is implemented
+    # # vectors in vectorset
+    # assert len(index_message.vectors) == 1
+    # vector = index_message.vectors["vectorset1"].vectors.popitem()[1].vector
+    # assert len(vector) > 0
