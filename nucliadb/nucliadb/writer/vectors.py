@@ -46,6 +46,4 @@ async def create_vectorset(
     elif status.status == OpStatusWriter.Status.NOTFOUND:
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
     elif status.status == OpStatusWriter.Status.ERROR:
-        raise HTTPException(
-            status_code=500, detail="Error on creating vectorset"
-        )
+        raise HTTPException(status_code=500, detail="Error on creating vectorset")
