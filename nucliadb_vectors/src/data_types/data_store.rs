@@ -92,6 +92,7 @@ pub fn get_value<I: Interpreter>(interpreter: I, src: &[u8], id: usize) -> &[u8]
 use lazy_static::lazy_static;
 use libc;
 
+#[cfg(not(target_os = "windows"))]
 pub fn will_need(src: &[u8], id: usize, dimension: usize) {
     lazy_static! {
         static ref PAGE_SIZE: usize = unsafe { libc::sysconf(libc::_SC_PAGESIZE) } as usize;
@@ -115,6 +116,9 @@ pub fn will_need(src: &[u8], id: usize, dimension: usize) {
 
     unsafe { libc::madvise(start_page as *mut libc::c_void, advise_size, libc::MADV_WILLNEED) };
 }
+
+#[cfg(target_os = "windows")]
+pub fn will_need(src: &[u8], id: usize, dimension: usize) {}
 
 pub fn create_key_value<D: IntoBuffer>(recipient: &mut File, slots: Vec<D>) -> io::Result<()> {
     let fixed_size = (HEADER_LEN + (POINTER_LEN * slots.len())) as u64;
