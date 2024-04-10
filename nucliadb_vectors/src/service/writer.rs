@@ -113,20 +113,24 @@ impl VectorWriter for VectorWriterService {
         let mut lengths: HashMap<usize, Vec<_>> = HashMap::new();
         let mut elems = Vec::new();
         if resource.status != ResourceStatus::Delete as i32 {
-            for (paragraph_field, paragraph) in resource.paragraphs.iter() {
-                for index in paragraph.paragraphs.values() {
-                    let mut inner_labels = index.labels.clone();
-                    inner_labels.push(paragraph_field.clone());
+            for (field_id, field_paragraphs) in resource.paragraphs.iter() {
+                for paragraph in field_paragraphs.paragraphs.values() {
+                    let mut inner_labels = paragraph.labels.clone();
+                    inner_labels.push(field_id.clone());
                     let labels = LabelDictionary::new(inner_labels);
 
-                    for (key, sentence) in index.sentences.iter().clone() {
+                    for (key, sentence) in paragraph.sentences.iter().clone() {
                         let key = key.to_string();
                         let labels = labels.clone();
-                        let vector = sentence.vector.clone();
+                        let vector = if resource.normalized_vectors {
+                            sentence.vector.clone()
+                        } else {
+                            normalize_vector(&sentence.vector)
+                        };
                         let metadata = sentence.metadata.as_ref().map(|m| m.encode_to_vec());
                         let bucket = lengths.entry(vector.len()).or_default();
                         elems.push(Elem::new(key, vector, labels, metadata));
-                        bucket.push(paragraph_field);
+                        bucket.push(field_id);
                     }
                 }
             }
@@ -258,6 +262,11 @@ impl VectorWriterService {
             })
         }
     }
+}
+
+fn normalize_vector(vector: &[f32]) -> Vec<f32> {
+    // TODO: implement
+    vector.to_vec()
 }
 
 #[cfg(test)]
