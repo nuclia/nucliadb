@@ -153,6 +153,7 @@ async def create_chat_response(
     client_type: NucliaDBClientType,
     origin: str,
     x_synchronous: bool,
+    resource: Optional[str] = None,
 ) -> Response:
     chat_result = await chat(
         kbid,
@@ -160,6 +161,7 @@ async def create_chat_response(
         user_id,
         client_type,
         origin,
+        resource=resource,
     )
     if x_synchronous:
         streamed_answer = b""

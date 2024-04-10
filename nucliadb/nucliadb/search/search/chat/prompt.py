@@ -154,7 +154,7 @@ async def get_expanded_conversation_messages(
 async def default_prompt_context(
     context: CappedPromptContext,
     kbid: str,
-    results: KnowledgeboxFindResults,
+    ordered_paragraphs: list[FindParagraph],
 ) -> None:
     """
     - Updates context (which is an ordered dict of text_block_id -> context_text).
@@ -166,11 +166,10 @@ async def default_prompt_context(
     - Using an dict prevents from duplicates pulled in through conversation expansion.
     """
     # Sort retrieved paragraphs by decreasing order (most relevant first)
-    ordered_paras = get_ordered_paragraphs(results)
     txn = await get_read_only_transaction()
     storage = await get_storage()
     kb = KnowledgeBoxORM(txn, storage, kbid)
-    for paragraph in ordered_paras:
+    for paragraph in ordered_paragraphs:
         context[paragraph.id] = _clean_paragraph_text(paragraph)
 
         # If the paragraph is a conversation and it matches semantically, we assume we
@@ -249,22 +248,32 @@ async def get_resource_extracted_texts(
 async def full_resource_prompt_context(
     context: CappedPromptContext,
     kbid: str,
-    results: KnowledgeboxFindResults,
+    ordered_paragraphs: list[FindParagraph],
+    resource: Optional[str],
     number_of_full_resources: Optional[int] = None,
 ) -> None:
     """
     Algorithm steps:
         - Collect the list of resources in the results (in order of relevance).
         - For each resource, collect the extracted text from all its fields and craft the context.
-    """
 
-    # Collect the list of resources in the results (in order of relevance).
-    ordered_paras = get_ordered_paragraphs(results)
-    ordered_resources = []
-    for paragraph in ordered_paras:
-        resource_uuid = paragraph.id.split("/")[0]
-        if resource_uuid not in ordered_resources:
-            ordered_resources.append(resource_uuid)
+    Arguments:
+        context: The context to be updated.
+        kbid: The knowledge box id.
+        results: The results of the retrieval (find) operation.
+        resource: The resource to be included in the context. This is used only when chatting with a specific resource with no retrieval.  # noqa: E501
+        number_of_full_resources: The number of full resources to include in the context.
+    """
+    if resource is not None:
+        # The user has specified a resource to be included in the context.
+        ordered_resources = [resource]
+    else:
+        # Collect the list of resources in the results (in order of relevance).
+        ordered_resources = []
+        for paragraph in ordered_paragraphs:
+            resource_uuid = paragraph.id.split("/")[0]
+            if resource_uuid not in ordered_resources:
+                ordered_resources.append(resource_uuid)
 
     # For each resource, collect the extracted text from all its fields.
     resource_extracted_texts = await run_concurrently(
@@ -286,7 +295,7 @@ async def full_resource_prompt_context(
 async def composed_prompt_context(
     context: CappedPromptContext,
     kbid: str,
-    results: KnowledgeboxFindResults,
+    ordered_paragraphs: list[FindParagraph],
     extend_with_fields: list[str],
 ) -> None:
     """
@@ -296,10 +305,8 @@ async def composed_prompt_context(
         - Add the extracted text of each field to the beginning of the context.
         - Add the extracted text of each paragraph to the end of the context.
     """
-    # Collect the list of resources in the results (in order of relevance).
-    ordered_paras = get_ordered_paragraphs(results)
     ordered_resources = []
-    for paragraph in ordered_paras:
+    for paragraph in ordered_paragraphs:
         resource_uuid = paragraph.id.split("/")[0]
         if resource_uuid not in ordered_resources:
             ordered_resources.append(resource_uuid)
@@ -323,7 +330,7 @@ async def composed_prompt_context(
         context[field.resource_unique_id] = extracted_text
 
     # Add the extracted text of each paragraph to the end of the context.
-    for paragraph in ordered_paras:
+    for paragraph in ordered_paragraphs:
         context[paragraph.id] = _clean_paragraph_text(paragraph)
 
 
@@ -336,6 +343,7 @@ class PromptContextBuilder:
         self,
         kbid: str,
         find_results: KnowledgeboxFindResults,
+        resource: Optional[str] = None,
         user_context: Optional[list[str]] = None,
         strategies: Optional[Sequence[RagStrategy]] = None,
         image_strategies: Optional[Sequence[ImageRagStrategy]] = None,
@@ -343,7 +351,8 @@ class PromptContextBuilder:
         visual_llm: bool = False,
     ):
         self.kbid = kbid
-        self.find_results = find_results
+        self.ordered_paragraphs = get_ordered_paragraphs(find_results)
+        self.resource = resource
         self.user_context = user_context
         self.strategies = strategies
         self.image_strategies = image_strategies
@@ -374,7 +383,6 @@ class PromptContextBuilder:
         return context, context_order, context_images
 
     async def _build_context_images(self, context: CappedPromptContext) -> None:
-        ordered_paras = get_ordered_paragraphs(self.find_results)
         flatten_strategies = []
         page_count = 5
         gather_pages = False
@@ -389,7 +397,7 @@ class PromptContextBuilder:
                 if strategy.name == ImageRagStrategyName.TABLES:
                     gather_tables = True
 
-        for paragraph in ordered_paras:
+        for paragraph in self.ordered_paragraphs:
             if paragraph.page_with_visual and paragraph.position:
                 if (
                     gather_pages
@@ -416,7 +424,7 @@ class PromptContextBuilder:
 
     async def _build_context(self, context: CappedPromptContext) -> None:
         if self.strategies is None or len(self.strategies) == 0:
-            await default_prompt_context(context, self.kbid, self.find_results)
+            await default_prompt_context(context, self.kbid, self.ordered_paragraphs)
             return
 
         number_of_full_resources = 0
@@ -426,25 +434,32 @@ class PromptContextBuilder:
             if strategy.name == RagStrategyName.FIELD_EXTENSION:
                 extend_with_fields.extend(strategy.fields)  # type: ignore
             elif strategy.name == RagStrategyName.FULL_RESOURCE:
-                number_of_full_resources = strategy.count or self.find_results.total  # type: ignore
+                if self.resource:
+                    number_of_full_resources = 1
+                else:
+                    number_of_full_resources = strategy.count or len(self.ordered_paragraphs)  # type: ignore
             elif strategy.name == RagStrategyName.HIERARCHY:
                 distance = strategy.count  # type: ignore
 
         if number_of_full_resources:
             await full_resource_prompt_context(
-                context, self.kbid, self.find_results, number_of_full_resources
+                context,
+                self.kbid,
+                self.ordered_paragraphs,
+                self.resource,
+                number_of_full_resources,
             )
             return
 
         if distance > 0:
-            await get_extra_chars(self.kbid, self.find_results, distance)
-            await default_prompt_context(context, self.kbid, self.find_results)
+            await get_extra_chars(self.kbid, self.ordered_paragraphs, distance)
+            await default_prompt_context(context, self.kbid, self.ordered_paragraphs)
             return
 
         await composed_prompt_context(
             context,
             self.kbid,
-            self.find_results,
+            self.ordered_paragraphs,
             extend_with_fields=extend_with_fields,
         )
         return
@@ -458,11 +473,11 @@ class ExtraCharsParagraph:
 
 
 async def get_extra_chars(
-    kbid: str, find_results: KnowledgeboxFindResults, distance: int
+    kbid: str, ordered_paragraphs: list[FindParagraph], distance: int
 ):
     etcache = paragraphs.ExtractedTextCache()
     resources: Dict[str, ExtraCharsParagraph] = {}
-    for paragraph in get_ordered_paragraphs(find_results):
+    for paragraph in ordered_paragraphs:
         rid, field_type, field = paragraph.id.split("/")[:3]
         field_path = "/".join([rid, field_type, field])
         position = paragraph.id.split("/")[-1]
@@ -503,7 +518,7 @@ async def get_extra_chars(
         else:
             resources[rid].paragraphs.append((paragraph, new_text))  # type: ignore
 
-    for key, values in resources.items():
+    for values in resources.values():
         title_text = values.title
         summary_text = values.summary
         first_paragraph = None
