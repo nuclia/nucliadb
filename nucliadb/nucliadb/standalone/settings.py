@@ -90,11 +90,10 @@ class Settings(DriverSettings, StorageSettings):
         description="Default role to assign to user that is authenticated \
                     upstream. Not used with `upstream_naive` auth policy.",
     )
-    auth_policy_role_mapping: Optional[
-        dict[str, dict[str, list[NucliaDBRoles]]]
-    ] = pydantic.Field(
-        default=None,
-        description="""
+    auth_policy_role_mapping: Optional[dict[str, dict[str, list[NucliaDBRoles]]]] = (
+        pydantic.Field(
+            default=None,
+            description="""
 Role mapping for `upstream_auth_header`, `upstream_oauth2` and `upstream_basicauth` auth policies.
 Allows mapping different properties from the auth request to a role.
 Available roles are: `READER`, `WRITER`, `MANAGER`.
@@ -104,6 +103,7 @@ Examples:
 - `{"group": {"managers": "MANAGER"}}` will map the users that have a `group` claim of
   `managers` on the jwt provided by upstream to the role `MANAGER` on `upstream_oauth2` policies.
 """,
+        )
     )
 
     jwk_key: Optional[str] = pydantic.Field(

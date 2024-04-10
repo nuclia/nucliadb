@@ -106,9 +106,9 @@ class IndexAuditHandler:
     @metrics.handler_histo.wrap({"type": "audit_counter"})
     async def process_kb(self, kbid: str) -> None:
         try:
-            shard_groups: list[
-                writer_pb2.ShardObject
-            ] = await self.shard_manager.get_shards_by_kbid(kbid)
+            shard_groups: list[writer_pb2.ShardObject] = (
+                await self.shard_manager.get_shards_by_kbid(kbid)
+            )
         except ShardsNotFound:
             logger.warning(f"No shards found for kbid {kbid}, skipping")
             return

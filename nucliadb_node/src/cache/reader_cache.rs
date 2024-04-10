@@ -37,8 +37,12 @@ pub struct ShardReaderCache {
 
 impl ShardReaderCache {
     pub fn new(settings: Settings) -> Self {
+        let resource_cache = match settings.max_open_shards {
+            Some(capacity) => ResourceCache::new_with_capacity(capacity),
+            None => ResourceCache::new_unbounded(),
+        };
         Self {
-            cache: Mutex::new(ResourceCache::new_unbounded()),
+            cache: Mutex::new(resource_cache),
             shards_path: settings.shards_path(),
         }
     }

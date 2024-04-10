@@ -26,7 +26,7 @@ from nucliadb_node.listeners import IndexedPublisher
 from nucliadb_node.signals import SuccessfulIndexingPayload, successful_indexing
 
 
-class TestShardGcScheduler:
+class TestIndexedPublisher:
     @pytest.fixture
     @pytest.mark.asyncio
     async def indexed_publisher(self):

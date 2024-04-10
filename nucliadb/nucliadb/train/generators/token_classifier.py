@@ -109,9 +109,9 @@ async def get_field_text(
     split_text: dict[str, str] = extracted_text.split_text
     split_text[MAIN] = extracted_text.text
 
-    split_ners: dict[
-        str, NERS_DICT
-    ] = {}  # Dict of entity group , with entity and list of positions in field
+    split_ners: dict[str, NERS_DICT] = (
+        {}
+    )  # Dict of entity group , with entity and list of positions in field
     split_ners[MAIN] = {}
 
     basic_data = await orm_resource.get_basic()

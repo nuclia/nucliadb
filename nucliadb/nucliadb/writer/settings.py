@@ -35,7 +35,7 @@ class BackPressureSettings(BaseSettings):
         env=["back_pressure_enabled"],
     )
     indexing_rate: float = Field(
-        default=2,
+        default=4,
         description="Estimation of the indexing rate in messages per second. This is used to calculate the try again in time",  # noqa
     )
     ingest_rate: float = Field(

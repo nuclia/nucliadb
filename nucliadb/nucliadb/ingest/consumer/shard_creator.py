@@ -112,6 +112,5 @@ class ShardCreatorHandler:
             await self.shard_manager.maybe_create_new_shard(
                 kbid,
                 shard.paragraphs,
-                shard.fields,
                 kb_shards.release_channel,
             )

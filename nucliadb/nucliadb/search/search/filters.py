@@ -113,9 +113,9 @@ def is_paragraph_labelset_kind(
     labelset_id: str, classification_labels: knowledgebox_pb2.Labels
 ) -> bool:
     try:
-        labelset: Optional[
-            knowledgebox_pb2.LabelSet
-        ] = classification_labels.labelset.get(labelset_id)
+        labelset: Optional[knowledgebox_pb2.LabelSet] = (
+            classification_labels.labelset.get(labelset_id)
+        )
         if labelset is None:
             return False
         return knowledgebox_pb2.LabelSet.LabelSetKind.PARAGRAPHS in labelset.kind

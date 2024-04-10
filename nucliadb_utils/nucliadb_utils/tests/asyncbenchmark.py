@@ -37,8 +37,7 @@ T = TypeVar("T")
 from pytest_benchmark.stats import Metadata  # type: ignore
 
 
-class FixtureAlreadyUsed(Exception):
-    ...
+class FixtureAlreadyUsed(Exception): ...  # noqa
 
 
 class AsyncBenchmarkFixture(object):  # pragma: no cover

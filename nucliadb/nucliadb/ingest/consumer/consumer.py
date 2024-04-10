@@ -173,9 +173,11 @@ class IngestConsumer:
                 try:
                     with consumer_observer(
                         {
-                            "source": "writer"
-                            if pb.source == pb.MessageSource.WRITER
-                            else "processor"
+                            "source": (
+                                "writer"
+                                if pb.source == pb.MessageSource.WRITER
+                                else "processor"
+                            )
                         }
                     ):
                         await self._process(pb, seqid)

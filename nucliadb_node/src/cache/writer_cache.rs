@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::collections::HashSet;
+use std::num::NonZeroUsize;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread::sleep;
@@ -43,9 +44,13 @@ struct InnerCache {
 }
 
 impl InnerCache {
-    pub fn new() -> InnerCache {
+    pub fn new(capacity: Option<NonZeroUsize>) -> InnerCache {
+        let active_shards = match capacity {
+            Some(capacity) => ResourceCache::new_with_capacity(capacity),
+            None => ResourceCache::new_unbounded(),
+        };
         Self {
-            active_shards: ResourceCache::new_unbounded(),
+            active_shards,
             blocked_shards: HashSet::new(),
         }
     }
@@ -106,7 +111,7 @@ pub struct ShardWriterCache {
 impl ShardWriterCache {
     pub fn new(settings: Settings) -> Self {
         Self {
-            cache: Mutex::new(InnerCache::new()),
+            cache: Mutex::new(InnerCache::new(settings.max_open_shards)),
             shards_path: settings.shards_path(),
             metadata_manager: Arc::new(ShardsMetadataManager::new(settings.shards_path())),
         }

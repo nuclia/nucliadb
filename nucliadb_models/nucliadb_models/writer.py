@@ -113,9 +113,9 @@ class CreateResourcePayload(BaseModel):
     links: Dict[FieldIdString, LinkField] = FieldDefaults.links
     texts: Dict[FieldIdString, TextField] = FieldDefaults.texts
     layouts: Dict[FieldIdString, InputLayoutField] = FieldDefaults.layouts
-    conversations: Dict[
-        FieldIdString, InputConversationField
-    ] = FieldDefaults.conversations
+    conversations: Dict[FieldIdString, InputConversationField] = (
+        FieldDefaults.conversations
+    )
     keywordsets: Dict[FieldIdString, FieldKeywordset] = FieldDefaults.keywordsets
     datetimes: Dict[FieldIdString, FieldDatetime] = FieldDefaults.datetimes
     processing_options: Optional[PushProcessingOptions] = PushProcessingOptions()
@@ -164,9 +164,9 @@ class UpdateResourcePayload(BaseModel):
     links: Dict[FieldIdString, LinkField] = FieldDefaults.links
     texts: Dict[FieldIdString, TextField] = FieldDefaults.texts
     layouts: Dict[FieldIdString, InputLayoutField] = FieldDefaults.layouts
-    conversations: Dict[
-        FieldIdString, InputConversationField
-    ] = FieldDefaults.conversations
+    conversations: Dict[FieldIdString, InputConversationField] = (
+        FieldDefaults.conversations
+    )
     keywordsets: Dict[FieldIdString, FieldKeywordset] = FieldDefaults.keywordsets
     datetimes: Dict[FieldIdString, FieldDatetime] = FieldDefaults.datetimes
     processing_options: Optional[PushProcessingOptions] = PushProcessingOptions()

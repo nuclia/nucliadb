@@ -103,7 +103,7 @@ async def test_handle_message_create_new_shard(
     await shard_creator_handler.handle_message(notif.SerializeToString())
     await asyncio.sleep(0.06)
     shard_manager.maybe_create_new_shard.assert_called_with(
-        "kbid", settings.max_shard_paragraphs + 1, 0, 0
+        "kbid", settings.max_shard_paragraphs + 1, 0
     )
 
 

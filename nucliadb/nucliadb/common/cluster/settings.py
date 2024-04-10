@@ -59,12 +59,6 @@ class Settings(BaseSettings):
         title="Max shard paragraphs",
         description="Maximum number of paragraphs to target per shard",
     )
-    max_shard_fields: int = Field(
-        default=125_000,
-        title="Max shard fields",
-        description="Maximum number of fields to target per shard. "
-        "If this is reached before max_shard_paragraphs, we will create a new shard",
-    )
     max_node_replicas: int = Field(
         default=800,
         title="Max node replicas",

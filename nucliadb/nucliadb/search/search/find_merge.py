@@ -191,14 +191,14 @@ async def fetch_find_metadata(
                             result_paragraph.paragraph.score,
                         )
                     )
-                find_field.paragraphs[
-                    result_paragraph.paragraph.id
-                ].score_type = SCORE_TYPE.BOTH
+                find_field.paragraphs[result_paragraph.paragraph.id].score_type = (
+                    SCORE_TYPE.BOTH
+                )
 
             else:
-                find_field.paragraphs[
-                    result_paragraph.paragraph.id
-                ] = result_paragraph.paragraph
+                find_field.paragraphs[result_paragraph.paragraph.id] = (
+                    result_paragraph.paragraph
+                )
                 orderer.add(
                     (
                         result_paragraph.rid,
