@@ -42,6 +42,7 @@ from nucliadb.models.responses import (
     HTTPNotFound,
 )
 from nucliadb.writer.api.v1.router import KB_PREFIX, api
+from nucliadb.writer.vectors import create_vectorset
 from nucliadb_models.entities import (
     CreateEntitiesGroupPayload,
     UpdateEntitiesGroupPayload,
