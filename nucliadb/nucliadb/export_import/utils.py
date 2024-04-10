@@ -50,7 +50,6 @@ PROCESSING_BM_FIELDS = [
     "field_metadata",
     "field_vectors",
     "field_large_metadata",
-    "user_vectors",
 ]
 
 # Broker message fields that are populated by the nucliadb writer component

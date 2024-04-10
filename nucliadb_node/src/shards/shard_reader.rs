@@ -26,10 +26,10 @@ use nucliadb_core::prelude::*;
 use nucliadb_core::protos;
 use nucliadb_core::protos::shard_created::{DocumentService, ParagraphService, RelationService, VectorService};
 use nucliadb_core::protos::{
-    DocumentSearchRequest, DocumentSearchResponse, EdgeList, GetShardRequest, ParagraphSearchRequest,
-    ParagraphSearchResponse, RelationPrefixSearchRequest, RelationSearchRequest, RelationSearchResponse, SearchRequest,
-    SearchResponse, Shard, ShardFile, ShardFileChunk, ShardFileList, StreamRequest, SuggestFeatures, SuggestRequest,
-    SuggestResponse, VectorSearchRequest, VectorSearchResponse,
+    DocumentSearchRequest, DocumentSearchResponse, EdgeList, ParagraphSearchRequest, ParagraphSearchResponse,
+    RelationPrefixSearchRequest, RelationSearchRequest, RelationSearchResponse, SearchRequest, SearchResponse, Shard,
+    ShardFile, ShardFileChunk, ShardFileList, StreamRequest, SuggestFeatures, SuggestRequest, SuggestResponse,
+    VectorSearchRequest, VectorSearchResponse,
 };
 use nucliadb_core::query_planner;
 use nucliadb_core::relations::*;
@@ -154,7 +154,7 @@ impl ShardReader {
 
     #[measure(actor = "shard", metric = "get_info")]
     #[tracing::instrument(skip_all)]
-    pub fn get_info(&self, request: &GetShardRequest) -> NodeResult<Shard> {
+    pub fn get_info(&self) -> NodeResult<Shard> {
         let span = tracing::Span::current();
 
         let paragraphs = self.paragraph_reader.clone();
@@ -166,7 +166,7 @@ impl ShardReader {
         let info = info_span!(parent: &span, "paragraph count");
         let paragraph_task = || run_with_telemetry(info, move || read_rw_lock(&paragraphs).count());
         let info = info_span!(parent: &span, "vector count");
-        let vector_task = || run_with_telemetry(info, move || read_rw_lock(&vectors).count(&request.vectorset));
+        let vector_task = || run_with_telemetry(info, move || read_rw_lock(&vectors).count());
 
         let mut text_result = Ok(0);
         let mut paragraph_result = Ok(0);
@@ -236,7 +236,6 @@ impl ShardReader {
         let vsc = VectorConfig {
             similarity: None,
             path: shard_path.join(VECTORS_DIR),
-            vectorset: shard_path.join(VECTORSET_DIR),
             channel,
             shard_id: id.clone(),
         };
@@ -589,8 +588,8 @@ impl ShardReader {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn vector_count(&self, vector_set: &str) -> NodeResult<usize> {
-        read_rw_lock(&self.vector_reader).count(vector_set)
+    pub fn vector_count(&self) -> NodeResult<usize> {
+        read_rw_lock(&self.vector_reader).count()
     }
 
     #[tracing::instrument(skip_all)]

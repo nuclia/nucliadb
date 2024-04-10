@@ -55,11 +55,7 @@ from nucliadb_models.metadata import (
 from nucliadb_models.security import ResourceSecurity
 from nucliadb_models.text import FieldText
 from nucliadb_models.utils import SlugString
-from nucliadb_models.vectors import (
-    SemanticModelMetadata,
-    UserVectorSet,
-    VectorSimilarity,
-)
+from nucliadb_models.vectors import SemanticModelMetadata, VectorSimilarity
 
 _T = TypeVar("_T")
 
@@ -84,7 +80,6 @@ class ExtractedDataTypeName(str, Enum):
     VECTOR = "vectors"
     LINK = "link"
     FILE = "file"
-    USERVECTORS = "uservectors"
     QA = "question_answers"
 
 
@@ -186,7 +181,6 @@ class ExtractedData(BaseModel):
     metadata: Optional[FieldComputedMetadata] = None
     large_metadata: Optional[LargeComputedMetadata] = None
     vectors: Optional[VectorObject] = None
-    uservectors: Optional[UserVectorSet] = None
     question_answers: Optional[QuestionAnswers] = None
 
 

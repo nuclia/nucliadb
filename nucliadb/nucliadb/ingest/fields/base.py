@@ -33,14 +33,8 @@ from nucliadb_protos.resources_pb2 import (
     LargeComputedMetadata,
     LargeComputedMetadataWrapper,
     QuestionAnswers,
-    UserVectorsWrapper,
 )
-from nucliadb_protos.utils_pb2 import (
-    ExtractedText,
-    UserVectorSet,
-    UserVectorsList,
-    VectorObject,
-)
+from nucliadb_protos.utils_pb2 import ExtractedText, VectorObject
 from nucliadb_protos.writer_pb2 import Error
 
 from nucliadb.ingest.fields.exceptions import InvalidFieldClass, InvalidPBClass
@@ -55,7 +49,6 @@ SUBFIELDFIELDS = ["l", "c"]
 class FieldTypes(str, enum.Enum):
     FIELD_TEXT = "extracted_text"
     FIELD_VECTORS = "extracted_vectors"
-    USER_FIELD_VECTORS = "user_vectors"
     FIELD_METADATA = "metadata"
     FIELD_LARGE_METADATA = "large_metadata"
     THUMBNAIL = "thumbnail"
@@ -70,7 +63,6 @@ class Field:
     extracted_vectors: Optional[VectorObject]
     computed_metadata: Optional[FieldComputedMetadata]
     large_computed_metadata: Optional[LargeComputedMetadata]
-    extracted_user_vectors: Optional[UserVectorSet]
     question_answers: Optional[QuestionAnswers]
 
     def __init__(
@@ -88,7 +80,6 @@ class Field:
         self.extracted_vectors = None
         self.computed_metadata = None
         self.large_computed_metadata = None
-        self.extracted_user_vectors = None
         self.question_answers = None
 
         self.id: str = id
@@ -342,50 +333,6 @@ class Field:
             if payload is not None:
                 self.extracted_vectors = payload
         return self.extracted_vectors
-
-    async def set_user_vectors(
-        self, user_vectors: UserVectorsWrapper
-    ) -> tuple[UserVectorSet, dict[str, UserVectorsList]]:
-        try:
-            actual_payload: Optional[UserVectorSet] = await self.get_user_vectors(
-                force=True
-            )
-        except KeyError:
-            actual_payload = None
-
-        sf = self.get_storage_field(FieldTypes.USER_FIELD_VECTORS)
-
-        vectors_to_delete: dict[str, UserVectorsList] = {}
-        if actual_payload is not None:
-            for vectorset, user_vector in user_vectors.vectors.vectors.items():
-                for key, vector in user_vector.vectors.items():
-                    if key in actual_payload.vectors[vectorset].vectors.keys():
-                        if vectorset not in vectors_to_delete:
-                            vectors_to_delete[vectorset] = UserVectorsList()
-                        vectors_to_delete[vectorset].vectors.append(key)
-                    actual_payload.vectors[vectorset].vectors[key].CopyFrom(vector)
-            for vectorset, delete_vectors in user_vectors.vectors_to_delete.items():
-                for vector_to_delete in delete_vectors.vectors:
-                    if (
-                        actual_payload.vectors.get(vectorset).vectors.get(
-                            vector_to_delete
-                        )
-                        is not None
-                    ):
-                        del actual_payload.vectors[vectorset].vectors[vector_to_delete]
-        else:
-            actual_payload = user_vectors.vectors
-        await self.storage.upload_pb(sf, actual_payload)
-        self.extracted_user_vectors = actual_payload
-        return actual_payload, vectors_to_delete
-
-    async def get_user_vectors(self, force=False) -> Optional[UserVectorSet]:
-        if self.extracted_user_vectors is None or force:
-            sf = self.get_storage_field(FieldTypes.USER_FIELD_VECTORS)
-            payload = await self.storage.download_pb(sf, UserVectorSet)
-            if payload is not None:
-                self.extracted_user_vectors = payload
-        return self.extracted_user_vectors
 
     async def get_vectors_cf(self) -> Optional[CloudFile]:
         sf = self.get_storage_field(FieldTypes.FIELD_VECTORS)

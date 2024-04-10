@@ -59,10 +59,11 @@ def test_kb_services(sdk: nucliadb_sdk.NucliaDB, kb):
     sdk.get_entitygroup(kbid=kb.uuid, group="foo")
     sdk.delete_entitygroup(kbid=kb.uuid, group="foo")
 
-    # Vectorsets
-    sdk.create_vectorset(kbid=kb.uuid, vectorset="foo", dimension=10)
-    sdk.list_vectorsets(kbid=kb.uuid)
-    sdk.delete_vectorset(kbid=kb.uuid, vectorset="foo")
+    # TODO: Uncomment when new vectorset endpoints are available
+    # # Vectorsets
+    # sdk.create_vectorset(kbid=kb.uuid, vectorset="foo", dimension=10)
+    # sdk.list_vectorsets(kbid=kb.uuid)
+    # sdk.delete_vectorset(kbid=kb.uuid, vectorset="foo")
 
 
 def test_resource_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):

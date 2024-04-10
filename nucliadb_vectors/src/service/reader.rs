@@ -20,7 +20,6 @@
 use crate::data_point_provider::reader::Reader;
 use crate::data_point_provider::*;
 use crate::formula::{AtomClause, BooleanOperator, Clause, CompoundClause, Formula};
-use crate::indexset::ReaderSet;
 use crate::service::query_io;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::prost::Message;
@@ -53,7 +52,6 @@ impl<'a> SearchRequest for (usize, &'a VectorSearchRequest, Formula) {
 
 pub struct VectorReaderService {
     index: Reader,
-    indexset: ReaderSet,
 }
 impl Debug for VectorReaderService {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -64,22 +62,13 @@ impl Debug for VectorReaderService {
 impl VectorReader for VectorReaderService {
     fn update(&mut self) -> NodeResult<()> {
         self.index.update()?;
-        self.indexset.update()?;
         Ok(())
     }
 
     #[tracing::instrument(skip_all)]
-    fn count(&self, vectorset: &str) -> NodeResult<usize> {
-        if vectorset.is_empty() {
-            debug!("Id for the vectorset is empty");
-            Ok(self.index.size())
-        } else if let Some(index) = self.indexset.get(vectorset)? {
-            debug!("Counting nodes for {vectorset}");
-            Ok(index.size())
-        } else {
-            debug!("There was not a set called {vectorset}");
-            Ok(0)
-        }
+    fn count(&self) -> NodeResult<usize> {
+        debug!("Id for the vectorset is empty");
+        Ok(self.index.size())
     }
 
     #[measure(actor = "vectors", metric = "search")]
@@ -118,16 +107,8 @@ impl VectorReader for VectorReaderService {
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Searching: starts at {v} ms");
 
-        let result = if request.vector_set.is_empty() {
-            debug!("{id:?} - No vectorset specified, searching in the main index");
-            self.index.search(&search_request)?
-        } else if let Some(index) = self.indexset.get(&request.vector_set)? {
-            debug!("{id:?} - vectorset specified and found, searching on {}", request.vector_set);
-            index.search(&search_request)?
-        } else {
-            debug!("{id:?} - A was vectorset specified, but not found. {} is not a vectorset", request.vector_set);
-            vec![]
-        };
+        let result = self.index.search(&search_request)?;
+
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Searching: ends at {v} ms");
         debug!("{id:?} - Creating results: starts at {v} ms");
@@ -194,12 +175,8 @@ impl VectorReaderService {
         if !config.path.exists() {
             return Err(node_error!("Invalid path {:?}", config.path));
         }
-        if !config.vectorset.exists() {
-            return Err(node_error!("Invalid path {:?}", config.vectorset));
-        }
         Ok(VectorReaderService {
             index: Reader::open(&config.path)?,
-            indexset: ReaderSet::new(&config.vectorset)?,
         })
     }
 }
@@ -224,7 +201,6 @@ mod tests {
         let vsc = VectorConfig {
             similarity: Some(VectorSimilarity::Cosine),
             path: dir.path().join("vectors"),
-            vectorset: dir.path().join("vectorset"),
             channel: Channel::EXPERIMENTAL,
             shard_id: "abc".into(),
         };
@@ -307,7 +283,6 @@ mod tests {
         let vsc = VectorConfig {
             similarity: Some(VectorSimilarity::Cosine),
             path: dir.path().join("vectors"),
-            vectorset: dir.path().join("vectorset"),
             channel: Channel::EXPERIMENTAL,
             shard_id: "abc".into(),
         };
@@ -389,7 +364,7 @@ mod tests {
             ..Default::default()
         };
         let result = reader.search(&request, &context).unwrap();
-        let no_nodes = reader.count("").unwrap();
+        let no_nodes = reader.count().unwrap();
         assert_eq!(no_nodes, 4);
         assert_eq!(result.documents.len(), 3);
 
@@ -406,7 +381,7 @@ mod tests {
             ..Default::default()
         };
         let result = reader.search(&request, &context).unwrap();
-        let no_nodes = reader.count("").unwrap();
+        let no_nodes = reader.count().unwrap();
         assert_eq!(no_nodes, 4);
         assert_eq!(result.documents.len(), 0);
 
@@ -429,7 +404,6 @@ mod tests {
         let vsc = VectorConfig {
             similarity: Some(VectorSimilarity::Cosine),
             path: dir.path().join("vectors"),
-            vectorset: dir.path().join("vectorset"),
             channel: Channel::EXPERIMENTAL,
             shard_id: "abc".into(),
         };

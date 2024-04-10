@@ -175,7 +175,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         let shards = Arc::clone(&self.shards);
         let task = move || {
             let shard = obtain_shard(shards, shard_id)?;
-            run_with_telemetry(info, move || shard.get_info(&request))
+            run_with_telemetry(info, move || shard.get_info())
         };
         let shard_info = tokio::task::spawn_blocking(task)
             .await

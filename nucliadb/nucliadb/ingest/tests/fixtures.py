@@ -717,14 +717,7 @@ async def create_resource(
     await add_field_id(test_resource, datetime_field)
     await make_field(datetime_field, "MyText")
 
-    # 3 USER VECTORS
-
     field_obj = await test_resource.get_field("datetime1", type=rpb.FieldType.DATETIME)
-    user_vectors = rpb.UserVectorsWrapper()
-    user_vectors.vectors.vectors["vectorset1"].vectors["vector1"].vector.extend(
-        (0.1, 0.2, 0.3)
-    )
-    await field_obj.set_user_vectors(user_vectors)
 
     # Q/A
     question_answers = rpb.FieldQuestionAnswerWrapper()

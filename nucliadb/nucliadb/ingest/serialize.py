@@ -55,7 +55,6 @@ from nucliadb_models.resource import (
 )
 from nucliadb_models.search import ResourceProperties
 from nucliadb_models.security import ResourceSecurity
-from nucliadb_models.vectors import UserVectorSet
 from nucliadb_utils.utilities import get_storage
 
 
@@ -96,11 +95,6 @@ async def set_resource_field_extracted_data(
         data_vec = await field.get_vectors()
         if data_vec is not None:
             field_data.vectors = models.VectorObject.from_message(data_vec)
-
-    if ExtractedDataTypeName.USERVECTORS in wanted_extracted_data:
-        user_data_vec = await field.get_user_vectors()
-        if user_data_vec is not None:
-            field_data.uservectors = UserVectorSet.from_message(user_data_vec)
 
     if ExtractedDataTypeName.QA in wanted_extracted_data:
         qa = await field.get_question_answers()

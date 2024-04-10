@@ -51,6 +51,7 @@ from nucliadb_utils.utilities import get_ingest
 
 
 @pytest.mark.asyncio
+@pytest.mark.xfail(reason="New vectorset api is not implemented yet")
 async def test_resource_crud_min(
     writer_api: Callable[[list[str]], AsyncClient], knowledgebox_writer: str
 ):
@@ -61,54 +62,6 @@ async def test_resource_crud_min(
             json={"dimension": 3, "similarity": "dot"},
         )
         assert resp.status_code == 200
-        # Test create resource
-        resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
-            json={
-                "uservectors": [
-                    {
-                        "vectors": {
-                            "base": {
-                                "vector1": {
-                                    "vector": [4.0, 2.0, 3.0],
-                                    "positions": [0, 0],
-                                }
-                            }
-                        },
-                        "field": {"field_type": "file", "field": "field1"},
-                    }
-                ]
-            },
-        )
-        assert resp.status_code == 201
-
-
-@pytest.mark.asyncio
-async def test_resource_crud_min_no_vectorset(
-    writer_api: Callable[[list[str]], AsyncClient], knowledgebox_writer: str
-):
-    knowledgebox_id = knowledgebox_writer
-    async with writer_api([NucliaDBRoles.WRITER]) as client:
-        # Test create resource
-        resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
-            json={
-                "uservectors": [
-                    {
-                        "vectors": {
-                            "base": {
-                                "vector1": {
-                                    "vector": [4.0, 2.0, 3.0],
-                                    "positions": [0, 0],
-                                }
-                            }
-                        },
-                        "field": {"field_type": "file", "field": "field1"},
-                    }
-                ]
-            },
-        )
-        assert resp.status_code == 201
 
 
 @pytest.mark.asyncio

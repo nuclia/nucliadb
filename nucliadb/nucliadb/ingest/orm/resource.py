@@ -50,7 +50,6 @@ from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
 from nucliadb_protos.resources_pb2 import Origin as PBOrigin
 from nucliadb_protos.resources_pb2 import Paragraph, ParagraphAnnotation
 from nucliadb_protos.resources_pb2 import Relations as PBRelations
-from nucliadb_protos.resources_pb2 import UserVectorsWrapper
 from nucliadb_protos.train_pb2 import EnabledMetadata
 from nucliadb_protos.train_pb2 import Position as TrainPosition
 from nucliadb_protos.train_pb2 import (
@@ -422,11 +421,6 @@ class Resource:
                 vo = await field.get_vectors()
                 if vo is not None:
                     brain.apply_field_vectors(field_key, vo, False, [])
-
-                vu = await field.get_user_vectors()
-                if vu is not None:
-                    vectors_to_delete = {}  # type: ignore
-                    brain.apply_user_vectors(field_key, vu, vectors_to_delete)  # type: ignore
         return brain
 
     async def generate_field_vectors(
@@ -444,22 +438,6 @@ class Resource:
         evw.field.field_type = type_id  # type: ignore
         evw.vectors.CopyFrom(vo)
         bm.field_vectors.append(evw)
-
-    async def generate_user_vectors(
-        self,
-        bm: BrokerMessage,
-        type_id: FieldType.ValueType,
-        field_id: str,
-        field: Field,
-    ):
-        uv = await field.get_user_vectors()
-        if uv is None:
-            return
-        uvw = UserVectorsWrapper()
-        uvw.field.field = field_id
-        uvw.field.field_type = type_id  # type: ignore
-        uvw.vectors.CopyFrom(uv)
-        bm.user_vectors.append(uvw)
 
     async def generate_field_large_computed_metadata(
         self,
@@ -601,9 +579,6 @@ class Resource:
 
             # Field vectors
             await self.generate_field_vectors(bm, type_id, field_id, field)
-
-            # User vectors
-            await self.generate_user_vectors(bm, type_id, field_id, field)
 
             # Large metadata
             await self.generate_field_large_computed_metadata(
@@ -871,8 +846,6 @@ class Resource:
         if self.disable_vectors is False:
             for field_vectors in message.field_vectors:
                 await self._apply_extracted_vectors(field_vectors)
-            for user_vectors in message.user_vectors:
-                await self._apply_user_vectors(user_vectors)
 
         # Only uploading to binary storage
         for field_large_metadata in message.field_large_metadata:
@@ -1050,27 +1023,6 @@ class Resource:
             await loop.run_in_executor(_executor, apply_field_vectors)
         else:
             raise AttributeError("VO not found on set")
-
-    async def _apply_user_vectors(self, user_vectors: UserVectorsWrapper):
-        field_obj = await self.get_field(
-            user_vectors.field.field,
-            user_vectors.field.field_type,
-            load=False,
-        )
-        uv, vectors_to_delete = await field_obj.set_user_vectors(user_vectors)
-        field_key = self.generate_field_id(user_vectors.field)
-        if uv is not None:
-            # We need to make sure that the vectors replaced are not on the new vectors
-            # So we extend the vectors to delete with the one replaced by the update
-            for vectorset, vectors in vectors_to_delete.items():
-                for vector in vectors.vectors:
-                    if vector not in user_vectors.vectors_to_delete[vectorset].vectors:
-                        user_vectors.vectors_to_delete[vectorset].vectors.append(vector)
-            self.indexer.apply_user_vectors(
-                field_key, uv, user_vectors.vectors_to_delete
-            )
-        else:
-            raise AttributeError("User Vectors not found on set")
 
     async def _apply_field_large_metadata(
         self, field_large_metadata: LargeComputedMetadataWrapper

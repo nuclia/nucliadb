@@ -73,7 +73,6 @@ async def test_get_field_all(
                 "extracted": [
                     "metadata",
                     "vectors",
-                    "uservectors",
                     "large_metadata",
                     "text",
                     "link",
