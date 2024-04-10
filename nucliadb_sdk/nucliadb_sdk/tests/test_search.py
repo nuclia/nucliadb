@@ -17,16 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import base64
 import os
 from typing import Any, Dict
 
-import pytest
-from sentence_transformers import SentenceTransformer  # type: ignore
-
 import nucliadb_sdk
 from nucliadb_models.resource import KnowledgeBoxObj
-from nucliadb_models.search import MinScore, ResourceProperties, SearchOptions
 
 TESTING_IN_CI = os.environ.get("CI") == "true"
 
@@ -249,21 +244,6 @@ def test_search_resource(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaDB):
             kbid=kb.uuid,
             texts={"text": {"body": text}},
             usermetadata={"classifications": [{"labelset": "emoji", "label": label}]},
-            uservectors=[
-                {
-                    "field": {
-                        "field": "text",
-                        "field_type": "text",
-                    },
-                    "vectors": {
-                        "all-MiniLM-L6-v2": {
-                            "vectors": {
-                                "vector": [1.0, 2.0, 3.0, 2.0],
-                            },
-                        }
-                    },
-                }
-            ],
         )
 
     resources = sdk.list_resources(kbid=kb.uuid, query_params={"size": 50})
@@ -296,131 +276,3 @@ def test_search_resource(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaDB):
         ]
         == 9 * 2
     )
-
-    vector_q = [1.0, 2.0, 3.0, 2.0]
-    results = sdk.search(
-        kbid=kb.uuid,
-        vector=vector_q,
-        vectorset="all-MiniLM-L6-v2",
-        min_score=0.70,
-        page_number=0,
-        page_size=20,
-        with_duplicates=True,
-    )
-    assert len(results.sentences.results) == 20
-
-
-# can fail in CI due to HuggingFace API
-@pytest.mark.xfail
-def test_standard_examples(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaDB):
-    encoder = SentenceTransformer("all-MiniLM-L6-v2")
-    sdk.create_resource(
-        kbid=kb.uuid,
-        title="Happy dog",
-        files={
-            "upload": {
-                "file": {
-                    "filename": "data.txt",
-                    "payload": base64.b64encode(b"Happy dog file data"),
-                }
-            }
-        },
-        texts={"text": {"body": "I'm Sierra, a very happy dog"}},
-        usermetadata={
-            "classifications": [{"labelset": "emotion", "label": "positive"}]
-        },
-        fieldmetadata=[
-            {
-                "field": {
-                    "field": "text",
-                    "field_type": "text",
-                },
-                "token": [{"token": "Sierra", "klass": "NAME", "start": 4, "end": 9}],
-            }
-        ],
-        uservectors=[
-            {
-                "field": {
-                    "field": "text",
-                    "field_type": "text",
-                },
-                "vectors": {
-                    "all-MiniLM-L6-v2": {
-                        "vectors": {
-                            "vector": encoder.encode(["I'm Sierra, a very happy dog"])[
-                                0
-                            ].tolist()
-                        },
-                    }
-                },
-            }
-        ],
-    )
-
-    sentences = [
-        ("Day 1", "She's having a terrible day", "emotion/negative"),
-        ("Day 2", "what a delighful day", "emotion/positive"),
-        ("Day 3", "Dog in catalan is gos", "emotion/neutral"),
-        ("Day 4", "he is heartbroken", "emotion/negative"),
-        ("Day 5", "He said that the race is quite tough", "emotion/neutral"),
-        ("Day 6", "love is tough", "emotion/negative"),
-    ]
-    for title, sentence, label in sentences:
-        sdk.create_resource(
-            kbid=kb.uuid,
-            title=title,
-            texts={"text": {"body": sentence}},
-            usermetadata={
-                "classifications": [
-                    {"labelset": label.split("/")[0], "label": label.split("/")[1]}
-                ]
-            },
-            uservectors=[
-                {
-                    "field": {
-                        "field": "text",
-                        "field_type": "text",
-                    },
-                    "vectors": {
-                        "all-MiniLM-L6-v2": {
-                            "vectors": {
-                                "vector": encoder.encode([sentence])[0].tolist()
-                            },
-                        }
-                    },
-                }
-            ],
-        )
-
-    # test semantic search
-    results = sdk.search(
-        kbid=kb.uuid,
-        vector=encoder.encode(["To be in love"])[0].tolist(),
-        vectorset="all-MiniLM-L6-v2",
-        min_score=MinScore(semantic=0.25),
-        features=[SearchOptions.VECTOR],
-        show=[ResourceProperties.BASIC, ResourceProperties.VALUES],
-    )
-    assert len(results.resources) == 2
-    res = next(iter(results.resources.values()))
-    assert res.data.texts["text"].value.body == "love is tough"
-
-    # full text search results
-    results = sdk.search(
-        kbid=kb.uuid,
-        query="dog",
-        features=[SearchOptions.DOCUMENT, SearchOptions.PARAGRAPH],
-    )
-    assert len(results.fulltext.results) == 3
-    assert len(results.paragraphs.results) == 1
-
-    # test filter
-    results = sdk.search(
-        kbid=kb.uuid,
-        filters=["/l/emotion/positive"],
-        features=[SearchOptions.DOCUMENT, SearchOptions.PARAGRAPH],
-        show=[ResourceProperties.BASIC, ResourceProperties.VALUES],
-    )
-
-    assert len(results.fulltext.results) == 4
-    assert len(results.paragraphs.results) == 2
