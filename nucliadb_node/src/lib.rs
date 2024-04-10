@@ -31,15 +31,21 @@
 
 pub mod analytics;
 pub mod cache;
+pub mod errors;
 pub mod grpc;
 pub mod http_server;
 pub mod lifecycle;
 pub mod merge;
+pub mod metadata_entity;
 pub mod node_metadata;
+pub mod paragraph_entity;
+pub mod relation_entity;
 pub mod replication;
 pub mod settings;
 pub mod shards;
 pub mod telemetry;
+pub mod text_entity;
 pub mod utils;
+pub mod vector_entity;
 
 mod disk_structure;

@@ -17,14 +17,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-//! This module provides tools for managing shards
+use nucliadb_core::texts::{TextConfig, TextWriter};
+use nucliadb_core::{node_error, NodeResult};
+use nucliadb_texts::writer::TextWriterService as TextWriterServiceV1;
+use nucliadb_texts2::writer::TextWriterService as TextWriterServiceV2;
+use std::sync::RwLock;
 
-pub mod metadata;
-pub mod shard_reader;
-pub mod shard_writer;
-pub mod versions;
+pub type TextWPointer = Box<RwLock<dyn TextWriter>>;
 
-// Alias for more readable imports
-pub use {shard_reader as reader, shard_writer as writer};
-
-pub type ShardId = String;
+pub fn new(version: u32, config: &TextConfig) -> NodeResult<TextWPointer> {
+    match version {
+        1 => TextWriterServiceV1::start(config).map(|i| Box::new(RwLock::new(i)) as TextWPointer),
+        2 => TextWriterServiceV2::start(config).map(|i| Box::new(RwLock::new(i)) as TextWPointer),
+        v => Err(node_error!("Invalid text writer version {v}")),
+    }
+}

@@ -17,14 +17,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-//! This module provides tools for managing shards
+use nucliadb_core::vectors::{VectorConfig, VectorWriter};
+use nucliadb_core::{node_error, NodeResult};
+use nucliadb_vectors::service::VectorWriterService;
+use std::sync::RwLock;
 
-pub mod metadata;
-pub mod shard_reader;
-pub mod shard_writer;
-pub mod versions;
+pub type VectorWPointer = Box<RwLock<dyn VectorWriter>>;
 
-// Alias for more readable imports
-pub use {shard_reader as reader, shard_writer as writer};
-
-pub type ShardId = String;
+pub fn new(version: u32, config: &VectorConfig) -> NodeResult<VectorWPointer> {
+    match version {
+        1 => VectorWriterService::start(config).map(|i| Box::new(RwLock::new(i)) as VectorWPointer),
+        2 => VectorWriterService::start(config).map(|i| Box::new(RwLock::new(i)) as VectorWPointer),
+        v => Err(node_error!("Invalid vectors version {v}")),
+    }
+}

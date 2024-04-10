@@ -52,7 +52,7 @@ impl Debug for TextWriterService {
     }
 }
 
-impl FieldWriter for TextWriterService {
+impl TextWriter for TextWriterService {
     #[measure(actor = "texts", metric = "count")]
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {

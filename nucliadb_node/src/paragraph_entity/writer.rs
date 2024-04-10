@@ -17,14 +17,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-//! This module provides tools for managing shards
+use nucliadb_core::paragraphs::{ParagraphConfig, ParagraphWriter};
+use nucliadb_core::{node_error, NodeResult};
+use nucliadb_paragraphs::writer::ParagraphWriterService as ParagraphWriterServiceV1;
+use nucliadb_paragraphs2::writer::ParagraphWriterService as ParagraphWriterServiceV2;
+use std::sync::RwLock;
 
-pub mod metadata;
-pub mod shard_reader;
-pub mod shard_writer;
-pub mod versions;
+pub type ParagraphWPointer = Box<RwLock<dyn ParagraphWriter>>;
 
-// Alias for more readable imports
-pub use {shard_reader as reader, shard_writer as writer};
-
-pub type ShardId = String;
+pub fn new(version: u32, config: &ParagraphConfig) -> NodeResult<ParagraphWPointer> {
+    match version {
+        1 => ParagraphWriterServiceV1::start(config).map(|i| Box::new(RwLock::new(i)) as ParagraphWPointer),
+        2 => ParagraphWriterServiceV2::start(config).map(|i| Box::new(RwLock::new(i)) as ParagraphWPointer),
+        v => Err(node_error!("Invalid paragraphs version {v}")),
+    }
+}

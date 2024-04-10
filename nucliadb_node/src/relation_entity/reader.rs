@@ -17,14 +17,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-//! This module provides tools for managing shards
+use nucliadb_core::relations::{RelationConfig, RelationsReader};
+use nucliadb_core::{node_error, NodeResult};
+use nucliadb_relations::service::RelationsReaderService as RelationsReaderServiceV1;
+use nucliadb_relations2::reader::RelationsReaderService as RelationsReaderServiceV2;
+use std::sync::RwLock;
 
-pub mod metadata;
-pub mod shard_reader;
-pub mod shard_writer;
-pub mod versions;
+pub type RelationRPointer = Box<RwLock<dyn RelationsReader>>;
 
-// Alias for more readable imports
-pub use {shard_reader as reader, shard_writer as writer};
-
-pub type ShardId = String;
+pub fn new(version: u32, config: &RelationConfig) -> NodeResult<RelationRPointer> {
+    match version {
+        1 => RelationsReaderServiceV1::start(config).map(|i| Box::new(RwLock::new(i)) as RelationRPointer),
+        2 => RelationsReaderServiceV2::start(config).map(|i| Box::new(RwLock::new(i)) as RelationRPointer),
+        v => Err(node_error!("Invalid relations version {v}")),
+    }
+}

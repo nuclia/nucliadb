@@ -93,7 +93,7 @@ impl Debug for TextReaderService {
     }
 }
 
-impl FieldReader for TextReaderService {
+impl TextReader for TextReaderService {
     #[measure(actor = "texts", metric = "prefilter")]
     #[tracing::instrument(skip_all)]
     fn prefilter(&self, request: &PreFilterRequest) -> NodeResult<PreFilterResponse> {

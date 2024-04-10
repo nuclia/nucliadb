@@ -25,8 +25,8 @@ use crate::protos::*;
 use crate::query_planner::{PreFilterRequest, PreFilterResponse};
 use crate::IndexFiles;
 
-pub type TextsReaderPointer = Arc<RwLock<dyn FieldReader>>;
-pub type TextsWriterPointer = Arc<RwLock<dyn FieldWriter>>;
+pub type TextsReaderPointer = Arc<RwLock<dyn TextReader>>;
+pub type TextsWriterPointer = Arc<RwLock<dyn TextWriter>>;
 pub type ProtosRequest = DocumentSearchRequest;
 pub type ProtosResponse = DocumentSearchResponse;
 
@@ -51,7 +51,7 @@ impl Iterator for DocumentIterator {
     }
 }
 
-pub trait FieldReader: std::fmt::Debug + Send + Sync {
+pub trait TextReader: std::fmt::Debug + Send + Sync {
     fn search(&self, request: &ProtosRequest) -> NodeResult<ProtosResponse>;
     fn stored_ids(&self) -> NodeResult<Vec<String>>;
     fn prefilter(&self, request: &PreFilterRequest) -> NodeResult<PreFilterResponse>;
@@ -59,7 +59,7 @@ pub trait FieldReader: std::fmt::Debug + Send + Sync {
     fn count(&self) -> NodeResult<usize>;
 }
 
-pub trait FieldWriter: std::fmt::Debug + Send + Sync {
+pub trait TextWriter: std::fmt::Debug + Send + Sync {
     fn set_resource(&mut self, resource: &Resource) -> NodeResult<()>;
     fn delete_resource(&mut self, resource_id: &ResourceId) -> NodeResult<()>;
     fn garbage_collection(&mut self) -> NodeResult<()>;

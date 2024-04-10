@@ -17,14 +17,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-//! This module provides tools for managing shards
+use crate::shards::metadata::ShardMetadata;
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
-pub mod metadata;
-pub mod shard_reader;
-pub mod shard_writer;
-pub mod versions;
-
-// Alias for more readable imports
-pub use {shard_reader as reader, shard_writer as writer};
-
-pub type ShardId = String;
+pub struct Metadata {
+    pub metadata: Arc<ShardMetadata>,
+    pub id: String,
+    pub path: PathBuf,
+    pub document_service_version: i32,
+    pub paragraph_service_version: i32,
+    pub vector_service_version: i32,
+    pub relation_service_version: i32,
+    pub gc_lock: tokio::sync::Mutex<()>, // lock to be able to do GC or not
+    pub write_lock: Mutex<()>,           // be able to lock writes on the shard
+}

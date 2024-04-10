@@ -17,14 +17,5 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-//! This module provides tools for managing shards
-
-pub mod metadata;
-pub mod shard_reader;
-pub mod shard_writer;
-pub mod versions;
-
-// Alias for more readable imports
-pub use {shard_reader as reader, shard_writer as writer};
-
-pub type ShardId = String;
+pub mod reader;
+pub mod writer;
