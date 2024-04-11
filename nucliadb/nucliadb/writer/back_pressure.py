@@ -49,7 +49,7 @@ __all__ = ["maybe_back_pressure"]
 back_pressure_observer = metrics.Observer("nucliadb_back_pressure", labels={"type": ""})
 
 
-rate_limited_requests_counter = metrics.Counter(
+RATE_LIMITED_REQUESTS_COUNTER = metrics.Counter(
     "nucliadb_rate_limited_requests", labels={"type": "", "cached": ""}
 )
 
@@ -113,8 +113,17 @@ def cached_back_pressure(kbid: str, resource_uuid: Optional[str] = None):
     if data is not None:
         try_after = data.try_after
         back_pressure_type = data.type
-        rate_limited_requests_counter.inc(
+        RATE_LIMITED_REQUESTS_COUNTER.inc(
             {"type": back_pressure_type, "cached": "true"}
+        )
+        logger.warning(
+            "Back pressure applied from cache",
+            extra={
+                "type": back_pressure_type,
+                "try_after": try_after,
+                "kbid": kbid,
+                "resource_uuid": resource_uuid,
+            },
         )
         raise HTTPException(
             status_code=429,
@@ -129,7 +138,7 @@ def cached_back_pressure(kbid: str, resource_uuid: Optional[str] = None):
     except BackPressureException as exc:
         try_after = exc.data.try_after
         back_pressure_type = exc.data.type
-        rate_limited_requests_counter.inc(
+        RATE_LIMITED_REQUESTS_COUNTER.inc(
             {"type": back_pressure_type, "cached": "false"}
         )
         _cache.set(cache_key, exc.data)
@@ -368,9 +377,19 @@ async def check_processing_behind(materializer: Materializer, kbid: str):
     kb_pending = await materializer.get_processing_pending(kbid)
     if kb_pending > max_pending:
         try_after = estimate_try_after(
-            rate=settings.processing_rate, pending=kb_pending, max_pending=max_pending
+            rate=settings.processing_rate,
+            pending=kb_pending,
+            max_wait=settings.max_wait_time,
         )
         data = BackPressureData(type="processing", try_after=try_after)
+        logger.warning(
+            "Processing back pressure applied",
+            extra={
+                "kbid": kbid,
+                "try_after": try_after,
+                "pending": kb_pending,
+            },
+        )
         raise BackPressureException(data)
 
 
@@ -422,9 +441,18 @@ async def check_indexing_behind(
         try_after = estimate_try_after(
             rate=settings.indexing_rate,
             pending=highest_pending,
-            max_pending=max_pending,
+            max_wait=settings.max_wait_time,
         )
         data = BackPressureData(type="indexing", try_after=try_after)
+        logger.warning(
+            "Indexing back pressure applied",
+            extra={
+                "kbid": kbid,
+                "resource_uuid": resource_uuid,
+                "try_after": try_after,
+                "pending": highest_pending,
+            },
+        )
         raise BackPressureException(data)
 
 
@@ -436,18 +464,23 @@ def check_ingest_behind(ingest_pending: int):
 
     if ingest_pending > max_pending:
         try_after = estimate_try_after(
-            rate=settings.ingest_rate, pending=ingest_pending, max_pending=max_pending
+            rate=settings.ingest_rate,
+            pending=ingest_pending,
+            max_wait=settings.max_wait_time,
         )
         data = BackPressureData(type="ingest", try_after=try_after)
+        logger.warning(
+            "Ingest back pressure applied",
+            extra={"try_after": try_after, "pending": ingest_pending},
+        )
         raise BackPressureException(data)
 
 
-def estimate_try_after(rate: float, pending: int, max_pending: int) -> datetime:
+def estimate_try_after(rate: float, pending: int, max_wait: int) -> datetime:
     """
     This function estimates the time to try again based on the rate and the number of pending messages.
     """
-    # We estimate the time to try again when the pending messages are half of the max_pending
-    delta_seconds = abs(pending - (max_pending / 2)) / rate
+    delta_seconds = min(pending / rate, max_wait)
     return datetime.utcnow() + timedelta(seconds=delta_seconds)
 
 

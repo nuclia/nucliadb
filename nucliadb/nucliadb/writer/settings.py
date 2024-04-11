@@ -51,7 +51,7 @@ class BackPressureSettings(BaseSettings):
         description="Max number of messages pending to index in a node queue before rate limiting writes. Set to 0 to disable indexing back pressure checks",  # noqa
     )
     max_ingest_pending: int = Field(
-        default=1_000,
+        default=1000,
         description="Max number of messages pending to be ingested by processed consumers before rate limiting writes. Set to 0 to disable ingest back pressure checks",  # noqa
     )
     max_processing_pending: int = Field(
@@ -65,6 +65,10 @@ class BackPressureSettings(BaseSettings):
     ingest_check_interval: int = Field(
         default=30,
         description="Interval in seconds to check the ingest pending messages",
+    )
+    max_wait_time: int = Field(
+        default=60,
+        description="Max time in seconds to wait before trying again after back pressure",
     )
 
 

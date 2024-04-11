@@ -59,15 +59,16 @@ def is_onprem_nucliadb():
 
 
 @pytest.mark.parametrize(
-    "rate,pending,max_pending,delta",
+    "rate,pending,max_wait,delta",
     [
-        (2, 10, 10, 2.5),
-        (10, 10, 10, 0.5),
+        (2, 10, 10, 5),
+        (10, 10, 10, 1),
+        (1, 10, 3, 3),
     ],
 )
-def test_estimate_try_after(rate, pending, max_pending, delta):
+def test_estimate_try_after(rate, pending, max_wait, delta):
     now = datetime.utcnow()
-    try_after = estimate_try_after(rate, pending, max_pending)
+    try_after = estimate_try_after(rate, pending, max_wait)
     assert int(try_after.timestamp()) == int(now.timestamp() + delta)
 
 
@@ -141,6 +142,7 @@ def settings():
         processing_rate=2,
         indexing_rate=2,
         ingest_rate=2,
+        max_wait_time=60,
     )
     with mock.patch(f"{MODULE}.settings", settings):
         yield settings
