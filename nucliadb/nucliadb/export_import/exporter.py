@@ -119,7 +119,10 @@ async def export_resources_with_metadata(
         metadata.resources_to_export.sort()
         metadata.total = len(metadata.resources_to_export)
         await dm.set_metadata("export", metadata)
-
+    else:
+        # The export was interrupted, we need to clean up
+        # the storage and start from scratch
+        await dm.try_delete_from_storage("export", kbid, metadata.id)
     try:
         for rid in metadata.resources_to_export:
             bm = await get_broker_message(kbid, rid)
