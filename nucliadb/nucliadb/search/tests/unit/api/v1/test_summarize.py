@@ -78,7 +78,7 @@ def summarize():
             NoResourcesToSummarize(),
             HTTPClientError(
                 status_code=412,
-                detail="No extracted text found for any of the specified resources. Could not summarize",
+                detail="Could not summarize: No resources or extracted text found.",
             ),
         ),
     ],
