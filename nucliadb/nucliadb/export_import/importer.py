@@ -75,11 +75,11 @@ async def import_kb(
 
         elif item_type == ExportedItemType.ENTITIES:
             entities = cast(kb_pb2.EntitiesGroups, data)
-            await set_entities_groups(context, kbid, entities)
+            await set_entities_groups(kbid, entities)
 
         elif item_type == ExportedItemType.LABELS:
             labels = cast(kb_pb2.Labels, data)
-            await set_labels(context, kbid, labels)
+            await set_labels(kbid, labels)
 
         else:
             logger.warning(f"Unknown exporteed item type: {item_type}")

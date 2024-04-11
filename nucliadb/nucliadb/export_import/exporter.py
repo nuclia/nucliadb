@@ -59,10 +59,10 @@ async def export_kb(
     async for chunk in resources_iterator:
         yield chunk
 
-    async for chunk in export_entities(context, kbid):
+    async for chunk in export_entities(kbid):
         yield chunk
 
-    async for chunk in export_labels(context, kbid):
+    async for chunk in export_labels(kbid):
         yield chunk
 
 
@@ -94,8 +94,8 @@ async def export_resources(
     context: ApplicationContext,
     kbid: str,
 ) -> AsyncGenerator[bytes, None]:
-    async for rid in iter_kb_resource_uuids(context, kbid):
-        bm = await get_broker_message(context, kbid, rid)
+    async for rid in iter_kb_resource_uuids(kbid):
+        bm = await get_broker_message(kbid, rid)
         if bm is None:
             logger.warning(f"No resource found for rid {rid}")
             continue
@@ -113,16 +113,19 @@ async def export_resources_with_metadata(
     metadata.processed = 0
     if len(metadata.resources_to_export) == 0:
         # Starting an export from scratch
-        async for rid in iter_kb_resource_uuids(context, kbid):
+        async for rid in iter_kb_resource_uuids(kbid):
             if rid not in metadata.exported_resources:
                 metadata.resources_to_export.append(rid)
         metadata.resources_to_export.sort()
         metadata.total = len(metadata.resources_to_export)
         await dm.set_metadata("export", metadata)
-
+    else:
+        # The export was interrupted, we need to clean up
+        # the storage and start from scratch
+        await dm.try_delete_from_storage("export", kbid, metadata.id)
     try:
         for rid in metadata.resources_to_export:
-            bm = await get_broker_message(context, kbid, rid)
+            bm = await get_broker_message(kbid, rid)
             if bm is None:
                 logger.warning(f"Skipping resource {rid} as it was deleted")
                 continue
@@ -170,10 +173,9 @@ async def export_resource_with_binaries(
 
 
 async def export_entities(
-    context: ApplicationContext,
     kbid: str,
 ) -> AsyncGenerator[bytes, None]:
-    entities = await get_entities(context, kbid)
+    entities = await get_entities(kbid)
     if len(entities.entities_groups) > 0:
         data = entities.SerializeToString()
         yield ExportedItemType.ENTITIES.encode("utf-8")
@@ -182,10 +184,9 @@ async def export_entities(
 
 
 async def export_labels(
-    context: ApplicationContext,
     kbid: str,
 ) -> AsyncGenerator[bytes, None]:
-    labels = await get_labels(context, kbid)
+    labels = await get_labels(kbid)
     if len(labels.labelset) > 0:
         data = labels.SerializeToString()
         yield ExportedItemType.LABELS.encode("utf-8")
