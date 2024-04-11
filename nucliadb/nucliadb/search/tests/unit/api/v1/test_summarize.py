@@ -26,6 +26,7 @@ from starlette.requests import Request
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import predict
 from nucliadb.search.api.v1.summarize import summarize_endpoint
+from nucliadb.search.search.summarize import NoResourcesToSummarize
 from nucliadb_utils.exceptions import LimitsExceededError
 
 pytestmark = pytest.mark.asyncio
@@ -60,7 +61,7 @@ def summarize():
 
 
 @pytest.mark.parametrize(
-    "predict_error,http_error_response",
+    "error,http_error_response",
     [
         (
             LimitsExceededError(402, "over the quota"),
@@ -73,15 +74,22 @@ def summarize():
                 detail="Temporary error",
             ),
         ),
+        (
+            NoResourcesToSummarize(),
+            HTTPClientError(
+                status_code=412,
+                detail="None of the specified resources were found. Could not summarize",
+            ),
+        ),
     ],
 )
 async def test_summarize_endpoint_handles_errors(
     summarize,
-    predict_error,
+    error,
     http_error_response,
     dummy_request,
 ):
-    summarize.side_effect = predict_error
+    summarize.side_effect = error
     response = await summarize_endpoint(
         request=dummy_request,
         kbid="kbid",
