@@ -42,6 +42,10 @@ ExtractedTexts = list[tuple[str, str, Optional[ExtractedText]]]
 MAX_GET_EXTRACTED_TEXT_OPS = 20
 
 
+class NoResourcesToSummarize(Exception):
+    pass
+
+
 async def summarize(kbid: str, request: SummarizeRequest) -> SummarizedResponse:
     predict_request = SummarizeModel()
     predict_request.generative_model = request.generative_model
@@ -58,6 +62,9 @@ async def summarize(kbid: str, request: SummarizeRequest) -> SummarizedResponse:
             uuid_or_slug, SummarizeResourceModel()
         ).fields
         fields[field_id] = extracted_text.text
+
+    if len(predict_request.resources) == 0:
+        raise NoResourcesToSummarize()
 
     predict = get_predict()
     return await predict.summarize(kbid, predict_request)
