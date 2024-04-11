@@ -56,7 +56,7 @@ async def summarize_endpoint(
     except NoResourcesToSummarize:
         return HTTPClientError(
             status_code=412,
-            detail="None of the specified resources were found. Could not summarize",
+            detail="No extracted text found for any of the specified resources. Could not summarize",
         )
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
