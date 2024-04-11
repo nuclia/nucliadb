@@ -143,7 +143,7 @@ class ImportThrottling:
     async def wait(self):
         logger.info("Waiting for nodes to catch up indexing")
         nodes = await self._get_nodes()
-        if not nodes:
+        if len(nodes) == 0:
             return
         for node_id in nodes:
             await wait_for_node(self.context, node_id)
