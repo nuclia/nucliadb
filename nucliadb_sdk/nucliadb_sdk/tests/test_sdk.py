@@ -96,7 +96,9 @@ def test_search_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
     resource = sdk.create_resource(kbid=kb.uuid, title="Resource", slug="resource")
     sdk.chat_on_resource(kbid=kb.uuid, rid=resource.uuid, query="foo")
     sdk.feedback(kbid=kb.uuid, ident="bar", good=True, feedback="baz", task="CHAT")
-    sdk.summarize(kbid=kb.uuid, resources=["foobar"])
+    with pytest.raises(nucliadb_sdk.v2.exceptions.UnknownError) as err:
+        sdk.summarize(kbid=kb.uuid, resources=["foobar"])
+    assert "Could not summarize" in str(err.value)
 
 
 def test_learning_config_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
