@@ -201,6 +201,8 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                     "No learning configuration provided. Default will be used.",
                     extra={"kbid": kbid},
                 )
+            # NOTE: we rely on learning to return an updated configuration with
+            # matryoshka settings if they're available
             lconfig = await learning_proxy.set_configuration(kbid, config=config)
             lconfig_created = True
         else:
@@ -874,6 +876,7 @@ def parse_model_metadata_from_learning_config(
         model.default_min_score = lconfig.semantic_threshold
     else:
         logger.warning("Default min score not set!")
+    model.matryoshka_dimensions.extend(lconfig.semantic_matryoshka_dims)
     return model
 
 

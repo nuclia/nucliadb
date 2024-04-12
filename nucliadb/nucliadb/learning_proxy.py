@@ -28,7 +28,7 @@ import backoff
 import httpx
 from fastapi import Request, Response
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, root_validator
 
 from nucliadb_telemetry import errors
 from nucliadb_utils.settings import is_onprem_nucliadb, nuclia_settings
@@ -53,11 +53,33 @@ class LearningService(str, Enum):
     COLLECTOR = "collector-api"
 
 
+# Subset of learning configuration of nucliadb's interest. Look at
+# learning_config models for more fields
 class LearningConfiguration(BaseModel):
     semantic_model: str
+    # aka similarity function
     semantic_vector_similarity: str
+    # aka vector_dimension
     semantic_vector_size: Optional[int]
+    # aka min_score
     semantic_threshold: Optional[float]
+    # List of possible subdivisions of the matryoshka embeddings (if the model
+    # supports it)
+    semantic_matryoshka_dims: Optional[list[int]]
+
+    @root_validator
+    def validate_matryoshka_and_vector_dimension_consistency(cls, values):
+        vector_dim = values.get("semantic_vector_size")
+        matryoshka_dims = values.get("semantic_matryoshka_dims", []) or []
+        if (
+            len(matryoshka_dims) > 0
+            and vector_dim is not None
+            and vector_dim not in matryoshka_dims
+        ):
+            raise ValueError(
+                "Semantic vector size is inconsistent with matryoshka dimensions"
+            )
+        return values
 
 
 async def get_configuration(
@@ -304,6 +326,7 @@ class DummyClient(httpx.AsyncClient):
             semantic_vector_similarity="cosine",
             semantic_vector_size=None,
             semantic_threshold=None,
+            semantic_matryoshka_dims=[],
         )
         return self._response(content=lconfig.dict())
 

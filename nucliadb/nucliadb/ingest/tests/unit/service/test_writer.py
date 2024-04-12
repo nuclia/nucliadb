@@ -199,6 +199,7 @@ class TestWriterServicer:
                 semantic_threshold=-1,
                 semantic_vector_size=10,
                 semantic_vector_similarity="cosine",
+                semantic_matryoshka_dims=[10, 20],
             )
         )
 
