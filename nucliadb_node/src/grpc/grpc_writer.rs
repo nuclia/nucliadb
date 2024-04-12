@@ -123,6 +123,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
             Some(kbid),
             request.similarity().into(),
             Some(Channel::from(request.release_channel)),
+            request.normalize_vectors,
         );
 
         let shards = Arc::clone(&self.shards);

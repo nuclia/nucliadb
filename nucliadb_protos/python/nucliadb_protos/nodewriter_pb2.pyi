@@ -197,17 +197,21 @@ class NewShardRequest(google.protobuf.message.Message):
     SIMILARITY_FIELD_NUMBER: builtins.int
     KBID_FIELD_NUMBER: builtins.int
     RELEASE_CHANNEL_FIELD_NUMBER: builtins.int
+    NORMALIZE_VECTORS_FIELD_NUMBER: builtins.int
     similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType
     kbid: builtins.str
     release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType
+    normalize_vectors: builtins.bool
+    """indicates whether the shard should normalize vectors on indexing or not"""
     def __init__(
         self,
         *,
         similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType = ...,
         kbid: builtins.str = ...,
         release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType = ...,
+        normalize_vectors: builtins.bool = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["kbid", b"kbid", "release_channel", b"release_channel", "similarity", b"similarity"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["kbid", b"kbid", "normalize_vectors", b"normalize_vectors", "release_channel", b"release_channel", "similarity", b"similarity"]) -> None: ...
 
 global___NewShardRequest = NewShardRequest
 

@@ -191,6 +191,7 @@ impl ShardWriter {
             path: path.join(VECTORS_DIR),
             channel,
             shard_id: metadata.id(),
+            normalize_vectors: metadata.normalize_vectors(),
         };
         let rsc = RelationConfig {
             path: path.join(RELATIONS_DIR),
@@ -222,6 +223,7 @@ impl ShardWriter {
             path: path.join(VECTORS_DIR),
             channel,
             shard_id: metadata.id(),
+            normalize_vectors: metadata.normalize_vectors(),
         };
         let rsc = RelationConfig {
             path: path.join(RELATIONS_DIR),

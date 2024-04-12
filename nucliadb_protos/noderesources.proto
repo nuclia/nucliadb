@@ -169,9 +169,6 @@ message Resource {
     map<string, utils.UserVectorsList> vectors_to_delete = 13;  // Vectorset prefix vector id
 
     optional utils.Security security = 14;
-
-    // TODO: adapt for vectorsets!
-    bool normalized_vectors = 15;
 }
 
 message ShardMetadata {

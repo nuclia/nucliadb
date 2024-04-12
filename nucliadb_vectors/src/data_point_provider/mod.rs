@@ -70,6 +70,8 @@ pub struct IndexMetadata {
     pub similarity: Similarity,
     #[serde(default)]
     pub channel: Channel,
+    #[serde(default)]
+    pub normalize_vectors: bool,
 }
 impl IndexMetadata {
     pub fn write(&self, path: &Path) -> VectorR<()> {

@@ -69,6 +69,9 @@ pub struct NewShardRequest {
     pub kbid: ::prost::alloc::string::String,
     #[prost(enumeration="super::utils::ReleaseChannel", tag="3")]
     pub release_channel: i32,
+    /// indicates whether the shard should normalize vectors on indexing or not
+    #[prost(bool, tag="4")]
+    pub normalize_vectors: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NewVectorSetRequest {

@@ -56,6 +56,8 @@ message NewShardRequest {
     utils.VectorSimilarity similarity = 1;
     string kbid = 2;
     utils.ReleaseChannel release_channel = 3;
+    // indicates whether the shard should normalize vectors on indexing or not
+    bool normalize_vectors = 4;
 }
 
 message NewVectorSetRequest {
