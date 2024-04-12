@@ -24,6 +24,7 @@ use crate::data_point_provider::*;
 use nucliadb_core::metrics;
 use nucliadb_core::metrics::request_time;
 use nucliadb_core::metrics::vectors::MergeSource;
+use crate::service::utils;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::prost::Message;
 use nucliadb_core::protos::resource::ResourceStatus;
@@ -125,7 +126,7 @@ impl VectorWriter for VectorWriterService {
                         let vector = if resource.normalized_vectors {
                             sentence.vector.clone()
                         } else {
-                            normalize_vector(&sentence.vector)
+                            utils::normalize_vector(&sentence.vector)
                         };
                         let metadata = sentence.metadata.as_ref().map(|m| m.encode_to_vec());
                         let bucket = lengths.entry(vector.len()).or_default();
@@ -262,11 +263,6 @@ impl VectorWriterService {
             })
         }
     }
-}
-
-fn normalize_vector(vector: &[f32]) -> Vec<f32> {
-    // TODO: implement
-    vector.to_vec()
 }
 
 #[cfg(test)]

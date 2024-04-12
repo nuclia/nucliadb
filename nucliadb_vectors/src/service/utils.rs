@@ -16,24 +16,30 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
-//
 
-mod query_io;
-pub mod reader;
-mod utils;
-pub mod writer;
+pub fn normalize_vector(vector: &[f32]) -> Vec<f32> {
+    let magnitude = f32::sqrt(vector.iter().fold(0.0, |acc, x| acc + x.powi(2)));
+    vector.iter().map(|x| *x / magnitude).collect()
+}
 
-use nucliadb_core::protos::VectorSimilarity as GrpcSimilarity;
-pub use reader::*;
-pub use writer::*;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-use crate::data_point::Similarity;
+    #[test]
+    fn test_vector_normalization() {
+        let normal = normalize_vector(&[]);
+        assert!(normal.is_empty());
 
-impl From<GrpcSimilarity> for Similarity {
-    fn from(value: GrpcSimilarity) -> Self {
-        match value {
-            GrpcSimilarity::Cosine => Similarity::Cosine,
-            GrpcSimilarity::Dot => Similarity::Dot,
-        }
+        let normal = normalize_vector(&[3.0, 0.0, 4.0, 0.0]);
+        assert_eq!(normal, vec![3.0 / 5.0, 0.0, 4.0 / 5.0, 0.0]);
+
+        let normal = normalize_vector(&[-1.0, -1.0, 0.0, 1.0, 1.0]);
+        assert_eq!(normal, vec![-0.5, -0.5, 0.0, 0.5, 0.5]);
+
+        // try it out with big vectors
+        let normal = normalize_vector(&vec![100.0; 10000]);
+        assert_eq!(normal[0], 0.01);
+        assert_eq!(normal, vec![0.01; 10000]);
     }
 }
