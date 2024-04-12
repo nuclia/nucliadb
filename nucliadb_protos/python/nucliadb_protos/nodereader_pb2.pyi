@@ -111,7 +111,7 @@ class StreamFilter(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _ConjunctionEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[StreamFilter._Conjunction.ValueType], builtins.type):
+    class _ConjunctionEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[StreamFilter._Conjunction.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         AND: StreamFilter._Conjunction.ValueType  # 0
         OR: StreamFilter._Conjunction.ValueType  # 1
@@ -161,7 +161,7 @@ class OrderBy(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _OrderTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[OrderBy._OrderType.ValueType], builtins.type):
+    class _OrderTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[OrderBy._OrderType.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         DESC: OrderBy._OrderType.ValueType  # 0
         ASC: OrderBy._OrderType.ValueType  # 1
@@ -174,7 +174,7 @@ class OrderBy(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _OrderFieldEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[OrderBy._OrderField.ValueType], builtins.type):
+    class _OrderFieldEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[OrderBy._OrderField.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         CREATED: OrderBy._OrderField.ValueType  # 0
         MODIFIED: OrderBy._OrderField.ValueType  # 1

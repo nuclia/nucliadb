@@ -127,5 +127,4 @@ async def test_create_knowledgebox_release_channel(
     async with driver.transaction() as txn:
         shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
         assert shards is not None
-        config = await get_kb_config(txn, kbid)
-        assert shards.release_channel == config.release_channel == release_channel
+        assert shards.release_channel == release_channel

@@ -176,7 +176,7 @@ class Audit(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _SourceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Audit._Source.ValueType], builtins.type):
+    class _SourceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Audit._Source.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         HTTP: Audit._Source.ValueType  # 0
         DASHBOARD: Audit._Source.ValueType  # 1
@@ -217,7 +217,7 @@ class Error(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _ErrorCodeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Error._ErrorCode.ValueType], builtins.type):
+    class _ErrorCodeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Error._ErrorCode.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         GENERIC: Error._ErrorCode.ValueType  # 0
         EXTRACT: Error._ErrorCode.ValueType  # 1
@@ -256,7 +256,7 @@ class BrokerMessage(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _MessageTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[BrokerMessage._MessageType.ValueType], builtins.type):
+    class _MessageTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[BrokerMessage._MessageType.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         AUTOCOMMIT: BrokerMessage._MessageType.ValueType  # 0
         MULTI: BrokerMessage._MessageType.ValueType  # 1
@@ -275,7 +275,7 @@ class BrokerMessage(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _MessageSourceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[BrokerMessage._MessageSource.ValueType], builtins.type):
+    class _MessageSourceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[BrokerMessage._MessageSource.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         WRITER: BrokerMessage._MessageSource.ValueType  # 0
         PROCESSOR: BrokerMessage._MessageSource.ValueType  # 1
@@ -687,7 +687,7 @@ class GetLabelsResponse(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[GetLabelsResponse._Status.ValueType], builtins.type):
+    class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[GetLabelsResponse._Status.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         OK: GetLabelsResponse._Status.ValueType  # 0
         NOTFOUND: GetLabelsResponse._Status.ValueType  # 1
@@ -765,7 +765,7 @@ class NewEntitiesGroupResponse(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[NewEntitiesGroupResponse._Status.ValueType], builtins.type):
+    class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[NewEntitiesGroupResponse._Status.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         OK: NewEntitiesGroupResponse._Status.ValueType  # 0
         ERROR: NewEntitiesGroupResponse._Status.ValueType  # 1
@@ -898,7 +898,7 @@ class UpdateEntitiesGroupResponse(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[UpdateEntitiesGroupResponse._Status.ValueType], builtins.type):
+    class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[UpdateEntitiesGroupResponse._Status.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         OK: UpdateEntitiesGroupResponse._Status.ValueType  # 0
         ERROR: UpdateEntitiesGroupResponse._Status.ValueType  # 1
@@ -947,7 +947,7 @@ class ListEntitiesGroupsResponse(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[ListEntitiesGroupsResponse._Status.ValueType], builtins.type):
+    class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[ListEntitiesGroupsResponse._Status.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         OK: ListEntitiesGroupsResponse._Status.ValueType  # 0
         NOTFOUND: ListEntitiesGroupsResponse._Status.ValueType  # 1
@@ -1016,7 +1016,7 @@ class GetEntitiesResponse(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[GetEntitiesResponse._Status.ValueType], builtins.type):
+    class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[GetEntitiesResponse._Status.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         OK: GetEntitiesResponse._Status.ValueType  # 0
         NOTFOUND: GetEntitiesResponse._Status.ValueType  # 1
@@ -1151,7 +1151,7 @@ class GetLabelSetResponse(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[GetLabelSetResponse._Status.ValueType], builtins.type):
+    class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[GetLabelSetResponse._Status.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         OK: GetLabelSetResponse._Status.ValueType  # 0
         NOTFOUND: GetLabelSetResponse._Status.ValueType  # 1
@@ -1208,7 +1208,7 @@ class GetEntitiesGroupResponse(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[GetEntitiesGroupResponse._Status.ValueType], builtins.type):
+    class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[GetEntitiesGroupResponse._Status.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         OK: GetEntitiesGroupResponse._Status.ValueType  # 0
         KB_NOT_FOUND: GetEntitiesGroupResponse._Status.ValueType  # 1
@@ -1266,7 +1266,7 @@ class GetVectorSetsResponse(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[GetVectorSetsResponse._Status.ValueType], builtins.type):
+    class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[GetVectorSetsResponse._Status.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         OK: GetVectorSetsResponse._Status.ValueType  # 0
         NOTFOUND: GetVectorSetsResponse._Status.ValueType  # 1
@@ -1349,7 +1349,7 @@ class OpStatusWriter(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[OpStatusWriter._Status.ValueType], builtins.type):
+    class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[OpStatusWriter._Status.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         OK: OpStatusWriter._Status.ValueType  # 0
         ERROR: OpStatusWriter._Status.ValueType  # 1
@@ -1379,7 +1379,7 @@ class Notification(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _ActionEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Notification._Action.ValueType], builtins.type):
+    class _ActionEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Notification._Action.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         COMMIT: Notification._Action.ValueType  # 0
         ABORT: Notification._Action.ValueType  # 1
@@ -1394,7 +1394,7 @@ class Notification(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _WriteTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Notification._WriteType.ValueType], builtins.type):
+    class _WriteTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Notification._WriteType.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         UNSET: Notification._WriteType.ValueType  # 0
         CREATED: Notification._WriteType.ValueType  # 1
@@ -1457,7 +1457,7 @@ class Member(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _TypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Member._Type.ValueType], builtins.type):
+    class _TypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Member._Type.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         IO: Member._Type.ValueType  # 0
         SEARCH: Member._Type.ValueType  # 1
