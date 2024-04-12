@@ -78,7 +78,7 @@ class CloudFile(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _SourceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[CloudFile._Source.ValueType], builtins.type):
+    class _SourceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[CloudFile._Source.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         FLAPS: CloudFile._Source.ValueType  # 0
         GCS: CloudFile._Source.ValueType  # 1
@@ -156,7 +156,7 @@ class Basic(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _QueueTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Basic._QueueType.ValueType], builtins.type):
+    class _QueueTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Basic._QueueType.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         PRIVATE: Basic._QueueType.ValueType  # 0
         SHARED: Basic._QueueType.ValueType  # 1
@@ -247,7 +247,7 @@ class Origin(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _SourceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Origin._Source.ValueType], builtins.type):
+    class _SourceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Origin._Source.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         WEB: Origin._Source.ValueType  # 0
         DESKTOP: Origin._Source.ValueType  # 1
@@ -363,7 +363,7 @@ class MessageContent(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _FormatEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[MessageContent._Format.ValueType], builtins.type):
+    class _FormatEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[MessageContent._Format.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         PLAIN: MessageContent._Format.ValueType  # 0
         HTML: MessageContent._Format.ValueType  # 1
@@ -404,7 +404,7 @@ class Message(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _MessageTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Message._MessageType.ValueType], builtins.type):
+    class _MessageTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Message._MessageType.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         UNSET: Message._MessageType.ValueType  # 0
         QUESTION: Message._MessageType.ValueType  # 1
@@ -919,7 +919,7 @@ class Paragraph(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _TypeParagraphEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Paragraph._TypeParagraph.ValueType], builtins.type):
+    class _TypeParagraphEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Paragraph._TypeParagraph.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         TEXT: Paragraph._TypeParagraph.ValueType  # 0
         OCR: Paragraph._TypeParagraph.ValueType  # 1
@@ -1302,7 +1302,7 @@ class Metadata(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Metadata._Status.ValueType], builtins.type):
+    class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Metadata._Status.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         PENDING: Metadata._Status.ValueType  # 0
         PROCESSED: Metadata._Status.ValueType  # 1
@@ -1366,7 +1366,7 @@ class FieldText(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _FormatEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[FieldText._Format.ValueType], builtins.type):
+    class _FormatEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[FieldText._Format.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         PLAIN: FieldText._Format.ValueType  # 0
         HTML: FieldText._Format.ValueType  # 1
@@ -1410,7 +1410,7 @@ class Block(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _TypeBlockEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Block._TypeBlock.ValueType], builtins.type):
+    class _TypeBlockEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Block._TypeBlock.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         TITLE: Block._TypeBlock.ValueType  # 0
         DESCRIPTION: Block._TypeBlock.ValueType  # 1
@@ -1509,7 +1509,7 @@ class FieldLayout(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _FormatEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[FieldLayout._Format.ValueType], builtins.type):
+    class _FormatEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[FieldLayout._Format.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         NUCLIAv1: FieldLayout._Format.ValueType  # 0
 

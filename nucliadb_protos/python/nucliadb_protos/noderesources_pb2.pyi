@@ -121,7 +121,7 @@ class ShardCreated(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _DocumentServiceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[ShardCreated._DocumentService.ValueType], builtins.type):
+    class _DocumentServiceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[ShardCreated._DocumentService.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         DOCUMENT_V0: ShardCreated._DocumentService.ValueType  # 0
         DOCUMENT_V1: ShardCreated._DocumentService.ValueType  # 1
@@ -136,7 +136,7 @@ class ShardCreated(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _ParagraphServiceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[ShardCreated._ParagraphService.ValueType], builtins.type):
+    class _ParagraphServiceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[ShardCreated._ParagraphService.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         PARAGRAPH_V0: ShardCreated._ParagraphService.ValueType  # 0
         PARAGRAPH_V1: ShardCreated._ParagraphService.ValueType  # 1
@@ -151,7 +151,7 @@ class ShardCreated(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _VectorServiceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[ShardCreated._VectorService.ValueType], builtins.type):
+    class _VectorServiceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[ShardCreated._VectorService.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         VECTOR_V0: ShardCreated._VectorService.ValueType  # 0
         VECTOR_V1: ShardCreated._VectorService.ValueType  # 1
@@ -164,7 +164,7 @@ class ShardCreated(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _RelationServiceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[ShardCreated._RelationService.ValueType], builtins.type):
+    class _RelationServiceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[ShardCreated._RelationService.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         RELATION_V0: ShardCreated._RelationService.ValueType  # 0
         RELATION_V1: ShardCreated._RelationService.ValueType  # 1
@@ -539,7 +539,7 @@ class Resource(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _ResourceStatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Resource._ResourceStatus.ValueType], builtins.type):
+    class _ResourceStatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Resource._ResourceStatus.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         PROCESSED: Resource._ResourceStatus.ValueType  # 0
         EMPTY: Resource._ResourceStatus.ValueType  # 1

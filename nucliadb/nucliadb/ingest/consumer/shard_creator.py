@@ -22,7 +22,7 @@ import logging
 import uuid
 from functools import partial
 
-from nucliadb.common import datamanagers, locking
+from nucliadb.common import locking
 from nucliadb.common.cluster.manager import choose_node
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.maindb.driver import Driver
@@ -91,12 +91,12 @@ class ShardCreatorHandler:
     async def process_kb(self, kbid: str) -> None:
         logger.info({"message": "Processing notification for kbid", "kbid": kbid})
         async with self.driver.transaction(read_only=True) as txn:
-            kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
             current_shard = await self.shard_manager.get_current_active_shard(txn, kbid)
 
-        if kb_shards is None or current_shard is None:
+        if current_shard is None:
             logger.error(
-                "Processing a notification for a nonexistent", extra={"kbid": kbid}
+                "Processing a notification for KB with no current shard",
+                extra={"kbid": kbid},
             )
             return
 
@@ -109,8 +109,4 @@ class ShardCreatorHandler:
             shard: nodereader_pb2.Shard = await node.reader.GetShard(
                 nodereader_pb2.GetShardRequest(shard_id=noderesources_pb2.ShardId(id=shard_id))  # type: ignore
             )
-            await self.shard_manager.maybe_create_new_shard(
-                kbid,
-                shard.paragraphs,
-                kb_shards.release_channel,
-            )
+            await self.shard_manager.maybe_create_new_shard(kbid, shard.paragraphs)

@@ -102,6 +102,7 @@ class KnowledgeBoxConfig(google.protobuf.message.Message):
     disable_vectors: builtins.bool
     migration_version: builtins.int
     release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType
+    """DEPRECATED: duplicated field also stored in `writer.proto Shards`"""
     def __init__(
         self,
         *,
@@ -286,7 +287,7 @@ class LabelSet(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _LabelSetKindEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[LabelSet._LabelSetKind.ValueType], builtins.type):
+    class _LabelSetKindEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[LabelSet._LabelSetKind.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         RESOURCES: LabelSet._LabelSetKind.ValueType  # 0
         PARAGRAPHS: LabelSet._LabelSetKind.ValueType  # 1
