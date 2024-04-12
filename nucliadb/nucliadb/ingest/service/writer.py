@@ -892,6 +892,19 @@ def parse_model_metadata_from_request(
         model.default_min_score = request.default_min_score
     else:
         logger.warning("Default min score not set!")
+
+    if len(request.matryoshka_dimensions) > 0:
+        if model.vector_dimension not in request.matryoshka_dimensions:
+            logger.warning(
+                "Vector dimensions is inconsistent with matryoshka dimensions! Ignoring them",
+                extra={
+                    "kbid": request.forceuuid,
+                    "kbslug": request.slug,
+                },
+            )
+        else:
+            model.matryoshka_dimensions.extend(request.matryoshka_dimensions)
+
     return model
 
 

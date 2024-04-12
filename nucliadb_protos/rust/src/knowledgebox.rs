@@ -49,6 +49,8 @@ pub struct KnowledgeBoxNew {
     pub vector_dimension: ::core::option::Option<i32>,
     #[prost(float, optional, tag="6")]
     pub default_min_score: ::core::option::Option<f32>,
+    #[prost(uint32, repeated, tag="9")]
+    pub matryoshka_dimensions: ::prost::alloc::vec::Vec<u32>,
     #[prost(enumeration="super::utils::ReleaseChannel", tag="7")]
     pub release_channel: i32,
     #[prost(string, tag="8")]
@@ -238,10 +240,6 @@ pub struct SemanticModelMetadata {
     /// supports it)
     #[prost(uint32, repeated, tag="4")]
     pub matryoshka_dimensions: ::prost::alloc::vec::Vec<u32>,
-    /// pointer to the used value in `matryoshka_dimensions`. -1 if the
-    /// embeddings are not matryoshka
-    #[prost(int32, tag="5")]
-    pub selected_matryoshka_dimension: i32,
 }
 // Do not update this model without confirmation of internal Learning Config API
 

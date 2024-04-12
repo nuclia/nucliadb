@@ -40,9 +40,12 @@ message KnowledgeBoxNew {
     string slug = 1;
     KnowledgeBoxConfig config = 2;
     string forceuuid = 3;
+
     utils.VectorSimilarity similarity = 4;
     optional int32 vector_dimension = 5;
     optional float default_min_score = 6;
+    repeated uint32 matryoshka_dimensions = 9;
+
     utils.ReleaseChannel release_channel = 7;
     string learning_config = 8;
 }
@@ -192,9 +195,6 @@ message SemanticModelMetadata {
     // list of possible subdivisions of the matryoshka embeddings (if the model
     // supports it)
     repeated uint32 matryoshka_dimensions = 4;
-    // pointer to the used value in `matryoshka_dimensions`. -1 if the
-    // embeddings are not matryoshka
-    int32 selected_matryoshka_dimension = 5;
 }
 
 // Do not update this model without confirmation of internal Learning Config API
