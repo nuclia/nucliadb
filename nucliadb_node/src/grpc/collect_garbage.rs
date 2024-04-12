@@ -46,7 +46,7 @@ pub async fn garbage_collection_loop(parameters: GCParameters, cache: Arc<ShardW
         let shards_dir_iterator = match read_dir(&parameters.shards_path) {
             Ok(iterator) => iterator,
             Err(error) => {
-                error!("Update loop can not read shards directory: {error:?}");
+                error!("Garbage collector loop can not read shards directory: {error:?}");
                 continue;
             }
         };
