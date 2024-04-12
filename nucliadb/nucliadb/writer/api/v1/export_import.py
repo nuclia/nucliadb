@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from typing import AsyncGenerator
 from uuid import uuid4
 
 from fastapi_versioning import version
@@ -28,13 +29,14 @@ from nucliadb.common.context import ApplicationContext
 from nucliadb.common.context.fastapi import get_app_context
 from nucliadb.export_import import importer
 from nucliadb.export_import.datamanager import ExportImportDataManager
+from nucliadb.export_import.exceptions import IncompatibleExport
 from nucliadb.export_import.models import (
     ExportMetadata,
     ImportMetadata,
     NatsTaskMessage,
 )
 from nucliadb.export_import.tasks import get_exports_producer, get_imports_producer
-from nucliadb.export_import.utils import IteratorExportStream
+from nucliadb.export_import.utils import IteratorExportStream, stream_compatible_with_kb
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.writer import logger
 from nucliadb.writer.api.v1.router import KB_PREFIX, api
@@ -91,34 +93,41 @@ async def start_kb_import_endpoint(request: Request, kbid: str):
 
     await maybe_back_pressure(request, kbid)
 
-    import_id = uuid4().hex
-    if in_standalone_mode():
-        # In standalone mode, we import directly from the request content stream.
-        # Note that we return an import_id simply to keep the API consistent with hosted nucliadb.
-        stream = FastAPIExportStream(request)
-        await importer.import_kb(
-            context=context,
-            kbid=kbid,
-            stream=stream,
-        )
-        return CreateImportResponse(import_id=import_id)
-    else:
-        import_size = await upload_import_to_blob_storage(
-            context=context,
-            request=request,
-            kbid=kbid,
-            import_id=import_id,
-        )
-        await start_import_task(context, kbid, import_id, import_size)
-        return CreateImportResponse(import_id=import_id)
+    stream = stream_compatible_with_kb(kbid, request.stream())
+
+    try:
+        import_id = uuid4().hex
+        if in_standalone_mode():
+            # In standalone mode, we import directly from the request content stream.
+            # Note that we return an import_id simply to keep the API consistent with hosted nucliadb.
+            await importer.import_kb(
+                context=context,
+                kbid=kbid,
+                stream=IteratorExportStream(stream.__aiter__()),
+            )
+            return CreateImportResponse(import_id=import_id)
+        else:
+            import_size = await upload_import_to_blob_storage(
+                context=context,
+                stream=stream,
+                kbid=kbid,
+                import_id=import_id,
+            )
+            await start_import_task(context, kbid, import_id, import_size)
+            return CreateImportResponse(import_id=import_id)
+    except IncompatibleExport as exc:
+        return HTTPClientError(status_code=400, detail=str(exc))
 
 
 async def upload_import_to_blob_storage(
-    context: ApplicationContext, request: Request, kbid: str, import_id: str
+    context: ApplicationContext,
+    stream: AsyncGenerator[bytes, None],
+    kbid: str,
+    import_id: str,
 ) -> int:
     dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
     return await dm.upload_import(
-        import_bytes=request.stream(),
+        import_bytes=stream,
         kbid=kbid,
         import_id=import_id,
     )
@@ -161,9 +170,3 @@ async def start_import_task(
         errors.capture_exception(e)
         await dm.delete_metadata("import", metadata)
         raise
-
-
-class FastAPIExportStream(IteratorExportStream):
-    def __init__(self, request: Request):
-        iterator = request.stream().__aiter__()
-        super().__init__(iterator)
