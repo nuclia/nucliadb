@@ -52,11 +52,10 @@ from nucliadb_protos.noderesources_pb2 import (
     ShardCreated,
     ShardId,
     ShardIds,
-    ShardMetadata,
     VectorSetID,
     VectorSetList,
 )
-from nucliadb_protos.nodewriter_pb2 import OpStatus
+from nucliadb_protos.nodewriter_pb2 import NewShardRequest, OpStatus
 
 from ..settings import settings
 
@@ -287,7 +286,7 @@ class StandaloneWriterWrapper:
         self.writer = NodeWriter()
         self.executor = ThreadPoolExecutor(settings.local_writer_threads)
 
-    async def NewShard(self, request: ShardMetadata) -> ShardCreated:
+    async def NewShard(self, request: NewShardRequest) -> ShardCreated:
         loop = asyncio.get_running_loop()
         resp = await loop.run_in_executor(
             self.executor, self.writer.new_shard, request.SerializeToString()
@@ -389,7 +388,7 @@ READER_METHODS = {
     "RelationEdges": (ShardId, EdgeList),
 }
 WRITER_METHODS = {
-    "NewShard": (ShardMetadata, ShardCreated),
+    "NewShard": (NewShardRequest, ShardCreated),
     "DeleteShard": (ShardId, ShardId),
     "ListShards": (EmptyQuery, ShardIds),
     "RemoveVectorSet": (VectorSetID, OpStatus),
