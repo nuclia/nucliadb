@@ -216,10 +216,7 @@ class KnowledgeBox:
         if config and exist != config:
             exist.MergeFrom(config)
 
-        await txn.set(
-            datamanagers.kb.KB_UUID.format(kbid=uuid),
-            exist.SerializeToString(),
-        )
+        await datamanagers.kb.set_config(txn, kbid=uuid, config=exist)
 
         return uuid
 
