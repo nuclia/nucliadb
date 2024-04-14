@@ -41,6 +41,7 @@ pub struct KnowledgeBoxNew {
     pub slug: ::prost::alloc::string::String,
     #[prost(message, optional, tag="2")]
     pub config: ::core::option::Option<KnowledgeBoxConfig>,
+    /// this fields are only set by backend when creating hosted KBs
     #[prost(string, tag="3")]
     pub forceuuid: ::prost::alloc::string::String,
     #[prost(enumeration="super::utils::VectorSimilarity", tag="4")]
@@ -51,10 +52,14 @@ pub struct KnowledgeBoxNew {
     pub default_min_score: ::core::option::Option<f32>,
     #[prost(uint32, repeated, tag="9")]
     pub matryoshka_dimensions: ::prost::alloc::vec::Vec<u32>,
-    #[prost(enumeration="super::utils::ReleaseChannel", tag="7")]
-    pub release_channel: i32,
+    /// this field are only used by NucliaDB Writer API when creating a KB. Used
+    /// in onprem scenarios
     #[prost(string, tag="8")]
     pub learning_config: ::prost::alloc::string::String,
+    /// release channel, although not used when backend creates hosted KBs, it's
+    /// recomputed and changed depending on the environment
+    #[prost(enumeration="super::utils::ReleaseChannel", tag="7")]
+    pub release_channel: i32,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NewKnowledgeBoxResponse {
