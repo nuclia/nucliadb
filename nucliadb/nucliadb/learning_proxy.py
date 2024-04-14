@@ -28,7 +28,7 @@ import backoff
 import httpx
 from fastapi import Request, Response
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, root_validator
+from pydantic import BaseModel, Field, root_validator
 
 from nucliadb_telemetry import errors
 from nucliadb_utils.settings import is_onprem_nucliadb, nuclia_settings
@@ -65,17 +65,20 @@ class LearningConfiguration(BaseModel):
     semantic_threshold: Optional[float]
     # List of possible subdivisions of the matryoshka embeddings (if the model
     # supports it)
-    semantic_matryoshka_dims: Optional[list[int]]
+    semantic_matryoshka_dimensions: Optional[list[int]] = Field(
+        default=None, alias="semantic_matryoshka_dims"
+    )
 
-    @root_validator
+    @root_validator(pre=False)
     def validate_matryoshka_and_vector_dimension_consistency(cls, values):
-        vector_dim = values.get("semantic_vector_size")
-        matryoshka_dims = values.get("semantic_matryoshka_dims", []) or []
+        vector_size = values.get("semantic_vector_size")
+        matryoshka_dimensions = values.get("semantic_matryoshka_dimensions", []) or []
         if (
-            len(matryoshka_dims) > 0
-            and vector_dim is not None
-            and vector_dim not in matryoshka_dims
+            len(matryoshka_dimensions) > 0
+            and vector_size is not None
+            and vector_size not in matryoshka_dimensions
         ):
+            print("value error!?")
             raise ValueError(
                 "Semantic vector size is inconsistent with matryoshka dimensions"
             )

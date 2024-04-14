@@ -876,7 +876,8 @@ def parse_model_metadata_from_learning_config(
         model.default_min_score = lconfig.semantic_threshold
     else:
         logger.warning("Default min score not set!")
-    model.matryoshka_dimensions.extend(lconfig.semantic_matryoshka_dims)
+    if lconfig.semantic_matryoshka_dimensions is not None:
+        model.matryoshka_dimensions.extend(lconfig.semantic_matryoshka_dimensions)
     return model
 
 
