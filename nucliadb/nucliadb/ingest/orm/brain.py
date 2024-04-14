@@ -55,7 +55,6 @@ else:
 
 FilePagePositions = dict[int, tuple[int, int]]
 
-
 FIELD_PARAGRAPH_ID = "{rid}/{field_id}/{paragraph_start}-{paragraph_end}"
 SPLIT_FIELD_PARAGRAPH_ID = (
     "{rid}/{field_id}/{subfield_id}/{paragraph_start}-{paragraph_end}"
@@ -64,7 +63,6 @@ FIELD_VECTOR_ID = "{rid}/{field_id}/{index}/{vector_start}-{vector_end}"
 SPLIT_FIELD_VECTOR_ID = (
     "{rid}/{field_id}/{subfield_id}/{index}/{vector_start}-{vector_end}"
 )
-
 
 METADATA_STATUS_PB_TYPE_TO_NAME_MAP = {
     Metadata.Status.ERROR: ResourceProcessingStatus.ERROR.name,
@@ -270,71 +268,88 @@ class ResourceBrain:
 
     def apply_field_vectors(
         self,
-        field_key: str,
-        vo: VectorObject,
-        replace_field: bool,
-        replace_splits: list[str],
+        field_id: str,
+        vo: utils_pb2.VectorObject,
+        *,
+        replace_field: bool = False,
+        replace_splits: Optional[list[str]] = None,
+        vector_dimension: Optional[int] = None,
     ):
+        replace_splits = replace_splits or []
+
         for subfield, vectors in vo.split_vectors.items():
             # For each split of this field
             for index, vector in enumerate(vectors.vectors):
                 paragraph_key = SPLIT_FIELD_PARAGRAPH_ID.format(
                     rid=self.rid,
-                    field_id=field_key,
+                    field_id=field_id,
                     subfield_id=subfield,
                     paragraph_start=vector.start_paragraph,
                     paragraph_end=vector.end_paragraph,
                 )
                 sentence_key = SPLIT_FIELD_VECTOR_ID.format(
                     rid=self.rid,
-                    field_id=field_key,
+                    field_id=field_id,
                     subfield_id=subfield,
                     index=index,
                     vector_start=vector.start,
                     vector_end=vector.end,
                 )
                 self._apply_field_vector(
-                    self.brain, field_key, paragraph_key, sentence_key, vector
+                    field_id,
+                    paragraph_key,
+                    sentence_key,
+                    vector,
+                    vector_dimension=vector_dimension,
                 )
 
         for index, vector in enumerate(vo.vectors.vectors):
             paragraph_key = FIELD_PARAGRAPH_ID.format(
                 rid=self.rid,
-                field_id=field_key,
+                field_id=field_id,
                 paragraph_start=vector.start_paragraph,
                 paragraph_end=vector.end_paragraph,
             )
             sentence_key = FIELD_VECTOR_ID.format(
                 rid=self.rid,
-                field_id=field_key,
+                field_id=field_id,
                 index=index,
                 vector_start=vector.start,
                 vector_end=vector.end,
             )
             self._apply_field_vector(
-                self.brain, field_key, paragraph_key, sentence_key, vector
+                field_id,
+                paragraph_key,
+                sentence_key,
+                vector,
+                vector_dimension=vector_dimension,
             )
 
         for split in replace_splits:
-            self.brain.sentences_to_delete.append(f"{self.rid}/{field_key}/{split}")
+            self.brain.sentences_to_delete.append(f"{self.rid}/{field_id}/{split}")
 
         if replace_field:
-            self.brain.sentences_to_delete.append(f"{self.rid}/{field_key}")
+            self.brain.sentences_to_delete.append(f"{self.rid}/{field_id}")
 
-    @staticmethod
     def _apply_field_vector(
-        brain: PBBrainResource,
-        field_key: str,
+        self,
+        field_id: str,
         paragraph_key: str,
         sentence_key: str,
         vector: utils_pb2.Vector,
+        *,
+        vector_dimension: Optional[int] = None,
     ):
-        """Modify `brain` by applying a vector"""
-        paragraph_pb = brain.paragraphs[field_key].paragraphs[paragraph_key]
+        paragraph_pb = self.brain.paragraphs[field_id].paragraphs[paragraph_key]
         sentence_pb = paragraph_pb.sentences[sentence_key]
 
         sentence_pb.ClearField("vector")  # clear first to prevent duplicates
-        sentence_pb.vector.extend(vector.vector)
+
+        # cut vectors if a specific dimension is specified
+        if vector_dimension is not None:
+            sentence_pb.vector.extend(vector.vector[:vector_dimension])
+        else:
+            sentence_pb.vector.extend(vector.vector)
 
         # we only care about start/stop position of the paragraph for a given sentence here
         # the key has the sentence position
