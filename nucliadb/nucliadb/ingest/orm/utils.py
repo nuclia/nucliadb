@@ -82,3 +82,10 @@ def set_title(writer: BrokerMessage, toprocess: PushPayload, title: str):
 
 def compute_paragraph_key(rid: str, paragraph_key: str) -> str:
     return paragraph_key.replace("N_RID", rid)
+
+
+def choose_matryoshka_dimension(dimensions: list[int]):
+    """Given a list of matryoshka embedding available dimensions, choose one to
+    set the vector dimension.
+    """
+    return min(dimensions)

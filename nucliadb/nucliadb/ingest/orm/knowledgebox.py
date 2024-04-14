@@ -48,7 +48,12 @@ from nucliadb.ingest.orm.resource import (
     Resource,
 )
 from nucliadb.ingest.orm.synonyms import Synonyms
-from nucliadb.ingest.orm.utils import compute_paragraph_key, get_basic, set_basic
+from nucliadb.ingest.orm.utils import (
+    choose_matryoshka_dimension,
+    compute_paragraph_key,
+    get_basic,
+    set_basic,
+)
 from nucliadb.migrator.utils import get_latest_version
 from nucliadb_protos import writer_pb2
 from nucliadb_utils.storages.storage import Storage
@@ -171,7 +176,15 @@ class KnowledgeBox:
             kb_shards.actual = -1
             # B/c with `Shards.similarity`, replaced by `model`
             kb_shards.similarity = semantic_model.similarity_function
+
+            # if this KB uses a matryoshka model, we can choose a different
+            # dimension
+            if len(semantic_model.matryoshka_dimensions) > 0:
+                semantic_model.vector_dimension = choose_matryoshka_dimension(
+                    semantic_model.matryoshka_dimensions  # type: ignore
+                )
             kb_shards.model.CopyFrom(semantic_model)
+
             kb_shards.release_channel = release_channel
 
             await datamanagers.cluster.update_kb_shards(
