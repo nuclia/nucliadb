@@ -1021,8 +1021,6 @@ class Resource:
             )
             loop = asyncio.get_running_loop()
             await loop.run_in_executor(_executor, apply_field_vectors)
-        else:
-            raise AttributeError("VO not found on set")
 
     async def _apply_field_large_metadata(
         self, field_large_metadata: LargeComputedMetadataWrapper
