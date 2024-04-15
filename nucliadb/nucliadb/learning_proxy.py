@@ -78,7 +78,6 @@ class LearningConfiguration(BaseModel):
             and vector_size is not None
             and vector_size not in matryoshka_dimensions
         ):
-            print("value error!?")
             raise ValueError(
                 "Semantic vector size is inconsistent with matryoshka dimensions"
             )
