@@ -226,7 +226,16 @@ where
     }
 
     // Creating the hnsw for the new node store.
-    let tracker = Retriever::new(&[], &nodes, &NoDLog, similarity, -1.0);
+    let tracker = Retriever::new(
+        &[],
+        &nodes,
+        &NoDLog,
+        SearchParams {
+            similarity,
+            min_score: -1.0,
+            dimension: operants[0].1.stored_len().unwrap_or(0) as usize,
+        },
+    );
     let mut ops = HnswOps::new(&tracker);
     for id in start_node_index..no_nodes {
         ops.insert(Address(id), &mut index)
@@ -294,16 +303,28 @@ pub fn create(
 
     // Serializing nodes on disk
     // Nodes are stored on disk and mmaped.
+    let dimension = elems.first().map(|e| e.vector.len());
     data_store::create_key_value(&mut nodesf, elems)?;
     let nodes = unsafe { Mmap::map(&nodesf)? };
     let no_nodes = data_store::stored_elements(&nodes);
 
     // Creating the HNSW using the mmaped nodes
-    let tracker = Retriever::new(&[], &nodes, &NoDLog, similarity, -1.0);
-    let mut ops = HnswOps::new(&tracker);
     let mut index = RAMHnsw::new();
-    for id in 0..no_nodes {
-        ops.insert(Address(id), &mut index)
+    if let Some(dimension) = dimension {
+        let tracker = Retriever::new(
+            &[],
+            &nodes,
+            &NoDLog,
+            SearchParams {
+                similarity,
+                min_score: -1.0,
+                dimension,
+            },
+        );
+        let mut ops = HnswOps::new(&tracker);
+        for id in 0..no_nodes {
+            ops.insert(Address(id), &mut index)
+        }
     }
 
     {
@@ -400,6 +421,12 @@ impl FormulaFilter<'_> {
     }
 }
 
+pub struct SearchParams {
+    pub similarity: Similarity,
+    pub min_score: f32,
+    pub dimension: usize,
+}
+
 pub struct Retriever<'a, Dlog> {
     similarity_function: fn(&[u8], &[u8]) -> f32,
     no_nodes: usize,
@@ -407,17 +434,17 @@ pub struct Retriever<'a, Dlog> {
     nodes: &'a Mmap,
     delete_log: &'a Dlog,
     min_score: f32,
+    dimension: usize,
 }
 impl<'a, Dlog: DeleteLog> Retriever<'a, Dlog> {
     pub fn new(
         temp: &'a [u8],
         nodes: &'a Mmap,
         delete_log: &'a Dlog,
-        similarity: Similarity,
-        min_score: f32,
+        search_params: SearchParams,
     ) -> Retriever<'a, Dlog> {
         let no_nodes = data_store::stored_elements(nodes);
-        let similarity_function = match similarity {
+        let similarity_function = match search_params.similarity {
             Similarity::Cosine => vector::cosine_similarity,
             Similarity::Dot => vector::dot_similarity,
         };
@@ -427,7 +454,8 @@ impl<'a, Dlog: DeleteLog> Retriever<'a, Dlog> {
             delete_log,
             similarity_function,
             no_nodes,
-            min_score,
+            min_score: search_params.min_score,
+            dimension: search_params.dimension,
         }
     }
     fn find_node(&self, Address(x): Address) -> &[u8] {
@@ -447,6 +475,10 @@ impl<'a, Dlog: DeleteLog> DataRetriever for Retriever<'a, Dlog> {
             let x = self.find_node(x);
             Node::key(x)
         }
+    }
+
+    fn will_need(&self, Address(x): Address) {
+        data_store::will_need(self.nodes, x, self.dimension);
     }
 
     fn get_vector(&self, x @ Address(addr): Address) -> &[u8] {
@@ -645,11 +677,10 @@ impl OpenDataPoint {
         filter: &Formula,
         with_duplicates: bool,
         results: usize,
-        similarity: Similarity,
-        min_score: f32,
+        search_params: SearchParams,
     ) -> impl Iterator<Item = Neighbour> + '_ {
         let encoded_query = vector::encode_vector(query);
-        let tracker = Retriever::new(&encoded_query, &self.nodes, delete_log, similarity, min_score);
+        let tracker = Retriever::new(&encoded_query, &self.nodes, delete_log, search_params);
         let filter = FormulaFilter::new(filter);
         let ops = HnswOps::new(&tracker);
         let neighbours = ops.search(Address(self.journal.nodes), self.index.as_ref(), results, filter, with_duplicates);

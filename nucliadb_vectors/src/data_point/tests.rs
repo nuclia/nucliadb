@@ -21,7 +21,7 @@
 use std::collections::HashSet;
 use std::time::{Instant, SystemTime};
 
-use crate::data_point::{self, DataPointPin, DeleteLog, Elem, LabelDictionary, Similarity};
+use crate::data_point::{self, DataPointPin, DeleteLog, Elem, LabelDictionary, SearchParams, Similarity};
 use crate::formula::{AtomClause, Formula};
 use crate::VectorR;
 
@@ -72,7 +72,18 @@ fn simple_flow() {
         acc.extend(i.clone());
         acc
     });
-    let result = reader.search(&HashSet::new(), &query, &formula, true, no_results, Similarity::Cosine, -1.0);
+    let result = reader.search(
+        &HashSet::new(),
+        &query,
+        &formula,
+        true,
+        no_results,
+        SearchParams {
+            similarity: Similarity::Cosine,
+            min_score: -1.0,
+            dimension: 8,
+        },
+    );
     let got_keys = reader.get_keys(&HashSet::new());
     assert!(got_keys.iter().all(|k| expected_keys.contains(k)));
     assert_eq!(got_keys.len(), expected_keys.len());
@@ -105,13 +116,35 @@ fn accuracy_test() {
         acc
     });
     let mut result_0 = reader
-        .search(&HashSet::new(), &query, &formula, true, no_results, Similarity::Cosine, -1.0)
+        .search(
+            &HashSet::new(),
+            &query,
+            &formula,
+            true,
+            no_results,
+            SearchParams {
+                similarity: Similarity::Cosine,
+                min_score: -1.0,
+                dimension: 178,
+            },
+        )
         .collect::<Vec<_>>();
     result_0.sort_by(|i, j| i.id().cmp(j.id()));
     let query: Vec<_> = query.into_iter().map(|v| v + 1.0).collect();
     let no_results = 10;
     let mut result_1 = reader
-        .search(&HashSet::new(), &query, &formula, true, no_results, Similarity::Cosine, -1.0)
+        .search(
+            &HashSet::new(),
+            &query,
+            &formula,
+            true,
+            no_results,
+            SearchParams {
+                similarity: Similarity::Cosine,
+                min_score: -1.0,
+                dimension: 178,
+            },
+        )
         .collect::<Vec<_>>();
     result_1.sort_by(|i, j| i.id().cmp(j.id()));
     assert_ne!(result_0, result_1)
@@ -127,13 +160,36 @@ fn single_graph() {
     let pin = DataPointPin::create_pin(temp_dir.path()).unwrap();
     let reader = data_point::create(&pin, elems.clone(), None, SIMILARITY).unwrap();
     let formula = Formula::new();
-    let result = reader.search(&HashSet::from([key.clone()]), &vector, &formula, true, 5, Similarity::Cosine, -1.0);
+    let result = reader.search(
+        &HashSet::from([key.clone()]),
+        &vector,
+        &formula,
+        true,
+        5,
+        SearchParams {
+            similarity: Similarity::Cosine,
+            min_score: -1.0,
+            dimension: 178,
+        },
+    );
     assert_eq!(result.count(), 0);
 
     let pin = DataPointPin::create_pin(temp_dir.path()).unwrap();
     let reader = data_point::create(&pin, elems, None, SIMILARITY).unwrap();
-    let result =
-        reader.search(&HashSet::new(), &vector, &formula, true, 5, Similarity::Cosine, -1.0).collect::<Vec<_>>();
+    let result = reader
+        .search(
+            &HashSet::new(),
+            &vector,
+            &formula,
+            true,
+            5,
+            SearchParams {
+                similarity: Similarity::Cosine,
+                min_score: -1.0,
+                dimension: 178,
+            },
+        )
+        .collect::<Vec<_>>();
     assert_eq!(result.len(), 1);
     assert!(result[0].score() >= 0.9);
     assert!(result[0].id() == key.as_bytes());
@@ -162,11 +218,37 @@ fn data_merge() {
     let dp = data_point::merge(&dp_pin, work, Similarity::Cosine, SystemTime::now()).unwrap();
 
     let formula = Formula::new();
-    let result: Vec<_> = dp.search(&HashSet::new(), &vector1, &formula, true, 1, Similarity::Cosine, -1.0).collect();
+    let result: Vec<_> = dp
+        .search(
+            &HashSet::new(),
+            &vector1,
+            &formula,
+            true,
+            1,
+            SearchParams {
+                similarity: Similarity::Cosine,
+                min_score: -1.0,
+                dimension: 178,
+            },
+        )
+        .collect();
     assert_eq!(result.len(), 1);
     assert!(result[0].score() >= 0.9);
     assert!(result[0].id() == key1.as_bytes());
-    let result: Vec<_> = dp.search(&HashSet::new(), &vector0, &formula, true, 1, Similarity::Cosine, -1.0).collect();
+    let result: Vec<_> = dp
+        .search(
+            &HashSet::new(),
+            &vector0,
+            &formula,
+            true,
+            1,
+            SearchParams {
+                similarity: Similarity::Cosine,
+                min_score: -1.0,
+                dimension: 178,
+            },
+        )
+        .collect();
     assert_eq!(result.len(), 1);
     assert!(result[0].score() >= 0.9);
     assert!(result[0].id() == key0.as_bytes());
@@ -211,14 +293,36 @@ fn prefiltering_test() {
             acc
         });
         let result_0 = reader
-            .search(&HashSet::new(), &query, &formula, true, no_results, Similarity::Cosine, -1.0)
+            .search(
+                &HashSet::new(),
+                &query,
+                &formula,
+                true,
+                no_results,
+                SearchParams {
+                    similarity: Similarity::Cosine,
+                    min_score: -1.0,
+                    dimension: 178,
+                },
+            )
             .collect::<Vec<_>>();
         assert_eq!(result_0.len(), 1);
 
         let delete_log: HashSet<_> =
             result_0.into_iter().map(|n| String::from_utf8_lossy(n.id()).to_string()).collect();
         let result_with_deleted = reader
-            .search(&delete_log, &query, &formula, true, no_results, Similarity::Cosine, -1.0)
+            .search(
+                &delete_log,
+                &query,
+                &formula,
+                true,
+                no_results,
+                SearchParams {
+                    similarity: Similarity::Cosine,
+                    min_score: -1.0,
+                    dimension: 178,
+                },
+            )
             .collect::<Vec<_>>();
         assert_eq!(result_with_deleted.len(), 0);
     }
@@ -258,7 +362,20 @@ fn fast_data_merge() -> VectorR<()> {
 
     for (i, v) in search_vectors.iter().enumerate() {
         let formula = Formula::new();
-        let result: Vec<_> = dp.search(&HashSet::new(), v, &formula, true, 1, Similarity::Dot, 0.999).collect();
+        let result: Vec<_> = dp
+            .search(
+                &HashSet::new(),
+                v,
+                &formula,
+                true,
+                1,
+                SearchParams {
+                    similarity: Similarity::Dot,
+                    min_score: 0.999,
+                    dimension: 178,
+                },
+            )
+            .collect();
         assert_eq!(result.len(), 1);
         assert!(result[0].score() >= 0.999);
         assert!(result[0].id() == format!("search_{i}").as_bytes());
@@ -275,7 +392,20 @@ fn fast_data_merge() -> VectorR<()> {
 
     for (i, v) in search_vectors.iter().enumerate() {
         let formula = Formula::new();
-        let result: Vec<_> = dp.search(&HashSet::new(), v, &formula, true, 1, Similarity::Dot, 0.999).collect();
+        let result: Vec<_> = dp
+            .search(
+                &HashSet::new(),
+                v,
+                &formula,
+                true,
+                1,
+                SearchParams {
+                    similarity: Similarity::Dot,
+                    min_score: 0.999,
+                    dimension: 178,
+                },
+            )
+            .collect();
         if i == 0 || i == 2 {
             // These were deleted, they should not be in the merge
             assert_eq!(result.len(), 0);
