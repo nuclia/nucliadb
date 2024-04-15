@@ -70,3 +70,11 @@ class WrongExportStreamFormat(Exception):
     """
 
     pass
+
+
+class IncompatibleExport(Exception):
+    """
+    Raised when trying to import an export file that is incompatible with the destination knowledgebox.
+    """
+
+    pass

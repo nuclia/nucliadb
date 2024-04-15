@@ -35,6 +35,7 @@ from nucliadb.export_import.utils import (
     get_cloud_files,
     get_entities,
     get_labels,
+    get_learning_config,
     iter_kb_resource_uuids,
 )
 from nucliadb_protos import writer_pb2
@@ -51,6 +52,9 @@ async def export_kb(
 
     If a metadata object is provided, uses it to resume the export if it was interrupted.
     """
+    async for chunk in export_learning_config(kbid):
+        yield chunk
+
     resources_iterator = export_resources(context, kbid)
     if metadata is not None:
         assert metadata.kbid == kbid
@@ -189,3 +193,18 @@ async def export_labels(
         yield ExportedItemType.LABELS.encode("utf-8")
         yield len(data).to_bytes(4, byteorder="big")
         yield data
+
+
+async def export_learning_config(
+    kbid: str,
+) -> AsyncGenerator[bytes, None]:
+    lconfig = await get_learning_config(kbid)
+    if lconfig is None:
+        logger.warning(
+            f"No learning configuration found for kbid", extra={"kbid": kbid}
+        )
+        return
+    data = lconfig.json().encode("utf-8")
+    yield ExportedItemType.LEARNING_CONFIG.encode("utf-8")
+    yield len(data).to_bytes(4, byteorder="big")
+    yield data
