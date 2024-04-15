@@ -90,3 +90,14 @@ async def get_model_metadata(
         return knowledgebox_pb2.SemanticModelMetadata(
             similarity_function=shards_obj.similarity
         )
+
+
+async def get_vector_dimension(txn: Transaction, *, kbid: str) -> Optional[int]:
+    model_metadata = await get_model_metadata(txn, kbid=kbid)
+    vector_dimension = None
+    if (
+        len(model_metadata.matryoshka_dimensions) > 0
+        and model_metadata.vector_dimension in model_metadata.matryoshka_dimensions
+    ):
+        vector_dimension = model_metadata.vector_dimension
+    return vector_dimension
