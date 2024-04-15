@@ -29,17 +29,15 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 use serde_json::Value;
 use tantivy::schema::Schema;
-use tantivy::{Index, IndexSettings, LeasedItem, Opstamp, Result, Searcher, SegmentId};
+use tantivy::{Index, IndexSettings, Opstamp, Result, Searcher, SegmentId};
 
 pub type Json = Value;
 
 /// Using a [`Searcher`] as a guard ensures us that until the
 /// value is dropped the files it has access to are not modified.
-pub struct ReplicationGuard(LeasedItem<Searcher>);
 
 pub struct TantivyReplicaState {
     pub files: Vec<PathBuf>,
-    pub guard: ReplicationGuard,
     pub metadata_path: PathBuf,
     pub index_metadata: Json,
 }
@@ -151,7 +149,6 @@ pub fn compute_safe_replica_state(params: ReplicationParameters, index: &Index) 
 
     Ok(TantivyReplicaState {
         files: segment_files,
-        guard: ReplicationGuard(searcher),
         metadata_path: PathBuf::from("meta.json"),
         index_metadata: serde_json::to_value(safe_metadata)?,
     })

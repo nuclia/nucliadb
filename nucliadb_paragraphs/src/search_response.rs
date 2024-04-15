@@ -66,7 +66,7 @@ pub struct SearchBm25Response<'a> {
     pub page_number: i32,
     pub results_per_page: i32,
     pub termc: TermCollector,
-    pub searcher: tantivy::LeasedItem<tantivy::Searcher>,
+    pub searcher: tantivy::Searcher,
     pub min_score: f32,
 }
 
@@ -80,7 +80,7 @@ pub struct SearchIntResponse<'a> {
     pub page_number: i32,
     pub results_per_page: i32,
     pub termc: TermCollector,
-    pub searcher: tantivy::LeasedItem<tantivy::Searcher>,
+    pub searcher: tantivy::Searcher,
 }
 
 pub struct SearchFacetsResponse<'a> {

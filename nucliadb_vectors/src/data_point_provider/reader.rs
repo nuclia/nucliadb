@@ -243,6 +243,7 @@ impl Reader {
 
         for open_data_point in self.open_data_points.values() {
             let data_point_journal = open_data_point.journal();
+            println!("Searching segment {}", data_point_journal.id());
             let delete_log = TimeSensitiveDLog {
                 time: data_point_journal.time(),
                 dlog: &self.delete_log,

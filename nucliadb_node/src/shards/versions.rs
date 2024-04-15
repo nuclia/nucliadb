@@ -110,8 +110,6 @@ impl Versions {
     }
     pub fn get_paragraphs_reader(&self, config: &ParagraphConfig) -> NodeResult<ParagraphsReaderPointer> {
         match self.version_paragraphs {
-            Some(1) => nucliadb_paragraphs::reader::ParagraphReaderService::start(config)
-                .map(|i| Arc::new(RwLock::new(i)) as ParagraphsReaderPointer),
             Some(2) => nucliadb_paragraphs2::reader::ParagraphReaderService::start(config)
                 .map(|i| Arc::new(RwLock::new(i)) as ParagraphsReaderPointer),
             Some(v) => Err(node_error!("Invalid paragraphs version {v}")),
@@ -121,8 +119,6 @@ impl Versions {
 
     pub fn get_texts_reader(&self, config: &TextConfig) -> NodeResult<TextsReaderPointer> {
         match self.version_texts {
-            Some(1) => nucliadb_texts::reader::TextReaderService::start(config)
-                .map(|i| Arc::new(RwLock::new(i)) as TextsReaderPointer),
             Some(2) => nucliadb_texts2::reader::TextReaderService::start(config)
                 .map(|i| Arc::new(RwLock::new(i)) as TextsReaderPointer),
             Some(v) => Err(node_error!("Invalid text reader version {v}")),
@@ -132,8 +128,6 @@ impl Versions {
 
     pub fn get_relations_reader(&self, config: &RelationConfig) -> NodeResult<RelationsReaderPointer> {
         match self.version_relations {
-            Some(1) => nucliadb_relations::service::RelationsReaderService::start(config)
-                .map(|i| Arc::new(RwLock::new(i)) as RelationsReaderPointer),
             Some(2) => nucliadb_relations2::reader::RelationsReaderService::start(config)
                 .map(|i| Arc::new(RwLock::new(i)) as RelationsReaderPointer),
             Some(v) => Err(node_error!("Invalid relations version {v}")),
@@ -153,8 +147,6 @@ impl Versions {
     }
     pub fn get_paragraphs_writer(&self, config: &ParagraphConfig) -> NodeResult<ParagraphsWriterPointer> {
         match self.version_paragraphs {
-            Some(1) => nucliadb_paragraphs::writer::ParagraphWriterService::start(config)
-                .map(|i| Arc::new(RwLock::new(i)) as ParagraphsWriterPointer),
             Some(2) => nucliadb_paragraphs2::writer::ParagraphWriterService::start(config)
                 .map(|i| Arc::new(RwLock::new(i)) as ParagraphsWriterPointer),
             Some(v) => Err(node_error!("Invalid paragraphs version {v}")),
@@ -164,8 +156,6 @@ impl Versions {
 
     pub fn get_texts_writer(&self, config: &TextConfig) -> NodeResult<TextsWriterPointer> {
         match self.version_texts {
-            Some(1) => nucliadb_texts::writer::TextWriterService::start(config)
-                .map(|i| Arc::new(RwLock::new(i)) as TextsWriterPointer),
             Some(2) => nucliadb_texts2::writer::TextWriterService::start(config)
                 .map(|i| Arc::new(RwLock::new(i)) as TextsWriterPointer),
             Some(v) => Err(node_error!("Invalid text writer version {v}")),
@@ -175,8 +165,6 @@ impl Versions {
 
     pub fn get_relations_writer(&self, config: &RelationConfig) -> NodeResult<RelationsWriterPointer> {
         match self.version_relations {
-            Some(1) => nucliadb_relations::service::RelationsWriterService::start(config)
-                .map(|i| Arc::new(RwLock::new(i)) as RelationsWriterPointer),
             Some(2) => nucliadb_relations2::writer::RelationsWriterService::start(config)
                 .map(|i| Arc::new(RwLock::new(i)) as RelationsWriterPointer),
             Some(v) => Err(node_error!("Invalid relations version {v}")),

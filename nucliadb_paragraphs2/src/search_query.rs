@@ -26,6 +26,7 @@ use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::ops::Bound;
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 use tantivy::query::*;
 use tantivy::schema::{Facet, Field, IndexRecordOption};
 use tantivy::{DocId, InvertedIndexReader, Term};
@@ -445,7 +446,7 @@ pub fn search_query(
     }
 
     // Keys filter
-    let mut key_filters: Vec<Box<dyn Query>> = vec![];
+    let mut key_filters: Vec<(Occur, Box<dyn Query>)> = vec![];
     search.key_filters.iter().for_each(|key| {
         let mut key_filter: Vec<Box<dyn Query>> = vec![];
 
@@ -453,26 +454,36 @@ pub fn search_query(
         let uuid = &parts[0];
         let term = Term::from_field_text(schema.uuid, uuid);
         let term_query = TermQuery::new(term, IndexRecordOption::Basic);
-        key_filter.push(Box::new(term_query));
+        // key_filter.push(Box::new(term_query));
 
-        if parts.len() >= 3 {
-            let mut field_key: String = "/".to_owned();
-            field_key.push_str(&parts[1..3].join("/"));
-            let facet = Facet::from_text(&field_key).unwrap();
-            let facet_term = Term::from_facet(schema.field, &facet);
-            let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
-            key_filter.push(Box::new(facet_term_query));
-        }
+        // if parts.len() >= 3 {
+        //     let mut field_key: String = "/".to_owned();
+        //     field_key.push_str(&parts[1..3].join("/"));
+        //     let facet = Facet::from_text(&field_key).unwrap();
+        //     let facet_term = Term::from_facet(schema.field, &facet);
+        //     let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
+        //     key_filter.push(Box::new(facet_term_query));
+        // }
 
         let key_filter_query = Box::new(BooleanQuery::intersection(key_filter));
-        key_filters.push(key_filter_query);
+        key_filters.push((Occur::Should, Box::new(term_query)));
     });
 
-    if !key_filters.is_empty() {
-        let key_filters_query = Box::new(BooleanQuery::union(key_filters));
-        fuzzies.push((Occur::Must, key_filters_query.clone()));
-        originals.push((Occur::Must, key_filters_query));
-    }
+    // println!("{key_filters:#?}");
+
+    // if !key_filters.is_empty() {
+    //     let key_filters_query = Box::new(BooleanQuery::new(key_filters));
+    //     fuzzies.push((Occur::Must, key_filters_query.clone()));
+    //     originals.push((Occur::Must, key_filters_query));
+    // }
+
+    let s = Instant::now();
+    let keys: Vec<_> = search.key_filters.iter().map(decode_hex).collect();
+    println!("{:?} spent doing hex conversion", s.elapsed());
+
+    // let tsq = Box::new(TermSetQuery::new(search.key_filters.iter().map(|k| Term::from_field_text(schema.uuid, k))));
+    // fuzzies.push((Occur::Must, tsq.clone()));
+    // originals.push((Occur::Must, tsq.clone()));
 
     if originals.len() == 1 && originals[0].1.is::<AllQuery>() {
         let original = originals.pop().unwrap().1;
@@ -486,6 +497,10 @@ pub fn search_query(
         let fuzzied = Box::new(BoostQuery::new(Box::new(BooleanQuery::new(fuzzies)), 0.5));
         (original, termc, fuzzied)
     }
+}
+
+pub fn decode_hex(s: &String) -> Vec<u8> {
+    (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap()).collect()
 }
 
 pub fn streaming_query(schema: &ParagraphSchema, request: &StreamRequest) -> Box<dyn Query> {

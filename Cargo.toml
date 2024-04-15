@@ -4,14 +4,15 @@ members = [
   "nucliadb_core",
   "nucliadb_node",
   "nucliadb_node_binding",
-  "nucliadb_paragraphs",
   "nucliadb_paragraphs2",
   "nucliadb_procs",
   "nucliadb_protos/rust",
-  "nucliadb_relations",
   "nucliadb_relations2",
-  "nucliadb_texts",
   "nucliadb_texts2",
   "nucliadb_vectors",
   "vectors_benchmark",
 ]
+
+[profile.samply]
+inherits = "release"
+debug = true

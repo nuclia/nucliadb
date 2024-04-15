@@ -18,7 +18,7 @@ tempfile = "3"
 rand = "0.8.4"
 ring = "0.16.20"
 data-encoding = "2.3.2"
-tantivy = { git = "https://github.com/nuclia/tantivy.git", branch = "original-17" }
+tantivy = { path = "../../tantivy" }
 
 nucliadb_core = { path = "../nucliadb_core" }
 nucliadb_procs = { path = "../nucliadb_procs" }
