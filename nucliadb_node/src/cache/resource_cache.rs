@@ -67,6 +67,12 @@ impl<K> Drop for ResourceLoadGuard<K> {
     }
 }
 
+impl<K> ResourceLoadGuard<K> {
+    pub fn key(&self) -> &K {
+        &self.key
+    }
+}
+
 // Use to wait until an entry is ready to be used
 pub struct ResourceWaiter(Arc<Waiter>);
 impl ResourceWaiter {

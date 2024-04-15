@@ -23,12 +23,12 @@ use nucliadb_paragraphs::writer::ParagraphWriterService as ParagraphWriterServic
 use nucliadb_paragraphs2::writer::ParagraphWriterService as ParagraphWriterServiceV2;
 use std::sync::RwLock;
 
-pub type ParagraphWPointer = Box<RwLock<dyn ParagraphWriter>>;
+pub type ParagraphWPointer = RwLock<Box<dyn ParagraphWriter>>;
 
 pub fn new(version: u32, config: &ParagraphConfig) -> NodeResult<ParagraphWPointer> {
     match version {
-        1 => ParagraphWriterServiceV1::start(config).map(|i| Box::new(RwLock::new(i)) as ParagraphWPointer),
-        2 => ParagraphWriterServiceV2::start(config).map(|i| Box::new(RwLock::new(i)) as ParagraphWPointer),
+        1 => ParagraphWriterServiceV1::start(config).map(|i| RwLock::new(Box::new(i) as Box<dyn ParagraphWriter>)),
+        2 => ParagraphWriterServiceV2::start(config).map(|i| RwLock::new(Box::new(i) as Box<dyn ParagraphWriter>)),
         v => Err(node_error!("Invalid paragraphs version {v}")),
     }
 }

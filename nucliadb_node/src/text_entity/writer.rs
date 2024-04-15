@@ -23,12 +23,12 @@ use nucliadb_texts::writer::TextWriterService as TextWriterServiceV1;
 use nucliadb_texts2::writer::TextWriterService as TextWriterServiceV2;
 use std::sync::RwLock;
 
-pub type TextWPointer = Box<RwLock<dyn TextWriter>>;
+pub type TextWPointer = RwLock<Box<dyn TextWriter>>;
 
 pub fn new(version: u32, config: &TextConfig) -> NodeResult<TextWPointer> {
     match version {
-        1 => TextWriterServiceV1::start(config).map(|i| Box::new(RwLock::new(i)) as TextWPointer),
-        2 => TextWriterServiceV2::start(config).map(|i| Box::new(RwLock::new(i)) as TextWPointer),
+        1 => TextWriterServiceV1::start(config).map(|i| RwLock::new(Box::new(i) as Box<dyn TextWriter>)),
+        2 => TextWriterServiceV2::start(config).map(|i| RwLock::new(Box::new(i) as Box<dyn TextWriter>)),
         v => Err(node_error!("Invalid text writer version {v}")),
     }
 }

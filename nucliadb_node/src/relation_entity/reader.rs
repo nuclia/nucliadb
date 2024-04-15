@@ -23,12 +23,12 @@ use nucliadb_relations::service::RelationsReaderService as RelationsReaderServic
 use nucliadb_relations2::reader::RelationsReaderService as RelationsReaderServiceV2;
 use std::sync::RwLock;
 
-pub type RelationRPointer = Box<RwLock<dyn RelationsReader>>;
+pub type RelationRPointer = RwLock<Box<dyn RelationsReader>>;
 
 pub fn new(version: u32, config: &RelationConfig) -> NodeResult<RelationRPointer> {
     match version {
-        1 => RelationsReaderServiceV1::start(config).map(|i| Box::new(RwLock::new(i)) as RelationRPointer),
-        2 => RelationsReaderServiceV2::start(config).map(|i| Box::new(RwLock::new(i)) as RelationRPointer),
+        1 => RelationsReaderServiceV1::start(config).map(|i| RwLock::new(Box::new(i) as Box<dyn RelationsReader>)),
+        2 => RelationsReaderServiceV2::start(config).map(|i| RwLock::new(Box::new(i) as Box<dyn RelationsReader>)),
         v => Err(node_error!("Invalid relations version {v}")),
     }
 }

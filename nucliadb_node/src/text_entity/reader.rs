@@ -23,12 +23,12 @@ use nucliadb_texts::reader::TextReaderService as TextReaderServiceV1;
 use nucliadb_texts2::reader::TextReaderService as TextReaderServiceV2;
 use std::sync::RwLock;
 
-pub type TextRPointer = Box<RwLock<dyn TextReader>>;
+pub type TextRPointer = RwLock<Box<dyn TextReader>>;
 
 pub fn new(version: u32, config: &TextConfig) -> NodeResult<TextRPointer> {
     match version {
-        1 => TextReaderServiceV1::start(config).map(|i| Box::new(RwLock::new(i)) as TextRPointer),
-        2 => TextReaderServiceV2::start(config).map(|i| Box::new(RwLock::new(i)) as TextRPointer),
+        1 => TextReaderServiceV1::start(config).map(|i| RwLock::new(Box::new(i) as Box<dyn TextReader>)),
+        2 => TextReaderServiceV2::start(config).map(|i| RwLock::new(Box::new(i) as Box<dyn TextReader>)),
         v => Err(node_error!("Invalid text version {v}")),
     }
 }

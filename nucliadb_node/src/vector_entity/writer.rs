@@ -22,12 +22,12 @@ use nucliadb_core::{node_error, NodeResult};
 use nucliadb_vectors::service::VectorWriterService;
 use std::sync::RwLock;
 
-pub type VectorWPointer = Box<RwLock<dyn VectorWriter>>;
+pub type VectorWPointer = RwLock<Box<dyn VectorWriter>>;
 
 pub fn new(version: u32, config: &VectorConfig) -> NodeResult<VectorWPointer> {
     match version {
-        1 => VectorWriterService::start(config).map(|i| Box::new(RwLock::new(i)) as VectorWPointer),
-        2 => VectorWriterService::start(config).map(|i| Box::new(RwLock::new(i)) as VectorWPointer),
+        1 => VectorWriterService::start(config).map(|i| RwLock::new(Box::new(i) as Box<dyn VectorWriter>)),
+        2 => VectorWriterService::start(config).map(|i| RwLock::new(Box::new(i) as Box<dyn VectorWriter>)),
         v => Err(node_error!("Invalid vectors version {v}")),
     }
 }

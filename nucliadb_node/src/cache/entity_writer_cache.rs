@@ -45,13 +45,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashSet;
-use std::num::NonZeroUsize;
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex, MutexGuard};
-use std::thread::sleep;
-use std::time::Duration;
-
 use super::resource_cache::{CacheResult, ResourceCache, ResourceLoadGuard};
 use crate::disk_structure;
 use crate::errors::ShardNotFoundError;
@@ -66,6 +59,12 @@ use crate::text_entity::writer::TextWPointer;
 use crate::vector_entity::writer::VectorWPointer;
 use nucliadb_core::tracing::debug;
 use nucliadb_core::{node_error, NodeResult};
+use std::collections::HashSet;
+use std::num::NonZeroUsize;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, MutexGuard};
+use std::thread::sleep;
+use std::time::Duration;
 
 pub enum WriteEntity {
     VectorEntity(VectorWPointer),
@@ -75,83 +74,82 @@ pub enum WriteEntity {
     MetadataEntity(Metadata),
 }
 
-/// This cache allows the user to block shards, ensuring that they will not be loaded from disk.
+/// This cache allows the user to block entities, ensuring that they will not be loaded from disk.
 /// Being able to do so is crucial, otherwise the only source of truth will be disk and that would
 /// not be thread-safe.
 struct InnerCache {
-    blocked_shards: HashSet<PathBuf>,
-    active_shards: ResourceCache<PathBuf, WriteEntity>,
+    blocked_entities: HashSet<PathBuf>,
+    active_entities: ResourceCache<PathBuf, WriteEntity>,
 }
 
-// impl InnerCache {
-//     pub fn new(capacity: Option<NonZeroUsize>) -> InnerCache {
-//         let active_shards = match capacity {
-//             Some(capacity) => ResourceCache::new_with_capacity(capacity),
-//             None => ResourceCache::new_unbounded(),
-//         };
-//         Self {
-//             active_shards,
-//             blocked_shards: HashSet::new(),
-//         }
-//     }
+impl InnerCache {
+    pub fn new(capacity: Option<NonZeroUsize>) -> InnerCache {
+        let active_entities = match capacity {
+            Some(capacity) => ResourceCache::new_with_capacity(capacity),
+            None => ResourceCache::new_unbounded(),
+        };
+        Self {
+            active_entities,
+            blocked_entities: HashSet::new(),
+        }
+    }
 
-//     pub fn peek(&mut self, id: &ShardId) -> Option<Arc<ShardWriter>> {
-//         if self.blocked_shards.contains(id) {
-//             return None;
-//         }
+    pub fn peek(&mut self, id: &PathBuf) -> Option<Arc<WriteEntity>> {
+        if self.blocked_entities.contains(id) {
+            return None;
+        }
 
-//         self.active_shards.get_cached(id)
-//     }
+        self.active_entities.get_cached(id)
+    }
 
-//     pub fn get(&mut self, id: &ShardId) -> NodeResult<CacheResult<ShardId, ShardWriter>> {
-//         if self.blocked_shards.contains(id) {
-//             return Err(node_error!(ShardNotFoundError("Shard {shard_path:?} is not on disk")));
-//         }
+    pub fn get(&mut self, path: &PathBuf) -> NodeResult<CacheResult<PathBuf, WriteEntity>> {
+        if self.blocked_entities.contains(path) {
+            return Err(node_error!(ShardNotFoundError("Entity {path:?} is not on disk")));
+        }
 
-//         Ok(self.active_shards.get(id))
-//     }
+        Ok(self.active_entities.get(path))
+    }
 
-//     pub fn shard_loaded(
-//         &mut self,
-//         guard: ResourceLoadGuard<ShardId>,
-//         shard: Arc<ShardWriter>,
-//     ) -> NodeResult<Arc<ShardWriter>> {
-//         if self.blocked_shards.contains(&shard.id) {
-//             return Err(node_error!(ShardNotFoundError("Shard {shard_path:?} is not on disk")));
-//         }
+    pub fn loaded(
+        &mut self,
+        guard: ResourceLoadGuard<PathBuf>,
+        entity: Arc<WriteEntity>,
+    ) -> NodeResult<Arc<WriteEntity>> {
+        if self.blocked_entities.contains(guard.key()) {
+            return Err(node_error!(ShardNotFoundError("Entity {:?} is not on disk")));
+        }
 
-//         self.active_shards.loaded(guard, &shard);
-//         Ok(shard)
-//     }
+        self.active_entities.loaded(guard, &entity);
+        Ok(entity)
+    }
 
-//     pub fn set_being_deleted(&mut self, id: ShardId) {
-//         self.blocked_shards.insert(id);
-//     }
+    pub fn set_being_deleted(&mut self, path: PathBuf) {
+        self.blocked_entities.insert(path);
+    }
 
-//     pub fn remove(&mut self, id: &ShardId) {
-//         self.blocked_shards.remove(id);
-//         self.active_shards.remove(id);
-//     }
+    pub fn remove(&mut self, path: &PathBuf) {
+        self.blocked_entities.remove(path);
+        self.active_entities.remove(path);
+    }
 
-//     pub fn add_active_shard(&mut self, id: &ShardId, shard: &Arc<ShardWriter>) {
-//         // It would be a dangerous bug to have a path
-//         // in the system that leads to this assertion failing.
-//         assert!(!self.blocked_shards.contains(id));
+    pub fn add_entity(&mut self, path: &PathBuf, entity: &Arc<WriteEntity>) {
+        // It would be a dangerous bug to have a path
+        // in the system that leads to this assertion failing.
+        assert!(!self.blocked_entities.contains(path));
 
-//         self.active_shards.insert(id, shard);
-//     }
+        self.active_entities.insert(path, entity);
+    }
+}
+
+// pub struct WriterCache {
+//     cache: Mutex<InnerCache>,
+//     metadata_manager: Arc<ShardsMetadataManager>,
 // }
 
-pub struct ShardWriterCache {
-    cache: Mutex<InnerCache>,
-    metadata_manager: Arc<ShardsMetadataManager>,
-}
-
-// impl ShardWriterCache {
+// impl WriterCache {
 //     pub fn new(settings: Settings) -> Self {
 //         Self {
 //             cache: Mutex::new(InnerCache::new(settings.max_open_shards)),
-//             shards_path: settings.shards_path(),
 //             metadata_manager: Arc::new(ShardsMetadataManager::new(settings.shards_path())),
 //         }
 //     }

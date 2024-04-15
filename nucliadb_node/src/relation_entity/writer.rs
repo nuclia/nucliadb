@@ -27,32 +27,12 @@ use nucliadb_relations::service::RelationsWriterService as RelationsWriterServic
 use nucliadb_relations2::writer::RelationsWriterService as RelationsWriterServiceV2;
 use std::sync::RwLock;
 
-pub type RelationWPointer = Box<RwLock<dyn RelationsWriter>>;
+pub type RelationWPointer = RwLock<Box<dyn RelationsWriter>>;
 
 pub fn new(version: u32, config: &RelationConfig) -> NodeResult<RelationWPointer> {
     match version {
-        1 => RelationsWriterServiceV1::start(config).map(|i| Box::new(RwLock::new(i)) as RelationWPointer),
-        2 => RelationsWriterServiceV2::start(config).map(|i| Box::new(RwLock::new(i)) as RelationWPointer),
+        1 => RelationsWriterServiceV1::start(config).map(|i| RwLock::new(Box::new(i) as Box<dyn RelationsWriter>)),
+        2 => RelationsWriterServiceV2::start(config).map(|i| RwLock::new(Box::new(i) as Box<dyn RelationsWriter>)),
         v => Err(node_error!("Invalid relations version {v}")),
     }
-}
-
-#[measure(actor = "relations", metric = "set_resource")]
-#[tracing::instrument(skip_all)]
-pub fn set_resource(writer: &RelationWPointer, resource: &Resource) -> NodeResult<()> {
-    let span = tracing::Span::current();
-    let info = tracing::info_span!(parent: &span, "relations set_resource");
-
-    let mut writer = write_rw_lock(writer);
-    run_with_telemetry(info, || writer.set_resource(resource))
-}
-
-#[measure(actor = "relations", metric = "remove_resource")]
-#[tracing::instrument(skip_all)]
-pub fn remove_resource(writer: &RelationWPointer, resource: &ResourceId) -> NodeResult<()> {
-    let span = tracing::Span::current();
-    let info = tracing::info_span!(parent: &span, "relations remove");
-
-    let mut writer = write_rw_lock(writer);
-    run_with_telemetry(info, || writer.delete_resource(resource))
 }

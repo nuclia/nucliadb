@@ -23,12 +23,12 @@ use nucliadb_paragraphs::reader::ParagraphReaderService as ParagraphReaderServic
 use nucliadb_paragraphs2::reader::ParagraphReaderService as ParagraphReaderServiceV2;
 use std::sync::RwLock;
 
-pub type ParagraphRPointer = Box<RwLock<dyn ParagraphReader>>;
+pub type ParagraphRPointer = RwLock<Box<dyn ParagraphReader>>;
 
 pub fn new(version: u32, config: &ParagraphConfig) -> NodeResult<ParagraphRPointer> {
     match version {
-        1 => ParagraphReaderServiceV1::start(config).map(|i| Box::new(RwLock::new(i)) as ParagraphRPointer),
-        2 => ParagraphReaderServiceV2::start(config).map(|i| Box::new(RwLock::new(i)) as ParagraphRPointer),
+        1 => ParagraphReaderServiceV1::start(config).map(|i| RwLock::new(Box::new(i) as Box<dyn ParagraphReader>)),
+        2 => ParagraphReaderServiceV2::start(config).map(|i| RwLock::new(Box::new(i) as Box<dyn ParagraphReader>)),
         v => Err(node_error!("Invalid paragraph version {v}")),
     }
 }
