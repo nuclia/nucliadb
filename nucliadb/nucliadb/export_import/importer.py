@@ -28,9 +28,7 @@ from nucliadb.export_import.models import (
     NatsTaskMessage,
 )
 from nucliadb.export_import.utils import (
-    ExportStream,
     ExportStreamReader,
-    IteratorExportStream,
     TaskRetryHandler,
     import_binary,
     import_broker_message,
@@ -47,7 +45,7 @@ BinaryStreamGenerator = Callable[[int], BinaryStream]
 async def import_kb(
     context: ApplicationContext,
     kbid: str,
-    stream: ExportStream,
+    stream: AsyncGenerator[bytes, None],
     metadata: Optional[ImportMetadata] = None,
 ) -> None:
     """
@@ -104,8 +102,7 @@ async def import_kb_from_blob_storage(
     kbid, import_id = msg.kbid, msg.id
     dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
     metadata = await dm.get_metadata(type="import", kbid=kbid, id=import_id)
-    iterator = dm.download_import(kbid, import_id)
-    stream = IteratorExportStream(iterator)
+    stream = dm.download_import(kbid, import_id)
 
     retry_handler = TaskRetryHandler("import", dm, metadata)
 

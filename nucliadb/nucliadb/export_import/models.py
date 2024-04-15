@@ -36,6 +36,7 @@ class ExportedItemType(str, Enum):
     LABELS = "LAB"
     ENTITIES = "ENT"
     BINARY = "BIN"
+    LEARNING_CONFIG = "LEA"
 
 
 ExportItem = tuple[ExportedItemType, Any]

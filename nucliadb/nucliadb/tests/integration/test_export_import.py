@@ -22,6 +22,7 @@ import base64
 import uuid
 from contextlib import contextmanager
 from io import BytesIO
+from unittest import mock
 from unittest.mock import patch
 
 import pytest
@@ -29,6 +30,7 @@ import pytest
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.context import ApplicationContext
 from nucliadb.export_import.tasks import get_exports_consumer, get_imports_consumer
+from nucliadb.learning_proxy import LearningConfiguration
 
 
 @pytest.fixture(scope="function")
@@ -213,9 +215,34 @@ async def _test_export_import_kb_api(nucliadb_writer, nucliadb_reader, src_kb, d
     # Check for import status
     await wait_for(nucliadb_reader, "import", dst_kb, import_id)
 
-    # Finally, check that the KBs are equal
+    # Check that the KBs are equal
     await _check_kb(nucliadb_reader, src_kb)
     await _check_kb(nucliadb_reader, dst_kb)
+
+    # Check learning config validation on import
+    export.seek(0)
+    await _test_learning_config_mismatch(nucliadb_writer, export, dst_kb)
+
+
+async def _test_learning_config_mismatch(nucliadb_writer, export, dst_kb):
+    # Make sure that the import fails if learning configs don't match
+    with mock.patch(
+        "nucliadb.export_import.utils.get_learning_config",
+        return_value=LearningConfiguration(
+            semantic_model="unknown-model",
+            semantic_threshold=0.5,
+            semantic_vector_size=100,
+            semantic_vector_similarity="cosine",
+        ),
+    ):
+        resp = await nucliadb_writer.post(
+            f"/kb/{dst_kb}/import", content=export.getvalue(), timeout=None
+        )
+        assert resp.status_code == 400
+        assert (
+            resp.json()["detail"]
+            == "Cannot import. Semantic model mismatch: unknown-model != multilingual"
+        )
 
 
 async def wait_for(nucliadb_reader, type: str, kbid: str, id: str, max_retries=30):

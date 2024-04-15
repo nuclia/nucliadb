@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 from io import BytesIO
 from unittest.mock import AsyncMock, Mock
 
@@ -26,10 +27,9 @@ from nucliadb_protos.writer_pb2 import BrokerMessage, BrokerMessageBlobReference
 from starlette.requests import Request
 
 from nucliadb.export_import.exceptions import ExportStreamExhausted
-from nucliadb.export_import.importer import ExportStream
 from nucliadb.export_import.models import ImportMetadata
 from nucliadb.export_import.utils import (
-    IteratorExportStream,
+    ExportStream,
     TaskRetryHandler,
     get_cloud_files,
     import_broker_message,
@@ -150,9 +150,18 @@ def test_get_cloud_files(broker_message):
         assert cf.source == resources_pb2.CloudFile.Source.EXPORT
 
 
-async def test_export_stream():
-    export = BytesIO(b"1234567890")
-    stream = ExportStream(export)
+async def test_export_stream_simple():
+
+    async def export_generator():
+        export = BytesIO(b"1234567890")
+        while True:
+            await asyncio.sleep(0)
+            chunk = export.read(2)
+            if not chunk:
+                break
+            yield chunk
+
+    stream = ExportStream(export_generator())
     assert stream.read_bytes == 0
     assert await stream.read(0) == b""
     assert stream.read_bytes == 0
@@ -188,11 +197,10 @@ class DummyTestRequest(Request):
         return {"type": "http.request", "body": chunk, "more_body": more_data}
 
 
-async def test_iterator_export_stream():
+async def test_export_stream():
     request = DummyTestRequest(data=b"01234XYZ", receive_chunk_size=2)
 
-    iterator = request.stream().__aiter__()
-    export_stream = IteratorExportStream(iterator)
+    export_stream = ExportStream(request.stream())
     assert await export_stream.read(0) == b""
     assert export_stream.read_bytes == 0
 
@@ -210,8 +218,7 @@ async def test_iterator_export_stream():
         await export_stream.read(0)
 
     request = DummyTestRequest(data=b"foobar", receive_chunk_size=2)
-    iterator = request.stream().__aiter__()
-    export_stream = IteratorExportStream(iterator)
+    export_stream = ExportStream(request.stream())
     assert await export_stream.read(50) == b"foobar"
     assert export_stream.read_bytes == 6
 
