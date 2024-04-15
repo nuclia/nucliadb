@@ -27,6 +27,7 @@ from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.migrator.models import Migration
 from nucliadb.tests.migrations import get_migration
+from nucliadb_protos import knowledgebox_pb2
 
 migration: Migration = get_migration(18)
 
@@ -50,7 +51,9 @@ async def test_migration_0018_global(maindb_driver: Driver):
 
             real_kb_slug = "real-kb-slug"
             real_kb_id, failed = await KnowledgeBox.create(
-                txn, slug=real_kb_slug, semantic_model=Mock()
+                txn,
+                slug=real_kb_slug,
+                semantic_model=knowledgebox_pb2.SemanticModelMetadata(),
             )
             assert not failed
             assert await datamanagers.kb.exists_kb(txn, kbid=real_kb_id)
