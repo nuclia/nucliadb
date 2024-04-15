@@ -421,13 +421,13 @@ class Resource:
             if self.disable_vectors is False:
                 vo = await field.get_vectors()
                 if vo is not None:
-                    vector_dimension = await datamanagers.kb.get_vector_dimension(
+                    dimension = await datamanagers.kb.get_matryoshka_vector_dimension(
                         self.txn, kbid=self.kb.kbid
                     )
                     brain.apply_field_vectors(
                         field_key,
                         vo,
-                        vector_dimension=vector_dimension,
+                        matryoshka_vector_dimension=dimension,
                     )
         return brain
 
@@ -1020,7 +1020,7 @@ class Resource:
         ) = await field_obj.set_vectors(field_vectors)
         field_key = self.generate_field_id(field_vectors.field)
         if vo is not None:
-            vector_dimension = await datamanagers.kb.get_vector_dimension(
+            dimension = await datamanagers.kb.get_matryoshka_vector_dimension(
                 self.txn, kbid=self.kb.kbid
             )
             apply_field_vectors_partial = partial(
@@ -1029,7 +1029,7 @@ class Resource:
                 vo,
                 replace_field=replace_field_sentences,
                 replace_splits=replace_splits_sentences,
-                vector_dimension=vector_dimension,
+                matryoshka_vector_dimension=dimension,
             )
             loop = asyncio.get_running_loop()
             await loop.run_in_executor(_executor, apply_field_vectors_partial)

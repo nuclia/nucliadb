@@ -92,12 +92,25 @@ async def get_model_metadata(
         )
 
 
-async def get_vector_dimension(txn: Transaction, *, kbid: str) -> Optional[int]:
+async def get_matryoshka_vector_dimension(
+    txn: Transaction, *, kbid: str
+) -> Optional[int]:
+    """Return vector dimension for matryoshka models"""
     model_metadata = await get_model_metadata(txn, kbid=kbid)
-    vector_dimension = None
+    dimension = None
     if (
         len(model_metadata.matryoshka_dimensions) > 0
-        and model_metadata.vector_dimension in model_metadata.matryoshka_dimensions
+        and model_metadata.vector_dimension
     ):
-        vector_dimension = model_metadata.vector_dimension
-    return vector_dimension
+        if model_metadata.vector_dimension in model_metadata.matryoshka_dimensions:
+            dimension = model_metadata.vector_dimension
+        else:
+            logger.error(
+                "KB has an invalid matryoshka dimension!",
+                extra={
+                    "kbid": kbid,
+                    "vector_dimension": model_metadata.vector_dimension,
+                    "matryoshka_dimensions": model_metadata.matryoshka_dimensions,
+                },
+            )
+    return dimension

@@ -273,7 +273,7 @@ class ResourceBrain:
         *,
         replace_field: bool = False,
         replace_splits: Optional[list[str]] = None,
-        vector_dimension: Optional[int] = None,
+        matryoshka_vector_dimension: Optional[int] = None,
     ):
         replace_splits = replace_splits or []
 
@@ -300,7 +300,7 @@ class ResourceBrain:
                     paragraph_key,
                     sentence_key,
                     vector,
-                    vector_dimension=vector_dimension,
+                    matryoshka_vector_dimension=matryoshka_vector_dimension,
                 )
 
         for index, vector in enumerate(vo.vectors.vectors):
@@ -322,7 +322,7 @@ class ResourceBrain:
                 paragraph_key,
                 sentence_key,
                 vector,
-                vector_dimension=vector_dimension,
+                matryoshka_vector_dimension=matryoshka_vector_dimension,
             )
 
         for split in replace_splits:
@@ -338,7 +338,7 @@ class ResourceBrain:
         sentence_key: str,
         vector: utils_pb2.Vector,
         *,
-        vector_dimension: Optional[int] = None,
+        matryoshka_vector_dimension: Optional[int] = None,
     ):
         paragraph_pb = self.brain.paragraphs[field_id].paragraphs[paragraph_key]
         sentence_pb = paragraph_pb.sentences[sentence_key]
@@ -346,8 +346,8 @@ class ResourceBrain:
         sentence_pb.ClearField("vector")  # clear first to prevent duplicates
 
         # cut vectors if a specific dimension is specified
-        if vector_dimension is not None:
-            sentence_pb.vector.extend(vector.vector[:vector_dimension])
+        if matryoshka_vector_dimension is not None:
+            sentence_pb.vector.extend(vector.vector[:matryoshka_vector_dimension])
         else:
             sentence_pb.vector.extend(vector.vector)
 

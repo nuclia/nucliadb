@@ -306,14 +306,18 @@ async def test_apply_extracted_vectors_matryoshka_embeddings(txn, storage, kb):
             resource.indexer, "apply_field_vectors", AsyncMock()
         ) as apply_field_vectors,
     ):
-        mock_datamanagers.kb.get_vector_dimension = AsyncMock(return_value=None)
+        mock_datamanagers.kb.get_matryoshka_vector_dimension = AsyncMock(
+            return_value=None
+        )
         await resource._apply_extracted_vectors(
             writer_pb2.ExtractedVectorsWrapper(vectors=vectors)
         )
         assert apply_field_vectors.call_count == 1
-        assert apply_field_vectors.call_args.kwargs["vector_dimension"] is None
+        assert (
+            apply_field_vectors.call_args.kwargs["matryoshka_vector_dimension"] is None
+        )
 
-        mock_datamanagers.kb.get_vector_dimension = AsyncMock(
+        mock_datamanagers.kb.get_matryoshka_vector_dimension = AsyncMock(
             return_value=MATRYOSHKA_DIMENSION
         )
         await resource._apply_extracted_vectors(
@@ -321,6 +325,6 @@ async def test_apply_extracted_vectors_matryoshka_embeddings(txn, storage, kb):
         )
         assert apply_field_vectors.call_count == 2
         assert (
-            apply_field_vectors.call_args.kwargs["vector_dimension"]
+            apply_field_vectors.call_args.kwargs["matryoshka_vector_dimension"]
             == MATRYOSHKA_DIMENSION
         )
