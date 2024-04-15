@@ -50,6 +50,9 @@ async def del_vectorset(txn: Transaction, *, kbid: str, vectorset_id: str):
     if vectorsets is None:
         return
 
+    if vectorset_id not in vectorsets.vectorsets:
+        return
+
     del vectorsets.vectorsets[vectorset_id]
 
     key = KB_VECTORSET.format(kbid=kbid)
