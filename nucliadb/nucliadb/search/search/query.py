@@ -51,6 +51,7 @@ from nucliadb_models.labels import translate_system_to_alias_label
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import (
     Filter,
+    MaxTokens,
     MinScore,
     QueryInfo,
     SearchOptions,
@@ -74,6 +75,10 @@ INDEX_SORTABLE_FIELDS = [
     SortField.CREATED,
     SortField.MODIFIED,
 ]
+
+# Multiply by 3 to have a good margin and guess between characters and tokens.
+# This will be fully properly cut at the NUA predict API.
+TOKEN_TO_CHARACTERS_MULTIPLIER = 3
 
 
 class QueryParser:
@@ -122,6 +127,7 @@ class QueryParser:
         security: Optional[RequestSecurity] = None,
         generative_model: Optional[str] = None,
         rephrase: Optional[bool] = False,
+        max_tokens: Optional[MaxTokens] = None,
     ):
         self.kbid = kbid
         self.features = features
@@ -153,6 +159,7 @@ class QueryParser:
             default=False,
             context={"kbid": self.kbid},
         )
+        self.max_tokens = max_tokens
 
         if len(self.filters) > 0:
             self.filters = translate_label_filters(self.filters)
@@ -511,10 +518,9 @@ class QueryParser:
     async def get_visual_llm_enabled(self) -> bool:
         return (await self._get_query_information()).visual_llm
 
-    async def get_max_context(self) -> int:
-        # Multiple by 3 is to have a good margin and guess
-        # between characters and tokens. This will be fully properly
-        # cut at the NUA API.
+    async def get_max_context_characters(self) -> int:
+        if self.max_tokens is not None and self.max_tokens.context is not None:
+            return self.max_tokens.context * TOKEN_TO_CHARACTERS_MULTIPLIER
         return (await self._get_query_information()).max_context * 3
 
 

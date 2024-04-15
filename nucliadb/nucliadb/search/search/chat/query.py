@@ -288,7 +288,7 @@ async def chat(
             page_size=0,
             min_score=MinScore(),
         )
-
+    query_parser.max_tokens = chat_request.max_tokens
     prompt_context_builder = PromptContextBuilder(
         kbid=kbid,
         find_results=find_results,
@@ -296,7 +296,7 @@ async def chat(
         user_context=user_context,
         strategies=chat_request.rag_strategies,
         image_strategies=chat_request.rag_images_strategies,
-        max_context_size=await query_parser.get_max_context(),
+        max_context_characters=await query_parser.get_max_context_characters(),
         visual_llm=await query_parser.get_visual_llm_enabled(),
     )
     (
@@ -307,7 +307,11 @@ async def chat(
     user_prompt = None
     if chat_request.prompt is not None:
         user_prompt = UserPrompt(prompt=chat_request.prompt)
-
+    max_tokens_answer = None
+    max_tokens_context = None
+    if chat_request.max_tokens:
+        max_tokens_answer = chat_request.max_tokens.answer
+        max_tokens_context = chat_request.max_tokens.context
     chat_model = ChatModel(
         user_id=user_id,
         query_context=prompt_context,
@@ -318,7 +322,8 @@ async def chat(
         user_prompt=user_prompt,
         citations=chat_request.citations,
         generative_model=chat_request.generative_model,
-        max_tokens=chat_request.max_tokens,
+        max_tokens=max_tokens_answer,
+        max_tokens_context=max_tokens_context,
         query_context_images=prompt_context_images,
     )
     predict = get_predict()

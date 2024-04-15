@@ -754,6 +754,19 @@ class Image(BaseModel):
     b64encoded: str
 
 
+class MaxTokens(BaseModel):
+    context: Optional[int] = Field(
+        default=None,
+        title="Maximum context tokens",
+        description="Use to limit the amount of tokens used in the LLM context",
+    )
+    answer: Optional[int] = Field(
+        default=None,
+        title="Maximum answer tokens",
+        description="Use to limit the amount of tokens used in the LLM answer",
+    )
+
+
 class ChatModel(BaseModel):
     """
     This is the model for the predict request payload on the chat endpoint
@@ -792,6 +805,10 @@ class ChatModel(BaseModel):
 
     max_tokens: Optional[int] = Field(
         default=None, description="Maximum characters to generate"
+    )
+
+    max_tokens_context: Optional[int] = Field(
+        default=None, description="Maximum number of tokens in the context"
     )
 
     query_context_images: Dict[str, Image] = Field(
@@ -1014,10 +1031,10 @@ class ChatRequest(BaseModel):
         description="The generative model to use for the chat endpoint. If not provided, the model configured for the Knowledge Box is used.",
     )
 
-    max_tokens: Optional[int] = Field(
+    max_tokens: Optional[MaxTokens] = Field(
         default=None,
-        title="Maximum tokens to generate",
-        description="The maximum amount of tokens to generate by the LLM",
+        title="Maximum tokens",
+        description="Use to limit the amount of tokens used in the LLM context and/or for generating the answer.",
     )
 
     rephrase: Optional[bool] = Field(
