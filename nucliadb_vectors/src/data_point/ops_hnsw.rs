@@ -38,6 +38,7 @@ pub trait DataRetriever: std::marker::Sync {
     fn get_vector(&self, x: Address) -> &[u8];
     /// Embeddings with smaller similarity should not be considered.
     fn min_score(&self) -> f32;
+    fn will_need(&self, x: Address);
 }
 
 /// Implementors of this trait are layers of an HNSW where a nearest neighbour search can be ran.
@@ -140,10 +141,13 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         // best solution. This algorithm takes a lazy approach to computing the similarity of
         // candidates.
 
+        const MAX_VECTORS_TO_PRELOAD: u32 = 20_000;
         let mut results = Vec::new();
         let inner_entry_points_iter = entry_points.iter().map(|Address(inner)| *inner);
         let mut visited_nodes: BitSet = BitSet::from_iter(inner_entry_points_iter);
         let mut candidates = VecDeque::from(entry_points);
+
+        let mut preloaded = 0;
 
         loop {
             let Some(candidate) = candidates.pop_front() else {
@@ -172,6 +176,11 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                 if !visited_nodes.contains(new_candidate.0) {
                     visited_nodes.insert(new_candidate.0);
                     candidates.push_back(new_candidate);
+
+                    if preloaded < MAX_VECTORS_TO_PRELOAD {
+                        self.tracker.will_need(new_candidate);
+                        preloaded += 1;
+                    }
                 }
             });
         }
@@ -199,6 +208,11 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                 (None, _) => break,
                 (Some(Cnx(_, cs)), Some(Reverse(Cnx(_, ws)))) if cs < ws => break,
                 (Some(Cnx(cn, _)), Some(Reverse(Cnx(_, mut ws)))) => {
+                    for (y, _) in layer.get_out_edges(cn) {
+                        if !visited.contains(&y) {
+                            self.tracker.will_need(y);
+                        }
+                    }
                     for (y, _) in layer.get_out_edges(cn) {
                         if !visited.contains(&y) {
                             visited.insert(y);

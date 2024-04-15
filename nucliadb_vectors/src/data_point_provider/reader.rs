@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::data_point::{self, DataPointPin, OpenDataPoint};
+use crate::data_point::{self, DataPointPin, OpenDataPoint, SearchParams};
 pub use crate::data_point::{DpId, Neighbour};
 use crate::data_point_provider::state::read_state;
 use crate::data_point_provider::{IndexMetadata, SearchRequest, OPENING_FLAG, STATE};
@@ -254,8 +254,11 @@ impl Reader {
                 filter,
                 with_duplicates,
                 no_results,
-                similarity,
-                min_score
+                SearchParams {
+                    similarity,
+                    min_score,
+                    dimension: dimension as usize,
+                }
             );
             for candidate in partial_solution {
                 ffsv.add(candidate);
