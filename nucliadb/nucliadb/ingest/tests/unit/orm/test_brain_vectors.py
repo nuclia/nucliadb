@@ -59,10 +59,14 @@ def test_apply_field_vectors_for_matryoshka_embeddings():
 
     brain = ResourceBrain(rid=rid)
     brain.apply_field_vectors(field_id, vectors, vector_dimension=None)
-    vector = brain.paragraphs[field_id].paragraphs[paragraph_key].sentences[vector_key]
+    vector = (
+        brain.brain.paragraphs[field_id].paragraphs[paragraph_key].sentences[vector_key]
+    )
     assert len(vector.vector) == STORED_VECTOR_DIMENSION
 
     brain = ResourceBrain(rid=rid)
     brain.apply_field_vectors(field_id, vectors, vector_dimension=MATRYOSHKA_DIMENSION)
-    vector = brain.paragraphs[field_id].paragraphs[paragraph_key].sentences[vector_key]
+    vector = (
+        brain.brain.paragraphs[field_id].paragraphs[paragraph_key].sentences[vector_key]
+    )
     assert len(vector.vector) == MATRYOSHKA_DIMENSION
