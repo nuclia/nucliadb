@@ -267,10 +267,6 @@ class ExportStream:
         self.buffer = b""
         self.read_bytes = 0
 
-    @classmethod
-    def from_generator(cls, generator: AsyncGenerator[bytes, None]):
-        return cls(iterator=generator.__aiter__())
-
     def _read_from_buffer(self, n_bytes: int) -> bytes:
         value = self.buffer[:n_bytes]
         self.buffer = self.buffer[n_bytes:]
@@ -387,13 +383,14 @@ class ExportStreamReader:
         self,
     ) -> tuple[Optional[learning_proxy.LearningConfiguration], bytes]:
         """
-        Tries to read a learning config from the stream.
-        Returs the learning config, if found, and the leftover bytes that
-        were read from the stream to memory.
+        Tries to read a learning config from the beginning of the stream.
+        Returs the learning config if found. It also returns any leftover bytes that
+        may have been read from the network into memory that need to be yielded and imported.
         """
+        # We assume that the learning config is the first item in the export stream.
         type_bytes = await self.stream.read(3)
         if type_bytes != ExportedItemType.LEARNING_CONFIG.value.encode():
-            # Backward compatible code for exports that don't have a learning config.
+            # Backward compatible code for old exports that don't have a learning config.
             return None, type_bytes + self.stream.buffer
 
         data = await self.read_item()
