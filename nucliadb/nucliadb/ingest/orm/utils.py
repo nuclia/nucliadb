@@ -84,8 +84,23 @@ def compute_paragraph_key(rid: str, paragraph_key: str) -> str:
     return paragraph_key.replace("N_RID", rid)
 
 
-def choose_matryoshka_dimension(dimensions: list[int]):
+def choose_matryoshka_dimension(dimensions: list[int]) -> int:
     """Given a list of matryoshka embedding available dimensions, choose one to
     set the vector dimension.
     """
-    return min(dimensions)
+    if len(dimensions) == 0:
+        raise ValueError("Can't choose matryoshka dimension from an empty list")
+
+    threshold = 2000
+    previous = None
+    for dimension in sorted(dimensions):
+        if dimension > threshold:
+            break
+        previous = dimension
+
+    if dimension > threshold:
+        if previous is None:
+            return dimension
+        else:
+            return previous
+    return dimension
