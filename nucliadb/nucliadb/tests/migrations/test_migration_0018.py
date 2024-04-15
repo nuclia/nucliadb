@@ -68,8 +68,6 @@ async def test_migration_0018_global(maindb_driver: Driver):
             assert fake_kb_slug in kb_slugs
             assert real_kb_slug in kb_slugs
 
-            await txn.commit()
-
     # execute migration, removing orphan kbslug keys
     await migration.module.migrate(execution_context)
 
