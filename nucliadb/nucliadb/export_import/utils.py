@@ -388,11 +388,13 @@ class ExportStreamReader:
         may have been read from the network into memory that need to be yielded and imported.
         """
         # We assume that the learning config is the first item in the export stream.
-        type_bytes = await self.stream.read(3)
+        try:
+            type_bytes = await self.stream.read(3)
+        except ExportStreamExhausted:
+            return None, self.stream.buffer
         if type_bytes != ExportedItemType.LEARNING_CONFIG.value.encode():
             # Backward compatible code for old exports that don't have a learning config.
             return None, type_bytes + self.stream.buffer
-
         data = await self.read_item()
         lconfig = learning_proxy.LearningConfiguration.parse_raw(data)
         return lconfig, self.stream.buffer
