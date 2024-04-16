@@ -403,14 +403,11 @@ class QueryParser:
             request.vectorset = self.vectorset
             node_features.inc({"type": "vectorset"})
 
+        query_vector = None
         if self.user_vector is None:
             if self.query_endpoint_enabled:
                 try:
                     query_info = await self._get_query_information()
-                    if query_info and query_info.sentence:
-                        request.vector.extend(query_info.sentence.data)
-                    else:
-                        incomplete = True
                 except SendToPredictError as err:
                     logger.warning(
                         f"Errors on predict api trying to embedd query: {err}"
@@ -419,9 +416,14 @@ class QueryParser:
                 except PredictVectorMissing:
                     logger.warning("Predict api returned an empty vector")
                     incomplete = True
+                else:
+                    if query_info and query_info.sentence:
+                        query_vector = query_info.sentence.data
+                    else:
+                        incomplete = True
             else:
                 try:
-                    request.vector.extend(await self._get_converted_vectors())
+                    query_vector = await self._get_converted_vectors()
                 except SendToPredictError as err:
                     logger.warning(
                         f"Errors on predict api trying to embedd query: {err}"
@@ -431,7 +433,19 @@ class QueryParser:
                     logger.warning("Predict api returned an empty vector")
                     incomplete = True
         else:
-            request.vector.extend(self.user_vector)
+            query_vector = self.user_vector
+
+        if query_vector is not None:
+            async with datamanagers.with_transaction(read_only=True) as txn:
+                dimension = await datamanagers.kb.get_matryoshka_vector_dimension(
+                    txn, kbid=self.kbid
+                )
+            if dimension is not None:
+                # KB using a matryoshka embeddings model, cut the query vector
+                # accordingly
+                query_vector = query_vector[:dimension]
+            request.vector.extend(query_vector)
+
         return incomplete
 
     async def parse_relation_search(
