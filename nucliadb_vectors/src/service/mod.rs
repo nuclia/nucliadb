@@ -20,7 +20,6 @@
 
 mod query_io;
 pub mod reader;
-mod utils;
 pub mod writer;
 
 use nucliadb_core::protos::VectorSimilarity as GrpcSimilarity;
