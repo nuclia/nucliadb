@@ -26,9 +26,22 @@ pub fn level_factor() -> f64 {
     1.0 / (m() as f64).ln()
 }
 
+pub const fn m_max_for_layer(layer: usize) -> usize {
+    if layer == 0 {
+        m_max0()
+    } else {
+        m_max()
+    }
+}
+
+/// Upper limit to the number of out-edges a embedding can have.
+pub const fn m_max0() -> usize {
+    60
+}
+
 /// Upper limit to the number of out-edges a embedding can have.
 pub const fn m_max() -> usize {
-    60
+    30
 }
 
 /// Number of bi-directional links created for every new element.
