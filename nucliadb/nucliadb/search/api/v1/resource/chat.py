@@ -65,6 +65,7 @@ async def resource_chat_endpoint_by_uuid(
     ),
 ) -> Union[StreamingResponse, HTTPClientError, Response]:
     return await resource_chat_endpoint(
+        request,
         kbid,
         item,
         x_ndb_client,
@@ -101,6 +102,7 @@ async def resource_chat_endpoint_by_slug(
     ),
 ) -> Union[StreamingResponse, HTTPClientError, Response]:
     return await resource_chat_endpoint(
+        request,
         kbid,
         item,
         x_ndb_client,
@@ -112,6 +114,7 @@ async def resource_chat_endpoint_by_slug(
 
 
 async def resource_chat_endpoint(
+    request: Request,
     kbid: str,
     item: ChatRequest,
     x_ndb_client: NucliaDBClientType,
