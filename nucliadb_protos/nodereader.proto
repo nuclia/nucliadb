@@ -320,6 +320,7 @@ message SearchRequest {
 
     repeated float vector = 10; // Embedded vector search.
 
+    // ID of the hnsw index to do vector search on
     string vectorset = 15;
 
     bool reload = 11 [deprecated = true];

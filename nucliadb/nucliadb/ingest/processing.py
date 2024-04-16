@@ -110,6 +110,12 @@ class PushPayload(BaseModel):
         default_factory=models.PushProcessingOptions
     )
 
+    embedding_models: list[models.Embedding] = Field(
+        title="Embedding models",
+        description="List of embedding models to calculate vectors for this resource",
+        default=[],
+    )
+
 
 class PushResponse(BaseModel):
     seqid: Optional[int] = None
