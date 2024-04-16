@@ -1031,10 +1031,10 @@ class ChatRequest(BaseModel):
         description="The generative model to use for the chat endpoint. If not provided, the model configured for the Knowledge Box is used.",
     )
 
-    max_tokens: Optional[MaxTokens] = Field(
+    max_tokens: Optional[Union[int, MaxTokens]] = Field(
         default=None,
-        title="Maximum tokens",
-        description="Use to limit the amount of tokens used in the LLM context and/or for generating the answer.",
+        title="Maximum LLM tokens to use for the request",
+        description="Use to limit the amount of tokens used in the LLM context and/or for generating the answer. If not provided, the default maximum tokens of the generative model will be used. If an integer is provided, it is interpreted as the maximum tokens for the answer.",  # noqa
     )
 
     rephrase: Optional[bool] = Field(

@@ -76,10 +76,6 @@ INDEX_SORTABLE_FIELDS = [
     SortField.MODIFIED,
 ]
 
-# Multiply by 3 to have a good margin and guess between characters and tokens.
-# This will be fully properly cut at the NUA predict API.
-TOKEN_TO_CHARACTERS_MULTIPLIER = 3
-
 
 class QueryParser:
     """
@@ -159,11 +155,10 @@ class QueryParser:
             default=False,
             context={"kbid": self.kbid},
         )
-        self.max_tokens = max_tokens
-
         if len(self.filters) > 0:
             self.filters = translate_label_filters(self.filters)
             self.flat_filter_labels = flat_filter_labels(self.filters)
+        self.max_tokens = max_tokens
 
     def _get_default_semantic_min_score(self) -> Awaitable[float]:
         if self._min_score_task is None:  # pragma: no cover
@@ -518,10 +513,15 @@ class QueryParser:
     async def get_visual_llm_enabled(self) -> bool:
         return (await self._get_query_information()).visual_llm
 
-    async def get_max_context_characters(self) -> int:
+    async def get_max_tokens_context(self) -> int:
         if self.max_tokens is not None and self.max_tokens.context is not None:
-            return self.max_tokens.context * TOKEN_TO_CHARACTERS_MULTIPLIER
-        return (await self._get_query_information()).max_context * 3
+            return self.max_tokens.context
+        return (await self._get_query_information()).max_context
+
+    def get_max_tokens_answer(self) -> Optional[int]:
+        if self.max_tokens is not None and self.max_tokens.answer is not None:
+            return self.max_tokens.answer
+        return None
 
 
 async def paragraph_query_to_pb(
