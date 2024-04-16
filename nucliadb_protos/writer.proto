@@ -113,7 +113,8 @@ message BrokerMessage {
     MessageSource source = 33;
     int64 account_seq = 34;
 
-    repeated resources.UserVectorsWrapper user_vectors = 35;
+    // Deprecated: user_vectors are no longer supported
+    repeated resources.UserVectorsWrapper user_vectors = 35 [deprecated = true];
 
     // If true, force reindex all paragraphs in a resource
     bool reindex = 36;

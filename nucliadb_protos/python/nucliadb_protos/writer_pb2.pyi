@@ -512,7 +512,8 @@ class BrokerMessage(google.protobuf.message.Message):
     source: global___BrokerMessage.MessageSource.ValueType
     account_seq: builtins.int
     @property
-    def user_vectors(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.resources_pb2.UserVectorsWrapper]: ...
+    def user_vectors(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.resources_pb2.UserVectorsWrapper]:
+        """Deprecated: user_vectors are no longer supported"""
     reindex: builtins.bool
     """If true, force reindex all paragraphs in a resource"""
     @property

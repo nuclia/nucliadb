@@ -201,6 +201,7 @@ message ExtractedVectorsWrapper {
         CloudFile file = 2;
     }
     FieldID field = 3;
+    string vectorset_id = 4;
 }
 
 

@@ -121,6 +121,8 @@ pub struct BrokerMessage {
     pub source: i32,
     #[prost(int64, tag="34")]
     pub account_seq: i64,
+    /// Deprecated: user_vectors are no longer supported
+    #[deprecated]
     #[prost(message, repeated, tag="35")]
     pub user_vectors: ::prost::alloc::vec::Vec<super::resources::UserVectorsWrapper>,
     /// If true, force reindex all paragraphs in a resource
