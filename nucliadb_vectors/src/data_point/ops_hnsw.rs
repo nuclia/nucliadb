@@ -128,28 +128,30 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         candidates: Vec<(Address, Edge)>,
     ) -> Vec<(Address, Edge)> {
         let mut results = Vec::new();
-        let mut discarded = Vec::new();
+        let mut discarded = BinaryHeap::new();
 
         // First, select the best candidates to link, trying to connect from all directions
         // i.e: avoid linking to all nodes in a single cluster
-        for (x, sim) in candidates.iter() {
+        for (x, sim) in candidates.into_iter() {
             if results.len() == k_neighbours {
                 break;
             }
             // Keep if x is more similar to the new node than it is similar to other results
             // i.e: similarity(x, new) > similarity(x, y) for all y in result
-            let check = results.iter().map(|&(y, _)| self.similarity(*x, y)).all(|inter_sim| *sim > inter_sim);
+            let check = results.iter().map(|&(y, _)| self.similarity(x, y)).all(|inter_sim| sim > inter_sim);
             if check {
-                results.push((*x, *sim));
+                results.push((x, sim));
             } else {
-                discarded.push((*x, *sim));
+                discarded.push(Cnx(x, sim));
             }
         }
 
         // keepPrunedConnections: keep some other connections to fill M
-        if results.len() < k_neighbours {
-            discarded.sort_unstable_by_key(|(n, d)| std::cmp::Reverse(Cnx(*n, *d)));
-            results.extend(discarded.into_iter().take(k_neighbours - results.len()));
+        while results.len() < k_neighbours {
+            let Some(Cnx(n, d)) = discarded.pop() else {
+                return results;
+            };
+            results.push((n, d));
         }
 
         results

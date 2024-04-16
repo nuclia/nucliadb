@@ -747,13 +747,11 @@ mod test {
 
         // Create a data point
         let temp_dir = tempdir()?;
+        let elems_vec: Vec<Elem> =
+            elems.iter().map(|(k, v)| Elem::new(k.clone(), v.clone(), Default::default(), None)).collect();
+
         let pin = DataPointPin::create_pin(temp_dir.path())?;
-        let dp = create(
-            &pin,
-            elems.iter().map(|(k, v)| Elem::new(k.clone(), v.clone(), Default::default(), None)).collect(),
-            None,
-            Similarity::Dot,
-        )?;
+        let dp = create(&pin, elems_vec, None, Similarity::Dot)?;
 
         // Search a few times
         let correct = (0..100)
