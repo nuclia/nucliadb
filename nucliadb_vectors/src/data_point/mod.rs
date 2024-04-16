@@ -701,7 +701,7 @@ mod test {
 
     use super::{create, DataPointPin, Elem, NoDLog, SearchParams, Similarity};
 
-    const DIMENSION: usize = 1536;
+    const DIMENSION: usize = 128;
 
     fn random_vector(rng: &mut impl Rng) -> Vec<f32> {
         let v: Vec<f32> = (0..DIMENSION).map(|_| rng.gen_range(-1.0..1.0)).collect();
@@ -725,13 +725,6 @@ mod test {
         normalize(v)
     }
 
-    fn random_elem(rng: &mut impl Rng) -> (String, Vec<f32>) {
-        let key = random_key(rng);
-        let v = random_vector(rng);
-
-        (key, v)
-    }
-
     fn random_key(rng: &mut impl Rng) -> String {
         format!("{:032x?}", rng.gen::<u128>())
     }
@@ -741,60 +734,10 @@ mod test {
     }
 
     #[test]
-    fn test_recall_random_data() -> NodeResult<()> {
-        let mut rng = SmallRng::seed_from_u64(1234567890);
-        let elems: BTreeMap<_, _> = (0..500).map(|_| random_elem(&mut rng)).collect();
-
-        // Create a data point
-        let temp_dir = tempdir()?;
-        let elems_vec: Vec<Elem> =
-            elems.iter().map(|(k, v)| Elem::new(k.clone(), v.clone(), Default::default(), None)).collect();
-
-        let pin = DataPointPin::create_pin(temp_dir.path())?;
-        let dp = create(&pin, elems_vec, None, Similarity::Dot)?;
-
-        // Search a few times
-        let correct = (0..100)
-            .map(|_| {
-                // Search near-ish an existing datapoint (simulates that the query is related to the data)
-                let base_v = elems.values().nth(rng.gen_range(0..elems.len())).unwrap();
-                let query = random_nearby_vector(&mut rng, base_v, 0.5);
-
-                let mut similarities: Vec<_> = elems.iter().map(|(k, v)| (k, similarity(v, &query))).collect();
-                similarities.sort_unstable_by(|a, b| a.1.total_cmp(&b.1).reverse());
-
-                let results: Vec<_> = dp
-                    .search(
-                        &NoDLog,
-                        &query,
-                        &Default::default(),
-                        false,
-                        5,
-                        SearchParams {
-                            similarity: Similarity::Dot,
-                            min_score: -1.0,
-                            dimension: DIMENSION,
-                        },
-                    )
-                    .collect();
-
-                let search: Vec<_> = results.iter().map(|r| String::from_utf8(r.id().to_vec()).unwrap()).collect();
-                let brute_force: Vec<_> = similarities.iter().take(5).map(|r| r.0.clone()).collect();
-                search == brute_force
-            })
-            .filter(|x| *x)
-            .count();
-
-        let recall = correct as f32 / 100.0;
-        println!("Assessed recall = {recall}");
-        // Expected 0.88-0.90, has a little margin because HNSW can be non-deterministic (use of HashMap)
-        assert!(recall >= 0.86);
-
-        Ok(())
-    }
-
-    #[test]
     fn test_recall_clustered_data() -> NodeResult<()> {
+        // This test is a simplified version of the synthetic_recall_benchmark, with smaller data for faster runs
+        // It's run here as a sanity check to get a big warning in case we mess up recall too badly
+        // You can play with the benchmark version in order to get more information, tweak parameters, etc.
         let mut rng = SmallRng::seed_from_u64(1234567890);
         let mut elems = BTreeMap::new();
 
@@ -857,7 +800,7 @@ mod test {
 
         let recall = correct as f32 / 100.0;
         println!("Assessed recall = {recall}");
-        // Expected 0.90-0.92, has a little margin because HNSW can be non-deterministic (use of HashMap)
+        // Expected 0.90-0.92, has a little margin because HNSW can be non-deterministic
         assert!(recall >= 0.88);
 
         Ok(())
