@@ -79,7 +79,7 @@ async def resource_chat_endpoint_by_uuid(
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_SLUG_PREFIX}/{{slug}}/chat",
     status_code=200,
-    name="Chat with a Resource (by id)",
+    name="Chat with a Resource (by slug)",
     summary="Chat with a resource",
     description="Chat with a resource",
     tags=["Search"],
