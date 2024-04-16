@@ -81,7 +81,7 @@ jobs:
     runs-on: ubuntu-latest
 
     strategy:
-      max-parallel: 1
+      max-parallel: 3
       matrix:
         include:
           - maindb_driver: "tikv"
