@@ -51,6 +51,7 @@ from nucliadb_models.labels import translate_system_to_alias_label
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import (
     Filter,
+    MaxTokens,
     MinScore,
     QueryInfo,
     SearchOptions,
@@ -122,6 +123,7 @@ class QueryParser:
         security: Optional[RequestSecurity] = None,
         generative_model: Optional[str] = None,
         rephrase: Optional[bool] = False,
+        max_tokens: Optional[MaxTokens] = None,
     ):
         self.kbid = kbid
         self.features = features
@@ -153,10 +155,10 @@ class QueryParser:
             default=False,
             context={"kbid": self.kbid},
         )
-
         if len(self.filters) > 0:
             self.filters = translate_label_filters(self.filters)
             self.flat_filter_labels = flat_filter_labels(self.filters)
+        self.max_tokens = max_tokens
 
     def _get_default_semantic_min_score(self) -> Awaitable[float]:
         if self._min_score_task is None:  # pragma: no cover
@@ -511,11 +513,21 @@ class QueryParser:
     async def get_visual_llm_enabled(self) -> bool:
         return (await self._get_query_information()).visual_llm
 
-    async def get_max_context(self) -> int:
-        # Multiple by 3 is to have a good margin and guess
-        # between characters and tokens. This will be fully properly
-        # cut at the NUA API.
-        return (await self._get_query_information()).max_context * 3
+    async def get_max_tokens_context(self) -> int:
+        model_max = (await self._get_query_information()).max_context
+        if self.max_tokens is not None and self.max_tokens.context is not None:
+            if self.max_tokens.context > model_max:
+                raise InvalidQueryError(
+                    "max_tokens.context",
+                    f"Max context tokens is higher than the model's limit of {model_max}",
+                )
+            return self.max_tokens.context
+        return model_max
+
+    def get_max_tokens_answer(self) -> Optional[int]:
+        if self.max_tokens is not None and self.max_tokens.answer is not None:
+            return self.max_tokens.answer
+        return None
 
 
 async def paragraph_query_to_pb(

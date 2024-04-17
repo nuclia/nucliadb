@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import nucliadb_sdk
+from nucliadb_models.search import MaxTokens
 
 
 def test_chat_on_kb(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
@@ -30,6 +31,8 @@ def test_chat_on_kb(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
             "Nuclia is a powerful AI search platform",
             "AI Search involves semantic search",
         ],
+        # Control the number of AI tokens used for every request
+        max_tokens=MaxTokens(context=100, answer=50),
     )
     assert result.learning_id == "00"
     assert result.answer == "valid answer  to"

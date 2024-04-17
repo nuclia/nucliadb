@@ -56,9 +56,11 @@ CONVERSATION_MESSAGE_CONTEXT_EXPANSION = 15
 
 class CappedPromptContext:
     """
-    Class to keep track of the size of the prompt context and raise an exception if it exceeds the configured limit.
+    Class to keep track of the size (in number of characters) of the prompt context
+    and raise an exception if it exceeds the configured limit.
 
-    This class will automatically trim data that exceeds the limit when it's being set on the dictionary.
+    This class will automatically trim data that exceeds the limit when it's being
+    set on the dictionary.
     """
 
     def __init__(self, max_size: Optional[int]):
@@ -69,6 +71,7 @@ class CappedPromptContext:
 
     def __setitem__(self, key: str, value: str) -> None:
         if self.max_size is None:
+            # Unbounded size
             self.output[key] = value
         else:
             existing_len = len(self.output.get(key, ""))
@@ -347,7 +350,7 @@ class PromptContextBuilder:
         user_context: Optional[list[str]] = None,
         strategies: Optional[Sequence[RagStrategy]] = None,
         image_strategies: Optional[Sequence[ImageRagStrategy]] = None,
-        max_context_size: Optional[int] = None,
+        max_context_characters: Optional[int] = None,
         visual_llm: bool = False,
     ):
         self.kbid = kbid
@@ -356,7 +359,7 @@ class PromptContextBuilder:
         self.user_context = user_context
         self.strategies = strategies
         self.image_strategies = image_strategies
-        self.max_context_size = max_context_size
+        self.max_context_characters = max_context_characters
         self.visual_llm = visual_llm
 
     def prepend_user_context(self, context: CappedPromptContext):
@@ -368,7 +371,7 @@ class PromptContextBuilder:
     async def build(
         self,
     ) -> tuple[PromptContext, PromptContextOrder, PromptContextImages]:
-        ccontext = CappedPromptContext(max_size=self.max_context_size)
+        ccontext = CappedPromptContext(max_size=self.max_context_characters)
         self.prepend_user_context(ccontext)
         await self._build_context(ccontext)
 
