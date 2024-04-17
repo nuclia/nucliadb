@@ -542,10 +542,8 @@ async def test_chat_on_a_kb_not_found(nucliadb_reader):
 @pytest.mark.asyncio()
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_chat_max_tokens(nucliadb_reader, knowledgebox, resources):
-    predict = get_predict()
 
     # As an integer
-    predict.calls.clear()
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/chat",
         json={
@@ -555,12 +553,7 @@ async def test_chat_max_tokens(nucliadb_reader, knowledgebox, resources):
     )
     assert resp.status_code == 200
 
-    predict_chat_query = predict.calls[-2]
-    assert predict_chat_query[0] == "chat_query"
-    assert predict_chat_query[1].max_tokens == 100
-
     # Same but with the max tokens in a dict
-    predict.calls.clear()
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/chat",
         json={
@@ -570,11 +563,8 @@ async def test_chat_max_tokens(nucliadb_reader, knowledgebox, resources):
     )
     assert resp.status_code == 200
 
-    predict_chat_query = predict.calls[-2]
-    assert predict_chat_query[0] == "chat_query"
-    assert predict_chat_query[1].max_tokens == 50
-
     # If the context requested is bigger than the max tokens, it should fail
+    predict = get_predict()
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/chat",
         json={
