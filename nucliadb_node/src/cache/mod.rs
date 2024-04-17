@@ -26,11 +26,40 @@
 //! For faster reads at cost of slower initialization and memory consumption,
 //! all shards can be loaded at initialization time.
 
-mod entity_reader_cache;
-mod entity_writer_cache;
+mod entity_cache;
 mod reader_cache;
 mod resource_cache;
 mod writer_cache;
 
+use crate::metadata_entity::Metadata;
+use crate::paragraph_entity::reader::ParagraphRPointer;
+use crate::paragraph_entity::writer::ParagraphWPointer;
+use crate::relation_entity::reader::RelationRPointer;
+use crate::relation_entity::writer::RelationWPointer;
+use crate::text_entity::reader::TextRPointer;
+use crate::text_entity::writer::TextWPointer;
+use crate::vector_entity::reader::VectorRPointer;
+use crate::vector_entity::writer::VectorWPointer;
+
+pub enum WriteEntity {
+    VectorEntity(VectorWPointer),
+    ParagraphEntity(ParagraphWPointer),
+    TextEntity(TextWPointer),
+    RelationEntity(RelationWPointer),
+    MetadataEntity(Metadata),
+}
+
+pub enum ReadEntity {
+    VectorEntity(VectorRPointer),
+    ParagraphEntity(ParagraphRPointer),
+    TextEntity(TextRPointer),
+    RelationEntity(RelationRPointer),
+    MetadataEntity(Metadata),
+}
+
+pub type ReadersCache = entity_cache::Cache<ReadEntity>;
+pub type WritersCache = entity_cache::Cache<WriteEntity>;
+
+// This needs to go
 pub use reader_cache::ShardReaderCache;
 pub use writer_cache::ShardWriterCache;
