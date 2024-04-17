@@ -191,6 +191,9 @@ class KnowledgeBox:
                 txn, kbid=uuid, shards=kb_shards
             )
 
+            # shard creation will alter this value on maindb, make sure nobody
+            # uses this variable anymore
+            del kb_shards
             shard_manager = get_shard_manager()
             try:
                 await shard_manager.create_shard_by_kbid(txn, uuid)
