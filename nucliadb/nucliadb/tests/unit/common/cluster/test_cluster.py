@@ -217,8 +217,8 @@ def test_choose_node_with_nodes_and_replicas(standalone_mode_off):
     """Validate how choose node selects between different options depending on
     configuration.
 
-    As some choices can be random between a subset of nodes, choose_node is
-    called multiple times per assert.
+    Choose_node is called multiple times per assert to ensure there
+    is no randomness in the replica/node choice.
 
     """
     TRIES_PER_ASSERT = 10
@@ -247,15 +247,15 @@ def test_choose_node_with_nodes_and_replicas(standalone_mode_off):
     shard_ids, node_ids = repeated_choose_node(
         TRIES_PER_ASSERT, shard, use_read_replica_nodes=False
     )
-    assert set(shard_ids) == {"123", "456"}
-    assert set(node_ids) == {"node-0", "node-1"}
+    assert set(shard_ids) == {"123"}
+    assert set(node_ids) == {"node-0"}
 
     # Secondaries are preferred
     shard_ids, node_ids = repeated_choose_node(
         TRIES_PER_ASSERT, shard, use_read_replica_nodes=True
     )
-    assert set(shard_ids) == {"123", "456"}
-    assert set(node_ids) == {"node-replica-0", "node-replica-1"}
+    assert set(shard_ids) == {"123"}
+    assert set(node_ids) == {"node-replica-0"}
 
     # Target replicas take more preference
     shard_ids, node_ids = repeated_choose_node(
@@ -291,8 +291,8 @@ def test_choose_node_with_nodes_and_replicas(standalone_mode_off):
     shard_ids, node_ids = repeated_choose_node(
         TRIES_PER_ASSERT, shard, use_read_replica_nodes=True
     )
-    assert set(shard_ids) == {"123", "456"}
-    assert set(node_ids) == {"node-replica-0", "node-replica-1"}
+    assert set(shard_ids) == {"123"}
+    assert set(node_ids) == {"node-replica-0"}
 
     # target replicas is ignored but only primaries are used
     shard_ids, node_ids = repeated_choose_node(
@@ -322,8 +322,8 @@ def test_choose_node_with_nodes_and_replicas(standalone_mode_off):
     shard_ids, node_ids = repeated_choose_node(
         TRIES_PER_ASSERT, shard, use_read_replica_nodes=False
     )
-    assert set(shard_ids) == {"123", "456"}
-    assert set(node_ids) == {"node-0", "node-1"}
+    assert set(shard_ids) == {"123"}
+    assert set(node_ids) == {"node-0"}
 
     shard_ids, node_ids = repeated_choose_node(
         TRIES_PER_ASSERT, shard, use_read_replica_nodes=True

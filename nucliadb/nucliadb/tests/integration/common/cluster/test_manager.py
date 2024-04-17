@@ -139,13 +139,15 @@ async def shards(fake_nodes, fake_kbid: str, maindb_driver: Driver):
     ],
 )
 @pytest.mark.asyncio
-async def test_choose_node(shards, shard_index: int, nodes: set):
+async def test_choose_node_always_prefer_the_same_node(
+    shards, shard_index: int, nodes: set
+):
     shard = shards.shards[shard_index]
     node_ids = set()
     for i in range(100):
         node, _ = manager.choose_node(shard)
         node_ids.add(node.id)
-    assert node_ids == nodes, "Random numbers have defeat this test"
+    assert len(node_ids) == 1
 
 
 async def test_choose_node_attempts_target_replicas_but_is_not_imperative(shards):
