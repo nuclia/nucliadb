@@ -320,7 +320,6 @@ async def chat(
         citations=chat_request.citations,
         generative_model=chat_request.generative_model,
         max_tokens=query_parser.get_max_tokens_answer(),
-        max_tokens_context=max_tokens_context,
         query_context_images=prompt_context_images,
     )
     predict = get_predict()

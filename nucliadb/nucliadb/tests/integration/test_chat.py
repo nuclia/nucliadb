@@ -514,15 +514,13 @@ async def test_chat_capped_context(
     max_size = 28
     assert total_size > max_size * 3
 
-    predict = get_predict()
-    predict.max_context = max_size  # type: ignore
-
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/chat",
         json={
             "query": "title",
             "rag_strategies": [{"name": "full_resource"}],
             "debug": True,
+            "max_tokens": {"context": max_size},
         },
         headers={"X-Synchronous": "True"},
         timeout=None,
@@ -539,3 +537,53 @@ async def test_chat_on_a_kb_not_found(nucliadb_reader):
     resp = await nucliadb_reader.post("/kb/unknown_kb_id/chat", json={"query": "title"})
     assert resp.status_code == 404
     assert resp.json() == {"detail": "Knowledge Box 'unknown_kb_id' not found."}
+
+
+@pytest.mark.asyncio()
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_chat_max_tokens(nucliadb_reader, knowledgebox, resources):
+    predict = get_predict()
+
+    # As an integer
+    predict.calls.clear()
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/chat",
+        json={
+            "query": "title",
+            "max_tokens": 100,
+        },
+    )
+    assert resp.status_code == 200
+
+    predict_chat_query = predict.calls[-2]
+    assert predict_chat_query[0] == "chat_query"
+    assert predict_chat_query[1].max_tokens == 100
+
+    # Same but with the max tokens in a dict
+    predict.calls.clear()
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/chat",
+        json={
+            "query": "title",
+            "max_tokens": {"context": 100, "answer": 50},
+        },
+    )
+    assert resp.status_code == 200
+
+    predict_chat_query = predict.calls[-2]
+    assert predict_chat_query[0] == "chat_query"
+    assert predict_chat_query[1].max_tokens == 50
+
+    # If the context requested is bigger than the max tokens, it should fail
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/chat",
+        json={
+            "query": "title",
+            "max_tokens": {"context": predict.max_context + 1},
+        },
+    )
+    assert resp.status_code == 412
+    assert (
+        resp.json()["detail"]
+        == "Invalid query. Error in max_tokens.context: Max context tokens is higher than the model's limit of 1000"
+    )

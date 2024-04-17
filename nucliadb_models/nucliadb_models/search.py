@@ -807,10 +807,6 @@ class ChatModel(BaseModel):
         default=None, description="Maximum characters to generate"
     )
 
-    max_tokens_context: Optional[int] = Field(
-        default=None, description="Maximum number of tokens in the context"
-    )
-
     query_context_images: Dict[str, Image] = Field(
         default={},
         description="The information retrieval context for the current query, each image is a base64 encoded string",
