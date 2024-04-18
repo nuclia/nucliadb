@@ -38,7 +38,6 @@ async def test_metadata_tokens_cancelled_by_the_user_sc_3775(
     }
     resp = await nucliadb_writer.post(
         f"/kb/{knowledgebox}/resources",
-        headers={"X-Synchronous": "true"},
         json={
             "title": "My Resource",
             "summary": "My summary",

@@ -18,10 +18,12 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+import json
 from enum import Enum
 from typing import Any, Optional, TypeVar, Union, overload
 
 from fastapi import HTTPException
+from google.protobuf.json_format import MessageToDict
 from grpc import StatusCode as GrpcStatusCode
 from grpc.aio import AioRpcError
 from nucliadb_protos.nodereader_pb2 import (
@@ -87,8 +89,7 @@ async def node_query(
     pb_query: SuggestRequest,
     target_shard_replicas: Optional[list[str]] = None,
     use_read_replica_nodes: bool = True,
-) -> tuple[list[SuggestResponse], bool, list[tuple[AbstractIndexNode, str]]]:
-    ...
+) -> tuple[list[SuggestResponse], bool, list[tuple[AbstractIndexNode, str]]]: ...
 
 
 @overload
@@ -98,8 +99,9 @@ async def node_query(
     pb_query: ParagraphSearchRequest,
     target_shard_replicas: Optional[list[str]] = None,
     use_read_replica_nodes: bool = True,
-) -> tuple[list[ParagraphSearchResponse], bool, list[tuple[AbstractIndexNode, str]]]:
-    ...
+) -> tuple[
+    list[ParagraphSearchResponse], bool, list[tuple[AbstractIndexNode, str]]
+]: ...
 
 
 @overload
@@ -109,8 +111,7 @@ async def node_query(
     pb_query: SearchRequest,
     target_shard_replicas: Optional[list[str]] = None,
     use_read_replica_nodes: bool = True,
-) -> tuple[list[SearchResponse], bool, list[tuple[AbstractIndexNode, str]]]:
-    ...
+) -> tuple[list[SearchResponse], bool, list[tuple[AbstractIndexNode, str]]]: ...
 
 
 @overload
@@ -120,8 +121,7 @@ async def node_query(
     pb_query: RelationSearchRequest,
     target_shard_replicas: Optional[list[str]] = None,
     use_read_replica_nodes: bool = True,
-) -> tuple[list[RelationSearchResponse], bool, list[tuple[AbstractIndexNode, str]]]:
-    ...
+) -> tuple[list[RelationSearchResponse], bool, list[tuple[AbstractIndexNode, str]]]: ...
 
 
 async def node_query(
@@ -186,6 +186,15 @@ async def node_query(
 
     error = validate_node_query_results(results or [])
     if error is not None:
+        query_dict = MessageToDict(pb_query)
+        query_dict.pop("vector", None)
+        logger.error(
+            "Error while querying nodes",
+            extra={
+                "kbid": kbid,
+                "query": json.dumps(query_dict),
+            },
+        )
         if (
             error.status_code >= 500
             and use_read_replica_nodes

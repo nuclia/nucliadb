@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::shards::cache::ShardWriterCache;
+use crate::cache::ShardWriterCache;
 use nucliadb_core::tracing::*;
 use std::fs::read_dir;
 use std::path::PathBuf;
@@ -43,9 +43,12 @@ pub async fn garbage_collection_loop(parameters: GCParameters, cache: Arc<ShardW
     loop {
         tokio::time::sleep(parameters.loop_interval).await;
 
-        let Ok(shards_dir_iterator) = read_dir(&parameters.shards_path) else {
-            error!("Garbage collection loop can not read shards directory");
-            break;
+        let shards_dir_iterator = match read_dir(&parameters.shards_path) {
+            Ok(iterator) => iterator,
+            Err(error) => {
+                error!("Garbage collector loop can not read shards directory: {error:?}");
+                continue;
+            }
         };
 
         let mut handles = vec![];

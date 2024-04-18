@@ -166,7 +166,6 @@ async def resource(redis, writer_api, knowledgebox_writer):
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.post(
             f"/{KB_PREFIX}/{knowledgebox_writer}/resources",
-            headers={"X-Synchronous": "true"},
             json={
                 "slug": "resource1",
                 "title": "Resource 1",

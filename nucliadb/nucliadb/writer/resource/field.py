@@ -84,9 +84,9 @@ async def extract_fields(resource: ORMResource, toprocess: PushPayload):
         field_pb = await field.get_value()
 
         if field_type_name is FieldTypeName.FILE:
-            toprocess.filefield[
-                field_id
-            ] = await processing.convert_internal_filefield_to_str(field_pb, storage)
+            toprocess.filefield[field_id] = (
+                await processing.convert_internal_filefield_to_str(field_pb, storage)
+            )
 
         if field_type_name is FieldTypeName.LINK:
             parsed_link = MessageToDict(
@@ -148,10 +148,10 @@ async def extract_fields(resource: ORMResource, toprocess: PushPayload):
                         await processing.convert_internal_cf_to_str(cf, storage)
                         for cf in message.content.attachments
                     ]
-                    parsed_message["content"][
-                        "format"
-                    ] = resources_pb2.MessageContent.Format.Value(
-                        parsed_message["content"]["format"]
+                    parsed_message["content"]["format"] = (
+                        resources_pb2.MessageContent.Format.Value(
+                            parsed_message["content"]["format"]
+                        )
                     )
                     full_conversation.messages.append(
                         models.PushMessage(**parsed_message)
@@ -317,12 +317,16 @@ def parse_link_field(
     if link_field.css_selector is not None:
         writer.links[key].css_selector = link_field.css_selector
 
+    if link_field.xpath is not None:
+        writer.links[key].xpath = link_field.xpath
+
     toprocess.linkfield[key] = models.LinkUpload(
         link=link_field.uri,
         headers=link_field.headers or {},
         cookies=link_field.cookies or {},
         localstorage=link_field.localstorage or {},
         css_selector=link_field.css_selector,
+        xpath=link_field.xpath,
     )
 
 

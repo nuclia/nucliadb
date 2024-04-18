@@ -21,8 +21,8 @@
 use std::sync::OnceLock;
 
 use lazy_static::lazy_static;
+use nucliadb_core::merge::MergerError;
 
-use crate::merge::errors::MergerError;
 use crate::merge::MergeScheduler;
 
 lazy_static! {

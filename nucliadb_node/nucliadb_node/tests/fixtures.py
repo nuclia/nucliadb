@@ -53,7 +53,6 @@ images.settings["nucliadb_node_reader"] = {
         "READER_LISTEN_ADDRESS": "0.0.0.0:4445",
         "RUST_BACKTRACE": "full",
         "RUST_LOG": "nucliadb_*=DEBUG",  # noqa
-        "DEBUG": "1",
     },
     "options": {
         "command": [
@@ -61,7 +60,8 @@ images.settings["nucliadb_node_reader"] = {
         ],
         "platform": "linux/amd64",
         "mem_limit": "3g",
-        "ports": {"4445": None},
+        "ports": {"4445": ("0.0.0.0", 0)},
+        "publish_all_ports": False,
     },
 }
 
@@ -74,7 +74,6 @@ images.settings["nucliadb_node_writer"] = {
         "WRITER_LISTEN_ADDRESS": "0.0.0.0:4446",
         "RUST_BACKTRACE": "full",
         "RUST_LOG": "nucliadb_*=DEBUG",  # noqa
-        "DEBUG": "1",
     },
     "options": {
         "command": [
@@ -82,7 +81,8 @@ images.settings["nucliadb_node_writer"] = {
         ],
         "platform": "linux/amd64",
         "mem_limit": "3g",
-        "ports": {"4446": None},
+        "ports": {"4446": ("0.0.0.0", 0)},
+        "publish_all_ports": False,
     },
 }
 

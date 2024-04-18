@@ -160,7 +160,6 @@ jobs:
           NUCLIA_PUBLIC_URL: https://{zone}.stashify.cloud
           cluster_discovery_mode: manual
           cluster_discovery_manual_addresses: '["localhost:10009","localhost:10010"]'
-          DEBUG: "1"
           NUA_API_KEY: ${{ secrets.NUA_API_KEY }}
           NUCLIADB_DISABLE_ANALYTICS: "True"
           ENVIRONMENT: "stage"

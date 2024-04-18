@@ -19,7 +19,6 @@
 
 //! This module provides tools for managing shards
 
-pub mod cache;
 pub mod errors;
 pub mod metadata;
 pub mod shard_reader;

@@ -19,6 +19,7 @@
 //
 
 pub mod fs_state;
+pub mod merge;
 pub mod metrics;
 pub mod paragraphs;
 pub mod query_language;

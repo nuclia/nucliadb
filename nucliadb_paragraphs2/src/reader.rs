@@ -36,6 +36,7 @@ use tantivy::{DocAddress, Index, IndexReader, LeasedItem, ReloadPolicy};
 use super::schema::ParagraphSchema;
 use crate::search_query;
 use crate::search_query::SharedTermC;
+use crate::search_response::extract_labels;
 use crate::search_response::{SearchBm25Response, SearchFacetsResponse, SearchIntResponse};
 
 const FUZZY_DISTANCE: u8 = 1;
@@ -307,12 +308,7 @@ impl Iterator for BatchProducer {
                 .unwrap()
                 .to_string();
 
-            let labels = doc
-                .get_all(self.facet_field)
-                .flat_map(|x| x.as_facet())
-                .map(|x| x.to_path_string())
-                .filter(|x| x.starts_with("/l/"))
-                .collect::<Vec<_>>();
+            let labels = extract_labels(doc.get_all(self.facet_field));
             items.push(ParagraphItem {
                 id,
                 labels,

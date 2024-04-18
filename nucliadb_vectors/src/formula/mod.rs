@@ -203,6 +203,9 @@ mod tests {
         fn min_score(&self) -> f32 {
             -1.0
         }
+        fn will_need(&self, _x: Address) {
+            // noop
+        }
     }
     #[test]
     fn test_query() {

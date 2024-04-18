@@ -51,6 +51,7 @@ from nucliadb_models.labels import translate_system_to_alias_label
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import (
     Filter,
+    MaxTokens,
     MinScore,
     QueryInfo,
     SearchOptions,
@@ -122,6 +123,7 @@ class QueryParser:
         security: Optional[RequestSecurity] = None,
         generative_model: Optional[str] = None,
         rephrase: Optional[bool] = False,
+        max_tokens: Optional[MaxTokens] = None,
     ):
         self.kbid = kbid
         self.features = features
@@ -153,10 +155,10 @@ class QueryParser:
             default=False,
             context={"kbid": self.kbid},
         )
-
         if len(self.filters) > 0:
             self.filters = translate_label_filters(self.filters)
             self.flat_filter_labels = flat_filter_labels(self.filters)
+        self.max_tokens = max_tokens
 
     def _get_default_semantic_min_score(self) -> Awaitable[float]:
         if self._min_score_task is None:  # pragma: no cover
@@ -403,14 +405,11 @@ class QueryParser:
             request.vectorset = self.vectorset
             node_features.inc({"type": "vectorset"})
 
+        query_vector = None
         if self.user_vector is None:
             if self.query_endpoint_enabled:
                 try:
                     query_info = await self._get_query_information()
-                    if query_info and query_info.sentence:
-                        request.vector.extend(query_info.sentence.data)
-                    else:
-                        incomplete = True
                 except SendToPredictError as err:
                     logger.warning(
                         f"Errors on predict api trying to embedd query: {err}"
@@ -419,9 +418,14 @@ class QueryParser:
                 except PredictVectorMissing:
                     logger.warning("Predict api returned an empty vector")
                     incomplete = True
+                else:
+                    if query_info and query_info.sentence:
+                        query_vector = query_info.sentence.data
+                    else:
+                        incomplete = True
             else:
                 try:
-                    request.vector.extend(await self._get_converted_vectors())
+                    query_vector = await self._get_converted_vectors()
                 except SendToPredictError as err:
                     logger.warning(
                         f"Errors on predict api trying to embedd query: {err}"
@@ -431,7 +435,19 @@ class QueryParser:
                     logger.warning("Predict api returned an empty vector")
                     incomplete = True
         else:
-            request.vector.extend(self.user_vector)
+            query_vector = self.user_vector
+
+        if query_vector is not None:
+            async with datamanagers.with_transaction(read_only=True) as txn:
+                dimension = await datamanagers.kb.get_matryoshka_vector_dimension(
+                    txn, kbid=self.kbid
+                )
+            if dimension is not None:
+                # KB using a matryoshka embeddings model, cut the query vector
+                # accordingly
+                query_vector = query_vector[:dimension]
+            request.vector.extend(query_vector)
+
         return incomplete
 
     async def parse_relation_search(
@@ -511,11 +527,21 @@ class QueryParser:
     async def get_visual_llm_enabled(self) -> bool:
         return (await self._get_query_information()).visual_llm
 
-    async def get_max_context(self) -> int:
-        # Multiple by 3 is to have a good margin and guess
-        # between characters and tokens. This will be fully properly
-        # cut at the NUA API.
-        return (await self._get_query_information()).max_context * 3
+    async def get_max_tokens_context(self) -> int:
+        model_max = (await self._get_query_information()).max_context
+        if self.max_tokens is not None and self.max_tokens.context is not None:
+            if self.max_tokens.context > model_max:
+                raise InvalidQueryError(
+                    "max_tokens.context",
+                    f"Max context tokens is higher than the model's limit of {model_max}",
+                )
+            return self.max_tokens.context
+        return model_max
+
+    def get_max_tokens_answer(self) -> Optional[int]:
+        if self.max_tokens is not None and self.max_tokens.answer is not None:
+            return self.max_tokens.answer
+        return None
 
 
 async def paragraph_query_to_pb(
@@ -667,12 +693,15 @@ def parse_entities_to_filters(
         if entity_filter not in request.filter.field_labels:
             request.filter.field_labels.append(entity_filter)
             added_filters.append(entity_filter)
+
     # We need to expand the filter expression with the automatically detected entities.
     if len(added_filters) > 0:
+        # So far, autofilters feature will only yield 'and' expressions with the detected entities.
+        # More complex autofilters can be added here if we leverage the query endpoint.
         expanded_expression = {"and": [{"literal": entity} for entity in added_filters]}
         if request.filter.expression:
             expression = json.loads(request.filter.expression)
-            expanded_expression["and"].extend(expression)
+            expanded_expression["and"].append(expression)
         request.filter.expression = json.dumps(expanded_expression)
     return added_filters
 

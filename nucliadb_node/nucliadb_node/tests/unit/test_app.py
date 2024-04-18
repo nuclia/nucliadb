@@ -36,8 +36,6 @@ async def test_main():
     ) as stop_nats_manager, patch(
         "nucliadb_node.app.start_indexed_publisher", AsyncMock()
     ) as start_indexed_publisher, patch(
-        "nucliadb_node.app.start_shard_gc_scheduler", AsyncMock()
-    ) as start_shard_gc_scheduler, patch(
         "nucliadb_node.app.start_grpc", AsyncMock()
     ) as start_grpc, patch(
         "nucliadb_node.app.serve_metrics", AsyncMock()
@@ -56,7 +54,6 @@ async def test_main():
                 start_grpc.return_value,
                 start_worker.return_value.finalize,
                 start_indexed_publisher.return_value.finalize,
-                start_shard_gc_scheduler.return_value.finalize,
                 serve_metrics.return_value.shutdown,
                 writer.return_value.close,
                 stop_nats_manager,

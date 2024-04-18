@@ -53,7 +53,7 @@ from nucliadb.writer.exceptions import (
     ResourceNotFound,
 )
 from nucliadb.writer.resource.audit import parse_audit
-from nucliadb.writer.resource.basic import parse_basic, set_processing_info
+from nucliadb.writer.resource.basic import parse_basic
 from nucliadb.writer.resource.field import parse_fields
 from nucliadb.writer.resource.origin import parse_extra, parse_origin
 from nucliadb.writer.tus import TUSUPLOAD, UPLOAD, get_dm, get_storage_manager
@@ -74,6 +74,7 @@ from nucliadb_models.writer import CreateResourcePayload, ResourceFileUploaded
 from nucliadb_utils.authentication import requires_one
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.storages.storage import KB_RESOURCE_FIELD
+from nucliadb_utils.transaction import TransactionCommitTimeoutError
 from nucliadb_utils.utilities import (
     get_ingest,
     get_partitioning,
@@ -404,11 +405,8 @@ async def tus_patch_rslug_prefix(
     rslug: str,
     field: str,
     upload_id: str,
-    x_synchronous: bool = Header(False),  # type: ignore
 ) -> Response:
-    return await tus_patch(
-        request, kbid, upload_id, rslug=rslug, field=field, x_synchronous=x_synchronous
-    )
+    return await tus_patch(request, kbid, upload_id, rslug=rslug, field=field)
 
 
 @api.patch(
@@ -426,11 +424,8 @@ async def tus_patch_rid_prefix(
     rid: str,
     field: str,
     upload_id: str,
-    x_synchronous: bool = Header(False),  # type: ignore
 ) -> Response:
-    return await tus_patch(
-        request, kbid, upload_id, rid=rid, field=field, x_synchronous=x_synchronous
-    )
+    return await tus_patch(request, kbid, upload_id, rid=rid, field=field)
 
 
 @api.patch(
@@ -446,9 +441,8 @@ async def patch(
     request: Request,
     kbid: str,
     upload_id: str,
-    x_synchronous: bool = Header(False),  # type: ignore
 ) -> Response:
-    return await tus_patch(request, kbid, upload_id, x_synchronous=x_synchronous)
+    return await tus_patch(request, kbid, upload_id)
 
 
 async def tus_patch(
@@ -458,7 +452,6 @@ async def tus_patch(
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
     field: Optional[str] = None,
-    x_synchronous: bool = False,
 ):
     try:
         return await _tus_patch(
@@ -468,7 +461,6 @@ async def tus_patch(
             rid=rid,
             rslug=rslug,
             field=field,
-            x_synchronous=x_synchronous,
         )
     except ResumableURINotAvailable:
         return HTTPClientError(
@@ -485,7 +477,6 @@ async def _tus_patch(
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
     field: Optional[str] = None,
-    x_synchronous: bool = False,
 ) -> Response:
     """
     Upload all bytes in the requests and append them in the specifyied offset
@@ -582,7 +573,6 @@ async def _tus_patch(
                 request=request,
                 bucket=storage_manager.storage.get_bucket_name(kbid),
                 item=creation_payload,
-                wait_on_commit=x_synchronous,
             )
         except LimitsExceededError as exc:
             raise HTTPException(status_code=exc.status_code, detail=exc.detail)
@@ -623,7 +613,6 @@ async def upload_rslug_prefix(
     x_password: Optional[list[str]] = Header(None),  # type: ignore
     x_language: Optional[list[str]] = Header(None),  # type: ignore
     x_md5: Optional[list[str]] = Header(None),  # type: ignore
-    x_synchronous: bool = Header(False),  # type: ignore
 ) -> ResourceFileUploaded:
     return await _upload(
         request,
@@ -634,7 +623,6 @@ async def upload_rslug_prefix(
         x_password=x_password,
         x_language=x_language,
         x_md5=x_md5,
-        x_synchronous=x_synchronous,
     )
 
 
@@ -656,7 +644,6 @@ async def upload_rid_prefix(
     x_password: Optional[list[str]] = Header(None),  # type: ignore
     x_language: Optional[list[str]] = Header(None),  # type: ignore
     x_md5: Optional[list[str]] = Header(None),  # type: ignore
-    x_synchronous: bool = Header(False),  # type: ignore
 ) -> ResourceFileUploaded:
     return await _upload(
         request,
@@ -667,7 +654,6 @@ async def upload_rid_prefix(
         x_password=x_password,
         x_language=x_language,
         x_md5=x_md5,
-        x_synchronous=x_synchronous,
     )
 
 
@@ -687,7 +673,6 @@ async def upload(
     x_password: Optional[list[str]] = Header(None),  # type: ignore
     x_language: Optional[list[str]] = Header(None),  # type: ignore
     x_md5: Optional[list[str]] = Header(None),  # type: ignore
-    x_synchronous: bool = Header(False),  # type: ignore
 ) -> ResourceFileUploaded:
     return await _upload(
         request,
@@ -696,7 +681,6 @@ async def upload(
         x_password=x_password,
         x_language=x_language,
         x_md5=x_md5,
-        x_synchronous=x_synchronous,
     )
 
 
@@ -711,7 +695,6 @@ async def _upload(
     x_password: Optional[list[str]] = Header(None),  # type: ignore
     x_language: Optional[list[str]] = Header(None),  # type: ignore
     x_md5: Optional[list[str]] = Header(None),  # type: ignore
-    x_synchronous: bool = Header(False),  # type: ignore
 ) -> ResourceFileUploaded:
     if rslug is not None:
         path_rid = await get_rid_from_params_or_raise_error(kbid, slug=rslug)
@@ -808,7 +791,6 @@ async def _upload(
             path=path,
             request=request,
             bucket=storage_manager.storage.get_bucket_name(kbid),
-            wait_on_commit=x_synchronous,
         )
     except LimitsExceededError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
@@ -874,7 +856,6 @@ async def store_file_on_nuclia_db(
     language: Optional[str] = None,
     md5: Optional[str] = None,
     item: Optional[CreateResourcePayload] = None,
-    wait_on_commit: bool = False,
 ) -> Optional[int]:
     # File is on NucliaDB Storage at path
 
@@ -958,16 +939,24 @@ async def store_file_on_nuclia_db(
         file_field, storage=storage
     )
 
+    writer.source = BrokerMessage.MessageSource.WRITER
+    try:
+        await transaction.commit(writer, partition, wait=True)
+    except TransactionCommitTimeoutError:
+        raise HTTPException(
+            status_code=501,
+            detail="Inconsistent write. This resource will not be processed and may not be stored.",
+        )
+
     try:
         processing_info = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
     except SendToProcessError:
-        raise HTTPException(status_code=500, detail="Error while sending to process")
-
-    writer.source = BrokerMessage.MessageSource.WRITER
-    set_processing_info(writer, processing_info)
-    await transaction.commit(writer, partition, wait=wait_on_commit)
+        raise HTTPException(
+            status_code=500,
+            detail="Error while sending to process. Try calling /reprocess",
+        )
 
     return processing_info.seqid
 

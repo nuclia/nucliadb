@@ -30,9 +30,9 @@ use tokio::io::AsyncReadExt;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::Response;
 
+use crate::cache::ShardWriterCache;
 use crate::replication::NodeRole;
 use crate::settings::Settings;
-use crate::shards::cache::ShardWriterCache;
 use crate::shards::metadata::Similarity;
 use crate::shards::writer::ShardWriter;
 use crate::utils::{get_primary_node_id, list_shards, read_host_key};
@@ -199,7 +199,7 @@ impl replication::replication_service_server::ReplicationService for Replication
         &self,
         raw_request: tonic::Request<replication::SecondaryCheckReplicationStateRequest>,
     ) -> Result<tonic::Response<replication::PrimaryCheckReplicationStateResponse>, tonic::Status> {
-        if self.settings.node_role() != NodeRole::Primary {
+        if self.settings.node_role != NodeRole::Primary {
             return Err(tonic::Status::unavailable("This node is not a primary node"));
         }
         let request = raw_request.into_inner();
@@ -229,6 +229,7 @@ impl replication::replication_service_server::ReplicationService for Replication
                         generation_id: gen_id,
                         kbid: metadata.kbid().unwrap_or_default(),
                         similarity: similarity.to_string(),
+                        normalize_vectors: metadata.normalize_vectors(),
                     });
                 }
             } else {
@@ -293,7 +294,7 @@ impl replication::replication_service_server::ReplicationService for Replication
         &self,
         _request: tonic::Request<noderesources::EmptyQuery>,
     ) -> Result<tonic::Response<noderesources::NodeMetadata>, tonic::Status> {
-        let settings = &self.settings.clone();
+        let settings = &self.settings;
         let mut total_disk = 0;
         let mut available_disk = 0;
 
@@ -303,8 +304,8 @@ impl replication::replication_service_server::ReplicationService for Replication
         }
         Ok(tonic::Response::new(noderesources::NodeMetadata {
             shard_count: list_shards(settings.shards_path()).await.len().try_into().unwrap(),
-            node_id: read_host_key(settings.host_key_path()).unwrap().to_string(),
-            primary_node_id: get_primary_node_id(settings.data_path()),
+            node_id: read_host_key(&settings.host_key_path).unwrap().to_string(),
+            primary_node_id: get_primary_node_id(&settings.data_path),
             total_disk,
             available_disk,
             ..Default::default()

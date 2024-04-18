@@ -46,6 +46,10 @@ permissions:
   id-token: write   # This is required for requesting the JWT
   contents: read    # This is required for actions/checkout
 
+env:
+  GCP_WORKLOAD_IDENTITY_PROVIDER: "projects/224545243904/locations/global/workloadIdentityPools/gh-nuclia/providers/gh-nuclia-provider"
+  GCP_SERVICE_ACCOUNT: "github-actions@nuclia-internal.iam.gserviceaccount.com"
+
 jobs:
 
   build-img:
@@ -89,8 +93,8 @@ jobs:
         id: gcp-auth
         uses: google-github-actions/auth@v1
         with:
-          workload_identity_provider: "${{ secrets.GCP_REGISTRY_WORKLOAD_IDENTITY_PROVIDER }}"
-          service_account: "${{ secrets.GCP_REGISTRY_SERVICE_ACCOUNT }}"
+          workload_identity_provider: "${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}"
+          service_account: "${{ env.GCP_SERVICE_ACCOUNT }}"
           token_format: access_token
 
       - name: Login to Google Artifact Registry

@@ -20,10 +20,10 @@
 
 use crate::analytics::payload::AnalyticsEvent;
 use crate::analytics::sync::send_analytics_event;
+use crate::cache::ShardWriterCache;
 use crate::grpc::collect_garbage::{garbage_collection_loop, GCParameters};
 use crate::merge::{global_merger, MergePriority, MergeRequest, MergeWaiter};
 use crate::settings::Settings;
-use crate::shards::cache::ShardWriterCache;
 use crate::shards::errors::ShardNotFoundError;
 use crate::shards::metadata::ShardMetadata;
 use crate::shards::writer::ShardWriter;
@@ -123,6 +123,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
             Some(kbid),
             request.similarity().into(),
             Some(Channel::from(request.release_channel)),
+            request.normalize_vectors,
         );
 
         let shards = Arc::clone(&self.shards);
@@ -194,7 +195,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let write_task = || {
             run_with_telemetry(info, move || {
                 let shard = obtain_shard(shards, shard_id_clone)?;
-                shard.set_resource(&resource).and_then(|()| shard.get_opstatus())
+                shard.set_resource(resource).and_then(|()| shard.get_opstatus())
             })
         };
         let status = tokio::task::spawn_blocking(write_task)
@@ -254,96 +255,20 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
     }
 
-    async fn add_vector_set(&self, request: Request<NewVectorSetRequest>) -> Result<Response<OpStatus>, Status> {
-        let span = Span::current();
-        let request = request.into_inner();
-        let vectorset_id = match request.id {
-            Some(ref vectorset_id) => vectorset_id.clone(),
-            None => return Err(tonic::Status::invalid_argument("Vectorset ID must be provided")),
-        };
-        let shard_id = match vectorset_id.shard {
-            Some(ref shard_id) => &shard_id.id,
-            None => return Err(tonic::Status::invalid_argument("Shard ID must be provided")),
-        };
-
-        let shards = Arc::clone(&self.shards);
-        let shard_id_clone = shard_id.clone();
-        let info = info_span!(parent: &span, "add vector set");
-        let task = || {
-            run_with_telemetry(info, move || {
-                let shard = obtain_shard(shards, shard_id_clone)?;
-                shard.add_vectorset(&vectorset_id, request.similarity()).and_then(|()| shard.get_opstatus())
-            })
-        };
-        let status = tokio::task::spawn_blocking(task)
-            .await
-            .map_err(|error| tonic::Status::internal(format!("Blocking task panicked: {error:?}")))?;
-        match status {
-            Ok(mut status) => {
-                status.status = 0;
-                status.detail = "Success!".to_string();
-                Ok(tonic::Response::new(status))
-            }
-            Err(error) => Err(tonic::Status::internal(error.to_string())),
-        }
+    async fn add_vector_set(&self, _: Request<NewVectorSetRequest>) -> Result<Response<OpStatus>, Status> {
+        Err(tonic::Status::internal("Coming soon.."))
     }
 
-    async fn remove_vector_set(&self, request: Request<VectorSetId>) -> Result<Response<OpStatus>, Status> {
-        let span = Span::current();
-        let request = request.into_inner();
-        let shard_id = match request.shard {
-            Some(ref shard_id) => &shard_id.id,
-            None => return Err(tonic::Status::invalid_argument("Shard ID must be provided")),
-        };
-        let shards = Arc::clone(&self.shards);
-        let shard_id_clone = shard_id.clone();
-        let info = info_span!(parent: &span, "remove vector set");
-        let task = || {
-            run_with_telemetry(info, move || {
-                let shard = obtain_shard(shards, shard_id_clone)?;
-                shard.remove_vectorset(&request).and_then(|()| shard.get_opstatus())
-            })
-        };
-        let status = tokio::task::spawn_blocking(task)
-            .await
-            .map_err(|error| tonic::Status::internal(format!("Blocking task panicked: {error:?}")))?;
-        match status {
-            Ok(mut status) => {
-                status.status = 0;
-                status.detail = "Success!".to_string();
-                Ok(tonic::Response::new(status))
-            }
-            Err(error) => Err(tonic::Status::internal(error.to_string())),
-        }
+    async fn remove_vector_set(&self, _: Request<VectorSetId>) -> Result<Response<OpStatus>, Status> {
+        Err(tonic::Status::internal("Coming soon.."))
     }
 
-    async fn list_vector_sets(&self, request: Request<ShardId>) -> Result<Response<VectorSetList>, Status> {
-        let span = Span::current();
-        let shard_id = request.into_inner();
-        let shards = Arc::clone(&self.shards);
-        let shard_id_clone = shard_id.id.clone();
-        let info = info_span!(parent: &span, "list vector sets");
-        let task = || {
-            let shard = obtain_shard(shards, shard_id_clone)?;
-            run_with_telemetry(info, move || shard.list_vectorsets())
-        };
-        let status = tokio::task::spawn_blocking(task)
-            .await
-            .map_err(|error| tonic::Status::internal(format!("Blocking task panicked: {error:?}")))?;
-        match status {
-            Ok(vectorset) => {
-                let list = VectorSetList {
-                    vectorset,
-                    shard: Some(shard_id),
-                };
-                Ok(tonic::Response::new(list))
-            }
-            Err(error) => Err(tonic::Status::internal(error.to_string())),
-        }
+    async fn list_vector_sets(&self, _: Request<ShardId>) -> Result<Response<VectorSetList>, Status> {
+        Err(tonic::Status::internal("Coming soon.."))
     }
 
     async fn get_metadata(&self, _request: Request<EmptyQuery>) -> Result<Response<NodeMetadata>, Status> {
-        let settings = &self.settings.clone();
+        let settings = &self.settings;
         let mut total_disk = 0;
         let mut available_disk = 0;
 
@@ -353,8 +278,8 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
         Ok(tonic::Response::new(NodeMetadata {
             shard_count: list_shards(settings.shards_path()).await.len().try_into().unwrap(),
-            node_id: read_host_key(settings.host_key_path()).unwrap().to_string(),
-            primary_node_id: get_primary_node_id(settings.data_path()),
+            node_id: read_host_key(&settings.host_key_path).unwrap().to_string(),
+            primary_node_id: get_primary_node_id(&settings.data_path),
             available_disk,
             total_disk,
             ..Default::default()

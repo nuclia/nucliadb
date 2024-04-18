@@ -189,6 +189,37 @@ class TestWriterServicer:
         )
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
 
+    async def test_NewKnowledgeBox_hosted_nucliadb_with_matryoshka_dimensions(
+        self, writer: WriterServicer, onprem_nucliadb
+    ):
+        onprem_nucliadb.return_value = False
+
+        request = writer_pb2.KnowledgeBoxNew(
+            slug="slug",
+            forceuuid="kbid",
+            similarity=VectorSimilarity.COSINE,
+            vector_dimension=200,
+            default_min_score=1.0,
+            matryoshka_dimensions=[200, 400],
+        )
+
+        resp = await writer.NewKnowledgeBox(request)
+
+        expected_model_metadata = SemanticModelMetadata(
+            similarity_function=VectorSimilarity.COSINE,
+            vector_dimension=200,
+            default_min_score=1.0,
+            matryoshka_dimensions=[200, 400],
+        )
+        writer.proc.create_kb.assert_called_once_with(
+            request.slug,
+            request.config,
+            expected_model_metadata,
+            forceuuid="kbid",
+            release_channel=0,
+        )
+        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
+
     async def test_NewKnowledgeBox_with_learning_config(
         self, writer: WriterServicer, learning_config
     ):
@@ -214,6 +245,43 @@ class TestWriterServicer:
             similarity_function=VectorSimilarity.COSINE,
             vector_dimension=10,
             default_min_score=-1.0,
+        )
+        writer.proc.create_kb.assert_called_once_with(
+            request.slug,
+            request.config,
+            expected_model_metadata,
+            forceuuid=request.forceuuid,
+            release_channel=0,
+        )
+        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
+
+    async def test_NewKnowledgeBox_with_learning_config_with_matryoshka_dimensions(
+        self, writer: WriterServicer, learning_config
+    ):
+        learning_config.get_configuration.return_value = None
+        learning_config.set_configuration = AsyncMock(
+            return_value=LearningConfiguration(
+                semantic_model="multilingual",
+                semantic_threshold=-1,
+                semantic_vector_size=10,
+                semantic_vector_similarity="cosine",
+                semantic_matryoshka_dims=[10, 20, 30],
+            )
+        )
+
+        request = writer_pb2.KnowledgeBoxNew(
+            slug="slug2",
+            forceuuid="kbid",
+            learning_config=json.dumps({"semantic_model": "multilingual"}),
+        )
+
+        resp = await writer.NewKnowledgeBox(request)
+
+        expected_model_metadata = SemanticModelMetadata(
+            similarity_function=VectorSimilarity.COSINE,
+            vector_dimension=10,
+            default_min_score=-1.0,
+            matryoshka_dimensions=[10, 20, 30],
         )
         writer.proc.create_kb.assert_called_once_with(
             request.slug,

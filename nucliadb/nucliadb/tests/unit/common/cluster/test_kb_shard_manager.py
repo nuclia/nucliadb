@@ -28,29 +28,19 @@ from nucliadb.common import datamanagers
 from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.settings import settings
 from nucliadb.common.maindb.driver import Transaction
-from nucliadb_protos import knowledgebox_pb2, utils_pb2, writer_pb2
+from nucliadb_protos import writer_pb2
 
 
 def test_should_create_new_shard():
     sm = manager.KBShardManager()
     low_para_counter = {
         "num_paragraphs": settings.max_shard_paragraphs - 1,
-        "num_fields": 0,
     }
     high_para_counter = {
         "num_paragraphs": settings.max_shard_paragraphs + 1,
-        "num_fields": 0,
     }
     assert sm.should_create_new_shard(**low_para_counter) is False
     assert sm.should_create_new_shard(**high_para_counter) is True
-
-    low_fields_counter = {"num_fields": settings.max_shard_fields, "num_paragraphs": 0}
-    high_fields_counter = {
-        "num_fields": settings.max_shard_fields + 1,
-        "num_paragraphs": 0,
-    }
-    assert sm.should_create_new_shard(**low_fields_counter) is False
-    assert sm.should_create_new_shard(**high_fields_counter) is True
 
 
 @pytest.fixture(scope="function")
@@ -99,15 +89,20 @@ async def test_shard_creation(fake_index_nodes: list[str], txn: Transaction):
     """
     index_nodes = set(fake_index_nodes)
     kbid = f"kbid:{test_shard_creation.__name__}"
-    semantic_model = knowledgebox_pb2.SemanticModelMetadata()
-    release_channel = utils_pb2.ReleaseChannel.STABLE
     sm = manager.KBShardManager()
 
+    # Fake KB shards instead of creating a KB to generate it
     shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
-    assert shards is None
+    await datamanagers.cluster.update_kb_shards(
+        txn,
+        kbid=kbid,
+        shards=writer_pb2.Shards(
+            kbid=kbid,
+        ),
+    )
 
     # create first shard
-    await sm.create_shard_by_kbid(txn, kbid, semantic_model, release_channel)
+    await sm.create_shard_by_kbid(txn, kbid)
 
     shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
     assert shards is not None
@@ -118,7 +113,7 @@ async def test_shard_creation(fake_index_nodes: list[str], txn: Transaction):
     assert set((replica.node for replica in shards.shards[0].replicas)) == index_nodes
 
     # adding a second shard will mark the first as read only
-    await sm.create_shard_by_kbid(txn, kbid, semantic_model, release_channel)
+    await sm.create_shard_by_kbid(txn, kbid)
 
     shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
     assert shards is not None
@@ -130,7 +125,7 @@ async def test_shard_creation(fake_index_nodes: list[str], txn: Transaction):
     assert set((replica.node for replica in shards.shards[1].replicas)) == index_nodes
 
     # adding a third one will be equivalent
-    await sm.create_shard_by_kbid(txn, kbid, semantic_model, release_channel)
+    await sm.create_shard_by_kbid(txn, kbid)
 
     shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
     assert shards is not None

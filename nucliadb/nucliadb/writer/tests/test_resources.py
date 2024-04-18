@@ -51,6 +51,7 @@ from nucliadb_utils.utilities import get_ingest
 
 
 @pytest.mark.asyncio
+@pytest.mark.xfail(reason="New vectorset api is not implemented yet")
 async def test_resource_crud_min(
     writer_api: Callable[[list[str]], AsyncClient], knowledgebox_writer: str
 ):
@@ -61,54 +62,6 @@ async def test_resource_crud_min(
             json={"dimension": 3, "similarity": "dot"},
         )
         assert resp.status_code == 200
-        # Test create resource
-        resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
-            json={
-                "uservectors": [
-                    {
-                        "vectors": {
-                            "base": {
-                                "vector1": {
-                                    "vector": [4.0, 2.0, 3.0],
-                                    "positions": [0, 0],
-                                }
-                            }
-                        },
-                        "field": {"field_type": "file", "field": "field1"},
-                    }
-                ]
-            },
-        )
-        assert resp.status_code == 201
-
-
-@pytest.mark.asyncio
-async def test_resource_crud_min_no_vectorset(
-    writer_api: Callable[[list[str]], AsyncClient], knowledgebox_writer: str
-):
-    knowledgebox_id = knowledgebox_writer
-    async with writer_api([NucliaDBRoles.WRITER]) as client:
-        # Test create resource
-        resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
-            json={
-                "uservectors": [
-                    {
-                        "vectors": {
-                            "base": {
-                                "vector1": {
-                                    "vector": [4.0, 2.0, 3.0],
-                                    "positions": [0, 0],
-                                }
-                            }
-                        },
-                        "field": {"field_type": "file", "field": "field1"},
-                    }
-                ]
-            },
-        )
-        assert resp.status_code == 201
 
 
 @pytest.mark.asyncio
@@ -120,7 +73,6 @@ async def test_resource_crud(
         # Test create resource
         resp = await client.post(
             f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
-            headers={"X-SYNCHRONOUS": "True"},
             json={
                 "slug": "resource1",
                 "title": "My resource",
@@ -216,7 +168,6 @@ async def test_resource_crud_sync(
         # Test create resource
         resp = await client.post(
             f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
-            headers={"X-SYNCHRONOUS": "True"},
             json={
                 "slug": "resource1",
                 "title": "My resource",
@@ -294,7 +245,6 @@ async def test_resource_crud_sync(
         # Test update resource
         resp = await client.patch(
             f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}",
-            headers={"X-SYNCHRONOUS": "True"},
             json={},
         )
         assert resp.status_code == 200
@@ -303,14 +253,12 @@ async def test_resource_crud_sync(
 
         resp = await client.delete(
             f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/resource1",
-            headers={"X-SYNCHRONOUS": "True"},
         )
 
         assert resp.status_code == 404
 
         resp = await client.delete(
             f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}",
-            headers={"X-SYNCHRONOUS": "True"},
         )
         assert resp.status_code == 204
 
@@ -397,7 +345,6 @@ async def test_resource_endpoints_by_slug(
         slug = "my-resource"
         resp = await client.post(
             f"/{KB_PREFIX}/{knowledgebox_ingest}/{RESOURCES_PREFIX}",
-            headers={"X-SYNCHRONOUS": "True"},
             json={
                 "slug": slug,
                 "texts": {"text1": {"body": "test1", "format": "PLAIN"}},
@@ -480,7 +427,6 @@ async def test_paragraph_annotations(writer_api, knowledgebox_writer):
         # Must have at least one classification
         resp = await client.post(
             f"/{KB_PREFIX}/{kbid}/resources",
-            headers={"X-SYNCHRONOUS": "True"},
             json={
                 "texts": {"text1": TEST_TEXT_PAYLOAD},
                 "fieldmetadata": [
@@ -504,7 +450,6 @@ async def test_paragraph_annotations(writer_api, knowledgebox_writer):
 
         resp = await client.post(
             f"/{KB_PREFIX}/{kbid}/resources",
-            headers={"X-SYNCHRONOUS": "True"},
             json={
                 "texts": {"text1": TEST_TEXT_PAYLOAD},
                 "fieldmetadata": [
@@ -526,7 +471,6 @@ async def test_paragraph_annotations(writer_api, knowledgebox_writer):
         # Classifications need to be unique
         resp = await client.patch(
             f"/{KB_PREFIX}/{kbid}/resource/{rid}",
-            headers={"X-SYNCHRONOUS": "True"},
             json={
                 "fieldmetadata": [
                     {

@@ -10,7 +10,7 @@ metadata:
     heritage: "{{ .Release.Service }}"
 data:
 {{- if .Values.running.debug }}
-  DEBUG: "True"
+  DEBUG: "true"
 {{- end }}
   RUNNING_ENVIRONMENT: {{ .Values.running.running_environment }}
   LOG_LEVEL: {{ .Values.running.log_level }}

@@ -25,7 +25,7 @@ HelloRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _HELLOREQUEST,
-        "__module__": "nucliadb_telemetry.tests.grpc.hellostreamingworld_pb2"
+        "__module__": "nucliadb_telemetry.tests.grpc.hellostreamingworld_pb2",
         # @@protoc_insertion_point(class_scope:hellostreamingworld.HelloRequest)
     },
 )
@@ -36,7 +36,7 @@ HelloReply = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _HELLOREPLY,
-        "__module__": "nucliadb_telemetry.tests.grpc.hellostreamingworld_pb2"
+        "__module__": "nucliadb_telemetry.tests.grpc.hellostreamingworld_pb2",
         # @@protoc_insertion_point(class_scope:hellostreamingworld.HelloReply)
     },
 )

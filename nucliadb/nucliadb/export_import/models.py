@@ -36,6 +36,7 @@ class ExportedItemType(str, Enum):
     LABELS = "LAB"
     ENTITIES = "ENT"
     BINARY = "BIN"
+    LEARNING_CONFIG = "LEA"
 
 
 ExportItem = tuple[ExportedItemType, Any]
@@ -65,8 +66,7 @@ class ExportMetadata(Metadata):
     exported_resources: list[str] = list()
 
 
-class ImportMetadata(Metadata):
-    ...
+class ImportMetadata(Metadata): ...
 
 
 class NatsTaskMessage(BaseModel):

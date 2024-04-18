@@ -33,8 +33,28 @@ KB_SLUGS = KB_SLUGS_BASE + "{slug}"
 logger = logging.getLogger(__name__)
 
 
+async def get_kbs(
+    txn: Transaction, *, prefix: str = ""
+) -> AsyncIterator[tuple[str, str]]:
+    async for key in txn.keys(KB_SLUGS.format(slug=prefix), count=-1):
+        slug = key.replace(KB_SLUGS_BASE, "")
+        uuid = await get_kb_uuid(txn, slug=slug)
+        if uuid is None:
+            logger.error(f"KB with slug ({slug}) but without uuid?")
+            continue
+        yield (uuid, slug)
+
+
 async def exists_kb(txn: Transaction, *, kbid: str) -> bool:
     return await get_config(txn, kbid=kbid) is not None
+
+
+async def get_kb_uuid(txn: Transaction, *, slug: str) -> Optional[str]:
+    uuid = await txn.get(KB_SLUGS.format(slug=slug))
+    if uuid is not None:
+        return uuid.decode()
+    else:
+        return None
 
 
 async def get_config(
@@ -47,6 +67,13 @@ async def get_config(
     response = knowledgebox_pb2.KnowledgeBoxConfig()
     response.ParseFromString(payload)
     return response
+
+
+async def set_config(
+    txn: Transaction, *, kbid: str, config: knowledgebox_pb2.KnowledgeBoxConfig
+):
+    key = KB_UUID.format(kbid=kbid)
+    await txn.set(key, config.SerializeToString())
 
 
 async def get_model_metadata(
@@ -65,21 +92,25 @@ async def get_model_metadata(
         )
 
 
-async def get_kb_uuid(txn: Transaction, *, slug: str) -> Optional[str]:
-    uuid = await txn.get(KB_SLUGS.format(slug=slug))
-    if uuid is not None:
-        return uuid.decode()
-    else:
-        return None
-
-
-async def get_kbs(
-    txn: Transaction, *, prefix: str = ""
-) -> AsyncIterator[tuple[str, str]]:
-    async for key in txn.keys(KB_SLUGS.format(slug=prefix), count=-1):
-        slug = key.replace(KB_SLUGS_BASE, "")
-        uuid = await get_kb_uuid(txn, slug=slug)
-        if uuid is None:
-            logger.error(f"KB with slug ({slug}) but without uuid?")
-            continue
-        yield (uuid, slug)
+async def get_matryoshka_vector_dimension(
+    txn: Transaction, *, kbid: str
+) -> Optional[int]:
+    """Return vector dimension for matryoshka models"""
+    model_metadata = await get_model_metadata(txn, kbid=kbid)
+    dimension = None
+    if (
+        len(model_metadata.matryoshka_dimensions) > 0
+        and model_metadata.vector_dimension
+    ):
+        if model_metadata.vector_dimension in model_metadata.matryoshka_dimensions:
+            dimension = model_metadata.vector_dimension
+        else:
+            logger.error(
+                "KB has an invalid matryoshka dimension!",
+                extra={
+                    "kbid": kbid,
+                    "vector_dimension": model_metadata.vector_dimension,
+                    "matryoshka_dimensions": model_metadata.matryoshka_dimensions,
+                },
+            )
+    return dimension

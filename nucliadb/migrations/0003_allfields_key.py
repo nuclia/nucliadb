@@ -26,8 +26,7 @@ from nucliadb.migrator.context import ExecutionContext
 from nucliadb.migrator.migrator import logger
 
 
-async def migrate(context: ExecutionContext) -> None:
-    ...
+async def migrate(context: ExecutionContext) -> None: ...
 
 
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:

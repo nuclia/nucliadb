@@ -683,7 +683,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bef552e6f588e446098f6ba40d89ac146c8c7b64aade83c051ee00bb5d2bc18d"
 dependencies = [
  "serde",
- "uuid 1.7.0",
+ "uuid 1.8.0",
 ]
 
 [[package]]
@@ -794,6 +794,15 @@ dependencies = [
  "log",
  "regex",
  "termcolor",
+]
+
+[[package]]
+name = "envy"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f47e0157f2cb54f5ae1bd371b30a2ae4311e1c028f575cd4e81de7353215965"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -1058,9 +1067,9 @@ checksum = "d2fabcfbdc87f4758337ca535fb41a6d701b65693ce38287d856d1674551ec9b"
 
 [[package]]
 name = "h2"
-version = "0.3.24"
+version = "0.3.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb2c4422095b67ee78da96fbb51a4cc413b3b25883c7717ff7ca1ab31022c9c9"
+checksum = "81fe527a889e1532da5c525686d96d4c2e74cdd345badf8dfef9f6b39dd5f5e8"
 dependencies = [
  "bytes",
  "fnv",
@@ -1726,6 +1735,7 @@ dependencies = [
  "tonic",
  "tower",
  "tracing",
+ "uuid 1.8.0",
 ]
 
 [[package]]
@@ -1740,7 +1750,7 @@ dependencies = [
  "backoff",
  "bincode",
  "crossbeam-utils",
- "derive_builder",
+ "envy",
  "filetime",
  "futures",
  "futures-core",
@@ -1763,7 +1773,6 @@ dependencies = [
  "nucliadb_texts",
  "nucliadb_texts2",
  "nucliadb_vectors",
- "nucliadb_vectors2",
  "num_cpus",
  "once_cell",
  "openssl",
@@ -1795,7 +1804,7 @@ dependencies = [
  "tracing-opentelemetry",
  "tracing-subscriber",
  "username",
- "uuid 1.7.0",
+ "uuid 1.8.0",
 ]
 
 [[package]]
@@ -1815,7 +1824,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
- "uuid 1.7.0",
+ "uuid 1.8.0",
 ]
 
 [[package]]
@@ -1895,7 +1904,7 @@ dependencies = [
  "tantivy 0.17.0 (git+https://github.com/nuclia/tantivy.git?rev=2183120aaa565b14fde05aa35342e5c5a3306d3b)",
  "tempfile",
  "thiserror",
- "uuid 1.7.0",
+ "uuid 1.8.0",
 ]
 
 [[package]]
@@ -1917,7 +1926,7 @@ dependencies = [
  "tantivy 0.17.0 (git+https://github.com/nuclia/tantivy.git?branch=original-17)",
  "tempfile",
  "thiserror",
- "uuid 1.7.0",
+ "uuid 1.8.0",
 ]
 
 [[package]]
@@ -1951,29 +1960,9 @@ dependencies = [
  "crossbeam",
  "fs2",
  "fst",
- "lazy_static",
- "memmap2",
- "nucliadb_core",
- "nucliadb_procs",
- "rand",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror",
- "uuid 1.7.0",
-]
-
-[[package]]
-name = "nucliadb_vectors2"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "bit-set",
- "crossbeam",
- "fs2",
- "fst",
  "fxhash",
  "lazy_static",
+ "libc",
  "memmap2",
  "nucliadb_core",
  "nucliadb_procs",
@@ -1982,7 +1971,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror",
- "uuid 1.7.0",
+ "uuid 1.8.0",
 ]
 
 [[package]]
@@ -2484,7 +2473,7 @@ dependencies = [
  "indoc",
  "libc",
  "memoffset",
- "parking_lot 0.12.1",
+ "parking_lot 0.11.2",
  "pyo3-build-config",
  "pyo3-ffi",
  "pyo3-macros",
@@ -3024,7 +3013,7 @@ dependencies = [
  "thiserror",
  "time",
  "url",
- "uuid 1.7.0",
+ "uuid 1.8.0",
 ]
 
 [[package]]
@@ -3041,7 +3030,7 @@ dependencies = [
  "thiserror",
  "time",
  "url",
- "uuid 1.7.0",
+ "uuid 1.8.0",
 ]
 
 [[package]]
@@ -4071,9 +4060,9 @@ dependencies = [
 
 [[package]]
 name = "uuid"
-version = "1.7.0"
+version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f00cc9702ca12d3c81455259621e676d0f7251cec66a21e98fe2e9a37db93b2a"
+checksum = "a183cf7feeba97b4dd1c0d46788634f6221d87fa961b305bed08c851829efcc0"
 dependencies = [
  "getrandom",
  "rand",
@@ -4083,9 +4072,9 @@ dependencies = [
 
 [[package]]
 name = "uuid-macro-internal"
-version = "1.7.0"
+version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7abb14ae1a50dad63eaa768a458ef43d298cd1bd44951677bd10b732a9ba2a2d"
+checksum = "9881bea7cbe687e36c9ab3b778c36cd0487402e270304e8b1296d5085303c1a2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4117,7 +4106,7 @@ dependencies = [
  "lazy_static",
  "memory-stats",
  "nucliadb_core",
- "nucliadb_vectors2",
+ "nucliadb_vectors",
  "rand",
  "reqwest",
  "serde",

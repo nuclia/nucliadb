@@ -49,14 +49,14 @@ images.settings["nucliadb_node_reader"] = {
         "READER_LISTEN_ADDRESS": "0.0.0.0:4445",
         "NUCLIADB_DISABLE_ANALYTICS": "True",
         "RUST_BACKTRACE": "full",
-        "DEBUG": "1",
         "RUST_LOG": "nucliadb_*=DEBUG",
     },
     "options": {
         "command": [
             "/usr/local/bin/node_reader",
         ],
-        "ports": {"4445": None},
+        "ports": {"4445": ("0.0.0.0", 0)},
+        "publish_all_ports": False,
         "mem_limit": "3g",  # default is 1g, need to override
         "platform": "linux/amd64",
     },
@@ -71,14 +71,14 @@ images.settings["nucliadb_node_writer"] = {
         "WRITER_LISTEN_ADDRESS": "0.0.0.0:4446",
         "NUCLIADB_DISABLE_ANALYTICS": "True",
         "RUST_BACKTRACE": "full",
-        "DEBUG": "1",
         "RUST_LOG": "nucliadb_*=DEBUG",
     },
     "options": {
         "command": [
             "/usr/local/bin/node_writer",
         ],
-        "ports": {"4446": None},
+        "ports": {"4446": ("0.0.0.0", 0)},
+        "publish_all_ports": False,
         "mem_limit": "3g",  # default is 1g, need to override
         "platform": "linux/amd64",
     },
@@ -97,13 +97,13 @@ images.settings["nucliadb_node_sidecar"] = {
         "WRITER_LISTEN_ADDRESS": "0.0.0.0:4446",
         "PYTHONUNBUFFERED": "1",
         "LOG_LEVEL": "DEBUG",
-        "DEBUG": "1",
     },
     "options": {
         "command": [
             "node_sidecar",
         ],
-        "ports": {"4447": None},
+        "ports": {"4447": ("0.0.0.0", 0)},
+        "publish_all_ports": False,
         "platform": "linux/amd64",
     },
 }

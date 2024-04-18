@@ -53,6 +53,14 @@ class LeaderNotFoundError(Exception):
     pass
 
 
+class PdClusterTimeout(Exception):
+    """
+    Raised with PD cluster fails to respond
+    """
+
+    pass
+
+
 tikv_observer = metrics.Observer(
     "tikv_client",
     labels={"type": ""},
@@ -334,8 +342,21 @@ class ConnectionHolder:
         self.url = url
         self.connect_lock = asyncio.Lock()
 
+    @backoff.on_exception(
+        backoff.expo,
+        PdClusterTimeout,
+        jitter=backoff.random_jitter,
+        max_tries=3,
+    )
     async def initialize(self) -> None:
-        self._txn_connection = await asynchronous.TransactionClient.connect(self.url)
+        try:
+            self._txn_connection = await asynchronous.TransactionClient.connect(
+                self.url
+            )
+        except Exception as exc:
+            if "PD cluster failed to respond" in str(exc):
+                raise PdClusterTimeout from exc
+            raise
 
     async def get_snapshot(
         self, timestamp: Optional[float] = None, retried: bool = False

@@ -228,19 +228,23 @@ impl DiskHnsw {
                 if ram.layers.len() == layer_index {
                     ram.layers.push(RAMLayer::default());
                 }
-                let ram_edges = ram.layers[layer_index].out.entry(Address(node_index)).or_default();
 
                 let layer_pos = node_end - (layer_index + 1) * USIZE_LEN;
                 let edges_start = usize_from_slice_le(&hnsw[layer_pos..layer_pos + USIZE_LEN]);
                 let number_edges = usize_from_slice_le(&hnsw[edges_start..edges_start + USIZE_LEN]);
+
                 let cnx_start = edges_start + USIZE_LEN;
                 let cnx_end = cnx_start + number_edges * CNX_LEN;
-                let edges = EdgeIter {
-                    crnt: 0,
-                    buf: &hnsw[cnx_start..cnx_end],
-                };
-                for (to, weight) in edges {
-                    ram_edges.push((to, weight));
+
+                if number_edges > 0 {
+                    let ram_edges = ram.layers[layer_index].out.entry(Address(node_index)).or_default();
+                    let edges = EdgeIter {
+                        crnt: 0,
+                        buf: &hnsw[cnx_start..cnx_end],
+                    };
+                    for (to, weight) in edges {
+                        ram_edges.push((to, weight));
+                    }
                 }
 
                 if cnx_end == layer_pos {

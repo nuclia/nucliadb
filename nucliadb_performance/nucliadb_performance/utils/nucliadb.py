@@ -17,8 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import time
 from dataclasses import dataclass
+from typing import Optional
 
+from nucliadb_performance.settings import get_search_api_url
+from nucliadb_performance.utils.exceptions import RequestError
+from nucliadb_performance.utils.metrics import record_request_process_time
 from nucliadb_sdk import NucliaDB
 from nucliadb_sdk.v2.exceptions import NotFoundError
 
@@ -57,3 +62,47 @@ def get_kbid(ndb, slug_or_kbid) -> str:
     except NotFoundError:
         kbid = ndb.reader.get_knowledge_box(kbid=slug_or_kbid)
     return kbid
+
+
+class APIClient:
+    valid_status_codes: list[int] = [200, 201, 204]
+
+    def __init__(self, session, base_url, headers: Optional[dict[str, str]] = None):
+        self.session = session
+        self.base_url = base_url
+        self.headers = headers or {}
+
+    async def make_request(self, method: str, path: str, *args, **kwargs):
+        url = self.base_url + path
+        func = getattr(self.session, method.lower())
+        base_headers = self.headers.copy()
+        kwargs_headers = kwargs.get("headers") or {}
+        kwargs_headers.update(base_headers)
+        kwargs["headers"] = kwargs_headers
+        start = time.perf_counter()
+        async with func(url, *args, **kwargs) as resp:
+            elapsed = time.perf_counter() - start
+            if resp.status not in self.valid_status_codes:
+                await self.handle_error(resp)
+            record_request_process_time(resp, client_time=elapsed)
+            return await resp.json()
+
+    async def handle_error(self, resp):
+        content = None
+        text = None
+        try:
+            content = await resp.json()
+        except Exception:
+            text = await resp.text()
+        raise RequestError(resp.status, content=content, text=text)
+
+
+class SearchClient(APIClient):
+    valid_status_codes: list[int] = [200]
+    headers: dict[str, str] = {"X-NUCLIADB-ROLES": "READER"}
+
+    def __init__(self, session, headers: Optional[dict[str, str]] = None):
+        base_url = get_search_api_url()
+        headers = headers or {}
+        headers.setdefault("X-NUCLIADB-ROLES", "READER")
+        super().__init__(session, base_url, headers)

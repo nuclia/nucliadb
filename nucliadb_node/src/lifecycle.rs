@@ -22,17 +22,17 @@
 
 use std::sync::Arc;
 
-use crate::merge::errors::MergerError;
-use crate::merge::{self, MergeScheduler};
+use crate::cache::ShardWriterCache;
+use crate::merge::{self, global_merger, MergeScheduler};
 use crate::settings::Settings;
-use crate::shards::cache::ShardWriterCache;
+use nucliadb_core::merge::{install_merge_requester, MergerError};
 use nucliadb_core::prelude::*;
 use nucliadb_core::thread::ThreadPoolBuilder;
 
 /// Initialize the index node writer. This function must be called before using
 /// a writer
 pub fn initialize_writer(settings: Settings) -> NodeResult<()> {
-    let data_path = settings.data_path();
+    let data_path = &settings.data_path;
     let shards_path = settings.shards_path();
     if !data_path.exists() {
         return Err(node_error!("Data directory ({:?}) should be already created", data_path));
@@ -43,7 +43,7 @@ pub fn initialize_writer(settings: Settings) -> NodeResult<()> {
     }
 
     // We shallow the error if the threadpools were already initialized
-    let _ = ThreadPoolBuilder::new().num_threads(settings.num_global_rayon_threads()).build_global();
+    let _ = ThreadPoolBuilder::new().num_threads(settings.num_global_rayon_threads).build_global();
 
     Ok(())
 }
@@ -53,6 +53,7 @@ pub fn initialize_writer(settings: Settings) -> NodeResult<()> {
 pub fn initialize_merger(shard_cache: Arc<ShardWriterCache>, settings: Settings) -> Result<(), MergerError> {
     let merger = MergeScheduler::new(shard_cache, settings);
     let _ = merge::install_global(merger).map(std::thread::spawn)?;
+    install_merge_requester(global_merger())?;
     Ok(())
 }
 
@@ -66,5 +67,5 @@ pub fn finalize_merger() {
 /// a reader
 pub fn initialize_reader(settings: Settings) {
     // We swallow the error if the threadpool was already initialized
-    let _ = ThreadPoolBuilder::new().num_threads(settings.num_global_rayon_threads()).build_global();
+    let _ = ThreadPoolBuilder::new().num_threads(settings.num_global_rayon_threads).build_global();
 }

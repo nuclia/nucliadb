@@ -18,9 +18,9 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use crate::cache::ShardReaderCache;
 use crate::grpc::update::{update_loop, UpdateParameters};
 use crate::settings::Settings;
-use crate::shards::cache::ShardReaderCache;
 use crate::shards::errors::ShardNotFoundError;
 use crate::shards::reader::{ShardFileChunkIterator, ShardReader};
 use crate::telemetry::run_with_telemetry;
@@ -175,7 +175,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         let shards = Arc::clone(&self.shards);
         let task = move || {
             let shard = obtain_shard(shards, shard_id)?;
-            run_with_telemetry(info, move || shard.get_info(&request))
+            run_with_telemetry(info, move || shard.get_info())
         };
         let shard_info = tokio::task::spawn_blocking(task)
             .await

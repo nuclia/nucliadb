@@ -54,19 +54,6 @@ def test_crud_resource(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaDB):
                 "token": [{"token": "Ramon", "klass": "NAME", "start": 5, "end": 9}],
             }
         ],
-        uservectors=[
-            {
-                "field": {
-                    "field": "text",
-                    "field_type": "text",
-                },
-                "vectors": {
-                    "base": {
-                        "vectors": {"vector": [1.0, 0.2]},
-                    }
-                },
-            }
-        ],
     )
     resource = sdk.get_resource_by_slug(
         kbid=kb.uuid,

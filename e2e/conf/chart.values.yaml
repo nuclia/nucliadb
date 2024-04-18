@@ -9,7 +9,6 @@ env:
   cluster_discovery_mode: kubernetes
   cluster_discovery_kubernetes_namespace: nucliadb
   cluster_discovery_kubernetes_selector: "app.kubernetes.io/name=node"
-  DEBUG: "1"
   NUCLIADB_DISABLE_ANALYTICS: "True"
   ENVIRONMENT: "stage"
   FLAG_SETTINGS_URL: https://raw.githubusercontent.com/nuclia/status/main/features-v2.json

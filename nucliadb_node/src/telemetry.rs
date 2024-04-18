@@ -18,7 +18,11 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::collections::HashMap;
+use std::sync::atomic::AtomicUsize;
+use std::sync::RwLock;
+use std::time::{Duration, Instant};
 
+use lazy_static::lazy_static;
 use nucliadb_core::tracing::{Level, Metadata, Span};
 use nucliadb_core::{Context, NodeResult};
 use opentelemetry::global;
@@ -35,6 +39,26 @@ use crate::settings::Settings;
 use crate::utils::ALL_TARGETS;
 
 const TRACE_ID: &str = "trace-id";
+const TELEMETRY_ERROR_INTERVAL: Duration = Duration::from_secs(5);
+
+fn telemetry_error_handler(error: global::Error) {
+    lazy_static! {
+        static ref LAST_ERROR: RwLock<Instant> = RwLock::new(Instant::now());
+    };
+    static ERROR_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+    let report = LAST_ERROR.read().map(|last| last.elapsed() > TELEMETRY_ERROR_INTERVAL).unwrap_or(true);
+
+    if report {
+        let error_count = ERROR_COUNT.fetch_min(0, std::sync::atomic::Ordering::Relaxed);
+        log::warn!("Open telemetry error {error:?} ({error_count} more since last report)");
+        if let Ok(mut last_error) = LAST_ERROR.write() {
+            *last_error = Instant::now()
+        };
+    } else {
+        ERROR_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    }
+}
 
 pub fn init_telemetry(settings: &Settings) -> NodeResult<Option<ClientInitGuard>> {
     let mut layers = Vec::new();
@@ -42,23 +66,18 @@ pub fn init_telemetry(settings: &Settings) -> NodeResult<Option<ClientInitGuard>
     let stdout = stdout_layer(settings);
     layers.push(stdout);
 
-    if settings.jaeger_enabled() {
+    if settings.jaeger_enabled {
         let jaeger = jaeger_layer(settings)?;
         layers.push(jaeger);
     }
 
-    let sentry_guard;
-
-    if settings.sentry_enabled() {
-        sentry_guard = Some(setup_sentry(settings.sentry_env(), settings.sentry_url()));
-        let sentry = sentry_layer();
-        layers.push(sentry);
-    } else {
-        eprintln!("Sentry disabled");
-        sentry_guard = None;
-    }
+    let sentry_guard = Some(setup_sentry(settings.sentry_env(), settings.sentry_url.clone()));
+    let sentry = sentry_layer();
+    layers.push(sentry);
 
     tracing_subscriber::registry().with(layers).try_init().with_context(|| "trying to init tracing")?;
+
+    global::set_error_handler(telemetry_error_handler)?;
 
     Ok(sentry_guard)
 }
@@ -142,7 +161,7 @@ fn stdout_layer(settings: &Settings) -> Box<dyn Layer<Registry> + Send + Sync> {
 
     let filter = LogLevelsFilter::new(log_levels);
 
-    if settings.plain_logs() || settings.debug() {
+    if settings.debug {
         layer.event_format(tracing_subscriber::fmt::format().compact()).with_filter(filter).boxed()
     } else {
         layer
@@ -175,7 +194,7 @@ fn jaeger_layer(settings: &Settings) -> NodeResult<Box<dyn Layer<Registry> + Sen
     Ok(tracing_opentelemetry::layer().with_tracer(tracer).with_filter(level_filter).with_filter(span_filter).boxed())
 }
 
-fn setup_sentry(env: &'static str, sentry_url: String) -> ClientInitGuard {
+fn setup_sentry(env: String, sentry_url: String) -> ClientInitGuard {
     sentry::init((
         sentry_url,
         sentry::ClientOptions {

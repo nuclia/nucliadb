@@ -32,7 +32,6 @@ async def test_delete_field(
 ) -> None:
     resp = await nucliadb_writer.post(
         f"/{KB_PREFIX}/{knowledgebox_one}/resources",
-        headers={"X-SYNCHRONOUS": "True"},
         json={
             "slug": "resource1",
             "title": "Resource 1",
@@ -51,7 +50,6 @@ async def test_delete_field(
 
     resp = await nucliadb_writer.delete(
         f"/{KB_PREFIX}/{knowledgebox_one}/resource/{uuid}/text/text1",
-        headers={"X-SYNCHRONOUS": "True"},
     )
     assert resp.status_code == 204
 

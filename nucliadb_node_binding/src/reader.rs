@@ -23,11 +23,9 @@ use crate::RawProtos;
 use nucliadb_core::paragraphs::ParagraphIterator;
 use nucliadb_core::protos::*;
 use nucliadb_core::texts::DocumentIterator;
+use nucliadb_node::cache::ShardReaderCache;
 use nucliadb_node::lifecycle;
-use nucliadb_node::settings::providers::env::EnvSettingsProvider;
-use nucliadb_node::settings::providers::SettingsProvider;
-use nucliadb_node::settings::Settings;
-use nucliadb_node::shards::cache::ShardReaderCache;
+use nucliadb_node::settings::load_settings;
 use nucliadb_node::shards::reader::ShardReader;
 use prost::Message;
 use pyo3::exceptions::{PyStopIteration, PyValueError};
@@ -88,7 +86,7 @@ impl NodeReader {
 impl NodeReader {
     #[new]
     pub fn new() -> Self {
-        let settings: Settings = EnvSettingsProvider::generate_settings().unwrap();
+        let settings = load_settings().unwrap();
         lifecycle::initialize_reader(settings.clone());
 
         let shards = Arc::new(ShardReaderCache::new(settings.clone()));
@@ -141,7 +139,7 @@ impl NodeReader {
             return Err(PyValueError::new_err("Missing shard_id field"));
         };
         let shard = self.obtain_shard(shard_id.id)?;
-        match shard.get_info(&request) {
+        match shard.get_info() {
             Ok(shard) => Ok(PyList::new(py, shard.encode_to_vec())),
             Err(error) => Err(IndexNodeException::new_err(error.to_string())),
         }

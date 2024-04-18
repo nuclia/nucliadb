@@ -52,7 +52,6 @@ async def test_external_file_field(
     kb_path = f"/{KB_PREFIX}/{knowledgebox}"
     resp = await nucliadb_writer.post(
         f"{kb_path}/{RESOURCES_PREFIX}",
-        headers={"X-SYNCHRONOUS": "True"},
         json={
             "slug": "resource1",
             "title": "Resource 1",
@@ -65,7 +64,6 @@ async def test_external_file_field(
     # Create the external file field to the resource
     resp = await nucliadb_writer.put(
         f"{kb_path}/{RESOURCE_PREFIX}/{resource}/file/field2",
-        headers={"X-SYNCHRONOUS": "True"},
         json=TEST_EXTERNAL_FILE_FIELD_PAYLOAD,
     )
     assert resp.status_code == 201
@@ -88,7 +86,6 @@ async def test_external_file_field(
     # Try the patch
     resp = await nucliadb_writer.patch(
         f"{kb_path}/{RESOURCE_PREFIX}/{resource}",
-        headers={"X-SYNCHRONOUS": "True"},
         json={"files": {"field3": TEST_EXTERNAL_FILE_FIELD_PAYLOAD}},
     )
     assert resp.status_code == 200

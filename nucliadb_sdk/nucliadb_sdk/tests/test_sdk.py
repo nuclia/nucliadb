@@ -59,10 +59,11 @@ def test_kb_services(sdk: nucliadb_sdk.NucliaDB, kb):
     sdk.get_entitygroup(kbid=kb.uuid, group="foo")
     sdk.delete_entitygroup(kbid=kb.uuid, group="foo")
 
-    # Vectorsets
-    sdk.create_vectorset(kbid=kb.uuid, vectorset="foo", dimension=10)
-    sdk.list_vectorsets(kbid=kb.uuid)
-    sdk.delete_vectorset(kbid=kb.uuid, vectorset="foo")
+    # TODO: Uncomment when new vectorset endpoints are available
+    # # Vectorsets
+    # sdk.create_vectorset(kbid=kb.uuid, vectorset="foo", dimension=10)
+    # sdk.list_vectorsets(kbid=kb.uuid)
+    # sdk.delete_vectorset(kbid=kb.uuid, vectorset="foo")
 
 
 def test_resource_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
@@ -94,8 +95,11 @@ def test_search_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
 
     resource = sdk.create_resource(kbid=kb.uuid, title="Resource", slug="resource")
     sdk.chat_on_resource(kbid=kb.uuid, rid=resource.uuid, query="foo")
+    sdk.chat_on_resource_by_slug(kbid=kb.uuid, slug="resource", query="foo")
     sdk.feedback(kbid=kb.uuid, ident="bar", good=True, feedback="baz", task="CHAT")
-    sdk.summarize(kbid=kb.uuid, resources=["foobar"])
+    with pytest.raises(nucliadb_sdk.v2.exceptions.UnknownError) as err:
+        sdk.summarize(kbid=kb.uuid, resources=["foobar"])
+    assert "Could not summarize" in str(err.value)
 
 
 def test_learning_config_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):

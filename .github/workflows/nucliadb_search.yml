@@ -16,7 +16,6 @@ on:
       - 'nucliadb_protos/python/**'
       - 'nucliadb_node/**'
       - 'nucliadb_vectors/**'
-      - 'nucliadb_vectors2/**'
       - 'nucliadb_texts/**'
       - 'nucliadb_texts2/**'
       - 'nucliadb_paragraphs/**'
@@ -41,16 +40,17 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
-  id-token: write   # This is required for requesting the JWT
-  contents: write   # This is required for actions/checkout
+  id-token: write       # This is required for requesting the JWT
+  contents: write       # This is required for actions/checkout
+  pull-requests: write  # Used by the benchmark action to leave a comment
 
 env:
   IMAGE_NAME: search
-  GCP_WORKLOAD_IDENTITY_PROVIDER: "projects/725951671212/locations/global/workloadIdentityPools/gh-nuclia/providers/gh-nuclia-provider"
-  GCP_SERVICE_ACCOUNT: "github-actions@stashify-218417.iam.gserviceaccount.com"
+  GCP_WORKLOAD_IDENTITY_PROVIDER: "projects/224545243904/locations/global/workloadIdentityPools/gh-nuclia/providers/gh-nuclia-provider"
+  GCP_SERVICE_ACCOUNT: "github-actions@nuclia-internal.iam.gserviceaccount.com"
 
 jobs:
   # Job to run pre-checks
@@ -81,7 +81,7 @@ jobs:
     runs-on: ubuntu-latest
 
     strategy:
-      max-parallel: 1
+      max-parallel: 3
       matrix:
         include:
           - maindb_driver: "tikv"
@@ -141,7 +141,6 @@ jobs:
               - 'nucliadb_telemetry/**'
               - 'nucliadb_texts/**'
               - 'nucliadb_vectors/**'
-              - 'nucliadb_vectors2/**'
             sidecar_modified:
               - 'nucliadb_node/nucliadb_node/**'
 

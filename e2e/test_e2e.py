@@ -52,7 +52,6 @@ def resource_id(kbid: str):
         headers={
             "content-type": "application/json",
             "X-NUCLIADB-ROLES": "WRITER",
-            "x-synchronous": "true",
             "x-ndb-client": "web",
         },
         json={

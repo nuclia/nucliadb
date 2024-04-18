@@ -87,11 +87,12 @@ async def test_resource_chat_endpoint_handles_errors(
     response = await resource_chat_endpoint(
         request=request,
         kbid="kbid",
-        rid="rid",
         item=Mock(),
         x_ndb_client=None,
         x_nucliadb_user="",
         x_forwarded_for="",
+        x_synchronous=True,
+        resource_id="rid",
     )
     assert response.status_code == http_error_response.status_code
     assert response.body == http_error_response.body

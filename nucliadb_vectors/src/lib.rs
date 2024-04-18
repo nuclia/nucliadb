@@ -22,8 +22,8 @@ pub mod data_point;
 pub mod data_point_provider;
 mod data_types;
 pub mod formula;
-pub mod indexset;
 pub mod service;
+mod utils;
 
 use thiserror::Error;
 #[derive(Debug, Error)]
@@ -38,10 +38,14 @@ pub enum VectorErr {
     IoErr(#[from] std::io::Error),
     #[error("Error in fs: {0}")]
     FsError(#[from] nucliadb_core::fs_state::FsError),
+    #[error("This index does not have an alive writer")]
+    NoWriterError,
+    #[error("Only one writer can be open at the same time")]
+    MultipleWritersError,
+    #[error("Writer has uncommitted changes, please commit or abort")]
+    UncommittedChangesError,
     #[error("Garbage collection delayed")]
     WorkDelayed,
-    #[error("Several writers are open at the same time ")]
-    MultipleWriters,
     #[error("Merger is already initialized")]
     MergerAlreadyInitialized,
     #[error("Can not merge zero datapoints")]
@@ -50,6 +54,8 @@ pub enum VectorErr {
     InconsistentDimensions,
     #[error("UTF8 decoding error: {0}")]
     FromUtf8Error(#[from] std::string::FromUtf8Error),
+    #[error("Some of the merged segments were not found")]
+    MissingMergedSegments,
 }
 
 pub type VectorR<O> = Result<O, VectorErr>;

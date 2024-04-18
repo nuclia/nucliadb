@@ -66,7 +66,7 @@ async def create_rollover_shards(
     app_context: ApplicationContext, kbid: str
 ) -> writer_pb2.Shards:
     """
-    Creates shards to to used for a rollover operation
+    Creates shards to be used for a rollover operation
     """
     logger.warning("Creating rollover shards", extra={"kbid": kbid})
     sm = app_context.shard_manager
@@ -101,11 +101,13 @@ async def create_rollover_shards(
                     if node is None:
                         logger.error(f"Node {node_id} is not found or not available")
                         continue
+                    is_matryoshka = len(kb_shards.model.matryoshka_dimensions) > 0
                     try:
                         shard_created = await node.new_shard(
                             kbid,
                             similarity=kb_shards.similarity,
                             release_channel=kb_shards.release_channel,
+                            normalize_vectors=is_matryoshka,
                         )
                     except Exception as e:
                         errors.capture_exception(e)

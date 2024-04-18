@@ -20,8 +20,8 @@
 
 use std::collections::{HashMap, VecDeque};
 
-use super::request::MergePriority;
-use super::request::MERGE_PRIORITIES;
+use super::MergePriority;
+use super::MERGE_PRIORITIES;
 
 /// Work queue structure for merge scheduler. It serves as a priority queue with
 /// deduplication of elements
@@ -70,10 +70,12 @@ impl<T: PartialEq> WorkQueue<T> {
         None
     }
 
+    #[allow(unused)]
     pub fn len(&self) -> usize {
         self.queues.values().fold(0, |acc, queue| acc + queue.len())
     }
 
+    #[allow(unused)]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }

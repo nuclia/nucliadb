@@ -41,56 +41,49 @@ from nucliadb.train.types import TrainBatch, TrainBatchType
 def get_batches_from_train_response_stream(
     response: aiohttp.ClientResponse,
     pb_klass: type[FieldClassificationBatch],
-) -> AsyncGenerator[FieldClassificationBatch, None]:
-    ...
+) -> AsyncGenerator[FieldClassificationBatch, None]: ...
 
 
 @overload
 def get_batches_from_train_response_stream(
     response: aiohttp.ClientResponse,
     pb_klass: type[ImageClassificationBatch],
-) -> AsyncGenerator[ImageClassificationBatch, None]:
-    ...
+) -> AsyncGenerator[ImageClassificationBatch, None]: ...
 
 
 @overload
 def get_batches_from_train_response_stream(
     response: aiohttp.ClientResponse,
     pb_klass: type[ParagraphClassificationBatch],
-) -> AsyncGenerator[ParagraphClassificationBatch, None]:
-    ...
+) -> AsyncGenerator[ParagraphClassificationBatch, None]: ...
 
 
 @overload
 def get_batches_from_train_response_stream(
     response: aiohttp.ClientResponse,
     pb_klass: type[ParagraphStreamingBatch],
-) -> AsyncGenerator[ParagraphStreamingBatch, None]:
-    ...
+) -> AsyncGenerator[ParagraphStreamingBatch, None]: ...
 
 
 @overload
 def get_batches_from_train_response_stream(
     response: aiohttp.ClientResponse,
     pb_klass: type[QuestionAnswerStreamingBatch],
-) -> AsyncGenerator[QuestionAnswerStreamingBatch, None]:
-    ...
+) -> AsyncGenerator[QuestionAnswerStreamingBatch, None]: ...
 
 
 @overload
 def get_batches_from_train_response_stream(
     response: aiohttp.ClientResponse,
     pb_klass: type[SentenceClassificationBatch],
-) -> AsyncGenerator[SentenceClassificationBatch, None]:
-    ...
+) -> AsyncGenerator[SentenceClassificationBatch, None]: ...
 
 
 @overload
 def get_batches_from_train_response_stream(
     response: aiohttp.ClientResponse,
     pb_klass: type[TokenClassificationBatch],
-) -> AsyncGenerator[TokenClassificationBatch, None]:
-    ...
+) -> AsyncGenerator[TokenClassificationBatch, None]: ...
 
 
 async def get_batches_from_train_response_stream(

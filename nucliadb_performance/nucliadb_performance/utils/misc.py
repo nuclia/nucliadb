@@ -22,9 +22,9 @@ import os
 import random
 import shelve
 import statistics
-import time
+import traceback
 from functools import cache
-from typing import Optional
+from json import dumps
 
 from faker import Faker
 
@@ -37,7 +37,8 @@ from nucliadb_performance.utils.kbs import parse_input_kb_slug
 from nucliadb_sdk import NucliaDB
 
 from .errors import append_error
-from .metrics import record_request_process_time
+from .exceptions import CountersError, RequestError
+from .nucliadb import SearchClient
 from .saved_requests import Request, load_saved_request
 
 CURRENT_DIR = os.getcwd()
@@ -55,13 +56,6 @@ EXCLUDE_KBIDS = [
 _DATA = {}
 
 MIN_KB_PARAGRAPHS = 5_000
-
-
-class RequestError(Exception):
-    def __init__(self, status, content=None, text=None):
-        self.status = status
-        self.content = content
-        self.text = text
 
 
 def cache_to_disk(func):
@@ -89,37 +83,6 @@ def cache_to_disk(func):
         return new_coro
     else:
         return new_func
-
-
-class Client:
-    def __init__(self, session, base_url, headers: Optional[dict[str, str]] = None):
-        self.session = session
-        self.base_url = base_url
-        self.headers = headers or {}
-
-    async def make_request(self, method: str, path: str, *args, **kwargs):
-        url = self.base_url + path
-        func = getattr(self.session, method.lower())
-        base_headers = self.headers.copy()
-        kwargs_headers = kwargs.get("headers") or {}
-        kwargs_headers.update(base_headers)
-        kwargs["headers"] = kwargs_headers
-        start = time.perf_counter()
-        async with func(url, *args, **kwargs) as resp:
-            elapsed = time.perf_counter() - start
-            if resp.status != 200:
-                await self.handle_search_error(resp)
-            record_request_process_time(resp, client_time=elapsed)
-            return await resp.json()
-
-    async def handle_search_error(self, resp):
-        content = None
-        text = None
-        try:
-            content = await resp.json()
-        except Exception:
-            text = await resp.text()
-        raise RequestError(resp.status, content=content, text=text)
 
 
 def get_kbs():
@@ -179,10 +142,6 @@ def get_kb(kbid=None, slug=None) -> str:
     return kbid
 
 
-class CountersError(Exception):
-    ...
-
-
 @cache_to_disk
 def get_kb_paragraphs(kbid):
     ndb = NucliaDB(
@@ -215,25 +174,27 @@ def get_fake_word():
     return word
 
 
-def get_search_client(session):
-    return Client(session, get_search_api_url(), headers={"X-NUCLIADB-ROLES": "READER"})
-
-
 async def make_kbid_request(session, kbid, method, path, params=None, json=None):
+    client = SearchClient(session)
+    return await _make_kbid_request(client, kbid, method, path, params, json)
+
+
+async def _make_kbid_request(client, kbid, method, path, params=None, json=None):
     try:
-        client = get_search_client(session)
         return await client.make_request(method, path, params=params, json=json)
     except RequestError as err:
         # Store error info so we can inspect after the script runs
         detail = (
             err.content and err.content.get("detail", None) if err.content else err.text
         )
+        if isinstance(detail, dict):
+            detail = dumps(detail)
         endpoint = path.split("/")[-1]
         append_error(kbid, endpoint, err.status, detail)
         raise
-    except Exception as err:
+    except Exception:
         endpoint = path.split("/")[-1]
-        append_error(kbid, endpoint, -1, str(err))
+        append_error(kbid, endpoint, -1, traceback.format_exc())
         raise
 
 

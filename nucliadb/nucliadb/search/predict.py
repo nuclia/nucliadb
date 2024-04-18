@@ -350,14 +350,17 @@ class PredictEngine:
             logger.warning(error)
             raise SendToPredictError(error)
 
+        params = {
+            "text": sentence,
+            "rephrase": str(rephrase),
+        }
+        if generative_model is not None:
+            params["generative_model"] = generative_model
+
         resp = await self.make_request(
             "GET",
             url=self.get_predict_url(QUERY, kbid),
-            params={
-                "text": sentence,
-                "generative_model": generative_model,
-                "rephrase": str(rephrase),
-            },
+            params=params,
             headers=self.get_predict_headers(kbid),
         )
         await self.check_response(resp, expected_status=200)

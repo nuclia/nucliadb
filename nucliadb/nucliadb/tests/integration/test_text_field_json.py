@@ -38,7 +38,6 @@ async def test_text_field_in_json_format(
 
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
-        headers={"x-synchronous": "true"},
         json={
             "title": "JSON text field",
             "texts": {
@@ -72,7 +71,6 @@ async def test_text_field_with_invalid_json(
 
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
-        headers={"x-synchronous": "true"},
         json={
             "title": "JSON text field",
             "texts": {

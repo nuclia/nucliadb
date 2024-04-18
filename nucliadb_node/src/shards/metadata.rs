@@ -76,6 +76,7 @@ pub struct ShardMetadataFile {
     pub id: Option<String>,
     #[serde(default)]
     pub channel: Option<Channel>,
+    pub normalize_vectors: Option<bool>,
 }
 
 #[derive(Default, Debug)]
@@ -85,6 +86,7 @@ pub struct ShardMetadata {
     kbid: Option<String>,
     similarity: Option<Similarity>,
     channel: Option<Channel>,
+    normalize_vectors: bool,
     // A generation id is a way to track if a shard has changed.
     // A new id means that something in the shard has changed.
     // This is used by replication to track which shards have changed
@@ -108,15 +110,18 @@ impl ShardMetadata {
             similarity: metadata.similarity,
             id: metadata.id.unwrap_or(requested_shard_id),
             channel: metadata.channel,
+            normalize_vectors: metadata.normalize_vectors.unwrap_or(false),
             generation_id: RwLock::new(None),
         })
     }
+
     pub fn new(
         shard_path: PathBuf,
         id: String,
         kbid: Option<String>,
         similarity: Similarity,
         channel: Option<Channel>,
+        normalize_vectors: bool,
     ) -> ShardMetadata {
         ShardMetadata {
             shard_path,
@@ -124,13 +129,16 @@ impl ShardMetadata {
             similarity: Some(similarity),
             id,
             channel,
+            normalize_vectors,
             generation_id: RwLock::new(None),
         }
     }
+
     pub fn exists(shard_path: &Path) -> bool {
         let metadata_path = shard_path.join(disk_structure::METADATA_FILE);
         metadata_path.exists()
     }
+
     pub fn serialize_metadata(&self) -> NodeResult<()> {
         let metadata_path = self.shard_path.join(disk_structure::METADATA_FILE);
         let temp_metadata_path = metadata_path.with_extension("tmp");
@@ -143,6 +151,7 @@ impl ShardMetadata {
                 similarity: self.similarity,
                 id: Some(self.id.clone()),
                 channel: self.channel,
+                normalize_vectors: Some(self.normalize_vectors),
             },
         )?;
         writer.flush()?;
@@ -153,18 +162,27 @@ impl ShardMetadata {
 
         Ok(())
     }
+
     pub fn shard_path(&self) -> PathBuf {
         self.shard_path.clone()
     }
+
     pub fn kbid(&self) -> Option<String> {
         self.kbid.clone()
     }
+
     pub fn similarity(&self) -> protos::VectorSimilarity {
         self.similarity.unwrap_or(Similarity::Cosine).into()
     }
+
     pub fn channel(&self) -> Channel {
         self.channel.unwrap_or_default()
     }
+
+    pub fn normalize_vectors(&self) -> bool {
+        self.normalize_vectors
+    }
+
     pub fn id(&self) -> String {
         self.id.clone()
     }
@@ -261,12 +279,17 @@ mod test {
             Some("KB".to_string()),
             Similarity::Cosine,
             Some(Channel::EXPERIMENTAL),
+            false,
         );
         meta.serialize_metadata().unwrap();
         let meta_disk = ShardMetadata::open(dir.path().to_path_buf()).unwrap();
         assert_eq!(meta.kbid, meta_disk.kbid);
         assert_eq!(meta.similarity, meta_disk.similarity);
+        assert_eq!(meta.id, meta_disk.id);
+        assert_eq!(meta.channel, meta_disk.channel);
+        assert_eq!(meta.normalize_vectors, meta_disk.normalize_vectors);
     }
+
     #[test]
     fn open_empty() {
         let dir = TempDir::new().unwrap();
@@ -298,6 +321,7 @@ mod test {
             Some("KB".to_string()),
             Similarity::Cosine,
             Some(Channel::EXPERIMENTAL),
+            false,
         );
         let gen_id = meta.get_generation_id();
         assert_eq!(gen_id, meta.get_generation_id());

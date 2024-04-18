@@ -27,6 +27,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.cors import CORSMiddleware
+from starlette.requests import ClientDisconnect
 from starlette.responses import HTMLResponse
 from starlette.routing import Mount
 
@@ -40,6 +41,10 @@ from nucliadb.standalone.lifecycle import finalize, initialize
 from nucliadb.train.api.v1.router import api as api_train_v1
 from nucliadb.writer.api.v1.router import api as api_writer_v1
 from nucliadb_telemetry.fastapi import metrics_endpoint
+from nucliadb_telemetry.fastapi.utils import (
+    client_disconnect_handler,
+    global_exception_handler,
+)
 from nucliadb_utils.fastapi.openapi import extend_openapi
 from nucliadb_utils.fastapi.versioning import VersionedFastAPI
 from nucliadb_utils.settings import http_settings, running_settings
@@ -99,6 +104,10 @@ def application_factory(settings: Settings) -> FastAPI:
         middleware=middleware,
         on_startup=[initialize],
         on_shutdown=[finalize],
+        exception_handlers={
+            Exception: global_exception_handler,
+            ClientDisconnect: client_disconnect_handler,
+        },
     )
 
     base_app = FastAPI(title="NucliaDB API", **fastapi_settings)  # type: ignore

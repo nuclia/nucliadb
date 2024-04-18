@@ -31,7 +31,6 @@ pub enum MergeSource {
     High,
     Low,
     Idle,
-    OnCommit,
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]

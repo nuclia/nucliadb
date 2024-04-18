@@ -41,7 +41,7 @@ async def get_shards_paragraphs(kbid: str) -> list[tuple[str, int]]:
     """
     Ordered shard -> num paragraph by number of paragraphs
     """
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_transaction(read_only=True) as txn:
         kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
     if kb_shards is None:
         return []
@@ -62,7 +62,7 @@ async def get_shards_paragraphs(kbid: str) -> list[tuple[str, int]]:
 
 async def maybe_add_shard(kbid: str) -> None:
     async with locking.distributed_lock(locking.NEW_SHARD_LOCK.format(kbid=kbid)):
-        async with datamanagers.with_transaction() as txn:
+        async with datamanagers.with_transaction(read_only=True) as txn:
             kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
         if kb_shards is None:
             return
@@ -75,14 +75,8 @@ async def maybe_add_shard(kbid: str) -> None:
         ):
             # create new shard
             async with datamanagers.with_transaction() as txn:
-                model = await datamanagers.kb.get_model_metadata(txn, kbid=kbid)
                 sm = get_shard_manager()
-                await sm.create_shard_by_kbid(
-                    txn,
-                    kbid,
-                    semantic_model=model,
-                    release_channel=kb_shards.release_channel,
-                )
+                await sm.create_shard_by_kbid(txn, kbid)
                 await txn.commit()
 
 

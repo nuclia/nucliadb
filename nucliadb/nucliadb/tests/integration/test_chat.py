@@ -92,7 +92,6 @@ async def resource(nucliadb_writer, knowledgebox):
             "summary": "The summary",
             "texts": {"text_field": {"body": "The body of the text field"}},
         },
-        headers={"X-Synchronous": "True"},
     )
     assert resp.status_code in (200, 201)
     rid = resp.json()["uuid"]
@@ -313,7 +312,6 @@ async def resources(nucliadb_writer, knowledgebox):
                 "summary": f"The summary {i}",
                 "texts": {"text_field": {"body": "The body of the text field"}},
             },
-            headers={"X-Synchronous": "True"},
         )
         assert resp.status_code in (200, 201)
         rid = resp.json()["uuid"]
@@ -516,15 +514,13 @@ async def test_chat_capped_context(
     max_size = 28
     assert total_size > max_size * 3
 
-    predict = get_predict()
-    predict.max_context = max_size  # type: ignore
-
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/chat",
         json={
             "query": "title",
             "rag_strategies": [{"name": "full_resource"}],
             "debug": True,
+            "max_tokens": {"context": max_size},
         },
         headers={"X-Synchronous": "True"},
         timeout=None,
@@ -541,3 +537,43 @@ async def test_chat_on_a_kb_not_found(nucliadb_reader):
     resp = await nucliadb_reader.post("/kb/unknown_kb_id/chat", json={"query": "title"})
     assert resp.status_code == 404
     assert resp.json() == {"detail": "Knowledge Box 'unknown_kb_id' not found."}
+
+
+@pytest.mark.asyncio()
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_chat_max_tokens(nucliadb_reader, knowledgebox, resources):
+
+    # As an integer
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/chat",
+        json={
+            "query": "title",
+            "max_tokens": 100,
+        },
+    )
+    assert resp.status_code == 200
+
+    # Same but with the max tokens in a dict
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/chat",
+        json={
+            "query": "title",
+            "max_tokens": {"context": 100, "answer": 50},
+        },
+    )
+    assert resp.status_code == 200
+
+    # If the context requested is bigger than the max tokens, it should fail
+    predict = get_predict()
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/chat",
+        json={
+            "query": "title",
+            "max_tokens": {"context": predict.max_context + 1},
+        },
+    )
+    assert resp.status_code == 412
+    assert (
+        resp.json()["detail"]
+        == "Invalid query. Error in max_tokens.context: Max context tokens is higher than the model's limit of 1000"
+    )

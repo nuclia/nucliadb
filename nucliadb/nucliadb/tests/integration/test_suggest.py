@@ -193,7 +193,6 @@ async def test_suggest_related_entities(
     ]
     resp = await nucliadb_writer.post(
         f"/kb/{knowledgebox}/resources",
-        headers={"X-Synchronous": "True"},
         json={
             "title": "People and places",
             "slug": "pap",
@@ -286,7 +285,6 @@ async def test_suggestion_on_link_computed_titles_sc6088(
                 }
             },
         },
-        headers={"X-Synchronous": "True"},
         timeout=None,
     )
     assert resp.status_code == 201
@@ -468,7 +466,6 @@ async def entities(nucliadb_writer: AsyncClient, knowledgebox: str):
     ]
     resp = await nucliadb_writer.post(
         f"/kb/{knowledgebox}/resources",
-        headers={"X-Synchronous": "True"},
         json={
             "title": "People and places",
             "slug": "pap",

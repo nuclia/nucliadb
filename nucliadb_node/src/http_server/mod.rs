@@ -32,7 +32,7 @@ use crate::settings::Settings;
 
 pub async fn run_http_server(settings: Settings) {
     // Add routes to services
-    let addr = SocketAddr::from(([0, 0, 0, 0], settings.metrics_port()));
+    let addr = SocketAddr::from(([0, 0, 0, 0], settings.metrics_port));
     let router = Router::new().route("/metrics", get(metrics_service::metrics_service));
     let router = router.route("/__dump", get(traces_service::thread_dump_service));
     axum_server::bind(addr).serve(router.into_make_service()).await.expect("Error starting the HTTP server");

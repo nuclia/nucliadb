@@ -61,7 +61,7 @@ async def resource_with_conversation(nucliadb_grpc, nucliadb_writer, knowledgebo
         )
     resp = await nucliadb_writer.post(
         f"/kb/{knowledgebox}/resources",
-        headers={"Content-Type": "application/json", "X-Synchronous": "true"},
+        headers={"Content-Type": "application/json"},
         data=CreateResourcePayload(  # type: ignore
             slug="myresource",
             conversations={

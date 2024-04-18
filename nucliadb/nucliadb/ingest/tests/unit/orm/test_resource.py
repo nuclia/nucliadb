@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 from nucliadb_protos.resources_pb2 import (
@@ -41,6 +41,7 @@ from nucliadb.ingest.orm.resource import (
     maybe_update_basic_thumbnail,
     update_basic_languages,
 )
+from nucliadb_protos import utils_pb2, writer_pb2
 
 
 @pytest.mark.asyncio
@@ -273,3 +274,57 @@ async def test_apply_fields_calls_update_all_field_ids(txn, storage, kb):
     resource.update_all_field_ids.call_args[1]["deleted"] == [
         FieldID(field_type=FieldType.LAYOUT, field="to_delete"),
     ]
+
+
+async def test_apply_extracted_vectors_matryoshka_embeddings(txn, storage, kb):
+    STORED_VECTOR_DIMENSION = 100
+    MATRYOSHKA_DIMENSION = 10
+
+    mock_field = AsyncMock()
+    vectors = utils_pb2.VectorObject(
+        vectors=utils_pb2.Vectors(
+            vectors=[
+                utils_pb2.Vector(
+                    start=0,
+                    end=10,
+                    start_paragraph=0,
+                    end_paragraph=10,
+                    vector=[1.0] * STORED_VECTOR_DIMENSION,
+                )
+            ]
+        )
+    )
+    mock_field.set_vectors.return_value = (vectors, False, [])
+
+    resource = Resource(txn, storage, kb, "matryoshka-rid")
+    with (
+        patch.object(resource, "has_field", Mock(return_value=True)),
+        patch.object(resource, "get_field", AsyncMock(return_value=mock_field)),
+        patch.object(resource, "generate_field_id", Mock(return_value="field_id")),
+        patch("nucliadb.ingest.orm.resource.datamanagers") as mock_datamanagers,
+        patch.object(
+            resource.indexer, "apply_field_vectors", AsyncMock()
+        ) as apply_field_vectors,
+    ):
+        mock_datamanagers.kb.get_matryoshka_vector_dimension = AsyncMock(
+            return_value=None
+        )
+        await resource._apply_extracted_vectors(
+            writer_pb2.ExtractedVectorsWrapper(vectors=vectors)
+        )
+        assert apply_field_vectors.call_count == 1
+        assert (
+            apply_field_vectors.call_args.kwargs["matryoshka_vector_dimension"] is None
+        )
+
+        mock_datamanagers.kb.get_matryoshka_vector_dimension = AsyncMock(
+            return_value=MATRYOSHKA_DIMENSION
+        )
+        await resource._apply_extracted_vectors(
+            writer_pb2.ExtractedVectorsWrapper(vectors=vectors)
+        )
+        assert apply_field_vectors.call_count == 2
+        assert (
+            apply_field_vectors.call_args.kwargs["matryoshka_vector_dimension"]
+            == MATRYOSHKA_DIMENSION
+        )

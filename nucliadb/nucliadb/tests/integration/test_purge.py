@@ -68,7 +68,6 @@ async def test_purge_deletes_everything_from_maindb(
 
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
-        headers={"x-synchronous": "true"},
         json={
             "title": "My title",
             "slug": "myresource",
@@ -132,7 +131,6 @@ async def test_purge_orphan_shards(
 
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
-        headers={"x-synchronous": "true"},
         json={
             "title": "My title",
             "slug": "myresource",
@@ -209,6 +207,7 @@ async def test_purge_orphan_shard_detection(
         kbid="deleted-kb",
         similarity=utils_pb2.VectorSimilarity.COSINE,
         release_channel=utils_pb2.ReleaseChannel.STABLE,
+        normalize_vectors=False,
     )
     orphan_shard_id = orphan_shard.id
 

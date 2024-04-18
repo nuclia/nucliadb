@@ -258,13 +258,14 @@ async def start_transaction_utility(
         return current
 
     if transaction_settings.transaction_local:
-        transaction_utility: Union[
-            LocalTransactionUtility, TransactionUtility
-        ] = LocalTransactionUtility()
+        transaction_utility: Union[LocalTransactionUtility, TransactionUtility] = (
+            LocalTransactionUtility()
+        )
     elif transaction_settings.transaction_jetstream_servers is not None:
         transaction_utility = TransactionUtility(
             nats_creds=transaction_settings.transaction_jetstream_auth,
             nats_servers=transaction_settings.transaction_jetstream_servers,
+            commit_timeout=transaction_settings.transaction_commit_timeout,
         )
         await transaction_utility.initialize(service_name)
     set_utility(Utility.TRANSACTION, transaction_utility)

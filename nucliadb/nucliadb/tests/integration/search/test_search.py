@@ -328,7 +328,6 @@ async def test_paragraph_search_with_filters(
             "title": "Mushrooms",
             "summary": "A very good book about mushrooms (aka funghi)",
         },
-        headers={"X-SYNCHRONOUS": "True"},
     )
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
@@ -712,7 +711,6 @@ async def test_processing_status_doesnt_change_on_search_after_processed(
             json={
                 "title": "My new title",
             },
-            headers={"X-SYNCHRONOUS": "True"},
             timeout=None,
         )
     ).status_code == 200
@@ -755,7 +753,6 @@ async def test_search_automatic_relations(
 
     resp = await nucliadb_writer.post(
         f"/kb/{knowledgebox}/resources",
-        headers={"X-Synchronous": "true"},
         json={
             "title": "My resource",
             "slug": "myresource",
@@ -1110,7 +1107,6 @@ async def test_resource_search_pagination(
 
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
-        headers={"X-Synchronous": "true"},
         json={
             "title": "Resource with ",
             "slug": "resource-with-texts",
@@ -1230,7 +1226,6 @@ async def create_dummy_resources(
     for payload in payloads:
         resp = await nucliadb_writer.post(
             f"/kb/{kbid}/resources",
-            headers={"X-Synchronous": "true"},
             json=payload,
         )
         assert resp.status_code == 201
@@ -1240,9 +1235,9 @@ async def create_dummy_resources(
         message = BrokerMessage()
         message.kbid = kbid
         message.uuid = uuid
-        message.texts[
-            "text"
-        ].body = "My own text Ramon. This is great to be here. \n Where is my beer?"
+        message.texts["text"].body = (
+            "My own text Ramon. This is great to be here. \n Where is my beer?"
+        )
         etw = rpb.ExtractedTextWrapper()
         etw.body.text = (
             "My own text Ramon. This is great to be here. \n Where is my beer?"
@@ -1512,7 +1507,6 @@ async def test_search_by_path_filter(
     for path in paths:
         resp = await nucliadb_writer.post(
             f"/kb/{knowledgebox}/resources",
-            headers={"X-Synchronous": "true"},
             json={
                 "title": f"My resource: {path}",
                 "summary": "Some summary",
@@ -1657,3 +1651,27 @@ async def test_catalog_post(
         },
     )
     assert resp.status_code == 200
+
+
+@pytest.fixture()
+def not_debug():
+    from nucliadb_utils.settings import running_settings
+
+    prev = running_settings.debug
+    running_settings.debug = False
+    yield
+    running_settings.debug = prev
+
+
+async def test_api_does_not_show_tracebacks_on_api_errors(
+    not_debug, nucliadb_reader: AsyncClient
+):
+    with mock.patch(
+        "nucliadb.search.api.v1.search.search",
+        side_effect=Exception("Something went wrong"),
+    ):
+        resp = await nucliadb_reader.get("/kb/foobar/search", timeout=None)
+        assert resp.status_code == 500
+        assert resp.json() == {
+            "detail": "Something went wrong, please contact your administrator"
+        }

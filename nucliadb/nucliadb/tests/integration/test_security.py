@@ -162,7 +162,6 @@ async def test_resource_security_search(
                 "access_groups": [],
             },
         },
-        headers={"x-synchronous": "true"},
     )
     assert resp.status_code == 200, resp.text
 

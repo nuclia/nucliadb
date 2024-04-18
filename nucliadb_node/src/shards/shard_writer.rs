@@ -23,7 +23,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use nucliadb_core::paragraphs::*;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::shard_created::{DocumentService, ParagraphService, RelationService, VectorService};
-use nucliadb_core::protos::{OpStatus, Resource, ResourceId, VectorSetId, VectorSimilarity};
+use nucliadb_core::protos::{OpStatus, Resource, ResourceId};
 use nucliadb_core::relations::*;
 use nucliadb_core::texts::*;
 use nucliadb_core::tracing::{self, *};
@@ -38,6 +38,29 @@ use crate::shards::versions::Versions;
 use crate::telemetry::run_with_telemetry;
 
 pub struct BlockingToken<'a>(MutexGuard<'a, ()>);
+
+const MAX_LABEL_LENGTH: usize = 32768; // Tantivy max is 2^16 - 4
+
+fn remove_invalid_labels(resource: &mut Resource) {
+    resource.labels.retain(|l| {
+        if l.len() > MAX_LABEL_LENGTH {
+            warn!("Label length ({}) longer than maximum, it will not be indexed", l.len());
+            false
+        } else {
+            true
+        }
+    });
+    for text in resource.texts.values_mut() {
+        text.labels.retain(|l| {
+            if l.len() > MAX_LABEL_LENGTH {
+                warn!("Label length ({}) longer than maximum, it will not be indexed", l.len());
+                false
+            } else {
+                true
+            }
+        });
+    }
+}
 
 #[derive(Debug)]
 pub struct ShardWriter {
@@ -166,8 +189,9 @@ impl ShardWriter {
         let vsc = VectorConfig {
             similarity: Some(metadata.similarity()),
             path: path.join(VECTORS_DIR),
-            vectorset: path.join(VECTORSET_DIR),
             channel,
+            shard_id: metadata.id(),
+            normalize_vectors: metadata.normalize_vectors(),
         };
         let rsc = RelationConfig {
             path: path.join(RELATIONS_DIR),
@@ -197,8 +221,9 @@ impl ShardWriter {
         let vsc = VectorConfig {
             similarity: None,
             path: path.join(VECTORS_DIR),
-            vectorset: path.join(VECTORSET_DIR),
             channel,
+            shard_id: metadata.id(),
+            normalize_vectors: metadata.normalize_vectors(),
         };
         let rsc = RelationConfig {
             path: path.join(RELATIONS_DIR),
@@ -210,45 +235,39 @@ impl ShardWriter {
 
     #[measure(actor = "shard", metric = "set_resource")]
     #[tracing::instrument(skip_all)]
-    pub fn set_resource(&self, resource: &Resource) -> NodeResult<()> {
+    pub fn set_resource(&self, mut resource: Resource) -> NodeResult<()> {
         let span = tracing::Span::current();
 
-        let text_writer_service = self.text_writer.clone();
-        let field_resource = resource.clone();
-        let text_task = move || {
+        remove_invalid_labels(&mut resource);
+
+        let text_task = || {
             debug!("Field service starts set_resource");
-            let mut writer = write_rw_lock(&text_writer_service);
-            let result = writer.set_resource(&field_resource);
+            let mut writer = write_rw_lock(&self.text_writer);
+            let result = writer.set_resource(&resource);
             debug!("Field service ends set_resource");
             result
         };
 
-        let paragraph_resource = resource.clone();
-        let paragraph_writer_service = self.paragraph_writer.clone();
-        let paragraph_task = move || {
+        let paragraph_task = || {
             debug!("Paragraph service starts set_resource");
-            let mut writer = write_rw_lock(&paragraph_writer_service);
-            let result = writer.set_resource(&paragraph_resource);
+            let mut writer = write_rw_lock(&self.paragraph_writer);
+            let result = writer.set_resource(&resource);
             debug!("Paragraph service ends set_resource");
             result
         };
 
-        let vector_writer_service = self.vector_writer.clone();
-        let vector_resource = resource.clone();
-        let vector_task = move || {
+        let vector_task = || {
             debug!("Vector service starts set_resource");
-            let mut writer = write_rw_lock(&vector_writer_service);
-            let result = writer.set_resource(&vector_resource);
+            let mut writer = write_rw_lock(&self.vector_writer);
+            let result = writer.set_resource(&resource);
             debug!("Vector service ends set_resource");
             result
         };
 
-        let relation_writer_service = self.relation_writer.clone();
-        let relation_resource = resource.clone();
-        let relation_task = move || {
+        let relation_task = || {
             debug!("Relation service starts set_resource");
-            let mut writer = write_rw_lock(&relation_writer_service);
-            let result = writer.set_resource(&relation_resource);
+            let mut writer = write_rw_lock(&self.relation_writer);
+            let result = writer.set_resource(&resource);
             debug!("Relation service ends set_resource");
             result
         };
@@ -288,29 +307,24 @@ impl ShardWriter {
     pub fn remove_resource(&self, resource: &ResourceId) -> NodeResult<()> {
         let span = tracing::Span::current();
 
-        let text_writer_service = self.text_writer.clone();
-        let field_resource = resource.clone();
-        let text_task = move || {
-            let mut writer = write_rw_lock(&text_writer_service);
-            writer.delete_resource(&field_resource)
+        let text_task = || {
+            let mut writer = write_rw_lock(&self.text_writer);
+            writer.delete_resource(resource)
         };
-        let paragraph_resource = resource.clone();
-        let paragraph_writer_service = self.paragraph_writer.clone();
-        let paragraph_task = move || {
-            let mut writer = write_rw_lock(&paragraph_writer_service);
-            writer.delete_resource(&paragraph_resource)
+
+        let paragraph_task = || {
+            let mut writer = write_rw_lock(&self.paragraph_writer);
+            writer.delete_resource(resource)
         };
-        let vector_writer_service = self.vector_writer.clone();
-        let vector_resource = resource.clone();
-        let vector_task = move || {
-            let mut writer = write_rw_lock(&vector_writer_service);
-            writer.delete_resource(&vector_resource)
+
+        let vector_task = || {
+            let mut writer = write_rw_lock(&self.vector_writer);
+            writer.delete_resource(resource)
         };
-        let relation_writer_service = self.relation_writer.clone();
-        let relation_resource = resource.clone();
+
         let relation_task = move || {
-            let mut writer = write_rw_lock(&relation_writer_service);
-            writer.delete_resource(&relation_resource)
+            let mut writer = write_rw_lock(&self.relation_writer);
+            writer.delete_resource(resource)
         };
 
         let info = info_span!(parent: &span, "text remove");
@@ -350,17 +364,21 @@ impl ShardWriter {
     pub fn get_opstatus(&self) -> NodeResult<OpStatus> {
         let span = tracing::Span::current();
 
-        let paragraphs = self.paragraph_writer.clone();
-        let vectors = self.vector_writer.clone();
-        let texts = self.text_writer.clone();
-
-        let count_fields =
-            || run_with_telemetry(info_span!(parent: &span, "field count"), move || read_rw_lock(&texts).count());
-        let count_paragraphs = || {
-            run_with_telemetry(info_span!(parent: &span, "paragraph count"), move || read_rw_lock(&paragraphs).count())
+        let count_fields = || {
+            run_with_telemetry(info_span!(parent: &span, "field count"), move || {
+                read_rw_lock(&self.text_writer).count()
+            })
         };
-        let count_vectors =
-            || run_with_telemetry(info_span!(parent: &span, "vector count"), move || read_rw_lock(&vectors).count());
+        let count_paragraphs = || {
+            run_with_telemetry(info_span!(parent: &span, "paragraph count"), move || {
+                read_rw_lock(&self.paragraph_writer).count()
+            })
+        };
+        let count_vectors = || {
+            run_with_telemetry(info_span!(parent: &span, "vector count"), move || {
+                read_rw_lock(&self.vector_writer).count()
+            })
+        };
 
         let mut field_count = Ok(0);
         let mut paragraph_count = Ok(0);
@@ -378,33 +396,6 @@ impl ShardWriter {
             sentence_count: vector_count? as u64,
             ..Default::default()
         })
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub fn list_vectorsets(&self) -> NodeResult<Vec<String>> {
-        let reader = read_rw_lock(&self.vector_writer);
-        let keys = reader.list_vectorsets()?;
-        Ok(keys)
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub fn add_vectorset(&self, setid: &VectorSetId, similarity: VectorSimilarity) -> NodeResult<()> {
-        let mut writer = write_rw_lock(&self.vector_writer);
-        writer.add_vectorset(setid, similarity)?;
-
-        self.metadata.new_generation_id();
-
-        Ok(())
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub fn remove_vectorset(&self, setid: &VectorSetId) -> NodeResult<()> {
-        let mut writer = write_rw_lock(&self.vector_writer);
-        writer.remove_vectorset(setid)?;
-
-        self.metadata.new_generation_id();
-
-        Ok(())
     }
 
     #[tracing::instrument(skip_all)]
@@ -450,10 +441,18 @@ impl ShardWriter {
 
     #[tracing::instrument(skip_all)]
     pub fn merge(&self, context: MergeContext) -> NodeResult<MergeMetrics> {
-        let result = write_rw_lock(&self.vector_writer).merge(context);
+        let runner = read_rw_lock(&self.vector_writer).prepare_merge(context.parameters)?;
+        let Some(mut runner) = runner else {
+            return Ok(MergeMetrics {
+                merged: 0,
+                left: 0,
+            });
+        };
+        let merge_result = runner.run()?;
+        let metrics = write_rw_lock(&self.vector_writer).record_merge(merge_result, context.source)?;
         self.metadata.new_generation_id();
 
-        result
+        Ok(metrics)
     }
 
     /// This must be used only by replication and should be

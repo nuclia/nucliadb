@@ -17,3 +17,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+
+from nucliadb.migrator.models import Migration
+from nucliadb.migrator.utils import get_migrations
+
+
+def get_migration(version: int) -> Migration:
+    migration: Migration = get_migrations(from_version=version - 1, to_version=version)[
+        0
+    ]
+    assert migration.version == version
+    return migration

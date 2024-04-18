@@ -427,7 +427,6 @@ async def test_knowledgebox_file_upload_field_sync(
                     "X-LANGUAGE": "ca",
                     "X-MD5": "7af0916dba8b70e29d99e72941923529",
                     "content-type": "image/jpg",
-                    "X-SYNCHRONOUS": "True",
                 },
             )
             assert resp.status_code == 201
@@ -644,9 +643,6 @@ async def test_file_upload_by_slug(writer_api, knowledgebox_writer):
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.post(
             f"/{KB_PREFIX}/{kb}/resources",
-            headers={
-                "X-Synchronous": "True",
-            },
             json={
                 "slug": rslug,
             },

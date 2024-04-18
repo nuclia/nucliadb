@@ -25,10 +25,12 @@ from pydantic.class_validators import root_validator
 
 
 class RunningSettings(BaseSettings):
-    debug: bool = True
+    debug: bool = False
     sentry_url: Optional[str] = None
     running_environment: str = Field(
-        default="local", env=["environment", "running_environment"]
+        default="local",
+        env=["environment", "running_environment"],
+        description="Running environment. One of: local, test, stage, prod",
     )
     metrics_port: int = 3030
     metrics_host: str = "0.0.0.0"
@@ -164,6 +166,9 @@ class TransactionSettings(BaseSettings):
     transaction_jetstream_auth: Optional[str] = None
     transaction_jetstream_servers: List[str] = ["nats://localhost:4222"]
     transaction_local: bool = False
+    transaction_commit_timeout: int = Field(
+        default=60, description="Transaction commit timeout in seconds"
+    )
 
 
 transaction_settings = TransactionSettings()

@@ -23,6 +23,7 @@ import asyncio
 import base64
 import json
 import os
+import socket
 import tempfile
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -61,6 +62,12 @@ MAX_RETRIES = 5
 RETRIABLE_EXCEPTIONS = (
     GoogleCloudException,
     aiohttp.client_exceptions.ClientPayloadError,
+    aiohttp.client_exceptions.ClientConnectorError,
+    aiohttp.client_exceptions.ClientConnectionError,
+    aiohttp.client_exceptions.ClientOSError,
+    aiohttp.client_exceptions.ServerConnectionError,
+    aiohttp.client_exceptions.ServerDisconnectedError,
+    socket.gaierror,
 )
 
 

@@ -86,7 +86,6 @@ async def test_find_with_label_changes(
                 "relations": [],
             }
         },
-        headers={"X-SYNCHRONOUS": "True"},
         timeout=None,
     )
     assert resp.status_code == 200
@@ -137,7 +136,6 @@ async def test_find_resource_filters(
             "summary": "My summary",
             "icon": "text/plain",
         },
-        headers={"X-SYNCHRONOUS": "True"},
     )
     assert resp.status_code == 201
     rid1 = resp.json()["uuid"]
@@ -149,7 +147,6 @@ async def test_find_resource_filters(
             "summary": "My summary",
             "icon": "text/plain",
         },
-        headers={"X-SYNCHRONOUS": "True"},
     )
     assert resp.status_code == 201
     rid2 = resp.json()["uuid"]

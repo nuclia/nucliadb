@@ -39,7 +39,6 @@ from nucliadb_models.processing import PushProcessingOptions
 from nucliadb_models.security import ResourceSecurity
 from nucliadb_models.text import TextField
 from nucliadb_models.utils import FieldIdString, SlugString
-from nucliadb_models.vectors import UserVectorsWrapper
 
 GENERIC_MIME_TYPE = "application/generic"
 
@@ -105,7 +104,6 @@ class CreateResourcePayload(BaseModel):
     metadata: Optional[InputMetadata] = None
     usermetadata: Optional[UserMetadata] = None
     fieldmetadata: Optional[List[UserFieldMetadata]] = None
-    uservectors: Optional[UserVectorsWrapper] = None
     origin: Optional[Origin] = None
     extra: Optional[Extra] = None
 
@@ -113,9 +111,9 @@ class CreateResourcePayload(BaseModel):
     links: Dict[FieldIdString, LinkField] = FieldDefaults.links
     texts: Dict[FieldIdString, TextField] = FieldDefaults.texts
     layouts: Dict[FieldIdString, InputLayoutField] = FieldDefaults.layouts
-    conversations: Dict[
-        FieldIdString, InputConversationField
-    ] = FieldDefaults.conversations
+    conversations: Dict[FieldIdString, InputConversationField] = (
+        FieldDefaults.conversations
+    )
     keywordsets: Dict[FieldIdString, FieldKeywordset] = FieldDefaults.keywordsets
     datetimes: Dict[FieldIdString, FieldDatetime] = FieldDefaults.datetimes
     processing_options: Optional[PushProcessingOptions] = PushProcessingOptions()
@@ -156,7 +154,6 @@ class UpdateResourcePayload(BaseModel):
     layout: Optional[str] = None
     metadata: Optional[InputMetadata] = None
     usermetadata: Optional[UserMetadata] = None
-    uservectors: Optional[UserVectorsWrapper] = None
     fieldmetadata: Optional[List[UserFieldMetadata]] = None
     origin: Optional[Origin] = None
     extra: Optional[Extra] = None
@@ -164,9 +161,9 @@ class UpdateResourcePayload(BaseModel):
     links: Dict[FieldIdString, LinkField] = FieldDefaults.links
     texts: Dict[FieldIdString, TextField] = FieldDefaults.texts
     layouts: Dict[FieldIdString, InputLayoutField] = FieldDefaults.layouts
-    conversations: Dict[
-        FieldIdString, InputConversationField
-    ] = FieldDefaults.conversations
+    conversations: Dict[FieldIdString, InputConversationField] = (
+        FieldDefaults.conversations
+    )
     keywordsets: Dict[FieldIdString, FieldKeywordset] = FieldDefaults.keywordsets
     datetimes: Dict[FieldIdString, FieldDatetime] = FieldDefaults.datetimes
     processing_options: Optional[PushProcessingOptions] = PushProcessingOptions()

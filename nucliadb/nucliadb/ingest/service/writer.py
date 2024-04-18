@@ -122,8 +122,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         )
         self.shards_manager = get_shard_manager()
 
-    async def finalize(self):
-        ...
+    async def finalize(self): ...
 
     async def SetVectors(  # type: ignore
         self, request: SetVectorsRequest, context=None
@@ -189,7 +188,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         """
         kbid = request.forceuuid or str(uuid.uuid4())
         release_channel = get_release_channel(request)
-        request.config.release_channel = release_channel
         lconfig = await learning_proxy.get_configuration(kbid)
         lconfig_created = False
         if lconfig is None:
@@ -203,6 +201,8 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                     "No learning configuration provided. Default will be used.",
                     extra={"kbid": kbid},
                 )
+            # NOTE: we rely on learning to return an updated configuration with
+            # matryoshka settings if they're available
             lconfig = await learning_proxy.set_configuration(kbid, config=config)
             lconfig_created = True
         else:
@@ -236,7 +236,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         """
         kbid = request.forceuuid or str(uuid.uuid4())
         release_channel = get_release_channel(request)
-        request.config.release_channel = release_channel
         await self.proc.create_kb(
             request.slug,
             request.config,
@@ -778,11 +777,8 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                     )
                     if shard is None:
                         # no shard currently exists, create one
-                        model = await datamanagers.kb.get_model_metadata(
-                            txn, kbid=request.kbid
-                        )
                         shard = await self.shards_manager.create_shard_by_kbid(
-                            txn, request.kbid, semantic_model=model
+                            txn, request.kbid
                         )
 
                     await datamanagers.resources.set_resource_shard_id(
@@ -880,6 +876,8 @@ def parse_model_metadata_from_learning_config(
         model.default_min_score = lconfig.semantic_threshold
     else:
         logger.warning("Default min score not set!")
+    if lconfig.semantic_matryoshka_dimensions is not None:
+        model.matryoshka_dimensions.extend(lconfig.semantic_matryoshka_dimensions)
     return model
 
 
@@ -898,6 +896,19 @@ def parse_model_metadata_from_request(
         model.default_min_score = request.default_min_score
     else:
         logger.warning("Default min score not set!")
+
+    if len(request.matryoshka_dimensions) > 0:
+        if model.vector_dimension not in request.matryoshka_dimensions:
+            logger.warning(
+                "Vector dimensions is inconsistent with matryoshka dimensions! Ignoring them",
+                extra={
+                    "kbid": request.forceuuid,
+                    "kbslug": request.slug,
+                },
+            )
+        else:
+            model.matryoshka_dimensions.extend(request.matryoshka_dimensions)
+
     return model
 
 

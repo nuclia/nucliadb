@@ -38,6 +38,7 @@ pub trait DataRetriever: std::marker::Sync {
     fn get_vector(&self, x: Address) -> &[u8];
     /// Embeddings with smaller similarity should not be considered.
     fn min_score(&self) -> f32;
+    fn will_need(&self, x: Address);
 }
 
 /// Implementors of this trait are layers of an HNSW where a nearest neighbour search can be ran.
@@ -110,7 +111,8 @@ pub struct HnswOps<'a, DR> {
 }
 
 impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
-    fn select_neighbours_heuristic(
+    #[allow(unused)]
+    fn select_neighbours_simple(
         &self,
         k_neighbours: usize,
         mut candidates: Vec<(Address, Edge)>,
@@ -119,6 +121,40 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         candidates.dedup_by_key(|(addr, _)| *addr);
         candidates.truncate(k_neighbours);
         candidates
+    }
+    fn select_neighbours_heuristic(
+        &self,
+        k_neighbours: usize,
+        candidates: Vec<(Address, Edge)>,
+    ) -> Vec<(Address, Edge)> {
+        let mut results = Vec::new();
+        let mut discarded = BinaryHeap::new();
+
+        // First, select the best candidates to link, trying to connect from all directions
+        // i.e: avoid linking to all nodes in a single cluster
+        for (x, sim) in candidates.into_iter() {
+            if results.len() == k_neighbours {
+                break;
+            }
+            // Keep if x is more similar to the new node than it is similar to other results
+            // i.e: similarity(x, new) > similarity(x, y) for all y in result
+            let check = results.iter().map(|&(y, _)| self.similarity(x, y)).all(|inter_sim| sim > inter_sim);
+            if check {
+                results.push((x, sim));
+            } else {
+                discarded.push(Cnx(x, sim));
+            }
+        }
+
+        // keepPrunedConnections: keep some other connections to fill M
+        while results.len() < k_neighbours {
+            let Some(Cnx(n, d)) = discarded.pop() else {
+                return results;
+            };
+            results.push((n, d));
+        }
+
+        results
     }
     fn similarity(&self, x: Address, y: Address) -> f32 {
         self.tracker.similarity(x, y)
@@ -140,10 +176,13 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         // best solution. This algorithm takes a lazy approach to computing the similarity of
         // candidates.
 
+        const MAX_VECTORS_TO_PRELOAD: u32 = 20_000;
         let mut results = Vec::new();
         let inner_entry_points_iter = entry_points.iter().map(|Address(inner)| *inner);
         let mut visited_nodes: BitSet = BitSet::from_iter(inner_entry_points_iter);
         let mut candidates = VecDeque::from(entry_points);
+
+        let mut preloaded = 0;
 
         loop {
             let Some(candidate) = candidates.pop_front() else {
@@ -172,6 +211,11 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                 if !visited_nodes.contains(new_candidate.0) {
                     visited_nodes.insert(new_candidate.0);
                     candidates.push_back(new_candidate);
+
+                    if preloaded < MAX_VECTORS_TO_PRELOAD {
+                        self.tracker.will_need(new_candidate);
+                        preloaded += 1;
+                    }
                 }
             });
         }
@@ -201,6 +245,11 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                 (Some(Cnx(cn, _)), Some(Reverse(Cnx(_, mut ws)))) => {
                     for (y, _) in layer.get_out_edges(cn) {
                         if !visited.contains(&y) {
+                            self.tracker.will_need(y);
+                        }
+                    }
+                    for (y, _) in layer.get_out_edges(cn) {
+                        if !visited.contains(&y) {
                             visited.insert(y);
                             let similarity = self.similarity(x, y);
                             if similarity > ws || ms_neighbours.len() < k_neighbours {
@@ -219,10 +268,11 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         }
         ms_neighbours.into_sorted_vec().into_iter().map(|Reverse(Cnx(n, d))| (n, d)).collect()
     }
-    fn layer_insert(&self, x: Address, layer: &mut RAMLayer, entry_points: &[Address]) -> Vec<Address> {
+
+    fn layer_insert(&self, x: Address, layer: &mut RAMLayer, entry_points: &[Address], mmax: usize) -> Vec<Address> {
         use params::*;
         let neighbours = self.layer_search::<&RAMLayer>(x, layer, ef_construction(), entry_points);
-        let neighbours = self.select_neighbours_heuristic(m_max(), neighbours);
+        let neighbours = self.select_neighbours_heuristic(m(), neighbours);
         let mut needs_repair = HashSet::new();
         let mut result = Vec::with_capacity(neighbours.len());
         layer.add_node(x);
@@ -230,13 +280,13 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
             result.push(y);
             layer.add_edge(x, dist, y);
             layer.add_edge(y, dist, x);
-            if layer.no_out_edges(y) > m_max() {
+            if layer.no_out_edges(y) > mmax {
                 needs_repair.insert(y);
             }
         }
         for crnt in needs_repair {
             let edges = layer.take_out_edges(crnt);
-            let neighbours = self.select_neighbours_heuristic(m_max(), edges);
+            let neighbours = self.select_neighbours_heuristic(mmax, edges);
             neighbours.into_iter().for_each(|(y, edge)| layer.add_edge(crnt, edge, y));
         }
         result
@@ -250,12 +300,17 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
             Some(entry_point) => {
                 let level = self.get_random_layer();
                 hnsw.increase_layers_with(x, level);
-                let top_layer = std::cmp::min(entry_point.layer, level);
-                let ep = entry_point.node;
-                hnsw.layers[0..=top_layer]
-                    .iter_mut()
-                    .rev()
-                    .fold(vec![ep], |eps, layer| self.layer_insert(x, layer, &eps));
+                let top_layer = std::cmp::max(entry_point.layer, level);
+                let mut eps = vec![entry_point.node];
+
+                for l in (0..=top_layer).rev() {
+                    if l > level {
+                        // Above insertion point, just search
+                        eps[0] = self.layer_search(x, &hnsw.layers[l], 1, &eps)[0].0;
+                    } else {
+                        eps = self.layer_insert(x, &mut hnsw.layers[l], &eps, params::m_max_for_layer(l));
+                    }
+                }
                 hnsw.update_entry_point();
             }
         }
@@ -283,7 +338,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         while crnt_layer != 0 {
             let layer = hnsw.get_layer(crnt_layer);
             let entry_points: Vec<_> = neighbours.into_iter().map(|(node, _)| node).collect();
-            let layer_res = self.layer_search(query, layer, 1, &entry_points);
+            let layer_res = self.layer_search(query, layer, 10, &entry_points);
             neighbours = layer_res;
             crnt_layer -= 1;
         }

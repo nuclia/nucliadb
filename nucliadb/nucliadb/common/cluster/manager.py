@@ -19,12 +19,10 @@
 #
 import asyncio
 import logging
-import random
 import uuid
 from typing import Any, Awaitable, Callable, Optional
 
 import backoff
-from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata  # type: ignore
 from nucliadb_protos.nodewriter_pb2 import IndexMessage, IndexMessageSource, TypeMessage
 
 from nucliadb.common import datamanagers
@@ -43,7 +41,6 @@ from nucliadb_protos import (
     nodereader_pb2,
     noderesources_pb2,
     nodewriter_pb2,
-    utils_pb2,
     writer_pb2,
 )
 from nucliadb_telemetry import errors
@@ -183,8 +180,6 @@ class KBShardManager:
         self,
         txn: Transaction,
         kbid: str,
-        semantic_model: SemanticModelMetadata,
-        release_channel: utils_pb2.ReleaseChannel.ValueType,
     ) -> writer_pb2.ShardObject:
         try:
             check_enough_nodes()
@@ -197,18 +192,12 @@ class KBShardManager:
 
         kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
         if kb_shards is None:
-            # First logic shard on the index
-            kb_shards = writer_pb2.Shards()
-            kb_shards.kbid = kbid
-            # B/c with Shards.actual
-            kb_shards.actual = -1
-            kb_shards.similarity = semantic_model.similarity_function
-            kb_shards.model.CopyFrom(semantic_model)
-        else:
-            # New logic shard on an existing index
-            pass
+            msg = (
+                "Attempting to create a shard for a KB when it has no stored shards in maindb",
+            )
+            logger.error(msg, extra={"kbid": kbid})
+            raise ShardsNotFound(msg)
 
-        kb_shards.release_channel = release_channel
         existing_kb_nodes = [
             replica.node for shard in kb_shards.shards for replica in shard.replicas
         ]
@@ -231,11 +220,13 @@ class KBShardManager:
                 if node is None:
                     logger.error(f"Node {node_id} is not found or not available")
                     continue
+                is_matryoshka = len(kb_shards.model.matryoshka_dimensions) > 0
                 try:
                     shard_created = await node.new_shard(
                         kbid,
                         similarity=kb_shards.similarity,
                         release_channel=kb_shards.release_channel,
+                        normalize_vectors=is_matryoshka,
                     )
                 except Exception as e:
                     errors.capture_exception(e)
@@ -259,8 +250,8 @@ class KBShardManager:
 
         # Append the created shard and make `actual` point to it.
         kb_shards.shards.append(shard)
-        # B/c with Shards.actual
-        kb_shards.actual += 1
+        # B/c with Shards.actual - we only use last created shard
+        kb_shards.actual = len(kb_shards.shards) - 1
 
         await datamanagers.cluster.update_kb_shards(txn, kbid=kbid, shards=kb_shards)
 
@@ -364,32 +355,21 @@ class KBShardManager:
             indexpb.shard = replica_id
             await indexing.index(indexpb, node_id)
 
-    def should_create_new_shard(self, num_paragraphs: int, num_fields: int) -> bool:
-        return (
-            num_paragraphs > settings.max_shard_paragraphs
-            or num_fields > settings.max_shard_fields
-        )
+    def should_create_new_shard(self, num_paragraphs: int) -> bool:
+        return num_paragraphs > settings.max_shard_paragraphs
 
     async def maybe_create_new_shard(
         self,
         kbid: str,
         num_paragraphs: int,
-        num_fields: int,
-        release_channel: utils_pb2.ReleaseChannel.ValueType = utils_pb2.ReleaseChannel.STABLE,
     ):
-        if not self.should_create_new_shard(num_paragraphs, num_fields):
+        if not self.should_create_new_shard(num_paragraphs):
             return
 
         logger.warning({"message": "Adding shard", "kbid": kbid})
 
         async with datamanagers.with_transaction() as txn:
-            model = await datamanagers.kb.get_model_metadata(txn, kbid=kbid)
-            await self.create_shard_by_kbid(
-                txn,
-                kbid,
-                semantic_model=model,
-                release_channel=release_channel,
-            )
+            await self.create_shard_by_kbid(txn, kbid)
             await txn.commit()
 
 
@@ -421,8 +401,6 @@ class StandaloneKBShardManager(KBShardManager):
             await self.maybe_create_new_shard(
                 kbid,
                 shard_info.paragraphs,
-                shard_info.fields,
-                shard_info.metadata.release_channel,
             )
             await index_node.writer.GC(noderesources_pb2.ShardId(id=shard_id))  # type: ignore
 
@@ -550,7 +528,10 @@ def choose_node(
         ranked_nodes.setdefault(score, []).append((node, shard_replica_id))
 
     top = ranked_nodes[max(ranked_nodes)]
-    selected_node, shard_replica_id = random.choice(top)
+    # As shard replica ids are random numbers, we sort by shard replica id and choose its
+    # node to make sure we choose in deterministically but we don't favour any node in particular
+    top.sort(key=lambda x: x[1])
+    selected_node, shard_replica_id = top[0]
     return selected_node, shard_replica_id
 
 

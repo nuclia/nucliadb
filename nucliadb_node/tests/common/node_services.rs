@@ -23,18 +23,18 @@ use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::Duration;
 
+use nucliadb_core::merge::MergerError;
 use nucliadb_core::protos::node_reader_client::NodeReaderClient;
 use nucliadb_core::protos::node_reader_server::NodeReaderServer;
 use nucliadb_core::protos::node_writer_client::NodeWriterClient;
 use nucliadb_core::protos::node_writer_server::NodeWriterServer;
+use nucliadb_node::cache::ShardWriterCache;
 use nucliadb_node::grpc::reader::NodeReaderGRPCDriver;
 use nucliadb_node::grpc::writer::NodeWriterGRPCDriver;
 use nucliadb_node::lifecycle;
-use nucliadb_node::merge::errors::MergerError;
 use nucliadb_node::replication::replicator::connect_to_primary_and_replicate;
 use nucliadb_node::replication::service::ReplicationServiceGRPCDriver;
 use nucliadb_node::settings::*;
-use nucliadb_node::shards::cache::ShardWriterCache;
 use nucliadb_node::utils::read_or_create_host_key;
 use nucliadb_protos::replication;
 use tempfile::TempDir;
@@ -115,27 +115,30 @@ impl NodeFixture {
         let writer_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), find_open_port());
         let secondary_reader_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), find_open_port());
 
-        let settings = Settings::builder()
-            .data_path(tempdir.path())
-            .reader_listen_address(reader_addr.to_string())
-            .writer_listen_address(writer_addr.to_string())
-            .build()
-            .expect("Error while building test settings");
-        let secondary_settings = Settings::builder()
-            .data_path(secondary_tempdir.path())
-            .reader_listen_address(secondary_reader_addr.to_string())
-            .primary_address(writer_addr.to_string())
-            .replication_delay(Duration::from_secs(1))
-            .build()
-            .expect("Error while building test settings");
+        let settings: Settings = EnvSettings {
+            data_path: tempdir.path().to_owned(),
+            reader_listen_address: reader_addr,
+            writer_listen_address: writer_addr,
+            ..Default::default()
+        }
+        .into();
 
-        for _setting in [&settings, &secondary_settings] {
-            let data_path = _setting.data_path();
+        let secondary_settings = EnvSettings {
+            data_path: secondary_tempdir.path().to_owned(),
+            reader_listen_address: secondary_reader_addr,
+            primary_address: writer_addr.to_string(),
+            replication_delay_seconds: 1,
+            ..Default::default()
+        }
+        .into();
+
+        for setting in [&settings, &secondary_settings] {
+            let data_path = &setting.data_path;
             if !data_path.exists() {
-                std::fs::create_dir(&data_path).expect("Cannot create data directory");
+                std::fs::create_dir(data_path).expect("Cannot create data directory");
             }
 
-            let shards_path = _setting.shards_path();
+            let shards_path = setting.shards_path();
             if !shards_path.exists() {
                 std::fs::create_dir(&shards_path).expect("Cannot create shards directory");
             }
@@ -229,8 +232,7 @@ impl NodeFixture {
 
         let settings = self.secondary_settings.clone();
         let cache_settings = self.secondary_settings.clone();
-        let host_key_path = settings.host_key_path();
-        let node_id = read_or_create_host_key(host_key_path)?;
+        let node_id = read_or_create_host_key(&settings.host_key_path)?;
         let shards_cache = Arc::new(ShardWriterCache::new(cache_settings));
         self.secondary_shard_cache = Some(shards_cache.clone());
         let notified = Arc::clone(&self.shutdown_notified);

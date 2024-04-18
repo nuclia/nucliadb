@@ -17,9 +17,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use std::fmt::Debug;
-use std::time::Instant;
-
+use crate::data_point_provider::reader::Reader;
+use crate::data_point_provider::*;
+use crate::formula::{AtomClause, BooleanOperator, Clause, CompoundClause, Formula};
+use crate::service::query_io;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::prost::Message;
 use nucliadb_core::protos::{
@@ -28,11 +29,8 @@ use nucliadb_core::protos::{
 use nucliadb_core::tracing::{self, *};
 use nucliadb_core::vectors::*;
 use nucliadb_procs::measure;
-
-use crate::data_point_provider::*;
-use crate::formula::{AtomClause, BooleanOperator, Clause, CompoundClause, Formula};
-use crate::indexset::IndexSet;
-use crate::service::query_io;
+use std::fmt::Debug;
+use std::time::Instant;
 
 impl<'a> SearchRequest for (usize, &'a VectorSearchRequest, Formula) {
     fn with_duplicates(&self) -> bool {
@@ -53,8 +51,7 @@ impl<'a> SearchRequest for (usize, &'a VectorSearchRequest, Formula) {
 }
 
 pub struct VectorReaderService {
-    index: Index,
-    indexset: IndexSet,
+    index: Reader,
 }
 impl Debug for VectorReaderService {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -63,25 +60,15 @@ impl Debug for VectorReaderService {
 }
 
 impl VectorReader for VectorReaderService {
-    #[tracing::instrument(skip_all)]
-    fn count(&self, vectorset: &str) -> NodeResult<usize> {
-        if vectorset.is_empty() {
-            debug!("Id for the vectorset is empty");
-            self.index_count(&self.index)
-        } else {
-            let indexet_slock = self.indexset.get_slock()?;
-            if let Some(index) = self.indexset.get(vectorset, &indexet_slock)? {
-                debug!("Counting nodes for {vectorset}");
-                self.index_count(&index)
-            } else {
-                debug!("There was not a set called {vectorset}");
-                Ok(0)
-            }
-        }
+    fn update(&mut self) -> NodeResult<()> {
+        self.index.update()?;
+        Ok(())
     }
 
-    fn update(&mut self) -> NodeResult<()> {
-        Ok(())
+    #[tracing::instrument(skip_all)]
+    fn count(&self) -> NodeResult<usize> {
+        debug!("Id for the vectorset is empty");
+        Ok(self.index.size())
     }
 
     #[measure(actor = "vectors", metric = "search")]
@@ -94,8 +81,6 @@ impl VectorReader for VectorReaderService {
         let total_to_get = offset + request.result_per_page;
         let offset = offset as usize;
         let total_to_get = total_to_get as usize;
-        let indexet_slock = self.indexset.get_slock()?;
-        let index_slock = self.index.get_slock()?;
 
         let key_filters = request.key_filters.iter().cloned().map(AtomClause::key_prefix);
         let field_labels = request.field_labels.iter().cloned().map(AtomClause::label);
@@ -122,24 +107,10 @@ impl VectorReader for VectorReaderService {
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Searching: starts at {v} ms");
 
-        let result = if request.vector_set.is_empty() {
-            debug!("{id:?} - No vectorset specified, searching in the main index");
-            self.index.search(&search_request, &index_slock)?
-        } else if let Some(index) = self.indexset.get(&request.vector_set, &indexet_slock)? {
-            debug!("{id:?} - vectorset specified and found, searching on {}", request.vector_set);
-            let lock = index.get_slock()?;
-            index.search(&search_request, &lock)?
-        } else {
-            debug!("{id:?} - A was vectorset specified, but not found. {} is not a vectorset", request.vector_set);
-            vec![]
-        };
+        let result = self.index.search(&search_request)?;
+
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Searching: ends at {v} ms");
-
-        std::mem::drop(indexet_slock);
-        std::mem::drop(index_slock);
-
-        let v = time.elapsed().as_millis();
         debug!("{id:?} - Creating results: starts at {v} ms");
 
         let documents = result
@@ -150,6 +121,7 @@ impl VectorReader for VectorReaderService {
             .flat_map(DocumentScored::try_from)
             .collect::<Vec<_>>();
         let v = time.elapsed().as_millis();
+
         debug!("{id:?} - Creating results: ends at {v} ms");
 
         let took = time.elapsed().as_secs_f64();
@@ -166,8 +138,7 @@ impl VectorReader for VectorReaderService {
     #[tracing::instrument(skip_all)]
     fn stored_ids(&self) -> NodeResult<Vec<String>> {
         let time = Instant::now();
-        let lock = self.index.get_slock().unwrap();
-        let result = self.index.get_keys(&lock)?;
+        let result = self.index.keys()?;
         let v = time.elapsed().as_millis();
         debug!("Ending at {v} ms");
 
@@ -204,21 +175,9 @@ impl VectorReaderService {
         if !config.path.exists() {
             return Err(node_error!("Invalid path {:?}", config.path));
         }
-        if !config.vectorset.exists() {
-            return Err(node_error!("Invalid path {:?}", config.vectorset));
-        }
         Ok(VectorReaderService {
-            index: Index::open(&config.path)?,
-            indexset: IndexSet::new(&config.vectorset)?,
+            index: Reader::open(&config.path)?,
         })
-    }
-
-    #[measure(actor = "vectors", metric = "count")]
-    fn index_count(&self, index: &Index) -> NodeResult<usize> {
-        let lock = index.get_slock()?;
-        let no_nodes = index.no_nodes(&lock);
-        std::mem::drop(lock);
-        Ok(no_nodes)
     }
 }
 
@@ -242,8 +201,9 @@ mod tests {
         let vsc = VectorConfig {
             similarity: Some(VectorSimilarity::Cosine),
             path: dir.path().join("vectors"),
-            vectorset: dir.path().join("vectorset"),
             channel: Channel::EXPERIMENTAL,
+            shard_id: "abc".into(),
+            normalize_vectors: false,
         };
         let raw_sentences = [
             ("DOC/KEY/1/1".to_string(), vec![1.0, 3.0, 4.0]),
@@ -295,8 +255,7 @@ mod tests {
         };
         // insert - delete - insert sequence
         let mut writer = VectorWriterService::start(&vsc).unwrap();
-        let res = writer.set_resource(&resource);
-        assert!(res.is_ok());
+        writer.set_resource(&resource).unwrap();
 
         let reader = VectorReaderService::start(&vsc).unwrap();
         let mut request = VectorSearchRequest {
@@ -325,8 +284,9 @@ mod tests {
         let vsc = VectorConfig {
             similarity: Some(VectorSimilarity::Cosine),
             path: dir.path().join("vectors"),
-            vectorset: dir.path().join("vectorset"),
             channel: Channel::EXPERIMENTAL,
+            shard_id: "abc".into(),
+            normalize_vectors: false,
         };
         let raw_sentences = [
             ("DOC/KEY/1/1".to_string(), vec![1.0, 3.0, 4.0]),
@@ -406,7 +366,7 @@ mod tests {
             ..Default::default()
         };
         let result = reader.search(&request, &context).unwrap();
-        let no_nodes = reader.count("").unwrap();
+        let no_nodes = reader.count().unwrap();
         assert_eq!(no_nodes, 4);
         assert_eq!(result.documents.len(), 3);
 
@@ -423,7 +383,7 @@ mod tests {
             ..Default::default()
         };
         let result = reader.search(&request, &context).unwrap();
-        let no_nodes = reader.count("").unwrap();
+        let no_nodes = reader.count().unwrap();
         assert_eq!(no_nodes, 4);
         assert_eq!(result.documents.len(), 0);
 
@@ -446,8 +406,9 @@ mod tests {
         let vsc = VectorConfig {
             similarity: Some(VectorSimilarity::Cosine),
             path: dir.path().join("vectors"),
-            vectorset: dir.path().join("vectorset"),
             channel: Channel::EXPERIMENTAL,
+            shard_id: "abc".into(),
+            normalize_vectors: false,
         };
         let raw_sentences =
             [("DOC/KEY/1/1".to_string(), vec![1.0, 2.0, 3.0]), ("DOC/KEY/1/2".to_string(), vec![1.0, 2.0, 3.0])];
