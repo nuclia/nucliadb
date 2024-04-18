@@ -92,7 +92,6 @@ class KnowledgeBox:
     async def delete_kb(cls, txn: Transaction, slug: str = "", kbid: str = ""):
         # Mark storage to be deleted
         # Mark keys to be deleted
-        logger.info(f"Deleting KB kbid={kbid} slug={slug}")
         if not kbid and not slug:
             raise AttributeError()
 
@@ -113,7 +112,6 @@ class KnowledgeBox:
         # Delete main anchor
         async with txn.driver.transaction() as subtxn:
             key_match = datamanagers.kb.KB_SLUGS.format(slug=slug)
-            logger.info(f"Deleting KB with slug: {slug}")
             await subtxn.delete(key_match)
 
             when = datetime.now().isoformat()
