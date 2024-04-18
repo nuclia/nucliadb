@@ -568,12 +568,18 @@ def get_answer_generator(response: aiohttp.ClientResponse):
     """
 
     async def _iter_answer_chunks(gen):
-        buffer = b""
-        async for chunk, end_of_chunk in gen:
-            buffer += chunk
-            if end_of_chunk:
-                yield buffer
-                buffer = b""
+        try:
+            buffer = b""
+            async for chunk, end_of_chunk in gen:
+                buffer += chunk
+                if end_of_chunk:
+                    yield buffer
+                    buffer = b""
+        except aiohttp.ClientPayloadError as err:
+            raise ProxiedPredictAPIError(
+                status=500,
+                detail="Error streaming the generated answer. The upstream LLM service may be overloaded. Please try again later.",  # noqa
+            ) from err
 
     return _iter_answer_chunks(response.content.iter_chunks())
 

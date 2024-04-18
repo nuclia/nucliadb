@@ -59,6 +59,12 @@ from nucliadb_utils.exceptions import LimitsExceededError
 END_OF_STREAM = "_END_"
 
 
+class PredictAPIChatStreamError(Exception):
+    """Raised when an error occurs while streaming the answer from the predict API."""
+
+    pass
+
+
 class SyncChatResponse(pydantic.BaseModel):
     answer: str
     relations: Optional[Relations]
@@ -166,6 +172,7 @@ async def create_chat_response(
         resource=resource,
     )
     if x_synchronous:
+
         streamed_answer = b""
         async for chunk in chat_result.answer_stream:
             streamed_answer += chunk
@@ -206,10 +213,22 @@ async def create_chat_response(
             yield len(bytes_results).to_bytes(length=4, byteorder="big", signed=False)
             yield bytes_results
 
-            streamed_answer = b""
-            async for chunk in chat_result.answer_stream:
-                streamed_answer += chunk
-                yield chunk
+            try:
+                streamed_answer = b""
+                async for chunk in chat_result.answer_stream:
+                    streamed_answer += chunk
+                    yield chunk
+            except predict.ProxiedPredictAPIError:
+                logger.error(
+                    "Handled error from the predict API while streaming the answer."
+                )
+                raise
+            except Exception as exc:
+                logger.exception(
+                    "Unhandled error while streaming the answer.", exc_info=True
+                )
+                capture_exception(exc)
+                raise
 
             answer, _ = parse_streamed_answer(streamed_answer, chat_request.citations)
 
