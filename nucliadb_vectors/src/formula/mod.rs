@@ -18,37 +18,43 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::data_point::{Address, DataRetriever};
+use std::collections::HashSet;
 
-#[derive(Debug, Copy, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
-pub enum AtomKind {
-    KeyPrefix,
-    Label,
-}
+use crate::data_point::{Address, DataRetriever};
 
 /// Is a singleton clause.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
-pub struct AtomClause {
-    kind: AtomKind,
-    value: String,
+pub enum AtomClause {
+    KeyPrefix(String),
+    Label(String),
+    KeyPrefixSet(HashSet<String>),
 }
 impl AtomClause {
-    pub fn new(value: String, kind: AtomKind) -> AtomClause {
-        AtomClause {
-            kind,
-            value,
-        }
-    }
     pub fn label(value: String) -> AtomClause {
-        AtomClause::new(value, AtomKind::Label)
+        Self::Label(value)
     }
     pub fn key_prefix(value: String) -> AtomClause {
-        AtomClause::new(value, AtomKind::KeyPrefix)
+        Self::KeyPrefix(value)
+    }
+    pub fn key_set(set: HashSet<String>) -> AtomClause {
+        Self::KeyPrefixSet(set)
     }
     fn run<D: DataRetriever>(&self, x: Address, retriever: &D) -> bool {
-        match self.kind {
-            AtomKind::KeyPrefix => retriever.get_key(x).starts_with(self.value.as_bytes()),
-            AtomKind::Label => retriever.has_label(x, self.value.as_bytes()),
+        match self {
+            Self::KeyPrefix(value) => 
+                retriever.get_key(x).starts_with(value.as_bytes()),
+                
+            
+            Self::Label(value) => retriever.has_label(x, value.as_bytes()),
+            Self::KeyPrefixSet(set) => {
+                let key = retriever.get_key(x);
+                let kk = String::from_utf8_lossy(key);
+                let parts: Vec<_> = kk.split('/').collect();
+                if parts.len() < 3 {
+                    return false;
+                }
+                set.contains(&parts[0..3].join("/"))
+            }
         }
     }
 }
@@ -123,20 +129,6 @@ impl From<CompoundClause> for Clause {
     }
 }
 
-#[derive(Default)]
-pub struct AtomCollector {
-    pub labels: Vec<String>,
-    pub key_prefixes: Vec<String>,
-}
-impl AtomCollector {
-    fn add(&mut self, atom: AtomClause) {
-        match atom.kind {
-            AtomKind::KeyPrefix => self.key_prefixes.push(atom.value),
-            AtomKind::Label => self.labels.push(atom.value),
-        }
-    }
-}
-
 /// Once applied to a given address, the formula becomes a boolean
 /// expression that evaluates to whether the address is valid or not.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, PartialEq)]
@@ -155,22 +147,6 @@ impl Formula {
     }
     pub fn run<D: DataRetriever>(&self, x: Address, retriever: &D) -> bool {
         self.clauses.iter().all(|q| q.run(x, retriever))
-    }
-    /// Returns the atoms that form a formula
-    pub fn get_atoms(&self) -> AtomCollector {
-        let mut collector = AtomCollector::default();
-        let mut work: Vec<_> = self.clauses.iter().collect();
-        while let Some(clause) = work.pop() {
-            match clause {
-                Clause::Atom(q) => collector.add(q.clone()),
-                Clause::Compound(clause) => {
-                    for clause in clause.operands.iter() {
-                        work.push(clause);
-                    }
-                }
-            }
-        }
-        collector
     }
 }
 

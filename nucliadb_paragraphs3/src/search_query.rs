@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 use crate::query_io;
+use crate::set_query::SetQuery;
 use itertools::Itertools;
 use nucliadb_core::paragraphs::ParagraphsContext;
 use nucliadb_core::protos::prost_types::Timestamp as ProstTimestamp;
@@ -420,34 +421,10 @@ pub fn search_query(
         originals.push((Occur::Must, query));
     }
 
-    // Keys filter
-    let mut key_filters: Vec<Box<dyn Query>> = vec![];
-    search.key_filters.iter().for_each(|key| {
-        let mut key_filter: Vec<Box<dyn Query>> = vec![];
-
-        let parts: Vec<String> = key.split('/').map(str::to_string).collect();
-        let uuid = &parts[0];
-        let term = Term::from_field_text(schema.uuid, uuid);
-        let term_query = TermQuery::new(term, IndexRecordOption::Basic);
-        key_filter.push(Box::new(term_query));
-
-        if parts.len() >= 3 {
-            let mut field_key: String = "/".to_owned();
-            field_key.push_str(&parts[1..3].join("/"));
-            let facet = Facet::from_text(&field_key).unwrap();
-            let facet_term = Term::from_facet(schema.field, &facet);
-            let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
-            key_filter.push(Box::new(facet_term_query));
-        }
-
-        let key_filter_query = Box::new(BooleanQuery::intersection(key_filter));
-        key_filters.push(key_filter_query);
-    });
-
-    if !key_filters.is_empty() {
-        let key_filters_query = Box::new(BooleanQuery::union(key_filters));
-        fuzzies.push((Occur::Must, key_filters_query.clone()));
-        originals.push((Occur::Must, key_filters_query));
+    if !search.key_filters.is_empty() {
+        let tsq = Box::new(SetQuery::new(schema.field_uuid, search.key_filters.clone()));
+        fuzzies.push((Occur::Must, tsq.clone()));
+        originals.push((Occur::Must, tsq.clone()));
     }
 
     if originals.len() == 1 && originals[0].1.is::<AllQuery>() {

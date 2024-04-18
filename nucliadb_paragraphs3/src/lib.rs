@@ -18,20 +18,12 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-mod common;
-
-use nucliadb_core::protos::StreamRequest;
-use nucliadb_core::texts::*;
-
-#[test]
-fn test_stream_request_iterator() {
-    let reader = common::test_reader();
-    let request = StreamRequest {
-        shard_id: None,
-        filter: None,
-        ..Default::default()
-    };
-    let iter = reader.iterator(&request).unwrap();
-    let count = iter.count();
-    assert_eq!(count, 2);
-}
+pub mod fuzzy_query;
+pub mod query_io;
+pub mod reader;
+pub mod schema;
+pub mod search_query;
+pub mod search_response;
+mod set_query;
+pub mod stop_words;
+pub mod writer;

@@ -93,7 +93,6 @@ impl VectorReader for VectorReaderService {
         let offset = offset as usize;
         let total_to_get = total_to_get as usize;
 
-        let key_filters = request.key_filters.iter().cloned().map(AtomClause::key_prefix);
         let field_labels = request.field_labels.iter().cloned().map(AtomClause::label);
         let mut formula = Formula::new();
 
@@ -103,10 +102,13 @@ impl VectorReader for VectorReaderService {
             formula.extend(field_clause);
         }
 
-        if key_filters.len() > 0 {
-            let clause_labels = key_filters.map(Clause::Atom).collect();
-            let key_clause = CompoundClause::new(BooleanOperator::Or, clause_labels);
-            formula.extend(key_clause);
+        if request.key_filters.len() > 0 {
+            let clause_labels = AtomClause::key_set(request.key_filters.iter().cloned().collect());
+            formula.extend(clause_labels);
+            // let key_filters =
+            //     request.key_filters.iter().cloned().map(AtomClause::key_prefix).map(Clause::Atom).collect();
+            // let key_clause = CompoundClause::new(BooleanOperator::Or, key_filters);
+            // formula.extend(key_clause);
         }
 
         if let Some(filter) = context.filtering_formula.as_ref() {

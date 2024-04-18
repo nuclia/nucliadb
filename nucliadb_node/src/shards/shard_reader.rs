@@ -129,6 +129,7 @@ impl ShardReader {
             0 => ParagraphService::ParagraphV0,
             1 => ParagraphService::ParagraphV1,
             2 => ParagraphService::ParagraphV2,
+            3 => ParagraphService::ParagraphV3,
             i => panic!("Unknown paragraph version {i}"),
         }
     }
@@ -316,6 +317,37 @@ impl ShardReader {
     #[measure(actor = "shard", metric = "suggest")]
     #[tracing::instrument(skip_all)]
     pub fn suggest(&self, request: SuggestRequest) -> NodeResult<SuggestResponse> {
+        let mut prefilter_request = PreFilterRequest {
+            timestamp_filters: vec![],
+            formula: query,
+            security: None,
+        };
+
+        // Security filters
+        let request_has_security_filters = search_request.security.is_some();
+        if request_has_security_filters {
+            prefilter_request.security = search_request.security.clone();
+        }
+
+        // Timestamp filters
+        let request_has_timestamp_filters = search_request.timestamps.as_ref().is_some();
+        if request_has_timestamp_filters {
+            let timestamp_filters = compute_timestamp_prefilters(search_request);
+            prefilter_request.timestamp_filters.extend(timestamp_filters);
+        }
+
+        let request_has_labels_filters = prefilter_request.formula.is_some();
+
+        if !request_has_timestamp_filters && !request_has_labels_filters && !request_has_security_filters {
+            None
+        } else {
+            Some(prefilter_request)
+        }
+
+        //
+        //
+        //
+
         let span = tracing::Span::current();
 
         let suggest_paragraphs = request.features.contains(&(SuggestFeatures::Paragraphs as i32));
