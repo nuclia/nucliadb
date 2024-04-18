@@ -67,12 +67,6 @@ async def list_all_kb_slugs(driver: Driver) -> list[str]:
     return slugs
 
 
-async def get_kb_config(txn, kbid) -> knowledgebox_pb2.KnowledgeBoxConfig:
-    config = await datamanagers.kb.get_config(txn, kbid=kbid)
-    assert config, "Config object not found!"
-    return config
-
-
 @pytest.mark.asyncio
 async def test_get_resource_id(grpc_servicer: IngestFixture) -> None:
     stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)  # type: ignore

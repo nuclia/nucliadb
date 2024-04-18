@@ -39,12 +39,21 @@ message KnowledgeBoxConfig {
 message KnowledgeBoxNew {
     string slug = 1;
     KnowledgeBoxConfig config = 2;
+
+    // this fields are only set by backend when creating hosted KBs
     string forceuuid = 3;
     utils.VectorSimilarity similarity = 4;
     optional int32 vector_dimension = 5;
     optional float default_min_score = 6;
-    utils.ReleaseChannel release_channel = 7;
+    repeated uint32 matryoshka_dimensions = 9;
+
+    // this field are only used by NucliaDB Writer API when creating a KB. Used
+    // in onprem scenarios
     string learning_config = 8;
+
+    // release channel, although not used when backend creates hosted KBs, it's
+    // recomputed and changed depending on the environment
+    utils.ReleaseChannel release_channel = 7;
 }
 
 
@@ -188,6 +197,10 @@ message SemanticModelMetadata {
     utils.VectorSimilarity similarity_function = 1;
     optional int32 vector_dimension = 2;
     optional float default_min_score = 3;
+
+    // list of possible subdivisions of the matryoshka embeddings (if the model
+    // supports it)
+    repeated uint32 matryoshka_dimensions = 4;
 }
 
 // Do not update this model without confirmation of internal Learning Config API

@@ -21,6 +21,7 @@ use crate::data_point::{self, DataPointPin, Elem, LabelDictionary};
 use crate::data_point_provider::garbage_collector;
 use crate::data_point_provider::writer::Writer;
 use crate::data_point_provider::*;
+use crate::utils;
 use nucliadb_core::metrics;
 use nucliadb_core::metrics::request_time;
 use nucliadb_core::metrics::vectors::MergeSource;
@@ -112,21 +113,26 @@ impl VectorWriter for VectorWriterService {
         let temporal_mark = SystemTime::now();
         let mut lengths: HashMap<usize, Vec<_>> = HashMap::new();
         let mut elems = Vec::new();
+        let normalize_vectors = self.index.metadata().normalize_vectors;
         if resource.status != ResourceStatus::Delete as i32 {
-            for (paragraph_field, paragraph) in resource.paragraphs.iter() {
-                for index in paragraph.paragraphs.values() {
-                    let mut inner_labels = index.labels.clone();
-                    inner_labels.push(paragraph_field.clone());
+            for (field_id, field_paragraphs) in resource.paragraphs.iter() {
+                for paragraph in field_paragraphs.paragraphs.values() {
+                    let mut inner_labels = paragraph.labels.clone();
+                    inner_labels.push(field_id.clone());
                     let labels = LabelDictionary::new(inner_labels);
 
-                    for (key, sentence) in index.sentences.iter().clone() {
+                    for (key, sentence) in paragraph.sentences.iter().clone() {
                         let key = key.to_string();
                         let labels = labels.clone();
-                        let vector = sentence.vector.clone();
+                        let vector = if normalize_vectors {
+                            utils::normalize_vector(&sentence.vector)
+                        } else {
+                            sentence.vector.clone()
+                        };
                         let metadata = sentence.metadata.as_ref().map(|m| m.encode_to_vec());
                         let bucket = lengths.entry(vector.len()).or_default();
                         elems.push(Elem::new(key, vector, labels, metadata));
-                        bucket.push(paragraph_field);
+                        bucket.push(field_id);
                     }
                 }
             }
@@ -238,6 +244,7 @@ impl VectorWriterService {
             let index_metadata = IndexMetadata {
                 similarity,
                 channel: config.channel,
+                normalize_vectors: config.normalize_vectors,
             };
             Ok(VectorWriterService {
                 index: Writer::new(path, index_metadata, config.shard_id.clone())?,
@@ -280,6 +287,7 @@ mod tests {
             path: dir.path().join("vectors"),
             channel: Channel::EXPERIMENTAL,
             shard_id: "abc".into(),
+            normalize_vectors: false,
         };
         let raw_sentences = [
             ("DOC/KEY/1/1".to_string(), vec![1.0, 3.0, 4.0]),
@@ -346,6 +354,7 @@ mod tests {
             path: dir.path().join("vectors"),
             channel: Channel::EXPERIMENTAL,
             shard_id: "abc".into(),
+            normalize_vectors: false,
         };
         let resource_id = ResourceId {
             shard_id: "DOC".to_string(),

@@ -62,6 +62,7 @@ from nucliadb_protos.train_pb2 import (
 from nucliadb_protos.utils_pb2 import Relation as PBRelation
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
+from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
@@ -420,7 +421,14 @@ class Resource:
             if self.disable_vectors is False:
                 vo = await field.get_vectors()
                 if vo is not None:
-                    brain.apply_field_vectors(field_key, vo, False, [])
+                    dimension = await datamanagers.kb.get_matryoshka_vector_dimension(
+                        self.txn, kbid=self.kb.kbid
+                    )
+                    brain.apply_field_vectors(
+                        field_key,
+                        vo,
+                        matryoshka_vector_dimension=dimension,
+                    )
         return brain
 
     async def generate_field_vectors(
@@ -1012,15 +1020,19 @@ class Resource:
         ) = await field_obj.set_vectors(field_vectors)
         field_key = self.generate_field_id(field_vectors.field)
         if vo is not None:
-            apply_field_vectors = partial(
+            dimension = await datamanagers.kb.get_matryoshka_vector_dimension(
+                self.txn, kbid=self.kb.kbid
+            )
+            apply_field_vectors_partial = partial(
                 self.indexer.apply_field_vectors,
                 field_key,
                 vo,
-                replace_field_sentences,
-                replace_splits_sentences,
+                replace_field=replace_field_sentences,
+                replace_splits=replace_splits_sentences,
+                matryoshka_vector_dimension=dimension,
             )
             loop = asyncio.get_running_loop()
-            await loop.run_in_executor(_executor, apply_field_vectors)
+            await loop.run_in_executor(_executor, apply_field_vectors_partial)
         else:
             raise AttributeError("VO not found on set")
 

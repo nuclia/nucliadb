@@ -53,6 +53,7 @@ pub struct VectorConfig {
     pub path: PathBuf,
     pub channel: Channel,
     pub shard_id: String,
+    pub normalize_vectors: bool,
 }
 
 // In an ideal world this should be part of the actual request, but since

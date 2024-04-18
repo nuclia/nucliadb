@@ -103,6 +103,7 @@ impl NodeWriter {
             Some(request.kbid),
             similarity.into(),
             Some(Channel::from(request.release_channel)),
+            request.normalize_vectors,
         );
         let new_shard = self.shards.create(metadata);
         match new_shard {

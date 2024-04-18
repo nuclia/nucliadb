@@ -201,6 +201,8 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                     "No learning configuration provided. Default will be used.",
                     extra={"kbid": kbid},
                 )
+            # NOTE: we rely on learning to return an updated configuration with
+            # matryoshka settings if they're available
             lconfig = await learning_proxy.set_configuration(kbid, config=config)
             lconfig_created = True
         else:
@@ -874,6 +876,8 @@ def parse_model_metadata_from_learning_config(
         model.default_min_score = lconfig.semantic_threshold
     else:
         logger.warning("Default min score not set!")
+    if lconfig.semantic_matryoshka_dimensions is not None:
+        model.matryoshka_dimensions.extend(lconfig.semantic_matryoshka_dimensions)
     return model
 
 
@@ -892,6 +896,19 @@ def parse_model_metadata_from_request(
         model.default_min_score = request.default_min_score
     else:
         logger.warning("Default min score not set!")
+
+    if len(request.matryoshka_dimensions) > 0:
+        if model.vector_dimension not in request.matryoshka_dimensions:
+            logger.warning(
+                "Vector dimensions is inconsistent with matryoshka dimensions! Ignoring them",
+                extra={
+                    "kbid": request.forceuuid,
+                    "kbslug": request.slug,
+                },
+            )
+        else:
+            model.matryoshka_dimensions.extend(request.matryoshka_dimensions)
+
     return model
 
 
