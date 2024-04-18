@@ -33,8 +33,6 @@ from nucliadb_protos.writer_pb2 import (
     GetLabelsRequest,
     GetLabelsResponse,
     GetSynonymsResponse,
-    GetVectorSetsRequest,
-    GetVectorSetsResponse,
     ListEntitiesGroupsRequest,
     ListEntitiesGroupsResponse,
     OpStatusWriter,
@@ -51,6 +49,7 @@ from nucliadb.models.responses import HTTPClientError
 from nucliadb.reader import SERVICE_NAME
 from nucliadb.reader.api.v1.router import KB_PREFIX, api
 from nucliadb.reader.reader.notifications import kb_notifications_stream
+from nucliadb.vectorsets import get_vectorsets
 from nucliadb_models.entities import (
     EntitiesGroup,
     EntitiesGroupSummary,
@@ -59,7 +58,9 @@ from nucliadb_models.entities import (
 from nucliadb_models.labels import KnowledgeBoxLabels, LabelSet
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.synonyms import KnowledgeBoxSynonyms
-from nucliadb_models.vectors import VectorSet, VectorSets
+from nucliadb_models.vectors import VectorSet as VectorSetResponse
+from nucliadb_models.vectors import VectorSets as GetVectorSetsResponse
+from nucliadb_models.vectors import VectorSimilarity
 from nucliadb_utils import const
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.utilities import get_ingest, get_storage, has_feature
@@ -215,33 +216,32 @@ async def get_labelset(request: Request, kbid: str, labelset: str) -> LabelSet:
     status_code=200,
     name="Get Knowledge Box Vector Sets",
     tags=["Knowledge Box Services"],
-    response_model=VectorSets,
+    response_model=GetVectorSetsResponse,
     openapi_extra={"x-operation_order": 1},
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def get_vectorsets(request: Request, kbid: str):
+async def get_vectorsets_endpoint(request: Request, kbid: str):
     if not has_feature(const.Features.VECTORSETS_V2, context={"kbid": kbid}):
         raise HTTPException(
             status_code=404,
             detail="Vectorsets API is not yet implemented",
         )
-    ingest = get_ingest()
-    pbrequest: GetVectorSetsRequest = GetVectorSetsRequest()
-    pbrequest.kb.uuid = kbid
 
-    vectorsets: GetVectorSetsResponse = await ingest.GetVectorSets(pbrequest)  # type: ignore
-    if vectorsets.status == GetVectorSetsResponse.Status.OK:
-        result = VectorSets(vectorsets={})
-        for key, vector in vectorsets.vectorsets.vectorsets.items():
-            result.vectorsets[key] = VectorSet.from_message(vector)
-        return result
-    elif vectorsets.status == GetVectorSetsResponse.Status.NOTFOUND:
-        raise HTTPException(status_code=404, detail="VectorSet does not exist")
-    elif vectorsets.status == GetVectorSetsResponse.Status.ERROR:
-        raise HTTPException(
-            status_code=500, detail="Error on getting vectorset on a Knowledge box"
+    response = GetVectorSetsResponse(vectorsets={})
+    vectorsets = await get_vectorsets(kbid)
+    for vectorset in vectorsets.vectorsets.values():
+        response.vectorsets[vectorset.id] = VectorSetResponse(
+            semantic_model=vectorset.semantic_model,
+            semantic_vector_similarity=VectorSimilarity(
+                vectorset.semantic_vector_similarity
+            ),
+            semantic_vector_size=vectorset.semantic_vector_size,
+            semantic_threshold=vectorset.semantic_threshold,
+            semantic_matryoshka_dimensions=vectorset.semantic_matryoshka_dimensions
+            or [],
         )
+    return response
 
 
 @api.get(

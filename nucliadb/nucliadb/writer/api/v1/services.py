@@ -25,7 +25,6 @@ from nucliadb_protos.knowledgebox_pb2 import LabelSet as LabelSetPB
 from nucliadb_protos.writer_pb2 import (
     DelEntitiesRequest,
     DelLabelsRequest,
-    DelVectorSetRequest,
     NewEntitiesGroupRequest,
     NewEntitiesGroupResponse,
     OpStatusWriter,
@@ -42,7 +41,7 @@ from nucliadb.models.responses import (
     HTTPInternalServerError,
     HTTPNotFound,
 )
-from nucliadb.vectorsets import create_vectorset
+from nucliadb.vectorsets import create_vectorset, delete_vectorset
 from nucliadb.vectorsets.exceptions import VectorsetConflictError
 from nucliadb.writer.api.v1.router import KB_PREFIX, api
 from nucliadb_models.entities import (
@@ -286,25 +285,13 @@ async def create_vectorset_endpoint(
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def delete_vectorset(request: Request, kbid: str, vectorset: str):
+async def delete_vectorset_endpoint(request: Request, kbid: str, vectorset: str):
     if not has_feature(const.Features.VECTORSETS_V2, context={"kbid": kbid}):
         raise HTTPException(
             status_code=404,
             detail="Vectorsets API is not yet implemented",
         )
-    ingest = get_ingest()
-    pbrequest: DelVectorSetRequest = DelVectorSetRequest()
-    pbrequest.kb.uuid = kbid
-    pbrequest.vectorset = vectorset
-    status: OpStatusWriter = await ingest.DelVectorSet(pbrequest)  # type: ignore
-    if status.status == OpStatusWriter.Status.OK:
-        return None
-    elif status.status == OpStatusWriter.Status.NOTFOUND:
-        raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
-    elif status.status == OpStatusWriter.Status.ERROR:
-        raise HTTPException(
-            status_code=500, detail="Error on deleting vectorset from a Knowledge box"
-        )
+    await delete_vectorset(kbid, vectorset)
     return Response(status_code=204)
 
 

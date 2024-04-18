@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import Optional
 
 from nucliadb.common import datamanagers
 from nucliadb.vectorsets.datamanager import (
@@ -34,9 +33,9 @@ from nucliadb_models.vectors import VectorSet as CreateVectorSetPayload
 node_part_ready = False
 
 
-async def get_vectorsets(kbid: str) -> Optional[VectorSets]:
+async def get_vectorsets(kbid: str) -> VectorSets:
     async with datamanagers.with_transaction(read_only=True) as txn:
-        return await get_vectorsets_kv(txn, kbid=kbid)
+        return await get_vectorsets_kv(txn, kbid=kbid) or VectorSets(vectorsets={})
 
 
 async def create_vectorset(
