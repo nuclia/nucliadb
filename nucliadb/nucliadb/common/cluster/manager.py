@@ -19,7 +19,6 @@
 #
 import asyncio
 import logging
-import random
 import uuid
 from typing import Any, Awaitable, Callable, Optional
 
@@ -527,7 +526,10 @@ def choose_node(
         ranked_nodes.setdefault(score, []).append((node, shard_replica_id))
 
     top = ranked_nodes[max(ranked_nodes)]
-    selected_node, shard_replica_id = random.choice(top)
+    # As shard replica ids are random numbers, we sort by shard replica id and choose its
+    # node to make sure we choose in deterministically but we don't favour any node in particular
+    top.sort(key=lambda x: x[1])
+    selected_node, shard_replica_id = top[0]
     return selected_node, shard_replica_id
 
 
