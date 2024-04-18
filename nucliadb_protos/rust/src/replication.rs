@@ -10,6 +10,8 @@ pub struct PrimaryShardReplicationState {
     pub kbid: ::prost::alloc::string::String,
     #[prost(string, tag="4")]
     pub similarity: ::prost::alloc::string::String,
+    #[prost(bool, tag="5")]
+    pub normalize_vectors: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SecondaryShardReplicationState {

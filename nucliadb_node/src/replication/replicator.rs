@@ -267,10 +267,7 @@ pub async fn connect_to_primary_and_replicate(
                     Some(shard_state.kbid.clone()),
                     shard_state.similarity.clone().into(),
                     None,
-                    // read replicas won't have to index resources, they don't
-                    // need this parameter for anything, so we avoid passing it
-                    // through the pb
-                    false,
+                    shard_state.normalize_vectors,
                 );
                 let shard_cache_clone = Arc::clone(&shard_cache);
 

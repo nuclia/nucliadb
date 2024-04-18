@@ -12,6 +12,7 @@ message PrimaryShardReplicationState {
     string generation_id = 2;
     string kbid = 3;
     string similarity = 4;
+    bool normalize_vectors = 5;
 }
 
 message SecondaryShardReplicationState {
