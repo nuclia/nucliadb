@@ -29,8 +29,8 @@ from nucliadb.vectorsets.datamanager import (
 from nucliadb.vectorsets.exceptions import VectorsetConflictError
 from nucliadb.vectorsets.models import VectorSet, VectorSets
 from nucliadb_models.vectors import VectorSet as CreateVectorSetPayload
-
-node_part_ready = False
+from nucliadb_utils import const
+from nucliadb_utils.utilities import has_feature
 
 
 async def get_vectorsets(kbid: str) -> VectorSets:
@@ -52,7 +52,7 @@ async def create_vectorset(
             raise VectorsetConflictError()
 
         hnsw_indexes = []
-        if node_part_ready:
+        if has_feature(const.Features.VECTORSETS_V2_INDEX_NODE_READY):
             hnsw_indexes = await create_vectorset_indexes(
                 kbid=kbid,
                 semantic_vector_dimension=payload.semantic_vector_size,
@@ -85,13 +85,10 @@ async def delete_vectorset(kbid: str, vectorset_id: str):
             # Vectorset does not exist or has already been deleted
             return
 
-        indexes = []
-        if node_part_ready:
-            indexes = vectorsets.vectorsets[vectorset_id].indexes
-
+        indexes = vectorsets.vectorsets[vectorset_id].indexes
         del vectorsets.vectorsets[vectorset_id]
         await set_vectorsets_kv(txn, kbid=kbid, vectorsets=vectorsets)
         await txn.commit()
 
-    if node_part_ready:
+    if has_feature(const.Features.VECTORSETS_V2_INDEX_NODE_READY):
         await delete_vectorset_indexes(vectorset_indexes=indexes)

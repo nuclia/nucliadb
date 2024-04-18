@@ -31,9 +31,9 @@ use crate::telemetry::run_with_telemetry;
 use crate::utils::{get_primary_node_id, list_shards, read_host_key};
 use nucliadb_core::protos::node_writer_server::NodeWriter;
 use nucliadb_core::protos::{
-    garbage_collector_response, merge_response, op_status, EmptyQuery, GarbageCollectorResponse, MergeResponse,
-    NewShardRequest, NewVectorSetRequest, NodeMetadata, OpStatus, Resource, ResourceId, ShardCreated, ShardId,
-    ShardIds, VectorSetId, VectorSetList,
+    garbage_collector_response, merge_response, op_status, CreateVectorSetRequest, EmptyQuery,
+    GarbageCollectorResponse, MergeResponse, NewShardRequest, NodeMetadata, OpStatus, Resource, ResourceId,
+    ShardCreated, ShardId, ShardIds, VectorSetId,
 };
 use nucliadb_core::tracing::{self, Span, *};
 use nucliadb_core::Channel;
@@ -255,15 +255,11 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
     }
 
-    async fn add_vector_set(&self, _: Request<NewVectorSetRequest>) -> Result<Response<OpStatus>, Status> {
+    async fn create_vector_set(&self, _: Request<CreateVectorSetRequest>) -> Result<Response<VectorSetId>, Status> {
         Err(tonic::Status::internal("Coming soon.."))
     }
 
     async fn remove_vector_set(&self, _: Request<VectorSetId>) -> Result<Response<OpStatus>, Status> {
-        Err(tonic::Status::internal("Coming soon.."))
-    }
-
-    async fn list_vector_sets(&self, _: Request<ShardId>) -> Result<Response<VectorSetList>, Status> {
         Err(tonic::Status::internal("Coming soon.."))
     }
 

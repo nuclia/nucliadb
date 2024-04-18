@@ -81,3 +81,4 @@ class Features:
     REBALANCE_KB = "nucliadb_rebalance_kb"
     CORS_MIDDLEWARE = "nucliadb_cors_middleware_enabled"
     VECTORSETS_V2 = "nucliadb_vectorsets_v2"
+    VECTORSETS_V2_INDEX_NODE_READY = "nucliadb_vectorsets_v2_index_node"

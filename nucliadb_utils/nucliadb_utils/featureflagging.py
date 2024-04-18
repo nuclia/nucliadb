@@ -73,6 +73,10 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
         "rollout": 0,
         "variants": {"environment": ["none"]},
     },
+    const.Features.VECTORSETS_V2_INDEX_NODE_READY: {
+        "rollout": 0,
+        "variants": {"environment": ["none"]},
+    },
 }
 
 
