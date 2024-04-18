@@ -46,45 +46,11 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use super::resource_cache::{CacheResult, ResourceCache, ResourceLoadGuard};
-use crate::disk_structure;
-use crate::errors::ShardNotFoundError;
-use crate::metadata_entity::Metadata;
-use crate::paragraph_entity::reader::ParagraphRPointer;
-use crate::paragraph_entity::writer::ParagraphWPointer;
-use crate::relation_entity::reader::RelationRPointer;
-use crate::relation_entity::writer::RelationWPointer;
-use crate::settings::Settings;
-use crate::shards::metadata::{ShardMetadata, ShardsMetadataManager};
-use crate::shards::writer::ShardWriter;
-use crate::shards::ShardId;
-use crate::text_entity::reader::TextRPointer;
-use crate::text_entity::writer::TextWPointer;
-use crate::vector_entity::reader::VectorRPointer;
-use crate::vector_entity::writer::VectorWPointer;
-use nucliadb_core::tracing::debug;
 use nucliadb_core::{node_error, NodeResult};
 use std::collections::HashSet;
 use std::num::NonZeroUsize;
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, MutexGuard};
-use std::thread::sleep;
-use std::time::Duration;
-
-pub enum WriteEntity {
-    VectorEntity(VectorWPointer),
-    ParagraphEntity(ParagraphWPointer),
-    TextEntity(TextWPointer),
-    RelationEntity(RelationWPointer),
-    MetadataEntity(Metadata),
-}
-
-pub enum ReadEntity {
-    VectorEntity(VectorRPointer),
-    ParagraphEntity(ParagraphRPointer),
-    TextEntity(TextRPointer),
-    RelationEntity(RelationRPointer),
-    MetadataEntity(Metadata),
-}
+use std::path::PathBuf;
+use std::sync::Arc;
 
 /// This cache allows the user to block entities, ensuring that they will not be loaded from disk.
 /// Being able to do so is crucial, otherwise the only source of truth will be disk and that would

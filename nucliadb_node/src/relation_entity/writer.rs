@@ -17,12 +17,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use crate::telemetry::run_with_telemetry;
-use nucliadb_core::protos::*;
 use nucliadb_core::relations::{RelationConfig, RelationsWriter};
-use nucliadb_core::write_rw_lock;
 use nucliadb_core::{node_error, NodeResult};
-use nucliadb_procs::measure;
 use nucliadb_relations::service::RelationsWriterService as RelationsWriterServiceV1;
 use nucliadb_relations2::writer::RelationsWriterService as RelationsWriterServiceV2;
 use std::sync::RwLock;
