@@ -113,7 +113,8 @@ message BrokerMessage {
     MessageSource source = 33;
     int64 account_seq = 34;
 
-    repeated resources.UserVectorsWrapper user_vectors = 35;
+    // user vectors has been removed
+    repeated resources.UserVectorsWrapper user_vectors = 35 [deprecated = true];
 
     // If true, force reindex all paragraphs in a resource
     bool reindex = 36;
@@ -123,6 +124,9 @@ message BrokerMessage {
     repeated resources.FieldQuestionAnswerWrapper question_answers = 38;
 
     utils.Security security = 39;
+
+    repeated resources.ExtractedVectorsWrapper field_vectorsets = 40;
+
 }
 
 message BrokerMessageBlobReference {

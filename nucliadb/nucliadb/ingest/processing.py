@@ -24,7 +24,7 @@ import uuid
 from collections import defaultdict
 from contextlib import AsyncExitStack
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, List, Optional, TypeVar
 
 import aiohttp
 import backoff
@@ -75,6 +75,11 @@ class ProcessingInfo(BaseModel):
     queue: Optional[QueueType] = None
 
 
+class RequestedVectorSets(BaseModel):
+    vectorset_id: str
+    semantic_model: str
+
+
 class PushPayload(BaseModel):
     # There are multiple options of payload
     uuid: str
@@ -108,6 +113,12 @@ class PushPayload(BaseModel):
     # List of available processing options (with default values)
     processing_options: Optional[models.PushProcessingOptions] = Field(
         default_factory=models.PushProcessingOptions
+    )
+
+    vectorsets: List[RequestedVectorSets] = Field(
+        default=[],
+        description="List of vectorsets to process this resource with",
+        unique_items=True,
     )
 
 

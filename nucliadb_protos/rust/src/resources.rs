@@ -294,6 +294,9 @@ pub mod extracted_text_wrapper {
 pub struct ExtractedVectorsWrapper {
     #[prost(message, optional, tag="3")]
     pub field: ::core::option::Option<FieldId>,
+    /// Vectorset id. If empty, it will be the default vector index
+    #[prost(string, tag="4")]
+    pub vectorset_id: ::prost::alloc::string::String,
     #[prost(oneof="extracted_vectors_wrapper::FileOrData", tags="1, 2")]
     pub file_or_data: ::core::option::Option<extracted_vectors_wrapper::FileOrData>,
 }

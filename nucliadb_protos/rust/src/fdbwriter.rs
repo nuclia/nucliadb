@@ -121,6 +121,8 @@ pub struct BrokerMessage {
     pub source: i32,
     #[prost(int64, tag="34")]
     pub account_seq: i64,
+    /// user vectors has been removed
+    #[deprecated]
     #[prost(message, repeated, tag="35")]
     pub user_vectors: ::prost::alloc::vec::Vec<super::resources::UserVectorsWrapper>,
     /// If true, force reindex all paragraphs in a resource
@@ -132,6 +134,8 @@ pub struct BrokerMessage {
     pub question_answers: ::prost::alloc::vec::Vec<super::resources::FieldQuestionAnswerWrapper>,
     #[prost(message, optional, tag="39")]
     pub security: ::core::option::Option<super::utils::Security>,
+    #[prost(message, repeated, tag="40")]
+    pub field_vectorsets: ::prost::alloc::vec::Vec<super::resources::ExtractedVectorsWrapper>,
 }
 /// Nested message and enum types in `BrokerMessage`.
 pub mod broker_message {
