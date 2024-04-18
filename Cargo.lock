@@ -3183,6 +3183,7 @@ dependencies = [
 [[package]]
 name = "tantivy"
 version = "0.17.0"
+source = "git+https://github.com/nuclia/tantivy.git?branch=original-17#12667ead066ddcc56eaff79aea1a7d76206ee217"
 dependencies = [
  "async-trait",
  "base64 0.13.1",

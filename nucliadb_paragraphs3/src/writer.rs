@@ -269,6 +269,7 @@ impl ParagraphWriterService {
                 doc.add_u64(self.schema.end_pos, end_pos);
                 doc.add_u64(self.schema.index, index);
                 doc.add_text(self.schema.split, split);
+                doc.add_text(self.schema.field_uuid, format!("{}/{}", resource.resource.as_ref().unwrap().uuid, field));
 
                 self.writer.delete_term(paragraph_term);
                 self.writer.add_document(doc)?;
