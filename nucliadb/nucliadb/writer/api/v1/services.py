@@ -37,12 +37,14 @@ from nucliadb_protos.writer_pb2 import (
 from starlette.requests import Request
 
 from nucliadb.models.responses import (
+    HTTPClientError,
     HTTPConflict,
     HTTPInternalServerError,
     HTTPNotFound,
 )
+from nucliadb.vectorsets import create_vectorset
+from nucliadb.vectorsets.exceptions import VectorsetConflictError
 from nucliadb.writer.api.v1.router import KB_PREFIX, api
-from nucliadb.writer.vectors import create_vectorset
 from nucliadb_models.entities import (
     CreateEntitiesGroupPayload,
     UpdateEntitiesGroupPayload,
@@ -251,19 +253,28 @@ async def delete_labels(request: Request, kbid: str, labelset: str):
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/vectorset/{{vectorset}}",
     status_code=200,
-    name="Set Knowledge Box VectorSet",
+    name="Create a new Knowledge Box VectorSet",
     tags=["Knowledge Box Services"],
     openapi_extra={"x-operation_order": 1},
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def set_vectorset(request: Request, kbid: str, vectorset: str, item: VectorSet):
+async def create_vectorset_endpoint(
+    request: Request, kbid: str, vectorset: str, item: VectorSet
+):
     if not has_feature(const.Features.VECTORSETS_V2, context={"kbid": kbid}):
         raise HTTPException(
             status_code=404,
             detail="Vectorsets API is not yet implemented",
         )
-    await create_vectorset(kbid, vectorset, item.dimension, similarity=item.similarity)
+    try:
+        await create_vectorset(
+            kbid=kbid,
+            vectorset_id=vectorset,
+            payload=item,
+        )
+    except VectorsetConflictError:
+        return HTTPClientError(status_code=409, detail="Vectorset already exists")
 
 
 @api.delete(

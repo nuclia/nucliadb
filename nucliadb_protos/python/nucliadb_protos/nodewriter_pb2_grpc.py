@@ -50,20 +50,15 @@ class NodeWriterStub(object):
                 request_serializer=nucliadb__protos_dot_noderesources__pb2.ResourceID.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_nodewriter__pb2.OpStatus.FromString,
                 )
-        self.AddVectorSet = channel.unary_unary(
-                '/nodewriter.NodeWriter/AddVectorSet',
-                request_serializer=nucliadb__protos_dot_nodewriter__pb2.NewVectorSetRequest.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_nodewriter__pb2.OpStatus.FromString,
+        self.CreateVectorSet = channel.unary_unary(
+                '/nodewriter.NodeWriter/CreateVectorSet',
+                request_serializer=nucliadb__protos_dot_nodewriter__pb2.CreateVectorSetRequest.SerializeToString,
+                response_deserializer=nucliadb__protos_dot_noderesources__pb2.VectorSetID.FromString,
                 )
         self.RemoveVectorSet = channel.unary_unary(
                 '/nodewriter.NodeWriter/RemoveVectorSet',
                 request_serializer=nucliadb__protos_dot_noderesources__pb2.VectorSetID.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_nodewriter__pb2.OpStatus.FromString,
-                )
-        self.ListVectorSets = channel.unary_unary(
-                '/nodewriter.NodeWriter/ListVectorSets',
-                request_serializer=nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_noderesources__pb2.VectorSetList.FromString,
                 )
         self.GetMetadata = channel.unary_unary(
                 '/nodewriter.NodeWriter/GetMetadata',
@@ -117,19 +112,13 @@ class NodeWriterServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def AddVectorSet(self, request, context):
+    def CreateVectorSet(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def RemoveVectorSet(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def ListVectorSets(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -179,20 +168,15 @@ def add_NodeWriterServicer_to_server(servicer, server):
                     request_deserializer=nucliadb__protos_dot_noderesources__pb2.ResourceID.FromString,
                     response_serializer=nucliadb__protos_dot_nodewriter__pb2.OpStatus.SerializeToString,
             ),
-            'AddVectorSet': grpc.unary_unary_rpc_method_handler(
-                    servicer.AddVectorSet,
-                    request_deserializer=nucliadb__protos_dot_nodewriter__pb2.NewVectorSetRequest.FromString,
-                    response_serializer=nucliadb__protos_dot_nodewriter__pb2.OpStatus.SerializeToString,
+            'CreateVectorSet': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateVectorSet,
+                    request_deserializer=nucliadb__protos_dot_nodewriter__pb2.CreateVectorSetRequest.FromString,
+                    response_serializer=nucliadb__protos_dot_noderesources__pb2.VectorSetID.SerializeToString,
             ),
             'RemoveVectorSet': grpc.unary_unary_rpc_method_handler(
                     servicer.RemoveVectorSet,
                     request_deserializer=nucliadb__protos_dot_noderesources__pb2.VectorSetID.FromString,
                     response_serializer=nucliadb__protos_dot_nodewriter__pb2.OpStatus.SerializeToString,
-            ),
-            'ListVectorSets': grpc.unary_unary_rpc_method_handler(
-                    servicer.ListVectorSets,
-                    request_deserializer=nucliadb__protos_dot_noderesources__pb2.ShardId.FromString,
-                    response_serializer=nucliadb__protos_dot_noderesources__pb2.VectorSetList.SerializeToString,
             ),
             'GetMetadata': grpc.unary_unary_rpc_method_handler(
                     servicer.GetMetadata,
@@ -329,7 +313,7 @@ class NodeWriter(object):
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
-    def AddVectorSet(request,
+    def CreateVectorSet(request,
             target,
             options=(),
             channel_credentials=None,
@@ -339,9 +323,9 @@ class NodeWriter(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/nodewriter.NodeWriter/AddVectorSet',
-            nucliadb__protos_dot_nodewriter__pb2.NewVectorSetRequest.SerializeToString,
-            nucliadb__protos_dot_nodewriter__pb2.OpStatus.FromString,
+        return grpc.experimental.unary_unary(request, target, '/nodewriter.NodeWriter/CreateVectorSet',
+            nucliadb__protos_dot_nodewriter__pb2.CreateVectorSetRequest.SerializeToString,
+            nucliadb__protos_dot_noderesources__pb2.VectorSetID.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -359,23 +343,6 @@ class NodeWriter(object):
         return grpc.experimental.unary_unary(request, target, '/nodewriter.NodeWriter/RemoveVectorSet',
             nucliadb__protos_dot_noderesources__pb2.VectorSetID.SerializeToString,
             nucliadb__protos_dot_nodewriter__pb2.OpStatus.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def ListVectorSets(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/nodewriter.NodeWriter/ListVectorSets',
-            nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
-            nucliadb__protos_dot_noderesources__pb2.VectorSetList.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 

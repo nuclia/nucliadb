@@ -337,16 +337,6 @@ class StandaloneWriterWrapper:
         resp.ParseFromString(pb_bytes)
         return resp
 
-    async def ListVectorSets(self, request: ShardId):
-        loop = asyncio.get_running_loop()
-        resp = await loop.run_in_executor(
-            self.executor, self.writer.get_vectorset, request.SerializeToString()
-        )
-        pb_bytes = bytes(resp)
-        resp = VectorSetList()
-        resp.ParseFromString(pb_bytes)
-        return resp
-
     async def SetResource(self, request: Resource) -> OpStatus:
         loop = asyncio.get_running_loop()
         resp = await loop.run_in_executor(

@@ -22,8 +22,8 @@ from typing import AsyncIterator, Optional
 
 from nucliadb_protos.nodereader_pb2_grpc import NodeReaderStub
 from nucliadb_protos.nodewriter_pb2 import (
+    CreateVectorSetRequest,
     NewShardRequest,
-    NewVectorSetRequest,
     OpStatus,
 )
 from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
@@ -127,21 +127,22 @@ class AbstractIndexNode(metaclass=ABCMeta):
         resp = await self.writer.RemoveVectorSet(req)  # type: ignore
         return resp
 
-    async def set_vectorset(
+    async def create_vectorset(
         self,
         shard_id: str,
-        vectorset: str,
-        similarity: utils_pb2.VectorSimilarity.ValueType = utils_pb2.VectorSimilarity.COSINE,
-    ) -> OpStatus:
-        req = NewVectorSetRequest()
-        req.id.shard.id = shard_id
-        req.id.vectorset = vectorset
-        req.similarity = similarity
-        resp = await self.writer.AddVectorSet(req)  # type: ignore
-        return resp
+        vector_dimension: int,
+        similarity: str,
+    ) -> str:
+        req = CreateVectorSetRequest()
+        req.shard_id = shard_id
 
-    async def get_vectorset(self, shard_id: str) -> noderesources_pb2.VectorSetList:
-        req = noderesources_pb2.ShardId()
-        req.id = shard_id
-        resp = await self.writer.ListVectorSets(req)  # type: ignore
-        return resp
+        if similarity == "cosine":
+            req.similarity = utils_pb2.VectorSimilarity.COSINE
+        elif similarity == "dot":
+            req.similarity = utils_pb2.VectorSimilarity.DOT
+        else:
+            raise ValueError(f"Invalid similarity: {similarity}")
+
+        req.dimension = vector_dimension
+        resp = await self.writer.CreateVectorSet(req)  # type: ignore
+        return resp.vectorset

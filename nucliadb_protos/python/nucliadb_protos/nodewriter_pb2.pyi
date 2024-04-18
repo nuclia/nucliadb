@@ -217,6 +217,8 @@ global___NewShardRequest = NewShardRequest
 
 @typing_extensions.final
 class NewVectorSetRequest(google.protobuf.message.Message):
+    """Deprecated"""
+
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     ID_FIELD_NUMBER: builtins.int
@@ -234,6 +236,27 @@ class NewVectorSetRequest(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["id", b"id", "similarity", b"similarity"]) -> None: ...
 
 global___NewVectorSetRequest = NewVectorSetRequest
+
+@typing_extensions.final
+class CreateVectorSetRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SHARD_ID_FIELD_NUMBER: builtins.int
+    SIMILARITY_FIELD_NUMBER: builtins.int
+    DIMENSION_FIELD_NUMBER: builtins.int
+    shard_id: builtins.str
+    similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType
+    dimension: builtins.int
+    def __init__(
+        self,
+        *,
+        shard_id: builtins.str = ...,
+        similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType = ...,
+        dimension: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["dimension", b"dimension", "shard_id", b"shard_id", "similarity", b"similarity"]) -> None: ...
+
+global___CreateVectorSetRequest = CreateVectorSetRequest
 
 @typing_extensions.final
 class MergeResponse(google.protobuf.message.Message):

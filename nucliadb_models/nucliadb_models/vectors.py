@@ -1,10 +1,10 @@
 from enum import Enum
-from typing import Dict, Optional, TypeVar
+from typing import Dict, List, Optional, TypeVar
 
 from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.utils_pb2 import VectorSimilarity as PBVectorSimilarity
 from nucliadb_protos.writer_pb2 import VectorSet as PBVectorSet
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, root_validator
 
 from nucliadb_protos import knowledgebox_pb2
 
@@ -61,8 +61,33 @@ class SemanticModelMetadata(BaseModel):
 
 
 class VectorSet(BaseModel):
-    dimension: int
-    similarity: Optional[VectorSimilarity] = None
+    semantic_model: str = Field(description="Id of the semantic model")
+    semantic_vector_similarity: VectorSimilarity = Field(
+        description="Vector similarity algorithm that is applied on search"
+    )
+    semantic_vector_size: int = Field(
+        description="Dimension of the indexed vectors/embeddings"
+    )
+    semantic_threshold: float = Field(
+        description="Minimum similarity value at which results are ignored"
+    )
+    semantic_matryoshka_dimensions: Optional[List[int]] = Field(
+        default=None, description="Matryoshka dimensions"
+    )
+
+    @root_validator(pre=False)
+    def validate_dimensions(cls, values):
+        vector_size = values.get("semantic_vector_size")
+        matryoshka_dimensions = values.get("semantic_matryoshka_dimensions", []) or []
+        if (
+            len(matryoshka_dimensions) > 0
+            and vector_size is not None
+            and vector_size not in matryoshka_dimensions
+        ):
+            raise ValueError(
+                f"Semantic vector size {vector_size} is inconsistent with matryoshka dimensions: {matryoshka_dimensions}"
+            )
+        return values
 
     @classmethod
     def from_message(cls, message: PBVectorSet):

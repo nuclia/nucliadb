@@ -73,12 +73,22 @@ pub struct NewShardRequest {
     #[prost(bool, tag="4")]
     pub normalize_vectors: bool,
 }
+/// Deprecated
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NewVectorSetRequest {
     #[prost(message, optional, tag="1")]
     pub id: ::core::option::Option<super::noderesources::VectorSetId>,
     #[prost(enumeration="super::utils::VectorSimilarity", tag="2")]
     pub similarity: i32,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct CreateVectorSetRequest {
+    #[prost(string, tag="1")]
+    pub shard_id: ::prost::alloc::string::String,
+    #[prost(enumeration="super::utils::VectorSimilarity", tag="2")]
+    pub similarity: i32,
+    #[prost(uint32, tag="3")]
+    pub dimension: u32,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct MergeResponse {
@@ -315,10 +325,13 @@ pub mod node_writer_client {
             );
             self.inner.unary(request.into_request(), path, codec).await
         }
-        pub async fn add_vector_set(
+        pub async fn create_vector_set(
             &mut self,
-            request: impl tonic::IntoRequest<super::NewVectorSetRequest>,
-        ) -> Result<tonic::Response<super::OpStatus>, tonic::Status> {
+            request: impl tonic::IntoRequest<super::CreateVectorSetRequest>,
+        ) -> Result<
+            tonic::Response<super::super::noderesources::VectorSetId>,
+            tonic::Status,
+        > {
             self.inner
                 .ready()
                 .await
@@ -330,7 +343,7 @@ pub mod node_writer_client {
                 })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
-                "/nodewriter.NodeWriter/AddVectorSet",
+                "/nodewriter.NodeWriter/CreateVectorSet",
             );
             self.inner.unary(request.into_request(), path, codec).await
         }
@@ -350,28 +363,6 @@ pub mod node_writer_client {
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/nodewriter.NodeWriter/RemoveVectorSet",
-            );
-            self.inner.unary(request.into_request(), path, codec).await
-        }
-        pub async fn list_vector_sets(
-            &mut self,
-            request: impl tonic::IntoRequest<super::super::noderesources::ShardId>,
-        ) -> Result<
-            tonic::Response<super::super::noderesources::VectorSetList>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::new(
-                        tonic::Code::Unknown,
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/nodewriter.NodeWriter/ListVectorSets",
             );
             self.inner.unary(request.into_request(), path, codec).await
         }
@@ -443,21 +434,17 @@ pub mod node_writer_server {
             &self,
             request: tonic::Request<super::super::noderesources::ResourceId>,
         ) -> Result<tonic::Response<super::OpStatus>, tonic::Status>;
-        async fn add_vector_set(
+        async fn create_vector_set(
             &self,
-            request: tonic::Request<super::NewVectorSetRequest>,
-        ) -> Result<tonic::Response<super::OpStatus>, tonic::Status>;
+            request: tonic::Request<super::CreateVectorSetRequest>,
+        ) -> Result<
+            tonic::Response<super::super::noderesources::VectorSetId>,
+            tonic::Status,
+        >;
         async fn remove_vector_set(
             &self,
             request: tonic::Request<super::super::noderesources::VectorSetId>,
         ) -> Result<tonic::Response<super::OpStatus>, tonic::Status>;
-        async fn list_vector_sets(
-            &self,
-            request: tonic::Request<super::super::noderesources::ShardId>,
-        ) -> Result<
-            tonic::Response<super::super::noderesources::VectorSetList>,
-            tonic::Status,
-        >;
         async fn get_metadata(
             &self,
             request: tonic::Request<super::super::noderesources::EmptyQuery>,
@@ -793,25 +780,25 @@ pub mod node_writer_server {
                     };
                     Box::pin(fut)
                 }
-                "/nodewriter.NodeWriter/AddVectorSet" => {
+                "/nodewriter.NodeWriter/CreateVectorSet" => {
                     #[allow(non_camel_case_types)]
-                    struct AddVectorSetSvc<T: NodeWriter>(pub Arc<T>);
+                    struct CreateVectorSetSvc<T: NodeWriter>(pub Arc<T>);
                     impl<
                         T: NodeWriter,
-                    > tonic::server::UnaryService<super::NewVectorSetRequest>
-                    for AddVectorSetSvc<T> {
-                        type Response = super::OpStatus;
+                    > tonic::server::UnaryService<super::CreateVectorSetRequest>
+                    for CreateVectorSetSvc<T> {
+                        type Response = super::super::noderesources::VectorSetId;
                         type Future = BoxFuture<
                             tonic::Response<Self::Response>,
                             tonic::Status,
                         >;
                         fn call(
                             &mut self,
-                            request: tonic::Request<super::NewVectorSetRequest>,
+                            request: tonic::Request<super::CreateVectorSetRequest>,
                         ) -> Self::Future {
                             let inner = self.0.clone();
                             let fut = async move {
-                                (*inner).add_vector_set(request).await
+                                (*inner).create_vector_set(request).await
                             };
                             Box::pin(fut)
                         }
@@ -821,7 +808,7 @@ pub mod node_writer_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let inner = inner.0;
-                        let method = AddVectorSetSvc(inner);
+                        let method = CreateVectorSetSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
@@ -865,46 +852,6 @@ pub mod node_writer_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = RemoveVectorSetSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/nodewriter.NodeWriter/ListVectorSets" => {
-                    #[allow(non_camel_case_types)]
-                    struct ListVectorSetsSvc<T: NodeWriter>(pub Arc<T>);
-                    impl<
-                        T: NodeWriter,
-                    > tonic::server::UnaryService<super::super::noderesources::ShardId>
-                    for ListVectorSetsSvc<T> {
-                        type Response = super::super::noderesources::VectorSetList;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::super::noderesources::ShardId>,
-                        ) -> Self::Future {
-                            let inner = self.0.clone();
-                            let fut = async move {
-                                (*inner).list_vector_sets(request).await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let inner = inner.0;
-                        let method = ListVectorSetsSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

@@ -186,19 +186,6 @@ class WriterStub:
         nucliadb_protos.writer_pb2.DelLabelsRequest,
         nucliadb_protos.writer_pb2.OpStatusWriter,
     ]
-    GetVectorSets: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.GetVectorSetsRequest,
-        nucliadb_protos.writer_pb2.GetVectorSetsResponse,
-    ]
-    """VectorSets"""
-    DelVectorSet: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.DelVectorSetRequest,
-        nucliadb_protos.writer_pb2.OpStatusWriter,
-    ]
-    SetVectorSet: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.SetVectorSetRequest,
-        nucliadb_protos.writer_pb2.OpStatusWriter,
-    ]
     NewEntitiesGroup: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.NewEntitiesGroupRequest,
         nucliadb_protos.writer_pb2.NewEntitiesGroupResponse,
@@ -338,25 +325,6 @@ class WriterServicer(metaclass=abc.ABCMeta):
     def DelLabels(
         self,
         request: nucliadb_protos.writer_pb2.DelLabelsRequest,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.writer_pb2.OpStatusWriter: ...
-    @abc.abstractmethod
-    def GetVectorSets(
-        self,
-        request: nucliadb_protos.writer_pb2.GetVectorSetsRequest,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.writer_pb2.GetVectorSetsResponse:
-        """VectorSets"""
-    @abc.abstractmethod
-    def DelVectorSet(
-        self,
-        request: nucliadb_protos.writer_pb2.DelVectorSetRequest,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.writer_pb2.OpStatusWriter: ...
-    @abc.abstractmethod
-    def SetVectorSet(
-        self,
-        request: nucliadb_protos.writer_pb2.SetVectorSetRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.OpStatusWriter: ...
     @abc.abstractmethod

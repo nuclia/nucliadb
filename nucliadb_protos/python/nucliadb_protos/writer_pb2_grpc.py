@@ -75,21 +75,6 @@ class WriterStub(object):
                 request_serializer=nucliadb__protos_dot_writer__pb2.DelLabelsRequest.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
                 )
-        self.GetVectorSets = channel.unary_unary(
-                '/fdbwriter.Writer/GetVectorSets',
-                request_serializer=nucliadb__protos_dot_writer__pb2.GetVectorSetsRequest.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_writer__pb2.GetVectorSetsResponse.FromString,
-                )
-        self.DelVectorSet = channel.unary_unary(
-                '/fdbwriter.Writer/DelVectorSet',
-                request_serializer=nucliadb__protos_dot_writer__pb2.DelVectorSetRequest.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
-                )
-        self.SetVectorSet = channel.unary_unary(
-                '/fdbwriter.Writer/SetVectorSet',
-                request_serializer=nucliadb__protos_dot_writer__pb2.SetVectorSetRequest.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
-                )
         self.NewEntitiesGroup = channel.unary_unary(
                 '/fdbwriter.Writer/NewEntitiesGroup',
                 request_serializer=nucliadb__protos_dot_writer__pb2.NewEntitiesGroupRequest.SerializeToString,
@@ -243,25 +228,6 @@ class WriterServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def DelLabels(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def GetVectorSets(self, request, context):
-        """VectorSets
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def DelVectorSet(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def SetVectorSet(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -426,21 +392,6 @@ def add_WriterServicer_to_server(servicer, server):
             'DelLabels': grpc.unary_unary_rpc_method_handler(
                     servicer.DelLabels,
                     request_deserializer=nucliadb__protos_dot_writer__pb2.DelLabelsRequest.FromString,
-                    response_serializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.SerializeToString,
-            ),
-            'GetVectorSets': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetVectorSets,
-                    request_deserializer=nucliadb__protos_dot_writer__pb2.GetVectorSetsRequest.FromString,
-                    response_serializer=nucliadb__protos_dot_writer__pb2.GetVectorSetsResponse.SerializeToString,
-            ),
-            'DelVectorSet': grpc.unary_unary_rpc_method_handler(
-                    servicer.DelVectorSet,
-                    request_deserializer=nucliadb__protos_dot_writer__pb2.DelVectorSetRequest.FromString,
-                    response_serializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.SerializeToString,
-            ),
-            'SetVectorSet': grpc.unary_unary_rpc_method_handler(
-                    servicer.SetVectorSet,
-                    request_deserializer=nucliadb__protos_dot_writer__pb2.SetVectorSetRequest.FromString,
                     response_serializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.SerializeToString,
             ),
             'NewEntitiesGroup': grpc.unary_unary_rpc_method_handler(
@@ -733,57 +684,6 @@ class Writer(object):
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/DelLabels',
             nucliadb__protos_dot_writer__pb2.DelLabelsRequest.SerializeToString,
-            nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def GetVectorSets(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/GetVectorSets',
-            nucliadb__protos_dot_writer__pb2.GetVectorSetsRequest.SerializeToString,
-            nucliadb__protos_dot_writer__pb2.GetVectorSetsResponse.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def DelVectorSet(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/DelVectorSet',
-            nucliadb__protos_dot_writer__pb2.DelVectorSetRequest.SerializeToString,
-            nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def SetVectorSet(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/SetVectorSet',
-            nucliadb__protos_dot_writer__pb2.SetVectorSetRequest.SerializeToString,
             nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

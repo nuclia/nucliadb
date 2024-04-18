@@ -60,17 +60,13 @@ class NodeWriterStub:
         nucliadb_protos.noderesources_pb2.ResourceID,
         nucliadb_protos.nodewriter_pb2.OpStatus,
     ]
-    AddVectorSet: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.nodewriter_pb2.NewVectorSetRequest,
-        nucliadb_protos.nodewriter_pb2.OpStatus,
+    CreateVectorSet: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.nodewriter_pb2.CreateVectorSetRequest,
+        nucliadb_protos.noderesources_pb2.VectorSetID,
     ]
     RemoveVectorSet: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.noderesources_pb2.VectorSetID,
         nucliadb_protos.nodewriter_pb2.OpStatus,
-    ]
-    ListVectorSets: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.noderesources_pb2.ShardId,
-        nucliadb_protos.noderesources_pb2.VectorSetList,
     ]
     GetMetadata: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.noderesources_pb2.EmptyQuery,
@@ -121,23 +117,17 @@ class NodeWriterServicer(metaclass=abc.ABCMeta):
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.nodewriter_pb2.OpStatus: ...
     @abc.abstractmethod
-    def AddVectorSet(
+    def CreateVectorSet(
         self,
-        request: nucliadb_protos.nodewriter_pb2.NewVectorSetRequest,
+        request: nucliadb_protos.nodewriter_pb2.CreateVectorSetRequest,
         context: grpc.ServicerContext,
-    ) -> nucliadb_protos.nodewriter_pb2.OpStatus: ...
+    ) -> nucliadb_protos.noderesources_pb2.VectorSetID: ...
     @abc.abstractmethod
     def RemoveVectorSet(
         self,
         request: nucliadb_protos.noderesources_pb2.VectorSetID,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.nodewriter_pb2.OpStatus: ...
-    @abc.abstractmethod
-    def ListVectorSets(
-        self,
-        request: nucliadb_protos.noderesources_pb2.ShardId,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.noderesources_pb2.VectorSetList: ...
     @abc.abstractmethod
     def GetMetadata(
         self,

@@ -538,11 +538,6 @@ service Writer {
     rpc SetLabels(SetLabelsRequest) returns (OpStatusWriter) {}
     rpc DelLabels(DelLabelsRequest) returns (OpStatusWriter) {}
 
-    // VectorSets
-    rpc GetVectorSets(GetVectorSetsRequest) returns (GetVectorSetsResponse) {}
-    rpc DelVectorSet(DelVectorSetRequest) returns (OpStatusWriter) {}
-    rpc SetVectorSet(SetVectorSetRequest) returns (OpStatusWriter) {}
-
     // Entities
     rpc NewEntitiesGroup(NewEntitiesGroupRequest) returns (NewEntitiesGroupResponse) {}
     rpc GetEntities(GetEntitiesRequest) returns (GetEntitiesResponse) {}

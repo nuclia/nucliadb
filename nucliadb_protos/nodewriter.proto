@@ -60,10 +60,19 @@ message NewShardRequest {
     bool normalize_vectors = 4;
 }
 
+// Deprecated
 message NewVectorSetRequest {
     noderesources.VectorSetID id = 1;
     utils.VectorSimilarity similarity = 2;
 }
+
+
+message CreateVectorSetRequest {
+    string shard_id = 1;
+    utils.VectorSimilarity similarity = 2;
+    uint32 dimension = 3;
+}
+
 
 message MergeResponse {
     enum MergeStatus {
@@ -84,9 +93,8 @@ service NodeWriter {
     rpc SetResource(noderesources.Resource) returns (OpStatus) {}
     rpc RemoveResource(noderesources.ResourceID) returns (OpStatus) {}
 
-    rpc AddVectorSet(NewVectorSetRequest) returns (OpStatus) {}  // New
+    rpc CreateVectorSet(CreateVectorSetRequest) returns (noderesources.VectorSetID) {}
     rpc RemoveVectorSet(noderesources.VectorSetID) returns (OpStatus) {}
-    rpc ListVectorSets(noderesources.ShardId) returns (noderesources.VectorSetList) {}
 
     rpc GetMetadata(noderesources.EmptyQuery) returns (noderesources.NodeMetadata) {}
 }
