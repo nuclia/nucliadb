@@ -41,10 +41,8 @@ impl AtomClause {
     }
     fn run<D: DataRetriever>(&self, x: Address, retriever: &D) -> bool {
         match self {
-            Self::KeyPrefix(value) => 
-                retriever.get_key(x).starts_with(value.as_bytes()),
-                
-            
+            Self::KeyPrefix(value) => retriever.get_key(x).starts_with(value.as_bytes()),
+
             Self::Label(value) => retriever.has_label(x, value.as_bytes()),
             Self::KeyPrefixSet(set) => {
                 let key = retriever.get_key(x);

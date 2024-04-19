@@ -332,9 +332,17 @@ pub fn suggest_query(
         });
 
     if !request.key_filters.is_empty() {
-        let set_query = Box::new(SetQuery::new(schema.field_uuid, request.key_filters.clone()));
-        fuzzies.push((Occur::Must, set_query.clone()));
-        originals.push((Occur::Must, set_query.clone()));
+        let (field_ids, resource_ids) = request.key_filters.iter().cloned().partition::<Vec<_>, _>(|k| k.contains('/'));
+        if !field_ids.is_empty() {
+            let set_query = Box::new(SetQuery::new(schema.field_uuid, field_ids));
+            fuzzies.push((Occur::Must, set_query.clone()));
+            originals.push((Occur::Must, set_query.clone()));
+        }
+        if !resource_ids.is_empty() {
+            let set_query = Box::new(SetQuery::new(schema.uuid, resource_ids));
+            fuzzies.push((Occur::Must, set_query.clone()));
+            originals.push((Occur::Must, set_query.clone()));
+        }
     }
 
     if originals.len() == 1 && originals[0].1.is::<AllQuery>() {
@@ -428,9 +436,17 @@ pub fn search_query(
     }
 
     if !search.key_filters.is_empty() {
-        let set_query = Box::new(SetQuery::new(schema.field_uuid, search.key_filters.clone()));
-        fuzzies.push((Occur::Must, set_query.clone()));
-        originals.push((Occur::Must, set_query.clone()));
+        let (field_ids, resource_ids) = search.key_filters.iter().cloned().partition::<Vec<_>, _>(|k| k.contains('/'));
+        if !field_ids.is_empty() {
+            let set_query = Box::new(SetQuery::new(schema.field_uuid, field_ids));
+            fuzzies.push((Occur::Must, set_query.clone()));
+            originals.push((Occur::Must, set_query.clone()));
+        }
+        if !resource_ids.is_empty() {
+            let set_query = Box::new(SetQuery::new(schema.uuid, resource_ids));
+            fuzzies.push((Occur::Must, set_query.clone()));
+            originals.push((Occur::Must, set_query.clone()));
+        }
     }
 
     if originals.len() == 1 && originals[0].1.is::<AllQuery>() {

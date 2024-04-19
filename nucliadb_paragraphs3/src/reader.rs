@@ -132,6 +132,7 @@ impl ParagraphReader for ParagraphReaderService {
     #[measure(actor = "paragraphs", metric = "search")]
     #[tracing::instrument(skip_all)]
     fn search(&self, request: &ProtosRequest, context: &ParagraphsContext) -> NodeResult<ProtosResponse> {
+        println!("{request:#?}");
         let time = Instant::now();
         let id = Some(&request.id);
 

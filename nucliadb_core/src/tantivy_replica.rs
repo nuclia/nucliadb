@@ -29,7 +29,7 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 use serde_json::Value;
 use tantivy::schema::Schema;
-use tantivy::{Index, IndexSettings, Opstamp, Result, Searcher, SegmentId};
+use tantivy::{Index, IndexSettings, Opstamp, Result, SegmentId};
 
 pub type Json = Value;
 
