@@ -285,4 +285,28 @@ fn test_search_with_min_score() {
     query(&reader, "should", 100.0, 0);
 }
 
+#[test]
+fn test_int_order_pagination() {
+    use nucliadb_core::protos::{order_by::OrderField, order_by::OrderType, OrderBy};
+    let reader = common::test_reader();
+
+    let request = DocumentSearchRequest {
+        id: "shard".to_string(),
+        body: "".to_string(),
+        page_number: 0,
+        result_per_page: 1,
+        order: Some(OrderBy {
+            r#type: OrderType::Desc.into(),
+            sort_by: OrderField::Created.into(),
+            ..Default::default()
+        }),
+        min_score: f32::MIN,
+        ..Default::default()
+    };
+
+    let response = reader.search(&request).unwrap();
+    assert_eq!(response.results.len(), 1);
+    assert!(response.next_page);
+}
+
 // TODO: order, timestamp filter, only_faceted, with_status
