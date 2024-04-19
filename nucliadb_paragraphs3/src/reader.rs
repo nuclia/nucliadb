@@ -36,7 +36,7 @@ use tantivy::{DocAddress, Index, IndexReader, LeasedItem, ReloadPolicy};
 use super::schema::ParagraphSchema;
 use crate::search_query;
 use crate::search_query::SharedTermC;
-use crate::search_response::{SearchBm25Response, SearchFacetsResponse, SearchIntResponse};
+use crate::search_response::{extract_labels, SearchBm25Response, SearchFacetsResponse, SearchIntResponse};
 
 const FUZZY_DISTANCE: u8 = 1;
 const NUMBER_OF_RESULTS_SUGGEST: usize = 10;
@@ -141,6 +141,7 @@ impl ParagraphReader for ParagraphReaderService {
         let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
         let results = request.result_per_page as usize;
         let offset = results * request.page_number as usize;
+
         let facets: Vec<_> = request
             .faceted
             .as_ref()
@@ -307,12 +308,7 @@ impl Iterator for BatchProducer {
                 .unwrap()
                 .to_string();
 
-            let labels = doc
-                .get_all(self.facet_field)
-                .flat_map(|x| x.as_facet())
-                .map(|x| x.to_path_string())
-                .filter(|x| x.starts_with("/l/"))
-                .collect::<Vec<_>>();
+            let labels = extract_labels(doc.get_all(self.facet_field));
             items.push(ParagraphItem {
                 id,
                 labels,

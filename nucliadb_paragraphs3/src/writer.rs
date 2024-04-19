@@ -38,6 +38,7 @@ use tantivy::{doc, Index, IndexSettings, IndexSortByField, IndexWriter, Order};
 
 use super::schema::ParagraphSchema;
 use crate::schema::timestamp_to_datetime_utc;
+use crate::search_response::is_label;
 
 lazy_static::lazy_static! {
     static ref REGEX: Regex = Regex::new(r"\\[a-zA-Z1-9]").unwrap();
@@ -261,7 +262,25 @@ impl ParagraphWriterService {
                     doc.add_bytes(self.schema.metadata, metadata.encode_to_vec());
                 }
 
-                paragraph_labels.into_iter().for_each(|facet| doc.add_facet(self.schema.facets, facet));
+                let resource_facets = resource
+                    .labels
+                    .iter()
+                    .map(Facet::from_text)
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|e| tantivy::TantivyError::InvalidArgument(e.to_string()))?;
+                let field_facets = text_info
+                    .labels
+                    .iter()
+                    .map(Facet::from_text)
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|e| tantivy::TantivyError::InvalidArgument(e.to_string()))?;
+
+                let field_labels = field_facets.into_iter().chain(resource_facets.into_iter()).filter(is_label);
+
+                paragraph_labels
+                    .into_iter()
+                    .chain(field_labels)
+                    .for_each(|facet| doc.add_facet(self.schema.facets, facet));
                 doc.add_facet(self.schema.field, Facet::from(&facet_field));
                 doc.add_text(self.schema.paragraph, paragraph_id.clone());
                 doc.add_text(self.schema.text, &text);
