@@ -331,6 +331,12 @@ pub fn suggest_query(
             originals.push((Occur::Must, Box::new(facet_term_query)));
         });
 
+    if !request.key_filters.is_empty() {
+        let tsq = Box::new(SetQuery::new(schema.field_uuid, request.key_filters.clone()));
+        fuzzies.push((Occur::Must, tsq.clone()));
+        originals.push((Occur::Must, tsq.clone()));
+    }
+
     if originals.len() == 1 && originals[0].1.is::<AllQuery>() {
         let original = originals.pop().unwrap().1;
         let fuzzy = Box::new(BooleanQuery::new(vec![]));

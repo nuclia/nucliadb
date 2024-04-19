@@ -340,6 +340,10 @@ async def kbid(
             label_filter(ClassificationLabels.RESOURCE_ANNOTATED),
             label_filter(ClassificationLabels.FIELD_DETECTED),
         ],
+        [
+            label_filter(ClassificationLabels.RESOURCE_ANNOTATED),
+            label_filter(ClassificationLabels.PARAGRAPH_DETECTED),
+        ],
     ],
 )
 async def test_filtering_before_and_after_reindexing(

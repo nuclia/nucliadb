@@ -111,7 +111,7 @@ class StreamFilter(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _ConjunctionEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[StreamFilter._Conjunction.ValueType], builtins.type):
+    class _ConjunctionEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[StreamFilter._Conjunction.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         AND: StreamFilter._Conjunction.ValueType  # 0
         OR: StreamFilter._Conjunction.ValueType  # 1
@@ -161,7 +161,7 @@ class OrderBy(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _OrderTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[OrderBy._OrderType.ValueType], builtins.type):
+    class _OrderTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[OrderBy._OrderType.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         DESC: OrderBy._OrderType.ValueType  # 0
         ASC: OrderBy._OrderType.ValueType  # 1
@@ -174,7 +174,7 @@ class OrderBy(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _OrderFieldEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[OrderBy._OrderField.ValueType], builtins.type):
+    class _OrderFieldEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[OrderBy._OrderField.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         CREATED: OrderBy._OrderField.ValueType  # 0
         MODIFIED: OrderBy._OrderField.ValueType  # 1
@@ -1075,6 +1075,7 @@ class SuggestRequest(google.protobuf.message.Message):
     FILTER_FIELD_NUMBER: builtins.int
     TIMESTAMPS_FIELD_NUMBER: builtins.int
     FIELDS_FIELD_NUMBER: builtins.int
+    KEY_FILTERS_FIELD_NUMBER: builtins.int
     shard: builtins.str
     body: builtins.str
     @property
@@ -1085,6 +1086,8 @@ class SuggestRequest(google.protobuf.message.Message):
     def timestamps(self) -> global___Timestamps: ...
     @property
     def fields(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    @property
+    def key_filters(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     def __init__(
         self,
         *,
@@ -1094,9 +1097,10 @@ class SuggestRequest(google.protobuf.message.Message):
         filter: global___Filter | None = ...,
         timestamps: global___Timestamps | None = ...,
         fields: collections.abc.Iterable[builtins.str] | None = ...,
+        key_filters: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["filter", b"filter", "timestamps", b"timestamps"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["body", b"body", "features", b"features", "fields", b"fields", "filter", b"filter", "shard", b"shard", "timestamps", b"timestamps"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["body", b"body", "features", b"features", "fields", b"fields", "filter", b"filter", "key_filters", b"key_filters", "shard", b"shard", "timestamps", b"timestamps"]) -> None: ...
 
 global___SuggestRequest = SuggestRequest
 

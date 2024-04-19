@@ -3,12 +3,9 @@
 isort:skip_file
 """
 import abc
-import collections.abc
 import grpc
-import grpc.aio
 import nucliadb_protos.noderesources_pb2
 import nucliadb_protos.nodewriter_pb2
-import typing
 from nucliadb_protos.noderesources_pb2 import (
     EmptyQuery as EmptyQuery,
     EmptyResponse as EmptyResponse,
@@ -33,16 +30,8 @@ from nucliadb_protos.noderesources_pb2 import (
     VectorSetList as VectorSetList,
 )
 
-_T = typing.TypeVar('_T')
-
-class _MaybeAsyncIterator(collections.abc.AsyncIterator[_T], collections.abc.Iterator[_T], metaclass=abc.ABCMeta):
-    ...
-
-class _ServicerContext(grpc.ServicerContext, grpc.aio.ServicerContext):  # type: ignore
-    ...
-
 class NodeWriterStub:
-    def __init__(self, channel: typing.Union[grpc.Channel, grpc.aio.Channel]) -> None: ...
+    def __init__(self, channel: grpc.Channel) -> None: ...
     NewShard: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.nodewriter_pb2.NewShardRequest,
         nucliadb_protos.noderesources_pb2.ShardCreated,
@@ -88,118 +77,72 @@ class NodeWriterStub:
         nucliadb_protos.noderesources_pb2.NodeMetadata,
     ]
 
-class NodeWriterAsyncStub:
-    NewShard: grpc.aio.UnaryUnaryMultiCallable[
-        nucliadb_protos.nodewriter_pb2.NewShardRequest,
-        nucliadb_protos.noderesources_pb2.ShardCreated,
-    ]
-    DeleteShard: grpc.aio.UnaryUnaryMultiCallable[
-        nucliadb_protos.noderesources_pb2.ShardId,
-        nucliadb_protos.noderesources_pb2.ShardId,
-    ]
-    ListShards: grpc.aio.UnaryUnaryMultiCallable[
-        nucliadb_protos.noderesources_pb2.EmptyQuery,
-        nucliadb_protos.noderesources_pb2.ShardIds,
-    ]
-    GC: grpc.aio.UnaryUnaryMultiCallable[
-        nucliadb_protos.noderesources_pb2.ShardId,
-        nucliadb_protos.nodewriter_pb2.GarbageCollectorResponse,
-    ]
-    Merge: grpc.aio.UnaryUnaryMultiCallable[
-        nucliadb_protos.noderesources_pb2.ShardId,
-        nucliadb_protos.nodewriter_pb2.MergeResponse,
-    ]
-    SetResource: grpc.aio.UnaryUnaryMultiCallable[
-        nucliadb_protos.noderesources_pb2.Resource,
-        nucliadb_protos.nodewriter_pb2.OpStatus,
-    ]
-    RemoveResource: grpc.aio.UnaryUnaryMultiCallable[
-        nucliadb_protos.noderesources_pb2.ResourceID,
-        nucliadb_protos.nodewriter_pb2.OpStatus,
-    ]
-    AddVectorSet: grpc.aio.UnaryUnaryMultiCallable[
-        nucliadb_protos.nodewriter_pb2.NewVectorSetRequest,
-        nucliadb_protos.nodewriter_pb2.OpStatus,
-    ]
-    RemoveVectorSet: grpc.aio.UnaryUnaryMultiCallable[
-        nucliadb_protos.noderesources_pb2.VectorSetID,
-        nucliadb_protos.nodewriter_pb2.OpStatus,
-    ]
-    ListVectorSets: grpc.aio.UnaryUnaryMultiCallable[
-        nucliadb_protos.noderesources_pb2.ShardId,
-        nucliadb_protos.noderesources_pb2.VectorSetList,
-    ]
-    GetMetadata: grpc.aio.UnaryUnaryMultiCallable[
-        nucliadb_protos.noderesources_pb2.EmptyQuery,
-        nucliadb_protos.noderesources_pb2.NodeMetadata,
-    ]
-
 class NodeWriterServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def NewShard(
         self,
         request: nucliadb_protos.nodewriter_pb2.NewShardRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[nucliadb_protos.noderesources_pb2.ShardCreated, collections.abc.Awaitable[nucliadb_protos.noderesources_pb2.ShardCreated]]: ...
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.noderesources_pb2.ShardCreated: ...
     @abc.abstractmethod
     def DeleteShard(
         self,
         request: nucliadb_protos.noderesources_pb2.ShardId,
-        context: _ServicerContext,
-    ) -> typing.Union[nucliadb_protos.noderesources_pb2.ShardId, collections.abc.Awaitable[nucliadb_protos.noderesources_pb2.ShardId]]: ...
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.noderesources_pb2.ShardId: ...
     @abc.abstractmethod
     def ListShards(
         self,
         request: nucliadb_protos.noderesources_pb2.EmptyQuery,
-        context: _ServicerContext,
-    ) -> typing.Union[nucliadb_protos.noderesources_pb2.ShardIds, collections.abc.Awaitable[nucliadb_protos.noderesources_pb2.ShardIds]]: ...
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.noderesources_pb2.ShardIds: ...
     @abc.abstractmethod
     def GC(
         self,
         request: nucliadb_protos.noderesources_pb2.ShardId,
-        context: _ServicerContext,
-    ) -> typing.Union[nucliadb_protos.nodewriter_pb2.GarbageCollectorResponse, collections.abc.Awaitable[nucliadb_protos.nodewriter_pb2.GarbageCollectorResponse]]: ...
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.nodewriter_pb2.GarbageCollectorResponse: ...
     @abc.abstractmethod
     def Merge(
         self,
         request: nucliadb_protos.noderesources_pb2.ShardId,
-        context: _ServicerContext,
-    ) -> typing.Union[nucliadb_protos.nodewriter_pb2.MergeResponse, collections.abc.Awaitable[nucliadb_protos.nodewriter_pb2.MergeResponse]]: ...
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.nodewriter_pb2.MergeResponse: ...
     @abc.abstractmethod
     def SetResource(
         self,
         request: nucliadb_protos.noderesources_pb2.Resource,
-        context: _ServicerContext,
-    ) -> typing.Union[nucliadb_protos.nodewriter_pb2.OpStatus, collections.abc.Awaitable[nucliadb_protos.nodewriter_pb2.OpStatus]]: ...
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.nodewriter_pb2.OpStatus: ...
     @abc.abstractmethod
     def RemoveResource(
         self,
         request: nucliadb_protos.noderesources_pb2.ResourceID,
-        context: _ServicerContext,
-    ) -> typing.Union[nucliadb_protos.nodewriter_pb2.OpStatus, collections.abc.Awaitable[nucliadb_protos.nodewriter_pb2.OpStatus]]: ...
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.nodewriter_pb2.OpStatus: ...
     @abc.abstractmethod
     def AddVectorSet(
         self,
         request: nucliadb_protos.nodewriter_pb2.NewVectorSetRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[nucliadb_protos.nodewriter_pb2.OpStatus, collections.abc.Awaitable[nucliadb_protos.nodewriter_pb2.OpStatus]]: ...
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.nodewriter_pb2.OpStatus: ...
     @abc.abstractmethod
     def RemoveVectorSet(
         self,
         request: nucliadb_protos.noderesources_pb2.VectorSetID,
-        context: _ServicerContext,
-    ) -> typing.Union[nucliadb_protos.nodewriter_pb2.OpStatus, collections.abc.Awaitable[nucliadb_protos.nodewriter_pb2.OpStatus]]: ...
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.nodewriter_pb2.OpStatus: ...
     @abc.abstractmethod
     def ListVectorSets(
         self,
         request: nucliadb_protos.noderesources_pb2.ShardId,
-        context: _ServicerContext,
-    ) -> typing.Union[nucliadb_protos.noderesources_pb2.VectorSetList, collections.abc.Awaitable[nucliadb_protos.noderesources_pb2.VectorSetList]]: ...
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.noderesources_pb2.VectorSetList: ...
     @abc.abstractmethod
     def GetMetadata(
         self,
         request: nucliadb_protos.noderesources_pb2.EmptyQuery,
-        context: _ServicerContext,
-    ) -> typing.Union[nucliadb_protos.noderesources_pb2.NodeMetadata, collections.abc.Awaitable[nucliadb_protos.noderesources_pb2.NodeMetadata]]: ...
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.noderesources_pb2.NodeMetadata: ...
 
-def add_NodeWriterServicer_to_server(servicer: NodeWriterServicer, server: typing.Union[grpc.Server, grpc.aio.Server]) -> None: ...
+def add_NodeWriterServicer_to_server(servicer: NodeWriterServicer, server: grpc.Server) -> None: ...
