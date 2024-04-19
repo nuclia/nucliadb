@@ -46,10 +46,11 @@ async def test_kb_services(sdk_async: nucliadb_sdk.NucliaDBAsync, kb):
     await sdk_async.get_entitygroup(kbid=kb.uuid, group="foo")
     await sdk_async.delete_entitygroup(kbid=kb.uuid, group="foo")
 
-    # Vectorsets
-    await sdk_async.create_vectorset(kbid=kb.uuid, vectorset="foo", dimension=10)
-    await sdk_async.list_vectorsets(kbid=kb.uuid)
-    await sdk_async.delete_vectorset(kbid=kb.uuid, vectorset="foo")
+    # # Vectorsets
+    # TODO: Uncomment when new vectorset endpoints are available
+    # await sdk_async.create_vectorset(kbid=kb.uuid, vectorset="foo", dimension=10)
+    # await sdk_async.list_vectorsets(kbid=kb.uuid)
+    # await sdk_async.delete_vectorset(kbid=kb.uuid, vectorset="foo")
 
 
 async def test_resource_endpoints(sdk_async: nucliadb_sdk.NucliaDBAsync, kb):
@@ -86,10 +87,13 @@ async def test_search_endpoints(sdk_async: nucliadb_sdk.NucliaDBAsync, kb):
         kbid=kb.uuid, title="Resource", slug="resource"
     )
     await sdk_async.chat_on_resource(kbid=kb.uuid, rid=resource.uuid, query="foo")
+    await sdk_async.chat_on_resource_by_slug(kbid=kb.uuid, slug="resource", query="foo")
     await sdk_async.feedback(
         kbid=kb.uuid, ident="bar", good=True, feedback="baz", task=FeedbackTasks.CHAT
     )
-    await sdk_async.summarize(kbid=kb.uuid, resources=["foobar"])
+    with pytest.raises(nucliadb_sdk.v2.exceptions.UnknownError) as err:
+        await sdk_async.summarize(kbid=kb.uuid, resources=["foobar"])
+    assert "Could not summarize" in str(err.value)
 
 
 async def test_learning_config_endpoints(sdk_async: nucliadb_sdk.NucliaDB, kb):

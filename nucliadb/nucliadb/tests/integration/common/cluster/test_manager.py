@@ -139,13 +139,15 @@ async def shards(fake_nodes, fake_kbid: str, maindb_driver: Driver):
     ],
 )
 @pytest.mark.asyncio
-async def test_choose_node(shards, shard_index: int, nodes: set):
+async def test_choose_node_always_prefer_the_same_node(
+    shards, shard_index: int, nodes: set
+):
     shard = shards.shards[shard_index]
     node_ids = set()
     for i in range(100):
         node, _ = manager.choose_node(shard)
         node_ids.add(node.id)
-    assert node_ids == nodes, "Random numbers have defeat this test"
+    assert len(node_ids) == 1
 
 
 async def test_choose_node_attempts_target_replicas_but_is_not_imperative(shards):
@@ -205,9 +207,8 @@ def node_new_shard():
         yield mocked
 
 
-@pytest.mark.parametrize("release_channel", ("EXPERIMENTAL", "STABLE"))
 async def test_create_shard_by_kbid_attempts_on_all_nodes(
-    shards, maindb_driver, fake_kbid, node_new_shard, release_channel
+    shards, maindb_driver, fake_kbid, node_new_shard
 ):
     shard_manager = manager.KBShardManager()
     async with maindb_driver.transaction() as txn:
@@ -215,8 +216,6 @@ async def test_create_shard_by_kbid_attempts_on_all_nodes(
             await shard_manager.create_shard_by_kbid(
                 txn,
                 fake_kbid,
-                semantic_model=mock.MagicMock(),
-                release_channel=release_channel,
             )
 
     assert node_new_shard.await_count == len(manager.get_index_nodes())

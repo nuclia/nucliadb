@@ -226,7 +226,16 @@ where
     }
 
     // Creating the hnsw for the new node store.
-    let tracker = Retriever::new(&[], &nodes, &NoDLog, similarity, -1.0);
+    let tracker = Retriever::new(
+        &[],
+        &nodes,
+        &NoDLog,
+        SearchParams {
+            similarity,
+            min_score: -1.0,
+            dimension: operants[0].1.stored_len().unwrap_or(0) as usize,
+        },
+    );
     let mut ops = HnswOps::new(&tracker);
     for id in start_node_index..no_nodes {
         ops.insert(Address(id), &mut index)
@@ -294,16 +303,28 @@ pub fn create(
 
     // Serializing nodes on disk
     // Nodes are stored on disk and mmaped.
+    let dimension = elems.first().map(|e| e.vector.len());
     data_store::create_key_value(&mut nodesf, elems)?;
     let nodes = unsafe { Mmap::map(&nodesf)? };
     let no_nodes = data_store::stored_elements(&nodes);
 
     // Creating the HNSW using the mmaped nodes
-    let tracker = Retriever::new(&[], &nodes, &NoDLog, similarity, -1.0);
-    let mut ops = HnswOps::new(&tracker);
     let mut index = RAMHnsw::new();
-    for id in 0..no_nodes {
-        ops.insert(Address(id), &mut index)
+    if let Some(dimension) = dimension {
+        let tracker = Retriever::new(
+            &[],
+            &nodes,
+            &NoDLog,
+            SearchParams {
+                similarity,
+                min_score: -1.0,
+                dimension,
+            },
+        );
+        let mut ops = HnswOps::new(&tracker);
+        for id in 0..no_nodes {
+            ops.insert(Address(id), &mut index)
+        }
     }
 
     {
@@ -400,6 +421,12 @@ impl FormulaFilter<'_> {
     }
 }
 
+pub struct SearchParams {
+    pub similarity: Similarity,
+    pub min_score: f32,
+    pub dimension: usize,
+}
+
 pub struct Retriever<'a, Dlog> {
     similarity_function: fn(&[u8], &[u8]) -> f32,
     no_nodes: usize,
@@ -407,17 +434,17 @@ pub struct Retriever<'a, Dlog> {
     nodes: &'a Mmap,
     delete_log: &'a Dlog,
     min_score: f32,
+    dimension: usize,
 }
 impl<'a, Dlog: DeleteLog> Retriever<'a, Dlog> {
     pub fn new(
         temp: &'a [u8],
         nodes: &'a Mmap,
         delete_log: &'a Dlog,
-        similarity: Similarity,
-        min_score: f32,
+        search_params: SearchParams,
     ) -> Retriever<'a, Dlog> {
         let no_nodes = data_store::stored_elements(nodes);
-        let similarity_function = match similarity {
+        let similarity_function = match search_params.similarity {
             Similarity::Cosine => vector::cosine_similarity,
             Similarity::Dot => vector::dot_similarity,
         };
@@ -427,7 +454,8 @@ impl<'a, Dlog: DeleteLog> Retriever<'a, Dlog> {
             delete_log,
             similarity_function,
             no_nodes,
-            min_score,
+            min_score: search_params.min_score,
+            dimension: search_params.dimension,
         }
     }
     fn find_node(&self, Address(x): Address) -> &[u8] {
@@ -447,6 +475,10 @@ impl<'a, Dlog: DeleteLog> DataRetriever for Retriever<'a, Dlog> {
             let x = self.find_node(x);
             Node::key(x)
         }
+    }
+
+    fn will_need(&self, Address(x): Address) {
+        data_store::will_need(self.nodes, x, self.dimension);
     }
 
     fn get_vector(&self, x @ Address(addr): Address) -> &[u8] {
@@ -645,15 +677,132 @@ impl OpenDataPoint {
         filter: &Formula,
         with_duplicates: bool,
         results: usize,
-        similarity: Similarity,
-        min_score: f32,
+        search_params: SearchParams,
     ) -> impl Iterator<Item = Neighbour> + '_ {
         let encoded_query = vector::encode_vector(query);
-        let tracker = Retriever::new(&encoded_query, &self.nodes, delete_log, similarity, min_score);
+        let tracker = Retriever::new(&encoded_query, &self.nodes, delete_log, search_params);
         let filter = FormulaFilter::new(filter);
         let ops = HnswOps::new(&tracker);
         let neighbours = ops.search(Address(self.journal.nodes), self.index.as_ref(), results, filter, with_duplicates);
 
         neighbours.into_iter().map(|(address, dist)| (Neighbour::new(address, &self.nodes, dist))).take(results)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::collections::BTreeMap;
+
+    use nucliadb_core::NodeResult;
+    use rand::{rngs::SmallRng, Rng, SeedableRng};
+    use tempfile::tempdir;
+
+    use crate::data_types::vector::{dot_similarity, encode_vector};
+
+    use super::{create, DataPointPin, Elem, NoDLog, SearchParams, Similarity};
+
+    const DIMENSION: usize = 128;
+
+    fn random_vector(rng: &mut impl Rng) -> Vec<f32> {
+        let v: Vec<f32> = (0..DIMENSION).map(|_| rng.gen_range(-1.0..1.0)).collect();
+        normalize(v)
+    }
+
+    fn normalize(v: Vec<f32>) -> Vec<f32> {
+        let mut modulus = 0.0;
+        for w in &v {
+            modulus += w * w;
+        }
+        modulus = modulus.powf(0.5);
+
+        v.into_iter().map(|w| w / modulus).collect()
+    }
+
+    fn random_nearby_vector(rng: &mut impl Rng, close_to: &[f32], distance: f32) -> Vec<f32> {
+        // Create a random vector of low modulus
+        let fuzz = random_vector(rng);
+        let v = close_to.iter().zip(fuzz.iter()).map(|(v, fuzz)| v + fuzz * distance).collect();
+        normalize(v)
+    }
+
+    fn random_key(rng: &mut impl Rng) -> String {
+        format!("{:032x?}", rng.gen::<u128>())
+    }
+
+    fn similarity(x: &[f32], y: &[f32]) -> f32 {
+        dot_similarity(&encode_vector(x), &encode_vector(y))
+    }
+
+    #[test]
+    fn test_recall_clustered_data() -> NodeResult<()> {
+        // This test is a simplified version of the synthetic_recall_benchmark, with smaller data for faster runs
+        // It's run here as a sanity check to get a big warning in case we mess up recall too badly
+        // You can play with the benchmark version in order to get more information, tweak parameters, etc.
+        let mut rng = SmallRng::seed_from_u64(1234567890);
+        let mut elems = BTreeMap::new();
+
+        // Create some clusters
+        let mut center = random_vector(&mut rng);
+        for _ in 0..4 {
+            // 80 tightly clustered vectors, ideally more than Mmax0
+            for _ in 0..80 {
+                elems.insert(random_key(&mut rng), random_nearby_vector(&mut rng, &center, 0.01));
+            }
+            // 80 tightly clustered vectors
+            for _ in 0..80 {
+                elems.insert(random_key(&mut rng), random_nearby_vector(&mut rng, &center, 0.03));
+            }
+            // Next cluster is nearby
+            center = random_nearby_vector(&mut rng, &center, 0.1);
+        }
+
+        // Create a data point
+        let temp_dir = tempdir()?;
+        let pin = DataPointPin::create_pin(temp_dir.path())?;
+        let dp = create(
+            &pin,
+            elems.iter().map(|(k, v)| Elem::new(k.clone(), v.clone(), Default::default(), None)).collect(),
+            None,
+            Similarity::Dot,
+        )?;
+
+        // Search a few times
+        let correct = (0..100)
+            .map(|_| {
+                // Search near an existing datapoint (simulates that the query is related to the data)
+                let base_v = elems.values().nth(rng.gen_range(0..elems.len())).unwrap();
+                let query = random_nearby_vector(&mut rng, base_v, 0.05);
+
+                let mut similarities: Vec<_> = elems.iter().map(|(k, v)| (k, similarity(v, &query))).collect();
+                similarities.sort_unstable_by(|a, b| a.1.total_cmp(&b.1).reverse());
+
+                let results: Vec<_> = dp
+                    .search(
+                        &NoDLog,
+                        &query,
+                        &Default::default(),
+                        false,
+                        5,
+                        SearchParams {
+                            similarity: Similarity::Dot,
+                            min_score: 0.0,
+                            dimension: DIMENSION,
+                        },
+                    )
+                    .collect();
+
+                let search: Vec<_> = results.iter().map(|r| String::from_utf8(r.id().to_vec()).unwrap()).collect();
+                let brute_force: Vec<_> = similarities.iter().take(5).map(|r| r.0.clone()).collect();
+                search == brute_force
+            })
+            .filter(|x| *x)
+            .count();
+
+        let recall = correct as f32 / 100.0;
+        println!("Assessed recall = {recall}");
+        // Expected 0.90-0.92, has a little margin because HNSW can be non-deterministic
+        assert!(recall >= 0.88);
+
+        Ok(())
     }
 }

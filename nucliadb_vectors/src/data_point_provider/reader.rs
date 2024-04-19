@@ -18,12 +18,13 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::data_point::{self, DataPointPin, OpenDataPoint};
+use crate::data_point::{self, DataPointPin, OpenDataPoint, SearchParams};
 pub use crate::data_point::{DpId, Neighbour};
 use crate::data_point_provider::state::read_state;
 use crate::data_point_provider::{IndexMetadata, SearchRequest, OPENING_FLAG, STATE};
 use crate::data_types::dtrie_ram::DTrie;
 use crate::data_types::DeleteLog;
+use crate::utils;
 use crate::{VectorErr, VectorR};
 use fs2::FileExt;
 use fxhash::{FxHashMap, FxHashSet};
@@ -229,12 +230,20 @@ impl Reader {
         let Some(dimension) = self.dimension else {
             return Ok(Vec::with_capacity(0));
         };
-        if dimension != request.get_query().len() as u64 {
+
+        let normalized_query;
+        let query = if self.metadata.normalize_vectors {
+            normalized_query = utils::normalize_vector(request.get_query());
+            &normalized_query
+        } else {
+            request.get_query()
+        };
+
+        if dimension != query.len() as u64 {
             return Err(VectorErr::InconsistentDimensions);
         }
 
         let similarity = self.metadata.similarity;
-        let query = request.get_query();
         let filter = request.get_filter();
         let with_duplicates = request.with_duplicates();
         let no_results = request.no_results();
@@ -254,8 +263,11 @@ impl Reader {
                 filter,
                 with_duplicates,
                 no_results,
-                similarity,
-                min_score
+                SearchParams {
+                    similarity,
+                    min_score,
+                    dimension: dimension as usize,
+                }
             );
             for candidate in partial_solution {
                 ffsv.add(candidate);

@@ -197,10 +197,16 @@ class IngestConsumer:
                     )
                     logger.log(
                         log_level,
-                        f"Successfully processed {message_type_name} message from \
-                            {message_source}. kb: {pb.kbid}, resource: {pb.uuid}, \
-                                nucliadb seqid: {seqid}, partition: {self.partition} as {audit_time}, \
-                                    total time: {time_to_process:.2f}s",
+                        f"Successfully processed {message_type_name} message",
+                        extra={
+                            "kbid": pb.kbid,
+                            "rid": pb.uuid,
+                            "message_source": message_source,
+                            "nucliadb_seqid": seqid,
+                            "partition": self.partition,
+                            "total_time": time_to_process,
+                            "audit_time": audit_time,
+                        },
                     )
             except DeadletteredError as e:
                 # Messages that have been sent to deadletter at some point

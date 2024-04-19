@@ -18,18 +18,19 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import functools
-from io import BytesIO
 from typing import AsyncGenerator, AsyncIterator, Callable, Optional
 
 import nats.errors
 from google.protobuf.message import DecodeError as ProtobufDecodeError
 
+from nucliadb import learning_proxy
 from nucliadb.common import datamanagers
 from nucliadb.common.context import ApplicationContext
 from nucliadb.export_import import logger
 from nucliadb.export_import.datamanager import ExportImportDataManager
 from nucliadb.export_import.exceptions import (
     ExportStreamExhausted,
+    IncompatibleExport,
     WrongExportStreamFormat,
 )
 from nucliadb.export_import.models import ExportedItemType, ExportItem, Metadata
@@ -50,7 +51,6 @@ PROCESSING_BM_FIELDS = [
     "field_metadata",
     "field_vectors",
     "field_large_metadata",
-    "user_vectors",
 ]
 
 # Broker message fields that are populated by the nucliadb writer component
@@ -259,27 +259,6 @@ class EndOfStream(Exception): ...
 class ExportStream:
     """
     Models a stream of export bytes that can be read from asynchronously.
-    """
-
-    def __init__(self, export: BytesIO):
-        self.export = export
-        self.read_bytes = 0
-        self._length = len(export.getvalue())
-
-    async def read(self, n_bytes):
-        """
-        Reads n_bytes from the export stream.
-        Raises ExportStreamExhausted if there are no more bytes to read.
-        """
-        if self.read_bytes == self._length:
-            raise ExportStreamExhausted()
-        chunk = self.export.read(n_bytes)
-        self.read_bytes += len(chunk)
-        return chunk
-
-
-class IteratorExportStream(ExportStream):
-    """
     Adapts the parent class to be able to read bytes yielded from an async iterator.
     """
 
@@ -324,8 +303,8 @@ class ExportStreamReader:
     yields the deserialized export items ready to be imported.
     """
 
-    def __init__(self, export_stream: ExportStream):
-        self.stream = export_stream
+    def __init__(self, stream: AsyncGenerator[bytes, None]):
+        self.stream = ExportStream(stream)
 
     @property
     def read_bytes(self) -> int:
@@ -399,6 +378,26 @@ class ExportStreamReader:
         except ProtobufDecodeError as ex:
             raise WrongExportStreamFormat() from ex
         return labels
+
+    async def maybe_read_learning_config(
+        self,
+    ) -> tuple[Optional[learning_proxy.LearningConfiguration], bytes]:
+        """
+        Tries to read a learning config from the beginning of the stream.
+        Returs the learning config if found. It also returns any leftover bytes that
+        may have been read from the network into memory that need to be yielded and imported.
+        """
+        # We assume that the learning config is the first item in the export stream.
+        try:
+            type_bytes = await self.stream.read(3)
+        except ExportStreamExhausted:
+            return None, self.stream.buffer
+        if type_bytes != ExportedItemType.LEARNING_CONFIG.value.encode():
+            # Backward compatible code for old exports that don't have a learning config.
+            return None, type_bytes + self.stream.buffer
+        data = await self.read_item()
+        lconfig = learning_proxy.LearningConfiguration.parse_raw(data)
+        return lconfig, self.stream.buffer
 
     async def iter_items(self) -> AsyncGenerator[ExportItem, None]:
         while True:
@@ -475,3 +474,55 @@ class TaskRetryHandler:
                 await self.dm.set_metadata(self.type, metadata)
 
         return wrapper
+
+
+async def get_learning_config(
+    kbid: str,
+) -> Optional[learning_proxy.LearningConfiguration]:
+    return await learning_proxy.get_configuration(kbid)
+
+
+def stream_compatible_with_kb(
+    kbid: str, stream: AsyncGenerator[bytes, None]
+) -> AsyncGenerator[bytes, None]:
+    """
+    Wrapper around an export stream that checks if the export is compatible with the destination knowledge box.
+    """
+
+    async def wrapped() -> AsyncGenerator[bytes, None]:
+        # Read the a few bytes from the beginning of the stream to check the semantic model.
+        # If the semantic model is not compatible, raise an exception.
+        # If there are leftover bytes, yield them.
+        leftover_bytes = await _check_semantic_model_compatibility(kbid, stream)
+        if len(leftover_bytes) > 0:
+            yield leftover_bytes
+
+        # Now yield the rest of the stream
+        async for chunk in stream:
+            yield chunk
+
+    return wrapped()
+
+
+async def _check_semantic_model_compatibility(
+    kbid: str, stream: AsyncGenerator[bytes, None]
+) -> bytes:
+    stream_reader = ExportStreamReader(stream)
+    lconfig, leftover_bytes = await stream_reader.maybe_read_learning_config()
+    if lconfig is None:
+        logger.warning(
+            "Learning config not found on the export stream. Export may be incompatible."
+        )
+        return leftover_bytes
+    kb_lconfig = await get_learning_config(kbid)
+    if kb_lconfig is None:
+        logger.warning(
+            "No learning config found on the knowledge box. Export may be incompatible."
+        )
+        return leftover_bytes
+    if kb_lconfig.semantic_model == lconfig.semantic_model:
+        logger.info(f"Semantic model match: {kb_lconfig.semantic_model}")
+        return leftover_bytes
+    raise IncompatibleExport(
+        f"Cannot import. Semantic model mismatch: {kb_lconfig.semantic_model} != {lconfig.semantic_model}"
+    )

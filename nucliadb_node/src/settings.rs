@@ -30,15 +30,15 @@
 //! The trait `Provider` makes it easy to extend this module with more
 //! providers (to parse from CLI for example).
 
+use anyhow::anyhow;
+use nucliadb_core::tracing::Level;
+use serde::de::Unexpected;
 use std::net::SocketAddr;
 use std::num::NonZeroUsize;
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-
-use anyhow::anyhow;
-use nucliadb_core::tracing::Level;
 
 use nucliadb_core::NodeResult;
 use serde::{Deserialize, Deserializer};
@@ -60,6 +60,18 @@ where
     D: Deserializer<'de>,
 {
     Ok(Duration::from_secs(u64::deserialize(d)?))
+}
+
+fn parse_case_insensitive_bool<'de, D>(d: D) -> Result<bool, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let as_string = String::deserialize(d)?;
+    match as_string.to_lowercase().as_str() {
+        "true" => Ok(true),
+        "false" => Ok(false),
+        unknown => Err(serde::de::Error::invalid_value(Unexpected::Str(unknown), &"Boolean value")),
+    }
 }
 
 pub fn load_settings() -> NodeResult<Settings> {
@@ -96,6 +108,7 @@ impl Deref for Settings {
 #[serde(default)]
 pub struct EnvSettings {
     // Debug
+    #[serde(deserialize_with = "parse_case_insensitive_bool")]
     pub debug: bool,
 
     // Data storage and access
@@ -113,6 +126,7 @@ pub struct EnvSettings {
     pub log_levels: Vec<(String, Level)>,
 
     // Telemetry
+    #[serde(deserialize_with = "parse_case_insensitive_bool")]
     pub jaeger_enabled: bool,
     pub jaeger_agent_host: String,
     pub jaeger_agent_port: u16,
@@ -303,8 +317,7 @@ mod tests {
         let Err(e) = settings else {
             panic!("Expected failure to load settings")
         };
-        assert!(e.to_string().contains("DEBUG"), "Error `{e}` does not match expected");
-        assert!(e.to_string().contains("`true` or `false`"), "Error `{e}` does not match expected");
+        assert!(e.to_string().contains("invalid value"));
     }
 
     #[test]

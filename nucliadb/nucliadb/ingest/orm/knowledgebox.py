@@ -30,7 +30,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     SemanticModelMetadata,
 )
 from nucliadb_protos.knowledgebox_pb2 import Synonyms as PBSynonyms
-from nucliadb_protos.knowledgebox_pb2 import VectorSet, VectorSets
+from nucliadb_protos.knowledgebox_pb2 import VectorSet
 from nucliadb_protos.resources_pb2 import Basic
 from nucliadb_protos.utils_pb2 import ReleaseChannel
 
@@ -48,7 +48,12 @@ from nucliadb.ingest.orm.resource import (
     Resource,
 )
 from nucliadb.ingest.orm.synonyms import Synonyms
-from nucliadb.ingest.orm.utils import compute_paragraph_key, get_basic, set_basic
+from nucliadb.ingest.orm.utils import (
+    choose_matryoshka_dimension,
+    compute_paragraph_key,
+    get_basic,
+    set_basic,
+)
 from nucliadb.migrator.utils import get_latest_version
 from nucliadb_protos import writer_pb2
 from nucliadb_utils.storages.storage import Storage
@@ -58,8 +63,6 @@ from nucliadb_utils.utilities import get_audit, get_storage
 KB_RESOURCE = "/kbs/{kbid}/r/{uuid}"
 
 KB_KEYS = "/kbs/{kbid}/"
-
-KB_VECTORSET = "/kbs/{kbid}/vectorsets"
 
 KB_TO_DELETE_BASE = "/kbtodelete/"
 KB_TO_DELETE_STORAGE_BASE = "/storagetodelete/"
@@ -92,7 +95,6 @@ class KnowledgeBox:
     async def delete_kb(cls, txn: Transaction, slug: str = "", kbid: str = ""):
         # Mark storage to be deleted
         # Mark keys to be deleted
-        logger.info(f"Deleting KB kbid={kbid} slug={slug}")
         if not kbid and not slug:
             raise AttributeError()
 
@@ -113,7 +115,6 @@ class KnowledgeBox:
         # Delete main anchor
         async with txn.driver.transaction() as subtxn:
             key_match = datamanagers.kb.KB_SLUGS.format(slug=slug)
-            logger.info(f"Deleting KB with slug: {slug}")
             await subtxn.delete(key_match)
 
             when = datetime.now().isoformat()
@@ -167,14 +168,33 @@ class KnowledgeBox:
             failed = True
 
         if failed is False:
+            kb_shards = writer_pb2.Shards()
+            kb_shards.kbid = uuid
+            # B/c with Shards.actual
+            kb_shards.actual = -1
+            # B/c with `Shards.similarity`, replaced by `model`
+            kb_shards.similarity = semantic_model.similarity_function
+
+            # if this KB uses a matryoshka model, we can choose a different
+            # dimension
+            if len(semantic_model.matryoshka_dimensions) > 0:
+                semantic_model.vector_dimension = choose_matryoshka_dimension(
+                    semantic_model.matryoshka_dimensions  # type: ignore
+                )
+            kb_shards.model.CopyFrom(semantic_model)
+
+            kb_shards.release_channel = release_channel
+
+            await datamanagers.cluster.update_kb_shards(
+                txn, kbid=uuid, shards=kb_shards
+            )
+
+            # shard creation will alter this value on maindb, make sure nobody
+            # uses this variable anymore
+            del kb_shards
             shard_manager = get_shard_manager()
             try:
-                await shard_manager.create_shard_by_kbid(
-                    txn,
-                    uuid,
-                    semantic_model=semantic_model,
-                    release_channel=release_channel,
-                )
+                await shard_manager.create_shard_by_kbid(txn, uuid)
             except Exception as e:
                 await storage.delete_kb(uuid)
                 raise e
@@ -210,10 +230,7 @@ class KnowledgeBox:
         if config and exist != config:
             exist.MergeFrom(config)
 
-        await txn.set(
-            datamanagers.kb.KB_UUID.format(kbid=uuid),
-            exist.SerializeToString(),
-        )
+        await datamanagers.kb.set_config(txn, kbid=uuid, config=exist)
 
         return uuid
 
@@ -231,36 +248,29 @@ class KnowledgeBox:
 
     # Vectorset
     async def get_vectorsets(self, response: writer_pb2.GetVectorSetsResponse):
-        vectorset_key = KB_VECTORSET.format(kbid=self.kbid)
-        payload = await self.txn.get(vectorset_key)
-        if payload is not None:
-            response.vectorsets.ParseFromString(payload)
-
-    async def del_vectorset(self, id: str):
-        vectorset_key = KB_VECTORSET.format(kbid=self.kbid)
-        payload = await self.txn.get(vectorset_key)
-        vts = VectorSets()
-        if payload is not None:
-            vts.ParseFromString(payload)
-        del vts.vectorsets[id]
-        # For each Node on the KB delete the vectorset
-        async for node, shard in self.iterate_kb_nodes():
-            await node.del_vectorset(shard, id)
-        payload = vts.SerializeToString()
-        await self.txn.set(vectorset_key, payload)
+        vectorsets = await datamanagers.vectorsets.get_vectorsets(
+            self.txn, kbid=self.kbid
+        )
+        if vectorsets is not None:
+            response.vectorsets.CopyFrom(vectorsets)
 
     async def set_vectorset(self, id: str, vs: VectorSet):
-        vectorset_key = KB_VECTORSET.format(kbid=self.kbid)
-        payload = await self.txn.get(vectorset_key)
-        vts = VectorSets()
-        if payload is not None:
-            vts.ParseFromString(payload)
-        vts.vectorsets[id].CopyFrom(vs)
         # For each Node on the KB add the vectorset
         async for node, shard in self.iterate_kb_nodes():
             await node.set_vectorset(shard, id, similarity=vs.similarity)
-        payload = vts.SerializeToString()
-        await self.txn.set(vectorset_key, payload)
+
+        await datamanagers.vectorsets.set_vectorset(
+            self.txn, kbid=self.kbid, vectorset_id=id, vs=vs
+        )
+
+    async def del_vectorset(self, id: str):
+        await datamanagers.vectorsets.del_vectorset(
+            self.txn, kbid=self.kbid, vectorset_id=id
+        )
+
+        # For each Node on the KB delete the vectorset
+        async for node, shard in self.iterate_kb_nodes():
+            await node.del_vectorset(shard, id)
 
     # Labels
     async def set_labelset(self, id: str, labelset: LabelSet):

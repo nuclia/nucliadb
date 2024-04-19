@@ -75,14 +75,8 @@ async def maybe_add_shard(kbid: str) -> None:
         ):
             # create new shard
             async with datamanagers.with_transaction() as txn:
-                model = await datamanagers.kb.get_model_metadata(txn, kbid=kbid)
                 sm = get_shard_manager()
-                await sm.create_shard_by_kbid(
-                    txn,
-                    kbid,
-                    semantic_model=model,
-                    release_channel=kb_shards.release_channel,
-                )
+                await sm.create_shard_by_kbid(txn, kbid)
                 await txn.commit()
 
 
