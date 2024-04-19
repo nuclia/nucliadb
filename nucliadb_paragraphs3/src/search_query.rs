@@ -332,9 +332,9 @@ pub fn suggest_query(
         });
 
     if !request.key_filters.is_empty() {
-        let tsq = Box::new(SetQuery::new(schema.field_uuid, request.key_filters.clone()));
-        fuzzies.push((Occur::Must, tsq.clone()));
-        originals.push((Occur::Must, tsq.clone()));
+        let set_query = Box::new(SetQuery::new(schema.field_uuid, request.key_filters.clone()));
+        fuzzies.push((Occur::Must, set_query.clone()));
+        originals.push((Occur::Must, set_query.clone()));
     }
 
     if originals.len() == 1 && originals[0].1.is::<AllQuery>() {
@@ -428,9 +428,9 @@ pub fn search_query(
     }
 
     if !search.key_filters.is_empty() {
-        let tsq = Box::new(SetQuery::new(schema.field_uuid, search.key_filters.clone()));
-        fuzzies.push((Occur::Must, tsq.clone()));
-        originals.push((Occur::Must, tsq.clone()));
+        let set_query = Box::new(SetQuery::new(schema.field_uuid, search.key_filters.clone()));
+        fuzzies.push((Occur::Must, set_query.clone()));
+        originals.push((Occur::Must, set_query.clone()));
     }
 
     if originals.len() == 1 && originals[0].1.is::<AllQuery>() {

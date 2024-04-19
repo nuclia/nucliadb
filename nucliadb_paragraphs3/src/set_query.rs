@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::sync::Arc;
 
 use tantivy::{DocId, DocSet, Score, Searcher, SegmentReader};
 use tantivy_common::BitSet;
@@ -10,13 +11,17 @@ use tantivy::TantivyError;
 /// A Term Set Query matches all of the documents containing any of the Term provided
 #[derive(Debug, Clone)]
 pub struct SetQuery {
-    set: SetWrapper,
+    set: SetWightWrapper,
 }
 
 impl SetQuery {
     /// Create a Term Set Query
     pub fn new(field: Field, values: Vec<String>) -> Self {
-        let set = SetWrapper(field, values.into_iter().collect());
+        let values = values.into_iter().collect();
+        let set = SetWightWrapper::new(SetWeight {
+            field,
+            values,
+        });
 
         SetQuery {
             set,
@@ -31,17 +36,30 @@ impl Query for SetQuery {
 }
 
 #[derive(Clone, Debug)]
-struct SetWrapper(Field, HashSet<String>);
-impl Weight for SetWrapper {
+struct SetWightWrapper(Arc<SetWeight>);
+
+impl SetWightWrapper {
+    fn new(v: SetWeight) -> Self {
+        Self(Arc::new(v))
+    }
+}
+
+#[derive(Debug)]
+struct SetWeight {
+    field: Field,
+    values: HashSet<String>,
+}
+
+impl Weight for SetWightWrapper {
     fn scorer(&self, reader: &SegmentReader, boost: Score) -> tantivy::Result<Box<dyn Scorer>> {
         let max_doc = reader.max_doc();
         let mut doc_bitset = BitSet::with_max_value(max_doc);
-        let inverted_index = reader.inverted_index(self.0)?;
+        let inverted_index = reader.inverted_index(self.0.field)?;
         let term_dict = inverted_index.terms();
         let mut term_stream = term_dict.stream()?;
         while term_stream.advance() {
             let k = String::from_utf8_lossy(term_stream.key());
-            if !self.1.contains(k.as_ref()) {
+            if !self.0.values.contains(k.as_ref()) {
                 continue;
             };
 

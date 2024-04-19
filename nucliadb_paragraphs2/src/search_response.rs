@@ -20,14 +20,26 @@
 use std::collections::HashMap;
 
 use itertools::Itertools;
+use lazy_static::lazy_static;
 use nucliadb_core::protos::{FacetResult, FacetResults, ParagraphResult, ParagraphSearchResponse, ResultScore};
 use nucliadb_core::tracing::*;
 use tantivy::collector::FacetCounts;
-use tantivy::schema::Value;
+use tantivy::schema::{Facet, Value};
 use tantivy::DocAddress;
 
 use crate::reader::ParagraphReaderService;
 use crate::search_query::TermCollector;
+
+pub fn extract_labels<'a>(facets_iterator: impl Iterator<Item = &'a Value>) -> Vec<String> {
+    lazy_static! {
+        static ref LABEL_PREFIX: Facet = Facet::from_text("/l/").unwrap();
+    };
+    facets_iterator
+        .flat_map(|x| x.as_facet())
+        .filter(|x| LABEL_PREFIX.is_prefix_of(x))
+        .map(|x| x.to_path_string())
+        .collect_vec()
+}
 
 fn facet_count(facet: &str, facets_count: &FacetCounts) -> Vec<FacetResult> {
     facets_count
@@ -137,12 +149,7 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
                         .unwrap()
                         .to_path_string();
 
-                    let labels = doc
-                        .get_all(schema.facets)
-                        .flat_map(|x| x.as_facet())
-                        .map(|x| x.to_path_string())
-                        .filter(|x| x.starts_with("/l/"))
-                        .collect_vec();
+                    let labels = extract_labels(doc.get_all(schema.facets));
 
                     let start_pos = doc.get_first(schema.start_pos).unwrap().as_u64().unwrap();
 
@@ -232,11 +239,7 @@ impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
                         .unwrap()
                         .to_path_string();
 
-                    let labels = doc
-                        .get_all(schema.facets)
-                        .map(|x| x.as_facet().unwrap().to_path_string())
-                        .filter(|x| x.starts_with("/l/"))
-                        .collect_vec();
+                    let labels = extract_labels(doc.get_all(schema.facets));
 
                     let start_pos = doc.get_first(schema.start_pos).unwrap().as_u64().unwrap();
 

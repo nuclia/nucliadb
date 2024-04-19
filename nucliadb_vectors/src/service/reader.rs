@@ -102,13 +102,9 @@ impl VectorReader for VectorReaderService {
             formula.extend(field_clause);
         }
 
-        if request.key_filters.len() > 0 {
+        if !request.key_filters.is_empty() {
             let clause_labels = AtomClause::key_set(request.key_filters.iter().cloned().collect());
             formula.extend(clause_labels);
-            // let key_filters =
-            //     request.key_filters.iter().cloned().map(AtomClause::key_prefix).map(Clause::Atom).collect();
-            // let key_clause = CompoundClause::new(BooleanOperator::Or, key_filters);
-            // formula.extend(key_clause);
         }
 
         if let Some(filter) = context.filtering_formula.as_ref() {
