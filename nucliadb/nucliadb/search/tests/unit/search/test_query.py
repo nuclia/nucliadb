@@ -147,6 +147,7 @@ class TestApplySynonymsToRequest:
             features=[],
             query="query",
             filters=[],
+            paragraph_filters=[],
             faceted=[],
             page_number=0,
             page_size=10,

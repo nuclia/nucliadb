@@ -421,6 +421,7 @@ async def search(
         features=item.features,
         query=item.query,
         filters=item.filters,
+        paragraph_filters=item.paragraph_filters,
         faceted=item.faceted,
         sort=item.sort,
         page_number=item.page_number,

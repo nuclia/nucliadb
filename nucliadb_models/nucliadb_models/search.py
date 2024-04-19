@@ -663,7 +663,12 @@ class BaseSearchRequest(BaseModel):
     filters: Union[List[str], List[Filter]] = Field(
         default=[],
         title="Filters",
-        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/docs/using/search/#filters",  # noqa: E501
+        description="The list of document-level filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/docs/using/search/#filters",  # noqa: E501
+    )
+    paragraph_filters: Union[List[str], List[Filter]] = Field(
+        default=[],
+        title="Filters",
+        description="The list of paragraph-label filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/docs/using/search/#filters",  # noqa: E501
     )
     page_number: int = SearchParamDefaults.page_number.to_pydantic_field()
     page_size: int = SearchParamDefaults.page_size.to_pydantic_field()

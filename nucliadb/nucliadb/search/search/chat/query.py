@@ -283,7 +283,6 @@ async def chat(
             kbid=kbid,
             features=[],
             query="",
-            filters=chat_request.filters,
             page_number=0,
             page_size=0,
             min_score=MinScore(),

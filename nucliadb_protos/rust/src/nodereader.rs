@@ -400,6 +400,8 @@ pub struct SearchRequest {
     pub body: ::prost::alloc::string::String,
     #[prost(message, optional, tag="4")]
     pub filter: ::core::option::Option<Filter>,
+    #[prost(message, optional, tag="26")]
+    pub paragraph_filter: ::core::option::Option<Filter>,
     #[prost(message, optional, tag="5")]
     pub order: ::core::option::Option<OrderBy>,
     #[prost(message, optional, tag="6")]

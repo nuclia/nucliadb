@@ -62,6 +62,7 @@ async def find(
         features=item.features,
         query=item.query,
         filters=item.filters,
+        paragraph_filters=item.paragraph_filters,
         faceted=None,
         sort=None,
         page_number=item.page_number,

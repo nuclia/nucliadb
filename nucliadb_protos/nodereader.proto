@@ -308,6 +308,7 @@ message SearchRequest {
     string body = 3;
 
     Filter filter = 4;
+    Filter paragraph_filter = 26;
 
     OrderBy order = 5;
 

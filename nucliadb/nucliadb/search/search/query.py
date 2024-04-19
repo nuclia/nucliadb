@@ -102,7 +102,6 @@ class QueryParser:
         kbid: str,
         features: list[SearchOptions],
         query: str,
-        filters: Union[list[str], list[Filter]],
         page_number: int,
         page_size: int,
         min_score: MinScore,
@@ -124,12 +123,12 @@ class QueryParser:
         generative_model: Optional[str] = None,
         rephrase: Optional[bool] = False,
         max_tokens: Optional[MaxTokens] = None,
+        filters: Union[None, list[str], list[Filter]] = None,
+        paragraph_filters: Union[None, list[str], list[Filter]] = None,
     ):
         self.kbid = kbid
         self.features = features
         self.query = query
-        self.filters: dict[str, Any] = convert_to_node_filters(filters)
-        self.flat_filter_labels: list[str] = []
         self.faceted = faceted or []
         self.page_number = page_number
         self.page_size = page_size
@@ -155,9 +154,17 @@ class QueryParser:
             default=False,
             context={"kbid": self.kbid},
         )
-        if len(self.filters) > 0:
-            self.filters = translate_label_filters(self.filters)
-            self.flat_filter_labels = flat_filter_labels(self.filters)
+
+        self.filters: dict[str, Any] = {}
+        if filters:
+            self.filters = translate_label_filters(convert_to_node_filters(filters))
+
+        self.paragraph_filters: dict[str, Any] = {}
+        if paragraph_filters:
+            self.paragraph_filters = translate_label_filters(
+                convert_to_node_filters(paragraph_filters)
+            )
+
         self.max_tokens = max_tokens
 
     def _get_default_semantic_min_score(self) -> Awaitable[float]:
@@ -235,9 +242,7 @@ class QueryParser:
         This will schedule concurrent tasks for different data that needs to be pulled
         for the sake of the query being performed
         """
-        if len(self.filters) > 0 and has_classification_label_filters(
-            self.flat_filter_labels
-        ):
+        if len(self.filters) > 0 or len(self.paragraph_filters) > 0:
             asyncio.ensure_future(self._get_classification_labels())
         if self.min_score.semantic is None:
             asyncio.ensure_future(self._get_default_semantic_min_score())
@@ -291,18 +296,31 @@ class QueryParser:
 
     async def parse_filters(self, request: nodereader_pb2.SearchRequest) -> None:
         if len(self.filters) > 0:
-            field_labels = self.flat_filter_labels
-            paragraph_labels: list[str] = []
-            if has_classification_label_filters(self.flat_filter_labels):
+            flat_labels = flat_filter_labels(self.filters)
+            if has_classification_label_filters(flat_labels):
                 classification_labels = await self._get_classification_labels()
-                field_labels, paragraph_labels = split_labels_by_type(
-                    self.flat_filter_labels, classification_labels
+                _, paragraph_labels = split_labels_by_type(
+                    flat_labels, classification_labels
                 )
-                check_supported_filters(self.filters, paragraph_labels)
-
-            request.filter.field_labels.extend(field_labels)
-            request.filter.paragraph_labels.extend(paragraph_labels)
+                if len(paragraph_labels) > 0:
+                    raise InvalidQueryError(
+                        "filters",
+                        "Paragraph labels can't be used in the 'filters' query field. Use 'paragraph_filters' instead.",
+                    )
             request.filter.expression = json.dumps(self.filters)
+
+        if len(self.paragraph_filters) > 0:
+            flat_labels = flat_filter_labels(self.paragraph_filters)
+            classification_labels = await self._get_classification_labels()
+            field_labels, paragraph_labels = split_labels_by_type(
+                flat_labels, classification_labels
+            )
+            if len(field_labels) > 0:
+                raise InvalidQueryError(
+                    "paragraph_filters",
+                    "Field labels can't be used in the 'paragraph_filters' query field. Use 'filters' instead.",
+                )
+            request.paragraph_filter.expression = json.dumps(self.paragraph_filters)
 
         request.faceted.labels.extend(
             [translate_label(facet) for facet in self.faceted]
