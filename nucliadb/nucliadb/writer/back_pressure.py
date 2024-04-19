@@ -225,6 +225,11 @@ class Materializer:
                 )
                 return 0
 
+            if pending > 0:
+                logger.info(
+                    f"Processing returned {pending} pending messages for KB",
+                    extra={"kbid": kbid},
+                )
             self.processing_pending_cache[kbid] = pending
             return pending
 
