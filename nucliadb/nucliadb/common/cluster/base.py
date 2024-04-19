@@ -132,7 +132,7 @@ class AbstractIndexNode(metaclass=ABCMeta):
         shard_id: str,
         vector_dimension: int,
         similarity: str,
-    ) -> str:
+    ):
         req = CreateVectorSetRequest()
         req.shard_id = shard_id
 
@@ -144,5 +144,5 @@ class AbstractIndexNode(metaclass=ABCMeta):
             raise ValueError(f"Invalid similarity: {similarity}")
 
         req.dimension = vector_dimension
-        resp = await self.writer.CreateVectorSet(req)  # type: ignore
-        return resp.vectorset
+        await self.writer.CreateVectorSet(req)  # type: ignore
+        return

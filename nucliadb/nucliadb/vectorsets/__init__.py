@@ -20,7 +20,7 @@
 
 
 from nucliadb.common import datamanagers
-from nucliadb.vectorsets.datamanager import (
+from nucliadb.common.datamanagers.vectorsets import (
     create_vectorset_indexes,
     delete_vectorset_indexes,
     get_vectorsets_kv,
@@ -51,9 +51,8 @@ async def create_vectorset(
         if vectorset_id in vectorsets.vectorsets:
             raise VectorsetConflictError()
 
-        hnsw_indexes = []
         if has_feature(const.Features.VECTORSETS_V2_INDEX_NODE_READY):
-            hnsw_indexes = await create_vectorset_indexes(
+            await create_vectorset_indexes(
                 kbid=kbid,
                 semantic_vector_dimension=payload.semantic_vector_size,
                 semantic_vector_similarity=str(payload.semantic_vector_similarity),
@@ -61,7 +60,6 @@ async def create_vectorset(
 
         vectorset = VectorSet(
             id=vectorset_id,
-            indexes=hnsw_indexes,
             semantic_model=payload.semantic_model,
             semantic_vector_similarity=payload.semantic_vector_similarity,
             semantic_vector_size=payload.semantic_vector_size,
@@ -81,14 +79,14 @@ async def delete_vectorset(kbid: str, vectorset_id: str):
         if vectorsets is None:
             # No vectorsets in the knowledge box
             return
+
         if vectorset_id not in vectorsets.vectorsets:
             # Vectorset does not exist or has already been deleted
             return
 
-        indexes = vectorsets.vectorsets[vectorset_id].indexes
         del vectorsets.vectorsets[vectorset_id]
         await set_vectorsets_kv(txn, kbid=kbid, vectorsets=vectorsets)
         await txn.commit()
 
     if has_feature(const.Features.VECTORSETS_V2_INDEX_NODE_READY):
-        await delete_vectorset_indexes(vectorset_indexes=indexes)
+        await delete_vectorset_indexes(kbid=kbid, vectorset_id=vectorset_id)

@@ -19,41 +19,43 @@
 #
 from typing import Optional
 
-from nucliadb.common.datamanagers.utils import get_kv_pb
+from nucliadb.common.cluster.manager import iterate_kb_nodes
 from nucliadb.common.maindb.driver import Transaction
-from nucliadb_protos import knowledgebox_pb2
+from nucliadb.vectorsets.models import VectorSets
 
-KB_VECTORSET = "/kbs/{kbid}/vectorsets"
+KB_VECTORSET = "/kbs/{kbid}/vectorsets2"
 
 
-async def get_vectorsets(
-    txn: Transaction, *, kbid: str
-) -> Optional[knowledgebox_pb2.VectorSets]:
+async def get_vectorsets_kv(txn: Transaction, *, kbid: str) -> Optional[VectorSets]:
     key = KB_VECTORSET.format(kbid=kbid)
-    return await get_kv_pb(txn, key, knowledgebox_pb2.VectorSets)
+    vectorsets_bytes: Optional[bytes] = await txn.get(key)
+    if not vectorsets_bytes:
+        return None
+    return VectorSets.parse_raw(vectorsets_bytes)
 
 
-async def set_vectorset(
-    txn: Transaction, *, kbid: str, vectorset_id: str, vs: knowledgebox_pb2.VectorSet
-):
-    vectorsets = await get_vectorsets(txn, kbid=kbid)
-    if vectorsets is None:
-        vectorsets = knowledgebox_pb2.VectorSets()
-
-    vectorsets.vectorsets[vectorset_id].CopyFrom(vs)
+async def set_vectorsets_kv(txn: Transaction, *, kbid: str, vectorsets: VectorSets):
     key = KB_VECTORSET.format(kbid=kbid)
-    await txn.set(key, vectorsets.SerializeToString())
+    await txn.set(key, vectorsets.json().encode())
 
 
-async def del_vectorset(txn: Transaction, *, kbid: str, vectorset_id: str):
-    vectorsets = await get_vectorsets(txn, kbid=kbid)
-    if vectorsets is None:
-        return
+async def create_vectorset_indexes(
+    *,
+    kbid: str,
+    semantic_vector_dimension: int,
+    semantic_vector_similarity: str,
+) -> None:
+    async for node, shard_id in iterate_kb_nodes(kbid=kbid):
+        await node.create_vectorset(
+            shard_id=shard_id,
+            vector_dimension=semantic_vector_dimension,
+            similarity=semantic_vector_similarity,
+        )
 
-    if vectorset_id not in vectorsets.vectorsets:
-        return
 
-    del vectorsets.vectorsets[vectorset_id]
-
-    key = KB_VECTORSET.format(kbid=kbid)
-    await txn.set(key, vectorsets.SerializeToString())
+async def delete_vectorset_indexes(*, kbid: str, vectorset_id: str) -> None:
+    """
+    Delete the hnsw indexes for the vectorset from all shards.
+    """
+    async for node, shard_replica_id in iterate_kb_nodes(kbid=kbid):
+        await node.del_vectorset(shard_id=shard_replica_id, vectorset=vectorset_id)

@@ -10,7 +10,7 @@ nucliadb-node-binding>=2.26.0
 uvicorn<0.19.0
 pydantic_argparse
 
-aiohttp>=3.9.3
+aiohttp>=3.9.4
 lru-dict>=1.1.7
 backoff
 aiofiles>=0.8.0

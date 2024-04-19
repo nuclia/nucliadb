@@ -20,7 +20,7 @@
 import asyncio
 import logging
 import uuid
-from typing import Any, Awaitable, Callable, Optional
+from typing import Any, AsyncIterator, Awaitable, Callable, Optional
 
 import backoff
 from nucliadb_protos.nodewriter_pb2 import IndexMessage, IndexMessageSource, TypeMessage
@@ -55,6 +55,10 @@ logger = logging.getLogger(__name__)
 
 INDEX_NODES: dict[str, AbstractIndexNode] = {}
 READ_REPLICA_INDEX_NODES: dict[str, set[str]] = {}
+
+
+class NodeNotFoundError(Exception):
+    pass
 
 
 def get_index_nodes(include_secondary: bool = False) -> list[AbstractIndexNode]:
@@ -580,3 +584,18 @@ def sorted_primary_nodes(avoid_nodes: Optional[list[str]] = None) -> list[str]:
         nid for nid in available_node_ids if nid not in preferred_nodes
     ]
     return preferred_node_order
+
+
+async def iterate_kb_nodes(
+    *, kbid: str
+) -> AsyncIterator[tuple[AbstractIndexNode, str]]:
+    async with datamanagers.with_transaction(read_only=True) as txn:
+        shards_obj = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+        if shards_obj is None:
+            raise ShardsNotFound(kbid)
+        for shard in shards_obj.shards:
+            for replica in shard.replicas:
+                node = get_index_node(replica.node)
+                if node is None:
+                    raise NodeNotFoundError(f"Node {replica.node} not found")
+                yield node, replica.shard.id
