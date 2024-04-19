@@ -304,8 +304,11 @@ impl TextReaderService {
         let total = response.total as i32;
         let retrieved_results = (response.page_number + 1) * response.results_per_page;
         let next_page = total > retrieved_results;
-        let mut results = Vec::with_capacity(response.top_docs.len());
-        for (id, (_, doc_address)) in response.top_docs.into_iter().enumerate() {
+        let results_per_page = response.results_per_page as usize;
+        let result_stream = response.top_docs.into_iter().take(results_per_page).enumerate();
+        let mut results = Vec::with_capacity(results_per_page);
+
+        for (id, (_, doc_address)) in result_stream {
             match searcher.doc(doc_address) {
                 Ok(doc) => {
                     let score = Some(ResultScore {
