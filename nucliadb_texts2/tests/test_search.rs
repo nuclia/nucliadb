@@ -19,6 +19,7 @@
 //
 
 mod common;
+use nucliadb_core::protos::{order_by::OrderField, order_by::OrderType, OrderBy};
 use nucliadb_core::protos::{DocumentSearchRequest, Faceted, Filter};
 use nucliadb_core::query_planner::{PreFilterRequest, ValidFieldCollector};
 use nucliadb_core::texts::*;
@@ -287,7 +288,6 @@ fn test_search_with_min_score() {
 
 #[test]
 fn test_int_order_pagination() {
-    use nucliadb_core::protos::{order_by::OrderField, order_by::OrderType, OrderBy};
     let reader = common::test_reader();
 
     let request = DocumentSearchRequest {
