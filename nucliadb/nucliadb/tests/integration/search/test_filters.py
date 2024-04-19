@@ -347,6 +347,7 @@ async def test_filtering_before_and_after_reindexing(
 ):
     await _test_filtering(nucliadb_reader, kbid, filters)
 
+    # We test again after rollover to make sure filters are properly applied on reindexing
     await rollover.rollover_kb_shards(app_context, kbid)
 
     await _test_filtering(nucliadb_reader, kbid, filters)
@@ -360,11 +361,16 @@ async def _test_filtering(nucliadb_reader: AsyncClient, kbid: str, filters):
         filter_paragraphs.append(FILTERS_TO_PARAGRAPHS.get(fltr, set()))
     expected_paragraphs = set.intersection(*filter_paragraphs)
 
+    # Separate filters into resource and paragraph filters
+    resource_filters = [fltr for fltr in filters if "paragraph" not in fltr]
+    paragraph_filters = [fltr for fltr in filters if "paragraph" in fltr]
+
     resp = await nucliadb_reader.post(
         f"/kb/{kbid}/find",
         json=dict(
             query="",
-            filters=filters,
+            filters=resource_filters,
+            paragraph_filters=paragraph_filters,
             features=["paragraph", "vector"],
             vector=[0.5, 0.5, 0.5],
             min_score=MinScore(semantic=-1).dict(),
