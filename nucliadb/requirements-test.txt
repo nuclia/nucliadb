@@ -11,3 +11,4 @@ pytest-rerunfailures>=11.1.2
 pytest-lazy-fixtures
 pytest-shard
 jsonschema
+faker

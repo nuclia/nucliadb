@@ -139,7 +139,7 @@ impl NodeReader {
             return Err(PyValueError::new_err("Missing shard_id field"));
         };
         let shard = self.obtain_shard(shard_id.id)?;
-        match shard.get_info(&request) {
+        match shard.get_info() {
             Ok(shard) => Ok(PyList::new(py, shard.encode_to_vec())),
             Err(error) => Err(IndexNodeException::new_err(error.to_string())),
         }

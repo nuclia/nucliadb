@@ -50,6 +50,10 @@ async fn main() -> NodeResult<()> {
         return Err(node_error!("Data directory missing"));
     }
 
+    if !settings.shards_path().exists() {
+        return Err(node_error!("Shards directory missing"));
+    }
+
     // XXX it probably should be moved to a more clear abstraction
     lifecycle::initialize_reader(settings.clone());
 

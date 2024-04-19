@@ -64,9 +64,6 @@ def shard_manager(reader):
         "nucliadb.ingest.consumer.shard_creator.choose_node",
         return_value=(node, "shard_id"),
     ), patch(
-        "nucliadb.ingest.consumer.shard_creator.datamanagers.cluster.get_kb_shards",
-        AsyncMock(return_value=shards),
-    ), patch(
         "nucliadb.ingest.consumer.shard_creator.locking.distributed_lock",
         return_value=AsyncMock(),
     ):
@@ -103,7 +100,7 @@ async def test_handle_message_create_new_shard(
     await shard_creator_handler.handle_message(notif.SerializeToString())
     await asyncio.sleep(0.06)
     shard_manager.maybe_create_new_shard.assert_called_with(
-        "kbid", settings.max_shard_paragraphs + 1, 0
+        "kbid", settings.max_shard_paragraphs + 1
     )
 
 

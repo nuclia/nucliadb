@@ -51,9 +51,9 @@ pub struct MergeContext {
 pub struct VectorConfig {
     pub similarity: Option<VectorSimilarity>,
     pub path: PathBuf,
-    pub vectorset: PathBuf,
     pub channel: Channel,
     pub shard_id: String,
+    pub normalize_vectors: bool,
 }
 
 // In an ideal world this should be part of the actual request, but since
@@ -83,7 +83,7 @@ pub trait MergeRunner {
 pub trait VectorReader: std::fmt::Debug + Send + Sync {
     fn search(&self, request: &ProtosRequest, context: &VectorsContext) -> NodeResult<ProtosResponse>;
     fn stored_ids(&self) -> NodeResult<Vec<String>>;
-    fn count(&self, vectorset: &str) -> NodeResult<usize>;
+    fn count(&self) -> NodeResult<usize>;
 
     fn update(&mut self) -> NodeResult<()>;
 }
@@ -92,7 +92,6 @@ pub trait VectorWriter: std::fmt::Debug + Send + Sync {
     fn count(&self) -> NodeResult<usize>;
     fn get_segment_ids(&self) -> NodeResult<Vec<String>>;
     fn get_index_files(&self, ignored_segment_ids: &[String]) -> NodeResult<IndexFiles>;
-    fn list_vectorsets(&self) -> NodeResult<Vec<String>>;
 
     fn prepare_merge(&self, parameters: MergeParameters) -> NodeResult<Option<Box<dyn MergeRunner>>>;
     fn record_merge(&mut self, merge_result: Box<dyn MergeResults>, source: MergeSource) -> NodeResult<MergeMetrics>;
@@ -100,7 +99,5 @@ pub trait VectorWriter: std::fmt::Debug + Send + Sync {
     fn delete_resource(&mut self, resource_id: &ResourceId) -> NodeResult<()>;
     fn garbage_collection(&mut self) -> NodeResult<()>;
     fn force_garbage_collection(&mut self) -> NodeResult<()>;
-    fn remove_vectorset(&mut self, setid: &VectorSetId) -> NodeResult<()>;
-    fn add_vectorset(&mut self, setid: &VectorSetId, similarity: VectorSimilarity) -> NodeResult<()>;
     fn reload(&mut self) -> NodeResult<()>;
 }

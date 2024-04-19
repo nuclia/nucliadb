@@ -398,19 +398,7 @@ class Processor:
             shard = await self.shard_manager.get_current_active_shard(txn, kbid)
             if shard is None:
                 # no shard available, create a new one
-                model = await datamanagers.kb.get_model_metadata(txn, kbid=kbid)
-                config = await kb.get_config()
-                if config is not None:
-                    release_channel = config.release_channel
-                else:
-                    release_channel = utils_pb2.ReleaseChannel.STABLE
-
-                shard = await self.shard_manager.create_shard_by_kbid(
-                    txn,
-                    kbid,
-                    semantic_model=model,
-                    release_channel=release_channel,
-                )
+                shard = await self.shard_manager.create_shard_by_kbid(txn, kbid)
             await datamanagers.resources.set_resource_shard_id(
                 txn, kbid=kbid, rid=uuid, shard=shard.shard
             )

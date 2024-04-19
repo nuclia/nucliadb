@@ -46,6 +46,7 @@ from nucliadb_models.search import (
     ChatOptions,
     ChatRequest,
     KnowledgeboxFindResults,
+    MaxTokens,
     NucliaDBClientType,
     PromptContext,
     PromptContextOrder,
@@ -153,13 +154,16 @@ async def create_chat_response(
     client_type: NucliaDBClientType,
     origin: str,
     x_synchronous: bool,
+    resource: Optional[str] = None,
 ) -> Response:
+    chat_request.max_tokens = parse_max_tokens(chat_request.max_tokens)
     chat_result = await chat(
         kbid,
         chat_request,
         user_id,
         client_type,
         origin,
+        resource=resource,
     )
     if x_synchronous:
         streamed_answer = b""
@@ -256,3 +260,14 @@ def parse_streamed_answer(
             "Error parsing citations. Returning the answer without citations."
         )
         return text_answer.decode("utf-8"), {}
+
+
+def parse_max_tokens(
+    max_tokens: Optional[Union[int, MaxTokens]]
+) -> Optional[MaxTokens]:
+    if isinstance(max_tokens, int):
+        # If the max_tokens is an integer, it is interpreted as the max_tokens value for the generated answer.
+        # The max tokens for the context is set to None to use the default value for the model (comes in the
+        # NUA's query endpoint response).
+        return MaxTokens(answer=max_tokens, context=None)
+    return max_tokens

@@ -60,8 +60,9 @@ from nucliadb_models.labels import KnowledgeBoxLabels, LabelSet
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.synonyms import KnowledgeBoxSynonyms
 from nucliadb_models.vectors import VectorSet, VectorSets
+from nucliadb_utils import const
 from nucliadb_utils.authentication import requires
-from nucliadb_utils.utilities import get_ingest, get_storage
+from nucliadb_utils.utilities import get_ingest, get_storage, has_feature
 
 
 @api.get(
@@ -220,6 +221,11 @@ async def get_labelset(request: Request, kbid: str, labelset: str) -> LabelSet:
 @requires(NucliaDBRoles.READER)
 @version(1)
 async def get_vectorsets(request: Request, kbid: str):
+    if not has_feature(const.Features.VECTORSETS_V2, context={"kbid": kbid}):
+        raise HTTPException(
+            status_code=404,
+            detail="Vectorsets API is not yet implemented",
+        )
     ingest = get_ingest()
     pbrequest: GetVectorSetsRequest = GetVectorSetsRequest()
     pbrequest.kb.uuid = kbid

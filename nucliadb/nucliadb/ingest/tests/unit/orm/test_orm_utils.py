@@ -16,20 +16,16 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-import nucliadb_sdk
+#
+
+import pytest
+
+from nucliadb.ingest.orm.utils import choose_matryoshka_dimension
 
 
-def test_similarity(sdk: nucliadb_sdk.NucliaDB):
-    # Create a KB with dot similarity
-    kb = sdk.create_knowledge_box(slug="dot")
-    assert kb is not None
-
-    # Add vectorsets with different similarities
-    sdk.create_vectorset(
-        kbid=kb.uuid, vectorset="cosine", dimension=728, similarity="cosine"
-    )
-    sdk.create_vectorset(kbid=kb.uuid, vectorset="dot", dimension=728, similarity="dot")
-
-    vectorsets = sdk.list_vectorsets(kbid=kb.uuid)
-    assert vectorsets.vectorsets["dot"].similarity.value == "dot"
-    assert vectorsets.vectorsets["cosine"].similarity.value == "cosine"
+@pytest.mark.parametrize(
+    "dimensions,expected",
+    [([1536, 512], 1536), ([3072, 1024, 256], 1024), ([6144, 3072], 3072)],
+)
+def test_choose_matryoshka_dimensions(dimensions, expected):
+    assert choose_matryoshka_dimension(dimensions) == expected

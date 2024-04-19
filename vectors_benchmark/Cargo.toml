@@ -35,3 +35,7 @@ path = "src/binaries/1m_stats.rs"
 [[bin]]
 name = "real_data_benchmark"
 path = "src/binaries/real_data_benchmark.rs"
+
+[[bin]]
+name = "synthetic_recall_benchmark"
+path = "src/binaries/synthetic_recall_benchmark.rs"

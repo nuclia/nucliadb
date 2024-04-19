@@ -267,6 +267,7 @@ pub async fn connect_to_primary_and_replicate(
                     Some(shard_state.kbid.clone()),
                     shard_state.similarity.clone().into(),
                     None,
+                    shard_state.normalize_vectors,
                 );
                 let shard_cache_clone = Arc::clone(&shard_cache);
 

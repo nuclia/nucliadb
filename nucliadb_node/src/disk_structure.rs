@@ -43,7 +43,6 @@ pub const SHARDS_DIR: &str = "shards";
 pub const PARAGRAPHS_DIR: &str = "paragraph";
 pub const RELATIONS_DIR: &str = "relations";
 pub const TEXTS_DIR: &str = "text";
-pub const VECTORSET_DIR: &str = "vectorset";
 pub const VECTORS_DIR: &str = "vectors";
 
 /// Path where shard `id` is stored

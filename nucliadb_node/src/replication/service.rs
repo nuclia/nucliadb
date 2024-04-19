@@ -229,6 +229,7 @@ impl replication::replication_service_server::ReplicationService for Replication
                         generation_id: gen_id,
                         kbid: metadata.kbid().unwrap_or_default(),
                         similarity: similarity.to_string(),
+                        normalize_vectors: metadata.normalize_vectors(),
                     });
                 }
             } else {

@@ -23,6 +23,7 @@ from datetime import datetime
 from typing import Optional
 
 from nucliadb_protos import resources_pb2 as rpb
+from nucliadb_protos import utils_pb2
 
 from .helpers import labels_to_classifications
 
@@ -36,6 +37,7 @@ class FieldUser:
 class FieldExtracted:
     metadata: Optional[rpb.FieldComputedMetadataWrapper] = None
     text: Optional[rpb.ExtractedTextWrapper] = None
+    vectors: Optional[rpb.ExtractedVectorsWrapper] = None
     question_answers: Optional[rpb.FieldQuestionAnswerWrapper] = None
 
 
@@ -51,6 +53,7 @@ class FieldBuilder:
         self._field_id = rpb.FieldID(field=field, field_type=field_type)
         self.__extracted_metadata: Optional[rpb.FieldComputedMetadataWrapper] = None
         self.__extracted_text: Optional[rpb.ExtractedTextWrapper] = None
+        self.__extracted_vectors: Optional[rpb.ExtractedVectorsWrapper] = None
         self.__user_metadata: Optional[rpb.UserFieldMetadata] = None
         self.__question_answers: Optional[rpb.FieldQuestionAnswerWrapper] = None
 
@@ -81,6 +84,12 @@ class FieldBuilder:
         return self.__extracted_text
 
     @property
+    def _extracted_vectors(self) -> rpb.ExtractedVectorsWrapper:
+        if self.__extracted_vectors is None:
+            self.__extracted_vectors = rpb.ExtractedVectorsWrapper(field=self._field_id)
+        return self.__extracted_vectors
+
+    @property
     def _question_answers(self) -> rpb.FieldQuestionAnswerWrapper:
         if self.__question_answers is None:
             self.__question_answers = rpb.FieldQuestionAnswerWrapper(
@@ -105,6 +114,10 @@ class FieldBuilder:
             field.extracted.text = rpb.ExtractedTextWrapper()
             field.extracted.text.CopyFrom(self.__extracted_text)
 
+        if self.__extracted_vectors is not None:
+            field.extracted.vectors = rpb.ExtractedVectorsWrapper()
+            field.extracted.vectors.CopyFrom(self.__extracted_vectors)
+
         if self.__question_answers is not None:
             field.extracted.question_answers = rpb.FieldQuestionAnswerWrapper()
             field.extracted.question_answers.CopyFrom(self.__question_answers)
@@ -123,6 +136,9 @@ class FieldBuilder:
 
     def with_extracted_text(self, text: str):
         self._extracted_text.body.text = text
+
+    def with_extracted_vectors(self, vectors: list[utils_pb2.Vector]):
+        self._extracted_vectors.vectors.vectors.vectors.extend(vectors)
 
     def with_extracted_paragraph_metadata(self, paragraph: rpb.Paragraph):
         self._extracted_metadata.metadata.metadata.paragraphs.append(paragraph)

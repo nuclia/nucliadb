@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import nucliadb_sdk
+from nucliadb_models.search import MaxTokens
 
 
 def test_chat_on_kb(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
@@ -30,6 +31,8 @@ def test_chat_on_kb(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
             "Nuclia is a powerful AI search platform",
             "AI Search involves semantic search",
         ],
+        # Control the number of AI tokens used for every request
+        max_tokens=MaxTokens(context=100, answer=50),
     )
     assert result.learning_id == "00"
     assert result.answer == "valid answer  to"
@@ -54,13 +57,15 @@ def test_chat_on_kb_no_context_found(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
 
 def test_chat_on_resource(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
     rid = sdk.list_resources(kbid=docs_dataset).resources[0].id
+    # With retrieval
     _ = sdk.chat_on_resource(
         kbid=docs_dataset, rid=rid, query="Nuclia loves Semantic Search"
     )
-    # Commenting this out as this test depends on some docs dataset
-    # that has changed and now the query does not return any results
 
-    # assert result.learning_id == "00"
-    # assert result.answer == "valid answer  to"
-    # assert len(result.result.resources) == 1
-    # assert result.result.resources[rid]
+    # Check chatting with the whole resource (no retrieval)
+    _ = sdk.chat_on_resource(
+        kbid=docs_dataset,
+        rid=rid,
+        query="Nuclia loves Semantic Search",
+        rag_strategies=[{"name": "full_resource"}],
+    )

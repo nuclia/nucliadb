@@ -26,7 +26,7 @@ from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
-from nucliadb.search.search.summarize import summarize
+from nucliadb.search.search.summarize import NoResourcesToSummarize, summarize
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import SummarizedResponse, SummarizeRequest
 from nucliadb_utils.authentication import requires
@@ -53,6 +53,11 @@ async def summarize_endpoint(
         return await summarize(kbid, item)
     except KnowledgeBoxNotFound:
         return HTTPClientError(status_code=404, detail="Knowledge box not found")
+    except NoResourcesToSummarize:
+        return HTTPClientError(
+            status_code=412,
+            detail="Could not summarize: No resources or extracted text found.",
+        )
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
     except predict.ProxiedPredictAPIError as err:
