@@ -87,7 +87,8 @@ class Filter(google.protobuf.message.Message):
     PARAGRAPH_LABELS_FIELD_NUMBER: builtins.int
     EXPRESSION_FIELD_NUMBER: builtins.int
     @property
-    def field_labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def field_labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """Deprecated, no longer used as we have the expression field"""
     @property
     def paragraph_labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     expression: builtins.str

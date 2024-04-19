@@ -1,7 +1,10 @@
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Filter {
+    /// Deprecated, no longer used as we have the expression field
+    #[deprecated]
     #[prost(string, repeated, tag="1")]
     pub field_labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[deprecated]
     #[prost(string, repeated, tag="2")]
     pub paragraph_labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     /// JSON string with the filter expression
