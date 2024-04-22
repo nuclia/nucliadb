@@ -155,7 +155,7 @@ async def merge_documents_results(
     if length > end:
         next_page = True
 
-    # We need to cut first and then sort, otherwise pagination will be wrong
+    # We need to cut first and then sort, otherwise pagination will be wrong if the order is DESC
     raw_resource_list = raw_resource_list[min(skip, length) : min(end, length)]
     raw_resource_list.sort(key=lambda x: x[1], reverse=(sort.order == SortOrder.DESC))
 
