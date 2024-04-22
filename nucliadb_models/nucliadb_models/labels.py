@@ -47,6 +47,7 @@ LABEL_QUERY_ALIASES = {
     "origin.tags": "t",
     "origin.metadata": "m",
     "origin.path": "p",
+    "origin.source-id": "u/s",
     "classification.labels": "l",
     "entities": "e",
     "field": "f",
