@@ -22,6 +22,7 @@ use std::fmt::Debug;
 use std::fs;
 use std::time::Instant;
 
+use itertools::Itertools;
 use nucliadb_core::paragraphs::*;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::prost::Message;
@@ -229,12 +230,27 @@ impl ParagraphWriterService {
         let inspect_paragraph =
             |field: &str| resource.paragraphs.get(field).map_or_else(|| &empty_paragraph, |i| &i.paragraphs);
         let mut paragraph_counter = 0;
+        let resource_labels = resource
+            .labels
+            .iter()
+            .map(Facet::from_text)
+            .filter_ok(is_label)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| tantivy::TantivyError::InvalidArgument(e.to_string()))?;
 
         for (field, text_info) in &resource.texts {
+            let chars: Vec<char> = REGEX.replace_all(&text_info.text, " ").chars().collect();
+            let field_labels = text_info
+                .labels
+                .iter()
+                .map(Facet::from_text)
+                .filter_ok(is_label)
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|e| tantivy::TantivyError::InvalidArgument(e.to_string()))?;
+
             for (paragraph_id, p) in inspect_paragraph(field) {
                 paragraph_counter += 1;
                 let paragraph_term = Term::from_field_text(self.schema.paragraph, paragraph_id);
-                let chars: Vec<char> = REGEX.replace_all(&text_info.text, " ").chars().collect();
                 let start_pos = p.start as u64;
                 let end_pos = p.end as u64;
                 let index = p.index;
@@ -262,24 +278,10 @@ impl ParagraphWriterService {
                     doc.add_bytes(self.schema.metadata, metadata.encode_to_vec());
                 }
 
-                let resource_facets = resource
-                    .labels
-                    .iter()
-                    .map(Facet::from_text)
-                    .collect::<Result<Vec<_>, _>>()
-                    .map_err(|e| tantivy::TantivyError::InvalidArgument(e.to_string()))?;
-                let field_facets = text_info
-                    .labels
-                    .iter()
-                    .map(Facet::from_text)
-                    .collect::<Result<Vec<_>, _>>()
-                    .map_err(|e| tantivy::TantivyError::InvalidArgument(e.to_string()))?;
-
-                let field_labels = field_facets.into_iter().chain(resource_facets.into_iter()).filter(is_label);
-
                 paragraph_labels
                     .into_iter()
-                    .chain(field_labels)
+                    .chain(field_labels.iter().cloned())
+                    .chain(resource_labels.iter().cloned())
                     .for_each(|facet| doc.add_facet(self.schema.facets, facet));
                 doc.add_facet(self.schema.field, Facet::from(&facet_field));
                 doc.add_text(self.schema.paragraph, paragraph_id.clone());
