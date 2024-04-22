@@ -29,11 +29,7 @@ from nucliadb.common import datamanagers
 from nucliadb.ingest.orm.synonyms import Synonyms
 from nucliadb.middleware.transaction import get_read_only_transaction
 from nucliadb.search import logger
-from nucliadb.search.predict import (
-    PredictVectorMissing,
-    SendToPredictError,
-    convert_relations,
-)
+from nucliadb.search.predict import SendToPredictError, convert_relations
 from nucliadb.search.search.filters import (
     convert_to_node_filters,
     flat_filter_labels,
@@ -55,19 +51,15 @@ from nucliadb_models.search import (
     MinScore,
     QueryInfo,
     SearchOptions,
-    SentenceSearch,
     SortField,
     SortFieldMap,
     SortOptions,
     SortOrder,
     SortOrderMap,
     SuggestOptions,
-    TokenSearch,
 )
 from nucliadb_models.security import RequestSecurity
 from nucliadb_protos import knowledgebox_pb2, nodereader_pb2, utils_pb2
-from nucliadb_utils import const
-from nucliadb_utils.utilities import has_feature
 
 from .exceptions import InvalidQueryError
 
@@ -89,7 +81,6 @@ class QueryParser:
 
     _min_score_task: Optional[asyncio.Task] = None
     _query_information_task: Optional[asyncio.Task] = None
-    _convert_vectors_task: Optional[asyncio.Task] = None
     _detected_entities_task: Optional[asyncio.Task] = None
     _entities_meta_cache_task: Optional[asyncio.Task] = None
     _deleted_entities_groups_task: Optional[asyncio.Task] = None
@@ -150,11 +141,7 @@ class QueryParser:
         self.security = security
         self.generative_model = generative_model
         self.rephrase = rephrase
-        self.query_endpoint_enabled = has_feature(
-            const.Features.PREDICT_QUERY_ENDPOINT,
-            default=False,
-            context={"kbid": self.kbid},
-        )
+        self.query_endpoint_used = False
         if len(self.filters) > 0:
             self.filters = translate_label_filters(self.filters)
             self.flat_filter_labels = flat_filter_labels(self.filters)
@@ -167,26 +154,7 @@ class QueryParser:
             )
         return self._min_score_task
 
-    def _get_converted_vectors(self) -> Awaitable[list[float]]:
-        if self._convert_vectors_task is None:  # pragma: no cover
-            self._convert_vectors_task = asyncio.create_task(
-                convert_vectors(self.kbid, self.query)
-            )
-        return self._convert_vectors_task
-
     def _get_query_information(self) -> Awaitable[QueryInfo]:
-        if self.query_endpoint_enabled is False:
-            # XXX Can be removed once query endpoint is fully enabled
-            async def static_query():
-                return QueryInfo(
-                    visual_llm=False,
-                    max_context=300_000,
-                    entities=TokenSearch(tokens=[], time=0.0),
-                    sentence=SentenceSearch(data=[], time=0.0),
-                    query=self.query,
-                )
-
-            return static_query()
         if self._query_information_task is None:  # pragma: no cover
             self._query_information_task = asyncio.create_task(
                 query_information(
@@ -243,20 +211,16 @@ class QueryParser:
             asyncio.ensure_future(self._get_default_semantic_min_score())
 
         if SearchOptions.VECTOR in self.features and self.user_vector is None:
-            if self.query_endpoint_enabled:
-                asyncio.ensure_future(self._get_query_information())
-            else:
-                asyncio.ensure_future(self._get_converted_vectors())
+            asyncio.ensure_future(self._get_query_information())
 
         if (SearchOptions.RELATIONS in self.features or self.autofilter) and len(
             self.query
         ) > 0:
             if (
-                not self.query_endpoint_enabled
+                not self.query_endpoint_used
                 or SearchOptions.VECTOR not in self.features
                 or self.user_vector is not None
             ):
-                self.query_endpoint_enabled = False
                 asyncio.ensure_future(self._get_detected_entities())
             asyncio.ensure_future(self._get_entities_meta_cache())
             asyncio.ensure_future(self._get_deleted_entity_groups())
@@ -407,32 +371,15 @@ class QueryParser:
 
         query_vector = None
         if self.user_vector is None:
-            if self.query_endpoint_enabled:
-                try:
-                    query_info = await self._get_query_information()
-                except SendToPredictError as err:
-                    logger.warning(
-                        f"Errors on predict api trying to embedd query: {err}"
-                    )
-                    incomplete = True
-                except PredictVectorMissing:
-                    logger.warning("Predict api returned an empty vector")
-                    incomplete = True
-                else:
-                    if query_info and query_info.sentence:
-                        query_vector = query_info.sentence.data
-                    else:
-                        incomplete = True
+            try:
+                query_info = await self._get_query_information()
+            except SendToPredictError as err:
+                logger.warning(f"Errors on predict api trying to embedd query: {err}")
+                incomplete = True
             else:
-                try:
-                    query_vector = await self._get_converted_vectors()
-                except SendToPredictError as err:
-                    logger.warning(
-                        f"Errors on predict api trying to embedd query: {err}"
-                    )
-                    incomplete = True
-                except PredictVectorMissing:
-                    logger.warning("Predict api returned an empty vector")
+                if query_info and query_info.sentence:
+                    query_vector = query_info.sentence.data
+                else:
                     incomplete = True
         else:
             query_vector = self.user_vector
@@ -456,7 +403,7 @@ class QueryParser:
         autofilters = []
         relations_search = SearchOptions.RELATIONS in self.features
         if relations_search or self.autofilter:
-            if not self.query_endpoint_enabled:
+            if not self.query_endpoint_used:
                 detected_entities = await self._get_detected_entities()
             else:
                 query_info_result = await self._get_query_information()
@@ -602,12 +549,6 @@ async def paragraph_query_to_pb(
         request.fields.extend(fields)
 
     return request
-
-
-@query_parse_dependency_observer.wrap({"type": "convert_vectors"})
-async def convert_vectors(kbid: str, query: str) -> list[float]:
-    predict = get_predict()
-    return await predict.convert_sentence_to_vector(kbid, query)
 
 
 @query_parse_dependency_observer.wrap({"type": "query_information"})
