@@ -86,6 +86,7 @@ class QueryParser:
     _deleted_entities_groups_task: Optional[asyncio.Task] = None
     _synonyms_task: Optional[asyncio.Task] = None
     _get_classification_labels_task: Optional[asyncio.Task] = None
+    _get_matryoshka_dimension_task: Optional[asyncio.Task] = None
 
     def __init__(
         self,
@@ -163,6 +164,13 @@ class QueryParser:
             )
         return self._query_information_task
 
+    def _get_matryoshka_dimension(self) -> Awaitable[Optional[int]]:
+        if self._get_matryoshka_dimension_task is None:
+            self._get_matryoshka_dimension_task = asyncio.create_task(
+                get_matryoshka_dimension_cached(self.kbid)
+            )
+        return self._get_matryoshka_dimension_task
+
     def _get_detected_entities(self) -> Awaitable[list[utils_pb2.RelationNode]]:
         if self._detected_entities_task is None:  # pragma: no cover
             self._detected_entities_task = asyncio.create_task(
@@ -211,16 +219,15 @@ class QueryParser:
             asyncio.ensure_future(self._get_default_semantic_min_score())
 
         if SearchOptions.VECTOR in self.features and self.user_vector is None:
+            self.query_endpoint_used = True
             asyncio.ensure_future(self._get_query_information())
+            asyncio.ensure_future(self._get_matryoshka_dimension())
 
         if (SearchOptions.RELATIONS in self.features or self.autofilter) and len(
             self.query
         ) > 0:
-            if (
-                not self.query_endpoint_used
-                or SearchOptions.VECTOR not in self.features
-                or self.user_vector is not None
-            ):
+            if not self.query_endpoint_used:
+                # If we only need to detect entities, we don't need the query endpoint
                 asyncio.ensure_future(self._get_detected_entities())
             asyncio.ensure_future(self._get_entities_meta_cache())
             asyncio.ensure_future(self._get_deleted_entity_groups())
@@ -383,18 +390,13 @@ class QueryParser:
                     incomplete = True
         else:
             query_vector = self.user_vector
-
         if query_vector is not None:
-            async with datamanagers.with_transaction(read_only=True) as txn:
-                dimension = await datamanagers.kb.get_matryoshka_vector_dimension(
-                    txn, kbid=self.kbid
-                )
-            if dimension is not None:
+            matryoshka_dimension = await self._get_matryoshka_dimension()
+            if matryoshka_dimension is not None:
                 # KB using a matryoshka embeddings model, cut the query vector
                 # accordingly
-                query_vector = query_vector[:dimension]
+                query_vector = query_vector[:matryoshka_dimension]
             request.vector.extend(query_vector)
-
         return incomplete
 
     async def parse_relation_search(
@@ -759,3 +761,14 @@ def check_supported_filters(filters: dict[str, Any], paragraph_labels: list[str]
                 "filters",
                 "Paragraph labels can only be used with 'all' filter",
             )
+
+
+@alru_cache(maxsize=None)
+async def get_matryoshka_dimension_cached(kbid: str) -> Optional[int]:
+    return await get_matryoshka_dimension(kbid)
+
+
+@query_parse_dependency_observer.wrap({"type": "matryoshka_dimension"})
+async def get_matryoshka_dimension(kbid: str) -> Optional[int]:
+    txn = await get_read_only_transaction()
+    return await datamanagers.kb.get_matryoshka_vector_dimension(txn, kbid=kbid)
