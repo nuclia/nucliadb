@@ -765,6 +765,7 @@ def check_supported_filters(filters: dict[str, Any], paragraph_labels: list[str]
 
 @alru_cache(maxsize=None)
 async def get_matryoshka_dimension_cached(kbid: str) -> Optional[int]:
+    # This can be safely cached as the matryoshka dimension is not expected to change
     return await get_matryoshka_dimension(kbid)
 
 
