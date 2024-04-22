@@ -148,8 +148,6 @@ async def merge_documents_results(
                 raw_resource_list.append((result, score))
         total += document_response.total
 
-    raw_resource_list.sort(key=lambda x: x[1], reverse=(sort.order == SortOrder.DESC))
-
     skip = page * count
     end = skip + count
     length = len(raw_resource_list)
@@ -157,8 +155,12 @@ async def merge_documents_results(
     if length > end:
         next_page = True
 
+    # We need to cut first and then sort, otherwise pagination will be wrong
+    raw_resource_list = raw_resource_list[min(skip, length) : min(end, length)]
+    raw_resource_list.sort(key=lambda x: x[1], reverse=(sort.order == SortOrder.DESC))
+
     result_resource_list: list[ResourceResult] = []
-    for result, _ in raw_resource_list[min(skip, length) : min(end, length)]:
+    for result, _ in raw_resource_list:
         # /f/file
 
         labels = await get_labels_resource(result, kbid)
