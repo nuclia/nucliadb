@@ -22,5 +22,6 @@ setup(
         "grpcio >= 1.44.0",
         "grpcio-tools >= 1.44.0",
         "mypy-protobuf >= 3.4.0",
+        "types-protobuf >= 4.24, < 5"
     ],
 )
