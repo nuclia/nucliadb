@@ -52,6 +52,7 @@ pub mod shard_created {
         ParagraphV0 = 0,
         ParagraphV1 = 1,
         ParagraphV2 = 2,
+        ParagraphV3 = 3,
     }
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]

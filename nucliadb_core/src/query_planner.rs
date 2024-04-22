@@ -107,7 +107,7 @@ impl IndexQueries {
         request.field_labels.clear();
     }
 
-    fn apply_to_paragraphs(request: &mut ParagraphSearchRequest, response: &PreFilterResponse) {
+    fn apply_to_paragraphs3(request: &mut ParagraphSearchRequest, response: &PreFilterResponse) {
         if matches!(response.valid_fields, ValidFieldCollector::All) {
             // Since all the fields are matching there is no need to use this filter.
             request.timestamps = None;
@@ -150,8 +150,8 @@ impl IndexQueries {
         };
 
         match (self.paragraphs_version, self.paragraphs_request.as_mut()) {
-            (1, Some(paragraph_request)) => IndexQueries::apply_to_paragraphs(paragraph_request, &prefiltered),
             (2, Some(paragraph_request)) => IndexQueries::apply_to_paragraphs2(paragraph_request, &prefiltered),
+            (3, Some(paragraph_request)) => IndexQueries::apply_to_paragraphs3(paragraph_request, &prefiltered),
             _ => (),
         }
     }

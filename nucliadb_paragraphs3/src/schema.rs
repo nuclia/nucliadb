@@ -35,6 +35,9 @@ pub struct ParagraphSchema {
     /// paragraph id
     pub paragraph: Field,
 
+    // Full field id (resource+field) for prefilter
+    pub field_uuid: Field,
+
     pub text: Field,
 
     pub start_pos: Field,
@@ -80,6 +83,7 @@ impl Default for ParagraphSchema {
         let facet_options = FacetOptions::default().set_stored();
 
         let uuid = sb.add_text_field("uuid", STRING | STORED);
+        let field_uuid = sb.add_text_field("field_uuid", STRING);
         let paragraph = sb.add_text_field("paragraph", STRING | STORED);
         let text = sb.add_text_field("text", TEXT);
         let start_pos = sb.add_u64_field("start_pos", num_options.clone());
@@ -91,11 +95,11 @@ impl Default for ParagraphSchema {
 
         // Status
         let status = sb.add_u64_field("status", num_options.clone());
-        let index = sb.add_u64_field("index", num_options);
+        let index = sb.add_u64_field("index", num_options.clone());
 
         // Facets
         let facets = sb.add_facet_field("facets", facet_options.clone());
-        let field = sb.add_facet_field("field", facet_options);
+        let field = sb.add_facet_field("field", facet_options.clone());
         let split = sb.add_text_field("split", STRING | STORED);
 
         let repeated_in_field = sb.add_u64_field("repeated_in_field", repeated_options);
@@ -114,6 +118,7 @@ impl Default for ParagraphSchema {
             status,
             facets,
             field,
+            field_uuid,
             split,
             index,
             repeated_in_field,

@@ -38,6 +38,7 @@ use tantivy::{doc, Index, IndexSettings, IndexSortByField, IndexWriter, Order};
 
 use super::schema::ParagraphSchema;
 use crate::schema::timestamp_to_datetime_utc;
+use crate::search_response::is_label;
 
 lazy_static::lazy_static! {
     static ref REGEX: Regex = Regex::new(r"\\[a-zA-Z1-9]").unwrap();
@@ -213,28 +214,23 @@ impl ParagraphWriterService {
         })
     }
 
-    fn index_paragraph(&mut self, resource: &Resource) -> tantivy::Result<()> {
-        let metadata = resource.metadata.as_ref().expect("Missing resource metadata");
-        let modified = metadata.modified.as_ref().expect("Missing resource modified date in metadata");
-        let created = metadata.created.as_ref().expect("Missing resource created date in metadata");
+    fn index_paragraph(&mut self, resource: &Resource) -> NodeResult<()> {
+        let Some(metadata) = resource.metadata.as_ref() else {
+            return Err(node_error!("Missing resource metadata"));
+        };
+        let Some(modified) = metadata.modified.as_ref() else {
+            return Err(node_error!("Missing resource modified date in metadata"));
+        };
+        let Some(created) = metadata.created.as_ref() else {
+            return Err(node_error!("Missing resource created date in metadata"));
+        };
 
         let empty_paragraph = HashMap::with_capacity(0);
         let inspect_paragraph =
             |field: &str| resource.paragraphs.get(field).map_or_else(|| &empty_paragraph, |i| &i.paragraphs);
-        let resource_facets = resource
-            .labels
-            .iter()
-            .map(Facet::from_text)
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| tantivy::TantivyError::InvalidArgument(e.to_string()))?;
         let mut paragraph_counter = 0;
+
         for (field, text_info) in &resource.texts {
-            let text_labels = text_info
-                .labels
-                .iter()
-                .map(Facet::from_text)
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(|e| tantivy::TantivyError::InvalidArgument(e.to_string()))?;
             for (paragraph_id, p) in inspect_paragraph(field) {
                 paragraph_counter += 1;
                 let paragraph_term = Term::from_field_text(self.schema.paragraph, paragraph_id);
@@ -266,11 +262,24 @@ impl ParagraphWriterService {
                     doc.add_bytes(self.schema.metadata, metadata.encode_to_vec());
                 }
 
-                resource_facets
+                let resource_facets = resource
+                    .labels
                     .iter()
-                    .chain(text_labels.iter())
-                    .chain(paragraph_labels.iter())
-                    .cloned()
+                    .map(Facet::from_text)
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|e| tantivy::TantivyError::InvalidArgument(e.to_string()))?;
+                let field_facets = text_info
+                    .labels
+                    .iter()
+                    .map(Facet::from_text)
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|e| tantivy::TantivyError::InvalidArgument(e.to_string()))?;
+
+                let field_labels = field_facets.into_iter().chain(resource_facets.into_iter()).filter(is_label);
+
+                paragraph_labels
+                    .into_iter()
+                    .chain(field_labels)
                     .for_each(|facet| doc.add_facet(self.schema.facets, facet));
                 doc.add_facet(self.schema.field, Facet::from(&facet_field));
                 doc.add_text(self.schema.paragraph, paragraph_id.clone());
@@ -279,6 +288,8 @@ impl ParagraphWriterService {
                 doc.add_u64(self.schema.end_pos, end_pos);
                 doc.add_u64(self.schema.index, index);
                 doc.add_text(self.schema.split, split);
+                doc.add_text(self.schema.field_uuid, format!("{}/{}", resource.resource.as_ref().unwrap().uuid, field));
+
                 self.writer.delete_term(paragraph_term);
                 self.writer.add_document(doc)?;
                 if paragraph_counter % 500 == 0 {

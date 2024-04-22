@@ -32,7 +32,7 @@ use crate::search_query::TermCollector;
 
 pub fn extract_labels<'a>(facets_iterator: impl Iterator<Item = &'a Value>) -> Vec<String> {
     lazy_static! {
-        static ref LABEL_PREFIX: Facet = Facet::from_text("/l/").unwrap();
+        static ref LABEL_PREFIX: Facet = Facet::from_text("/l").unwrap();
     };
     facets_iterator
         .flat_map(|x| x.as_facet())

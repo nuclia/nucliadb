@@ -1075,6 +1075,7 @@ class SuggestRequest(google.protobuf.message.Message):
     FILTER_FIELD_NUMBER: builtins.int
     TIMESTAMPS_FIELD_NUMBER: builtins.int
     FIELDS_FIELD_NUMBER: builtins.int
+    KEY_FILTERS_FIELD_NUMBER: builtins.int
     shard: builtins.str
     body: builtins.str
     @property
@@ -1085,6 +1086,8 @@ class SuggestRequest(google.protobuf.message.Message):
     def timestamps(self) -> global___Timestamps: ...
     @property
     def fields(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    @property
+    def key_filters(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     def __init__(
         self,
         *,
@@ -1094,9 +1097,10 @@ class SuggestRequest(google.protobuf.message.Message):
         filter: global___Filter | None = ...,
         timestamps: global___Timestamps | None = ...,
         fields: collections.abc.Iterable[builtins.str] | None = ...,
+        key_filters: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["filter", b"filter", "timestamps", b"timestamps"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["body", b"body", "features", b"features", "fields", b"fields", "filter", b"filter", "shard", b"shard", "timestamps", b"timestamps"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["body", b"body", "features", b"features", "fields", b"fields", "filter", b"filter", "key_filters", b"key_filters", "shard", b"shard", "timestamps", b"timestamps"]) -> None: ...
 
 global___SuggestRequest = SuggestRequest
 

@@ -152,6 +152,7 @@ impl ShardWriter {
             0 => ParagraphService::ParagraphV0,
             1 => ParagraphService::ParagraphV1,
             2 => ParagraphService::ParagraphV2,
+            3 => ParagraphService::ParagraphV3,
             i => panic!("Unknown paragraph version {i}"),
         }
     }
