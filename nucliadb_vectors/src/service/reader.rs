@@ -92,7 +92,8 @@ impl VectorReader for VectorReaderService {
         }
 
         if !request.key_filters.is_empty() {
-            let clause_labels = AtomClause::key_set(request.key_filters.iter().cloned().collect());
+            let (field_ids, resource_ids) = request.key_filters.iter().cloned().partition(|k| k.contains('/'));
+            let clause_labels = AtomClause::key_set(resource_ids, field_ids);
             formula.extend(clause_labels);
         }
 

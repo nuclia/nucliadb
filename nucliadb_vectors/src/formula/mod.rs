@@ -27,7 +27,7 @@ use crate::data_point::{Address, DataRetriever};
 pub enum AtomClause {
     KeyPrefix(String),
     Label(String),
-    KeyPrefixSet(HashSet<String>),
+    KeyPrefixSet((HashSet<String>, HashSet<String>)),
 }
 impl AtomClause {
     pub fn label(value: String) -> AtomClause {
@@ -36,22 +36,28 @@ impl AtomClause {
     pub fn key_prefix(value: String) -> AtomClause {
         Self::KeyPrefix(value)
     }
-    pub fn key_set(set: HashSet<String>) -> AtomClause {
-        Self::KeyPrefixSet(set)
+    pub fn key_set(resource_set: HashSet<String>, field_set: HashSet<String>) -> AtomClause {
+        Self::KeyPrefixSet((resource_set, field_set))
     }
     fn run<D: DataRetriever>(&self, x: Address, retriever: &D) -> bool {
         match self {
             Self::KeyPrefix(value) => retriever.get_key(x).starts_with(value.as_bytes()),
 
             Self::Label(value) => retriever.has_label(x, value.as_bytes()),
-            Self::KeyPrefixSet(set) => {
+            Self::KeyPrefixSet((resource_set, field_set)) => {
                 let key = retriever.get_key(x);
                 let kk = String::from_utf8_lossy(key);
                 let parts: Vec<_> = kk.split('/').collect();
+
+                let matches_resource = resource_set.contains(parts[0]);
+                if matches_resource {
+                    return true;
+                }
+
                 if parts.len() < 3 {
                     return false;
                 }
-                set.contains(&parts[0..3].join("/"))
+                field_set.contains(&parts[0..3].join("/"))
             }
         }
     }
@@ -218,6 +224,58 @@ mod tests {
 
         let inner = vec![Clause::Atom(AtomClause::key_prefix("/This/is/not".to_string()))];
         formula.extend(CompoundClause::new(BooleanOperator::Or, inner));
+        assert!(!formula.run(ADDRESS, &retriever));
+    }
+
+    #[test]
+    fn test_key_filters() {
+        let resource_id = String::from("015163a0629e4f368aa9d54978d2a9ff");
+        const FIELD_ID: &str = "015163a0629e4f368aa9d54978d2a9ff/f/file1";
+        let field_id = String::from(FIELD_ID);
+
+        let fake_resource_id = String::from("badcafe0badcafe0badcafe0badcafe0");
+        let fake_field_id = format!("{resource_id}/f/not_a_field");
+
+        const ADDRESS: Address = Address::dummy();
+        let retriever = DummyRetriever {
+            key: FIELD_ID.as_bytes(),
+            labels: HashSet::new(),
+        };
+
+        // Find by resource_id
+        let mut formula = Formula::new();
+        formula.extend(AtomClause::key_prefix(resource_id.clone()));
+        assert!(formula.run(ADDRESS, &retriever));
+
+        let mut formula = Formula::new();
+        formula.extend(AtomClause::key_prefix(fake_resource_id.clone()));
+        assert!(!formula.run(ADDRESS, &retriever));
+
+        // Find by field_id
+        let mut formula = Formula::new();
+        formula.extend(AtomClause::key_prefix(field_id.clone()));
+        assert!(formula.run(ADDRESS, &retriever));
+
+        let mut formula = Formula::new();
+        formula.extend(AtomClause::key_prefix(fake_field_id.clone()));
+        assert!(!formula.run(ADDRESS, &retriever));
+
+        // Find by set of resource_ids
+        let mut formula = Formula::new();
+        formula.extend(AtomClause::key_set([resource_id.clone()].into_iter().collect(), HashSet::new()));
+        assert!(formula.run(ADDRESS, &retriever));
+
+        let mut formula = Formula::new();
+        formula.extend(AtomClause::key_set([fake_resource_id.clone()].into_iter().collect(), HashSet::new()));
+        assert!(!formula.run(ADDRESS, &retriever));
+
+        // Find by set of field_ids
+        let mut formula = Formula::new();
+        formula.extend(AtomClause::key_set(HashSet::new(), [field_id.clone()].into_iter().collect()));
+        assert!(formula.run(ADDRESS, &retriever));
+
+        let mut formula = Formula::new();
+        formula.extend(AtomClause::key_set(HashSet::new(), [fake_field_id.clone()].into_iter().collect()));
         assert!(!formula.run(ADDRESS, &retriever));
     }
 }
