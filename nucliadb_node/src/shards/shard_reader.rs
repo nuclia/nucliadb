@@ -31,7 +31,11 @@ use nucliadb_core::protos::{
     ShardFile, ShardFileChunk, ShardFileList, StreamRequest, SuggestFeatures, SuggestRequest, SuggestResponse,
     VectorSearchRequest, VectorSearchResponse,
 };
+use nucliadb_core::query_language::BooleanExpression;
+use nucliadb_core::query_language::BooleanOperation;
+use nucliadb_core::query_language::Operator;
 use nucliadb_core::query_planner;
+use nucliadb_core::query_planner::PreFilterRequest;
 use nucliadb_core::relations::*;
 use nucliadb_core::texts::*;
 use nucliadb_core::thread::*;
@@ -129,6 +133,7 @@ impl ShardReader {
             0 => ParagraphService::ParagraphV0,
             1 => ParagraphService::ParagraphV1,
             2 => ParagraphService::ParagraphV2,
+            3 => ParagraphService::ParagraphV3,
             i => panic!("Unknown paragraph version {i}"),
         }
     }
@@ -315,15 +320,44 @@ impl ShardReader {
 
     #[measure(actor = "shard", metric = "suggest")]
     #[tracing::instrument(skip_all)]
-    pub fn suggest(&self, request: SuggestRequest) -> NodeResult<SuggestResponse> {
+    pub fn suggest(&self, mut request: SuggestRequest) -> NodeResult<SuggestResponse> {
         let span = tracing::Span::current();
 
-        let suggest_paragraphs = request.features.contains(&(SuggestFeatures::Paragraphs as i32));
+        let mut suggest_paragraphs = request.features.contains(&(SuggestFeatures::Paragraphs as i32));
         let suggest_entities = request.features.contains(&(SuggestFeatures::Entities as i32));
 
         let paragraphs_reader_service = self.paragraph_reader.clone();
         let relations_reader_service = self.relation_reader.clone();
         let prefixes = Self::split_suggest_query(request.body.clone(), MAX_SUGGEST_COMPOUND_WORDS);
+
+        // Prefilter to apply field label filters
+        if let Some(filter) = &mut request.filter {
+            // nucliadb_paragraphs2 has all the labels and doesn't need a prefilter
+            if !filter.field_labels.is_empty() && suggest_paragraphs && self.paragraph_version != 2 {
+                let labels = std::mem::take(&mut filter.field_labels);
+                let operands = labels.into_iter().map(BooleanExpression::Literal).collect();
+                let op = BooleanOperation {
+                    operator: Operator::And,
+                    operands,
+                };
+                let prefilter = PreFilterRequest {
+                    timestamp_filters: vec![],
+                    security: None,
+                    formula: Some(BooleanExpression::Operation(op)),
+                };
+
+                let prefiltered = read_rw_lock(&self.text_reader).prefilter(&prefilter)?;
+
+                // Apply prefilter to paragraphs query
+                match prefiltered.valid_fields {
+                    query_planner::ValidFieldCollector::All => {}
+                    query_planner::ValidFieldCollector::Some(keys) => {
+                        request.key_filters = keys.iter().map(|v| format!("{}{}", v.resource_id, v.field_id)).collect()
+                    }
+                    query_planner::ValidFieldCollector::None => suggest_paragraphs = false,
+                }
+            }
+        }
 
         let suggest_paragraphs_task = suggest_paragraphs.then(|| {
             let paragraph_task = move || read_rw_lock(&paragraphs_reader_service).suggest(&request);

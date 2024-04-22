@@ -18,37 +18,62 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::data_point::{Address, DataRetriever};
+use std::collections::HashSet;
 
-#[derive(Debug, Copy, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
-pub enum AtomKind {
-    KeyPrefix,
-    Label,
-}
+use crate::data_point::{Address, DataRetriever};
 
 /// Is a singleton clause.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
-pub struct AtomClause {
-    kind: AtomKind,
-    value: String,
+pub enum AtomClause {
+    KeyPrefix(String),
+    Label(String),
+    KeyPrefixSet((HashSet<String>, HashSet<String>)),
 }
 impl AtomClause {
-    pub fn new(value: String, kind: AtomKind) -> AtomClause {
-        AtomClause {
-            kind,
-            value,
-        }
-    }
     pub fn label(value: String) -> AtomClause {
-        AtomClause::new(value, AtomKind::Label)
+        Self::Label(value)
     }
     pub fn key_prefix(value: String) -> AtomClause {
-        AtomClause::new(value, AtomKind::KeyPrefix)
+        Self::KeyPrefix(value)
+    }
+    pub fn key_set(resource_set: HashSet<String>, field_set: HashSet<String>) -> AtomClause {
+        Self::KeyPrefixSet((resource_set, field_set))
     }
     fn run<D: DataRetriever>(&self, x: Address, retriever: &D) -> bool {
-        match self.kind {
-            AtomKind::KeyPrefix => retriever.get_key(x).starts_with(self.value.as_bytes()),
-            AtomKind::Label => retriever.has_label(x, self.value.as_bytes()),
+        match self {
+            Self::KeyPrefix(value) => retriever.get_key(x).starts_with(value.as_bytes()),
+
+            Self::Label(value) => retriever.has_label(x, value.as_bytes()),
+            Self::KeyPrefixSet((resource_set, field_set)) => {
+                let key = retriever.get_key(x);
+                let mut key_parts = key.split(|b| *b == b'/');
+
+                // Matches resource_id
+                let resource_id = std::str::from_utf8(key_parts.next().unwrap()).unwrap();
+                let matches_resource = resource_set.contains(resource_id);
+                if matches_resource {
+                    return true;
+                }
+
+                // Matches field_id (key up to the third slash)
+                let mut slash_count = 0;
+                let mut end_pos = 0;
+                for char in key.iter() {
+                    if *char == b'/' {
+                        slash_count += 1;
+                        if slash_count == 3 {
+                            break;
+                        }
+                    }
+                    end_pos += 1;
+                }
+                // slash_count = 2 if we reach the end of string with 2 middle slashes
+                if slash_count < 2 {
+                    return false;
+                }
+
+                field_set.contains(std::str::from_utf8(&key[0..end_pos]).unwrap())
+            }
         }
     }
 }
@@ -123,20 +148,6 @@ impl From<CompoundClause> for Clause {
     }
 }
 
-#[derive(Default)]
-pub struct AtomCollector {
-    pub labels: Vec<String>,
-    pub key_prefixes: Vec<String>,
-}
-impl AtomCollector {
-    fn add(&mut self, atom: AtomClause) {
-        match atom.kind {
-            AtomKind::KeyPrefix => self.key_prefixes.push(atom.value),
-            AtomKind::Label => self.labels.push(atom.value),
-        }
-    }
-}
-
 /// Once applied to a given address, the formula becomes a boolean
 /// expression that evaluates to whether the address is valid or not.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, PartialEq)]
@@ -155,22 +166,6 @@ impl Formula {
     }
     pub fn run<D: DataRetriever>(&self, x: Address, retriever: &D) -> bool {
         self.clauses.iter().all(|q| q.run(x, retriever))
-    }
-    /// Returns the atoms that form a formula
-    pub fn get_atoms(&self) -> AtomCollector {
-        let mut collector = AtomCollector::default();
-        let mut work: Vec<_> = self.clauses.iter().collect();
-        while let Some(clause) = work.pop() {
-            match clause {
-                Clause::Atom(q) => collector.add(q.clone()),
-                Clause::Compound(clause) => {
-                    for clause in clause.operands.iter() {
-                        work.push(clause);
-                    }
-                }
-            }
-        }
-        collector
     }
 }
 
@@ -244,6 +239,58 @@ mod tests {
 
         let inner = vec![Clause::Atom(AtomClause::key_prefix("/This/is/not".to_string()))];
         formula.extend(CompoundClause::new(BooleanOperator::Or, inner));
+        assert!(!formula.run(ADDRESS, &retriever));
+    }
+
+    #[test]
+    fn test_key_filters() {
+        let resource_id = String::from("015163a0629e4f368aa9d54978d2a9ff");
+        const FIELD_ID: &str = "015163a0629e4f368aa9d54978d2a9ff/f/file1";
+        let field_id = String::from(FIELD_ID);
+
+        let fake_resource_id = String::from("badcafe0badcafe0badcafe0badcafe0");
+        let fake_field_id = format!("{resource_id}/f/not_a_field");
+
+        const ADDRESS: Address = Address::dummy();
+        let retriever = DummyRetriever {
+            key: FIELD_ID.as_bytes(),
+            labels: HashSet::new(),
+        };
+
+        // Find by resource_id
+        let mut formula = Formula::new();
+        formula.extend(AtomClause::key_prefix(resource_id.clone()));
+        assert!(formula.run(ADDRESS, &retriever));
+
+        let mut formula = Formula::new();
+        formula.extend(AtomClause::key_prefix(fake_resource_id.clone()));
+        assert!(!formula.run(ADDRESS, &retriever));
+
+        // Find by field_id
+        let mut formula = Formula::new();
+        formula.extend(AtomClause::key_prefix(field_id.clone()));
+        assert!(formula.run(ADDRESS, &retriever));
+
+        let mut formula = Formula::new();
+        formula.extend(AtomClause::key_prefix(fake_field_id.clone()));
+        assert!(!formula.run(ADDRESS, &retriever));
+
+        // Find by set of resource_ids
+        let mut formula = Formula::new();
+        formula.extend(AtomClause::key_set([resource_id.clone()].into_iter().collect(), HashSet::new()));
+        assert!(formula.run(ADDRESS, &retriever));
+
+        let mut formula = Formula::new();
+        formula.extend(AtomClause::key_set([fake_resource_id.clone()].into_iter().collect(), HashSet::new()));
+        assert!(!formula.run(ADDRESS, &retriever));
+
+        // Find by set of field_ids
+        let mut formula = Formula::new();
+        formula.extend(AtomClause::key_set(HashSet::new(), [field_id.clone()].into_iter().collect()));
+        assert!(formula.run(ADDRESS, &retriever));
+
+        let mut formula = Formula::new();
+        formula.extend(AtomClause::key_set(HashSet::new(), [fake_field_id.clone()].into_iter().collect()));
         assert!(!formula.run(ADDRESS, &retriever));
     }
 }
