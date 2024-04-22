@@ -33,8 +33,6 @@ from nucliadb_protos.writer_pb2 import (
     IndexResource,
     ResourceFieldExistsResponse,
     ResourceFieldId,
-    ResourceIdRequest,
-    ResourceIdResponse,
 )
 from starlette.requests import Request
 
@@ -592,19 +590,37 @@ async def _reindex_resource(
     return Response(status_code=200)
 
 
-async def get_resource_uuid_from_slug(kbid: str, slug: str) -> str:
+async def get_rid_from_slug_or_raise_error(kbid: str, rslug: str) -> str:
+    async with datamanagers.with_transaction(read_only=True) as txn:
+        rid = await datamanagers.resources.get_resource_uuid_from_slug(
+            txn, kbid=kbid, slug=rslug
+        )
+    if not rid:
+        raise HTTPException(status_code=404, detail="Resource does not exist")
+    return rid
+
+
+async def validate_rid_exists_or_raise_error(
+    kbid: str,
+    rid: str,
+) -> str:
     ingest = get_ingest()
-    pbrequest = ResourceIdRequest()
+    pbrequest = ResourceFieldId()
     pbrequest.kbid = kbid
-    pbrequest.slug = slug
+    pbrequest.rid = rid
+
     try:
-        response: ResourceIdResponse = await ingest.GetResourceId(pbrequest)  # type: ignore
+        response: ResourceFieldExistsResponse = await ingest.ResourceFieldExists(pbrequest)  # type: ignore
     except AioRpcError as exc:
         if exc.code() is GrpcStatusCode.UNAVAILABLE:
             raise IngestNotAvailable()
         else:
             raise exc
-    return response.uuid
+
+    if response.found:
+        return rid
+    else:
+        raise HTTPException(status_code=404, detail="Resource does not exist")
 
 
 async def get_rid_from_params_or_raise_error(
@@ -613,31 +629,12 @@ async def get_rid_from_params_or_raise_error(
     slug: Optional[str] = None,
 ) -> str:
     if rid is not None:
-        ingest = get_ingest()
-        pbrequest = ResourceFieldId()
-        pbrequest.kbid = kbid
-        pbrequest.rid = rid
-
-        try:
-            response: ResourceFieldExistsResponse = await ingest.ResourceFieldExists(pbrequest)  # type: ignore
-        except AioRpcError as exc:
-            if exc.code() is GrpcStatusCode.UNAVAILABLE:
-                raise IngestNotAvailable()
-            else:
-                raise exc
-
-        if response.found:
-            return rid
-        else:
-            raise HTTPException(status_code=404, detail="Resource does not exist")
+        return await validate_rid_exists_or_raise_error(kbid, rid)
 
     if slug is None:
         raise ValueError("Either rid or slug must be set")
 
-    rid = await get_resource_uuid_from_slug(kbid, slug)
-    if not rid:
-        raise HTTPException(status_code=404, detail="Resource does not exist")
-
+    rid = await get_rid_from_slug_or_raise_error(kbid, slug)
     return rid
 
 

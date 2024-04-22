@@ -1716,39 +1716,6 @@ class ResourceFieldExistsResponse(google.protobuf.message.Message):
 global___ResourceFieldExistsResponse = ResourceFieldExistsResponse
 
 @typing_extensions.final
-class ResourceIdRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    KBID_FIELD_NUMBER: builtins.int
-    SLUG_FIELD_NUMBER: builtins.int
-    kbid: builtins.str
-    slug: builtins.str
-    def __init__(
-        self,
-        *,
-        kbid: builtins.str = ...,
-        slug: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["kbid", b"kbid", "slug", b"slug"]) -> None: ...
-
-global___ResourceIdRequest = ResourceIdRequest
-
-@typing_extensions.final
-class ResourceIdResponse(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    UUID_FIELD_NUMBER: builtins.int
-    uuid: builtins.str
-    def __init__(
-        self,
-        *,
-        uuid: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["uuid", b"uuid"]) -> None: ...
-
-global___ResourceIdResponse = ResourceIdResponse
-
-@typing_extensions.final
 class SetVectorsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

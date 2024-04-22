@@ -150,8 +150,6 @@ from nucliadb_protos.writer_pb2 import (
     PROCESSOR as PROCESSOR,
     ResourceFieldExistsResponse as ResourceFieldExistsResponse,
     ResourceFieldId as ResourceFieldId,
-    ResourceIdRequest as ResourceIdRequest,
-    ResourceIdResponse as ResourceIdResponse,
     SetEntitiesRequest as SetEntitiesRequest,
     SetLabelsRequest as SetLabelsRequest,
     SetSynonymsRequest as SetSynonymsRequest,

@@ -161,10 +161,6 @@ class WriterStub:
         nucliadb_protos.writer_pb2.ResourceFieldId,
         nucliadb_protos.writer_pb2.ResourceFieldExistsResponse,
     ]
-    GetResourceId: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.ResourceIdRequest,
-        nucliadb_protos.writer_pb2.ResourceIdResponse,
-    ]
     ProcessMessage: grpc.StreamUnaryMultiCallable[
         nucliadb_protos.writer_pb2.BrokerMessage,
         nucliadb_protos.writer_pb2.OpStatusWriter,
@@ -290,12 +286,6 @@ class WriterServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.writer_pb2.ResourceFieldId,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.ResourceFieldExistsResponse: ...
-    @abc.abstractmethod
-    def GetResourceId(
-        self,
-        request: nucliadb_protos.writer_pb2.ResourceIdRequest,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.writer_pb2.ResourceIdResponse: ...
     @abc.abstractmethod
     def ProcessMessage(
         self,

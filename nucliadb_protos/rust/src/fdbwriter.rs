@@ -623,18 +623,6 @@ pub struct ResourceFieldExistsResponse {
     pub found: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ResourceIdRequest {
-    #[prost(string, tag="1")]
-    pub kbid: ::prost::alloc::string::String,
-    #[prost(string, tag="2")]
-    pub slug: ::prost::alloc::string::String,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ResourceIdResponse {
-    #[prost(string, tag="1")]
-    pub uuid: ::prost::alloc::string::String,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SetVectorsRequest {
     #[prost(message, optional, tag="1")]
     pub vectors: ::core::option::Option<super::utils::VectorObject>,

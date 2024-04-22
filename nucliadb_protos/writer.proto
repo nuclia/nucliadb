@@ -455,15 +455,6 @@ message ResourceFieldExistsResponse {
     bool found = 1;
 }
 
-message ResourceIdRequest {
-    string kbid = 1;
-    string slug = 2;
-}
-
-message ResourceIdResponse {
-    string uuid = 1;
-}
-
 message SetVectorsRequest {
     utils.VectorObject vectors = 1;
     string kbid = 2;
@@ -527,8 +518,6 @@ service Writer {
     rpc SetVectors(SetVectorsRequest) returns (SetVectorsResponse) {}
 
     rpc ResourceFieldExists(ResourceFieldId) returns (ResourceFieldExistsResponse) {}
-
-    rpc GetResourceId(ResourceIdRequest) returns (ResourceIdResponse) {}
 
     rpc ProcessMessage(stream BrokerMessage) returns (OpStatusWriter) {}
 

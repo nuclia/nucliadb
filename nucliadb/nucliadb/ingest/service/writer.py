@@ -63,8 +63,6 @@ from nucliadb_protos.writer_pb2 import (
     OpStatusWriter,
     ResourceFieldExistsResponse,
     ResourceFieldId,
-    ResourceIdRequest,
-    ResourceIdResponse,
     SetEntitiesRequest,
     SetLabelsRequest,
     SetSynonymsRequest,
@@ -647,18 +645,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             ]
         )
         return response
-
-    async def GetResourceId(  # type: ignore
-        self, request: ResourceIdRequest, context=None
-    ) -> ResourceIdResponse:
-        response = ResourceIdResponse()
-        response.uuid = ""
-        async with self.driver.transaction() as txn:
-            kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
-            rid = await kbobj.get_resource_uuid_by_slug(request.slug)
-            if rid:
-                response.uuid = rid
-            return response
 
     async def ResourceFieldExists(  # type: ignore
         self, request: ResourceFieldId, context=None
