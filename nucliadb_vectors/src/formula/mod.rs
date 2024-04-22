@@ -46,18 +46,33 @@ impl AtomClause {
             Self::Label(value) => retriever.has_label(x, value.as_bytes()),
             Self::KeyPrefixSet((resource_set, field_set)) => {
                 let key = retriever.get_key(x);
-                let kk = String::from_utf8_lossy(key);
-                let parts: Vec<_> = kk.split('/').collect();
+                let mut key_parts = key.split(|b| *b == b'/');
 
-                let matches_resource = resource_set.contains(parts[0]);
+                // Matches resource_id
+                let resource_id = std::str::from_utf8(key_parts.next().unwrap()).unwrap();
+                let matches_resource = resource_set.contains(resource_id);
                 if matches_resource {
                     return true;
                 }
 
-                if parts.len() < 3 {
+                // Matches field_id (key up to the third slash)
+                let mut slash_count = 0;
+                let mut end_pos = 0;
+                for char in key.iter() {
+                    if *char == b'/' {
+                        slash_count += 1;
+                        if slash_count == 3 {
+                            break;
+                        }
+                    }
+                    end_pos += 1;
+                }
+                // slash_count = 2 if we reach the end of string with 2 middle slashes
+                if slash_count < 2 {
                     return false;
                 }
-                field_set.contains(&parts[0..3].join("/"))
+
+                field_set.contains(std::str::from_utf8(&key[0..end_pos]).unwrap())
             }
         }
     }
