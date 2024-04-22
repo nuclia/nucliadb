@@ -77,22 +77,21 @@ from .paragraphs import ExtractedTextCache, get_paragraph_text, get_text_sentenc
 Bm25Score = tuple[float, float]
 TimestampScore = datetime.datetime
 TitleScore = str
-Score = Union[Bm25Score, TimestampScore, TitleScore]
+SortValue = Union[Bm25Score, TimestampScore, TitleScore]
 
 
 def sort_results_by_score(results: Union[list[ParagraphResult], list[DocumentResult]]):
     results.sort(key=lambda x: (x.score.bm25, x.score.booster), reverse=True)
 
 
-async def text_score(
+async def get_sort_value(
     item: Union[DocumentResult, ParagraphResult],
     sort_field: SortField,
     kbid: str,
-) -> Optional[Score]:
+) -> Optional[SortValue]:
     """Returns the score for given `item` and `sort_field`. If the resource is being
     deleted, it might appear on search results but not in maindb. In this
     specific case, return None.
-
     """
     if sort_field == SortField.SCORE:
         return (item.score.bm25, item.score.booster)
@@ -101,6 +100,7 @@ async def text_score(
     resource = await get_resource_from_cache(kbid, item.uuid)
     if resource is None:
         return score
+
     basic = await resource.get_basic()
     if basic is None:
         return score
@@ -124,7 +124,7 @@ async def merge_documents_results(
     sort: SortOptions,
     min_score: float,
 ) -> Resources:
-    raw_resource_list: list[tuple[DocumentResult, Score]] = []
+    raw_resource_list: list[tuple[DocumentResult, SortValue]] = []
     facets: dict[str, Any] = {}
     query = None
     total = 0
@@ -143,9 +143,9 @@ async def merge_documents_results(
         if document_response.next_page:
             next_page = True
         for result in document_response.results:
-            score = await text_score(result, sort.field, kbid)
-            if score is not None:
-                raw_resource_list.append((result, score))
+            sort_value = await get_sort_value(result, sort.field, kbid)
+            if sort_value is not None:
+                raw_resource_list.append((result, sort_value))
         total += document_response.total
 
     skip = page * count
@@ -161,8 +161,6 @@ async def merge_documents_results(
 
     result_resource_list: list[ResourceResult] = []
     for result, _ in raw_resource_list:
-        # /f/file
-
         labels = await get_labels_resource(result, kbid)
         _, field_type, field = result.field.split("/")
 
@@ -353,7 +351,7 @@ async def merge_paragraph_results(
     sort: SortOptions,
     min_score: float,
 ):
-    raw_paragraph_list: list[tuple[ParagraphResult, Score]] = []
+    raw_paragraph_list: list[tuple[ParagraphResult, SortValue]] = []
     facets: dict[str, Any] = {}
     query = None
     next_page = False
@@ -375,7 +373,7 @@ async def merge_paragraph_results(
         if paragraph_response.next_page:
             next_page = True
         for result in paragraph_response.results:
-            score = await text_score(result, sort.field, kbid)
+            score = await get_sort_value(result, sort.field, kbid)
             if score is not None:
                 raw_paragraph_list.append((result, score))
         total += paragraph_response.total

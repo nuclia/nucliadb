@@ -1675,3 +1675,57 @@ async def test_api_does_not_show_tracebacks_on_api_errors(
         assert resp.json() == {
             "detail": "Something went wrong, please contact your administrator"
         }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_catalog_pagination(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox,
+):
+    n_resources = 35
+    for i in range(n_resources):
+        resp = await nucliadb_writer.post(
+            f"/kb/{knowledgebox}/resources",
+            json={
+                "title": f"Resource {i}",
+                "texts": {
+                    "text": {
+                        "body": f"Text for resource {i}",
+                    }
+                },
+            },
+        )
+        assert resp.status_code == 201
+
+    # Give some time for the resources to be refreshed in the index
+    await asyncio.sleep(1)
+
+    resource_uuids = []
+    creation_dates = []
+    page_size = 10
+    page_number = 0
+    while True:
+        resp = await nucliadb_reader.get(
+            f"/kb/{knowledgebox}/catalog",
+            params={
+                "page_number": page_number,
+                "page_size": page_size,
+            },
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert len(body["resources"]) <= page_size
+        for resource_id, resource_data in body["resources"].items():
+            resource_created_date = datetime.fromisoformat(
+                resource_data["created"]
+            ).timestamp()
+            if resource_id in resource_uuids:
+                assert False, f"Resource {resource_id} already seen"
+            resource_uuids.append(resource_id)
+            creation_dates.append(resource_created_date)
+        if not body["fulltext"]["next_page"]:
+            break
+        page_number += 1
+    assert len(resource_uuids) == n_resources
