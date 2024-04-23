@@ -22,7 +22,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional, Union
 
-from nucliadb_protos.noderesources_pb2 import IndexParagraph as BrainParagraph
+from nucliadb_protos.noderesources_pb2 import IndexParagraph as BrainParagraph, VectorIndexResource
 from nucliadb_protos.noderesources_pb2 import ParagraphMetadata
 from nucliadb_protos.noderesources_pb2 import Position as TextPosition
 from nucliadb_protos.noderesources_pb2 import Representation
@@ -47,6 +47,8 @@ from nucliadb.ingest.orm.utils import compute_paragraph_key
 from nucliadb_models.labels import BASE_LABELS, flatten_resource_labels
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_protos import utils_pb2
+from nucliadb_utils import const
+from nucliadb_utils.utilities import has_feature
 
 if TYPE_CHECKING:  # pragma: no cover
     StatusValue = Union[Metadata.Status.V, int]
@@ -80,11 +82,18 @@ class ParagraphClassifications:
 
 
 class ResourceBrain:
-    def __init__(self, rid: str):
+    def __init__(self, rid: str, vectors_as_separate_messages: bool = False):
         self.rid = rid
         ridobj = ResourceID(uuid=rid)
         self.brain: PBBrainResource = PBBrainResource(resource=ridobj)
+        self.vectors_as_separate_messages = vectors_as_separate_messages
+        self.vectors_brain = VectorIndexResource()
         self.labels: dict[str, list[str]] = deepcopy(BASE_LABELS)
+
+    def vectors_index_message(self) -> Union[PBBrainResource, VectorIndexResource]:
+        if self.vectors_as_separate_messages:
+            return self.vectors_brain
+        return self.brain
 
     def apply_field_text(self, field_key: str, text: str):
         self.brain.texts[field_key].text = text
@@ -340,7 +349,12 @@ class ResourceBrain:
         *,
         matryoshka_vector_dimension: Optional[int] = None,
     ):
-        paragraph_pb = self.brain.paragraphs[field_id].paragraphs[paragraph_key]
+        if self.vectors_as_separate_messages:
+            index_message = self.vectors_brain
+        else:
+            index_message = self.brain
+
+        paragraph_pb = index_message.paragraphs[field_id].paragraphs[paragraph_key]
         sentence_pb = paragraph_pb.sentences[sentence_key]
 
         sentence_pb.ClearField("vector")  # clear first to prevent duplicates
@@ -377,7 +391,7 @@ class ResourceBrain:
     def delete_vectors(self, field_key: str, vo: VectorObject):
         for subfield, vectors in vo.split_vectors.items():
             for vector in vectors.vectors:
-                self.brain.sentences_to_delete.append(
+                self.index_message.sentences_to_delete.append(
                     f"{self.rid}/{field_key}/{subfield}/{vector.start}-{vector.end}"
                 )
 
