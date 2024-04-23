@@ -232,6 +232,8 @@ pub struct Resource {
     pub vectors_to_delete: ::std::collections::HashMap<::prost::alloc::string::String, super::utils::UserVectorsList>,
     #[prost(message, optional, tag="14")]
     pub security: ::core::option::Option<super::utils::Security>,
+    #[prost(bool, tag="15")]
+    pub includes_vectors: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct VectorIndexResource {

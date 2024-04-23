@@ -257,6 +257,7 @@ impl ShardWriter {
             result
         };
 
+        // TODO: Conditionally run vector task if resource.includes_vectors is True
         let vector_task = || {
             debug!("Vector service starts set_resource");
             let mut writer = write_rw_lock(&self.vector_writer);
@@ -306,10 +307,8 @@ impl ShardWriter {
 
     #[measure(actor = "shard", metric = "set_vector_index_resource")]
     #[tracing::instrument(skip_all)]
-    pub fn set_vector_index_resource(&self, mut resource: VectorIndexResource) -> NodeResult<()> {
+    pub fn set_vector_index_resource(&self, resource: VectorIndexResource) -> NodeResult<()> {
         let span = tracing::Span::current();
-
-        remove_invalid_labels(&mut resource);
 
         let vector_task = || {
             debug!("Vector service starts set_vector_index_resource");
