@@ -53,6 +53,7 @@ TEXT_FORMAT_TO_MIMETYPE = {
     TextFormat.RST: "text/x-rst",
     TextFormat.MARKDOWN: "text/markdown",
     TextFormat.JSON: "application/json",
+    TextFormat.KEEP_MARKDOWN: "text/markdown",
 }
 
 
