@@ -27,7 +27,6 @@ from yarl import URL
 from nucliadb.search.predict import (
     DummyPredictEngine,
     PredictEngine,
-    PredictVectorMissing,
     ProxiedPredictAPIError,
     RephraseError,
     RephraseMissingContextError,
@@ -58,73 +57,9 @@ async def test_dummy_predict_engine():
     await pe.send_feedback("kbid", Mock(), "", "", "")
     assert await pe.rephrase_query("kbid", Mock())
     assert await pe.chat_query("kbid", Mock())
-    assert await pe.convert_sentence_to_vector("kbid", "some sentence")
     assert await pe.detect_entities("kbid", "some sentence")
     assert await pe.ask_document("kbid", "query", [["footext"]], "userid")
     assert await pe.summarize("kbid", Mock(resources={}))
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "onprem,expected_url,expected_header,expected_header_value",
-    [
-        (
-            True,
-            "{public_url}/api/v1/predict/sentence/kbid",
-            "X-STF-NUAKEY",
-            "Bearer {service_account}",
-        ),
-        (False, "{cluster}/api/v1/internal/predict/sentence", "X-STF-KBID", "{kbid}"),
-    ],
-)
-async def test_convert_sentence_ok(
-    onprem, expected_url, expected_header, expected_header_value
-):
-    service_account = "service-account"
-
-    pe = PredictEngine(
-        "cluster",
-        "public-{zone}",
-        service_account,
-        zone="zone1",
-        onprem=onprem,
-    )
-
-    pe.session = get_mocked_session(
-        "GET", 200, json={"data": [0.0, 0.1]}, context_manager=False
-    )
-
-    kbid = "kbid"
-    sentence = "some sentence"
-
-    assert await pe.convert_sentence_to_vector(kbid, sentence) == [0.0, 0.1]
-
-    path = expected_url.format(public_url=pe.public_url, cluster=pe.cluster_url)
-
-    headers = {
-        expected_header: expected_header_value.format(
-            kbid=kbid, service_account=service_account
-        )
-    }
-    pe.session.get.assert_awaited_once_with(
-        url=path,
-        params={"text": sentence},
-        headers=headers,
-    )
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("onprem", [True, False])
-async def test_convert_sentence_error(onprem):
-    pe = PredictEngine(
-        "cluster",
-        "public-{zone}",
-        "service-account",
-        onprem=onprem,
-    )
-    pe.session = get_mocked_session("GET", 400, json="uops!", context_manager=False)
-    with pytest.raises(ProxiedPredictAPIError):
-        await pe.convert_sentence_to_vector("kbid", "some sentence")
 
 
 @pytest.mark.asyncio
@@ -209,7 +144,6 @@ def session_limits_exceeded():
 @pytest.mark.parametrize(
     "method,args",
     [
-        ("convert_sentence_to_vector", ["kbid", "sentence"]),
         ("detect_entities", ["kbid", "sentence"]),
         ("chat_query", ["kbid", ChatModel(question="foo", user_id="bar")]),
         (
@@ -246,7 +180,6 @@ async def test_predict_engine_handles_limits_exceeded_error(
         ("chat_query", ["kbid", Mock()], True, None),
         ("rephrase_query", ["kbid", Mock()], True, None),
         ("send_feedback", ["kbid", MagicMock(), "", "", ""], False, None),
-        ("convert_sentence_to_vector", ["kbid", "sentence"], False, []),
         ("detect_entities", ["kbid", "sentence"], False, []),
         ("ask_document", ["kbid", "query", [["footext"]], "userid"], True, None),
         ("summarize", ["kbid", Mock(resources={})], True, None),
@@ -266,20 +199,6 @@ async def test_onprem_nuclia_service_account_not_configured(
             await getattr(pe, method)(*args)
     else:
         assert await getattr(pe, method)(*args) == output
-
-
-async def test_convert_sentence_to_vector_empty_vectors():
-    pe = PredictEngine(
-        "cluster",
-        "public-{zone}",
-        nuclia_service_account="foo",
-        onprem=True,
-    )
-    pe.session = get_mocked_session(
-        "GET", 200, json={"data": []}, context_manager=False
-    )
-    with pytest.raises(PredictVectorMissing):
-        await pe.convert_sentence_to_vector("kbid", "sentence")
 
 
 async def test_ask_document_onprem():

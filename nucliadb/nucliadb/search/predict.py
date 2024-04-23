@@ -59,10 +59,6 @@ class ProxiedPredictAPIError(Exception):
         self.detail = detail
 
 
-class PredictVectorMissing(Exception):
-    pass
-
-
 class NUAKeyMissingError(Exception):
     pass
 
@@ -107,7 +103,6 @@ predict_observer = metrics.Observer(
     error_mappings={
         "over_limits": LimitsExceededError,
         "predict_api_error": SendToPredictError,
-        "empty_vectors": PredictVectorMissing,
     },
 )
 
@@ -367,28 +362,6 @@ class PredictEngine:
         data = await resp.json()
         return QueryInfo(**data)
 
-    @predict_observer.wrap({"type": "sentence"})
-    async def convert_sentence_to_vector(self, kbid: str, sentence: str) -> list[float]:
-        try:
-            self.check_nua_key_is_configured_for_onprem()
-        except NUAKeyMissingError:
-            logger.warning(
-                "Nuclia Service account is not defined so could not retrieve vectors for the query"
-            )
-            return []
-
-        resp = await self.make_request(
-            "GET",
-            url=self.get_predict_url(SENTENCE, kbid),
-            params={"text": sentence},
-            headers=self.get_predict_headers(kbid),
-        )
-        await self.check_response(resp, expected_status=200)
-        data = await resp.json()
-        if len(data["data"]) == 0:
-            raise PredictVectorMissing()
-        return data["data"]
-
     @predict_observer.wrap({"type": "entities"})
     async def detect_entities(self, kbid: str, sentence: str) -> list[RelationNode]:
         try:
@@ -527,15 +500,6 @@ class DummyPredictEngine(PredictEngine):
                 sentence=SentenceSearch(data=Q, time=0.0),
                 query=sentence,
             )
-
-    async def convert_sentence_to_vector(self, kbid: str, sentence: str) -> list[float]:
-        self.calls.append(("convert_sentence_to_vector", sentence))
-        if (
-            os.environ.get("TEST_SENTENCE_ENCODER") == "multilingual-2023-02-21"
-        ):  # pragma: no cover
-            return Qm2023
-        else:
-            return Q
 
     async def detect_entities(self, kbid: str, sentence: str) -> list[RelationNode]:
         self.calls.append(("detect_entities", sentence))

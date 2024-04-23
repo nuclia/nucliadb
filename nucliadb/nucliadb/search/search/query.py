@@ -29,11 +29,7 @@ from nucliadb.common import datamanagers
 from nucliadb.ingest.orm.synonyms import Synonyms
 from nucliadb.middleware.transaction import get_read_only_transaction
 from nucliadb.search import logger
-from nucliadb.search.predict import (
-    PredictVectorMissing,
-    SendToPredictError,
-    convert_relations,
-)
+from nucliadb.search.predict import SendToPredictError, convert_relations
 from nucliadb.search.search.filters import (
     convert_to_node_filters,
     flat_filter_labels,
@@ -55,19 +51,15 @@ from nucliadb_models.search import (
     MinScore,
     QueryInfo,
     SearchOptions,
-    SentenceSearch,
     SortField,
     SortFieldMap,
     SortOptions,
     SortOrder,
     SortOrderMap,
     SuggestOptions,
-    TokenSearch,
 )
 from nucliadb_models.security import RequestSecurity
 from nucliadb_protos import knowledgebox_pb2, nodereader_pb2, utils_pb2
-from nucliadb_utils import const
-from nucliadb_utils.utilities import has_feature
 
 from .exceptions import InvalidQueryError
 
@@ -89,12 +81,12 @@ class QueryParser:
 
     _min_score_task: Optional[asyncio.Task] = None
     _query_information_task: Optional[asyncio.Task] = None
-    _convert_vectors_task: Optional[asyncio.Task] = None
     _detected_entities_task: Optional[asyncio.Task] = None
     _entities_meta_cache_task: Optional[asyncio.Task] = None
     _deleted_entities_groups_task: Optional[asyncio.Task] = None
     _synonyms_task: Optional[asyncio.Task] = None
     _get_classification_labels_task: Optional[asyncio.Task] = None
+    _get_matryoshka_dimension_task: Optional[asyncio.Task] = None
 
     def __init__(
         self,
@@ -150,11 +142,7 @@ class QueryParser:
         self.security = security
         self.generative_model = generative_model
         self.rephrase = rephrase
-        self.query_endpoint_enabled = has_feature(
-            const.Features.PREDICT_QUERY_ENDPOINT,
-            default=False,
-            context={"kbid": self.kbid},
-        )
+        self.query_endpoint_used = False
         if len(self.filters) > 0:
             self.filters = translate_label_filters(self.filters)
             self.flat_filter_labels = flat_filter_labels(self.filters)
@@ -167,26 +155,7 @@ class QueryParser:
             )
         return self._min_score_task
 
-    def _get_converted_vectors(self) -> Awaitable[list[float]]:
-        if self._convert_vectors_task is None:  # pragma: no cover
-            self._convert_vectors_task = asyncio.create_task(
-                convert_vectors(self.kbid, self.query)
-            )
-        return self._convert_vectors_task
-
     def _get_query_information(self) -> Awaitable[QueryInfo]:
-        if self.query_endpoint_enabled is False:
-            # XXX Can be removed once query endpoint is fully enabled
-            async def static_query():
-                return QueryInfo(
-                    visual_llm=False,
-                    max_context=300_000,
-                    entities=TokenSearch(tokens=[], time=0.0),
-                    sentence=SentenceSearch(data=[], time=0.0),
-                    query=self.query,
-                )
-
-            return static_query()
         if self._query_information_task is None:  # pragma: no cover
             self._query_information_task = asyncio.create_task(
                 query_information(
@@ -194,6 +163,13 @@ class QueryParser:
                 )
             )
         return self._query_information_task
+
+    def _get_matryoshka_dimension(self) -> Awaitable[Optional[int]]:
+        if self._get_matryoshka_dimension_task is None:
+            self._get_matryoshka_dimension_task = asyncio.create_task(
+                get_matryoshka_dimension_cached(self.kbid)
+            )
+        return self._get_matryoshka_dimension_task
 
     def _get_detected_entities(self) -> Awaitable[list[utils_pb2.RelationNode]]:
         if self._detected_entities_task is None:  # pragma: no cover
@@ -243,20 +219,15 @@ class QueryParser:
             asyncio.ensure_future(self._get_default_semantic_min_score())
 
         if SearchOptions.VECTOR in self.features and self.user_vector is None:
-            if self.query_endpoint_enabled:
-                asyncio.ensure_future(self._get_query_information())
-            else:
-                asyncio.ensure_future(self._get_converted_vectors())
+            self.query_endpoint_used = True
+            asyncio.ensure_future(self._get_query_information())
+            asyncio.ensure_future(self._get_matryoshka_dimension())
 
         if (SearchOptions.RELATIONS in self.features or self.autofilter) and len(
             self.query
         ) > 0:
-            if (
-                not self.query_endpoint_enabled
-                or SearchOptions.VECTOR not in self.features
-                or self.user_vector is not None
-            ):
-                self.query_endpoint_enabled = False
+            if not self.query_endpoint_used:
+                # If we only need to detect entities, we don't need the query endpoint
                 asyncio.ensure_future(self._get_detected_entities())
             asyncio.ensure_future(self._get_entities_meta_cache())
             asyncio.ensure_future(self._get_deleted_entity_groups())
@@ -407,47 +378,25 @@ class QueryParser:
 
         query_vector = None
         if self.user_vector is None:
-            if self.query_endpoint_enabled:
-                try:
-                    query_info = await self._get_query_information()
-                except SendToPredictError as err:
-                    logger.warning(
-                        f"Errors on predict api trying to embedd query: {err}"
-                    )
-                    incomplete = True
-                except PredictVectorMissing:
-                    logger.warning("Predict api returned an empty vector")
-                    incomplete = True
-                else:
-                    if query_info and query_info.sentence:
-                        query_vector = query_info.sentence.data
-                    else:
-                        incomplete = True
+            try:
+                query_info = await self._get_query_information()
+            except SendToPredictError as err:
+                logger.warning(f"Errors on predict api trying to embedd query: {err}")
+                incomplete = True
             else:
-                try:
-                    query_vector = await self._get_converted_vectors()
-                except SendToPredictError as err:
-                    logger.warning(
-                        f"Errors on predict api trying to embedd query: {err}"
-                    )
-                    incomplete = True
-                except PredictVectorMissing:
-                    logger.warning("Predict api returned an empty vector")
+                if query_info and query_info.sentence:
+                    query_vector = query_info.sentence.data
+                else:
                     incomplete = True
         else:
             query_vector = self.user_vector
-
         if query_vector is not None:
-            async with datamanagers.with_transaction(read_only=True) as txn:
-                dimension = await datamanagers.kb.get_matryoshka_vector_dimension(
-                    txn, kbid=self.kbid
-                )
-            if dimension is not None:
+            matryoshka_dimension = await self._get_matryoshka_dimension()
+            if matryoshka_dimension is not None:
                 # KB using a matryoshka embeddings model, cut the query vector
                 # accordingly
-                query_vector = query_vector[:dimension]
+                query_vector = query_vector[:matryoshka_dimension]
             request.vector.extend(query_vector)
-
         return incomplete
 
     async def parse_relation_search(
@@ -456,7 +405,7 @@ class QueryParser:
         autofilters = []
         relations_search = SearchOptions.RELATIONS in self.features
         if relations_search or self.autofilter:
-            if not self.query_endpoint_enabled:
+            if not self.query_endpoint_used:
                 detected_entities = await self._get_detected_entities()
             else:
                 query_info_result = await self._get_query_information()
@@ -602,12 +551,6 @@ async def paragraph_query_to_pb(
         request.fields.extend(fields)
 
     return request
-
-
-@query_parse_dependency_observer.wrap({"type": "convert_vectors"})
-async def convert_vectors(kbid: str, query: str) -> list[float]:
-    predict = get_predict()
-    return await predict.convert_sentence_to_vector(kbid, query)
 
 
 @query_parse_dependency_observer.wrap({"type": "query_information"})
@@ -818,3 +761,15 @@ def check_supported_filters(filters: dict[str, Any], paragraph_labels: list[str]
                 "filters",
                 "Paragraph labels can only be used with 'all' filter",
             )
+
+
+@alru_cache(maxsize=None)
+async def get_matryoshka_dimension_cached(kbid: str) -> Optional[int]:
+    # This can be safely cached as the matryoshka dimension is not expected to change
+    return await get_matryoshka_dimension(kbid)
+
+
+@query_parse_dependency_observer.wrap({"type": "matryoshka_dimension"})
+async def get_matryoshka_dimension(kbid: str) -> Optional[int]:
+    txn = await get_read_only_transaction()
+    return await datamanagers.kb.get_matryoshka_vector_dimension(txn, kbid=kbid)

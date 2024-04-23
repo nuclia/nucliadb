@@ -37,7 +37,7 @@ from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.consumer import shard_creator
 from nucliadb.ingest.tests.vectors import V1
-from nucliadb.search.predict import PredictVectorMissing, SendToPredictError
+from nucliadb.search.predict import SendToPredictError
 from nucliadb.tests.utils import broker_resource, inject_message
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_utils.audit.stream import StreamAuditStorage
@@ -1195,11 +1195,8 @@ async def test_search_endpoints_handle_predict_errors(
 ):
     kbid = knowledgebox
 
-    for convert_sentence_to_vector_mock in (
-        AsyncMock(side_effect=PredictVectorMissing()),
-        AsyncMock(side_effect=SendToPredictError()),
-    ):
-        predict_mock.query = convert_sentence_to_vector_mock
+    for query_mock in (AsyncMock(side_effect=SendToPredictError()),):
+        predict_mock.query = query_mock
         resp = await nucliadb_reader.post(
             f"/kb/{kbid}/{endpoint}",
             json={
