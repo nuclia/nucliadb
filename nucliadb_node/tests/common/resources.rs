@@ -24,7 +24,7 @@ use std::time::SystemTime;
 use nucliadb_core::protos::prost_types::Timestamp;
 use nucliadb_core::protos::relation::RelationType;
 use nucliadb_core::protos::relation_node::NodeType;
-use nucliadb_core::protos::resource::ResourceStatus;
+use nucliadb_core::protos::ResourceStatus;
 use nucliadb_core::protos::{
     IndexMetadata, IndexParagraph, IndexParagraphs, Relation, RelationNode, Resource, ResourceId, TextInformation,
     VectorSentence,

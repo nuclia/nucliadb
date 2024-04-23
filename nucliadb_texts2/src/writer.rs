@@ -24,7 +24,7 @@ use std::path::Path;
 use std::time::Instant;
 
 use nucliadb_core::prelude::*;
-use nucliadb_core::protos::resource::ResourceStatus;
+use nucliadb_core::protos::ResourceStatus;
 use nucliadb_core::protos::{Resource, ResourceId};
 use nucliadb_core::texts::*;
 use nucliadb_core::tracing::{self, *};

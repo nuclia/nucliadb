@@ -132,6 +132,16 @@ message IndexParagraphs {
     map<string, IndexParagraph> paragraphs = 1;
 }
 
+enum ResourceStatus {
+    PROCESSED = 0;
+    EMPTY = 1;
+    ERROR = 2;
+    DELETE = 3;
+    PENDING = 4;
+    BLOCKED = 5;
+    EXPIRED = 6;
+}
+
 message Resource {
     ResourceID resource = 1;
 
@@ -142,16 +152,6 @@ message Resource {
     // Key is RID/FIELDID
 
     repeated string labels = 4; // Document labels always serialized full
-
-    enum ResourceStatus {
-        PROCESSED = 0;
-        EMPTY = 1;
-        ERROR = 2;
-        DELETE = 3;
-        PENDING = 4;
-        BLOCKED = 5;
-        EXPIRED = 6;
-    }
 
     ResourceStatus status = 5; // Tantivy doc
 
@@ -170,6 +170,16 @@ message Resource {
     map<string, utils.UserVectorsList> vectors_to_delete = 13;  // Vectorset prefix vector id
 
     optional utils.Security security = 14;
+}
+
+message VectorIndexResource {
+    string shard_id = 1;
+    string vectorset = 2;
+    ResourceID resource = 3;
+    IndexMetadata metadata = 4;
+    ResourceStatus status = 5;
+    map<string, IndexParagraphs> paragraphs = 6;
+    repeated string sentences_to_delete = 7;
 }
 
 message ShardMetadata {

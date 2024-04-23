@@ -96,6 +96,7 @@ pub trait VectorWriter: std::fmt::Debug + Send + Sync {
     fn prepare_merge(&self, parameters: MergeParameters) -> NodeResult<Option<Box<dyn MergeRunner>>>;
     fn record_merge(&mut self, merge_result: Box<dyn MergeResults>, source: MergeSource) -> NodeResult<MergeMetrics>;
     fn set_resource(&mut self, resource: &Resource) -> NodeResult<()>;
+    fn set_vector_index_resource(&mut self, resource: &VectorIndexResource) -> NodeResult<()>;
     fn delete_resource(&mut self, resource_id: &ResourceId) -> NodeResult<()>;
     fn garbage_collection(&mut self) -> NodeResult<()>;
     fn force_garbage_collection(&mut self) -> NodeResult<()>;

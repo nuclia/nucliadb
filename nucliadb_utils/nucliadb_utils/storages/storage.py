@@ -210,9 +210,7 @@ class Storage:
             txid=reindex_id,
         )
         message_serialized = message.SerializeToString()
-        logger.debug("Starting to upload bytes")
         await self.uploadbytes(self.indexing_bucket, key, message_serialized)
-        logger.debug("Finished to upload bytes")
         return key
 
     async def get_indexing(self, payload: IndexMessage) -> BrainResource:

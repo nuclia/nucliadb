@@ -81,7 +81,7 @@ message DocumentSearchRequest {
 
     bool reload = 10 [deprecated = true];
     bool only_faceted = 15;
-    optional noderesources.Resource.ResourceStatus with_status = 16;
+    optional noderesources.ResourceStatus with_status = 16;
     optional string advanced_query = 17;
 
     float min_score = 18;
@@ -330,7 +330,7 @@ message SearchRequest {
     bool only_faceted = 16;
 
     optional string advanced_query = 18;
-    optional noderesources.Resource.ResourceStatus with_status = 17;
+    optional noderesources.ResourceStatus with_status = 17;
 
     // if provided, search metadata for this nodes (nodes at distance
     // one) and get the shortest path between nodes

@@ -7,17 +7,25 @@ import grpc
 import nucliadb_protos.noderesources_pb2
 import nucliadb_protos.nodewriter_pb2
 from nucliadb_protos.noderesources_pb2 import (
+    BLOCKED as BLOCKED,
+    DELETE as DELETE,
+    EMPTY as EMPTY,
+    ERROR as ERROR,
+    EXPIRED as EXPIRED,
     EmptyQuery as EmptyQuery,
     EmptyResponse as EmptyResponse,
     IndexMetadata as IndexMetadata,
     IndexParagraph as IndexParagraph,
     IndexParagraphs as IndexParagraphs,
     NodeMetadata as NodeMetadata,
+    PENDING as PENDING,
+    PROCESSED as PROCESSED,
     ParagraphMetadata as ParagraphMetadata,
     Position as Position,
     Representation as Representation,
     Resource as Resource,
     ResourceID as ResourceID,
+    ResourceStatus as ResourceStatus,
     SentenceMetadata as SentenceMetadata,
     Shard as Shard,
     ShardCreated as ShardCreated,
@@ -25,6 +33,7 @@ from nucliadb_protos.noderesources_pb2 import (
     ShardIds as ShardIds,
     ShardMetadata as ShardMetadata,
     TextInformation as TextInformation,
+    VectorIndexResource as VectorIndexResource,
     VectorSentence as VectorSentence,
     VectorSetID as VectorSetID,
     VectorSetList as VectorSetList,
@@ -54,6 +63,10 @@ class NodeWriterStub:
     ]
     SetResource: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.noderesources_pb2.Resource,
+        nucliadb_protos.nodewriter_pb2.OpStatus,
+    ]
+    SetVectorIndexResource: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.noderesources_pb2.VectorIndexResource,
         nucliadb_protos.nodewriter_pb2.OpStatus,
     ]
     RemoveResource: grpc.UnaryUnaryMultiCallable[
@@ -112,6 +125,12 @@ class NodeWriterServicer(metaclass=abc.ABCMeta):
     def SetResource(
         self,
         request: nucliadb_protos.noderesources_pb2.Resource,
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.nodewriter_pb2.OpStatus: ...
+    @abc.abstractmethod
+    def SetVectorIndexResource(
+        self,
+        request: nucliadb_protos.noderesources_pb2.VectorIndexResource,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.nodewriter_pb2.OpStatus: ...
     @abc.abstractmethod

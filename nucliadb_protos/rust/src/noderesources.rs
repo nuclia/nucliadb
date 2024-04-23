@@ -208,7 +208,7 @@ pub struct Resource {
     #[prost(string, repeated, tag="4")]
     pub labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     /// Tantivy doc
-    #[prost(enumeration="resource::ResourceStatus", tag="5")]
+    #[prost(enumeration="ResourceStatus", tag="5")]
     pub status: i32,
     /// Paragraph
     ///
@@ -233,19 +233,22 @@ pub struct Resource {
     #[prost(message, optional, tag="14")]
     pub security: ::core::option::Option<super::utils::Security>,
 }
-/// Nested message and enum types in `Resource`.
-pub mod resource {
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
-    #[repr(i32)]
-    pub enum ResourceStatus {
-        Processed = 0,
-        Empty = 1,
-        Error = 2,
-        Delete = 3,
-        Pending = 4,
-        Blocked = 5,
-        Expired = 6,
-    }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct VectorIndexResource {
+    #[prost(string, tag="1")]
+    pub shard_id: ::prost::alloc::string::String,
+    #[prost(string, tag="2")]
+    pub vectorset: ::prost::alloc::string::String,
+    #[prost(message, optional, tag="3")]
+    pub resource: ::core::option::Option<ResourceId>,
+    #[prost(message, optional, tag="4")]
+    pub metadata: ::core::option::Option<IndexMetadata>,
+    #[prost(enumeration="ResourceStatus", tag="5")]
+    pub status: i32,
+    #[prost(map="string, message", tag="6")]
+    pub paragraphs: ::std::collections::HashMap<::prost::alloc::string::String, IndexParagraphs>,
+    #[prost(string, repeated, tag="7")]
+    pub sentences_to_delete: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ShardMetadata {
@@ -282,4 +285,15 @@ pub mod node_metadata {
         #[prost(float, tag="2")]
         pub load_score: f32,
     }
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+#[repr(i32)]
+pub enum ResourceStatus {
+    Processed = 0,
+    Empty = 1,
+    Error = 2,
+    Delete = 3,
+    Pending = 4,
+    Blocked = 5,
+    Expired = 6,
 }

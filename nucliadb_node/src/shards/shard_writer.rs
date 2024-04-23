@@ -23,7 +23,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use nucliadb_core::paragraphs::*;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::shard_created::{DocumentService, ParagraphService, RelationService, VectorService};
-use nucliadb_core::protos::{OpStatus, Resource, ResourceId};
+use nucliadb_core::protos::{OpStatus, Resource, ResourceId, VectorIndexResource};
 use nucliadb_core::relations::*;
 use nucliadb_core::texts::*;
 use nucliadb_core::tracing::{self, *};
@@ -299,6 +299,37 @@ impl ShardWriter {
         paragraph_result?;
         vector_result?;
         relation_result?;
+        self.metadata.new_generation_id(); // VERY NAIVE, SHOULD BE DONE AFTER MERGE AS WELL
+        Ok(())
+    }
+
+
+    #[measure(actor = "shard", metric = "set_vector_index_resource")]
+    #[tracing::instrument(skip_all)]
+    pub fn set_vector_index_resource(&self, mut resource: VectorIndexResource) -> NodeResult<()> {
+        let span = tracing::Span::current();
+
+        remove_invalid_labels(&mut resource);
+
+        let vector_task = || {
+            debug!("Vector service starts set_vector_index_resource");
+            let mut writer = write_rw_lock(&self.vector_writer);
+            let result = writer.set_vector_index_resource(&resource);
+            debug!("Vector service ends set_vector_index_resource");
+            result
+        };
+
+        let info = info_span!(parent: &span, "vector set_vector_index_resource");
+        let vector_task = || run_with_telemetry(info, vector_task);
+
+        let mut vector_result = Ok(());
+
+        let _lock = self.write_lock.lock().unwrap_or_else(|e| e.into_inner());
+        thread::scope(|s| {
+            s.spawn(|_| vector_result = vector_task());
+        });
+
+        vector_result?;
         self.metadata.new_generation_id(); // VERY NAIVE, SHOULD BE DONE AFTER MERGE AS WELL
         Ok(())
     }

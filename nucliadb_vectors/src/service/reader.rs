@@ -184,7 +184,7 @@ impl VectorReaderService {
 mod tests {
     use std::collections::HashMap;
 
-    use nucliadb_core::protos::resource::ResourceStatus;
+    use nucliadb_core::protos::ResourceStatus;
     use nucliadb_core::protos::{
         IndexParagraph, IndexParagraphs, Resource, ResourceId, VectorSentence, VectorSimilarity,
     };

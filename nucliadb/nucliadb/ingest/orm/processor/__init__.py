@@ -242,7 +242,7 @@ class Processor:
         txn = await self.driver.begin()
         kbid = messages[0].kbid
         if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
-            logger.warning(f"KB {kbid} is deleted: skiping txn")
+            logger.warning("KnowledgeBox not found - it has been deleted: skipping txn", extra={"kbid": kbid})
             if transaction_check:
                 await sequence_manager.set_last_seqid(txn, partition, seqid)
             await txn.commit()

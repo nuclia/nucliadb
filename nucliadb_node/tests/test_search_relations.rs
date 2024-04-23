@@ -28,7 +28,7 @@ use nucliadb_core::protos::op_status::Status;
 use nucliadb_core::protos::prost_types::Timestamp;
 use nucliadb_core::protos::relation::RelationType;
 use nucliadb_core::protos::relation_node::NodeType;
-use nucliadb_core::protos::resource::ResourceStatus;
+use nucliadb_core::protos::ResourceStatus;
 use nucliadb_core::protos::{
     EntitiesSubgraphRequest, IndexMetadata, NewShardRequest, Relation, RelationNode, RelationNodeFilter,
     RelationPrefixSearchRequest, RelationSearchRequest, RelationSearchResponse, ReleaseChannel, Resource, ResourceId,

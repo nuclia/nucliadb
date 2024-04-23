@@ -40,6 +40,31 @@ from nucliadb_protos.utils_pb2 import (
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+class _ResourceStatus:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _ResourceStatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_ResourceStatus.ValueType], builtins.type):
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    PROCESSED: _ResourceStatus.ValueType  # 0
+    EMPTY: _ResourceStatus.ValueType  # 1
+    ERROR: _ResourceStatus.ValueType  # 2
+    DELETE: _ResourceStatus.ValueType  # 3
+    PENDING: _ResourceStatus.ValueType  # 4
+    BLOCKED: _ResourceStatus.ValueType  # 5
+    EXPIRED: _ResourceStatus.ValueType  # 6
+
+class ResourceStatus(_ResourceStatus, metaclass=_ResourceStatusEnumTypeWrapper): ...
+
+PROCESSED: ResourceStatus.ValueType  # 0
+EMPTY: ResourceStatus.ValueType  # 1
+ERROR: ResourceStatus.ValueType  # 2
+DELETE: ResourceStatus.ValueType  # 3
+PENDING: ResourceStatus.ValueType  # 4
+BLOCKED: ResourceStatus.ValueType  # 5
+EXPIRED: ResourceStatus.ValueType  # 6
+global___ResourceStatus = ResourceStatus
+
 @typing_extensions.final
 class TextInformation(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -537,29 +562,6 @@ global___IndexParagraphs = IndexParagraphs
 class Resource(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    class _ResourceStatus:
-        ValueType = typing.NewType("ValueType", builtins.int)
-        V: typing_extensions.TypeAlias = ValueType
-
-    class _ResourceStatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Resource._ResourceStatus.ValueType], builtins.type):  # noqa: F821
-        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-        PROCESSED: Resource._ResourceStatus.ValueType  # 0
-        EMPTY: Resource._ResourceStatus.ValueType  # 1
-        ERROR: Resource._ResourceStatus.ValueType  # 2
-        DELETE: Resource._ResourceStatus.ValueType  # 3
-        PENDING: Resource._ResourceStatus.ValueType  # 4
-        BLOCKED: Resource._ResourceStatus.ValueType  # 5
-        EXPIRED: Resource._ResourceStatus.ValueType  # 6
-
-    class ResourceStatus(_ResourceStatus, metaclass=_ResourceStatusEnumTypeWrapper): ...
-    PROCESSED: Resource.ResourceStatus.ValueType  # 0
-    EMPTY: Resource.ResourceStatus.ValueType  # 1
-    ERROR: Resource.ResourceStatus.ValueType  # 2
-    DELETE: Resource.ResourceStatus.ValueType  # 3
-    PENDING: Resource.ResourceStatus.ValueType  # 4
-    BLOCKED: Resource.ResourceStatus.ValueType  # 5
-    EXPIRED: Resource.ResourceStatus.ValueType  # 6
-
     @typing_extensions.final
     class TextsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -660,7 +662,7 @@ class Resource(google.protobuf.message.Message):
 
         Document labels always serialized full
         """
-    status: global___Resource.ResourceStatus.ValueType
+    status: global___ResourceStatus.ValueType
     """Tantivy doc"""
     @property
     def paragraphs(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___IndexParagraphs]:
@@ -690,7 +692,7 @@ class Resource(google.protobuf.message.Message):
         metadata: global___IndexMetadata | None = ...,
         texts: collections.abc.Mapping[builtins.str, global___TextInformation] | None = ...,
         labels: collections.abc.Iterable[builtins.str] | None = ...,
-        status: global___Resource.ResourceStatus.ValueType = ...,
+        status: global___ResourceStatus.ValueType = ...,
         paragraphs: collections.abc.Mapping[builtins.str, global___IndexParagraphs] | None = ...,
         paragraphs_to_delete: collections.abc.Iterable[builtins.str] | None = ...,
         sentences_to_delete: collections.abc.Iterable[builtins.str] | None = ...,
@@ -705,6 +707,62 @@ class Resource(google.protobuf.message.Message):
     def WhichOneof(self, oneof_group: typing_extensions.Literal["_security", b"_security"]) -> typing_extensions.Literal["security"] | None: ...
 
 global___Resource = Resource
+
+@typing_extensions.final
+class VectorIndexResource(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    @typing_extensions.final
+    class ParagraphsEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        @property
+        def value(self) -> global___IndexParagraphs: ...
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: global___IndexParagraphs | None = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+
+    SHARD_ID_FIELD_NUMBER: builtins.int
+    VECTORSET_FIELD_NUMBER: builtins.int
+    RESOURCE_FIELD_NUMBER: builtins.int
+    METADATA_FIELD_NUMBER: builtins.int
+    STATUS_FIELD_NUMBER: builtins.int
+    PARAGRAPHS_FIELD_NUMBER: builtins.int
+    SENTENCES_TO_DELETE_FIELD_NUMBER: builtins.int
+    shard_id: builtins.str
+    vectorset: builtins.str
+    @property
+    def resource(self) -> global___ResourceID: ...
+    @property
+    def metadata(self) -> global___IndexMetadata: ...
+    status: global___ResourceStatus.ValueType
+    @property
+    def paragraphs(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___IndexParagraphs]: ...
+    @property
+    def sentences_to_delete(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def __init__(
+        self,
+        *,
+        shard_id: builtins.str = ...,
+        vectorset: builtins.str = ...,
+        resource: global___ResourceID | None = ...,
+        metadata: global___IndexMetadata | None = ...,
+        status: global___ResourceStatus.ValueType = ...,
+        paragraphs: collections.abc.Mapping[builtins.str, global___IndexParagraphs] | None = ...,
+        sentences_to_delete: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["metadata", b"metadata", "resource", b"resource"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["metadata", b"metadata", "paragraphs", b"paragraphs", "resource", b"resource", "sentences_to_delete", b"sentences_to_delete", "shard_id", b"shard_id", "status", b"status", "vectorset", b"vectorset"]) -> None: ...
+
+global___VectorIndexResource = VectorIndexResource
 
 @typing_extensions.final
 class ShardMetadata(google.protobuf.message.Message):

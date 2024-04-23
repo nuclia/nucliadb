@@ -45,6 +45,11 @@ class NodeWriterStub(object):
                 request_serializer=nucliadb__protos_dot_noderesources__pb2.Resource.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_nodewriter__pb2.OpStatus.FromString,
                 )
+        self.SetVectorIndexResource = channel.unary_unary(
+                '/nodewriter.NodeWriter/SetVectorIndexResource',
+                request_serializer=nucliadb__protos_dot_noderesources__pb2.VectorIndexResource.SerializeToString,
+                response_deserializer=nucliadb__protos_dot_nodewriter__pb2.OpStatus.FromString,
+                )
         self.RemoveResource = channel.unary_unary(
                 '/nodewriter.NodeWriter/RemoveResource',
                 request_serializer=nucliadb__protos_dot_noderesources__pb2.ResourceID.SerializeToString,
@@ -111,6 +116,12 @@ class NodeWriterServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def SetVectorIndexResource(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def RemoveResource(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -172,6 +183,11 @@ def add_NodeWriterServicer_to_server(servicer, server):
             'SetResource': grpc.unary_unary_rpc_method_handler(
                     servicer.SetResource,
                     request_deserializer=nucliadb__protos_dot_noderesources__pb2.Resource.FromString,
+                    response_serializer=nucliadb__protos_dot_nodewriter__pb2.OpStatus.SerializeToString,
+            ),
+            'SetVectorIndexResource': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetVectorIndexResource,
+                    request_deserializer=nucliadb__protos_dot_noderesources__pb2.VectorIndexResource.FromString,
                     response_serializer=nucliadb__protos_dot_nodewriter__pb2.OpStatus.SerializeToString,
             ),
             'RemoveResource': grpc.unary_unary_rpc_method_handler(
@@ -307,6 +323,23 @@ class NodeWriter(object):
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/nodewriter.NodeWriter/SetResource',
             nucliadb__protos_dot_noderesources__pb2.Resource.SerializeToString,
+            nucliadb__protos_dot_nodewriter__pb2.OpStatus.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def SetVectorIndexResource(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/nodewriter.NodeWriter/SetVectorIndexResource',
+            nucliadb__protos_dot_noderesources__pb2.VectorIndexResource.SerializeToString,
             nucliadb__protos_dot_nodewriter__pb2.OpStatus.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

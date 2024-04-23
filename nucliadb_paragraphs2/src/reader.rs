@@ -463,7 +463,7 @@ impl<'a> Searcher<'a> {
 mod tests {
 
     use nucliadb_core::protos::prost_types::Timestamp;
-    use nucliadb_core::protos::resource::ResourceStatus;
+    use nucliadb_core::protos::ResourceStatus;
     use nucliadb_core::protos::{
         Faceted, IndexMetadata, IndexParagraph, IndexParagraphs, OrderBy, Resource, ResourceId, TextInformation,
         Timestamps,

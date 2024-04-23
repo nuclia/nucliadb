@@ -103,7 +103,7 @@ pub struct DocumentSearchRequest {
     pub reload: bool,
     #[prost(bool, tag="15")]
     pub only_faceted: bool,
-    #[prost(enumeration="super::noderesources::resource::ResourceStatus", optional, tag="16")]
+    #[prost(enumeration="super::noderesources::ResourceStatus", optional, tag="16")]
     pub with_status: ::core::option::Option<i32>,
     #[prost(string, optional, tag="17")]
     pub advanced_query: ::core::option::Option<::prost::alloc::string::String>,
@@ -428,7 +428,7 @@ pub struct SearchRequest {
     pub only_faceted: bool,
     #[prost(string, optional, tag="18")]
     pub advanced_query: ::core::option::Option<::prost::alloc::string::String>,
-    #[prost(enumeration="super::noderesources::resource::ResourceStatus", optional, tag="17")]
+    #[prost(enumeration="super::noderesources::ResourceStatus", optional, tag="17")]
     pub with_status: ::core::option::Option<i32>,
     /// if provided, search metadata for this nodes (nodes at distance
     /// one) and get the shortest path between nodes

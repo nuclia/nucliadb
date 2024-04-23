@@ -25,7 +25,7 @@ use std::time::Instant;
 use nucliadb_core::paragraphs::*;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::prost::Message;
-use nucliadb_core::protos::resource::ResourceStatus;
+use nucliadb_core::protos::ResourceStatus;
 use nucliadb_core::protos::{Resource, ResourceId};
 use nucliadb_core::tracing::{self, *};
 use nucliadb_core::{tantivy_replica, IndexFiles};
@@ -329,7 +329,7 @@ mod tests {
     use std::time::SystemTime;
 
     use nucliadb_core::protos::prost_types::Timestamp;
-    use nucliadb_core::protos::resource::ResourceStatus;
+    use nucliadb_core::protos::ResourceStatus;
     use nucliadb_core::protos::{
         IndexMetadata, IndexParagraph, IndexParagraphs, Resource, ResourceId, TextInformation,
     };

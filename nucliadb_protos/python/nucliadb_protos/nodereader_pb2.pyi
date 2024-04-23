@@ -19,17 +19,25 @@ if sys.version_info >= (3, 10):
 else:
     import typing_extensions
 from nucliadb_protos.noderesources_pb2 import (
+    BLOCKED as BLOCKED,
+    DELETE as DELETE,
+    EMPTY as EMPTY,
+    ERROR as ERROR,
+    EXPIRED as EXPIRED,
     EmptyQuery as EmptyQuery,
     EmptyResponse as EmptyResponse,
     IndexMetadata as IndexMetadata,
     IndexParagraph as IndexParagraph,
     IndexParagraphs as IndexParagraphs,
     NodeMetadata as NodeMetadata,
+    PENDING as PENDING,
+    PROCESSED as PROCESSED,
     ParagraphMetadata as ParagraphMetadata,
     Position as Position,
     Representation as Representation,
     Resource as Resource,
     ResourceID as ResourceID,
+    ResourceStatus as ResourceStatus,
     SentenceMetadata as SentenceMetadata,
     Shard as Shard,
     ShardCreated as ShardCreated,
@@ -37,6 +45,7 @@ from nucliadb_protos.noderesources_pb2 import (
     ShardIds as ShardIds,
     ShardMetadata as ShardMetadata,
     TextInformation as TextInformation,
+    VectorIndexResource as VectorIndexResource,
     VectorSentence as VectorSentence,
     VectorSetID as VectorSetID,
     VectorSetList as VectorSetList,
@@ -297,7 +306,7 @@ class DocumentSearchRequest(google.protobuf.message.Message):
     def timestamps(self) -> global___Timestamps: ...
     reload: builtins.bool
     only_faceted: builtins.bool
-    with_status: nucliadb_protos.noderesources_pb2.Resource.ResourceStatus.ValueType
+    with_status: nucliadb_protos.noderesources_pb2.ResourceStatus.ValueType
     advanced_query: builtins.str
     min_score: builtins.float
     def __init__(
@@ -314,7 +323,7 @@ class DocumentSearchRequest(google.protobuf.message.Message):
         timestamps: global___Timestamps | None = ...,
         reload: builtins.bool = ...,
         only_faceted: builtins.bool = ...,
-        with_status: nucliadb_protos.noderesources_pb2.Resource.ResourceStatus.ValueType | None = ...,
+        with_status: nucliadb_protos.noderesources_pb2.ResourceStatus.ValueType | None = ...,
         advanced_query: builtins.str | None = ...,
         min_score: builtins.float = ...,
     ) -> None: ...
@@ -1009,7 +1018,7 @@ class SearchRequest(google.protobuf.message.Message):
     with_duplicates: builtins.bool
     only_faceted: builtins.bool
     advanced_query: builtins.str
-    with_status: nucliadb_protos.noderesources_pb2.Resource.ResourceStatus.ValueType
+    with_status: nucliadb_protos.noderesources_pb2.ResourceStatus.ValueType
     @property
     def relations(self) -> global___RelationSearchRequest:
         """if provided, search metadata for this nodes (nodes at distance
@@ -1045,7 +1054,7 @@ class SearchRequest(google.protobuf.message.Message):
         with_duplicates: builtins.bool = ...,
         only_faceted: builtins.bool = ...,
         advanced_query: builtins.str | None = ...,
-        with_status: nucliadb_protos.noderesources_pb2.Resource.ResourceStatus.ValueType | None = ...,
+        with_status: nucliadb_protos.noderesources_pb2.ResourceStatus.ValueType | None = ...,
         relations: global___RelationSearchRequest | None = ...,
         relation_prefix: global___RelationPrefixSearchRequest | None = ...,
         relation_subgraph: global___EntitiesSubgraphRequest | None = ...,
