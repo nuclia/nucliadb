@@ -212,7 +212,7 @@ async def search_knowledgebox(
     response_model_exclude_unset=True,
     tags=["Search"],
 )
-@requires(NucliaDBRoles.READER)
+@requires([NucliaDBRoles.MANAGER, NucliaDBRoles.READER])
 @version(1)
 async def catalog_get(
     request: Request,
@@ -256,7 +256,7 @@ async def catalog_get(
     response_model_exclude_unset=True,
     tags=["Search"],
 )
-@requires(NucliaDBRoles.READER)
+@requires([NucliaDBRoles.MANAGER, NucliaDBRoles.READER])
 @version(1)
 async def catalog_post(
     request: Request,
