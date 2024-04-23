@@ -20,8 +20,8 @@
 from typing import AsyncGenerator, Optional
 
 import backoff
-from nucliadb_protos.resources_pb2 import Basic
 
+from nucliadb.common.datamanagers.utils import get_kv_pb
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
 
@@ -29,13 +29,14 @@ from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG, KB_RESOURCE_SLUG_BASE
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.orm.utils import get_basic, set_basic
-from nucliadb_protos import noderesources_pb2, writer_pb2
+from nucliadb_protos import noderesources_pb2, resources_pb2, writer_pb2
 from nucliadb_utils.utilities import get_storage
 
 from .utils import with_transaction
 
 KB_MATERIALIZED_RESOURCES_COUNT = "/kbs/{kbid}/materialized/resources/count"
 KB_RESOURCE_SHARD = "/kbs/{kbid}/r/{uuid}/shard"
+KB_RESOURCE_ALL_FIELDS = "/kbs/{kbid}/r/{uuid}/allfields"
 
 
 @backoff.on_exception(
@@ -112,6 +113,11 @@ async def get_resource(
     return await kb_orm.get(rid)
 
 
+async def resource_exists(txn: Transaction, *, kbid: str, rid: str) -> bool:
+    basic = await get_basic(txn, kbid, rid)
+    return basic is not None
+
+
 @backoff.on_exception(
     backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3
 )
@@ -177,11 +183,11 @@ async def get_broker_message(
 
 async def get_resource_basic(
     txn: Transaction, *, kbid: str, rid: str
-) -> Optional[Basic]:
+) -> Optional[resources_pb2.Basic]:
     raw_basic = await get_basic(txn, kbid, rid)
     if not raw_basic:
         return None
-    basic = Basic()
+    basic = resources_pb2.Basic()
     basic.ParseFromString(raw_basic)
     return basic
 
@@ -219,3 +225,29 @@ async def modify_slug(txn: Transaction, *, kbid: str, rid: str, new_slug: str) -
 
 async def set_resource_shard_id(txn: Transaction, *, kbid: str, rid: str, shard: str):
     await txn.set(KB_RESOURCE_SHARD.format(kbid=kbid, uuid=rid), shard.encode())
+
+
+async def get_all_field_ids(
+    txn: Transaction, *, kbid: str, rid: str
+) -> Optional[resources_pb2.AllFieldIDs]:
+    key = KB_RESOURCE_ALL_FIELDS.format(kbid=kbid, uuid=rid)
+    return await get_kv_pb(txn, key, resources_pb2.AllFieldIDs)
+
+
+async def set_all_field_ids(
+    txn: Transaction, *, kbid: str, rid: str, allfields: resources_pb2.AllFieldIDs
+):
+    key = KB_RESOURCE_ALL_FIELDS.format(kbid=kbid, uuid=rid)
+    await txn.set(key, allfields.SerializeToString())
+
+
+async def has_field(
+    txn: Transaction, *, kbid: str, rid: str, field_id: resources_pb2.FieldID
+) -> bool:
+    fields = await get_all_field_ids(txn, kbid=kbid, rid=rid)
+    if fields is None:
+        return False
+    for resource_field_id in fields.fields:
+        if field_id == resource_field_id:
+            return True
+    return False
