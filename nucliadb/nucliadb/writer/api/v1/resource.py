@@ -25,15 +25,8 @@ from uuid import uuid4
 
 from fastapi import HTTPException, Query, Response
 from fastapi_versioning import version
-from grpc import StatusCode as GrpcStatusCode
-from grpc.aio import AioRpcError
 from nucliadb_protos.resources_pb2 import Metadata
-from nucliadb_protos.writer_pb2 import (
-    BrokerMessage,
-    IndexResource,
-    ResourceFieldExistsResponse,
-    ResourceFieldId,
-)
+from nucliadb_protos.writer_pb2 import BrokerMessage, IndexResource
 from starlette.requests import Request
 
 from nucliadb.common import datamanagers
@@ -53,7 +46,6 @@ from nucliadb.writer.api.v1.router import (
     api,
 )
 from nucliadb.writer.back_pressure import maybe_back_pressure
-from nucliadb.writer.exceptions import IngestNotAvailable
 from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.basic import (
     parse_basic,
@@ -600,26 +592,17 @@ async def get_rid_from_slug_or_raise_error(kbid: str, rslug: str) -> str:
     return rid
 
 
+async def resource_exists(kbid: str, rid: str) -> bool:
+    async with datamanagers.with_transaction(read_only=True) as txn:
+        exists = await datamanagers.resources.resource_exists(txn, kbid=kbid, rid=rid)
+    return exists
+
+
 async def validate_rid_exists_or_raise_error(
     kbid: str,
     rid: str,
-) -> str:
-    ingest = get_ingest()
-    pbrequest = ResourceFieldId()
-    pbrequest.kbid = kbid
-    pbrequest.rid = rid
-
-    try:
-        response: ResourceFieldExistsResponse = await ingest.ResourceFieldExists(pbrequest)  # type: ignore
-    except AioRpcError as exc:
-        if exc.code() is GrpcStatusCode.UNAVAILABLE:
-            raise IngestNotAvailable()
-        else:
-            raise exc
-
-    if response.found:
-        return rid
-    else:
+):
+    if not (await resource_exists(kbid, rid)):
         raise HTTPException(status_code=404, detail="Resource does not exist")
 
 
@@ -629,7 +612,8 @@ async def get_rid_from_params_or_raise_error(
     slug: Optional[str] = None,
 ) -> str:
     if rid is not None:
-        return await validate_rid_exists_or_raise_error(kbid, rid)
+        await validate_rid_exists_or_raise_error(kbid, rid)
+        return rid
 
     if slug is None:
         raise ValueError("Either rid or slug must be set")
