@@ -57,6 +57,8 @@ STORAGE_FILE_EXTRACTED = "kbs/{kbid}/r/{uuid}/e/{field_type}/{field}/{key}"
 DEADLETTER = "deadletter/{partition}/{seqid}/{seq}"
 OLD_INDEXING_KEY = "index/{node}/{shard}/{txid}"
 INDEXING_KEY = "index/{kb}/{shard}/{resource}/{txid}"
+VECTOR_INDEXING_KEY = "index/{kb}/{shard}/{resource}/{txid}/vector/{vectorset}"
+
 # temporary storage for large stream data
 MESSAGE_KEY = "message/{kbid}/{rid}/{mid}"
 
@@ -171,6 +173,23 @@ class Storage:
             kb=kb, shard=logical_shard, resource=resource_uid, txid=txid
         )
 
+    def get_vector_indexing_storage_key(
+        self,
+        *,
+        kb: str,
+        logical_shard: str,
+        resource_uid: str,
+        txid: Union[int, str],
+        vectorset: str,
+    ):
+        return VECTOR_INDEXING_KEY.format(
+            kb=kb,
+            shard=logical_shard,
+            resource=resource_uid,
+            txid=txid,
+            vectorset=vectorset or "default",
+        )
+
     async def indexing(
         self,
         message: BrainResource,
@@ -195,8 +214,18 @@ class Storage:
 
         vector_keys: list[str] = []
         for vector_index_message in vector_index_messages or []:
-            # TODO
-            pass
+            vector_key = self.get_vector_indexing_storage_key(
+                kb=kb,
+                logical_shard=logical_shard,
+                resource_uid=message.resource.uuid,
+                txid=txid,
+                vectorset=vector_index_message.vectorset,
+            )
+            vector_index_message_serialized = vector_index_message.SerializeToString()
+            await self.uploadbytes(
+                self.indexing_bucket, vector_key, vector_index_message_serialized
+            )
+            vector_keys.append(vector_key)
 
         return key, vector_keys
 
@@ -222,8 +251,18 @@ class Storage:
 
         vector_keys: list[str] = []
         for vector_index_message in vector_index_messages or []:
-            # TODO
-            pass
+            vector_key = self.get_vector_indexing_storage_key(
+                kb=kb,
+                logical_shard=logical_shard,
+                resource_uid=message.resource.uuid,
+                txid=reindex_id,
+                vectorset=vector_index_message.vectorset,
+            )
+            vector_index_message_serialized = vector_index_message.SerializeToString()
+            await self.uploadbytes(
+                self.indexing_bucket, vector_key, vector_index_message_serialized
+            )
+            vector_keys.append(vector_key)
 
         return key, vector_keys
 

@@ -28,7 +28,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from grpc.aio import AioRpcError
-from nucliadb_protos.noderesources_pb2 import Resource, Shard, ShardId
+from nucliadb_protos.noderesources_pb2 import Resource, ResourceStatus, Shard, ShardId
 from nucliadb_protos.nodewriter_pb2 import IndexMessage, IndexMessageSource, TypeMessage
 from nucliadb_protos.writer_pb2 import Notification
 
