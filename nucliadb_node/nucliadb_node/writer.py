@@ -28,6 +28,7 @@ from nucliadb_protos.noderesources_pb2 import (
     ResourceID,
     ShardId,
     ShardIds,
+    VectorIndexResource,
 )
 from nucliadb_protos.nodewriter_pb2 import OpStatus
 from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
@@ -49,6 +50,9 @@ class Writer:
 
     async def set_resource(self, pb: Resource) -> OpStatus:
         return await self.stub.SetResource(pb)  # type: ignore
+
+    async def set_vector_index_resource(self, pb: VectorIndexResource) -> OpStatus:
+        return await self.stub.SetVectorIndexResource(pb)  # type: ignore
 
     async def delete_resource(self, pb: ResourceID) -> OpStatus:
         return await self.stub.RemoveResource(pb)  # type: ignore

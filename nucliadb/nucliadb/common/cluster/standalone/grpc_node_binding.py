@@ -52,6 +52,7 @@ from nucliadb_protos.noderesources_pb2 import (
     ShardCreated,
     ShardId,
     ShardIds,
+    VectorIndexResource,
     VectorSetID,
     VectorSetList,
 )
@@ -351,6 +352,18 @@ class StandaloneWriterWrapper:
         loop = asyncio.get_running_loop()
         resp = await loop.run_in_executor(
             self.executor, self.writer.set_resource, request.SerializeToString()
+        )
+        pb_bytes = bytes(resp)
+        op_status = OpStatus()
+        op_status.ParseFromString(pb_bytes)
+        return op_status
+
+    async def SetVectorIndexResource(self, request: VectorIndexResource) -> OpStatus:
+        loop = asyncio.get_running_loop()
+        resp = await loop.run_in_executor(
+            self.executor,
+            self.writer.set_vector_index_resource,
+            request.SerializeToString(),
         )
         pb_bytes = bytes(resp)
         op_status = OpStatus()
