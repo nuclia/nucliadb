@@ -46,6 +46,9 @@ pub struct IndexMessage {
     pub kbid: ::prost::alloc::string::String,
     #[prost(enumeration="IndexMessageSource", tag="10")]
     pub source: i32,
+    /// Additional storage keys for individual vector index messages 
+    #[prost(string, repeated, tag="11")]
+    pub vectors_storage_keys: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GarbageCollectorResponse {

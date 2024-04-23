@@ -37,6 +37,7 @@ from typing import (
 )
 
 from nucliadb_protos.noderesources_pb2 import Resource as BrainResource
+from nucliadb_protos.noderesources_pb2 import VectorIndexResource
 from nucliadb_protos.nodewriter_pb2 import IndexMessage
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.writer_pb2 import BrokerMessage
@@ -177,7 +178,8 @@ class Storage:
         partition: Optional[str],
         kb: str,
         logical_shard: str,
-    ) -> str:
+        vector_index_messages: Optional[list[VectorIndexResource]] = None,
+    ) -> tuple[str, list[str]]:
         if self.indexing_bucket is None:
             raise AttributeError()
         if txid < 0:
@@ -191,7 +193,12 @@ class Storage:
         )
         await self.uploadbytes(self.indexing_bucket, key, message.SerializeToString())
 
-        return key
+        vector_keys: list[str] = []
+        for vector_index_message in vector_index_messages or []:
+            # TODO
+            pass
+
+        return key, vector_keys
 
     async def reindexing(
         self,
@@ -200,7 +207,8 @@ class Storage:
         partition: Optional[str],
         kb: str,
         logical_shard: str,
-    ) -> str:
+        vector_index_messages: Optional[list[VectorIndexResource]] = None,
+    ) -> tuple[str, list[str]]:
         if self.indexing_bucket is None:
             raise AttributeError()
         key = self.get_indexing_storage_key(
@@ -211,7 +219,13 @@ class Storage:
         )
         message_serialized = message.SerializeToString()
         await self.uploadbytes(self.indexing_bucket, key, message_serialized)
-        return key
+
+        vector_keys: list[str] = []
+        for vector_index_message in vector_index_messages or []:
+            # TODO
+            pass
+
+        return key, vector_keys
 
     async def get_indexing(self, payload: IndexMessage) -> BrainResource:
         if self.indexing_bucket is None:
@@ -239,6 +253,20 @@ class Storage:
         bytes_buffer.flush()
         return pb
 
+    async def iter_vector_index_messages(
+        self, payload: IndexMessage
+    ) -> AsyncGenerator[VectorIndexResource, None]:
+        if self.indexing_bucket is None:
+            raise AttributeError()
+        for key in payload.vectors_storage_keys:
+            bytes_buffer = await self.downloadbytes(self.indexing_bucket, key)
+            if bytes_buffer.getbuffer().nbytes == 0:
+                raise IndexDataNotFound(f'Indexing data not found for key "{key}"')
+            pb = VectorIndexResource()
+            pb.ParseFromString(bytes_buffer.read())
+            bytes_buffer.flush()
+            yield pb
+
     async def delete_indexing(
         self,
         resource_uid: str,
@@ -260,6 +288,8 @@ class Storage:
             )
             + ".deleted"
         )
+
+        # TODO: Mark the vector index messages as deleted too
 
         await self.uploadbytes(self.indexing_bucket, key, b"")
 

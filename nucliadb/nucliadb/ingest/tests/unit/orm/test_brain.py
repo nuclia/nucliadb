@@ -20,7 +20,7 @@
 from uuid import uuid4
 
 import pytest
-from nucliadb_protos.noderesources_pb2 import Resource as PBResource
+from nucliadb_protos.noderesources_pb2 import ResourceStatus
 from nucliadb_protos.resources_pb2 import (
     Basic,
     ExtractedText,
@@ -137,41 +137,45 @@ def test_get_page_number():
     "new_status,previous_status,expected_brain_status",
     [
         # No previous_status
-        (Metadata.Status.PENDING, None, PBResource.PENDING),
-        (Metadata.Status.PROCESSED, None, PBResource.PROCESSED),
-        (Metadata.Status.ERROR, None, PBResource.PROCESSED),
-        (Metadata.Status.BLOCKED, None, PBResource.PROCESSED),
-        (Metadata.Status.EXPIRED, None, PBResource.PROCESSED),
+        (Metadata.Status.PENDING, None, ResourceStatus.PENDING),
+        (Metadata.Status.PROCESSED, None, ResourceStatus.PROCESSED),
+        (Metadata.Status.ERROR, None, ResourceStatus.PROCESSED),
+        (Metadata.Status.BLOCKED, None, ResourceStatus.PROCESSED),
+        (Metadata.Status.EXPIRED, None, ResourceStatus.PROCESSED),
         # previous_status = PENDING
-        (Metadata.Status.PENDING, Metadata.Status.PENDING, PBResource.PENDING),
-        (Metadata.Status.PROCESSED, Metadata.Status.PENDING, PBResource.PROCESSED),
-        (Metadata.Status.ERROR, Metadata.Status.PENDING, PBResource.PROCESSED),
-        (Metadata.Status.BLOCKED, Metadata.Status.PENDING, PBResource.PROCESSED),
-        (Metadata.Status.EXPIRED, Metadata.Status.PENDING, PBResource.PROCESSED),
+        (Metadata.Status.PENDING, Metadata.Status.PENDING, ResourceStatus.PENDING),
+        (Metadata.Status.PROCESSED, Metadata.Status.PENDING, ResourceStatus.PROCESSED),
+        (Metadata.Status.ERROR, Metadata.Status.PENDING, ResourceStatus.PROCESSED),
+        (Metadata.Status.BLOCKED, Metadata.Status.PENDING, ResourceStatus.PROCESSED),
+        (Metadata.Status.EXPIRED, Metadata.Status.PENDING, ResourceStatus.PROCESSED),
         # previous_status = PROCESSED
-        (Metadata.Status.PROCESSED, Metadata.Status.PROCESSED, PBResource.PROCESSED),
-        (Metadata.Status.ERROR, Metadata.Status.PROCESSED, PBResource.PROCESSED),
-        (Metadata.Status.BLOCKED, Metadata.Status.PROCESSED, PBResource.PROCESSED),
-        (Metadata.Status.PENDING, Metadata.Status.PROCESSED, PBResource.PROCESSED),
-        (Metadata.Status.EXPIRED, Metadata.Status.PROCESSED, PBResource.PROCESSED),
+        (
+            Metadata.Status.PROCESSED,
+            Metadata.Status.PROCESSED,
+            ResourceStatus.PROCESSED,
+        ),
+        (Metadata.Status.ERROR, Metadata.Status.PROCESSED, ResourceStatus.PROCESSED),
+        (Metadata.Status.BLOCKED, Metadata.Status.PROCESSED, ResourceStatus.PROCESSED),
+        (Metadata.Status.PENDING, Metadata.Status.PROCESSED, ResourceStatus.PROCESSED),
+        (Metadata.Status.EXPIRED, Metadata.Status.PROCESSED, ResourceStatus.PROCESSED),
         # previous_status = ERROR
-        (Metadata.Status.PENDING, Metadata.Status.ERROR, PBResource.PROCESSED),
-        (Metadata.Status.PROCESSED, Metadata.Status.ERROR, PBResource.PROCESSED),
-        (Metadata.Status.ERROR, Metadata.Status.ERROR, PBResource.PROCESSED),
-        (Metadata.Status.BLOCKED, Metadata.Status.ERROR, PBResource.PROCESSED),
-        (Metadata.Status.EXPIRED, Metadata.Status.ERROR, PBResource.PROCESSED),
+        (Metadata.Status.PENDING, Metadata.Status.ERROR, ResourceStatus.PROCESSED),
+        (Metadata.Status.PROCESSED, Metadata.Status.ERROR, ResourceStatus.PROCESSED),
+        (Metadata.Status.ERROR, Metadata.Status.ERROR, ResourceStatus.PROCESSED),
+        (Metadata.Status.BLOCKED, Metadata.Status.ERROR, ResourceStatus.PROCESSED),
+        (Metadata.Status.EXPIRED, Metadata.Status.ERROR, ResourceStatus.PROCESSED),
         # previous_status = BLOCKED
-        (Metadata.Status.PENDING, Metadata.Status.BLOCKED, PBResource.PROCESSED),
-        (Metadata.Status.PROCESSED, Metadata.Status.BLOCKED, PBResource.PROCESSED),
-        (Metadata.Status.ERROR, Metadata.Status.BLOCKED, PBResource.PROCESSED),
-        (Metadata.Status.BLOCKED, Metadata.Status.BLOCKED, PBResource.PROCESSED),
-        (Metadata.Status.EXPIRED, Metadata.Status.BLOCKED, PBResource.PROCESSED),
+        (Metadata.Status.PENDING, Metadata.Status.BLOCKED, ResourceStatus.PROCESSED),
+        (Metadata.Status.PROCESSED, Metadata.Status.BLOCKED, ResourceStatus.PROCESSED),
+        (Metadata.Status.ERROR, Metadata.Status.BLOCKED, ResourceStatus.PROCESSED),
+        (Metadata.Status.BLOCKED, Metadata.Status.BLOCKED, ResourceStatus.PROCESSED),
+        (Metadata.Status.EXPIRED, Metadata.Status.BLOCKED, ResourceStatus.PROCESSED),
         # previous_status = EXPIRED
-        (Metadata.Status.PENDING, Metadata.Status.EXPIRED, PBResource.PROCESSED),
-        (Metadata.Status.PROCESSED, Metadata.Status.EXPIRED, PBResource.PROCESSED),
-        (Metadata.Status.ERROR, Metadata.Status.EXPIRED, PBResource.PROCESSED),
-        (Metadata.Status.BLOCKED, Metadata.Status.EXPIRED, PBResource.PROCESSED),
-        (Metadata.Status.EXPIRED, Metadata.Status.EXPIRED, PBResource.PROCESSED),
+        (Metadata.Status.PENDING, Metadata.Status.EXPIRED, ResourceStatus.PROCESSED),
+        (Metadata.Status.PROCESSED, Metadata.Status.EXPIRED, ResourceStatus.PROCESSED),
+        (Metadata.Status.ERROR, Metadata.Status.EXPIRED, ResourceStatus.PROCESSED),
+        (Metadata.Status.BLOCKED, Metadata.Status.EXPIRED, ResourceStatus.PROCESSED),
+        (Metadata.Status.EXPIRED, Metadata.Status.EXPIRED, ResourceStatus.PROCESSED),
     ],
 )
 def test_set_processing_status(new_status, previous_status, expected_brain_status):

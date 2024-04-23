@@ -42,6 +42,8 @@ message IndexMessage {
     string storage_key = 8;
     string kbid = 9;
     IndexMessageSource source = 10;
+    // Additional storage keys for individual vector index messages 
+    repeated string vectors_storage_keys = 11;
 }
 
 message GarbageCollectorResponse {

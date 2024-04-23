@@ -23,7 +23,7 @@ from datetime import datetime
 from typing import Any, Awaitable, Optional, Union
 
 from async_lru import alru_cache
-from nucliadb_protos.noderesources_pb2 import Resource
+from nucliadb_protos.noderesources_pb2 import ResourceStatus
 
 from nucliadb.common import datamanagers
 from nucliadb.ingest.orm.synonyms import Synonyms
@@ -742,12 +742,12 @@ def suggest_query_to_pb(
 
 
 PROCESSING_STATUS_TO_PB_MAP = {
-    ResourceProcessingStatus.PENDING: Resource.ResourceStatus.PENDING,
-    ResourceProcessingStatus.PROCESSED: Resource.ResourceStatus.PROCESSED,
-    ResourceProcessingStatus.ERROR: Resource.ResourceStatus.ERROR,
-    ResourceProcessingStatus.EMPTY: Resource.ResourceStatus.EMPTY,
-    ResourceProcessingStatus.BLOCKED: Resource.ResourceStatus.BLOCKED,
-    ResourceProcessingStatus.EXPIRED: Resource.ResourceStatus.EXPIRED,
+    ResourceProcessingStatus.PENDING: ResourceStatus.PENDING,
+    ResourceProcessingStatus.PROCESSED: ResourceStatus.PROCESSED,
+    ResourceProcessingStatus.ERROR: ResourceStatus.ERROR,
+    ResourceProcessingStatus.EMPTY: ResourceStatus.EMPTY,
+    ResourceProcessingStatus.BLOCKED: ResourceStatus.BLOCKED,
+    ResourceProcessingStatus.EXPIRED: ResourceStatus.EXPIRED,
 }
 
 

@@ -338,7 +338,7 @@ def resource_payload(shard: str) -> Resource:
     pb.texts["title"].labels.extend(["/c/label1", "/c/label2"])
     pb.texts["description"].text = "My description is amazing"
     pb.texts["description"].labels.extend(["/c/label3", "/c/label4"])
-    pb.status = Resource.ResourceStatus.PROCESSED
+    pb.status = ResourceStatus.PROCESSED
     pb.paragraphs["title"].paragraphs["title/0-10"].start = 0
     pb.paragraphs["title"].paragraphs["title/0-10"].end = 10
     pb.paragraphs["title"].paragraphs["title/0-10"].field = "title"
@@ -366,7 +366,7 @@ async def create_indexing_message(
     source: IndexMessageSource.ValueType = IndexMessageSource.PROCESSOR,
 ) -> IndexMessage:
     storage = await get_storage(service_name=SERVICE_NAME)
-    storage_key = await storage.indexing(
+    storage_key, _ = await storage.indexing(
         resource, txid=1, partition=TEST_PARTITION, kb=kb, logical_shard=shard
     )
     index = IndexMessage()

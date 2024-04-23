@@ -22,7 +22,7 @@ from typing import Optional
 from uuid import uuid4
 
 import pytest
-from nucliadb_protos.noderesources_pb2 import Resource
+from nucliadb_protos.noderesources_pb2 import ResourceStatus
 from nucliadb_protos.resources_pb2 import Basic as PBBasic
 from nucliadb_protos.resources_pb2 import Classification as PBClassification
 from nucliadb_protos.resources_pb2 import ExtractedVectorsWrapper
@@ -474,7 +474,7 @@ async def test_generate_index_message_contains_all_metadata(
     )
 
     # Processing status
-    assert index_message.status == Resource.ResourceStatus.PROCESSED
+    assert index_message.status == ResourceStatus.PROCESSED
 
     # Paragraphs
     assert set(index_message.paragraphs.keys()) == expected_fields

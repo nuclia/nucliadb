@@ -320,6 +320,9 @@ class KBShardManager:
         kb: str,
         reindex_id: Optional[str] = None,
         source: IndexMessageSource.ValueType = IndexMessageSource.PROCESSOR,
+        vector_index_messages: Optional[
+            list[noderesources_pb2.VectorIndexResource]
+        ] = None,
     ) -> None:
         if txid == -1 and reindex_id is None:
             # This means we are injecting a complete resource via ingest gRPC
@@ -332,18 +335,29 @@ class KBShardManager:
         indexpb = IndexMessage()
 
         if reindex_id is not None:
-            storage_key = await storage.reindexing(
-                resource, reindex_id, partition, kb=kb, logical_shard=shard.shard
+            storage_key, vector_storage_keys = await storage.reindexing(
+                resource,
+                reindex_id,
+                partition,
+                kb=kb,
+                logical_shard=shard.shard,
+                vector_index_messages=vector_index_messages,
             )
             indexpb.reindex_id = reindex_id
         else:
-            storage_key = await storage.indexing(
-                resource, txid, partition, kb=kb, logical_shard=shard.shard
+            storage_key, vector_storage_keys = await storage.indexing(
+                resource,
+                txid,
+                partition,
+                kb=kb,
+                logical_shard=shard.shard,
+                vector_index_messages=vector_index_messages,
             )
             indexpb.txid = txid
 
         indexpb.typemessage = TypeMessage.CREATION
         indexpb.storage_key = storage_key
+        indexpb.vectors_storage_keys.extend(vector_storage_keys)
         indexpb.kbid = kb
         if partition:
             indexpb.partition = partition
@@ -444,6 +458,9 @@ class StandaloneKBShardManager(KBShardManager):
         kb: str,
         reindex_id: Optional[str] = None,
         source: IndexMessageSource.ValueType = IndexMessageSource.PROCESSOR,
+        vector_index_messages: Optional[
+            list[noderesources_pb2.VectorIndexResource]
+        ] = None,
     ) -> None:
         index_node = None
         for shardreplica in shard.replicas:

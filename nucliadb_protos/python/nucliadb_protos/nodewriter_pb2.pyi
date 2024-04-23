@@ -3,7 +3,9 @@
 isort:skip_file
 """
 import builtins
+import collections.abc
 import google.protobuf.descriptor
+import google.protobuf.internal.containers
 import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
 import nucliadb_protos.noderesources_pb2
@@ -140,6 +142,7 @@ class IndexMessage(google.protobuf.message.Message):
     STORAGE_KEY_FIELD_NUMBER: builtins.int
     KBID_FIELD_NUMBER: builtins.int
     SOURCE_FIELD_NUMBER: builtins.int
+    VECTORS_STORAGE_KEYS_FIELD_NUMBER: builtins.int
     node: builtins.str
     shard: builtins.str
     """physical shard message is for"""
@@ -151,6 +154,9 @@ class IndexMessage(google.protobuf.message.Message):
     storage_key: builtins.str
     kbid: builtins.str
     source: global___IndexMessageSource.ValueType
+    @property
+    def vectors_storage_keys(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """Additional storage keys for individual vector index messages"""
     def __init__(
         self,
         *,
@@ -164,9 +170,10 @@ class IndexMessage(google.protobuf.message.Message):
         storage_key: builtins.str = ...,
         kbid: builtins.str = ...,
         source: global___IndexMessageSource.ValueType = ...,
+        vectors_storage_keys: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["_partition", b"_partition", "partition", b"partition"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["_partition", b"_partition", "kbid", b"kbid", "node", b"node", "partition", b"partition", "reindex_id", b"reindex_id", "resource", b"resource", "shard", b"shard", "source", b"source", "storage_key", b"storage_key", "txid", b"txid", "typemessage", b"typemessage"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["_partition", b"_partition", "kbid", b"kbid", "node", b"node", "partition", b"partition", "reindex_id", b"reindex_id", "resource", b"resource", "shard", b"shard", "source", b"source", "storage_key", b"storage_key", "txid", b"txid", "typemessage", b"typemessage", "vectors_storage_keys", b"vectors_storage_keys"]) -> None: ...
     def WhichOneof(self, oneof_group: typing_extensions.Literal["_partition", b"_partition"]) -> typing_extensions.Literal["partition"] | None: ...
 
 global___IndexMessage = IndexMessage

@@ -49,7 +49,7 @@ class IndexNode:
         resource.resource.uuid = "001"
         resource.resource.shard_id = shard_id
         resource.texts["field1"].text = "My lovely text"
-        resource.status = Resource.ResourceStatus.PROCESSED
+        resource.status = ResourceStatus.PROCESSED
         resource.shard_id = shard_id
         now = datetime.now()
         resource.metadata.created.FromDatetime(now)

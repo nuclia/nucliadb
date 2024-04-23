@@ -27,7 +27,7 @@ from nucliadb_protos.noderesources_pb2 import ParagraphMetadata
 from nucliadb_protos.noderesources_pb2 import Position as TextPosition
 from nucliadb_protos.noderesources_pb2 import Representation
 from nucliadb_protos.noderesources_pb2 import Resource as PBBrainResource
-from nucliadb_protos.noderesources_pb2 import ResourceID
+from nucliadb_protos.noderesources_pb2 import ResourceID, ResourceStatus
 from nucliadb_protos.resources_pb2 import (
     Basic,
     ExtractedText,
@@ -400,15 +400,15 @@ class ResourceBrain:
         status = basic.metadata.status
         if previous_status is not None and previous_status != Metadata.Status.PENDING:
             # Already processed once, so it stays as PROCESSED
-            self.brain.status = PBBrainResource.PROCESSED
+            self.brain.status = ResourceStatus.PROCESSED
             return
         # previos_status is None or PENDING
         if status == Metadata.Status.PENDING:
             # Stays in pending
-            self.brain.status = PBBrainResource.PENDING
+            self.brain.status = ResourceStatus.PENDING
         else:
             # Means it has just been processed
-            self.brain.status = PBBrainResource.PROCESSED
+            self.brain.status = ResourceStatus.PROCESSED
 
     def set_security(self, security: utils_pb2.Security):
         self.brain.security.CopyFrom(security)
