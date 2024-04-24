@@ -70,6 +70,7 @@ from nucliadb.writer.tus.storage import FileStorageManager  # type: ignore
 from nucliadb.writer.tus.utils import parse_tus_metadata
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_models.utils import FieldIdString
 from nucliadb_models.writer import CreateResourcePayload, ResourceFileUploaded
 from nucliadb_utils.authentication import requires_one
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
@@ -148,7 +149,7 @@ async def tus_post_rslug_prefix(
     request: Request,
     kbid: str,
     rslug: str,
-    field: str,
+    field: FieldIdString,
     item: Optional[CreateResourcePayload] = None,
 ) -> Response:
     return await _tus_post(request, kbid, item=item, rslug=rslug, field=field)
@@ -166,7 +167,7 @@ async def tus_post_rid_prefix(
     request: Request,
     kbid: str,
     path_rid: str,
-    field: str,
+    field: FieldIdString,
     item: Optional[CreateResourcePayload] = None,
 ) -> Response:
     return await _tus_post(request, kbid, item=item, path_rid=path_rid, field=field)
@@ -327,7 +328,7 @@ async def tus_head_rslug_prefix(
     request: Request,
     kbid: str,
     rslug: str,
-    field: str,
+    field: FieldIdString,
     upload_id: str,
 ) -> Response:
     return await _tus_head(upload_id)
@@ -346,7 +347,7 @@ async def tus_head_rid_prefix(
     request: Request,
     kbid: str,
     path_rid: str,
-    field: str,
+    field: FieldIdString,
     upload_id: str,
 ) -> Response:
     return await _tus_head(upload_id)
@@ -403,7 +404,7 @@ async def tus_patch_rslug_prefix(
     request: Request,
     kbid: str,
     rslug: str,
-    field: str,
+    field: FieldIdString,
     upload_id: str,
 ) -> Response:
     return await tus_patch(request, kbid, upload_id, rslug=rslug, field=field)
@@ -422,7 +423,7 @@ async def tus_patch_rid_prefix(
     request: Request,
     kbid: str,
     rid: str,
-    field: str,
+    field: FieldIdString,
     upload_id: str,
 ) -> Response:
     return await tus_patch(request, kbid, upload_id, rid=rid, field=field)
@@ -608,7 +609,7 @@ async def upload_rslug_prefix(
     request: StarletteRequest,
     kbid: str,
     rslug: str,
-    field: str,
+    field: FieldIdString,
     x_filename: Optional[list[str]] = Header(None),  # type: ignore
     x_password: Optional[list[str]] = Header(None),  # type: ignore
     x_language: Optional[list[str]] = Header(None),  # type: ignore
@@ -639,7 +640,7 @@ async def upload_rid_prefix(
     request: StarletteRequest,
     kbid: str,
     path_rid: str,
-    field: str,
+    field: FieldIdString,
     x_filename: Optional[list[str]] = Header(None),  # type: ignore
     x_password: Optional[list[str]] = Header(None),  # type: ignore
     x_language: Optional[list[str]] = Header(None),  # type: ignore
