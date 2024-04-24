@@ -61,6 +61,12 @@ class DummyWriterStub:  # pragma: no cover
         result.field_count = 1
         return result
 
+    async def SetResourceV2(self, data):  # pragma: no cover
+        self.calls.setdefault("SetResourceV2", []).append(data)
+        result = OpStatus()
+        result.field_count = 1
+        return result
+
     async def AddVectorSet(self, data):  # pragma: no cover
         self.calls.setdefault("AddVectorSet", []).append(data)
         result = OpStatus()

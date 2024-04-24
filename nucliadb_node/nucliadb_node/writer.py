@@ -29,7 +29,7 @@ from nucliadb_protos.noderesources_pb2 import (
     ShardId,
     ShardIds,
 )
-from nucliadb_protos.nodewriter_pb2 import OpStatus
+from nucliadb_protos.nodewriter_pb2 import IndexMessage, OpStatus
 from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
 
 from nucliadb_node import SERVICE_NAME  # type: ignore
@@ -49,6 +49,9 @@ class Writer:
 
     async def set_resource(self, pb: Resource) -> OpStatus:
         return await self.stub.SetResource(pb)  # type: ignore
+
+    async def set_resource_v2(self, pb: IndexMessage) -> OpStatus:
+        return await self.stub.SetResourceV2(pb)  # type: ignore
 
     async def delete_resource(self, pb: ResourceID) -> OpStatus:
         return await self.stub.RemoveResource(pb)  # type: ignore
