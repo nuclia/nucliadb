@@ -30,7 +30,6 @@ from nucliadb.writer.api.v1.upload import (
 )
 from nucliadb.writer.tus.exceptions import HTTPConflict, HTTPNotFound
 from nucliadb_models.resource import QueueType
-from nucliadb_protos import writer_pb2
 
 UPLOAD_PACKAGE = "nucliadb.writer.api.v1.upload"
 
@@ -119,19 +118,12 @@ def test_guess_content_type(filename, content_type):
 )
 @pytest.mark.asyncio
 async def test_validate_field_upload(rid, field, md5, exists: bool, result):
-    mock_ingest = AsyncMock()
-    mock_ingest.ResourceFieldExists = AsyncMock(
-        return_value=writer_pb2.ResourceFieldExistsResponse(found=exists)
-    )
-
     mock_uuid = Mock()
     mock_uuid4 = Mock()
     mock_uuid4.hex = "uuid4"
     mock_uuid.uuid4 = Mock(return_value=mock_uuid4)
 
-    with patch(
-        "nucliadb.writer.api.v1.upload.get_ingest", new=Mock(return_value=mock_ingest)
-    ), patch("nucliadb.writer.api.v1.upload.uuid", mock_uuid), patch(
+    with patch("nucliadb.writer.api.v1.upload.uuid", mock_uuid), patch(
         "nucliadb.writer.api.v1.upload.resource_exists", AsyncMock(return_value=exists)
     ):
         if isinstance(result, tuple):

@@ -61,8 +61,6 @@ from nucliadb_protos.writer_pb2 import (
     NewEntitiesGroupRequest,
     NewEntitiesGroupResponse,
     OpStatusWriter,
-    ResourceFieldExistsResponse,
-    ResourceFieldId,
     SetEntitiesRequest,
     SetLabelsRequest,
     SetSynonymsRequest,
@@ -645,43 +643,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             ]
         )
         return response
-
-    async def ResourceFieldExists(  # type: ignore
-        self, request: ResourceFieldId, context=None
-    ) -> ResourceFieldExistsResponse:
-        response = ResourceFieldExistsResponse()
-        response.found = False
-        resobj = None
-        async with self.driver.transaction() as txn:
-            kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
-            resobj = ResourceORM(txn, self.storage, kbobj, request.rid)
-
-            if request.field != "":
-                field = await resobj.get_field(
-                    request.field, request.field_type, load=True
-                )
-                if field.value is not None:
-                    response.found = True
-                else:
-                    response.found = False
-                return response
-
-            if request.rid != "":
-                if await resobj.exists():
-                    response.found = True
-                else:
-                    response.found = False
-                return response
-
-            if request.kbid != "":
-                config = await datamanagers.kb.get_config(txn, kbid=request.kbid)
-                if config is not None:
-                    response.found = True
-                else:
-                    response.found = False
-                return response
-
-            return response
 
     async def Index(self, request: IndexResource, context=None) -> IndexStatus:  # type: ignore
         async with self.driver.transaction() as txn:

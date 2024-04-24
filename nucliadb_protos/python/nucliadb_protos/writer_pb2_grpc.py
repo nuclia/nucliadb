@@ -40,11 +40,6 @@ class WriterStub(object):
                 request_serializer=nucliadb__protos_dot_writer__pb2.SetVectorsRequest.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_writer__pb2.SetVectorsResponse.FromString,
                 )
-        self.ResourceFieldExists = channel.unary_unary(
-                '/fdbwriter.Writer/ResourceFieldExists',
-                request_serializer=nucliadb__protos_dot_writer__pb2.ResourceFieldId.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_writer__pb2.ResourceFieldExistsResponse.FromString,
-                )
         self.ProcessMessage = channel.stream_unary(
                 '/fdbwriter.Writer/ProcessMessage',
                 request_serializer=nucliadb__protos_dot_writer__pb2.BrokerMessage.SerializeToString,
@@ -180,12 +175,6 @@ class WriterServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def SetVectors(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def ResourceFieldExists(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -347,11 +336,6 @@ def add_WriterServicer_to_server(servicer, server):
                     servicer.SetVectors,
                     request_deserializer=nucliadb__protos_dot_writer__pb2.SetVectorsRequest.FromString,
                     response_serializer=nucliadb__protos_dot_writer__pb2.SetVectorsResponse.SerializeToString,
-            ),
-            'ResourceFieldExists': grpc.unary_unary_rpc_method_handler(
-                    servicer.ResourceFieldExists,
-                    request_deserializer=nucliadb__protos_dot_writer__pb2.ResourceFieldId.FromString,
-                    response_serializer=nucliadb__protos_dot_writer__pb2.ResourceFieldExistsResponse.SerializeToString,
             ),
             'ProcessMessage': grpc.stream_unary_rpc_method_handler(
                     servicer.ProcessMessage,
@@ -550,23 +534,6 @@ class Writer(object):
         return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/SetVectors',
             nucliadb__protos_dot_writer__pb2.SetVectorsRequest.SerializeToString,
             nucliadb__protos_dot_writer__pb2.SetVectorsResponse.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def ResourceFieldExists(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/ResourceFieldExists',
-            nucliadb__protos_dot_writer__pb2.ResourceFieldId.SerializeToString,
-            nucliadb__protos_dot_writer__pb2.ResourceFieldExistsResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
