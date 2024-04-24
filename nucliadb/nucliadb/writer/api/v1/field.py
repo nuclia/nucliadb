@@ -51,6 +51,7 @@ from nucliadb.writer.resource.field import (
 )
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_models.utils import FieldIdString
 from nucliadb_models.writer import ResourceFieldAdded, ResourceUpdated
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
@@ -144,7 +145,7 @@ async def add_resource_field_text_rslug_prefix(
     request: Request,
     kbid: str,
     rslug: str,
-    field_id: str,
+    field_id: FieldIdString,
     field_payload: models.TextField,
 ) -> ResourceFieldAdded:
     return await _add_resource_field_text(
@@ -169,7 +170,7 @@ async def add_resource_field_text_rid_prefix(
     request: Request,
     kbid: str,
     rid: str,
-    field_id: str,
+    field_id: FieldIdString,
     field_payload: models.TextField,
 ) -> ResourceFieldAdded:
     return await _add_resource_field_text(
@@ -212,7 +213,7 @@ async def add_resource_field_link_rslug_prefix(
     request: Request,
     kbid: str,
     rslug: str,
-    field_id: str,
+    field_id: FieldIdString,
     field_payload: models.LinkField,
 ) -> ResourceFieldAdded:
     return await _add_resource_field_link(
@@ -233,7 +234,7 @@ async def add_resource_field_link_rid_prefix(
     request: Request,
     kbid: str,
     rid: str,
-    field_id: str,
+    field_id: FieldIdString,
     field_payload: models.LinkField,
 ) -> ResourceFieldAdded:
     return await _add_resource_field_link(
@@ -272,7 +273,7 @@ async def add_resource_field_keywordset_rslug_prefix(
     request: Request,
     kbid: str,
     rslug: str,
-    field_id: str,
+    field_id: FieldIdString,
     field_payload: models.FieldKeywordset,
 ) -> ResourceFieldAdded:
     return await _add_resource_field_keywordset(
@@ -293,7 +294,7 @@ async def add_resource_field_keywordset_rid_prefix(
     request: Request,
     kbid: str,
     rid: str,
-    field_id: str,
+    field_id: FieldIdString,
     field_payload: models.FieldKeywordset,
 ) -> ResourceFieldAdded:
     return await _add_resource_field_keywordset(
@@ -332,7 +333,7 @@ async def add_resource_field_datetime_rslug_prefix(
     request: Request,
     kbid: str,
     rslug: str,
-    field_id: str,
+    field_id: FieldIdString,
     field_payload: models.FieldDatetime,
 ) -> ResourceFieldAdded:
     return await _add_resource_field_datetime(
@@ -353,7 +354,7 @@ async def add_resource_field_datetime_rid_prefix(
     request: Request,
     kbid: str,
     rid: str,
-    field_id: str,
+    field_id: FieldIdString,
     field_payload: models.FieldDatetime,
 ) -> ResourceFieldAdded:
     return await _add_resource_field_datetime(
@@ -392,7 +393,7 @@ async def add_resource_field_layout_rslug_prefix(
     request: Request,
     kbid: str,
     rslug: str,
-    field_id: str,
+    field_id: FieldIdString,
     field_payload: models.InputLayoutField,
 ) -> ResourceFieldAdded:
     return await _add_resource_field_layout(
@@ -417,7 +418,7 @@ async def add_resource_field_layout_rid_prefix(
     request: Request,
     kbid: str,
     rid: str,
-    field_id: str,
+    field_id: FieldIdString,
     field_payload: models.InputLayoutField,
 ) -> ResourceFieldAdded:
     return await _add_resource_field_layout(
@@ -456,7 +457,7 @@ async def add_resource_field_conversation_rslug_prefix(
     request: Request,
     kbid: str,
     rslug: str,
-    field_id: str,
+    field_id: FieldIdString,
     field_payload: models.InputConversationField,
 ) -> ResourceFieldAdded:
     return await _add_resource_field_conversation(
@@ -477,7 +478,7 @@ async def add_resource_field_conversation_rid_prefix(
     request: Request,
     kbid: str,
     rid: str,
-    field_id: str,
+    field_id: FieldIdString,
     field_payload: models.InputConversationField,
 ) -> ResourceFieldAdded:
     return await _add_resource_field_conversation(
@@ -518,7 +519,7 @@ async def add_resource_field_file_rslug_prefix(
     request: Request,
     kbid: str,
     rslug: str,
-    field_id: str,
+    field_id: FieldIdString,
     field_payload: models.FileField,
     x_skip_store: bool = SKIP_STORE_DEFAULT,
 ) -> ResourceFieldAdded:
@@ -545,7 +546,7 @@ async def add_resource_field_file_rid_prefix(
     request: Request,
     kbid: str,
     rid: str,
-    field_id: str,
+    field_id: FieldIdString,
     field_payload: models.FileField,
     x_skip_store: bool = SKIP_STORE_DEFAULT,
 ) -> ResourceFieldAdded:
@@ -588,7 +589,7 @@ async def append_messages_to_conversation_field_rslug_prefix(
     request: Request,
     kbid: str,
     rslug: str,
-    field_id: str,
+    field_id: FieldIdString,
     messages: list[models.InputMessage],
 ) -> ResourceFieldAdded:
     return await _append_messages_to_conversation_field(
@@ -609,7 +610,7 @@ async def append_messages_to_conversation_field_rid_prefix(
     request: Request,
     kbid: str,
     rid: str,
-    field_id: str,
+    field_id: FieldIdString,
     messages: list[models.InputMessage],
 ) -> ResourceFieldAdded:
     return await _append_messages_to_conversation_field(
@@ -690,7 +691,7 @@ async def append_blocks_to_layout_field_rslug_prefix(
     request: Request,
     kbid: str,
     rslug: str,
-    field_id: str,
+    field_id: FieldIdString,
     blocks: dict[str, models.InputBlock],
 ) -> ResourceFieldAdded:
     return await _append_blocks_to_layout_field(
@@ -711,7 +712,7 @@ async def append_blocks_to_layout_field_rid_prefix(
     request: Request,
     kbid: str,
     rid: str,
-    field_id: str,
+    field_id: FieldIdString,
     blocks: dict[str, models.InputBlock],
 ) -> ResourceFieldAdded:
     return await _append_blocks_to_layout_field(
@@ -791,7 +792,7 @@ async def delete_resource_field_rslug_prefix(
     kbid: str,
     rslug: str,
     field_type: models.FieldTypeName,
-    field_id: str,
+    field_id: FieldIdString,
 ):
     return await _delete_resource_field(
         request,
@@ -816,7 +817,7 @@ async def delete_resource_field_rid_prefix(
     kbid: str,
     rid: str,
     field_type: models.FieldTypeName,
-    field_id: str,
+    field_id: FieldIdString,
 ):
     return await _delete_resource_field(request, kbid, field_type, field_id, rid=rid)
 
@@ -871,7 +872,7 @@ async def reprocess_file_field(
     request: Request,
     kbid: str,
     rid: str,
-    field_id: str,
+    field_id: FieldIdString,
     x_nucliadb_user: str = X_NUCLIADB_USER,
     x_file_password: Optional[str] = X_FILE_PASSWORD,
 ) -> ResourceUpdated:
