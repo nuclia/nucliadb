@@ -40,8 +40,9 @@ from nucliadb.ingest.processing import PushPayload, Source
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.writer import SERVICE_NAME
 from nucliadb.writer.api.v1.resource import (
-    get_rid_from_params_or_raise_error,
+    get_rid_from_slug_or_raise_error,
     resource_exists,
+    validate_rid_exists_or_raise_error,
 )
 from nucliadb.writer.back_pressure import maybe_back_pressure
 from nucliadb.writer.resource.audit import parse_audit
@@ -142,7 +143,8 @@ async def tus_post_rslug_prefix(
     field: FieldIdString,
     item: Optional[CreateResourcePayload] = None,
 ) -> Response:
-    return await _tus_post(request, kbid, item=item, rslug=rslug, field=field)
+    rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
+    return await _tus_post(request, kbid, item, path_rid=rid, field_id=field)
 
 
 @api.post(
@@ -160,7 +162,7 @@ async def tus_post_rid_prefix(
     field: FieldIdString,
     item: Optional[CreateResourcePayload] = None,
 ) -> Response:
-    return await _tus_post(request, kbid, item=item, path_rid=path_rid, field=field)
+    return await _tus_post(request, kbid, item, path_rid=path_rid, field_id=field)
 
 
 @api.post(
@@ -176,7 +178,7 @@ async def tus_post(
     kbid: str,
     item: Optional[CreateResourcePayload] = None,
 ) -> Response:
-    return await _tus_post(request, kbid, item=item)
+    return await _tus_post(request, kbid, item)
 
 
 # called by one the three POST above - there are defined distinctly to produce clean API doc
@@ -185,22 +187,21 @@ async def _tus_post(
     kbid: str,
     item: Optional[CreateResourcePayload] = None,
     path_rid: Optional[str] = None,
-    rslug: Optional[str] = None,
-    field: Optional[str] = None,
+    field_id: Optional[str] = None,
 ) -> Response:
     """
     An empty POST request is used to create a new upload resource.
     The Upload-Length header indicates the size of the entire upload in bytes.
     """
+    if path_rid is not None:
+        await validate_rid_exists_or_raise_error(kbid, path_rid)
+
+    await maybe_back_pressure(request, kbid, resource_uuid=path_rid)
+
     dm = get_dm()
     storage_manager = get_storage_manager()
 
-    if rslug is not None:
-        path_rid = await get_rid_from_params_or_raise_error(kbid, slug=rslug)
-
     implies_resource_creation = path_rid is None
-
-    await maybe_back_pressure(request, kbid, resource_uuid=path_rid)
 
     deferred_length = False
     if request.headers.get("upload-defer-length") == "1":
@@ -227,7 +228,7 @@ async def _tus_post(
         metadata = {}
 
     path, rid, field = await validate_field_upload(
-        kbid, path_rid, field, metadata.get("md5")
+        kbid, path_rid, field_id, metadata.get("md5")
     )
 
     if implies_resource_creation:
@@ -390,7 +391,8 @@ async def tus_patch_rslug_prefix(
     field: FieldIdString,
     upload_id: str,
 ) -> Response:
-    return await tus_patch(request, kbid, upload_id, rslug=rslug, field=field)
+    rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
+    return await tus_patch(request, kbid, upload_id, rid=rid, field=field)
 
 
 @api.patch(
@@ -434,7 +436,6 @@ async def tus_patch(
     kbid: str,
     upload_id: str,
     rid: Optional[str] = None,
-    rslug: Optional[str] = None,
     field: Optional[str] = None,
 ):
     try:
@@ -443,7 +444,6 @@ async def tus_patch(
             kbid,
             upload_id,
             rid=rid,
-            rslug=rslug,
             field=field,
         )
     except ResumableURINotAvailable:
@@ -459,14 +459,13 @@ async def _tus_patch(
     kbid: str,
     upload_id: str,
     rid: Optional[str] = None,
-    rslug: Optional[str] = None,
     field: Optional[str] = None,
 ) -> Response:
     """
     Upload all bytes in the requests and append them in the specifyied offset
     """
-    if rslug is not None:
-        rid = await get_rid_from_params_or_raise_error(kbid, slug=rslug)
+    if rid is not None:
+        await validate_rid_exists_or_raise_error(kbid, rid)
 
     dm = get_dm()
     await dm.load(upload_id)
@@ -598,10 +597,11 @@ async def upload_rslug_prefix(
     x_language: Optional[list[str]] = Header(None),  # type: ignore
     x_md5: Optional[list[str]] = Header(None),  # type: ignore
 ) -> ResourceFileUploaded:
+    rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
     return await _upload(
         request,
         kbid,
-        rslug=rslug,
+        path_rid=rid,
         field=field,
         x_filename=x_filename,
         x_password=x_password,
@@ -673,15 +673,14 @@ async def _upload(
     request: StarletteRequest,
     kbid: str,
     path_rid: Optional[str] = None,
-    rslug: Optional[str] = None,
     field: Optional[str] = None,
     x_filename: Optional[list[str]] = Header(None),  # type: ignore
     x_password: Optional[list[str]] = Header(None),  # type: ignore
     x_language: Optional[list[str]] = Header(None),  # type: ignore
     x_md5: Optional[list[str]] = Header(None),  # type: ignore
 ) -> ResourceFileUploaded:
-    if rslug is not None:
-        path_rid = await get_rid_from_params_or_raise_error(kbid, slug=rslug)
+    if path_rid is not None:
+        await validate_rid_exists_or_raise_error(kbid, path_rid)
 
     await maybe_back_pressure(request, kbid, resource_uuid=path_rid)
 
