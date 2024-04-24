@@ -30,13 +30,17 @@ use crate::shards::writer::ShardWriter;
 use crate::telemetry::run_with_telemetry;
 use crate::utils::{get_primary_node_id, list_shards, read_host_key};
 use nucliadb_core::protos::node_writer_server::NodeWriter;
+use nucliadb_core::protos::prost::Message;
 use nucliadb_core::protos::{
-    garbage_collector_response, merge_response, op_status, EmptyQuery, GarbageCollectorResponse, MergeResponse,
-    NewShardRequest, NewVectorSetRequest, NodeMetadata, OpStatus, Resource, ResourceId, ShardCreated, ShardId,
-    ShardIds, VectorSetId, VectorSetList,
+    garbage_collector_response, merge_response, op_status, EmptyQuery, GarbageCollectorResponse, IndexMessage,
+    MergeResponse, NewShardRequest, NewVectorSetRequest, NodeMetadata, OpStatus, Resource, ResourceId, ShardCreated,
+    ShardId, ShardIds, VectorSetId, VectorSetList,
 };
 use nucliadb_core::tracing::{self, Span, *};
 use nucliadb_core::Channel;
+use object_store::local::LocalFileSystem;
+use object_store::path::Path;
+use object_store::ObjectStore;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::UnboundedSender;
@@ -51,6 +55,7 @@ pub struct NodeWriterGRPCDriver {
     shards: Arc<ShardWriterCache>,
     sender: Option<UnboundedSender<NodeWriterEvent>>,
     settings: Settings,
+    object_store: Arc<dyn ObjectStore>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -74,11 +79,15 @@ impl NodeWriterGRPCDriver {
             garbage_collection_loop(gc_parameters, cache_gc_copy).await;
         });
 
+        let _ = std::fs::create_dir(settings.objects_path());
+        let object_store = Arc::new(LocalFileSystem::new_with_prefix(settings.objects_path()).unwrap());
+
         NodeWriterGRPCDriver {
             settings,
             gc_loop_handle,
             shards: shard_cache,
             sender: None,
+            object_store: object_store,
         }
     }
 
@@ -184,7 +193,6 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }))
     }
 
-    // Incremental call that can be call multiple times for the same resource
     async fn set_resource(&self, request: Request<Resource>) -> Result<Response<OpStatus>, Status> {
         let span = Span::current();
         let resource = request.into_inner();
@@ -218,6 +226,14 @@ impl NodeWriter for NodeWriterGRPCDriver {
                 Ok(tonic::Response::new(status))
             }
         }
+    }
+
+    async fn set_resource_v2(&self, request: Request<IndexMessage>) -> Result<Response<OpStatus>, Status> {
+        let resource_path = request.into_inner().storage_key;
+        let bytes = self.object_store.get(&Path::from(resource_path)).await.unwrap().bytes().await.unwrap();
+        let resource = Resource::decode(bytes).unwrap();
+        let set_resource_request = Request::new(resource);
+        self.set_resource(set_resource_request).await
     }
 
     async fn remove_resource(&self, request: Request<ResourceId>) -> Result<Response<OpStatus>, Status> {

@@ -296,6 +296,25 @@ pub mod node_writer_client {
             );
             self.inner.unary(request.into_request(), path, codec).await
         }
+        pub async fn set_resource_v2(
+            &mut self,
+            request: impl tonic::IntoRequest<super::IndexMessage>,
+        ) -> Result<tonic::Response<super::OpStatus>, tonic::Status> {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/nodewriter.NodeWriter/SetResourceV2",
+            );
+            self.inner.unary(request.into_request(), path, codec).await
+        }
         pub async fn remove_resource(
             &mut self,
             request: impl tonic::IntoRequest<super::super::noderesources::ResourceId>,
@@ -438,6 +457,10 @@ pub mod node_writer_server {
         async fn set_resource(
             &self,
             request: tonic::Request<super::super::noderesources::Resource>,
+        ) -> Result<tonic::Response<super::OpStatus>, tonic::Status>;
+        async fn set_resource_v2(
+            &self,
+            request: tonic::Request<super::IndexMessage>,
         ) -> Result<tonic::Response<super::OpStatus>, tonic::Status>;
         async fn remove_resource(
             &self,
@@ -739,6 +762,44 @@ pub mod node_writer_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = SetResourceSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/nodewriter.NodeWriter/SetResourceV2" => {
+                    #[allow(non_camel_case_types)]
+                    struct SetResourceV2Svc<T: NodeWriter>(pub Arc<T>);
+                    impl<T: NodeWriter> tonic::server::UnaryService<super::IndexMessage>
+                    for SetResourceV2Svc<T> {
+                        type Response = super::OpStatus;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::IndexMessage>,
+                        ) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move {
+                                (*inner).set_resource_v2(request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = SetResourceV2Svc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

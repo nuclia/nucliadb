@@ -733,6 +733,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56254986775e3233ffa9c4d7d3faaf6d36a2c09d30b20687e9f88bc8bafc16c8"
 
 [[package]]
+name = "doc-comment"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fea41bba32d969b513997752735605054bc0dfa92b4c56bf1189f2e174be7a10"
+
+[[package]]
 name = "downcast-rs"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1380,6 +1386,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1703,7 +1718,7 @@ dependencies = [
  "hostname",
  "http",
  "hyper",
- "itertools",
+ "itertools 0.10.5",
  "lazy_static",
  "log",
  "lru 0.12.3",
@@ -1717,6 +1732,7 @@ dependencies = [
  "nucliadb_texts2",
  "nucliadb_vectors",
  "num_cpus",
+ "object_store",
  "once_cell",
  "openssl",
  "opentelemetry",
@@ -1774,7 +1790,7 @@ dependencies = [
 name = "nucliadb_paragraphs2"
 version = "0.1.0"
 dependencies = [
- "itertools",
+ "itertools 0.10.5",
  "lazy_static",
  "levenshtein_automata",
  "nucliadb_core",
@@ -1792,7 +1808,7 @@ dependencies = [
 name = "nucliadb_paragraphs3"
 version = "0.1.0"
 dependencies = [
- "itertools",
+ "itertools 0.10.5",
  "lazy_static",
  "levenshtein_automata",
  "nucliadb_core",
@@ -1835,7 +1851,7 @@ dependencies = [
  "data-encoding",
  "derive_builder",
  "deunicode",
- "itertools",
+ "itertools 0.10.5",
  "lazy_static",
  "nucliadb_core",
  "nucliadb_procs",
@@ -1853,7 +1869,7 @@ dependencies = [
 name = "nucliadb_texts2"
 version = "0.1.0"
 dependencies = [
- "itertools",
+ "itertools 0.10.5",
  "nucliadb_core",
  "nucliadb_procs",
  "tantivy",
@@ -1921,6 +1937,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a6a622008b6e321afc04970976f62ee297fdbaa6f95318ca343e3eebb9648441"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "object_store"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9cda97d37376c28c508b0abc56b855c5e700324e9b753226681e658c833675c5"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "chrono",
+ "futures",
+ "humantime",
+ "itertools 0.12.1",
+ "parking_lot 0.12.1",
+ "percent-encoding",
+ "snafu",
+ "tokio",
+ "tracing",
+ "url",
+ "walkdir",
 ]
 
 [[package]]
@@ -2327,7 +2364,7 @@ dependencies = [
  "cfg-if",
  "cmake",
  "heck",
- "itertools",
+ "itertools 0.10.5",
  "lazy_static",
  "log",
  "multimap",
@@ -2346,7 +2383,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b670f45da57fb8542ebdbb6105a925fe571b67f9e7ed9f47a06a84e72b4e7cc"
 dependencies = [
  "anyhow",
- "itertools",
+ "itertools 0.10.5",
  "proc-macro2",
  "quote",
  "syn 1.0.109",
@@ -2372,7 +2409,7 @@ dependencies = [
  "indoc",
  "libc",
  "memoffset",
- "parking_lot 0.11.2",
+ "parking_lot 0.12.1",
  "pyo3-build-config",
  "pyo3-ffi",
  "pyo3-macros",
@@ -3085,6 +3122,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6ecd384b10a64542d77071bd64bd7b231f4ed5940fba55e98c3de13824cf3d7"
 
 [[package]]
+name = "snafu"
+version = "0.7.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e4de37ad025c587a29e8f3f5605c00f70b98715ef90b9061a815b9e59e9042d6"
+dependencies = [
+ "doc-comment",
+ "snafu-derive",
+]
+
+[[package]]
+name = "snafu-derive"
+version = "0.7.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "990079665f075b699031e9c08fd3ab99be5029b96f3b78dc0709e8f77e4efebf"
+dependencies = [
+ "heck",
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
 name = "socket2"
 version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3202,7 +3261,7 @@ dependencies = [
  "fs2",
  "futures",
  "htmlescape",
- "itertools",
+ "itertools 0.10.5",
  "levenshtein_automata",
  "log",
  "lru 0.7.8",

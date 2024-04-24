@@ -44,7 +44,7 @@ use nucliadb_core::NodeResult;
 use serde::{Deserialize, Deserializer};
 use tracing::error;
 
-use crate::disk_structure::{METADATA_FILE, SHARDS_DIR};
+use crate::disk_structure::{METADATA_FILE, OBJECTS_DIR, SHARDS_DIR};
 use crate::replication::NodeRole;
 use crate::utils::{parse_log_levels, reliable_lookup_host};
 
@@ -179,6 +179,11 @@ impl EnvSettings {
     /// Path where all shards are stored
     pub fn shards_path(&self) -> PathBuf {
         self.data_path.join(SHARDS_DIR)
+    }
+
+    /// Path where all objects are stored
+    pub fn objects_path(&self) -> PathBuf {
+        self.data_path.join(OBJECTS_DIR)
     }
 
     pub fn sentry_env(&self) -> String {
