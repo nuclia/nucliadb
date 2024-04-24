@@ -17,28 +17,34 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from unittest import mock
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from fastapi.requests import Request
 
 from nucliadb.ingest.processing import ProcessingInfo, Source
-from nucliadb.writer.api.v1.upload import guess_content_type, store_file_on_nuclia_db
+from nucliadb.writer.api.v1.upload import (
+    guess_content_type,
+    store_file_on_nuclia_db,
+    validate_field_upload,
+)
+from nucliadb.writer.tus.exceptions import HTTPConflict, HTTPNotFound
 from nucliadb_models.resource import QueueType
+from nucliadb_protos import writer_pb2
 
 UPLOAD_PACKAGE = "nucliadb.writer.api.v1.upload"
 
 
 @pytest.fixture(scope="function")
 def partitioning_mock():
-    with mock.patch(f"{UPLOAD_PACKAGE}.get_partitioning"):
+    with patch(f"{UPLOAD_PACKAGE}.get_partitioning"):
         yield
 
 
 @pytest.fixture(scope="function")
 def processing_mock():
-    with mock.patch(f"{UPLOAD_PACKAGE}.get_processing") as get_processing_mock:
-        processing = mock.AsyncMock()
+    with patch(f"{UPLOAD_PACKAGE}.get_processing") as get_processing_mock:
+        processing = AsyncMock()
         processing.convert_internal_filefield_to_str.return_value = "foo"
         processing_info = ProcessingInfo(seqid=1, account_seq=1, queue=QueueType.SHARED)
         processing.send_to_process.return_value = processing_info
@@ -48,8 +54,8 @@ def processing_mock():
 
 @pytest.fixture(scope="function")
 def transaction_mock():
-    with mock.patch(f"{UPLOAD_PACKAGE}.get_transaction_utility") as transaction_mock:
-        transaction = mock.AsyncMock()
+    with patch(f"{UPLOAD_PACKAGE}.get_transaction_utility") as transaction_mock:
+        transaction = AsyncMock()
         transaction_mock.return_value = transaction
         yield transaction
 
@@ -88,3 +94,53 @@ async def test_store_file_on_nucliadb_does_not_store_passwords(
 )
 def test_guess_content_type(filename, content_type):
     assert guess_content_type(filename) == content_type
+
+
+@pytest.mark.parametrize(
+    "rid,field,md5,exists,result",
+    [
+        (None, None, None, False, ("uuid4", "uuid4")),
+        (None, None, None, True, ("uuid4", "uuid4")),
+        (None, None, "md5", False, ("md5", "md5")),
+        (None, None, "md5", True, HTTPConflict),
+        (None, "field", None, False, ("uuid4", "field")),
+        (None, "field", None, True, ("uuid4", "field")),
+        (None, "field", "md5", False, ("md5", "field")),
+        (None, "field", "md5", True, HTTPConflict),
+        ("rid", None, None, False, HTTPNotFound),
+        ("rid", None, None, True, ("rid", "uuid4")),
+        ("rid", None, "md5", False, HTTPNotFound),
+        ("rid", None, "md5", True, ("rid", "md5")),
+        ("rid", "field", None, False, HTTPNotFound),
+        ("rid", "field", None, True, ("rid", "field")),
+        ("rid", "field", "md5", False, HTTPNotFound),
+        ("rid", "field", "md5", True, ("rid", "field")),
+    ],
+)
+@pytest.mark.asyncio
+async def test_validate_field_upload(rid, field, md5, exists: bool, result):
+    mock_ingest = AsyncMock()
+    mock_ingest.ResourceFieldExists = AsyncMock(
+        return_value=writer_pb2.ResourceFieldExistsResponse(found=exists)
+    )
+
+    mock_uuid = Mock()
+    mock_uuid4 = Mock()
+    mock_uuid4.hex = "uuid4"
+    mock_uuid.uuid4 = Mock(return_value=mock_uuid4)
+
+    with patch(
+        "nucliadb.writer.api.v1.upload.get_ingest", new=Mock(return_value=mock_ingest)
+    ), patch("nucliadb.writer.api.v1.upload.uuid", mock_uuid), patch(
+        "nucliadb.writer.api.v1.upload.resource_exists", AsyncMock(return_value=exists)
+    ):
+        if isinstance(result, tuple):
+            _, result_rid, result_field = await validate_field_upload(
+                "kbid", rid, field, md5
+            )
+            assert (result_rid, result_field) == result
+        else:
+            with pytest.raises(result):
+                _, result_rid, result_field = await validate_field_upload(
+                    "kbid", rid, field, md5
+                )
