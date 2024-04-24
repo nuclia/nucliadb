@@ -40,7 +40,6 @@ from nucliadb_protos.writer_pb2 import (
     BrokerMessage,
     DelEntitiesRequest,
     DelLabelsRequest,
-    DelVectorSetRequest,
     ExtractedVectorsWrapper,
     FileRequest,
     FileUploaded,
@@ -53,8 +52,6 @@ from nucliadb_protos.writer_pb2 import (
     GetLabelsRequest,
     GetLabelsResponse,
     GetSynonymsResponse,
-    GetVectorSetsRequest,
-    GetVectorSetsResponse,
     IndexResource,
     IndexStatus,
     ListEntitiesGroupsRequest,
@@ -71,7 +68,6 @@ from nucliadb_protos.writer_pb2 import (
     SetEntitiesRequest,
     SetLabelsRequest,
     SetSynonymsRequest,
-    SetVectorSetRequest,
     SetVectorsRequest,
     SetVectorsResponse,
     UpdateEntitiesGroupRequest,
@@ -375,48 +371,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 response.status = GetLabelSetResponse.Status.OK
             else:
                 response.status = GetLabelSetResponse.Status.NOTFOUND
-            return response
-
-    async def GetVectorSets(  # type: ignore
-        self, request: GetVectorSetsRequest, context=None
-    ) -> GetVectorSetsResponse:
-        async with self.driver.transaction() as txn:
-            kbobj = await self.proc.get_kb_obj(txn, request.kb)
-            response = GetVectorSetsResponse()
-            if kbobj is not None:
-                await kbobj.get_vectorsets(response)
-                response.kb.uuid = kbobj.kbid
-                response.status = GetVectorSetsResponse.Status.OK
-            else:
-                response.status = GetVectorSetsResponse.Status.NOTFOUND
-            return response
-
-    async def DelVectorSet(  # type: ignore
-        self, request: DelVectorSetRequest, context=None
-    ) -> OpStatusWriter:
-        async with self.driver.transaction() as txn:
-            kbobj = await self.proc.get_kb_obj(txn, request.kb)
-            response = OpStatusWriter()
-            if kbobj is not None:
-                await kbobj.del_vectorset(request.vectorset)
-                response.status = OpStatusWriter.Status.OK
-                await txn.commit()
-            else:
-                response.status = OpStatusWriter.Status.NOTFOUND
-            return response
-
-    async def SetVectorSet(  # type: ignore
-        self, request: SetVectorSetRequest, context=None
-    ) -> OpStatusWriter:
-        async with self.driver.transaction() as txn:
-            kbobj = await self.proc.get_kb_obj(txn, request.kb)
-            response = OpStatusWriter()
-            if kbobj is not None:
-                await kbobj.set_vectorset(request.id, request.vectorset)
-                response.status = OpStatusWriter.Status.OK
-                await txn.commit()
-            else:
-                response.status = OpStatusWriter.Status.NOTFOUND
             return response
 
     async def NewEntitiesGroup(  # type: ignore

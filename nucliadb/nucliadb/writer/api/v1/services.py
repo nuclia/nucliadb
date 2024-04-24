@@ -25,7 +25,6 @@ from nucliadb_protos.knowledgebox_pb2 import LabelSet as LabelSetPB
 from nucliadb_protos.writer_pb2 import (
     DelEntitiesRequest,
     DelLabelsRequest,
-    DelVectorSetRequest,
     NewEntitiesGroupRequest,
     NewEntitiesGroupResponse,
     OpStatusWriter,
@@ -42,7 +41,6 @@ from nucliadb.models.responses import (
     HTTPNotFound,
 )
 from nucliadb.writer.api.v1.router import KB_PREFIX, api
-from nucliadb.writer.vectors import create_vectorset
 from nucliadb_models.entities import (
     CreateEntitiesGroupPayload,
     UpdateEntitiesGroupPayload,
@@ -50,10 +48,8 @@ from nucliadb_models.entities import (
 from nucliadb_models.labels import LabelSet
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.synonyms import KnowledgeBoxSynonyms
-from nucliadb_models.vectors import VectorSet
-from nucliadb_utils import const
 from nucliadb_utils.authentication import requires
-from nucliadb_utils.utilities import get_ingest, has_feature
+from nucliadb_utils.utilities import get_ingest
 
 
 @api.post(
@@ -244,55 +240,6 @@ async def delete_labels(request: Request, kbid: str, labelset: str):
     elif status.status == OpStatusWriter.Status.ERROR:
         raise HTTPException(
             status_code=500, detail="Error on deleting labels from a Knowledge box"
-        )
-    return Response(status_code=204)
-
-
-@api.post(
-    f"/{KB_PREFIX}/{{kbid}}/vectorset/{{vectorset}}",
-    status_code=200,
-    name="Set Knowledge Box VectorSet",
-    tags=["Knowledge Box Services"],
-    openapi_extra={"x-operation_order": 1},
-)
-@requires(NucliaDBRoles.WRITER)
-@version(1)
-async def set_vectorset(request: Request, kbid: str, vectorset: str, item: VectorSet):
-    if not has_feature(const.Features.VECTORSETS_V2, context={"kbid": kbid}):
-        raise HTTPException(
-            status_code=404,
-            detail="Vectorsets API is not yet implemented",
-        )
-    await create_vectorset(kbid, vectorset, item.dimension, similarity=item.similarity)
-
-
-@api.delete(
-    f"/{KB_PREFIX}/{{kbid}}/vectorset/{{vectorset}}",
-    status_code=200,
-    name="Delete Knowledge Box VectorSet",
-    tags=["Knowledge Box Services"],
-    openapi_extra={"x-operation_order": 3},
-)
-@requires(NucliaDBRoles.WRITER)
-@version(1)
-async def delete_vectorset(request: Request, kbid: str, vectorset: str):
-    if not has_feature(const.Features.VECTORSETS_V2, context={"kbid": kbid}):
-        raise HTTPException(
-            status_code=404,
-            detail="Vectorsets API is not yet implemented",
-        )
-    ingest = get_ingest()
-    pbrequest: DelVectorSetRequest = DelVectorSetRequest()
-    pbrequest.kb.uuid = kbid
-    pbrequest.vectorset = vectorset
-    status: OpStatusWriter = await ingest.DelVectorSet(pbrequest)  # type: ignore
-    if status.status == OpStatusWriter.Status.OK:
-        return None
-    elif status.status == OpStatusWriter.Status.NOTFOUND:
-        raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
-    elif status.status == OpStatusWriter.Status.ERROR:
-        raise HTTPException(
-            status_code=500, detail="Error on deleting vectorset from a Knowledge box"
         )
     return Response(status_code=204)
 

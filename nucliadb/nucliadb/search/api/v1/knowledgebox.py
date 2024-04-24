@@ -84,7 +84,6 @@ async def knowledgebox_shards(request: Request, kbid: str) -> KnowledgeboxShards
 async def knowledgebox_counters(
     request: Request,
     kbid: str,
-    vectorset: str = fastapi_query(SearchParamDefaults.vectorset),
     debug: bool = fastapi_query(SearchParamDefaults.debug),
 ) -> KnowledgeboxCounters:
     shard_manager = get_shard_manager()
@@ -111,7 +110,7 @@ async def knowledgebox_counters(
             if shard_id is not None:
                 # At least one node is alive for this shard group
                 # let's add it ot the query list if has a valid value
-                ops.append(get_shard(node, shard_id, vectorset=vectorset))
+                ops.append(get_shard(node, shard_id))
                 queried_shards.append(shard_id)
 
     if not ops:

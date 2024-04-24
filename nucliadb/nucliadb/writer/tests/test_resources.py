@@ -51,20 +51,6 @@ from nucliadb_utils.utilities import get_ingest
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="New vectorset api is not implemented yet")
-async def test_resource_crud_min(
-    writer_api: Callable[[list[str]], AsyncClient], knowledgebox_writer: str
-):
-    knowledgebox_id = knowledgebox_writer
-    async with writer_api([NucliaDBRoles.WRITER]) as client:
-        resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_id}/vectorset/base",
-            json={"dimension": 3, "similarity": "dot"},
-        )
-        assert resp.status_code == 200
-
-
-@pytest.mark.asyncio
 async def test_resource_crud(
     writer_api: Callable[[list[str]], AsyncClient], knowledgebox_writer: str
 ):

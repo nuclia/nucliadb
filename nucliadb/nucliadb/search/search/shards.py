@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import Optional
 
 from nucliadb_protos.nodereader_pb2 import (
     GetShardRequest,
@@ -55,13 +54,9 @@ async def query_shard(
         return await node.reader.Search(req)  # type: ignore
 
 
-async def get_shard(
-    node: AbstractIndexNode, shard_id: str, vectorset: Optional[str] = None
-) -> Shard:
+async def get_shard(node: AbstractIndexNode, shard_id: str) -> Shard:
     req = GetShardRequest()
     req.shard_id.id = shard_id
-    if vectorset is not None:
-        req.vectorset = vectorset
     with node_observer({"type": "get_shard", "node_id": node.id}):
         return await node.reader.GetShard(req)  # type: ignore
 

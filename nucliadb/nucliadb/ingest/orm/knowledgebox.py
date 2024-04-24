@@ -30,7 +30,6 @@ from nucliadb_protos.knowledgebox_pb2 import (
     SemanticModelMetadata,
 )
 from nucliadb_protos.knowledgebox_pb2 import Synonyms as PBSynonyms
-from nucliadb_protos.knowledgebox_pb2 import VectorSet
 from nucliadb_protos.resources_pb2 import Basic
 from nucliadb_protos.utils_pb2 import ReleaseChannel
 
@@ -245,32 +244,6 @@ class KnowledgeBox:
                 node = get_index_node(replica.node)
                 if node is not None:
                     yield node, replica.shard.id
-
-    # Vectorset
-    async def get_vectorsets(self, response: writer_pb2.GetVectorSetsResponse):
-        vectorsets = await datamanagers.vectorsets.get_vectorsets(
-            self.txn, kbid=self.kbid
-        )
-        if vectorsets is not None:
-            response.vectorsets.CopyFrom(vectorsets)
-
-    async def set_vectorset(self, id: str, vs: VectorSet):
-        # For each Node on the KB add the vectorset
-        async for node, shard in self.iterate_kb_nodes():
-            await node.set_vectorset(shard, id, similarity=vs.similarity)
-
-        await datamanagers.vectorsets.set_vectorset(
-            self.txn, kbid=self.kbid, vectorset_id=id, vs=vs
-        )
-
-    async def del_vectorset(self, id: str):
-        await datamanagers.vectorsets.del_vectorset(
-            self.txn, kbid=self.kbid, vectorset_id=id
-        )
-
-        # For each Node on the KB delete the vectorset
-        async for node, shard in self.iterate_kb_nodes():
-            await node.del_vectorset(shard, id)
 
     # Labels
     async def set_labelset(self, id: str, labelset: LabelSet):
