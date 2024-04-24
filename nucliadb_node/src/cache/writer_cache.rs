@@ -29,8 +29,8 @@ use nucliadb_core::{node_error, NodeResult};
 
 use super::resource_cache::{CacheResult, ResourceCache, ResourceLoadGuard};
 use crate::disk_structure;
+use crate::errors::ShardNotFoundError;
 use crate::settings::Settings;
-use crate::shards::errors::ShardNotFoundError;
 use crate::shards::metadata::{ShardMetadata, ShardsMetadataManager};
 use crate::shards::writer::ShardWriter;
 use crate::shards::ShardId;
