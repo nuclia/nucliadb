@@ -267,7 +267,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
     async def delete_kb(self, request: KnowledgeBoxID) -> None:
         kbid = request.uuid
-        await self.proc.delete_kb(kbid, request.slug)
+        await self.proc.delete_kb(kbid)
         # learning configuration is automatically removed in nuclia backend for
         # hosted users, we only need to remove it for onprem
         if is_onprem_nucliadb():

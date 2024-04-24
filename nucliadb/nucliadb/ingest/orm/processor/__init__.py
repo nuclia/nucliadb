@@ -672,9 +672,9 @@ class Processor:
             await txn.commit()
         return uuid
 
-    async def delete_kb(self, kbid: str = "", slug: str = "") -> str:
+    async def delete_kb(self, kbid: str) -> str:
         async with self.driver.transaction() as txn:
-            uuid = await KnowledgeBox.delete_kb(txn, kbid=kbid, slug=slug)
+            uuid = await KnowledgeBox.delete_kb(txn, kbid)
             await txn.commit()
         return uuid
 
