@@ -432,7 +432,6 @@ async def search(
         range_modification_end=item.range_modification_end,
         fields=item.fields,
         user_vector=item.vector,
-        vectorset=item.vectorset,
         with_duplicates=item.with_duplicates,
         with_status=with_status,
         with_synonyms=item.with_synonyms,

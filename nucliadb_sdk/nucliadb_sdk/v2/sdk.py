@@ -73,7 +73,6 @@ from nucliadb_models.search import (
     SummarizeRequest,
 )
 from nucliadb_models.trainset import TrainSetPartitions
-from nucliadb_models.vectors import VectorSet, VectorSets
 from nucliadb_models.writer import (
     CreateResourcePayload,
     ResourceCreated,
@@ -577,32 +576,6 @@ class _NucliaDBBase:
         path_params=("kbid", "group"),
         request_type=None,
         response_type=EntitiesGroup,
-    )
-
-    # Vectorsets
-    create_vectorset = _request_builder(
-        name="create_vectorset",
-        path_template="/v1/kb/{kbid}/vectorset/{vectorset}",
-        method="POST",
-        path_params=("kbid", "vectorset"),
-        request_type=VectorSet,
-        response_type=None,
-    )
-    delete_vectorset = _request_builder(
-        name="delete_vectorset",
-        path_template="/v1/kb/{kbid}/vectorset/{vectorset}",
-        method="DELETE",
-        path_params=("kbid", "vectorset"),
-        request_type=None,
-        response_type=None,
-    )
-    list_vectorsets = _request_builder(
-        name="list_vectorsets",
-        path_template="/v1/kb/{kbid}/vectorsets",
-        method="GET",
-        path_params=("kbid",),
-        request_type=None,
-        response_type=VectorSets,
     )
 
     # Search / Find Endpoints

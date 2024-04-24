@@ -1,14 +1,11 @@
 from enum import Enum
-from typing import Dict, Optional, TypeVar
+from typing import Optional
 
 from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.utils_pb2 import VectorSimilarity as PBVectorSimilarity
-from nucliadb_protos.writer_pb2 import VectorSet as PBVectorSet
 from pydantic import BaseModel, Field
 
 from nucliadb_protos import knowledgebox_pb2
-
-_T = TypeVar("_T")
 
 # Managing vectors
 
@@ -58,22 +55,3 @@ class SemanticModelMetadata(BaseModel):
             message.similarity_function
         )
         return cls(**as_dict)
-
-
-class VectorSet(BaseModel):
-    dimension: int
-    similarity: Optional[VectorSimilarity] = None
-
-    @classmethod
-    def from_message(cls, message: PBVectorSet):
-        as_dict = MessageToDict(
-            message,
-            preserving_proto_field_name=True,
-            including_default_value_fields=True,
-        )
-        as_dict["similarity"] = VectorSimilarity.from_message(message.similarity)
-        return cls(**as_dict)
-
-
-class VectorSets(BaseModel):
-    vectorsets: Dict[str, VectorSet]

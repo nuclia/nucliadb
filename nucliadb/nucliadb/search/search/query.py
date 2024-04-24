@@ -106,7 +106,6 @@ class QueryParser:
         range_modification_end: Optional[datetime] = None,
         fields: Optional[list[str]] = None,
         user_vector: Optional[list[float]] = None,
-        vectorset: Optional[str] = None,
         with_duplicates: bool = False,
         with_status: Optional[ResourceProcessingStatus] = None,
         with_synonyms: bool = False,
@@ -133,7 +132,6 @@ class QueryParser:
         self.range_modification_end = range_modification_end
         self.fields = fields or []
         self.user_vector = user_vector
-        self.vectorset = vectorset
         self.with_duplicates = with_duplicates
         self.with_status = with_status
         self.with_synonyms = with_synonyms
@@ -372,10 +370,6 @@ class QueryParser:
         node_features.inc({"type": "vectors"})
 
         incomplete = False
-        if self.vectorset is not None:
-            request.vectorset = self.vectorset
-            node_features.inc({"type": "vectorset"})
-
         query_vector = None
         if self.user_vector is None:
             try:

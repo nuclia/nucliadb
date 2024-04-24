@@ -567,11 +567,6 @@ class SearchParamDefaults:
         title="Search Vector",
         description="The vector to perform the search with. If not provided, NucliaDB will use Nuclia Predict API to create the vector off from the query.",  # noqa
     )
-    vectorset = ParamDefault(
-        default=None,
-        title="Vectorset id",
-        description="Id of the vectorset to perform the vector search into.",
-    )
     chat_context = ParamDefault(
         default=None,
         title="Chat history",
@@ -705,7 +700,6 @@ class BaseSearchRequest(BaseModel):
     )
     shards: List[str] = SearchParamDefaults.shards.to_pydantic_field()
     vector: Optional[List[float]] = SearchParamDefaults.vector.to_pydantic_field()
-    vectorset: Optional[str] = SearchParamDefaults.vectorset.to_pydantic_field()
     with_duplicates: bool = SearchParamDefaults.with_duplicates.to_pydantic_field()
     with_synonyms: bool = SearchParamDefaults.with_synonyms.to_pydantic_field()
     autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
