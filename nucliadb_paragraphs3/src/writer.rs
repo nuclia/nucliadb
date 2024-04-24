@@ -157,23 +157,7 @@ impl ParagraphWriter for ParagraphWriterService {
 
 impl ParagraphWriterService {
     #[tracing::instrument(skip_all)]
-    pub fn start(config: &ParagraphConfig) -> NodeResult<Self> {
-        let path = std::path::Path::new(&config.path);
-        if !path.exists() {
-            match ParagraphWriterService::new(config) {
-                Err(e) if path.exists() => {
-                    std::fs::remove_dir(path)?;
-                    Err(e)
-                }
-                Err(e) => Err(e),
-                Ok(v) => Ok(v),
-            }
-        } else {
-            Ok(ParagraphWriterService::open(config)?)
-        }
-    }
-    #[tracing::instrument(skip_all)]
-    pub fn new(config: &ParagraphConfig) -> NodeResult<ParagraphWriterService> {
+    pub fn create(config: &ParagraphConfig) -> NodeResult<ParagraphWriterService> {
         let paragraph_schema = ParagraphSchema::default();
 
         fs::create_dir(&config.path)?;
@@ -450,7 +434,7 @@ mod tests {
             path: dir.path().join("paragraphs"),
         };
 
-        let mut paragraph_writer_service = ParagraphWriterService::start(&psc).unwrap();
+        let mut paragraph_writer_service = ParagraphWriterService::create(&psc).unwrap();
         let resource1 = create_resource("shard1".to_string());
         let _ = paragraph_writer_service.set_resource(&resource1);
         let _ = paragraph_writer_service.set_resource(&resource1);

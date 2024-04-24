@@ -156,16 +156,6 @@ impl FieldWriter for TextWriterService {
 
 impl TextWriterService {
     #[tracing::instrument(skip_all)]
-    pub fn start(config: &TextConfig) -> NodeResult<Self> {
-        let path = std::path::Path::new(&config.path);
-        if !path.exists() {
-            Self::new(config)
-        } else {
-            Self::open(config)
-        }
-    }
-
-    #[tracing::instrument(skip_all)]
     pub fn open(config: &TextConfig) -> NodeResult<Self> {
         let field_schema = TextSchema::new();
         let index = Index::open_in_dir(&config.path)?;
@@ -180,7 +170,7 @@ impl TextWriterService {
     }
 
     #[tracing::instrument(skip_all)]
-    fn new(config: &TextConfig) -> NodeResult<Self> {
+    pub fn create(config: &TextConfig) -> NodeResult<Self> {
         Self::try_create_index_dir(&config.path)?;
 
         let settings = IndexSettings {

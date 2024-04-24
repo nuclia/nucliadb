@@ -170,7 +170,7 @@ impl TryFrom<Neighbour> for DocumentScored {
 
 impl VectorReaderService {
     #[tracing::instrument(skip_all)]
-    pub fn start(config: &VectorConfig) -> NodeResult<Self> {
+    pub fn open(config: &VectorConfig) -> NodeResult<Self> {
         if !config.path.exists() {
             return Err(node_error!("Invalid path {:?}", config.path));
         }
@@ -253,10 +253,10 @@ mod tests {
             ..Default::default()
         };
         // insert - delete - insert sequence
-        let mut writer = VectorWriterService::start(&vsc).unwrap();
+        let mut writer = VectorWriterService::create(&vsc).unwrap();
         writer.set_resource(&resource).unwrap();
 
-        let reader = VectorReaderService::start(&vsc).unwrap();
+        let reader = VectorReaderService::open(&vsc).unwrap();
         let mut request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),
@@ -336,10 +336,10 @@ mod tests {
             ..Default::default()
         };
         // insert - delete - insert sequence
-        let mut writer = VectorWriterService::start(&vsc).unwrap();
+        let mut writer = VectorWriterService::create(&vsc).unwrap();
         let res = writer.set_resource(&resource);
         assert!(res.is_ok());
-        let reader = VectorReaderService::start(&vsc).unwrap();
+        let reader = VectorReaderService::open(&vsc).unwrap();
         let request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),
@@ -453,10 +453,10 @@ mod tests {
             shard_id: "DOC".to_string(),
             ..Default::default()
         };
-        let mut writer = VectorWriterService::start(&vsc).unwrap();
+        let mut writer = VectorWriterService::create(&vsc).unwrap();
         let res = writer.set_resource(&resource);
         assert!(res.is_ok());
-        let reader = VectorReaderService::start(&vsc).unwrap();
+        let reader = VectorReaderService::open(&vsc).unwrap();
         let request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),

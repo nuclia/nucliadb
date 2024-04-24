@@ -39,7 +39,6 @@ pub mod merge;
 pub mod node_metadata;
 pub mod replication;
 pub mod settings;
-pub mod shard2;
 pub mod shards;
 pub mod telemetry;
 pub mod utils;

@@ -36,7 +36,7 @@ fn test_index_docs() -> NodeResult<()> {
         channel: Channel::EXPERIMENTAL,
     };
 
-    let mut writer = RelationsWriterService::start(&config).unwrap();
+    let mut writer = RelationsWriterService::create(&config).unwrap();
 
     writer.set_resource(&Resource {
         resource: Some(ResourceId {

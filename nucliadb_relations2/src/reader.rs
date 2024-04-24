@@ -118,7 +118,7 @@ impl RelationsReader for RelationsReaderService {
 
 impl RelationsReaderService {
     #[tracing::instrument(skip_all)]
-    pub fn start(config: &RelationConfig) -> NodeResult<Self> {
+    pub fn open(config: &RelationConfig) -> NodeResult<Self> {
         if !config.path.exists() {
             return Err(node_error!("Invalid path {:?}", config.path));
         }

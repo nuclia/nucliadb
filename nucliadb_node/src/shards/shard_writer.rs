@@ -18,7 +18,7 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard, RwLock};
 
 use nucliadb_core::paragraphs::*;
 use nucliadb_core::prelude::*;
@@ -32,14 +32,49 @@ use nucliadb_core::{thread, IndexFiles};
 use nucliadb_procs::measure;
 use nucliadb_vectors::VectorErr;
 
+use super::metadata::ShardMetadata;
+use super::versioning::Versions;
 use crate::disk_structure::*;
-use crate::shards::metadata::ShardMetadata;
-use crate::shards::versions::Versions;
 use crate::telemetry::run_with_telemetry;
 
 pub struct BlockingToken<'a>(MutexGuard<'a, ()>);
 
 const MAX_LABEL_LENGTH: usize = 32768; // Tantivy max is 2^16 - 4
+
+pub fn open_vectors_writer(version: u32, config: &VectorConfig) -> NodeResult<VectorsWriterPointer> {
+    match version {
+        1 => nucliadb_vectors::service::VectorWriterService::start(config)
+            .map(|i| Arc::new(RwLock::new(i)) as VectorsWriterPointer),
+        2 => nucliadb_vectors::service::VectorWriterService::start(config)
+            .map(|i| Arc::new(RwLock::new(i)) as VectorsWriterPointer),
+        v => Err(node_error!("Invalid vectors version {v}")),
+    }
+}
+pub fn open_paragraphs_writer(version: u32, config: &ParagraphConfig) -> NodeResult<ParagraphsWriterPointer> {
+    match version {
+        2 => nucliadb_paragraphs2::writer::ParagraphWriterService::start(config)
+            .map(|i| Arc::new(RwLock::new(i)) as ParagraphsWriterPointer),
+        3 => nucliadb_paragraphs3::writer::ParagraphWriterService::start(config)
+            .map(|i| Arc::new(RwLock::new(i)) as ParagraphsWriterPointer),
+        v => Err(node_error!("Invalid paragraphs version {v}")),
+    }
+}
+
+pub fn open_texts_writer(version: u32, config: &TextConfig) -> NodeResult<TextsWriterPointer> {
+    match version {
+        2 => nucliadb_texts2::writer::TextWriterService::start(config)
+            .map(|i| Arc::new(RwLock::new(i)) as TextsWriterPointer),
+        v => Err(node_error!("Invalid text writer version {v}")),
+    }
+}
+
+pub fn open_relations_writer(version: u32, config: &RelationConfig) -> NodeResult<RelationsWriterPointer> {
+    match version {
+        2 => nucliadb_relations2::writer::RelationsWriterService::start(config)
+            .map(|i| Arc::new(RwLock::new(i)) as RelationsWriterPointer),
+        v => Err(node_error!("Invalid relations version {v}")),
+    }
+}
 
 fn remove_invalid_labels(resource: &mut Resource) {
     resource.labels.retain(|l| {
@@ -88,11 +123,12 @@ impl ShardWriter {
         vsc: VectorConfig,
         rsc: RelationConfig,
     ) -> NodeResult<ShardWriter> {
-        let versions = Versions::load_or_create(&metadata.shard_path().join(VERSION_FILE), metadata.channel())?;
-        let text_task = || Some(versions.get_texts_writer(&tsc));
-        let paragraph_task = || Some(versions.get_paragraphs_writer(&psc));
-        let vector_task = || Some(versions.get_vectors_writer(&vsc));
-        let relation_task = || Some(versions.get_relations_writer(&rsc));
+        let versions_path = metadata.shard_path().join(VERSION_FILE);
+        let versions = Versions::create(&versions_path, metadata.channel())?;
+        let text_task = || Some(open_texts_writer(versions.texts, &tsc));
+        let paragraph_task = || Some(open_paragraphs_writer(versions.paragraphs, &psc));
+        let vector_task = || Some(open_vectors_writer(versions.vectors, &vsc));
+        let relation_task = || Some(open_relations_writer(versions.relations, &rsc));
 
         let span = tracing::Span::current();
         let info = info_span!(parent: &span, "text start");
@@ -128,10 +164,10 @@ impl ShardWriter {
             paragraph_writer: paragraphs.unwrap(),
             vector_writer: vectors.unwrap(),
             relation_writer: relations.unwrap(),
-            document_service_version: versions.version_texts() as i32,
-            paragraph_service_version: versions.version_paragraphs() as i32,
-            vector_service_version: versions.version_vectors() as i32,
-            relation_service_version: versions.version_relations() as i32,
+            document_service_version: versions.texts as i32,
+            paragraph_service_version: versions.paragraphs as i32,
+            vector_service_version: versions.vectors as i32,
+            relation_service_version: versions.relations as i32,
             gc_lock: tokio::sync::Mutex::new(()),
             write_lock: Mutex::new(()),
         })

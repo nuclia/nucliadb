@@ -110,16 +110,6 @@ impl RelationsWriter for RelationsWriterService {
 
 impl RelationsWriterService {
     #[tracing::instrument(skip_all)]
-    pub fn start(config: &RelationConfig) -> NodeResult<Self> {
-        let path = std::path::Path::new(&config.path);
-        if !path.exists() {
-            Self::new(config)
-        } else {
-            Self::open(config)
-        }
-    }
-
-    #[tracing::instrument(skip_all)]
     pub fn open(config: &RelationConfig) -> NodeResult<Self> {
         let field_schema = Schema::new();
         let index = Index::open_in_dir(&config.path)?;
@@ -134,7 +124,7 @@ impl RelationsWriterService {
     }
 
     #[tracing::instrument(skip_all)]
-    fn new(config: &RelationConfig) -> NodeResult<Self> {
+    pub fn create(config: &RelationConfig) -> NodeResult<Self> {
         Self::try_create_index_dir(&config.path)?;
 
         let settings = IndexSettings {

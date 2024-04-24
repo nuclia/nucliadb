@@ -246,7 +246,7 @@ impl ParagraphReader for ParagraphReaderService {
 
 impl ParagraphReaderService {
     #[tracing::instrument(skip_all)]
-    pub fn start(config: &ParagraphConfig) -> NodeResult<Self> {
+    pub fn open(config: &ParagraphConfig) -> NodeResult<Self> {
         if !config.path.exists() {
             return Err(node_error!("Invalid path {:?}", config.path));
         }
@@ -608,10 +608,10 @@ mod tests {
             nanos: 0,
         };
 
-        let mut paragraph_writer_service = ParagraphWriterService::start(&psc).unwrap();
+        let mut paragraph_writer_service = ParagraphWriterService::create(&psc).unwrap();
         let resource1 = create_resource("shard1".to_string(), timestamp);
         paragraph_writer_service.set_resource(&resource1)?;
-        let paragraph_reader_service = ParagraphReaderService::start(&psc).unwrap();
+        let paragraph_reader_service = ParagraphReaderService::open(&psc).unwrap();
         let context = ParagraphsContext::default();
 
         // Search on all paragraphs faceted
@@ -669,11 +669,11 @@ mod tests {
             nanos: 0,
         };
 
-        let mut paragraph_writer_service = ParagraphWriterService::start(&psc).unwrap();
+        let mut paragraph_writer_service = ParagraphWriterService::create(&psc).unwrap();
         let resource1 = create_resource("shard1".to_string(), timestamp);
         paragraph_writer_service.set_resource(&resource1)?;
 
-        let paragraph_reader_service = ParagraphReaderService::start(&psc).unwrap();
+        let paragraph_reader_service = ParagraphReaderService::open(&psc).unwrap();
 
         let reader = paragraph_writer_service.index.reader()?;
         let searcher = reader.searcher();
@@ -740,10 +740,10 @@ mod tests {
             seconds,
             nanos: 0,
         };
-        let mut paragraph_writer_service = ParagraphWriterService::start(&psc).unwrap();
+        let mut paragraph_writer_service = ParagraphWriterService::create(&psc).unwrap();
         let resource1 = create_resource("shard1".to_string(), timestamp);
         paragraph_writer_service.set_resource(&resource1)?;
-        let paragraph_reader_service = ParagraphReaderService::start(&psc).unwrap();
+        let paragraph_reader_service = ParagraphReaderService::open(&psc).unwrap();
         let reader = paragraph_writer_service.index.reader()?;
         let searcher = reader.searcher();
         let empty_context = ParagraphsContext::default();
@@ -994,12 +994,12 @@ mod tests {
             nanos: 0,
         };
 
-        let mut paragraph_writer_service = ParagraphWriterService::start(&psc).unwrap();
+        let mut paragraph_writer_service = ParagraphWriterService::create(&psc).unwrap();
         let resource1 = create_resource("shard1".to_string(), time_baseline.clone());
 
         paragraph_writer_service.set_resource(&resource1)?;
 
-        let paragraph_reader_service = ParagraphReaderService::start(&psc).unwrap();
+        let paragraph_reader_service = ParagraphReaderService::open(&psc).unwrap();
 
         let reader = paragraph_writer_service.index.reader()?;
         let searcher = reader.searcher();

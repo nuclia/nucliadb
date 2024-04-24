@@ -40,8 +40,8 @@ fn create_reader() -> NodeResult<RelationsReaderService> {
         channel: Channel::EXPERIMENTAL,
     };
 
-    let mut writer = RelationsWriterService::start(&config)?;
-    let reader = RelationsReaderService::start(&config)?;
+    let mut writer = RelationsWriterService::create(&config)?;
+    let reader = RelationsReaderService::open(&config)?;
 
     writer.set_resource(&Resource {
         resource: Some(ResourceId {
@@ -129,8 +129,8 @@ fn test_start_new_reader_after_a_writer() -> NodeResult<()> {
         channel: Channel::EXPERIMENTAL,
     };
 
-    let _writer = RelationsWriterService::start(&config)?;
-    let reader: Result<RelationsReaderService, nucliadb_core::Error> = RelationsReaderService::start(&config);
+    let _writer = RelationsWriterService::create(&config)?;
+    let reader: Result<RelationsReaderService, nucliadb_core::Error> = RelationsReaderService::open(&config);
     assert!(reader.is_ok());
 
     Ok(())

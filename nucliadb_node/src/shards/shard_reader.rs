@@ -16,9 +16,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use super::metadata::ShardMetadata;
+use super::versioning::Versions;
 use crate::disk_structure::*;
-use crate::shards::metadata::ShardMetadata;
-use crate::shards::versions::Versions;
 use crate::telemetry::run_with_telemetry;
 use crossbeam_utils::thread as crossbeam_thread;
 use nucliadb_core::paragraphs::*;
@@ -49,11 +49,46 @@ use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 const MAX_SUGGEST_COMPOUND_WORDS: usize = 3;
 const MIN_VIABLE_PREFIX_SUGGEST: usize = 1;
 const CHUNK_SIZE: usize = 65535;
+
+fn open_vectors_reader(version: u32, config: &VectorConfig) -> NodeResult<VectorsReaderPointer> {
+    match version {
+        1 => nucliadb_vectors::service::VectorReaderService::open(config)
+            .map(|i| Arc::new(RwLock::new(i)) as VectorsReaderPointer),
+        2 => nucliadb_vectors::service::VectorReaderService::open(config)
+            .map(|i| Arc::new(RwLock::new(i)) as VectorsReaderPointer),
+        v => Err(node_error!("Invalid vectors version {v}")),
+    }
+}
+fn open_paragraphs_reader(version: u32, config: &ParagraphConfig) -> NodeResult<ParagraphsReaderPointer> {
+    match version {
+        2 => nucliadb_paragraphs2::reader::ParagraphReaderService::open(config)
+            .map(|i| Arc::new(RwLock::new(i)) as ParagraphsReaderPointer),
+        3 => nucliadb_paragraphs3::reader::ParagraphReaderService::open(config)
+            .map(|i| Arc::new(RwLock::new(i)) as ParagraphsReaderPointer),
+        v => Err(node_error!("Invalid paragraphs version {v}")),
+    }
+}
+
+fn open_texts_reader(version: u32, config: &TextConfig) -> NodeResult<TextsReaderPointer> {
+    match version {
+        2 => nucliadb_texts2::reader::TextReaderService::open(config)
+            .map(|i| Arc::new(RwLock::new(i)) as TextsReaderPointer),
+        v => Err(node_error!("Invalid text reader version {v}")),
+    }
+}
+
+fn open_relations_reader(version: u32, config: &RelationConfig) -> NodeResult<RelationsReaderPointer> {
+    match version {
+        2 => nucliadb_relations2::reader::RelationsReaderService::open(config)
+            .map(|i| Arc::new(RwLock::new(i)) as RelationsReaderPointer),
+        v => Err(node_error!("Invalid relations version {v}")),
+    }
+}
 
 pub struct ShardFileChunkIterator {
     file_path: PathBuf,
@@ -250,10 +285,10 @@ impl ShardReader {
             channel,
         };
         let versions = Versions::load(&shard_path.join(VERSION_FILE))?;
-        let text_task = || Some(versions.get_texts_reader(&tsc));
-        let paragraph_task = || Some(versions.get_paragraphs_reader(&psc));
-        let vector_task = || Some(versions.get_vectors_reader(&vsc));
-        let relation_task = || Some(versions.get_relations_reader(&rsc));
+        let text_task = || Some(open_texts_reader(versions.texts, &tsc));
+        let paragraph_task = || Some(open_paragraphs_reader(versions.paragraphs, &psc));
+        let vector_task = || Some(open_vectors_reader(versions.vectors, &vsc));
+        let relation_task = || Some(open_relations_reader(versions.relations, &rsc));
 
         let info = info_span!(parent: &span, "text open");
         let text_task = || run_with_telemetry(info, text_task);
@@ -290,10 +325,10 @@ impl ShardReader {
             paragraph_reader: paragraphs.unwrap(),
             vector_reader: vectors.unwrap(),
             relation_reader: relations.unwrap(),
-            document_version: versions.version_texts() as i32,
-            paragraph_version: versions.version_paragraphs() as i32,
-            vector_version: versions.version_vectors() as i32,
-            relation_version: versions.version_relations() as i32,
+            document_version: versions.texts as i32,
+            paragraph_version: versions.paragraphs as i32,
+            vector_version: versions.vectors as i32,
+            relation_version: versions.relations as i32,
         })
     }
 
