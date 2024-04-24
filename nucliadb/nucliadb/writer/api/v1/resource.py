@@ -598,22 +598,6 @@ async def validate_rid_exists_or_raise_error(
         raise HTTPException(status_code=404, detail="Resource does not exist")
 
 
-async def get_rid_from_params_or_raise_error(
-    kbid: str,
-    rid: Optional[str] = None,
-    slug: Optional[str] = None,
-) -> str:
-    if rid is not None:
-        await validate_rid_exists_or_raise_error(kbid, rid)
-        return rid
-
-    if slug is None:
-        raise ValueError("Either rid or slug must be set")
-
-    rid = await get_rid_from_slug_or_raise_error(kbid, slug)
-    return rid
-
-
 def maybe_mark_reindex(message: BrokerMessage, item: UpdateResourcePayload):
     if needs_resource_reindex(item):
         message.reindex = True
