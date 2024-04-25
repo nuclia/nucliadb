@@ -19,16 +19,15 @@
 //
 
 use nucliadb_core::prelude::*;
-use nucliadb_core::Channel;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-const VECTORS_VERSION: u32 = 1;
-const PARAGRAPHS_VERSION: u32 = 3;
-const RELATIONS_VERSION: u32 = 2;
-const TEXTS_VERSION: u32 = 2;
+pub const VECTORS_VERSION: u32 = 1;
+pub const PARAGRAPHS_VERSION: u32 = 3;
+pub const RELATIONS_VERSION: u32 = 2;
+pub const TEXTS_VERSION: u32 = 2;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Copy)]
 pub struct Versions {
     pub paragraphs: u32,
     pub vectors: u32,
@@ -43,15 +42,9 @@ impl Versions {
         Ok(versions)
     }
 
-    pub fn create(versions_file: &Path, _channel: Channel) -> NodeResult<Versions> {
-        let versions = Versions {
-            paragraphs: PARAGRAPHS_VERSION,
-            vectors: VECTORS_VERSION,
-            texts: TEXTS_VERSION,
-            relations: RELATIONS_VERSION,
-        };
+    pub fn create(versions_file: &Path, versions: Versions) -> NodeResult<()> {
         let serialized = serde_json::to_string(&versions)?;
         std::fs::write(versions_file, serialized)?;
-        Ok(versions)
+        Ok(())
     }
 }
