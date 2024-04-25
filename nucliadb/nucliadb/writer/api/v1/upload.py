@@ -33,7 +33,7 @@ from fastapi.responses import Response
 from fastapi_versioning import version  # type: ignore
 from grpc import StatusCode as GrpcStatusCode
 from grpc.aio import AioRpcError
-from nucliadb_protos.resources_pb2 import FieldFile
+from nucliadb_protos.resources_pb2 import FieldFile, Metadata
 from nucliadb_protos.writer_pb2 import (
     BrokerMessage,
     ResourceFieldExistsResponse,
@@ -941,6 +941,8 @@ async def store_file_on_nuclia_db(
     )
 
     writer.source = BrokerMessage.MessageSource.WRITER
+    writer.basic.metadata.status = Metadata.Status.PENDING
+    writer.basic.metadata.useful = True
     try:
         await transaction.commit(writer, partition, wait=True)
     except TransactionCommitTimeoutError:
