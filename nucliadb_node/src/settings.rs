@@ -108,21 +108,24 @@ pub fn build_object_store_driver(settings: &EnvSettings) -> Arc<dyn ObjectStore>
     match settings.file_backend {
         ObjectStoreType::GCS => {
             let service_account_key = STANDARD.decode(&settings.gcs_base64_creds).unwrap();
-            let object_store = GoogleCloudStorageBuilder::new()
-                .with_service_account_key(String::from_utf8(service_account_key).unwrap())
-                .with_bucket_name(settings.gcs_indexing_bucket.clone())
+            Arc::new(
+                GoogleCloudStorageBuilder::new()
+                    .with_service_account_key(String::from_utf8(service_account_key).unwrap())
+                    .with_bucket_name(settings.gcs_indexing_bucket.clone())
+                    .build()
+                    .unwrap(),
+            )
+        }
+        ObjectStoreType::S3 => Arc::new(
+            AmazonS3Builder::new()
+                .with_access_key_id(settings.s3_client_id.clone())
+                .with_secret_access_key(settings.s3_client_secret.clone())
+                .with_region(settings.s3_region_name.clone())
+                .with_bucket_name(settings.s3_indexing_bucket.clone())
                 .build()
-                .unwrap();
-            Arc::new(object_store)
-        }
-        ObjectStoreType::S3 => {
-            // TODO: Implement S3 object store
-            Arc::new(InMemory::new())
-        }
-        ObjectStoreType::UNSET => {
-            // TODO: Add log warning and default to memory object store
-            Arc::new(InMemory::new())
-        }
+                .unwrap(),
+        ),
+        ObjectStoreType::UNSET => Arc::new(InMemory::new()),
     }
 }
 
@@ -206,7 +209,6 @@ pub struct EnvSettings {
 
     // Object store settings coming from nucliadb_shared chart
     pub file_backend: ObjectStoreType,
-    pub gcs_project: String,
     pub gcs_indexing_bucket: String,
     pub gcs_base64_creds: String,
     pub s3_client_id: String,
@@ -285,7 +287,6 @@ impl Default for EnvSettings {
             merge_on_commit_segments_before_merge: 100,
             max_open_shards: None,
             file_backend: ObjectStoreType::UNSET,
-            gcs_project: Default::default(),
             gcs_indexing_bucket: Default::default(),
             gcs_base64_creds: Default::default(),
             s3_client_id: Default::default(),
