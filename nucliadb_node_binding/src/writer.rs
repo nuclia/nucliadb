@@ -178,7 +178,7 @@ impl NodeWriter {
         }
     }
 
-    pub fn set_resource_v2<'p>(&mut self, _index_message: RawProtos, _py: Python<'p>) -> PyResult<&'p PyAny> {
+    pub fn set_resource_from_storage<'p>(&mut self, _index_message: RawProtos, _py: Python<'p>) -> PyResult<&'p PyAny> {
         Err(IndexNodeException::new_err("Not implemented"))
     }
 

@@ -296,7 +296,7 @@ pub mod node_writer_client {
             );
             self.inner.unary(request.into_request(), path, codec).await
         }
-        pub async fn set_resource_v2(
+        pub async fn set_resource_from_storage(
             &mut self,
             request: impl tonic::IntoRequest<super::IndexMessage>,
         ) -> Result<tonic::Response<super::OpStatus>, tonic::Status> {
@@ -311,7 +311,7 @@ pub mod node_writer_client {
                 })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
-                "/nodewriter.NodeWriter/SetResourceV2",
+                "/nodewriter.NodeWriter/SetResourceFromStorage",
             );
             self.inner.unary(request.into_request(), path, codec).await
         }
@@ -458,7 +458,7 @@ pub mod node_writer_server {
             &self,
             request: tonic::Request<super::super::noderesources::Resource>,
         ) -> Result<tonic::Response<super::OpStatus>, tonic::Status>;
-        async fn set_resource_v2(
+        async fn set_resource_from_storage(
             &self,
             request: tonic::Request<super::IndexMessage>,
         ) -> Result<tonic::Response<super::OpStatus>, tonic::Status>;
@@ -773,11 +773,11 @@ pub mod node_writer_server {
                     };
                     Box::pin(fut)
                 }
-                "/nodewriter.NodeWriter/SetResourceV2" => {
+                "/nodewriter.NodeWriter/SetResourceFromStorage" => {
                     #[allow(non_camel_case_types)]
-                    struct SetResourceV2Svc<T: NodeWriter>(pub Arc<T>);
+                    struct SetResourceFromStorageSvc<T: NodeWriter>(pub Arc<T>);
                     impl<T: NodeWriter> tonic::server::UnaryService<super::IndexMessage>
-                    for SetResourceV2Svc<T> {
+                    for SetResourceFromStorageSvc<T> {
                         type Response = super::OpStatus;
                         type Future = BoxFuture<
                             tonic::Response<Self::Response>,
@@ -789,7 +789,7 @@ pub mod node_writer_server {
                         ) -> Self::Future {
                             let inner = self.0.clone();
                             let fut = async move {
-                                (*inner).set_resource_v2(request).await
+                                (*inner).set_resource_from_storage(request).await
                             };
                             Box::pin(fut)
                         }
@@ -799,7 +799,7 @@ pub mod node_writer_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let inner = inner.0;
-                        let method = SetResourceV2Svc(inner);
+                        let method = SetResourceFromStorageSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

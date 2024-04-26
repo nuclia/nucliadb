@@ -45,8 +45,8 @@ class NodeWriterStub(object):
                 request_serializer=nucliadb__protos_dot_noderesources__pb2.Resource.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_nodewriter__pb2.OpStatus.FromString,
                 )
-        self.SetResourceV2 = channel.unary_unary(
-                '/nodewriter.NodeWriter/SetResourceV2',
+        self.SetResourceFromStorage = channel.unary_unary(
+                '/nodewriter.NodeWriter/SetResourceFromStorage',
                 request_serializer=nucliadb__protos_dot_nodewriter__pb2.IndexMessage.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_nodewriter__pb2.OpStatus.FromString,
                 )
@@ -116,7 +116,7 @@ class NodeWriterServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def SetResourceV2(self, request, context):
+    def SetResourceFromStorage(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -185,8 +185,8 @@ def add_NodeWriterServicer_to_server(servicer, server):
                     request_deserializer=nucliadb__protos_dot_noderesources__pb2.Resource.FromString,
                     response_serializer=nucliadb__protos_dot_nodewriter__pb2.OpStatus.SerializeToString,
             ),
-            'SetResourceV2': grpc.unary_unary_rpc_method_handler(
-                    servicer.SetResourceV2,
+            'SetResourceFromStorage': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetResourceFromStorage,
                     request_deserializer=nucliadb__protos_dot_nodewriter__pb2.IndexMessage.FromString,
                     response_serializer=nucliadb__protos_dot_nodewriter__pb2.OpStatus.SerializeToString,
             ),
@@ -328,7 +328,7 @@ class NodeWriter(object):
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
-    def SetResourceV2(request,
+    def SetResourceFromStorage(request,
             target,
             options=(),
             channel_credentials=None,
@@ -338,7 +338,7 @@ class NodeWriter(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/nodewriter.NodeWriter/SetResourceV2',
+        return grpc.experimental.unary_unary(request, target, '/nodewriter.NodeWriter/SetResourceFromStorage',
             nucliadb__protos_dot_nodewriter__pb2.IndexMessage.SerializeToString,
             nucliadb__protos_dot_nodewriter__pb2.OpStatus.FromString,
             options, channel_credentials,

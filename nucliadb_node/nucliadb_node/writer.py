@@ -50,8 +50,8 @@ class Writer:
     async def set_resource(self, pb: Resource) -> OpStatus:
         return await self.stub.SetResource(pb)  # type: ignore
 
-    async def set_resource_v2(self, pb: IndexMessage) -> OpStatus:
-        return await self.stub.SetResourceV2(pb)  # type: ignore
+    async def set_resource_from_storage(self, pb: IndexMessage) -> OpStatus:
+        return await self.stub.SetResourceFromStorage(pb)  # type: ignore
 
     async def delete_resource(self, pb: ResourceID) -> OpStatus:
         return await self.stub.RemoveResource(pb)  # type: ignore

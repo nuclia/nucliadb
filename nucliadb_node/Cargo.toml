@@ -55,7 +55,9 @@ tracing-opentelemetry = "0.17.2"
 reqwest = { version = "0.11.16", features = ["json", "rustls-tls", "blocking"] }
 num_cpus = "1.16.0"
 crossbeam-utils = "0.8.16"
-object_store = "0.10.0"
+object_store = { version = "0.10.0", features = ["gcp", "aws"]}
+base64 = "^0.21"
+
 
 # Text Service
 async-stream = "0.3.2"

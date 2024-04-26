@@ -388,7 +388,7 @@ class PriorityIndexer:
     async def _index_message(self, pb: IndexMessage):
         if pb.typemessage == TypeMessage.CREATION:
             if has_feature(const.Features.NODE_SET_RESOURCE_V2):
-                await self._set_resource_v2(pb)
+                await self._set_resource_from_storage(pb)
             else:
                 await self._set_resource(pb)
         elif pb.typemessage == TypeMessage.DELETION:
@@ -475,7 +475,7 @@ class PriorityIndexer:
             )
             return
 
-    async def _set_resource_v2(self, pb: IndexMessage) -> None:
+    async def _set_resource_from_storage(self, pb: IndexMessage) -> None:
         """
         Set a resource using the new v2 method that doesn't
         require the indexer to fetch the resource from storage.
@@ -488,7 +488,7 @@ class PriorityIndexer:
         }
         try:
             with self._handled_grpc_errors():
-                status = await self.writer.set_resource_v2(pb)
+                status = await self.writer.set_resource_from_storage(pb)
                 self._parse_op_status_errors(pb, status)
                 return
         except ShardNotFound:

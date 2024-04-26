@@ -61,8 +61,8 @@ class DummyWriterStub:  # pragma: no cover
         result.field_count = 1
         return result
 
-    async def SetResourceV2(self, data):  # pragma: no cover
-        self.calls.setdefault("SetResourceV2", []).append(data)
+    async def SetResourceFromStorage(self, data):  # pragma: no cover
+        self.calls.setdefault("SetResourceFromStorage", []).append(data)
         result = OpStatus()
         result.field_count = 1
         return result

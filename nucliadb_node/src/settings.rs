@@ -32,6 +32,7 @@
 
 use anyhow::anyhow;
 use nucliadb_core::tracing::Level;
+use object_store::ObjectStore;
 use serde::de::Unexpected;
 use std::net::SocketAddr;
 use std::num::NonZeroUsize;
@@ -40,13 +41,17 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use nucliadb_core::NodeResult;
-use serde::{Deserialize, Deserializer};
-use tracing::error;
-
-use crate::disk_structure::{METADATA_FILE, OBJECTS_DIR, SHARDS_DIR};
+use crate::disk_structure::{METADATA_FILE, SHARDS_DIR};
 use crate::replication::NodeRole;
 use crate::utils::{parse_log_levels, reliable_lookup_host};
+use base64::engine::general_purpose::STANDARD;
+use base64::Engine;
+use nucliadb_core::NodeResult;
+use object_store::aws::AmazonS3Builder;
+use object_store::gcp::GoogleCloudStorageBuilder;
+use object_store::memory::InMemory;
+use serde::{Deserialize, Deserializer};
+use tracing::error;
 
 fn parse_log_levels_serde<'de, D>(d: D) -> Result<Vec<(String, Level)>, D::Error>
 where
@@ -86,15 +91,42 @@ const DEFAULT_ENV: &str = "stage";
 #[derive(Clone)]
 pub struct Settings {
     env: Arc<EnvSettings>,
+    pub object_store: Arc<dyn ObjectStore>,
 }
 
 impl From<EnvSettings> for Settings {
     fn from(value: EnvSettings) -> Self {
+        let object_store = build_object_store_driver(&value);
         Self {
             env: Arc::new(value),
+            object_store,
         }
     }
 }
+
+pub fn build_object_store_driver(settings: &EnvSettings) -> Arc<dyn ObjectStore> {
+    match settings.file_backend {
+        ObjectStoreType::GCS => {
+            let service_account_key = STANDARD.decode(&settings.gcs_base64_creds).unwrap();
+            let object_store = GoogleCloudStorageBuilder::new()
+                .with_service_account_key(String::from_utf8(service_account_key).unwrap())
+                .with_bucket_name(settings.gcs_indexing_bucket.clone())
+                .build()
+                .unwrap();
+            Arc::new(object_store)
+        }
+        ObjectStoreType::S3 => {
+            // TODO: Implement S3 object store
+            Arc::new(InMemory::new())
+        }
+        ObjectStoreType::UNSET => {
+            // TODO: Add log warning and default to memory object store
+            Arc::new(InMemory::new())
+        }
+    }
+}
+
+impl Settings {}
 
 impl Deref for Settings {
     type Target = EnvSettings;
@@ -102,6 +134,13 @@ impl Deref for Settings {
     fn deref(&self) -> &Self::Target {
         &self.env
     }
+}
+
+#[derive(Deserialize)]
+pub enum ObjectStoreType {
+    GCS,
+    S3,
+    UNSET,
 }
 
 #[derive(Deserialize)]
@@ -164,6 +203,16 @@ pub struct EnvSettings {
     pub merge_on_commit_segments_before_merge: usize,
 
     pub max_open_shards: Option<NonZeroUsize>,
+
+    // Object store settings coming from nucliadb_shared chart
+    pub file_backend: ObjectStoreType,
+    pub gcs_project: String,
+    pub gcs_indexing_bucket: String,
+    pub gcs_base64_creds: String,
+    pub s3_client_id: String,
+    pub s3_client_secret: String,
+    pub s3_region_name: String,
+    pub s3_indexing_bucket: String,
 }
 
 impl EnvSettings {
@@ -179,11 +228,6 @@ impl EnvSettings {
     /// Path where all shards are stored
     pub fn shards_path(&self) -> PathBuf {
         self.data_path.join(SHARDS_DIR)
-    }
-
-    /// Path where all objects are stored
-    pub fn objects_path(&self) -> PathBuf {
-        self.data_path.join(OBJECTS_DIR)
     }
 
     pub fn sentry_env(&self) -> String {
@@ -240,6 +284,14 @@ impl Default for EnvSettings {
             merge_on_commit_max_nodes_in_merge: 10_000,
             merge_on_commit_segments_before_merge: 100,
             max_open_shards: None,
+            file_backend: ObjectStoreType::UNSET,
+            gcs_project: Default::default(),
+            gcs_indexing_bucket: Default::default(),
+            gcs_base64_creds: Default::default(),
+            s3_client_id: Default::default(),
+            s3_client_secret: Default::default(),
+            s3_region_name: Default::default(),
+            s3_indexing_bucket: Default::default(),
         }
     }
 }

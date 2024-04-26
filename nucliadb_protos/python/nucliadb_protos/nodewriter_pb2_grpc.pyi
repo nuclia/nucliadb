@@ -56,7 +56,7 @@ class NodeWriterStub:
         nucliadb_protos.noderesources_pb2.Resource,
         nucliadb_protos.nodewriter_pb2.OpStatus,
     ]
-    SetResourceV2: grpc.UnaryUnaryMultiCallable[
+    SetResourceFromStorage: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.nodewriter_pb2.IndexMessage,
         nucliadb_protos.nodewriter_pb2.OpStatus,
     ]
@@ -119,7 +119,7 @@ class NodeWriterServicer(metaclass=abc.ABCMeta):
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.nodewriter_pb2.OpStatus: ...
     @abc.abstractmethod
-    def SetResourceV2(
+    def SetResourceFromStorage(
         self,
         request: nucliadb_protos.nodewriter_pb2.IndexMessage,
         context: grpc.ServicerContext,

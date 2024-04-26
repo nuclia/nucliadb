@@ -39,7 +39,6 @@ pub const METADATA_FILE: &str = "metadata.json";
 pub const GENERATION_FILE: &str = "generation";
 
 pub const SHARDS_DIR: &str = "shards";
-pub const OBJECTS_DIR: &str = "objects";
 
 pub const PARAGRAPHS_DIR: &str = "paragraph";
 pub const RELATIONS_DIR: &str = "relations";

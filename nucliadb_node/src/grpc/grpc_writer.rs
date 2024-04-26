@@ -29,6 +29,7 @@ use crate::shards::metadata::ShardMetadata;
 use crate::shards::writer::ShardWriter;
 use crate::telemetry::run_with_telemetry;
 use crate::utils::{get_primary_node_id, list_shards, read_host_key};
+use nucliadb_core::metrics::get_metrics;
 use nucliadb_core::protos::node_writer_server::NodeWriter;
 use nucliadb_core::protos::prost::Message;
 use nucliadb_core::protos::{
@@ -38,9 +39,7 @@ use nucliadb_core::protos::{
 };
 use nucliadb_core::tracing::{self, Span, *};
 use nucliadb_core::Channel;
-use object_store::local::LocalFileSystem;
 use object_store::path::Path;
-use object_store::ObjectStore;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::UnboundedSender;
@@ -55,7 +54,6 @@ pub struct NodeWriterGRPCDriver {
     shards: Arc<ShardWriterCache>,
     sender: Option<UnboundedSender<NodeWriterEvent>>,
     settings: Settings,
-    object_store: Arc<dyn ObjectStore>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -63,6 +61,8 @@ pub enum NodeWriterEvent {
     ShardCreation,
     ShardDeletion,
 }
+
+pub trait ObjectStoreDriver {}
 
 impl NodeWriterGRPCDriver {
     pub fn new(settings: Settings, shard_cache: Arc<ShardWriterCache>) -> Self {
@@ -79,15 +79,11 @@ impl NodeWriterGRPCDriver {
             garbage_collection_loop(gc_parameters, cache_gc_copy).await;
         });
 
-        let _ = std::fs::create_dir(settings.objects_path());
-        let object_store = Arc::new(LocalFileSystem::new_with_prefix(settings.objects_path()).unwrap());
-
         NodeWriterGRPCDriver {
             settings,
             gc_loop_handle,
             shards: shard_cache,
             sender: None,
-            object_store: object_store,
         }
     }
 
@@ -228,10 +224,28 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
     }
 
-    async fn set_resource_v2(&self, request: Request<IndexMessage>) -> Result<Response<OpStatus>, Status> {
-        let resource_path = request.into_inner().storage_key;
-        let bytes = self.object_store.get(&Path::from(resource_path)).await.unwrap().bytes().await.unwrap();
-        let resource = Resource::decode(bytes).unwrap();
+    async fn set_resource_from_storage(&self, request: Request<IndexMessage>) -> Result<Response<OpStatus>, Status> {
+        let download_start = std::time::Instant::now();
+
+        let storage_key = request.into_inner().storage_key;
+
+        let get_result = self.settings.object_store.get(&Path::from(storage_key)).await.map_err(|e| {
+            error!("Failed to get indexing resource from object store: {}", e);
+            tonic::Status::internal(format!("Failed to get indexing resource from object store: {}", e))
+        })?;
+
+        let bytes = get_result.bytes().await.map_err(|e| {
+            error!("Failed to download indexing resource from object store: {}", e);
+            tonic::Status::internal(format!("Failed to download indexing resource from object store: {}", e))
+        })?;
+
+        get_metrics().indexing_resource_download_histogram.observe(download_start.elapsed().as_secs_f64());
+
+        let resource = Resource::decode(bytes).map_err(|e| {
+            error!("Failed to decode indexing resource: {}", e);
+            tonic::Status::internal(format!("Failed to decode indexing resource: {}", e))
+        })?;
+
         let set_resource_request = Request::new(resource);
         self.set_resource(set_resource_request).await
     }
