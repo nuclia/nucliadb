@@ -16,31 +16,14 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
-//
 
-// #![warn(missing_docs)]
+use std::fmt::Display;
 
-//! NucliaDB Index Node component
-//!
-//! This module provides the top level NucliaDB's indexing funcionality. It
-//! allows indexing, searching and deleting indexed contents.
-//!
-//! As a high level interface, it provides a gRPC server to deploy the index in
-//! a distributed fashion. The API allows building other interfaces, as the
-//! already built PyO3 bindings.
+#[derive(Debug)]
+pub struct ShardNotFoundError(pub &'static str);
 
-pub mod analytics;
-pub mod cache;
-pub mod errors;
-pub mod grpc;
-pub mod http_server;
-pub mod lifecycle;
-pub mod merge;
-pub mod node_metadata;
-pub mod replication;
-pub mod settings;
-pub mod shards;
-pub mod telemetry;
-pub mod utils;
-
-mod disk_structure;
+impl Display for ShardNotFoundError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Shard not found: {}", self.0)
+    }
+}

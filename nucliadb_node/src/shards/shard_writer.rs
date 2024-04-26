@@ -17,8 +17,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::collections::HashMap;
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, MutexGuard, RwLock};
 
 use nucliadb_core::paragraphs::*;
 use nucliadb_core::prelude::*;
@@ -32,14 +32,49 @@ use nucliadb_core::{thread, IndexFiles};
 use nucliadb_procs::measure;
 use nucliadb_vectors::VectorErr;
 
+use super::metadata::ShardMetadata;
+use super::versioning::{self, Versions};
 use crate::disk_structure::*;
-use crate::shards::metadata::ShardMetadata;
-use crate::shards::versions::Versions;
 use crate::telemetry::run_with_telemetry;
 
 pub struct BlockingToken<'a>(MutexGuard<'a, ()>);
 
 const MAX_LABEL_LENGTH: usize = 32768; // Tantivy max is 2^16 - 4
+
+pub fn open_vectors_writer(version: u32, path: &Path, shard_id: String) -> NodeResult<VectorsWriterPointer> {
+    match version {
+        1 => nucliadb_vectors::service::VectorWriterService::open(path, shard_id)
+            .map(|i| Arc::new(RwLock::new(i)) as VectorsWriterPointer),
+        2 => nucliadb_vectors::service::VectorWriterService::open(path, shard_id)
+            .map(|i| Arc::new(RwLock::new(i)) as VectorsWriterPointer),
+        v => Err(node_error!("Invalid vectors version {v}")),
+    }
+}
+pub fn open_paragraphs_writer(version: u32, config: &ParagraphConfig) -> NodeResult<ParagraphsWriterPointer> {
+    match version {
+        2 => nucliadb_paragraphs2::writer::ParagraphWriterService::open(config)
+            .map(|i| Arc::new(RwLock::new(i)) as ParagraphsWriterPointer),
+        3 => nucliadb_paragraphs3::writer::ParagraphWriterService::open(config)
+            .map(|i| Arc::new(RwLock::new(i)) as ParagraphsWriterPointer),
+        v => Err(node_error!("Invalid paragraphs version {v}")),
+    }
+}
+
+pub fn open_texts_writer(version: u32, config: &TextConfig) -> NodeResult<TextsWriterPointer> {
+    match version {
+        2 => nucliadb_texts2::writer::TextWriterService::open(config)
+            .map(|i| Arc::new(RwLock::new(i)) as TextsWriterPointer),
+        v => Err(node_error!("Invalid text writer version {v}")),
+    }
+}
+
+pub fn open_relations_writer(version: u32, config: &RelationConfig) -> NodeResult<RelationsWriterPointer> {
+    match version {
+        2 => nucliadb_relations2::writer::RelationsWriterService::open(config)
+            .map(|i| Arc::new(RwLock::new(i)) as RelationsWriterPointer),
+        v => Err(node_error!("Invalid relations version {v}")),
+    }
+}
 
 fn remove_invalid_labels(resource: &mut Resource) {
     resource.labels.retain(|l| {
@@ -80,63 +115,6 @@ pub struct ShardWriter {
 }
 
 impl ShardWriter {
-    #[tracing::instrument(skip_all)]
-    fn initialize(
-        metadata: Arc<ShardMetadata>,
-        tsc: TextConfig,
-        psc: ParagraphConfig,
-        vsc: VectorConfig,
-        rsc: RelationConfig,
-    ) -> NodeResult<ShardWriter> {
-        let versions = Versions::load_or_create(&metadata.shard_path().join(VERSION_FILE), metadata.channel())?;
-        let text_task = || Some(versions.get_texts_writer(&tsc));
-        let paragraph_task = || Some(versions.get_paragraphs_writer(&psc));
-        let vector_task = || Some(versions.get_vectors_writer(&vsc));
-        let relation_task = || Some(versions.get_relations_writer(&rsc));
-
-        let span = tracing::Span::current();
-        let info = info_span!(parent: &span, "text start");
-        let text_task = || run_with_telemetry(info, text_task);
-        let info = info_span!(parent: &span, "paragraph start");
-        let paragraph_task = || run_with_telemetry(info, paragraph_task);
-        let info = info_span!(parent: &span, "vector start");
-        let vector_task = || run_with_telemetry(info, vector_task);
-        let info = info_span!(parent: &span, "relation start");
-        let relation_task = || run_with_telemetry(info, relation_task);
-
-        let mut text_result = None;
-        let mut paragraph_result = None;
-        let mut vector_result = None;
-        let mut relation_result = None;
-        thread::scope(|s| {
-            s.spawn(|_| text_result = text_task());
-            s.spawn(|_| paragraph_result = paragraph_task());
-            s.spawn(|_| vector_result = vector_task());
-            s.spawn(|_| relation_result = relation_task());
-        });
-
-        let fields = text_result.transpose()?;
-        let paragraphs = paragraph_result.transpose()?;
-        let vectors = vector_result.transpose()?;
-        let relations = relation_result.transpose()?;
-
-        Ok(ShardWriter {
-            id: metadata.id(),
-            path: metadata.shard_path(),
-            metadata,
-            text_writer: fields.unwrap(),
-            paragraph_writer: paragraphs.unwrap(),
-            vector_writer: vectors.unwrap(),
-            relation_writer: relations.unwrap(),
-            document_service_version: versions.version_texts() as i32,
-            paragraph_service_version: versions.version_paragraphs() as i32,
-            vector_service_version: versions.version_vectors() as i32,
-            relation_service_version: versions.version_relations() as i32,
-            gc_lock: tokio::sync::Mutex::new(()),
-            write_lock: Mutex::new(()),
-        })
-    }
-
     #[tracing::instrument(skip_all)]
     pub fn document_version(&self) -> DocumentService {
         match self.document_service_version {
@@ -201,9 +179,62 @@ impl ShardWriter {
 
         std::fs::create_dir(path)?;
 
-        let sw = ShardWriter::initialize(Arc::clone(&metadata), tsc, psc, vsc, rsc)?;
+        let versions = Versions {
+            paragraphs: versioning::PARAGRAPHS_VERSION,
+            vectors: versioning::VECTORS_VERSION,
+            texts: versioning::TEXTS_VERSION,
+            relations: versioning::RELATIONS_VERSION,
+        };
+        let versions_path = metadata.shard_path().join(VERSION_FILE);
+        Versions::create(&versions_path, versions)?;
+
+        let text_task = || Some(nucliadb_texts2::writer::TextWriterService::create(&tsc));
+        let paragraph_task = || Some(nucliadb_paragraphs3::writer::ParagraphWriterService::create(&psc));
+        let vector_task = || Some(nucliadb_vectors::service::VectorWriterService::create(&vsc));
+        let relation_task = || Some(nucliadb_relations2::writer::RelationsWriterService::create(&rsc));
+
+        let span = tracing::Span::current();
+        let info = info_span!(parent: &span, "text start");
+        let text_task = || run_with_telemetry(info, text_task);
+        let info = info_span!(parent: &span, "paragraph start");
+        let paragraph_task = || run_with_telemetry(info, paragraph_task);
+        let info = info_span!(parent: &span, "vector start");
+        let vector_task = || run_with_telemetry(info, vector_task);
+        let info = info_span!(parent: &span, "relation start");
+        let relation_task = || run_with_telemetry(info, relation_task);
+
+        let mut text_result = None;
+        let mut paragraph_result = None;
+        let mut vector_result = None;
+        let mut relation_result = None;
+        thread::scope(|s| {
+            s.spawn(|_| text_result = text_task());
+            s.spawn(|_| paragraph_result = paragraph_task());
+            s.spawn(|_| vector_result = vector_task());
+            s.spawn(|_| relation_result = relation_task());
+        });
+
+        let fields = text_result.transpose()?;
+        let paragraphs = paragraph_result.transpose()?;
+        let vectors = vector_result.transpose()?;
+        let relations = relation_result.transpose()?;
+
         metadata.serialize_metadata()?;
-        Ok(sw)
+        Ok(ShardWriter {
+            id: metadata.id(),
+            path: metadata.shard_path(),
+            metadata,
+            text_writer: Arc::new(RwLock::new(fields.unwrap())),
+            paragraph_writer: Arc::new(RwLock::new(paragraphs.unwrap())),
+            vector_writer: Arc::new(RwLock::new(vectors.unwrap())),
+            relation_writer: Arc::new(RwLock::new(relations.unwrap())),
+            document_service_version: versions.texts as i32,
+            paragraph_service_version: versions.paragraphs as i32,
+            vector_service_version: versions.vectors as i32,
+            relation_service_version: versions.relations as i32,
+            gc_lock: tokio::sync::Mutex::new(()),
+            write_lock: Mutex::new(()),
+        })
     }
 
     #[measure(actor = "shard", metric = "open")]
@@ -219,19 +250,60 @@ impl ShardWriter {
 
         let channel = metadata.channel();
 
-        let vsc = VectorConfig {
-            similarity: None,
-            path: path.join(VECTORS_DIR),
-            channel,
-            shard_id: metadata.id(),
-            normalize_vectors: metadata.normalize_vectors(),
-        };
         let rsc = RelationConfig {
             path: path.join(RELATIONS_DIR),
             channel,
         };
 
-        ShardWriter::initialize(metadata, tsc, psc, vsc, rsc)
+        let versions_path = metadata.shard_path().join(VERSION_FILE);
+        let versions = Versions::load(&versions_path)?;
+
+        let text_task = || Some(open_texts_writer(versions.texts, &tsc));
+        let paragraph_task = || Some(open_paragraphs_writer(versions.paragraphs, &psc));
+        let vector_task = || Some(open_vectors_writer(versions.vectors, &path.join(VECTORS_DIR), metadata.id()));
+        let relation_task = || Some(open_relations_writer(versions.relations, &rsc));
+
+        let span = tracing::Span::current();
+        let info = info_span!(parent: &span, "text start");
+        let text_task = || run_with_telemetry(info, text_task);
+        let info = info_span!(parent: &span, "paragraph start");
+        let paragraph_task = || run_with_telemetry(info, paragraph_task);
+        let info = info_span!(parent: &span, "vector start");
+        let vector_task = || run_with_telemetry(info, vector_task);
+        let info = info_span!(parent: &span, "relation start");
+        let relation_task = || run_with_telemetry(info, relation_task);
+
+        let mut text_result = None;
+        let mut paragraph_result = None;
+        let mut vector_result = None;
+        let mut relation_result = None;
+        thread::scope(|s| {
+            s.spawn(|_| text_result = text_task());
+            s.spawn(|_| paragraph_result = paragraph_task());
+            s.spawn(|_| vector_result = vector_task());
+            s.spawn(|_| relation_result = relation_task());
+        });
+
+        let fields = text_result.transpose()?;
+        let paragraphs = paragraph_result.transpose()?;
+        let vectors = vector_result.transpose()?;
+        let relations = relation_result.transpose()?;
+
+        Ok(ShardWriter {
+            id: metadata.id(),
+            path: metadata.shard_path(),
+            metadata,
+            text_writer: fields.unwrap(),
+            paragraph_writer: paragraphs.unwrap(),
+            vector_writer: vectors.unwrap(),
+            relation_writer: relations.unwrap(),
+            document_service_version: versions.texts as i32,
+            paragraph_service_version: versions.paragraphs as i32,
+            vector_service_version: versions.vectors as i32,
+            relation_service_version: versions.relations as i32,
+            gc_lock: tokio::sync::Mutex::new(()),
+            write_lock: Mutex::new(()),
+        })
     }
 
     #[measure(actor = "shard", metric = "set_resource")]
