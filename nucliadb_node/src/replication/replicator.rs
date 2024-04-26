@@ -24,7 +24,7 @@ use std::sync::Arc;
 use futures::Future;
 use nucliadb_core::metrics::replication as replication_metrics;
 use nucliadb_core::tracing::{debug, error, info, warn};
-use nucliadb_core::{metrics, Error, NodeResult};
+use nucliadb_core::{metrics, Channel, Error, NodeResult};
 use nucliadb_protos::prelude::EmptyQuery;
 use nucliadb_protos::replication;
 use tokio::io::AsyncWriteExt;
@@ -264,9 +264,9 @@ pub async fn connect_to_primary_and_replicate(
                 let metadata = ShardMetadata::new(
                     shards_path.join(shard_id.clone()),
                     shard_state.shard_id.clone(),
-                    Some(shard_state.kbid.clone()),
+                    shard_state.kbid.clone(),
                     shard_state.similarity.clone().into(),
-                    None,
+                    Channel::from(shard_state.release_channel),
                     shard_state.normalize_vectors,
                 );
                 let shard_cache_clone = Arc::clone(&shard_cache);

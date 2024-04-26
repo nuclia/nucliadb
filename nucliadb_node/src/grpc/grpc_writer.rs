@@ -120,9 +120,9 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let metadata = ShardMetadata::new(
             self.shards.shards_path.join(shard_id.clone()),
             shard_id,
-            Some(kbid),
+            kbid,
             request.similarity().into(),
-            Some(Channel::from(request.release_channel)),
+            Channel::from(request.release_channel),
             request.normalize_vectors,
         );
 

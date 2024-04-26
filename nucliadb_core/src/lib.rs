@@ -72,6 +72,15 @@ impl From<i32> for Channel {
     }
 }
 
+impl From<Channel> for i32 {
+    fn from(value: Channel) -> Self {
+        match value {
+            Channel::STABLE => 0,
+            Channel::EXPERIMENTAL => 1,
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct RawReplicaState {
     pub metadata_files: HashMap<String, Vec<u8>>,
