@@ -94,7 +94,7 @@ fn test_old_writer_test() -> NodeResult<()> {
     let _ = field_writer_service.set_resource(&resource1);
     let _ = field_writer_service.set_resource(&resource1);
 
-    let field_reader_service = TextReaderService::open(&fsc).unwrap();
+    let field_reader_service = TextReaderService::open(&fsc.path).unwrap();
 
     let reader = field_reader_service;
     let searcher = reader.reader.searcher();

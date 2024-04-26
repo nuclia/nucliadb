@@ -19,6 +19,7 @@
 //
 use std::collections::HashSet;
 use std::fmt::Debug;
+use std::path::Path;
 
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::{
@@ -118,12 +119,12 @@ impl RelationsReader for RelationsReaderService {
 
 impl RelationsReaderService {
     #[tracing::instrument(skip_all)]
-    pub fn open(config: &RelationConfig) -> NodeResult<Self> {
-        if !config.path.exists() {
-            return Err(node_error!("Invalid path {:?}", config.path));
+    pub fn open(path: &Path) -> NodeResult<Self> {
+        if !path.exists() {
+            return Err(node_error!("Invalid path {:?}", path));
         }
         let field_schema = Schema::new();
-        let index = Index::open_in_dir(&config.path)?;
+        let index = Index::open_in_dir(path)?;
 
         let reader = index.reader_builder().reload_policy(ReloadPolicy::OnCommit).try_into()?;
 
