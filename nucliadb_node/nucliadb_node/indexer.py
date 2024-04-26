@@ -35,7 +35,6 @@ from nucliadb_protos.nodewriter_pb2 import (
     TypeMessage,
 )
 
-from nucliadb.common.cluster.exceptions import ShardNotFound
 from nucliadb_node import SERVICE_NAME, logger, signals
 from nucliadb_node.settings import settings
 from nucliadb_node.signals import SuccessfulIndexingPayload
@@ -77,6 +76,10 @@ class IndexNodeError(Exception):
 
 
 class MetadataNotFoundError(IndexNodeError):
+    pass
+
+
+class ShardNotFound(IndexNodeError):
     pass
 
 
