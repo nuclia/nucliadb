@@ -21,10 +21,10 @@
 use crate::analytics::payload::AnalyticsEvent;
 use crate::analytics::sync::send_analytics_event;
 use crate::cache::ShardWriterCache;
+use crate::errors::ShardNotFoundError;
 use crate::grpc::collect_garbage::{garbage_collection_loop, GCParameters};
 use crate::merge::{global_merger, MergePriority, MergeRequest, MergeWaiter};
 use crate::settings::Settings;
-use crate::shards::errors::ShardNotFoundError;
 use crate::shards::metadata::ShardMetadata;
 use crate::shards::writer::ShardWriter;
 use crate::telemetry::run_with_telemetry;

@@ -36,12 +36,13 @@ use nucliadb_core::{IndexFiles, RawReplicaState};
 use nucliadb_procs::measure;
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 use std::time::SystemTime;
 
 pub struct VectorWriterService {
     index: Writer,
-    config: VectorConfig,
+    path: PathBuf,
 }
 
 impl Debug for VectorWriterService {
@@ -188,12 +189,12 @@ impl VectorWriter for VectorWriterService {
     }
 
     fn get_segment_ids(&self) -> NodeResult<Vec<String>> {
-        Ok(replication::get_segment_ids(&self.config.path)?)
+        Ok(replication::get_segment_ids(&self.path)?)
     }
 
     fn get_index_files(&self, ignored_segment_ids: &[String]) -> NodeResult<IndexFiles> {
         // Should be called along with a lock at a higher level to be safe
-        let replica_state = replication::get_index_files(&self.config.path, "vectors", ignored_segment_ids)?;
+        let replica_state = replication::get_index_files(&self.path, "vectors", ignored_segment_ids)?;
 
         if replica_state.files.is_empty() {
             // exit with no changes
@@ -216,24 +217,7 @@ impl VectorWriterService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn start(config: &VectorConfig) -> NodeResult<Self> {
-        let path = std::path::Path::new(&config.path);
-        if !path.exists() {
-            match VectorWriterService::new(config) {
-                Err(e) if path.exists() => {
-                    std::fs::remove_dir(path)?;
-                    Err(e)
-                }
-                Err(e) => Err(e),
-                Ok(v) => Ok(v),
-            }
-        } else {
-            VectorWriterService::open(config)
-        }
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub fn new(config: &VectorConfig) -> NodeResult<Self> {
+    pub fn create(config: &VectorConfig) -> NodeResult<Self> {
         let path = std::path::Path::new(&config.path);
         if path.exists() {
             Err(node_error!("Shard does exist".to_string()))
@@ -248,20 +232,19 @@ impl VectorWriterService {
             };
             Ok(VectorWriterService {
                 index: Writer::new(path, index_metadata, config.shard_id.clone())?,
-                config: config.clone(),
+                path: path.to_path_buf(),
             })
         }
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn open(config: &VectorConfig) -> NodeResult<Self> {
-        let path = std::path::Path::new(&config.path);
+    pub fn open(path: &Path, shard_id: String) -> NodeResult<Self> {
         if !path.exists() {
             Err(node_error!("Shard does not exist".to_string()))
         } else {
             Ok(VectorWriterService {
-                index: Writer::open(path, config.shard_id.clone())?,
-                config: config.clone(),
+                index: Writer::open(path, shard_id)?,
+                path: path.to_path_buf(),
             })
         }
     }
@@ -337,7 +320,7 @@ mod tests {
             ..Default::default()
         };
         // insert - delete - insert sequence
-        let mut writer = VectorWriterService::start(&vsc).unwrap();
+        let mut writer = VectorWriterService::create(&vsc).unwrap();
         let res = writer.set_resource(&resource);
         assert!(res.is_ok());
         let res = writer.delete_resource(&resource_id);
@@ -400,7 +383,7 @@ mod tests {
             ..Default::default()
         };
         // insert - delete - insert sequence
-        let mut writer = VectorWriterService::start(&vsc).unwrap();
+        let mut writer = VectorWriterService::create(&vsc).unwrap();
         let res = writer.set_resource(&resource);
         assert!(res.is_ok());
         let res = writer.delete_resource(&resource_id);

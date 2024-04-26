@@ -30,8 +30,8 @@ fn test_start_new_reader_after_a_writer() {
         path: dir.path().join("texts"),
     };
 
-    let _writer = TextWriterService::start(&config).unwrap();
-    let reader = TextReaderService::start(&config);
+    let _writer = TextWriterService::create(&config).unwrap();
+    let reader = TextReaderService::open(&config);
     assert!(reader.is_ok());
 }
 
@@ -42,10 +42,10 @@ fn test_open_multiple_readers() {
         path: dir.path().join("texts"),
     };
 
-    let _writer = TextWriterService::start(&config).unwrap();
-    let reader1 = TextReaderService::start(&config);
-    let reader2 = TextReaderService::start(&config);
-    let reader3 = TextReaderService::start(&config);
+    let _writer = TextWriterService::create(&config).unwrap();
+    let reader1 = TextReaderService::open(&config);
+    let reader2 = TextReaderService::open(&config);
+    let reader3 = TextReaderService::open(&config);
     assert!(reader1.is_ok());
     assert!(reader2.is_ok());
     assert!(reader3.is_ok());
@@ -58,6 +58,6 @@ fn test_start_new_reader_before_a_writer() {
         path: dir.path().join("texts"),
     };
 
-    let reader = TextReaderService::start(&config);
+    let reader = TextReaderService::open(&config);
     assert!(reader.is_err());
 }

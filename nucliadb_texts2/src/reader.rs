@@ -284,7 +284,7 @@ impl TextReaderService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn start(config: &TextConfig) -> NodeResult<Self> {
+    pub fn open(config: &TextConfig) -> NodeResult<Self> {
         if !config.path.exists() {
             return Err(node_error!("Invalid path {:?}", config.path));
         }

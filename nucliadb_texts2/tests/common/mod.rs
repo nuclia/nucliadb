@@ -38,11 +38,11 @@ pub fn test_reader() -> TextReaderService {
         path: dir.path().join("texts"),
     };
 
-    let mut writer = TextWriterService::start(&config).unwrap();
+    let mut writer = TextWriterService::create(&config).unwrap();
     let resource = create_resource("shard".to_string());
     writer.set_resource(&resource).unwrap();
 
-    TextReaderService::start(&config).unwrap()
+    TextReaderService::open(&config).unwrap()
 }
 
 pub fn create_resource(shard_id: String) -> Resource {

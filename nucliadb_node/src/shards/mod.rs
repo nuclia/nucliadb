@@ -19,11 +19,11 @@
 
 //! This module provides tools for managing shards
 
-pub mod errors;
+// pub mod errors;
 pub mod metadata;
 pub mod shard_reader;
 pub mod shard_writer;
-pub mod versions;
+pub mod versioning;
 
 // Alias for more readable imports
 pub use {shard_reader as reader, shard_writer as writer};
