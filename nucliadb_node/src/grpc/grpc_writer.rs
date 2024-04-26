@@ -62,8 +62,6 @@ pub enum NodeWriterEvent {
     ShardDeletion,
 }
 
-pub trait ObjectStoreDriver {}
-
 impl NodeWriterGRPCDriver {
     pub fn new(settings: Settings, shard_cache: Arc<ShardWriterCache>) -> Self {
         let cache_gc_copy = Arc::clone(&shard_cache);

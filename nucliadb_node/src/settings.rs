@@ -129,8 +129,6 @@ pub fn build_object_store_driver(settings: &EnvSettings) -> Arc<dyn ObjectStore>
     }
 }
 
-impl Settings {}
-
 impl Deref for Settings {
     type Target = EnvSettings;
 
