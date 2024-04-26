@@ -387,7 +387,9 @@ class PriorityIndexer:
 
     async def _index_message(self, pb: IndexMessage):
         if pb.typemessage == TypeMessage.CREATION:
-            if has_feature(const.Features.NODE_SET_RESOURCE_V2):
+            if has_feature(
+                const.Features.NODE_SET_RESOURCE_FROM_STORAGE, context={"kbid": pb.kbid}
+            ):
                 await self._set_resource_from_storage(pb)
             else:
                 await self._set_resource(pb)
