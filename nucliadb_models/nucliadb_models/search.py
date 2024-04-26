@@ -1044,7 +1044,7 @@ class ChatRequest(BaseModel):
         description="Consume LLM tokens to rephrase the query so the semantic search is better",
     )
 
-    prefer_markdown: Optional[bool] = Field(
+    prefer_markdown: bool = Field(
         default=False,
         title="Prefer markdown",
         description="If set to true, the response will be in markdown format",
