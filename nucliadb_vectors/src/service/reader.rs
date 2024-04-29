@@ -30,6 +30,7 @@ use nucliadb_core::tracing::{self, *};
 use nucliadb_core::vectors::*;
 use nucliadb_procs::measure;
 use std::fmt::Debug;
+use std::path::Path;
 use std::time::Instant;
 
 impl<'a> SearchRequest for (usize, &'a VectorSearchRequest, Formula) {
@@ -170,12 +171,12 @@ impl TryFrom<Neighbour> for DocumentScored {
 
 impl VectorReaderService {
     #[tracing::instrument(skip_all)]
-    pub fn open(config: &VectorConfig) -> NodeResult<Self> {
-        if !config.path.exists() {
-            return Err(node_error!("Invalid path {:?}", config.path));
+    pub fn open(path: &Path) -> NodeResult<Self> {
+        if !path.exists() {
+            return Err(node_error!("Invalid path {:?}", path));
         }
         Ok(VectorReaderService {
-            index: Reader::open(&config.path)?,
+            index: Reader::open(path)?,
         })
     }
 }
@@ -256,7 +257,7 @@ mod tests {
         let mut writer = VectorWriterService::create(&vsc).unwrap();
         writer.set_resource(&resource).unwrap();
 
-        let reader = VectorReaderService::open(&vsc).unwrap();
+        let reader = VectorReaderService::open(&vsc.path).unwrap();
         let mut request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),
@@ -339,7 +340,7 @@ mod tests {
         let mut writer = VectorWriterService::create(&vsc).unwrap();
         let res = writer.set_resource(&resource);
         assert!(res.is_ok());
-        let reader = VectorReaderService::open(&vsc).unwrap();
+        let reader = VectorReaderService::open(&vsc.path).unwrap();
         let request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),
@@ -456,7 +457,7 @@ mod tests {
         let mut writer = VectorWriterService::create(&vsc).unwrap();
         let res = writer.set_resource(&resource);
         assert!(res.is_ok());
-        let reader = VectorReaderService::open(&vsc).unwrap();
+        let reader = VectorReaderService::open(&vsc.path).unwrap();
         let request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),

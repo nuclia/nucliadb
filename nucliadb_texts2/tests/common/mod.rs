@@ -42,7 +42,7 @@ pub fn test_reader() -> TextReaderService {
     let resource = create_resource("shard".to_string());
     writer.set_resource(&resource).unwrap();
 
-    TextReaderService::open(&config).unwrap()
+    TextReaderService::open(&config.path).unwrap()
 }
 
 pub fn create_resource(shard_id: String) -> Resource {
