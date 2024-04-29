@@ -595,17 +595,6 @@ pub struct Shards {
     pub extra: ::std::collections::HashMap<::prost::alloc::string::String, ::prost::alloc::string::String>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ResourceFieldId {
-    #[prost(string, tag="1")]
-    pub kbid: ::prost::alloc::string::String,
-    #[prost(string, tag="2")]
-    pub rid: ::prost::alloc::string::String,
-    #[prost(enumeration="super::resources::FieldType", tag="3")]
-    pub field_type: i32,
-    #[prost(string, tag="4")]
-    pub field: ::prost::alloc::string::String,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IndexResource {
     #[prost(string, tag="1")]
     pub kbid: ::prost::alloc::string::String,
@@ -616,23 +605,6 @@ pub struct IndexResource {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IndexStatus {
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ResourceFieldExistsResponse {
-    #[prost(bool, tag="1")]
-    pub found: bool,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ResourceIdRequest {
-    #[prost(string, tag="1")]
-    pub kbid: ::prost::alloc::string::String,
-    #[prost(string, tag="2")]
-    pub slug: ::prost::alloc::string::String,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ResourceIdResponse {
-    #[prost(string, tag="1")]
-    pub uuid: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SetVectorsRequest {

@@ -24,6 +24,7 @@ from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG
 from nucliadb.ingest.orm.utils import set_basic
+from nucliadb_protos import resources_pb2
 
 pytestmark = pytest.mark.asyncio
 
@@ -67,3 +68,67 @@ async def test_modify_slug(resource_with_slug, maindb_driver: Driver):
         await txn.commit()
 
     await check_slug(maindb_driver, kbid, rid, new_slug)
+
+
+async def test_all_fields(maindb_driver: Driver):
+    kbid = "mykb"
+    rid = "myresource"
+    field = resources_pb2.FieldID(
+        field="myfield", field_type=resources_pb2.FieldType.LINK
+    )
+
+    async with maindb_driver.transaction(read_only=True) as txn:
+        all_fields = await datamanagers.resources.get_all_field_ids(
+            txn, kbid=kbid, rid=rid
+        )
+        assert all_fields is None
+
+        assert (
+            await datamanagers.resources.has_field(
+                txn, kbid=kbid, rid=rid, field_id=field
+            )
+        ) is False
+
+    # set a field for a resource
+
+    async with maindb_driver.transaction() as txn:
+        pb = resources_pb2.AllFieldIDs()
+        pb.fields.append(field)
+        await datamanagers.resources.set_all_field_ids(
+            txn, kbid=kbid, rid=rid, allfields=pb
+        )
+        await txn.commit()
+
+    async with maindb_driver.transaction(read_only=True) as txn:
+        all_fields = await datamanagers.resources.get_all_field_ids(
+            txn, kbid=kbid, rid=rid
+        )
+        assert all_fields is not None
+        assert len(all_fields.fields) == 1
+
+        assert (
+            await datamanagers.resources.has_field(
+                txn, kbid=kbid, rid=rid, field_id=field
+            )
+        ) is True
+
+    # set no fields
+
+    async with maindb_driver.transaction() as txn:
+        await datamanagers.resources.set_all_field_ids(
+            txn, kbid=kbid, rid=rid, allfields=resources_pb2.AllFieldIDs()
+        )
+        await txn.commit()
+
+    async with maindb_driver.transaction(read_only=True) as txn:
+        all_fields = await datamanagers.resources.get_all_field_ids(
+            txn, kbid=kbid, rid=rid
+        )
+        assert all_fields is not None
+        assert len(all_fields.fields) == 0
+
+        assert (
+            await datamanagers.resources.has_field(
+                txn, kbid=kbid, rid=rid, field_id=field
+            )
+        ) is False

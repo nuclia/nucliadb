@@ -21,14 +21,13 @@ from typing import AsyncIterator
 from unittest.mock import AsyncMock
 
 import pytest
-from nucliadb_protos.writer_pb2 import ResourceFieldId
 
 from nucliadb.ingest.processing import ProcessingInfo
+from nucliadb.writer.api.v1.resource import resource_exists
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_PREFIX
 from nucliadb.writer.tests.utils import load_file_as_FileB64_payload
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models.resource import NucliaDBRoles, QueueType
-from nucliadb_utils.utilities import get_ingest
 
 
 @pytest.fixture(scope="function")
@@ -72,13 +71,7 @@ async def file_field(
         assert resp.status_code == 201
         rid = resp.json()["uuid"]
 
-        ingest = get_ingest()
-        pbrequest = ResourceFieldId()
-        pbrequest.kbid = kbid
-        pbrequest.rid = rid
-
-        res = await ingest.ResourceFieldExists(pbrequest)  # type: ignore
-        assert res.found
+        assert (await resource_exists(kbid, rid)) is True
 
     yield kbid, rid, field_id
 

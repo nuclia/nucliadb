@@ -176,6 +176,7 @@ def storage():
 @pytest.fixture(scope="function")
 def kb():
     mock = AsyncMock()
+    mock.kbid = "mock-kbid"
     return mock
 
 

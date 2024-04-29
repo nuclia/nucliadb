@@ -31,13 +31,12 @@ PB_TYPE = TypeVar("PB_TYPE", bound=Message)
 async def get_kv_pb(
     txn: Transaction, key: str, pb_type: Type[PB_TYPE]
 ) -> Optional[PB_TYPE]:
-    kb_shards_bytes: Optional[bytes] = await txn.get(key)
-    if kb_shards_bytes:
-        kb_shards = pb_type()
-        kb_shards.ParseFromString(kb_shards_bytes)
-        return kb_shards
-    else:
+    serialized: Optional[bytes] = await txn.get(key)
+    if serialized is None:
         return None
+    pb = pb_type()
+    pb.ParseFromString(serialized)
+    return pb
 
 
 @contextlib.asynccontextmanager

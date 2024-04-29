@@ -207,7 +207,7 @@ async def knowledgebox_ingest(
     yield kbid
 
     async with maindb_driver.transaction() as txn:
-        await KnowledgeBox.delete_kb(txn, kbslug, kbid)
+        await KnowledgeBox.delete_kb(txn, kbid)
         await txn.commit()
 
 

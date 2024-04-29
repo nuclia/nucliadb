@@ -49,7 +49,7 @@ from nucliadb_protos.resources_pb2 import Origin, Paragraph, QuestionAnswer
 from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
-from nucliadb.common import datamanagers
+from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest import SERVICE_NAME
 from nucliadb.ingest.consumer.auditing import (
     IndexAuditHandler,
@@ -70,7 +70,7 @@ EXAMPLE_VECTOR = base64.b64decode(
 
 @pytest.fixture(autouse=True)
 async def audit_consumers(
-    maindb_driver, storage, pubsub, stream_audit: StreamAuditStorage
+    maindb_driver: Driver, storage, pubsub, stream_audit: StreamAuditStorage
 ):
     index_auditor = IndexAuditHandler(
         driver=maindb_driver,
@@ -205,7 +205,7 @@ async def test_ingest_messages_autocommit(kbid: str, processor):
 
 @pytest.mark.asyncio
 async def test_ingest_error_message(
-    kbid: str, storage: Storage, processor, maindb_driver
+    kbid: str, storage: Storage, processor, maindb_driver: Driver
 ):
     filename = f"{dirname(__file__)}/assets/resource.pb"
     with open(filename, "r") as f:
@@ -356,7 +356,7 @@ async def test_ingest_audit_stream_files_only(
     knowledgebox_ingest,
     stream_processor,
     stream_audit: StreamAuditStorage,
-    maindb_driver,
+    maindb_driver: Driver,
 ):
     from nucliadb_utils.settings import audit_settings
 
@@ -477,25 +477,21 @@ async def test_ingest_audit_stream_files_only(
 
     # Test 5: Delete knowledgebox
 
-    txn = await maindb_driver.begin()
-    kb = await datamanagers.kb.get_config(txn, kbid=knowledgebox_ingest)
+    async with maindb_driver.transaction() as txn:
+        set_utility(Utility.AUDIT, stream_audit)
+        await KnowledgeBox.delete_kb(txn, knowledgebox_ingest)  # type: ignore
 
-    set_utility(Utility.AUDIT, stream_audit)
-    await KnowledgeBox.delete_kb(txn, kb.slug, knowledgebox_ingest)  # type: ignore
+        auditreq = await get_audit_messages(psub)
+        assert auditreq.kbid == knowledgebox_ingest
+        assert auditreq.type == AuditRequest.AuditType.KB_DELETED
 
-    auditreq = await get_audit_messages(psub)
-    assert auditreq.kbid == knowledgebox_ingest
-    assert auditreq.type == AuditRequest.AuditType.KB_DELETED
+        try:
+            int(auditreq.trace_id)
+        except ValueError:
+            assert False, "Invalid trace ID"
 
-    try:
-        int(auditreq.trace_id)
-    except ValueError:
-        assert False, "Invalid trace ID"
-
-    # Currently where not updating audit counters on delete operations
-    assert not auditreq.HasField("kb_counter")
-
-    await txn.abort()
+        # Currently where not updating audit counters on delete operations
+        assert not auditreq.HasField("kb_counter")
 
     await client.drain()
     await client.close()
@@ -671,7 +667,7 @@ async def test_ingest_processor_handles_missing_kb(
 
 @pytest.mark.asyncio
 async def test_ingest_autocommit_deadletter_marks_resource(
-    kbid: str, processor: Processor, storage, maindb_driver
+    kbid: str, processor: Processor, storage, maindb_driver: Driver
 ):
     rid = str(uuid.uuid4())
     message = make_message(kbid, rid)
