@@ -239,7 +239,8 @@ impl NodeWriter for NodeWriterGRPCDriver {
 
         get_metrics().indexing_resource_download_histogram.observe(download_start.elapsed().as_secs_f64());
 
-        let resource = Resource::decode(bytes).map_err(|e| {
+        let handle = tokio::task::spawn_blocking(move || Resource::decode(bytes)).await.unwrap();
+        let resource = handle.map_err(|e| {
             error!("Failed to decode indexing resource: {}", e);
             tonic::Status::internal(format!("Failed to decode indexing resource: {}", e))
         })?;
