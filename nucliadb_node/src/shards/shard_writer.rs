@@ -472,21 +472,6 @@ impl ShardWriter {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn paragraph_count(&self) -> NodeResult<usize> {
-        read_rw_lock(&self.paragraph_writer).count()
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub fn vector_count(&self) -> NodeResult<usize> {
-        read_rw_lock(&self.vector_writer).count()
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub fn text_count(&self) -> NodeResult<usize> {
-        read_rw_lock(&self.text_writer).count()
-    }
-
-    #[tracing::instrument(skip_all)]
     pub fn collect_garbage(&self) -> NodeResult<GarbageCollectorStatus> {
         let _lock = self.gc_lock.blocking_lock();
         let result = write_rw_lock(&self.vector_writer).garbage_collection();
