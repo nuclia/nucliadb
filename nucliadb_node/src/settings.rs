@@ -138,6 +138,7 @@ impl Deref for Settings {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum ObjectStoreType {
     GCS,
     S3,
