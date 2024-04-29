@@ -69,6 +69,8 @@ images.settings["nucliadb_node_writer"] = {
     "image": "europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node",
     "version": "latest",
     "env": {
+        "FILE_BACKEND": "s3",
+        "S3_INDEXING_BUCKET": "indexing",
         "NUCLIADB_DISABLE_ANALYTICS": "True",
         "DATA_PATH": "/data",
         "WRITER_LISTEN_ADDRESS": "0.0.0.0:4446",
@@ -116,14 +118,27 @@ class nucliadbNodeWriter(BaseImage):
     name = "nucliadb_node_writer"
     port = 4446
 
-    def run(self, volume):
+    def run(
+        self,
+        volume,
+        file_backend: str = "unset",
+        file_backend_config: Optional[dict[str, str]] = None,
+    ):
         self._volume = volume
         self._mount = "/data"
+        self._file_backend = file_backend
+        self._file_backend_config = file_backend_config or {}
         return super(nucliadbNodeWriter, self).run()
 
     def get_image_options(self):
         options = super(nucliadbNodeWriter, self).get_image_options()
         options["volumes"] = {self._volume.name: {"bind": "/data"}}
+
+        # Set the file backend and its configuration via environment variables
+        options["environment"]["FILE_BACKEND"] = self._file_backend
+        for key, value in self._file_backend_config.items():
+            options["environment"][key] = value
+
         return options
 
     def check(self):
@@ -142,11 +157,14 @@ nucliadb_node_writer = nucliadbNodeWriter()
 
 
 @pytest.fixture(scope="session")
-def node_single():
+def node_single(s3):
     docker_client = docker.from_env(version=BaseImage.docker_version)
     volume_node = docker_client.volumes.create(driver="local")
-
-    writer1_host, writer1_port = nucliadb_node_writer.run(volume_node)
+    writer1_host, writer1_port = nucliadb_node_writer.run(
+        volume_node,
+        file_backend="s3",
+        file_backend_config={"S3_INDEXING_BUCKET": "indexing", "S3_ENDPOINT": s3},
+    )
     reader1_host, reader1_port = nucliadb_node_reader.run(volume_node)
 
     settings.writer_listen_address = f"{writer1_host}:{writer1_port}"
@@ -172,7 +190,7 @@ def node_single():
     nucliadb_node_writer.stop()
 
     for container_id in container_ids:
-        for i in range(5):
+        for _ in range(5):
             try:
                 docker_client.containers.get(container_id)
             except docker.errors.NotFound:
@@ -273,7 +291,7 @@ async def listeners(writer: Writer):
 @pytest.fixture(scope="function")
 async def worker(
     node_single,
-    gcs_storage,
+    s3_storage,
     nats_manager: NatsConnectionManager,
     writer: Writer,
     writer_stub: NodeWriterStub,

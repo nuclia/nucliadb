@@ -126,7 +126,6 @@ async def test_search_resource_all(
     search_api: Callable[..., AsyncClient], test_search_resource: str
 ) -> None:
     kbid = test_search_resource
-
     async with search_api(roles=[NucliaDBRoles.READER]) as client:
         await asyncio.sleep(1)
         resp = await client.get(

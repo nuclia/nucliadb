@@ -117,15 +117,18 @@ pub fn build_object_store_driver(settings: &EnvSettings) -> Arc<dyn ObjectStore>
                     .unwrap(),
             )
         }
-        ObjectStoreType::S3 => Arc::new(
-            AmazonS3Builder::new()
+        ObjectStoreType::S3 => {
+            let mut builder = AmazonS3Builder::new()
                 .with_access_key_id(settings.s3_client_id.clone())
                 .with_secret_access_key(settings.s3_client_secret.clone())
                 .with_region(settings.s3_region_name.clone())
-                .with_bucket_name(settings.s3_indexing_bucket.clone())
-                .build()
-                .unwrap(),
-        ),
+                .with_bucket_name(settings.s3_indexing_bucket.clone());
+            if settings.s3_endpoint.is_some() {
+                // This is needed for minio compatibility
+                builder = builder.with_endpoint(settings.s3_endpoint.clone().unwrap()).with_allow_http(true);
+            }
+            Arc::new(builder.build().unwrap())
+        }
         ObjectStoreType::UNSET => Arc::new(InMemory::new()),
     }
 }
@@ -217,6 +220,7 @@ pub struct EnvSettings {
     pub s3_client_secret: String,
     pub s3_region_name: String,
     pub s3_indexing_bucket: String,
+    pub s3_endpoint: Option<String>,
 }
 
 impl EnvSettings {
@@ -295,6 +299,7 @@ impl Default for EnvSettings {
             s3_client_secret: Default::default(),
             s3_region_name: Default::default(),
             s3_indexing_bucket: Default::default(),
+            s3_endpoint: None,
         }
     }
 }
