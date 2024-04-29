@@ -105,6 +105,7 @@ impl From<EnvSettings> for Settings {
 }
 
 pub fn build_object_store_driver(settings: &EnvSettings) -> Arc<dyn ObjectStore> {
+    eprintln!("File backend: {:?}", settings.file_backend);
     match settings.file_backend {
         ObjectStoreType::GCS => {
             let service_account_key = STANDARD.decode(&settings.gcs_base64_creds).unwrap();
@@ -137,11 +138,12 @@ impl Deref for Settings {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Default, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum ObjectStoreType {
     GCS,
     S3,
+    #[default]
     UNSET,
 }
 
@@ -207,6 +209,7 @@ pub struct EnvSettings {
     pub max_open_shards: Option<NonZeroUsize>,
 
     // Object store settings coming from nucliadb_shared chart
+    #[serde(default)]
     pub file_backend: ObjectStoreType,
     pub gcs_indexing_bucket: String,
     pub gcs_base64_creds: String,
