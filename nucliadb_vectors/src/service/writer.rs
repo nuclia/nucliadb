@@ -222,11 +222,8 @@ impl VectorWriterService {
         if path.exists() {
             Err(node_error!("Shard does exist".to_string()))
         } else {
-            let Some(similarity) = config.similarity.map(|i| i.into()) else {
-                return Err(node_error!("A similarity must be specified, {:?}", config.similarity));
-            };
             let index_metadata = IndexMetadata {
-                similarity,
+                similarity: config.similarity.into(),
                 channel: config.channel,
                 normalize_vectors: config.normalize_vectors,
             };
@@ -266,7 +263,7 @@ mod tests {
     fn test_new_vector_writer() {
         let dir = TempDir::new().unwrap();
         let vsc = VectorConfig {
-            similarity: Some(VectorSimilarity::Cosine),
+            similarity: VectorSimilarity::Cosine,
             path: dir.path().join("vectors"),
             channel: Channel::EXPERIMENTAL,
             shard_id: "abc".into(),
@@ -333,7 +330,7 @@ mod tests {
     fn test_get_segments() {
         let dir = TempDir::new().unwrap();
         let vsc = VectorConfig {
-            similarity: Some(VectorSimilarity::Cosine),
+            similarity: VectorSimilarity::Cosine,
             path: dir.path().join("vectors"),
             channel: Channel::EXPERIMENTAL,
             shard_id: "abc".into(),

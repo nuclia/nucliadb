@@ -166,7 +166,7 @@ impl ShardWriter {
         let channel = metadata.channel();
 
         let vsc = VectorConfig {
-            similarity: Some(metadata.similarity()),
+            similarity: metadata.similarity(),
             path: path.join(VECTORS_DIR),
             channel,
             shard_id: metadata.id(),

@@ -49,7 +49,7 @@ pub struct MergeContext {
 
 #[derive(Clone)]
 pub struct VectorConfig {
-    pub similarity: Option<VectorSimilarity>,
+    pub similarity: VectorSimilarity,
     pub path: PathBuf,
     pub channel: Channel,
     pub shard_id: String,

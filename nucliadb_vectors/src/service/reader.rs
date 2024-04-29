@@ -199,7 +199,7 @@ mod tests {
     fn test_key_prefix_search() {
         let dir = TempDir::new().unwrap();
         let vsc = VectorConfig {
-            similarity: Some(VectorSimilarity::Cosine),
+            similarity: VectorSimilarity::Cosine,
             path: dir.path().join("vectors"),
             channel: Channel::EXPERIMENTAL,
             shard_id: "abc".into(),
@@ -282,7 +282,7 @@ mod tests {
     fn test_new_vector_reader() {
         let dir = TempDir::new().unwrap();
         let vsc = VectorConfig {
-            similarity: Some(VectorSimilarity::Cosine),
+            similarity: VectorSimilarity::Cosine,
             path: dir.path().join("vectors"),
             channel: Channel::EXPERIMENTAL,
             shard_id: "abc".into(),
@@ -404,7 +404,7 @@ mod tests {
     fn test_vectors_deduplication() {
         let dir = TempDir::new().unwrap();
         let vsc = VectorConfig {
-            similarity: Some(VectorSimilarity::Cosine),
+            similarity: VectorSimilarity::Cosine,
             path: dir.path().join("vectors"),
             channel: Channel::EXPERIMENTAL,
             shard_id: "abc".into(),
