@@ -12,6 +12,8 @@ pub struct PrimaryShardReplicationState {
     pub similarity: ::prost::alloc::string::String,
     #[prost(bool, tag="5")]
     pub normalize_vectors: bool,
+    #[prost(enumeration="super::utils::ReleaseChannel", tag="6")]
+    pub release_channel: i32,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SecondaryShardReplicationState {

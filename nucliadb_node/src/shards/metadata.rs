@@ -71,21 +71,20 @@ impl From<Similarity> for protos::VectorSimilarity {
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug)]
 pub struct ShardMetadataFile {
-    pub kbid: Option<String>,
-    pub similarity: Option<Similarity>,
-    pub id: Option<String>,
-    #[serde(default)]
-    pub channel: Option<Channel>,
-    pub normalize_vectors: Option<bool>,
+    pub kbid: String,
+    pub id: String,
+    pub channel: Channel,
+    pub similarity: Similarity,
+    pub normalize_vectors: bool,
 }
 
 #[derive(Default, Debug)]
 pub struct ShardMetadata {
     shard_path: PathBuf,
     id: String,
-    kbid: Option<String>,
-    similarity: Option<Similarity>,
-    channel: Option<Channel>,
+    kbid: String,
+    similarity: Similarity,
+    channel: Channel,
     normalize_vectors: bool,
     // A generation id is a way to track if a shard has changed.
     // A new id means that something in the shard has changed.
@@ -100,7 +99,6 @@ impl ShardMetadata {
         if !metadata_path.exists() {
             return Err(node_error!("Shard metadata file does not exist"));
         }
-        let requested_shard_id = shard_path.file_name().unwrap().to_str().unwrap().to_string();
 
         let mut reader = BufReader::new(File::open(metadata_path)?);
         let metadata: ShardMetadataFile = serde_json::from_reader(&mut reader)?;
@@ -108,9 +106,9 @@ impl ShardMetadata {
             shard_path,
             kbid: metadata.kbid,
             similarity: metadata.similarity,
-            id: metadata.id.unwrap_or(requested_shard_id),
+            id: metadata.id,
             channel: metadata.channel,
-            normalize_vectors: metadata.normalize_vectors.unwrap_or(false),
+            normalize_vectors: metadata.normalize_vectors,
             generation_id: RwLock::new(None),
         })
     }
@@ -118,15 +116,15 @@ impl ShardMetadata {
     pub fn new(
         shard_path: PathBuf,
         id: String,
-        kbid: Option<String>,
+        kbid: String,
         similarity: Similarity,
-        channel: Option<Channel>,
+        channel: Channel,
         normalize_vectors: bool,
     ) -> ShardMetadata {
         ShardMetadata {
             shard_path,
             kbid,
-            similarity: Some(similarity),
+            similarity,
             id,
             channel,
             normalize_vectors,
@@ -149,9 +147,9 @@ impl ShardMetadata {
             &ShardMetadataFile {
                 kbid: self.kbid.clone(),
                 similarity: self.similarity,
-                id: Some(self.id.clone()),
+                id: self.id.clone(),
                 channel: self.channel,
-                normalize_vectors: Some(self.normalize_vectors),
+                normalize_vectors: self.normalize_vectors,
             },
         )?;
         writer.flush()?;
@@ -167,16 +165,16 @@ impl ShardMetadata {
         self.shard_path.clone()
     }
 
-    pub fn kbid(&self) -> Option<String> {
+    pub fn kbid(&self) -> String {
         self.kbid.clone()
     }
 
     pub fn similarity(&self) -> protos::VectorSimilarity {
-        self.similarity.unwrap_or(Similarity::Cosine).into()
+        self.similarity.into()
     }
 
     pub fn channel(&self) -> Channel {
-        self.channel.unwrap_or_default()
+        self.channel
     }
 
     pub fn normalize_vectors(&self) -> bool {
@@ -276,9 +274,9 @@ mod test {
         let meta = ShardMetadata::new(
             dir.path().to_path_buf(),
             "ID".to_string(),
-            Some("KB".to_string()),
+            "KB".to_string(),
             Similarity::Cosine,
-            Some(Channel::EXPERIMENTAL),
+            Channel::EXPERIMENTAL,
             false,
         );
         meta.serialize_metadata().unwrap();
@@ -318,9 +316,9 @@ mod test {
         let meta = ShardMetadata::new(
             dir.path().to_path_buf(),
             "ID".to_string(),
-            Some("KB".to_string()),
+            "KB".to_string(),
             Similarity::Cosine,
-            Some(Channel::EXPERIMENTAL),
+            Channel::EXPERIMENTAL,
             false,
         );
         let gen_id = meta.get_generation_id();

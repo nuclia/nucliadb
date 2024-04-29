@@ -220,7 +220,7 @@ impl ShardReader {
 
         Ok(Shard {
             metadata: Some(protos::ShardMetadata {
-                kbid: self.metadata.kbid().unwrap_or_default(),
+                kbid: self.metadata.kbid(),
                 release_channel: self.metadata.channel() as i32,
             }),
             shard_id: self.id.clone(),
