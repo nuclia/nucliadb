@@ -145,16 +145,13 @@ pub struct ShardReader {
     paragraph_reader: ParagraphsReaderPointer,
     vector_reader: VectorsReaderPointer,
     relation_reader: RelationsReaderPointer,
-    document_version: i32,
-    paragraph_version: i32,
-    vector_version: i32,
-    relation_version: i32,
+    versions: Versions,
 }
 
 impl ShardReader {
     #[tracing::instrument(skip_all)]
     pub fn text_version(&self) -> DocumentService {
-        match self.document_version {
+        match self.versions.texts{
             0 => DocumentService::DocumentV0,
             1 => DocumentService::DocumentV1,
             2 => DocumentService::DocumentV2,
@@ -164,7 +161,7 @@ impl ShardReader {
 
     #[tracing::instrument(skip_all)]
     pub fn paragraph_version(&self) -> ParagraphService {
-        match self.paragraph_version {
+        match self.versions.paragraphs {
             0 => ParagraphService::ParagraphV0,
             1 => ParagraphService::ParagraphV1,
             2 => ParagraphService::ParagraphV2,
@@ -175,7 +172,7 @@ impl ShardReader {
 
     #[tracing::instrument(skip_all)]
     pub fn vector_version(&self) -> VectorService {
-        match self.vector_version {
+        match self.versions.vectors {
             0 => VectorService::VectorV0,
             1 => VectorService::VectorV1,
             i => panic!("Unknown vector version {i}"),
@@ -184,7 +181,7 @@ impl ShardReader {
 
     #[tracing::instrument(skip_all)]
     pub fn relation_version(&self) -> RelationService {
-        match self.relation_version {
+        match self.versions.relations {
             0 => RelationService::RelationV0,
             1 => RelationService::RelationV1,
             2 => RelationService::RelationV2,
@@ -305,10 +302,7 @@ impl ShardReader {
             paragraph_reader: paragraphs.unwrap(),
             vector_reader: vectors.unwrap(),
             relation_reader: relations.unwrap(),
-            document_version: versions.texts as i32,
-            paragraph_version: versions.paragraphs as i32,
-            vector_version: versions.vectors as i32,
-            relation_version: versions.relations as i32,
+            versions,
         })
     }
 
@@ -348,7 +342,7 @@ impl ShardReader {
         // Prefilter to apply field label filters
         if let Some(filter) = &mut request.filter {
             // nucliadb_paragraphs2 has all the labels and doesn't need a prefilter
-            if !filter.field_labels.is_empty() && suggest_paragraphs && self.paragraph_version != 2 {
+            if !filter.field_labels.is_empty() && suggest_paragraphs && self.versions.paragraphs != 2 {
                 let labels = std::mem::take(&mut filter.field_labels);
                 let operands = labels.into_iter().map(BooleanExpression::Literal).collect();
                 let op = BooleanOperation {
@@ -455,7 +449,7 @@ impl ShardReader {
     #[measure(actor = "shard", metric = "request/search")]
     #[tracing::instrument(skip_all)]
     pub fn search(&self, search_request: SearchRequest) -> NodeResult<SearchResponse> {
-        let query_plan = query_planner::build_query_plan(self.paragraph_version, search_request)?;
+        let query_plan = query_planner::build_query_plan(self.versions.paragraphs, search_request)?;
 
         let search_id = uuid::Uuid::new_v4().to_string();
         let span = tracing::Span::current();
