@@ -69,8 +69,6 @@ images.settings["nucliadb_node_writer"] = {
     "image": "europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node",
     "version": "latest",
     "env": {
-        "FILE_BACKEND": "s3",
-        "S3_INDEXING_BUCKET": "indexing",
         "NUCLIADB_DISABLE_ANALYTICS": "True",
         "DATA_PATH": "/data",
         "WRITER_LISTEN_ADDRESS": "0.0.0.0:4446",
@@ -157,14 +155,10 @@ nucliadb_node_writer = nucliadbNodeWriter()
 
 
 @pytest.fixture(scope="session")
-def node_single(s3):
+def node_single():
     docker_client = docker.from_env(version=BaseImage.docker_version)
     volume_node = docker_client.volumes.create(driver="local")
-    writer1_host, writer1_port = nucliadb_node_writer.run(
-        volume_node,
-        file_backend="s3",
-        file_backend_config={"S3_INDEXING_BUCKET": "indexing", "S3_ENDPOINT": s3},
-    )
+    writer1_host, writer1_port = nucliadb_node_writer.run(volume_node)
     reader1_host, reader1_port = nucliadb_node_reader.run(volume_node)
 
     settings.writer_listen_address = f"{writer1_host}:{writer1_port}"
@@ -291,7 +285,7 @@ async def listeners(writer: Writer):
 @pytest.fixture(scope="function")
 async def worker(
     node_single,
-    s3_storage,
+    gcs_storage,
     nats_manager: NatsConnectionManager,
     writer: Writer,
     writer_stub: NodeWriterStub,

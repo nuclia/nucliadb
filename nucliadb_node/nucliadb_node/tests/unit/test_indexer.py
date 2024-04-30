@@ -225,6 +225,11 @@ class TestPriorityIndexer:
         with patch("nucliadb_node.indexer.get_storage") as mock:
             yield mock
 
+    @pytest.fixture(autouse=True)
+    def from_storage_flag_enabled(self):
+        with patch("nucliadb_node.indexer.has_feature", return_value=True):
+            yield
+
     @pytest.fixture
     def writer(self):
         writer = Mock()

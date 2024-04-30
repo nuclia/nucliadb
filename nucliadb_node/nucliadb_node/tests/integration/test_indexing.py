@@ -197,8 +197,8 @@ class TestConcurrentIndexingFailureRecovery:
             else:
                 await func(*args, **kwargs)
 
-        original_set_resource = worker.writer.set_resource_from_storage
-        worker.writer.set_resource_from_storage = partial(
+        original_set_resource = worker.writer.set_resource
+        worker.writer.set_resource = partial(
             run_or_fail, original_set_resource, fail_ratio
         )
         original_delete_resource = worker.writer.delete_resource
@@ -208,7 +208,7 @@ class TestConcurrentIndexingFailureRecovery:
 
         yield worker
 
-        worker.writer.set_resource_from_storage = original_set_resource
+        worker.writer.set_resource = original_set_resource
         worker.writer.delete_resource = original_delete_resource
 
     @pytest.mark.asyncio
