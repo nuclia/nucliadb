@@ -338,7 +338,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         while crnt_layer != 0 {
             let layer = hnsw.get_layer(crnt_layer);
             let entry_points: Vec<_> = neighbours.into_iter().map(|(node, _)| node).collect();
-            let layer_res = self.layer_search(query, layer, 10, &entry_points);
+            let layer_res = self.layer_search(query, layer, 1, &entry_points);
             neighbours = layer_res;
             crnt_layer -= 1;
         }
