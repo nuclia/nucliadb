@@ -106,18 +106,16 @@ pub struct ShardWriter {
     paragraph_writer: ParagraphsWriterPointer,
     vector_writer: VectorsWriterPointer,
     relation_writer: RelationsWriterPointer,
-    document_service_version: i32,
-    paragraph_service_version: i32,
-    vector_service_version: i32,
-    relation_service_version: i32,
+    versions: Versions,
     pub gc_lock: tokio::sync::Mutex<()>, // lock to be able to do GC or not
     write_lock: Mutex<()>,               // be able to lock writes on the shard
 }
 
+
 impl ShardWriter {
     #[tracing::instrument(skip_all)]
     pub fn document_version(&self) -> DocumentService {
-        match self.document_service_version {
+        match self.versions.texts {
             0 => DocumentService::DocumentV0,
             1 => DocumentService::DocumentV1,
             2 => DocumentService::DocumentV2,
@@ -126,7 +124,7 @@ impl ShardWriter {
     }
     #[tracing::instrument(skip_all)]
     pub fn paragraph_version(&self) -> ParagraphService {
-        match self.paragraph_service_version {
+        match self.versions.paragraphs {
             0 => ParagraphService::ParagraphV0,
             1 => ParagraphService::ParagraphV1,
             2 => ParagraphService::ParagraphV2,
@@ -136,7 +134,7 @@ impl ShardWriter {
     }
     #[tracing::instrument(skip_all)]
     pub fn vector_version(&self) -> VectorService {
-        match self.vector_service_version {
+        match self.versions.vectors {
             0 => VectorService::VectorV0,
             1 => VectorService::VectorV1,
             i => panic!("Unknown vector version {i}"),
@@ -144,7 +142,7 @@ impl ShardWriter {
     }
     #[tracing::instrument(skip_all)]
     pub fn relation_version(&self) -> RelationService {
-        match self.relation_service_version {
+        match self.versions.relations {
             0 => RelationService::RelationV0,
             1 => RelationService::RelationV1,
             2 => RelationService::RelationV2,
@@ -228,10 +226,7 @@ impl ShardWriter {
             paragraph_writer: Arc::new(RwLock::new(paragraphs.unwrap())),
             vector_writer: Arc::new(RwLock::new(vectors.unwrap())),
             relation_writer: Arc::new(RwLock::new(relations.unwrap())),
-            document_service_version: versions.texts as i32,
-            paragraph_service_version: versions.paragraphs as i32,
-            vector_service_version: versions.vectors as i32,
-            relation_service_version: versions.relations as i32,
+            versions,
             gc_lock: tokio::sync::Mutex::new(()),
             write_lock: Mutex::new(()),
         })
@@ -297,10 +292,7 @@ impl ShardWriter {
             paragraph_writer: paragraphs.unwrap(),
             vector_writer: vectors.unwrap(),
             relation_writer: relations.unwrap(),
-            document_service_version: versions.texts as i32,
-            paragraph_service_version: versions.paragraphs as i32,
-            vector_service_version: versions.vectors as i32,
-            relation_service_version: versions.relations as i32,
+            versions,
             gc_lock: tokio::sync::Mutex::new(()),
             write_lock: Mutex::new(()),
         })

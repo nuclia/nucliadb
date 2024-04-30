@@ -27,7 +27,7 @@ pub const PARAGRAPHS_VERSION: u32 = 3;
 pub const RELATIONS_VERSION: u32 = 2;
 pub const TEXTS_VERSION: u32 = 2;
 
-#[derive(Serialize, Deserialize, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub struct Versions {
     #[serde(rename = "version_paragraphs")]
     pub paragraphs: u32,
