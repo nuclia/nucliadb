@@ -32,6 +32,7 @@ use nucliadb_core::{thread, IndexFiles};
 use nucliadb_procs::measure;
 use nucliadb_vectors::VectorErr;
 
+use super::indexes::ShardIndexes;
 use super::metadata::ShardMetadata;
 use super::versioning::{self, Versions};
 use crate::disk_structure::*;
@@ -111,7 +112,6 @@ pub struct ShardWriter {
     write_lock: Mutex<()>,               // be able to lock writes on the shard
 }
 
-
 impl ShardWriter {
     #[tracing::instrument(skip_all)]
     pub fn document_version(&self) -> DocumentService {
@@ -152,30 +152,28 @@ impl ShardWriter {
 
     #[measure(actor = "shard", metric = "new")]
     pub fn new(metadata: Arc<ShardMetadata>) -> NodeResult<ShardWriter> {
-        let path = metadata.shard_path();
+        let shard_path = metadata.shard_path();
+        let indexes = ShardIndexes::new(&shard_path);
+
         let tsc = TextConfig {
-            path: path.join(TEXTS_DIR),
+            path: indexes.texts_path(),
         };
-
         let psc = ParagraphConfig {
-            path: path.join(PARAGRAPHS_DIR),
+            path: indexes.paragraphs_path(),
         };
-
-        let channel = metadata.channel();
-
         let vsc = VectorConfig {
             similarity: metadata.similarity(),
-            path: path.join(VECTORS_DIR),
-            channel,
+            path: indexes.vectors_path(),
+            channel: metadata.channel(),
             shard_id: metadata.id(),
             normalize_vectors: metadata.normalize_vectors(),
         };
         let rsc = RelationConfig {
-            path: path.join(RELATIONS_DIR),
-            channel,
+            path: indexes.relations_path(),
+            channel: metadata.channel(),
         };
 
-        std::fs::create_dir(path)?;
+        std::fs::create_dir(shard_path)?;
 
         let versions = Versions {
             paragraphs: versioning::PARAGRAPHS_VERSION,
@@ -218,6 +216,8 @@ impl ShardWriter {
         let relations = relation_result.transpose()?;
 
         metadata.serialize_metadata()?;
+        indexes.store()?;
+
         Ok(ShardWriter {
             id: metadata.id(),
             path: metadata.shard_path(),
@@ -234,20 +234,23 @@ impl ShardWriter {
 
     #[measure(actor = "shard", metric = "open")]
     pub fn open(metadata: Arc<ShardMetadata>) -> NodeResult<ShardWriter> {
-        let path = metadata.shard_path();
+        let shard_path = metadata.shard_path();
+        let indexes = ShardIndexes::load(&shard_path).unwrap_or_else(|_| ShardIndexes::new(&shard_path));
+
+        // TODO: this call will generate the shard indexes file, as a lazy
+        // migration. When every shard has the file, this line should be
+        // removed
+        indexes.store()?;
+
         let tsc = TextConfig {
-            path: path.join(TEXTS_DIR),
+            path: indexes.texts_path(),
         };
-
         let psc = ParagraphConfig {
-            path: path.join(PARAGRAPHS_DIR),
+            path: indexes.paragraphs_path(),
         };
-
-        let channel = metadata.channel();
-
         let rsc = RelationConfig {
-            path: path.join(RELATIONS_DIR),
-            channel,
+            path: indexes.relations_path(),
+            channel: metadata.channel(),
         };
 
         let versions_path = metadata.shard_path().join(VERSION_FILE);
@@ -255,7 +258,7 @@ impl ShardWriter {
 
         let text_task = || Some(open_texts_writer(versions.texts, &tsc));
         let paragraph_task = || Some(open_paragraphs_writer(versions.paragraphs, &psc));
-        let vector_task = || Some(open_vectors_writer(versions.vectors, &path.join(VECTORS_DIR), metadata.id()));
+        let vector_task = || Some(open_vectors_writer(versions.vectors, &indexes.vectors_path(), metadata.id()));
         let relation_task = || Some(open_relations_writer(versions.relations, &rsc));
 
         let span = tracing::Span::current();

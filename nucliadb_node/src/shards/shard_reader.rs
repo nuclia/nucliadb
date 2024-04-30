@@ -16,6 +16,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use super::indexes::ShardIndexes;
 use super::metadata::ShardMetadata;
 use super::versioning::Versions;
 use crate::disk_structure::*;
@@ -151,7 +152,7 @@ pub struct ShardReader {
 impl ShardReader {
     #[tracing::instrument(skip_all)]
     pub fn text_version(&self) -> DocumentService {
-        match self.versions.texts{
+        match self.versions.texts {
             0 => DocumentService::DocumentV0,
             1 => DocumentService::DocumentV1,
             2 => DocumentService::DocumentV2,
@@ -260,12 +261,13 @@ impl ShardReader {
         let span = tracing::Span::current();
 
         let metadata = ShardMetadata::open(shard_path.to_path_buf())?;
+        let indexes = ShardIndexes::load(shard_path).unwrap_or_else(|_| ShardIndexes::new(shard_path));
 
         let versions = Versions::load(&shard_path.join(VERSION_FILE))?;
-        let text_task = || Some(open_texts_reader(versions.texts, &shard_path.join(TEXTS_DIR)));
-        let paragraph_task = || Some(open_paragraphs_reader(versions.paragraphs, &shard_path.join(PARAGRAPHS_DIR)));
-        let vector_task = || Some(open_vectors_reader(versions.vectors, &shard_path.join(VECTORS_DIR)));
-        let relation_task = || Some(open_relations_reader(versions.relations, &shard_path.join(RELATIONS_DIR)));
+        let text_task = || Some(open_texts_reader(versions.texts, &indexes.texts_path()));
+        let paragraph_task = || Some(open_paragraphs_reader(versions.paragraphs, &indexes.paragraphs_path()));
+        let vector_task = || Some(open_vectors_reader(versions.vectors, &indexes.vectors_path()));
+        let relation_task = || Some(open_relations_reader(versions.relations, &indexes.relations_path()));
 
         let info = info_span!(parent: &span, "text open");
         let text_task = || run_with_telemetry(info, text_task);

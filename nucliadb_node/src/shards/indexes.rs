@@ -17,22 +17,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
-use std::io::{BufReader, BufWriter};
-use std::fs::File;
-use std::path::{Path, PathBuf};
-use nucliadb_core::NodeResult;
-use serde::{Serialize, Deserialize};
-use uuid::Uuid;
 use nucliadb_core::node_error;
+use nucliadb_core::NodeResult;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::{BufReader, BufWriter};
+use std::path::{Path, PathBuf};
+use uuid::Uuid;
 
 use crate::disk_structure;
-
 
 pub const DEFAULT_VECTOR_INDEX_NAME: &str = "__default__";
 pub const SHARD_INDEXES_FILENAME: &str = "indexes.json";
 
-#[cfg_attr(test, derive(Debug))]
+#[derive(Debug)]
 pub struct ShardIndexes {
     inner: ShardIndexesFile,
     shard_path: PathBuf,
@@ -57,18 +56,35 @@ impl ShardIndexes {
         self.inner.store(&self.shard_path)
     }
 
+    // Index path getters
+
+    pub fn texts_path(&self) -> PathBuf {
+        self.shard_path.join(&self.inner.texts)
+    }
+
+    pub fn paragraphs_path(&self) -> PathBuf {
+        self.shard_path.join(&self.inner.paragraphs)
+    }
+
+    pub fn vectors_path(&self) -> PathBuf {
+        self.vectorset_path(DEFAULT_VECTOR_INDEX_NAME).expect("Default vectors index should always be present")
+    }
+
+    pub fn vectorset_path(&self, name: &str) -> Option<PathBuf> {
+        self.inner.vectorsets.get(name).map(|vectorset| self.shard_path.join(vectorset))
+    }
+
+    pub fn relations_path(&self) -> PathBuf {
+        self.shard_path.join(&self.inner.relations)
+    }
+
     // Vectorsets
 
+    #[allow(dead_code)]
     /// Add a new vectorset to the index and returns it's path
     pub fn add_vectorset(&mut self, name: String) -> NodeResult<PathBuf> {
         if name == DEFAULT_VECTOR_INDEX_NAME {
-            return Err(
-                node_error!(
-                    format!(
-                        "Vectorset id {DEFAULT_VECTOR_INDEX_NAME} is reserved for internal use"
-                    )
-                )
-            );
+            return Err(node_error!(format!("Vectorset id {DEFAULT_VECTOR_INDEX_NAME} is reserved for internal use")));
         }
 
         let uuid = format!("vectorset_{}", Uuid::new_v4());
@@ -77,25 +93,19 @@ impl ShardIndexes {
         Ok(path)
     }
 
+    #[allow(dead_code)]
     /// Removes a vectorset from the shard and returns the index path
     pub fn remove_vectorset(&mut self, name: &str) -> NodeResult<Option<PathBuf>> {
         if name == DEFAULT_VECTOR_INDEX_NAME {
-            return Err(
-                node_error!(
-                    format!(
-                        "Vectorset id {DEFAULT_VECTOR_INDEX_NAME} is reserved and can't be removed"
-                    )
-                )
-            );
+            return Err(node_error!(format!(
+                "Vectorset id {DEFAULT_VECTOR_INDEX_NAME} is reserved and can't be removed"
+            )));
         }
         let removed = self.inner.vectorsets.remove(name).map(|vectorset| self.shard_path.join(vectorset));
         Ok(removed)
     }
 
-    pub fn vectorset_path(&self, name: &str) -> Option<PathBuf> {
-        self.inner.vectorsets.get(name).map(|vectorset| self.shard_path.join(vectorset))
-    }
-
+    #[allow(dead_code)]
     pub fn iter_vectorsets(&self) -> impl Iterator<Item = (String, PathBuf)> + '_ {
         self.inner.vectorsets.iter().map(|(name, vectorset)| (name.to_owned(), self.shard_path.join(vectorset)))
     }
@@ -137,7 +147,6 @@ impl Default for ShardIndexesFile {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use itertools::Itertools;
@@ -173,21 +182,27 @@ mod tests {
         assert_eq!(vectorsets[0].0, DEFAULT_VECTOR_INDEX_NAME.to_string());
         assert_eq!(vectorsets[0].1, shard_path.join(disk_structure::VECTORS_DIR));
 
-        assert_eq!(indexes.vectorset_path(DEFAULT_VECTOR_INDEX_NAME), Some(shard_path.join(disk_structure::VECTORS_DIR)));
+        assert_eq!(
+            indexes.vectorset_path(DEFAULT_VECTOR_INDEX_NAME),
+            Some(shard_path.join(disk_structure::VECTORS_DIR))
+        );
 
         // Default vectorset can't be removed
         assert!(indexes.remove_vectorset(DEFAULT_VECTOR_INDEX_NAME).is_err());
-
     }
 
     #[test]
-    fn test_vectorset_path() {
+    fn test_indexes_path() {
         let tempdir = tempfile::tempdir().unwrap();
         let shard_path = tempdir.path();
 
         let mut indexes = ShardIndexes::new(shard_path);
 
         indexes.add_vectorset("gecko".to_string()).unwrap();
+
+        assert_eq!(indexes.texts_path(), shard_path.join(disk_structure::TEXTS_DIR));
+        assert_eq!(indexes.paragraphs_path(), shard_path.join(disk_structure::PARAGRAPHS_DIR));
+        assert_eq!(indexes.relations_path(), shard_path.join(disk_structure::RELATIONS_DIR));
 
         let vectorset_path_prefix = shard_path.join("vectorset_");
         let vectorset_path_prefix = vectorset_path_prefix.to_str().unwrap();
