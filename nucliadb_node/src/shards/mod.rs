@@ -24,6 +24,7 @@ pub mod metadata;
 pub mod shard_reader;
 pub mod shard_writer;
 pub mod versioning;
+mod indexes;
 
 // Alias for more readable imports
 pub use {shard_reader as reader, shard_writer as writer};
