@@ -411,19 +411,19 @@ async def validate_indexed_data(
             )
             await txn.commit()
 
-        # any left overs should be deleted
-        async for resource_id, (
-            shard_id,
-            last_indexed,
-        ) in datamanagers.rollover.iterate_indexed_data(kbid=kbid):
-            if last_indexed == -1:
-                continue
+    # any left overs should be deleted
+    async for resource_id, (
+        shard_id,
+        last_indexed,
+    ) in datamanagers.rollover.iterate_indexed_data(kbid=kbid):
+        if last_indexed == -1:
+            continue
 
-            shard = _get_shard(rolled_over_shards, shard_id)
-            if shard is None:
-                raise UnexpectedRolloverError("Shard not found. This should not happen")
+        shard = _get_shard(rolled_over_shards, shard_id)
+        if shard is None:
+            raise UnexpectedRolloverError("Shard not found. This should not happen")
 
-            await delete_resource_from_shard(app_context, kbid, resource_id, shard)
+        await delete_resource_from_shard(app_context, kbid, resource_id, shard)
 
     _set_rollover_status(rolled_over_shards, RolloverStatus.RESOURCES_VALIDATED)
     async with datamanagers.with_transaction() as txn:
