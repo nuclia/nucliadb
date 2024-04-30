@@ -136,12 +136,10 @@ impl ShardIndexesFile {
 
 impl Default for ShardIndexesFile {
     fn default() -> Self {
-        let mut vectorsets = HashMap::new();
-        vectorsets.insert(DEFAULT_VECTOR_INDEX_NAME.to_string(), disk_structure::VECTORS_DIR.into());
         Self {
             texts: disk_structure::TEXTS_DIR.into(),
             paragraphs: disk_structure::PARAGRAPHS_DIR.into(),
-            vectorsets,
+            vectorsets: HashMap::from([(DEFAULT_VECTOR_INDEX_NAME.to_string(), disk_structure::VECTORS_DIR.into())]),
             relations: disk_structure::RELATIONS_DIR.into(),
         }
     }
