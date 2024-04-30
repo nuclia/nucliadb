@@ -86,6 +86,9 @@ impl ShardIndexes {
         if name == DEFAULT_VECTOR_INDEX_NAME {
             return Err(node_error!(format!("Vectorset id {DEFAULT_VECTOR_INDEX_NAME} is reserved for internal use")));
         }
+        if self.inner.vectorsets.contains_key(&name) {
+            return Err(node_error!(format!("Vectorset id {name} is already in use")));
+        }
 
         let uuid = format!("vectorset_{}", Uuid::new_v4());
         let path = self.shard_path.join(uuid.clone());
@@ -262,5 +265,18 @@ mod tests {
         assert_eq!(vectorsets[0].0, DEFAULT_VECTOR_INDEX_NAME.to_string());
         assert_eq!(vectorsets[1].0, "openai".to_string());
         assert_eq!(vectorsets[1].1, indexes.vectorset_path("openai").unwrap());
+    }
+
+    #[test]
+    fn test_add_vectorset_twice() {
+        let tempdir = tempfile::tempdir().unwrap();
+        let shard_path = tempdir.path();
+
+        let mut indexes = ShardIndexes::new(shard_path);
+
+        // Add two vectorsets more
+
+        assert!(indexes.add_vectorset("gecko".to_string()).is_ok());
+        assert!(indexes.add_vectorset("gecko".to_string()).is_err());
     }
 }
