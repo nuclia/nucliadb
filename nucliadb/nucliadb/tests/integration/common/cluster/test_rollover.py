@@ -17,6 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
+import random
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -102,3 +104,112 @@ async def test_rollover_kb_shards_does_a_clean_cutover(
 
     shards2 = await get_kb_shards(knowledgebox)
     assert shards2.extra == {}
+
+
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_rollover_kb_shards_handles_changes_in_between(
+    app_context,
+    knowledgebox,
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    nucliadb_manager: AsyncClient,
+):
+    count = 50
+    resources = []
+    for i in range(count):
+        resp = await nucliadb_writer.post(
+            f"/kb/{knowledgebox}/resources",
+            json={
+                "slug": f"myresource-{i}",
+                "title": f"My Title {i}",
+                "summary": f"My summary {i}",
+                "icon": "text/plain",
+            },
+        )
+        assert resp.status_code == 201
+        rid = resp.json()["uuid"]
+        resources.append(rid)
+
+    # Shuffle the list so that the deleted and modified resources are random
+    shuffled_resources = resources.copy()
+    random.shuffle(shuffled_resources)
+
+    rollover_finished = asyncio.Event()
+
+    async def the_rollover():
+        try:
+            await rollover.rollover_kb_shards(app_context, knowledgebox)
+        except asyncio.CancelledError:
+            pass
+        rollover_finished.set()
+
+    # Start rollover in a separate asyncio task
+    rollover_task = asyncio.create_task(the_rollover())
+    try:
+        # Delete a couple of resources while the rollover is running
+        deleted_resources = []
+        for i in range(3):
+            rid_to_delete = shuffled_resources.pop(0)
+            deleted_resources.append(rid_to_delete)
+            resp = await nucliadb_writer.delete(
+                f"/kb/{knowledgebox}/resource/{rid_to_delete}"
+            )
+            assert resp.status_code == 204
+
+        # Modify a couple of resources while the rollover is running
+        modified_resources = []
+        for i in range(3):
+            rid_to_modify = shuffled_resources.pop(0)
+            modified_resources.append(rid_to_modify)
+            resp = await nucliadb_writer.patch(
+                f"/kb/{knowledgebox}/resource/{rid_to_modify}",
+                json={
+                    "title": f"Modified Title {i}",
+                },
+            )
+            assert resp.status_code == 200
+    except Exception as ex:
+        print("Exception caught: ", ex)
+        rollover_task.cancel()
+        raise
+    else:
+        assert not rollover_finished.is_set()
+        # Wait for the rollover to finish
+        await rollover_task
+
+    # Check that the expected number of resources are in the new shards
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/find",
+        json={
+            "query": "title",
+            "page_size": 1000,
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == count - len(deleted_resources)
+
+    # Check that after the rollover has finished, the deleted resources are not found in the index
+    for rid in deleted_resources:
+        index = resources.index(rid)
+        resp = await nucliadb_reader.post(
+            f"/kb/{knowledgebox}/find",
+            json={
+                "query": f'"My title {index}"',
+                "fields": ["a/title"],
+            },
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert len(body["resources"]) == 0
+
+    # Modified resources should be updated in the new shards
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/find",
+        json={
+            "query": "Modified",
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == len(modified_resources)
