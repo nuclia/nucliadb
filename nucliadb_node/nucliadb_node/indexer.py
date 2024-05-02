@@ -452,7 +452,6 @@ class PriorityIndexer:
             "rid": rid,
             "storage_key": pb.storage_key,
         }
-
         logger.debug(f"Adding {rid} at {shard_id} otx:{pb.txid}", extra=_extra)
         try:
             with self._handled_grpc_errors():
