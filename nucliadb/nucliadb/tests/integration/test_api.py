@@ -967,3 +967,37 @@ async def test_link_fields_store_xpath(
         xpath = resource.data.links["link"].value.xpath
 
     assert xpath == "my_xpath"
+
+
+@pytest.mark.asyncio
+async def test_pagination_limits(
+    nucliadb_reader: AsyncClient,
+):
+    # Maximum of 200 results per page
+    resp = await nucliadb_reader.post(
+        f"/kb/kbid/find",
+        json={
+            "query": "foo",
+            "features": ["vector"],
+            "page_size": 1000,
+        },
+    )
+    assert resp.status_code == 422
+    data = resp.json()
+    assert (
+        data["detail"][0]["msg"] == "ensure this value is less than or equal to 200.0"
+    )
+
+    # Max scrolling of 2000 vector results
+    resp = await nucliadb_reader.post(
+        f"/kb/kbid/find",
+        json={
+            "query": "foo",
+            "features": ["vector"],
+            "page_number": 30,
+            "page_size": 100,
+        },
+    )
+    assert resp.status_code == 412
+    data = resp.json()
+    assert "Pagination of semantic results limit reached" in data["detail"]
