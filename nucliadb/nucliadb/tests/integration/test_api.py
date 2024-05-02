@@ -1001,3 +1001,15 @@ async def test_pagination_limits(
     assert resp.status_code == 412
     data = resp.json()
     assert "Pagination of semantic results limit reached" in data["detail"]
+
+    # Removing vectors allows to paginate without limits
+    resp = await nucliadb_reader.post(
+        f"/kb/kbid/find",
+        json={
+            "query": "foo",
+            "features": ["paragraph"],
+            "page_number": 30,
+            "page_size": 100,
+        },
+    )
+    assert resp.status_code != 412
