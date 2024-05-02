@@ -63,7 +63,7 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
     },
     const.Features.NODE_SET_RESOURCE_FROM_STORAGE: {
         "rollout": 0,
-        "variants": {"environment": ["local"]},
+        "variants": {"environment": ["none"]},
     },
 }
 

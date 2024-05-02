@@ -104,6 +104,11 @@ class TestIndexerWorkUnit:
 
 class TestConcurrentShardIndexer:
     @pytest.fixture(autouse=True)
+    def from_storage_flag_enabled(self):
+        with patch("nucliadb_node.indexer.has_feature", return_value=True):
+            yield
+
+    @pytest.fixture(autouse=True)
     def storage(self):
         with patch("nucliadb_node.indexer.get_storage"):
             yield
