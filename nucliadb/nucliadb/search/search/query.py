@@ -358,11 +358,11 @@ class QueryParser:
 
         if (
             self.has_vector_search
-            and request.result_per_page > MAX_HNWS_RESULTS_ALLOWED
+            and request.result_per_page > MAX_VECTOR_RESULTS_ALLOWED
         ):
             raise InvalidQueryError(
                 "page_size",
-                f"Pagination of semantic results limit reached: {MAX_HNWS_RESULTS_ALLOWED}. If you want to paginate through all results, please disable the vector search feature.",  # noqa: E501
+                f"Pagination of semantic results limit reached: {MAX_VECTOR_RESULTS_ALLOWED}. If you want to paginate through all results, please disable the vector search feature.",  # noqa: E501
             )
 
     async def parse_min_score(self, request: nodereader_pb2.SearchRequest) -> None:
