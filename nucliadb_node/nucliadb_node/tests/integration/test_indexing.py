@@ -195,7 +195,7 @@ class TestConcurrentIndexingFailureRecovery:
             if work_done_count % round(1 / fail_ratio) == 0:
                 raise Exception("Intended exception to test failure recovery")
             else:
-                await func(*args, **kwargs)
+                return await func(*args, **kwargs)
 
         original_set_resource = worker.writer.set_resource
         worker.writer.set_resource = partial(
