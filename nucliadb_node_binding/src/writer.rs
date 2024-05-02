@@ -178,6 +178,10 @@ impl NodeWriter {
         }
     }
 
+    pub fn set_resource_from_storage<'p>(&mut self, _index_message: RawProtos, _py: Python<'p>) -> PyResult<&'p PyAny> {
+        Err(IndexNodeException::new_err("Not implemented"))
+    }
+
     pub fn remove_resource<'p>(&mut self, resource: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         let resource = ResourceId::decode(&mut Cursor::new(resource)).expect("Error decoding arguments");
         let shard_id = resource.shard_id.clone();

@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use prometheus_client::encoding;
+use prometheus_client::metrics::histogram::Histogram;
 use prometheus_client::registry::Registry;
 
 use crate::metrics::metric::grpc_ops::{GrpcOpKey, GrpcOpMetric, GrpcOpValue};
@@ -28,6 +29,8 @@ use crate::metrics::metric::{grpc_ops, replication, request_time, shard_cache, v
 use crate::metrics::task_monitor::{Monitor, TaskId};
 use crate::tracing::{debug, error};
 use crate::NodeResult;
+
+const TIME_BUCKETS: [f64; 12] = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 2.5, 5.0, 10.0, 30.0, 60.0];
 
 pub struct PrometheusMeter {
     registry: Registry,
@@ -40,6 +43,7 @@ pub struct PrometheusMeter {
     open_shards_metric: shard_cache::OpenShardsMetric,
     evicted_shards_metric: shard_cache::EvictedShardsMetric,
 
+    pub indexing_resource_download_histogram: Histogram,
     pub vectors_metrics: vectors::VectorsMetrics,
 }
 
@@ -108,6 +112,13 @@ impl PrometheusMeter {
         let tokio_tasks_observer = TokioTasksObserver::new(prefixed_subregistry);
         let tokio_runtime_observer = TokioRuntimeObserver::new(prefixed_subregistry);
 
+        let indexing_resource_download_histogram = Histogram::new(TIME_BUCKETS.iter().copied());
+        prefixed_subregistry.register(
+            "indexing_resource_download_seconds",
+            "Time to download indexing resources from object storage",
+            indexing_resource_download_histogram.clone(),
+        );
+
         Self {
             registry,
             request_time_metric,
@@ -119,6 +130,7 @@ impl PrometheusMeter {
             open_shards_metric,
             evicted_shards_metric,
             vectors_metrics,
+            indexing_resource_download_histogram,
         }
     }
 }

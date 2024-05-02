@@ -25,7 +25,7 @@ if [ -f /etc/redhat-release ]; then
     $SUDO dnf install -y gcc gcc-c++ python3-devel make zlib-devel \
       ncurses-devel nss-devel openssl-devel \
       readline-devel libffi-devel sqlite-devel wget \
-      bzip2-devel xz-devel tk-devel
+      bzip2-devel xz-devel tk-devel dnf install
 fi
 
 # Check if /etc/debian_version exists (Debian/Ubuntu)

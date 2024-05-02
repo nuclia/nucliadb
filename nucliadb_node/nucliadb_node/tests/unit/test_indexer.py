@@ -104,6 +104,11 @@ class TestIndexerWorkUnit:
 
 class TestConcurrentShardIndexer:
     @pytest.fixture(autouse=True)
+    def from_storage_flag_enabled(self):
+        with patch("nucliadb_node.indexer.has_feature", return_value=True):
+            yield
+
+    @pytest.fixture(autouse=True)
     def storage(self):
         with patch("nucliadb_node.indexer.get_storage"):
             yield
@@ -120,7 +125,7 @@ class TestConcurrentShardIndexer:
         status = OpStatus()
         status.status = OpStatus.Status.OK
         status.detail = "Successful"
-        writer.set_resource = AsyncMock(return_value=status)
+        writer.set_resource_from_storage = AsyncMock(return_value=status)
         writer.delete_resource = AsyncMock(return_value=status)
         yield writer
 
@@ -225,12 +230,17 @@ class TestPriorityIndexer:
         with patch("nucliadb_node.indexer.get_storage") as mock:
             yield mock
 
+    @pytest.fixture(autouse=True)
+    def from_storage_flag_enabled(self):
+        with patch("nucliadb_node.indexer.has_feature", return_value=True):
+            yield
+
     @pytest.fixture
     def writer(self):
         writer = Mock()
         status = OpStatus()
         status.status = OpStatus.Status.OK
-        writer.set_resource = AsyncMock(return_value=status)
+        writer.set_resource_from_storage = AsyncMock(return_value=status)
         writer.delete_resource = AsyncMock(return_value=status)
         yield writer
 
@@ -270,7 +280,7 @@ class TestPriorityIndexer:
         await indexer.work_until_finish()
 
         assert indexer.work_queue.qsize() == 0
-        assert writer.set_resource.await_count == total
+        assert writer.set_resource_from_storage.await_count == total
         assert successful_indexing.dispatch.await_count == total
 
     @pytest.mark.asyncio
@@ -281,7 +291,7 @@ class TestPriorityIndexer:
         work.seqid = 10
         await indexer._do_work(work)
 
-        assert writer.set_resource.await_count == 1  # type: ignore
+        assert writer.set_resource_from_storage.await_count == 1  # type: ignore
         assert successful_indexing.dispatch.await_count == 1
         assert successful_indexing.dispatch.await_args.args[0].seqid == 10
 
@@ -293,7 +303,7 @@ class TestPriorityIndexer:
         status.status = OpStatus.Status.ERROR
         status.detail = "node writer error"
 
-        writer.set_resource.return_value = status
+        writer.set_resource_from_storage.return_value = status
         with pytest.raises(IndexNodeError):
             pb = IndexMessage()
             pb.typemessage = TypeMessage.CREATION
@@ -313,7 +323,7 @@ class TestPriorityIndexer:
         status.status = OpStatus.Status.ERROR
         status.detail = 'status: NotFound, message: "Shard not found: Shard'
 
-        writer.set_resource.return_value = status
+        writer.set_resource_from_storage.return_value = status
         pb = IndexMessage()
         pb.typemessage = TypeMessage.CREATION
         await indexer._index_message(pb)
@@ -322,7 +332,7 @@ class TestPriorityIndexer:
     async def test_node_writer_aio_rpc_errors_are_handled(
         self, indexer: PriorityIndexer, writer: AsyncMock
     ):
-        writer.set_resource.side_effect = AioRpcError(
+        writer.set_resource_from_storage.side_effect = AioRpcError(
             code=StatusCode.UNKNOWN,
             initial_metadata=None,  # type: ignore
             trailing_metadata=None,  # type: ignore
