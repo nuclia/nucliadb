@@ -51,7 +51,7 @@ $SUDO make install
 $SUDO /opt/python/Python-$PYTHON_VERSION/python -m venv $INSTALL_DIR
 cd $INSTALL_DIR
 $SUDO $INSTALL_DIR/bin/python -m pip install --upgrade pip
-$SUDO $INSTALL_DIR/bin/pip install -r requirements.lock.txt
+$SUDO $INSTALL_DIR/bin/pip install -r https://raw.githubusercontent.com/nuclia/nucliadb/main/nucliadb/requirements.lock.txt
 $SUDO $INSTALL_DIR/bin/pip install nucliadb
 
 $SUDO ln -s $INSTALL_DIR/bin/nucliadb /bin/nucliadb
