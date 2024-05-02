@@ -7,6 +7,7 @@ import collections.abc
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.message
+import nucliadb_protos.utils_pb2
 import sys
 
 if sys.version_info >= (3, 8):
@@ -48,6 +49,7 @@ class PrimaryShardReplicationState(google.protobuf.message.Message):
     KBID_FIELD_NUMBER: builtins.int
     SIMILARITY_FIELD_NUMBER: builtins.int
     NORMALIZE_VECTORS_FIELD_NUMBER: builtins.int
+    RELEASE_CHANNEL_FIELD_NUMBER: builtins.int
     shard_id: builtins.str
     generation_id: builtins.str
     """ID to identify the generation of the shard to know
@@ -56,6 +58,7 @@ class PrimaryShardReplicationState(google.protobuf.message.Message):
     kbid: builtins.str
     similarity: builtins.str
     normalize_vectors: builtins.bool
+    release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType
     def __init__(
         self,
         *,
@@ -64,8 +67,9 @@ class PrimaryShardReplicationState(google.protobuf.message.Message):
         kbid: builtins.str = ...,
         similarity: builtins.str = ...,
         normalize_vectors: builtins.bool = ...,
+        release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["generation_id", b"generation_id", "kbid", b"kbid", "normalize_vectors", b"normalize_vectors", "shard_id", b"shard_id", "similarity", b"similarity"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["generation_id", b"generation_id", "kbid", b"kbid", "normalize_vectors", b"normalize_vectors", "release_channel", b"release_channel", "shard_id", b"shard_id", "similarity", b"similarity"]) -> None: ...
 
 global___PrimaryShardReplicationState = PrimaryShardReplicationState
 

@@ -332,7 +332,7 @@ class TestWriterServicer:
 
         resp = await writer.DeleteKnowledgeBox(request)
 
-        writer.proc.delete_kb.assert_called_once_with(request.uuid, request.slug)
+        writer.proc.delete_kb.assert_called_once_with(request.uuid)
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
 
     async def test_DeleteKnowledgeBox_handle_error(self, writer: WriterServicer):

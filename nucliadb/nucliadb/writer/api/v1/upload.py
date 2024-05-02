@@ -31,27 +31,20 @@ from fastapi.params import Header
 from fastapi.requests import Request
 from fastapi.responses import Response
 from fastapi_versioning import version  # type: ignore
-from grpc import StatusCode as GrpcStatusCode
-from grpc.aio import AioRpcError
 from nucliadb_protos.resources_pb2 import FieldFile, Metadata
-from nucliadb_protos.writer_pb2 import (
-    BrokerMessage,
-    ResourceFieldExistsResponse,
-    ResourceFieldId,
-)
+from nucliadb_protos.writer_pb2 import BrokerMessage
 from starlette.requests import Request as StarletteRequest
 
 from nucliadb.ingest.orm.utils import set_title
 from nucliadb.ingest.processing import PushPayload, Source
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.writer import SERVICE_NAME
-from nucliadb.writer.api.v1.resource import get_rid_from_params_or_raise_error
-from nucliadb.writer.back_pressure import maybe_back_pressure
-from nucliadb.writer.exceptions import (
-    ConflictError,
-    IngestNotAvailable,
-    ResourceNotFound,
+from nucliadb.writer.api.v1.resource import (
+    get_rid_from_slug_or_raise_error,
+    resource_exists,
+    validate_rid_exists_or_raise_error,
 )
+from nucliadb.writer.back_pressure import maybe_back_pressure
 from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.basic import parse_basic
 from nucliadb.writer.resource.field import parse_fields
@@ -62,7 +55,6 @@ from nucliadb.writer.tus.exceptions import (
     HTTPConflict,
     HTTPNotFound,
     HTTPPreconditionFailed,
-    HTTPServiceUnavailable,
     InvalidTUSMetadata,
     ResumableURINotAvailable,
 )
@@ -77,7 +69,6 @@ from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.storages.storage import KB_RESOURCE_FIELD
 from nucliadb_utils.transaction import TransactionCommitTimeoutError
 from nucliadb_utils.utilities import (
-    get_ingest,
     get_partitioning,
     get_storage,
     get_transaction_utility,
@@ -152,7 +143,8 @@ async def tus_post_rslug_prefix(
     field: FieldIdString,
     item: Optional[CreateResourcePayload] = None,
 ) -> Response:
-    return await _tus_post(request, kbid, item=item, rslug=rslug, field=field)
+    rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
+    return await _tus_post(request, kbid, item, path_rid=rid, field_id=field)
 
 
 @api.post(
@@ -170,7 +162,7 @@ async def tus_post_rid_prefix(
     field: FieldIdString,
     item: Optional[CreateResourcePayload] = None,
 ) -> Response:
-    return await _tus_post(request, kbid, item=item, path_rid=path_rid, field=field)
+    return await _tus_post(request, kbid, item, path_rid=path_rid, field_id=field)
 
 
 @api.post(
@@ -186,7 +178,7 @@ async def tus_post(
     kbid: str,
     item: Optional[CreateResourcePayload] = None,
 ) -> Response:
-    return await _tus_post(request, kbid, item=item)
+    return await _tus_post(request, kbid, item)
 
 
 # called by one the three POST above - there are defined distinctly to produce clean API doc
@@ -195,22 +187,21 @@ async def _tus_post(
     kbid: str,
     item: Optional[CreateResourcePayload] = None,
     path_rid: Optional[str] = None,
-    rslug: Optional[str] = None,
-    field: Optional[str] = None,
+    field_id: Optional[str] = None,
 ) -> Response:
     """
     An empty POST request is used to create a new upload resource.
     The Upload-Length header indicates the size of the entire upload in bytes.
     """
+    if path_rid is not None:
+        await validate_rid_exists_or_raise_error(kbid, path_rid)
+
+    await maybe_back_pressure(request, kbid, resource_uuid=path_rid)
+
     dm = get_dm()
     storage_manager = get_storage_manager()
 
-    if rslug is not None:
-        path_rid = await get_rid_from_params_or_raise_error(kbid, slug=rslug)
-
     implies_resource_creation = path_rid is None
-
-    await maybe_back_pressure(request, kbid, resource_uuid=path_rid)
 
     deferred_length = False
     if request.headers.get("upload-defer-length") == "1":
@@ -236,16 +227,9 @@ async def _tus_post(
     else:
         metadata = {}
 
-    try:
-        path, rid, field = await start_upload_field(
-            kbid, path_rid, field, metadata.get("md5")
-        )
-    except ResourceNotFound:
-        raise HTTPNotFound("Resource is not found or not yet available")
-    except ConflictError:
-        raise HTTPConflict("A resource with the same uploaded file already exists")
-    except IngestNotAvailable:
-        raise HTTPServiceUnavailable("Upload not available right now, try again")
+    path, rid, field = await validate_field_upload(
+        kbid, path_rid, field_id, metadata.get("md5")
+    )
 
     if implies_resource_creation:
         # When uploading a file to a new kb resource, we want to allow multiple
@@ -407,7 +391,8 @@ async def tus_patch_rslug_prefix(
     field: FieldIdString,
     upload_id: str,
 ) -> Response:
-    return await tus_patch(request, kbid, upload_id, rslug=rslug, field=field)
+    rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
+    return await tus_patch(request, kbid, upload_id, rid=rid, field=field)
 
 
 @api.patch(
@@ -451,7 +436,6 @@ async def tus_patch(
     kbid: str,
     upload_id: str,
     rid: Optional[str] = None,
-    rslug: Optional[str] = None,
     field: Optional[str] = None,
 ):
     try:
@@ -460,7 +444,6 @@ async def tus_patch(
             kbid,
             upload_id,
             rid=rid,
-            rslug=rslug,
             field=field,
         )
     except ResumableURINotAvailable:
@@ -476,14 +459,13 @@ async def _tus_patch(
     kbid: str,
     upload_id: str,
     rid: Optional[str] = None,
-    rslug: Optional[str] = None,
     field: Optional[str] = None,
 ) -> Response:
     """
     Upload all bytes in the requests and append them in the specifyied offset
     """
-    if rslug is not None:
-        rid = await get_rid_from_params_or_raise_error(kbid, slug=rslug)
+    if rid is not None:
+        await validate_rid_exists_or_raise_error(kbid, rid)
 
     dm = get_dm()
     await dm.load(upload_id)
@@ -615,10 +597,11 @@ async def upload_rslug_prefix(
     x_language: Optional[list[str]] = Header(None),  # type: ignore
     x_md5: Optional[list[str]] = Header(None),  # type: ignore
 ) -> ResourceFileUploaded:
+    rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
     return await _upload(
         request,
         kbid,
-        rslug=rslug,
+        path_rid=rid,
         field=field,
         x_filename=x_filename,
         x_password=x_password,
@@ -690,29 +673,21 @@ async def _upload(
     request: StarletteRequest,
     kbid: str,
     path_rid: Optional[str] = None,
-    rslug: Optional[str] = None,
     field: Optional[str] = None,
     x_filename: Optional[list[str]] = Header(None),  # type: ignore
     x_password: Optional[list[str]] = Header(None),  # type: ignore
     x_language: Optional[list[str]] = Header(None),  # type: ignore
     x_md5: Optional[list[str]] = Header(None),  # type: ignore
 ) -> ResourceFileUploaded:
-    if rslug is not None:
-        path_rid = await get_rid_from_params_or_raise_error(kbid, slug=rslug)
+    if path_rid is not None:
+        await validate_rid_exists_or_raise_error(kbid, path_rid)
 
     await maybe_back_pressure(request, kbid, resource_uuid=path_rid)
 
     md5_user = x_md5[0] if x_md5 is not None and len(x_md5) > 0 else None
-    try:
-        path, rid, valid_field = await start_upload_field(
-            kbid, path_rid, field, md5_user
-        )
-    except ResourceNotFound:
-        raise HTTPNotFound("Resource is not found or not yet available")
-    except ConflictError:
-        raise HTTPConflict("A resource with the same uploaded file already exists")
-    except IngestNotAvailable:
-        raise HTTPServiceUnavailable("Upload not available right now, try again")
+    path, rid, valid_field = await validate_field_upload(
+        kbid, path_rid, field, md5_user
+    )
     dm = get_dm()
     storage_manager = get_storage_manager()
 
@@ -799,43 +774,39 @@ async def _upload(
     return ResourceFileUploaded(seqid=seqid, uuid=rid, field_id=valid_field)
 
 
-async def start_upload_field(
+async def validate_field_upload(
     kbid: str,
     rid: Optional[str] = None,
     field: Optional[str] = None,
     md5: Optional[str] = None,
 ):
-    ingest = get_ingest()
-    pbrequest = ResourceFieldId()
-    pbrequest.kbid = kbid
-    if rid is not None:
-        pbrequest.rid = rid
+    """Validate field upload and return blob storage path, rid and field id.
 
-    elif rid is None and md5 is not None:
-        pbrequest.rid = md5
+    This function assumes KB exists
+    """
 
-    try:
-        response: ResourceFieldExistsResponse = await ingest.ResourceFieldExists(pbrequest)  # type: ignore
-    except AioRpcError as exc:
-        if exc.code() is GrpcStatusCode.UNAVAILABLE:
-            raise IngestNotAvailable()
+    if rid is None:
+        # we are going to create a new resource and a field
+        if md5 is not None:
+            exists = await resource_exists(kbid, md5)
+            if exists:
+                raise HTTPConflict(
+                    "A resource with the same uploaded file already exists"
+                )
+            rid = md5
         else:
-            raise exc
+            rid = uuid.uuid4().hex
+    else:
+        # we're adding a field to a resource
+        exists = await resource_exists(kbid, rid)
+        if not exists:
+            raise HTTPNotFound("Resource is not found or not yet available")
 
-    if response.found is False and rid is not None:
-        raise ResourceNotFound()
-    elif response.found is True and rid is None and md5 is not None:
-        raise ConflictError()
-
-    if rid is None and md5 is None:
-        rid = uuid.uuid4().hex
-    elif rid is None:
-        rid = md5
-
-    if field is None and md5 is None:
-        field = uuid.uuid4().hex
-    elif field is None:
-        field = md5
+    if field is None:
+        if md5 is None:
+            field = uuid.uuid4().hex
+        else:
+            field = md5
 
     path = KB_RESOURCE_FIELD.format(kbid=kbid, uuid=rid, field=field)
     return path, rid, field

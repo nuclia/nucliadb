@@ -55,36 +55,36 @@ const MAX_SUGGEST_COMPOUND_WORDS: usize = 3;
 const MIN_VIABLE_PREFIX_SUGGEST: usize = 1;
 const CHUNK_SIZE: usize = 65535;
 
-fn open_vectors_reader(version: u32, config: &VectorConfig) -> NodeResult<VectorsReaderPointer> {
+fn open_vectors_reader(version: u32, path: &Path) -> NodeResult<VectorsReaderPointer> {
     match version {
-        1 => nucliadb_vectors::service::VectorReaderService::open(config)
+        1 => nucliadb_vectors::service::VectorReaderService::open(path)
             .map(|i| Arc::new(RwLock::new(i)) as VectorsReaderPointer),
-        2 => nucliadb_vectors::service::VectorReaderService::open(config)
+        2 => nucliadb_vectors::service::VectorReaderService::open(path)
             .map(|i| Arc::new(RwLock::new(i)) as VectorsReaderPointer),
         v => Err(node_error!("Invalid vectors version {v}")),
     }
 }
-fn open_paragraphs_reader(version: u32, config: &ParagraphConfig) -> NodeResult<ParagraphsReaderPointer> {
+fn open_paragraphs_reader(version: u32, path: &Path) -> NodeResult<ParagraphsReaderPointer> {
     match version {
-        2 => nucliadb_paragraphs2::reader::ParagraphReaderService::open(config)
+        2 => nucliadb_paragraphs2::reader::ParagraphReaderService::open(path)
             .map(|i| Arc::new(RwLock::new(i)) as ParagraphsReaderPointer),
-        3 => nucliadb_paragraphs3::reader::ParagraphReaderService::open(config)
+        3 => nucliadb_paragraphs3::reader::ParagraphReaderService::open(path)
             .map(|i| Arc::new(RwLock::new(i)) as ParagraphsReaderPointer),
         v => Err(node_error!("Invalid paragraphs version {v}")),
     }
 }
 
-fn open_texts_reader(version: u32, config: &TextConfig) -> NodeResult<TextsReaderPointer> {
+fn open_texts_reader(version: u32, path: &Path) -> NodeResult<TextsReaderPointer> {
     match version {
-        2 => nucliadb_texts2::reader::TextReaderService::open(config)
+        2 => nucliadb_texts2::reader::TextReaderService::open(path)
             .map(|i| Arc::new(RwLock::new(i)) as TextsReaderPointer),
         v => Err(node_error!("Invalid text reader version {v}")),
     }
 }
 
-fn open_relations_reader(version: u32, config: &RelationConfig) -> NodeResult<RelationsReaderPointer> {
+fn open_relations_reader(version: u32, path: &Path) -> NodeResult<RelationsReaderPointer> {
     match version {
-        2 => nucliadb_relations2::reader::RelationsReaderService::open(config)
+        2 => nucliadb_relations2::reader::RelationsReaderService::open(path)
             .map(|i| Arc::new(RwLock::new(i)) as RelationsReaderPointer),
         v => Err(node_error!("Invalid relations version {v}")),
     }
@@ -220,7 +220,7 @@ impl ShardReader {
 
         Ok(Shard {
             metadata: Some(protos::ShardMetadata {
-                kbid: self.metadata.kbid().unwrap_or_default(),
+                kbid: self.metadata.kbid(),
                 release_channel: self.metadata.channel() as i32,
             }),
             shard_id: self.id.clone(),
@@ -263,32 +263,12 @@ impl ShardReader {
         let span = tracing::Span::current();
 
         let metadata = ShardMetadata::open(shard_path.to_path_buf())?;
-        let tsc = TextConfig {
-            path: shard_path.join(TEXTS_DIR),
-        };
 
-        let psc: ParagraphConfig = ParagraphConfig {
-            path: shard_path.join(PARAGRAPHS_DIR),
-        };
-
-        let channel = metadata.channel();
-
-        let vsc = VectorConfig {
-            similarity: None,
-            path: shard_path.join(VECTORS_DIR),
-            channel,
-            shard_id: id.clone(),
-            normalize_vectors: metadata.normalize_vectors(),
-        };
-        let rsc = RelationConfig {
-            path: shard_path.join(RELATIONS_DIR),
-            channel,
-        };
         let versions = Versions::load(&shard_path.join(VERSION_FILE))?;
-        let text_task = || Some(open_texts_reader(versions.texts, &tsc));
-        let paragraph_task = || Some(open_paragraphs_reader(versions.paragraphs, &psc));
-        let vector_task = || Some(open_vectors_reader(versions.vectors, &vsc));
-        let relation_task = || Some(open_relations_reader(versions.relations, &rsc));
+        let text_task = || Some(open_texts_reader(versions.texts, &shard_path.join(TEXTS_DIR)));
+        let paragraph_task = || Some(open_paragraphs_reader(versions.paragraphs, &shard_path.join(PARAGRAPHS_DIR)));
+        let vector_task = || Some(open_vectors_reader(versions.vectors, &shard_path.join(VECTORS_DIR)));
+        let relation_task = || Some(open_relations_reader(versions.relations, &shard_path.join(RELATIONS_DIR)));
 
         let info = info_span!(parent: &span, "text open");
         let text_task = || run_with_telemetry(info, text_task);

@@ -1646,30 +1646,6 @@ class Shards(google.protobuf.message.Message):
 global___Shards = Shards
 
 @typing_extensions.final
-class ResourceFieldId(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    KBID_FIELD_NUMBER: builtins.int
-    RID_FIELD_NUMBER: builtins.int
-    FIELD_TYPE_FIELD_NUMBER: builtins.int
-    FIELD_FIELD_NUMBER: builtins.int
-    kbid: builtins.str
-    rid: builtins.str
-    field_type: nucliadb_protos.resources_pb2.FieldType.ValueType
-    field: builtins.str
-    def __init__(
-        self,
-        *,
-        kbid: builtins.str = ...,
-        rid: builtins.str = ...,
-        field_type: nucliadb_protos.resources_pb2.FieldType.ValueType = ...,
-        field: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["field", b"field", "field_type", b"field_type", "kbid", b"kbid", "rid", b"rid"]) -> None: ...
-
-global___ResourceFieldId = ResourceFieldId
-
-@typing_extensions.final
 class IndexResource(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1699,54 +1675,6 @@ class IndexStatus(google.protobuf.message.Message):
     ) -> None: ...
 
 global___IndexStatus = IndexStatus
-
-@typing_extensions.final
-class ResourceFieldExistsResponse(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    FOUND_FIELD_NUMBER: builtins.int
-    found: builtins.bool
-    def __init__(
-        self,
-        *,
-        found: builtins.bool = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["found", b"found"]) -> None: ...
-
-global___ResourceFieldExistsResponse = ResourceFieldExistsResponse
-
-@typing_extensions.final
-class ResourceIdRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    KBID_FIELD_NUMBER: builtins.int
-    SLUG_FIELD_NUMBER: builtins.int
-    kbid: builtins.str
-    slug: builtins.str
-    def __init__(
-        self,
-        *,
-        kbid: builtins.str = ...,
-        slug: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["kbid", b"kbid", "slug", b"slug"]) -> None: ...
-
-global___ResourceIdRequest = ResourceIdRequest
-
-@typing_extensions.final
-class ResourceIdResponse(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    UUID_FIELD_NUMBER: builtins.int
-    uuid: builtins.str
-    def __init__(
-        self,
-        *,
-        uuid: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["uuid", b"uuid"]) -> None: ...
-
-global___ResourceIdResponse = ResourceIdResponse
 
 @typing_extensions.final
 class SetVectorsRequest(google.protobuf.message.Message):

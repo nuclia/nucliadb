@@ -13,6 +13,7 @@ message PrimaryShardReplicationState {
     string kbid = 3;
     string similarity = 4;
     bool normalize_vectors = 5;
+    utils.ReleaseChannel release_channel = 6;
 }
 
 message SecondaryShardReplicationState {

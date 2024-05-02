@@ -434,13 +434,6 @@ message Shards {
     map<string, string> extra = 7;
 }
 
-message ResourceFieldId {
-    string kbid = 1;
-    string rid = 2;
-    resources.FieldType field_type = 3;
-    string field = 4;
-}
-
 message IndexResource {
     string kbid = 1;
     string rid = 2;
@@ -449,19 +442,6 @@ message IndexResource {
 
 message IndexStatus {
 
-}
-
-message ResourceFieldExistsResponse {
-    bool found = 1;
-}
-
-message ResourceIdRequest {
-    string kbid = 1;
-    string slug = 2;
-}
-
-message ResourceIdResponse {
-    string uuid = 1;
 }
 
 message SetVectorsRequest {
@@ -525,10 +505,6 @@ service Writer {
     rpc UpdateKnowledgeBox(knowledgebox.KnowledgeBoxUpdate) returns (knowledgebox.UpdateKnowledgeBoxResponse) {}
     rpc GCKnowledgeBox(knowledgebox.KnowledgeBoxID) returns (knowledgebox.GCKnowledgeBoxResponse) {}
     rpc SetVectors(SetVectorsRequest) returns (SetVectorsResponse) {}
-
-    rpc ResourceFieldExists(ResourceFieldId) returns (ResourceFieldExistsResponse) {}
-
-    rpc GetResourceId(ResourceIdRequest) returns (ResourceIdResponse) {}
 
     rpc ProcessMessage(stream BrokerMessage) returns (OpStatusWriter) {}
 

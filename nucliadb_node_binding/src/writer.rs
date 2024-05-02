@@ -100,9 +100,9 @@ impl NodeWriter {
         let metadata = ShardMetadata::new(
             self.shards_path.join(shard_id.clone()),
             shard_id,
-            Some(request.kbid),
+            request.kbid,
             similarity.into(),
-            Some(Channel::from(request.release_channel)),
+            Channel::from(request.release_channel),
             request.normalize_vectors,
         );
         let new_shard = self.shards.create(metadata);

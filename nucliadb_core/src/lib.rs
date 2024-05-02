@@ -51,6 +51,7 @@ use std::collections::HashMap;
 use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 pub use anyhow::{anyhow as node_error, Context, Error};
+use nucliadb_protos::utils::ReleaseChannel;
 use serde::{Deserialize, Serialize};
 
 use crate::tantivy_replica::TantivyReplicaState;
@@ -68,6 +69,15 @@ impl From<i32> for Channel {
         match value {
             1 => Channel::EXPERIMENTAL,
             _ => Channel::STABLE,
+        }
+    }
+}
+
+impl From<Channel> for i32 {
+    fn from(value: Channel) -> Self {
+        match value {
+            Channel::STABLE => ReleaseChannel::Stable as i32,
+            Channel::EXPERIMENTAL => ReleaseChannel::Experimental as i32,
         }
     }
 }

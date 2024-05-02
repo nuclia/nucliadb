@@ -92,7 +92,6 @@ KB_RESOURCE_SECURITY = "/kbs/{kbid}/r/{uuid}/security"
 KB_RESOURCE_METADATA = "/kbs/{kbid}/r/{uuid}/metadata"
 KB_RESOURCE_RELATIONS = "/kbs/{kbid}/r/{uuid}/relations"
 KB_RESOURCE_FIELDS = "/kbs/{kbid}/r/{uuid}/f/"
-KB_RESOURCE_ALL_FIELDS = "/kbs/{kbid}/r/{uuid}/allfields"
 KB_RESOURCE_SLUG_BASE = "/kbs/{kbid}/s/"
 KB_RESOURCE_SLUG = f"{KB_RESOURCE_SLUG_BASE}{{slug}}"
 KB_RESOURCE_CONVERSATION = "/kbs/{kbid}/r/{uuid}/c/{page}"
@@ -708,17 +707,14 @@ class Resource:
         return (type, field) in self.fields
 
     async def get_all_field_ids(self) -> Optional[PBAllFieldIDs]:
-        key = KB_RESOURCE_ALL_FIELDS.format(kbid=self.kb.kbid, uuid=self.uuid)
-        payload = await self.txn.get(key)
-        if payload is None:
-            return None
-        all_fields = PBAllFieldIDs()
-        all_fields.ParseFromString(payload)
-        return all_fields
+        return await datamanagers.resources.get_all_field_ids(
+            self.txn, kbid=self.kb.kbid, rid=self.uuid
+        )
 
     async def set_all_field_ids(self, all_fields: PBAllFieldIDs):
-        key = KB_RESOURCE_ALL_FIELDS.format(kbid=self.kb.kbid, uuid=self.uuid)
-        await self.txn.set(key, all_fields.SerializeToString())
+        return await datamanagers.resources.set_all_field_ids(
+            self.txn, kbid=self.kb.kbid, rid=self.uuid, allfields=all_fields
+        )
 
     async def update_all_field_ids(
         self,
