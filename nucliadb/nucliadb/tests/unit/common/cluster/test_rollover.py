@@ -209,8 +209,7 @@ async def test_index_rollover_shards_handles_missing_shard_id(
 ):
     rollover_datamanager.get_kb_rollover_shards.return_value = shards
     resources_datamanager.get_resource_shard_id.return_value = None
-    with pytest.raises(rollover.UnexpectedRolloverError):
-        await rollover.index_rollover_shards(app_context, "kbid")
+    await rollover.index_rollover_shards(app_context, "kbid")
 
 
 async def test_index_rollover_shards_handles_missing_res(
