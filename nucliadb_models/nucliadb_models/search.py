@@ -473,8 +473,9 @@ class SearchParamDefaults:
     )
     page_size = ParamDefault(
         default=20,
+        lt=100,
         title="Page size",
-        description="The number of results to return per page",
+        description="The number of results to return per page. The maximum number of results per page allowed is 100.",
     )
     highlight = ParamDefault(
         default=False,

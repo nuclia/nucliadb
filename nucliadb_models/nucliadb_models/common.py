@@ -53,6 +53,7 @@ class ParamDefault(BaseModel):
     default: Any
     title: str
     description: str
+    lt: Optional[float] = None
     gt: Optional[float] = None
     max_items: Optional[int] = None
 
@@ -66,6 +67,7 @@ class ParamDefault(BaseModel):
             title=self.title,
             description=self.description,
             gt=self.gt,
+            lt=self.lt,
             max_items=self.max_items,
         )
 
