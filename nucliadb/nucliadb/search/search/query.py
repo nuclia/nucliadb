@@ -68,6 +68,8 @@ INDEX_SORTABLE_FIELDS = [
     SortField.MODIFIED,
 ]
 
+MAX_VECTOR_RESULTS_ALLOWED = 2000
+
 
 class QueryParser:
     """
@@ -146,6 +148,14 @@ class QueryParser:
             self.flat_filter_labels = flat_filter_labels(self.filters)
         self.max_tokens = max_tokens
 
+    @property
+    def has_vector_search(self) -> bool:
+        return SearchOptions.VECTOR in self.features
+
+    @property
+    def has_relations_search(self) -> bool:
+        return SearchOptions.RELATIONS in self.features
+
     def _get_default_semantic_min_score(self) -> Awaitable[float]:
         if self._min_score_task is None:  # pragma: no cover
             self._min_score_task = asyncio.create_task(
@@ -216,14 +226,12 @@ class QueryParser:
         if self.min_score.semantic is None:
             asyncio.ensure_future(self._get_default_semantic_min_score())
 
-        if SearchOptions.VECTOR in self.features and self.user_vector is None:
+        if self.has_vector_search and self.user_vector is None:
             self.query_endpoint_used = True
             asyncio.ensure_future(self._get_query_information())
             asyncio.ensure_future(self._get_matryoshka_dimension())
 
-        if (SearchOptions.RELATIONS in self.features or self.autofilter) and len(
-            self.query
-        ) > 0:
+        if (self.has_relations_search or self.autofilter) and len(self.query) > 0:
             if not self.query_endpoint_used:
                 # If we only need to detect entities, we don't need the query endpoint
                 asyncio.ensure_future(self._get_detected_entities())
@@ -244,6 +252,8 @@ class QueryParser:
         request.body = self.query
         request.with_duplicates = self.with_duplicates
 
+        self.parse_sorting(request)
+
         await self._schedule_dependency_tasks()
 
         await self.parse_filters(request)
@@ -253,7 +263,6 @@ class QueryParser:
         autofilters = await self.parse_relation_search(request)
         await self.parse_synonyms(request)
 
-        self.parse_sorting(request)
         await self.parse_min_score(request)
 
         return request, incomplete, autofilters
@@ -347,6 +356,15 @@ class QueryParser:
             request.order.sort_by = sort_field
             request.order.type = SortOrderMap[self.sort.order]  # type: ignore
 
+        if (
+            self.has_vector_search
+            and request.result_per_page > MAX_VECTOR_RESULTS_ALLOWED
+        ):
+            raise InvalidQueryError(
+                "page_size",
+                f"Pagination of semantic results limit reached: {MAX_VECTOR_RESULTS_ALLOWED}. If you want to paginate through all results, please disable the vector search feature.",  # noqa: E501
+            )
+
     async def parse_min_score(self, request: nodereader_pb2.SearchRequest) -> None:
         if self.min_score.semantic is None:
             self.min_score.semantic = await self._get_default_semantic_min_score()
@@ -364,7 +382,7 @@ class QueryParser:
             node_features.inc({"type": "paragraphs"})
 
     async def parse_vector_search(self, request: nodereader_pb2.SearchRequest) -> bool:
-        if SearchOptions.VECTOR not in self.features:
+        if not self.has_vector_search:
             return False
 
         node_features.inc({"type": "vectors"})
@@ -397,8 +415,7 @@ class QueryParser:
         self, request: nodereader_pb2.SearchRequest
     ) -> list[str]:
         autofilters = []
-        relations_search = SearchOptions.RELATIONS in self.features
-        if relations_search or self.autofilter:
+        if self.has_relations_search or self.autofilter:
             if not self.query_endpoint_used:
                 detected_entities = await self._get_detected_entities()
             else:
@@ -411,7 +428,7 @@ class QueryParser:
                     detected_entities = []
             meta_cache = await self._get_entities_meta_cache()
             detected_entities = expand_entities(meta_cache, detected_entities)
-            if relations_search:
+            if self.has_relations_search:
                 request.relation_subgraph.entry_points.extend(detected_entities)
                 request.relation_subgraph.depth = 1
                 request.relation_subgraph.deleted_groups.extend(
@@ -435,10 +452,7 @@ class QueryParser:
         if not self.with_synonyms:
             return
 
-        if (
-            SearchOptions.VECTOR in self.features
-            or SearchOptions.RELATIONS in self.features
-        ):
+        if self.has_vector_search or self.has_relations_search:
             raise InvalidQueryError(
                 "synonyms",
                 "Search with custom synonyms is only supported on paragraph and document search",
