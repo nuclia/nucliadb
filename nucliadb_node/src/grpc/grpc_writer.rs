@@ -224,8 +224,10 @@ impl NodeWriter for NodeWriterGRPCDriver {
 
     async fn set_resource_from_storage(&self, request: Request<IndexMessage>) -> Result<Response<OpStatus>, Status> {
         let download_start = std::time::Instant::now();
-        let shard_id = request.into_inner().shard.clone();
-        let storage_key = request.into_inner().storage_key;
+
+        let index_message = request.into_inner();
+        let shard_id = index_message.shard.clone();
+        let storage_key = index_message.storage_key.clone();
 
         let get_result = self.settings.object_store.get(&Path::from(storage_key)).await.map_err(|e| {
             error!("Failed to get indexing resource from object store: {}", e);
