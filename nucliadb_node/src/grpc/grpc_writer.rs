@@ -246,8 +246,9 @@ impl NodeWriter for NodeWriterGRPCDriver {
             error!("Failed to decode indexing resource: {}", e);
             tonic::Status::internal(format!("Failed to decode indexing resource: {}", e))
         })?;
+
         // Set the shard id to the one provided by index message
-        resource.shard_id = shard_id;
+        resource.shard_id = shard_id.clone();
         let set_resource_request = Request::new(resource);
         self.set_resource(set_resource_request).await
     }
