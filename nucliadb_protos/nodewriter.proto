@@ -82,6 +82,7 @@ service NodeWriter {
     rpc Merge(noderesources.ShardId) returns (MergeResponse) {}
 
     rpc SetResource(noderesources.Resource) returns (OpStatus) {}
+    rpc SetResourceFromStorage(IndexMessage) returns (OpStatus) {}
     rpc RemoveResource(noderesources.ResourceID) returns (OpStatus) {}
 
     rpc AddVectorSet(NewVectorSetRequest) returns (OpStatus) {}  // New

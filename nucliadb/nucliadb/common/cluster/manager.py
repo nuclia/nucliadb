@@ -321,6 +321,9 @@ class KBShardManager:
         reindex_id: Optional[str] = None,
         source: IndexMessageSource.ValueType = IndexMessageSource.PROCESSOR,
     ) -> None:
+        """
+        Stores the Resource object in the object storage and sends an IndexMessage to the indexing Nats stream.
+        """
         if txid == -1 and reindex_id is None:
             # This means we are injecting a complete resource via ingest gRPC
             # outside of a transaction. We need to treat this as a reindex operation.
@@ -445,6 +448,10 @@ class StandaloneKBShardManager(KBShardManager):
         reindex_id: Optional[str] = None,
         source: IndexMessageSource.ValueType = IndexMessageSource.PROCESSOR,
     ) -> None:
+        """
+        Calls the node writer's SetResource method directly to store the resource in the node.
+        There is no queuing for standalone nodes at the moment -- indexing is done synchronously.
+        """
         index_node = None
         for shardreplica in shard.replicas:
             resource.shard_id = resource.resource.shard_id = shardreplica.shard.id

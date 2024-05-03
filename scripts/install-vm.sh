@@ -22,7 +22,7 @@ fi
 if [ -f /etc/redhat-release ]; then
     echo "Detected Red Hat or Fedora"
     $SUDO dnf update -y
-    $SUDO dnf install -y gcc make zlib-devel \
+    $SUDO dnf install -y gcc gcc-c++ python3-devel make zlib-devel \
       ncurses-devel nss-devel openssl-devel \
       readline-devel libffi-devel sqlite-devel wget \
       bzip2-devel xz-devel tk-devel
@@ -51,6 +51,7 @@ $SUDO make install
 $SUDO /opt/python/Python-$PYTHON_VERSION/python -m venv $INSTALL_DIR
 cd $INSTALL_DIR
 $SUDO $INSTALL_DIR/bin/python -m pip install --upgrade pip
+$SUDO $INSTALL_DIR/bin/pip install -r https://raw.githubusercontent.com/nuclia/nucliadb/main/nucliadb/requirements.lock.txt
 $SUDO $INSTALL_DIR/bin/pip install nucliadb
 
 $SUDO ln -s $INSTALL_DIR/bin/nucliadb /bin/nucliadb

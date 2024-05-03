@@ -32,6 +32,7 @@
 
 use anyhow::anyhow;
 use nucliadb_core::tracing::Level;
+use object_store::ObjectStore;
 use serde::de::Unexpected;
 use std::net::SocketAddr;
 use std::num::NonZeroUsize;
@@ -40,13 +41,17 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use nucliadb_core::NodeResult;
-use serde::{Deserialize, Deserializer};
-use tracing::error;
-
 use crate::disk_structure::{METADATA_FILE, SHARDS_DIR};
 use crate::replication::NodeRole;
 use crate::utils::{parse_log_levels, reliable_lookup_host};
+use base64::engine::general_purpose::STANDARD;
+use base64::Engine;
+use nucliadb_core::NodeResult;
+use object_store::aws::AmazonS3Builder;
+use object_store::gcp::GoogleCloudStorageBuilder;
+use object_store::memory::InMemory;
+use serde::{Deserialize, Deserializer};
+use tracing::{error, warn};
 
 fn parse_log_levels_serde<'de, D>(d: D) -> Result<Vec<(String, Level)>, D::Error>
 where
@@ -86,13 +91,44 @@ const DEFAULT_ENV: &str = "stage";
 #[derive(Clone)]
 pub struct Settings {
     env: Arc<EnvSettings>,
+    pub object_store: Arc<dyn ObjectStore>,
 }
 
 impl From<EnvSettings> for Settings {
     fn from(value: EnvSettings) -> Self {
+        let object_store = build_object_store_driver(&value);
         Self {
             env: Arc::new(value),
+            object_store,
         }
+    }
+}
+
+pub fn build_object_store_driver(settings: &EnvSettings) -> Arc<dyn ObjectStore> {
+    println!("File backend: {:?}", settings.file_backend);
+    match settings.file_backend {
+        ObjectStoreType::GCS => {
+            let mut builder = GoogleCloudStorageBuilder::new().with_bucket_name(settings.gcs_indexing_bucket.clone());
+            if !settings.gcs_base64_creds.is_empty() {
+                let service_account_key = STANDARD.decode(&settings.gcs_base64_creds).unwrap();
+                builder = builder.with_service_account_key(String::from_utf8(service_account_key).unwrap());
+            }
+            Arc::new(builder.build().unwrap())
+        }
+        ObjectStoreType::S3 => {
+            let mut builder = AmazonS3Builder::new()
+                .with_access_key_id(settings.s3_client_id.clone())
+                .with_secret_access_key(settings.s3_client_secret.clone())
+                .with_region(settings.s3_region_name.clone())
+                .with_bucket_name(settings.s3_indexing_bucket.clone());
+            if settings.s3_endpoint.is_some() {
+                // This is needed for minio compatibility
+                builder = builder.with_endpoint(settings.s3_endpoint.clone().unwrap()).with_allow_http(true);
+            }
+            Arc::new(builder.build().unwrap())
+        }
+        // Any other type is not supported for now
+        _ => Arc::new(InMemory::new()),
     }
 }
 
@@ -101,6 +137,31 @@ impl Deref for Settings {
 
     fn deref(&self) -> &Self::Target {
         &self.env
+    }
+}
+
+#[derive(Default, Debug, PartialEq)]
+pub enum ObjectStoreType {
+    #[default]
+    NOTSET,
+    GCS,
+    S3,
+}
+
+impl<'de> Deserialize<'de> for ObjectStoreType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?.to_lowercase();
+        match s.as_str() {
+            "gcs" => Ok(ObjectStoreType::GCS),
+            "s3" => Ok(ObjectStoreType::S3),
+            _ => {
+                warn!("Invalid object store type: {}. Using default one", s);
+                Ok(ObjectStoreType::NOTSET)
+            }
+        }
     }
 }
 
@@ -164,6 +225,17 @@ pub struct EnvSettings {
     pub merge_on_commit_segments_before_merge: usize,
 
     pub max_open_shards: Option<NonZeroUsize>,
+
+    // Object store settings coming from nucliadb_shared chart
+    #[serde(default)]
+    pub file_backend: ObjectStoreType,
+    pub gcs_indexing_bucket: String,
+    pub gcs_base64_creds: String,
+    pub s3_client_id: String,
+    pub s3_client_secret: String,
+    pub s3_region_name: String,
+    pub s3_indexing_bucket: String,
+    pub s3_endpoint: Option<String>,
 }
 
 impl EnvSettings {
@@ -235,6 +307,14 @@ impl Default for EnvSettings {
             merge_on_commit_max_nodes_in_merge: 10_000,
             merge_on_commit_segments_before_merge: 100,
             max_open_shards: None,
+            file_backend: ObjectStoreType::NOTSET,
+            gcs_indexing_bucket: Default::default(),
+            gcs_base64_creds: Default::default(),
+            s3_client_id: Default::default(),
+            s3_client_secret: Default::default(),
+            s3_region_name: Default::default(),
+            s3_indexing_bucket: Default::default(),
+            s3_endpoint: None,
         }
     }
 }
@@ -259,6 +339,18 @@ mod tests {
         assert_eq!(settings.data_path, PathBuf::from("my_little_path"));
         assert_eq!(settings.shards_path(), PathBuf::from("my_little_path/shards"));
         assert_eq!(settings.metadata_path(), PathBuf::from("my_little_path/metadata.json"));
+    }
+
+    #[test]
+    fn test_file_backend() {
+        let settings = from_pairs(&[("FILE_BACKEND", "gcs")]).unwrap();
+        assert_eq!(settings.file_backend, super::ObjectStoreType::GCS);
+
+        let settings = from_pairs(&[("FILE_BACKEND", "s3")]).unwrap();
+        assert_eq!(settings.file_backend, super::ObjectStoreType::S3);
+
+        let settings = from_pairs(&[("FILE_BACKEND", "unknown")]).unwrap();
+        assert_eq!(settings.file_backend, super::ObjectStoreType::NOTSET);
     }
 
     #[test]

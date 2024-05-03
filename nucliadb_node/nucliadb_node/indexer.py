@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+import contextlib
 import logging
 import time
 from functools import cached_property, partial, total_ordering
@@ -38,12 +39,13 @@ from nucliadb_node import SERVICE_NAME, logger, signals
 from nucliadb_node.settings import settings
 from nucliadb_node.signals import SuccessfulIndexingPayload
 from nucliadb_node.writer import Writer
-from nucliadb_telemetry import errors, metrics
+from nucliadb_telemetry import metrics
 from nucliadb_telemetry.errors import capture_exception
+from nucliadb_utils import const
 from nucliadb_utils.nats import MessageProgressUpdater
 from nucliadb_utils.settings import nats_consumer_settings
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import get_storage
+from nucliadb_utils.utilities import get_storage, has_feature
 
 CONCURRENT_INDEXERS_COUNT = metrics.Gauge(
     "nucliadb_concurrent_indexers_count", labels={"node": ""}
@@ -70,6 +72,14 @@ indexer_observer = metrics.Observer(
 
 
 class IndexNodeError(Exception):
+    pass
+
+
+class MetadataNotFoundError(IndexNodeError):
+    pass
+
+
+class ShardNotFound(IndexNodeError):
     pass
 
 
@@ -379,15 +389,27 @@ class PriorityIndexer:
         )
 
     async def _index_message(self, pb: IndexMessage):
-        status = None
         if pb.typemessage == TypeMessage.CREATION:
-            status = await self._set_resource(pb)
+            if has_feature(
+                const.Features.NODE_SET_RESOURCE_FROM_STORAGE, context={"kbid": pb.kbid}
+            ):
+                await self._set_resource_from_storage(pb)
+            else:
+                await self._set_resource(pb)
         elif pb.typemessage == TypeMessage.DELETION:
-            status = await self._delete_resource(pb)
-        if status is not None and status.status != OpStatus.Status.OK:
-            self._handle_index_message_error(pb, status)
+            await self._delete_resource(pb)
+        else:  # pragma: no cover
+            logger.error(
+                "Unknown message type",
+                extra={
+                    "storage_key": pb.storage_key,
+                    "type": str(pb.typemessage),
+                },
+            )
 
-    def _handle_index_message_error(self, pb: IndexMessage, status: OpStatus):
+    def _parse_op_status_errors(self, pb: IndexMessage, status: OpStatus):
+        if status.status == OpStatus.Status.OK:
+            return
         if (
             status.status == OpStatus.Status.ERROR
             and "Shard not found" in status.detail
@@ -401,11 +423,50 @@ class PriorityIndexer:
                     "storage_key": pb.storage_key,
                 },
             )
-            return
+            raise ShardNotFound()
         if (
             status.status == OpStatus.Status.ERROR
             and "Missing resource metadata" in status.detail
         ):
+            raise MetadataNotFoundError()
+        raise IndexNodeError(status.detail)
+
+    @contextlib.contextmanager
+    def _handled_grpc_errors(self):
+        try:
+            yield
+        except AioRpcError as grpc_error:
+            if grpc_error.code() == StatusCode.NOT_FOUND:
+                raise ShardNotFound()
+            else:
+                raise grpc_error
+
+    async def _set_resource(self, pb: IndexMessage) -> None:
+        brain = await self.storage.get_indexing(pb)
+        shard_id = pb.shard
+        rid = brain.resource.uuid
+        brain.shard_id = brain.resource.shard_id = shard_id
+        _extra = {
+            "kbid": pb.kbid,
+            "shard": pb.shard,
+            "rid": rid,
+            "storage_key": pb.storage_key,
+        }
+        logger.debug(f"Adding {rid} at {shard_id} otx:{pb.txid}", extra=_extra)
+        try:
+            with self._handled_grpc_errors():
+                status = await self.writer.set_resource(brain)
+                self._parse_op_status_errors(pb, status)
+                logger.debug(
+                    f"...done (Added {rid} at {shard_id} otx:{pb.txid})", extra=_extra
+                )
+                return
+        except ShardNotFound:
+            logger.error(
+                "Shard does not exist. This message will be ignored", extra=_extra
+            )
+            return
+        except MetadataNotFoundError:
             logger.error(
                 "Error on indexer worker trying to set a resource without metadata. "
                 "This message will be ignored",
@@ -417,53 +478,42 @@ class PriorityIndexer:
                 },
             )
             return
-        raise IndexNodeError(status.detail)
 
-    async def _set_resource(self, pb: IndexMessage) -> Optional[OpStatus]:
-        brain = await self.storage.get_indexing(pb)
-        shard_id = pb.shard
-        rid = brain.resource.uuid
-        brain.shard_id = brain.resource.shard_id = shard_id
+    async def _set_resource_from_storage(self, pb: IndexMessage) -> None:
+        """
+        Set a resource using the new v2 method that doesn't
+        require the indexer to fetch the resource from storage.
+        """
         _extra = {
             "kbid": pb.kbid,
             "shard": pb.shard,
-            "rid": rid,
+            "otx": pb.txid,
             "storage_key": pb.storage_key,
         }
-
-        logger.debug(f"Adding {rid} at {shard_id} otx:{pb.txid}", extra=_extra)
         try:
-            status = await self.writer.set_resource(brain)
-
-        except AioRpcError as grpc_error:
-            if grpc_error.code() == StatusCode.NOT_FOUND:
-                logger.error(
-                    f"Shard does not exist {pb.shard}. This message will be ignored",
-                    extra=_extra,
-                )
-            else:
-                # REVIEW: we should always have metadata and the writer node
-                # should handle this in a better way than a panic
-                if brain.HasField("metadata"):
-                    # Hard fail if we have the correct data
-                    raise grpc_error
-                else:
-                    event_id = errors.capture_exception(grpc_error)
-                    logger.error(
-                        "Error on indexer worker trying to set a resource without metadata. "
-                        "This message won't be retried. Check sentry for more details. "
-                        f"Event id: {event_id}",
-                        extra=_extra,
-                    )
-            return None
-
-        else:
-            logger.debug(
-                f"...done (Added {rid} at {shard_id} otx:{pb.txid})", extra=_extra
+            with self._handled_grpc_errors():
+                status = await self.writer.set_resource_from_storage(pb)
+                self._parse_op_status_errors(pb, status)
+                return
+        except ShardNotFound:
+            logger.error(
+                "Shard does not exist. This message will be ignored", extra=_extra
             )
-            return status
+            return
+        except MetadataNotFoundError:
+            logger.error(
+                "Error on indexer worker trying to set a resource without metadata. "
+                "This message will be ignored",
+                extra={
+                    "kbid": pb.kbid,
+                    "shard": pb.shard,
+                    "rid": pb.resource,
+                    "storage_key": pb.storage_key,
+                },
+            )
+            return
 
-    async def _delete_resource(self, pb: IndexMessage) -> Optional[OpStatus]:
+    async def _delete_resource(self, pb: IndexMessage) -> None:
         shard_id = pb.shard
         rid = pb.resource
         resource = ResourceID(uuid=rid, shard_id=shard_id)
@@ -476,20 +526,16 @@ class PriorityIndexer:
 
         logger.debug(f"Deleting {rid} in {shard_id} otx:{pb.txid}", extra=_extra)
         try:
-            status = await self.writer.delete_resource(resource)
-
-        except AioRpcError as grpc_error:
-            if grpc_error.code() == StatusCode.NOT_FOUND:
-                logger.error(
-                    f"Shard does not exist {pb.shard}. This message will be ignored",
-                    extra=_extra,
+            with self._handled_grpc_errors():
+                status = await self.writer.delete_resource(resource)
+                self._parse_op_status_errors(pb, status)
+                logger.debug(
+                    f"...done (Deleted {rid} in {shard_id} otx:{pb.txid})", extra=_extra
                 )
-            else:
-                raise grpc_error
-            return None
-
-        else:
-            logger.debug(
-                f"...done (Deleted {rid} in {shard_id} otx:{pb.txid})", extra=_extra
+                return
+        except ShardNotFound:
+            logger.error(
+                f"Shard does not exist {pb.shard}. This message will be ignored",
+                extra=_extra,
             )
-            return status
+            return
