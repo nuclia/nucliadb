@@ -44,7 +44,7 @@ async fn test_set_resource_from_storage(
     let new_shard_response = writer.new_shard(request).await.expect("Unable to create new shard");
     let shard_id = &new_shard_response.get_ref().id;
     let mut resource = resources::little_prince(shard_id);
-    
+
     // Clear the shard id to simulate the payload coming from storage
     resource.shard_id.clear();
 
