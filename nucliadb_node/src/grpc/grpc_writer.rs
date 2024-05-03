@@ -225,7 +225,9 @@ impl NodeWriter for NodeWriterGRPCDriver {
     async fn set_resource_from_storage(&self, request: Request<IndexMessage>) -> Result<Response<OpStatus>, Status> {
         let download_start = std::time::Instant::now();
 
-        let storage_key = request.into_inner().storage_key;
+        let index_message = request.into_inner();
+        let shard_id = index_message.shard.clone();
+        let storage_key = index_message.storage_key.clone();
 
         let get_result = self.settings.object_store.get(&Path::from(storage_key)).await.map_err(|e| {
             error!("Failed to get indexing resource from object store: {}", e);
@@ -240,11 +242,13 @@ impl NodeWriter for NodeWriterGRPCDriver {
         get_metrics().indexing_resource_download_histogram.observe(download_start.elapsed().as_secs_f64());
 
         let handle = tokio::task::spawn_blocking(move || Resource::decode(bytes)).await.unwrap();
-        let resource = handle.map_err(|e| {
+        let mut resource = handle.map_err(|e| {
             error!("Failed to decode indexing resource: {}", e);
             tonic::Status::internal(format!("Failed to decode indexing resource: {}", e))
         })?;
 
+        // Set the shard id to the one provided by index message
+        resource.shard_id = shard_id.clone();
         let set_resource_request = Request::new(resource);
         self.set_resource(set_resource_request).await
     }

@@ -51,7 +51,7 @@ use object_store::aws::AmazonS3Builder;
 use object_store::gcp::GoogleCloudStorageBuilder;
 use object_store::memory::InMemory;
 use serde::{Deserialize, Deserializer};
-use tracing::error;
+use tracing::{error, warn};
 
 fn parse_log_levels_serde<'de, D>(d: D) -> Result<Vec<(String, Level)>, D::Error>
 where
@@ -105,17 +105,15 @@ impl From<EnvSettings> for Settings {
 }
 
 pub fn build_object_store_driver(settings: &EnvSettings) -> Arc<dyn ObjectStore> {
-    eprintln!("File backend: {:?}", settings.file_backend);
+    println!("File backend: {:?}", settings.file_backend);
     match settings.file_backend {
         ObjectStoreType::GCS => {
-            let service_account_key = STANDARD.decode(&settings.gcs_base64_creds).unwrap();
-            Arc::new(
-                GoogleCloudStorageBuilder::new()
-                    .with_service_account_key(String::from_utf8(service_account_key).unwrap())
-                    .with_bucket_name(settings.gcs_indexing_bucket.clone())
-                    .build()
-                    .unwrap(),
-            )
+            let mut builder = GoogleCloudStorageBuilder::new().with_bucket_name(settings.gcs_indexing_bucket.clone());
+            if !settings.gcs_base64_creds.is_empty() {
+                let service_account_key = STANDARD.decode(&settings.gcs_base64_creds).unwrap();
+                builder = builder.with_service_account_key(String::from_utf8(service_account_key).unwrap());
+            }
+            Arc::new(builder.build().unwrap())
         }
         ObjectStoreType::S3 => {
             let mut builder = AmazonS3Builder::new()
@@ -129,7 +127,8 @@ pub fn build_object_store_driver(settings: &EnvSettings) -> Arc<dyn ObjectStore>
             }
             Arc::new(builder.build().unwrap())
         }
-        ObjectStoreType::UNSET => Arc::new(InMemory::new()),
+        // Any other type is not supported for now
+        _ => Arc::new(InMemory::new()),
     }
 }
 
@@ -141,13 +140,29 @@ impl Deref for Settings {
     }
 }
 
-#[derive(Deserialize, Default, Debug)]
-#[serde(rename_all = "lowercase")]
+#[derive(Default, Debug, PartialEq)]
 pub enum ObjectStoreType {
     #[default]
-    UNSET,
+    NOTSET,
     GCS,
     S3,
+}
+
+impl<'de> Deserialize<'de> for ObjectStoreType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?.to_lowercase();
+        match s.as_str() {
+            "gcs" => Ok(ObjectStoreType::GCS),
+            "s3" => Ok(ObjectStoreType::S3),
+            _ => {
+                warn!("Invalid object store type: {}. Using default one", s);
+                Ok(ObjectStoreType::NOTSET)
+            }
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -292,7 +307,7 @@ impl Default for EnvSettings {
             merge_on_commit_max_nodes_in_merge: 10_000,
             merge_on_commit_segments_before_merge: 100,
             max_open_shards: None,
-            file_backend: ObjectStoreType::UNSET,
+            file_backend: ObjectStoreType::NOTSET,
             gcs_indexing_bucket: Default::default(),
             gcs_base64_creds: Default::default(),
             s3_client_id: Default::default(),
@@ -324,6 +339,18 @@ mod tests {
         assert_eq!(settings.data_path, PathBuf::from("my_little_path"));
         assert_eq!(settings.shards_path(), PathBuf::from("my_little_path/shards"));
         assert_eq!(settings.metadata_path(), PathBuf::from("my_little_path/metadata.json"));
+    }
+
+    #[test]
+    fn test_file_backend() {
+        let settings = from_pairs(&[("FILE_BACKEND", "gcs")]).unwrap();
+        assert_eq!(settings.file_backend, super::ObjectStoreType::GCS);
+
+        let settings = from_pairs(&[("FILE_BACKEND", "s3")]).unwrap();
+        assert_eq!(settings.file_backend, super::ObjectStoreType::S3);
+
+        let settings = from_pairs(&[("FILE_BACKEND", "unknown")]).unwrap();
+        assert_eq!(settings.file_backend, super::ObjectStoreType::NOTSET);
     }
 
     #[test]
