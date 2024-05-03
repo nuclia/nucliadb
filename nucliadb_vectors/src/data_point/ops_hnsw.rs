@@ -126,6 +126,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         &self,
         k_neighbours: usize,
         candidates: Vec<(Address, Edge)>,
+        layer: &RAMLayer,
     ) -> Vec<(Address, Edge)> {
         let mut results = Vec::new();
         let mut discarded = BinaryHeap::new();
@@ -138,7 +139,17 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
             }
             // Keep if x is more similar to the new node than it is similar to other results
             // i.e: similarity(x, new) > similarity(x, y) for all y in result
-            let check = results.iter().map(|&(y, _)| self.similarity(x, y)).all(|inter_sim| sim > inter_sim);
+            let check = results
+                .iter()
+                .map(|&(y, _)| {
+                    // Try to get the similarity from an existing graph edge, fallback to calculating it
+                    if let Some((_, edge)) = layer.get_out_edges(x).find(|&(z, _)| z == y) {
+                        edge
+                    } else {
+                        self.similarity(x, y)
+                    }
+                })
+                .all(|inter_sim| sim > inter_sim);
             if check {
                 results.push((x, sim));
             } else {
@@ -272,7 +283,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
     fn layer_insert(&self, x: Address, layer: &mut RAMLayer, entry_points: &[Address], mmax: usize) -> Vec<Address> {
         use params::*;
         let neighbours = self.layer_search::<&RAMLayer>(x, layer, ef_construction(), entry_points);
-        let neighbours = self.select_neighbours_heuristic(m(), neighbours);
+        let neighbours = self.select_neighbours_heuristic(m(), neighbours, layer);
         let mut needs_repair = HashSet::new();
         let mut result = Vec::with_capacity(neighbours.len());
         layer.add_node(x);
@@ -286,7 +297,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         }
         for crnt in needs_repair {
             let edges = layer.take_out_edges(crnt);
-            let neighbours = self.select_neighbours_heuristic(mmax, edges);
+            let neighbours = self.select_neighbours_heuristic(params::prune_m(mmax), edges, layer);
             neighbours.into_iter().for_each(|(y, edge)| layer.add_edge(crnt, edge, y));
         }
         result

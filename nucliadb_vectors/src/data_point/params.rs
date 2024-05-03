@@ -34,6 +34,11 @@ pub const fn m_max_for_layer(layer: usize) -> usize {
     }
 }
 
+/// M to use when pruning neighbours
+pub const fn prune_m(m: usize) -> usize {
+    m * 95 / 100
+}
+
 /// Upper limit to the number of out-edges a embedding can have.
 pub const fn m_max0() -> usize {
     60
