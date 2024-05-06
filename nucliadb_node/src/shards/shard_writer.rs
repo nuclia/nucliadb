@@ -184,10 +184,10 @@ impl ShardWriter {
         let versions_path = metadata.shard_path().join(VERSION_FILE);
         Versions::create(&versions_path, versions)?;
 
-        let text_task = || Some(nucliadb_texts2::writer::TextWriterService::create(&tsc));
-        let paragraph_task = || Some(nucliadb_paragraphs3::writer::ParagraphWriterService::create(&psc));
-        let vector_task = || Some(nucliadb_vectors::service::VectorWriterService::create(&vsc));
-        let relation_task = || Some(nucliadb_relations2::writer::RelationsWriterService::create(&rsc));
+        let text_task = || Some(nucliadb_texts2::writer::TextWriterService::create(tsc));
+        let paragraph_task = || Some(nucliadb_paragraphs3::writer::ParagraphWriterService::create(psc));
+        let vector_task = || Some(nucliadb_vectors::service::VectorWriterService::create(vsc));
+        let relation_task = || Some(nucliadb_relations2::writer::RelationsWriterService::create(rsc));
 
         let span = tracing::Span::current();
         let info = info_span!(parent: &span, "text start");

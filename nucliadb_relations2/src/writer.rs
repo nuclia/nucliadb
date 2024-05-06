@@ -124,7 +124,7 @@ impl RelationsWriterService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn create(config: &RelationConfig) -> NodeResult<Self> {
+    pub fn create(config: RelationConfig) -> NodeResult<Self> {
         Self::try_create_index_dir(&config.path)?;
 
         let settings = IndexSettings {
@@ -140,7 +140,7 @@ impl RelationsWriterService {
             index,
             writer,
             schema: field_schema,
-            config: config.clone(),
+            config,
         })
     }
 
