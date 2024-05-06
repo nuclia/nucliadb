@@ -82,7 +82,7 @@ pub struct PreFilterResponse {
 /// The queries a [`QueryPlan`] has decided to send to each index.
 #[derive(Default, Clone)]
 pub struct IndexQueries {
-    pub paragraphs_version: i32,
+    pub paragraphs_version: u32,
     pub vectors_context: VectorsContext,
     pub paragraphs_context: ParagraphsContext,
     pub vectors_request: Option<VectorSearchRequest>,
@@ -176,7 +176,7 @@ fn analyze_filter(search_request: &SearchRequest) -> NodeResult<QueryAnalysis> {
     query_language::translate(&filter.expression, &context)
 }
 
-pub fn build_query_plan(paragraphs_version: i32, search_request: SearchRequest) -> NodeResult<QueryPlan> {
+pub fn build_query_plan(paragraphs_version: u32, search_request: SearchRequest) -> NodeResult<QueryPlan> {
     let vectors_request = compute_vectors_request(&search_request);
     let paragraphs_request = compute_paragraphs_request(&search_request);
     let texts_request = compute_texts_request(&search_request);

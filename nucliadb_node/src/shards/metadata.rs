@@ -83,9 +83,12 @@ pub struct ShardMetadata {
     shard_path: PathBuf,
     id: String,
     kbid: String,
-    similarity: Similarity,
     channel: Channel,
+
+    // redundant configuration
+    similarity: Similarity,
     normalize_vectors: bool,
+
     // A generation id is a way to track if a shard has changed.
     // A new id means that something in the shard has changed.
     // This is used by replication to track which shards have changed
