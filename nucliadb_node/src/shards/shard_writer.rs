@@ -23,7 +23,7 @@ use std::sync::{Arc, Mutex, MutexGuard, RwLock};
 use nucliadb_core::paragraphs::*;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::shard_created::{DocumentService, ParagraphService, RelationService, VectorService};
-use nucliadb_core::protos::{OpStatus, Resource, ResourceId};
+use nucliadb_core::protos::{Resource, ResourceId};
 use nucliadb_core::relations::*;
 use nucliadb_core::texts::*;
 use nucliadb_core::tracing::{self, *};
@@ -430,45 +430,6 @@ impl ShardWriter {
         self.metadata.new_generation_id();
 
         Ok(())
-    }
-
-    #[measure(actor = "shard", metric = "get_opstatus")]
-    #[tracing::instrument(skip_all)]
-    pub fn get_opstatus(&self) -> NodeResult<OpStatus> {
-        let span = tracing::Span::current();
-
-        let count_fields = || {
-            run_with_telemetry(info_span!(parent: &span, "field count"), move || {
-                read_rw_lock(&self.text_writer).count()
-            })
-        };
-        let count_paragraphs = || {
-            run_with_telemetry(info_span!(parent: &span, "paragraph count"), move || {
-                read_rw_lock(&self.paragraph_writer).count()
-            })
-        };
-        let count_vectors = || {
-            run_with_telemetry(info_span!(parent: &span, "vector count"), move || {
-                read_rw_lock(&self.vector_writer).count()
-            })
-        };
-
-        let mut field_count = Ok(0);
-        let mut paragraph_count = Ok(0);
-        let mut vector_count = Ok(0);
-        thread::scope(|s| {
-            s.spawn(|_| field_count = count_fields());
-            s.spawn(|_| paragraph_count = count_paragraphs());
-            s.spawn(|_| vector_count = count_vectors());
-        });
-
-        Ok(OpStatus {
-            shard_id: self.id.clone(),
-            field_count: field_count? as u64,
-            paragraph_count: paragraph_count? as u64,
-            sentence_count: vector_count? as u64,
-            ..Default::default()
-        })
     }
 
     #[tracing::instrument(skip_all)]
