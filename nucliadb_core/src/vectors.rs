@@ -32,7 +32,7 @@ use crate::Channel;
 use crate::IndexFiles;
 
 pub type VectorsReaderPointer = Arc<RwLock<dyn VectorReader>>;
-pub type VectorsWriterPointer = Arc<RwLock<dyn VectorWriter>>;
+pub type VectorsWriterPointer = Box<dyn VectorWriter>;
 pub type ProtosRequest = VectorSearchRequest;
 pub type ProtosResponse = VectorSearchResponse;
 
