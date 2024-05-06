@@ -29,13 +29,13 @@ pub const TEXTS_VERSION: u32 = 2;
 
 #[derive(Serialize, Deserialize, Clone, Copy)]
 pub struct Versions {
-    #[serde(rename = "version_paragraphs")]
+    #[serde(alias = "version_paragraphs")]
     pub paragraphs: u32,
-    #[serde(rename = "version_vectors")]
+    #[serde(alias = "version_vectors")]
     pub vectors: u32,
-    #[serde(rename = "version_texts")]
+    #[serde(alias = "version_texts")]
     pub texts: u32,
-    #[serde(rename = "version_relations")]
+    #[serde(alias = "version_relations")]
     pub relations: u32,
 }
 
