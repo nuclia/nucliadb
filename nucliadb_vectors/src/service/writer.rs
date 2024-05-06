@@ -217,7 +217,7 @@ impl VectorWriterService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn create(config: &VectorConfig) -> NodeResult<Self> {
+    pub fn create(config: VectorConfig) -> NodeResult<Self> {
         let path = std::path::Path::new(&config.path);
         if path.exists() {
             Err(node_error!("Shard does exist".to_string()))
@@ -228,7 +228,7 @@ impl VectorWriterService {
                 normalize_vectors: config.normalize_vectors,
             };
             Ok(VectorWriterService {
-                index: Writer::new(path, index_metadata, config.shard_id.clone())?,
+                index: Writer::new(path, index_metadata, config.shard_id)?,
                 path: path.to_path_buf(),
             })
         }
@@ -317,7 +317,7 @@ mod tests {
             ..Default::default()
         };
         // insert - delete - insert sequence
-        let mut writer = VectorWriterService::create(&vsc).unwrap();
+        let mut writer = VectorWriterService::create(vsc).unwrap();
         let res = writer.set_resource(&resource);
         assert!(res.is_ok());
         let res = writer.delete_resource(&resource_id);
@@ -380,7 +380,7 @@ mod tests {
             ..Default::default()
         };
         // insert - delete - insert sequence
-        let mut writer = VectorWriterService::create(&vsc).unwrap();
+        let mut writer = VectorWriterService::create(vsc).unwrap();
         let res = writer.set_resource(&resource);
         assert!(res.is_ok());
         let res = writer.delete_resource(&resource_id);

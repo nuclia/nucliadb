@@ -155,7 +155,7 @@ impl ParagraphWriter for ParagraphWriterService {
 
 impl ParagraphWriterService {
     #[tracing::instrument(skip_all)]
-    pub fn create(config: &ParagraphConfig) -> NodeResult<ParagraphWriterService> {
+    pub fn create(config: ParagraphConfig) -> NodeResult<ParagraphWriterService> {
         let paragraph_schema = ParagraphSchema::default();
 
         fs::create_dir(&config.path)?;
@@ -178,7 +178,7 @@ impl ParagraphWriterService {
             index,
             writer,
             schema: paragraph_schema,
-            config: config.clone(),
+            config,
         })
     }
     #[tracing::instrument(skip_all)]
@@ -454,7 +454,7 @@ mod tests {
             path: dir.path().join("paragraphs"),
         };
 
-        let mut paragraph_writer_service = ParagraphWriterService::create(&psc).unwrap();
+        let mut paragraph_writer_service = ParagraphWriterService::create(psc).unwrap();
         let resource1 = create_resource("shard1".to_string());
         let _ = paragraph_writer_service.set_resource(&resource1);
         let _ = paragraph_writer_service.set_resource(&resource1);
