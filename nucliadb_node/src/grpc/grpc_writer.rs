@@ -197,29 +197,25 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let write_task = || {
             run_with_telemetry(info, move || {
                 let shard = obtain_shard(shards, shard_id_clone)?;
-                shard.set_resource(resource).and_then(|()| shard.get_opstatus())
+                shard.set_resource(resource)
             })
         };
-        let status = tokio::task::spawn_blocking(write_task)
+        let result = tokio::task::spawn_blocking(write_task)
             .await
             .map_err(|error| tonic::Status::internal(format!("Blocking task panicked: {error:?}")))?;
-        match status {
-            Ok(mut status) => {
-                status.status = 0;
-                status.detail = "Success!".to_string();
-                Ok(tonic::Response::new(status))
-            }
-            Err(error) => {
-                let status = OpStatus {
-                    status: op_status::Status::Error as i32,
-                    detail: error.to_string(),
-                    field_count: 0_u64,
-                    shard_id,
-                    ..Default::default()
-                };
-                Ok(tonic::Response::new(status))
-            }
-        }
+        let status = match result {
+            Ok(()) => OpStatus {
+                status: op_status::Status::Ok as i32,
+                detail: "Success!".to_string(),
+                ..Default::default()
+            },
+            Err(error) => OpStatus {
+                status: op_status::Status::Error as i32,
+                detail: error.to_string(),
+                ..Default::default()
+            },
+        };
+        Ok(tonic::Response::new(status))
     }
 
     async fn set_resource_from_storage(&self, request: Request<IndexMessage>) -> Result<Response<OpStatus>, Status> {
@@ -263,29 +259,25 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let write_task = || {
             run_with_telemetry(info, move || {
                 let shard = obtain_shard(shards, shard_id_clone)?;
-                shard.remove_resource(&resource).and_then(|()| shard.get_opstatus())
+                shard.remove_resource(&resource)
             })
         };
-        let status = tokio::task::spawn_blocking(write_task)
+        let result = tokio::task::spawn_blocking(write_task)
             .await
             .map_err(|error| tonic::Status::internal(format!("Blocking task panicked: {error:?}")))?;
-        match status {
-            Ok(mut status) => {
-                status.status = 0;
-                status.detail = "Success!".to_string();
-                Ok(tonic::Response::new(status))
-            }
-            Err(error) => {
-                let status = OpStatus {
-                    status: op_status::Status::Error as i32,
-                    detail: error.to_string(),
-                    field_count: 0_u64,
-                    shard_id,
-                    ..Default::default()
-                };
-                Ok(tonic::Response::new(status))
-            }
-        }
+        let status = match result {
+            Ok(()) => OpStatus {
+                status: op_status::Status::Ok as i32,
+                detail: "Success!".to_string(),
+                ..Default::default()
+            },
+            Err(error) => OpStatus {
+                status: op_status::Status::Error as i32,
+                detail: error.to_string(),
+                ..Default::default()
+            },
+        };
+        Ok(tonic::Response::new(status))
     }
 
     async fn add_vector_set(&self, _: Request<NewVectorSetRequest>) -> Result<Response<OpStatus>, Status> {

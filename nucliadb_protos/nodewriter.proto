@@ -13,10 +13,11 @@ message OpStatus {
     }
     Status status = 1;
     string detail = 2;
-    uint64 field_count = 3;
-    uint64 paragraph_count = 5;
-    uint64 sentence_count = 6;
-    string shard_id = 4;
+
+    uint64 field_count = 3 [deprecated = true];
+    uint64 paragraph_count = 5 [deprecated = true];
+    uint64 sentence_count = 6 [deprecated = true];
+    string shard_id = 4 [deprecated = true];
 }
 
 // Implemented at nucliadb_object_storage
