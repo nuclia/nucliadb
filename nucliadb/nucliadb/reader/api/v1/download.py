@@ -50,7 +50,7 @@ class DownloadType(Enum):
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/{{field_type}}/{{field_id}}/download/extracted/{{download_field:path}}",  # noqa
     tags=["Resource fields"],
     status_code=200,
-    name="Download extracted binary file (by slug)",
+    summary="Download extracted binary file (by slug)",
 )
 @requires_one([NucliaDBRoles.READER])
 @version(1)
@@ -71,7 +71,7 @@ async def download_extract_file_rslug_prefix(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/{{field_type}}/{{field_id}}/download/extracted/{{download_field:path}}",  # noqa
     tags=["Resource fields"],
     status_code=200,
-    name="Download extracted binary file (by id)",
+    summary="Download extracted binary file (by id)",
 )
 @requires_one([NucliaDBRoles.READER])
 @version(1)
@@ -113,7 +113,7 @@ async def _download_extract_file(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/file/{{field_id}}/download/field",
     tags=["Resource fields"],
     status_code=200,
-    name="Download field binary field (by slug)",
+    summary="Download field binary field (by slug)",
 )
 @requires_one([NucliaDBRoles.READER])
 @version(1)
@@ -133,7 +133,7 @@ async def download_field_file_rslug_prefix(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/file/{{field_id}}/download/field",
     tags=["Resource fields"],
     status_code=200,
-    name="Download field binary field (by id)",
+    summary="Download field binary field (by id)",
 )
 @requires_one([NucliaDBRoles.READER])
 @version(1)
@@ -168,7 +168,7 @@ async def _download_field_file(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/layout/{{field_id}}/download/field/{{download_field}}",
     tags=["Resource fields"],
     status_code=200,
-    name="Download layout binary field (by slug)",
+    summary="Download layout binary field (by slug)",
 )
 @requires_one([NucliaDBRoles.READER])
 @version(1)
@@ -188,7 +188,7 @@ async def download_field_layout_rslug_prefix(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/layout/{{field_id}}/download/field/{{download_field}}",
     tags=["Resource fields"],
     status_code=200,
-    name="Download layout binary field (by id)",
+    summary="Download layout binary field (by id)",
 )
 @requires_one([NucliaDBRoles.READER])
 @version(1)
@@ -225,7 +225,7 @@ async def _download_field_layout(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/conversation/{{field_id}}/download/field/{{message_id}}/{{file_num}}",  # noqa
     tags=["Resource fields"],
     status_code=200,
-    name="Download conversation binary field (by slug)",
+    summary="Download conversation binary field (by slug)",
 )
 @requires_one([NucliaDBRoles.READER])
 @version(1)
@@ -246,7 +246,7 @@ async def download_field_conversation_rslug_prefix(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/conversation/{{field_id}}/download/field/{{message_id}}/{{file_num}}",  # noqa
     tags=["Resource fields"],
     status_code=200,
-    name="Download conversation binary field (by id)",
+    summary="Download conversation binary field (by id)",
 )
 @requires_one([NucliaDBRoles.READER])
 @version(1)

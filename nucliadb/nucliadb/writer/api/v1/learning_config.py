@@ -29,7 +29,7 @@ from nucliadb_utils.authentication import requires
 @api.post(
     path=f"/{KB_PREFIX}/{{kbid}}/configuration",
     status_code=204,
-    name="Create Knowledge Box models configuration",
+    summary="Create Knowledge Box models configuration",
     description="Create configuration of models assigned to a Knowledge Box",
     response_model=None,
     tags=["Knowledge Boxes"],
@@ -46,7 +46,7 @@ async def set_configuration(
 @api.patch(
     path=f"/{KB_PREFIX}/{{kbid}}/configuration",
     status_code=204,
-    name="Update Knowledge Box models configuration",
+    summary="Update Knowledge Box models configuration",
     description="Update current configuration of models assigned to a Knowledge Box",
     response_model=None,
     tags=["Knowledge Boxes"],

@@ -54,7 +54,7 @@ from nucliadb_utils.authentication import requires_one
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/export",
     status_code=200,
-    name="Start an export of a Knowledge Box",
+    summary="Start an export of a Knowledge Box",
     tags=["Knowledge Boxes"],
     response_model=CreateExportResponse,
 )
@@ -79,7 +79,7 @@ async def start_kb_export_endpoint(request: Request, kbid: str):
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/import",
     status_code=200,
-    name="Start an import to a Knowledge Box",
+    summary="Start an import to a Knowledge Box",
     tags=["Knowledge Boxes"],
     response_model=CreateImportResponse,
 )

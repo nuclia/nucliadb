@@ -87,7 +87,7 @@ SEARCH_EXAMPLES = {
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/search",
     status_code=200,
-    name="Search Knowledge Box",
+    summary="Search Knowledge Box",
     description="Search on a Knowledge Box and retrieve separate results for documents, paragraphs, and sentences. Usually, it is better to use `find`",  # noqa: E501
     response_model=KnowledgeboxSearchResults,
     response_model_exclude_unset=True,
@@ -206,7 +206,7 @@ async def search_knowledgebox(
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/catalog",
     status_code=200,
-    name="List resources of a Knowledge Box",
+    summary="List resources of a Knowledge Box",
     description="List resources of a Knowledge Box",
     response_model=KnowledgeboxSearchResults,
     response_model_exclude_unset=True,
@@ -250,7 +250,7 @@ async def catalog_get(
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/catalog",
     status_code=200,
-    name="List resources of a Knowledge Box",
+    summary="List resources of a Knowledge Box",
     description="List resources of a Knowledge Box",
     response_model=KnowledgeboxSearchResults,
     response_model_exclude_unset=True,
@@ -346,7 +346,7 @@ async def catalog(
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/search",
     status_code=200,
-    name="Search Knowledge Box",
+    summary="Search Knowledge Box",
     description="Search on a Knowledge Box and retrieve separate results for documents, paragraphs, and sentences. Usually, it is better to use `find`",  # noqa: E501
     response_model=KnowledgeboxSearchResults,
     response_model_exclude_unset=True,

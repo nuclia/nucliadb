@@ -55,7 +55,7 @@ from nucliadb_utils.utilities import get_ingest
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/entitiesgroups",
     status_code=200,
-    name="Create Knowledge Box Entities Group",
+    summary="Create Knowledge Box Entities Group",
     tags=["Knowledge Box Services"],
     openapi_extra={"x-operation_order": 1},
 )
@@ -100,7 +100,7 @@ async def create_entities_group(
 @api.patch(
     f"/{KB_PREFIX}/{{kbid}}/entitiesgroup/{{group}}",
     status_code=200,
-    name="Update Knowledge Box Entities Group",
+    summary="Update Knowledge Box Entities Group",
     tags=["Knowledge Box Services"],
     openapi_extra={"x-operation_order": 2},
 )
@@ -147,7 +147,7 @@ async def update_entities_group(
 @api.delete(
     f"/{KB_PREFIX}/{{kbid}}/entitiesgroup/{{group}}",
     status_code=200,
-    name="Delete Knowledge Box Entities",
+    summary="Delete Knowledge Box Entities",
     tags=["Knowledge Box Services"],
     openapi_extra={"x-operation_order": 3},
 )
@@ -175,7 +175,7 @@ async def delete_entities(request: Request, kbid: str, group: str):
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/labelset/{{labelset}}",
     status_code=200,
-    name="Set Knowledge Box Labels",
+    summary="Set Knowledge Box Labels",
     tags=["Knowledge Box Services"],
     openapi_extra={"x-operation_order": 1},
 )
@@ -221,7 +221,7 @@ async def set_labels(request: Request, kbid: str, labelset: str, item: LabelSet)
 @api.delete(
     f"/{KB_PREFIX}/{{kbid}}/labelset/{{labelset}}",
     status_code=200,
-    name="Delete Knowledge Box Label",
+    summary="Delete Knowledge Box Label",
     tags=["Knowledge Box Services"],
     openapi_extra={"x-operation_order": 3},
 )
@@ -247,7 +247,7 @@ async def delete_labels(request: Request, kbid: str, labelset: str):
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/custom-synonyms",
     status_code=204,
-    name="Set Knowledge Box Custom Synonyms",
+    summary="Set Knowledge Box Custom Synonyms",
     tags=["Knowledge Box Services"],
     openapi_extra={"x-operation_order": 1},
 )
@@ -272,7 +272,7 @@ async def set_custom_synonyms(request: Request, kbid: str, item: KnowledgeBoxSyn
 @api.delete(
     f"/{KB_PREFIX}/{{kbid}}/custom-synonyms",
     status_code=204,
-    name="Delete Knowledge Box Custom Synonyms",
+    summary="Delete Knowledge Box Custom Synonyms",
     tags=["Knowledge Box Services"],
     openapi_extra={"x-operation_order": 3},
 )

@@ -32,7 +32,7 @@ from nucliadb_utils.authentication import requires_one
     f"/{KB_PREFIX}/{{kbid}}/check/labeler/{{labelset}}",
     tags=["Train"],
     status_code=200,
-    name="Return check status of labels",
+    summary="Return check status of labels",
     response_model=TrainSetPartitions,
 )
 @version(1)
@@ -48,7 +48,7 @@ async def check_labeler(
     f"/{KB_PREFIX}/{{kbid}}/check/ner/{{entitygroup}}",
     tags=["Train"],
     status_code=200,
-    name="Return check status of entities",
+    summary="Return check status of entities",
     response_model=TrainSetPartitions,
 )
 @version(1)

@@ -29,7 +29,7 @@ from nucliadb_utils.authentication import requires
 @api.get(
     path=f"/{KB_PREFIX}/{{kbid}}/feedback/{{month}}",
     status_code=200,
-    name="Download feedback of a Knowledge Box",
+    summary="Download feedback of a Knowledge Box",
     description="Download the feedback of a particular month in a Knowledge Box",  # noqa
     response_model=None,
     tags=["Knowledge Boxes"],
@@ -49,7 +49,7 @@ async def feedback_download(
 @api.get(
     path=f"/{KB_PREFIX}/{{kbid}}/feedback",
     status_code=200,
-    name="Feedback avalaible months",
+    summary="Feedback avalaible months",
     description="List of months within the last year with feedback data",
     response_model=None,
     tags=["Knowledge Boxes"],

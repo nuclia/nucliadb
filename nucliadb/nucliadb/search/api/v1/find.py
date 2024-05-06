@@ -63,7 +63,7 @@ FIND_EXAMPLES = {
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/find",
     status_code=200,
-    name="Find Knowledge Box",
+    summary="Find Knowledge Box",
     description="Find on a Knowledge Box",
     response_model=KnowledgeboxFindResults,
     response_model_exclude_unset=True,
@@ -170,7 +170,7 @@ async def find_knowledgebox(
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/find",
     status_code=200,
-    name="Find Knowledge Box",
+    summary="Find Knowledge Box",
     description="Find on a Knowledge Box",
     response_model=KnowledgeboxFindResults,
     response_model_exclude_unset=True,

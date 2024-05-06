@@ -36,8 +36,7 @@ from nucliadb_utils.exceptions import LimitsExceededError
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/summarize",
     status_code=200,
-    name="Summarize Your Documents",
-    summary="Summarize Your Documents",
+    summary="Summarize your documents",
     description="Summarize Your Documents",
     tags=["Search"],
     response_model=SummarizedResponse,

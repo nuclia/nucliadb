@@ -34,7 +34,7 @@ from nucliadb_utils.authentication import requires_one
     f"/{KB_PREFIX}/{{kbid}}/trainset/{{shard}}",
     tags=["Object Response"],
     status_code=200,
-    name="Return Train Stream",
+    summary="Return Train Stream",
 )
 @requires_one([NucliaDBRoles.READER])
 @version(1)
