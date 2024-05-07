@@ -226,7 +226,7 @@ class S3StorageField(StorageField):
             # delete existing file
             try:
                 await self.storage.delete_upload(
-                    uri=self.field.old_uri, bucket=self.field.old_bucket
+                    uri=self.field.old_uri, bucket_name=self.field.old_bucket
                 )
                 self.field.ClearField("old_uri")
                 self.field.ClearField("old_bucket")
