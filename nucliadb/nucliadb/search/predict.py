@@ -20,12 +20,13 @@
 import json
 import os
 from enum import Enum
-from typing import AsyncIterator, Optional
+from typing import Any, AsyncIterator, Literal, Optional, Union
 from unittest.mock import AsyncMock, Mock
 
 import aiohttp
 import backoff
 from nucliadb_protos.utils_pb2 import RelationNode
+from pydantic import BaseModel, Field
 
 from nucliadb.ingest.tests.vectors import Q, Qm2023
 from nucliadb.search import logger
@@ -113,6 +114,41 @@ class AnswerStatusCode(str, Enum):
     SUCCESS = "0"
     ERROR = "-1"
     NO_CONTEXT = "-2"
+
+
+class TextGenerativeResponse(BaseModel):
+    type: Literal["text"] = "text"
+    text: str
+
+
+class MetaGenerativeResponse(BaseModel):
+    type: Literal["meta"] = "meta"
+    input_tokens: int
+    output_tokens: int
+    timings: dict[str, float]
+
+
+class CitationsGenerativeResponse(BaseModel):
+    type: Literal["citations"] = "citations"
+    citations: dict[str, Any]
+
+
+class StatusGenerativeResponse(BaseModel):
+    type: Literal["status"] = "status"
+    code: str
+    details: Optional[str] = None
+
+
+GenerativeResponse = Union[
+    TextGenerativeResponse,
+    MetaGenerativeResponse,
+    CitationsGenerativeResponse,
+    StatusGenerativeResponse,
+]
+
+
+class GenerativeChunk(BaseModel):
+    chunk: GenerativeResponse = Field(..., discriminator="type")
 
 
 async def start_predict_engine():
@@ -304,6 +340,32 @@ class PredictEngine:
         ident = resp.headers.get(NUCLIA_LEARNING_ID_HEADER)
         return ident, get_answer_generator(resp)
 
+    @predict_observer.wrap({"type": "chat_v2"})
+    async def chat_query_v2(
+        self, kbid: str, item: ChatModel
+    ) -> tuple[str, AsyncIterator[bytes]]:
+        try:
+            self.check_nua_key_is_configured_for_onprem()
+        except NUAKeyMissingError:
+            error = "Nuclia Service account is not defined so the chat operation could not be performed"
+            logger.warning(error)
+            raise SendToPredictError(error)
+
+        # The new stream format is triggered by the Accept header
+        headers = self.get_predict_headers(kbid)
+        headers["Accept"] = "application/x-ndjson"
+
+        resp = await self.make_request(
+            "POST",
+            url=self.get_predict_url(CHAT, kbid),
+            json=item.dict(),
+            headers=headers,
+            timeout=None,
+        )
+        await self.check_response(resp, expected_status=200)
+        ident = resp.headers.get(NUCLIA_LEARNING_ID_HEADER)
+        return ident, get_v2_answer_generator(resp)
+
     @predict_observer.wrap({"type": "query"})
     async def query(
         self,
@@ -494,6 +556,24 @@ class DummyPredictEngine(PredictEngine):
 
 
 def get_answer_generator(response: aiohttp.ClientResponse):
+    """
+    Returns an async generator that yields the chunks of the response
+    in the same way as received from the server.
+    See: https://docs.aiohttp.org/en/stable/streams.html#aiohttp.StreamReader.iter_chunks
+    """
+
+    async def _iter_answer_chunks(gen):
+        buffer = b""
+        async for chunk, end_of_chunk in gen:
+            buffer += chunk
+            if end_of_chunk:
+                yield buffer
+                buffer = b""
+
+    return _iter_answer_chunks(response.content.iter_chunks())
+
+
+def get_v2_answer_generator(response: aiohttp.ClientResponse):
     """
     Returns an async generator that yields the chunks of the response
     in the same way as received from the server.

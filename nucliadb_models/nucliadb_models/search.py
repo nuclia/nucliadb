@@ -1307,3 +1307,59 @@ def validate_facets(facets):
                 )
         facet = next_facet
     return facets
+
+
+class AskRequest(ChatRequest): ...
+
+
+class FindResultsAskResponseItem(BaseModel):
+    type: Literal["find_results"] = "find_results"
+    results: KnowledgeboxFindResults
+
+
+class TextAskResponseItem(BaseModel):
+    type: Literal["text"] = "text"
+    text: str
+
+
+class MetadataAskResponseItem(BaseModel):
+    type: Literal["metadata"] = "metadata"
+    input_tokens: int
+    output_tokens: int
+    timings: dict[str, float]
+
+
+class CitationsAskResponseItem(BaseModel):
+    type: Literal["citations"] = "citations"
+    citations: dict[str, Any]
+
+
+class StatusAskResponseItem(BaseModel):
+    type: Literal["status"] = "status"
+    code: str
+    details: Optional[str] = None
+
+
+class ErrorAskResponseItem(BaseModel):
+    type: Literal["error"] = "error"
+    error: str
+
+
+class RelationsAskResponseItem(BaseModel):
+    type: Literal["relations"] = "relations"
+    relations: Relations
+
+
+AskResponseItemType = Union[
+    TextAskResponseItem,
+    MetadataAskResponseItem,
+    CitationsAskResponseItem,
+    StatusAskResponseItem,
+    ErrorAskResponseItem,
+    FindResultsAskResponseItem,
+    RelationsAskResponseItem,
+]
+
+
+class AskResultItem(BaseModel):
+    item: AskResponseItemType = Field(..., discriminator="type")
