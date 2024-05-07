@@ -217,21 +217,18 @@ impl VectorWriterService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn create(config: &VectorConfig) -> NodeResult<Self> {
+    pub fn create(config: VectorConfig) -> NodeResult<Self> {
         let path = std::path::Path::new(&config.path);
         if path.exists() {
             Err(node_error!("Shard does exist".to_string()))
         } else {
-            let Some(similarity) = config.similarity.map(|i| i.into()) else {
-                return Err(node_error!("A similarity must be specified, {:?}", config.similarity));
-            };
             let index_metadata = IndexMetadata {
-                similarity,
+                similarity: config.similarity.into(),
                 channel: config.channel,
                 normalize_vectors: config.normalize_vectors,
             };
             Ok(VectorWriterService {
-                index: Writer::new(path, index_metadata, config.shard_id.clone())?,
+                index: Writer::new(path, index_metadata, config.shard_id)?,
                 path: path.to_path_buf(),
             })
         }
@@ -266,7 +263,7 @@ mod tests {
     fn test_new_vector_writer() {
         let dir = TempDir::new().unwrap();
         let vsc = VectorConfig {
-            similarity: Some(VectorSimilarity::Cosine),
+            similarity: VectorSimilarity::Cosine,
             path: dir.path().join("vectors"),
             channel: Channel::EXPERIMENTAL,
             shard_id: "abc".into(),
@@ -320,7 +317,7 @@ mod tests {
             ..Default::default()
         };
         // insert - delete - insert sequence
-        let mut writer = VectorWriterService::create(&vsc).unwrap();
+        let mut writer = VectorWriterService::create(vsc).unwrap();
         let res = writer.set_resource(&resource);
         assert!(res.is_ok());
         let res = writer.delete_resource(&resource_id);
@@ -333,7 +330,7 @@ mod tests {
     fn test_get_segments() {
         let dir = TempDir::new().unwrap();
         let vsc = VectorConfig {
-            similarity: Some(VectorSimilarity::Cosine),
+            similarity: VectorSimilarity::Cosine,
             path: dir.path().join("vectors"),
             channel: Channel::EXPERIMENTAL,
             shard_id: "abc".into(),
@@ -383,7 +380,7 @@ mod tests {
             ..Default::default()
         };
         // insert - delete - insert sequence
-        let mut writer = VectorWriterService::create(&vsc).unwrap();
+        let mut writer = VectorWriterService::create(vsc).unwrap();
         let res = writer.set_resource(&resource);
         assert!(res.is_ok());
         let res = writer.delete_resource(&resource_id);

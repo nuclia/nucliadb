@@ -34,15 +34,16 @@ use tempfile::TempDir;
 
 pub fn test_reader() -> TextReaderService {
     let dir = TempDir::new().unwrap();
+    let shard_path = dir.path().join("texts");
     let config = TextConfig {
-        path: dir.path().join("texts"),
+        path: shard_path.clone(),
     };
 
-    let mut writer = TextWriterService::create(&config).unwrap();
+    let mut writer = TextWriterService::create(config).unwrap();
     let resource = create_resource("shard".to_string());
     writer.set_resource(&resource).unwrap();
 
-    TextReaderService::open(&config.path).unwrap()
+    TextReaderService::open(&shard_path).unwrap()
 }
 
 pub fn create_resource(shard_id: String) -> Resource {

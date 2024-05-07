@@ -51,7 +51,7 @@ use object_store::aws::AmazonS3Builder;
 use object_store::gcp::GoogleCloudStorageBuilder;
 use object_store::memory::InMemory;
 use serde::{Deserialize, Deserializer};
-use tracing::{error, warn};
+use tracing::{error, info, warn};
 
 fn parse_log_levels_serde<'de, D>(d: D) -> Result<Vec<(String, Level)>, D::Error>
 where
@@ -105,7 +105,7 @@ impl From<EnvSettings> for Settings {
 }
 
 pub fn build_object_store_driver(settings: &EnvSettings) -> Arc<dyn ObjectStore> {
-    println!("File backend: {:?}", settings.file_backend);
+    info!("File backend: {:?}", settings.file_backend);
     match settings.file_backend {
         ObjectStoreType::GCS => {
             let mut builder = GoogleCloudStorageBuilder::new().with_bucket_name(settings.gcs_indexing_bucket.clone());

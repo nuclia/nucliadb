@@ -186,6 +186,7 @@ impl ShardWriterCache {
         if let Some(shard) = shard {
             // The shard was still cached, there may be operations running on it. We must ensure
             // that all of them have finished before proceeding.
+            // XXX: DEAD CODE! this function use to acquire a write lock in the shard writer
             // let _blocking_token = shard.block_shard();
             // At this point we can ensure that no operations are being performed in this shard.
             // Next operations will require using the cache, where the shard is marked as deleted.

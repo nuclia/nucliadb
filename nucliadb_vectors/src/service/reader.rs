@@ -61,11 +61,6 @@ impl Debug for VectorReaderService {
 }
 
 impl VectorReader for VectorReaderService {
-    fn update(&mut self) -> NodeResult<()> {
-        self.index.update()?;
-        Ok(())
-    }
-
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
         debug!("Id for the vectorset is empty");
@@ -198,9 +193,10 @@ mod tests {
     #[test]
     fn test_key_prefix_search() {
         let dir = TempDir::new().unwrap();
+        let shard_path = dir.path().join("vectors");
         let vsc = VectorConfig {
-            similarity: Some(VectorSimilarity::Cosine),
-            path: dir.path().join("vectors"),
+            similarity: VectorSimilarity::Cosine,
+            path: shard_path.clone(),
             channel: Channel::EXPERIMENTAL,
             shard_id: "abc".into(),
             normalize_vectors: false,
@@ -254,10 +250,10 @@ mod tests {
             ..Default::default()
         };
         // insert - delete - insert sequence
-        let mut writer = VectorWriterService::create(&vsc).unwrap();
+        let mut writer = VectorWriterService::create(vsc).unwrap();
         writer.set_resource(&resource).unwrap();
 
-        let reader = VectorReaderService::open(&vsc.path).unwrap();
+        let reader = VectorReaderService::open(&shard_path).unwrap();
         let mut request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),
@@ -281,9 +277,10 @@ mod tests {
     #[test]
     fn test_new_vector_reader() {
         let dir = TempDir::new().unwrap();
+        let shard_path = dir.path().join("vectors");
         let vsc = VectorConfig {
-            similarity: Some(VectorSimilarity::Cosine),
-            path: dir.path().join("vectors"),
+            similarity: VectorSimilarity::Cosine,
+            path: shard_path.clone(),
             channel: Channel::EXPERIMENTAL,
             shard_id: "abc".into(),
             normalize_vectors: false,
@@ -337,10 +334,10 @@ mod tests {
             ..Default::default()
         };
         // insert - delete - insert sequence
-        let mut writer = VectorWriterService::create(&vsc).unwrap();
+        let mut writer = VectorWriterService::create(vsc).unwrap();
         let res = writer.set_resource(&resource);
         assert!(res.is_ok());
-        let reader = VectorReaderService::open(&vsc.path).unwrap();
+        let reader = VectorReaderService::open(&shard_path).unwrap();
         let request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),
@@ -403,9 +400,10 @@ mod tests {
     #[test]
     fn test_vectors_deduplication() {
         let dir = TempDir::new().unwrap();
+        let shard_path = dir.path().join("vectors");
         let vsc = VectorConfig {
-            similarity: Some(VectorSimilarity::Cosine),
-            path: dir.path().join("vectors"),
+            similarity: VectorSimilarity::Cosine,
+            path: shard_path.clone(),
             channel: Channel::EXPERIMENTAL,
             shard_id: "abc".into(),
             normalize_vectors: false,
@@ -454,10 +452,10 @@ mod tests {
             shard_id: "DOC".to_string(),
             ..Default::default()
         };
-        let mut writer = VectorWriterService::create(&vsc).unwrap();
+        let mut writer = VectorWriterService::create(vsc).unwrap();
         let res = writer.set_resource(&resource);
         assert!(res.is_ok());
-        let reader = VectorReaderService::open(&vsc.path).unwrap();
+        let reader = VectorReaderService::open(&shard_path).unwrap();
         let request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),
