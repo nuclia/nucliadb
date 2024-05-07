@@ -18,14 +18,13 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 use std::path::PathBuf;
-use std::sync::{Arc, RwLock};
 
 use crate::prelude::*;
 use crate::protos::*;
 use crate::query_planner::{PreFilterRequest, PreFilterResponse};
 use crate::IndexFiles;
 
-pub type TextsReaderPointer = Arc<RwLock<dyn FieldReader>>;
+pub type TextsReaderPointer = Box<dyn FieldReader>;
 pub type TextsWriterPointer = Box<dyn FieldWriter>;
 pub type ProtosRequest = DocumentSearchRequest;
 pub type ProtosResponse = DocumentSearchResponse;

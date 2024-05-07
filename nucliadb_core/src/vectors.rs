@@ -20,7 +20,6 @@
 
 use std::collections::HashSet;
 use std::path::PathBuf;
-use std::sync::{Arc, RwLock};
 
 use uuid::Uuid;
 
@@ -31,7 +30,7 @@ use crate::query_language::BooleanExpression;
 use crate::Channel;
 use crate::IndexFiles;
 
-pub type VectorsReaderPointer = Arc<RwLock<dyn VectorReader>>;
+pub type VectorsReaderPointer = Box<dyn VectorReader>;
 pub type VectorsWriterPointer = Box<dyn VectorWriter>;
 pub type ProtosRequest = VectorSearchRequest;
 pub type ProtosResponse = VectorSearchResponse;
@@ -84,8 +83,6 @@ pub trait VectorReader: std::fmt::Debug + Send + Sync {
     fn search(&self, request: &ProtosRequest, context: &VectorsContext) -> NodeResult<ProtosResponse>;
     fn stored_ids(&self) -> NodeResult<Vec<String>>;
     fn count(&self) -> NodeResult<usize>;
-
-    fn update(&mut self) -> NodeResult<()>;
 }
 
 pub trait VectorWriter: std::fmt::Debug + Send + Sync {

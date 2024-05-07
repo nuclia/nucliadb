@@ -61,11 +61,6 @@ impl Debug for VectorReaderService {
 }
 
 impl VectorReader for VectorReaderService {
-    fn update(&mut self) -> NodeResult<()> {
-        self.index.update()?;
-        Ok(())
-    }
-
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
         debug!("Id for the vectorset is empty");
