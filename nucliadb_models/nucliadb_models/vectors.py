@@ -40,9 +40,10 @@ class SemanticModelMetadata(BaseModel):
     vector_dimension: Optional[int] = Field(
         description="Dimension of the indexed vectors/embeddings"
     )
-    default_min_score: Optional[float] = Field(
-        description="Default minimum similarity value at which results are ignored"
-    )
+
+    # We no longer need this field as we're fetching the minimum
+    # semantic score from the query endpoint at search time
+    default_min_score: Optional[float] = Field(description="Deprecated", default=None)
 
     @classmethod
     def from_message(cls, message: knowledgebox_pb2.SemanticModelMetadata):

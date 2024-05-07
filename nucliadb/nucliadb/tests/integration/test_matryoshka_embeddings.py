@@ -54,7 +54,6 @@ async def test_matryoshka_embeddings(
             # set vector dimension to the greatest matryoshka dimension, but
             # we'll internally choose another one more convinient for nucliadb
             vector_dimension=matryoshka_dimensions[0],
-            default_min_score=0.0,
             matryoshka_dimensions=matryoshka_dimensions,
         )
     )

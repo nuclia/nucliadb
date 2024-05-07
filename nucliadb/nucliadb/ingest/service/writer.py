@@ -773,10 +773,6 @@ def parse_model_metadata_from_learning_config(
         model.vector_dimension = lconfig.semantic_vector_size
     else:
         logger.warning("Vector dimension not set!")
-    if lconfig.semantic_threshold is not None:
-        model.default_min_score = lconfig.semantic_threshold
-    else:
-        logger.warning("Default min score not set!")
     if lconfig.semantic_matryoshka_dimensions is not None:
         model.matryoshka_dimensions.extend(lconfig.semantic_matryoshka_dimensions)
     return model
@@ -793,10 +789,6 @@ def parse_model_metadata_from_request(
         logger.warning(
             "Vector dimension not set. Will be detected automatically on the first vector set."
         )
-    if request.HasField("default_min_score"):
-        model.default_min_score = request.default_min_score
-    else:
-        logger.warning("Default min score not set!")
 
     if len(request.matryoshka_dimensions) > 0:
         if model.vector_dimension not in request.matryoshka_dimensions:
