@@ -213,6 +213,8 @@ def get_cloud_files(bm: writer_pb2.BrokerMessage) -> list[resources_pb2.CloudFil
             _clone_collect_cf(binaries, link_extracted_data.link_preview)
         if link_extracted_data.HasField("link_image"):
             _clone_collect_cf(binaries, link_extracted_data.link_image)
+        for file_generated in link_extracted_data.file_generated.values():
+            _clone_collect_cf(binaries, file_generated)
 
     for field_metadata in bm.field_metadata:
         if field_metadata.metadata.metadata.HasField("thumbnail"):

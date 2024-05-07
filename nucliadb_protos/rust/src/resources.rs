@@ -272,6 +272,8 @@ pub struct LinkExtractedData {
     pub embed: ::prost::alloc::string::String,
     #[prost(message, optional, tag="13")]
     pub pdf_structure: ::core::option::Option<PageStructure>,
+    #[prost(map="string, message", tag="14")]
+    pub file_generated: ::std::collections::HashMap<::prost::alloc::string::String, CloudFile>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ExtractedTextWrapper {

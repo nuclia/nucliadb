@@ -56,6 +56,7 @@ async def test_create_resource_orm_link_extracted(
     )
     ex1.link_preview.CopyFrom(cf1)
     ex1.link_thumbnail.CopyFrom(cf1)
+    ex1.file_generated["asd"].CopyFrom(cf1)
 
     field_obj: Link = await r.get_field(ex1.field, FieldType.LINK, load=False)
     await field_obj.set_link_extracted_data(ex1)
@@ -67,4 +68,7 @@ async def test_create_resource_orm_link_extracted(
     data = await storage.downloadbytescf(ex2.link_preview)
     with open(filename, "rb") as testfile:
         data2 = testfile.read()
+    assert data.read() == data2
+
+    data = await storage.downloadbytescf(ex2.file_generated["asd"])
     assert data.read() == data2
