@@ -446,3 +446,45 @@ def tokens_to_chars(n_tokens: int) -> int:
     # Multiply by 3 to have a good margin and guess between characters and tokens.
     # This will be properly cut at the NUA predict API.
     return n_tokens * 3
+
+
+class ChatAuditor:
+    def __init__(
+        self,
+        kbid: str,
+        user_id: str,
+        client_type: NucliaDBClientType,
+        origin: str,
+        start_time: float,
+        user_query: str,
+        rephrased_query: Optional[str],
+        chat_history: list[str],
+        learning_id: Optional[str],
+        query_context: list[str],
+    ):
+        self.kbid = kbid
+        self.user_id = user_id
+        self.client_type = client_type
+        self.origin = origin
+        self.start_time = start_time
+        self.user_query = user_query
+        self.rephrased_query = rephrased_query
+        self.chat_history = chat_history
+        self.learning_id = learning_id
+        self.query_context = query_context
+
+    async def audit(self, text_answer: bytes, status_code: AnswerStatusCode):
+        await maybe_audit_chat(
+            kbid=self.kbid,
+            user_id=self.user_id,
+            client_type=self.client_type,
+            origin=self.origin,
+            duration=time() - self.start_time,
+            user_query=self.user_query,
+            rephrased_query=self.rephrased_query,
+            text_answer=text_answer,
+            status_code=status_code.value,
+            chat_history=self.chat_history,
+            query_context=self.query_context,
+            learning_id=self.learning_id,
+        )

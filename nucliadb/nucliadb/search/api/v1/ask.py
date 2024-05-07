@@ -31,9 +31,7 @@ from nucliadb.search import predict
 from nucliadb.search.api.v1.resource.ask import ASK_EXAMPLES
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.predict import AnswerStatusCode
-from nucliadb.search.search.chat.query import (
-    ask,
-)
+from nucliadb.search.search.chat.query import ask
 from nucliadb.search.search.exceptions import (
     IncompleteFindResultsError,
     InvalidQueryError,

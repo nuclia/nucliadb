@@ -26,7 +26,7 @@ from unittest.mock import AsyncMock, Mock
 import aiohttp
 import backoff
 from nucliadb_protos.utils_pb2 import RelationNode
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from nucliadb.ingest.tests.vectors import Q, Qm2023
 from nucliadb.search import logger
@@ -42,7 +42,7 @@ from nucliadb_models.search import (
     SummarizeModel,
     TokenSearch,
 )
-from nucliadb_telemetry import metrics
+from nucliadb_telemetry import errors, metrics
 from nucliadb_utils import const
 from nucliadb_utils.exceptions import LimitsExceededError
 from nucliadb_utils.settings import nuclia_settings
@@ -343,7 +343,7 @@ class PredictEngine:
     @predict_observer.wrap({"type": "chat_v2"})
     async def chat_query_v2(
         self, kbid: str, item: ChatModel
-    ) -> tuple[str, AsyncIterator[bytes]]:
+    ) -> tuple[str, AsyncIterator[GenerativeChunk]]:
         try:
             self.check_nua_key_is_configured_for_onprem()
         except NUAKeyMissingError:
@@ -364,7 +364,7 @@ class PredictEngine:
         )
         await self.check_response(resp, expected_status=200)
         ident = resp.headers.get(NUCLIA_LEARNING_ID_HEADER)
-        return ident, get_v2_answer_generator(resp)
+        return ident, get_chat_v2_answer_generator(resp)
 
     @predict_observer.wrap({"type": "query"})
     async def query(
@@ -573,22 +573,19 @@ def get_answer_generator(response: aiohttp.ClientResponse):
     return _iter_answer_chunks(response.content.iter_chunks())
 
 
-def get_v2_answer_generator(response: aiohttp.ClientResponse):
-    """
-    Returns an async generator that yields the chunks of the response
-    in the same way as received from the server.
-    See: https://docs.aiohttp.org/en/stable/streams.html#aiohttp.StreamReader.iter_chunks
-    """
+def get_chat_v2_answer_generator(
+    response: aiohttp.ClientResponse,
+) -> AsyncIterator[GenerativeChunk]:
+    async def _parse_generative_chunks(gen):
+        async for chunk in gen:
+            try:
+                yield GenerativeChunk.parse_raw(chunk.strip())
+            except ValidationError as ex:
+                errors.capture_exception(ex)
+                logger.error(f"Invalid chunk received: {chunk}")
+                continue
 
-    async def _iter_answer_chunks(gen):
-        buffer = b""
-        async for chunk, end_of_chunk in gen:
-            buffer += chunk
-            if end_of_chunk:
-                yield buffer
-                buffer = b""
-
-    return _iter_answer_chunks(response.content.iter_chunks())
+    return _parse_generative_chunks(response.content)
 
 
 async def _parse_rephrase_response(

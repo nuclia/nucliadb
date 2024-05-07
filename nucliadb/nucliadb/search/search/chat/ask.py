@@ -22,12 +22,19 @@ from time import monotonic as time
 from typing import Any, AsyncGenerator, Optional
 
 from nucliadb.search import logger
-from nucliadb.search.predict import AnswerStatusCode
+from nucliadb.search.predict import (
+    AnswerStatusCode,
+    CitationsGenerativeResponse,
+    GenerativeChunk,
+    MetaGenerativeResponse,
+    StatusGenerativeResponse,
+    TextGenerativeResponse,
+)
 from nucliadb.search.search.chat.prompt import PromptContextBuilder
 from nucliadb.search.search.chat.query import (
+    ChatAuditor,
     get_find_results,
     get_relations_results,
-    maybe_audit_chat,
     rephrase_query,
     tokens_to_chars,
 )
@@ -45,6 +52,7 @@ from nucliadb_models.search import (
     NucliaDBClientType,
     PromptContext,
     PromptContextOrder,
+    Relations,
     StatusAskResponseItem,
     TextAskResponseItem,
     UserPrompt,
@@ -58,15 +66,10 @@ class AskResult:
         ask_request: AskRequest,
         find_results: KnowledgeboxFindResults,
         nuclia_learning_id: Optional[str],
-        user_id: str,
-        client_type: NucliaDBClientType,
-        origin: str,
-        start_time: float,
-        user_query: str,
-        rephrased_query: Optional[str],
-        predict_answer_stream: AsyncGenerator,
+        predict_answer_stream: AsyncGenerator[GenerativeChunk, None],
         prompt_context: PromptContext,
         prompt_context_order: PromptContextOrder,
+        auditor: ChatAuditor,
     ):
         # Initial attributes
         self.ask_request = ask_request
@@ -75,21 +78,27 @@ class AskResult:
         self.predict_answer_stream = predict_answer_stream
         self.prompt_context = prompt_context
         self.prompt_context_order = prompt_context_order
+        self.auditor = auditor
 
-        # Computed from the predict answer stream
+        # Computed from the predict chat answer stream
         self._answer_text = ""
-        self._status_code = AnswerStatusCode.NO_CONTEXT
-        self._citations = None
-        self._relations_results = None
+        self._status: Optional[StatusGenerativeResponse] = None
+        self._citations: Optional[CitationsGenerativeResponse] = None
+        self._metadata: Optional[MetaGenerativeResponse] = None
+        self._relations_results: Optional[Relations] = None
         self._relations_task = None
 
     @property
     def status_code(self) -> AnswerStatusCode:
-        return self._status_code
+        return self._status.code
 
     @property
     def citations(self) -> dict[str, Any]:
-        return self._citations or {}
+        return self._citations.citations
+
+    @property
+    def timings(self) -> dict[str, float]:
+        return self._metadata.timings
 
     @property
     def ask_request_with_relations(self) -> bool:
@@ -119,19 +128,10 @@ class AskResult:
         # Then the status code
         yield AskResultItem(item=StatusAskResponseItem(code=self.status_code))
 
-        await maybe_audit_chat(
-            kbid=self.ask_request.kbid,
-            user_id=self.user_id,
-            client_type=self.client_type,
-            origin=self.origin,
-            duration=time() - self.start_time,
-            user_query=self.user_query,
-            rephrased_query=self.rephrased_query,
-            text_answer=self.answer_text,
-            status_code=self.status_code.value,
-            chat_history=self.ask_request.chat_history,
-            query_context=self.prompt_context,
-            learning_id=self.nuclia_learning_id,
+        # Audit the answer
+        await self.auditor.audit(
+            status_code=self.status_code,
+            answer_text=self._answer_text.encode("utf-8"),
         )
 
         # Stream out the citations
@@ -155,25 +155,27 @@ class AskResult:
 
     async def _stream_predict_answer_text(self) -> AsyncGenerator[str, None]:
         async for item in self.predict_answer_stream:
-            if isinstance(item, TextAskResponseItem):
+            if isinstance(item, TextGenerativeResponse):
                 # Accumulate the answer text. We assume that the answer
                 # is streamed in order from the server
                 self._answer_text += item.text
                 yield item.text
             # Status code and citations are not part of the answer text but
             # we need to parse them while streaming the answer
-            elif isinstance(item, StatusAskResponseItem):
-                self._status_code = item.code
+            elif isinstance(item, StatusGenerativeResponse):
+                self._status = item
                 continue
-            elif isinstance(item, CitationsAskResponseItem):
-                self._citations = item.citations
+            elif isinstance(item, CitationsGenerativeResponse):
+                self._citations = item
                 continue
+            elif isinstance(item, MetaGenerativeResponse):
+                self._metadata = item
             else:
                 logger.warning(f"Unexpected item in predict answer stream: {item}")
                 continue
 
 
-class NotEnoughContextResult:
+class NotEnoughContextResult(AskResult):
     def __init__(
         self,
         find_results: KnowledgeboxFindResults,
@@ -186,7 +188,7 @@ class NotEnoughContextResult:
             item=TextAskResponseItem(text="Not enough context to answer.")
         )
         yield AskResultItem(
-            item=StatusAskResponseItem(status=AnswerStatusCode.NO_CONTEXT)
+            item=StatusAskResponseItem(code=AnswerStatusCode.NO_CONTEXT.value)
         )
 
 
@@ -207,8 +209,8 @@ async def ask(
     prompt_context: PromptContext = {}
     prompt_context_order: PromptContextOrder = {}
 
+    # Maybe rephrase the query
     if len(chat_history) > 0 or len(user_context) > 0:
-
         rephrased_query = await rephrase_query(
             kbid,
             chat_history=chat_history,
@@ -228,6 +230,7 @@ async def ask(
         ):
             needs_retrieval = False
 
+    # Maybe do a retrieval query
     if needs_retrieval:
         find_results, query_parser = await get_find_results(
             kbid=kbid,
@@ -253,6 +256,7 @@ async def ask(
             min_score=MinScore(),
         )
 
+    # Now we build the prompt context
     query_parser.max_tokens = ask_request.max_tokens  # type: ignore
     max_tokens_context = await query_parser.get_max_tokens_context()
     prompt_context_builder = PromptContextBuilder(
@@ -294,17 +298,25 @@ async def ask(
         kbid, chat_model
     )
 
-    return AskResult(
-        ask_request=ask_request,
-        find_results=find_results,
-        nuclia_learning_id=nuclia_learning_id,
+    auditor = ChatAuditor(
+        kbid=kbid,
         user_id=user_id,
         client_type=client_type,
         origin=origin,
         start_time=start_time,
         user_query=user_query,
         rephrased_query=rephrased_query,
+        chat_history=chat_history,
+        query_context=prompt_context,
+        learning_id=nuclia_learning_id,
+    )
+
+    return AskResult(
+        ask_request=ask_request,
+        find_results=find_results,
+        nuclia_learning_id=nuclia_learning_id,
         predict_answer_stream=predict_generator,
         prompt_context=prompt_context,
         prompt_context_order=prompt_context_order,
+        auditor=auditor,
     )
