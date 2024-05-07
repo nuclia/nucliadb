@@ -68,11 +68,10 @@ async def writer_api(
     def make_client_fixture(
         roles: Optional[list[Enum]] = None,
         user: str = "",
-        version: str = "1",
     ) -> AsyncClient:
         roles = roles or []
         client_base_url = "http://test"
-        client_base_url = f"{client_base_url}/{API_PREFIX}/v{version}"
+        client_base_url = f"{client_base_url}/{API_PREFIX}"
 
         client = AsyncClient(app=application, base_url=client_base_url)  # type: ignore
         client.headers["X-NUCLIADB-ROLES"] = ";".join(
