@@ -272,6 +272,7 @@ pub struct LinkExtractedData {
     pub embed: ::prost::alloc::string::String,
     #[prost(message, optional, tag="13")]
     pub pdf_structure: ::core::option::Option<PageStructure>,
+    /// The key is the file ID
     #[prost(map="string, message", tag="14")]
     pub file_generated: ::std::collections::HashMap<::prost::alloc::string::String, CloudFile>,
 }

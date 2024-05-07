@@ -757,7 +757,8 @@ class LinkExtractedData(google.protobuf.message.Message):
     @property
     def pdf_structure(self) -> global___PageStructure: ...
     @property
-    def file_generated(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___CloudFile]: ...
+    def file_generated(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___CloudFile]:
+        """The key is the file ID"""
     def __init__(
         self,
         *,
