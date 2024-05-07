@@ -26,7 +26,7 @@ use crate::Channel;
 use crate::IndexFiles;
 
 pub type RelationsReaderPointer = Arc<RwLock<dyn RelationsReader>>;
-pub type RelationsWriterPointer = Arc<RwLock<dyn RelationsWriter>>;
+pub type RelationsWriterPointer = Box<dyn RelationsWriter>;
 pub type ProtosRequest = RelationSearchRequest;
 pub type ProtosResponse = RelationSearchResponse;
 

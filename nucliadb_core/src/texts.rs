@@ -26,7 +26,7 @@ use crate::query_planner::{PreFilterRequest, PreFilterResponse};
 use crate::IndexFiles;
 
 pub type TextsReaderPointer = Arc<RwLock<dyn FieldReader>>;
-pub type TextsWriterPointer = Arc<RwLock<dyn FieldWriter>>;
+pub type TextsWriterPointer = Box<dyn FieldWriter>;
 pub type ProtosRequest = DocumentSearchRequest;
 pub type ProtosResponse = DocumentSearchResponse;
 
