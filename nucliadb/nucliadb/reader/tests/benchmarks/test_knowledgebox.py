@@ -47,7 +47,7 @@ async def test_get_knowledgeboxes(
     async with reader_api(roles=[NucliaDBRoles.MANAGER]) as client:
         resp = await asyncbenchmark(
             client.get,
-            f"/{KBS_PREFIX}",
+            f"/v1/{KBS_PREFIX}",
         )
         assert resp.status_code == 200
 

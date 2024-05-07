@@ -31,7 +31,7 @@ from nucliadb_utils.utilities import get_ingest
 async def test_service_lifecycle_entities(writer_api, entities_manager_mock):
     async with writer_api(roles=[NucliaDBRoles.MANAGER]) as client:
         resp = await client.post(
-            f"/{KBS_PREFIX}",
+            f"/v1/{KBS_PREFIX}",
             json={
                 "slug": "kbid1",
                 "title": "My Knowledge Box",
@@ -88,7 +88,7 @@ async def test_entities_custom_field_for_user_defined_groups(
     """
     async with writer_api(roles=[NucliaDBRoles.MANAGER]) as client:
         resp = await client.post(
-            f"/{KBS_PREFIX}",
+            f"/v1/{KBS_PREFIX}",
             json={
                 "slug": "kbid1",
                 "title": "My Knowledge Box",
@@ -114,7 +114,7 @@ async def test_entities_custom_field_for_user_defined_groups(
 async def test_service_lifecycle_labels(writer_api):
     async with writer_api(roles=[NucliaDBRoles.MANAGER]) as client:
         resp = await client.post(
-            f"/{KBS_PREFIX}",
+            f"/v1/{KBS_PREFIX}",
             json={
                 "slug": "kbid1",
                 "title": "My Knowledge Box",

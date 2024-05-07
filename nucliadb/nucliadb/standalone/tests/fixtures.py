@@ -28,7 +28,7 @@ from nucliadb.search.api.v1.router import KBS_PREFIX
 async def knowledgebox_one(nucliadb_manager):
     kbslug = str(uuid.uuid4())
     data = {"slug": kbslug}
-    resp = await nucliadb_manager.post(f"/{KBS_PREFIX}", json=data)
+    resp = await nucliadb_manager.post(f"/v1/{KBS_PREFIX}", json=data)
     assert resp.status_code == 201
     kbid = resp.json()["uuid"]
 

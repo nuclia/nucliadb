@@ -27,7 +27,7 @@ from nucliadb_models.resource import NucliaDBRoles
 async def test_knowledgebox_lifecycle(writer_api):
     async with writer_api(roles=[NucliaDBRoles.MANAGER]) as client:
         resp = await client.post(
-            f"/{KBS_PREFIX}",
+            f"/v1/{KBS_PREFIX}",
             json={
                 "slug": "kbid1",
                 "title": "My Knowledge Box",
