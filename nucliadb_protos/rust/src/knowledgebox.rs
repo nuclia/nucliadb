@@ -48,6 +48,7 @@ pub struct KnowledgeBoxNew {
     pub similarity: i32,
     #[prost(int32, optional, tag="5")]
     pub vector_dimension: ::core::option::Option<i32>,
+    #[deprecated]
     #[prost(float, optional, tag="6")]
     pub default_min_score: ::core::option::Option<f32>,
     #[prost(uint32, repeated, tag="9")]
@@ -239,6 +240,7 @@ pub struct SemanticModelMetadata {
     pub similarity_function: i32,
     #[prost(int32, optional, tag="2")]
     pub vector_dimension: ::core::option::Option<i32>,
+    #[deprecated]
     #[prost(float, optional, tag="3")]
     pub default_min_score: ::core::option::Option<f32>,
     /// list of possible subdivisions of the matryoshka embeddings (if the model
