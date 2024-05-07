@@ -707,6 +707,24 @@ class LinkExtractedData(google.protobuf.message.Message):
         ) -> None: ...
         def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
 
+    @typing_extensions.final
+    class FileGeneratedEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        @property
+        def value(self) -> global___CloudFile: ...
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: global___CloudFile | None = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+
     DATE_FIELD_NUMBER: builtins.int
     LANGUAGE_FIELD_NUMBER: builtins.int
     TITLE_FIELD_NUMBER: builtins.int
@@ -719,6 +737,7 @@ class LinkExtractedData(google.protobuf.message.Message):
     TYPE_FIELD_NUMBER: builtins.int
     EMBED_FIELD_NUMBER: builtins.int
     PDF_STRUCTURE_FIELD_NUMBER: builtins.int
+    FILE_GENERATED_FIELD_NUMBER: builtins.int
     @property
     def date(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     language: builtins.str
@@ -737,6 +756,9 @@ class LinkExtractedData(google.protobuf.message.Message):
     embed: builtins.str
     @property
     def pdf_structure(self) -> global___PageStructure: ...
+    @property
+    def file_generated(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___CloudFile]:
+        """The key is the file ID"""
     def __init__(
         self,
         *,
@@ -752,9 +774,10 @@ class LinkExtractedData(google.protobuf.message.Message):
         type: builtins.str = ...,
         embed: builtins.str = ...,
         pdf_structure: global___PageStructure | None = ...,
+        file_generated: collections.abc.Mapping[builtins.str, global___CloudFile] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["date", b"date", "link_image", b"link_image", "link_preview", b"link_preview", "link_thumbnail", b"link_thumbnail", "pdf_structure", b"pdf_structure"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["date", b"date", "description", b"description", "embed", b"embed", "field", b"field", "language", b"language", "link_image", b"link_image", "link_preview", b"link_preview", "link_thumbnail", b"link_thumbnail", "metadata", b"metadata", "pdf_structure", b"pdf_structure", "title", b"title", "type", b"type"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["date", b"date", "description", b"description", "embed", b"embed", "field", b"field", "file_generated", b"file_generated", "language", b"language", "link_image", b"link_image", "link_preview", b"link_preview", "link_thumbnail", b"link_thumbnail", "metadata", b"metadata", "pdf_structure", b"pdf_structure", "title", b"title", "type", b"type"]) -> None: ...
 
 global___LinkExtractedData = LinkExtractedData
 

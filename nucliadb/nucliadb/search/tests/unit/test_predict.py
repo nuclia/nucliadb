@@ -36,7 +36,6 @@ from nucliadb.search.predict import (
 )
 from nucliadb.tests.utils.aiohttp_session import get_mocked_session
 from nucliadb_models.search import (
-    AskDocumentModel,
     ChatModel,
     FeedbackRequest,
     FeedbackTasks,
@@ -58,7 +57,6 @@ async def test_dummy_predict_engine():
     assert await pe.rephrase_query("kbid", Mock())
     assert await pe.chat_query("kbid", Mock())
     assert await pe.detect_entities("kbid", "some sentence")
-    assert await pe.ask_document("kbid", "query", [["footext"]], "userid")
     assert await pe.summarize("kbid", Mock(resources={}))
 
 
@@ -157,7 +155,6 @@ def session_limits_exceeded():
             ],
         ),
         ("rephrase_query", ["kbid", RephraseModel(question="foo", user_id="bar")]),
-        ("ask_document", ["kbid", "query", [["footext"]], "userid"]),
     ],
 )
 async def test_predict_engine_handles_limits_exceeded_error(
@@ -181,7 +178,6 @@ async def test_predict_engine_handles_limits_exceeded_error(
         ("rephrase_query", ["kbid", Mock()], True, None),
         ("send_feedback", ["kbid", MagicMock(), "", "", ""], False, None),
         ("detect_entities", ["kbid", "sentence"], False, []),
-        ("ask_document", ["kbid", "query", [["footext"]], "userid"], True, None),
         ("summarize", ["kbid", Mock(resources={})], True, None),
     ],
 )
@@ -199,57 +195,6 @@ async def test_onprem_nuclia_service_account_not_configured(
             await getattr(pe, method)(*args)
     else:
         assert await getattr(pe, method)(*args) == output
-
-
-async def test_ask_document_onprem():
-    pe = PredictEngine(
-        "cluster",
-        "public-{zone}",
-        nuclia_service_account="foo",
-        zone="europe1",
-        onprem=True,
-    )
-    pe.session = get_mocked_session(
-        "POST", 200, text="The answer", context_manager=False
-    )
-
-    assert (
-        await pe.ask_document("kbid", "query", [["footext"]], "userid") == "The answer"
-    )
-
-    pe.session.post.assert_awaited_once_with(
-        url="public-europe1/api/v1/predict/ask_document/kbid",
-        json=AskDocumentModel(
-            question="query", blocks=[["footext"]], user_id="userid"
-        ).dict(),
-        headers={"X-STF-NUAKEY": "Bearer foo"},
-        timeout=None,
-    )
-
-
-async def test_ask_document_cloud():
-    pe = PredictEngine(
-        "cluster",
-        "public-{zone}",
-        zone="europe1",
-        onprem=False,
-    )
-    pe.session = get_mocked_session(
-        "POST", 200, text="The answer", context_manager=False
-    )
-
-    assert (
-        await pe.ask_document("kbid", "query", [["footext"]], "userid") == "The answer"
-    )
-
-    pe.session.post.assert_awaited_once_with(
-        url="cluster/api/v1/internal/predict/ask_document",
-        json=AskDocumentModel(
-            question="query", blocks=[["footext"]], user_id="userid"
-        ).dict(),
-        headers={"X-STF-KBID": "kbid"},
-        timeout=None,
-    )
 
 
 async def test_rephrase():

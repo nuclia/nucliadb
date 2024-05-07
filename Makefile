@@ -83,7 +83,7 @@ venv:  ## Initializes an environment
 
 install: ## Install dependencies (on the active environment)
 	pip install --upgrade pip wheel
-	pip install Cython==0.29.24 grpcio-tools>=1.44.0
+	pip install "Cython==0.29.24" "grpcio-tools>=1.44.0,<1.63.0"
 	pip install -r code-requirements.txt -r test-requirements.txt
 	pip install -e ./nucliadb_protos/python
 	pip install -e ./nucliadb_telemetry

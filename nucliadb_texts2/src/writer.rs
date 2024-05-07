@@ -170,7 +170,7 @@ impl TextWriterService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn create(config: &TextConfig) -> NodeResult<Self> {
+    pub fn create(config: TextConfig) -> NodeResult<Self> {
         Self::try_create_index_dir(&config.path)?;
 
         let settings = IndexSettings {
@@ -190,7 +190,7 @@ impl TextWriterService {
             index,
             writer,
             schema: field_schema,
-            config: config.clone(),
+            config,
         })
     }
 

@@ -35,13 +35,14 @@ use tempfile::TempDir;
 
 fn create_reader() -> NodeResult<RelationsReaderService> {
     let dir = TempDir::new().unwrap();
+    let shard_path = dir.path().join("relations");
     let config = RelationConfig {
-        path: dir.path().join("relations"),
+        path: shard_path.clone(),
         channel: Channel::EXPERIMENTAL,
     };
 
-    let mut writer = RelationsWriterService::create(&config)?;
-    let reader = RelationsReaderService::open(&config.path)?;
+    let mut writer = RelationsWriterService::create(config)?;
+    let reader = RelationsReaderService::open(&shard_path)?;
 
     writer.set_resource(&Resource {
         resource: Some(ResourceId {
@@ -124,13 +125,14 @@ fn create_reader() -> NodeResult<RelationsReaderService> {
 #[test]
 fn test_start_new_reader_after_a_writer() -> NodeResult<()> {
     let dir = TempDir::new()?;
+    let shard_path = dir.path().join("relations");
     let config = RelationConfig {
-        path: dir.path().join("relations"),
+        path: shard_path.clone(),
         channel: Channel::EXPERIMENTAL,
     };
 
-    let _writer = RelationsWriterService::create(&config)?;
-    let reader: Result<RelationsReaderService, nucliadb_core::Error> = RelationsReaderService::open(&config.path);
+    let _writer = RelationsWriterService::create(config)?;
+    let reader: Result<RelationsReaderService, nucliadb_core::Error> = RelationsReaderService::open(&shard_path);
     assert!(reader.is_ok());
 
     Ok(())

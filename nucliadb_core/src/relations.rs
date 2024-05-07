@@ -18,15 +18,14 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 use std::path::PathBuf;
-use std::sync::{Arc, RwLock};
 
 use crate::prelude::*;
 use crate::protos::*;
 use crate::Channel;
 use crate::IndexFiles;
 
-pub type RelationsReaderPointer = Arc<RwLock<dyn RelationsReader>>;
-pub type RelationsWriterPointer = Arc<RwLock<dyn RelationsWriter>>;
+pub type RelationsReaderPointer = Box<dyn RelationsReader>;
+pub type RelationsWriterPointer = Box<dyn RelationsWriter>;
 pub type ProtosRequest = RelationSearchRequest;
 pub type ProtosResponse = RelationSearchResponse;
 

@@ -4,12 +4,16 @@ pub struct OpStatus {
     pub status: i32,
     #[prost(string, tag="2")]
     pub detail: ::prost::alloc::string::String,
+    #[deprecated]
     #[prost(uint64, tag="3")]
     pub field_count: u64,
+    #[deprecated]
     #[prost(uint64, tag="5")]
     pub paragraph_count: u64,
+    #[deprecated]
     #[prost(uint64, tag="6")]
     pub sentence_count: u64,
+    #[deprecated]
     #[prost(string, tag="4")]
     pub shard_id: ::prost::alloc::string::String,
 }

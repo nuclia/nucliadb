@@ -76,6 +76,15 @@ class Link(Field):
             )
             link_extracted_data.link_image.CopyFrom(cf_link_image)
 
+        for fileid, origincf in link_extracted_data.file_generated.items():
+            sf_generated: StorageField = self.storage.file_extracted(
+                self.kbid, self.uuid, self.type, self.id, f"generated/{fileid}"
+            )
+            cf_generated: CloudFile = await self.storage.normalize_binary(
+                origincf, sf_generated
+            )
+            link_extracted_data.file_generated[fileid].CopyFrom(cf_generated)
+
         sf: StorageField = self.storage.file_extracted(
             self.kbid, self.uuid, self.type, self.id, LINK_METADATA
         )

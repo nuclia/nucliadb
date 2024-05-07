@@ -184,6 +184,8 @@ message LinkExtractedData {
     string embed = 12;
 
     PageStructure pdf_structure = 13;
+    // The key is the file ID
+    map<string, CloudFile> file_generated = 14;
 }
 
 message ExtractedTextWrapper {
