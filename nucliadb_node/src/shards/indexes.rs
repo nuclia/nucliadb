@@ -22,6 +22,7 @@ use nucliadb_core::NodeResult;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
+use std::io::Write;
 use std::io::{BufReader, BufWriter};
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
@@ -136,6 +137,7 @@ impl ShardIndexesFile {
         let temp = shard_path.join(TEMP_SHARD_INDEXES_FILENAME);
         let mut writer = BufWriter::new(File::create(temp.clone())?);
         serde_json::to_writer(&mut writer, &self)?;
+        writer.flush()?;
         std::fs::rename(temp, filename)?;
         Ok(())
     }
