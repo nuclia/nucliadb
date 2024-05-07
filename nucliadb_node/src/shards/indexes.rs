@@ -22,6 +22,7 @@ use nucliadb_core::NodeResult;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
+use std::io::Write;
 use std::io::{BufReader, BufWriter};
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
@@ -30,6 +31,7 @@ use crate::disk_structure;
 
 pub const DEFAULT_VECTOR_INDEX_NAME: &str = "__default__";
 pub const SHARD_INDEXES_FILENAME: &str = "indexes.json";
+pub const TEMP_SHARD_INDEXES_FILENAME: &str = "indexes.temp.json";
 
 #[derive(Debug)]
 pub struct ShardIndexes {
@@ -131,8 +133,12 @@ impl ShardIndexesFile {
     }
 
     pub fn store(&self, shard_path: &Path) -> NodeResult<()> {
-        let mut writer = BufWriter::new(File::create(shard_path.join(SHARD_INDEXES_FILENAME))?);
+        let filename = shard_path.join(SHARD_INDEXES_FILENAME);
+        let temp = shard_path.join(TEMP_SHARD_INDEXES_FILENAME);
+        let mut writer = BufWriter::new(File::create(temp.clone())?);
         serde_json::to_writer(&mut writer, &self)?;
+        writer.flush()?;
+        std::fs::rename(temp, filename)?;
         Ok(())
     }
 }
