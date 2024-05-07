@@ -42,7 +42,7 @@ async def test_reindex(
     rid = await create_resource(knowledgebox, nucliadb_grpc)
 
     # Doing a search should return results
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query=text")
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox}/search?query=text")
     assert resp.status_code == 200
     content = resp.json()
     assert len(content["sentences"]["results"]) > 0
@@ -69,7 +69,7 @@ async def test_reindex(
     await asyncio.sleep(0.5)
 
     # Doing a search should not return any result now
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query=My+own")
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox}/search?query=My+own")
     assert resp.status_code == 200
     content = resp.json()
     assert len(content["sentences"]["results"]) == 0
@@ -77,14 +77,14 @@ async def test_reindex(
 
     # Then do a reindex of the resource with its vectors
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resource/{rid}/reindex?reindex_vectors=true"
+        f"/v1/kb/{knowledgebox}/resource/{rid}/reindex?reindex_vectors=true"
     )
     assert resp.status_code == 200
 
     await asyncio.sleep(0.5)
 
     # Doing a search should return semantic results
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query=My+own")
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox}/search?query=My+own")
     assert resp.status_code == 200
     content = resp.json()
     assert len(content["sentences"]["results"]) > 0

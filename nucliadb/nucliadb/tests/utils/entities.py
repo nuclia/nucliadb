@@ -25,7 +25,6 @@ from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxID
 from nucliadb_protos.writer_pb2 import GetEntitiesGroupRequest, GetEntitiesGroupResponse
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
-from nucliadb.writer.api.v1.router import KB_PREFIX
 from nucliadb_models.entities import (
     CreateEntitiesGroupPayload,
     UpdateEntitiesGroupPayload,
@@ -36,7 +35,7 @@ async def create_entities_group(
     writer: AsyncClient, kbid: str, payload: CreateEntitiesGroupPayload
 ):
     resp = await writer.post(
-        f"/{KB_PREFIX}/{kbid}/entitiesgroups",
+        f"/v1/kb/{kbid}/entitiesgroups",
         content=payload.json(),
     )
     return resp
@@ -49,14 +48,14 @@ async def update_entities_group(
     payload: UpdateEntitiesGroupPayload,
 ):
     resp = await writer.patch(
-        f"/{KB_PREFIX}/{kbid}/entitiesgroup/{group}",
+        f"/v1/kb/{kbid}/entitiesgroup/{group}",
         content=payload.json(),
     )
     return resp
 
 
 async def delete_entities_group(writer: AsyncClient, kbid: str, group: str):
-    resp = await writer.delete(f"/{KB_PREFIX}/{kbid}/entitiesgroup/{group}")
+    resp = await writer.delete(f"/v1/kb/{kbid}/entitiesgroup/{group}")
     return resp
 
 

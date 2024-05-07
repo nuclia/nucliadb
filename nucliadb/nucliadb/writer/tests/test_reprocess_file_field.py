@@ -24,7 +24,7 @@ import pytest
 
 from nucliadb.ingest.processing import ProcessingInfo
 from nucliadb.writer.api.v1.resource import resource_exists
-from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_PREFIX
+from nucliadb.writer.api.v1.router import RESOURCE_PREFIX, RESOURCES_PREFIX
 from nucliadb.writer.tests.utils import load_file_as_FileB64_payload
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models.resource import NucliaDBRoles, QueueType
@@ -53,7 +53,7 @@ async def file_field(
 
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.post(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}",
+            f"/v1/kb/{kbid}/{RESOURCES_PREFIX}",
             json={
                 "slug": "resource",
                 "title": "My resource",
@@ -77,7 +77,7 @@ async def file_field(
 
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.delete(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
+            f"/v1/kb/{kbid}/{RESOURCE_PREFIX}/{rid}",
         )
         assert resp.status_code == 204
 
@@ -92,7 +92,7 @@ async def test_reprocess_nonexistent_file_field(
 
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.post(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/reprocess",
+            f"/v1/kb/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/reprocess",
         )
         assert resp.status_code == 404
 
@@ -106,7 +106,7 @@ async def test_reprocess_file_field_with_password(
 
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.post(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/reprocess",
+            f"/v1/kb/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/reprocess",
             headers={
                 "X-FILE-PASSWORD": password,
             },
@@ -124,7 +124,7 @@ async def test_reprocess_file_field_without_password(
 
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.post(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/reprocess",
+            f"/v1/kb/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/reprocess",
         )
         assert resp.status_code == 202
 

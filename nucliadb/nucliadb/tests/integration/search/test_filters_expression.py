@@ -33,7 +33,7 @@ async def test_filtering_expression(nucliadb_reader, nucliadb_writer, knowledgeb
         ("Resource3", "resource3", "folder3", "scientific"),
     ]:
         resp = await nucliadb_writer.post(
-            f"/kb/{kbid}/resources",
+            f"/v1/kb/{kbid}/resources",
             json={
                 "title": title,
                 "slug": slug,
@@ -84,7 +84,7 @@ async def test_filtering_expression(nucliadb_reader, nucliadb_writer, knowledgeb
         ),
     ]:
         resp = await nucliadb_reader.post(
-            f"/kb/{kbid}/find",
+            f"/v1/kb/{kbid}/find",
             json={"query": "", "filters": filters},
             timeout=None,
         )

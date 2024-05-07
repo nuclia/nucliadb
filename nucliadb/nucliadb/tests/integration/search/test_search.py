@@ -60,10 +60,10 @@ async def test_simple_search_sc_2062(
     knowledgebox,
 ):
     # PUBLIC API
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}")
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox}")
     assert resp.status_code == 200
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/v1/kb/{knowledgebox}/resources",
         json={
             "slug": "myresource",
             "title": "My Title",
@@ -74,13 +74,13 @@ async def test_simple_search_sc_2062(
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}")
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox}/resource/{rid}")
     assert resp.status_code == 200
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query=title")
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox}/search?query=title")
     assert resp.status_code == 200
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query=summary")
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox}/search?query=summary")
     assert resp.status_code == 200
     assert len(resp.json()["paragraphs"]["results"]) == 1
 
@@ -159,14 +159,14 @@ async def test_search_filters_out_duplicate_paragraphs(
 
     query = "text"
     # It should filter out duplicates by default
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query={query}")
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox}/search?query={query}")
     assert resp.status_code == 200
     content = resp.json()
     assert len(content["paragraphs"]["results"]) == 2
 
     # It should filter out duplicates if specified
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search?query={query}&with_duplicates=false"
+        f"/v1/kb/{knowledgebox}/search?query={query}&with_duplicates=false"
     )
     assert resp.status_code == 200
     content = resp.json()
@@ -174,7 +174,7 @@ async def test_search_filters_out_duplicate_paragraphs(
 
     # It should return duplicates if specified
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search?query={query}&with_duplicates=true"
+        f"/v1/kb/{knowledgebox}/search?query={query}&with_duplicates=true"
     )
     assert resp.status_code == 200
     content = resp.json()
@@ -193,7 +193,7 @@ async def test_search_returns_paragraph_positions(
     await create_resource_with_duplicates(
         knowledgebox, nucliadb_grpc, sentence=sentence
     )
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query=Ramon")
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox}/search?query=Ramon")
     assert resp.status_code == 200
     content = resp.json()
     position = content["paragraphs"]["results"][0]["position"]
@@ -268,7 +268,7 @@ async def test_search_returns_labels(
     await inject_message(nucliadb_grpc, bm)
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search?query=Some&show=extracted&extracted=metadata",
+        f"/v1/kb/{knowledgebox}/search?query=Some&show=extracted&extracted=metadata",
     )
     assert resp.status_code == 200
     content = resp.json()
@@ -299,14 +299,14 @@ async def test_search_with_filters(
 
     # Check that filtering by pdf icon returns it
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search?show=basic&filters=/icon/application/pdf"
+        f"/v1/kb/{knowledgebox}/search?show=basic&filters=/icon/application/pdf"
     )
     assert resp.status_code == 200
     assert len(resp.json()["resources"]) == 1
 
     # With a different icon should return no results
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search?show=basic&filters=/icon/application/docx"
+        f"/v1/kb/{knowledgebox}/search?show=basic&filters=/icon/application/docx"
     )
     assert resp.status_code == 200
     assert len(resp.json()["resources"]) == 0
@@ -323,7 +323,7 @@ async def test_paragraph_search_with_filters(
     kbid = knowledgebox
     # Create a resource with two fields (title and summary)
     resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/resources",
+        f"/v1/kb/{kbid}/resources",
         json={
             "title": "Mushrooms",
             "summary": "A very good book about mushrooms (aka funghi)",
@@ -333,7 +333,7 @@ async def test_paragraph_search_with_filters(
     rid = resp.json()["uuid"]
 
     resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/resource/{rid}/search?query=mushrooms"
+        f"/v1/kb/{kbid}/resource/{rid}/search?query=mushrooms"
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -342,7 +342,7 @@ async def test_paragraph_search_with_filters(
 
     # Check that you can filter results by field
     resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/resource/{rid}/search",
+        f"/v1/kb/{kbid}/resource/{rid}/search",
         params={"query": "mushrooms", "fields": ["a/summary"]},
     )
     assert resp.status_code == 200
@@ -378,7 +378,7 @@ async def test_catalog_can_filter_by_processing_status(
         created += 1
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/catalog",
+        f"/v1/kb/{knowledgebox}/catalog",
         params={
             "query": "",
         },
@@ -388,7 +388,7 @@ async def test_catalog_can_filter_by_processing_status(
 
     # Two should be PROCESSED (the ERROR is counted as processed)
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/catalog",
+        f"/v1/kb/{knowledgebox}/catalog",
         params={
             "query": "",
             "with_status": "PROCESSED",
@@ -399,7 +399,7 @@ async def test_catalog_can_filter_by_processing_status(
 
     # One should be PENDING
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/catalog",
+        f"/v1/kb/{knowledgebox}/catalog",
         params={
             "query": "",
             "with_status": "PENDING",
@@ -410,7 +410,7 @@ async def test_catalog_can_filter_by_processing_status(
 
     # Get the list of PENDING
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/catalog",
+        f"/v1/kb/{knowledgebox}/catalog",
         params={
             "query": "",
             "filters": ["/metadata.status/PENDING"],
@@ -421,7 +421,7 @@ async def test_catalog_can_filter_by_processing_status(
 
     # Check facets by processing status
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/catalog",
+        f"/v1/kb/{knowledgebox}/catalog",
         params={
             "query": "",
             "faceted": ["/metadata.status"],
@@ -443,7 +443,7 @@ async def test_(
     knowledgebox,
 ):
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/v1/kb/{knowledgebox}/resources",
         json={
             "title": "Rust for dummies",
         },
@@ -452,7 +452,7 @@ async def test_(
     rust_for_dummies = resp.json()["uuid"]
 
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/v1/kb/{knowledgebox}/resources",
         json={
             "title": "Introduction to Python",
         },
@@ -461,7 +461,7 @@ async def test_(
     intro_to_python = resp.json()["uuid"]
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/catalog",
+        f"/v1/kb/{knowledgebox}/catalog",
         params={
             "query": "Rust",
         },
@@ -472,7 +472,7 @@ async def test_(
     assert rust_for_dummies in resources
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/catalog",
+        f"/v1/kb/{knowledgebox}/catalog",
         params={
             "query": "Intro",
         },
@@ -493,7 +493,7 @@ async def test_search_returns_sentence_positions(
 ):
     await inject_resource_with_a_sentence(knowledgebox, nucliadb_grpc)
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/search", json=dict(query="my own text", min_score=-1)
+        f"/v1/kb/{knowledgebox}/search", json=dict(query="my own text", min_score=-1)
     )
     assert resp.status_code == 200
     content = resp.json()
@@ -573,7 +573,7 @@ async def test_search_relations(
     )
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search",
+        f"/v1/kb/{knowledgebox}/search",
         params={
             "features": "relations",
             "query": "What relates Newton and Becquer?",
@@ -640,7 +640,7 @@ async def test_search_relations(
     predict_mock.detect_entities = AsyncMock(return_value=[relation_nodes["Animal"]])
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search",
+        f"/v1/kb/{knowledgebox}/search",
         params={
             "features": "relations",
             "query": "Do you like animals?",
@@ -695,7 +695,7 @@ async def test_processing_status_doesnt_change_on_search_after_processed(
 
     # Check that search for resource list shows it
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/catalog",
+        f"/v1/kb/{knowledgebox}/catalog",
         params={
             "query": "",
             "with_status": "PROCESSED",
@@ -707,7 +707,7 @@ async def test_processing_status_doesnt_change_on_search_after_processed(
     # Edit the resource so that status=PENDING
     assert (
         await nucliadb_writer.patch(
-            f"/kb/{knowledgebox}/resource/{bm.uuid}",
+            f"/v1/kb/{knowledgebox}/resource/{bm.uuid}",
             json={
                 "title": "My new title",
             },
@@ -720,7 +720,7 @@ async def test_processing_status_doesnt_change_on_search_after_processed(
 
     # Check that search for resource list still shows it
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/catalog",
+        f"/v1/kb/{knowledgebox}/catalog",
         params={
             "query": "",
             "with_status": "PROCESSED",
@@ -731,7 +731,7 @@ async def test_processing_status_doesnt_change_on_search_after_processed(
 
     # Check that facets count it as PENDING though
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/catalog",
+        f"/v1/kb/{knowledgebox}/catalog",
         params={
             "query": "",
             "faceted": ["/metadata.status"],
@@ -752,7 +752,7 @@ async def test_search_automatic_relations(
     set_utility(Utility.PREDICT, predict_mock)
 
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/v1/kb/{knowledgebox}/resources",
         json={
             "title": "My resource",
             "slug": "myresource",
@@ -815,7 +815,7 @@ async def test_search_automatic_relations(
     predict_mock.detect_entities = AsyncMock(return_value=[rn])
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search",
+        f"/v1/kb/{knowledgebox}/search",
         params={
             "features": "relations",
             "query": "Relations for this resource",
@@ -912,7 +912,7 @@ async def test_search_automatic_relations(
     predict_mock.detect_entities = AsyncMock(return_value=[rn])
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search",
+        f"/v1/kb/{knowledgebox}/search",
         params={
             "features": "relations",
             "query": "You know John?",
@@ -955,17 +955,17 @@ async def test_only_search_and_suggest_calls_audit(nucliadb_reader, knowledgebox
     audit.search = AsyncMock()
     audit.suggest = AsyncMock()
 
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/catalog", params={"query": ""})
+    resp = await nucliadb_reader.get(f"/v1/kb/{kbid}/catalog", params={"query": ""})
     assert resp.status_code == 200
 
     audit.search.assert_not_awaited()
 
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/search")
+    resp = await nucliadb_reader.get(f"/v1/kb/{kbid}/search")
     assert resp.status_code == 200
 
     audit.search.assert_awaited_once()
 
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/suggest?query=")
+    resp = await nucliadb_reader.get(f"/v1/kb/{kbid}/suggest?query=")
 
     assert resp.status_code == 200
 
@@ -1011,7 +1011,7 @@ async def test_search_and_suggest_sent_audit(
 
     # Test search sends audit
     resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/search", headers={"x-ndb-client": "chrome_extension"}
+        f"/v1/kb/{kbid}/search", headers={"x-ndb-client": "chrome_extension"}
     )
     assert resp.status_code == 200
 
@@ -1029,7 +1029,7 @@ async def test_search_and_suggest_sent_audit(
 
     # Test suggest sends audit
     resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/suggest?query=", headers={"x-ndb-client": "chrome_extension"}
+        f"/v1/kb/{kbid}/suggest?query=", headers={"x-ndb-client": "chrome_extension"}
     )
     assert resp.status_code == 200
 
@@ -1066,7 +1066,7 @@ async def test_search_pagination(
         total_pages = math.floor(total / page_size)
         for page_number in range(0, total_pages):
             resp = await nucliadb_reader.get(
-                f"/kb/{kbid}/search",
+                f"/v1/kb/{kbid}/search",
                 params={
                     "features": [feature],
                     "page_number": page_number,
@@ -1079,7 +1079,7 @@ async def test_search_pagination(
             assert len(body["results"]) == body["page_size"] == page_size
 
         resp = await nucliadb_reader.get(
-            f"/kb/{kbid}/search",
+            f"/v1/kb/{kbid}/search",
             params={
                 "features": [feature],
                 "page_number": page_number + 1,
@@ -1106,7 +1106,7 @@ async def test_resource_search_pagination(
     texts = [(f"text-{i}", f"Dummy text field to test ({i})") for i in range(n_texts)]
 
     resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/resources",
+        f"/v1/kb/{kbid}/resources",
         json={
             "title": "Resource with ",
             "slug": "resource-with-texts",
@@ -1156,7 +1156,7 @@ async def test_resource_search_pagination(
 
     for page_number in range(0, total_pages):
         resp = await nucliadb_reader.get(
-            f"/kb/{kbid}/resource/{rid}/search",
+            f"/v1/kb/{kbid}/resource/{rid}/search",
             params={
                 "query": query,
                 "features": ["paragraph"],
@@ -1170,7 +1170,7 @@ async def test_resource_search_pagination(
         assert len(body["results"]) == body["page_size"] == page_size
 
     resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/resource/{rid}/search",
+        f"/v1/kb/{kbid}/resource/{rid}/search",
         params={
             "query": query,
             "features": ["paragraph"],
@@ -1198,7 +1198,7 @@ async def test_search_endpoints_handle_predict_errors(
     for query_mock in (AsyncMock(side_effect=SendToPredictError()),):
         predict_mock.query = query_mock
         resp = await nucliadb_reader.post(
-            f"/kb/{kbid}/{endpoint}",
+            f"/v1/kb/{kbid}/{endpoint}",
             json={
                 "features": ["vector"],
                 "query": "something",
@@ -1222,7 +1222,7 @@ async def create_dummy_resources(
     ]
     for payload in payloads:
         resp = await nucliadb_writer.post(
-            f"/kb/{kbid}/resources",
+            f"/v1/kb/{kbid}/resources",
             json=payload,
         )
         assert resp.status_code == 201
@@ -1368,14 +1368,14 @@ async def test_search_min_score(
 ):
     # When not specifying the min score on the request, it should default to 0.7
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/search", json={"query": "dummy"}
+        f"/v1/kb/{knowledgebox}/search", json={"query": "dummy"}
     )
     assert resp.status_code == 200
     assert resp.json()["sentences"]["min_score"] == 0.7
 
     # If we specify a min score, it should be used
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/search",
+        f"/v1/kb/{knowledgebox}/search",
         json={"query": "dummy", "min_score": {"bm25": 10, "semantic": 0.5}},
     )
     assert resp.status_code == 200
@@ -1425,7 +1425,7 @@ async def test_facets_validation(
                 if method == "get"
                 else {"json": {"faceted": facets}}
             )
-            resp = await func(f"/kb/{kbid}/{endpoint}", **kwargs)
+            resp = await func(f"/v1/kb/{kbid}/{endpoint}", **kwargs)
             if valid:
                 assert resp.status_code == 200
             else:
@@ -1441,7 +1441,7 @@ async def test_search_marks_fuzzy_results(
     knowledgebox,
 ):
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/v1/kb/{knowledgebox}/resources",
         json={
             "slug": "myresource",
             "title": "My Title",
@@ -1451,7 +1451,7 @@ async def test_search_marks_fuzzy_results(
 
     # Should get only one non-fuzzy result
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/search",
+        f"/v1/kb/{knowledgebox}/search",
         json={
             "query": "Title",
         },
@@ -1462,7 +1462,7 @@ async def test_search_marks_fuzzy_results(
 
     # Should get only one fuzzy result
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/search",
+        f"/v1/kb/{knowledgebox}/search",
         json={
             "query": "totle",
         },
@@ -1473,7 +1473,7 @@ async def test_search_marks_fuzzy_results(
 
     # Should not get any result if exact match term queried
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/search",
+        f"/v1/kb/{knowledgebox}/search",
         json={
             "query": '"totle"',
         },
@@ -1503,7 +1503,7 @@ async def test_search_by_path_filter(
 
     for path in paths:
         resp = await nucliadb_writer.post(
-            f"/kb/{knowledgebox}/resources",
+            f"/v1/kb/{knowledgebox}/resources",
             json={
                 "title": f"My resource: {path}",
                 "summary": "Some summary",
@@ -1515,7 +1515,7 @@ async def test_search_by_path_filter(
         assert resp.status_code == 201
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/catalog",
+        f"/v1/kb/{knowledgebox}/catalog",
         params={
             "query": "",
         },
@@ -1525,21 +1525,21 @@ async def test_search_by_path_filter(
 
     # Get the list of all
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search?filters=/origin.path/foo"
+        f"/v1/kb/{knowledgebox}/search?filters=/origin.path/foo"
     )
     assert resp.status_code == 200
     assert len(resp.json()["resources"]) == len(paths)
 
     # Get the list of under foo/bar
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search?filters=/origin.path/foo/bar"
+        f"/v1/kb/{knowledgebox}/search?filters=/origin.path/foo/bar"
     )
     assert resp.status_code == 200
     assert len(resp.json()["resources"]) == len(paths) - 1
 
     # Get the list of under foo/bar/4
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search?filters=/origin.path/foo/bar/4"
+        f"/v1/kb/{knowledgebox}/search?filters=/origin.path/foo/bar/4"
     )
     assert resp.status_code == 200
     assert len(resp.json()["resources"]) == 1
@@ -1609,7 +1609,7 @@ async def test_catalog_returns_shard_and_node_data(
     knowledgebox,
 ):
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/catalog",
+        f"/v1/kb/{knowledgebox}/catalog",
         params={
             "query": "",
         },
@@ -1618,7 +1618,7 @@ async def test_catalog_returns_shard_and_node_data(
     assert len(resp.json()["shards"]) > 0
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/catalog",
+        f"/v1/kb/{knowledgebox}/catalog",
         params={
             "query": "",
             "debug": "true",
@@ -1635,7 +1635,7 @@ async def test_catalog_post(
     knowledgebox,
 ):
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/catalog",
+        f"/v1/kb/{knowledgebox}/catalog",
         json={
             "query": "",
             "filters": [
@@ -1667,7 +1667,7 @@ async def test_api_does_not_show_tracebacks_on_api_errors(
         "nucliadb.search.api.v1.search.search",
         side_effect=Exception("Something went wrong"),
     ):
-        resp = await nucliadb_reader.get("/kb/foobar/search", timeout=None)
+        resp = await nucliadb_reader.get("/v1/kb/foobar/search", timeout=None)
         assert resp.status_code == 500
         assert resp.json() == {
             "detail": "Something went wrong, please contact your administrator"
@@ -1684,7 +1684,7 @@ async def test_catalog_pagination(
     n_resources = 35
     for i in range(n_resources):
         resp = await nucliadb_writer.post(
-            f"/kb/{knowledgebox}/resources",
+            f"/v1/kb/{knowledgebox}/resources",
             json={
                 "title": f"Resource {i}",
                 "texts": {
@@ -1705,7 +1705,7 @@ async def test_catalog_pagination(
     page_number = 0
     while True:
         resp = await nucliadb_reader.get(
-            f"/kb/{knowledgebox}/catalog",
+            f"/v1/kb/{knowledgebox}/catalog",
             params={
                 "page_number": page_number,
                 "page_size": page_size,

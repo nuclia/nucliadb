@@ -74,7 +74,7 @@ async def test_multiple_search_resource_all(
 
     async with search_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/search?query=own+text&highlight=true&page_number=0&page_size=40",
+            f"/v1/kb/{kbid}/search?query=own+text&highlight=true&page_number=0&page_size=40",
         )
 
         assert resp.status_code == 200, resp.content
@@ -87,7 +87,7 @@ async def test_multiple_search_resource_all(
         pos_35 = resp.json()["paragraphs"]["results"][35]
 
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/search?query=own+text&highlight=true&page_number=3&page_size=10&shards={shards[0]}",  # noqa
+            f"/v1/kb/{kbid}/search?query=own+text&highlight=true&page_number=3&page_size=10&shards={shards[0]}",  # noqa
         )
 
         assert resp.status_code == 200, resp.content
@@ -96,7 +96,7 @@ async def test_multiple_search_resource_all(
         assert resp.json()["paragraphs"]["results"][5]["rid"] == pos_35["rid"]
 
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/search?query=own+text&highlight=true&page_number=4&page_size=20",
+            f"/v1/kb/{kbid}/search?query=own+text&highlight=true&page_number=4&page_size=20",
         )
         assert resp.status_code == 200, resp.content
         for _ in range(10):
@@ -106,7 +106,7 @@ async def test_multiple_search_resource_all(
             ):
                 await asyncio.sleep(1)
                 resp = await client.get(
-                    f"/{KB_PREFIX}/{kbid}/search?query=own+text&highlight=true&page_number=4&page_size=20",
+                    f"/v1/kb/{kbid}/search?query=own+text&highlight=true&page_number=4&page_size=20",
                 )
                 assert resp.status_code == 200, resp.content
             else:
@@ -129,7 +129,7 @@ async def test_search_resource_all(
     async with search_api(roles=[NucliaDBRoles.READER]) as client:
         await asyncio.sleep(1)
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/search?query=own+text&split=true&highlight=true&text_resource=true",
+            f"/v1/kb/{kbid}/search?query=own+text&split=true&highlight=true&text_resource=true",
         )
         assert resp.status_code == 200
         assert resp.json()["fulltext"]["query"] == "own text"
@@ -208,9 +208,7 @@ async def test_search_with_facets(
     kbid = multiple_search_resource
 
     async with search_api(roles=[NucliaDBRoles.READER]) as client:
-        url = (
-            f"/{KB_PREFIX}/{kbid}/search?query=own+text&faceted=/classification.labels"
-        )
+        url = f"/v1/kb/{kbid}/search?query=own+text&faceted=/classification.labels"
 
         resp = await client.get(url)
         data = resp.json()
@@ -228,7 +226,7 @@ async def test_search_with_facets(
         )
 
         # also just test short hand filter
-        url = f"/{KB_PREFIX}/{kbid}/search?query=own+text&faceted=/l"
+        url = f"/v1/kb/{kbid}/search?query=own+text&faceted=/l"
         resp = await client.get(url)
         data = resp.json()
         assert (

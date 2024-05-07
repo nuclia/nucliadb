@@ -28,7 +28,7 @@ from redis import asyncio as aioredis
 
 from nucliadb.ingest.tests.fixtures import IngestFixture
 from nucliadb.writer import API_PREFIX
-from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX
+from nucliadb.writer.api.v1.router import KBS_PREFIX
 from nucliadb.writer.settings import settings
 from nucliadb.writer.tus import clear_storage
 from nucliadb_models.resource import NucliaDBRoles
@@ -165,7 +165,7 @@ async def knowledgebox_writer(writer_api):
 async def resource(redis, writer_api, knowledgebox_writer):
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_writer}/resources",
+            f"/v1/kb/{knowledgebox_writer}/resources",
             json={
                 "slug": "resource1",
                 "title": "Resource 1",

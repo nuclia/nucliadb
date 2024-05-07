@@ -27,7 +27,6 @@ from nucliadb_protos.writer_pb2 import Shards as PBShards
 from nucliadb.common.cluster.manager import INDEX_NODES
 from nucliadb.common.datamanagers.cluster import KB_SHARDS
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb_models.resource import NucliaDBRoles
 
 
@@ -40,7 +39,7 @@ async def test_suggest_resource_all(
 
     async with search_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/suggest?query=own+text",
+            f"/v1/kb/{kbid}/suggest?query=own+text",
         )
         assert resp.status_code == 200
         paragraph_results = resp.json()["paragraphs"]["results"]

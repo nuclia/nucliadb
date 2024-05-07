@@ -55,7 +55,7 @@ async def test_predict_proxy(
     if method == "POST":
         http_func_kwargs["json"] = payload
     resp = await http_func(
-        f"/kb/{kbid}/predict/{endpoint}",
+        f"/v1/kb/{kbid}/predict/{endpoint}",
         timeout=None,
         **http_func_kwargs,
     )
@@ -70,7 +70,7 @@ async def test_predict_proxy_not_proxied_returns_422(
 ):
     kbid = knowledgebox
     resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/predict/summarize",
+        f"/v1/kb/{kbid}/predict/summarize",
         json={"resources": {"foo": "bar"}},
     )
     assert resp.status_code == 422

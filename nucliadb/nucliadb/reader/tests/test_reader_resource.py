@@ -23,7 +23,7 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb.ingest.orm.resource import Resource
-from nucliadb.reader.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX
+from nucliadb.reader.api.v1.router import RESOURCE_PREFIX, RSLUG_PREFIX
 from nucliadb_models.resource import NucliaDBRoles
 
 ID = ("id",)
@@ -60,7 +60,7 @@ async def test_get_resource_inexistent(
 
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
+            f"/v1/kb/{kbid}/{RESOURCE_PREFIX}/{rid}",
         )
         assert resp.status_code == 404
 
@@ -75,7 +75,7 @@ async def test_get_resource_default_options(
 
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
+            f"/v1/kb/{kbid}/{RESOURCE_PREFIX}/{rid}",
         )
         assert resp.status_code == 200
 
@@ -96,7 +96,7 @@ async def test_get_resource_sequence_ids_are_set_on_resource(
 
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
+            f"/v1/kb/{kbid}/{RESOURCE_PREFIX}/{rid}",
         )
         assert resp.status_code == 200
 
@@ -123,7 +123,7 @@ async def test_get_resource_all(
 
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
+            f"/v1/kb/{kbid}/{RESOURCE_PREFIX}/{rid}",
             params={
                 "show": ["basic", "origin", "relations", "values", "extracted"],
                 "field_type": [
@@ -202,7 +202,7 @@ async def test_get_resource_filter_root_fields(reader_api, test_resource):
 
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
+            f"/v1/kb/{kbid}/{RESOURCE_PREFIX}/{rid}",
             params={"show": ["basic", "values"]},
         )
         assert resp.status_code == 200
@@ -242,7 +242,7 @@ async def test_get_resource_filter_field_types(reader_api, test_resource):
 
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
+            f"/v1/kb/{kbid}/{RESOURCE_PREFIX}/{rid}",
             params={"show": ["values", "extracted"], "field_type": ["text", "link"]},
         )
         assert resp.status_code == 200
@@ -267,7 +267,7 @@ async def test_get_resource_filter_field_types_and_extracted(reader_api, test_re
 
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
+            f"/v1/kb/{kbid}/{RESOURCE_PREFIX}/{rid}",
             params={
                 "show": ["extracted"],
                 "field_type": ["text"],
@@ -303,24 +303,24 @@ async def test_resource_endpoints_by_slug(reader_api, test_resource):
         # Regular GET
 
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RSLUG_PREFIX}/{rslug}",
+            f"/v1/kb/{kbid}/{RSLUG_PREFIX}/{rslug}",
         )
         assert resp.status_code == 200
 
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RSLUG_PREFIX}/{non_existent_slug}",
+            f"/v1/kb/{kbid}/{RSLUG_PREFIX}/{non_existent_slug}",
         )
         assert resp.status_code == 404
 
         # Field endpoint
 
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RSLUG_PREFIX}/{rslug}/text/text1",
+            f"/v1/kb/{kbid}/{RSLUG_PREFIX}/{rslug}/text/text1",
         )
         assert resp.status_code == 200
 
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RSLUG_PREFIX}/{non_existent_slug}/text/text1",
+            f"/v1/kb/{kbid}/{RSLUG_PREFIX}/{non_existent_slug}/text/text1",
         )
         assert resp.status_code == 404
         assert resp.json()["detail"] == "Resource does not exist"
@@ -336,7 +336,7 @@ async def test_get_resource_extracted_metadata(
 
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
+            f"/v1/kb/{kbid}/{RESOURCE_PREFIX}/{rid}",
             params={
                 "show": ["extracted"],
                 "extracted": [

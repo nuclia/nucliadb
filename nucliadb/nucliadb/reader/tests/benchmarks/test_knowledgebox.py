@@ -24,7 +24,7 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb.ingest.orm.resource import Resource
-from nucliadb.reader.api.v1.router import KB_PREFIX, KBS_PREFIX
+from nucliadb.reader.api.v1.router import KBS_PREFIX
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.tests.asyncbenchmark import AsyncBenchmarkFixture
 
@@ -63,7 +63,7 @@ async def test_get_knowledgebox(
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await asyncbenchmark(
             client.get,
-            f"/{KB_PREFIX}/{kbid}",
+            f"/v1/kb/{kbid}",
         )
         assert resp.status_code == 200
 
@@ -79,6 +79,6 @@ async def test_get_knowledgebox_by_slug(
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await asyncbenchmark(
             client.get,
-            f"/{KB_PREFIX}/{slug}",
+            f"/v1/kb/{slug}",
         )
         assert resp.status_code == 200

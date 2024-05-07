@@ -28,7 +28,6 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb.common.http_clients import processing
-from nucliadb.reader.api.v1.router import KB_PREFIX
 from nucliadb_models.notifications import (
     Notification,
     ResourceIndexedNotification,
@@ -98,7 +97,7 @@ async def test_activity(
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         async with client.stream(
             method="GET",
-            url=f"/{KB_PREFIX}/{kbid}/notifications",
+            url=f"/v1/kb/{kbid}/notifications",
         ) as resp:
             assert resp.status_code == 200
 
@@ -149,7 +148,7 @@ async def test_activity_kb_not_found(
     reader_api: Callable[..., AsyncClient],
 ):
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(f"/{KB_PREFIX}/foobar/notifications")
+        resp = await client.get(f"/v1/kb/foobar/notifications")
         assert resp.status_code == 404
 
 
@@ -183,7 +182,7 @@ async def test_processing_status(
         return_value=processing_client,
     ):
         async with reader_api(roles=[NucliaDBRoles.READER]) as client:
-            resp = await client.get(f"/{KB_PREFIX}/{kbid}/processing-status")
+            resp = await client.get(f"/v1/kb/{kbid}/processing-status")
             assert resp.status_code == 200
 
             data = processing.RequestsResults.parse_obj(resp.json())

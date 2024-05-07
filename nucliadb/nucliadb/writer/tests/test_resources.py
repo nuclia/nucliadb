@@ -57,7 +57,7 @@ async def test_resource_crud(
     async with writer_api([NucliaDBRoles.WRITER]) as client:
         # Test create resource
         resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
+            f"/v1/kb/{knowledgebox_id}/{RESOURCES_PREFIX}",
             json={
                 "slug": "resource1",
                 "title": "My resource",
@@ -128,7 +128,7 @@ async def test_resource_crud(
 
         # Test update resource
         resp = await client.patch(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}",
+            f"/v1/kb/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}",
             json={},
         )
         assert resp.status_code == 200
@@ -139,7 +139,7 @@ async def test_resource_crud(
 
         # Test delete resource
         resp = await client.delete(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}",
+            f"/v1/kb/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}",
         )
         assert resp.status_code == 204
 
@@ -152,7 +152,7 @@ async def test_resource_crud_sync(
     async with writer_api([NucliaDBRoles.WRITER]) as client:
         # Test create resource
         resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
+            f"/v1/kb/{knowledgebox_id}/{RESOURCES_PREFIX}",
             json={
                 "slug": "resource1",
                 "title": "My resource",
@@ -223,7 +223,7 @@ async def test_resource_crud_sync(
 
         # Test update resource
         resp = await client.patch(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}",
+            f"/v1/kb/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}",
             json={},
         )
         assert resp.status_code == 200
@@ -231,13 +231,13 @@ async def test_resource_crud_sync(
         # Test delete resource
 
         resp = await client.delete(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/resource1",
+            f"/v1/kb/{knowledgebox_id}/{RESOURCE_PREFIX}/resource1",
         )
 
         assert resp.status_code == 404
 
         resp = await client.delete(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}",
+            f"/v1/kb/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}",
         )
         assert resp.status_code == 204
 
@@ -268,7 +268,7 @@ async def test_reprocess_resource(
 
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.post(
-            f"/{KB_PREFIX}/{kbid}/resource/{rid}/reprocess",
+            f"/v1/kb/{kbid}/resource/{rid}/reprocess",
         )
         assert resp.status_code == 202
 
@@ -322,7 +322,7 @@ async def test_resource_endpoints_by_slug(
     async with writer_api([NucliaDBRoles.WRITER]) as client:
         slug = "my-resource"
         resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_ingest}/{RESOURCES_PREFIX}",
+            f"/v1/kb/{knowledgebox_ingest}/{RESOURCES_PREFIX}",
             json={
                 "slug": slug,
                 "texts": {"text1": {"body": "test1", "format": "PLAIN"}},
@@ -388,12 +388,12 @@ async def test_reindex(writer_api, test_resource):
     rid = rsc.uuid
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.post(
-            f"/{KB_PREFIX}/{kbid}/resource/{rid}/reindex",
+            f"/v1/kb/{kbid}/resource/{rid}/reindex",
         )
         assert resp.status_code == 200
 
         resp = await client.post(
-            f"/{KB_PREFIX}/{kbid}/resource/{rid}/reindex?reindex_vectors=True",
+            f"/v1/kb/{kbid}/resource/{rid}/reindex?reindex_vectors=True",
         )
         assert resp.status_code == 200
 
@@ -404,7 +404,7 @@ async def test_paragraph_annotations(writer_api, knowledgebox_writer):
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         # Must have at least one classification
         resp = await client.post(
-            f"/{KB_PREFIX}/{kbid}/resources",
+            f"/v1/kb/{kbid}/resources",
             json={
                 "texts": {"text1": TEST_TEXT_PAYLOAD},
                 "fieldmetadata": [
@@ -427,7 +427,7 @@ async def test_paragraph_annotations(writer_api, knowledgebox_writer):
         classification = {"label": "label", "labelset": "ls"}
 
         resp = await client.post(
-            f"/{KB_PREFIX}/{kbid}/resources",
+            f"/v1/kb/{kbid}/resources",
             json={
                 "texts": {"text1": TEST_TEXT_PAYLOAD},
                 "fieldmetadata": [
@@ -448,7 +448,7 @@ async def test_paragraph_annotations(writer_api, knowledgebox_writer):
 
         # Classifications need to be unique
         resp = await client.patch(
-            f"/{KB_PREFIX}/{kbid}/resource/{rid}",
+            f"/v1/kb/{kbid}/resource/{rid}",
             json={
                 "fieldmetadata": [
                     {

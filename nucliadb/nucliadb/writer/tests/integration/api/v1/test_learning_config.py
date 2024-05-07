@@ -48,13 +48,13 @@ async def test_api(writer_api, knowledgebox_ingest, learning_config_proxy_mock):
     kbid = knowledgebox_ingest
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         # post configuration
-        resp = await client.post(f"/kb/{kbid}/configuration", json={"some": "data"})
+        resp = await client.post(f"/v1/kb/{kbid}/configuration", json={"some": "data"})
         assert resp.status_code == 204
 
         assert learning_config_proxy_mock.calls[0][1:] == ("POST", f"/config/{kbid}")
 
         # patch configuration
-        resp = await client.patch(f"/kb/{kbid}/configuration", json={"some": "data"})
+        resp = await client.patch(f"/v1/kb/{kbid}/configuration", json={"some": "data"})
         assert resp.status_code == 204
 
         assert learning_config_proxy_mock.calls[1][1:] == ("PATCH", f"/config/{kbid}")

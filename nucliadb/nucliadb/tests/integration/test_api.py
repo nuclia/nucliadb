@@ -97,17 +97,17 @@ async def test_creation(
     knowledgebox,
 ):
     # PUBLIC API
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}")
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox}")
     assert resp.status_code == 200
 
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/labelset/ls1",
+        f"/v1/kb/{knowledgebox}/labelset/ls1",
         json={"title": "Labelset 1", "labels": [{"text": "text", "title": "title"}]},
     )
     assert resp.status_code == 200
 
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/v1/kb/{knowledgebox}/resources",
         json={
             "title": "My title",
             "slug": "myresource",
@@ -145,7 +145,7 @@ async def test_creation(
     await nucliadb_grpc.ProcessMessage(iterate(bm))  # type: ignore
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{rid}?show=extracted&show=values&extracted=text&extracted=metadata",
+        f"/v1/kb/{knowledgebox}/resource/{rid}?show=extracted&show=values&extracted=text&extracted=metadata",
     )
     assert resp.status_code == 200
     assert (
@@ -158,7 +158,7 @@ async def test_creation(
     # ADD A LABEL
 
     resp = await nucliadb_writer.patch(
-        f"/kb/{knowledgebox}/resource/{rid}",
+        f"/v1/kb/{knowledgebox}/resource/{rid}",
         json={
             "fieldmetadata": [
                 {
@@ -179,7 +179,7 @@ async def test_creation(
     assert resp.status_code == 200
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{rid}?show=errors&show=values&show=basic",
+        f"/v1/kb/{knowledgebox}/resource/{rid}?show=errors&show=values&show=basic",
         timeout=None,
     )
     assert resp.status_code == 200
@@ -202,14 +202,14 @@ async def test_creation(
     trainset.batch_size = 20
     trainset.type = TaskType.PARAGRAPH_CLASSIFICATION
     trainset.filter.labels.append("ls1")
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/trainset")
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox}/trainset")
     assert resp.status_code == 200
     data = resp.json()
     assert len(data["partitions"]) == 1
     partition_id = data["partitions"][0]
 
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/trainset/{partition_id}",
+        f"/v1/kb/{knowledgebox}/trainset/{partition_id}",
         content=trainset.SerializeToString(),
     )
     assert len(resp.content) > 0
@@ -274,7 +274,7 @@ async def test_serialize_errors(
     await inject_message(nucliadb_grpc, br)
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{br.uuid}",
+        f"/v1/kb/{knowledgebox}/resource/{br.uuid}",
         params=dict(show=["extracted", "errors", "basic"], extracted=["metadata"]),
     )
     assert resp.status_code == 200
@@ -308,12 +308,12 @@ async def test_entitygroups(
         },
     }
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/entitiesgroups", json=entitygroup
+        f"/v1/kb/{knowledgebox}/entitiesgroups", json=entitygroup
     )
     assert resp.status_code == 200
 
     # Entities are not returned by default
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/entitiesgroups")
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox}/entitiesgroups")
     groups = resp.json()["groups"]
     assert "entities" in groups["group1"]
     assert len(groups["group1"]["entities"]) == 0
@@ -323,7 +323,7 @@ async def test_entitygroups(
 
     # show_entities=true returns a http 400
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/entitiesgroups?show_entities=true"
+        f"/v1/kb/{knowledgebox}/entitiesgroups?show_entities=true"
     )
     assert resp.status_code == 400
 
@@ -379,7 +379,7 @@ async def test_extracted_shortened_metadata(
 
     # Check that when 'shortened_metadata' in extracted param fields are cropped
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{br.uuid}/text/text",
+        f"/v1/kb/{knowledgebox}/resource/{br.uuid}/text/text",
         params=dict(show=["extracted"], extracted=["shortened_metadata"]),
     )
     assert resp.status_code == 200
@@ -393,7 +393,7 @@ async def test_extracted_shortened_metadata(
     # Check that when 'metadata' in extracted param fields are returned
     for extracted_param in (["metadata"], ["metadata", "shortened_metadata"]):
         resp = await nucliadb_reader.get(
-            f"/kb/{knowledgebox}/resource/{br.uuid}/text/text",
+            f"/v1/kb/{knowledgebox}/resource/{br.uuid}/text/text",
             params=dict(show=["extracted"], extracted=extracted_param),
         )
         assert resp.status_code == 200
@@ -434,7 +434,7 @@ async def test_field_ids_are_validated(
             }
         },
     }
-    resp = await nucliadb_writer.post(f"/kb/{knowledgebox}/resources", json=payload)
+    resp = await nucliadb_writer.post(f"/v1/kb/{knowledgebox}/resources", json=payload)
     if error:
         assert resp.status_code == 422
         body = resp.json()
@@ -460,7 +460,7 @@ async def test_extra(
     kbid = knowledgebox
     invalid_extra = {"metadata": {i: f"foo{i}" for i in range(100000)}}
     resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/resources",
+        f"/v1/kb/{kbid}/resources",
         json={
             "title": "Foo",
             "extra": invalid_extra,
@@ -483,7 +483,7 @@ async def test_extra(
         }
     }
     resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/resources",
+        f"/v1/kb/{kbid}/resources",
         json={
             "title": "Foo",
             "extra": extra,
@@ -494,23 +494,23 @@ async def test_extra(
     rid = resp.json()["uuid"]
 
     # Check that extra metadata is not returned by default on GET
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}")
+    resp = await nucliadb_reader.get(f"/v1/kb/{kbid}/resource/{rid}")
     assert resp.status_code == 200
     assert "extra" not in resp.json()
 
     # Check that extra metadata is returned when requested on GET
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}?show=extra")
+    resp = await nucliadb_reader.get(f"/v1/kb/{kbid}/resource/{rid}?show=extra")
     assert resp.status_code == 200
     assert resp.json()["extra"] == extra
 
     # Check that extra metadata is not returned by default on search
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/search?query=foo")
+    resp = await nucliadb_reader.get(f"/v1/kb/{kbid}/search?query=foo")
     assert resp.status_code == 200
     resource = resp.json()["resources"][rid]
     assert "extra" not in resource
 
     # Check that extra metadata is returned when requested on search results
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/search?query=foo&show=extra")
+    resp = await nucliadb_reader.get(f"/v1/kb/{kbid}/search?query=foo&show=extra")
     assert resp.status_code == 200
     resource = resp.json()["resources"][rid]
     assert resource["extra"] == extra
@@ -518,11 +518,11 @@ async def test_extra(
     # Check modification of extra metadata
     extra["metadata"].pop("dict")
     resp = await nucliadb_writer.patch(
-        f"/kb/{kbid}/resource/{rid}", json={"extra": extra}
+        f"/v1/kb/{kbid}/resource/{rid}", json={"extra": extra}
     )
     assert resp.status_code == 200
 
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}?show=extra")
+    resp = await nucliadb_reader.get(f"/v1/kb/{kbid}/resource/{rid}?show=extra")
     assert resp.status_code == 200
     assert resp.json()["extra"] == extra
 
@@ -536,19 +536,19 @@ async def test_icon_doesnt_change_after_labeling_resource_sc_5625(
 ):
     kbid = knowledgebox
     resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/resources",
+        f"/v1/kb/{kbid}/resources",
         json={"title": "Foo", "icon": "application/pdf"},
         timeout=None,
     )
     assert resp.status_code == 201
     uuid = resp.json()["uuid"]
 
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{uuid}")
+    resp = await nucliadb_reader.get(f"/v1/kb/{kbid}/resource/{uuid}")
     assert resp.json()["icon"] == "application/pdf"
 
     # A partial patch should not change the icon
     resp = await nucliadb_writer.patch(
-        f"/kb/{kbid}/resource/{uuid}",
+        f"/v1/kb/{kbid}/resource/{uuid}",
         json={
             "usermetadata": {"classifications": [{"labelset": "foo", "label": "bar"}]}
         },
@@ -556,7 +556,7 @@ async def test_icon_doesnt_change_after_labeling_resource_sc_5625(
     )
     assert resp.status_code == 200
 
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{uuid}")
+    resp = await nucliadb_reader.get(f"/v1/kb/{kbid}/resource/{uuid}")
     assert resp.json()["icon"] == "application/pdf"
 
 
@@ -582,11 +582,11 @@ async def test_resource_slug_validation(
     nucliadb_writer, nucliadb_reader, knowledgebox, slug, valid
 ):
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources", json={"slug": slug}
+        f"/v1/kb/{knowledgebox}/resources", json={"slug": slug}
     )
     if valid:
         assert resp.status_code == 201
-        resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/slug/{slug}")
+        resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox}/slug/{slug}")
         assert resp.status_code == 200
     else:
         assert resp.status_code == 422
@@ -604,7 +604,7 @@ async def test_icon_doesnt_change_after_adding_file_field_sc_2388(
 ):
     kbid = knowledgebox
     resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/resources",
+        f"/v1/kb/{kbid}/resources",
         json={
             "title": "Foo",
             "icon": "text/plain",
@@ -615,18 +615,18 @@ async def test_icon_doesnt_change_after_adding_file_field_sc_2388(
     assert resp.status_code == 201
     uuid = resp.json()["uuid"]
 
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{uuid}")
+    resp = await nucliadb_reader.get(f"/v1/kb/{kbid}/resource/{uuid}")
     assert resp.json()["icon"] == "text/plain"
 
     # A subsequent file upload should not change the icon
     resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/resource/{uuid}/file/file/upload",
+        f"/v1/kb/{kbid}/resource/{uuid}/file/file/upload",
         content=b"foo" * 200,
         timeout=None,
     )
     assert resp.status_code == 201
 
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{uuid}")
+    resp = await nucliadb_reader.get(f"/v1/kb/{kbid}/resource/{uuid}")
     assert resp.json()["icon"] == "text/plain"
 
 
@@ -640,7 +640,7 @@ async def test_language_metadata(
 ):
     kbid = knowledgebox
     resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/resources",
+        f"/v1/kb/{kbid}/resources",
         json={"title": "My resource"},
         timeout=None,
     )
@@ -673,7 +673,7 @@ async def test_language_metadata(
     assert resp.status == OpStatusWriter.Status.OK
 
     resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/resource/{uuid}", params={"show": ["basic"]}
+        f"/v1/kb/{kbid}/resource/{uuid}", params={"show": ["basic"]}
     )
     assert resp.status_code == 200
     res = resp.json()
@@ -681,7 +681,7 @@ async def test_language_metadata(
     assert set(res["metadata"]["languages"]) == {"ca", "es", "it", "en"}
 
     resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/resources",
+        f"/v1/kb/{kbid}/resources",
         json={"metadata": {"language": "en"}},
         timeout=None,
     )
@@ -689,7 +689,7 @@ async def test_language_metadata(
     uuid = resp.json()["uuid"]
 
     resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/resource/{uuid}", params={"show": ["basic"]}
+        f"/v1/kb/{kbid}/resource/{uuid}", params={"show": ["basic"]}
     )
     assert resp.status_code == 200
     res = resp.json()
@@ -697,14 +697,14 @@ async def test_language_metadata(
     assert res["metadata"]["languages"] == []
 
     resp = await nucliadb_writer.patch(
-        f"/kb/{kbid}/resource/{uuid}",
+        f"/v1/kb/{kbid}/resource/{uuid}",
         json={"metadata": {"language": "de"}},
         timeout=None,
     )
     assert resp.status_code == 200
 
     resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/resource/{uuid}", params={"show": ["basic"]}
+        f"/v1/kb/{kbid}/resource/{uuid}", params={"show": ["basic"]}
     )
     assert resp.status_code == 200
     res = resp.json()
@@ -720,7 +720,7 @@ async def test_story_7081(
     knowledgebox,
 ):
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/v1/kb/{knowledgebox}/resources",
         json={
             "title": "My title",
             "slug": "myresource",
@@ -732,13 +732,13 @@ async def test_story_7081(
     rid = resp.json()["uuid"]
 
     resp = await nucliadb_writer.patch(
-        f"/kb/{knowledgebox}/resource/{rid}",
+        f"/v1/kb/{knowledgebox}/resource/{rid}",
         json={"origin": {"metadata": {"some": "data"}}},
     )
     assert resp.status_code == 200
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{rid}?show=origin",
+        f"/v1/kb/{knowledgebox}/resource/{rid}?show=origin",
         timeout=None,
     )
     assert resp.status_code == 200
@@ -756,7 +756,7 @@ async def test_question_answer(
 ):
     # create a new resource
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/v1/kb/{knowledgebox}/resources",
         json={
             "title": "My title",
             "slug": "myresource",
@@ -799,7 +799,7 @@ async def test_question_answer(
     await nucliadb_grpc.ProcessMessage(iterate(message))  # type: ignore
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{rid}?show=extracted&extracted=question_answers",
+        f"/v1/kb/{knowledgebox}/resource/{rid}?show=extracted&extracted=question_answers",
         timeout=None,
     )
     assert resp.status_code == 200
@@ -855,7 +855,7 @@ async def test_question_answer_annotations(
     )
 
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/v1/kb/{knowledgebox}/resources",
         json={
             "title": "My title",
             "slug": "myresource",
@@ -876,7 +876,7 @@ async def test_question_answer_annotations(
     rid = resp.json()["uuid"]
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{rid}?show=basic",
+        f"/v1/kb/{knowledgebox}/resource/{rid}?show=basic",
         timeout=None,
     )
     assert resp.status_code == 200
@@ -893,7 +893,7 @@ async def test_link_fields_store_css_selector(
     knowledgebox,
 ):
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/v1/kb/{knowledgebox}/resources",
         json={
             "title": "My title",
             "slug": "myresource",
@@ -910,7 +910,7 @@ async def test_link_fields_store_css_selector(
     rid = resp.json()["uuid"]
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{rid}?show=values",
+        f"/v1/kb/{knowledgebox}/resource/{rid}?show=values",
         timeout=None,
     )
     assert resp.status_code == 200
@@ -935,7 +935,7 @@ async def test_link_fields_store_xpath(
     knowledgebox,
 ):
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/v1/kb/{knowledgebox}/resources",
         json={
             "title": "My title",
             "slug": "myresource",
@@ -952,7 +952,7 @@ async def test_link_fields_store_xpath(
     rid = resp.json()["uuid"]
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{rid}?show=values",
+        f"/v1/kb/{knowledgebox}/resource/{rid}?show=values",
         timeout=None,
     )
     assert resp.status_code == 200

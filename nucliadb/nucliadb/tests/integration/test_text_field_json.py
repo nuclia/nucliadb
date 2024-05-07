@@ -37,7 +37,7 @@ async def test_text_field_in_json_format(
     payload = {"hello": "world"}
 
     resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/resources",
+        f"/v1/kb/{kbid}/resources",
         json={
             "title": "JSON text field",
             "texts": {
@@ -51,7 +51,7 @@ async def test_text_field_in_json_format(
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
 
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}?show=values")
+    resp = await nucliadb_reader.get(f"/v1/kb/{kbid}/resource/{rid}?show=values")
     assert resp.status_code == 200
 
     body = resp.json()
@@ -70,7 +70,7 @@ async def test_text_field_with_invalid_json(
     invalid_json = '{hello": "world"}'
 
     resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/resources",
+        f"/v1/kb/{kbid}/resources",
         json={
             "title": "JSON text field",
             "texts": {

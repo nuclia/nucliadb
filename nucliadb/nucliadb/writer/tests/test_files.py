@@ -29,7 +29,7 @@ from nucliadb_protos.resources_pb2 import FieldID, FieldType
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb.common import datamanagers
-from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX
+from nucliadb.writer.api.v1.router import RESOURCE_PREFIX, RSLUG_PREFIX
 from nucliadb.writer.api.v1.upload import maybe_b64decode
 from nucliadb.writer.tus import TUSUPLOAD, UPLOAD, get_storage_manager
 from nucliadb_models.resource import NucliaDBRoles
@@ -46,7 +46,7 @@ async def test_knowledgebox_file_tus_options(
     client: AsyncClient
     async with writer_api([NucliaDBRoles.WRITER]) as client:
         resp = await client.options(
-            f"/{KB_PREFIX}/{knowledgebox_writer}/resource/xxx/file/xxx/{TUSUPLOAD}/xxx"
+            f"/v1/kb/{knowledgebox_writer}/resource/xxx/file/xxx/{TUSUPLOAD}/xxx"
         )
         assert resp.status_code == 204
         assert resp.headers["tus-resumable"] == "1.0.0"
@@ -54,22 +54,20 @@ async def test_knowledgebox_file_tus_options(
         assert resp.headers["tus-extension"] == "creation-defer-length"
 
         resp = await client.options(
-            f"/{KB_PREFIX}/{knowledgebox_writer}/resource/xxx/file/xxx/{TUSUPLOAD}"
+            f"/v1/kb/{knowledgebox_writer}/resource/xxx/file/xxx/{TUSUPLOAD}"
         )
         assert resp.status_code == 204
         assert resp.headers["tus-resumable"] == "1.0.0"
         assert resp.headers["tus-version"] == "1.0.0"
         assert resp.headers["tus-extension"] == "creation-defer-length"
 
-        resp = await client.options(f"/{KB_PREFIX}/{knowledgebox_writer}/{TUSUPLOAD}")
+        resp = await client.options(f"/v1/kb/{knowledgebox_writer}/{TUSUPLOAD}")
         assert resp.status_code == 204
         assert resp.headers["tus-resumable"] == "1.0.0"
         assert resp.headers["tus-version"] == "1.0.0"
         assert resp.headers["tus-extension"] == "creation-defer-length"
 
-        resp = await client.options(
-            f"/{KB_PREFIX}/{knowledgebox_writer}/{TUSUPLOAD}/xxx"
-        )
+        resp = await client.options(f"/v1/kb/{knowledgebox_writer}/{TUSUPLOAD}/xxx")
         assert resp.status_code == 204
         assert resp.headers["tus-resumable"] == "1.0.0"
         assert resp.headers["tus-version"] == "1.0.0"
@@ -83,7 +81,7 @@ async def test_knowledgebox_file_tus_upload_root(writer_api, knowledgebox_writer
         filename = base64.b64encode(b"image.jpg").decode()
         md5 = base64.b64encode(b"7af0916dba8b70e29d99e72941923529").decode()
         resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_writer}/{TUSUPLOAD}",
+            f"/v1/kb/{knowledgebox_writer}/{TUSUPLOAD}",
             headers={
                 "tus-resumable": "1.0.0",
                 "upload-metadata": f"filename {filename},language {language},md5 {md5}",
@@ -156,7 +154,7 @@ async def test_knowledgebox_file_tus_upload_root(writer_api, knowledgebox_writer
 
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_writer}/{TUSUPLOAD}",
+            f"/v1/kb/{knowledgebox_writer}/{TUSUPLOAD}",
             headers={
                 "tus-resumable": "1.0.0",
                 "upload-metadata": f"filename {filename},language {language},md5 {md5}",
@@ -175,7 +173,7 @@ async def test_knowledgebox_file_upload_root(
     async with writer_api([NucliaDBRoles.WRITER]) as client:
         with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
             resp = await client.post(
-                f"/{KB_PREFIX}/{knowledgebox_writer}/{UPLOAD}",
+                f"/v1/kb/{knowledgebox_writer}/{UPLOAD}",
                 content=f.read(),
                 headers={
                     "content-type": "image/jpg",
@@ -213,7 +211,7 @@ async def test_knowledgebox_file_upload_root(
     async with writer_api([NucliaDBRoles.WRITER]) as client:
         with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
             resp = await client.post(
-                f"/{KB_PREFIX}/{knowledgebox_writer}/{UPLOAD}",
+                f"/v1/kb/{knowledgebox_writer}/{UPLOAD}",
                 content=f.read(),
                 headers={
                     "content-type": "image/jpg",
@@ -232,7 +230,7 @@ async def test_knowledgebox_file_upload_root_headers(
         filename = base64.b64encode(b"image.jpg").decode()
         with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
             resp = await client.post(
-                f"/{KB_PREFIX}/{knowledgebox_writer}/{UPLOAD}",
+                f"/v1/kb/{knowledgebox_writer}/{UPLOAD}",
                 content=f.read(),
                 headers={
                     "X-FILENAME": filename,
@@ -281,7 +279,7 @@ async def test_knowledgebox_file_tus_upload_field(
         md5 = base64.b64encode(b"7af0916dba8b70e29d99e72941923529").decode()
 
         resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_writer}/resource/invalidresource/file/field1/{TUSUPLOAD}",
+            f"/v1/kb/{knowledgebox_writer}/resource/invalidresource/file/field1/{TUSUPLOAD}",
             headers={
                 "tus-resumable": "1.0.0",
                 "upload-metadata": f"filename {filename},language {language},md5 {md5}",
@@ -293,7 +291,7 @@ async def test_knowledgebox_file_tus_upload_field(
         await asyncio.sleep(1)
 
         resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_writer}/resource/{resource}/file/field1/{TUSUPLOAD}",
+            f"/v1/kb/{knowledgebox_writer}/resource/{resource}/file/field1/{TUSUPLOAD}",
             headers={
                 "tus-resumable": "1.0.0",
                 "upload-metadata": f"filename {filename},language {language},md5 {md5}",
@@ -374,7 +372,7 @@ async def test_knowledgebox_file_upload_field_headers(
         encoded_filename = base64.b64encode(filename.encode()).decode()
         with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
             resp = await client.post(
-                f"/{KB_PREFIX}/{knowledgebox_writer}/resource/{resource}/file/field1/{UPLOAD}",
+                f"/v1/kb/{knowledgebox_writer}/resource/{resource}/file/field1/{UPLOAD}",
                 content=f.read(),
                 headers={
                     "X-FILENAME": encoded_filename,
@@ -421,7 +419,7 @@ async def test_knowledgebox_file_upload_field_sync(
         filename = "image.jpg"
         with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
             resp = await client.post(
-                f"/{KB_PREFIX}/{knowledgebox_writer}/resource/{resource}/file/field1/{UPLOAD}",
+                f"/v1/kb/{knowledgebox_writer}/resource/{resource}/file/field1/{UPLOAD}",
                 content=f.read(),
                 headers={
                     "X-FILENAME": filename,
@@ -460,13 +458,13 @@ async def test_file_tus_upload_field_by_slug(writer_api, knowledgebox_writer, re
         }
 
         resp = await client.post(
-            f"/{KB_PREFIX}/{kb}/slug/idonotexist/file/field1/{TUSUPLOAD}",
+            f"/v1/kb/{kb}/slug/idonotexist/file/field1/{TUSUPLOAD}",
             headers=headers,
         )
         assert resp.status_code == 404
 
         resp = await client.post(
-            f"/{KB_PREFIX}/{kb}/slug/{rslug}/file/field1/{TUSUPLOAD}",
+            f"/v1/kb/{kb}/slug/{rslug}/file/field1/{TUSUPLOAD}",
             headers=headers,
         )
         assert resp.status_code == 201
@@ -553,13 +551,13 @@ async def test_file_tus_upload_urls_field_by_resource_id(
         }
 
         resp = await client.post(
-            f"/{KB_PREFIX}/{kb}/resource/idonotexist/file/field1/{TUSUPLOAD}",
+            f"/v1/kb/{kb}/resource/idonotexist/file/field1/{TUSUPLOAD}",
             headers=headers,
         )
         assert resp.status_code == 404
 
         resp = await client.post(
-            f"/{KB_PREFIX}/{kb}/resource/{resource}/file/field1/{TUSUPLOAD}",
+            f"/v1/kb/{kb}/resource/{resource}/file/field1/{TUSUPLOAD}",
             headers=headers,
         )
         assert resp.status_code == 201
@@ -591,7 +589,7 @@ async def test_multiple_tus_file_upload_tries(
         }
 
         resp = await client.post(
-            f"/{KB_PREFIX}/{kb}/slug/{rslug}/file/field1/{TUSUPLOAD}",
+            f"/v1/kb/{kb}/slug/{rslug}/file/field1/{TUSUPLOAD}",
             headers=headers,
         )
         assert resp.status_code == 201
@@ -614,7 +612,7 @@ async def test_multiple_tus_file_upload_tries(
 
         # next one should work as well
         resp = await client.post(
-            f"/{KB_PREFIX}/{kb}/slug/{rslug}/file/field1/{TUSUPLOAD}",
+            f"/v1/kb/{kb}/slug/{rslug}/file/field1/{TUSUPLOAD}",
             headers=headers,
         )
         assert resp.status_code == 201
@@ -643,7 +641,7 @@ async def test_file_upload_by_slug(writer_api, knowledgebox_writer):
 
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.post(
-            f"/{KB_PREFIX}/{kb}/resources",
+            f"/v1/kb/{kb}/resources",
             json={
                 "slug": rslug,
             },
@@ -653,7 +651,7 @@ async def test_file_upload_by_slug(writer_api, knowledgebox_writer):
         filename = "image.jpg"
         with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
             resp = await client.post(
-                f"/{KB_PREFIX}/{kb}/{RSLUG_PREFIX}/{rslug}/file/file1/{UPLOAD}",
+                f"/v1/kb/{kb}/{RSLUG_PREFIX}/{rslug}/file/file1/{UPLOAD}",
                 content=f.read(),
                 headers={
                     "X-FILENAME": filename,
@@ -707,7 +705,7 @@ async def test_tus_validates_intermediate_chunks_length(
         filename = base64.b64encode(b"image.jpg").decode()
         md5 = base64.b64encode(b"7af0916dba8b70e29d99e72941923529").decode()
         resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_writer}/{TUSUPLOAD}",
+            f"/v1/kb/{knowledgebox_writer}/{TUSUPLOAD}",
             headers={
                 "tus-resumable": "1.0.0",
                 "upload-metadata": f"filename {filename},language {language},md5 {md5}",

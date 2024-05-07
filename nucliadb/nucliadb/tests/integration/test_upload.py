@@ -34,7 +34,7 @@ async def test_upload(
 ):
     content = b"Test for /upload endpoint"
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/{UPLOAD}",
+        f"/v1/kb/{knowledgebox}/{UPLOAD}",
         headers={
             "X-Filename": base64.b64encode(b"testfile").decode("utf-8"),
             "Content-Type": "text/plain",
@@ -55,7 +55,7 @@ async def test_upload(
     assert field_id
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{rid}/file/{field_id}"
+        f"/v1/kb/{knowledgebox}/resource/{rid}/file/{field_id}"
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -79,7 +79,7 @@ async def test_upload_guesses_content_type(
     content_type = "text/plain"
     # Upload the file without specifying the content type
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/{UPLOAD}",
+        f"/v1/kb/{knowledgebox}/{UPLOAD}",
         headers={
             "X-Filename": base64.b64encode(filename.encode()).decode("utf-8"),
         },
@@ -92,7 +92,7 @@ async def test_upload_guesses_content_type(
 
     # Test that the content type is correctly guessed from the filename
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{rid}/file/{field_id}"
+        f"/v1/kb/{knowledgebox}/resource/{rid}/file/{field_id}"
     )
     assert resp.status_code == 200
     body = resp.json()

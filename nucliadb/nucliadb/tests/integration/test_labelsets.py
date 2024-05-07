@@ -32,7 +32,7 @@ async def test_selection_labelsets(
     kbid = knowledgebox
 
     resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/labelset/myselections",
+        f"/v1/kb/{kbid}/labelset/myselections",
         json={
             "title": "My Selections",
             "kind": ["SELECTIONS"],
@@ -46,16 +46,16 @@ async def test_selection_labelsets(
     )
     assert resp.status_code == 200
 
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/labelset/myselections")
+    resp = await nucliadb_reader.get(f"/v1/kb/{kbid}/labelset/myselections")
     assert resp.status_code == 200
     body = resp.json()
     labels = {label["title"] for label in body["labels"]}
     assert labels == {"title", "introduction", "body", "conclusion"}
 
-    resp = await nucliadb_writer.delete(f"/kb/{kbid}/labelset/myselections")
+    resp = await nucliadb_writer.delete(f"/v1/kb/{kbid}/labelset/myselections")
     assert resp.status_code == 200
 
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/labelset/myselections")
+    resp = await nucliadb_reader.get(f"/v1/kb/{kbid}/labelset/myselections")
     assert resp.status_code == 200
     body = resp.json()
     assert body["labels"] == []

@@ -60,7 +60,7 @@ async def resource_with_conversation(nucliadb_grpc, nucliadb_writer, knowledgebo
             )
         )
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/v1/kb/{knowledgebox}/resources",
         headers={"Content-Type": "application/json"},
         data=CreateResourcePayload(  # type: ignore
             slug="myresource",
@@ -75,7 +75,7 @@ async def resource_with_conversation(nucliadb_grpc, nucliadb_writer, knowledgebo
 
     # add another message using the api to add single message
     resp = await nucliadb_writer.put(
-        f"/kb/{knowledgebox}/resource/{rid}/conversation/faq/messages",
+        f"/v1/kb/{knowledgebox}/resource/{rid}/conversation/faq/messages",
         data="["  # type: ignore
         + InputMessage(
             to=[f"computer"],
@@ -124,7 +124,9 @@ async def test_conversations(
     rid = resource_with_conversation
 
     # get field summary
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}?show=values")
+    resp = await nucliadb_reader.get(
+        f"/v1/kb/{knowledgebox}/resource/{rid}?show=values"
+    )
     assert resp.status_code == 200
 
     res_resp = ResponseResponse.parse_obj(resp.json())
@@ -137,7 +139,7 @@ async def test_conversations(
 
     # get first page
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{rid}/conversation/faq?page=1"
+        f"/v1/kb/{knowledgebox}/resource/{rid}/conversation/faq?page=1"
     )
     assert resp.status_code == 200
     field_resp = ResourceField.parse_obj(resp.json())
@@ -148,7 +150,7 @@ async def test_conversations(
 
     # get second page
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{rid}/conversation/faq?page=2"
+        f"/v1/kb/{knowledgebox}/resource/{rid}/conversation/faq?page=2"
     )
     assert resp.status_code == 200
     field_resp = ResourceField.parse_obj(resp.json())
@@ -170,7 +172,7 @@ async def test_extracted_text_is_serialized_properly(
     rid = resource_with_conversation
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{rid}?show=values&show=extracted&extracted=text",
+        f"/v1/kb/{knowledgebox}/resource/{rid}?show=values&show=extracted&extracted=text",
     )
     assert resp.status_code == 200
     resource = Resource.parse_obj(resp.json())
@@ -190,7 +192,7 @@ async def test_find_conversations(
     rid = resource_with_conversation
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/find?query=&show=values&show=extracted&extracted=text",
+        f"/v1/kb/{knowledgebox}/find?query=&show=values&show=extracted&extracted=text",
     )
     assert resp.status_code == 200
     results = KnowledgeboxFindResults.parse_obj(resp.json())

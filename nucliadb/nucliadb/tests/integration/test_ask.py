@@ -40,7 +40,7 @@ async def test_ask_document(
 ):
     kbid = knowledgebox
     resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/resources",
+        f"/v1/kb/{kbid}/resources",
         json={
             "title": "The title",
             "summary": "The summary",
@@ -51,7 +51,7 @@ async def test_ask_document(
     rid = resp.json()["uuid"]
 
     resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/resource/{rid}/ask",
+        f"/v1/kb/{kbid}/resource/{rid}/ask",
         json={"question": "Some question?"},
     )
     assert resp.status_code == 200
@@ -68,7 +68,7 @@ async def test_ask_document_disabled(
 ):
     kbid = knowledgebox
     resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/resource/someresource/ask",
+        f"/v1/kb/{kbid}/resource/someresource/ask",
         json={"question": "Some question?"},
     )
     assert resp.status_code == 404

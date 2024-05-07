@@ -24,10 +24,10 @@ from nucliadb_models.resource import NucliaDBRoles
 async def test_api(writer_api, knowledgebox_ingest):
     kbid = knowledgebox_ingest
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        resp = await client.post(f"/kb/{kbid}/import")
+        resp = await client.post(f"/v1/kb/{kbid}/import")
         assert resp.status_code < 500
 
-        resp = await client.post(f"/kb/{kbid}/export")
+        resp = await client.post(f"/v1/kb/{kbid}/export")
         assert resp.status_code < 500
 
         # Check that for non-existing kbs, endpoints return a 404

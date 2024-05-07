@@ -19,7 +19,7 @@
 #
 import pytest
 
-from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX
+from nucliadb.writer.api.v1.router import KBS_PREFIX
 from nucliadb_models.resource import NucliaDBRoles
 
 
@@ -40,7 +40,7 @@ async def test_knowledgebox_lifecycle(writer_api):
         kbid = data["uuid"]
 
         resp = await client.patch(
-            f"/{KB_PREFIX}/{kbid}",
+            f"/v1/kb/{kbid}",
             json={
                 "slug": "kbid2",
                 "description": "My lovely knowledgebox2",

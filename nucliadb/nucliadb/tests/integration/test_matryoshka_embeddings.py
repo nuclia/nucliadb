@@ -69,7 +69,7 @@ async def test_matryoshka_embeddings(
     body = fake.text(10000)
 
     resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/resources",
+        f"/v1/kb/{kbid}/resources",
         json={
             "title": title,
             "slug": rslug,
@@ -114,7 +114,7 @@ async def test_matryoshka_embeddings(
 
     with patch.object(predict, "Q", [10.0] * vector_dimension):
         resp = await nucliadb_reader.get(
-            f"/kb/{kbid}/search",
+            f"/v1/kb/{kbid}/search",
             params={
                 "query": "matryoshka",
                 "features": ["vector"],

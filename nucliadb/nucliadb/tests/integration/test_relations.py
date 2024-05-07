@@ -39,7 +39,7 @@ async def resource_with_bm_relations(
     knowledgebox,
 ):
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/v1/kb/{knowledgebox}/resources",
         json={
             "slug": "myresource",
             "texts": {"text1": {"body": "Mickey loves Minnie"}},
@@ -67,7 +67,7 @@ async def test_api_aliases(
     rid, field_id = resource_with_bm_relations
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{rid}",
+        f"/v1/kb/{knowledgebox}/resource/{rid}",
         params=dict(
             show=["relations", "extracted"],
             extracted=["metadata"],
@@ -81,7 +81,7 @@ async def test_api_aliases(
     assert "from_" not in extracted_metadata["metadata"]["relations"][0]
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{rid}/text/{field_id}",
+        f"/v1/kb/{knowledgebox}/resource/{rid}/text/{field_id}",
         params=dict(
             show=["extracted"],
             extracted=["metadata"],
@@ -111,7 +111,7 @@ async def test_broker_message_relations(
     rid, field_id = resource_with_bm_relations
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{rid}",
+        f"/v1/kb/{knowledgebox}/resource/{rid}",
         params=dict(
             show=["relations", "extracted"],
             extracted=["metadata"],
@@ -132,7 +132,7 @@ async def test_broker_message_relations(
     )
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{rid}/text/{field_id}",
+        f"/v1/kb/{knowledgebox}/resource/{rid}/text/{field_id}",
         params=dict(
             show=["extracted"],
             extracted=["metadata"],
@@ -158,7 +158,7 @@ async def test_extracted_relations(
     extracted and test it.
     """
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/v1/kb/{knowledgebox}/resources",
         json={
             "title": "My resource",
             "slug": "myresource",
@@ -206,7 +206,7 @@ async def test_extracted_relations(
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}?show=basic")
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox}/resource/{rid}?show=basic")
     assert resp.status_code == 200
     assert len(resp.json()["usermetadata"]["relations"]) == 5
 

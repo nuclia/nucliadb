@@ -365,7 +365,7 @@ async def _test_filtering(nucliadb_reader: AsyncClient, kbid: str, filters):
     expected_paragraphs = set.intersection(*filter_paragraphs)
 
     resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/find",
+        f"/v1/kb/{kbid}/find",
         json=dict(
             query="",
             filters=filters,

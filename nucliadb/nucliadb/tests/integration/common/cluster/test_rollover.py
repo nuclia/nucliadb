@@ -50,7 +50,7 @@ async def test_rollover_kb_shards(
     count = 20
     for i in range(count):
         resp = await nucliadb_writer.post(
-            f"/kb/{knowledgebox}/resources",
+            f"/v1/kb/{knowledgebox}/resources",
             json={
                 "slug": f"myresource-{i}",
                 "title": f"My Title {i}",
@@ -60,13 +60,13 @@ async def test_rollover_kb_shards(
         )
         assert resp.status_code == 201
 
-    resp = await nucliadb_manager.get(f"/kb/{knowledgebox}/shards")
+    resp = await nucliadb_manager.get(f"/v1/kb/{knowledgebox}/shards")
     assert resp.status_code == 200, resp.text
     shards_body1 = resp.json()
 
     await rollover.rollover_kb_shards(app_context, knowledgebox)
 
-    resp = await nucliadb_manager.get(f"/kb/{knowledgebox}/shards")
+    resp = await nucliadb_manager.get(f"/v1/kb/{knowledgebox}/shards")
     assert resp.status_code == 200, resp.text
     shards_body2 = resp.json()
     # check that shards have changed
@@ -76,7 +76,7 @@ async def test_rollover_kb_shards(
     )
 
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/find",
+        f"/v1/kb/{knowledgebox}/find",
         json={
             "query": "title",
         },

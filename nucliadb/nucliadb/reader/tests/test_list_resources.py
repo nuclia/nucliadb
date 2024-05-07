@@ -23,7 +23,6 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb.reader.api import DEFAULT_RESOURCE_LIST_PAGE_SIZE
-from nucliadb.reader.api.v1.router import KB_PREFIX
 from nucliadb_models.resource import NucliaDBRoles
 
 # All this scenarios are meant to match a total of 10 resources
@@ -62,7 +61,7 @@ async def test_list_resources(
         query_params["size"] = size
 
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(f"/{KB_PREFIX}/{kbid}/resources", params=query_params)
+        resp = await client.get(f"/v1/kb/{kbid}/resources", params=query_params)
         assert resp.status_code == 200
         resources = resp.json()["resources"]
         pagination = resp.json()["pagination"]

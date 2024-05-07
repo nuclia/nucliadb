@@ -157,7 +157,7 @@ async def test_search_with_date_range_filters_origin_dates(
     """
     # Set origin dates of the resource
     resp = await nucliadb_writer.patch(
-        f"/kb/{knowledgebox}/resource/{resource}",
+        f"/v1/kb/{knowledgebox}/resource/{resource}",
         json={
             "origin": {
                 "created": ORIGIN_CREATION.isoformat(),
@@ -201,7 +201,7 @@ async def _test_find_date_ranges(
     if modification_end is not None:
         payload["range_modification_end"] = modification_end.isoformat()
 
-    resp = await nucliadb_reader.post(f"/kb/{kbid}/find", json=payload)
+    resp = await nucliadb_reader.post(f"/v1/kb/{kbid}/find", json=payload)
     assert resp.status_code == 200
     body = resp.json()
     paragraphs = parse_paragraphs(body)

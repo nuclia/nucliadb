@@ -67,7 +67,7 @@ async def test_purge_deletes_everything_from_maindb(
     assert body["kbs"][0]["uuid"] == kbid
 
     resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/resources",
+        f"/v1/kb/{kbid}/resources",
         json={
             "title": "My title",
             "slug": "myresource",
@@ -130,7 +130,7 @@ async def test_purge_orphan_shards(
     kbid = resp.json().get("uuid")
 
     resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/resources",
+        f"/v1/kb/{kbid}/resources",
         json={
             "title": "My title",
             "slug": "myresource",

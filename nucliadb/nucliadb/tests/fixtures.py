@@ -240,7 +240,7 @@ async def knowledge_graph(
     nucliadb_writer: AsyncClient, nucliadb_grpc: WriterStub, knowledgebox
 ):
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/v1/kb/{knowledgebox}/resources",
         json={
             "title": "Knowledge graph",
             "slug": "knowledgegraph",
@@ -422,7 +422,7 @@ async def knowledge_graph(
     await inject_message(nucliadb_grpc, bm)
 
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/entitiesgroups",
+        f"/v1/kb/{knowledgebox}/entitiesgroups",
         json={
             "title": "scientist",
             "color": "",
@@ -437,12 +437,12 @@ async def knowledge_graph(
     )
     assert resp.status_code == 200, resp.content
     resp = await nucliadb_writer.patch(
-        f"/kb/{knowledgebox}/entitiesgroup/scientist",
+        f"/v1/kb/{knowledgebox}/entitiesgroup/scientist",
         json={"add": {}, "update": {}, "delete": ["Isaac Newsome"]},
     )
     assert resp.status_code == 200, resp.content
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/entitiesgroups",
+        f"/v1/kb/{knowledgebox}/entitiesgroups",
         json={
             "title": "poet",
             "color": "",

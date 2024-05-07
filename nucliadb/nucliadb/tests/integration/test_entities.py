@@ -72,7 +72,7 @@ async def text_field(
     field_id = "text-field"
 
     resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/resources",
+        f"/v1/kb/{kbid}/resources",
         json={
             "slug": "entities-test-resource",
             "title": "E2E entities test resource",
@@ -89,7 +89,7 @@ async def text_field(
 
     yield (kbid, rid, field_id)
 
-    resp = await nucliadb_writer.delete(f"/kb/{kbid}/resource/{rid}")
+    resp = await nucliadb_writer.delete(f"/v1/kb/{kbid}/resource/{rid}")
     assert resp.status_code == 204
 
 
@@ -132,7 +132,7 @@ async def annotated_entities(
     kbid, rid, field_id = text_field
 
     resp = await nucliadb_writer.patch(
-        f"/kb/{kbid}/resource/{rid}",
+        f"/v1/kb/{kbid}/resource/{rid}",
         json={
             "fieldmetadata": [
                 {
@@ -221,7 +221,7 @@ async def test_get_entities_groups(
 ):
     kbid = knowledgebox
 
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroup/ANIMALS")
+    resp = await nucliadb_reader.get(f"/v1/kb/{kbid}/entitiesgroup/ANIMALS")
     assert resp.status_code == 200
     body = resp.json()
 
@@ -237,7 +237,7 @@ async def test_get_entities_groups(
     assert body["entities"]["domestic-cat"]["merged"] is True
     assert body["entities"]["domestic-cat"]["represents"] == []
 
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroup/I-DO-NOT-EXIST")
+    resp = await nucliadb_reader.get(f"/v1/kb/{kbid}/entitiesgroup/I-DO-NOT-EXIST")
     assert resp.status_code == 404
     body = resp.json()
     assert body["detail"] == "Entities group 'I-DO-NOT-EXIST' does not exist"
@@ -252,7 +252,9 @@ async def test_list_entities_groups(
 ):
     kbid = knowledgebox
 
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroups?show_entities=false")
+    resp = await nucliadb_reader.get(
+        f"/v1/kb/{kbid}/entitiesgroups?show_entities=false"
+    )
     assert resp.status_code == 200
     body = resp.json()
 
@@ -299,7 +301,7 @@ async def test_update_entities_group(
     resp = await update_entities_group(nucliadb_writer, kbid, "ANIMALS", update)
     assert resp.status_code == 200
 
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroup/ANIMALS")
+    resp = await nucliadb_reader.get(f"/v1/kb/{kbid}/entitiesgroup/ANIMALS")
     assert resp.status_code == 200
     body = resp.json()
 
@@ -330,7 +332,7 @@ async def test_update_indexed_entities_group(
     resp = await update_entities_group(nucliadb_writer, kbid, "ANIMALS", update)
     assert resp.status_code == 200
 
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroup/ANIMALS")
+    resp = await nucliadb_reader.get(f"/v1/kb/{kbid}/entitiesgroup/ANIMALS")
     assert resp.status_code == 200
     body = resp.json()
 
@@ -358,7 +360,7 @@ async def test_update_entities_group_metadata(
     resp = await update_entities_group(nucliadb_writer, kbid, "ANIMALS", update)
     assert resp.status_code == 200
 
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroup/ANIMALS")
+    resp = await nucliadb_reader.get(f"/v1/kb/{kbid}/entitiesgroup/ANIMALS")
     assert resp.status_code == 200
     body = resp.json()
 
@@ -379,7 +381,7 @@ async def test_delete_entities_group(
     resp = await delete_entities_group(nucliadb_writer, kbid, "ANIMALS")
     assert resp.status_code == 200
 
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroup/ANIMALS")
+    resp = await nucliadb_reader.get(f"/v1/kb/{kbid}/entitiesgroup/ANIMALS")
     assert resp.status_code == 404
 
 
@@ -405,7 +407,7 @@ async def test_delete_and_recreate_entities_group(
     resp = await create_entities_group(nucliadb_writer, knowledgebox, payload)
     assert resp.status_code == 200
 
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroup/ANIMALS")
+    resp = await nucliadb_reader.get(f"/v1/kb/{kbid}/entitiesgroup/ANIMALS")
     assert resp.status_code == 200
     body = resp.json()
     assert body["entities"].keys() == {"gecko"}
@@ -425,7 +427,7 @@ async def test_entities_indexing(
     kbid = knowledgebox
 
     resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/suggest",
+        f"/v1/kb/{kbid}/suggest",
         params={
             "query": "do",
         },

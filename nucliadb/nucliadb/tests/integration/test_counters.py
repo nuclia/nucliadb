@@ -29,11 +29,11 @@ async def test_counters(
     knowledgebox,
 ):
     # PUBLIC API
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}")
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox}")
     assert resp.status_code == 200
 
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/v1/kb/{knowledgebox}/resources",
         json={
             "title": "My title",
             "slug": "myresource",
@@ -45,18 +45,18 @@ async def test_counters(
     assert resp.status_code == 201
 
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/v1/kb/{knowledgebox}/resources",
         json={"slug": "myresource2", "title": "mytitle1"},
     )
     assert resp.status_code == 201
 
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/v1/kb/{knowledgebox}/resources",
         json={"slug": "myresource3", "title": "mytitle1"},
     )
     assert resp.status_code == 201
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/counters")
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox}/counters")
 
     assert resp.status_code == 200
     assert resp.json()["resources"] == 3

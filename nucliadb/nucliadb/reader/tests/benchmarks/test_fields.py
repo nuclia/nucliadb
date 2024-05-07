@@ -24,7 +24,7 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb.ingest.orm.resource import Resource
-from nucliadb.reader.api.v1.router import KB_PREFIX, RESOURCE_PREFIX
+from nucliadb.reader.api.v1.router import RESOURCE_PREFIX
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.tests.asyncbenchmark import AsyncBenchmarkFixture
 
@@ -66,7 +66,7 @@ async def test_get_field_all(
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await asyncbenchmark(
             client.get,
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/{field_type}/{field_id}",
+            f"/v1/kb/{kbid}/{RESOURCE_PREFIX}/{rid}/{field_type}/{field_id}",
             params={
                 "show": ["value", "extracted", "error"],
                 "field_type": [field_type],

@@ -54,7 +54,7 @@ async def test_autofilters_are_returned(
     )
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search",
+        f"/v1/kb/{knowledgebox}/search",
         params={
             "query": "What relates Newton and Becquer?",
         },
@@ -63,7 +63,7 @@ async def test_autofilters_are_returned(
     assert resp.json()["autofilters"] == []
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/find",
+        f"/v1/kb/{knowledgebox}/find",
         params={
             "autofilter": True,
             "query": "What relates Newton and Becquer?",

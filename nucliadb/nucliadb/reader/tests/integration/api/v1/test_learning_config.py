@@ -68,7 +68,7 @@ async def test_api(
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         # Get configuration
         resp = await client.get(
-            f"/kb/{kbid}/configuration", headers={"x-nucliadb-user": "userfoo"}
+            f"/v1/kb/{kbid}/configuration", headers={"x-nucliadb-user": "userfoo"}
         )
         assert resp.status_code == 200
         assert learning_config_proxy_mock.calls[-1][1:] == (
@@ -78,7 +78,7 @@ async def test_api(
         )
 
         # Download model
-        resp = await client.get(f"/kb/{kbid}/models/model1/path")
+        resp = await client.get(f"/v1/kb/{kbid}/models/model1/path")
         assert resp.status_code == 200
         data = BytesIO()
         for chunk in resp.iter_bytes():
@@ -91,7 +91,7 @@ async def test_api(
         )
 
         # List models
-        resp = await client.get(f"/kb/{kbid}/models")
+        resp = await client.get(f"/v1/kb/{kbid}/models")
         assert resp.status_code == 200
         assert learning_config_proxy_mock.calls[-1][1:] == (
             "GET",
@@ -101,7 +101,7 @@ async def test_api(
 
         # Get metadata of a model
         resp = await client.get(
-            f"/kb/{kbid}/model/model1", headers={"x-nucliadb-user": "userfoo"}
+            f"/v1/kb/{kbid}/model/model1", headers={"x-nucliadb-user": "userfoo"}
         )
         assert resp.status_code == 200
         assert learning_config_proxy_mock.calls[-1][1:] == (
@@ -111,7 +111,7 @@ async def test_api(
         )
 
         # Get schema for updates
-        resp = await client.get(f"/kb/{kbid}/schema")
+        resp = await client.get(f"/v1/kb/{kbid}/schema")
         assert resp.status_code == 200
         assert learning_config_proxy_mock.calls[-1][1:] == (
             "GET",

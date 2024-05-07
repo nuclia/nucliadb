@@ -22,7 +22,6 @@ from typing import Callable
 import pytest
 from httpx import AsyncClient
 
-from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb_models.resource import NucliaDBRoles
 
 
@@ -34,7 +33,7 @@ async def test_find(
 
     async with search_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/find?query=own+text",
+            f"/v1/kb/{kbid}/find?query=own+text",
         )
         assert resp.status_code == 200
 

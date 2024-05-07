@@ -39,7 +39,7 @@ async def test_summarize(
     for i in range(20):
         slug = f"resource-{i}"
         resp = await nucliadb_writer.post(
-            f"/kb/{kbid}/resources",
+            f"/v1/kb/{kbid}/resources",
             json={
                 "title": f"Resource {i}",
                 "slug": slug,
@@ -55,7 +55,7 @@ async def test_summarize(
 
     # Summarize all of them
     resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/summarize", json={"resources": resources + ["non-existent"]}
+        f"/v1/kb/{kbid}/summarize", json={"resources": resources + ["non-existent"]}
     )
     assert resp.status_code == 200, resp.text
 

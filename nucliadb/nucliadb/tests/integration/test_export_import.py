@@ -43,7 +43,7 @@ async def src_kb(nucliadb_writer, nucliadb_manager):
 
     for i in range(11):
         resp = await nucliadb_writer.post(
-            f"/kb/{kbid}/resources",
+            f"/v1/kb/{kbid}/resources",
             json={
                 "title": "Test",
                 "thumbnail": "foobar",
@@ -58,7 +58,7 @@ async def src_kb(nucliadb_writer, nucliadb_manager):
 
         content = b"Test for /upload endpoint"
         resp = await nucliadb_writer.post(
-            f"/kb/{kbid}/resource/{rid}/file/file/upload",
+            f"/v1/kb/{kbid}/resource/{rid}/file/file/upload",
             headers={
                 "X-Filename": base64.b64encode(b"testfile").decode("utf-8"),
                 "Content-Type": "text/plain",
@@ -70,7 +70,7 @@ async def src_kb(nucliadb_writer, nucliadb_manager):
 
     # Create an entity group with a few entities
     resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/entitiesgroups",
+        f"/v1/kb/{kbid}/entitiesgroups",
         json={
             "group": "foo",
             "entities": {
@@ -84,7 +84,7 @@ async def src_kb(nucliadb_writer, nucliadb_manager):
 
     # Create a labelset with a few labels
     resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/labelset/foo",
+        f"/v1/kb/{kbid}/labelset/foo",
         json={
             "title": "Foo title",
             "color": "red",
@@ -250,7 +250,7 @@ async def wait_for(nucliadb_reader, type: str, kbid: str, id: str, max_retries=3
     finished = False
     for _ in range(max_retries):
         await asyncio.sleep(1)
-        url = f"/kb/{kbid}/{type}/{id}/status"
+        url = f"/v1/kb/{kbid}/{type}/{id}/status"
         resp = await nucliadb_reader.get(url, timeout=None)
         assert resp.status_code == 200
         status = resp.json()["status"]
@@ -263,7 +263,7 @@ async def wait_for(nucliadb_reader, type: str, kbid: str, id: str, max_retries=3
 
 async def _check_kb(nucliadb_reader, kbid):
     # Resource
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/resources")
+    resp = await nucliadb_reader.get(f"/v1/kb/{kbid}/resources")
     assert resp.status_code == 200
     body = resp.json()
     resources = body["resources"]
@@ -276,7 +276,7 @@ async def _check_kb(nucliadb_reader, kbid):
         assert resource["thumbnail"] == "foobar"
 
         # File uploaded (metadata)
-        resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}/file/file")
+        resp = await nucliadb_reader.get(f"/v1/kb/{kbid}/resource/{rid}/file/file")
         assert resp.status_code == 200
         body = resp.json()
         field = body["value"]["file"]
@@ -291,14 +291,14 @@ async def _check_kb(nucliadb_reader, kbid):
         assert base64.b64decode(resp.content) == b"Test for /upload endpoint"
 
     # Entities
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroups")
+    resp = await nucliadb_reader.get(f"/v1/kb/{kbid}/entitiesgroups")
     assert resp.status_code == 200
     body = resp.json()
     groups = body["groups"]
     assert len(groups) == 1
 
     # Labels
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/labelsets")
+    resp = await nucliadb_reader.get(f"/v1/kb/{kbid}/labelsets")
     assert resp.status_code == 200
     body = resp.json()
     labelsets = body["labelsets"]

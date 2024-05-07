@@ -49,7 +49,7 @@ async def test_rebalance_kb_shards(
     count = 50
     for i in range(count):
         resp = await nucliadb_writer.post(
-            f"/kb/{knowledgebox}/resources",
+            f"/v1/kb/{knowledgebox}/resources",
             json={
                 "slug": f"myresource-{i}",
                 "title": f"My Title {i}",
@@ -63,8 +63,8 @@ async def test_rebalance_kb_shards(
         )
         assert resp.status_code == 201
 
-    counters1_resp = await nucliadb_manager.get(f"/kb/{knowledgebox}/counters")
-    shards1_resp = await nucliadb_manager.get(f"/kb/{knowledgebox}/shards")
+    counters1_resp = await nucliadb_manager.get(f"/v1/kb/{knowledgebox}/counters")
+    shards1_resp = await nucliadb_manager.get(f"/v1/kb/{knowledgebox}/shards")
     counters1 = counters1_resp.json()
     shards1 = shards1_resp.json()
 
@@ -73,7 +73,7 @@ async def test_rebalance_kb_shards(
     with patch.object(settings, "max_shard_paragraphs", counters1["paragraphs"] / 2):
         await rebalance.rebalance_kb(app_context, knowledgebox)
 
-    shards2_resp = await nucliadb_manager.get(f"/kb/{knowledgebox}/shards")
+    shards2_resp = await nucliadb_manager.get(f"/v1/kb/{knowledgebox}/shards")
     shards2 = shards2_resp.json()
     assert len(shards2["shards"]) == 2
 

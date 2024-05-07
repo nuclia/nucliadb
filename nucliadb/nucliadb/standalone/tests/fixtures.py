@@ -21,7 +21,7 @@ import uuid
 
 import pytest
 
-from nucliadb.search.api.v1.router import KB_PREFIX, KBS_PREFIX
+from nucliadb.search.api.v1.router import KBS_PREFIX
 
 
 @pytest.fixture(scope="function")
@@ -34,5 +34,5 @@ async def knowledgebox_one(nucliadb_manager):
 
     yield kbid
 
-    resp = await nucliadb_manager.delete(f"/{KB_PREFIX}/{kbid}")
+    resp = await nucliadb_manager.delete(f"/v1/kb/{kbid}")
     assert resp.status_code == 200

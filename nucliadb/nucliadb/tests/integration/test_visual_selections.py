@@ -64,7 +64,7 @@ async def annotated_file_field(
     assert len(selections_by_page[0]) == PAGE_0_SELECTION_COUNT
 
     resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/resources",
+        f"/v1/kb/{kbid}/resources",
         json={
             "title": "My invoice",
             "files": {
@@ -105,7 +105,7 @@ async def test_visual_selection(
     rid, field_id = annotated_file_field
 
     resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/resource/{rid}",
+        f"/v1/kb/{kbid}/resource/{rid}",
     )
     assert resp.status_code == 200
     body = resp.json()

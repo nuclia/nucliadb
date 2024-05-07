@@ -46,7 +46,7 @@ async def ten_dummy_resources_kb(
 
     for payload in payloads:
         resp = await nucliadb_writer.post(
-            f"/kb/{kbid}/resources",
+            f"/v1/kb/{kbid}/resources",
             json=payload,
         )
         assert resp.status_code == 201
@@ -54,7 +54,7 @@ async def ten_dummy_resources_kb(
         await asyncio.sleep(1)
 
     resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/resources",
+        f"/v1/kb/{kbid}/resources",
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -89,13 +89,13 @@ async def ten_quick_dummy_resources_kb(
 
     for payload in payloads:
         resp = await nucliadb_writer.post(
-            f"/kb/{kbid}/resources",
+            f"/v1/kb/{kbid}/resources",
             json=payload,
         )
         assert resp.status_code == 201
 
     resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/resources",
+        f"/v1/kb/{kbid}/resources",
     )
     assert resp.status_code == 200
     body = resp.json()

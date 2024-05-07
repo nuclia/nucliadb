@@ -37,7 +37,7 @@ async def test_find_with_label_changes(
     knowledgebox,
 ):
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/v1/kb/{knowledgebox}/resources",
         json={
             "slug": "myresource",
             "title": "My Title",
@@ -52,7 +52,7 @@ async def test_find_with_label_changes(
 
     # should get 1 result
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/find",
+        f"/v1/kb/{knowledgebox}/find",
         json={
             "query": "title",
         },
@@ -63,7 +63,7 @@ async def test_find_with_label_changes(
 
     # assert we get no results with label filter
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/find",
+        f"/v1/kb/{knowledgebox}/find",
         json={"query": "title", "filters": ["/classification.labels/labels/label1"]},
     )
     assert resp.status_code == 200
@@ -72,7 +72,7 @@ async def test_find_with_label_changes(
 
     # add new label
     resp = await nucliadb_writer.patch(
-        f"/kb/{knowledgebox}/resource/{rid}",
+        f"/v1/kb/{knowledgebox}/resource/{rid}",
         json={
             # "title": "My new title",
             "usermetadata": {
@@ -93,7 +93,7 @@ async def test_find_with_label_changes(
 
     # we should get 1 result now with updated label
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/find",
+        f"/v1/kb/{knowledgebox}/find",
         json={"query": "title", "filters": ["/classification.labels/labels/label1"]},
     )
     assert resp.status_code == 200
@@ -108,13 +108,13 @@ async def test_find_does_not_support_fulltext_search(
     knowledgebox,
 ):
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/find?query=title&features=document&features=paragraph",
+        f"/v1/kb/{knowledgebox}/find?query=title&features=document&features=paragraph",
     )
     assert resp.status_code == 422
     assert resp.json()["detail"][0]["msg"] == "fulltext search not supported"
 
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/find",
+        f"/v1/kb/{knowledgebox}/find",
         json={"query": "title", "features": ["document", "paragraph"]},
     )
     assert resp.status_code == 422
@@ -130,7 +130,7 @@ async def test_find_resource_filters(
     knowledgebox,
 ):
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/v1/kb/{knowledgebox}/resources",
         json={
             "title": "My Title",
             "summary": "My summary",
@@ -141,7 +141,7 @@ async def test_find_resource_filters(
     rid1 = resp.json()["uuid"]
 
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/v1/kb/{knowledgebox}/resources",
         json={
             "title": "My Title",
             "summary": "My summary",
@@ -153,7 +153,7 @@ async def test_find_resource_filters(
 
     # Should get 2 result
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/find",
+        f"/v1/kb/{knowledgebox}/find",
         json={
             "query": "title",
         },
@@ -165,7 +165,7 @@ async def test_find_resource_filters(
     # Check that resource filtering works
     for rid in [rid1, rid2]:
         resp = await nucliadb_reader.post(
-            f"/kb/{knowledgebox}/find",
+            f"/v1/kb/{knowledgebox}/find",
             json={
                 "query": "title",
                 "resource_filters": [rid],
@@ -185,14 +185,14 @@ async def test_find_min_score(
     # When not specifying the min score on the request
     # it should default to 0 for bm25 and 0.7 for semantic
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/find", json={"query": "dummy"}
+        f"/v1/kb/{knowledgebox}/find", json={"query": "dummy"}
     )
     assert resp.status_code == 200
     assert resp.json()["min_score"] == {"bm25": 0, "semantic": 0.7}
 
     # When specifying the min score on the request
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/find",
+        f"/v1/kb/{knowledgebox}/find",
         json={"query": "dummy", "min_score": {"bm25": 10, "semantic": 0.5}},
     )
     assert resp.status_code == 200
@@ -200,7 +200,7 @@ async def test_find_min_score(
 
     # Check that old api still works
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/find", json={"query": "dummy", "min_score": 0.5}
+        f"/v1/kb/{knowledgebox}/find", json={"query": "dummy", "min_score": 0.5}
     )
     assert resp.status_code == 200
     assert resp.json()["min_score"] == {"bm25": 0, "semantic": 0.5}
@@ -214,7 +214,7 @@ async def test_story_7286(
     knowledgebox,
 ):
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/v1/kb/{knowledgebox}/resources",
         json={
             "slug": "myresource",
             "title": "My Title",
@@ -226,7 +226,7 @@ async def test_story_7286(
     rid = resp.json()["uuid"]
 
     resp = await nucliadb_writer.patch(
-        f"/kb/{knowledgebox}/resource/{rid}",
+        f"/v1/kb/{knowledgebox}/resource/{rid}",
         json={
             "fieldmetadata": [
                 {
@@ -251,7 +251,7 @@ async def test_story_7286(
     ):
         # should get no result (because serialize returns None, as the resource is not found in the DB)
         resp = await nucliadb_reader.post(
-            f"/kb/{knowledgebox}/find",
+            f"/v1/kb/{knowledgebox}/find",
             json={
                 "query": "title",
                 "features": ["paragraph", "vector", "relations"],
@@ -276,7 +276,7 @@ async def test_find_marks_fuzzy_results(
     knowledgebox,
 ):
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/v1/kb/{knowledgebox}/resources",
         json={
             "slug": "myresource",
             "title": "My Title",
@@ -286,7 +286,7 @@ async def test_find_marks_fuzzy_results(
 
     # Should get only one non-fuzzy result
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/find",
+        f"/v1/kb/{knowledgebox}/find",
         json={
             "query": "Title",
         },
@@ -297,7 +297,7 @@ async def test_find_marks_fuzzy_results(
 
     # Should get only one fuzzy result
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/find",
+        f"/v1/kb/{knowledgebox}/find",
         json={
             "query": "totle",
         },
@@ -308,7 +308,7 @@ async def test_find_marks_fuzzy_results(
 
     # Should not get any result if exact match term queried
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/find",
+        f"/v1/kb/{knowledgebox}/find",
         json={
             "query": '"totle"',
         },
@@ -336,7 +336,7 @@ async def test_find_returns_best_matches(
     kbid = philosophy_books_kb
 
     resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/find",
+        f"/v1/kb/{kbid}/find",
         json={
             "query": "and",
         },

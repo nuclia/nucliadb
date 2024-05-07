@@ -20,15 +20,13 @@
 
 import pytest
 
-from nucliadb.search.api.v1.router import KB_PREFIX
-
 
 @pytest.mark.asyncio
 async def test_basic_patch_thumbnail_sc_2390(
     knowledgebox_one, nucliadb_reader, nucliadb_writer
 ) -> None:
     resp = await nucliadb_writer.post(
-        f"/{KB_PREFIX}/{knowledgebox_one}/resources",
+        f"/v1/kb/{knowledgebox_one}/resources",
         json={
             "title": "Resource title",
             "summary": "A simple summary",
@@ -39,7 +37,7 @@ async def test_basic_patch_thumbnail_sc_2390(
     rid = resp.json()["uuid"]
 
     resp = await nucliadb_reader.get(
-        f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}",
+        f"/v1/kb/{knowledgebox_one}/resource/{rid}",
     )
     assert resp.status_code == 200
 
@@ -47,13 +45,13 @@ async def test_basic_patch_thumbnail_sc_2390(
     assert resource["thumbnail"] == "thumbnail-on-creation"
 
     resp = await nucliadb_writer.patch(
-        f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}",
+        f"/v1/kb/{knowledgebox_one}/resource/{rid}",
         json={"thumbnail": "thumbnail-modified"},
     )
     assert resp.status_code == 200
 
     resp = await nucliadb_reader.get(
-        f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}",
+        f"/v1/kb/{knowledgebox_one}/resource/{rid}",
     )
     assert resp.status_code == 200
 

@@ -29,11 +29,11 @@ async def test_labels_sc_2053(
     knowledgebox,
 ):
     # PUBLIC API
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}")
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox}")
     assert resp.status_code == 200
 
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/v1/kb/{knowledgebox}/resources",
         json={
             "slug": "myresource",
             "usermetadata": {
@@ -44,14 +44,14 @@ async def test_labels_sc_2053(
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}")
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox}/resource/{rid}")
     assert resp.status_code == 200
     assert len(resp.json()["usermetadata"]["classifications"]) == 1
 
     # ADD A LABEL
 
     resp = await nucliadb_writer.patch(
-        f"/kb/{knowledgebox}/resource/{rid}",
+        f"/v1/kb/{knowledgebox}/resource/{rid}",
         json={
             "usermetadata": {
                 "classifications": [
@@ -63,16 +63,16 @@ async def test_labels_sc_2053(
     )
     assert resp.status_code == 200
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}")
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox}/resource/{rid}")
     assert resp.status_code == 200
     assert len(resp.json()["usermetadata"]["classifications"]) == 2
 
     resp = await nucliadb_writer.patch(
-        f"/kb/{knowledgebox}/resource/{rid}",
+        f"/v1/kb/{knowledgebox}/resource/{rid}",
         json={"usermetadata": {"classifications": []}},
     )
     assert resp.status_code == 200
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}")
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox}/resource/{rid}")
     assert resp.status_code == 200
     assert len(resp.json()["usermetadata"]["classifications"]) == 0

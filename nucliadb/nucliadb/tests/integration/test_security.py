@@ -30,7 +30,7 @@ DEVELOPERS_GROUP = "developers"
 async def resource_with_security(nucliadb_writer, knowledgebox):
     kbid = knowledgebox
     resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/resources",
+        f"/v1/kb/{kbid}/resources",
         json={
             "title": "Test resource",
             "texts": {
@@ -53,7 +53,7 @@ async def test_resource_security_is_returned_serialization(
     resource_id = resource_with_security
 
     resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/resource/{resource_id}", params={"show": ["security"]}
+        f"/v1/kb/{kbid}/resource/{resource_id}", params={"show": ["security"]}
     )
     assert resp.status_code == 200, resp.text
     resource = resp.json()
@@ -71,7 +71,7 @@ async def test_resource_security_is_updated(
 
     # Update the security of the resource: make it public for all groups
     resp = await nucliadb_writer.patch(
-        f"/kb/{kbid}/resource/{resource_id}",
+        f"/v1/kb/{kbid}/resource/{resource_id}",
         json={
             "security": {
                 "access_groups": [],
@@ -82,7 +82,7 @@ async def test_resource_security_is_updated(
 
     # Check that it was updated properly
     resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/resource/{resource_id}",
+        f"/v1/kb/{kbid}/resource/{resource_id}",
         params={"show": ["security"]},
     )
     assert resp.status_code == 200, resp.text
@@ -106,7 +106,7 @@ async def test_resource_security_search(
     support_group = "support"
     # Add another group to the resource
     resp = await nucliadb_writer.patch(
-        f"/kb/{kbid}/resource/{resource_id}",
+        f"/v1/kb/{kbid}/resource/{resource_id}",
         json={
             "security": {
                 "access_groups": [PLATFORM_GROUP, DEVELOPERS_GROUP, support_group],
@@ -156,7 +156,7 @@ async def test_resource_security_search(
 
     # Make it public now
     resp = await nucliadb_writer.patch(
-        f"/kb/{kbid}/resource/{resource_id}",
+        f"/v1/kb/{kbid}/resource/{resource_id}",
         json={
             "security": {
                 "access_groups": [],
@@ -202,22 +202,22 @@ async def _test_search_request_with_security(
 
     if search_endpoint == "find_post":
         resp = await nucliadb_reader.post(
-            f"/kb/{kbid}/find",
+            f"/v1/kb/{kbid}/find",
             json=payload,
         )
     elif search_endpoint == "find_get":
         resp = await nucliadb_reader.get(
-            f"/kb/{kbid}/find",
+            f"/v1/kb/{kbid}/find",
             params=params,
         )
     elif search_endpoint == "search_post":
         resp = await nucliadb_reader.post(
-            f"/kb/{kbid}/search",
+            f"/v1/kb/{kbid}/search",
             json=payload,
         )
     elif search_endpoint == "search_get":
         resp = await nucliadb_reader.get(
-            f"/kb/{kbid}/search",
+            f"/v1/kb/{kbid}/search",
             params=params,
         )
     else:

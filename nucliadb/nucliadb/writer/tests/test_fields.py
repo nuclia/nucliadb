@@ -25,7 +25,6 @@ from os.path import dirname
 import pytest
 
 from nucliadb.writer.api.v1.router import (
-    KB_PREFIX,
     RESOURCE_PREFIX,
     RESOURCES_PREFIX,
     RSLUG_PREFIX,
@@ -132,7 +131,7 @@ async def test_resource_field_add(writer_api, knowledgebox_writer):
     knowledgebox_id = knowledgebox_writer
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
+            f"/v1/kb/{knowledgebox_id}/{RESOURCES_PREFIX}",
             json={"slug": "resource1", "title": "My resource"},
         )
         assert resp.status_code == 201
@@ -143,7 +142,7 @@ async def test_resource_field_add(writer_api, knowledgebox_writer):
 
         # Text
         resp = await client.put(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/text/text1",
+            f"/v1/kb/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/text/text1",
             json=TEST_TEXT_PAYLOAD,
         )
         assert resp.status_code == 201
@@ -152,7 +151,7 @@ async def test_resource_field_add(writer_api, knowledgebox_writer):
 
         # Link
         resp = await client.put(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/link/link1",
+            f"/v1/kb/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/link/link1",
             json=TEST_LINK_PAYLOAD,
         )
         assert resp.status_code == 201
@@ -161,7 +160,7 @@ async def test_resource_field_add(writer_api, knowledgebox_writer):
 
         # Keywordset
         resp = await client.put(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/keywordset/kws1",
+            f"/v1/kb/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/keywordset/kws1",
             json=TEST_KEYWORDSETS_PAYLOAD,
         )
         assert resp.status_code == 201
@@ -171,7 +170,7 @@ async def test_resource_field_add(writer_api, knowledgebox_writer):
         # Datetimes
 
         resp = await client.put(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/datetime/date1",
+            f"/v1/kb/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/datetime/date1",
             json=TEST_DATETIMES_PAYLOAD,
         )
         assert resp.status_code == 201
@@ -180,7 +179,7 @@ async def test_resource_field_add(writer_api, knowledgebox_writer):
 
         # Conversation
         resp = await client.put(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/conversation/conv1",
+            f"/v1/kb/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/conversation/conv1",
             json=TEST_CONVERSATION_PAYLOAD,
         )
 
@@ -190,7 +189,7 @@ async def test_resource_field_add(writer_api, knowledgebox_writer):
 
         # Layout
         resp = await client.put(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/layout/layout1",
+            f"/v1/kb/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/layout/layout1",
             json=TEST_LAYOUT_PAYLOAD,
         )
 
@@ -200,7 +199,7 @@ async def test_resource_field_add(writer_api, knowledgebox_writer):
 
         # File
         resp = await client.put(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/file/file1",
+            f"/v1/kb/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/file/file1",
             json=TEST_FILE_PAYLOAD,
         )
         assert resp.status_code == 201
@@ -209,7 +208,7 @@ async def test_resource_field_add(writer_api, knowledgebox_writer):
 
         # File without storing it in the internal BrokerMessage, only send to process
         resp = await client.put(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/file/file1",
+            f"/v1/kb/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/file/file1",
             json=TEST_FILE_PAYLOAD,
             headers={"x_skip_store": "1"},
         )
@@ -219,7 +218,7 @@ async def test_resource_field_add(writer_api, knowledgebox_writer):
 
         # File field pointing to an externally hosted file
         resp = await client.put(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/file/externalfile",
+            f"/v1/kb/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/file/externalfile",
             json=TEST_EXTERNAL_FILE_PAYLOAD,
         )
         assert resp.status_code == 201
@@ -232,7 +231,7 @@ async def test_resource_field_append_extra(writer_api, knowledgebox_writer):
     knowledgebox_id = knowledgebox_writer
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
+            f"/v1/kb/{knowledgebox_id}/{RESOURCES_PREFIX}",
             json={
                 "slug": "resource1",
                 "title": "My resource",
@@ -248,7 +247,7 @@ async def test_resource_field_append_extra(writer_api, knowledgebox_writer):
 
         # Conversation
         resp = await client.put(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/conversation/conv1/messages",
+            f"/v1/kb/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/conversation/conv1/messages",
             json=TEST_CONVERSATION_APPEND_MESSAGES_PAYLOAD,
         )
         assert resp.status_code == 200
@@ -257,7 +256,7 @@ async def test_resource_field_append_extra(writer_api, knowledgebox_writer):
 
         # Layout
         resp = await client.put(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/layout/layout1/blocks",
+            f"/v1/kb/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/layout/layout1/blocks",
             json=TEST_LAYOUT_APPEND_BLOCKS_PAYLOAD,
         )
 
@@ -271,7 +270,7 @@ async def test_resource_field_delete(writer_api, knowledgebox_writer):
     knowledgebox_id = knowledgebox_writer
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
+            f"/v1/kb/{knowledgebox_id}/{RESOURCES_PREFIX}",
             json={
                 "slug": "resource1",
                 "title": "My resource",
@@ -291,43 +290,43 @@ async def test_resource_field_delete(writer_api, knowledgebox_writer):
 
         # Text
         resp = await client.delete(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/text/text1"
+            f"/v1/kb/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/text/text1"
         )
         assert resp.status_code == 204
 
         # Link
         resp = await client.delete(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/link/link1"
+            f"/v1/kb/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/link/link1"
         )
         assert resp.status_code == 204
 
         # Keywords
         resp = await client.delete(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/keywordset/kws1"
+            f"/v1/kb/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/keywordset/kws1"
         )
         assert resp.status_code == 204
 
         # Datetimes
 
         resp = await client.delete(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/datetime/date1"
+            f"/v1/kb/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/datetime/date1"
         )
         assert resp.status_code == 204
 
         # Conversation
         resp = await client.delete(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/conversation/conv1"
+            f"/v1/kb/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/conversation/conv1"
         )
 
         # Layout
         resp = await client.delete(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/layout/layout1"
+            f"/v1/kb/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/layout/layout1"
         )
         assert resp.status_code == 204
 
         # File
         resp = await client.delete(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/file/file1"
+            f"/v1/kb/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/file/file1"
         )
         assert resp.status_code == 204
 
@@ -352,7 +351,7 @@ async def test_sync_ops(writer_api, knowledgebox_writer, endpoint, payload):
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         # Create a resource
         resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
+            f"/v1/kb/{knowledgebox_id}/{RESOURCES_PREFIX}",
             json={
                 "slug": "resource1",
                 "title": "My resource",
@@ -364,7 +363,7 @@ async def test_sync_ops(writer_api, knowledgebox_writer, endpoint, payload):
         data = resp.json()
         rid = data["uuid"]
 
-        resource_path = f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}"
+        resource_path = f"/v1/kb/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}"
         resp = await client.put(
             f"{resource_path}/{endpoint}",
             json=payload,
@@ -377,7 +376,7 @@ async def test_external_file_field(writer_api, knowledgebox_writer):
     knowledgebox_id = knowledgebox_writer
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
+            f"/v1/kb/{knowledgebox_id}/{RESOURCES_PREFIX}",
             json={"slug": "resource1", "title": "My resource"},
         )
         assert resp.status_code == 201
@@ -385,7 +384,7 @@ async def test_external_file_field(writer_api, knowledgebox_writer):
 
         # File field pointing to an externally hosted file
         resp = await client.put(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/file/externalfile",
+            f"/v1/kb/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/file/externalfile",
             json=TEST_EXTERNAL_FILE_PAYLOAD,
         )
         assert resp.status_code == 201
@@ -396,7 +395,7 @@ async def test_file_field_validation(writer_api, knowledgebox_writer):
     knowledgebox_id = knowledgebox_writer
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
+            f"/v1/kb/{knowledgebox_id}/{RESOURCES_PREFIX}",
             json={"slug": "resource1", "title": "My resource"},
         )
         assert resp.status_code == 201
@@ -407,7 +406,7 @@ async def test_file_field_validation(writer_api, knowledgebox_writer):
         payload["file"].pop("md5")
 
         resp = await client.put(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/file/file1",
+            f"/v1/kb/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/file/file1",
             json=payload,
         )
         assert resp.status_code == 201
@@ -440,7 +439,7 @@ async def test_field_endpoints_by_slug(
         field_type = "text"
 
         resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_ingest}/{RESOURCES_PREFIX}",
+            f"/v1/kb/{knowledgebox_ingest}/{RESOURCES_PREFIX}",
             json={"slug": slug},
         )
         assert resp.status_code == 201
@@ -457,7 +456,7 @@ async def test_field_endpoints_by_slug(
         )
 
         resp = await op(
-            f"/{KB_PREFIX}/{knowledgebox_ingest}/{RSLUG_PREFIX}/idonotexist" + url,
+            f"/v1/kb/{knowledgebox_ingest}/{RSLUG_PREFIX}/idonotexist" + url,
             **extra_params,
         )
         assert resp.status_code == 404
@@ -469,7 +468,7 @@ async def test_field_endpoints_by_slug(
             field_type=field_type,
         )
         resp = await op(
-            f"/{KB_PREFIX}/{knowledgebox_ingest}/{RSLUG_PREFIX}/{slug}" + url,
+            f"/v1/kb/{knowledgebox_ingest}/{RSLUG_PREFIX}/{slug}" + url,
             **extra_params,
         )
         assert str(resp.status_code).startswith("2")

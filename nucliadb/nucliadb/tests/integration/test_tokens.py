@@ -37,7 +37,7 @@ async def test_metadata_tokens_cancelled_by_the_user_sc_3775(
         "cancelled_by_user": True,
     }
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/v1/kb/{knowledgebox}/resources",
         json={
             "title": "My Resource",
             "summary": "My summary",
@@ -58,7 +58,7 @@ async def test_metadata_tokens_cancelled_by_the_user_sc_3775(
 
     # Check cancelled tokens come in resource get
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{rid}",
+        f"/v1/kb/{knowledgebox}/resource/{rid}",
     )
     assert resp.status_code == 200
     content = resp.json()
@@ -66,14 +66,14 @@ async def test_metadata_tokens_cancelled_by_the_user_sc_3775(
 
     # Check cancelled labels come in resource list
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resources",
+        f"/v1/kb/{knowledgebox}/resources",
     )
     assert resp.status_code == 200
     content = resp.json()
     assert content["resources"][0]["fieldmetadata"][0]["token"][0] == token
 
     # Check cancelled labels come in search results
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query=summary")
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox}/search?query=summary")
     assert resp.status_code == 200
     content = resp.json()
     assert content["resources"][rid]["fieldmetadata"][0]["token"][0] == token

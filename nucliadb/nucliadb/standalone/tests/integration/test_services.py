@@ -19,8 +19,6 @@
 #
 import pytest
 
-from nucliadb.search.api.v1.router import KB_PREFIX
-
 
 @pytest.mark.asyncio
 async def test_entities_service(
@@ -43,28 +41,26 @@ async def test_entities_service(
         },
     }
     resp = await nucliadb_writer.post(
-        f"/{KB_PREFIX}/{knowledgebox_one}/entitiesgroups", json=entitygroup
+        f"/v1/kb/{knowledgebox_one}/entitiesgroups", json=entitygroup
     )
     assert resp.status_code == 200
 
-    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{knowledgebox_one}/entitiesgroups")
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox_one}/entitiesgroups")
     assert resp.status_code == 200
     groups = resp.json()["groups"]
     assert len(groups) == 1
     assert groups["group1"]["custom"] is True
 
-    resp = await nucliadb_reader.get(
-        f"/{KB_PREFIX}/{knowledgebox_one}/entitiesgroup/group1"
-    )
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox_one}/entitiesgroup/group1")
     assert resp.status_code == 200
     assert resp.json()["custom"] is True
 
     resp = await nucliadb_writer.delete(
-        f"/{KB_PREFIX}/{knowledgebox_one}/entitiesgroup/group1"
+        f"/v1/kb/{knowledgebox_one}/entitiesgroup/group1"
     )
     assert resp.status_code == 200
 
-    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{knowledgebox_one}/entitiesgroups")
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox_one}/entitiesgroups")
     assert resp.status_code == 200
     assert len(resp.json()["groups"]) == 0
 
@@ -78,27 +74,23 @@ async def test_labelsets_service(
         "labels": [{"title": "Label 1", "related": "related 1", "text": "My Text"}],
     }
     resp = await nucliadb_writer.post(
-        f"/{KB_PREFIX}/{knowledgebox_one}/labelset/labelset1", json=payload
+        f"/v1/kb/{knowledgebox_one}/labelset/labelset1", json=payload
     )
     assert resp.status_code == 200
 
-    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{knowledgebox_one}/labelsets")
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox_one}/labelsets")
     assert len(resp.json()["labelsets"]) == 1
 
-    resp = await nucliadb_reader.get(
-        f"/{KB_PREFIX}/{knowledgebox_one}/labelset/labelset1"
-    )
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox_one}/labelset/labelset1")
     assert resp.status_code == 200
 
-    resp = await nucliadb_writer.delete(
-        f"/{KB_PREFIX}/{knowledgebox_one}/labelset/labelset1"
-    )
+    resp = await nucliadb_writer.delete(f"/v1/kb/{knowledgebox_one}/labelset/labelset1")
     assert resp.status_code == 200
 
-    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{knowledgebox_one}/labelsets")
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox_one}/labelsets")
     assert len(resp.json()["labelsets"]) == 0
 
 
 async def test_notifications_service(nucliadb_reader):
-    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/foobar/notifications")
+    resp = await nucliadb_reader.get(f"/v1/kb/foobar/notifications")
     assert resp.status_code == 404

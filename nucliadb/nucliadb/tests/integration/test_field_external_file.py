@@ -19,7 +19,7 @@
 #
 import pytest
 
-from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_PREFIX
+from nucliadb.writer.api.v1.router import RESOURCE_PREFIX, RESOURCES_PREFIX
 from nucliadb_utils.settings import nuclia_settings
 
 EXTERNAL_FILE_URL = "http://mysite.com/files/myfile.pdf"
@@ -49,7 +49,7 @@ async def test_external_file_field(
     knowledgebox,
 ):
     # Create a resource
-    kb_path = f"/{KB_PREFIX}/{knowledgebox}"
+    kb_path = f"/v1/kb/{knowledgebox}"
     resp = await nucliadb_writer.post(
         f"{kb_path}/{RESOURCES_PREFIX}",
         json={

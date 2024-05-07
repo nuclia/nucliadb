@@ -28,7 +28,7 @@ import nucliadb.ingest.tests.fixtures
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.tests.fixtures import TEST_CLOUDFILE, THUMBNAIL
 from nucliadb.reader.api.v1.download import parse_media_range, safe_http_header_encode
-from nucliadb.reader.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX
+from nucliadb.reader.api.v1.router import RESOURCE_PREFIX, RSLUG_PREFIX
 from nucliadb_models.resource import NucliaDBRoles
 
 BASE = ("field_id", "field_type")
@@ -50,7 +50,7 @@ async def test_resource_download_extracted_file(
 
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/{field_type}/{field_id}/download/{download_type}/{download_field}",  # noqa
+            f"/v1/kb/{kbid}/{RESOURCE_PREFIX}/{rid}/{field_type}/{field_id}/download/{download_type}/{download_field}",  # noqa
         )
         assert resp.status_code == 200
         filename = f"{os.path.dirname(nucliadb.ingest.tests.fixtures.__file__)}{THUMBNAIL.bucket_name}/{THUMBNAIL.uri}"
@@ -69,7 +69,7 @@ async def test_resource_download_field_file(
 
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}?show=values",
+            f"/v1/kb/{kbid}/{RESOURCE_PREFIX}/{rid}?show=values",
         )
         assert (
             resp.json()["data"]["files"]["file1"]["value"]["file"]["filename"]
@@ -78,7 +78,7 @@ async def test_resource_download_field_file(
 
         # Check that invalid range is handled
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/download/field",
+            f"/v1/kb/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/download/field",
             headers={"range": "bytes=invalid-range"},
         )
         assert resp.status_code == 416
@@ -86,14 +86,14 @@ async def test_resource_download_field_file(
 
         # Check that multipart ranges not implemented is handled
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/download/field",
+            f"/v1/kb/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/download/field",
             headers={"range": "bytes=0-50, 100-150"},
         )
         assert resp.status_code == 416
         assert resp.json()["detail"]["reason"] == "rangeNotSupported"
 
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/download/field",
+            f"/v1/kb/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/download/field",
             headers={"range": "bytes=0-"},
         )
         assert resp.status_code == 206
@@ -104,7 +104,7 @@ async def test_resource_download_field_file(
         open(filename, "rb").read() == resp.content
 
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}?show=values",
+            f"/v1/kb/{kbid}/{RESOURCE_PREFIX}/{rid}?show=values",
         )
         assert resp.status_code == 200
 
@@ -130,7 +130,7 @@ async def test_resource_download_field_layout(
 
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/layout/{field_id}/download/field/{download_field}",
+            f"/v1/kb/{kbid}/{RESOURCE_PREFIX}/{rid}/layout/{field_id}/download/field/{download_field}",
         )
         assert resp.status_code == 200
         filename = f"{os.path.dirname(nucliadb.ingest.tests.fixtures.__file__)}/{TEST_CLOUDFILE.bucket_name}/{TEST_CLOUDFILE.uri}"  # noqa
@@ -151,7 +151,7 @@ async def test_resource_download_field_conversation(
 
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/conversation/{field_id}/download/field/{msg_id}/{file_id}",
+            f"/v1/kb/{kbid}/{RESOURCE_PREFIX}/{rid}/conversation/{field_id}/download/field/{msg_id}/{file_id}",
         )
         assert resp.status_code == 200
         filename = f"{os.path.dirname(nucliadb.ingest.tests.fixtures.__file__)}/{THUMBNAIL.bucket_name}/{THUMBNAIL.uri}"  # noqa
@@ -190,7 +190,7 @@ async def test_download_fields_by_resource_slug(
         endpoint_params["file_num"] = file_num
 
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
-        resource_path = f"/{KB_PREFIX}/{kbid}/{RSLUG_PREFIX}/{slug}"
+        resource_path = f"/v1/kb/{kbid}/{RSLUG_PREFIX}/{slug}"
         endpoint = endpoint_part.format(**endpoint_params)
         resp = await client.get(
             f"{resource_path}/{endpoint}",
@@ -198,7 +198,7 @@ async def test_download_fields_by_resource_slug(
         assert resp.status_code == 200
 
         # Check that 404 is returned when a slug does not exist
-        unexisting_resource_path = f"/{KB_PREFIX}/{kbid}/{RSLUG_PREFIX}/idonotexist"
+        unexisting_resource_path = f"/v1/kb/{kbid}/{RSLUG_PREFIX}/idonotexist"
         resp = await client.get(
             f"{unexisting_resource_path}/{endpoint}",
         )
@@ -253,7 +253,7 @@ async def test_resource_download_field_file_content_disposition(
     rid = rsc.uuid
     field_id = "file1"
     download_url = (
-        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/download/field"
+        f"/v1/kb/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/download/field"
     )
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         # Defaults to attachment

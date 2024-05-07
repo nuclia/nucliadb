@@ -55,7 +55,7 @@ async def test_search_returns_labels(
 
     resp = await asyncbenchmark(
         nucliadb_reader.get,
-        f"/kb/{knowledgebox}/search?query=Some&show=extracted&extracted=metadata",
+        f"/v1/kb/{knowledgebox}/search?query=Some&show=extracted&extracted=metadata",
     )
     assert resp.status_code == 200
 
@@ -90,7 +90,7 @@ async def test_search_relations(
 
     resp = await asyncbenchmark(
         nucliadb_reader.get,
-        f"/kb/{knowledgebox}/search",
+        f"/v1/kb/{knowledgebox}/search",
         params={
             "features": "relations",
             "query": "What relates Newton and Becquer?",

@@ -57,7 +57,7 @@ async def test_endpoint_set_resource_status_to_pending(
     br.basic.metadata.status = rpb.Metadata.Status.PROCESSED
     await inject_message(nucliadb_grpc, br)
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{br.uuid}")
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox}/resource/{br.uuid}")
     assert resp.status_code == 200
     resp_json = resp.json()
     assert resp_json["metadata"]["status"] == "PROCESSED"
@@ -69,7 +69,7 @@ async def test_endpoint_set_resource_status_to_pending(
     )
     assert resp.status_code == expected_status
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{br.uuid}")
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox}/resource/{br.uuid}")
     assert resp.status_code == 200
     resp_json = resp.json()
     assert resp_json["metadata"]["status"] == "PENDING"

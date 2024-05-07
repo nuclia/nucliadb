@@ -171,11 +171,11 @@ async def test_labels_global(
     knowledgebox,
 ):
     # PUBLIC API
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}")
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox}")
     assert resp.status_code == 200
 
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/labelset/label1",
+        f"/v1/kb/{knowledgebox}/labelset/label1",
         json={
             "title": "mylabel",
             "multiple": False,
@@ -184,14 +184,14 @@ async def test_labels_global(
     )
     assert resp.status_code == 200
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/labelsets")
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox}/labelsets")
     assert resp.status_code == 200
     assert len(resp.json()["labelsets"]) == 1
     assert resp.json()["labelsets"]["label1"]["multiple"] is False
 
     rid = await inject_resource_with_paragraph_labels(knowledgebox, nucliadb_grpc)
 
-    resp = await nucliadb_writer.post(f"/kb/{knowledgebox}/resource/{rid}/reindex")
+    resp = await nucliadb_writer.post(f"/v1/kb/{knowledgebox}/resource/{rid}/reindex")
     assert resp.status_code == 200
 
 
@@ -208,7 +208,7 @@ async def test_classification_labels_cancelled_by_the_user(
         "cancelled_by_user": True,
     }
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/v1/kb/{knowledgebox}/resources",
         json={
             "title": "My Resource",
             "summary": "My summary",
@@ -220,7 +220,7 @@ async def test_classification_labels_cancelled_by_the_user(
 
     # Check cancelled labels come in resource get
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{rid}",
+        f"/v1/kb/{knowledgebox}/resource/{rid}",
     )
     assert resp.status_code == 200
     content = resp.json()
@@ -228,7 +228,7 @@ async def test_classification_labels_cancelled_by_the_user(
 
     # Check cancelled labels come in resource list
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resources",
+        f"/v1/kb/{knowledgebox}/resources",
     )
     assert resp.status_code == 200
     content = resp.json()
@@ -237,7 +237,7 @@ async def test_classification_labels_cancelled_by_the_user(
     )
 
     # Check cancelled labels come in search results
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query=summary")
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox}/search?query=summary")
     assert resp.status_code == 200
     content = resp.json()
     assert (
@@ -268,19 +268,19 @@ async def test_classification_labels_are_shown_in_resource_basic(
     )
 
     # Check resource get
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}?show=basic")
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox}/resource/{rid}?show=basic")
     assert resp.status_code == 200
     resource = Resource.parse_raw(resp.content)
     assert resource.computedmetadata == expected_computedmetadata
 
     # Check resources list
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resources?show=basic")
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox}/resources?show=basic")
     assert resp.status_code == 200
     resources = ResourceList.parse_raw(resp.content)
     assert resources.resources[0].computedmetadata == expected_computedmetadata
 
     # Check search results list
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?show=basic")
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox}/search?show=basic")
     assert resp.status_code == 200
     results = KnowledgeboxSearchResults.parse_raw(resp.content)
     assert results.resources[rid].computedmetadata == expected_computedmetadata
@@ -347,14 +347,14 @@ async def test_fieldmetadata_classification_labels(
         fieldmetadata=[fieldmetadata],
     )
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/v1/kb/{knowledgebox}/resources",
         data=payload.json(),  # type: ignore
     )
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
 
     # Check resource get
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}?show=basic")
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox}/resource/{rid}?show=basic")
     assert resp.status_code == 200
     resource = Resource.parse_raw(resp.content)
     assert resource.fieldmetadata[0] == fieldmetadata  # type: ignore

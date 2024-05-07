@@ -46,13 +46,13 @@ async def test_chat(
     knowledgebox,
 ):
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/chat", json={"query": "query"}
+        f"/v1/kb/{knowledgebox}/chat", json={"query": "query"}
     )
     assert resp.status_code == 200
 
     context = [{"author": "USER", "text": "query"}]
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/chat", json={"query": "query", "context": context}
+        f"/v1/kb/{knowledgebox}/chat", json={"query": "query", "context": context}
     )
     assert resp.status_code == 200
 
@@ -74,7 +74,7 @@ async def test_chat_handles_incomplete_find_results(
     find_incomplete_results,
 ):
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/chat", json={"query": "query"}
+        f"/v1/kb/{knowledgebox}/chat", json={"query": "query"}
     )
     assert resp.status_code == 529
     assert resp.json() == {
@@ -86,7 +86,7 @@ async def test_chat_handles_incomplete_find_results(
 async def resource(nucliadb_writer, knowledgebox):
     kbid = knowledgebox
     resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/resources",
+        f"/v1/kb/{kbid}/resources",
         json={
             "title": "The title",
             "summary": "The summary",
@@ -107,7 +107,7 @@ async def test_chat_handles_status_codes_in_a_different_chunk(
     predict.generated_answer = [b"some ", b"text ", b"with ", b"status.", b"-2"]  # type: ignore
 
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/chat", json={"query": "title"}
+        f"/v1/kb/{knowledgebox}/chat", json={"query": "title"}
     )
     assert resp.status_code == 200
     _, answer, _, _ = parse_chat_response(resp.content)
@@ -124,7 +124,7 @@ async def test_chat_handles_status_codes_in_the_same_chunk(
     predict.generated_answer = [b"some ", b"text ", b"with ", b"status.-2"]  # type: ignore
 
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/chat", json={"query": "title"}
+        f"/v1/kb/{knowledgebox}/chat", json={"query": "title"}
     )
     assert resp.status_code == 200
     _, answer, _, _ = parse_chat_response(resp.content)
@@ -141,7 +141,7 @@ async def test_chat_handles_status_codes_with_last_chunk_empty(
     predict.generated_answer = [b"some ", b"text ", b"with ", b"status.", b"-2", b""]  # type: ignore
 
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/chat", json={"query": "title"}
+        f"/v1/kb/{knowledgebox}/chat", json={"query": "title"}
     )
     assert resp.status_code == 200
     _, answer, _, _ = parse_chat_response(resp.content)
@@ -181,7 +181,7 @@ async def test_chat_always_returns_relations(
     nucliadb_reader: AsyncClient, knowledgebox
 ):
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/chat",
+        f"/v1/kb/{knowledgebox}/chat",
         json={"query": "summary", "features": ["relations"]},
         timeout=None,
     )
@@ -197,7 +197,7 @@ async def test_chat_synchronous(nucliadb_reader: AsyncClient, knowledgebox, reso
     predict = get_predict()
     predict.generated_answer = [b"some ", b"text ", b"with ", b"status.", b"0"]  # type: ignore
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/chat",
+        f"/v1/kb/{knowledgebox}/chat",
         json={"query": "title"},
         headers={"X-Synchronous": "True"},
     )
@@ -232,7 +232,7 @@ async def test_chat_with_citations(
     ]
 
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/chat",
+        f"/v1/kb/{knowledgebox}/chat",
         json={"query": "title", "citations": True},
         headers={"X-Synchronous": str(sync_chat)},
         timeout=None,
@@ -263,7 +263,7 @@ async def test_chat_without_citations(
     ]
 
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/chat",
+        f"/v1/kb/{knowledgebox}/chat",
         json={"query": "title", "citations": False},
         headers={"X-Synchronous": str(sync_chat)},
         timeout=None,
@@ -286,7 +286,7 @@ async def test_sync_chat_returns_prompt_context(
 ):
     # Make sure prompt context is returned if debug is True
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/chat",
+        f"/v1/kb/{knowledgebox}/chat",
         json={"query": "title", "debug": debug},
         headers={"X-Synchronous": "True"},
     )
@@ -306,7 +306,7 @@ async def resources(nucliadb_writer, knowledgebox):
     rids = []
     for i in range(2):
         resp = await nucliadb_writer.post(
-            f"/kb/{kbid}/resources",
+            f"/v1/kb/{kbid}/resources",
             json={
                 "title": f"The title {i}",
                 "summary": f"The summary {i}",
@@ -330,7 +330,7 @@ async def test_chat_rag_options_full_resource(
     predict.calls.clear()  # type: ignore
 
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/chat",
+        f"/v1/kb/{knowledgebox}/chat",
         json={"query": "title", "rag_strategies": [{"name": "full_resource"}]},
         timeout=None,
     )
@@ -362,7 +362,7 @@ async def test_chat_rag_options_extend_with_fields(
     predict.calls.clear()  # type: ignore
 
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/chat",
+        f"/v1/kb/{knowledgebox}/chat",
         json={
             "query": "title",
             "rag_strategies": [{"name": "field_extension", "fields": ["a/summary"]}],
@@ -496,7 +496,7 @@ async def test_chat_capped_context(
 ):
     # By default, max size is big enough to fit all the prompt context
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/chat",
+        f"/v1/kb/{knowledgebox}/chat",
         json={
             "query": "title",
             "rag_strategies": [{"name": "full_resource"}],
@@ -515,7 +515,7 @@ async def test_chat_capped_context(
     assert total_size > max_size * 3
 
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/chat",
+        f"/v1/kb/{knowledgebox}/chat",
         json={
             "query": "title",
             "rag_strategies": [{"name": "full_resource"}],
@@ -534,7 +534,9 @@ async def test_chat_capped_context(
 
 @pytest.mark.asyncio()
 async def test_chat_on_a_kb_not_found(nucliadb_reader):
-    resp = await nucliadb_reader.post("/kb/unknown_kb_id/chat", json={"query": "title"})
+    resp = await nucliadb_reader.post(
+        "/v1/kb/unknown_kb_id/chat", json={"query": "title"}
+    )
     assert resp.status_code == 404
     assert resp.json() == {"detail": "Knowledge Box 'unknown_kb_id' not found."}
 
@@ -545,7 +547,7 @@ async def test_chat_max_tokens(nucliadb_reader, knowledgebox, resources):
 
     # As an integer
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/chat",
+        f"/v1/kb/{knowledgebox}/chat",
         json={
             "query": "title",
             "max_tokens": 100,
@@ -555,7 +557,7 @@ async def test_chat_max_tokens(nucliadb_reader, knowledgebox, resources):
 
     # Same but with the max tokens in a dict
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/chat",
+        f"/v1/kb/{knowledgebox}/chat",
         json={
             "query": "title",
             "max_tokens": {"context": 100, "answer": 50},
@@ -566,7 +568,7 @@ async def test_chat_max_tokens(nucliadb_reader, knowledgebox, resources):
     # If the context requested is bigger than the max tokens, it should fail
     predict = get_predict()
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/chat",
+        f"/v1/kb/{knowledgebox}/chat",
         json={
             "query": "title",
             "max_tokens": {"context": predict.max_context + 1},

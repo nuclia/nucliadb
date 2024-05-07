@@ -28,7 +28,7 @@ async def test_custom_synonyms_api(
     knowledgebox,
 ):
     kbid = knowledgebox
-    synonyms_url = f"/kb/{kbid}/custom-synonyms"
+    synonyms_url = f"/v1/kb/{kbid}/custom-synonyms"
 
     # Delete first
     resp = await nucliadb_writer.delete(synonyms_url, timeout=None)
@@ -76,7 +76,7 @@ async def test_custom_synonyms_api(
 @pytest.fixture(scope="function")
 async def knowledgebox_with_synonyms(nucliadb_writer, knowledgebox):
     kbid = knowledgebox
-    synonyms_url = f"/kb/{kbid}/custom-synonyms"
+    synonyms_url = f"/v1/kb/{kbid}/custom-synonyms"
     kb_synonyms = {
         "synonyms": {
             "planet": ["earth", "globe", "sphere", "world"],
@@ -100,7 +100,7 @@ async def test_search_with_synonyms(
     # - the term on the summary
     # - one of the synonyms in the title
     resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/resources",
+        f"/v1/kb/{kbid}/resources",
         json={
             "title": "Earth",
             "summary": "Planet",
@@ -112,7 +112,7 @@ async def test_search_with_synonyms(
     # Create another resource with the remaining
     # synonyms present in title and summary fields
     resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/resources",
+        f"/v1/kb/{kbid}/resources",
         json={
             "title": "Globe Sphere",
             "summary": "World",
@@ -124,7 +124,7 @@ async def test_search_with_synonyms(
     # Create another resource that does not match
     # with the term or any of its synonyms
     resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/resources",
+        f"/v1/kb/{kbid}/resources",
         json={
             "title": "Tomatoes",
             "summary": "The tomatoe collection",
@@ -134,7 +134,7 @@ async def test_search_with_synonyms(
     tomatoe_rid = resp.json()["uuid"]
 
     resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/search",
+        f"/v1/kb/{kbid}/search",
         json=dict(
             features=["paragraph", "document"],
             query="planet",
@@ -155,7 +155,7 @@ async def test_search_with_synonyms(
 
     # Check that searching without synonyms matches only query term
     resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/search",
+        f"/v1/kb/{kbid}/search",
         json=dict(features=["paragraph", "document"], query="planet"),
     )
     assert resp.status_code == 200
@@ -169,7 +169,7 @@ async def test_search_with_synonyms(
     # Check that searching with a term that has synonyms and
     # one that doesn't matches all of them
     resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/search",
+        f"/v1/kb/{kbid}/search",
         json=dict(
             features=["paragraph", "document"],
             query="planet tomatoe",
@@ -193,7 +193,7 @@ async def test_search_errors_if_vectors_or_relations_requested(
 ):
     kbid = knowledgebox
     resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/search",
+        f"/v1/kb/{kbid}/search",
         json=dict(
             features=["paragraph", "vector", "relations"],
             query="planet",

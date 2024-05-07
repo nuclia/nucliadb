@@ -21,7 +21,7 @@ import base64
 
 import pytest
 
-from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_PREFIX
+from nucliadb.writer.api.v1.router import RESOURCE_PREFIX, RESOURCES_PREFIX
 from nucliadb.writer.settings import settings as writer_settings
 from nucliadb.writer.tests.test_files import ASSETS_PATH as WRITER_ASSETS_PATH
 from nucliadb.writer.tus import TUSUPLOAD
@@ -44,7 +44,7 @@ async def test_file_tus_upload_and_download(
     encoded_filename = base64.b64encode(filename.encode()).decode()
     md5 = base64.b64encode(b"7af0916dba8b70e29d99e72941923529").decode()
 
-    kb_path = f"/{KB_PREFIX}/{knowledgebox_one}"
+    kb_path = f"/v1/kb/{knowledgebox_one}"
     resp = await nucliadb_writer.post(
         f"{kb_path}/{RESOURCES_PREFIX}",
         json={
@@ -109,7 +109,7 @@ async def test_tus_upload_handles_unknown_upload_ids(
 ):
     kbid = knowledgebox_one
     resp = await nucliadb_writer.patch(
-        f"/kb/{kbid}/{TUSUPLOAD}/foobarid",
+        f"/v1/kb/{kbid}/{TUSUPLOAD}/foobarid",
         headers={},
         data=b"foobar",
     )

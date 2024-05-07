@@ -20,8 +20,6 @@
 
 import pytest
 
-from nucliadb.search.api.v1.router import KB_PREFIX
-
 
 @pytest.mark.asyncio
 async def test_fieldmetadata_crud(
@@ -119,7 +117,7 @@ async def test_fieldmetadata_crud(
     # Step 1
 
     resp = await nucliadb_writer.post(
-        f"/{KB_PREFIX}/{knowledgebox_one}/resources",
+        f"/v1/kb/{knowledgebox_one}/resources",
         json={
             "texts": {
                 "textfield1": {"body": "Some text", "format": "PLAIN"},
@@ -131,7 +129,7 @@ async def test_fieldmetadata_crud(
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
 
-    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}")
+    resp = await nucliadb_reader.get(f"/v1/kb/{knowledgebox_one}/resource/{rid}")
     fieldmetadata = resp.json()["fieldmetadata"]
     assert len(fieldmetadata) == 1
     assert fieldmetadata[0] == fieldmetadata_0
@@ -139,13 +137,13 @@ async def test_fieldmetadata_crud(
     # Step 2
 
     resp = await nucliadb_writer.patch(
-        f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}",
+        f"/v1/kb/{knowledgebox_one}/resource/{rid}",
         json={"fieldmetadata": [fieldmetadata_1]},
     )
     assert resp.status_code == 200
 
     resp = await nucliadb_reader.get(
-        f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}?show=basic&show=extracted",
+        f"/v1/kb/{knowledgebox_one}/resource/{rid}?show=basic&show=extracted",
     )
     assert resp.status_code == 200
     fieldmetadata = resp.json()["fieldmetadata"]
@@ -159,13 +157,13 @@ async def test_fieldmetadata_crud(
     # Step 3
 
     resp = await nucliadb_writer.patch(
-        f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}",
+        f"/v1/kb/{knowledgebox_one}/resource/{rid}",
         json={"fieldmetadata": [fieldmetadata_2]},
     )
     assert resp.status_code == 200
 
     resp = await nucliadb_reader.get(
-        f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}?show=basic&show=extracted",
+        f"/v1/kb/{knowledgebox_one}/resource/{rid}?show=basic&show=extracted",
     )
     assert resp.status_code == 200
     fieldmetadata = resp.json()["fieldmetadata"]
