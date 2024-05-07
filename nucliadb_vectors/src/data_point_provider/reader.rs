@@ -27,11 +27,10 @@ use crate::data_types::DeleteLog;
 use crate::utils;
 use crate::{VectorErr, VectorR};
 use fs2::FileExt;
-use fxhash::{FxHashMap, FxHashSet};
+use fxhash::FxHashMap;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
-use std::io;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
@@ -99,19 +98,12 @@ impl Fssc {
     }
 }
 
-fn last_modified(path: &Path) -> io::Result<SystemTime> {
-    let meta = std::fs::metadata(path)?;
-    meta.modified()
-}
-
 pub struct Reader {
     metadata: IndexMetadata,
     path: PathBuf,
     open_data_points: FxHashMap<DpId, OpenDataPoint>,
-    data_point_pins: Vec<DataPointPin>,
     delete_log: DTrie,
     number_of_embeddings: usize,
-    version: SystemTime,
     dimension: Option<u64>,
 }
 
@@ -129,8 +121,7 @@ impl Reader {
         })?;
 
         let state_path = path.join(STATE);
-        let state_file = File::open(&state_path)?;
-        let version = last_modified(&state_path)?;
+        let state_file = File::open(state_path)?;
         let state = read_state(&state_file)?;
         let data_point_list = state.data_point_list;
         let delete_log = state.delete_log;
@@ -156,74 +147,12 @@ impl Reader {
 
         Ok(Reader {
             metadata,
-            version,
-            data_point_pins,
             open_data_points,
             delete_log,
             number_of_embeddings,
             dimension,
             path: path.to_path_buf(),
         })
-    }
-
-    pub fn update(&mut self) -> VectorR<()> {
-        let state_path = self.path.join(STATE);
-        let disk_version = last_modified(&state_path)?;
-
-        if disk_version == self.version {
-            return Ok(());
-        }
-
-        let state_file = File::open(state_path)?;
-        let state = read_state(&state_file)?;
-        let data_point_list = state.data_point_list;
-        let new_delete_log = state.delete_log;
-        let mut new_dimension = self.dimension;
-        let mut new_number_of_embeddings = 0;
-        let mut new_data_point_pins = Vec::new();
-        let mut new_open_data_points = Vec::new();
-        let mut data_points_to_eject: FxHashSet<_> = self.open_data_points.keys().copied().collect();
-
-        for data_point_id in data_point_list {
-            let data_point_pin = DataPointPin::open_pin(&self.path, data_point_id)?;
-
-            if let Some(open_data_point) = self.open_data_points.get(&data_point_id) {
-                let data_point_journal = open_data_point.journal();
-                new_number_of_embeddings += data_point_journal.no_nodes();
-                data_points_to_eject.remove(&data_point_id);
-            } else {
-                let open_data_point = data_point::open(&data_point_pin)?;
-                let data_point_journal = open_data_point.journal();
-                new_number_of_embeddings += data_point_journal.no_nodes();
-                new_open_data_points.push(open_data_point);
-            }
-
-            new_data_point_pins.push(data_point_pin);
-        }
-
-        for open_data_point in new_open_data_points {
-            let data_point_id = open_data_point.get_id();
-            self.open_data_points.insert(data_point_id, open_data_point);
-        }
-
-        for data_point_id in data_points_to_eject {
-            self.open_data_points.remove(&data_point_id);
-        }
-
-        if new_dimension.is_none() {
-            if let Some(data_point_pin) = new_data_point_pins.first() {
-                let open_data_point = &self.open_data_points[&data_point_pin.id()];
-                new_dimension = open_data_point.stored_len();
-            }
-        }
-
-        self.version = disk_version;
-        self.delete_log = new_delete_log;
-        self.data_point_pins = new_data_point_pins;
-        self.dimension = new_dimension;
-        self.number_of_embeddings = new_number_of_embeddings;
-
-        Ok(())
     }
 
     pub fn search(&self, request: &dyn SearchRequest) -> VectorR<Vec<Neighbour>> {
