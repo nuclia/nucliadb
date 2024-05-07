@@ -2,5 +2,5 @@ httpx>=0.23.0
 pydantic
 requests
 tikv-client>=0.0.3
-types-protobuf>=4.24,<5
+types-protobuf>=5.26,<6
 types-requests
