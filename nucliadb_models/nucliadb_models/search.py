@@ -821,14 +821,6 @@ class RephraseModel(BaseModel):
     )
 
 
-class AskDocumentModel(BaseModel):
-    question: str = Field(description="The question to ask on the document")
-    blocks: List[List[str]] = Field(
-        description="The complete list of text blocks of a document"
-    )
-    user_id: str = Field(description="The id of the user associated to the request")
-
-
 class RagStrategyName:
     FIELD_EXTENSION = "field_extension"
     FULL_RESOURCE = "full_resource"
@@ -1267,26 +1259,6 @@ class FeedbackRequest(BaseModel):
         description="The task the feedback is for. For now, only `CHAT` task is available",
     )
     feedback: Optional[str] = Field(title="Feedback", description="Feedback text")
-
-
-TextBlocks = List[List[str]]
-
-
-class AskRequest(BaseModel):
-    question: str = Field(
-        ...,
-        title="Question",
-        description="Question asked to the document",
-        example="Does this document contain personal information?",
-    )
-
-
-class AskResponse(BaseModel):
-    answer: str = Field(
-        ...,
-        title="Answer",
-        description="Answer to the question received from the generative AI model",
-    )
 
 
 def validate_facets(facets):
