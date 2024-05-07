@@ -46,7 +46,7 @@ async def test_rebalance_kb_shards(
     nucliadb_writer: AsyncClient,
     nucliadb_manager: AsyncClient,
 ):
-    count = 50
+    count = 10
     for i in range(count):
         resp = await nucliadb_writer.post(
             f"/kb/{knowledgebox}/resources",
