@@ -20,7 +20,6 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
-use nucliadb_core::paragraphs::*;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::shard_created::{DocumentService, ParagraphService, RelationService, VectorService};
 use nucliadb_core::protos::{Resource, ResourceId};
@@ -28,11 +27,13 @@ use nucliadb_core::relations::*;
 use nucliadb_core::texts::*;
 use nucliadb_core::tracing::{self, *};
 use nucliadb_core::vectors::*;
+use nucliadb_core::{paragraphs::*, Channel};
 use nucliadb_core::{thread, IndexFiles};
 use nucliadb_procs::measure;
+use nucliadb_protos::utils::VectorSimilarity;
 use nucliadb_vectors::VectorErr;
 
-use super::indexes::{ShardIndexes, DEFAULT_VECTOR_INDEX_NAME};
+use super::indexes::{ShardIndexes, DEFAULT_VECTORS_INDEX_NAME};
 use super::metadata::ShardMetadata;
 use super::versioning::{self, Versions};
 use crate::disk_structure::*;
@@ -227,7 +228,7 @@ impl ShardWriter {
                 texts_index: Box::new(fields.unwrap()),
                 paragraphs_index: Box::new(paragraphs.unwrap()),
                 vectors_indexes: HashMap::from([(
-                    DEFAULT_VECTOR_INDEX_NAME.to_string(),
+                    DEFAULT_VECTORS_INDEX_NAME.to_string(),
                     Box::new(vectors.unwrap()) as VectorsWriterPointer,
                 )]),
                 relations_index: Box::new(relations.unwrap()),
@@ -267,7 +268,7 @@ impl ShardWriter {
         let paragraph_task = || run_with_telemetry(info, paragraph_task);
 
         let mut vector_tasks = vec![];
-        for (name, path) in indexes.iter_vectorsets() {
+        for (name, path) in indexes.iter_vectors_indexes() {
             vector_tasks.push(|| {
                 // redefining here allows to get a copy of path without moving
                 // metadata
@@ -323,6 +324,21 @@ impl ShardWriter {
             versions,
             gc_lock: tokio::sync::Mutex::new(()),
         })
+    }
+
+    pub fn create_vectors_index(&self, new: NewVectorsIndex) -> NodeResult<()> {
+        let mut indexes = ShardIndexes::load(&self.metadata.shard_path())?;
+        let path = indexes.add_vectors_index(new.name.clone())?;
+        let vectors_writer = nucliadb_vectors::service::VectorWriterService::create(VectorConfig {
+            path,
+            shard_id: new.shard_id,
+            channel: new.channel,
+            similarity: new.similarity,
+            normalize_vectors: new.normalize_vectors,
+        })?;
+        indexes.store()?;
+        write_rw_lock(&self.indexes).vectors_indexes.insert(new.name, Box::new(vectors_writer));
+        Ok(())
     }
 
     #[measure(actor = "shard", metric = "set_resource")]
@@ -515,7 +531,7 @@ impl ShardWriter {
             let indexes: &ShardWriterIndexes = &read_rw_lock(&self.indexes);
             let default_vectors_index = indexes
                 .vectors_indexes
-                .get(DEFAULT_VECTOR_INDEX_NAME)
+                .get(DEFAULT_VECTORS_INDEX_NAME)
                 .expect("Default vectors index should never be deleted (yet)");
             let runner = default_vectors_index.prepare_merge(context.parameters)?;
             let Some(mut runner) = runner else {
@@ -530,7 +546,7 @@ impl ShardWriter {
             let indexes: &mut ShardWriterIndexes = &mut write_rw_lock(&self.indexes);
             let default_vectors_index = indexes
                 .vectors_indexes
-                .get_mut(DEFAULT_VECTOR_INDEX_NAME)
+                .get_mut(DEFAULT_VECTORS_INDEX_NAME)
                 .expect("Default vectors index should never be deleted (yet)");
             let metrics = default_vectors_index.record_merge(merge_result, context.source)?;
             self.metadata.new_generation_id();
@@ -563,7 +579,7 @@ impl ShardWriter {
         // TODO: return segments for all vector indexes
         let default_vectors_index = indexes
             .vectors_indexes
-            .get(DEFAULT_VECTOR_INDEX_NAME)
+            .get(DEFAULT_VECTORS_INDEX_NAME)
             .expect("Default vectors index should never be deleted (yet)");
         segments.insert("vector".to_string(), default_vectors_index.get_segment_ids()?);
         segments.insert("relation".to_string(), indexes.relations_index.get_segment_ids()?);
@@ -586,7 +602,7 @@ impl ShardWriter {
         // TODO: return files for all vector indexes
         let default_vectors_index = indexes
             .vectors_indexes
-            .get(DEFAULT_VECTOR_INDEX_NAME)
+            .get(DEFAULT_VECTORS_INDEX_NAME)
             .expect("Default vectors index should never be deleted (yet)");
         let vector_files =
             default_vectors_index.get_index_files(ignored_segement_ids.get("vector").unwrap_or(&Vec::new()))?;
@@ -598,6 +614,14 @@ impl ShardWriter {
         files.push((PathBuf::from(RELATIONS_DIR), relation_files));
         Ok(files)
     }
+}
+
+pub struct NewVectorsIndex {
+    pub shard_id: String,
+    pub name: String,
+    pub channel: Channel,
+    pub similarity: VectorSimilarity,
+    pub normalize_vectors: bool,
 }
 
 pub enum GarbageCollectorStatus {
