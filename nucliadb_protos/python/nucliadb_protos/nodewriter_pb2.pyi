@@ -221,17 +221,21 @@ class NewVectorSetRequest(google.protobuf.message.Message):
 
     ID_FIELD_NUMBER: builtins.int
     SIMILARITY_FIELD_NUMBER: builtins.int
+    NORMALIZE_VECTORS_FIELD_NUMBER: builtins.int
     @property
     def id(self) -> nucliadb_protos.noderesources_pb2.VectorSetID: ...
     similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType
+    normalize_vectors: builtins.bool
+    """indicates whether the shard should normalize vectors on indexing or not"""
     def __init__(
         self,
         *,
         id: nucliadb_protos.noderesources_pb2.VectorSetID | None = ...,
         similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType = ...,
+        normalize_vectors: builtins.bool = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["id", b"id"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["id", b"id", "similarity", b"similarity"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["id", b"id", "normalize_vectors", b"normalize_vectors", "similarity", b"similarity"]) -> None: ...
 
 global___NewVectorSetRequest = NewVectorSetRequest
 

@@ -64,6 +64,8 @@ message NewShardRequest {
 message NewVectorSetRequest {
     noderesources.VectorSetID id = 1;
     utils.VectorSimilarity similarity = 2;
+    // indicates whether the shard should normalize vectors on indexing or not
+    bool normalize_vectors = 3;
 }
 
 message MergeResponse {
