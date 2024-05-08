@@ -35,8 +35,10 @@ from nucliadb.search.search.exceptions import (
 )
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import AskRequest, NucliaDBClientType, parse_max_tokens
+from nucliadb_utils import const
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
+from nucliadb_utils.utilities import has_feature
 
 ASK_EXAMPLES = {
     "ask": Example(
@@ -65,6 +67,8 @@ ASK_EXAMPLES = {
     description="Ask questions on a Knowledge Box",
     tags=["Search"],
     response_model=None,
+    # Include once the endpoint is stable enough
+    include_in_schema=False,
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
@@ -82,6 +86,12 @@ async def ask_knowledgebox_endpoint(
     ),
 ) -> Union[StreamingResponse, HTTPClientError, Response]:
     try:
+        if not has_feature(const.Features.ASK_ENDPOINT, context={"kbid": kbid}):
+            return HTTPClientError(
+                status_code=404,
+                detail="This endpoint is not yet available for this Knowledge Box",
+            )
+
         return await create_ask_response(
             kbid, item, x_nucliadb_user, x_ndb_client, x_forwarded_for, x_synchronous
         )

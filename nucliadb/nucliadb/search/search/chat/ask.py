@@ -126,9 +126,13 @@ class AskResult:
             async for item in self._stream():
                 yield self.encode_item(item)
         except Exception as exc:
-            # Handle any exception that might happen
+            # Handle any unexpected error that might happen
             # during the streaming and halt the stream
             item = ErrorAskResponseItem(error=str(exc))
+            yield self.encode_item(item)
+
+            staus = AnswerStatusCode.ERROR
+            item = StatusAskResponseItem(code=staus.value, status=staus.name)
             yield self.encode_item(item)
             return
 
@@ -145,7 +149,9 @@ class AskResult:
             yield AnswerAskResponseItem(text=answer_chunk)
 
         # Then the status code
-        yield StatusAskResponseItem(code=self.status_code.value)
+        yield StatusAskResponseItem(
+            code=self.status_code.value, status=self.status_code.name
+        )
 
         # Audit the answer
         await self.auditor.audit(
@@ -268,8 +274,9 @@ class NotEnoughContextAskResult(AskResult):
         yield self.encode_item(
             AnswerAskResponseItem(text="Not enough context to answer.")
         )
+        status = AnswerStatusCode.NO_CONTEXT
         yield self.encode_item(
-            StatusAskResponseItem(code=AnswerStatusCode.NO_CONTEXT.value)
+            StatusAskResponseItem(code=status.value, status=status.name)
         )
 
     async def to_sync_response(self):

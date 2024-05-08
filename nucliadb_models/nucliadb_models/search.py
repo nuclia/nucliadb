@@ -1359,6 +1359,7 @@ class CitationsAskResponseItem(BaseModel):
 class StatusAskResponseItem(BaseModel):
     type: Literal["status"] = "status"
     code: str
+    status: str
     details: Optional[str] = None
 
 

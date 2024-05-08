@@ -61,6 +61,10 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
         "rollout": 0,
         "variants": {"environment": ["none"]},
     },
+    const.Features.ASK_ENDPOINT: {
+        "rollout": 0,
+        "variants": {"environment": ["local", "stage"]},
+    },
 }
 
 
