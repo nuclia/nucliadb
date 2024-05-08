@@ -180,7 +180,7 @@ async def get_find_results(
 
 
 async def get_relations_results(
-    *, kbid: str, chat_request: ChatRequest, text_answer: str
+    *, kbid: str, text_answer: str, target_shard_replicas: Optional[list[str]]
 ) -> Relations:
     try:
         predict = get_predict()
@@ -198,7 +198,7 @@ async def get_relations_results(
             kbid,
             Method.RELATIONS,
             relation_request,
-            target_shard_replicas=chat_request.shards,
+            target_shard_replicas=target_shard_replicas,
         )
         return await merge_relations_results(
             relations_results, relation_request.subgraph
@@ -345,6 +345,7 @@ async def chat(
             status_code=status_code.value,
             chat_history=chat_history,
             query_context=prompt_context,
+            query_context_order=prompt_context_order,
             learning_id=nuclia_learning_id,
         )
 
@@ -393,7 +394,8 @@ async def maybe_audit_chat(
     text_answer: bytes,
     status_code: Optional[AnswerStatusCode],
     chat_history: list[ChatContextMessage],
-    query_context: list[str],
+    query_context: PromptContext,
+    query_context_order: PromptContextOrder,
     learning_id: str,
 ):
     audit = get_audit()
@@ -407,10 +409,13 @@ async def maybe_audit_chat(
         audit_pb2.ChatContext(author=message.author, text=message.text)
         for message in chat_history
     ]
+    sorted_query_context = sorted_prompt_context_list(
+        query_context, query_context_order
+    )
     audit_context.append(
         audit_pb2.ChatContext(
             author=Author.NUCLIA,
-            text=AUDIT_TEXT_RESULT_SEP.join(query_context),
+            text=AUDIT_TEXT_RESULT_SEP.join(sorted_query_context),
         )
     )
     await audit.chat(
@@ -458,9 +463,10 @@ class ChatAuditor:
         start_time: float,
         user_query: str,
         rephrased_query: Optional[str],
-        chat_history: list[str],
+        chat_history: list[ChatContextMessage],
         learning_id: Optional[str],
-        query_context: list[str],
+        query_context: PromptContext,
+        query_context_order: PromptContextOrder,
     ):
         self.kbid = kbid
         self.user_id = user_id
@@ -472,6 +478,7 @@ class ChatAuditor:
         self.chat_history = chat_history
         self.learning_id = learning_id
         self.query_context = query_context
+        self.query_context_order = query_context_order
 
     async def audit(self, text_answer: bytes, status_code: AnswerStatusCode):
         await maybe_audit_chat(
@@ -483,8 +490,24 @@ class ChatAuditor:
             user_query=self.user_query,
             rephrased_query=self.rephrased_query,
             text_answer=text_answer,
-            status_code=status_code.value,
+            status_code=status_code,
             chat_history=self.chat_history,
             query_context=self.query_context,
-            learning_id=self.learning_id,
+            query_context_order=self.query_context_order,
+            learning_id=self.learning_id or "unknown",
         )
+
+
+def sorted_prompt_context_list(
+    context: PromptContext, order: PromptContextOrder
+) -> list[str]:
+    """
+    context = {"x": "foo", "y": "bar"}
+    order = {"y": 1, "x": 0}
+    sorted_prompt_context_list(context, order) == ["foo", "bar"]
+    """
+    sorted_items = sorted(
+        context.items(),
+        key=lambda item: order.get(item[0], float("inf")),
+    )
+    return list(map(lambda item: item[1], sorted_items))

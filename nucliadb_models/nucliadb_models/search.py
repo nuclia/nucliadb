@@ -768,6 +768,17 @@ class MaxTokens(BaseModel):
     )
 
 
+def parse_max_tokens(
+    max_tokens: Optional[Union[int, MaxTokens]]
+) -> Optional[MaxTokens]:
+    if isinstance(max_tokens, int):
+        # If the max_tokens is an integer, it is interpreted as the max_tokens value for the generated answer.
+        # The max tokens for the context is set to None to use the default value for the model (comes in the
+        # NUA's query endpoint response).
+        return MaxTokens(answer=max_tokens, context=None)
+    return max_tokens
+
+
 class ChatModel(BaseModel):
     """
     This is the model for the predict request payload on the chat endpoint
@@ -1312,21 +1323,32 @@ def validate_facets(facets):
 class AskRequest(ChatRequest): ...
 
 
-class FindResultsAskResponseItem(BaseModel):
-    type: Literal["find_results"] = "find_results"
+class RetrievalAskResponseItem(BaseModel):
+    type: Literal["retrieval"] = "retrieval"
     results: KnowledgeboxFindResults
 
 
-class TextAskResponseItem(BaseModel):
-    type: Literal["text"] = "text"
+class AnswerAskResponseItem(BaseModel):
+    type: Literal["answer"] = "answer"
     text: str
+
+
+class AskTimings(BaseModel):
+    generative_first_chunk: Optional[float] = Field(
+        title="Generative first chunk",
+        description="Time the LLM took to generate the first chunk of the answer",
+    )
+    generative_total: Optional[float] = Field(
+        title="Generative total",
+        description="Total time the LLM took to generate the answer",
+    )
 
 
 class MetadataAskResponseItem(BaseModel):
     type: Literal["metadata"] = "metadata"
     input_tokens: int
     output_tokens: int
-    timings: dict[str, float]
+    timings: AskTimings
 
 
 class CitationsAskResponseItem(BaseModel):
@@ -1350,14 +1372,20 @@ class RelationsAskResponseItem(BaseModel):
     relations: Relations
 
 
+class DebugAskResponseItem(BaseModel):
+    type: Literal["debug"] = "debug"
+    metadata: dict[str, Any]
+
+
 AskResponseItemType = Union[
-    TextAskResponseItem,
+    AnswerAskResponseItem,
     MetadataAskResponseItem,
     CitationsAskResponseItem,
     StatusAskResponseItem,
     ErrorAskResponseItem,
-    FindResultsAskResponseItem,
+    RetrievalAskResponseItem,
     RelationsAskResponseItem,
+    DebugAskResponseItem,
 ]
 
 

@@ -17,9 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
 from time import monotonic as time
 from typing import Any, AsyncGenerator, Optional
+
+import pydantic
 
 from nucliadb.search import logger
 from nucliadb.search.predict import (
@@ -41,28 +42,46 @@ from nucliadb.search.search.chat.query import (
 from nucliadb.search.search.query import QueryParser
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import (
+    AnswerAskResponseItem,
     AskRequest,
+    AskResponseItemType,
     AskResultItem,
+    AskTimings,
     ChatModel,
     ChatOptions,
     CitationsAskResponseItem,
-    FindResultsAskResponseItem,
+    DebugAskResponseItem,
+    ErrorAskResponseItem,
     KnowledgeboxFindResults,
+    MetadataAskResponseItem,
     MinScore,
     NucliaDBClientType,
     PromptContext,
     PromptContextOrder,
     Relations,
+    RelationsAskResponseItem,
+    RetrievalAskResponseItem,
     StatusAskResponseItem,
-    TextAskResponseItem,
     UserPrompt,
 )
+
+
+class SyncAskResponse(pydantic.BaseModel):
+    answer: str
+    relations: Optional[Relations]
+    results: KnowledgeboxFindResults
+    status: AnswerStatusCode
+    citations: dict[str, Any] = {}
+    prompt_context: Optional[PromptContext] = None
+    prompt_context_order: Optional[PromptContextOrder] = None
+    metadata: dict[str, Any] = {}
 
 
 class AskResult:
     def __init__(
         self,
         *,
+        kbid: str,
         ask_request: AskRequest,
         find_results: KnowledgeboxFindResults,
         nuclia_learning_id: Optional[str],
@@ -72,6 +91,7 @@ class AskResult:
         auditor: ChatAuditor,
     ):
         # Initial attributes
+        self.kbid = kbid
         self.ask_request = ask_request
         self.find_results = find_results
         self.nuclia_learning_id = nuclia_learning_id
@@ -85,83 +105,139 @@ class AskResult:
         self._status: Optional[StatusGenerativeResponse] = None
         self._citations: Optional[CitationsGenerativeResponse] = None
         self._metadata: Optional[MetaGenerativeResponse] = None
-        self._relations_results: Optional[Relations] = None
-        self._relations_task = None
+        self._relations: Optional[Relations] = None
 
     @property
     def status_code(self) -> AnswerStatusCode:
-        return self._status.code
-
-    @property
-    def citations(self) -> dict[str, Any]:
-        return self._citations.citations
-
-    @property
-    def timings(self) -> dict[str, float]:
-        return self._metadata.timings
+        if self._status is None:
+            return AnswerStatusCode.SUCCESS
+        return AnswerStatusCode(self._status.code)
 
     @property
     def ask_request_with_relations(self) -> bool:
         return ChatOptions.RELATIONS in self.ask_request.features
 
     @property
-    def ask_request_with_citations(self) -> bool:
-        return self.ask_request.citations
+    def ask_request_with_debug_flag(self) -> bool:
+        return self.ask_request.debug
 
-    async def stream(self) -> AsyncGenerator[AskResultItem, None]:
+    async def stream(self) -> AsyncGenerator[str, None]:
+        try:
+            async for item in self._stream():
+                yield self.encode_item(item)
+        except Exception as exc:
+            # Handle any exception that might happen
+            # during the streaming and halt the stream
+            item = ErrorAskResponseItem(error=str(exc))
+            yield self.encode_item(item)
+            return
+
+    def encode_item(self, item: AskResponseItemType) -> str:
+        result_item = AskResultItem(item=item)
+        return result_item.json(exclude_unset=False, exclude_none=True) + "\n"
+
+    async def _stream(self) -> AsyncGenerator[AskResponseItemType, None]:
         # First stream out the find results
-        yield AskResultItem(item=FindResultsAskResponseItem(results=self.find_results))
+        yield RetrievalAskResponseItem(results=self.find_results)
 
         # Then stream out the predict answer
         async for answer_chunk in self._stream_predict_answer_text():
-            yield AskResultItem(item=TextAskResponseItem(text=answer_chunk))
-
-        # Schedule the relations results if needed
-        relations_needed = (
-            self.ask_request_with_relations
-            and self.status_code != AnswerStatusCode.NO_CONTEXT
-        )
-        if relations_needed:
-            # Schedule the relations query as soon as possible
-            self._schedule_relations_results()
+            yield AnswerAskResponseItem(text=answer_chunk)
 
         # Then the status code
-        yield AskResultItem(item=StatusAskResponseItem(code=self.status_code))
+        yield StatusAskResponseItem(code=self.status_code.value)
 
         # Audit the answer
         await self.auditor.audit(
+            text_answer=self._answer_text.encode("utf-8"),
             status_code=self.status_code,
-            answer_text=self._answer_text.encode("utf-8"),
         )
 
         # Stream out the citations
-        if self.ask_request_with_citations:
-            yield AskResultItem(item=CitationsAskResponseItem(citations=self.citations))
+        if self._citations is not None:
+            yield CitationsAskResponseItem(citations=self._citations.citations)
 
-        # Stream out the relations results
-        if relations_needed:
-            relations_item = await self.get_relations_results_item()
-            yield AskResultItem(item=relations_item)
-
-    def _schedule_relations_results(self):
-        if self._relations_task is None:
-            self._relations_task = asyncio.create_task(
-                get_relations_results(
-                    kbid=self.ask_request.kbid,
-                    chat_request=self.ask_request,
-                    text_answer=self._answer_text,
-                )
+        # Stream out other metadata about the answer if available
+        if self._metadata is not None:
+            yield MetadataAskResponseItem(
+                input_tokens=self._metadata.input_tokens,
+                output_tokens=self._metadata.output_tokens,
+                timings=AskTimings(
+                    generative_first_chunk=self._metadata.timings.get(
+                        "generative_first_chunk"
+                    ),
+                    generative_total=self._metadata.timings.get("generative"),
+                ),
             )
 
+        # Stream out the relations results
+        should_query_relations = (
+            self.ask_request_with_relations
+            and self.status_code != AnswerStatusCode.NO_CONTEXT
+        )
+        if should_query_relations:
+            relations = await self.get_relations_results()
+            yield RelationsAskResponseItem(relations=relations)
+
+        # Stream out debug information
+        if self.ask_request_with_debug_flag:
+            yield DebugAskResponseItem(
+                metadata={
+                    "prompt_context": self.prompt_context,
+                    "prompt_context_order": self.prompt_context_order,
+                }
+            )
+
+    async def to_sync_response(self) -> SyncAskResponse:
+        # First, run the stream in memory to get all the data in memory
+        async for _ in self._stream():
+            ...
+
+        metadata = {}
+        if self._metadata is not None:
+            metadata = {
+                "input_tokens": self._metadata.input_tokens,
+                "output_tokens": self._metadata.output_tokens,
+                "timings": self._metadata.timings,
+            }
+        citations = {}
+        if self._citations is not None:
+            citations = self._citations.citations
+        response = SyncAskResponse(
+            answer=self._answer_text,
+            relations=self._relations,
+            results=self.find_results,
+            status=self.status_code,
+            citations=citations,
+            metadata=metadata,
+        )
+        if self.ask_request_with_debug_flag:
+            response.prompt_context = self.prompt_context
+            response.prompt_context_order = self.prompt_context_order
+        return response
+
+    async def get_relations_results(self) -> Relations:
+        if self._relations is None:
+            self._relations = await get_relations_results(
+                kbid=self.kbid,
+                text_answer=self._answer_text,
+                target_shard_replicas=self.ask_request.shards,
+            )
+        return self._relations
+
     async def _stream_predict_answer_text(self) -> AsyncGenerator[str, None]:
-        async for item in self.predict_answer_stream:
+        """
+        Reads the stream of the generative model, yielding the answer text but also parsing
+        other items like status codes, citations and miscellaneous metadata.
+
+        This method does not assume any order in the stream of items, but it assumes that at least
+        the answer text is streamed in order.
+        """
+        async for generative_chunk in self.predict_answer_stream:
+            item = generative_chunk.chunk
             if isinstance(item, TextGenerativeResponse):
-                # Accumulate the answer text. We assume that the answer
-                # is streamed in order from the server
                 self._answer_text += item.text
                 yield item.text
-            # Status code and citations are not part of the answer text but
-            # we need to parse them while streaming the answer
             elif isinstance(item, StatusGenerativeResponse):
                 self._status = item
                 continue
@@ -172,23 +248,35 @@ class AskResult:
                 self._metadata = item
             else:
                 logger.warning(f"Unexpected item in predict answer stream: {item}")
-                continue
 
 
-class NotEnoughContextResult(AskResult):
+class NotEnoughContextAskResult(AskResult):
     def __init__(
         self,
         find_results: KnowledgeboxFindResults,
     ):
         self.find_results = find_results
+        self.nuclia_learning_id = None
 
-    async def stream(self):
-        yield AskResultItem(item=FindResultsAskResponseItem(results=self.find_results))
-        yield AskResultItem(
-            item=TextAskResponseItem(text="Not enough context to answer.")
+    async def stream(self) -> AsyncGenerator[str, None]:
+        """
+        In the case where there are no results in the retrieval phase, we simply
+        return the find results and the messages indicating that there is not enough
+        context in the corpus to answer.
+        """
+        yield self.encode_item(RetrievalAskResponseItem(results=self.find_results))
+        yield self.encode_item(
+            AnswerAskResponseItem(text="Not enough context to answer.")
         )
-        yield AskResultItem(
-            item=StatusAskResponseItem(code=AnswerStatusCode.NO_CONTEXT.value)
+        yield self.encode_item(
+            StatusAskResponseItem(code=AnswerStatusCode.NO_CONTEXT.value)
+        )
+
+    async def to_sync_response(self):
+        return SyncAskResponse(
+            answer="Not enough context to answer.",
+            results=self.find_results,
+            status=AnswerStatusCode.NO_CONTEXT,
         )
 
 
@@ -242,7 +330,7 @@ async def ask(
         )
 
         if len(find_results.resources) == 0:
-            return NotEnoughContextResult()
+            return NotEnoughContextAskResult(find_results=find_results)
 
     else:
         find_results = KnowledgeboxFindResults(resources={}, min_score=None)
@@ -275,10 +363,12 @@ async def ask(
         prompt_context_images,
     ) = await prompt_context_builder.build()
 
+    # Parse the user prompt (if any)
     user_prompt = None
     if ask_request.prompt is not None:
         user_prompt = UserPrompt(prompt=ask_request.prompt)
 
+    # Make the chat request to the generative model
     chat_model = ChatModel(
         user_id=user_id,
         query_context=prompt_context,
@@ -292,9 +382,8 @@ async def ask(
         max_tokens=query_parser.get_max_tokens_answer(),
         query_context_images=prompt_context_images,
     )
-
     predict = get_predict()
-    nuclia_learning_id, predict_generator = await predict.chat_query_v2(
+    nuclia_learning_id, predict_answer_stream = await predict.chat_query_v2(
         kbid, chat_model
     )
 
@@ -307,15 +396,17 @@ async def ask(
         user_query=user_query,
         rephrased_query=rephrased_query,
         chat_history=chat_history,
-        query_context=prompt_context,
         learning_id=nuclia_learning_id,
+        query_context=prompt_context,
+        query_context_order=prompt_context_order,
     )
 
     return AskResult(
+        kbid=kbid,
         ask_request=ask_request,
         find_results=find_results,
         nuclia_learning_id=nuclia_learning_id,
-        predict_answer_stream=predict_generator,
+        predict_answer_stream=predict_answer_stream,
         prompt_context=prompt_context,
         prompt_context_order=prompt_context_order,
         auditor=auditor,

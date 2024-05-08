@@ -17,9 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Any, Optional, Union
+from typing import Optional, Union
 
-import pydantic
 from fastapi import Body, Header, Request, Response
 from fastapi.openapi.models import Example
 from fastapi_versioning import version
@@ -28,39 +27,16 @@ from starlette.responses import StreamingResponse
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import predict
-from nucliadb.search.api.v1.resource.ask import ASK_EXAMPLES
 from nucliadb.search.api.v1.router import KB_PREFIX, api
-from nucliadb.search.predict import AnswerStatusCode
-from nucliadb.search.search.chat.query import ask
+from nucliadb.search.search.chat.ask import AskResult, ask
 from nucliadb.search.search.exceptions import (
     IncompleteFindResultsError,
     InvalidQueryError,
 )
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_models.search import (
-    AskRequest,
-    KnowledgeboxFindResults,
-    MaxTokens,
-    NucliaDBClientType,
-    PromptContext,
-    PromptContextOrder,
-    Relations,
-)
+from nucliadb_models.search import AskRequest, NucliaDBClientType, parse_max_tokens
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
-
-END_OF_STREAM = "_END_"
-
-
-class SyncAskResponse(pydantic.BaseModel):
-    answer: str
-    relations: Optional[Relations]
-    results: KnowledgeboxFindResults
-    status: AnswerStatusCode
-    citations: dict[str, Any] = {}
-    prompt_context: Optional[PromptContext] = None
-    prompt_context_order: Optional[PromptContextOrder] = None
-
 
 ASK_EXAMPLES = {
     "ask": Example(
@@ -149,9 +125,8 @@ async def create_ask_response(
     x_synchronous: bool,
     resource: Optional[str] = None,
 ) -> Response:
-
     ask_request.max_tokens = parse_max_tokens(ask_request.max_tokens)
-    ask_result = await ask(
+    ask_result: AskResult = await ask(
         kbid,
         ask_request,
         user_id,
@@ -160,25 +135,9 @@ async def create_ask_response(
         resource=resource,
     )
     if x_synchronous:
-        # Run the stream in memory to get all the data in memory
-        async for _ in ask_result.stream():
-            ...
-
-        # Return it as a JSON response
-        sync_ask_response = SyncAskResponse(
-            answer=ask_result.answer,
-            relations=ask_result.relations_results,
-            results=ask_result.find_results,
-            status=ask_result.status_code.value,
-            citations=ask_result.citations,
-        )
-
-        if ask_request.debug:
-            sync_ask_response.prompt_context = ask_result.prompt_context
-            sync_ask_response.prompt_context_order = ask_result.prompt_context_order
-
+        sync_response = await ask_result.to_sync_response()
         return Response(
-            content=sync_ask_response.json(exclude_unset=True),
+            content=sync_response.json(exclude_unset=True),
             headers={
                 "NUCLIA-LEARNING-ID": ask_result.nuclia_learning_id or "unknown",
                 "Access-Control-Expose-Headers": "NUCLIA-LEARNING-ID",
@@ -194,14 +153,3 @@ async def create_ask_response(
                 "Access-Control-Expose-Headers": "NUCLIA-LEARNING-ID",
             },
         )
-
-
-def parse_max_tokens(
-    max_tokens: Optional[Union[int, MaxTokens]]
-) -> Optional[MaxTokens]:
-    if isinstance(max_tokens, int):
-        # If the max_tokens is an integer, it is interpreted as the max_tokens value for the generated answer.
-        # The max tokens for the context is set to None to use the default value for the model (comes in the
-        # NUA's query endpoint response).
-        return MaxTokens(answer=max_tokens, context=None)
-    return max_tokens
