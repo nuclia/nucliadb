@@ -96,7 +96,7 @@ impl NodeWriter {
 
         let request = NewShardRequest::decode(&mut Cursor::new(metadata)).expect("Error decoding arguments");
         let shard_id = uuid::Uuid::new_v4().to_string();
-        let similarity = VectorSimilarity::from_i32(request.similarity).unwrap();
+        let similarity = VectorSimilarity::try_from(request.similarity).unwrap();
         let metadata = ShardMetadata::new(
             self.shards_path.join(shard_id.clone()),
             shard_id,

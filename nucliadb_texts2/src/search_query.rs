@@ -149,7 +149,7 @@ pub fn create_query(
 fn create_stream_filter_queries(schema: &TextSchema, filter: &StreamFilter) -> Vec<(Occur, Box<dyn Query>)> {
     let mut queries = vec![];
 
-    let conjunction = Conjunction::from_i32(filter.conjunction).unwrap_or(Conjunction::And).into_occur();
+    let conjunction = Conjunction::try_from(filter.conjunction).unwrap_or(Conjunction::And).into_occur();
 
     filter.labels.iter().flat_map(|facet_key| Facet::from_text(facet_key).ok().into_iter()).for_each(|facet| {
         let facet_term = Term::from_facet(schema.facets, &facet);
