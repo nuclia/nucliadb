@@ -226,9 +226,10 @@ impl ShardWriter {
             indexes: RwLock::new(ShardWriterIndexes {
                 texts_index: Box::new(fields.unwrap()),
                 paragraphs_index: Box::new(paragraphs.unwrap()),
-                vectors_indexes: HashMap::from([
-                    (DEFAULT_VECTOR_INDEX_NAME.to_string(), Box::new(vectors.unwrap()) as VectorsWriterPointer)
-                ]),
+                vectors_indexes: HashMap::from([(
+                    DEFAULT_VECTOR_INDEX_NAME.to_string(),
+                    Box::new(vectors.unwrap()) as VectorsWriterPointer,
+                )]),
                 relations_index: Box::new(relations.unwrap()),
             }),
             versions,
@@ -333,50 +334,44 @@ impl ShardWriter {
 
         let indexes: &mut ShardWriterIndexes = &mut write_rw_lock(&self.indexes);
 
-        let mut text_task = || run_with_telemetry(
-            info_span!(parent: &span, "text set_resource"),
-            || {
+        let mut text_task = || {
+            run_with_telemetry(info_span!(parent: &span, "text set_resource"), || {
                 debug!("Field service starts set_resource");
                 let result = indexes.texts_index.set_resource(&resource);
                 debug!("Field service ends set_resource");
                 result
-            }
-        );
+            })
+        };
 
-        let mut paragraph_task = || run_with_telemetry(
-            info_span!(parent: &span, "paragraph set_resource"),
-            || {
+        let mut paragraph_task = || {
+            run_with_telemetry(info_span!(parent: &span, "paragraph set_resource"), || {
                 debug!("Paragraph service starts set_resource");
                 let result = indexes.paragraphs_index.set_resource(&resource);
                 debug!("Paragraph service ends set_resource");
                 result
-            }
-        );
+            })
+        };
 
         let mut vector_tasks = vec![];
         for (_, vector_writer) in indexes.vectors_indexes.iter_mut() {
-            vector_tasks.push( || {
-                run_with_telemetry(
-                    info_span!(parent: &span, "vector set_resource"),
-                    || {
-                        debug!("Vector service starts set_resource");
-                        let result = vector_writer.set_resource(&resource);
-                        debug!("Vector service ends set_resource");
-                        result
-                    }
-                )
+            vector_tasks.push(|| {
+                run_with_telemetry(info_span!(parent: &span, "vector set_resource"), || {
+                    debug!("Vector service starts set_resource");
+                    let result = vector_writer.set_resource(&resource);
+                    debug!("Vector service ends set_resource");
+                    result
+                })
             });
         }
 
-        let mut relation_task = || run_with_telemetry(
-            info_span!(parent: &span, "relation set_resource"),
-            || {
+        let mut relation_task = || {
+            run_with_telemetry(info_span!(parent: &span, "relation set_resource"), || {
                 debug!("Relation service starts set_resource");
                 let result = indexes.relations_index.set_resource(&resource);
                 debug!("Relation service ends set_resource");
                 result
-            }
-        );
+            })
+        };
 
         let mut text_result = Ok(());
         let mut paragraph_result = Ok(());
@@ -413,30 +408,32 @@ impl ShardWriter {
 
         let indexes: &mut ShardWriterIndexes = &mut write_rw_lock(&self.indexes);
 
-        let mut text_task = || run_with_telemetry(
-            info_span!(parent: &span, "text remove"),
-            || indexes.texts_index.delete_resource(resource)
-        );
+        let mut text_task = || {
+            run_with_telemetry(info_span!(parent: &span, "text remove"), || {
+                indexes.texts_index.delete_resource(resource)
+            })
+        };
 
-        let mut paragraph_task = || run_with_telemetry(
-            info_span!(parent: &span, "paragraph remove"),
-            || indexes.paragraphs_index.delete_resource(resource)
-        );
+        let mut paragraph_task = || {
+            run_with_telemetry(info_span!(parent: &span, "paragraph remove"), || {
+                indexes.paragraphs_index.delete_resource(resource)
+            })
+        };
 
         let mut vector_tasks = vec![];
         for (_, vector_writer) in indexes.vectors_indexes.iter_mut() {
-            vector_tasks.push(
-                || run_with_telemetry(
-                    info_span!(parent: &span, "vector remove"),
-                    || vector_writer.delete_resource(resource)
-                )
-            );
+            vector_tasks.push(|| {
+                run_with_telemetry(info_span!(parent: &span, "vector remove"), || {
+                    vector_writer.delete_resource(resource)
+                })
+            });
         }
 
-        let mut relation_task = || run_with_telemetry(
-            info_span!(parent: &span, "relation remove"),
-            || indexes.relations_index.delete_resource(resource)
-        );
+        let mut relation_task = || {
+            run_with_telemetry(info_span!(parent: &span, "relation remove"), || {
+                indexes.relations_index.delete_resource(resource)
+            })
+        };
 
         let mut text_result = Ok(());
         let mut paragraph_result = Ok(());
@@ -509,22 +506,37 @@ impl ShardWriter {
             }
         }
         Ok(GarbageCollectorStatus::GarbageCollected)
-   }
+    }
 
     #[tracing::instrument(skip_all)]
     pub fn merge(&self, context: MergeContext) -> NodeResult<MergeMetrics> {
-        let runner = read_rw_lock(&self.indexes).vector_writer.prepare_merge(context.parameters)?;
-        let Some(mut runner) = runner else {
-            return Ok(MergeMetrics {
-                merged: 0,
-                left: 0,
-            });
+        // TODO: return metrics by vectorset, not only the deafult one
+        let merge_result = {
+            let indexes: &ShardWriterIndexes = &read_rw_lock(&self.indexes);
+            let default_vectors_index = indexes
+                .vectors_indexes
+                .get(DEFAULT_VECTOR_INDEX_NAME)
+                .expect("Default vectors index should never be deleted (yet)");
+            let runner = default_vectors_index.prepare_merge(context.parameters)?;
+            let Some(mut runner) = runner else {
+                return Ok(MergeMetrics {
+                    merged: 0,
+                    left: 0,
+                });
+            };
+            runner.run()?
         };
-        let merge_result = runner.run()?;
-        let metrics = write_rw_lock(&self.indexes).vector_writer.record_merge(merge_result, context.source)?;
-        self.metadata.new_generation_id();
+        {
+            let indexes: &mut ShardWriterIndexes = &mut write_rw_lock(&self.indexes);
+            let default_vectors_index = indexes
+                .vectors_indexes
+                .get_mut(DEFAULT_VECTOR_INDEX_NAME)
+                .expect("Default vectors index should never be deleted (yet)");
+            let metrics = default_vectors_index.record_merge(merge_result, context.source)?;
+            self.metadata.new_generation_id();
 
-        Ok(metrics)
+            Ok(metrics)
+        }
     }
 
     /// This must be used only by replication and should be
@@ -544,11 +556,17 @@ impl ShardWriter {
 
     pub fn get_shard_segments(&self) -> NodeResult<HashMap<String, Vec<String>>> {
         let mut segments = HashMap::new();
+        let indexes: &ShardWriterIndexes = &read_rw_lock(&self.indexes);
 
-        segments.insert("paragraph".to_string(), read_rw_lock(&self.indexes).paragraph_writer.get_segment_ids()?);
-        segments.insert("text".to_string(), read_rw_lock(&self.indexes).text_writer.get_segment_ids()?);
-        segments.insert("vector".to_string(), read_rw_lock(&self.indexes).vector_writer.get_segment_ids()?);
-        segments.insert("relation".to_string(), read_rw_lock(&self.indexes).relation_writer.get_segment_ids()?);
+        segments.insert("paragraph".to_string(), indexes.paragraphs_index.get_segment_ids()?);
+        segments.insert("text".to_string(), indexes.texts_index.get_segment_ids()?);
+        // TODO: return segments for all vector indexes
+        let default_vectors_index = indexes
+            .vectors_indexes
+            .get(DEFAULT_VECTOR_INDEX_NAME)
+            .expect("Default vectors index should never be deleted (yet)");
+        segments.insert("vector".to_string(), default_vectors_index.get_segment_ids()?);
+        segments.insert("relation".to_string(), indexes.relations_index.get_segment_ids()?);
 
         Ok(segments)
     }
@@ -562,13 +580,18 @@ impl ShardWriter {
         // while we retrieve the list of files
         let indexes = write_rw_lock(&self.indexes);
         let paragraph_files =
-            indexes.paragraph_writer.get_index_files(ignored_segement_ids.get("paragraph").unwrap_or(&Vec::new()))?;
+            indexes.paragraphs_index.get_index_files(ignored_segement_ids.get("paragraph").unwrap_or(&Vec::new()))?;
         let text_files =
-            indexes.text_writer.get_index_files(ignored_segement_ids.get("text").unwrap_or(&Vec::new()))?;
+            indexes.texts_index.get_index_files(ignored_segement_ids.get("text").unwrap_or(&Vec::new()))?;
+        // TODO: return files for all vector indexes
+        let default_vectors_index = indexes
+            .vectors_indexes
+            .get(DEFAULT_VECTOR_INDEX_NAME)
+            .expect("Default vectors index should never be deleted (yet)");
         let vector_files =
-            indexes.vector_writer.get_index_files(ignored_segement_ids.get("vector").unwrap_or(&Vec::new()))?;
+            default_vectors_index.get_index_files(ignored_segement_ids.get("vector").unwrap_or(&Vec::new()))?;
         let relation_files =
-            indexes.relation_writer.get_index_files(ignored_segement_ids.get("relation").unwrap_or(&Vec::new()))?;
+            indexes.relations_index.get_index_files(ignored_segement_ids.get("relation").unwrap_or(&Vec::new()))?;
         files.push((PathBuf::from(PARAGRAPHS_DIR), paragraph_files));
         files.push((PathBuf::from(TEXTS_DIR), text_files));
         files.push((PathBuf::from(VECTORS_DIR), vector_files));
