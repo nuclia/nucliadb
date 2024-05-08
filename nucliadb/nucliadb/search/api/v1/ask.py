@@ -17,10 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import contextlib
 from typing import Optional, Union
 
-from fastapi import Body, Header, Request, Response
-from fastapi.openapi.models import Example
+from fastapi import Header, Request, Response
 from fastapi_versioning import version
 from starlette.responses import StreamingResponse
 
@@ -40,24 +40,6 @@ from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
 from nucliadb_utils.utilities import has_feature
 
-ASK_EXAMPLES = {
-    "ask": Example(
-        summary="Ask who won the league final",
-        description="You can ask a question to your knowledge box",  # noqa
-        value={
-            "query": "Who won the league final?",
-        },
-    ),
-    "ask_with_custom_prompt": Example(
-        summary="Ask for the gold price evolution in 2023 in a very conscise way",
-        description="You can ask a question and specify a custom prompt to tweak the tone of the response",  # noqa
-        value={
-            "query": "How has the price of gold evolved during 2023?",
-            "prompt": "Given this context: {context}. Answer this {question} in a concise way using the provided context",  # noqa
-        },
-    ),
-}
-
 
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/ask",
@@ -75,7 +57,7 @@ ASK_EXAMPLES = {
 async def ask_knowledgebox_endpoint(
     request: Request,
     kbid: str,
-    item: AskRequest = Body(openapi_examples=ASK_EXAMPLES),
+    item: AskRequest,
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
@@ -85,16 +67,21 @@ async def ask_knowledgebox_endpoint(
         "This is slower and requires waiting for entire answer to be ready.",
     ),
 ) -> Union[StreamingResponse, HTTPClientError, Response]:
-    try:
+    with ask_endpoint_handled_errors(kbid):
         if not has_feature(const.Features.ASK_ENDPOINT, context={"kbid": kbid}):
             return HTTPClientError(
                 status_code=404,
                 detail="This endpoint is not yet available for this Knowledge Box",
             )
-
         return await create_ask_response(
             kbid, item, x_nucliadb_user, x_ndb_client, x_forwarded_for, x_synchronous
         )
+
+
+@contextlib.contextmanager
+def ask_endpoint_handled_errors(kbid):
+    try:
+        yield
     except KnowledgeBoxNotFound:
         return HTTPClientError(
             status_code=404,
