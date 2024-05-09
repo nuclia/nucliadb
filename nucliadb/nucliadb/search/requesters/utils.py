@@ -20,7 +20,7 @@
 import asyncio
 import json
 from enum import Enum
-from typing import Any, Optional, TypeVar, Union, overload
+from typing import Any, Optional, TypeVar, Union, overload, Sequence
 
 from fastapi import HTTPException
 from google.protobuf.json_format import MessageToDict
@@ -130,7 +130,7 @@ async def node_query(
     pb_query: REQUEST_TYPE,
     target_shard_replicas: Optional[list[str]] = None,
     use_read_replica_nodes: bool = True,
-) -> tuple[list[T], bool, list[tuple[AbstractIndexNode, str]]]:
+) -> tuple[Sequence[Union[T, BaseException]], bool, list[tuple[AbstractIndexNode, str]]]:
     use_read_replica_nodes = use_read_replica_nodes and has_feature(
         const.Features.READ_REPLICA_SEARCHES, context={"kbid": kbid}
     )
@@ -173,8 +173,8 @@ async def node_query(
         )
 
     try:
-        results = await asyncio.wait_for(  # type: ignore
-            asyncio.gather(*ops, return_exceptions=True),  # type: ignore
+        results: list[Union[T, BaseException]] = await asyncio.wait_for(
+            asyncio.gather(*ops, return_exceptions=True),
             timeout=settings.search_timeout,
         )
     except asyncio.TimeoutError as exc:  # pragma: no cover
