@@ -31,7 +31,7 @@ from nucliadb_utils.settings import is_onprem_nucliadb
 @api.get(
     path=f"/{KB_PREFIX}/{{kbid}}/models/{{model_id}}/{{filename:path}}",
     status_code=200,
-    name="Download the Knowledege Box model",
+    summary="Download the Knowledege Box model",
     description="Download the trained model or any other generated file as a result of a training task on a Knowledge Box.",  # noqa
     response_model=None,
     tags=["Models"],
@@ -52,7 +52,7 @@ async def download_model(
 @api.get(
     path=f"/{KB_PREFIX}/{{kbid}}/configuration",
     status_code=200,
-    name="Get Knowledge Box models configuration",
+    summary="Get Knowledge Box models configuration",
     description="Current configuration of models assigned to a Knowledge Box",
     response_model=None,
     tags=["Models"],
@@ -74,7 +74,7 @@ async def get_configuration(
 @api.get(
     path=f"/{KB_PREFIX}/{{kbid}}/models",
     status_code=200,
-    name="Get available models",
+    summary="Get available models",
     description="Get available models",
     response_model=None,
     tags=["Models"],
@@ -91,7 +91,7 @@ async def get_models(
 @api.get(
     path=f"/{KB_PREFIX}/{{kbid}}/model/{{model_id}}",
     status_code=200,
-    name="Get model metadata",
+    summary="Get model metadata",
     description="Get metadata for a particular model",
     response_model=None,
     tags=["Models"],
@@ -114,7 +114,7 @@ async def get_model(
 @api.get(
     path=f"/{KB_PREFIX}/{{kbid}}/schema",
     status_code=200,
-    name="Learning configuration schema",
+    summary="Learning configuration schema",
     description="Get jsonschema definition to update the `learning_configuration` of your Knowledge Box",
     response_model=None,
     tags=["Models"],
@@ -131,7 +131,7 @@ async def get_schema_for_configuration_updates(
 @api.get(
     path=f"/nua/schema",
     status_code=200,
-    name="Learning configuration schema for Knowledge Box creation",
+    summary="Learning configuration schema for Knowledge Box creation",
     description="Get jsonschema definition for `learning_configuration` field for the Knowledge Box creation payload",
     response_model=None,
     tags=["Models"],

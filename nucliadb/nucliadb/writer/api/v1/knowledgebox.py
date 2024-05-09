@@ -48,7 +48,7 @@ from nucliadb_utils.utilities import get_ingest
 @api.post(
     f"/{KBS_PREFIX}",
     status_code=201,
-    name="Create Knowledge Box",
+    summary="Create Knowledge Box",
     response_model=KnowledgeBoxObj,
     tags=["Knowledge Boxes"],
     openapi_extra={"x-hidden-operation": True},
@@ -90,7 +90,7 @@ def parse_create_kb_request(item: KnowledgeBoxConfig) -> KnowledgeBoxNew:
 @api.patch(
     f"/{KB_PREFIX}/{{kbid}}",
     status_code=200,
-    name="Update Knowledge Box",
+    summary="Update Knowledge Box",
     response_model=KnowledgeBoxObjID,
     tags=["Knowledge Boxes"],
     openapi_extra={"x-hidden-operation": True},
@@ -118,7 +118,7 @@ async def update_kb(request: Request, kbid: str, item: KnowledgeBoxConfig):
 @api.delete(
     f"/{KB_PREFIX}/{{kbid}}",
     status_code=200,
-    name="Delete Knowledge Box",
+    summary="Delete Knowledge Box",
     response_model=KnowledgeBoxObj,
     tags=["Knowledge Boxes"],
     openapi_extra={"x-hidden-operation": True},

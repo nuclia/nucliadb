@@ -64,7 +64,7 @@ from nucliadb_utils.utilities import get_ingest, get_storage
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/entitiesgroups",
     status_code=200,
-    name="Get Knowledge Box Entities",
+    summary="Get Knowledge Box Entities",
     response_model=KnowledgeBoxEntities,
     tags=["Knowledge Box Services"],
 )
@@ -108,7 +108,7 @@ async def list_entities_groups(kbid: str):
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/entitiesgroup/{{group}}",
     status_code=200,
-    name="Get a Knowledge Box Entities Group",
+    summary="Get a Knowledge Box Entities Group",
     response_model=EntitiesGroup,
     tags=["Knowledge Box Services"],
 )
@@ -141,7 +141,7 @@ async def get_entity(request: Request, kbid: str, group: str) -> EntitiesGroup:
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/labelsets",
     status_code=200,
-    name="Get Knowledge Box Label Sets",
+    summary="Get Knowledge Box Label Sets",
     response_model=KnowledgeBoxLabels,
     tags=["Knowledge Box Services"],
 )
@@ -176,7 +176,7 @@ async def get_labelsets(request: Request, kbid: str) -> KnowledgeBoxLabels:
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/labelset/{{labelset}}",
     status_code=200,
-    name="Get a Knowledge Box Label Set",
+    summary="Get a Knowledge Box Label Set",
     response_model=LabelSet,
     tags=["Knowledge Box Services"],
 )
@@ -209,7 +209,7 @@ async def get_labelset(request: Request, kbid: str, labelset: str) -> LabelSet:
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/custom-synonyms",
     status_code=200,
-    name="Get Knowledge Box Custom Synonyms",
+    summary="Get Knowledge Box Custom Synonyms",
     tags=["Knowledge Box Services"],
     response_model=KnowledgeBoxSynonyms,
     openapi_extra={"x-operation_order": 2},
@@ -233,7 +233,7 @@ async def get_custom_synonyms(request: Request, kbid: str):
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/notifications",
     status_code=200,
-    name="Knowledge Box Notifications Stream",
+    summary="Knowledge Box Notifications Stream",
     description="Provides a stream of activity notifications for the given Knowledge Box. The stream will be automatically closed after 2 minutes.",  # noqa: E501
     tags=["Knowledge Box Services"],
     response_description="Each line of the response is a Base64-encoded JSON object representing a notification. Refer to [the internal documentation](https://github.com/nuclia/nucliadb/blob/main/docs/tutorials/KB_NOTIFICATIONS.md) for a more detailed explanation of each notification type.",  # noqa: E501
@@ -273,7 +273,7 @@ async def exists_kb(kbid: str) -> bool:
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/processing-status",
     status_code=200,
-    name="Knowledge Box Processing Status",
+    summary="Knowledge Box Processing Status",
     description="Provides the status of the processing of the given Knowledge Box.",
     tags=["Knowledge Box Services"],
     response_model=processing.RequestsResults,

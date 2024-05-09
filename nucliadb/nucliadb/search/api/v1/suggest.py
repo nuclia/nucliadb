@@ -47,6 +47,7 @@ from nucliadb_utils.utilities import get_audit
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/suggest",
     status_code=200,
+    summary="Suggest on a knowledge box",
     description="Suggestions on a knowledge box",
     response_model=KnowledgeboxSuggestResults,
     response_model_exclude_unset=True,

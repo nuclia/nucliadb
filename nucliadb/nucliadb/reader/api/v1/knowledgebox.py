@@ -37,7 +37,7 @@ from nucliadb_utils.authentication import requires, requires_one
 @api.get(
     f"/{KBS_PREFIX}",
     status_code=200,
-    name="List Knowledge Boxes",
+    summary="List Knowledge Boxes",
     response_model=KnowledgeBoxList,
     tags=["Knowledge Boxes"],
     include_in_schema=False,
@@ -56,7 +56,7 @@ async def get_kbs(request: Request, prefix: str = "") -> KnowledgeBoxList:
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}",
     status_code=200,
-    name="Get Knowledge Box",
+    summary="Get Knowledge Box",
     response_model=KnowledgeBoxObj,
     tags=["Knowledge Boxes"],
 )
@@ -79,7 +79,7 @@ async def get_kb(request: Request, kbid: str) -> KnowledgeBoxObj:
 @api.get(
     f"/{KB_PREFIX}/s/{{slug}}",
     status_code=200,
-    name="Get Knowledge Box (by slug)",
+    summary="Get Knowledge Box (by slug)",
     response_model=KnowledgeBoxObj,
     tags=["Knowledge Boxes"],
 )

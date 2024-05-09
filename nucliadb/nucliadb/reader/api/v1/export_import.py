@@ -41,7 +41,7 @@ from nucliadb_utils.authentication import requires_one
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/export/{{export_id}}",
     status_code=200,
-    name="Download a Knowledge Box export",
+    summary="Download a Knowledge Box export",
     tags=["Knowledge Boxes"],
     response_class=StreamingResponse,
 )
@@ -100,7 +100,7 @@ async def download_export_and_delete(
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/export/{{export_id}}/status",
     status_code=200,
-    name="Get the status of a Knowledge Box Export",
+    summary="Get the status of a Knowledge Box Export",
     response_model=StatusResponse,
     tags=["Knowledge Boxes"],
 )
@@ -119,7 +119,7 @@ async def get_export_status_endpoint(
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/import/{{import_id}}/status",
     status_code=200,
-    name="Get the status of a Knowledge Box Import",
+    summary="Get the status of a Knowledge Box Import",
     response_model=StatusResponse,
     tags=["Knowledge Boxes"],
 )

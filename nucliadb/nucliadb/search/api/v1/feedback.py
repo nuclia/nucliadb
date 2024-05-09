@@ -35,7 +35,7 @@ from nucliadb_utils.authentication import requires
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/feedback",
     status_code=200,
-    name="Send Feedback",
+    summary="Send Feedback",
     description="Send feedback for a search operation in a Knowledge Box",
     tags=["Search"],
 )
