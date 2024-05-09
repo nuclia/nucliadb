@@ -269,12 +269,8 @@ impl ShardWriter {
 
         let mut vector_tasks = vec![];
         for (name, path) in indexes.iter_vectors_indexes() {
-            vector_tasks.push(|| {
-                // redefining here allows to get a copy of path without moving
-                // metadata
-                #[allow(clippy::redundant_locals)]
-                let path = path;
-                Some((name, open_vectors_writer(versions.vectors, &path, metadata.id())))
+            let id = metadata.id();
+            vector_tasks.push(move || Some((name, open_vectors_writer(versions.vectors, &path, id))))
             })
         }
 
