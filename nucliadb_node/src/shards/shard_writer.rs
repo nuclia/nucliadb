@@ -270,8 +270,7 @@ impl ShardWriter {
         let mut vector_tasks = vec![];
         for (name, path) in indexes.iter_vectors_indexes() {
             let id = metadata.id();
-            vector_tasks.push(move || Some((name, open_vectors_writer(versions.vectors, &path, id))))
-            })
+            vector_tasks.push(move || Some((name, open_vectors_writer(versions.vectors, &path, id))));
         }
 
         let rsc = RelationConfig {
@@ -541,7 +540,7 @@ impl ShardWriter {
 
     #[tracing::instrument(skip_all)]
     pub fn merge(&self, context: MergeContext) -> NodeResult<MergeMetrics> {
-        // TODO: return metrics by vectorset, not only the deafult one
+        // TODO: merge and returns metrics of all vectorsets
         let merge_result = {
             let indexes: &ShardWriterIndexes = &read_rw_lock(&self.indexes);
             let default_vectors_index = indexes
