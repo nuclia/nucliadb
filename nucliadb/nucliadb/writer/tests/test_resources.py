@@ -23,13 +23,13 @@ from unittest.mock import AsyncMock  # type: ignore
 
 import pytest
 from httpx import AsyncClient
-from nucliadb_protos.writer_pb2 import ResourceFieldId
 
 import nucliadb_models
 from nucliadb.common.maindb.local import LocalDriver
 from nucliadb.common.maindb.redis import RedisDriver
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.processing import PushPayload
+from nucliadb.writer.api.v1.resource import resource_exists
 from nucliadb.writer.api.v1.router import (
     KB_PREFIX,
     RESOURCE_PREFIX,
@@ -47,7 +47,6 @@ from nucliadb.writer.tests.test_fields import (
     TEST_TEXT_PAYLOAD,
 )
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_utils.utilities import get_ingest
 
 
 @pytest.mark.asyncio
@@ -220,13 +219,7 @@ async def test_resource_crud_sync(
         assert "elapsed" in data
         rid = data["uuid"]
 
-        ingest = get_ingest()
-        pbrequest = ResourceFieldId()
-        pbrequest.kbid = knowledgebox_id
-        pbrequest.rid = rid
-
-        res = await ingest.ResourceFieldExists(pbrequest)  # type: ignore
-        assert res.found
+        assert (await resource_exists(knowledgebox_id, rid)) is True
 
         # Test update resource
         resp = await client.patch(
@@ -248,8 +241,7 @@ async def test_resource_crud_sync(
         )
         assert resp.status_code == 204
 
-        res = await ingest.ResourceFieldExists(pbrequest)  # type: ignore
-        assert not res.found
+        assert (await resource_exists(knowledgebox_id, rid)) is False
 
 
 @pytest.mark.asyncio

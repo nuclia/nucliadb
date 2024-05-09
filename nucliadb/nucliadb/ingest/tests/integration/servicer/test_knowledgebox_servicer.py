@@ -24,7 +24,7 @@ from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.local import LocalDriver
 from nucliadb.ingest.tests.fixtures import IngestFixture
-from nucliadb_protos import knowledgebox_pb2, utils_pb2, writer_pb2, writer_pb2_grpc
+from nucliadb_protos import knowledgebox_pb2, utils_pb2, writer_pb2_grpc
 
 
 @pytest.mark.asyncio
@@ -65,19 +65,6 @@ async def list_all_kb_slugs(driver: Driver) -> list[str]:
         async for _, slug in datamanagers.kb.get_kbs(txn):
             slugs.append(slug)
     return slugs
-
-
-@pytest.mark.asyncio
-async def test_get_resource_id(grpc_servicer: IngestFixture) -> None:
-    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)  # type: ignore
-
-    pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test")
-    pb.config.title = "My Title"
-    result: knowledgebox_pb2.NewKnowledgeBoxResponse = await stub.NewKnowledgeBox(pb)  # type: ignore
-
-    pbid = writer_pb2.ResourceIdRequest(kbid="foo", slug="bar")
-    result = await stub.GetResourceId(pbid)  # type: ignore
-    assert result.uuid == ""
 
 
 @pytest.mark.asyncio

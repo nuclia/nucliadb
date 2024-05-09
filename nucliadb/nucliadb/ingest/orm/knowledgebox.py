@@ -91,25 +91,14 @@ class KnowledgeBox:
             return self._config
 
     @classmethod
-    async def delete_kb(cls, txn: Transaction, slug: str = "", kbid: str = ""):
+    async def delete_kb(cls, txn: Transaction, kbid: str):
         # Mark storage to be deleted
         # Mark keys to be deleted
-        if not kbid and not slug:
-            raise AttributeError()
-
-        if slug and not kbid:
-            kbid_bytes = await txn.get(datamanagers.kb.KB_SLUGS.format(slug=slug))
-            if kbid_bytes is None:
-                raise datamanagers.exceptions.KnowledgeBoxNotFound()
-            kbid = kbid_bytes.decode()
-
-        if kbid and not slug:
-            kbconfig_bytes = await txn.get(datamanagers.kb.KB_UUID.format(kbid=kbid))
-            if kbconfig_bytes is None:
-                raise datamanagers.exceptions.KnowledgeBoxNotFound()
-            pbconfig = KnowledgeBoxConfig()
-            pbconfig.ParseFromString(kbconfig_bytes)
-            slug = pbconfig.slug
+        kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
+        if kb_config is None:
+            # consider KB as deleted
+            return
+        slug = kb_config.slug
 
         # Delete main anchor
         async with txn.driver.transaction() as subtxn:

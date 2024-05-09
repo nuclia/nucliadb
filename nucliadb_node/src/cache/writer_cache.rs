@@ -186,6 +186,7 @@ impl ShardWriterCache {
         if let Some(shard) = shard {
             // The shard was still cached, there may be operations running on it. We must ensure
             // that all of them have finished before proceeding.
+            // XXX: DEAD CODE! this function use to acquire a write lock in the shard writer
             // let _blocking_token = shard.block_shard();
             // At this point we can ensure that no operations are being performed in this shard.
             // Next operations will require using the cache, where the shard is marked as deleted.
@@ -235,6 +236,7 @@ mod tests {
     use std::time::Duration;
 
     use crossbeam_utils::thread::scope;
+    use nucliadb_core::Channel;
     use tempfile::tempdir;
 
     use super::ShardWriterCache;
@@ -256,8 +258,14 @@ mod tests {
         let shard_0_path = settings.shards_path().join(shard_id_0.clone());
         fs::create_dir(settings.shards_path()).unwrap();
 
-        let shard_meta =
-            ShardMetadata::new(shard_0_path.clone(), shard_id_0.clone(), None, Similarity::Cosine, None, false);
+        let shard_meta = ShardMetadata::new(
+            shard_0_path.clone(),
+            shard_id_0.clone(),
+            "kbid".to_string(),
+            Similarity::Cosine,
+            Channel::EXPERIMENTAL,
+            false,
+        );
         cache.create(shard_meta).unwrap();
 
         let shard_0 = cache.get(&shard_id_0).unwrap();
@@ -297,8 +305,14 @@ mod tests {
         assert!(cache.get(&shard_id_0).is_err());
 
         // Recreating the shard should work (i.e: it's not stuck in the deletion state)
-        let shard_meta =
-            ShardMetadata::new(shard_0_path.clone(), shard_id_0.clone(), None, Similarity::Cosine, None, false);
+        let shard_meta = ShardMetadata::new(
+            shard_0_path.clone(),
+            shard_id_0.clone(),
+            "kbid".to_string(),
+            Similarity::Cosine,
+            Channel::EXPERIMENTAL,
+            false,
+        );
         cache.create(shard_meta).unwrap();
 
         assert!(cache.get(&shard_id_0).is_ok());

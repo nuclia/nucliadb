@@ -210,6 +210,7 @@ class LinkExtractedData(BaseModel):
     description: Optional[str]
     type: Optional[str]
     embed: Optional[str]
+    file_generated: Optional[Dict[str, CloudLink]]
 
     @classmethod
     def from_message(cls: Type[_T], message: resources_pb2.LinkExtractedData) -> _T:

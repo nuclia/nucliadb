@@ -128,7 +128,6 @@ class TestWriterServicer:
         expected_model_metadata = SemanticModelMetadata(
             similarity_function=VectorSimilarity.DOT,
             vector_dimension=200,
-            default_min_score=1.0,
         )
         writer.proc.create_kb.assert_called_once_with(
             request.slug,
@@ -149,7 +148,6 @@ class TestWriterServicer:
         expected_model_metadata = SemanticModelMetadata(
             similarity_function=VectorSimilarity.DOT,
             vector_dimension=200,
-            default_min_score=1.0,
         )
         writer.proc.create_kb.assert_called_once_with(
             request.slug,
@@ -170,7 +168,6 @@ class TestWriterServicer:
             forceuuid="kbid",
             similarity=VectorSimilarity.COSINE,
             vector_dimension=200,
-            default_min_score=1.0,
         )
 
         resp = await writer.NewKnowledgeBox(request)
@@ -178,7 +175,6 @@ class TestWriterServicer:
         expected_model_metadata = SemanticModelMetadata(
             similarity_function=VectorSimilarity.COSINE,
             vector_dimension=200,
-            default_min_score=1.0,
         )
         writer.proc.create_kb.assert_called_once_with(
             request.slug,
@@ -199,7 +195,6 @@ class TestWriterServicer:
             forceuuid="kbid",
             similarity=VectorSimilarity.COSINE,
             vector_dimension=200,
-            default_min_score=1.0,
             matryoshka_dimensions=[200, 400],
         )
 
@@ -208,7 +203,6 @@ class TestWriterServicer:
         expected_model_metadata = SemanticModelMetadata(
             similarity_function=VectorSimilarity.COSINE,
             vector_dimension=200,
-            default_min_score=1.0,
             matryoshka_dimensions=[200, 400],
         )
         writer.proc.create_kb.assert_called_once_with(
@@ -244,7 +238,6 @@ class TestWriterServicer:
         expected_model_metadata = SemanticModelMetadata(
             similarity_function=VectorSimilarity.COSINE,
             vector_dimension=10,
-            default_min_score=-1.0,
         )
         writer.proc.create_kb.assert_called_once_with(
             request.slug,
@@ -280,7 +273,6 @@ class TestWriterServicer:
         expected_model_metadata = SemanticModelMetadata(
             similarity_function=VectorSimilarity.COSINE,
             vector_dimension=10,
-            default_min_score=-1.0,
             matryoshka_dimensions=[10, 20, 30],
         )
         writer.proc.create_kb.assert_called_once_with(
@@ -332,7 +324,7 @@ class TestWriterServicer:
 
         resp = await writer.DeleteKnowledgeBox(request)
 
-        writer.proc.delete_kb.assert_called_once_with(request.uuid, request.slug)
+        writer.proc.delete_kb.assert_called_once_with(request.uuid)
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
 
     async def test_DeleteKnowledgeBox_handle_error(self, writer: WriterServicer):

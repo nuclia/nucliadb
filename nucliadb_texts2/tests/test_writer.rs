@@ -36,7 +36,7 @@ fn test_start_new_writer() {
         path: dir.path().join("texts"),
     };
 
-    let writer = TextWriterService::create(&config);
+    let writer = TextWriterService::create(config);
     assert!(writer.is_ok());
 }
 
@@ -47,7 +47,7 @@ fn test_open_writer_for_existent_index() {
         path: dir.path().join("texts"),
     };
 
-    let writer = TextWriterService::create(&config).unwrap();
+    let writer = TextWriterService::create(config.clone()).unwrap();
     std::mem::drop(writer);
 
     let another_writer = TextWriterService::open(&config);
@@ -63,7 +63,7 @@ fn test_two_simultaneous_writers() {
         path: dir.path().join("texts"),
     };
 
-    let _writer = TextWriterService::create(&config).unwrap();
+    let _writer = TextWriterService::create(config.clone()).unwrap();
     let _another_writer = TextWriterService::open(&config);
 }
 
@@ -74,7 +74,7 @@ fn test_set_resource() {
         path: dir.path().join("texts"),
     };
 
-    let mut writer = TextWriterService::create(&config).unwrap();
+    let mut writer = TextWriterService::create(config).unwrap();
     let resource = common::create_resource("shard1".to_string());
     let result = writer.set_resource(&resource);
 
@@ -85,16 +85,17 @@ fn test_set_resource() {
 #[test]
 fn test_old_writer_test() -> NodeResult<()> {
     let dir = TempDir::new().unwrap();
+    let shard_path = dir.path().join("texts");
     let fsc = TextConfig {
-        path: dir.path().join("texts"),
+        path: shard_path.clone(),
     };
 
-    let mut field_writer_service = TextWriterService::create(&fsc).unwrap();
+    let mut field_writer_service = TextWriterService::create(fsc).unwrap();
     let resource1 = common::create_resource("shard1".to_string());
     let _ = field_writer_service.set_resource(&resource1);
     let _ = field_writer_service.set_resource(&resource1);
 
-    let field_reader_service = TextReaderService::open(&fsc).unwrap();
+    let field_reader_service = TextReaderService::open(&shard_path).unwrap();
 
     let reader = field_reader_service;
     let searcher = reader.reader.searcher();

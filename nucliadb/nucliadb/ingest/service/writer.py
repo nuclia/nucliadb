@@ -61,10 +61,6 @@ from nucliadb_protos.writer_pb2 import (
     NewEntitiesGroupRequest,
     NewEntitiesGroupResponse,
     OpStatusWriter,
-    ResourceFieldExistsResponse,
-    ResourceFieldId,
-    ResourceIdRequest,
-    ResourceIdResponse,
     SetEntitiesRequest,
     SetLabelsRequest,
     SetSynonymsRequest,
@@ -271,7 +267,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
     async def delete_kb(self, request: KnowledgeBoxID) -> None:
         kbid = request.uuid
-        await self.proc.delete_kb(kbid, request.slug)
+        await self.proc.delete_kb(kbid)
         # learning configuration is automatically removed in nuclia backend for
         # hosted users, we only need to remove it for onprem
         if is_onprem_nucliadb():
@@ -648,55 +644,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         )
         return response
 
-    async def GetResourceId(  # type: ignore
-        self, request: ResourceIdRequest, context=None
-    ) -> ResourceIdResponse:
-        response = ResourceIdResponse()
-        response.uuid = ""
-        async with self.driver.transaction() as txn:
-            kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
-            rid = await kbobj.get_resource_uuid_by_slug(request.slug)
-            if rid:
-                response.uuid = rid
-            return response
-
-    async def ResourceFieldExists(  # type: ignore
-        self, request: ResourceFieldId, context=None
-    ) -> ResourceFieldExistsResponse:
-        response = ResourceFieldExistsResponse()
-        response.found = False
-        resobj = None
-        async with self.driver.transaction() as txn:
-            kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
-            resobj = ResourceORM(txn, self.storage, kbobj, request.rid)
-
-            if request.field != "":
-                field = await resobj.get_field(
-                    request.field, request.field_type, load=True
-                )
-                if field.value is not None:
-                    response.found = True
-                else:
-                    response.found = False
-                return response
-
-            if request.rid != "":
-                if await resobj.exists():
-                    response.found = True
-                else:
-                    response.found = False
-                return response
-
-            if request.kbid != "":
-                config = await datamanagers.kb.get_config(txn, kbid=request.kbid)
-                if config is not None:
-                    response.found = True
-                else:
-                    response.found = False
-                return response
-
-            return response
-
     async def Index(self, request: IndexResource, context=None) -> IndexStatus:  # type: ignore
         async with self.driver.transaction() as txn:
             kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
@@ -826,10 +773,6 @@ def parse_model_metadata_from_learning_config(
         model.vector_dimension = lconfig.semantic_vector_size
     else:
         logger.warning("Vector dimension not set!")
-    if lconfig.semantic_threshold is not None:
-        model.default_min_score = lconfig.semantic_threshold
-    else:
-        logger.warning("Default min score not set!")
     if lconfig.semantic_matryoshka_dimensions is not None:
         model.matryoshka_dimensions.extend(lconfig.semantic_matryoshka_dimensions)
     return model
@@ -846,10 +789,6 @@ def parse_model_metadata_from_request(
         logger.warning(
             "Vector dimension not set. Will be detected automatically on the first vector set."
         )
-    if request.HasField("default_min_score"):
-        model.default_min_score = request.default_min_score
-    else:
-        logger.warning("Default min score not set!")
 
     if len(request.matryoshka_dimensions) > 0:
         if model.vector_dimension not in request.matryoshka_dimensions:

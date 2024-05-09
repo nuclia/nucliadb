@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 tempfile = "3"
 tantivy = { git = "https://github.com/nuclia/tantivy.git", branch = "original-17" }
-itertools = "0.10.5"
+itertools = "0.12"
 
 nucliadb_core = { path = "../nucliadb_core" }
 nucliadb_procs = { path = "../nucliadb_procs" }

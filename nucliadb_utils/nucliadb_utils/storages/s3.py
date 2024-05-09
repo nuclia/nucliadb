@@ -226,7 +226,7 @@ class S3StorageField(StorageField):
             # delete existing file
             try:
                 await self.storage.delete_upload(
-                    uri=self.field.old_uri, bucket=self.field.old_bucket
+                    uri=self.field.old_uri, bucket_name=self.field.old_bucket
                 )
                 self.field.ClearField("old_uri")
                 self.field.ClearField("old_bucket")
@@ -402,10 +402,10 @@ class S3Storage(Storage):
     async def finalize(self):
         await self._exit_stack.__aexit__(None, None, None)
 
-    async def delete_upload(self, uri: str, bucket: str):
+    async def delete_upload(self, uri: str, bucket_name: str):
         if uri:
             try:
-                await self._s3aioclient.delete_object(Bucket=bucket, Key=uri)
+                await self._s3aioclient.delete_object(Bucket=bucket_name, Key=uri)
             except botocore.exceptions.ClientError:
                 logger.warning("Error deleting object", exc_info=True)
         else:

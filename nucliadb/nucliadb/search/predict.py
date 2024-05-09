@@ -30,7 +30,6 @@ from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb.ingest.tests.vectors import Q, Qm2023
 from nucliadb.search import logger
 from nucliadb_models.search import (
-    AskDocumentModel,
     ChatModel,
     FeedbackRequest,
     Ner,
@@ -90,7 +89,6 @@ TOKENS = "/tokens"
 QUERY = "/query"
 SUMMARIZE = "/summarize"
 CHAT = "/chat"
-ASK_DOCUMENT = "/ask_document"
 REPHRASE = "/rephrase"
 FEEDBACK = "/feedback"
 
@@ -306,28 +304,6 @@ class PredictEngine:
         ident = resp.headers.get(NUCLIA_LEARNING_ID_HEADER)
         return ident, get_answer_generator(resp)
 
-    @predict_observer.wrap({"type": "ask_document"})
-    async def ask_document(
-        self, kbid: str, question: str, blocks: list[list[str]], user_id: str
-    ) -> str:
-        try:
-            self.check_nua_key_is_configured_for_onprem()
-        except NUAKeyMissingError:
-            error = "Nuclia Service account is not defined so could not ask document"
-            logger.warning(error)
-            raise SendToPredictError(error)
-
-        item = AskDocumentModel(question=question, blocks=blocks, user_id=user_id)
-        resp = await self.make_request(
-            "POST",
-            url=self.get_predict_url(ASK_DOCUMENT, kbid),
-            json=item.dict(),
-            headers=self.get_predict_headers(kbid),
-            timeout=None,
-        )
-        await self.check_response(resp, expected_status=200)
-        return await resp.text()
-
     @predict_observer.wrap({"type": "query"})
     async def query(
         self,
@@ -456,13 +432,6 @@ class DummyPredictEngine(PredictEngine):
                 yield i
 
         return (DUMMY_LEARNING_ID, generate())
-
-    async def ask_document(
-        self, kbid: str, query: str, blocks: list[list[str]], user_id: str
-    ) -> str:
-        self.calls.append(("ask_document", (query, blocks, user_id)))
-        answer = os.environ.get("TEST_ASK_DOCUMENT") or "Answer to your question"
-        return answer
 
     async def query(
         self,

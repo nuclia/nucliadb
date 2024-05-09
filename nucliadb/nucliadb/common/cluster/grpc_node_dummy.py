@@ -58,13 +58,16 @@ class DummyWriterStub:  # pragma: no cover
     async def SetResource(self, data):  # pragma: no cover
         self.calls.setdefault("SetResource", []).append(data)
         result = OpStatus()
-        result.field_count = 1
+        return result
+
+    async def SetResourceFromStorage(self, data):  # pragma: no cover
+        self.calls.setdefault("SetResourceFromStorage", []).append(data)
+        result = OpStatus()
         return result
 
     async def AddVectorSet(self, data):  # pragma: no cover
         self.calls.setdefault("AddVectorSet", []).append(data)
         result = OpStatus()
-        result.field_count = 1
         return result
 
     async def ListVectorSet(self, data: ShardId):  # pragma: no cover

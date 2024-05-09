@@ -3,7 +3,7 @@ name: nucliadb Node Binding (rust + python)
 on: workflow_dispatch
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:

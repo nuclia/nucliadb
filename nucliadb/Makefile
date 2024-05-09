@@ -52,8 +52,8 @@ freeze-requirements:
 .PHONY: format
 format:
 	cd .. && isort --profile black nucliadb
-	ruff check --fix --config=../ruff.toml nucliadb/
 	black .
+	ruff check --fix --config=../ruff.toml nucliadb/
 
 $(format_subpackages_targets):
 
@@ -92,8 +92,8 @@ $(test_cov_subpackages_targets):
 
 format-%:
 	cd .. && isort --profile black nucliadb/nucliadb/$*
-	ruff check --fix nucliadb/$* --config=../ruff.toml
 	black nucliadb/$*
+	ruff check --fix nucliadb/$* --config=../ruff.toml
 
 lint-%:
 	ruff check nucliadb/$* --config=../ruff.toml

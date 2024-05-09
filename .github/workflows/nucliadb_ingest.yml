@@ -9,7 +9,7 @@ on:
       - main
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -73,7 +73,7 @@ jobs:
 
       - name: Install tikv
         if: matrix.maindb_driver == 'tikv'
-        run: ./scripts/run-tikv.sh
+        run: sudo cp ./scripts/pingcap-com.pem /usr/local/share/ca-certificates/pingcap.crt && sudo update-ca-certificates && ./scripts/run-tikv.sh
 
       - name: Run tests
         env:

@@ -43,7 +43,7 @@ from . import context
 try:
     from uvicorn.logging import AccessFormatter  # type: ignore
 except ImportError:  # pragma: no cover
-    AccessFormatter = logging.Formatter
+    AccessFormatter = logging.Formatter  # type: ignore
 
 _BUILTIN_ATTRS = set(
     [

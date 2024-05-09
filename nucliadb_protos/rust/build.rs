@@ -21,6 +21,8 @@
 use std::io::Result;
 
 fn main() -> Result<()> {
+    std::env::set_var("PROTOC", protobuf_src::protoc());
+
     println!("cargo:rerun-if-changed=../knowledgebox.proto");
     println!("cargo:rerun-if-changed=../resources.proto");
     println!("cargo:rerun-if-changed=../noderesources.proto");

@@ -44,6 +44,7 @@ images.settings["nucliadb_node_reader"] = {
     "image": "europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node",
     "version": "latest",
     "env": {
+        "FILE_BACKEND": "unset",
         "HOST_KEY_PATH": "/data/node.key",
         "DATA_PATH": "/data",
         "READER_LISTEN_ADDRESS": "0.0.0.0:4445",
@@ -66,6 +67,7 @@ images.settings["nucliadb_node_writer"] = {
     "image": "europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node",
     "version": "latest",
     "env": {
+        "FILE_BACKEND": "unset",
         "HOST_KEY_PATH": "/data/node.key",
         "DATA_PATH": "/data",
         "WRITER_LISTEN_ADDRESS": "0.0.0.0:4446",
@@ -322,20 +324,19 @@ class _NodeRunner:
         return self.data
 
     def stop(self):
-        container_ids = [
-            nucliadb_node_1_reader.container_obj.id,
-            nucliadb_node_1_writer.container_obj.id,
-            nucliadb_node_1_sidecar.container_obj.id,
-            nucliadb_node_2_writer.container_obj.id,
-            nucliadb_node_2_reader.container_obj.id,
-            nucliadb_node_2_sidecar.container_obj.id,
-        ]
-        nucliadb_node_1_reader.stop()
-        nucliadb_node_1_writer.stop()
-        nucliadb_node_1_sidecar.stop()
-        nucliadb_node_2_writer.stop()
-        nucliadb_node_2_reader.stop()
-        nucliadb_node_2_sidecar.stop()
+        container_ids = []
+        for component in [
+            nucliadb_node_1_reader,
+            nucliadb_node_1_writer,
+            nucliadb_node_1_sidecar,
+            nucliadb_node_2_writer,
+            nucliadb_node_2_reader,
+            nucliadb_node_2_sidecar,
+        ]:
+            container_obj = getattr(component, "container_obj", None)
+            if container_obj:
+                container_ids.append(container_obj.id)
+                component.stop()
 
         for container_id in container_ids:
             for _ in range(5):

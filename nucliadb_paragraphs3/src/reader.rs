@@ -19,6 +19,7 @@
 //
 
 use std::fmt::Debug;
+use std::path::Path;
 use std::time::Instant;
 
 use nucliadb_core::paragraphs::*;
@@ -246,12 +247,12 @@ impl ParagraphReader for ParagraphReaderService {
 
 impl ParagraphReaderService {
     #[tracing::instrument(skip_all)]
-    pub fn open(config: &ParagraphConfig) -> NodeResult<Self> {
-        if !config.path.exists() {
-            return Err(node_error!("Invalid path {:?}", config.path));
+    pub fn open(path: &Path) -> NodeResult<Self> {
+        if !path.exists() {
+            return Err(node_error!("Invalid path {:?}", path));
         }
         let paragraph_schema = ParagraphSchema::default();
-        let index = Index::open_in_dir(&config.path)?;
+        let index = Index::open_in_dir(path)?;
         let reader = index.reader_builder().reload_policy(ReloadPolicy::OnCommit).try_into()?;
         Ok(ParagraphReaderService {
             index,
@@ -599,8 +600,9 @@ mod tests {
     fn test_total_number_of_results() -> NodeResult<()> {
         const UUID: &str = "f56c58ac-b4f9-4d61-a077-ffccaadd0001";
         let dir = TempDir::new().unwrap();
+        let shard_path = dir.path().join("paragraphs");
         let psc = ParagraphConfig {
-            path: dir.path().join("paragraphs"),
+            path: shard_path.clone(),
         };
         let seconds = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).map(|t| t.as_secs() as i64).unwrap();
         let timestamp = Timestamp {
@@ -608,10 +610,10 @@ mod tests {
             nanos: 0,
         };
 
-        let mut paragraph_writer_service = ParagraphWriterService::create(&psc).unwrap();
+        let mut paragraph_writer_service = ParagraphWriterService::create(psc).unwrap();
         let resource1 = create_resource("shard1".to_string(), timestamp);
         paragraph_writer_service.set_resource(&resource1)?;
-        let paragraph_reader_service = ParagraphReaderService::open(&psc).unwrap();
+        let paragraph_reader_service = ParagraphReaderService::open(&shard_path).unwrap();
         let context = ParagraphsContext::default();
 
         // Search on all paragraphs faceted
@@ -660,8 +662,9 @@ mod tests {
     fn test_filtered_search() -> NodeResult<()> {
         const UUID: &str = "f56c58ac-b4f9-4d61-a077-ffccaadd0001";
         let dir = TempDir::new().unwrap();
+        let shard_path = dir.path().join("paragraphs");
         let psc = ParagraphConfig {
-            path: dir.path().join("paragraphs"),
+            path: shard_path.clone(),
         };
         let seconds = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).map(|t| t.as_secs() as i64).unwrap();
         let timestamp = Timestamp {
@@ -669,11 +672,11 @@ mod tests {
             nanos: 0,
         };
 
-        let mut paragraph_writer_service = ParagraphWriterService::create(&psc).unwrap();
+        let mut paragraph_writer_service = ParagraphWriterService::create(psc).unwrap();
         let resource1 = create_resource("shard1".to_string(), timestamp);
         paragraph_writer_service.set_resource(&resource1)?;
 
-        let paragraph_reader_service = ParagraphReaderService::open(&psc).unwrap();
+        let paragraph_reader_service = ParagraphReaderService::open(&shard_path).unwrap();
 
         let reader = paragraph_writer_service.index.reader()?;
         let searcher = reader.searcher();
@@ -732,18 +735,19 @@ mod tests {
     fn test_new_paragraph() -> NodeResult<()> {
         const UUID: &str = "f56c58ac-b4f9-4d61-a077-ffccaadd0001";
         let dir = TempDir::new().unwrap();
+        let shard_path = dir.path().join("paragraphs");
         let psc = ParagraphConfig {
-            path: dir.path().join("paragraphs"),
+            path: shard_path.clone(),
         };
         let seconds = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).map(|t| t.as_secs() as i64).unwrap();
         let timestamp = Timestamp {
             seconds,
             nanos: 0,
         };
-        let mut paragraph_writer_service = ParagraphWriterService::create(&psc).unwrap();
+        let mut paragraph_writer_service = ParagraphWriterService::create(psc).unwrap();
         let resource1 = create_resource("shard1".to_string(), timestamp);
         paragraph_writer_service.set_resource(&resource1)?;
-        let paragraph_reader_service = ParagraphReaderService::open(&psc).unwrap();
+        let paragraph_reader_service = ParagraphReaderService::open(&shard_path).unwrap();
         let reader = paragraph_writer_service.index.reader()?;
         let searcher = reader.searcher();
         let empty_context = ParagraphsContext::default();
@@ -986,20 +990,21 @@ mod tests {
     #[test]
     fn test_search_paragraph_with_timestamps() -> NodeResult<()> {
         let dir = TempDir::new().unwrap();
+        let shard_path = dir.path().join("paragraphs");
         let psc = ParagraphConfig {
-            path: dir.path().join("paragraphs"),
+            path: shard_path.clone(),
         };
         let time_baseline = Timestamp {
             seconds: 2,
             nanos: 0,
         };
 
-        let mut paragraph_writer_service = ParagraphWriterService::create(&psc).unwrap();
+        let mut paragraph_writer_service = ParagraphWriterService::create(psc).unwrap();
         let resource1 = create_resource("shard1".to_string(), time_baseline.clone());
 
         paragraph_writer_service.set_resource(&resource1)?;
 
-        let paragraph_reader_service = ParagraphReaderService::open(&psc).unwrap();
+        let paragraph_reader_service = ParagraphReaderService::open(&shard_path).unwrap();
 
         let reader = paragraph_writer_service.index.reader()?;
         let searcher = reader.searcher();

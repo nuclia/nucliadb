@@ -16,6 +16,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use super::indexes::ShardIndexes;
 use super::metadata::ShardMetadata;
 use super::versioning::Versions;
 use crate::disk_structure::*;
@@ -49,43 +50,40 @@ use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, RwLock};
+use std::sync::RwLock;
 
 const MAX_SUGGEST_COMPOUND_WORDS: usize = 3;
 const MIN_VIABLE_PREFIX_SUGGEST: usize = 1;
 const CHUNK_SIZE: usize = 65535;
 
-fn open_vectors_reader(version: u32, config: &VectorConfig) -> NodeResult<VectorsReaderPointer> {
+fn open_vectors_reader(version: u32, path: &Path) -> NodeResult<VectorsReaderPointer> {
     match version {
-        1 => nucliadb_vectors::service::VectorReaderService::open(config)
-            .map(|i| Arc::new(RwLock::new(i)) as VectorsReaderPointer),
-        2 => nucliadb_vectors::service::VectorReaderService::open(config)
-            .map(|i| Arc::new(RwLock::new(i)) as VectorsReaderPointer),
+        1 => nucliadb_vectors::service::VectorReaderService::open(path).map(|i| Box::new(i) as VectorsReaderPointer),
+        2 => nucliadb_vectors::service::VectorReaderService::open(path).map(|i| Box::new(i) as VectorsReaderPointer),
         v => Err(node_error!("Invalid vectors version {v}")),
     }
 }
-fn open_paragraphs_reader(version: u32, config: &ParagraphConfig) -> NodeResult<ParagraphsReaderPointer> {
+fn open_paragraphs_reader(version: u32, path: &Path) -> NodeResult<ParagraphsReaderPointer> {
     match version {
-        2 => nucliadb_paragraphs2::reader::ParagraphReaderService::open(config)
-            .map(|i| Arc::new(RwLock::new(i)) as ParagraphsReaderPointer),
-        3 => nucliadb_paragraphs3::reader::ParagraphReaderService::open(config)
-            .map(|i| Arc::new(RwLock::new(i)) as ParagraphsReaderPointer),
+        2 => nucliadb_paragraphs2::reader::ParagraphReaderService::open(path)
+            .map(|i| Box::new(i) as ParagraphsReaderPointer),
+        3 => nucliadb_paragraphs3::reader::ParagraphReaderService::open(path)
+            .map(|i| Box::new(i) as ParagraphsReaderPointer),
         v => Err(node_error!("Invalid paragraphs version {v}")),
     }
 }
 
-fn open_texts_reader(version: u32, config: &TextConfig) -> NodeResult<TextsReaderPointer> {
+fn open_texts_reader(version: u32, path: &Path) -> NodeResult<TextsReaderPointer> {
     match version {
-        2 => nucliadb_texts2::reader::TextReaderService::open(config)
-            .map(|i| Arc::new(RwLock::new(i)) as TextsReaderPointer),
+        2 => nucliadb_texts2::reader::TextReaderService::open(path).map(|i| Box::new(i) as TextsReaderPointer),
         v => Err(node_error!("Invalid text reader version {v}")),
     }
 }
 
-fn open_relations_reader(version: u32, config: &RelationConfig) -> NodeResult<RelationsReaderPointer> {
+fn open_relations_reader(version: u32, path: &Path) -> NodeResult<RelationsReaderPointer> {
     match version {
-        2 => nucliadb_relations2::reader::RelationsReaderService::open(config)
-            .map(|i| Arc::new(RwLock::new(i)) as RelationsReaderPointer),
+        2 => nucliadb_relations2::reader::RelationsReaderService::open(path)
+            .map(|i| Box::new(i) as RelationsReaderPointer),
         v => Err(node_error!("Invalid relations version {v}")),
     }
 }
@@ -139,22 +137,20 @@ impl Iterator for ShardFileChunkIterator {
 pub struct ShardReader {
     pub id: String,
     pub metadata: ShardMetadata,
+    indexes: ShardIndexes,
     root_path: PathBuf,
     suffixed_root_path: String,
-    text_reader: TextsReaderPointer,
-    paragraph_reader: ParagraphsReaderPointer,
-    vector_reader: VectorsReaderPointer,
-    relation_reader: RelationsReaderPointer,
-    document_version: i32,
-    paragraph_version: i32,
-    vector_version: i32,
-    relation_version: i32,
+    text_reader: RwLock<TextsReaderPointer>,
+    paragraph_reader: RwLock<ParagraphsReaderPointer>,
+    vector_reader: RwLock<VectorsReaderPointer>,
+    relation_reader: RwLock<RelationsReaderPointer>,
+    versions: Versions,
 }
 
 impl ShardReader {
     #[tracing::instrument(skip_all)]
     pub fn text_version(&self) -> DocumentService {
-        match self.document_version {
+        match self.versions.texts {
             0 => DocumentService::DocumentV0,
             1 => DocumentService::DocumentV1,
             2 => DocumentService::DocumentV2,
@@ -164,7 +160,7 @@ impl ShardReader {
 
     #[tracing::instrument(skip_all)]
     pub fn paragraph_version(&self) -> ParagraphService {
-        match self.paragraph_version {
+        match self.versions.paragraphs {
             0 => ParagraphService::ParagraphV0,
             1 => ParagraphService::ParagraphV1,
             2 => ParagraphService::ParagraphV2,
@@ -175,7 +171,7 @@ impl ShardReader {
 
     #[tracing::instrument(skip_all)]
     pub fn vector_version(&self) -> VectorService {
-        match self.vector_version {
+        match self.versions.vectors {
             0 => VectorService::VectorV0,
             1 => VectorService::VectorV1,
             i => panic!("Unknown vector version {i}"),
@@ -184,7 +180,7 @@ impl ShardReader {
 
     #[tracing::instrument(skip_all)]
     pub fn relation_version(&self) -> RelationService {
-        match self.relation_version {
+        match self.versions.relations {
             0 => RelationService::RelationV0,
             1 => RelationService::RelationV1,
             2 => RelationService::RelationV2,
@@ -197,16 +193,12 @@ impl ShardReader {
     pub fn get_info(&self) -> NodeResult<Shard> {
         let span = tracing::Span::current();
 
-        let paragraphs = self.paragraph_reader.clone();
-        let vectors = self.vector_reader.clone();
-        let texts = self.text_reader.clone();
-
         let info = info_span!(parent: &span, "text count");
-        let text_task = || run_with_telemetry(info, move || read_rw_lock(&texts).count());
+        let text_task = || run_with_telemetry(info, || read_rw_lock(&self.text_reader).count());
         let info = info_span!(parent: &span, "paragraph count");
-        let paragraph_task = || run_with_telemetry(info, move || read_rw_lock(&paragraphs).count());
+        let paragraph_task = || run_with_telemetry(info, || read_rw_lock(&self.paragraph_reader).count());
         let info = info_span!(parent: &span, "vector count");
-        let vector_task = || run_with_telemetry(info, move || read_rw_lock(&vectors).count());
+        let vector_task = || run_with_telemetry(info, || read_rw_lock(&self.vector_reader).count());
 
         let mut text_result = Ok(0);
         let mut paragraph_result = Ok(0);
@@ -220,7 +212,7 @@ impl ShardReader {
 
         Ok(Shard {
             metadata: Some(protos::ShardMetadata {
-                kbid: self.metadata.kbid().unwrap_or_default(),
+                kbid: self.metadata.kbid(),
                 release_channel: self.metadata.channel() as i32,
             }),
             shard_id: self.id.clone(),
@@ -263,32 +255,13 @@ impl ShardReader {
         let span = tracing::Span::current();
 
         let metadata = ShardMetadata::open(shard_path.to_path_buf())?;
-        let tsc = TextConfig {
-            path: shard_path.join(TEXTS_DIR),
-        };
+        let indexes = ShardIndexes::load(shard_path).unwrap_or_else(|_| ShardIndexes::new(shard_path));
 
-        let psc: ParagraphConfig = ParagraphConfig {
-            path: shard_path.join(PARAGRAPHS_DIR),
-        };
-
-        let channel = metadata.channel();
-
-        let vsc = VectorConfig {
-            similarity: None,
-            path: shard_path.join(VECTORS_DIR),
-            channel,
-            shard_id: id.clone(),
-            normalize_vectors: metadata.normalize_vectors(),
-        };
-        let rsc = RelationConfig {
-            path: shard_path.join(RELATIONS_DIR),
-            channel,
-        };
         let versions = Versions::load(&shard_path.join(VERSION_FILE))?;
-        let text_task = || Some(open_texts_reader(versions.texts, &tsc));
-        let paragraph_task = || Some(open_paragraphs_reader(versions.paragraphs, &psc));
-        let vector_task = || Some(open_vectors_reader(versions.vectors, &vsc));
-        let relation_task = || Some(open_relations_reader(versions.relations, &rsc));
+        let text_task = || Some(open_texts_reader(versions.texts, &indexes.texts_path()));
+        let paragraph_task = || Some(open_paragraphs_reader(versions.paragraphs, &indexes.paragraphs_path()));
+        let vector_task = || Some(open_vectors_reader(versions.vectors, &indexes.vectors_path()));
+        let relation_task = || Some(open_relations_reader(versions.relations, &indexes.relations_path()));
 
         let info = info_span!(parent: &span, "text open");
         let text_task = || run_with_telemetry(info, text_task);
@@ -319,16 +292,14 @@ impl ShardReader {
         Ok(ShardReader {
             id,
             metadata,
-            root_path: shard_path.to_path_buf(),
             suffixed_root_path,
-            text_reader: fields.unwrap(),
-            paragraph_reader: paragraphs.unwrap(),
-            vector_reader: vectors.unwrap(),
-            relation_reader: relations.unwrap(),
-            document_version: versions.texts as i32,
-            paragraph_version: versions.paragraphs as i32,
-            vector_version: versions.vectors as i32,
-            relation_version: versions.relations as i32,
+            indexes,
+            root_path: shard_path.to_path_buf(),
+            text_reader: RwLock::new(fields.unwrap()),
+            paragraph_reader: RwLock::new(paragraphs.unwrap()),
+            vector_reader: RwLock::new(vectors.unwrap()),
+            relation_reader: RwLock::new(relations.unwrap()),
+            versions,
         })
     }
 
@@ -360,15 +331,12 @@ impl ShardReader {
 
         let mut suggest_paragraphs = request.features.contains(&(SuggestFeatures::Paragraphs as i32));
         let suggest_entities = request.features.contains(&(SuggestFeatures::Entities as i32));
-
-        let paragraphs_reader_service = self.paragraph_reader.clone();
-        let relations_reader_service = self.relation_reader.clone();
         let prefixes = Self::split_suggest_query(request.body.clone(), MAX_SUGGEST_COMPOUND_WORDS);
 
         // Prefilter to apply field label filters
         if let Some(filter) = &mut request.filter {
             // nucliadb_paragraphs2 has all the labels and doesn't need a prefilter
-            if !filter.field_labels.is_empty() && suggest_paragraphs && self.paragraph_version != 2 {
+            if !filter.field_labels.is_empty() && suggest_paragraphs && self.versions.paragraphs != 2 {
                 let labels = std::mem::take(&mut filter.field_labels);
                 let operands = labels.into_iter().map(BooleanExpression::Literal).collect();
                 let op = BooleanOperation {
@@ -395,7 +363,7 @@ impl ShardReader {
         }
 
         let suggest_paragraphs_task = suggest_paragraphs.then(|| {
-            let paragraph_task = move || read_rw_lock(&paragraphs_reader_service).suggest(&request);
+            let paragraph_task = move || read_rw_lock(&self.paragraph_reader).suggest(&request);
             let info = info_span!(parent: &span, "paragraph suggest");
             || run_with_telemetry(info, paragraph_task)
         });
@@ -416,9 +384,8 @@ impl ShardReader {
                         },
                     );
 
-                let responses = requests
-                    .map(|request| read_rw_lock(&relations_reader_service).search(&request))
-                    .collect::<Vec<_>>();
+                let responses: Vec<_> =
+                    requests.map(|request| read_rw_lock(&self.relation_reader).search(&request)).collect();
 
                 let entities = responses
                     .into_iter()
@@ -475,7 +442,7 @@ impl ShardReader {
     #[measure(actor = "shard", metric = "request/search")]
     #[tracing::instrument(skip_all)]
     pub fn search(&self, search_request: SearchRequest) -> NodeResult<SearchResponse> {
-        let query_plan = query_planner::build_query_plan(self.paragraph_version, search_request)?;
+        let query_plan = query_planner::build_query_plan(self.versions.paragraphs, search_request)?;
 
         let search_id = uuid::Uuid::new_v4().to_string();
         let span = tracing::Span::current();
@@ -490,34 +457,30 @@ impl ShardReader {
         // Run the rest of the plan
         let text_task = index_queries.texts_request.map(|mut request| {
             request.id = search_id.clone();
-            let text_reader_service = self.text_reader.clone();
             let info = info_span!(parent: &span, "text search");
-            let task = move || read_rw_lock(&text_reader_service).search(&request);
+            let task = move || read_rw_lock(&self.text_reader).search(&request);
             || run_with_telemetry(info, task)
         });
 
         let paragraph_task = index_queries.paragraphs_request.map(|mut request| {
             request.id = search_id.clone();
             let paragraphs_context = &index_queries.paragraphs_context;
-            let paragraph_reader_service = self.paragraph_reader.clone();
             let info = info_span!(parent: &span, "paragraph search");
-            let task = move || read_rw_lock(&paragraph_reader_service).search(&request, paragraphs_context);
+            let task = move || read_rw_lock(&self.paragraph_reader).search(&request, paragraphs_context);
             || run_with_telemetry(info, task)
         });
 
         let vector_task = index_queries.vectors_request.map(|mut request| {
             request.id = search_id.clone();
             let vectors_context = &index_queries.vectors_context;
-            let vector_reader_service = self.vector_reader.clone();
             let info = info_span!(parent: &span, "vector search");
-            let task = move || read_rw_lock(&vector_reader_service).search(&request, vectors_context);
+            let task = move || read_rw_lock(&self.vector_reader).search(&request, vectors_context);
             || run_with_telemetry(info, task)
         });
 
         let relation_task = index_queries.relations_request.map(|request| {
-            let relation_reader_service = self.relation_reader.clone();
             let info = info_span!(parent: &span, "relations search");
-            let task = move || read_rw_lock(&relation_reader_service).search(&request);
+            let task = move || read_rw_lock(&self.relation_reader).search(&request);
             || run_with_telemetry(info, task)
         });
 
@@ -553,18 +516,16 @@ impl ShardReader {
     #[tracing::instrument(skip_all)]
     pub fn paragraph_iterator(&self, request: StreamRequest) -> NodeResult<ParagraphIterator> {
         let span = tracing::Span::current();
-        let paragraph_task_copy = Arc::clone(&self.paragraph_reader);
         run_with_telemetry(info_span!(parent: &span, "paragraph iteration"), || {
-            read_rw_lock(&paragraph_task_copy).iterator(&request)
+            read_rw_lock(&self.paragraph_reader).iterator(&request)
         })
     }
 
     #[tracing::instrument(skip_all)]
     pub fn document_iterator(&self, request: StreamRequest) -> NodeResult<DocumentIterator> {
         let span = tracing::Span::current();
-        let text_task_copy = Arc::clone(&self.text_reader);
         run_with_telemetry(info_span!(parent: &span, "field iteration"), || {
-            read_rw_lock(&text_task_copy).iterator(&request)
+            read_rw_lock(&self.text_reader).iterator(&request)
         })
     }
 
@@ -616,39 +577,35 @@ impl ShardReader {
     #[tracing::instrument(skip_all)]
     pub fn paragraph_search(&self, search_request: ParagraphSearchRequest) -> NodeResult<ParagraphSearchResponse> {
         let span = tracing::Span::current();
-        let paragraph_task_copy = Arc::clone(&self.paragraph_reader);
 
         run_with_telemetry(info_span!(parent: &span, "paragraph reader search"), || {
-            read_rw_lock(&paragraph_task_copy).search(&search_request, &ParagraphsContext::default())
+            read_rw_lock(&self.paragraph_reader).search(&search_request, &ParagraphsContext::default())
         })
     }
 
     #[tracing::instrument(skip_all)]
     pub fn document_search(&self, search_request: DocumentSearchRequest) -> NodeResult<DocumentSearchResponse> {
         let span = tracing::Span::current();
-        let text_task_copy = Arc::clone(&self.text_reader);
 
         run_with_telemetry(info_span!(parent: &span, "field reader search"), || {
-            read_rw_lock(&text_task_copy).search(&search_request)
+            read_rw_lock(&self.text_reader).search(&search_request)
         })
     }
 
     #[tracing::instrument(skip_all)]
     pub fn vector_search(&self, search_request: VectorSearchRequest) -> NodeResult<VectorSearchResponse> {
         let span = tracing::Span::current();
-        let vector_task_copy = Arc::clone(&self.vector_reader);
 
         run_with_telemetry(info_span!(parent: &span, "vector reader search"), || {
-            read_rw_lock(&vector_task_copy).search(&search_request, &VectorsContext::default())
+            read_rw_lock(&self.vector_reader).search(&search_request, &VectorsContext::default())
         })
     }
     #[tracing::instrument(skip_all)]
     pub fn relation_search(&self, search_request: RelationSearchRequest) -> NodeResult<RelationSearchResponse> {
         let span = tracing::Span::current();
-        let relation_task_copy = Arc::clone(&self.relation_reader);
 
         run_with_telemetry(info_span!(parent: &span, "relation reader search"), || {
-            read_rw_lock(&relation_task_copy).search(&search_request)
+            read_rw_lock(&self.relation_reader).search(&search_request)
         })
     }
 
@@ -668,7 +625,12 @@ impl ShardReader {
     }
 
     pub fn update(&self) -> NodeResult<()> {
-        write_rw_lock(&self.vector_reader).update()
+        let version = self.versions.vectors;
+        let path = self.indexes.vectors_path();
+        let new_reader = open_vectors_reader(version, &path)?;
+        let mut writer = write_rw_lock(&self.vector_reader);
+        *writer = new_reader;
+        Ok(())
     }
 }
 

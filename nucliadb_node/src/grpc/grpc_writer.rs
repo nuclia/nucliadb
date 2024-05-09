@@ -29,14 +29,17 @@ use crate::shards::metadata::ShardMetadata;
 use crate::shards::writer::ShardWriter;
 use crate::telemetry::run_with_telemetry;
 use crate::utils::{get_primary_node_id, list_shards, read_host_key};
+use nucliadb_core::metrics::get_metrics;
 use nucliadb_core::protos::node_writer_server::NodeWriter;
+use nucliadb_core::protos::prost::Message;
 use nucliadb_core::protos::{
-    garbage_collector_response, merge_response, op_status, EmptyQuery, GarbageCollectorResponse, MergeResponse,
-    NewShardRequest, NewVectorSetRequest, NodeMetadata, OpStatus, Resource, ResourceId, ShardCreated, ShardId,
-    ShardIds, VectorSetId, VectorSetList,
+    garbage_collector_response, merge_response, op_status, EmptyQuery, GarbageCollectorResponse, IndexMessage,
+    MergeResponse, NewShardRequest, NewVectorSetRequest, NodeMetadata, OpStatus, Resource, ResourceId, ShardCreated,
+    ShardId, ShardIds, VectorSetId, VectorSetList,
 };
 use nucliadb_core::tracing::{self, Span, *};
 use nucliadb_core::Channel;
+use object_store::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::UnboundedSender;
@@ -120,9 +123,9 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let metadata = ShardMetadata::new(
             self.shards.shards_path.join(shard_id.clone()),
             shard_id,
-            Some(kbid),
+            kbid,
             request.similarity().into(),
-            Some(Channel::from(request.release_channel)),
+            Channel::from(request.release_channel),
             request.normalize_vectors,
         );
 
@@ -184,7 +187,6 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }))
     }
 
-    // Incremental call that can be call multiple times for the same resource
     async fn set_resource(&self, request: Request<Resource>) -> Result<Response<OpStatus>, Status> {
         let span = Span::current();
         let resource = request.into_inner();
@@ -195,29 +197,56 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let write_task = || {
             run_with_telemetry(info, move || {
                 let shard = obtain_shard(shards, shard_id_clone)?;
-                shard.set_resource(resource).and_then(|()| shard.get_opstatus())
+                shard.set_resource(resource)
             })
         };
-        let status = tokio::task::spawn_blocking(write_task)
+        let result = tokio::task::spawn_blocking(write_task)
             .await
             .map_err(|error| tonic::Status::internal(format!("Blocking task panicked: {error:?}")))?;
-        match status {
-            Ok(mut status) => {
-                status.status = 0;
-                status.detail = "Success!".to_string();
-                Ok(tonic::Response::new(status))
-            }
-            Err(error) => {
-                let status = OpStatus {
-                    status: op_status::Status::Error as i32,
-                    detail: error.to_string(),
-                    field_count: 0_u64,
-                    shard_id,
-                    ..Default::default()
-                };
-                Ok(tonic::Response::new(status))
-            }
-        }
+        let status = match result {
+            Ok(()) => OpStatus {
+                status: op_status::Status::Ok as i32,
+                detail: "Success!".to_string(),
+                ..Default::default()
+            },
+            Err(error) => OpStatus {
+                status: op_status::Status::Error as i32,
+                detail: error.to_string(),
+                ..Default::default()
+            },
+        };
+        Ok(tonic::Response::new(status))
+    }
+
+    async fn set_resource_from_storage(&self, request: Request<IndexMessage>) -> Result<Response<OpStatus>, Status> {
+        let download_start = std::time::Instant::now();
+
+        let index_message = request.into_inner();
+        let shard_id = index_message.shard.clone();
+        let storage_key = index_message.storage_key.clone();
+
+        let get_result = self.settings.object_store.get(&Path::from(storage_key)).await.map_err(|e| {
+            error!("Failed to get indexing resource from object store: {}", e);
+            tonic::Status::internal(format!("Failed to get indexing resource from object store: {}", e))
+        })?;
+
+        let bytes = get_result.bytes().await.map_err(|e| {
+            error!("Failed to download indexing resource from object store: {}", e);
+            tonic::Status::internal(format!("Failed to download indexing resource from object store: {}", e))
+        })?;
+
+        get_metrics().indexing_resource_download_histogram.observe(download_start.elapsed().as_secs_f64());
+
+        let handle = tokio::task::spawn_blocking(move || Resource::decode(bytes)).await.unwrap();
+        let mut resource = handle.map_err(|e| {
+            error!("Failed to decode indexing resource: {}", e);
+            tonic::Status::internal(format!("Failed to decode indexing resource: {}", e))
+        })?;
+
+        // Set the shard id to the one provided by index message
+        resource.shard_id = shard_id.clone();
+        let set_resource_request = Request::new(resource);
+        self.set_resource(set_resource_request).await
     }
 
     async fn remove_resource(&self, request: Request<ResourceId>) -> Result<Response<OpStatus>, Status> {
@@ -230,29 +259,25 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let write_task = || {
             run_with_telemetry(info, move || {
                 let shard = obtain_shard(shards, shard_id_clone)?;
-                shard.remove_resource(&resource).and_then(|()| shard.get_opstatus())
+                shard.remove_resource(&resource)
             })
         };
-        let status = tokio::task::spawn_blocking(write_task)
+        let result = tokio::task::spawn_blocking(write_task)
             .await
             .map_err(|error| tonic::Status::internal(format!("Blocking task panicked: {error:?}")))?;
-        match status {
-            Ok(mut status) => {
-                status.status = 0;
-                status.detail = "Success!".to_string();
-                Ok(tonic::Response::new(status))
-            }
-            Err(error) => {
-                let status = OpStatus {
-                    status: op_status::Status::Error as i32,
-                    detail: error.to_string(),
-                    field_count: 0_u64,
-                    shard_id,
-                    ..Default::default()
-                };
-                Ok(tonic::Response::new(status))
-            }
-        }
+        let status = match result {
+            Ok(()) => OpStatus {
+                status: op_status::Status::Ok as i32,
+                detail: "Success!".to_string(),
+                ..Default::default()
+            },
+            Err(error) => OpStatus {
+                status: op_status::Status::Error as i32,
+                detail: error.to_string(),
+                ..Default::default()
+            },
+        };
+        Ok(tonic::Response::new(status))
     }
 
     async fn add_vector_set(&self, _: Request<NewVectorSetRequest>) -> Result<Response<OpStatus>, Status> {

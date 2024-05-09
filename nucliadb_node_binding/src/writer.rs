@@ -96,13 +96,13 @@ impl NodeWriter {
 
         let request = NewShardRequest::decode(&mut Cursor::new(metadata)).expect("Error decoding arguments");
         let shard_id = uuid::Uuid::new_v4().to_string();
-        let similarity = VectorSimilarity::from_i32(request.similarity).unwrap();
+        let similarity = VectorSimilarity::try_from(request.similarity).unwrap();
         let metadata = ShardMetadata::new(
             self.shards_path.join(shard_id.clone()),
             shard_id,
-            Some(request.kbid),
+            request.kbid,
             similarity.into(),
-            Some(Channel::from(request.release_channel)),
+            Channel::from(request.release_channel),
             request.normalize_vectors,
         );
         let new_shard = self.shards.create(metadata);
@@ -158,48 +158,44 @@ impl NodeWriter {
         let resource = Resource::decode(&mut Cursor::new(resource)).expect("Error decoding arguments");
         let shard_id = resource.shard_id.clone();
         let shard = self.obtain_shard(shard_id.clone())?;
-        let status = shard.set_resource(resource).and_then(|()| shard.get_opstatus());
-        match status {
-            Ok(mut status) => {
-                status.status = 0;
-                status.detail = "Success!".to_string();
-                Ok(PyList::new(py, status.encode_to_vec()))
-            }
-            Err(error) => {
-                let status = OpStatus {
-                    status: op_status::Status::Error as i32,
-                    detail: error.to_string(),
-                    field_count: 0_u64,
-                    shard_id,
-                    ..Default::default()
-                };
-                Ok(PyList::new(py, status.encode_to_vec()))
-            }
-        }
+        let result = shard.set_resource(resource);
+        let status = match result {
+            Ok(()) => OpStatus {
+                status: op_status::Status::Ok as i32,
+                detail: "Success!".to_string(),
+                ..Default::default()
+            },
+            Err(error) => OpStatus {
+                status: op_status::Status::Error as i32,
+                detail: error.to_string(),
+                ..Default::default()
+            },
+        };
+        Ok(PyList::new(py, status.encode_to_vec()))
+    }
+
+    pub fn set_resource_from_storage<'p>(&mut self, _index_message: RawProtos, _py: Python<'p>) -> PyResult<&'p PyAny> {
+        Err(IndexNodeException::new_err("Not implemented"))
     }
 
     pub fn remove_resource<'p>(&mut self, resource: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         let resource = ResourceId::decode(&mut Cursor::new(resource)).expect("Error decoding arguments");
         let shard_id = resource.shard_id.clone();
         let shard = self.obtain_shard(shard_id.clone())?;
-        let status = shard.remove_resource(&resource).and_then(|()| shard.get_opstatus());
-        match status {
-            Ok(mut status) => {
-                status.status = 0;
-                status.detail = "Success!".to_string();
-                Ok(PyList::new(py, status.encode_to_vec()))
-            }
-            Err(error) => {
-                let status = OpStatus {
-                    status: op_status::Status::Error as i32,
-                    detail: error.to_string(),
-                    field_count: 0_u64,
-                    shard_id,
-                    ..Default::default()
-                };
-                Ok(PyList::new(py, status.encode_to_vec()))
-            }
-        }
+        let result = shard.remove_resource(&resource);
+        let status = match result {
+            Ok(()) => OpStatus {
+                status: op_status::Status::Ok as i32,
+                detail: "Success!".to_string(),
+                ..Default::default()
+            },
+            Err(error) => OpStatus {
+                status: op_status::Status::Error as i32,
+                detail: error.to_string(),
+                ..Default::default()
+            },
+        };
+        Ok(PyList::new(py, status.encode_to_vec()))
     }
 
     // TODO: rename to list_vectorsets

@@ -227,9 +227,10 @@ impl replication::replication_service_server::ReplicationService for Replication
                     resp_shard_states.push(replication::PrimaryShardReplicationState {
                         shard_id,
                         generation_id: gen_id,
-                        kbid: metadata.kbid().unwrap_or_default(),
+                        kbid: metadata.kbid(),
                         similarity: similarity.to_string(),
                         normalize_vectors: metadata.normalize_vectors(),
+                        release_channel: metadata.channel().into(),
                     });
                 }
             } else {

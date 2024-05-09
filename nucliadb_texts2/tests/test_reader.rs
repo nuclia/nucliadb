@@ -26,26 +26,28 @@ use tempfile::TempDir;
 #[test]
 fn test_start_new_reader_after_a_writer() {
     let dir = TempDir::new().unwrap();
+    let shard_path = dir.path().join("texts");
     let config = TextConfig {
-        path: dir.path().join("texts"),
+        path: shard_path.clone(),
     };
 
-    let _writer = TextWriterService::create(&config).unwrap();
-    let reader = TextReaderService::open(&config);
+    let _writer = TextWriterService::create(config).unwrap();
+    let reader = TextReaderService::open(&shard_path);
     assert!(reader.is_ok());
 }
 
 #[test]
 fn test_open_multiple_readers() {
     let dir = TempDir::new().unwrap();
+    let shard_path = dir.path().join("texts");
     let config = TextConfig {
-        path: dir.path().join("texts"),
+        path: shard_path.clone(),
     };
 
-    let _writer = TextWriterService::create(&config).unwrap();
-    let reader1 = TextReaderService::open(&config);
-    let reader2 = TextReaderService::open(&config);
-    let reader3 = TextReaderService::open(&config);
+    let _writer = TextWriterService::create(config.clone()).unwrap();
+    let reader1 = TextReaderService::open(&shard_path);
+    let reader2 = TextReaderService::open(&shard_path);
+    let reader3 = TextReaderService::open(&shard_path);
     assert!(reader1.is_ok());
     assert!(reader2.is_ok());
     assert!(reader3.is_ok());
@@ -58,6 +60,6 @@ fn test_start_new_reader_before_a_writer() {
         path: dir.path().join("texts"),
     };
 
-    let reader = TextReaderService::open(&config);
+    let reader = TextReaderService::open(&config.path);
     assert!(reader.is_err());
 }

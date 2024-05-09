@@ -72,9 +72,9 @@ class Streams:
 
 class Features:
     WAIT_FOR_INDEX = "nucliadb_wait_for_resource_index"
-    ASK_YOUR_DOCUMENTS = "nucliadb_ask_your_documents"
     EXPERIMENTAL_KB = "nucliadb_experimental_kb"
     READ_REPLICA_SEARCHES = "nucliadb_read_replica_searches"
     VERSIONED_PRIVATE_PREDICT = "nucliadb_versioned_private_predict"
     REBALANCE_KB = "nucliadb_rebalance_kb"
     CORS_MIDDLEWARE = "nucliadb_cors_middleware_enabled"
+    NODE_SET_RESOURCE_FROM_STORAGE = "nucliadb_node_set_resource_from_storage"

@@ -25,15 +25,16 @@ from typing import Callable
 
 import pytest
 from httpx import AsyncClient
-from nucliadb_protos.resources_pb2 import FieldType
-from nucliadb_protos.writer_pb2 import BrokerMessage, ResourceFieldId
+from nucliadb_protos.resources_pb2 import FieldID, FieldType
+from nucliadb_protos.writer_pb2 import BrokerMessage
 
+from nucliadb.common import datamanagers
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX
 from nucliadb.writer.api.v1.upload import maybe_b64decode
 from nucliadb.writer.tus import TUSUPLOAD, UPLOAD, get_storage_manager
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils import const
-from nucliadb_utils.utilities import get_ingest, get_storage, get_transaction_utility
+from nucliadb_utils.utilities import get_storage, get_transaction_utility
 
 ASSETS_PATH = os.path.dirname(__file__) + "/assets"
 
@@ -431,15 +432,15 @@ async def test_knowledgebox_file_upload_field_sync(
             )
             assert resp.status_code == 201
 
-        ingest = get_ingest()
-        pbrequest = ResourceFieldId()
-        pbrequest.kbid = knowledgebox_writer
-        pbrequest.rid = resource
-        pbrequest.field_type = FieldType.FILE
-        pbrequest.field = "field1"
-
-        res = await ingest.ResourceFieldExists(pbrequest)
-        assert res.found
+        async with datamanagers.with_transaction(read_only=True) as txn:
+            assert (
+                await datamanagers.resources.has_field(
+                    txn,
+                    kbid=knowledgebox_writer,
+                    rid=resource,
+                    field_id=FieldID(field="field1", field_type=FieldType.FILE),
+                )
+            ) is True
 
 
 @pytest.mark.asyncio

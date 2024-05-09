@@ -25,17 +25,8 @@ from uuid import uuid4
 
 from fastapi import HTTPException, Query, Response
 from fastapi_versioning import version
-from grpc import StatusCode as GrpcStatusCode
-from grpc.aio import AioRpcError
 from nucliadb_protos.resources_pb2 import Metadata
-from nucliadb_protos.writer_pb2 import (
-    BrokerMessage,
-    IndexResource,
-    ResourceFieldExistsResponse,
-    ResourceFieldId,
-    ResourceIdRequest,
-    ResourceIdResponse,
-)
+from nucliadb_protos.writer_pb2 import BrokerMessage, IndexResource
 from starlette.requests import Request
 
 from nucliadb.common import datamanagers
@@ -55,7 +46,6 @@ from nucliadb.writer.api.v1.router import (
     api,
 )
 from nucliadb.writer.back_pressure import maybe_back_pressure
-from nucliadb.writer.exceptions import IngestNotAvailable
 from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.basic import (
     parse_basic,
@@ -188,11 +178,12 @@ async def modify_resource_rslug_prefix(
     x_skip_store: bool = SKIP_STORE_DEFAULT,
     x_nucliadb_user: str = X_NUCLIADB_USER,
 ):
+    rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
     return await modify_resource_endpoint(
         request,
         item,
         kbid,
-        path_rslug=rslug,
+        rid,
         x_skip_store=x_skip_store,
         x_nucliadb_user=x_nucliadb_user,
     )
@@ -219,7 +210,7 @@ async def modify_resource_rid_prefix(
         request,
         item,
         kbid,
-        path_rid=rid,
+        rid,
         x_skip_store=x_skip_store,
         x_nucliadb_user=x_nucliadb_user,
     )
@@ -229,14 +220,13 @@ async def modify_resource_endpoint(
     request: Request,
     item: UpdateResourcePayload,
     kbid: str,
+    rid: str,
     x_skip_store: bool,
     x_nucliadb_user: str,
-    path_rid: Optional[str] = None,
-    path_rslug: Optional[str] = None,
 ):
-    resource_uuid = await get_rid_from_params_or_raise_error(kbid, path_rid, path_rslug)
+    await validate_rid_exists_or_raise_error(kbid, rid)
 
-    await maybe_back_pressure(request, kbid, resource_uuid=resource_uuid)
+    await maybe_back_pressure(request, kbid, resource_uuid=rid)
 
     if item.slug is None:
         return await modify_resource(
@@ -245,19 +235,17 @@ async def modify_resource_endpoint(
             kbid,
             x_skip_store=x_skip_store,
             x_nucliadb_user=x_nucliadb_user,
-            rid=resource_uuid,
+            rid=rid,
         )
 
-    async with safe_update_resource_slug(
-        request, kbid, rid=resource_uuid, new_slug=item.slug
-    ):
+    async with safe_update_resource_slug(request, kbid, rid=rid, new_slug=item.slug):
         return await modify_resource(
             request,
             item,
             kbid,
             x_skip_store=x_skip_store,
             x_nucliadb_user=x_nucliadb_user,
-            rid=resource_uuid,
+            rid=rid,
         )
 
 
@@ -383,8 +371,9 @@ async def reprocess_resource_rslug_prefix(
     rslug: str,
     x_nucliadb_user: str = X_NUCLIADB_USER,
 ):
+    rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
     return await _reprocess_resource(
-        request, kbid, rslug=rslug, x_nucliadb_user=x_nucliadb_user
+        request, kbid, rid, x_nucliadb_user=x_nucliadb_user
     )
 
 
@@ -404,23 +393,21 @@ async def reprocess_resource_rid_prefix(
     x_nucliadb_user: str = X_NUCLIADB_USER,
 ):
     return await _reprocess_resource(
-        request, kbid, rid=rid, x_nucliadb_user=x_nucliadb_user
+        request, kbid, rid, x_nucliadb_user=x_nucliadb_user
     )
 
 
 async def _reprocess_resource(
     request: Request,
     kbid: str,
+    rid: str,
     x_nucliadb_user: str,
-    rid: Optional[str] = None,
-    rslug: Optional[str] = None,
 ):
+    await validate_rid_exists_or_raise_error(kbid, rid)
+    await maybe_back_pressure(request, kbid, resource_uuid=rid)
+
     transaction = get_transaction_utility()
     partitioning = get_partitioning()
-
-    rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
-
-    await maybe_back_pressure(request, kbid, resource_uuid=rid)
 
     partition = partitioning.generate_partition(kbid, rid)
 
@@ -479,7 +466,8 @@ async def delete_resource_rslug_prefix(
     kbid: str,
     rslug: str,
 ):
-    return await _delete_resource(request, kbid, rslug=rslug)
+    rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
+    return await _delete_resource(request, kbid, rid)
 
 
 @api.delete(
@@ -495,19 +483,18 @@ async def delete_resource_rid_prefix(
     kbid: str,
     rid: str,
 ):
-    return await _delete_resource(request, kbid, rid=rid)
+    return await _delete_resource(request, kbid, rid)
 
 
 async def _delete_resource(
     request: Request,
     kbid: str,
-    rid: Optional[str] = None,
-    rslug: Optional[str] = None,
+    rid: str,
 ):
+    await validate_rid_exists_or_raise_error(kbid, rid)
+
     transaction = get_transaction_utility()
     partitioning = get_partitioning()
-
-    rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
     partition = partitioning.generate_partition(kbid, rid)
     writer = BrokerMessage()
@@ -547,9 +534,8 @@ async def reindex_resource_rslug_prefix(
     rslug: str,
     reindex_vectors: bool = Query(False),
 ):
-    return await _reindex_resource(
-        request, kbid, rslug=rslug, reindex_vectors=reindex_vectors
-    )
+    rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
+    return await _reindex_resource(request, kbid, rid, reindex_vectors=reindex_vectors)
 
 
 @api.post(
@@ -566,20 +552,16 @@ async def reindex_resource_rid_prefix(
     rid: str,
     reindex_vectors: bool = Query(False),
 ):
-    return await _reindex_resource(
-        request, kbid, rid=rid, reindex_vectors=reindex_vectors
-    )
+    return await _reindex_resource(request, kbid, rid, reindex_vectors=reindex_vectors)
 
 
 async def _reindex_resource(
     request: Request,
     kbid: str,
+    rid: str,
     reindex_vectors: bool,
-    rid: Optional[str] = None,
-    rslug: Optional[str] = None,
 ):
-    rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
-
+    await validate_rid_exists_or_raise_error(kbid, rid)
     await maybe_back_pressure(request, kbid, resource_uuid=rid)
 
     ingest = get_ingest()
@@ -592,53 +574,28 @@ async def _reindex_resource(
     return Response(status_code=200)
 
 
-async def get_resource_uuid_from_slug(kbid: str, slug: str) -> str:
-    ingest = get_ingest()
-    pbrequest = ResourceIdRequest()
-    pbrequest.kbid = kbid
-    pbrequest.slug = slug
-    try:
-        response: ResourceIdResponse = await ingest.GetResourceId(pbrequest)  # type: ignore
-    except AioRpcError as exc:
-        if exc.code() is GrpcStatusCode.UNAVAILABLE:
-            raise IngestNotAvailable()
-        else:
-            raise exc
-    return response.uuid
-
-
-async def get_rid_from_params_or_raise_error(
-    kbid: str,
-    rid: Optional[str] = None,
-    slug: Optional[str] = None,
-) -> str:
-    if rid is not None:
-        ingest = get_ingest()
-        pbrequest = ResourceFieldId()
-        pbrequest.kbid = kbid
-        pbrequest.rid = rid
-
-        try:
-            response: ResourceFieldExistsResponse = await ingest.ResourceFieldExists(pbrequest)  # type: ignore
-        except AioRpcError as exc:
-            if exc.code() is GrpcStatusCode.UNAVAILABLE:
-                raise IngestNotAvailable()
-            else:
-                raise exc
-
-        if response.found:
-            return rid
-        else:
-            raise HTTPException(status_code=404, detail="Resource does not exist")
-
-    if slug is None:
-        raise ValueError("Either rid or slug must be set")
-
-    rid = await get_resource_uuid_from_slug(kbid, slug)
+async def get_rid_from_slug_or_raise_error(kbid: str, rslug: str) -> str:
+    async with datamanagers.with_transaction(read_only=True) as txn:
+        rid = await datamanagers.resources.get_resource_uuid_from_slug(
+            txn, kbid=kbid, slug=rslug
+        )
     if not rid:
         raise HTTPException(status_code=404, detail="Resource does not exist")
-
     return rid
+
+
+async def resource_exists(kbid: str, rid: str) -> bool:
+    async with datamanagers.with_transaction(read_only=True) as txn:
+        exists = await datamanagers.resources.resource_exists(txn, kbid=kbid, rid=rid)
+    return exists
+
+
+async def validate_rid_exists_or_raise_error(
+    kbid: str,
+    rid: str,
+):
+    if not (await resource_exists(kbid, rid)):
+        raise HTTPException(status_code=404, detail="Resource does not exist")
 
 
 def maybe_mark_reindex(message: BrokerMessage, item: UpdateResourcePayload):
