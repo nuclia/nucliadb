@@ -26,13 +26,14 @@ profile = "release-wheel"
 
 [project]
 name = "nucliadb_node_binding"
-version = "3.0.3"
 requires-python = ">=3.9"
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
+dynamic = ["version"]
+
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

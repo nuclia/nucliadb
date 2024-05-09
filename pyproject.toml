@@ -17,4 +17,4 @@ dev = [
 [project]
 name = "nucliadb_workspace"
 requires-python = ">=3.9"
-version = "0.1.0"
+version = "0.0.0"
