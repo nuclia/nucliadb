@@ -321,6 +321,7 @@ async def chat(
         generative_model=chat_request.generative_model,
         max_tokens=query_parser.get_max_tokens_answer(),
         query_context_images=prompt_context_images,
+        prefer_markdown=chat_request.prefer_markdown,
     )
     predict = get_predict()
     nuclia_learning_id, predict_generator = await predict.chat_query(kbid, chat_model)

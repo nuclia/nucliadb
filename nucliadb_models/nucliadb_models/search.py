@@ -601,6 +601,11 @@ class SearchParamDefaults:
         title="Rephrase query consuming LLMs",
         description="Rephrase query consuming LLMs - it will make the query slower",  # noqa
     )
+    prefer_markdown = ParamDefault(
+        default=False,
+        title="Prefer markdown",
+        description="If set to true, the response will be in markdown format",
+    )
 
 
 class Filter(BaseModel):
@@ -806,6 +811,11 @@ class ChatModel(BaseModel):
     query_context_images: Dict[str, Image] = Field(
         default={},
         description="The information retrieval context for the current query, each image is a base64 encoded string",
+    )
+
+    prefer_markdown: bool = Field(
+        default=False,
+        description="If set to true, the response will be in markdown format",
     )
 
 
@@ -1025,6 +1035,12 @@ class ChatRequest(BaseModel):
         default=False,
         title="Rephrase the query to improve search",
         description="Consume LLM tokens to rephrase the query so the semantic search is better",
+    )
+
+    prefer_markdown: bool = Field(
+        default=False,
+        title="Prefer markdown",
+        description="If set to true, the response will be in markdown format",
     )
 
     @root_validator(pre=True)
