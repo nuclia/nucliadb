@@ -330,7 +330,7 @@ pub struct VectorSetList {
     #[prost(message, optional, tag = "1")]
     pub shard: ::core::option::Option<ShardId>,
     #[prost(string, repeated, tag = "2")]
-    pub vectorset: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    pub vectorsets: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
