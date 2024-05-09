@@ -47,6 +47,7 @@ async def test_distributed_lock(maindb_driver):
 
     task = asyncio.create_task(test_lock(1.5))
     await asyncio.sleep(0.05)
+    assert await locking.is_locked(test_lock_key) is True
     with pytest.raises(locking.ResourceLocked):
         # should raise
         await test_lock(0.0)

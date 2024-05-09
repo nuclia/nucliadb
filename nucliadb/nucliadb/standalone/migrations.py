@@ -35,8 +35,9 @@ def run_migrations():
 
 async def safe_run_migrations():
     """
-    Run migrations for the standalone mode -- only if the node is a worker node.
-    The worker node will keep blocked until the migrations are run.
+    Run migrations for the standalone mode, only if the node is a worker node.
+    The worker node will keep blocked until the migrations are run -- it relies
+    on the migrator's internal distributed lock.
     """
     if not is_worker_node():
         return
