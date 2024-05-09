@@ -128,7 +128,7 @@ class _Lock:
     async def is_locked(self) -> bool:
         async with get_driver().transaction(read_only=True) as txn:
             lock_data = await self.get_lock_data(txn)
-        return lock_data is None or time.time() > lock_data.expires_at
+        return lock_data is not None and time.time() < lock_data.expires_at
 
 
 def distributed_lock(
@@ -146,5 +146,4 @@ def distributed_lock(
 
 
 async def is_locked(key: str) -> bool:
-    lock = _Lock(key, lock_timeout=0, expire_timeout=0, refresh_timeout=0)
-    return await lock.is_locked()
+    return await distributed_lock(key).is_locked()
