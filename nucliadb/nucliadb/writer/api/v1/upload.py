@@ -304,6 +304,7 @@ async def _tus_post(
     tags=["Resource field TUS uploads"],
     status_code=200,
     openapi_extra={"x-operation-order": 3},
+    name="Upload information",
     summary="Upload information",
 )
 @requires_one([NucliaDBRoles.WRITER])
@@ -323,6 +324,7 @@ async def tus_head_rslug_prefix(
     tags=["Resource field TUS uploads"],
     status_code=200,
     openapi_extra={"x-operation-order": 3},
+    name="Upload information",
     summary="Upload information",
 )
 @requires_one([NucliaDBRoles.WRITER])
@@ -342,6 +344,7 @@ async def tus_head_rid_prefix(
     tags=["Knowledge Box TUS uploads"],
     status_code=200,
     openapi_extra={"x-operation-order": 3},
+    name="Upload information",
     summary="Upload information",
 )
 @requires_one([NucliaDBRoles.WRITER])
