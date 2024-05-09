@@ -44,7 +44,7 @@ message KnowledgeBoxNew {
     string forceuuid = 3;
     utils.VectorSimilarity similarity = 4;
     optional int32 vector_dimension = 5;
-    optional float default_min_score = 6;
+    optional float default_min_score = 6  [deprecated = true];
     repeated uint32 matryoshka_dimensions = 9;
 
     // this field are only used by NucliaDB Writer API when creating a KB. Used
@@ -196,7 +196,7 @@ message Synonyms {
 message SemanticModelMetadata {
     utils.VectorSimilarity similarity_function = 1;
     optional int32 vector_dimension = 2;
-    optional float default_min_score = 3;
+    optional float default_min_score = 3 [deprecated = true];
 
     // list of possible subdivisions of the matryoshka embeddings (if the model
     // supports it)

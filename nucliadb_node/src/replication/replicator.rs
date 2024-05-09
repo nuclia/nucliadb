@@ -271,7 +271,7 @@ pub async fn connect_to_primary_and_replicate(
                 );
                 let shard_cache_clone = Arc::clone(&shard_cache);
 
-                warn!("Creating shard to replicate: {shard_id}");
+                info!("Creating shard to replicate: {shard_id}");
                 let shard_create = tokio::task::spawn_blocking(move || shard_cache_clone.create(metadata)).await?;
                 if shard_create.is_err() {
                     warn!("Failed to create shard: {:?}", shard_create);

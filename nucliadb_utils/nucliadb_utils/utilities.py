@@ -168,6 +168,14 @@ async def get_storage(
     return MAIN[Utility.STORAGE]
 
 
+async def teardown_storage():
+    storage: Optional[Storage] = get_utility(Utility.STORAGE)
+    if storage is None:
+        return
+    await storage.finalize()
+    clean_utility(Utility.STORAGE)
+
+
 def get_local_storage() -> LocalStorage:
     if Utility.LOCAL_STORAGE not in MAIN:
         from nucliadb_utils.storages.local import LocalStorage

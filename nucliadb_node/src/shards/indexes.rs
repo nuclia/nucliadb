@@ -30,6 +30,7 @@ use uuid::Uuid;
 use crate::disk_structure;
 
 pub const DEFAULT_VECTOR_INDEX_NAME: &str = "__default__";
+pub const MAX_ALLOWED_VECTORSETS: usize = 5;
 pub const SHARD_INDEXES_FILENAME: &str = "indexes.json";
 pub const TEMP_SHARD_INDEXES_FILENAME: &str = "indexes.temp.json";
 
@@ -85,6 +86,12 @@ impl ShardIndexes {
     #[allow(dead_code)]
     /// Add a new vectorset to the index and returns it's path
     pub fn add_vectorset(&mut self, name: String) -> NodeResult<PathBuf> {
+        if self.inner.vectorsets.len() >= MAX_ALLOWED_VECTORSETS {
+            return Err(node_error!(format!(
+                "Max amount of allowed vectorsets reached: {}",
+                self.inner.vectorsets.len()
+            )));
+        }
         if name == DEFAULT_VECTOR_INDEX_NAME {
             return Err(node_error!(format!("Vectorset id {DEFAULT_VECTOR_INDEX_NAME} is reserved for internal use")));
         }
@@ -284,5 +291,18 @@ mod tests {
 
         assert!(indexes.add_vectorset("gecko".to_string()).is_ok());
         assert!(indexes.add_vectorset("gecko".to_string()).is_err());
+    }
+
+    #[test]
+    fn test_max_vectorsets_allowed() {
+        let tempdir = tempfile::tempdir().unwrap();
+        let shard_path = tempdir.path();
+
+        let mut indexes = ShardIndexes::new(shard_path);
+
+        for i in 0..(MAX_ALLOWED_VECTORSETS - 1) {
+            assert!(indexes.add_vectorset(format!("vectorset-{i}")).is_ok());
+        }
+        assert!(indexes.add_vectorset("too-many".to_string()).is_err());
     }
 }

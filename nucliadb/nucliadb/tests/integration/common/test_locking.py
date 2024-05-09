@@ -18,22 +18,15 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-import os
 import uuid
 
 import pytest
 
 from nucliadb.common import locking
 
-TESTING_MAINDB_DRIVERS = os.environ.get("TESTING_MAINDB_DRIVERS", "tikv,pg").split(",")
-
 
 @pytest.mark.asyncio
 async def test_distributed_lock(maindb_driver):
-    if maindb_driver.__module__.split(".")[-1] not in ("pg", "tikv"):
-        pytest.skip(f"maindb driver {maindb_driver} does not support distributed locks")
-        return
-
     test_lock_key = uuid.uuid4().hex
 
     async def test_lock(for_seconds: float, lock_timeout: float = 1.0):
@@ -47,6 +40,7 @@ async def test_distributed_lock(maindb_driver):
 
     task = asyncio.create_task(test_lock(1.5))
     await asyncio.sleep(0.05)
+    assert await locking.is_locked(test_lock_key) is True
     with pytest.raises(locking.ResourceLocked):
         # should raise
         await test_lock(0.0)

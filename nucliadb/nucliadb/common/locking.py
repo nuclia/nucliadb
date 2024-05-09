@@ -36,6 +36,7 @@ logger = logging.getLogger(__name__)
 NEW_SHARD_LOCK = "new-shard-{kbid}"
 RESOURCE_INDEX_LOCK = "resource-index-{kbid}-{resource_id}"
 KB_SHARDS_LOCK = "shards-kb-{kbid}"
+MIGRATIONS_LOCK = "migration"
 
 
 class ResourceLocked(Exception): ...
@@ -124,10 +125,10 @@ class _Lock:
             await txn.delete(self.key)
             await txn.commit()
 
-    async def is_locked(self, key: str) -> bool:
+    async def is_locked(self) -> bool:
         async with get_driver().transaction(read_only=True) as txn:
             lock_data = await self.get_lock_data(txn)
-        return lock_data is None or time.time() > lock_data.expires_at
+        return lock_data is not None and time.time() < lock_data.expires_at
 
 
 def distributed_lock(
@@ -142,3 +143,7 @@ def distributed_lock(
         expire_timeout=expire_timeout,
         refresh_timeout=refresh_timeout,
     )
+
+
+async def is_locked(key: str) -> bool:
+    return await distributed_lock(key).is_locked()

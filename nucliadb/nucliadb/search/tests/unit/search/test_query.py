@@ -22,16 +22,14 @@ import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
-from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata, Synonyms
+from nucliadb_protos.knowledgebox_pb2 import Synonyms
 from nucliadb_protos.nodereader_pb2 import SearchRequest
-from nucliadb_protos.utils_pb2 import RelationNode, VectorSimilarity
+from nucliadb_protos.utils_pb2 import RelationNode
 
 from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.query import (
     QueryParser,
     check_supported_filters,
-    get_default_semantic_min_score,
-    get_kb_model_default_min_score,
     parse_entities_to_filters,
 )
 from nucliadb_models.search import MinScore
@@ -61,44 +59,6 @@ def test_parse_entities_to_filters():
 
 
 @pytest.fixture()
-def get_kb_model_default_min_score_mock():
-    with unittest.mock.patch(f"{QUERY_MODULE}.get_kb_model_default_min_score") as mock:
-        yield mock
-
-
-async def test_get_default_semantic_min_score(get_kb_model_default_min_score_mock):
-    get_kb_model_default_min_score_mock.return_value = 1.5
-
-    assert await get_default_semantic_min_score("kbid") == 1.5
-
-    get_default_semantic_min_score.cache_clear()
-
-
-async def test_get_default_semantic_min_score_default_value(
-    get_kb_model_default_min_score_mock,
-):
-    get_kb_model_default_min_score_mock.return_value = None
-
-    assert await get_default_semantic_min_score("kbid") == 0.7
-
-    get_default_semantic_min_score.cache_clear()
-
-
-async def test_get_default_semantic_min_score_is_cached(
-    get_kb_model_default_min_score_mock,
-):
-    await get_default_semantic_min_score("kbid1")
-    await get_default_semantic_min_score("kbid1")
-    await get_default_semantic_min_score("kbid1")
-
-    await get_default_semantic_min_score("kbid2")
-
-    assert get_kb_model_default_min_score_mock.call_count == 2
-
-    get_default_semantic_min_score.cache_clear()
-
-
-@pytest.fixture()
 def read_only_txn():
     txn = unittest.mock.AsyncMock()
     with unittest.mock.patch(
@@ -112,23 +72,6 @@ def kbdm(read_only_txn):
     kbdm = unittest.mock.AsyncMock()
     with unittest.mock.patch(f"{QUERY_MODULE}.datamanagers.kb", kbdm):
         yield kbdm
-
-
-async def test_get_kb_model_default_min_score(kbdm):
-    # If min_score is set, it should return it
-    kbdm.get_model_metadata.return_value = SemanticModelMetadata(
-        similarity_function=VectorSimilarity.COSINE,
-        default_min_score=1.5,
-    )
-    assert await get_kb_model_default_min_score("kbid") == 1.5
-
-
-async def test_get_kb_model_default_min_score_backward_compatible(kbdm):
-    # If min_score is not set yet, it should return None
-    kbdm.get_model_metadata.return_value = SemanticModelMetadata(
-        similarity_function=VectorSimilarity.COSINE
-    )
-    assert await get_kb_model_default_min_score("kbid") is None
 
 
 class TestApplySynonymsToRequest:
@@ -150,7 +93,7 @@ class TestApplySynonymsToRequest:
             faceted=[],
             page_number=0,
             page_size=10,
-            min_score=MinScore(vector=0.5),
+            min_score=MinScore(semantic=0.5),
             with_synonyms=True,
         )
         with patch("nucliadb.search.search.query.get_kb_synonyms", get_synonyms):

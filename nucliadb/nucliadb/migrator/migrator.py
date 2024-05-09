@@ -219,7 +219,7 @@ async def run_rollovers(context: ExecutionContext) -> None:
 
 
 async def run(context: ExecutionContext, target_version: Optional[int] = None) -> None:
-    async with locking.distributed_lock("migration"):
+    async with locking.distributed_lock(locking.MIGRATIONS_LOCK):
         # before we move to managed migrations, see if there are any rollovers
         # scheduled and run them
         await run_rollovers(context)

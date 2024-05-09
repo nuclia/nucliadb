@@ -31,6 +31,7 @@ from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.ingest.settings import settings as ingest_settings
 from nucliadb.standalone import versions
 from nucliadb.standalone.config import config_nucliadb
+from nucliadb.standalone.migrations import run_migrations
 from nucliadb.standalone.settings import Settings
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.fastapi import instrument_app
@@ -80,6 +81,7 @@ def get_server(settings: Settings) -> tuple[FastAPI, uvicorn.Server]:
 
 def run():
     settings = setup()
+    run_migrations()
     app, server = get_server(settings)
     instrument_app(app, excluded_urls=["/"], metrics=True)
 

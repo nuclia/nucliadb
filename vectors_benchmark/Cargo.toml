@@ -17,7 +17,7 @@ nucliadb_core = { path = "../nucliadb_core" }
 lazy_static = "1.4.0"
 memory-stats = "1.0.0"
 byte-unit = "4.0.19"
-reqwest = { version = "0.11.20", features = ["blocking"] }
+reqwest = { version = "0.11", features = ["blocking"] }
 indicatif = "0.17.6"
 tar = "0.4.40"
 flate2 = "1.0.27"

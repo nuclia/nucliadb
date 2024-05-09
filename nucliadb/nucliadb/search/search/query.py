@@ -69,6 +69,7 @@ INDEX_SORTABLE_FIELDS = [
 ]
 
 MAX_VECTOR_RESULTS_ALLOWED = 2000
+DEFAULT_GENERIC_SEMANTIC_THRESHOLD = 0.7
 
 
 class QueryParser:
@@ -81,7 +82,6 @@ class QueryParser:
     query parsing.
     """
 
-    _min_score_task: Optional[asyncio.Task] = None
     _query_information_task: Optional[asyncio.Task] = None
     _detected_entities_task: Optional[asyncio.Task] = None
     _entities_meta_cache_task: Optional[asyncio.Task] = None
@@ -156,13 +156,6 @@ class QueryParser:
     def has_relations_search(self) -> bool:
         return SearchOptions.RELATIONS in self.features
 
-    def _get_default_semantic_min_score(self) -> Awaitable[float]:
-        if self._min_score_task is None:  # pragma: no cover
-            self._min_score_task = asyncio.create_task(
-                get_default_semantic_min_score(self.kbid)
-            )
-        return self._min_score_task
-
     def _get_query_information(self) -> Awaitable[QueryInfo]:
         if self._query_information_task is None:  # pragma: no cover
             self._query_information_task = asyncio.create_task(
@@ -223,8 +216,6 @@ class QueryParser:
             self.flat_filter_labels
         ):
             asyncio.ensure_future(self._get_classification_labels())
-        if self.min_score.semantic is None:
-            asyncio.ensure_future(self._get_default_semantic_min_score())
 
         if self.has_vector_search and self.user_vector is None:
             self.query_endpoint_used = True
@@ -262,9 +253,7 @@ class QueryParser:
         incomplete = await self.parse_vector_search(request)
         autofilters = await self.parse_relation_search(request)
         await self.parse_synonyms(request)
-
-        await self.parse_min_score(request)
-
+        await self.parse_min_score(request, incomplete)
         return request, incomplete, autofilters
 
     async def parse_filters(self, request: nodereader_pb2.SearchRequest) -> None:
@@ -365,9 +354,22 @@ class QueryParser:
                 f"Pagination of semantic results limit reached: {MAX_VECTOR_RESULTS_ALLOWED}. If you want to paginate through all results, please disable the vector search feature.",  # noqa: E501
             )
 
-    async def parse_min_score(self, request: nodereader_pb2.SearchRequest) -> None:
-        if self.min_score.semantic is None:
-            self.min_score.semantic = await self._get_default_semantic_min_score()
+    async def parse_min_score(
+        self, request: nodereader_pb2.SearchRequest, incomplete: bool
+    ) -> None:
+        semantic_min_score = DEFAULT_GENERIC_SEMANTIC_THRESHOLD
+        if self.min_score.semantic is not None:
+            semantic_min_score = self.min_score.semantic
+        elif self.has_vector_search and not incomplete:
+            query_information = await self._get_query_information()
+            if query_information.semantic_threshold is not None:
+                semantic_min_score = query_information.semantic_threshold
+            else:
+                logger.warning(
+                    "Semantic threshold not found in query information, using default",
+                    extra={"kbid": self.kbid},
+                )
+        self.min_score.semantic = semantic_min_score
         request.min_score_semantic = self.min_score.semantic
         request.min_score_bm25 = self.min_score.bm25
 
@@ -700,25 +702,6 @@ PROCESSING_STATUS_TO_PB_MAP = {
     ResourceProcessingStatus.BLOCKED: Resource.ResourceStatus.BLOCKED,
     ResourceProcessingStatus.EXPIRED: Resource.ResourceStatus.EXPIRED,
 }
-
-
-@query_parse_dependency_observer.wrap({"type": "min_score"})
-async def get_kb_model_default_min_score(kbid: str) -> Optional[float]:
-    txn = await get_read_only_transaction()
-    model = await datamanagers.kb.get_model_metadata(txn, kbid=kbid)
-    if model.HasField("default_min_score"):
-        return model.default_min_score
-    else:
-        return None
-
-
-@alru_cache(maxsize=None)
-async def get_default_semantic_min_score(kbid: str) -> float:
-    fallback = 0.7
-    model_min_score = await get_kb_model_default_min_score(kbid)
-    if model_min_score is not None:
-        return model_min_score
-    return fallback
 
 
 @query_parse_dependency_observer.wrap({"type": "synonyms"})

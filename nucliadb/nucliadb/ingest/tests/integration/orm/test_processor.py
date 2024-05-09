@@ -38,7 +38,6 @@ async def test_create_knowledgebox(
     model = SemanticModelMetadata(
         similarity_function=VectorSimilarity.COSINE,
         vector_dimension=384,
-        default_min_score=1.2,
     )
     kbid = await grpc_servicer.servicer.proc.create_kb(
         "test", KnowledgeBoxConfig(title="My Title 1"), model
