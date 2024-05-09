@@ -75,7 +75,7 @@ pub struct ShardMetadataFile {
     pub id: String,
     pub channel: Channel,
     pub similarity: Similarity,
-    pub normalize_vectors: bool,
+    pub normalize_vectors: Option<bool>,
 }
 
 #[derive(Default, Debug)]
@@ -111,7 +111,7 @@ impl ShardMetadata {
             similarity: metadata.similarity,
             id: metadata.id,
             channel: metadata.channel,
-            normalize_vectors: metadata.normalize_vectors,
+            normalize_vectors: metadata.normalize_vectors.unwrap_or(false),
             generation_id: RwLock::new(None),
         })
     }
@@ -152,7 +152,7 @@ impl ShardMetadata {
                 similarity: self.similarity,
                 id: self.id.clone(),
                 channel: self.channel,
-                normalize_vectors: self.normalize_vectors,
+                normalize_vectors: Some(self.normalize_vectors),
             },
         )?;
         writer.flush()?;
