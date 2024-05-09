@@ -1,3 +1,8 @@
+[project]
+name = "nucliadb_workspace"
+requires-python = ">=3.9"
+version = "0.0.0"
+
 [tool.pdm.dev-dependencies]
 dev = [
     "-e file:///${PROJECT_ROOT}/nucliadb",
@@ -47,7 +52,5 @@ dev = [
     "jsonschema",
 ]
 
-[project]
-name = "nucliadb_workspace"
-requires-python = ">=3.9"
-version = "0.0.0"
+[tool.setuptools]
+py-modules = []

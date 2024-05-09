@@ -158,7 +158,7 @@ class AsyncBenchmarkFixture(object):  # pragma: no cover
         self,
         function_to_benchmark: Callable[..., Coroutine[Any, Any, T]],
         *args,
-        **kwargs
+        **kwargs,
     ) -> T:
         if self._mode:
             self.has_error = True
@@ -177,7 +177,7 @@ class AsyncBenchmarkFixture(object):  # pragma: no cover
         self,
         function_to_benchmark: Callable[..., Coroutine[Any, Any, T]],
         *args,
-        **kwargs
+        **kwargs,
     ) -> T:
         if self.enabled:
             runner = await self._make_runner(function_to_benchmark, args, kwargs)
@@ -303,7 +303,7 @@ async def asyncbenchmark(request: pytest.FixtureRequest):  # pragma: no cover
             logger=bs.logger,
             warner=request.node.warn,
             disabled=bs.disabled,
-            **dict(bs.options, **options)
+            **dict(bs.options, **options),
         )
         request.addfinalizer(fixture._cleanup)
         return fixture
