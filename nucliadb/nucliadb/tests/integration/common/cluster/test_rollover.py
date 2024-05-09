@@ -168,6 +168,22 @@ async def test_rollover_kb_shards_handles_changes_in_between(
                 },
             )
             assert resp.status_code == 200
+
+        # Add a couple of resources while the rollover is running
+        for i in range(2):
+            resp = await nucliadb_writer.post(
+                f"/kb/{knowledgebox}/resources",
+                json={
+                    "slug": f"my-added-resource-{i}",
+                    "title": f"My Added Resource Title {i}",
+                    "summary": f"My Added resource summary {i}",
+                    "icon": "text/plain",
+                },
+            )
+            assert resp.status_code == 201
+            resources.append(resp.json()["uuid"])
+            count += 1
+
     except Exception as ex:
         print("Exception caught: ", ex)
         rollover_task.cancel()
@@ -213,3 +229,14 @@ async def test_rollover_kb_shards_handles_changes_in_between(
     assert resp.status_code == 200
     body = resp.json()
     assert len(body["resources"]) == len(modified_resources)
+
+    # Created resources should be in the new shards
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/find",
+        json={
+            "query": "Added",
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == 2
