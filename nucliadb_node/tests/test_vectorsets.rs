@@ -25,6 +25,7 @@ use common::NodeFixture;
 use nucliadb_core::protos::op_status::Status;
 use nucliadb_core::protos::{NewShardRequest, ReleaseChannel};
 use nucliadb_node::shards::indexes::DEFAULT_VECTORS_INDEX_NAME;
+use nucliadb_protos::noderesources::ResourceId;
 use nucliadb_protos::noderesources::ShardId;
 use nucliadb_protos::noderesources::VectorSetId;
 use nucliadb_protos::nodewriter::NewVectorSetRequest;
@@ -96,7 +97,22 @@ async fn test_vectorsets(
     expected.sort();
     assert_eq!(vectorsets, expected);
 
-    let response = writer.set_resource(test_resources::little_prince(shard_id)).await?;
+    // Work with multiple vectorsets
+    let resource = test_resources::little_prince(shard_id);
+    let rid = resource.resource.as_ref().unwrap().uuid.clone();
+
+    let response = writer.set_resource(resource).await?;
+    assert_eq!(response.get_ref().status(), Status::Ok);
+
+    let response = writer.set_resource(test_resources::people_and_places(shard_id)).await?;
+    assert_eq!(response.get_ref().status(), Status::Ok);
+
+    let response = writer
+        .remove_resource(ResourceId {
+            shard_id: shard_id.clone(),
+            uuid: rid.clone(),
+        })
+        .await?;
     assert_eq!(response.get_ref().status(), Status::Ok);
 
     // Removal of the default vectorset is not allowed (yet)
