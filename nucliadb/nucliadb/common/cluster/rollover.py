@@ -427,7 +427,6 @@ async def validate_indexed_data(
         shard = _get_shard(rolled_over_shards, shard_id)
         if shard is None:
             raise UnexpectedRolloverError("Shard not found. This should not happen")
-
         await delete_resource_from_shard(app_context, kbid, resource_id, shard)
 
     _set_rollover_status(rolled_over_shards, RolloverStatus.RESOURCES_VALIDATED)

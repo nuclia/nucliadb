@@ -198,7 +198,7 @@ async def test_rollover_kb_shards_handles_changes_in_between(
         f"/kb/{knowledgebox}/find",
         json={
             "query": "title",
-            "page_size": 1000,
+            "page_size": 100,
         },
     )
     assert resp.status_code == 200
