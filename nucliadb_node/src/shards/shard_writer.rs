@@ -356,6 +356,10 @@ impl ShardWriter {
         Ok(())
     }
 
+    pub fn list_vectors_indexes(&self) -> Vec<String> {
+        read_rw_lock(&self.indexes).vectors_indexes.keys().cloned().collect::<Vec<String>>()
+    }
+
     #[measure(actor = "shard", metric = "set_resource")]
     #[tracing::instrument(skip_all)]
     pub fn set_resource(&self, mut resource: Resource) -> NodeResult<()> {

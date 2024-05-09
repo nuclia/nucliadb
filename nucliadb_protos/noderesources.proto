@@ -124,7 +124,7 @@ message VectorSetID {
 
 message VectorSetList {
     ShardId shard = 1;
-    repeated string vectorset = 2;
+    repeated string vectorsets = 2;
 }
 
 message IndexParagraphs {

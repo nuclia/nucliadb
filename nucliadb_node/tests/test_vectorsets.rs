@@ -50,6 +50,19 @@ async fn test_vectorsets(
         .await?;
     let shard_id = &response.get_ref().id;
 
+    let response = writer
+        .list_vector_sets(ShardId {
+            id: shard_id.clone(),
+        })
+        .await?;
+    assert_eq!(
+        response.get_ref().shard,
+        Some(ShardId {
+            id: shard_id.clone()
+        })
+    );
+    assert_eq!(response.get_ref().vectorsets, vec![DEFAULT_VECTORS_INDEX_NAME.to_string()]);
+
     let vectorset = "gecko".to_string();
 
     let response = writer
@@ -65,6 +78,23 @@ async fn test_vectorsets(
         }))
         .await?;
     assert_eq!(response.get_ref().status(), Status::Ok);
+
+    let response = writer
+        .list_vector_sets(ShardId {
+            id: shard_id.clone(),
+        })
+        .await?;
+    assert_eq!(
+        response.get_ref().shard,
+        Some(ShardId {
+            id: shard_id.clone()
+        })
+    );
+    let mut vectorsets = response.get_ref().vectorsets.clone();
+    vectorsets.sort();
+    let mut expected = vec![DEFAULT_VECTORS_INDEX_NAME.to_string(), vectorset.clone()];
+    expected.sort();
+    assert_eq!(vectorsets, expected);
 
     let response = writer.set_resource(test_resources::little_prince(shard_id)).await?;
     assert_eq!(response.get_ref().status(), Status::Ok);
@@ -91,6 +121,19 @@ async fn test_vectorsets(
         })
         .await?;
     assert_eq!(response.get_ref().status(), Status::Ok);
+
+    let response = writer
+        .list_vector_sets(ShardId {
+            id: shard_id.clone(),
+        })
+        .await?;
+    assert_eq!(
+        response.get_ref().shard,
+        Some(ShardId {
+            id: shard_id.clone()
+        })
+    );
+    assert_eq!(response.get_ref().vectorsets, vec![DEFAULT_VECTORS_INDEX_NAME.to_string()]);
 
     // TODO: to be continued
 

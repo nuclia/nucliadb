@@ -482,19 +482,19 @@ class VectorSetList(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     SHARD_FIELD_NUMBER: builtins.int
-    VECTORSET_FIELD_NUMBER: builtins.int
+    VECTORSETS_FIELD_NUMBER: builtins.int
     @property
     def shard(self) -> global___ShardId: ...
     @property
-    def vectorset(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def vectorsets(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     def __init__(
         self,
         *,
         shard: global___ShardId | None = ...,
-        vectorset: collections.abc.Iterable[builtins.str] | None = ...,
+        vectorsets: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["shard", b"shard"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["shard", b"shard", "vectorset", b"vectorset"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["shard", b"shard", "vectorsets", b"vectorsets"]) -> None: ...
 
 global___VectorSetList = VectorSetList
 

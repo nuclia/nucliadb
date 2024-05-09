@@ -38,7 +38,7 @@ use nucliadb_core::protos::{
     ShardId, ShardIds, VectorSetId, VectorSetList,
 };
 use nucliadb_core::tracing::{self, Span, *};
-use nucliadb_core::Channel;
+use nucliadb_core::{Channel, NodeResult};
 use object_store::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
@@ -373,8 +373,30 @@ impl NodeWriter for NodeWriterGRPCDriver {
         Ok(tonic::Response::new(status))
     }
 
-    async fn list_vector_sets(&self, _: Request<ShardId>) -> Result<Response<VectorSetList>, Status> {
-        Err(tonic::Status::internal("Coming soon.."))
+    async fn list_vector_sets(&self, request: Request<ShardId>) -> Result<Response<VectorSetList>, Status> {
+        let span = Span::current();
+
+        let shard_id = request.into_inner().id;
+        let shard_id_clone = shard_id.clone();
+        let shards = Arc::clone(&self.shards);
+        let task = move || {
+            run_with_telemetry(info_span!(parent: &span, "Remove vectorset"), move || {
+                let shard = obtain_shard(shards, shard_id_clone)?;
+                Ok(shard.list_vectors_indexes())
+            })
+        };
+        let result: NodeResult<Vec<String>> = tokio::task::spawn_blocking(task)
+            .await
+            .map_err(|error| tonic::Status::internal(format!("Blocking task panicked: {error:?}")))?;
+        match result {
+            Ok(vectorsets) => Ok(tonic::Response::new(VectorSetList {
+                shard: Some(ShardId {
+                    id: shard_id,
+                }),
+                vectorsets,
+            })),
+            Err(error) => Err(tonic::Status::internal(error.to_string())),
+        }
     }
 
     async fn get_metadata(&self, _request: Request<EmptyQuery>) -> Result<Response<NodeMetadata>, Status> {
