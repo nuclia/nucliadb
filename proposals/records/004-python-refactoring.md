@@ -249,7 +249,7 @@ Let's take a simple example for this code block:
 @api.get(
     f"/{KBS_PREFIX}",
     status_code=200,
-    name="List Knowledge Boxes",
+    summary="List Knowledge Boxes",
     response_model=KnowledgeBoxList,
     tags=["Knowledge Boxes"],
     include_in_schema=False,
@@ -278,7 +278,7 @@ Alternative:
 @api.get(
     f"/{KBS_PREFIX}",
     status_code=200,
-    name="List Knowledge Boxes",
+    summary="List Knowledge Boxes",
     response_model=KnowledgeBoxList,
     tags=["Knowledge Boxes"],
     include_in_schema=False,

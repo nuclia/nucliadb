@@ -164,7 +164,7 @@ async def create_resource(
 @api.patch(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}",
     status_code=200,
-    name="Modify Resource (by slug)",
+    summary="Modify Resource (by slug)",
     response_model=ResourceUpdated,
     tags=["Resources"],
 )
@@ -192,7 +192,7 @@ async def modify_resource_rslug_prefix(
 @api.patch(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}",
     status_code=200,
-    name="Modify Resource (by id)",
+    summary="Modify Resource (by id)",
     response_model=ResourceUpdated,
     tags=["Resources"],
 )
@@ -359,7 +359,7 @@ async def update_resource_slug(
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/reprocess",
     status_code=202,
-    name="Reprocess resource (by slug)",
+    summary="Reprocess resource (by slug)",
     response_model=ResourceUpdated,
     tags=["Resources"],
 )
@@ -380,7 +380,7 @@ async def reprocess_resource_rslug_prefix(
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/reprocess",
     status_code=202,
-    name="Reprocess resource (by id)",
+    summary="Reprocess resource (by id)",
     response_model=ResourceUpdated,
     tags=["Resources"],
 )
@@ -456,7 +456,7 @@ async def _reprocess_resource(
 @api.delete(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}",
     status_code=204,
-    name="Delete Resource (by slug)",
+    summary="Delete Resource (by slug)",
     tags=["Resources"],
 )
 @requires(NucliaDBRoles.WRITER)
@@ -473,7 +473,7 @@ async def delete_resource_rslug_prefix(
 @api.delete(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}",
     status_code=204,
-    name="Delete Resource (by id)",
+    summary="Delete Resource (by id)",
     tags=["Resources"],
 )
 @requires(NucliaDBRoles.WRITER)
@@ -523,7 +523,7 @@ async def _delete_resource(
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/reindex",
     status_code=204,
-    name="Reindex Resource (by slug)",
+    summary="Reindex Resource (by slug)",
     tags=["Resources"],
 )
 @requires(NucliaDBRoles.WRITER)
@@ -541,7 +541,7 @@ async def reindex_resource_rslug_prefix(
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/reindex",
     status_code=204,
-    name="Reindex Resource (by id)",
+    summary="Reindex Resource (by id)",
     tags=["Resources"],
 )
 @requires(NucliaDBRoles.WRITER)
