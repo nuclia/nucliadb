@@ -95,3 +95,10 @@ def is_index_node() -> bool:
         StandaloneNodeRole.ALL,
         StandaloneNodeRole.INDEX,
     )
+
+
+def is_worker_node() -> bool:
+    return cluster_settings.standalone_node_role in (
+        StandaloneNodeRole.ALL,
+        StandaloneNodeRole.WORKER,
+    )

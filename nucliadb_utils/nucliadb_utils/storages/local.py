@@ -244,15 +244,15 @@ class LocalStorage(Storage):
             created = False
         return created
 
-    async def delete_kb(self, kbid: str):
+    async def delete_kb(self, kbid: str) -> tuple[bool, bool]:
         bucket = self.get_bucket_name(kbid)
         path = self.get_bucket_path(bucket)
         try:
             shutil.rmtree(path)
             deleted = True
-        except Exception:
+        except FileNotFoundError:
             deleted = False
-        return deleted
+        return deleted, False
 
     async def delete_upload(self, uri: str, bucket_name: str):
         file_path = self.get_file_path(bucket_name, uri)

@@ -30,8 +30,6 @@ from nucliadb_utils.partition import PartitionUtility
 from nucliadb_utils.settings import indexing_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import (
-    Utility,
-    clean_utility,
     get_storage,
     start_indexing_utility,
     start_nats_manager,
@@ -41,6 +39,7 @@ from nucliadb_utils.utilities import (
     stop_nats_manager,
     stop_partitioning_utility,
     stop_transaction_utility,
+    teardown_storage,
 )
 
 
@@ -88,9 +87,9 @@ class ApplicationContext:
         if not in_standalone_mode():
             await stop_indexing_utility()
             await stop_nats_manager()
+
         stop_partitioning_utility()
         await teardown_cluster()
         await teardown_driver()
-        await self.blob_storage.finalize()
-        clean_utility(Utility.STORAGE)
+        await teardown_storage()
         self._initialized = False
