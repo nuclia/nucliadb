@@ -35,6 +35,7 @@ from nucliadb.common.cluster.standalone.service import (
 from nucliadb.common.cluster.standalone.utils import is_index_node
 from nucliadb_protos import noderesources_pb2, writer_pb2
 from nucliadb_utils import const
+from nucliadb_utils.settings import is_onprem_nucliadb
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -85,6 +86,10 @@ def get_shard_manager() -> KBShardManager:
 
 
 async def wait_for_node(app_context: ApplicationContext, node_id: str) -> None:
+    if is_onprem_nucliadb():
+        # On onprem deployments indexing is synchronous right now, so we don't need to wait
+        return
+
     logged = False
     while True:
         # get raw js client
