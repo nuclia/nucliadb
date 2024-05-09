@@ -176,11 +176,12 @@ fn jaeger_layer(settings: &Settings) -> NodeResult<Box<dyn Layer<Registry> + Sen
     global::set_text_map_propagator(opentelemetry_zipkin::Propagator::new());
 
     let agent_endpoint = settings.jaeger_agent_address();
-    let tracer = opentelemetry_jaeger::new_pipeline()
-        .with_agent_endpoint(agent_endpoint)
+    #[allow(deprecated)]
+    let tracer = opentelemetry_jaeger::new_agent_pipeline()
+        .with_endpoint(agent_endpoint)
         .with_service_name("nucliadb_node")
         .with_auto_split_batch(true)
-        .install_batch(opentelemetry::runtime::Tokio)?;
+        .install_batch(opentelemetry_sdk::runtime::Tokio)?;
 
     // To avoid sending too much information to Jaeger, we filter out all events
     // (as they are logged to stdout), spans from external instrumented crates
