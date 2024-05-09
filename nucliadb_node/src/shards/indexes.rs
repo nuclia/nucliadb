@@ -104,7 +104,6 @@ impl ShardIndexes {
         Ok(path)
     }
 
-    #[allow(dead_code)]
     /// Removes a vectors index from the shard and returns its path
     pub fn remove_vectors_index(&mut self, name: &str) -> NodeResult<Option<PathBuf>> {
         if name == DEFAULT_VECTORS_INDEX_NAME {
@@ -116,9 +115,12 @@ impl ShardIndexes {
         Ok(removed)
     }
 
-    #[allow(dead_code)]
     pub fn iter_vectors_indexes(&self) -> impl Iterator<Item = (String, PathBuf)> + '_ {
         self.inner.vectorsets.iter().map(|(name, vectorset)| (name.to_owned(), self.shard_path.join(vectorset)))
+    }
+
+    pub fn count_vectors_indexes(&self) -> usize {
+        self.inner.vectorsets.len()
     }
 }
 
