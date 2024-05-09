@@ -35,9 +35,10 @@ pytestmark = pytest.mark.asyncio
 @pytest.fixture
 def cluster_settings():
     settings = Settings()
-    with patch(
-        "nucliadb.common.cluster.standalone.service.cluster_settings", settings
-    ), tempfile.TemporaryDirectory() as tmpdir:
+    with (
+        patch("nucliadb.common.cluster.standalone.service.cluster_settings", settings),
+        tempfile.TemporaryDirectory() as tmpdir,
+    ):
         settings.data_path = tmpdir
         os.makedirs(os.path.join(tmpdir, "shards"))
         yield settings

@@ -30,9 +30,10 @@ from nucliadb.common.cluster.standalone import utils
 @pytest.fixture
 def cluster_settings():
     settings = Settings()
-    with patch(
-        "nucliadb.common.cluster.standalone.utils.cluster_settings", settings
-    ), tempfile.TemporaryDirectory() as tmpdir:
+    with (
+        patch("nucliadb.common.cluster.standalone.utils.cluster_settings", settings),
+        tempfile.TemporaryDirectory() as tmpdir,
+    ):
         settings.data_path = tmpdir
         yield settings
 
@@ -52,8 +53,9 @@ def test_get_self_k8s_host(cluster_settings: Settings, monkeypatch):
     monkeypatch.setenv("NUCLIADB_SERVICE_HOST", "host")
     monkeypatch.setenv("HOSTNAME", "nucliadb-0")
 
-    with patch(
-        "nucliadb.common.cluster.standalone.grpc_node_binding.NodeWriter"
-    ), patch("nucliadb.common.cluster.standalone.grpc_node_binding.NodeReader"):
+    with (
+        patch("nucliadb.common.cluster.standalone.grpc_node_binding.NodeWriter"),
+        patch("nucliadb.common.cluster.standalone.grpc_node_binding.NodeReader"),
+    ):
         # patch because loading settings validates address now
         assert utils.get_self().address == "nucliadb-0.nucliadb"

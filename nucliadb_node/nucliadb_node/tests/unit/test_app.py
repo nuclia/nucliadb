@@ -27,26 +27,23 @@ pytestmark = pytest.mark.asyncio
 
 
 async def test_main():
-    with patch("nucliadb_node.app.get_storage", AsyncMock()) as storage, patch(
-        "nucliadb_node.app.start_worker", AsyncMock()
-    ) as start_worker, patch(
-        "nucliadb_node.app.start_nats_manager", AsyncMock()
-    ) as _, patch(
-        "nucliadb_node.app.stop_nats_manager", AsyncMock()
-    ) as stop_nats_manager, patch(
-        "nucliadb_node.app.start_indexed_publisher", AsyncMock()
-    ) as start_indexed_publisher, patch(
-        "nucliadb_node.app.start_grpc", AsyncMock()
-    ) as start_grpc, patch(
-        "nucliadb_node.app.serve_metrics", AsyncMock()
-    ) as serve_metrics, patch(
-        "nucliadb_node.app.run_until_exit", AsyncMock()
-    ) as run_until_exit, patch(
-        "nucliadb_node.app.Writer", MagicMock()
-    ) as writer, patch(
-        "nucliadb_node.app.get_storage",
-        AsyncMock(),
-    ) as storage:
+    with (
+        patch("nucliadb_node.app.get_storage", AsyncMock()) as storage,
+        patch("nucliadb_node.app.start_worker", AsyncMock()) as start_worker,
+        patch("nucliadb_node.app.start_nats_manager", AsyncMock()) as _,
+        patch("nucliadb_node.app.stop_nats_manager", AsyncMock()) as stop_nats_manager,
+        patch(
+            "nucliadb_node.app.start_indexed_publisher", AsyncMock()
+        ) as start_indexed_publisher,
+        patch("nucliadb_node.app.start_grpc", AsyncMock()) as start_grpc,
+        patch("nucliadb_node.app.serve_metrics", AsyncMock()) as serve_metrics,
+        patch("nucliadb_node.app.run_until_exit", AsyncMock()) as run_until_exit,
+        patch("nucliadb_node.app.Writer", MagicMock()) as writer,
+        patch(
+            "nucliadb_node.app.get_storage",
+            AsyncMock(),
+        ) as storage,
+    ):
         await app.main()
 
         run_until_exit.assert_awaited_once_with(

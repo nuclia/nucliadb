@@ -90,7 +90,7 @@ async def add_indexed(
     kbid: str,
     resource_id: str,
     shard_id: str,
-    modification_time: int
+    modification_time: int,
 ) -> None:
     to_index = KB_ROLLOVER_RESOURCES_TO_INDEX.format(kbid=kbid, resource=resource_id)
     indexed = KB_ROLLOVER_RESOURCES_INDEXED.format(kbid=kbid, resource=resource_id)

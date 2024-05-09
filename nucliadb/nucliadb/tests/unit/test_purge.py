@@ -123,14 +123,12 @@ async def test_purge_kb_storage_handle_errors(keys, driver, storage):
 
 
 async def test_main(driver, storage):
-    with patch("nucliadb.purge.purge_kb", AsyncMock()) as purge_kb, patch(
-        "nucliadb.purge.purge_kb_storage", AsyncMock()
-    ) as purge_kb_storage, patch(
-        "nucliadb.purge.get_storage", return_value=storage
-    ), patch(
-        "nucliadb.purge.setup_driver", return_value=driver
-    ), patch(
-        "nucliadb.purge.setup_cluster", return_value=driver
+    with (
+        patch("nucliadb.purge.purge_kb", AsyncMock()) as purge_kb,
+        patch("nucliadb.purge.purge_kb_storage", AsyncMock()) as purge_kb_storage,
+        patch("nucliadb.purge.get_storage", return_value=storage),
+        patch("nucliadb.purge.setup_driver", return_value=driver),
+        patch("nucliadb.purge.setup_cluster", return_value=driver),
     ):
         await purge.main()
 

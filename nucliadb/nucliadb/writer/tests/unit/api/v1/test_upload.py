@@ -123,8 +123,12 @@ async def test_validate_field_upload(rid, field, md5, exists: bool, result):
     mock_uuid4.hex = "uuid4"
     mock_uuid.uuid4 = Mock(return_value=mock_uuid4)
 
-    with patch("nucliadb.writer.api.v1.upload.uuid", mock_uuid), patch(
-        "nucliadb.writer.api.v1.upload.resource_exists", AsyncMock(return_value=exists)
+    with (
+        patch("nucliadb.writer.api.v1.upload.uuid", mock_uuid),
+        patch(
+            "nucliadb.writer.api.v1.upload.resource_exists",
+            AsyncMock(return_value=exists),
+        ),
     ):
         if isinstance(result, tuple):
             _, result_rid, result_field = await validate_field_upload(

@@ -117,8 +117,13 @@ async def move_set_of_kb_resources(
     for result in search_response.document.results:
         resource_id = result.uuid
         try:
-            async with datamanagers.with_transaction() as txn, locking.distributed_lock(
-                locking.RESOURCE_INDEX_LOCK.format(kbid=kbid, resource_id=resource_id)
+            async with (
+                datamanagers.with_transaction() as txn,
+                locking.distributed_lock(
+                    locking.RESOURCE_INDEX_LOCK.format(
+                        kbid=kbid, resource_id=resource_id
+                    )
+                ),
             ):
                 found_shard_id = await datamanagers.resources.get_resource_shard_id(
                     txn, kbid=kbid, rid=resource_id

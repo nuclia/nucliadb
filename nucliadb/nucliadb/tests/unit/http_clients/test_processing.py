@@ -41,12 +41,12 @@ def test_check_status():
 
 
 def test_get_processing_api_url():
-    with mock.patch.object(
-        nuclia_settings, "nuclia_service_account", "sa"
-    ), mock.patch.object(
-        nuclia_settings, "nuclia_zone", "nuclia_zone"
-    ), mock.patch.object(
-        nuclia_settings, "nuclia_public_url", "https://{zone}.nuclia_public_url"
+    with (
+        mock.patch.object(nuclia_settings, "nuclia_service_account", "sa"),
+        mock.patch.object(nuclia_settings, "nuclia_zone", "nuclia_zone"),
+        mock.patch.object(
+            nuclia_settings, "nuclia_public_url", "https://{zone}.nuclia_public_url"
+        ),
     ):
         assert (
             processing.get_processing_api_url()
