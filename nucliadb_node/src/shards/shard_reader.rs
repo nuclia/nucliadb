@@ -137,7 +137,6 @@ impl Iterator for ShardFileChunkIterator {
 pub struct ShardReader {
     pub id: String,
     pub metadata: ShardMetadata,
-    indexes: ShardIndexes,
     root_path: PathBuf,
     suffixed_root_path: String,
     text_reader: RwLock<TextsReaderPointer>,
@@ -293,7 +292,6 @@ impl ShardReader {
             id,
             metadata,
             suffixed_root_path,
-            indexes,
             root_path: shard_path.to_path_buf(),
             text_reader: RwLock::new(fields.unwrap()),
             paragraph_reader: RwLock::new(paragraphs.unwrap()),
@@ -625,9 +623,11 @@ impl ShardReader {
     }
 
     pub fn update(&self) -> NodeResult<()> {
-        let version = self.versions.vectors;
-        let path = self.indexes.vectors_path();
-        let new_reader = open_vectors_reader(version, &path)?;
+        let shard_path = self.metadata.shard_path();
+        // TODO: while we don't have all shards migrated, we still have to
+        // unwrap with a default
+        let indexes = ShardIndexes::load(&shard_path).unwrap_or_else(|_| ShardIndexes::new(&shard_path));
+        let new_reader = open_vectors_reader(self.versions.vectors, &indexes.vectors_path())?;
         let mut writer = write_rw_lock(&self.vector_reader);
         *writer = new_reader;
         Ok(())
