@@ -1284,18 +1284,6 @@ pub struct PageStructurePage {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PageStructureToken {
-    #[deprecated]
-    #[prost(int64, tag = "1")]
-    pub x_deprecated: i64,
-    #[deprecated]
-    #[prost(int64, tag = "2")]
-    pub y_deprecated: i64,
-    #[deprecated]
-    #[prost(int64, tag = "3")]
-    pub width_deprecated: i64,
-    #[deprecated]
-    #[prost(int64, tag = "4")]
-    pub height_deprecated: i64,
     #[prost(float, tag = "7")]
     pub x: f32,
     #[prost(float, tag = "8")]

@@ -8,8 +8,10 @@ dev = [
     "-e file:///${PROJECT_ROOT}/nucliadb_telemetry",
     "-e file:///${PROJECT_ROOT}/nucliadb_utils",
     "mypy-protobuf>=3.6.0",
-    "mypy>=1.10.0",
+    "mypy==1.6.1",
     "pytest>=8.2.0",
+    "faker>=25.1.0",
+    "pytest-mock>=3.14.0",
 ]
 
 [project]
