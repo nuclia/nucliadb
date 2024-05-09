@@ -31,6 +31,7 @@ def run_migrations():
     """
     loop = asyncio.new_event_loop()
     loop.run_until_complete(safe_run_migrations())
+    loop.close()
 
 
 async def safe_run_migrations():
