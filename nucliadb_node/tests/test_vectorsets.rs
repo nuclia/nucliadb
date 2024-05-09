@@ -24,6 +24,7 @@ use common::resources as test_resources;
 use common::NodeFixture;
 use nucliadb_core::protos::op_status::Status;
 use nucliadb_core::protos::{NewShardRequest, ReleaseChannel};
+use nucliadb_node::shards::indexes::DEFAULT_VECTORS_INDEX_NAME;
 use nucliadb_protos::noderesources::ShardId;
 use nucliadb_protos::noderesources::VectorSetId;
 use nucliadb_protos::nodewriter::NewVectorSetRequest;
@@ -41,30 +42,55 @@ async fn test_vectorsets(
     let mut writer = fixture.writer_client();
     let _reader = fixture.reader_client();
 
-    let new_shard_response = writer
+    let response = writer
         .new_shard(Request::new(NewShardRequest {
             release_channel: release_channel.into(),
             ..Default::default()
         }))
         .await?;
-    let shard_id = &new_shard_response.get_ref().id;
+    let shard_id = &response.get_ref().id;
 
-    let new_vectorset_response = writer
+    let vectorset = "gecko".to_string();
+
+    let response = writer
         .add_vector_set(Request::new(NewVectorSetRequest {
             id: Some(VectorSetId {
                 shard: Some(ShardId {
                     id: shard_id.clone(),
                 }),
-                vectorset: "gecko".to_string(),
+                vectorset: vectorset.clone(),
             }),
             similarity: VectorSimilarity::Dot.into(),
             normalize_vectors: true,
         }))
         .await?;
-    assert_eq!(new_vectorset_response.get_ref().status(), Status::Ok);
+    assert_eq!(response.get_ref().status(), Status::Ok);
 
-    let result = writer.set_resource(test_resources::little_prince(shard_id)).await?;
-    assert_eq!(result.get_ref().status(), Status::Ok);
+    let response = writer.set_resource(test_resources::little_prince(shard_id)).await?;
+    assert_eq!(response.get_ref().status(), Status::Ok);
+
+    // Removal of the default vectorset is not allowed (yet)
+    let response = writer
+        .remove_vector_set(VectorSetId {
+            shard: Some(ShardId {
+                id: shard_id.clone(),
+            }),
+            vectorset: DEFAULT_VECTORS_INDEX_NAME.to_string(),
+        })
+        .await?;
+    assert_eq!(response.get_ref().status(), Status::Error);
+    assert!(response.get_ref().detail.contains("is reserved and can't be removed"));
+
+    // A user-created vectorset can be deleted
+    let response = writer
+        .remove_vector_set(VectorSetId {
+            shard: Some(ShardId {
+                id: shard_id.clone(),
+            }),
+            vectorset: vectorset.clone(),
+        })
+        .await?;
+    assert_eq!(response.get_ref().status(), Status::Ok);
 
     // TODO: to be continued
 

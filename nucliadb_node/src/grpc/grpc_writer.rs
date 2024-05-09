@@ -331,8 +331,46 @@ impl NodeWriter for NodeWriterGRPCDriver {
         Ok(tonic::Response::new(status))
     }
 
-    async fn remove_vector_set(&self, _: Request<VectorSetId>) -> Result<Response<OpStatus>, Status> {
-        Err(tonic::Status::internal("Coming soon.."))
+    async fn remove_vector_set(&self, request: Request<VectorSetId>) -> Result<Response<OpStatus>, Status> {
+        let span = Span::current();
+
+        let VectorSetId {
+            shard: Some(ShardId {
+                id: shard_id,
+            }),
+            vectorset,
+        } = request.into_inner()
+        else {
+            return Ok(tonic::Response::new(OpStatus {
+                status: op_status::Status::Error.into(),
+                detail: "Vectorset ID must be provided".to_string(),
+                ..Default::default()
+            }));
+        };
+
+        let shards = Arc::clone(&self.shards);
+        let task = move || {
+            run_with_telemetry(info_span!(parent: &span, "Remove vectorset"), move || {
+                let shard = obtain_shard(shards, shard_id.clone())?;
+                shard.remove_vectors_index(vectorset)
+            })
+        };
+        let result = tokio::task::spawn_blocking(task)
+            .await
+            .map_err(|error| tonic::Status::internal(format!("Blocking task panicked: {error:?}")))?;
+        let status = match result {
+            Ok(()) => OpStatus {
+                status: op_status::Status::Ok.into(),
+                detail: "Vectorset successfully deleted".to_string(),
+                ..Default::default()
+            },
+            Err(error) => OpStatus {
+                status: op_status::Status::Error.into(),
+                detail: error.to_string(),
+                ..Default::default()
+            },
+        };
+        Ok(tonic::Response::new(status))
     }
 
     async fn list_vector_sets(&self, _: Request<ShardId>) -> Result<Response<VectorSetList>, Status> {

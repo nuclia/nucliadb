@@ -341,6 +341,21 @@ impl ShardWriter {
         Ok(())
     }
 
+    pub fn remove_vectors_index(&self, name: String) -> NodeResult<()> {
+        let mut indexes = ShardIndexes::load(&self.metadata.shard_path())?;
+        let path = indexes.remove_vectors_index(&name)?;
+        indexes.store()?;
+        write_rw_lock(&self.indexes).vectors_indexes.remove(&name);
+        if let Some(path) = path {
+            // Although there can be a reader with this index open, readers
+            // currently open all vectors index files so we rely on Linux not
+            // deleting the files until it closes the index. Readers then should
+            // be able to keep answering for that vectorset until closing it
+            std::fs::remove_dir_all(path)?;
+        }
+        Ok(())
+    }
+
     #[measure(actor = "shard", metric = "set_resource")]
     #[tracing::instrument(skip_all)]
     pub fn set_resource(&self, mut resource: Resource) -> NodeResult<()> {
