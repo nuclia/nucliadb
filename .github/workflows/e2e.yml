@@ -94,7 +94,7 @@ jobs:
 
       - name: Run tests
         run: |
-          kubectl port-forward -n nucliadb service/nucliadb 8080:8080 &
+          kubectl port-forward -n nucliadb service/nucliadb 8080:8080 > /dev/null 2>&1 &
           sleep 10
           pytest -s -vv --tb=native e2e/test_e2e.py ||
             (kubectl get all --all-namespaces &&
