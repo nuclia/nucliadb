@@ -26,6 +26,7 @@ profile = "release-wheel"
 
 [project]
 name = "nucliadb_node_binding"
+version = "3.0.3"
 requires-python = ">=3.9"
 classifiers = [
     "Programming Language :: Rust",

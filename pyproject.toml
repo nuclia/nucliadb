@@ -1,0 +1,18 @@
+[tool.pdm.dev-dependencies]
+dev = [
+    "-e file:///${PROJECT_ROOT}/nucliadb",
+    "-e file:///${PROJECT_ROOT}/nucliadb_models",
+    "-e file:///${PROJECT_ROOT}/nucliadb_node",
+    "-e file:///${PROJECT_ROOT}/nucliadb_node_binding",
+    "-e file:///${PROJECT_ROOT}/nucliadb_protos/python",
+    "-e file:///${PROJECT_ROOT}/nucliadb_telemetry",
+    "-e file:///${PROJECT_ROOT}/nucliadb_utils",
+    "mypy-protobuf>=3.6.0",
+    "mypy>=1.10.0",
+    "pytest>=8.2.0",
+]
+
+[project]
+name = "nucliadb_workspace"
+requires-python = ">=3.9"
+version = "0.1.0"

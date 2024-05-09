@@ -22,7 +22,7 @@ import os
 
 # abstract advanced error handling into its own module to prevent
 # code from handling sentry integration everywhere
-from typing import Any, ContextManager, List, Optional
+from typing import Any, ContextManager, List, Optional, Literal
 
 import pydantic
 
@@ -59,7 +59,7 @@ def capture_exception(error: BaseException) -> Optional[str]:
 
 def capture_message(
     error_msg: str,
-    level: Optional[str] = None,
+    level: Optional[Literal['fatal', 'critical', 'error', 'warning', 'info', 'debug']] = None,
     scope: Optional[Any] = None,
     **scope_args: Any
 ) -> Optional[str]:
