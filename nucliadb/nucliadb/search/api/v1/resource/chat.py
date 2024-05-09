@@ -42,8 +42,7 @@ from ..chat import create_chat_response
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/resource/{{rid}}/chat",
     status_code=200,
-    name="Chat with a Resource (by id)",
-    summary="Chat with a resource",
+    summary="Chat with a resource (by id)",
     description="Chat with a resource",
     tags=["Search"],
     response_model=None,
@@ -79,8 +78,7 @@ async def resource_chat_endpoint_by_uuid(
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_SLUG_PREFIX}/{{slug}}/chat",
     status_code=200,
-    name="Chat with a Resource (by slug)",
-    summary="Chat with a resource",
+    summary="Chat with a resource (by slug)",
     description="Chat with a resource",
     tags=["Search"],
     response_model=None,

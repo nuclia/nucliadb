@@ -34,7 +34,7 @@ from nucliadb_utils.authentication import requires_one
     f"/{KB_PREFIX}/{{kbid}}/trainset",
     tags=["Train"],
     status_code=200,
-    name="Return Train call",
+    summary="Return Train call",
     response_model=TrainSetPartitions,
 )
 @requires_one([NucliaDBRoles.READER])
@@ -47,7 +47,7 @@ async def get_partitions_all(request: Request, kbid: str) -> TrainSetPartitions:
     f"/{KB_PREFIX}/{{kbid}}/trainset/{{prefix}}",
     tags=["Train"],
     status_code=200,
-    name="Return Train call",
+    summary="Return Train call",
     response_model=TrainSetPartitions,
 )
 @requires_one([NucliaDBRoles.READER])

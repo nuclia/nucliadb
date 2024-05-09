@@ -330,7 +330,7 @@ FIELD_PARSERS_MAP: dict[Type, Union[Callable]] = {
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/text/{{field_id}}",
     status_code=201,
-    name="Add resource text field (by slug)",
+    summary="Add resource text field (by slug)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
@@ -351,7 +351,7 @@ async def add_resource_field_text_rslug_prefix(
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/text/{{field_id}}",
     status_code=201,
-    name="Add resource text field (by id)",
+    summary="Add resource text field (by id)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
@@ -370,7 +370,7 @@ async def add_resource_field_text_rid_prefix(
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/link/{{field_id}}",
     status_code=201,
-    name="Add resource link field (by slug)",
+    summary="Add resource link field (by slug)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
@@ -391,7 +391,7 @@ async def add_resource_field_link_rslug_prefix(
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/link/{{field_id}}",
     status_code=201,
-    name="Add resource link field (by id)",
+    summary="Add resource link field (by id)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
@@ -410,7 +410,7 @@ async def add_resource_field_link_rid_prefix(
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/keywordset/{{field_id}}",
     status_code=201,
-    name="Add resource keywordset field (by slug)",
+    summary="Add resource keywordset field (by slug)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
@@ -431,7 +431,7 @@ async def add_resource_field_keywordset_rslug_prefix(
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/keywordset/{{field_id}}",
     status_code=201,
-    name="Add resource keywordset field (by id)",
+    summary="Add resource keywordset field (by id)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
@@ -450,7 +450,7 @@ async def add_resource_field_keywordset_rid_prefix(
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/datetime/{{field_id}}",
     status_code=201,
-    name="Add resource datetime field (by slug)",
+    summary="Add resource datetime field (by slug)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
@@ -471,7 +471,7 @@ async def add_resource_field_datetime_rslug_prefix(
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/datetime/{{field_id}}",
     status_code=201,
-    name="Add resource datetime field (by id)",
+    summary="Add resource datetime field (by id)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
@@ -490,7 +490,7 @@ async def add_resource_field_datetime_rid_prefix(
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/layout/{{field_id}}",
     status_code=201,
-    name="Add resource layout field (by slug)",
+    summary="Add resource layout field (by slug)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
@@ -511,7 +511,7 @@ async def add_resource_field_layout_rslug_prefix(
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/layout/{{field_id}}",
     status_code=201,
-    name="Add resource layout field (by id)",
+    summary="Add resource layout field (by id)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
@@ -530,7 +530,7 @@ async def add_resource_field_layout_rid_prefix(
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/conversation/{{field_id}}",
     status_code=201,
-    name="Add resource conversation field (by slug)",
+    summary="Add resource conversation field (by slug)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
@@ -551,7 +551,7 @@ async def add_resource_field_conversation_rslug_prefix(
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/conversation/{{field_id}}",
     status_code=201,
-    name="Add resource conversation field (by id)",
+    summary="Add resource conversation field (by id)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
@@ -570,7 +570,7 @@ async def add_resource_field_conversation_rid_prefix(
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/file/{{field_id}}",
     status_code=201,
-    name="Add resource file field (by slug)",
+    summary="Add resource file field (by slug)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
@@ -592,7 +592,7 @@ async def add_resource_field_file_rslug_prefix(
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/file/{{field_id}}",
     status_code=201,
-    name="Add resource file field (by id)",
+    summary="Add resource file field (by id)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
@@ -614,7 +614,7 @@ async def add_resource_field_file_rid_prefix(
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/conversation/{{field_id}}/messages",
     status_code=200,
-    name="Append messages to conversation field (by slug)",
+    summary="Append messages to conversation field (by slug)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
@@ -635,7 +635,7 @@ async def append_messages_to_conversation_field_rslug_prefix(
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/conversation/{{field_id}}/messages",
     status_code=200,
-    name="Append messages to conversation field (by id)",
+    summary="Append messages to conversation field (by id)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
@@ -656,7 +656,7 @@ async def append_messages_to_conversation_field_rid_prefix(
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/layout/{{field_id}}/blocks",
     status_code=200,
-    name="Append blocks to layout field (by slug)",
+    summary="Append blocks to layout field (by slug)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
@@ -677,7 +677,7 @@ async def append_blocks_to_layout_field_rslug_prefix(
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/layout/{{field_id}}/blocks",
     status_code=200,
-    name="Append blocks to layout field (by id)",
+    summary="Append blocks to layout field (by id)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
@@ -698,7 +698,7 @@ async def append_blocks_to_layout_field_rid_prefix(
 @api.delete(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/{{field_type}}/{{field_id}}",
     status_code=204,
-    name="Delete Resource field (by slug)",
+    summary="Delete Resource field (by slug)",
     response_model_exclude_unset=True,
     tags=["Resource fields"],
 )
@@ -719,7 +719,7 @@ async def delete_resource_field_rslug_prefix(
 @api.delete(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/{{field_type}}/{{field_id}}",
     status_code=204,
-    name="Delete Resource field (by id)",
+    summary="Delete Resource field (by id)",
     response_model_exclude_unset=True,
     tags=["Resource fields"],
 )
@@ -738,7 +738,7 @@ async def delete_resource_field_rid_prefix(
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/file/{{field_id}}/reprocess",
     status_code=202,
-    name="Reprocess file field (by id)",
+    summary="Reprocess file field (by id)",
     response_model=models.writer.ResourceUpdated,
     tags=["Resource fields"],
 )

@@ -47,8 +47,8 @@ from nucliadb_utils.authentication import requires_one
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/search",
     status_code=200,
-    name="Search on Resource",
-    description="Search on a Resource",
+    summary="Search on Resource",
+    description="Search on a single resource",
     tags=["Search"],
     response_model_exclude_unset=True,
     response_model=ResourceSearchResults,

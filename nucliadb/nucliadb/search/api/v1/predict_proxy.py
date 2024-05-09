@@ -39,7 +39,7 @@ DESCRIPTION = "Convenience endpoint that proxies requests to the Predict API. It
 @api.get(
     path=f"/{KB_PREFIX}/{{kbid}}/predict/{{endpoint}}",
     status_code=200,
-    name="Predict API Proxy",
+    summary="Predict API Proxy",
     description=DESCRIPTION,
     response_model=None,
     tags=["Search"],
@@ -47,7 +47,7 @@ DESCRIPTION = "Convenience endpoint that proxies requests to the Predict API. It
 @api.post(
     path=f"/{KB_PREFIX}/{{kbid}}/predict/{{endpoint}}",
     status_code=200,
-    name="Predict API Proxy",
+    summary="Predict API Proxy",
     description=DESCRIPTION,
     response_model=None,
     tags=["Search"],
