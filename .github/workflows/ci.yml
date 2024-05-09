@@ -1,0 +1,237 @@
+name: New CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  # Pre-checks
+  format-rust:
+    name: "Pre-checks: Rust code Format"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          profile: minimal
+          components: rustfmt
+          override: true
+      - name: rustfmt
+        run: cargo +nightly fmt --check
+
+  clippy-rust:
+    name: "Pre-checks: Clippy lint"
+    runs-on: ubuntu-latest
+    permissions: write-all
+    steps:
+      - uses: actions/checkout@v3
+      - run: rustup component add clippy
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --all-targets
+
+  pre-checks-python:
+    name: "Pre-checks: Node python lint"
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11"]
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Run pre-checks
+        run: |
+          pip install -r code-requirements.txt
+          isort -c --profile black nucliadb_node
+          cd nucliadb_node
+          flake8 nucliadb_node --config=setup.cfg
+          black --check .
+
+  mypy-check:
+    name: "Pre-checks: Node mypy"
+    runs-on: ubuntu-latest
+    needs:
+      - build-virtual-env
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Restore venv
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/venv
+          key: venv-${{ github.sha }}
+          fail-on-cache-miss: true
+      - name: Run mypy
+        run: |
+          source /tmp/venv/bin/activate
+          MYPYPATH=mypy_stubs mypy --config-file=mypy.ini -m nucliadb_node
+
+  licenses:
+    name: Check Licenses
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: EmbarkStudios/cargo-deny-action@v1
+        name: cargo deny
+        with:
+          log-level: warn
+          command: check licenses
+
+  # Builds
+  build-node-binaries:
+    name: Build node binaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: Swatinem/rust-cache@v2
+      - name: Compile
+        run: cargo build --release --bin node_reader --bin node_writer
+      - name: Upload binaries to cache
+        uses: actions/cache/save@v4
+        with:
+          path: "target/release/node_*er"
+          key: node-bin-${{ github.sha }}
+
+  build-virtual-env:
+    name: Build node bindings
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: Swatinem/rust-cache@v2
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - name: Install venv
+        run: |
+          python -m venv /tmp/venv
+          source /tmp/venv/bin/activate
+          (pip install maturin && maturin build -m nucliadb_node_binding/Cargo.toml) &
+          pip install -r test-requirements.txt -r code-requirements.txt -r nucliadb/requirements.txt -r nucliadb/requirements-test.txt -r nucliadb/requirements-sources.txt -e ./nucliadb
+          wait $(jobs -p)
+          pip install ./nucliadb_node_binding
+      - name: Upload virtualenv to cache
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/venv
+          key: venv-${{ github.sha }}
+
+  # Tests
+  node-python-tests:
+    name: Node Python tests
+    runs-on: ubuntu-latest
+    needs:
+      - build-node-binaries
+      - build-virtual-env
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Restore venv
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/venv
+          key: venv-${{ github.sha }}
+          fail-on-cache-miss: true
+      - name: Restore binaries
+        uses: actions/cache/restore@v4
+        with:
+          path: "target/release/node_*er"
+          key: node-bin-${{ github.sha }}
+          fail-on-cache-miss: true
+
+      - name: Build docker images for node
+        run: mkdir builds && mv target/release/node_* builds && docker build -t europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node:latest -f Dockerfile.node_prebuilt .
+
+      - name: Run tests
+        run: /tmp/venv/bin/pytest -rfE --cov=nucliadb_node -s --tb=native -v --cov-report xml --cov-append nucliadb_node/nucliadb_node
+
+
+  node-rust-tests:
+    name: Node Rust tests
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: Swatinem/rust-cache@v2
+    - uses: actions-rs/cargo@v1
+      env:
+        RUST_BACKTRACE: 1
+      name: cargo test
+      with:
+        command: test
+        args: --workspace --all-features
+
+
+  nucliadb-tests:
+    name: NucliaDB tests
+    runs-on: ubuntu-latest
+    needs:
+      - build-virtual-env
+    strategy:
+      fail-fast: false
+      matrix:
+        maindb_driver: ["tikv", "pg"]
+        shard: [0, 1, 2]
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Restore venv
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/venv
+          key: venv-${{ github.sha }}
+          fail-on-cache-miss: true
+
+      - name: Install tikv
+        if: matrix.maindb_driver == 'tikv'
+        run: ./scripts/run-tikv.sh
+
+      - name: Run NucliaDB tests
+        # These tests can be flaky, let's retry them...
+        uses: nick-fields/retry@v2
+        env:
+          TESTING_MAINDB_DRIVERS: ${{ matrix.maindb_driver }}
+          TESTING_TIKV_LOCAL: "true"
+        with:
+          max_attempts: 2
+          retry_on: error
+          timeout_minutes: 10
+          command: source /tmp/venv/bin/activate &&  make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=${{ matrix.shard }} --num-shards=3"
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: nucliadb

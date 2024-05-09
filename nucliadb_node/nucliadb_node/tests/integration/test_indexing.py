@@ -206,10 +206,14 @@ class TestConcurrentIndexingFailureRecovery:
             run_or_fail, original_delete_resource, fail_ratio
         )
 
+        original_delay = settings.indexer_delay_after_error
+        settings.indexer_delay_after_error = 0.5
+
         yield worker
 
         worker.writer.set_resource = original_set_resource
         worker.writer.delete_resource = original_delete_resource
+        settings.indexer_delay_after_error = original_delay
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
