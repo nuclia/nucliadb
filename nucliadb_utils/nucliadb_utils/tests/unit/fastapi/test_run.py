@@ -53,8 +53,9 @@ def test_metrics_app():
 async def test_serve_metrics():
     server = Mock()
     config = Mock()
-    with patch("nucliadb_utils.fastapi.run.start_server") as start_server, patch(
-        "nucliadb_utils.fastapi.run.metrics_app", return_value=(server, config)
+    with (
+        patch("nucliadb_utils.fastapi.run.start_server") as start_server,
+        patch("nucliadb_utils.fastapi.run.metrics_app", return_value=(server, config)),
     ):
         await run.serve_metrics()
 
@@ -68,20 +69,19 @@ def test_run_fastapi_with_metrics():
     metrics_server = AsyncMock(started=True)
     metrics_config = MagicMock()
 
-    with patch(
-        "nucliadb_utils.fastapi.run.start_server", AsyncMock()
-    ) as start_server, patch(
-        "nucliadb_utils.fastapi.run.run_server_forever", AsyncMock()
-    ) as run_server_forever, patch(
-        "nucliadb_utils.fastapi.run.metrics_app",
-        return_value=(metrics_server, metrics_config),
-    ), patch(
-        "nucliadb_utils.fastapi.run.Server", return_value=server
-    ), patch(
-        "nucliadb_utils.fastapi.run.Config", return_value=config
-    ), patch(
-        "nucliadb_utils.fastapi.run.sys.exit", return_value=config
-    ) as exit:
+    with (
+        patch("nucliadb_utils.fastapi.run.start_server", AsyncMock()) as start_server,
+        patch(
+            "nucliadb_utils.fastapi.run.run_server_forever", AsyncMock()
+        ) as run_server_forever,
+        patch(
+            "nucliadb_utils.fastapi.run.metrics_app",
+            return_value=(metrics_server, metrics_config),
+        ),
+        patch("nucliadb_utils.fastapi.run.Server", return_value=server),
+        patch("nucliadb_utils.fastapi.run.Config", return_value=config),
+        patch("nucliadb_utils.fastapi.run.sys.exit", return_value=config) as exit,
+    ):
         run.run_fastapi_with_metrics(app)
 
         start_server.assert_called_once_with(metrics_server, metrics_config)

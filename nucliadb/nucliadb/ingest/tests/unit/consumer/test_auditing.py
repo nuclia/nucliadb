@@ -48,11 +48,12 @@ def shard_manager(reader):
     nm = MagicMock()
     node = MagicMock(reader=reader)
     nm.get_shards_by_kbid = AsyncMock(return_value=[ShardObject()])
-    with patch(
-        "nucliadb.ingest.consumer.auditing.get_shard_manager", return_value=nm
-    ), patch(
-        "nucliadb.ingest.consumer.auditing.choose_node",
-        return_value=(node, "shard_id"),
+    with (
+        patch("nucliadb.ingest.consumer.auditing.get_shard_manager", return_value=nm),
+        patch(
+            "nucliadb.ingest.consumer.auditing.choose_node",
+            return_value=(node, "shard_id"),
+        ),
     ):
         yield nm
 

@@ -36,9 +36,11 @@ def reset_driver_utils():
 @pytest.mark.asyncio
 async def test_setup_driver_redis():
     mock = AsyncMock(initialized=False)
-    with patch.object(settings, "driver", "redis"), patch.object(
-        settings, "driver_redis_url", "driver_redis_url"
-    ), patch("nucliadb.common.maindb.utils.RedisDriver", return_value=mock):
+    with (
+        patch.object(settings, "driver", "redis"),
+        patch.object(settings, "driver_redis_url", "driver_redis_url"),
+        patch("nucliadb.common.maindb.utils.RedisDriver", return_value=mock),
+    ):
         assert await setup_driver() == mock
         mock.initialize.assert_awaited_once()
 
@@ -46,9 +48,11 @@ async def test_setup_driver_redis():
 @pytest.mark.asyncio
 async def test_setup_driver_tikv():
     mock = AsyncMock(initialized=False)
-    with patch.object(settings, "driver", "tikv"), patch.object(
-        settings, "driver_tikv_url", "driver_tikv_url"
-    ), patch("nucliadb.common.maindb.utils.TiKVDriver", return_value=mock):
+    with (
+        patch.object(settings, "driver", "tikv"),
+        patch.object(settings, "driver_tikv_url", "driver_tikv_url"),
+        patch("nucliadb.common.maindb.utils.TiKVDriver", return_value=mock),
+    ):
         assert await setup_driver() == mock
         mock.initialize.assert_awaited_once()
 
@@ -56,9 +60,11 @@ async def test_setup_driver_tikv():
 @pytest.mark.asyncio
 async def test_setup_driver_pg():
     mock = AsyncMock(initialized=False)
-    with patch.object(settings, "driver", "pg"), patch.object(
-        settings, "driver_pg_url", "driver_pg_url"
-    ), patch("nucliadb.common.maindb.utils.PGDriver", return_value=mock):
+    with (
+        patch.object(settings, "driver", "pg"),
+        patch.object(settings, "driver_pg_url", "driver_pg_url"),
+        patch("nucliadb.common.maindb.utils.PGDriver", return_value=mock),
+    ):
         assert await setup_driver() == mock
         mock.initialize.assert_awaited_once()
 
@@ -66,16 +72,20 @@ async def test_setup_driver_pg():
 @pytest.mark.asyncio
 async def test_setup_driver_local():
     mock = AsyncMock(initialized=False)
-    with patch.object(settings, "driver", "local"), patch.object(
-        settings, "driver_local_url", "driver_local_url"
-    ), patch("nucliadb.common.maindb.utils.LocalDriver", return_value=mock):
+    with (
+        patch.object(settings, "driver", "local"),
+        patch.object(settings, "driver_local_url", "driver_local_url"),
+        patch("nucliadb.common.maindb.utils.LocalDriver", return_value=mock),
+    ):
         assert await setup_driver() == mock
         mock.initialize.assert_awaited_once()
 
 
 @pytest.mark.asyncio
 async def test_setup_driver_error():
-    with patch.object(settings, "driver", "pg"), patch.object(
-        settings, "driver_pg_url", None
-    ), pytest.raises(ConfigurationError):
+    with (
+        patch.object(settings, "driver", "pg"),
+        patch.object(settings, "driver_pg_url", None),
+        pytest.raises(ConfigurationError),
+    ):
         await setup_driver()

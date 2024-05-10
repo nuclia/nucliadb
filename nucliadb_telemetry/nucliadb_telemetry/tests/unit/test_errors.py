@@ -23,8 +23,9 @@ from nucliadb_telemetry import errors
 
 
 def test_capture_exception() -> None:
-    with patch("nucliadb_telemetry.errors.sentry_sdk") as mock_sentry_sdk, patch.object(
-        errors, "SENTRY", True
+    with (
+        patch("nucliadb_telemetry.errors.sentry_sdk") as mock_sentry_sdk,
+        patch.object(errors, "SENTRY", True),
     ):
         ex = Exception("test")
         errors.capture_exception(ex)
@@ -32,36 +33,40 @@ def test_capture_exception() -> None:
 
 
 def test_capture_exception_no_sentry() -> None:
-    with patch.object(errors, "SENTRY", False), patch(
-        "nucliadb_telemetry.errors.sentry_sdk"
-    ) as mock_sentry_sdk:
+    with (
+        patch.object(errors, "SENTRY", False),
+        patch("nucliadb_telemetry.errors.sentry_sdk") as mock_sentry_sdk,
+    ):
         errors.capture_exception(Exception())
         mock_sentry_sdk.capture_exception.assert_not_called()
 
 
 def test_capture_message() -> None:
-    with patch("nucliadb_telemetry.errors.sentry_sdk") as mock_sentry_sdk, patch.object(
-        errors, "SENTRY", True
+    with (
+        patch("nucliadb_telemetry.errors.sentry_sdk") as mock_sentry_sdk,
+        patch.object(errors, "SENTRY", True),
     ):
-        errors.capture_message("error_msg", "level", "scope")
+        errors.capture_message("error_msg", "info", "scope")
         mock_sentry_sdk.capture_message.assert_called_once_with(
-            "error_msg", "level", "scope"
+            "error_msg", "info", "scope"
         )
 
 
 def test_capture_message_no_sentry() -> None:
-    with patch.object(errors, "SENTRY", False), patch(
-        "nucliadb_telemetry.errors.sentry_sdk"
-    ) as mock_sentry_sdk:
-        errors.capture_message("error_msg", "level", "scope")
+    with (
+        patch.object(errors, "SENTRY", False),
+        patch("nucliadb_telemetry.errors.sentry_sdk") as mock_sentry_sdk,
+    ):
+        errors.capture_message("error_msg", "info", "scope")
         mock_sentry_sdk.capture_message.assert_not_called()
 
 
 def test_setup_error_handling(monkeypatch):
     monkeypatch.setenv("sentry_url", "sentry_url")
     monkeypatch.setenv("environment", "environment")
-    with patch("nucliadb_telemetry.errors.sentry_sdk") as mock_sentry_sdk, patch.object(
-        errors, "SENTRY", True
+    with (
+        patch("nucliadb_telemetry.errors.sentry_sdk") as mock_sentry_sdk,
+        patch.object(errors, "SENTRY", True),
     ):
         errors.setup_error_handling("1.0.0")
         mock_sentry_sdk.init.assert_called_once_with(
@@ -80,8 +85,9 @@ def test_setup_error_handling_no_sentry(monkeypatch):
 
 
 def test_push_scope() -> None:
-    with patch("nucliadb_telemetry.errors.sentry_sdk") as mock_sentry_sdk, patch.object(
-        errors, "SENTRY", True
+    with (
+        patch("nucliadb_telemetry.errors.sentry_sdk") as mock_sentry_sdk,
+        patch.object(errors, "SENTRY", True),
     ):
         with errors.push_scope() as scope:
             scope.set_extra("key", "value")
@@ -89,8 +95,9 @@ def test_push_scope() -> None:
 
 
 def test_push_scope_no_sentry() -> None:
-    with patch("nucliadb_telemetry.errors.sentry_sdk") as mock_sentry_sdk, patch.object(
-        errors, "SENTRY", False
+    with (
+        patch("nucliadb_telemetry.errors.sentry_sdk") as mock_sentry_sdk,
+        patch.object(errors, "SENTRY", False),
     ):
         with errors.push_scope() as scope:
             scope.set_extra("key", "value")

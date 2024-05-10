@@ -41,8 +41,9 @@ def test_clean_utility():
 @pytest.mark.asyncio
 async def test_get_storage_s3():
     s3 = AsyncMock()
-    with patch.object(utilities.storage_settings, "file_backend", "s3"), patch(
-        "nucliadb_utils.storages.s3.S3Storage", return_value=s3
+    with (
+        patch.object(utilities.storage_settings, "file_backend", "s3"),
+        patch("nucliadb_utils.storages.s3.S3Storage", return_value=s3),
     ):
         assert await utilities.get_storage() == s3
 
@@ -50,8 +51,9 @@ async def test_get_storage_s3():
 @pytest.mark.asyncio
 async def test_get_storage_gcs():
     gcs = AsyncMock()
-    with patch.object(utilities.storage_settings, "file_backend", "gcs"), patch(
-        "nucliadb_utils.storages.gcs.GCSStorage", return_value=gcs
+    with (
+        patch.object(utilities.storage_settings, "file_backend", "gcs"),
+        patch("nucliadb_utils.storages.gcs.GCSStorage", return_value=gcs),
     ):
         assert await utilities.get_storage() == gcs
 
@@ -59,8 +61,9 @@ async def test_get_storage_gcs():
 @pytest.mark.asyncio
 async def test_get_storage_pg():
     pg = AsyncMock()
-    with patch.object(utilities.storage_settings, "file_backend", "pg"), patch(
-        "nucliadb_utils.storages.pg.PostgresStorage", return_value=pg
+    with (
+        patch.object(utilities.storage_settings, "file_backend", "pg"),
+        patch("nucliadb_utils.storages.pg.PostgresStorage", return_value=pg),
     ):
         assert await utilities.get_storage() == pg
 
@@ -68,10 +71,10 @@ async def test_get_storage_pg():
 @pytest.mark.asyncio
 async def test_get_storage_local():
     local = AsyncMock()
-    with patch.object(
-        utilities.storage_settings, "file_backend", "local"
-    ), patch.object(utilities.storage_settings, "local_files", "/files"), patch(
-        "nucliadb_utils.storages.local.LocalStorage", return_value=local
+    with (
+        patch.object(utilities.storage_settings, "file_backend", "local"),
+        patch.object(utilities.storage_settings, "local_files", "/files"),
+        patch("nucliadb_utils.storages.local.LocalStorage", return_value=local),
     ):
         assert await utilities.get_storage() == local
 
@@ -112,8 +115,9 @@ async def test_finalize_utilities():
 
 @pytest.mark.asyncio
 async def test_start_audit_utility():
-    with patch("nucliadb_utils.utilities.NatsPubsub", return_value=AsyncMock()), patch(
-        "nucliadb_utils.utilities.StreamAuditStorage", return_value=AsyncMock()
+    with (
+        patch("nucliadb_utils.utilities.NatsPubsub", return_value=AsyncMock()),
+        patch("nucliadb_utils.utilities.StreamAuditStorage", return_value=AsyncMock()),
     ):
         await utilities.start_audit_utility("service")
 
@@ -122,8 +126,9 @@ async def test_start_audit_utility():
 
 @pytest.mark.asyncio
 async def test_stop_audit_utility():
-    with patch("nucliadb_utils.utilities.NatsPubsub", return_value=AsyncMock()), patch(
-        "nucliadb_utils.utilities.StreamAuditStorage", return_value=AsyncMock()
+    with (
+        patch("nucliadb_utils.utilities.NatsPubsub", return_value=AsyncMock()),
+        patch("nucliadb_utils.utilities.StreamAuditStorage", return_value=AsyncMock()),
     ):
         await utilities.start_audit_utility("service")
         await utilities.stop_audit_utility()

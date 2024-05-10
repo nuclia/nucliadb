@@ -37,9 +37,12 @@ async def test_migration_0018_global(maindb_driver: Driver):
     execution_context = Mock()
     execution_context.kv_driver = maindb_driver
 
-    with patch("nucliadb.ingest.orm.knowledgebox.get_storage", new=AsyncMock()), patch(
-        "nucliadb.ingest.orm.knowledgebox.get_shard_manager",
-        new=Mock(return_value=AsyncMock()),
+    with (
+        patch("nucliadb.ingest.orm.knowledgebox.get_storage", new=AsyncMock()),
+        patch(
+            "nucliadb.ingest.orm.knowledgebox.get_shard_manager",
+            new=Mock(return_value=AsyncMock()),
+        ),
     ):
         # setup some orphan /kbslugs keys and some real ones
         async with maindb_driver.transaction() as txn:

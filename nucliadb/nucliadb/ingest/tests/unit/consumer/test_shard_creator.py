@@ -58,14 +58,18 @@ def shard_manager(reader):
     shards = Shards(shards=[ShardObject(read_only=False)], actual=0)
     sm.get_current_active_shard = AsyncMock(return_value=shards.shards[0])
     sm.maybe_create_new_shard = AsyncMock()
-    with patch(
-        "nucliadb.ingest.consumer.shard_creator.get_shard_manager", return_value=sm
-    ), patch(
-        "nucliadb.ingest.consumer.shard_creator.choose_node",
-        return_value=(node, "shard_id"),
-    ), patch(
-        "nucliadb.ingest.consumer.shard_creator.locking.distributed_lock",
-        return_value=AsyncMock(),
+    with (
+        patch(
+            "nucliadb.ingest.consumer.shard_creator.get_shard_manager", return_value=sm
+        ),
+        patch(
+            "nucliadb.ingest.consumer.shard_creator.choose_node",
+            return_value=(node, "shard_id"),
+        ),
+        patch(
+            "nucliadb.ingest.consumer.shard_creator.locking.distributed_lock",
+            return_value=AsyncMock(),
+        ),
     ):
         yield sm
 

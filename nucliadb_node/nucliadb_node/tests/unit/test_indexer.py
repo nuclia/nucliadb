@@ -142,9 +142,10 @@ class TestConcurrentShardIndexer:
         self,
         csi: ConcurrentShardIndexer,
     ):
-        with patch("nucliadb_node.indexer.asyncio") as asyncio_mock, patch(
-            "nucliadb_node.indexer.PriorityIndexer"
-        ) as PriorityIndexer_mock:
+        with (
+            patch("nucliadb_node.indexer.asyncio") as asyncio_mock,
+            patch("nucliadb_node.indexer.PriorityIndexer") as PriorityIndexer_mock,
+        ):
             seqid = 1
             n_tasks = 5
             for i in range(n_tasks):

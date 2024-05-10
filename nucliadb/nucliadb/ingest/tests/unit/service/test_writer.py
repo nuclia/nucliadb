@@ -660,11 +660,14 @@ class TestWriterServicer:
         request = writer_pb2.IndexResource(kbid="kbid", rid="rid")
 
         txn = AsyncMock()
-        with patch(
-            "nucliadb.ingest.service.writer.get_partitioning"
-        ) as get_partitioning, patch(
-            "nucliadb.ingest.service.writer.get_transaction_utility",
-            MagicMock(return_value=txn),
+        with (
+            patch(
+                "nucliadb.ingest.service.writer.get_partitioning"
+            ) as get_partitioning,
+            patch(
+                "nucliadb.ingest.service.writer.get_transaction_utility",
+                MagicMock(return_value=txn),
+            ),
         ):
             resp = await writer.Index(request)
 

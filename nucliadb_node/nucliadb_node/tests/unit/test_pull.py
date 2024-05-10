@@ -92,8 +92,9 @@ class TestSubscriptionWorker:
     @pytest.fixture(scope="function")
     def worker(self, settings, nats_manager):
         writer = AsyncMock()
-        with mock.patch("nucliadb_node.pull.get_storage"), mock.patch(
-            "nucliadb_node.indexer.get_storage"
+        with (
+            mock.patch("nucliadb_node.pull.get_storage"),
+            mock.patch("nucliadb_node.indexer.get_storage"),
         ):
             worker = Worker(writer, "node", nats_manager)
             worker.store_seqid = Mock()

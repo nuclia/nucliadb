@@ -148,9 +148,10 @@ class IngestConsumer:
         message_source = "<msg source not set>"
         start = time.monotonic()
 
-        async with MessageProgressUpdater(
-            msg, nats_consumer_settings.nats_ack_wait * 0.66
-        ), self.lock:
+        async with (
+            MessageProgressUpdater(msg, nats_consumer_settings.nats_ack_wait * 0.66),
+            self.lock,
+        ):
             logger.info(
                 f"Message processing: subject:{subject}, seqid: {seqid}, reply: {reply}"
             )

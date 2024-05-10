@@ -72,20 +72,18 @@ jobs:
       - build-virtual-env
     steps:
       - uses: actions/checkout@v3
-      - name: Setup Python
-        uses: actions/setup-python@v4
+      - name: Set up PDM
+        uses: pdm-project/setup-pdm@v3
         with:
           python-version: "3.11"
       - name: Restore venv
         uses: actions/cache/restore@v4
         with:
-          path: /tmp/venv
+          path: .venv
           key: venv-${{ github.sha }}
           fail-on-cache-miss: true
       - name: Run mypy
-        run: |
-          source /tmp/venv/bin/activate
-          MYPYPATH=mypy_stubs mypy --config-file=mypy.ini -m nucliadb_node
+        run: pdm run mypy nucliadb_node
 
   licenses:
     name: Check Licenses
@@ -120,23 +118,16 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: Swatinem/rust-cache@v2
-      - name: Setup Python
-        uses: actions/setup-python@v4
+      - name: Set up PDM
+        uses: pdm-project/setup-pdm@v3
         with:
           python-version: "3.11"
-          cache: "pip"
       - name: Install venv
-        run: |
-          python -m venv /tmp/venv
-          source /tmp/venv/bin/activate
-          (pip install maturin && maturin build -m nucliadb_node_binding/Cargo.toml) &
-          pip install -r test-requirements.txt -r code-requirements.txt -r nucliadb/requirements.txt -r nucliadb/requirements-test.txt -r nucliadb/requirements-sources.txt -e ./nucliadb
-          wait $(jobs -p)
-          pip install ./nucliadb_node_binding
+        run: pdm sync -d
       - name: Upload virtualenv to cache
         uses: actions/cache/save@v4
         with:
-          path: /tmp/venv
+          path: .venv
           key: venv-${{ github.sha }}
 
   # Tests
@@ -155,7 +146,7 @@ jobs:
       - name: Restore venv
         uses: actions/cache/restore@v4
         with:
-          path: /tmp/venv
+          path: .venv
           key: venv-${{ github.sha }}
           fail-on-cache-miss: true
       - name: Restore binaries
@@ -169,7 +160,7 @@ jobs:
         run: mkdir builds && mv target/release/node_* builds && docker build -t europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node:latest -f Dockerfile.node_prebuilt .
 
       - name: Run tests
-        run: /tmp/venv/bin/pytest -rfE --cov=nucliadb_node -s --tb=native -v --cov-report xml --cov-append nucliadb_node/nucliadb_node
+        run: .venv/bin/pytest -rfE --cov=nucliadb_node -s --tb=native -v --cov-report xml --cov-append nucliadb_node/nucliadb_node
 
 
   node-rust-tests:
@@ -210,7 +201,7 @@ jobs:
       - name: Restore venv
         uses: actions/cache/restore@v4
         with:
-          path: /tmp/venv
+          path: .venv
           key: venv-${{ github.sha }}
           fail-on-cache-miss: true
 
@@ -228,7 +219,7 @@ jobs:
           max_attempts: 2
           retry_on: error
           timeout_minutes: 10
-          command: source /tmp/venv/bin/activate &&  make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=${{ matrix.shard }} --num-shards=3"
+          command: source .venv/bin/activate && make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=${{ matrix.shard }} --num-shards=3"
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3

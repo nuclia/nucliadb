@@ -672,8 +672,9 @@ async def test_ingest_autocommit_deadletter_marks_resource(
     rid = str(uuid.uuid4())
     message = make_message(kbid, rid)
 
-    with patch.object(processor, "notify_commit") as mock_notify, pytest.raises(
-        DeadletteredError
+    with (
+        patch.object(processor, "notify_commit") as mock_notify,
+        pytest.raises(DeadletteredError),
     ):
         # cause an error to force deadletter handling
         mock_notify.side_effect = Exception("test")
