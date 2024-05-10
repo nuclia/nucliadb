@@ -201,7 +201,10 @@ class KBShardManager:
         existing_kb_nodes = [
             replica.node for shard in kb_shards.shards for replica in shard.replicas
         ]
-        nodes = sorted_primary_nodes(avoid_nodes=existing_kb_nodes)
+        nodes = sorted_primary_nodes(
+            avoid_nodes=existing_kb_nodes,
+            ignore_nodes=settings.drain_nodes,
+        )
 
         shard_uuid = uuid.uuid4().hex
         shard = writer_pb2.ShardObject(shard=shard_uuid, read_only=False)
@@ -546,8 +549,10 @@ def check_enough_nodes():
     """
     It raises an exception if it can't find enough nodes for the configured replicas.
     """
+    drain_nodes = settings.drain_nodes
     target_replicas = settings.node_replicas
     available_nodes = get_index_nodes()
+    available_nodes = [node for node in available_nodes if node.id not in drain_nodes]
     if len(available_nodes) < target_replicas:
         raise NodeClusterSmall(
             f"Not enough nodes. Total: {len(available_nodes)}, Required: {target_replicas}"
@@ -564,26 +569,34 @@ def check_enough_nodes():
             )
 
 
-def sorted_primary_nodes(avoid_nodes: Optional[list[str]] = None) -> list[str]:
+def sorted_primary_nodes(
+    avoid_nodes: Optional[list[str]] = None,
+    ignore_nodes: Optional[list[str]] = None,
+) -> list[str]:
     """
     Returns the list of all primary node ids sorted by decreasing available
     disk space (from more to less available disk reported).
 
-    It will put the node ids in `avoid_nodes` at the tail of the list.
+    Nodes in `avoid_nodes` are placed at the tail of the list.
+    Nodes in `ignore_nodes` are ignored and never returned.
     """
     primary_nodes = get_index_nodes(include_secondary=False)
 
     # Sort by available disk
-    sorted_primary_nodes = sorted(
-        primary_nodes, key=lambda n: n.available_disk, reverse=True
-    )
-    available_node_ids = [node.id for node in sorted_primary_nodes]
+    sorted_nodes = sorted(primary_nodes, key=lambda n: n.available_disk, reverse=True)
+    available_node_ids = [node.id for node in sorted_nodes]
 
     avoid_nodes = avoid_nodes or []
-    # get preferred nodes first
+    ignore_nodes = ignore_nodes or []
+
+    # Get the non-avoided nodes first
     preferred_nodes = [nid for nid in available_node_ids if nid not in avoid_nodes]
-    # now, add to the end of the last nodes
-    preferred_node_order = preferred_nodes + [
+
+    # Add avoid_nodes to the end of the last nodes
+    result_nodes = preferred_nodes + [
         nid for nid in available_node_ids if nid not in preferred_nodes
     ]
-    return preferred_node_order
+
+    # Remove ignore_nodes from the list
+    result_nodes = [nid for nid in result_nodes if nid not in ignore_nodes]
+    return result_nodes

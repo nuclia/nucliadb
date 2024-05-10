@@ -60,7 +60,7 @@ def test_sorted_primary_nodes_orders_by_available_disk(available_nodes):
         assert nodes == ["node-0", "node-30", "node-40"]
 
 
-def test_sorted_primary_nodes_puts_nodes_to_avoid_at_the_end(available_nodes):
+def test_sorted_primary_nodes_avoid_nodes(available_nodes):
     with mock.patch.object(settings, "node_replicas", 2):
         excluded_node = "node-0"
         nodes = manager.sorted_primary_nodes(avoid_nodes=[excluded_node])
@@ -72,6 +72,15 @@ def test_sorted_primary_nodes_puts_nodes_to_avoid_at_the_end(available_nodes):
             "node-0",
             "node-30",
             "node-40",
+        ]
+
+        # check ignore_nodes are ignored while keeping avoid_nodes at the end
+        all_nodes = list(available_nodes.keys())
+        assert manager.sorted_primary_nodes(
+            avoid_nodes=["node-0"], ignore_nodes=["node-30"]
+        ) == [
+            "node-40",
+            "node-0",
         ]
 
 
