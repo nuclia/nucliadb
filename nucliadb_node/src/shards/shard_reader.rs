@@ -485,23 +485,7 @@ impl ShardReader {
         let vector_task = index_queries.vectors_request.map(|mut request| {
             request.id = search_id.clone();
             let vectors_context = &index_queries.vectors_context;
-            let task = move || {
-                let vectorset = &request.vector_set;
-                if vectorset.is_empty() {
-                    read_rw_lock(&self.vector_readers)
-                        .get(DEFAULT_VECTORS_INDEX_NAME)
-                        .expect("Default vectors index should never be deleted (yet)")
-                        .search(&request, vectors_context)
-                } else {
-                    let vector_readers = read_rw_lock(&self.vector_readers);
-                    let reader = vector_readers.get(vectorset);
-                    if let Some(reader) = reader {
-                        reader.search(&request, vectors_context)
-                    } else {
-                        Err(node_error!("Vectorset '{vectorset}' not found"))
-                    }
-                }
-            };
+            let task = move || self.vectors_index_search(&request, vectors_context);
             || run_with_telemetry(info_span!(parent: &span, "vector search"), task)
         });
 
@@ -624,10 +608,7 @@ impl ShardReader {
         let span = tracing::Span::current();
 
         run_with_telemetry(info_span!(parent: &span, "vector reader search"), || {
-            read_rw_lock(&self.vector_readers)
-                .get(DEFAULT_VECTORS_INDEX_NAME)
-                .expect("Default vectors index should never be deleted (yet)")
-                .search(&search_request, &VectorsContext::default())
+            self.vectors_index_search(&search_request, &VectorsContext::default())
         })
     }
     #[tracing::instrument(skip_all)]
@@ -671,6 +652,28 @@ impl ShardReader {
         let mut vector_indexes = write_rw_lock(&self.vector_readers);
         *vector_indexes = updated_indexes;
         Ok(())
+    }
+
+    fn vectors_index_search(
+        &self,
+        request: &VectorSearchRequest,
+        context: &VectorsContext,
+    ) -> NodeResult<VectorSearchResponse> {
+        let vectorset = &request.vector_set;
+        if vectorset.is_empty() {
+            read_rw_lock(&self.vector_readers)
+                .get(DEFAULT_VECTORS_INDEX_NAME)
+                .expect("Default vectors index should never be deleted (yet)")
+                .search(request, context)
+        } else {
+            let vector_readers = read_rw_lock(&self.vector_readers);
+            let reader = vector_readers.get(vectorset);
+            if let Some(reader) = reader {
+                reader.search(request, context)
+            } else {
+                Err(node_error!("Vectorset '{vectorset}' not found"))
+            }
+        }
     }
 }
 
