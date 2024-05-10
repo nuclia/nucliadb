@@ -340,10 +340,14 @@ class PredictEngine:
         ident = resp.headers.get(NUCLIA_LEARNING_ID_HEADER)
         return ident, get_answer_generator(resp)
 
-    @predict_observer.wrap({"type": "chat_v2"})
-    async def chat_query_v2(
+    @predict_observer.wrap({"type": "chat_ndjson"})
+    async def chat_query_ndjson(
         self, kbid: str, item: ChatModel
     ) -> tuple[str, AsyncIterator[GenerativeChunk]]:
+        """
+        Chat query using the new stream format
+        Format specs: https://github.com/ndjson/ndjson-spec
+        """
         try:
             self.check_nua_key_is_configured_for_onprem()
         except NUAKeyMissingError:
@@ -351,7 +355,7 @@ class PredictEngine:
             logger.warning(error)
             raise SendToPredictError(error)
 
-        # The new stream format is triggered by the Accept header
+        # The ndjson format is triggered by the Accept header
         headers = self.get_predict_headers(kbid)
         headers["Accept"] = "application/x-ndjson"
 
@@ -364,7 +368,7 @@ class PredictEngine:
         )
         await self.check_response(resp, expected_status=200)
         ident = resp.headers.get(NUCLIA_LEARNING_ID_HEADER)
-        return ident, get_chat_v2_answer_generator(resp)
+        return ident, get_chat_ndjson_generator(resp)
 
     @predict_observer.wrap({"type": "query"})
     async def query(
@@ -452,6 +456,12 @@ class DummyPredictEngine(PredictEngine):
             b" to",
             AnswerStatusCode.SUCCESS.encode(),
         ]
+        self.ndjson_answer = [
+            b'{"chunk": {"type": "text", "text": "valid "}}\n',
+            b'{"chunk": {"type": "text", "text": "answer "}}\n',
+            b'{"chunk": {"type": "text", "text": "to"}}\n',
+            b'{"chunk": {"type": "status", "code": "0"}}\n',
+        ]
         self.max_context = 1000
 
     async def initialize(self):
@@ -492,6 +502,17 @@ class DummyPredictEngine(PredictEngine):
         async def generate():
             for i in self.generated_answer:
                 yield i
+
+        return (DUMMY_LEARNING_ID, generate())
+
+    async def chat_query_ndjson(
+        self, kbid: str, item: ChatModel
+    ) -> tuple[str, AsyncIterator[bytes]]:
+        self.calls.append(("chat_query_ndjson", item))
+
+        async def generate():
+            for item in self.ndjson_answer:
+                yield item
 
         return (DUMMY_LEARNING_ID, generate())
 
@@ -573,9 +594,10 @@ def get_answer_generator(response: aiohttp.ClientResponse):
     return _iter_answer_chunks(response.content.iter_chunks())
 
 
-def get_chat_v2_answer_generator(
+def get_chat_ndjson_generator(
     response: aiohttp.ClientResponse,
 ) -> AsyncIterator[GenerativeChunk]:
+
     async def _parse_generative_chunks(gen):
         async for chunk in gen:
             try:
