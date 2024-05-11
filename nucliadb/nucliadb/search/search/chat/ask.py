@@ -66,14 +66,17 @@ from nucliadb_models.search import (
 )
 
 
+# TODO: move this to nucliadb_models.search
 class SyncAskResponse(pydantic.BaseModel):
-    answer: str
-    relations: Optional[Relations]
+    # TODO: Add the pydantic.Field descriptions for all fields
+    answer: str = pydantic.Field()
     results: KnowledgeboxFindResults
     status: AnswerStatusCode
+    relations: Optional[Relations] = None
     citations: dict[str, Any] = {}
     prompt_context: Optional[PromptContext] = None
     prompt_context_order: Optional[PromptContextOrder] = None
+    # TODO: Add more structure here
     metadata: dict[str, Any] = {}
 
 
@@ -121,22 +124,22 @@ class AskResult:
     def ask_request_with_debug_flag(self) -> bool:
         return self.ask_request.debug
 
-    async def stream(self) -> AsyncGenerator[str, None]:
+    async def ndjson_stream(self) -> AsyncGenerator[str, None]:
         try:
             async for item in self._stream():
-                yield self.encode_item(item)
+                yield self.ndjson_encode(item)
         except Exception as exc:
             # Handle any unexpected error that might happen
             # during the streaming and halt the stream
             item = ErrorAskResponseItem(error=str(exc))
-            yield self.encode_item(item)
+            yield self.ndjson_encode(item)
 
             staus = AnswerStatusCode.ERROR
             item = StatusAskResponseItem(code=staus.value, status=staus.name)
-            yield self.encode_item(item)
+            yield self.ndjson_encode(item)
             return
 
-    def encode_item(self, item: AskResponseItemType) -> str:
+    def ndjson_encode(self, item: AskResponseItemType) -> str:
         result_item = AskResultItem(item=item)
         return result_item.json(exclude_unset=False, exclude_none=True) + "\n"
 
@@ -194,7 +197,7 @@ class AskResult:
                 }
             )
 
-    async def to_sync_response(self) -> SyncAskResponse:
+    async def json(self) -> str:
         # First, run the stream in memory to get all the data in memory
         async for _ in self._stream():
             ...
@@ -220,7 +223,7 @@ class AskResult:
         if self.ask_request_with_debug_flag:
             response.prompt_context = self.prompt_context
             response.prompt_context_order = self.prompt_context_order
-        return response
+        return response.json(exclude_unset=True)
 
     async def get_relations_results(self) -> Relations:
         if self._relations is None:
@@ -264,27 +267,27 @@ class NotEnoughContextAskResult(AskResult):
         self.find_results = find_results
         self.nuclia_learning_id = None
 
-    async def stream(self) -> AsyncGenerator[str, None]:
+    async def ndjson_stream(self) -> AsyncGenerator[str, None]:
         """
         In the case where there are no results in the retrieval phase, we simply
         return the find results and the messages indicating that there is not enough
         context in the corpus to answer.
         """
-        yield self.encode_item(RetrievalAskResponseItem(results=self.find_results))
-        yield self.encode_item(
+        yield self.ndjson_encode(RetrievalAskResponseItem(results=self.find_results))
+        yield self.ndjson_encode(
             AnswerAskResponseItem(text="Not enough context to answer.")
         )
         status = AnswerStatusCode.NO_CONTEXT
-        yield self.encode_item(
+        yield self.ndjson_encode(
             StatusAskResponseItem(code=status.value, status=status.name)
         )
 
-    async def to_sync_response(self):
+    async def json(self) -> str:
         return SyncAskResponse(
             answer="Not enough context to answer.",
             results=self.find_results,
             status=AnswerStatusCode.NO_CONTEXT,
-        )
+        ).json(exclude_unset=True)
 
 
 async def ask(
@@ -296,15 +299,14 @@ async def ask(
     resource: Optional[str] = None,
 ) -> AskResult:
     start_time = time()
-    nuclia_learning_id: Optional[str] = None
     chat_history = ask_request.context or []
     user_context = ask_request.extra_context or []
     user_query = ask_request.query
-    rephrased_query = None
     prompt_context: PromptContext = {}
     prompt_context_order: PromptContextOrder = {}
 
     # Maybe rephrase the query
+    rephrased_query = None
     if len(chat_history) > 0 or len(user_context) > 0:
         rephrased_query = await rephrase_query(
             kbid,
@@ -335,7 +337,6 @@ async def ask(
             user=user_id,
             origin=origin,
         )
-
         if len(find_results.resources) == 0:
             return NotEnoughContextAskResult(find_results=find_results)
 
@@ -390,7 +391,7 @@ async def ask(
         query_context_images=prompt_context_images,
     )
     predict = get_predict()
-    nuclia_learning_id, predict_answer_stream = await predict.chat_query_v2(
+    nuclia_learning_id, predict_answer_stream = await predict.chat_query_ndjson(
         kbid, chat_model
     )
 

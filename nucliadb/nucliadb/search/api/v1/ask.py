@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import contextlib
 from typing import Optional, Union
 
 from fastapi import Header, Request, Response
@@ -44,12 +43,11 @@ from nucliadb_utils.utilities import has_feature
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/ask",
     status_code=200,
-    name="Ask Knowledge Box",
-    summary="Ask questions on a Knowledge Box",
+    summary="Ask Knowledge Box",
     description="Ask questions on a Knowledge Box",
     tags=["Search"],
     response_model=None,
-    # Include once the endpoint is stable enough
+    # TODO: Include in schema once the endpoint is stable enough
     include_in_schema=False,
 )
 @requires(NucliaDBRoles.READER)
@@ -62,26 +60,20 @@ async def ask_knowledgebox_endpoint(
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
     x_synchronous: bool = Header(
-        False,
+        default=False,
         description="When set to true, outputs response as JSON in a non-streaming way. "
         "This is slower and requires waiting for entire answer to be ready.",
     ),
 ) -> Union[StreamingResponse, HTTPClientError, Response]:
-    with ask_endpoint_handled_errors(kbid):
-        if not has_feature(const.Features.ASK_ENDPOINT, context={"kbid": kbid}):
-            return HTTPClientError(
-                status_code=404,
-                detail="This endpoint is not yet available for this Knowledge Box",
-            )
+    if not has_feature(const.Features.ASK_ENDPOINT, context={"kbid": kbid}):
+        return HTTPClientError(
+            status_code=404,
+            detail="This endpoint is not yet available for this Knowledge Box",
+        )
+    try:
         return await create_ask_response(
             kbid, item, x_nucliadb_user, x_ndb_client, x_forwarded_for, x_synchronous
         )
-
-
-@contextlib.contextmanager
-def ask_endpoint_handled_errors(kbid):
-    try:
-        yield
     except KnowledgeBoxNotFound:
         return HTTPClientError(
             status_code=404,
@@ -131,22 +123,21 @@ async def create_ask_response(
         origin,
         resource=resource,
     )
+    headers = {
+        "NUCLIA-LEARNING-ID": ask_result.nuclia_learning_id or "unknown",
+        "Access-Control-Expose-Headers": "NUCLIA-LEARNING-ID",
+    }
     if x_synchronous:
-        sync_response = await ask_result.to_sync_response()
         return Response(
-            content=sync_response.json(exclude_unset=True),
-            headers={
-                "NUCLIA-LEARNING-ID": ask_result.nuclia_learning_id or "unknown",
-                "Access-Control-Expose-Headers": "NUCLIA-LEARNING-ID",
-                "Content-Type": "application/json",
-            },
+            content=await ask_result.json(),
+            status_code=200,
+            headers=headers,
+            media_type="application/json",
         )
     else:
         return StreamingResponse(
-            ask_result.stream(),
-            media_type="application/octet-stream",
-            headers={
-                "NUCLIA-LEARNING-ID": ask_result.nuclia_learning_id or "unknown",
-                "Access-Control-Expose-Headers": "NUCLIA-LEARNING-ID",
-            },
+            content=ask_result.ndjson_stream(),
+            status_code=200,
+            headers=headers,
+            media_type="application/x-ndjson",
         )
