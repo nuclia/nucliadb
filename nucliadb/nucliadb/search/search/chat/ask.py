@@ -127,19 +127,19 @@ class AskResult:
     async def ndjson_stream(self) -> AsyncGenerator[str, None]:
         try:
             async for item in self._stream():
-                yield self.ndjson_encode(item)
+                yield self._ndjson_encode(item)
         except Exception as exc:
             # Handle any unexpected error that might happen
             # during the streaming and halt the stream
             item = ErrorAskResponseItem(error=str(exc))
-            yield self.ndjson_encode(item)
+            yield self._ndjson_encode(item)
 
             staus = AnswerStatusCode.ERROR
             item = StatusAskResponseItem(code=staus.value, status=staus.name)
-            yield self.ndjson_encode(item)
+            yield self._ndjson_encode(item)
             return
 
-    def ndjson_encode(self, item: AskResponseItemType) -> str:
+    def _ndjson_encode(self, item: AskResponseItemType) -> str:
         result_item = AskResultItem(item=item)
         return result_item.json(exclude_unset=False, exclude_none=True) + "\n"
 
@@ -256,7 +256,10 @@ class AskResult:
             elif isinstance(item, MetaGenerativeResponse):
                 self._metadata = item
             else:
-                logger.warning(f"Unexpected item in predict answer stream: {item}")
+                logger.warning(
+                    f"Unexpected item in predict answer stream: {item}",
+                    extra={"kbid": self.kbid},
+                )
 
 
 class NotEnoughContextAskResult(AskResult):
@@ -273,12 +276,12 @@ class NotEnoughContextAskResult(AskResult):
         return the find results and the messages indicating that there is not enough
         context in the corpus to answer.
         """
-        yield self.ndjson_encode(RetrievalAskResponseItem(results=self.find_results))
-        yield self.ndjson_encode(
+        yield self._ndjson_encode(RetrievalAskResponseItem(results=self.find_results))
+        yield self._ndjson_encode(
             AnswerAskResponseItem(text="Not enough context to answer.")
         )
         status = AnswerStatusCode.NO_CONTEXT
-        yield self.ndjson_encode(
+        yield self._ndjson_encode(
             StatusAskResponseItem(code=status.value, status=status.name)
         )
 
@@ -302,8 +305,6 @@ async def ask(
     chat_history = ask_request.context or []
     user_context = ask_request.extra_context or []
     user_query = ask_request.query
-    prompt_context: PromptContext = {}
-    prompt_context_order: PromptContextOrder = {}
 
     # Maybe rephrase the query
     rephrased_query = None
@@ -331,6 +332,7 @@ async def ask(
     if needs_retrieval:
         find_results, query_parser = await get_find_results(
             kbid=kbid,
+            # Prefer the rephrased query if available
             query=rephrased_query or user_query,
             chat_request=ask_request,
             ndb_client=client_type,
@@ -376,7 +378,7 @@ async def ask(
     if ask_request.prompt is not None:
         user_prompt = UserPrompt(prompt=ask_request.prompt)
 
-    # Make the chat request to the generative model
+    # Make the chat request to the predict API
     chat_model = ChatModel(
         user_id=user_id,
         query_context=prompt_context,
