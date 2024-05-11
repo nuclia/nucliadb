@@ -27,8 +27,6 @@ shards in nodes we want to remove.
 
 Will read the DRAIN_NODES envvar to get the list of nodes to drain.
 
-# TODO:
- - Figure out if we need to add the name or the id of the nodes.
 """
 
 import logging
