@@ -27,7 +27,11 @@ from nucliadb.common.cluster.discovery.utils import (
     setup_cluster_discovery,
     teardown_cluster_discovery,
 )
-from nucliadb.common.cluster.manager import KBShardManager, StandaloneKBShardManager
+from nucliadb.common.cluster.manager import (
+    KBShardManager,
+    StandaloneKBShardManager,
+    clear_index_nodes,
+)
 from nucliadb.common.cluster.settings import settings
 from nucliadb.common.cluster.standalone.service import (
     start_grpc as start_standalone_grpc,
@@ -79,6 +83,8 @@ async def teardown_cluster():
     if std_server is not None:
         await std_server.stop(None)
         clean_utility(_STANDALONE_SERVER)
+
+    clear_index_nodes()
 
 
 def get_shard_manager() -> KBShardManager:

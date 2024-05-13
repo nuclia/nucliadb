@@ -68,6 +68,11 @@ def get_index_node(node_id: str) -> Optional[AbstractIndexNode]:
     return INDEX_NODES.get(node_id)
 
 
+def clear_index_nodes():
+    INDEX_NODES.clear()
+    READ_REPLICA_INDEX_NODES.clear()
+
+
 def get_read_replica_node_ids(node_id: str) -> list[str]:
     return list(READ_REPLICA_INDEX_NODES.get(node_id, set()))
 
