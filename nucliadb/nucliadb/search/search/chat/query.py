@@ -409,13 +409,11 @@ async def maybe_audit_chat(
         audit_pb2.ChatContext(author=message.author, text=message.text)
         for message in chat_history
     ]
-    sorted_query_context = sorted_prompt_context_list(
-        query_context, query_context_order
-    )
+    query_context_paragaph_ids = list(query_context.keys())
     audit_context.append(
         audit_pb2.ChatContext(
             author=Author.NUCLIA,
-            text=AUDIT_TEXT_RESULT_SEP.join(sorted_query_context),
+            text=AUDIT_TEXT_RESULT_SEP.join(query_context_paragaph_ids),
         )
     )
     await audit.chat(
