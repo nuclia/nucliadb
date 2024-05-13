@@ -438,7 +438,7 @@ async def test_field_ids_are_validated(
     if error:
         assert resp.status_code == 422
         body = resp.json()
-        assert body["detail"][0]["type"] == "value_error.wrong_field_id"
+        assert body["detail"][0]["type"] == "string_pattern_mismatch"
     else:
         assert resp.status_code == 201
 
@@ -471,8 +471,8 @@ async def test_extra(
     assert error_detail["loc"] == ["body", "extra"]
     assert error_detail["type"] == "value_error"
     assert (
-        error_detail["msg"]
-        == "metadata should be less than 400000 bytes when serialized to JSON"
+        "metadata should be less than 400000 bytes when serialized to JSON"
+        in error_detail["msg"]
     )
     extra = {
         "metadata": {
@@ -592,7 +592,7 @@ async def test_resource_slug_validation(
         assert resp.status_code == 422
         detail = resp.json()["detail"][0]
         assert detail["loc"] == ["body", "slug"]
-        assert detail["msg"].startswith(f"Invalid slug: '{slug}'")
+        assert f"Invalid slug: '{slug}'" in detail["msg"]
 
 
 @pytest.mark.asyncio
@@ -985,7 +985,7 @@ async def test_pagination_limits(
     assert resp.status_code == 422
     data = resp.json()
     assert (
-        data["detail"][0]["msg"] == "ensure this value is less than or equal to 200.0"
+        data["detail"][0]["msg"] == "Input should be less than or equal to 200"
     )
 
     # Max scrolling of 2000 vector results

@@ -239,7 +239,7 @@ def test_search_resource(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaDB):
     for index, text in enumerate(DATA["text"]):
         if index == 50:
             break
-        label = DATA["label"][index]
+        label = str(DATA["label"][index])
         sdk.create_resource(
             kbid=kb.uuid,
             texts={"text": {"body": text}},

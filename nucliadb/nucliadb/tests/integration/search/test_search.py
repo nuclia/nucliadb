@@ -1392,7 +1392,7 @@ async def test_search_min_score(
         (
             [f"/a/{i}" for i in range(51)],
             False,
-            "ensure this value has at most 50 items",
+            "should have at most 50 items",
         ),
         (
             ["/a/b", "/a/b"],
@@ -1430,7 +1430,7 @@ async def test_facets_validation(
                 assert resp.status_code == 200
             else:
                 assert resp.status_code == 422
-                assert error_message == resp.json()["detail"][0]["msg"]
+                assert error_message in resp.json()["detail"][0]["msg"]
 
 
 @pytest.mark.asyncio

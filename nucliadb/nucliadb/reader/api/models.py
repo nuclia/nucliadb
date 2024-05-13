@@ -56,7 +56,7 @@ class ResourceField(BaseModel):
     field_type: FieldTypeName
     field_id: str
     value: ValueType = None
-    extracted: ExtractedDataType= None
+    extracted: ExtractedDataType = None
     error: Optional[Error] = None
 
 

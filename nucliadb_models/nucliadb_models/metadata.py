@@ -320,7 +320,9 @@ class UserFieldMetadata(BaseModel):
             for selections in message.page_selections
         ]
 
-        value["field"]["field_type"] = FIELD_TYPES_MAP[value["field"]["field_type"]].value
+        value["field"]["field_type"] = FIELD_TYPES_MAP[
+            value["field"]["field_type"]
+        ].value
         return cls(**value)
 
 
