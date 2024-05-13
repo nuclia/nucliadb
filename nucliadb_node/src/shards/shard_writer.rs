@@ -540,30 +540,56 @@ impl ShardWriter {
 
     #[tracing::instrument(skip_all)]
     pub fn merge(&self, context: MergeContext) -> NodeResult<MergeMetrics> {
-        // TODO: merge and returns metrics of all vectorsets
-        let merge_result = {
+        let mut merge_results = HashMap::new();
+
+        {
             let indexes: &ShardWriterIndexes = &read_rw_lock(&self.indexes);
-            let default_vectors_index = indexes
-                .vectors_indexes
-                .get(DEFAULT_VECTORS_INDEX_NAME)
-                .expect("Default vectors index should never be deleted (yet)");
-            let runner = default_vectors_index.prepare_merge(context.parameters)?;
-            let Some(mut runner) = runner else {
-                return Ok(MergeMetrics {
-                    merged: 0,
-                    left: 0,
-                });
-            };
-            runner.run()?
-        };
+            for (name, vectors_index) in indexes.vectors_indexes.iter() {
+                let runner = vectors_index.prepare_merge(context.parameters);
+                if let Ok(Some(mut runner)) = runner {
+                    let result = runner.run();
+                    merge_results.insert(name.clone(), result);
+                }
+            }
+        }
         {
             let indexes: &mut ShardWriterIndexes = &mut write_rw_lock(&self.indexes);
-            let default_vectors_index = indexes
-                .vectors_indexes
-                .get_mut(DEFAULT_VECTORS_INDEX_NAME)
-                .expect("Default vectors index should never be deleted (yet)");
-            let metrics = default_vectors_index.record_merge(merge_result, context.source)?;
-            self.metadata.new_generation_id();
+
+            let mut metrics = MergeMetrics {
+                merged: 0,
+                left: 0,
+            };
+            let mut prepare_merge_errors = Vec::new();
+            let mut record_merge_errors = Vec::new();
+            for (name, vectors_index) in indexes.vectors_indexes.iter_mut() {
+                let result = merge_results.remove(name);
+                if result.is_none() {
+                    // new index have been added while acquiring indexes a
+                    // second time. Ignore
+                    continue;
+                }
+                let result = result.unwrap();
+
+                if let Ok(merge_result) = result {
+                    let recorded = vectors_index.record_merge(merge_result, context.source);
+                    if let Ok(m) = recorded {
+                        metrics.merged += m.merged;
+                        metrics.left += m.left;
+                    } else {
+                        record_merge_errors.push(recorded);
+                    }
+                } else {
+                    prepare_merge_errors.push(result);
+                }
+            }
+
+            // return one of the errors we found if there are
+            for error in prepare_merge_errors {
+                error?;
+            }
+            for error in record_merge_errors {
+                error?;
+            }
 
             Ok(metrics)
         }
