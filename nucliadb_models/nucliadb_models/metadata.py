@@ -133,7 +133,7 @@ class Relation(BaseModel):
     from_: Optional[RelationEntity] = Field(None, validation_alias="from")
     to: RelationEntity
 
-    @model_validator(mode="after")
+    @model_validator(mode="before")
     def check_relation_is_valid(cls, values):
         if values["relation"] == RelationType.CHILD.value:
             if values["to"].get("type") != RelationNodeType.RESOURCE.value:
@@ -319,7 +319,8 @@ class UserFieldMetadata(BaseModel):
             )
             for selections in message.page_selections
         ]
-        value["field"]["field_type"] = FIELD_TYPES_MAP[value["field"]["field_type"]]
+
+        value["field"]["field_type"] = FIELD_TYPES_MAP[value["field"]["field_type"]].value
         return cls(**value)
 
 

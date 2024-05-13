@@ -232,12 +232,12 @@ class Paragraph(BaseModel):
         TITLE = "TITLE"
         TABLE = "TABLE"
 
-    kind: Optional[TypeParagraph]
-    classifications: Optional[List[Classification]]
-    sentences: Optional[List[Sentence]]
-    key: Optional[str]
-    page: Optional[PageInformation]
-    representation: Optional[Representation]
+    kind: Optional[TypeParagraph] = None
+    classifications: Optional[List[Classification]] = None
+    sentences: Optional[List[Sentence]] = None
+    key: Optional[str] = None
+    page: Optional[PageInformation] = None
+    representation: Optional[Representation] = None
 
 
 class Shards(BaseModel):
