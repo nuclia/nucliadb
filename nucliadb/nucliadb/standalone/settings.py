@@ -52,10 +52,13 @@ class Settings(DriverSettings, StorageSettings):
     # all settings here are mapped in to other env var settings used
     # in the app. These are helper settings to make things easier to
     # use with standalone app vs cluster app.
-    nua_api_key: Optional[str] = pydantic.Field(default=None,
-        description="Nuclia Understanding API Key. Read how to generate a NUA Key here: https://docs.nuclia.dev/docs/docs/using/understanding/intro#get-a-nua-key"  # noqa
+    nua_api_key: Optional[str] = pydantic.Field(
+        default=None,
+        description="Nuclia Understanding API Key. Read how to generate a NUA Key here: https://docs.nuclia.dev/docs/docs/using/understanding/intro#get-a-nua-key",  # noqa
     )
-    zone: Optional[str] = pydantic.Field(default=None, description="Nuclia Understanding API Zone ID")
+    zone: Optional[str] = pydantic.Field(
+        default=None, description="Nuclia Understanding API Zone ID"
+    )
     http_host: str = pydantic.Field(default="0.0.0.0", description="HTTP Port")
     http_port: int = pydantic.Field(default=8080, description="HTTP Port")
     ingest_grpc_port: int = pydantic.Field(default=8030, description="Ingest GRPC Port")

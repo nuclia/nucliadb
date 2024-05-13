@@ -23,7 +23,7 @@ import re
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import model_validator, BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from nucliadb_protos import resources_pb2
 
@@ -68,7 +68,7 @@ class ParamDefault(BaseModel):
             description=self.description,
             gt=self.gt,
             le=self.le,
-            max_items=self.max_items,
+            max_length=self.max_items,
         )
 
 

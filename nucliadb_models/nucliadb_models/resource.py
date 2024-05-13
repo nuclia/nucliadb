@@ -26,7 +26,7 @@ from typing import Any, Dict, List, Optional, Type, TypeVar, Union
 from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig as PBKnowledgeBoxConfig
 from nucliadb_protos.utils_pb2 import ReleaseChannel as PBReleaseChannel
-from pydantic import field_validator, BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from nucliadb_models.conversation import FieldConversation
 from nucliadb_models.datetime import FieldDatetime

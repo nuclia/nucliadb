@@ -21,7 +21,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Optional, Type, TypeVar
 
 from google.protobuf.json_format import MessageToDict
-from pydantic import model_validator, BaseModel
+from pydantic import BaseModel, model_validator
 
 from nucliadb_models.utils import validate_json
 from nucliadb_protos import resources_pb2

@@ -51,7 +51,7 @@ aiodns>=3.0.0
 types-orjson
 
 asyncpg>=0.27.0
-tikv-client>=0.0.3
+tikv-client==0.0.3
 
 # improve dependency resolution
 multidict>=6.0.4

@@ -21,7 +21,6 @@ import json
 from typing import Any, Optional
 
 import mrflagly
-import pydantic
 import pydantic_settings
 
 from nucliadb_utils import const

@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 from typing import List, Optional
+
 from pydantic_settings import BaseSettings
 
 

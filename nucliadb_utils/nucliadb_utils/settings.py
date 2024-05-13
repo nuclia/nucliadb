@@ -20,8 +20,7 @@
 from enum import Enum
 from typing import Dict, List, Optional
 
-from pydantic import model_validator, Field, AliasChoices
-from pydantic.class_validators import root_validator
+from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings
 
 
@@ -68,7 +67,7 @@ class FileBackendConfig(str, Enum):
 
 class StorageSettings(BaseSettings):
     file_backend: FileBackendConfig = Field(
-        FileBackendConfig.NOT_SET, description="File backend storage type"
+        default=FileBackendConfig.NOT_SET, description="File backend storage type"
     )
 
     gcs_base64_creds: Optional[str] = Field(
@@ -131,7 +130,9 @@ class NucliaSettings(BaseSettings):
         "http://processing-api.processing.svc.cluster.local:8080"
     )
     nuclia_inner_predict_url: str = "http://predict.learning.svc.cluster.local:8080"
-    learning_internal_svc_base_url: str = "http://{service}.learning.svc.cluster.local:8080"
+    learning_internal_svc_base_url: str = (
+        "http://{service}.learning.svc.cluster.local:8080"
+    )
 
     nuclia_zone: str = "europe-1"
     onprem: bool = True

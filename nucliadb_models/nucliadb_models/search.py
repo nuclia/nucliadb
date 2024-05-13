@@ -20,7 +20,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional, Type, TypeVar, Union, Set
+from typing import Any, Dict, List, Literal, Optional, Set, Type, TypeVar, Union
 
 from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.audit_pb2 import ClientType
@@ -29,7 +29,7 @@ from nucliadb_protos.nodereader_pb2 import ParagraphResult as PBParagraphResult
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb_protos.writer_pb2 import Shards as PBShards
-from pydantic import field_validator, model_validator, BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing_extensions import Annotated
 
 from nucliadb_models.common import FieldTypeName, ParamDefault
@@ -1229,7 +1229,7 @@ class FindResource(Resource):
     fields: Dict[str, FindField]
 
     def updated_from(self, origin: Resource):
-        for key in origin.__fields__.keys():
+        for key in origin.model_fields.keys():
             self.__setattr__(key, getattr(origin, key))
 
 
@@ -1255,7 +1255,8 @@ class KnowledgeboxFindResults(JsonBaseModel):
     )
     autofilters: List[str] = ModelParamDefaults.applied_autofilters.to_pydantic_field()
     min_score: Optional[Union[float, MinScore]] = Field(
-        None, title="Minimum result score",
+        None,
+        title="Minimum result score",
         description="The minimum scores that have been used for the search operation.",
     )
     best_matches: List[str] = Field(

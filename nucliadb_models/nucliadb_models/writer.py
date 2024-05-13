@@ -20,7 +20,7 @@
 import json
 from typing import Dict, List, Optional, Union
 
-from pydantic import field_validator, BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from nucliadb_models.conversation import InputConversationField
 from nucliadb_models.datetime import FieldDatetime
@@ -38,7 +38,7 @@ from nucliadb_models.metadata import (
 from nucliadb_models.processing import PushProcessingOptions
 from nucliadb_models.security import ResourceSecurity
 from nucliadb_models.text import TextField
-from nucliadb_models.utils import FieldIdString, SlugString
+from nucliadb_models.utils import FieldIdPattern, FieldIdString, SlugString
 
 GENERIC_MIME_TYPE = "application/generic"
 
@@ -60,37 +60,37 @@ class FieldDefaults:
     files = Field(
         {},
         title="Files",
-        description=f"Dictionary of file fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdString.__metadata__[0].pattern}",  # noqa
+        description=f"Dictionary of file fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdPattern}",  # noqa
     )
     links = Field(
         {},
         title="Links",
-        description=f"Dictionary of link fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdString.__metadata__[0].pattern}",  # noqa
+        description=f"Dictionary of link fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdPattern}",  # noqa
     )
     texts = Field(
         {},
         title="Texts",
-        description=f"Dictionary of text fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdString.__metadata__[0].pattern}",  # noqa
+        description=f"Dictionary of text fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdPattern}",  # noqa
     )
     layouts = Field(
         {},
         title="Layouts",
-        description=f"Dictionary of layout fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdString.__metadata__[0].pattern}",  # noqa
+        description=f"Dictionary of layout fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdPattern}",  # noqa
     )
     conversations = Field(
         {},
         title="Conversations",
-        description=f"Dictionary of conversation fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdString.__metadata__[0].pattern}",  # noqa
+        description=f"Dictionary of conversation fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdPattern}",  # noqa
     )
     keywordsets = Field(
         {},
         title="Keywordsets",
-        description=f"Dictionary of keywordset fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdString.__metadata__[0].pattern}",  # noqa
+        description=f"Dictionary of keywordset fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdPattern}",  # noqa
     )
     datetimes = Field(
         {},
         title="Datetimes",
-        description=f"Dictionary of datetime fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdString.__metadata__[0].pattern}",  # noqa
+        description=f"Dictionary of datetime fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdPattern}",  # noqa
     )
 
 

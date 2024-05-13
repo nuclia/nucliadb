@@ -18,13 +18,14 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import json
-import re
 
 import pydantic
 from typing_extensions import Annotated
 
+FieldIdPattern = r"^[a-zA-Z0-9:_-]+$"
 
-FieldIdString = Annotated[str, pydantic.StringConstraints(pattern=r"^[a-zA-Z0-9:_-]+$")]
+
+FieldIdString = Annotated[str, pydantic.StringConstraints(pattern=FieldIdPattern)]
 
 
 SlugString = Annotated[str, pydantic.StringConstraints(pattern=r"^[a-zA-Z0-9:_-]+$")]

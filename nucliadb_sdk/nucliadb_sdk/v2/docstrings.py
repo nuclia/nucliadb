@@ -443,7 +443,7 @@ def _inject_signature_and_annotations(
     # Body params
     if request_type is not None:
         if isinstance(request_type, type) and issubclass(request_type, BaseModel):
-            for field in request_type.__fields__.values():
+            for field in request_type.model_fields.values():
                 parameters.append(
                     inspect.Parameter(
                         field.name,
@@ -515,7 +515,7 @@ def _inject_docstring(
         params.append(f":type {path_param}: <class 'str'>")
     if request_type is not None:
         if isinstance(request_type, type) and issubclass(request_type, BaseModel):
-            for field in request_type.__fields__.values():
+            for field in request_type.model_fields.values():
                 params.append(
                     f":param {field.name}: {field.field_info.description or ''}"
                 )
