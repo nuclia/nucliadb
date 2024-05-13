@@ -92,8 +92,8 @@ class Region(str, enum.Enum):
 class ChatResponse(BaseModel):
     result: KnowledgeboxFindResults
     answer: str
-    relations: Optional[Relations]
-    learning_id: Optional[str]
+    relations: Optional[Relations] = None
+    learning_id: Optional[str] = None
     citations: dict[str, Any] = {}
 
 

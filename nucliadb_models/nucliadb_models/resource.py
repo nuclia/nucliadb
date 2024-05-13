@@ -26,7 +26,7 @@ from typing import Any, Dict, List, Optional, Type, TypeVar, Union
 from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig as PBKnowledgeBoxConfig
 from nucliadb_protos.utils_pb2 import ReleaseChannel as PBReleaseChannel
-from pydantic import BaseModel, Field, validator
+from pydantic import field_validator, BaseModel, Field
 
 from nucliadb_models.conversation import FieldConversation
 from nucliadb_models.datetime import FieldDatetime
@@ -130,7 +130,8 @@ class KnowledgeBoxConfig(BaseModel):
         description="This field is deprecated. Use 'learning_configuration' instead.",
     )
 
-    @validator("slug")
+    @field_validator("slug")
+    @classmethod
     def id_check(cls, v: str) -> str:
         for char in v:
             if char in string.ascii_uppercase:

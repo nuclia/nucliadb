@@ -24,7 +24,7 @@ from typing import Optional, Union
 from fastapi import Body, Header, Query, Request, Response
 from fastapi.openapi.models import Example
 from fastapi_versioning import version
-from pydantic.error_wrappers import ValidationError
+from pydantic import ValidationError
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.models.responses import HTTPClientError

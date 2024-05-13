@@ -35,7 +35,7 @@ class Keyword(BaseModel):
 
 
 class FieldKeywordset(BaseModel):
-    keywords: Optional[List[Keyword]]
+    keywords: Optional[List[Keyword]] = None
 
     @classmethod
     def from_message(cls: Type[_T], message: resources_pb2.FieldKeywordset) -> _T:

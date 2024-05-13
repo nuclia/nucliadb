@@ -22,12 +22,13 @@ from typing import Any, Optional
 
 import mrflagly
 import pydantic
+import pydantic_settings
 
 from nucliadb_utils import const
 from nucliadb_utils.settings import nuclia_settings, running_settings
 
 
-class Settings(pydantic.BaseSettings):
+class Settings(pydantic_settings.BaseSettings):
     flag_settings_url: Optional[str]
 
 

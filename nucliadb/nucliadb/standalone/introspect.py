@@ -70,7 +70,7 @@ class NodeInfo(BaseModel):
     id: str
     address: str
     shard_count: int
-    primary_id: Optional[str]
+    primary_id: Optional[str] = None
 
 
 class ClusterInfo(BaseModel):

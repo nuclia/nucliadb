@@ -3,7 +3,8 @@ types-protobuf
 grpcio
 requests
 aiohttp
-pydantic_argparse
+pydantic_argparse @ git+https://github.com/cody-mar10/pydantic-argparse.git@master
+pydantic-settings>=2.2
 pyarrow
 
 # automatically bumped during release

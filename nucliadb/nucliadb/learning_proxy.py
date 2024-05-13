@@ -28,7 +28,7 @@ import backoff
 import httpx
 from fastapi import Request, Response
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field, root_validator
+from pydantic import model_validator, BaseModel, Field
 
 from nucliadb_telemetry import errors
 from nucliadb_utils.settings import is_onprem_nucliadb, nuclia_settings
@@ -60,16 +60,17 @@ class LearningConfiguration(BaseModel):
     # aka similarity function
     semantic_vector_similarity: str
     # aka vector_dimension
-    semantic_vector_size: Optional[int]
+    semantic_vector_size: Optional[int] = None
     # aka min_score
-    semantic_threshold: Optional[float]
+    semantic_threshold: Optional[float] = None
     # List of possible subdivisions of the matryoshka embeddings (if the model
     # supports it)
     semantic_matryoshka_dimensions: Optional[list[int]] = Field(
         default=None, alias="semantic_matryoshka_dims"
     )
 
-    @root_validator(pre=False)
+    @model_validator(mode="after")
+    @classmethod
     def validate_matryoshka_and_vector_dimension_consistency(cls, values):
         vector_size = values.get("semantic_vector_size")
         matryoshka_dimensions = values.get("semantic_matryoshka_dimensions", []) or []

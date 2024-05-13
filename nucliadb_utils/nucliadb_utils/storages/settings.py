@@ -19,8 +19,7 @@
 
 import os
 from typing import Dict, Optional
-
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):

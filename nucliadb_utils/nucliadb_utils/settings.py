@@ -20,8 +20,9 @@
 from enum import Enum
 from typing import Dict, List, Optional
 
-from pydantic import BaseSettings, Field
+from pydantic import model_validator, Field, AliasChoices
 from pydantic.class_validators import root_validator
+from pydantic_settings import BaseSettings
 
 
 class RunningSettings(BaseSettings):
@@ -29,7 +30,7 @@ class RunningSettings(BaseSettings):
     sentry_url: Optional[str] = None
     running_environment: str = Field(
         default="local",
-        env=["environment", "running_environment"],
+        validation_alias=AliasChoices("environment", "running_environment"),
         description="Running environment. One of: local, test, stage, prod",
     )
     metrics_port: int = 3030
@@ -53,7 +54,7 @@ class FileBackendConfig(str, Enum):
     S3 = "s3"
     PG = "pg"
     LOCAL = "local"
-    NOT_SET = "notset"  # setting not provided
+    NOT_SET = "notset123"  # setting not provided
 
     @classmethod
     def _missing_(cls, value):
@@ -67,7 +68,7 @@ class FileBackendConfig(str, Enum):
 
 class StorageSettings(BaseSettings):
     file_backend: FileBackendConfig = Field(
-        default=FileBackendConfig.NOT_SET, description="File backend storage type"
+        FileBackendConfig.NOT_SET, description="File backend storage type"
     )
 
     gcs_base64_creds: Optional[str] = Field(
@@ -130,7 +131,7 @@ class NucliaSettings(BaseSettings):
         "http://processing-api.processing.svc.cluster.local:8080"
     )
     nuclia_inner_predict_url: str = "http://predict.learning.svc.cluster.local:8080"
-    learning_internal_svc_base_url = "http://{service}.learning.svc.cluster.local:8080"
+    learning_internal_svc_base_url: str = "http://{service}.learning.svc.cluster.local:8080"
 
     nuclia_zone: str = "europe-1"
     onprem: bool = True
@@ -145,7 +146,8 @@ class NucliaSettings(BaseSettings):
     local_predict: bool = False
     local_predict_headers: Dict[str, str] = {}
 
-    @root_validator(pre=True)
+    @model_validator(mode="before")
+    @classmethod
     def check_onprem_does_not_use_jwt_key(cls, values):
         if values.get("onprem") and values.get("jwt_key") is not None:
             raise ValueError("Invalid validation")

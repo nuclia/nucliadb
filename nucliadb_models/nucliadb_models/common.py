@@ -23,7 +23,7 @@ import re
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, root_validator
+from pydantic import model_validator, BaseModel, Field
 
 from nucliadb_protos import resources_pb2
 
@@ -50,7 +50,7 @@ _NOT_SET = object()
 
 
 class ParamDefault(BaseModel):
-    default: Any
+    default: Any = None
     title: str
     description: str
     le: Optional[float] = None
@@ -88,15 +88,16 @@ class FieldID(BaseModel):
 
 
 class File(BaseModel):
-    filename: Optional[str]
+    filename: Optional[str] = None
     content_type: str = "application/octet-stream"
-    payload: Optional[str] = Field(description="Base64 encoded file content")
+    payload: Optional[str] = Field(None, description="Base64 encoded file content")
     md5: Optional[str] = None
     # These are to be used for external files
     uri: Optional[str] = None
     extra_headers: Dict[str, str] = {}
 
-    @root_validator(pre=False)
+    @model_validator(mode="after")
+    @classmethod
     def _check_internal_file_fields(cls, values):
         if values.get("uri"):
             # Externally hosted file
@@ -128,10 +129,10 @@ class FileB64(BaseModel):
 
 
 class CloudFile(BaseModel):
-    uri: Optional[str]
-    size: Optional[int]
-    content_type: Optional[str]
-    bucket_name: Optional[str]
+    uri: Optional[str] = None
+    size: Optional[int] = None
+    content_type: Optional[str] = None
+    bucket_name: Optional[str] = None
 
     class Source(Enum):
         FLAPS = "FLAPS"
@@ -152,11 +153,11 @@ class CloudFile(BaseModel):
 
 
 class CloudLink(BaseModel):
-    uri: Optional[str]
-    size: Optional[int]
-    content_type: Optional[str]
-    filename: Optional[str]
-    md5: Optional[str]
+    uri: Optional[str] = None
+    size: Optional[int] = None
+    content_type: Optional[str] = None
+    filename: Optional[str] = None
+    md5: Optional[str] = None
 
     @staticmethod
     def format_reader_download_uri(uri: str) -> str:
@@ -201,26 +202,26 @@ class UserClassification(Classification):
 
 
 class Sentence(BaseModel):
-    start: Optional[int]
-    end: Optional[int]
-    key: Optional[str]
+    start: Optional[int] = None
+    end: Optional[int] = None
+    key: Optional[str] = None
 
 
 class PageInformation(BaseModel):
-    page: Optional[int]
-    page_with_visual: Optional[bool]
+    page: Optional[int] = None
+    page_with_visual: Optional[bool] = None
 
 
 class Representation(BaseModel):
-    is_a_table: Optional[bool]
-    reference_file: Optional[str]
+    is_a_table: Optional[bool] = None
+    reference_file: Optional[str] = None
 
 
 class Paragraph(BaseModel):
-    start: Optional[int]
-    end: Optional[int]
-    start_seconds: Optional[List[int]]
-    end_seconds: Optional[List[int]]
+    start: Optional[int] = None
+    end: Optional[int] = None
+    start_seconds: Optional[List[int]] = None
+    end_seconds: Optional[List[int]] = None
 
     class TypeParagraph(str, Enum):
         TEXT = "TEXT"
@@ -240,7 +241,7 @@ class Paragraph(BaseModel):
 
 
 class Shards(BaseModel):
-    shards: Optional[List[str]]
+    shards: Optional[List[str]] = None
 
 
 FIELD_TYPES_MAP: Dict[resources_pb2.FieldType.ValueType, FieldTypeName] = {

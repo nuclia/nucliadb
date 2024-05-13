@@ -21,7 +21,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Optional, Type, TypeVar
 
 from google.protobuf.json_format import MessageToDict
-from pydantic import BaseModel, root_validator
+from pydantic import model_validator, BaseModel
 
 from nucliadb_models.utils import validate_json
 from nucliadb_protos import resources_pb2
@@ -61,9 +61,9 @@ TEXT_FORMAT_TO_MIMETYPE = {
 
 
 class FieldText(BaseModel):
-    body: Optional[str]
-    format: Optional[TextFormat]
-    md5: Optional[str]
+    body: Optional[str] = None
+    format: Optional[TextFormat] = None
+    md5: Optional[str] = None
 
     @classmethod
     def from_message(cls: Type[_T], message: resources_pb2.FieldText) -> _T:
@@ -83,7 +83,8 @@ class TextField(BaseModel):
     body: str
     format: TextFormat = TextFormat.PLAIN
 
-    @root_validator(pre=False, skip_on_failure=True)
+    @model_validator(mode="after")
+    @classmethod
     def check_text_format(cls, values):
         if values.get("format") == TextFormat.JSON:
             validate_json(values.get("body", ""))

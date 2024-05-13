@@ -20,7 +20,7 @@
 import json
 from typing import Dict, List, Optional, Union
 
-from pydantic import BaseModel, Field, validator
+from pydantic import field_validator, BaseModel, Field
 
 from nucliadb_models.conversation import InputConversationField
 from nucliadb_models.datetime import FieldDatetime
@@ -60,37 +60,37 @@ class FieldDefaults:
     files = Field(
         {},
         title="Files",
-        description=f"Dictionary of file fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdString.regex.pattern}",  # noqa
+        description=f"Dictionary of file fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdString.__metadata__[0].pattern}",  # noqa
     )
     links = Field(
         {},
         title="Links",
-        description=f"Dictionary of link fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdString.regex.pattern}",  # noqa
+        description=f"Dictionary of link fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdString.__metadata__[0].pattern}",  # noqa
     )
     texts = Field(
         {},
         title="Texts",
-        description=f"Dictionary of text fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdString.regex.pattern}",  # noqa
+        description=f"Dictionary of text fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdString.__metadata__[0].pattern}",  # noqa
     )
     layouts = Field(
         {},
         title="Layouts",
-        description=f"Dictionary of layout fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdString.regex.pattern}",  # noqa
+        description=f"Dictionary of layout fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdString.__metadata__[0].pattern}",  # noqa
     )
     conversations = Field(
         {},
         title="Conversations",
-        description=f"Dictionary of conversation fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdString.regex.pattern}",  # noqa
+        description=f"Dictionary of conversation fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdString.__metadata__[0].pattern}",  # noqa
     )
     keywordsets = Field(
         {},
         title="Keywordsets",
-        description=f"Dictionary of keywordset fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdString.regex.pattern}",  # noqa
+        description=f"Dictionary of keywordset fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdString.__metadata__[0].pattern}",  # noqa
     )
     datetimes = Field(
         {},
         title="Datetimes",
-        description=f"Dictionary of datetime fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdString.regex.pattern}",  # noqa
+        description=f"Dictionary of datetime fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdString.__metadata__[0].pattern}",  # noqa
     )
 
 
@@ -123,7 +123,8 @@ class CreateResourcePayload(BaseModel):
         description="Security metadata for the resource. It can be used to have fine-grained control over who can access the resource.",  # noqa
     )
 
-    @validator("icon")
+    @field_validator("icon")
+    @classmethod
     def icon_check(cls, v):
         if v is None:
             return v
@@ -136,7 +137,8 @@ class CreateResourcePayload(BaseModel):
 
         return v
 
-    @validator("extra")
+    @field_validator("extra")
+    @classmethod
     def extra_check(cls, value):
         limit = 400_000
         if value and value.metadata and len(json.dumps(value.metadata)) > limit:

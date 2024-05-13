@@ -21,9 +21,10 @@ import enum
 from typing import Dict, Optional
 
 import pydantic
+from pydantic_settings import BaseSettings
 
 try:
-    from pydantic import BaseSettings
+    pass
 except ImportError:  # pragma: no cover
     from pydantic_settings import BaseSettings  # type: ignore
 
