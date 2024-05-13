@@ -452,7 +452,7 @@ def _inject_signature_and_annotations(
                         default=field.default,
                     )
                 )
-                annotations[field.name] = field.annotation  # type: ignore
+                annotations[field_name] = field.annotation  # type: ignore
         parameters.append(
             inspect.Parameter(
                 "content",

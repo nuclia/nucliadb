@@ -28,7 +28,7 @@ from nucliadb_utils.settings import nuclia_settings, running_settings
 
 
 class Settings(pydantic_settings.BaseSettings):
-    flag_settings_url: Optional[str]
+    flag_settings_url: Optional[str] = None
 
 
 DEFAULT_FLAG_DATA: dict[str, Any] = {

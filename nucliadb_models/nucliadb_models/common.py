@@ -96,7 +96,7 @@ class File(BaseModel):
     uri: Optional[str] = None
     extra_headers: Dict[str, str] = {}
 
-    @model_validator(mode="after")
+    @model_validator(mode="before")
     @classmethod
     def _check_internal_file_fields(cls, values):
         if values.get("uri"):
