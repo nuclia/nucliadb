@@ -18,9 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from time import monotonic as time
-from typing import Any, AsyncGenerator, Optional
-
-import pydantic
+from typing import AsyncGenerator, Optional
 
 from nucliadb.search import logger
 from nucliadb.search.predict import (
@@ -37,6 +35,7 @@ from nucliadb.search.search.chat.query import (
     get_find_results,
     get_relations_results,
     rephrase_query,
+    sorted_prompt_context_list,
     tokens_to_chars,
 )
 from nucliadb.search.search.query import QueryParser
@@ -47,6 +46,7 @@ from nucliadb_models.search import (
     AskResponseItemType,
     AskResultItem,
     AskTimings,
+    AskTokens,
     ChatModel,
     ChatOptions,
     CitationsAskResponseItem,
@@ -62,22 +62,10 @@ from nucliadb_models.search import (
     RelationsAskResponseItem,
     RetrievalAskResponseItem,
     StatusAskResponseItem,
+    SyncAskMetadata,
+    SyncAskResponse,
     UserPrompt,
 )
-
-
-# TODO: move this to nucliadb_models.search
-class SyncAskResponse(pydantic.BaseModel):
-    # TODO: Add the pydantic.Field descriptions for all fields
-    answer: str = pydantic.Field()
-    results: KnowledgeboxFindResults
-    status: AnswerStatusCode
-    relations: Optional[Relations] = None
-    citations: dict[str, Any] = {}
-    prompt_context: Optional[PromptContext] = None
-    prompt_context_order: Optional[PromptContextOrder] = None
-    # TODO: Add more structure here
-    metadata: dict[str, Any] = {}
 
 
 class AskResult:
@@ -135,7 +123,7 @@ class AskResult:
             yield self._ndjson_encode(item)
 
             staus = AnswerStatusCode.ERROR
-            item = StatusAskResponseItem(code=staus.value, status=staus.name)
+            item = StatusAskResponseItem(code=staus.value, status=staus.prettify())
             yield self._ndjson_encode(item)
             return
 
@@ -153,7 +141,7 @@ class AskResult:
 
         # Then the status code
         yield StatusAskResponseItem(
-            code=self.status_code.value, status=self.status_code.name
+            code=self.status_code.value, status=self.status_code.prettify()
         )
 
         # Audit the answer
@@ -169,8 +157,10 @@ class AskResult:
         # Stream out other metadata about the answer if available
         if self._metadata is not None:
             yield MetadataAskResponseItem(
-                input_tokens=self._metadata.input_tokens,
-                output_tokens=self._metadata.output_tokens,
+                tokens=AskTokens(
+                    input=self._metadata.input_tokens,
+                    output=self._metadata.output_tokens,
+                ),
                 timings=AskTimings(
                     generative_first_chunk=self._metadata.timings.get(
                         "generative_first_chunk"
@@ -202,27 +192,36 @@ class AskResult:
         async for _ in self._stream():
             ...
 
-        metadata = {}
+        metadata = None
         if self._metadata is not None:
-            metadata = {
-                "input_tokens": self._metadata.input_tokens,
-                "output_tokens": self._metadata.output_tokens,
-                "timings": self._metadata.timings,
-            }
+            metadata = SyncAskMetadata(
+                tokens=AskTokens(
+                    input=self._metadata.input_tokens,
+                    output=self._metadata.output_tokens,
+                ),
+                timings=AskTimings(
+                    generative_first_chunk=self._metadata.timings.get(
+                        "generative_first_chunk"
+                    ),
+                    generative_total=self._metadata.timings.get("generative"),
+                ),
+            )
         citations = {}
         if self._citations is not None:
             citations = self._citations.citations
         response = SyncAskResponse(
             answer=self._answer_text,
+            status=self.status_code.prettify(),
             relations=self._relations,
-            results=self.find_results,
-            status=self.status_code,
+            retrieval_results=self.find_results,
             citations=citations,
             metadata=metadata,
         )
         if self.ask_request_with_debug_flag:
-            response.prompt_context = self.prompt_context
-            response.prompt_context_order = self.prompt_context_order
+            sorted_prompt_context = sorted_prompt_context_list(
+                self.prompt_context, self.prompt_context_order
+            )
+            response.prompt_context = sorted_prompt_context
         return response.json(exclude_unset=True)
 
     async def get_relations_results(self) -> Relations:
@@ -282,13 +281,13 @@ class NotEnoughContextAskResult(AskResult):
         )
         status = AnswerStatusCode.NO_CONTEXT
         yield self._ndjson_encode(
-            StatusAskResponseItem(code=status.value, status=status.name)
+            StatusAskResponseItem(code=status.value, status=status.prettify())
         )
 
     async def json(self) -> str:
         return SyncAskResponse(
             answer="Not enough context to answer.",
-            results=self.find_results,
+            retrieval_results=self.find_results,
             status=AnswerStatusCode.NO_CONTEXT,
         ).json(exclude_unset=True)
 

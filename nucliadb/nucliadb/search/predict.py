@@ -115,6 +115,13 @@ class AnswerStatusCode(str, Enum):
     ERROR = "-1"
     NO_CONTEXT = "-2"
 
+    def prettify(self) -> str:
+        return {
+            AnswerStatusCode.SUCCESS: "success",
+            AnswerStatusCode.ERROR: "error",
+            AnswerStatusCode.NO_CONTEXT: "no_context",
+        }[self]
+
 
 class TextGenerativeResponse(BaseModel):
     type: Literal["text"] = "text"

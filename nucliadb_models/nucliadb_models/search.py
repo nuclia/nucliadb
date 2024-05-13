@@ -1323,14 +1323,15 @@ def validate_facets(facets):
 class AskRequest(ChatRequest): ...
 
 
-class RetrievalAskResponseItem(BaseModel):
-    type: Literal["retrieval"] = "retrieval"
-    results: KnowledgeboxFindResults
-
-
-class AnswerAskResponseItem(BaseModel):
-    type: Literal["answer"] = "answer"
-    text: str
+class AskTokens(BaseModel):
+    input: int = Field(
+        title="Input tokens",
+        description="Number of LLM tokens used for the context in the query",
+    )
+    output: int = Field(
+        title="Output tokens",
+        description="Number of LLM tokens used for the answer",
+    )
 
 
 class AskTimings(BaseModel):
@@ -1344,10 +1345,59 @@ class AskTimings(BaseModel):
     )
 
 
+class SyncAskMetadata(BaseModel):
+    tokens: AskTokens
+    timings: AskTimings
+
+
+class SyncAskResponse(BaseModel):
+    answer: str = Field(
+        title="Answer",
+        description="The generative answer to the query",
+    )
+    status: str = Field(
+        title="Status",
+        description="The status of the query execution. It can be 'success', 'error' or 'no_context'",  # noqa
+    )
+    retrieval_results: KnowledgeboxFindResults = Field(
+        title="Retrieval results",
+        description="The retrieval results of the query",
+    )
+    relations: Optional[Relations] = Field(
+        default=None,
+        title="Relations",
+        description="The detected relations of the answer",
+    )
+    citations: dict[str, Any] = Field(
+        default={},
+        title="Citations",
+        description="The citations of the answer. List of references to the resources used to generate the answer.",
+    )
+    prompt_context: Optional[list[str]] = Field(
+        default=None,
+        title="Prompt context",
+        description="The prompt context used to generate the answer. Returned only if the debug flag is set to true",
+    )
+    metadata: Optional[SyncAskMetadata] = Field(
+        default=None,
+        title="Metadata",
+        description="Metadata of the query execution. This includes the number of tokens used in the LLM context and answer, and the timings of the generative model.",  # noqa
+    )
+
+
+class RetrievalAskResponseItem(BaseModel):
+    type: Literal["retrieval"] = "retrieval"
+    results: KnowledgeboxFindResults
+
+
+class AnswerAskResponseItem(BaseModel):
+    type: Literal["answer"] = "answer"
+    text: str
+
+
 class MetadataAskResponseItem(BaseModel):
     type: Literal["metadata"] = "metadata"
-    input_tokens: int
-    output_tokens: int
+    tokens: AskTokens
     timings: AskTimings
 
 
