@@ -698,7 +698,7 @@ class _NucliaDBBase:
         method="POST",
         path_params=("kbid", "rid"),
         request_type=AskRequest,
-        response_type=chat_response_parser,
+        response_type=ask_response_parser,
     )
 
     ask_on_resource_by_slug = _request_builder(
