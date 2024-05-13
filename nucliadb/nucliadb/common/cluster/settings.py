@@ -70,6 +70,12 @@ class Settings(BaseSettings):
         description="Maximum number of paragraphs allowed on a single resource",
     )
 
+    drain_nodes: list[str] = Field(
+        default=[],
+        title="Drain nodes",
+        description="List of node IDs to ignore when creating new shards. It is used for draining nodes from a cluster. Example: ['1bf3bfe7-e164-4a19-a4d9-41372fc15aca',]",  # noqa: E501
+    )
+
     local_reader_threads: int = 5
     local_writer_threads: int = 5
 

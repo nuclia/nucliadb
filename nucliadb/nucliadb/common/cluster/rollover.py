@@ -63,10 +63,11 @@ class UnexpectedRolloverError(Exception):
 
 
 async def create_rollover_shards(
-    app_context: ApplicationContext, kbid: str
+    app_context: ApplicationContext, kbid: str, drain_nodes: Optional[list[str]] = None
 ) -> writer_pb2.Shards:
     """
-    Creates shards to be used for a rollover operation
+    Creates shards to be used for a rollover operation.
+    If drain_nodes is provided, no replicas will be created on those nodes.
     """
     logger.warning("Creating rollover shards", extra={"kbid": kbid})
     sm = app_context.shard_manager
@@ -86,7 +87,7 @@ async def create_rollover_shards(
         # create new shards
         created_shards = []
         try:
-            nodes = cluster_manager.sorted_primary_nodes()
+            nodes = cluster_manager.sorted_primary_nodes(ignore_nodes=drain_nodes)
             for shard in kb_shards.shards:
                 shard.ClearField("replicas")
                 # Attempt to create configured number of replicas
@@ -94,7 +95,9 @@ async def create_rollover_shards(
                 while replicas_created < settings.node_replicas:
                     if len(nodes) == 0:
                         # could have multiple shards on single node
-                        nodes = cluster_manager.sorted_primary_nodes()
+                        nodes = cluster_manager.sorted_primary_nodes(
+                            ignore_nodes=drain_nodes
+                        )
                     node_id = nodes.pop(0)
 
                     node = get_index_node(node_id)
@@ -467,13 +470,18 @@ async def clean_rollover_status(app_context: ApplicationContext, kbid: str) -> N
         await datamanagers.cluster.update_kb_shards(txn, kbid=kbid, shards=kb_shards)
 
 
-async def rollover_kb_shards(app_context: ApplicationContext, kbid: str) -> None:
+async def rollover_kb_shards(
+    app_context: ApplicationContext, kbid: str, drain_nodes: Optional[list[str]] = None
+) -> None:
     """
     Rollover a shard is the process of creating new shard replicas for every
     shard and indexing all existing resources into the replicas.
 
     Once all the data is in the new shards, cut over the registered replicas
     to the new shards and delete the old shards.
+
+    If drain_nodes is provided, no replicas will be created on those nodes. This is useful
+    for when we want to remove a set of nodes from the cluster.
 
     This is a very expensive operation and should be done with care.
 
@@ -496,7 +504,7 @@ async def rollover_kb_shards(app_context: ApplicationContext, kbid: str) -> None
     logger.warning("Rolling over shards", extra={"kbid": kbid})
 
     async with locking.distributed_lock(locking.KB_SHARDS_LOCK.format(kbid=kbid)):
-        await create_rollover_shards(app_context, kbid)
+        await create_rollover_shards(app_context, kbid, drain_nodes=drain_nodes)
         await schedule_resource_indexing(app_context, kbid)
         await index_rollover_shards(app_context, kbid)
         await cutover_shards(app_context, kbid)
