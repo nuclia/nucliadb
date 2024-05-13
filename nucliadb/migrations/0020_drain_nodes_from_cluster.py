@@ -19,16 +19,11 @@
 #
 
 """Migration #20
-
 This migration is for reducing the number of nodes in a cluster.
-
-Essentially, it is a rollover shards migration for KBs that have
-shards in nodes we want to remove.
-
-Will read the DRAIN_NODES envvar to get the list of nodes to drain.
-
-# TODO:
- - Figure out if we need to add the name or the id of the nodes.
+Essentially, it is a rollover shards migration only for KBs that have
+shards in the nodes we want to remove from the cluster.
+Will read the DRAIN_NODES envvar to get the list of nodes to drain, and will
+create new shards in the remaining nodes.
 """
 
 import logging
@@ -70,13 +65,12 @@ async def kb_has_shards_on_drain_nodes(kbid: str, drain_node_ids: list[str]) -> 
         if not shards:
             logger.warning("Shards object not found", extra={"kbid": kbid})
             return False
-
-        hits_drain_nodes = False
+        shard_in_drain_nodes = False
         for shard in shards.shards:
             for replica in shard.replicas:
-                if replica.node not in drain_node_ids:
+                if replica.node in drain_node_ids:
                     logger.info(
-                        "Replica is not on the nodes to drain",
+                        "Shard found in drain nodes, will rollover it",
                         extra={
                             "kbid": kbid,
                             "logical_shard": shard.shard,
@@ -85,6 +79,5 @@ async def kb_has_shards_on_drain_nodes(kbid: str, drain_node_ids: list[str]) -> 
                             "drain_node_ids": drain_node_ids,
                         },
                     )
-                    hits_drain_nodes = True
-
-        return hits_drain_nodes
+                    shard_in_drain_nodes = True
+        return shard_in_drain_nodes
