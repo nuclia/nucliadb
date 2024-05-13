@@ -190,8 +190,9 @@ class AskResult:
         if self.ask_request_with_debug_flag:
             yield DebugAskResponseItem(
                 metadata={
-                    "prompt_context": self.prompt_context,
-                    "prompt_context_order": self.prompt_context_order,
+                    "prompt_context": sorted_prompt_context_list(
+                        self.prompt_context, self.prompt_context_order
+                    )
                 }
             )
 
