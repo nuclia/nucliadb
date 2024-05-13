@@ -23,20 +23,13 @@ from fastapi import Header, Request, Response
 from fastapi_versioning import version
 from starlette.responses import StreamingResponse
 
-from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.models.responses import HTTPClientError
-from nucliadb.search import predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
-from nucliadb.search.search.chat.ask import AskResult, ask
-from nucliadb.search.search.exceptions import (
-    IncompleteFindResultsError,
-    InvalidQueryError,
-)
+from nucliadb.search.search.chat.ask import AskResult, ask, handled_ask_exceptions
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import AskRequest, NucliaDBClientType, parse_max_tokens
 from nucliadb_utils import const
 from nucliadb_utils.authentication import requires
-from nucliadb_utils.exceptions import LimitsExceededError
 from nucliadb_utils.utilities import has_feature
 
 
@@ -70,41 +63,12 @@ async def ask_knowledgebox_endpoint(
             status_code=404,
             detail="This endpoint is not yet available for this Knowledge Box",
         )
-    try:
-        return await create_ask_response(
-            kbid, item, x_nucliadb_user, x_ndb_client, x_forwarded_for, x_synchronous
-        )
-    except KnowledgeBoxNotFound:
-        return HTTPClientError(
-            status_code=404,
-            detail=f"Knowledge Box '{kbid}' not found.",
-        )
-    except LimitsExceededError as exc:
-        return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
-    except predict.ProxiedPredictAPIError as err:
-        return HTTPClientError(
-            status_code=err.status,
-            detail=err.detail,
-        )
-    except IncompleteFindResultsError:
-        return HTTPClientError(
-            status_code=529,
-            detail="Temporary error on information retrieval. Please try again.",
-        )
-    except predict.RephraseMissingContextError:
-        return HTTPClientError(
-            status_code=412,
-            detail="Unable to rephrase the query with the provided context.",
-        )
-    except predict.RephraseError as err:
-        return HTTPClientError(
-            status_code=529,
-            detail=f"Temporary error while rephrasing the query. Please try again later. Error: {err}",
-        )
-    except InvalidQueryError as exc:
-        return HTTPClientError(status_code=412, detail=str(exc))
+    return await create_ask_response(
+        kbid, item, x_nucliadb_user, x_ndb_client, x_forwarded_for, x_synchronous
+    )
 
 
+@handled_ask_exceptions
 async def create_ask_response(
     kbid: str,
     ask_request: AskRequest,

@@ -1261,6 +1261,7 @@ class KnowledgeboxFindResults(JsonBaseModel):
     )
     autofilters: List[str] = ModelParamDefaults.applied_autofilters.to_pydantic_field()
     min_score: Optional[Union[float, MinScore]] = Field(
+        default=MinScore(),
         title="Minimum result score",
         description="The minimum scores that have been used for the search operation.",
     )
@@ -1346,8 +1347,16 @@ class AskTimings(BaseModel):
 
 
 class SyncAskMetadata(BaseModel):
-    tokens: AskTokens
-    timings: AskTimings
+    tokens: Optional[AskTokens] = Field(
+        default=None,
+        title="Tokens",
+        description="Number of tokens used in the LLM context and answer",
+    )
+    timings: Optional[AskTimings] = Field(
+        default=None,
+        title="Timings",
+        description="Timings of the generative model",
+    )
 
 
 class SyncAskResponse(BaseModel):
@@ -1362,6 +1371,11 @@ class SyncAskResponse(BaseModel):
     retrieval_results: KnowledgeboxFindResults = Field(
         title="Retrieval results",
         description="The retrieval results of the query",
+    )
+    learning_id: str = Field(
+        default="",
+        title="Learning id",
+        description="The id of the learning request. This id can be used to provide feedback on the learning process.",  # noqa
     )
     relations: Optional[Relations] = Field(
         default=None,

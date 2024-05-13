@@ -17,10 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import functools
 from time import monotonic as time
 from typing import AsyncGenerator, Optional
 
-from nucliadb.search import logger
+from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
+from nucliadb.models.responses import HTTPClientError
+from nucliadb.search import logger, predict
 from nucliadb.search.predict import (
     AnswerStatusCode,
     CitationsGenerativeResponse,
@@ -37,6 +40,10 @@ from nucliadb.search.search.chat.query import (
     rephrase_query,
     sorted_prompt_context_list,
     tokens_to_chars,
+)
+from nucliadb.search.search.exceptions import (
+    IncompleteFindResultsError,
+    InvalidQueryError,
 )
 from nucliadb.search.search.query import QueryParser
 from nucliadb.search.utilities import get_predict
@@ -66,6 +73,7 @@ from nucliadb_models.search import (
     SyncAskResponse,
     UserPrompt,
 )
+from nucliadb_utils.exceptions import LimitsExceededError
 
 
 class AskResult:
@@ -216,6 +224,7 @@ class AskResult:
             retrieval_results=self.find_results,
             citations=citations,
             metadata=metadata,
+            learning_id=self.nuclia_learning_id or "",
         )
         if self.ask_request_with_debug_flag:
             sorted_prompt_context = sorted_prompt_context_list(
@@ -420,3 +429,41 @@ async def ask(
         prompt_context_order=prompt_context_order,
         auditor=auditor,
     )
+
+
+def handled_ask_exceptions(func):
+    @functools.wraps(func)
+    async def wrapper(*args, **kwargs):
+        try:
+            return await func(*args, **kwargs)
+        except KnowledgeBoxNotFound:
+            return HTTPClientError(
+                status_code=404,
+                detail=f"Knowledge Box not found.",
+            )
+        except LimitsExceededError as exc:
+            return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
+        except predict.ProxiedPredictAPIError as err:
+            return HTTPClientError(
+                status_code=err.status,
+                detail=err.detail,
+            )
+        except IncompleteFindResultsError:
+            return HTTPClientError(
+                status_code=529,
+                detail="Temporary error on information retrieval. Please try again.",
+            )
+        except predict.RephraseMissingContextError:
+            return HTTPClientError(
+                status_code=412,
+                detail="Unable to rephrase the query with the provided context.",
+            )
+        except predict.RephraseError as err:
+            return HTTPClientError(
+                status_code=529,
+                detail=f"Temporary error while rephrasing the query. Please try again later. Error: {err}",
+            )
+        except InvalidQueryError as exc:
+            return HTTPClientError(status_code=412, detail=str(exc))
+
+    return wrapper

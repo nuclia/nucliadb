@@ -28,4 +28,5 @@ from . import suggest  # noqa
 from . import summarize  # noqa
 from .resource import chat as chat_resource  # noqa
 from .resource import search as search_resource  # noqa
+from .resource import ask as ask_resource  # noqa
 from .router import api  # noqa
