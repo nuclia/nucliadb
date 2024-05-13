@@ -22,11 +22,11 @@ from pathlib import Path
 from typing import Optional
 
 import pydantic
+from pydantic_settings import BaseSettings
 
 from nucliadb_dataset import ExportType
 from nucliadb_dataset.tasks import Task
 from nucliadb_sdk.v2.sdk import Region
-from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -36,7 +36,7 @@ class Settings(BaseSettings):
 settings = Settings()
 
 
-class RunningSettings(pydantic.BaseSettings):
+class RunningSettings(BaseSettings):
     export: ExportType = pydantic.Field(
         ExportType.FILESYSTEM, description="Destination of export"
     )

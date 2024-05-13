@@ -23,11 +23,6 @@ from typing import Dict, Optional
 import pydantic
 from pydantic_settings import BaseSettings
 
-try:
-    pass
-except ImportError:  # pragma: no cover
-    from pydantic_settings import BaseSettings  # type: ignore
-
 
 class TelemetrySettings(BaseSettings):
     jaeger_agent_host: str = "localhost"

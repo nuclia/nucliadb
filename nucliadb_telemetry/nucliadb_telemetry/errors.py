@@ -83,10 +83,13 @@ def push_scope(**kwargs: Any) -> ContextManager[Scope]:
 
 
 class ErrorHandlingSettings(BaseSettings):
-    zone: str = pydantic.Field(default="local", validation_alias=pydantic.AliasChoices("NUCLIA_ZONE", "ZONE"))
+    zone: str = pydantic.Field(
+        default="local", validation_alias=pydantic.AliasChoices("NUCLIA_ZONE", "ZONE")
+    )
     sentry_url: Optional[str] = None
     environment: str = pydantic.Field(
-        default="local", validation_alias=pydantic.AliasChoices("environment", "running_environment")
+        default="local",
+        validation_alias=pydantic.AliasChoices("environment", "running_environment"),
     )
 
 
