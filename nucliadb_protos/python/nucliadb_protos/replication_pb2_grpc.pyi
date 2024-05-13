@@ -29,6 +29,7 @@ from nucliadb_protos.noderesources_pb2 import (
     VectorSentence as VectorSentence,
     VectorSetID as VectorSetID,
     VectorSetList as VectorSetList,
+    VectorsetSentences as VectorsetSentences,
 )
 
 class ReplicationServiceStub:

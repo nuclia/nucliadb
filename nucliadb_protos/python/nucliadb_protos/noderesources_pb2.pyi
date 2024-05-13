@@ -368,6 +368,41 @@ class VectorSentence(google.protobuf.message.Message):
 global___VectorSentence = VectorSentence
 
 @typing_extensions.final
+class VectorsetSentences(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    @typing_extensions.final
+    class SentencesEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        @property
+        def value(self) -> global___VectorSentence: ...
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: global___VectorSentence | None = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+
+    SENTENCES_FIELD_NUMBER: builtins.int
+    @property
+    def sentences(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___VectorSentence]:
+        """key is full id for vectors"""
+    def __init__(
+        self,
+        *,
+        sentences: collections.abc.Mapping[builtins.str, global___VectorSentence] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["sentences", b"sentences"]) -> None: ...
+
+global___VectorsetSentences = VectorsetSentences
+
+@typing_extensions.final
 class ParagraphMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -413,10 +448,29 @@ class IndexParagraph(google.protobuf.message.Message):
         def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
         def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
 
+    @typing_extensions.final
+    class VectorsetsSentencesEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        @property
+        def value(self) -> global___VectorsetSentences: ...
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: global___VectorsetSentences | None = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+
     START_FIELD_NUMBER: builtins.int
     END_FIELD_NUMBER: builtins.int
     LABELS_FIELD_NUMBER: builtins.int
     SENTENCES_FIELD_NUMBER: builtins.int
+    VECTORSETS_SENTENCES_FIELD_NUMBER: builtins.int
     FIELD_FIELD_NUMBER: builtins.int
     SPLIT_FIELD_NUMBER: builtins.int
     INDEX_FIELD_NUMBER: builtins.int
@@ -432,6 +486,9 @@ class IndexParagraph(google.protobuf.message.Message):
     @property
     def sentences(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___VectorSentence]:
         """key is full id for vectors"""
+    @property
+    def vectorsets_sentences(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___VectorsetSentences]:
+        """key is vectorset id"""
     field: builtins.str
     split: builtins.str
     """split were it belongs"""
@@ -446,6 +503,7 @@ class IndexParagraph(google.protobuf.message.Message):
         end: builtins.int = ...,
         labels: collections.abc.Iterable[builtins.str] | None = ...,
         sentences: collections.abc.Mapping[builtins.str, global___VectorSentence] | None = ...,
+        vectorsets_sentences: collections.abc.Mapping[builtins.str, global___VectorsetSentences] | None = ...,
         field: builtins.str = ...,
         split: builtins.str = ...,
         index: builtins.int = ...,
@@ -453,7 +511,7 @@ class IndexParagraph(google.protobuf.message.Message):
         metadata: global___ParagraphMetadata | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["metadata", b"metadata"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["end", b"end", "field", b"field", "index", b"index", "labels", b"labels", "metadata", b"metadata", "repeated_in_field", b"repeated_in_field", "sentences", b"sentences", "split", b"split", "start", b"start"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["end", b"end", "field", b"field", "index", b"index", "labels", b"labels", "metadata", b"metadata", "repeated_in_field", b"repeated_in_field", "sentences", b"sentences", "split", b"split", "start", b"start", "vectorsets_sentences", b"vectorsets_sentences"]) -> None: ...
 
 global___IndexParagraph = IndexParagraph
 

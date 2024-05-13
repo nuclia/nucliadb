@@ -99,6 +99,10 @@ message VectorSentence {
     SentenceMetadata metadata = 9;
 }
 
+message VectorsetSentences {
+    map<string, VectorSentence> sentences = 1; // key is full id for vectors
+}
+
 message ParagraphMetadata {
     Position position = 1;
     bool page_with_visual = 2;
@@ -110,6 +114,7 @@ message IndexParagraph {
     int32 end = 2; // Start end position in field text
     repeated string labels = 3; // Paragraph specific labels
     map<string, VectorSentence> sentences = 4; // key is full id for vectors
+    map<string, VectorsetSentences> vectorsets_sentences = 10; // key is vectorset id
     string field = 5;
     string split = 6; // split were it belongs
     uint64 index = 7;
@@ -166,8 +171,8 @@ message Resource {
 
     string shard_id = 11;
 
-    map<string, utils.UserVectors> vectors = 12; // vectorset is the key
-    map<string, utils.UserVectorsList> vectors_to_delete = 13;  // Vectorset prefix vector id
+    map<string, utils.UserVectors> vectors = 12 [deprecated = true]; // vectorset is the key
+    map<string, utils.UserVectorsList> vectors_to_delete = 13 [deprecated = true];  // Vectorset prefix vector id
 
     optional utils.Security security = 14;
 }
