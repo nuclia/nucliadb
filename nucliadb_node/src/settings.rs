@@ -117,10 +117,16 @@ pub fn build_object_store_driver(settings: &EnvSettings) -> Arc<dyn ObjectStore>
         }
         ObjectStoreType::S3 => {
             let mut builder = AmazonS3Builder::new()
-                .with_access_key_id(settings.s3_client_id.clone())
-                .with_secret_access_key(settings.s3_client_secret.clone())
                 .with_region(settings.s3_region_name.clone())
                 .with_bucket_name(settings.s3_indexing_bucket.clone());
+
+            // Unless client_id and client_secret are specified, the library will try to use the credentials by looking
+            // at the standard AWS_WEB_IDENTITY_TOKEN_FILE environment variable
+            if !settings.s3_client_id.is_empty() && !settings.s3_client_secret.is_empty() {
+                builder = builder
+                    .with_access_key_id(settings.s3_client_id.clone())
+                    .with_secret_access_key(settings.s3_client_secret.clone());
+            }
             if settings.s3_endpoint.is_some() {
                 // This is needed for minio compatibility
                 builder = builder.with_endpoint(settings.s3_endpoint.clone().unwrap()).with_allow_http(true);
