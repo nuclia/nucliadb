@@ -106,9 +106,20 @@ impl From<EnvSettings> for Settings {
 
 pub fn build_object_store_driver(settings: &EnvSettings) -> Arc<dyn ObjectStore> {
     info!("File backend: {:?}", settings.file_backend);
+    let retry_config = object_store::RetryConfig {
+        backoff: object_store::BackoffConfig {
+            init_backoff: Duration::from_secs(1),
+            max_backoff: Duration::from_secs(10),
+            base: 2.0,
+        },
+        max_retries: 4,
+        retry_timeout: Duration::from_secs(60),
+    };
     match settings.file_backend {
         ObjectStoreType::GCS => {
-            let mut builder = GoogleCloudStorageBuilder::new().with_bucket_name(settings.gcs_indexing_bucket.clone());
+            let mut builder = GoogleCloudStorageBuilder::new()
+                .with_retry(retry_config)
+                .with_bucket_name(settings.gcs_indexing_bucket.clone());
             if !settings.gcs_base64_creds.is_empty() {
                 let service_account_key = STANDARD.decode(&settings.gcs_base64_creds).unwrap();
                 builder = builder.with_service_account_key(String::from_utf8(service_account_key).unwrap());
@@ -117,9 +128,9 @@ pub fn build_object_store_driver(settings: &EnvSettings) -> Arc<dyn ObjectStore>
         }
         ObjectStoreType::S3 => {
             let mut builder = AmazonS3Builder::new()
+                .with_retry(retry_config)
                 .with_region(settings.s3_region_name.clone())
                 .with_bucket_name(settings.s3_indexing_bucket.clone());
-
             // Unless client_id and client_secret are specified, the library will try to use the credentials by looking
             // at the standard AWS_WEB_IDENTITY_TOKEN_FILE environment variable
             if !settings.s3_client_id.is_empty() && !settings.s3_client_secret.is_empty() {
