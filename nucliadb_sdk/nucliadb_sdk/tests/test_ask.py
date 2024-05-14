@@ -58,7 +58,7 @@ def test_ask_on_kb(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
         max_tokens=MaxTokens(context=100, answer=50),
     )
     assert result.learning_id == "00"
-    assert result.answer == "valid answer  to"
+    assert result.answer == "valid answer to"
     assert len(result.result.resources) == 7
     assert result.relations
     assert len(result.relations.entities["Nuclia"].related_to) == 18
