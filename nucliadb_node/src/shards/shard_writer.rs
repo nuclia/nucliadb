@@ -540,18 +540,24 @@ impl ShardWriter {
 
     #[tracing::instrument(skip_all)]
     pub fn merge(&self, context: MergeContext) -> NodeResult<MergeMetrics> {
-        let mut merge_results = HashMap::new();
-
+        let mut runners = HashMap::new();
         {
             let indexes: &ShardWriterIndexes = &read_rw_lock(&self.indexes);
             for (name, vectors_index) in indexes.vectors_indexes.iter() {
                 let runner = vectors_index.prepare_merge(context.parameters);
-                if let Ok(Some(mut runner)) = runner {
-                    let result = runner.run();
-                    merge_results.insert(name.clone(), result);
+                if let Ok(Some(runner)) = runner {
+                    runners.insert(name.clone(), runner);
                 }
             }
         }
+
+        // Running merge is costly, so we don't want a lock indexes while merging
+        let mut merge_results = HashMap::new();
+        for (name, mut runner) in runners.into_iter() {
+            let result = runner.run();
+            merge_results.insert(name, result);
+        }
+
         {
             let indexes: &mut ShardWriterIndexes = &mut write_rw_lock(&self.indexes);
 
