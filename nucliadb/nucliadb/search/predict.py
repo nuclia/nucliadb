@@ -519,7 +519,7 @@ class DummyPredictEngine(PredictEngine):
 
         async def generate():
             for item in self.ndjson_answer:
-                yield item
+                yield GenerativeChunk.parse_raw(item)
 
         return (DUMMY_LEARNING_ID, generate())
 
