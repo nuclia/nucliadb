@@ -34,6 +34,7 @@ from nucliadb.search.predict import (
 )
 from nucliadb.search.search.chat.prompt import PromptContextBuilder
 from nucliadb.search.search.chat.query import (
+    NOT_ENOUGH_CONTEXT_ANSWER,
     ChatAuditor,
     get_find_results,
     get_relations_results,
@@ -286,9 +287,7 @@ class NotEnoughContextAskResult(AskResult):
         context in the corpus to answer.
         """
         yield self._ndjson_encode(RetrievalAskResponseItem(results=self.find_results))
-        yield self._ndjson_encode(
-            AnswerAskResponseItem(text="Not enough context to answer.")
-        )
+        yield self._ndjson_encode(AnswerAskResponseItem(text=NOT_ENOUGH_CONTEXT_ANSWER))
         status = AnswerStatusCode.NO_CONTEXT
         yield self._ndjson_encode(
             StatusAskResponseItem(code=status.value, status=status.prettify())
@@ -296,7 +295,7 @@ class NotEnoughContextAskResult(AskResult):
 
     async def json(self) -> str:
         return SyncAskResponse(
-            answer="Not enough context to answer.",
+            answer=NOT_ENOUGH_CONTEXT_ANSWER,
             retrieval_results=self.find_results,
             status=AnswerStatusCode.NO_CONTEXT,
         ).json(exclude_unset=True)
