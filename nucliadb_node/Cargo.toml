@@ -55,7 +55,7 @@ tracing-opentelemetry = "0.23"
 reqwest = { version = "0.11", features = ["json", "rustls-tls", "blocking"] }
 num_cpus = "1.16.0"
 crossbeam-utils = "0.8.16"
-object_store = { version = "0.9.1", features = ["gcp", "aws"]}
+object_store = { version = "^0.10.1", features = ["gcp", "aws"]}
 base64 = "^0.21"
 
 
