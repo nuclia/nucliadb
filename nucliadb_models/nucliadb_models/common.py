@@ -23,7 +23,7 @@ import re
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_serializer, model_validator
 
 from nucliadb_protos import resources_pb2
 
@@ -152,9 +152,6 @@ class CloudFile(BaseModel):
     md5: Optional[str]
 
 
-import pydantic
-
-
 class CloudLink(BaseModel):
     uri: Optional[str] = None
     size: Optional[int] = None
@@ -173,7 +170,7 @@ class CloudLink(BaseModel):
         url_params["field_type"] = FIELD_TYPE_CHAR_MAP[url_params["field_type"]]
         return DOWNLOAD_URI.format(**url_params).rstrip("/")
 
-    @pydantic.field_serializer("uri")
+    @field_serializer("uri")
     def serialize_uri(uri):
         return CloudLink.format_reader_download_uri(uri)
 
