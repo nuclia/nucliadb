@@ -33,9 +33,7 @@ from nucliadb_models.search import (
     SyncAskResponse,
     parse_max_tokens,
 )
-from nucliadb_utils import const
 from nucliadb_utils.authentication import requires
-from nucliadb_utils.utilities import has_feature
 
 
 @api.post(
@@ -63,11 +61,6 @@ async def ask_knowledgebox_endpoint(
         "This is slower and requires waiting for entire answer to be ready.",
     ),
 ) -> Union[StreamingResponse, HTTPClientError, Response]:
-    if not has_feature(const.Features.ASK_ENDPOINT, context={"kbid": kbid}):
-        return HTTPClientError(
-            status_code=404,
-            detail="This endpoint is not yet available for this Knowledge Box",
-        )
     return await create_ask_response(
         kbid, item, x_nucliadb_user, x_ndb_client, x_forwarded_for, x_synchronous
     )
