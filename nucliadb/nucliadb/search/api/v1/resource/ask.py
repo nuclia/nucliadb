@@ -65,7 +65,7 @@ async def resource_ask_endpoint_by_uuid(
         x_nucliadb_user,
         x_forwarded_for,
         x_synchronous,
-        resource_id=rid,
+        resource=rid,
     )
 
 
