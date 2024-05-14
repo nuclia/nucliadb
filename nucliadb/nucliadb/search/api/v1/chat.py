@@ -46,11 +46,11 @@ from nucliadb_models.search import (
     ChatOptions,
     ChatRequest,
     KnowledgeboxFindResults,
-    MaxTokens,
     NucliaDBClientType,
     PromptContext,
     PromptContextOrder,
     Relations,
+    parse_max_tokens,
 )
 from nucliadb_telemetry.errors import capture_exception
 from nucliadb_utils.authentication import requires
@@ -177,7 +177,7 @@ async def create_chat_response(
         if ChatOptions.RELATIONS in chat_request.features:
             # XXX should use query parser here
             relations_results = await get_relations_results(
-                kbid=kbid, chat_request=chat_request, text_answer=answer
+                kbid=kbid, text_answer=answer, target_shard_replicas=chat_request.shards
             )
 
         sync_chat_resp = SyncChatResponse(
@@ -216,7 +216,9 @@ async def create_chat_response(
             if ChatOptions.RELATIONS in chat_request.features:
                 # XXX should use query parser here
                 relations_results = await get_relations_results(
-                    kbid=kbid, chat_request=chat_request, text_answer=answer
+                    kbid=kbid,
+                    text_answer=answer,
+                    target_shard_replicas=chat_request.shards,
                 )
                 yield base64.b64encode(relations_results.json().encode())
 
@@ -259,14 +261,3 @@ def parse_streamed_answer(
             "Error parsing citations. Returning the answer without citations."
         )
         return text_answer.decode("utf-8"), {}
-
-
-def parse_max_tokens(
-    max_tokens: Optional[Union[int, MaxTokens]]
-) -> Optional[MaxTokens]:
-    if isinstance(max_tokens, int):
-        # If the max_tokens is an integer, it is interpreted as the max_tokens value for the generated answer.
-        # The max tokens for the context is set to None to use the default value for the model (comes in the
-        # NUA's query endpoint response).
-        return MaxTokens(answer=max_tokens, context=None)
-    return max_tokens
