@@ -152,6 +152,9 @@ class CloudFile(BaseModel):
     md5: Optional[str]
 
 
+import pydantic
+
+
 class CloudLink(BaseModel):
     uri: Optional[str] = None
     size: Optional[int] = None
@@ -170,9 +173,9 @@ class CloudLink(BaseModel):
         url_params["field_type"] = FIELD_TYPE_CHAR_MAP[url_params["field_type"]]
         return DOWNLOAD_URI.format(**url_params).rstrip("/")
 
-    def dict(self, **kwargs):
-        self.uri = self.format_reader_download_uri(self.uri)
-        return BaseModel.dict(self)
+    @pydantic.field_serializer("uri")
+    def serialize_uri(uri):
+        return CloudLink.format_reader_download_uri(uri)
 
 
 class FieldTypeName(str, Enum):

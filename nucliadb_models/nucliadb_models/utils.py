@@ -65,11 +65,3 @@ def validate_json(value: str):
         json.loads(value)
     except json.JSONDecodeError as exc:
         raise ValueError("Invalid JSON") from exc
-
-
-class InvalidFieldIdError(pydantic.PydanticUserError):
-    code = "wrong_field_id"
-    msg_template = (
-        "Invalid field id: '{value}'. Field ids must be a string with only "
-        "letters, numbers, underscores, colons and dashes."
-    )

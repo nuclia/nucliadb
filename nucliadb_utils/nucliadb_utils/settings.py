@@ -29,7 +29,7 @@ class RunningSettings(BaseSettings):
     sentry_url: Optional[str] = None
     running_environment: str = Field(
         default="local",
-        alias=AliasChoices("environment", "running_environment"),
+        validation_alias=AliasChoices("environment", "running_environment"),
         description="Running environment. One of: local, test, stage, prod",
     )
     metrics_port: int = 3030
@@ -53,7 +53,7 @@ class FileBackendConfig(str, Enum):
     S3 = "s3"
     PG = "pg"
     LOCAL = "local"
-    NOT_SET = "notset123"  # setting not provided
+    NOT_SET = "notset"  # setting not provided
 
     @classmethod
     def _missing_(cls, value):

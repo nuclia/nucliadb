@@ -86,7 +86,7 @@ class TextField(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def check_text_format(cls, values):
-        if values.get("format") == TextFormat.JSON:
+        if values.get("format") == TextFormat.JSON.value:
             validate_json(values.get("body", ""))
         return values
 

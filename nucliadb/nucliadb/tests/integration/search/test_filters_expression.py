@@ -109,8 +109,8 @@ async def test_filtering_expression_validation(nucliadb_reader, nucliadb_writer)
     )
     assert resp.status_code == 422
     assert (
-        resp.json()["detail"][-1]["msg"]
-        == "Only one of 'all', 'any', 'none' or 'not_all' can be set"
+        "Only one of 'all', 'any', 'none' or 'not_all' can be set"
+        in resp.json()["detail"][-1]["msg"]
     )
 
     # Empty lists of filter operators are not allowed
