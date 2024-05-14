@@ -1,20 +1,21 @@
-from contextlib import suppress
-from datetime import datetime
-from datetime import timezone
-from nats.js.client import JetStreamContext
-from nuclia_usage.protos.kb_usage_pb2 import KBSource
-from nuclia_usage.protos.kb_usage_pb2 import KbUsage
-from nuclia_usage.protos.kb_usage_pb2 import Predict
-from nuclia_usage.protos.kb_usage_pb2 import Process
-from nuclia_usage.protos.kb_usage_pb2 import Search
-from nuclia_usage.protos.kb_usage_pb2 import Service
-from nuclia_usage.protos.kb_usage_pb2 import Storage
-from sentry_sdk import capture_exception
-from typing import Optional
-from typing import Union
-
 import asyncio
 import logging
+from contextlib import suppress
+from datetime import datetime, timezone
+from typing import Optional, Union
+
+from nats.js.client import JetStreamContext
+from sentry_sdk import capture_exception
+
+from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import (
+    KBSource,
+    KbUsage,
+    Predict,
+    Process,
+    Search,
+    Service,
+    Storage,
+)
 
 logger = logging.getLogger(__name__)
 

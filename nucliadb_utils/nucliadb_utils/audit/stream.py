@@ -30,6 +30,7 @@ from nucliadb_protos.audit_pb2 import (
     AuditKBCounter,
     AuditRequest,
     ChatContext,
+    ClientType,
 )
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.resources_pb2 import FieldID
@@ -38,10 +39,17 @@ from opentelemetry.trace import format_trace_id, get_current_span
 from nucliadb_utils import logger
 from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.nats import get_traced_jetstream
+from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import (
+    ClientType as ClientTypeKbUsage,
+)
+from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import (
+    KBSource,
+    Search,
+    SearchType,
+    Service,
+    Storage,
+)
 from nucliadb_utils.nuclia_usage.utils.kb_usage_report import KbUsageReportUtility
-from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import KBSource, SearchType, Storage, Service, Search
-from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import ClientType as ClientTypeKbUsage
-from nucliadb_protos.audit_pb2 import ClientType
 
 
 class StreamAuditStorage(AuditStorage):
@@ -103,7 +111,9 @@ class StreamAuditStorage(AuditStorage):
 
         self.js = get_traced_jetstream(self.nc, self.service)
         self.task = asyncio.create_task(self.run())
-        self.kb_usage_utility = KbUsageReportUtility(nats_stream=self.js, nats_subject="TODO") # TODO
+        self.kb_usage_utility = KbUsageReportUtility(
+            nats_stream=self.js, nats_subject="TODO"
+        )  # TODO
         await self.kb_usage_utility.initialize()
         self.initialized = True
 
@@ -191,13 +201,14 @@ class StreamAuditStorage(AuditStorage):
                 account_id=None,
                 kb_id=kbid,
                 kb_source=KBSource.HOSTED,
-                storage=Storage(paragraphs=kb_counter.paragraphs, fields=kb_counter.fields),
+                storage=Storage(
+                    paragraphs=kb_counter.paragraphs, fields=kb_counter.fields
+                ),
             )
 
         auditrequest.trace_id = get_trace_id()
 
         await self.send(auditrequest)
-
 
     async def visited(self, kbid: str, uuid: str, user: str, origin: str):
         auditrequest = AuditRequest()
@@ -260,7 +271,12 @@ class StreamAuditStorage(AuditStorage):
             kb_id=kbid,
             kb_source=KBSource.HOSTED,
             # TODO unify AuditRequest client type and Nuclia Usage client type
-            searches=Search(client=ClientTypeKbUsage.Value(ClientType.Name(client_type)), type=SearchType.SEARCH, tokens=2000, num_searches=1),
+            searches=Search(
+                client=ClientTypeKbUsage.Value(ClientType.Name(client_type)),
+                type=SearchType.SEARCH,
+                tokens=2000,
+                num_searches=1,
+            ),
         )
 
     async def suggest(
@@ -289,7 +305,12 @@ class StreamAuditStorage(AuditStorage):
             kb_id=kbid,
             kb_source=KBSource.HOSTED,
             # TODO unify AuditRequest client type and Nuclia Usage client type
-            searches=Search(client=ClientTypeKbUsage.Value(ClientType.Name(client_type)), type=SearchType.SUGGEST, tokens=0, num_searches=1),
+            searches=Search(
+                client=ClientTypeKbUsage.Value(ClientType.Name(client_type)),
+                type=SearchType.SUGGEST,
+                tokens=0,
+                num_searches=1,
+            ),
         )
 
     async def chat(

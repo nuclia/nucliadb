@@ -105,7 +105,8 @@ class TestRequires:
     async def test_requires_async(self):
         req = Request({"type": "http", "auth": Mock(scopes=["admin"])})
 
-        async def noop(request): ...
+        async def noop(request):
+            ...
 
         assert await authentication.requires(["admin"])(noop)(request=req) is None
 
@@ -113,7 +114,8 @@ class TestRequires:
     async def test_requires_async_returns_status(self):
         req = Request({"type": "http", "auth": Mock(scopes=["admin"])})
 
-        async def noop(request): ...
+        async def noop(request):
+            ...
 
         with pytest.raises(HTTPException):
             assert await authentication.requires(["foobar"])(noop)(request=req)
@@ -122,7 +124,8 @@ class TestRequires:
     async def test_requires_async_returns_redirect(self):
         req = Request({"type": "http", "auth": Mock(scopes=["admin"])})
 
-        async def noop(request): ...
+        async def noop(request):
+            ...
 
         with patch.object(req, "url_for", return_value="http://foobar"):
             resp = await authentication.requires(["foobar"], redirect="/foobar")(noop)(
@@ -139,7 +142,8 @@ class TestRequires:
             send=AsyncMock(),
         )
 
-        async def noop(websocket): ...
+        async def noop(websocket):
+            ...
 
         assert await authentication.requires(["admin"])(noop)(req) is None
 
@@ -151,7 +155,8 @@ class TestRequires:
             send=AsyncMock(),
         )
 
-        async def noop(websocket): ...
+        async def noop(websocket):
+            ...
 
         with patch.object(req, "close", return_value=None):
             assert await authentication.requires(["notallowed"])(noop)(req) is None

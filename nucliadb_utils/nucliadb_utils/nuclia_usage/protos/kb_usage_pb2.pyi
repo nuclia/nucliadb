@@ -23,7 +23,10 @@ class _KBSource:
     ValueType = typing.NewType("ValueType", builtins.int)
     V: typing_extensions.TypeAlias = ValueType
 
-class _KBSourceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_KBSource.ValueType], builtins.type):
+class _KBSourceEnumTypeWrapper(
+    google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_KBSource.ValueType],
+    builtins.type,
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     HOSTED: _KBSource.ValueType  # 0
     ONPREM: _KBSource.ValueType  # 1
@@ -38,7 +41,10 @@ class _Service:
     ValueType = typing.NewType("ValueType", builtins.int)
     V: typing_extensions.TypeAlias = ValueType
 
-class _ServiceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_Service.ValueType], builtins.type):
+class _ServiceEnumTypeWrapper(
+    google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_Service.ValueType],
+    builtins.type,
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     PREDICT: _Service.ValueType  # 0
     PROCESSING: _Service.ValueType  # 1
@@ -55,7 +61,10 @@ class _SearchType:
     ValueType = typing.NewType("ValueType", builtins.int)
     V: typing_extensions.TypeAlias = ValueType
 
-class _SearchTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_SearchType.ValueType], builtins.type):
+class _SearchTypeEnumTypeWrapper(
+    google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_SearchType.ValueType],
+    builtins.type,
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     SEARCH: _SearchType.ValueType  # 0
     SUGGEST: _SearchType.ValueType  # 1
@@ -70,7 +79,10 @@ class _PredictType:
     ValueType = typing.NewType("ValueType", builtins.int)
     V: typing_extensions.TypeAlias = ValueType
 
-class _PredictTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_PredictType.ValueType], builtins.type):
+class _PredictTypeEnumTypeWrapper(
+    google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_PredictType.ValueType],
+    builtins.type,
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     SENTENCE: _PredictType.ValueType  # 0
     TOKEN: _PredictType.ValueType  # 1
@@ -101,7 +113,10 @@ class _ClientType:
     ValueType = typing.NewType("ValueType", builtins.int)
     V: typing_extensions.TypeAlias = ValueType
 
-class _ClientTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_ClientType.ValueType], builtins.type):
+class _ClientTypeEnumTypeWrapper(
+    google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_ClientType.ValueType],
+    builtins.type,
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     API: _ClientType.ValueType  # 0
     WEB: _ClientType.ValueType  # 1
@@ -160,7 +175,31 @@ class Process(google.protobuf.message.Message):
         media_files: builtins.int = ...,
         num_processed: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["bytes", b"bytes", "chars", b"chars", "client", b"client", "media_files", b"media_files", "media_seconds", b"media_seconds", "num_processed", b"num_processed", "pages", b"pages", "paragraphs", b"paragraphs", "pre_processing_time", b"pre_processing_time", "slow_processing_time", b"slow_processing_time"]) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "bytes",
+            b"bytes",
+            "chars",
+            b"chars",
+            "client",
+            b"client",
+            "media_files",
+            b"media_files",
+            "media_seconds",
+            b"media_seconds",
+            "num_processed",
+            b"num_processed",
+            "pages",
+            b"pages",
+            "paragraphs",
+            b"paragraphs",
+            "pre_processing_time",
+            b"pre_processing_time",
+            "slow_processing_time",
+            b"slow_processing_time",
+        ],
+    ) -> None: ...
 
 global___Process = Process
 
@@ -178,7 +217,12 @@ class Storage(google.protobuf.message.Message):
         paragraphs: builtins.int = ...,
         fields: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["fields", b"fields", "paragraphs", b"paragraphs"]) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "fields", b"fields", "paragraphs", b"paragraphs"
+        ],
+    ) -> None: ...
 
 global___Storage = Storage
 
@@ -202,7 +246,19 @@ class Search(google.protobuf.message.Message):
         tokens: builtins.int = ...,
         num_searches: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["client", b"client", "num_searches", b"num_searches", "tokens", b"tokens", "type", b"type"]) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "client",
+            b"client",
+            "num_searches",
+            b"num_searches",
+            "tokens",
+            b"tokens",
+            "type",
+            b"type",
+        ],
+    ) -> None: ...
 
 global___Search = Search
 
@@ -235,7 +291,25 @@ class Predict(google.protobuf.message.Message):
         image: builtins.int = ...,
         num_predicts: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["client", b"client", "image", b"image", "input", b"input", "model", b"model", "num_predicts", b"num_predicts", "output", b"output", "type", b"type"]) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "client",
+            b"client",
+            "image",
+            b"image",
+            "input",
+            b"input",
+            "model",
+            b"model",
+            "num_predicts",
+            b"num_predicts",
+            "output",
+            b"output",
+            "type",
+            b"type",
+        ],
+    ) -> None: ...
 
 global___Predict = Predict
 
@@ -260,12 +334,24 @@ class KbUsage(google.protobuf.message.Message):
     kb_id: builtins.str
     kb_source: global___KBSource.ValueType
     @property
-    def processes(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Process]:
+    def processes(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___Process
+    ]:
         """Data"""
     @property
-    def predicts(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Predict]: ...
+    def predicts(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___Predict
+    ]: ...
     @property
-    def searches(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Search]: ...
+    def searches(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___Search
+    ]: ...
     @property
     def storage(self) -> global___Storage: ...
     def __init__(
@@ -281,14 +367,66 @@ class KbUsage(google.protobuf.message.Message):
         searches: collections.abc.Iterable[global___Search] | None = ...,
         storage: global___Storage | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["_account_id", b"_account_id", "_kb_id", b"_kb_id", "_storage", b"_storage", "account_id", b"account_id", "kb_id", b"kb_id", "storage", b"storage", "timestamp", b"timestamp"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["_account_id", b"_account_id", "_kb_id", b"_kb_id", "_storage", b"_storage", "account_id", b"account_id", "kb_id", b"kb_id", "kb_source", b"kb_source", "predicts", b"predicts", "processes", b"processes", "searches", b"searches", "service", b"service", "storage", b"storage", "timestamp", b"timestamp"]) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "_account_id",
+            b"_account_id",
+            "_kb_id",
+            b"_kb_id",
+            "_storage",
+            b"_storage",
+            "account_id",
+            b"account_id",
+            "kb_id",
+            b"kb_id",
+            "storage",
+            b"storage",
+            "timestamp",
+            b"timestamp",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "_account_id",
+            b"_account_id",
+            "_kb_id",
+            b"_kb_id",
+            "_storage",
+            b"_storage",
+            "account_id",
+            b"account_id",
+            "kb_id",
+            b"kb_id",
+            "kb_source",
+            b"kb_source",
+            "predicts",
+            b"predicts",
+            "processes",
+            b"processes",
+            "searches",
+            b"searches",
+            "service",
+            b"service",
+            "storage",
+            b"storage",
+            "timestamp",
+            b"timestamp",
+        ],
+    ) -> None: ...
     @typing.overload
-    def WhichOneof(self, oneof_group: typing_extensions.Literal["_account_id", b"_account_id"]) -> typing_extensions.Literal["account_id"] | None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["_account_id", b"_account_id"]
+    ) -> typing_extensions.Literal["account_id"] | None: ...
     @typing.overload
-    def WhichOneof(self, oneof_group: typing_extensions.Literal["_kb_id", b"_kb_id"]) -> typing_extensions.Literal["kb_id"] | None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["_kb_id", b"_kb_id"]
+    ) -> typing_extensions.Literal["kb_id"] | None: ...
     @typing.overload
-    def WhichOneof(self, oneof_group: typing_extensions.Literal["_storage", b"_storage"]) -> typing_extensions.Literal["storage"] | None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["_storage", b"_storage"]
+    ) -> typing_extensions.Literal["storage"] | None: ...
 
 global___KbUsage = KbUsage
 
@@ -298,12 +436,18 @@ class KbUsageAggregated(google.protobuf.message.Message):
 
     KB_USAGES_FIELD_NUMBER: builtins.int
     @property
-    def kb_usages(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___KbUsage]: ...
+    def kb_usages(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___KbUsage
+    ]: ...
     def __init__(
         self,
         *,
         kb_usages: collections.abc.Iterable[global___KbUsage] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["kb_usages", b"kb_usages"]) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["kb_usages", b"kb_usages"]
+    ) -> None: ...
 
 global___KbUsageAggregated = KbUsageAggregated
