@@ -72,7 +72,6 @@ async def ask_knowledgebox_endpoint(
         kbid, item, x_nucliadb_user, x_ndb_client, x_forwarded_for, x_synchronous
     )
 
-
 @handled_ask_exceptions
 async def create_ask_response(
     kbid: str,
@@ -85,11 +84,11 @@ async def create_ask_response(
 ) -> Response:
     ask_request.max_tokens = parse_max_tokens(ask_request.max_tokens)
     ask_result: AskResult = await ask(
-        kbid,
-        ask_request,
-        user_id,
-        client_type,
-        origin,
+        kbid=kbid,
+        ask_request=ask_request,
+        user_id=user_id,
+        client_type=client_type,
+        origin=origin,
         resource=resource,
     )
     headers = {

@@ -21,6 +21,7 @@ from typing import Optional, Union
 
 from fastapi import Header, Request, Response
 from fastapi_versioning import version
+from nucliadb.search.search.chat.ask import handled_ask_exceptions
 from starlette.responses import StreamingResponse
 
 from nucliadb.common import datamanagers
@@ -60,11 +61,10 @@ async def resource_ask_endpoint_by_uuid(
     ),
 ) -> Union[StreamingResponse, HTTPClientError, Response]:
     return await create_ask_response(
-        request,
         kbid,
         item,
-        x_ndb_client,
         x_nucliadb_user,
+        x_ndb_client,
         x_forwarded_for,
         x_synchronous,
         resource=rid,
@@ -101,11 +101,10 @@ async def resource_ask_endpoint_by_slug(
     if resource_id is None:
         return HTTPClientError(status_code=404, detail="Resource not found")
     return await create_ask_response(
-        request,
         kbid,
         item,
-        x_ndb_client,
         x_nucliadb_user,
+        x_ndb_client,
         x_forwarded_for,
         x_synchronous,
         resource=resource_id,

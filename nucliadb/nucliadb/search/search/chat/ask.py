@@ -303,6 +303,7 @@ class NotEnoughContextAskResult(AskResult):
 
 
 async def ask(
+    *,
     kbid: str,
     ask_request: AskRequest,
     user_id: str,
