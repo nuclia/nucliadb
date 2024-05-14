@@ -24,7 +24,7 @@ import nucliadb_sdk
 from nucliadb_models.metadata import RelationType
 from nucliadb_models.search import (
     AnswerAskResponseItem,
-    AskResultItem,
+    AskResponseItem,
     AskTimings,
     AskTokens,
     CitationsAskResponseItem,
@@ -123,7 +123,7 @@ def test_ask_response_parser():
         ),
         CitationsAskResponseItem(citations={"some/paragraph/id": "This is a citation"}),
     ]
-    raw_lines = [AskResultItem(item=item).json() for item in items]
+    raw_lines = [AskResponseItem(item=item).json() for item in items]
     response = unittest.mock.Mock()
     response.headers = {"NUCLIA-LEARNING-ID": "learning_id"}
     response.iter_lines = unittest.mock.Mock(return_value=raw_lines)

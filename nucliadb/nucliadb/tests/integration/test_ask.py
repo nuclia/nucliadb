@@ -28,7 +28,7 @@ from nucliadb.search.predict import (
     GenerativeChunk,
 )
 from nucliadb.search.utilities import get_predict
-from nucliadb_models.search import AskResultItem, SyncAskResponse
+from nucliadb_models.search import AskResponseItem, SyncAskResponse
 
 
 @pytest.fixture(scope="function", autouse=True)
@@ -179,7 +179,7 @@ async def resources(nucliadb_writer, knowledgebox):
 def parse_ask_response(resp):
     results = []
     for line in resp.iter_lines():
-        result_item = AskResultItem.parse_raw(line)
+        result_item = AskResponseItem.parse_raw(line)
         results.append(result_item)
     return results
 

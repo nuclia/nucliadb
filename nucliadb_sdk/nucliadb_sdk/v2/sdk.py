@@ -64,7 +64,7 @@ from nucliadb_models.resource import (
 from nucliadb_models.search import (
     AnswerAskResponseItem,
     AskRequest,
-    AskResultItem,
+    AskResponseItem,
     ChatRequest,
     CitationsAskResponseItem,
     FeedbackRequest,
@@ -157,7 +157,7 @@ def ask_response_parser(response: httpx.Response) -> SyncAskResponse:
     timings = None
     for line in response.iter_lines():
         try:
-            item = AskResultItem.parse_raw(line).item
+            item = AskResponseItem.parse_raw(line).item
             if isinstance(item, AnswerAskResponseItem):
                 answer += item.text
             elif isinstance(item, RelationsAskResponseItem):

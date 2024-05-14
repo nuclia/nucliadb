@@ -1454,5 +1454,5 @@ AskResponseItemType = Union[
 ]
 
 
-class AskResultItem(BaseModel):
+class AskResponseItem(BaseModel):
     item: AskResponseItemType = Field(..., discriminator="type")

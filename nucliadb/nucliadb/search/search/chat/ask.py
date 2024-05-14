@@ -50,8 +50,8 @@ from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import (
     AnswerAskResponseItem,
     AskRequest,
+    AskResponseItem,
     AskResponseItemType,
-    AskResultItem,
     AskTimings,
     AskTokens,
     ChatModel,
@@ -136,7 +136,7 @@ class AskResult:
             return
 
     def _ndjson_encode(self, item: AskResponseItemType) -> str:
-        result_item = AskResultItem(item=item)
+        result_item = AskResponseItem(item=item)
         return result_item.json(exclude_unset=False, exclude_none=True) + "\n"
 
     async def _stream(self) -> AsyncGenerator[AskResponseItemType, None]:
