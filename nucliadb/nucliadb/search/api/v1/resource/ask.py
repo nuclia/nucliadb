@@ -27,7 +27,7 @@ from nucliadb.common import datamanagers
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, RESOURCE_SLUG_PREFIX, api
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_models.search import AskRequest, NucliaDBClientType
+from nucliadb_models.search import AskRequest, NucliaDBClientType, SyncAskResponse
 from nucliadb_utils.authentication import requires
 
 from ..ask import create_ask_response
@@ -39,7 +39,9 @@ from ..ask import create_ask_response
     summary="Ask with a resource (by id)",
     description="Ask questions to a resource",
     tags=["Search"],
-    response_model=None,
+    response_model=SyncAskResponse,
+    # Add this to OpenAPI schema when endpoint is not in beta anymore
+    include_in_schema=False,
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
@@ -75,7 +77,9 @@ async def resource_ask_endpoint_by_uuid(
     summary="Ask with a resource (by slug)",
     description="Ask with a resource",
     tags=["Search"],
-    response_model=None,
+    response_model=SyncAskResponse,
+    # Add this to OpenAPI schema when endpoint is not in beta anymore
+    include_in_schema=False,
 )
 @requires(NucliaDBRoles.READER)
 @version(1)

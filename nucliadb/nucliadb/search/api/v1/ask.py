@@ -27,7 +27,12 @@ from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.search.chat.ask import AskResult, ask, handled_ask_exceptions
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_models.search import AskRequest, NucliaDBClientType, parse_max_tokens
+from nucliadb_models.search import (
+    AskRequest,
+    NucliaDBClientType,
+    SyncAskResponse,
+    parse_max_tokens,
+)
 from nucliadb_utils import const
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.utilities import has_feature
@@ -39,8 +44,8 @@ from nucliadb_utils.utilities import has_feature
     summary="Ask Knowledge Box",
     description="Ask questions on a Knowledge Box",
     tags=["Search"],
-    response_model=None,
-    # TODO: Include in schema once the endpoint is stable enough
+    response_model=SyncAskResponse,
+    # Add this to OpenAPI schema when endpoint is not in beta anymore
     include_in_schema=False,
 )
 @requires(NucliaDBRoles.READER)
