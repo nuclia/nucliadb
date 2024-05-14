@@ -440,7 +440,6 @@ async def test_ask_max_tokens(nucliadb_reader, knowledgebox, resources):
     assert resp.status_code == 412
 
 
-
 @pytest.mark.asyncio()
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_ask_on_resource(nucliadb_reader: AsyncClient, knowledgebox, resource):
@@ -448,7 +447,6 @@ async def test_ask_on_resource(nucliadb_reader: AsyncClient, knowledgebox, resou
         f"/kb/{knowledgebox}/resource/{resource}/ask",
         json={"query": "title"},
         headers={"X-Synchronous": "True"},
-        timeout=None,
     )
     assert resp.status_code == 200
-    resp_data = SyncAskResponse.parse_raw(resp.content)
+    SyncAskResponse.parse_raw(resp.content)

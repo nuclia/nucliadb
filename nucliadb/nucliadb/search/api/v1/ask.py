@@ -72,6 +72,7 @@ async def ask_knowledgebox_endpoint(
         kbid, item, x_nucliadb_user, x_ndb_client, x_forwarded_for, x_synchronous
     )
 
+
 @handled_ask_exceptions
 async def create_ask_response(
     kbid: str,

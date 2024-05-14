@@ -21,7 +21,6 @@ from typing import Optional, Union
 
 from fastapi import Header, Request, Response
 from fastapi_versioning import version
-from nucliadb.search.search.chat.ask import handled_ask_exceptions
 from starlette.responses import StreamingResponse
 
 from nucliadb.common import datamanagers
