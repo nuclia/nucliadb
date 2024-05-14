@@ -57,7 +57,7 @@ async def resource_ask_endpoint_by_uuid(
         "This is slower and requires waiting for entire answer to be ready.",
     ),
 ) -> Union[StreamingResponse, HTTPClientError, Response]:
-    return await resource_ask_endpoint(
+    return await create_ask_response(
         request,
         kbid,
         item,
@@ -93,43 +93,15 @@ async def resource_ask_endpoint_by_slug(
         "This is slower and requires waiting for entire answer to be ready.",
     ),
 ) -> Union[StreamingResponse, HTTPClientError, Response]:
-    return await resource_ask_endpoint(
+    resource_id = await get_resource_uuid_by_slug(kbid, slug)
+    if resource_id is None:
+        return HTTPClientError(status_code=404, detail="Resource not found")
+    return await create_ask_response(
         request,
         kbid,
         item,
         x_ndb_client,
         x_nucliadb_user,
-        x_forwarded_for,
-        x_synchronous,
-        resource_slug=slug,
-    )
-
-
-async def resource_ask_endpoint(
-    request: Request,
-    kbid: str,
-    item: AskRequest,
-    x_ndb_client: NucliaDBClientType,
-    x_nucliadb_user: str,
-    x_forwarded_for: str,
-    x_synchronous: bool,
-    resource_id: Optional[str] = None,
-    resource_slug: Optional[str] = None,
-) -> Union[StreamingResponse, HTTPClientError, Response]:
-
-    if resource_id is None:
-        if resource_slug is None:
-            raise ValueError("Either resource_id or resource_slug must be provided")
-
-        resource_id = await get_resource_uuid_by_slug(kbid, resource_slug)
-        if resource_id is None:
-            return HTTPClientError(status_code=404, detail="Resource not found")
-
-    return await create_ask_response(
-        kbid,
-        item,
-        x_nucliadb_user,
-        x_ndb_client,
         x_forwarded_for,
         x_synchronous,
         resource=resource_id,
