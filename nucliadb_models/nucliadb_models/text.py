@@ -83,11 +83,11 @@ class TextField(BaseModel):
     body: str
     format: TextFormat = TextFormat.PLAIN
 
-    @model_validator(mode="before")
+    @model_validator(mode="after")
     @classmethod
     def check_text_format(cls, values):
-        if values.get("format") == TextFormat.JSON.value:
-            validate_json(values.get("body", ""))
+        if values.format == TextFormat.JSON:
+            validate_json(values.body or "")
         return values
 
 

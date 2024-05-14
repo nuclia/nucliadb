@@ -26,11 +26,14 @@ from typing_extensions import Annotated
 def validate_field_id(value, handler, info):
     try:
         return handler(value)
-    except:
-        raise ValueError(
-            f"Invalid field_id: '{value}'. Slug must be a string with only "
-            "letters, numbers, underscores, colons and dashes."
-        )
+    except pydantic.ValidationError as e:
+        if any(x["type"] == "string_pattern_mismatch" for x in e.errors()):
+            raise ValueError(
+                f"Invalid field_id: '{value}'. Field ID must be a string with only "
+                "letters, numbers, underscores, colons and dashes."
+            )
+        else:
+            raise e
 
 
 FieldIdPattern = r"^[a-zA-Z0-9:_-]+$"
@@ -46,11 +49,14 @@ FieldIdString = Annotated[
 def validate_slug(value, handler, info):
     try:
         return handler(value)
-    except:
-        raise ValueError(
-            f"Invalid slug: '{value}'. Slug must be a string with only "
-            "letters, numbers, underscores, colons and dashes."
-        )
+    except pydantic.ValidationError as e:
+        if any(x["type"] == "string_pattern_mismatch" for x in e.errors()):
+            raise ValueError(
+                f"Invalid slug: '{value}'. Slug must be a string with only "
+                "letters, numbers, underscores, colons and dashes."
+            )
+        else:
+            raise e
 
 
 SlugString = Annotated[

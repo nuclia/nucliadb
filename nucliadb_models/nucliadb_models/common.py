@@ -96,22 +96,22 @@ class File(BaseModel):
     uri: Optional[str] = None
     extra_headers: Dict[str, str] = {}
 
-    @model_validator(mode="before")
+    @model_validator(mode="after")
     @classmethod
     def _check_internal_file_fields(cls, values):
-        if values.get("uri"):
+        if values.uri:
             # Externally hosted file
             return values
 
         required_keys = ["filename", "payload"]
         for key in required_keys:
-            if values.get(key) is None:
+            if getattr(values, key) is None:
                 raise ValueError(f"{key} is required")
-        if values.get("md5") is None:
+        if values.md5 is None:
             # In case md5 is not supplied, compute it
             try:
-                result = hashlib.md5(base64.b64decode(values.get("payload")))
-                values["md5"] = result.hexdigest()
+                result = hashlib.md5(base64.b64decode(values.payload))
+                values.md5 = result.hexdigest()
             except Exception:
                 raise ValueError("MD5 could not be computed")
         return values

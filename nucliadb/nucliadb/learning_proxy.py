@@ -69,11 +69,11 @@ class LearningConfiguration(BaseModel):
         default=None, alias="semantic_matryoshka_dims"
     )
 
-    @model_validator(mode="before")
+    @model_validator(mode="after")
     @classmethod
     def validate_matryoshka_and_vector_dimension_consistency(cls, values):
-        vector_size = values.get("semantic_vector_size")
-        matryoshka_dimensions = values.get("semantic_matryoshka_dimensions", []) or []
+        vector_size = values.semantic_vector_size
+        matryoshka_dimensions = values.semantic_matryoshka_dimensions or []
         if (
             len(matryoshka_dimensions) > 0
             and vector_size is not None
