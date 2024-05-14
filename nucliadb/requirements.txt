@@ -8,7 +8,7 @@ nucliadb-node-binding>=2.26.0
 
 # external dependencies
 uvicorn<0.19.0
-pydantic_argparse @ git+https://github.com/cody-mar10/pydantic-argparse.git@master
+pydantic_argparse @ https://codeload.github.com/cody-mar10/pydantic-argparse/zip/4a79a48aa393a8b8947229d40f297fbad5802ac1
 
 aiohttp>=3.9.4
 lru-dict>=1.1.7

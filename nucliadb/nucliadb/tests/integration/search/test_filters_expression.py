@@ -119,7 +119,7 @@ async def test_filtering_expression_validation(nucliadb_reader, nucliadb_writer)
         json={"query": "", "filters": [{"all": []}]},
     )
     assert resp.status_code == 422
-    assert resp.json()["detail"][-1]["msg"] == "ensure this value has at least 1 items"
+    assert "List should have at least 1 item" in resp.json()["detail"][-1]["msg"]
 
     # But we ignore None values
     resp = await nucliadb_reader.post(

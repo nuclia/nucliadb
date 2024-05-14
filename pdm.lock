@@ -2180,7 +2180,7 @@ dependencies = [
     "orjson>=3.6.7",
     "protobuf>=4.22.3",
     "psutil>=5.9.7",
-    "pydantic-argparse @ git+https://github.com/cody-mar10/pydantic-argparse.git@master",
+    "pydantic-argparse @ https://codeload.github.com/cody-mar10/pydantic-argparse/zip/4a79a48aa393a8b8947229d40f297fbad5802ac1",
     "pydantic-settings>=2.2",
     "pydantic>=2.7",
     "pyjwt>=2.4.0",
@@ -2929,15 +2929,16 @@ files = [
 [[package]]
 name = "pydantic-argparse"
 version = "1.0.0"
-requires_python = ">=3.7,<4.0"
-git = "https://github.com/cody-mar10/pydantic-argparse.git"
-ref = "master"
-revision = "4a79a48aa393a8b8947229d40f297fbad5802ac1"
+requires_python = "<4.0,>=3.7"
+url = "https://codeload.github.com/cody-mar10/pydantic-argparse/zip/4a79a48aa393a8b8947229d40f297fbad5802ac1"
 summary = "Typed Argument Parsing with Pydantic"
 groups = ["dev"]
 dependencies = [
     "boltons",
     "pydantic<3,>=2",
+]
+files = [
+    {file = "4a79a48aa393a8b8947229d40f297fbad5802ac1", hash = "sha256:bb55a8e16e01cafd384b73dde96523406369dcaec0f27f46bd21e0794cc2df00"},
 ]
 
 [[package]]

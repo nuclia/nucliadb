@@ -3,7 +3,7 @@ types-protobuf
 grpcio
 requests
 aiohttp
-pydantic_argparse @ git+https://github.com/cody-mar10/pydantic-argparse.git@master
+pydantic_argparse @ https://codeload.github.com/cody-mar10/pydantic-argparse/zip/4a79a48aa393a8b8947229d40f297fbad5802ac1
 pydantic-settings>=2.2
 pyarrow
 
