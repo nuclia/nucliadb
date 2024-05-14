@@ -33,7 +33,7 @@ class BackPressureSettings(BaseSettings):
     enabled: bool = Field(
         default=False,
         description="Enable or disable back pressure.",
-        validation_alias="back_pressure_enabled",
+        alias="back_pressure_enabled",
     )
     indexing_rate: float = Field(
         default=4,

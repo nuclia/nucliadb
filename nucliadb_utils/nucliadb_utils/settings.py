@@ -29,7 +29,7 @@ class RunningSettings(BaseSettings):
     sentry_url: Optional[str] = None
     running_environment: str = Field(
         default="local",
-        validation_alias=AliasChoices("environment", "running_environment"),
+        alias=AliasChoices("environment", "running_environment"),
         description="Running environment. One of: local, test, stage, prod",
     )
     metrics_port: int = 3030

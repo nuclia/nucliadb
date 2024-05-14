@@ -438,7 +438,7 @@ async def test_field_ids_are_validated(
     if error:
         assert resp.status_code == 422
         body = resp.json()
-        assert body["detail"][0]["type"] == "string_pattern_mismatch"
+        assert body["detail"][0]["type"] == "value_error"
     else:
         assert resp.status_code == 201
 
@@ -984,9 +984,7 @@ async def test_pagination_limits(
     )
     assert resp.status_code == 422
     data = resp.json()
-    assert (
-        data["detail"][0]["msg"] == "Input should be less than or equal to 200"
-    )
+    assert data["detail"][0]["msg"] == "Input should be less than or equal to 200"
 
     # Max scrolling of 2000 vector results
     resp = await nucliadb_reader.post(
