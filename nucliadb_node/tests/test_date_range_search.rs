@@ -28,7 +28,7 @@ use nucliadb_protos::prost_types::Timestamp;
 use nucliadb_protos::resource::ResourceStatus;
 use nucliadb_protos::{
     IndexMetadata, IndexParagraph, IndexParagraphs, NewShardRequest, ReleaseChannel, Resource, ResourceId,
-    SearchRequest, TextInformation, Timestamps, VectorSentence,
+    SearchRequest, TextInformation, Timestamps, VectorSentence, VectorsetSentences,
 };
 use rstest::*;
 use tonic::Request;
@@ -65,7 +65,13 @@ async fn populate(writer: &mut TestNodeWriter, shard_id: String, metadata: Index
     let paragraph = IndexParagraph {
         start: 0,
         end: 0,
-        sentences,
+        sentences: sentences.clone(),
+        vectorsets_sentences: HashMap::from([(
+            "__default__".to_string(),
+            VectorsetSentences {
+                sentences,
+            },
+        )]),
         field: field_id.clone(),
         labels: vec![],
         index: 3,

@@ -29,7 +29,7 @@ use uuid::Uuid;
 
 use crate::disk_structure;
 
-pub const DEFAULT_VECTOR_INDEX_NAME: &str = "__default__";
+pub const DEFAULT_VECTORS_INDEX_NAME: &str = "__default__";
 pub const MAX_ALLOWED_VECTORSETS: usize = 5;
 pub const SHARD_INDEXES_FILENAME: &str = "indexes.json";
 pub const TEMP_SHARD_INDEXES_FILENAME: &str = "indexes.temp.json";
@@ -70,7 +70,7 @@ impl ShardIndexes {
     }
 
     pub fn vectors_path(&self) -> PathBuf {
-        self.vectorset_path(DEFAULT_VECTOR_INDEX_NAME).expect("Default vectors index should always be present")
+        self.vectorset_path(DEFAULT_VECTORS_INDEX_NAME).expect("Default vectors index should always be present")
     }
 
     pub fn vectorset_path(&self, name: &str) -> Option<PathBuf> {
@@ -83,17 +83,16 @@ impl ShardIndexes {
 
     // Vectorsets
 
-    #[allow(dead_code)]
-    /// Add a new vectorset to the index and returns it's path
-    pub fn add_vectorset(&mut self, name: String) -> NodeResult<PathBuf> {
+    /// Add a new vectors index to the shard and returns it's path
+    pub fn add_vectors_index(&mut self, name: String) -> NodeResult<PathBuf> {
         if self.inner.vectorsets.len() >= MAX_ALLOWED_VECTORSETS {
             return Err(node_error!(format!(
                 "Max amount of allowed vectorsets reached: {}",
                 self.inner.vectorsets.len()
             )));
         }
-        if name == DEFAULT_VECTOR_INDEX_NAME {
-            return Err(node_error!(format!("Vectorset id {DEFAULT_VECTOR_INDEX_NAME} is reserved for internal use")));
+        if name == DEFAULT_VECTORS_INDEX_NAME {
+            return Err(node_error!(format!("Vectorset id {DEFAULT_VECTORS_INDEX_NAME} is reserved for internal use")));
         }
         if self.inner.vectorsets.contains_key(&name) {
             return Err(node_error!(format!("Vectorset id {name} is already in use")));
@@ -105,21 +104,23 @@ impl ShardIndexes {
         Ok(path)
     }
 
-    #[allow(dead_code)]
-    /// Removes a vectorset from the shard and returns the index path
-    pub fn remove_vectorset(&mut self, name: &str) -> NodeResult<Option<PathBuf>> {
-        if name == DEFAULT_VECTOR_INDEX_NAME {
+    /// Removes a vectors index from the shard and returns its path
+    pub fn remove_vectors_index(&mut self, name: &str) -> NodeResult<Option<PathBuf>> {
+        if name == DEFAULT_VECTORS_INDEX_NAME {
             return Err(node_error!(format!(
-                "Vectorset id {DEFAULT_VECTOR_INDEX_NAME} is reserved and can't be removed"
+                "Vectorset id {DEFAULT_VECTORS_INDEX_NAME} is reserved and can't be removed"
             )));
         }
         let removed = self.inner.vectorsets.remove(name).map(|vectorset| self.shard_path.join(vectorset));
         Ok(removed)
     }
 
-    #[allow(dead_code)]
-    pub fn iter_vectorsets(&self) -> impl Iterator<Item = (String, PathBuf)> + '_ {
+    pub fn iter_vectors_indexes(&self) -> impl Iterator<Item = (String, PathBuf)> + '_ {
         self.inner.vectorsets.iter().map(|(name, vectorset)| (name.to_owned(), self.shard_path.join(vectorset)))
+    }
+
+    pub fn count_vectors_indexes(&self) -> usize {
+        self.inner.vectorsets.len()
     }
 }
 
@@ -135,7 +136,7 @@ struct ShardIndexesFile {
 impl ShardIndexesFile {
     pub fn load(shard_path: &Path) -> NodeResult<Self> {
         let mut reader = BufReader::new(File::open(shard_path.join(SHARD_INDEXES_FILENAME))?);
-        let indexes: ShardIndexesFile = serde_json::from_reader(&mut reader)?;
+        let indexes: Self = serde_json::from_reader(&mut reader)?;
         Ok(indexes)
     }
 
@@ -155,7 +156,7 @@ impl Default for ShardIndexesFile {
         Self {
             texts: disk_structure::TEXTS_DIR.into(),
             paragraphs: disk_structure::PARAGRAPHS_DIR.into(),
-            vectorsets: HashMap::from([(DEFAULT_VECTOR_INDEX_NAME.to_string(), disk_structure::VECTORS_DIR.into())]),
+            vectorsets: HashMap::from([(DEFAULT_VECTORS_INDEX_NAME.to_string(), disk_structure::VECTORS_DIR.into())]),
             relations: disk_structure::RELATIONS_DIR.into(),
         }
     }
@@ -191,18 +192,18 @@ mod tests {
 
         let mut indexes = ShardIndexes::new(shard_path);
 
-        let vectorsets = indexes.iter_vectorsets().collect::<Vec<(String, PathBuf)>>();
+        let vectorsets = indexes.iter_vectors_indexes().collect::<Vec<(String, PathBuf)>>();
         assert_eq!(vectorsets.len(), 1);
-        assert_eq!(vectorsets[0].0, DEFAULT_VECTOR_INDEX_NAME.to_string());
+        assert_eq!(vectorsets[0].0, DEFAULT_VECTORS_INDEX_NAME.to_string());
         assert_eq!(vectorsets[0].1, shard_path.join(disk_structure::VECTORS_DIR));
 
         assert_eq!(
-            indexes.vectorset_path(DEFAULT_VECTOR_INDEX_NAME),
+            indexes.vectorset_path(DEFAULT_VECTORS_INDEX_NAME),
             Some(shard_path.join(disk_structure::VECTORS_DIR))
         );
 
         // Default vectorset can't be removed
-        assert!(indexes.remove_vectorset(DEFAULT_VECTOR_INDEX_NAME).is_err());
+        assert!(indexes.remove_vectors_index(DEFAULT_VECTORS_INDEX_NAME).is_err());
     }
 
     #[test]
@@ -212,7 +213,7 @@ mod tests {
 
         let mut indexes = ShardIndexes::new(shard_path);
 
-        indexes.add_vectorset("gecko".to_string()).unwrap();
+        indexes.add_vectors_index("gecko".to_string()).unwrap();
 
         assert_eq!(indexes.texts_path(), shard_path.join(disk_structure::TEXTS_DIR));
         assert_eq!(indexes.paragraphs_path(), shard_path.join(disk_structure::PARAGRAPHS_DIR));
@@ -233,13 +234,13 @@ mod tests {
 
         let mut indexes = ShardIndexes::new(shard_path);
 
-        indexes.add_vectorset("gecko".to_string()).unwrap();
-        indexes.add_vectorset("openai".to_string()).unwrap();
+        indexes.add_vectors_index("gecko".to_string()).unwrap();
+        indexes.add_vectors_index("openai".to_string()).unwrap();
 
-        let vectorsets = indexes.iter_vectorsets().sorted().collect::<Vec<(String, PathBuf)>>();
+        let vectorsets = indexes.iter_vectors_indexes().sorted().collect::<Vec<(String, PathBuf)>>();
         assert_eq!(vectorsets.len(), 3);
 
-        assert_eq!(vectorsets[0].0, DEFAULT_VECTOR_INDEX_NAME.to_string());
+        assert_eq!(vectorsets[0].0, DEFAULT_VECTORS_INDEX_NAME.to_string());
         assert_eq!(vectorsets[1].0, "gecko".to_string());
         assert_eq!(vectorsets[1].1, indexes.vectorset_path("gecko").unwrap());
         assert_eq!(vectorsets[2].0, "openai".to_string());
@@ -255,15 +256,15 @@ mod tests {
 
         // Add two vectorsets more
 
-        let added = indexes.add_vectorset("gecko".to_string()).is_ok();
+        let added = indexes.add_vectors_index("gecko".to_string()).is_ok();
         assert!(added);
-        let added = indexes.add_vectorset("openai".to_string()).is_ok();
+        let added = indexes.add_vectors_index("openai".to_string()).is_ok();
         assert!(added);
 
-        let vectorsets = indexes.iter_vectorsets().sorted().collect::<Vec<(String, PathBuf)>>();
+        let vectorsets = indexes.iter_vectors_indexes().sorted().collect::<Vec<(String, PathBuf)>>();
         assert_eq!(vectorsets.len(), 3);
 
-        assert_eq!(vectorsets[0].0, DEFAULT_VECTOR_INDEX_NAME.to_string());
+        assert_eq!(vectorsets[0].0, DEFAULT_VECTORS_INDEX_NAME.to_string());
         assert_eq!(vectorsets[1].0, "gecko".to_string());
         assert_eq!(vectorsets[1].1, indexes.vectorset_path("gecko").unwrap());
         assert_eq!(vectorsets[2].0, "openai".to_string());
@@ -271,11 +272,11 @@ mod tests {
 
         // Remove a regular vectorset
 
-        assert!(indexes.remove_vectorset("gecko").is_ok());
+        assert!(indexes.remove_vectors_index("gecko").is_ok());
 
-        let vectorsets = indexes.iter_vectorsets().sorted().collect::<Vec<(String, PathBuf)>>();
+        let vectorsets = indexes.iter_vectors_indexes().sorted().collect::<Vec<(String, PathBuf)>>();
         assert_eq!(vectorsets.len(), 2);
-        assert_eq!(vectorsets[0].0, DEFAULT_VECTOR_INDEX_NAME.to_string());
+        assert_eq!(vectorsets[0].0, DEFAULT_VECTORS_INDEX_NAME.to_string());
         assert_eq!(vectorsets[1].0, "openai".to_string());
         assert_eq!(vectorsets[1].1, indexes.vectorset_path("openai").unwrap());
     }
@@ -289,8 +290,8 @@ mod tests {
 
         // Add two vectorsets more
 
-        assert!(indexes.add_vectorset("gecko".to_string()).is_ok());
-        assert!(indexes.add_vectorset("gecko".to_string()).is_err());
+        assert!(indexes.add_vectors_index("gecko".to_string()).is_ok());
+        assert!(indexes.add_vectors_index("gecko".to_string()).is_err());
     }
 
     #[test]
@@ -301,8 +302,8 @@ mod tests {
         let mut indexes = ShardIndexes::new(shard_path);
 
         for i in 0..(MAX_ALLOWED_VECTORSETS - 1) {
-            assert!(indexes.add_vectorset(format!("vectorset-{i}")).is_ok());
+            assert!(indexes.add_vectors_index(format!("vectorset-{i}")).is_ok());
         }
-        assert!(indexes.add_vectorset("too-many".to_string()).is_err());
+        assert!(indexes.add_vectors_index("too-many".to_string()).is_err());
     }
 }

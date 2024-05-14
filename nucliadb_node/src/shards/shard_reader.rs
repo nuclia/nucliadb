@@ -17,6 +17,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use super::indexes::ShardIndexes;
+use super::indexes::DEFAULT_VECTORS_INDEX_NAME;
 use super::metadata::ShardMetadata;
 use super::versioning::Versions;
 use crate::disk_structure::*;
@@ -46,6 +47,7 @@ use nucliadb_procs::measure;
 use nucliadb_protos::nodereader::{RelationNodeFilter, RelationPrefixSearchResponse};
 use nucliadb_protos::utils::relation_node::NodeType;
 use nucliadb_relations2::reader::HashedRelationNode;
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::{BufReader, Read};
@@ -137,12 +139,13 @@ impl Iterator for ShardFileChunkIterator {
 pub struct ShardReader {
     pub id: String,
     pub metadata: ShardMetadata,
-    indexes: ShardIndexes,
     root_path: PathBuf,
     suffixed_root_path: String,
     text_reader: RwLock<TextsReaderPointer>,
     paragraph_reader: RwLock<ParagraphsReaderPointer>,
-    vector_reader: RwLock<VectorsReaderPointer>,
+    // vector index searches are not intended to run in parallel, so we only
+    // need a lock for all of them
+    vector_readers: RwLock<HashMap<String, VectorsReaderPointer>>,
     relation_reader: RwLock<RelationsReaderPointer>,
     versions: Versions,
 }
@@ -198,7 +201,14 @@ impl ShardReader {
         let info = info_span!(parent: &span, "paragraph count");
         let paragraph_task = || run_with_telemetry(info, || read_rw_lock(&self.paragraph_reader).count());
         let info = info_span!(parent: &span, "vector count");
-        let vector_task = || run_with_telemetry(info, || read_rw_lock(&self.vector_reader).count());
+        let vector_task = || {
+            run_with_telemetry(info, || {
+                read_rw_lock(&self.vector_readers)
+                    .get(DEFAULT_VECTORS_INDEX_NAME)
+                    .expect("Default vectors index should never be deleted (yet)")
+                    .count()
+            })
+        };
 
         let mut text_result = Ok(0);
         let mut paragraph_result = Ok(0);
@@ -236,7 +246,10 @@ impl ShardReader {
 
     #[tracing::instrument(skip_all)]
     pub fn get_vectors_keys(&self) -> NodeResult<Vec<String>> {
-        read_rw_lock(&self.vector_reader).stored_ids()
+        read_rw_lock(&self.vector_readers)
+            .get(DEFAULT_VECTORS_INDEX_NAME)
+            .expect("Default vectors index should never be deleted (yet)")
+            .stored_ids()
     }
 
     #[tracing::instrument(skip_all)]
@@ -293,11 +306,10 @@ impl ShardReader {
             id,
             metadata,
             suffixed_root_path,
-            indexes,
             root_path: shard_path.to_path_buf(),
             text_reader: RwLock::new(fields.unwrap()),
             paragraph_reader: RwLock::new(paragraphs.unwrap()),
-            vector_reader: RwLock::new(vectors.unwrap()),
+            vector_readers: RwLock::new(HashMap::from([(DEFAULT_VECTORS_INDEX_NAME.to_string(), vectors.unwrap())])),
             relation_reader: RwLock::new(relations.unwrap()),
             versions,
         })
@@ -473,9 +485,8 @@ impl ShardReader {
         let vector_task = index_queries.vectors_request.map(|mut request| {
             request.id = search_id.clone();
             let vectors_context = &index_queries.vectors_context;
-            let info = info_span!(parent: &span, "vector search");
-            let task = move || read_rw_lock(&self.vector_reader).search(&request, vectors_context);
-            || run_with_telemetry(info, task)
+            let task = move || self.vectors_index_search(&request, vectors_context);
+            || run_with_telemetry(info_span!(parent: &span, "vector search"), task)
         });
 
         let relation_task = index_queries.relations_request.map(|request| {
@@ -597,7 +608,7 @@ impl ShardReader {
         let span = tracing::Span::current();
 
         run_with_telemetry(info_span!(parent: &span, "vector reader search"), || {
-            read_rw_lock(&self.vector_reader).search(&search_request, &VectorsContext::default())
+            self.vectors_index_search(&search_request, &VectorsContext::default())
         })
     }
     #[tracing::instrument(skip_all)]
@@ -616,7 +627,10 @@ impl ShardReader {
 
     #[tracing::instrument(skip_all)]
     pub fn vector_count(&self) -> NodeResult<usize> {
-        read_rw_lock(&self.vector_reader).count()
+        read_rw_lock(&self.vector_readers)
+            .get(DEFAULT_VECTORS_INDEX_NAME)
+            .expect("Default vectors index should never be deleted (yet)")
+            .count()
     }
 
     #[tracing::instrument(skip_all)]
@@ -625,12 +639,41 @@ impl ShardReader {
     }
 
     pub fn update(&self) -> NodeResult<()> {
-        let version = self.versions.vectors;
-        let path = self.indexes.vectors_path();
-        let new_reader = open_vectors_reader(version, &path)?;
-        let mut writer = write_rw_lock(&self.vector_reader);
-        *writer = new_reader;
+        let shard_path = self.metadata.shard_path();
+        // TODO: while we don't have all shards migrated, we still have to
+        // unwrap with a default
+        let indexes = ShardIndexes::load(&shard_path).unwrap_or_else(|_| ShardIndexes::new(&shard_path));
+
+        let mut updated_indexes = HashMap::with_capacity(indexes.count_vectors_indexes());
+        for (vectorset, path) in indexes.iter_vectors_indexes() {
+            let new_reader = open_vectors_reader(self.versions.vectors, &path)?;
+            updated_indexes.insert(vectorset, new_reader);
+        }
+        let mut vector_indexes = write_rw_lock(&self.vector_readers);
+        *vector_indexes = updated_indexes;
         Ok(())
+    }
+
+    fn vectors_index_search(
+        &self,
+        request: &VectorSearchRequest,
+        context: &VectorsContext,
+    ) -> NodeResult<VectorSearchResponse> {
+        let vectorset = &request.vector_set;
+        if vectorset.is_empty() {
+            read_rw_lock(&self.vector_readers)
+                .get(DEFAULT_VECTORS_INDEX_NAME)
+                .expect("Default vectors index should never be deleted (yet)")
+                .search(request, context)
+        } else {
+            let vector_readers = read_rw_lock(&self.vector_readers);
+            let reader = vector_readers.get(vectorset);
+            if let Some(reader) = reader {
+                reader.search(request, context)
+            } else {
+                Err(node_error!("Vectorset '{vectorset}' not found"))
+            }
+        }
     }
 }
 

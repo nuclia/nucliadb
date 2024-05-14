@@ -151,6 +151,9 @@ pub struct NewVectorSetRequest {
     pub id: ::core::option::Option<super::noderesources::VectorSetId>,
     #[prost(enumeration = "super::utils::VectorSimilarity", tag = "2")]
     pub similarity: i32,
+    /// indicates whether the shard should normalize vectors on indexing or not
+    #[prost(bool, tag = "3")]
+    pub normalize_vectors: bool,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
