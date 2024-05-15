@@ -93,8 +93,12 @@ class KbUsageReportUtility:
         usage.predicts.extend(predicts)
         usage.searches.extend(searches)
         if storage is not None:
-            usage.storage.paragraphs = storage.paragraphs
-            usage.storage.fields = storage.fields
+            if storage.HasField("fields"):
+                usage.storage.fields = storage.fields
+            if storage.HasField("paragraphs"):
+                usage.storage.paragraphs = storage.paragraphs
+            if storage.HasField("resources"):
+                usage.storage.resources = storage.resources
 
         self.send(usage)
 

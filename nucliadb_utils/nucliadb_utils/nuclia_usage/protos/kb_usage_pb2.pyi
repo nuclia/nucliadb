@@ -209,20 +209,63 @@ class Storage(google.protobuf.message.Message):
 
     PARAGRAPHS_FIELD_NUMBER: builtins.int
     FIELDS_FIELD_NUMBER: builtins.int
+    RESOURCES_FIELD_NUMBER: builtins.int
     paragraphs: builtins.int
     fields: builtins.int
+    resources: builtins.int
     def __init__(
         self,
         *,
-        paragraphs: builtins.int = ...,
-        fields: builtins.int = ...,
+        paragraphs: builtins.int | None = ...,
+        fields: builtins.int | None = ...,
+        resources: builtins.int | None = ...,
     ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "_fields",
+            b"_fields",
+            "_paragraphs",
+            b"_paragraphs",
+            "_resources",
+            b"_resources",
+            "fields",
+            b"fields",
+            "paragraphs",
+            b"paragraphs",
+            "resources",
+            b"resources",
+        ],
+    ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "fields", b"fields", "paragraphs", b"paragraphs"
+            "_fields",
+            b"_fields",
+            "_paragraphs",
+            b"_paragraphs",
+            "_resources",
+            b"_resources",
+            "fields",
+            b"fields",
+            "paragraphs",
+            b"paragraphs",
+            "resources",
+            b"resources",
         ],
     ) -> None: ...
+    @typing.overload
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["_fields", b"_fields"]
+    ) -> typing_extensions.Literal["fields"] | None: ...
+    @typing.overload
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["_paragraphs", b"_paragraphs"]
+    ) -> typing_extensions.Literal["paragraphs"] | None: ...
+    @typing.overload
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["_resources", b"_resources"]
+    ) -> typing_extensions.Literal["resources"] | None: ...
 
 global___Storage = Storage
 
