@@ -111,10 +111,12 @@ class StreamAuditStorage(AuditStorage):
 
         self.js = get_traced_jetstream(self.nc, self.service)
         self.task = asyncio.create_task(self.run())
+
         self.kb_usage_utility = KbUsageReportUtility(
             nats_stream=self.js, nats_subject="TODO"
         )  # TODO
         await self.kb_usage_utility.initialize()
+
         self.initialized = True
 
     async def finalize(self):
@@ -251,7 +253,7 @@ class StreamAuditStorage(AuditStorage):
             account_id=None,
             kb_id=kbid,
             kb_source=KBSource.HOSTED,
-            storage=Storage(paragraphs=0, fields=0),
+            storage=Storage(paragraphs=0, fields=0, resources=0),
         )
 
     async def search(
@@ -285,12 +287,12 @@ class StreamAuditStorage(AuditStorage):
             kb_id=kbid,
             kb_source=KBSource.HOSTED,
             # TODO unify AuditRequest client type and Nuclia Usage client type
-            searches=Search(
+            searches=[Search(
                 client=ClientTypeKbUsage.Value(ClientType.Name(client_type)),  # type: ignore
                 type=SearchType.SEARCH,
                 tokens=2000,
                 num_searches=1,
-            ),
+            )],
         )
 
     async def suggest(
@@ -319,12 +321,12 @@ class StreamAuditStorage(AuditStorage):
             kb_id=kbid,
             kb_source=KBSource.HOSTED,
             # TODO unify AuditRequest client type and Nuclia Usage client type
-            searches=Search(
+            searches=[Search(
                 client=ClientTypeKbUsage.Value(ClientType.Name(client_type)),  # type: ignore
                 type=SearchType.SUGGEST,
                 tokens=0,
                 num_searches=1,
-            ),
+            )],
         )
 
     async def chat(
