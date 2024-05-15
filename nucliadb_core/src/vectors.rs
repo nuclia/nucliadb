@@ -39,6 +39,7 @@ pub type ProtosResponse = VectorSearchResponse;
 pub struct MergeParameters {
     pub max_nodes_in_merge: usize,
     pub segments_before_merge: usize,
+    pub maximum_deleted_entries: usize,
 }
 
 pub struct MergeContext {

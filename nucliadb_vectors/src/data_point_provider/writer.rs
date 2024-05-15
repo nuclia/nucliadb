@@ -194,8 +194,14 @@ impl Writer {
         let mut nodes_in_merge = 0;
         let mut inputs = Vec::new();
 
-        // Order smallest segments last (first to be pop()), so they are merged first
-        live_segments.sort_unstable_by_key(|i| std::cmp::Reverse(i.journal.no_nodes()));
+        let pruning_deletions = self.delete_log.size() > parameters.maximum_deleted_entries;
+        if pruning_deletions {
+            // Too many deletins, order oldest segments last (first to pop()) so we can prune the delete log
+            live_segments.sort_unstable_by_key(|i| std::cmp::Reverse(i.journal.time()));
+        } else {
+            // Order smallest segments last (first to be pop()), so they are merged first
+            live_segments.sort_unstable_by_key(|i| std::cmp::Reverse(i.journal.no_nodes()));
+        }
 
         let dtrie_copy = self.delete_log.clone();
         while nodes_in_merge < parameters.max_nodes_in_merge {
@@ -204,7 +210,7 @@ impl Writer {
             };
             let data_point_size = online_data_point.journal.no_nodes();
 
-            if data_point_size + nodes_in_merge > parameters.max_nodes_in_merge {
+            if data_point_size + nodes_in_merge > parameters.max_nodes_in_merge && nodes_in_merge > 0 {
                 break;
             }
 
@@ -213,7 +219,8 @@ impl Writer {
             nodes_in_merge += data_point_size;
         }
 
-        if inputs.len() < 2 {
+        // We need at least one segment for pruning deletes and 2 for an actual merge
+        if inputs.is_empty() || (inputs.len() < 2 && !pruning_deletions) {
             return Ok(None);
         }
 
@@ -490,6 +497,8 @@ impl Writer {
 #[cfg(test)]
 mod test {
 
+    use std::time::Duration;
+
     use super::*;
     use crate::data_point::Similarity;
     use data_point::create;
@@ -504,6 +513,7 @@ mod test {
         let merge_parameters = MergeParameters {
             segments_before_merge: 10,
             max_nodes_in_merge: 50_000,
+            maximum_deleted_entries: 25_000,
         };
 
         for _ in 0..100 {
@@ -538,6 +548,7 @@ mod test {
         let merge_parameters = MergeParameters {
             segments_before_merge: 1000,
             max_nodes_in_merge: 50_000,
+            maximum_deleted_entries: 25_000,
         };
 
         for _ in 0..50 {
@@ -570,6 +581,7 @@ mod test {
         let merge_parameters = MergeParameters {
             segments_before_merge: 100,
             max_nodes_in_merge: 50_000,
+            maximum_deleted_entries: 25_000,
         };
 
         for _ in 0..100 {
@@ -594,6 +606,53 @@ mod test {
         assert_eq!(metrics.merged, 100);
         assert_eq!(metrics.left, 1);
 
+        let merge_proposal = writer.prepare_merge(merge_parameters).unwrap();
+        assert!(merge_proposal.is_none());
+    }
+
+    #[test]
+    fn merge_old_segments() {
+        let dir = tempfile::tempdir().unwrap();
+        let vectors_path = dir.path().join("vectors");
+
+        // Writer with a single empty vector
+        let mut writer = Writer::new(&vectors_path, IndexMetadata::default(), "abc".into()).unwrap();
+        let merge_parameters = MergeParameters {
+            segments_before_merge: 1,
+            max_nodes_in_merge: 50_000,
+            maximum_deleted_entries: 10,
+        };
+
+        let similarity = Similarity::Cosine;
+        let embeddings = vec![];
+        let time = Some(SystemTime::now());
+        let data_point_pin = DataPointPin::create_pin(&vectors_path).unwrap();
+        create(&data_point_pin, embeddings, time, similarity).unwrap();
+
+        let online_data_point = OnlineDataPoint {
+            journal: data_point_pin.read_journal().unwrap(),
+            pin: data_point_pin,
+        };
+        writer.online_data_points = vec![online_data_point];
+
+        // Should not merge, there is no reason to with a single segment
+        assert!(writer.prepare_merge(merge_parameters).unwrap().is_none());
+
+        // Create a bunch of deletions
+        let past = SystemTime::now().checked_sub(Duration::from_secs(5)).unwrap();
+        for i in 0..20 {
+            writer.record_delete(format!("delete{i:02}").as_bytes(), past);
+        }
+        writer.commit().unwrap();
+        assert_eq!(writer.delete_log.size(), 20);
+
+        // Should merge, just to prune the deletion tree
+        let result = writer.prepare_merge(merge_parameters).unwrap().unwrap().run().unwrap();
+        writer.record_merge(result.as_ref()).unwrap();
+
+        assert_eq!(writer.delete_log.size(), 0);
+
+        // Nothing else to merge
         let merge_proposal = writer.prepare_merge(merge_parameters).unwrap();
         assert!(merge_proposal.is_none());
     }
