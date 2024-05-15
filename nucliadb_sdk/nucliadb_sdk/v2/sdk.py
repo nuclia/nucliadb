@@ -147,6 +147,9 @@ def chat_response_parser(response: httpx.Response) -> ChatResponse:
 
 
 def ask_response_parser(response: httpx.Response) -> SyncAskResponse:
+    if response.headers["Content-Type"] == "application/json":
+        # This comes from a request with the X-Synchronous header set to true
+        return SyncAskResponse.parse_raw(response.content)
     answer = ""
     status = ""
     retrieval_results = None

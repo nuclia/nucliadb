@@ -36,7 +36,7 @@ from ..ask import create_ask_response
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/resource/{{rid}}/ask",
     status_code=200,
-    summary="Ask with a resource (by id)",
+    summary="Ask a resource (by id)",
     description="Ask questions to a resource",
     tags=["Search"],
     response_model=SyncAskResponse,
@@ -73,8 +73,8 @@ async def resource_ask_endpoint_by_uuid(
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_SLUG_PREFIX}/{{slug}}/ask",
     status_code=200,
-    summary="Ask with a resource (by slug)",
-    description="Ask with a resource",
+    summary="Ask a resource (by slug)",
+    description="Ask questions to a resource",
     tags=["Search"],
     response_model=SyncAskResponse,
     # Add this to OpenAPI schema when endpoint is not in beta anymore
