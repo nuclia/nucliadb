@@ -203,8 +203,9 @@ pub async fn connect_to_primary_and_replicate(
     }
     eprintln!("Connecting to primary: {:?}", primary_address);
     let mut client =
-        replication::replication_service_client::ReplicationServiceClient::connect(primary_address.clone()).await?;
-    // .max_decoding_message_size(256 * 1024 * 1024)
+        replication::replication_service_client::ReplicationServiceClient::connect(primary_address.clone())
+            .await?
+            .max_decoding_message_size(256 * 1024 * 1024);
     // .max_encoding_message_size(256 * 1024 * 1024);address);
 
     let repl_health_mng = ReplicationHealthManager::new(settings.clone());
