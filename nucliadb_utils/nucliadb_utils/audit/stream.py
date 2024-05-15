@@ -286,7 +286,7 @@ class StreamAuditStorage(AuditStorage):
             kb_source=KBSource.HOSTED,
             # TODO unify AuditRequest client type and Nuclia Usage client type
             searches=Search(
-                client=ClientTypeKbUsage.Value(ClientType.Name(client_type)),
+                client=ClientTypeKbUsage.Value(ClientType.Name(client_type)),  # type: ignore
                 type=SearchType.SEARCH,
                 tokens=2000,
                 num_searches=1,
@@ -320,7 +320,7 @@ class StreamAuditStorage(AuditStorage):
             kb_source=KBSource.HOSTED,
             # TODO unify AuditRequest client type and Nuclia Usage client type
             searches=Search(
-                client=ClientTypeKbUsage.Value(ClientType.Name(client_type)),
+                client=ClientTypeKbUsage.Value(ClientType.Name(client_type)),  # type: ignore
                 type=SearchType.SUGGEST,
                 tokens=0,
                 num_searches=1,

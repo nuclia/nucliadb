@@ -101,13 +101,13 @@ class KbUsageReportUtility:
         storage: Optional[Storage] = None,
     ):
         usage = KbUsage()
-        usage.service = service
+        usage.service = service  # type: ignore
         usage.timestamp.FromDatetime(datetime.now(tz=timezone.utc))
         if account_id is not None:
             usage.account_id = account_id
         if kb_id is not None:
             usage.kb_id = kb_id
-        usage.kb_source = kb_source
+        usage.kb_source = kb_source  # type: ignore
 
         usage.processes.extend(processes)
         usage.predicts.extend(predicts)
