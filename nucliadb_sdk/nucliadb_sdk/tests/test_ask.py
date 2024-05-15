@@ -142,3 +142,12 @@ def test_ask_response_parser():
     assert ask_response.metadata.tokens.output == 5
     assert ask_response.metadata.timings.generative_first_chunk == 0.1
     assert ask_response.metadata.timings.generative_total == 0.2
+
+
+def test_ask_synchronous(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
+    sdk.session.headers["X-Synchronous"] = "true"
+    sdk.ask(
+        kbid=docs_dataset,
+        query="Nuclia loves Semantic Search",
+    )
+    sdk.session.headers.pop("X-Synchronous", None)
