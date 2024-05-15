@@ -281,6 +281,17 @@ class Field:
     async def set_vectors(
         self, new_vectors: ExtractedVectorsWrapper
     ) -> tuple[Optional[VectorObject], bool, list[str]]:
+        """
+        This function does way too many things...
+
+        It stores the vectors for a field to the object storage.
+        However, it will updates the existing vectors if they already
+        existed -- but only for a subset of the field types.
+
+        Returns the vectors, a boolean indicating if the field sentences need
+        to be replaced at the index, and a list of sentences that need to be
+        replaced at the index (from the split fields).
+        """
         has_vectors = await self.has_vectors()
         existing_vectors: Optional[VectorObject] = None
         if has_vectors and self.type in SUBFIELDFIELDS:
