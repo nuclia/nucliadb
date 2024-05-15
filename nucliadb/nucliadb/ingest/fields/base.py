@@ -288,8 +288,9 @@ class Field:
             existing_vectors = await self.get_vectors(force=True)
         sf = self.get_storage_field(FieldTypes.FIELD_VECTORS)
         vo: Optional[VectorObject] = None
-        replace_field: bool = has_vectors
-        replace_splits = []
+        # We really only want to replace the field from the index if there were vectors before
+        replace_field_sentences = has_vectors
+        replace_field_splits_sentences = []
         if existing_vectors is None:
             # Upload the vectors to the corresponding storage key
             if new_vectors.HasField("file"):
@@ -316,16 +317,16 @@ class Field:
                 existing_vectors.split_vectors[key].CopyFrom(value)
             for key in new_vectors.vectors.deleted_splits:
                 if key in existing_vectors.split_vectors:
-                    replace_splits.append(key)
+                    replace_field_splits_sentences.append(key)
                     del existing_vectors.split_vectors[key]
             if len(new_vectors.vectors.vectors.vectors) > 0:
-                replace_field = True
+                replace_field_sentences = True
                 existing_vectors.vectors.CopyFrom(new_vectors.vectors.vectors)
 
             # Upload the updated vectors to the corresponding storage key
             await self.storage.upload_pb(sf, existing_vectors)
             self.extracted_vectors = existing_vectors
-        return vo, replace_field, replace_splits
+        return vo, replace_field_sentences, replace_field_splits_sentences
 
     async def get_vectors(self, force=False) -> Optional[VectorObject]:
         if self.extracted_vectors is None or force:

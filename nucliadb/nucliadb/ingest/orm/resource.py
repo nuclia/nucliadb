@@ -1023,8 +1023,8 @@ class Resource:
                 self.indexer.apply_field_vectors,
                 field_key,
                 vo,
-                replace_field=replace_field_sentences,
-                replace_splits=replace_splits_sentences,
+                replace_field_sentences=replace_field_sentences,
+                replace_field_splits_sentences=replace_splits_sentences,
                 matryoshka_vector_dimension=dimension,
             )
             loop = asyncio.get_running_loop()

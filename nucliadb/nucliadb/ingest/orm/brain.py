@@ -263,11 +263,11 @@ class ResourceBrain:
         field_id: str,
         vo: utils_pb2.VectorObject,
         *,
-        replace_field: bool = False,
-        replace_splits: Optional[list[str]] = None,
+        replace_field_sentences: bool = False,
+        replace_field_splits_sentences: Optional[list[str]] = None,
         matryoshka_vector_dimension: Optional[int] = None,
     ):
-        replace_splits = replace_splits or []
+        replace_field_splits_sentences = replace_field_splits_sentences or []
 
         for subfield, vectors in vo.split_vectors.items():
             # For each split of this field
@@ -318,9 +318,9 @@ class ResourceBrain:
             )
 
         sentence_prefixes_to_delete = []
-        for split in replace_splits:
+        for split in replace_field_splits_sentences:
             sentence_prefixes_to_delete.append(f"{self.rid}/{field_id}/{split}")
-        if replace_field:
+        if replace_field_sentences:
             sentence_prefixes_to_delete.append(f"{self.rid}/{field_id}")
         extend_unique(self.brain.sentences_to_delete, sentence_prefixes_to_delete)
 
