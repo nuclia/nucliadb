@@ -85,7 +85,6 @@ async fn test_vector_normalization_shard(
 
     assert!(results.vector.is_some());
     let vector_results = results.vector.unwrap();
-    println!("{vector_results:#?}");
     assert_eq!(vector_results.documents.len(), 20);
     let scores = vector_results.documents.iter().map(|result| result.score).collect::<Vec<f32>>();
     assert!(scores.iter().all(|score| *score == scores[0]));

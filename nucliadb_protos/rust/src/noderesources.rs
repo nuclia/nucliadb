@@ -278,6 +278,16 @@ pub struct VectorSentence {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct VectorsetSentences {
+    /// key is full id for vectors
+    #[prost(map = "string, message", tag = "1")]
+    pub sentences: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        VectorSentence,
+    >,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ParagraphMetadata {
     #[prost(message, optional, tag = "1")]
     pub position: ::core::option::Option<Position>,
@@ -303,6 +313,12 @@ pub struct IndexParagraph {
     pub sentences: ::std::collections::HashMap<
         ::prost::alloc::string::String,
         VectorSentence,
+    >,
+    /// key is vectorset id
+    #[prost(map = "string, message", tag = "10")]
+    pub vectorsets_sentences: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        VectorsetSentences,
     >,
     #[prost(string, tag = "5")]
     pub field: ::prost::alloc::string::String,
@@ -330,7 +346,7 @@ pub struct VectorSetList {
     #[prost(message, optional, tag = "1")]
     pub shard: ::core::option::Option<ShardId>,
     #[prost(string, repeated, tag = "2")]
-    pub vectorset: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    pub vectorsets: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

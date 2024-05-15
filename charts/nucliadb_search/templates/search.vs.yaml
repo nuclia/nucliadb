@@ -23,6 +23,10 @@ spec:
           method:
             regex: "POST|OPTIONS"
         - uri:
+            regex: '^/api/v\d+/kb/[^/]+/ask$'
+          method:
+            regex: "POST|OPTIONS"
+        - uri:
             regex: '^/api/v\d+/kb/[^/]+/feedback$'
           method:
             regex: "POST|OPTIONS"

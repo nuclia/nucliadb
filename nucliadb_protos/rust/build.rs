@@ -48,7 +48,7 @@ fn main() -> Result<()> {
         &["../../"],
     )?;
 
-    tonic_build::configure().build_server(true).out_dir("src").compile(
+    tonic_build::configure().build_server(true).emit_rerun_if_changed(false).out_dir("src").compile(
         &["nucliadb_protos/nodewriter.proto", "nucliadb_protos/nodereader.proto", "nucliadb_protos/replication.proto"],
         &["../../"],
     )?;

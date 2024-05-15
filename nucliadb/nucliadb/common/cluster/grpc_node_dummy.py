@@ -70,11 +70,11 @@ class DummyWriterStub:  # pragma: no cover
         result = OpStatus()
         return result
 
-    async def ListVectorSet(self, data: ShardId):  # pragma: no cover
-        self.calls.setdefault("ListVectorSet", []).append(data)
+    async def ListVectorSets(self, data: ShardId):  # pragma: no cover
+        self.calls.setdefault("ListVectorSets", []).append(data)
         result = VectorSetList()
         result.shard.id = data.id
-        result.vectorset.append("base")
+        result.vectorsets.append("base")
         return result
 
     async def GC(self, request: ShardId) -> EmptyResponse:  # pragma: no cover

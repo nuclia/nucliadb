@@ -182,7 +182,7 @@ mod tests {
 
     use nucliadb_core::protos::resource::ResourceStatus;
     use nucliadb_core::protos::{
-        IndexParagraph, IndexParagraphs, Resource, ResourceId, VectorSentence, VectorSimilarity,
+        IndexParagraph, IndexParagraphs, Resource, ResourceId, VectorSentence, VectorSimilarity, VectorsetSentences,
     };
     use nucliadb_core::Channel;
     use tempfile::TempDir;
@@ -223,7 +223,13 @@ mod tests {
         let paragraph = IndexParagraph {
             start: 0,
             end: 0,
-            sentences,
+            sentences: sentences.clone(),
+            vectorsets_sentences: HashMap::from([(
+                "__default__".to_string(),
+                VectorsetSentences {
+                    sentences,
+                },
+            )]),
             field: "".to_string(),
             labels: vec!["1".to_string()],
             index: 3,
@@ -307,7 +313,13 @@ mod tests {
         let paragraph = IndexParagraph {
             start: 0,
             end: 0,
-            sentences,
+            sentences: sentences.clone(),
+            vectorsets_sentences: HashMap::from([(
+                "__default__".to_string(),
+                VectorsetSentences {
+                    sentences,
+                },
+            )]),
             field: "".to_string(),
             labels: vec!["1".to_string()],
             index: 3,
@@ -426,7 +438,13 @@ mod tests {
         let paragraph = IndexParagraph {
             start: 0,
             end: 0,
-            sentences,
+            sentences: sentences.clone(),
+            vectorsets_sentences: HashMap::from([(
+                "__default__".to_string(),
+                VectorsetSentences {
+                    sentences,
+                },
+            )]),
             field: "".to_string(),
             labels: vec!["1".to_string()],
             index: 3,

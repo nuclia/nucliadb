@@ -45,6 +45,10 @@ use tonic::transport::Server;
 
 type GrpcServer = NodeWriterServer<NodeWriterGRPCDriver>;
 
+// Big limit since SetResource is sending big messages via grpc
+// TODO: Remove this once we no longer use grpc for ingestion
+const MAX_GRPC_MESSAGE_SIZE: usize = 100 * 1024 * 1024;
+
 #[derive(Debug)]
 pub enum NodeUpdate {
     ShardCount(u64),
@@ -189,7 +193,8 @@ pub async fn start_grpc_service(
 
     if settings.node_role == NodeRole::Primary {
         let grpc_driver = NodeWriterGRPCDriver::new(settings.clone(), shard_cache.clone()).with_sender(metadata_sender);
-        server_builder = server_builder.add_service(GrpcServer::new(grpc_driver));
+        server_builder =
+            server_builder.add_service(GrpcServer::new(grpc_driver).max_decoding_message_size(MAX_GRPC_MESSAGE_SIZE));
     }
     let replication_server = replication::replication_service_server::ReplicationServiceServer::new(
         ReplicationServiceGRPCDriver::new(settings.clone(), shard_cache.clone(), node_id),

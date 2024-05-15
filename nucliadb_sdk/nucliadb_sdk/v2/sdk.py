@@ -39,7 +39,7 @@ from typing import (
 
 import httpx
 import orjson
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from nucliadb_models.conversation import InputMessage
 from nucliadb_models.entities import (
@@ -62,15 +62,25 @@ from nucliadb_models.resource import (
     ResourceList,
 )
 from nucliadb_models.search import (
+    AnswerAskResponseItem,
+    AskRequest,
+    AskResponseItem,
     ChatRequest,
+    CitationsAskResponseItem,
     FeedbackRequest,
     FindRequest,
     KnowledgeboxFindResults,
     KnowledgeboxSearchResults,
+    MetadataAskResponseItem,
     Relations,
+    RelationsAskResponseItem,
+    RetrievalAskResponseItem,
     SearchRequest,
+    StatusAskResponseItem,
     SummarizedResponse,
     SummarizeRequest,
+    SyncAskMetadata,
+    SyncAskResponse,
 )
 from nucliadb_models.trainset import TrainSetPartitions
 from nucliadb_models.writer import (
@@ -133,6 +143,52 @@ def chat_response_parser(response: httpx.Response) -> ChatResponse:
         relations=relations_result,
         learning_id=learning_id,
         citations=citations,
+    )
+
+
+def ask_response_parser(response: httpx.Response) -> SyncAskResponse:
+    answer = ""
+    status = ""
+    retrieval_results = None
+    relations = None
+    learning_id = response.headers.get("NUCLIA-LEARNING-ID")
+    citations: dict[str, Any] = {}
+    tokens = None
+    timings = None
+    for line in response.iter_lines():
+        try:
+            item = AskResponseItem.parse_raw(line).item
+            if isinstance(item, AnswerAskResponseItem):
+                answer += item.text
+            elif isinstance(item, RelationsAskResponseItem):
+                relations = item.relations
+            elif isinstance(item, StatusAskResponseItem):
+                status = item.status
+            elif isinstance(item, RetrievalAskResponseItem):
+                retrieval_results = item.results
+            elif isinstance(item, MetadataAskResponseItem):
+                tokens = item.tokens
+                timings = item.timings
+            elif isinstance(item, CitationsAskResponseItem):
+                citations = item.citations
+            else:
+                warnings.warn(f"Unknown item in ask endpoint response: {item}")
+        except ValidationError:
+            warnings.warn(f"Unknown line in ask endpoint response: {line}")
+            continue
+
+    if retrieval_results is None:
+        warnings.warn("No retrieval results found in ask response")
+        retrieval_results = KnowledgeboxFindResults(resources={})
+
+    return SyncAskResponse(
+        answer=answer,
+        status=status,
+        retrieval_results=retrieval_results,
+        relations=relations,
+        learning_id=learning_id,
+        citations=citations,
+        metadata=SyncAskMetadata(tokens=tokens, timings=timings),
     )
 
 
@@ -606,6 +662,16 @@ class _NucliaDBBase:
         response_type=chat_response_parser,
         docstring=docstrings.CHAT,
     )
+
+    ask = _request_builder(
+        name="ask",
+        path_template="/v1/kb/{kbid}/ask",
+        method="POST",
+        path_params=("kbid",),
+        request_type=AskRequest,
+        response_type=ask_response_parser,
+    )
+
     chat_on_resource = _request_builder(
         name="chat_on_resource",
         path_template="/v1/kb/{kbid}/resource/{rid}/chat",
@@ -615,8 +681,9 @@ class _NucliaDBBase:
         response_type=chat_response_parser,
         docstring=docstrings.RESOURCE_CHAT,
     )
+
     chat_on_resource_by_slug = _request_builder(
-        name="chat_on_resource",
+        name="chat_on_resource_by_slug",
         path_template="/v1/kb/{kbid}/slug/{slug}/chat",
         method="POST",
         path_params=("kbid", "slug"),
@@ -624,6 +691,25 @@ class _NucliaDBBase:
         response_type=chat_response_parser,
         docstring=docstrings.RESOURCE_CHAT,
     )
+
+    ask_on_resource = _request_builder(
+        name="ask_on_resource",
+        path_template="/v1/kb/{kbid}/resource/{rid}/ask",
+        method="POST",
+        path_params=("kbid", "rid"),
+        request_type=AskRequest,
+        response_type=ask_response_parser,
+    )
+
+    ask_on_resource_by_slug = _request_builder(
+        name="ask_on_resource_by_slug",
+        path_template="/v1/kb/{kbid}/slug/{slug}/ask",
+        method="POST",
+        path_params=("kbid", "slug"),
+        request_type=AskRequest,
+        response_type=ask_response_parser,
+    )
+
     summarize = _request_builder(
         name="summarize",
         path_template="/v1/kb/{kbid}/summarize",
