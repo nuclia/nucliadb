@@ -645,11 +645,27 @@ impl ShardReader {
         let indexes = ShardIndexes::load(&shard_path).unwrap_or_else(|_| ShardIndexes::new(&shard_path));
 
         let mut updated_indexes = HashMap::with_capacity(indexes.count_vectors_indexes());
+        let mut keep_indexes = vec![];
+        let vector_indexes = read_rw_lock(&self.vector_readers);
         for (vectorset, path) in indexes.iter_vectors_indexes() {
+            if let Some(existing_index) = vector_indexes.get(&vectorset) {
+                if let Ok(false) = existing_index.needs_update() {
+                    // Index already loaded and does not need update, skip
+                    keep_indexes.push(vectorset);
+                    continue;
+                }
+            }
             let new_reader = open_vectors_reader(self.versions.vectors, &path)?;
             updated_indexes.insert(vectorset, new_reader);
         }
+        drop(vector_indexes);
+
         let mut vector_indexes = write_rw_lock(&self.vector_readers);
+        for keep in keep_indexes {
+            if let Some(index) = vector_indexes.remove(&keep) {
+                updated_indexes.insert(keep, index);
+            }
+        }
         *vector_indexes = updated_indexes;
         Ok(())
     }
