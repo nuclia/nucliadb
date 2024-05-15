@@ -196,7 +196,7 @@ class StreamAuditStorage(AuditStorage):
         if kb_counter:
             auditrequest.kb_counter.CopyFrom(kb_counter)
 
-            await self.kb_usage_utility.send_kb_usage(
+            self.kb_usage_utility.send_kb_usage(
                 service=Service.NUCLIA_DB,
                 account_id=None,
                 kb_id=kbid,
@@ -209,6 +209,20 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.trace_id = get_trace_id()
 
         await self.send(auditrequest)
+
+    def report_resources(
+        self,
+        *,
+        kbid: str,
+        resources: int,
+    ):
+        self.kb_usage_utility.send_kb_usage(
+            service=Service.NUCLIA_DB,
+            account_id=None,
+            kb_id=kbid,
+            kb_source=KBSource.HOSTED,
+            storage=Storage(resources=resources)
+        )
 
     async def visited(self, kbid: str, uuid: str, user: str, origin: str):
         auditrequest = AuditRequest()
@@ -232,7 +246,7 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.trace_id = get_trace_id()
         await self.send(auditrequest)
 
-        await self.kb_usage_utility.send_kb_usage(
+        self.kb_usage_utility.send_kb_usage(
             service=Service.NUCLIA_DB,
             account_id=None,
             kb_id=kbid,
@@ -265,7 +279,7 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.trace_id = get_trace_id()
         await self.send(auditrequest)
 
-        await self.kb_usage_utility.send_kb_usage(
+        self.kb_usage_utility.send_kb_usage(
             service=Service.NUCLIA_DB,
             account_id=None,
             kb_id=kbid,
@@ -299,7 +313,7 @@ class StreamAuditStorage(AuditStorage):
 
         await self.send(auditrequest)
 
-        await self.kb_usage_utility.send_kb_usage(
+        self.kb_usage_utility.send_kb_usage(
             service=Service.NUCLIA_DB,
             account_id=None,
             kb_id=kbid,
