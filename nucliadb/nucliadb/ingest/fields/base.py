@@ -281,21 +281,16 @@ class Field:
     async def set_vectors(
         self, new_vectors: ExtractedVectorsWrapper
     ) -> tuple[Optional[VectorObject], bool, list[str]]:
-        # Try fetching existing vectors if any
-        try:
-            existing_vectors: Optional[VectorObject] = await self.get_vectors(
-                force=True
-            )
-        except KeyError:
-            existing_vectors = None
-
+        has_vectors = await self.has_vectors()
+        existing_vectors: Optional[VectorObject] = None
+        if has_vectors and self.type in SUBFIELDFIELDS:
+            # Get existing vectors to update them later
+            existing_vectors = await self.get_vectors(force=True)
         sf = self.get_storage_field(FieldTypes.FIELD_VECTORS)
         vo: Optional[VectorObject] = None
-        replace_field: bool = False
+        replace_field: bool = has_vectors
         replace_splits = []
         if existing_vectors is None:
-            # It did not have any vectors before, so we don't need to replace it
-            replace_field = False
             # Upload the vectors to the corresponding storage key
             if new_vectors.HasField("file"):
                 # Store the vectors from cloud file reference protobuffer
@@ -339,6 +334,10 @@ class Field:
             if payload is not None:
                 self.extracted_vectors = payload
         return self.extracted_vectors
+
+    async def has_vectors(self) -> bool:
+        sf = self.get_storage_field(FieldTypes.FIELD_VECTORS)
+        return await sf.exists() is not None
 
     async def get_vectors_cf(self) -> Optional[CloudFile]:
         sf = self.get_storage_field(FieldTypes.FIELD_VECTORS)
