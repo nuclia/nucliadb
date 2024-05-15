@@ -61,9 +61,7 @@ class BasicAuditStorage(AuditStorage):
         kbid: str,
         resources: int,
     ):
-        logger.debug(
-            f"REPORT RESOURCES {kbid} {resources}"
-        )
+        logger.debug(f"REPORT RESOURCES {kbid} {resources}")
 
     async def visited(self, kbid: str, uuid: str, user: str, origin: str):
         logger.debug(f"VISITED {kbid} {uuid} {user} {origin}")

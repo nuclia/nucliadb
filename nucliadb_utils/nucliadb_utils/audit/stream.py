@@ -221,7 +221,7 @@ class StreamAuditStorage(AuditStorage):
             account_id=None,
             kb_id=kbid,
             kb_source=KBSource.HOSTED,
-            storage=Storage(resources=resources)
+            storage=Storage(resources=resources),
         )
 
     async def visited(self, kbid: str, uuid: str, user: str, origin: str):
