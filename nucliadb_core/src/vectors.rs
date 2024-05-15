@@ -83,6 +83,7 @@ pub trait VectorReader: std::fmt::Debug + Send + Sync {
     fn search(&self, request: &ProtosRequest, context: &VectorsContext) -> NodeResult<ProtosResponse>;
     fn stored_ids(&self) -> NodeResult<Vec<String>>;
     fn count(&self) -> NodeResult<usize>;
+    fn needs_update(&self) -> NodeResult<bool>;
 }
 
 pub trait VectorWriter: std::fmt::Debug + Send + Sync {

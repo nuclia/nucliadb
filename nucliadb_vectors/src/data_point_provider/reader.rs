@@ -105,6 +105,11 @@ pub struct Reader {
     delete_log: DTrie,
     number_of_embeddings: usize,
     dimension: Option<u64>,
+    state_last_modified: SystemTime,
+}
+
+fn last_modified(path: &Path) -> std::io::Result<SystemTime> {
+    std::fs::metadata(path)?.modified()
 }
 
 impl Reader {
@@ -121,6 +126,7 @@ impl Reader {
         })?;
 
         let state_path = path.join(STATE);
+        let state_last_modified = last_modified(&state_path)?;
         let state_file = File::open(state_path)?;
         let state = read_state(&state_file)?;
         let data_point_list = state.data_point_list;
@@ -152,6 +158,7 @@ impl Reader {
             number_of_embeddings,
             dimension,
             path: path.to_path_buf(),
+            state_last_modified,
         })
     }
 
@@ -234,5 +241,11 @@ impl Reader {
 
     pub fn embedding_dimension(&self) -> Option<u64> {
         self.dimension
+    }
+
+    pub fn needs_update(&self) -> VectorR<bool> {
+        let state_path = self.path.join(STATE);
+        let state_modified = last_modified(&state_path)?;
+        Ok(self.state_last_modified < state_modified)
     }
 }

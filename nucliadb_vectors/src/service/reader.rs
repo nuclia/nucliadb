@@ -139,6 +139,10 @@ impl VectorReader for VectorReaderService {
 
         Ok(result)
     }
+
+    fn needs_update(&self) -> NodeResult<bool> {
+        Ok(self.index.needs_update()?)
+    }
 }
 
 impl TryFrom<Neighbour> for DocumentScored {
