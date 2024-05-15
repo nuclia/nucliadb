@@ -243,28 +243,20 @@ class ResourceBrain:
             for relation in relations.relations:
                 self.brain.relations.append(relation)
 
-        for split, sentences in replace_splits.items():
-            for sentence in sentences:
-                self.brain.paragraphs_to_delete.append(
-                    f"{self.rid}/{field_key}/{split}/{sentence}"
-                )
-
-        for sentence_to_delete in replace_field:
-            self.brain.paragraphs_to_delete.append(
-                f"{self.rid}/{field_key}/{sentence_to_delete}"
-            )
+        paragraph_prefixes_to_delete = []
+        for split in replace_splits.keys():
+            paragraph_prefixes_to_delete.append(f"{self.rid}/{field_key}/{split}")
+        if len(replace_field) > 0:
+            paragraph_prefixes_to_delete.append(f"{self.rid}/{field_key}")
+        extend_unique(self.brain.paragraphs_to_delete, paragraph_prefixes_to_delete)
 
     def delete_metadata(self, field_key: str, metadata: FieldComputedMetadata):
-        for subfield, metadata_split in metadata.split_metadata.items():
-            for paragraph in metadata_split.paragraphs:
-                self.brain.paragraphs_to_delete.append(
-                    f"{self.rid}/{field_key}/{subfield}/{paragraph.start}-{paragraph.end}"
-                )
-
-        for paragraph in metadata.metadata.paragraphs:
-            self.brain.sentences_to_delete.append(
-                f"{self.rid}/{field_key}/{paragraph.start}-{paragraph.end}"
-            )
+        sentence_prefixes_to_delete = []
+        for subfield in metadata.split_metadata.keys():
+            sentence_prefixes_to_delete.append(f"{self.rid}/{field_key}/{subfield}")
+        if len(metadata.metadata.paragraphs) > 0:
+            sentence_prefixes_to_delete.append(f"{self.rid}/{field_key}")
+        extend_unique(self.brain.paragraphs_to_delete, sentence_prefixes_to_delete)
 
     def apply_field_vectors(
         self,
@@ -325,11 +317,12 @@ class ResourceBrain:
                 matryoshka_vector_dimension=matryoshka_vector_dimension,
             )
 
+        sentence_prefixes_to_delete = []
         for split in replace_splits:
-            self.brain.sentences_to_delete.append(f"{self.rid}/{field_id}/{split}")
-
+            sentence_prefixes_to_delete.append(f"{self.rid}/{field_id}/{split}")
         if replace_field:
-            self.brain.sentences_to_delete.append(f"{self.rid}/{field_id}")
+            sentence_prefixes_to_delete.append(f"{self.rid}/{field_id}")
+        extend_unique(self.brain.sentences_to_delete, sentence_prefixes_to_delete)
 
     def _apply_field_vector(
         self,
@@ -375,17 +368,12 @@ class ResourceBrain:
         sentence_pb.metadata.position.index = paragraph_pb.metadata.position.index
 
     def delete_vectors(self, field_key: str, vo: VectorObject):
-        # TODO: no need to iterate over all vectors, just delete the whole field
-        for subfield, vectors in vo.split_vectors.items():
-            for vector in vectors.vectors:
-                self.brain.sentences_to_delete.append(
-                    f"{self.rid}/{field_key}/{subfield}/{vector.start}-{vector.end}"
-                )
-
-        for vector in vo.vectors.vectors:
-            self.brain.sentences_to_delete.append(
-                f"{self.rid}/{field_key}/{vector.start}-{vector.end}"
-            )
+        prefixes_to_delete = []
+        for subfield in vo.split_vectors.keys():
+            prefixes_to_delete.append(f"{self.rid}/{field_key}/{subfield}")
+        if len(vo.vectors.vectors) > 0:
+            prefixes_to_delete.append(f"{self.rid}/{field_key}")
+        extend_unique(self.brain.sentences_to_delete, prefixes_to_delete)
 
     def set_processing_status(
         self, basic: Basic, previous_status: Optional[Metadata.Status.ValueType]
@@ -708,7 +696,7 @@ class ParagraphPages:
             return 0
 
 
-def extend_unique(a: list, b: list):
+def extend_unique(a, b):
     """
     Prevents extending with duplicate elements
     """

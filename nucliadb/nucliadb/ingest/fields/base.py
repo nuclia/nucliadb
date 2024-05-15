@@ -279,51 +279,57 @@ class Field:
             return None
 
     async def set_vectors(
-        self, payload: ExtractedVectorsWrapper
+        self, new_vectors: ExtractedVectorsWrapper
     ) -> tuple[Optional[VectorObject], bool, list[str]]:
-        if self.type in SUBFIELDFIELDS:
-            try:
-                actual_payload: Optional[VectorObject] = await self.get_vectors(
-                    force=True
-                )
-            except KeyError:
-                actual_payload = None
-        else:
-            actual_payload = None
+        # Try fetching existing vectors if any
+        try:
+            existing_vectors: Optional[VectorObject] = await self.get_vectors(
+                force=True
+            )
+        except KeyError:
+            existing_vectors = None
 
         sf = self.get_storage_field(FieldTypes.FIELD_VECTORS)
         vo: Optional[VectorObject] = None
-        replace_field: bool = True
+        replace_field: bool = False
         replace_splits = []
-        if actual_payload is None:
-            # Its first extracted text
-            if payload.HasField("file"):
-                await self.storage.normalize_binary(payload.file, sf)
+        if existing_vectors is None:
+            # It did not have any vectors before, so we don't need to replace it
+            replace_field = False
+            # Upload the vectors to the corresponding storage key
+            if new_vectors.HasField("file"):
+                # Store the vectors from cloud file reference protobuffer
+                await self.storage.normalize_binary(new_vectors.file, sf)
                 vo = await self.storage.download_pb(sf, VectorObject)
             else:
-                await self.storage.upload_pb(sf, payload.vectors)
-                vo = payload.vectors
-                self.extracted_vectors = payload.vectors
+                await self.storage.upload_pb(sf, new_vectors.vectors)
+                vo = new_vectors.vectors
+                self.extracted_vectors = new_vectors.vectors
         else:
-            if payload.HasField("file"):
-                raw_payload = await self.storage.downloadbytescf(payload.file)
+            # It had vectors before
+            if new_vectors.HasField("file"):
+                # Load the vectors from cloud file reference protobuffer
+                raw_payload = await self.storage.downloadbytescf(new_vectors.file)
                 pb = VectorObject()
                 pb.ParseFromString(raw_payload.read())
                 raw_payload.flush()
-                payload.vectors.CopyFrom(pb)
-            vo = payload.vectors
-            # We know its payload.body
-            for key, value in payload.vectors.split_vectors.items():
-                actual_payload.split_vectors[key].CopyFrom(value)
-            for key in payload.vectors.deleted_splits:
-                if key in actual_payload.split_vectors:
+                new_vectors.vectors.CopyFrom(pb)
+
+            # Update the existing vectors with the new vectors
+            vo = new_vectors.vectors
+            for key, value in new_vectors.vectors.split_vectors.items():
+                existing_vectors.split_vectors[key].CopyFrom(value)
+            for key in new_vectors.vectors.deleted_splits:
+                if key in existing_vectors.split_vectors:
                     replace_splits.append(key)
-                    del actual_payload.split_vectors[key]
-            if len(payload.vectors.vectors.vectors) > 0:
+                    del existing_vectors.split_vectors[key]
+            if len(new_vectors.vectors.vectors.vectors) > 0:
                 replace_field = True
-                actual_payload.vectors.CopyFrom(payload.vectors.vectors)
-            await self.storage.upload_pb(sf, actual_payload)
-            self.extracted_vectors = actual_payload
+                existing_vectors.vectors.CopyFrom(new_vectors.vectors.vectors)
+
+            # Upload the updated vectors to the corresponding storage key
+            await self.storage.upload_pb(sf, existing_vectors)
+            self.extracted_vectors = existing_vectors
         return vo, replace_field, replace_splits
 
     async def get_vectors(self, force=False) -> Optional[VectorObject]:
