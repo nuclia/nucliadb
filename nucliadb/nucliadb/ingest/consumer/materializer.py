@@ -22,14 +22,16 @@ import logging
 import uuid
 from functools import partial
 
-from nucliadb.common import datamanagers
-from nucliadb.common.cluster.utils import get_shard_manager
-from nucliadb.common.maindb.driver import Driver
 from nucliadb_protos import writer_pb2
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_audit
+
+from nucliadb.common import datamanagers
+from nucliadb.common.cluster.utils import get_shard_manager
+from nucliadb.common.maindb.driver import Driver
+
 from .utils import DelayedTaskHandler
 
 logger = logging.getLogger(__name__)
