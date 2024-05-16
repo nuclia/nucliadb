@@ -23,6 +23,7 @@ from typing import Optional
 
 from nucliadb.common import locking
 from nucliadb.common.cluster.rollover import rollover_kb_shards
+from nucliadb.common.cluster.settings import in_standalone_mode
 from nucliadb.migrator.context import ExecutionContext
 from nucliadb.migrator.utils import get_migrations
 from nucliadb_telemetry import errors, metrics
@@ -91,8 +92,10 @@ async def run_all_kb_migrations(context: ExecutionContext, target_version: int) 
 
     if len(to_migrate) == 0:
         return
-
-    max_concurrent = context.settings.max_concurrent_migrations
+    if in_standalone_mode():
+        max_concurrent = 1
+    else:
+        max_concurrent = context.settings.max_concurrent_migrations
     semaphore = asyncio.Semaphore(max_concurrent)
 
     logger.info(
