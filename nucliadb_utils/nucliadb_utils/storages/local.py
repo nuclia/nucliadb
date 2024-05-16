@@ -57,7 +57,7 @@ class LocalStorageField(StorageField):
         destination_bucket_path = self.storage.get_bucket_path(destination_bucket_name)
         origin_path = f"{origin_bucket_path}/{origin_uri}"
         destination_path = f"{destination_bucket_path}/{destination_uri}"
-        os.rename(origin_path, destination_path)
+        os.renames(origin_path, destination_path)
 
     async def copy(
         self,
