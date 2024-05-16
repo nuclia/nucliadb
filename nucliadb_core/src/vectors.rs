@@ -131,34 +131,23 @@ impl<'a> ResourceWrapper<'a> {
     }
 
     pub fn fields(&self) -> impl Iterator<Item = (&String, impl Iterator<Item = ParagraphVectors>)> {
-        let vectorset = &self.vectorset;
-        self.resource
-            .paragraphs
-            .iter()
-            .map(|(field_id, field_paragraphs_wrapper)| (field_id, &field_paragraphs_wrapper.paragraphs))
-            .map(|(field_id, field_paragraphs)| {
-                let sentences_iterator = field_paragraphs.iter().filter_map(|(_paragraph_id, paragraph)| {
-                    match vectorset.as_ref() {
-                        None => {
-                            // Default vectors index (no vectorset)
-                            Some(ParagraphVectors {
-                                vectors: &paragraph.sentences,
-                                labels: &paragraph.labels,
-                            })
-                        }
-                        Some(vectorset) => {
-                            // indexing a vectorset, we should return only
-                            // paragraphs from this vectorset. If vectorset
-                            // is not found, we'll skip this paragraph
-                            paragraph.vectorsets_sentences.get(vectorset).map(|vectorset_sentences| ParagraphVectors {
-                                vectors: &vectorset_sentences.sentences,
-                                labels: &paragraph.labels,
-                            })
-                        }
-                    }
-                });
-                (field_id, sentences_iterator)
-            })
+        self.resource.paragraphs.iter().map(|(field_id, paragraphs_wrapper)| {
+            let sentences_iterator = paragraphs_wrapper.paragraphs.iter().filter_map(|(_paragraph_id, paragraph)| {
+                let sentences = if let Some(vectorset) = &self.vectorset {
+                    // indexing a vectorset, we should return only paragraphs from this vectorset.
+                    // If vectorset is not found, we'll skip this paragraph
+                    paragraph.vectorsets_sentences.get(vectorset).map(|x| &x.sentences)
+                } else {
+                    // Default vectors index (no vectorset)
+                    Some(&paragraph.sentences)
+                };
+                sentences.map(|s| ParagraphVectors {
+                    vectors: s,
+                    labels: &paragraph.labels,
+                })
+            });
+            (field_id, sentences_iterator)
+        })
     }
 
     pub fn sentences_to_delete(&self) -> impl Iterator<Item = &str> {
