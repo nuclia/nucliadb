@@ -270,7 +270,11 @@ impl ShardWriter {
         let mut vector_tasks = vec![];
         for (name, path) in indexes.iter_vectors_indexes() {
             let id = metadata.id();
-            vector_tasks.push(move || Some((name, open_vectors_writer(versions.vectors, &path, id))));
+            vector_tasks.push(|| {
+                run_with_telemetry(info_span!(parent: &span, "Open vectors index writer"), move || {
+                    Some((name, open_vectors_writer(versions.vectors, &path, id)))
+                })
+            });
         }
 
         let rsc = RelationConfig {
@@ -383,11 +387,17 @@ impl ShardWriter {
         };
 
         let mut vector_tasks = vec![];
-        for (_, vector_writer) in indexes.vectors_indexes.iter_mut() {
+        for (vectorset, vector_writer) in indexes.vectors_indexes.iter_mut() {
             vector_tasks.push(|| {
                 run_with_telemetry(info_span!(parent: &span, "vector set_resource"), || {
                     debug!("Vector service starts set_resource");
-                    let result = vector_writer.set_resource(&resource);
+                    let vectorset_resource = match vectorset.as_str() {
+                        "" | DEFAULT_VECTORS_INDEX_NAME => (&resource).into(),
+                        vectorset => {
+                            nucliadb_core::vectors::ResourceWrapper::new_vectorset_resource(&resource, vectorset)
+                        }
+                    };
+                    let result = vector_writer.set_resource(vectorset_resource);
                     debug!("Vector service ends set_resource");
                     result
                 })
