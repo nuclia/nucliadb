@@ -392,7 +392,7 @@ impl ShardWriter {
                 run_with_telemetry(info_span!(parent: &span, "vector set_resource"), || {
                     debug!("Vector service starts set_resource");
                     let vectorset_resource = match vectorset.as_str() {
-                        "" | DEFAULT_VECTORS_INDEX_NAME => nucliadb_core::vectors::ResourceWrapper::from(&resource),
+                        "" | DEFAULT_VECTORS_INDEX_NAME => (&resource).into(),
                         vectorset => {
                             nucliadb_core::vectors::ResourceWrapper::new_vectorset_resource(&resource, vectorset)
                         }
