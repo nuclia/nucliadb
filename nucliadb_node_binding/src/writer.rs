@@ -198,18 +198,18 @@ impl NodeWriter {
         Ok(PyList::new(py, status.encode_to_vec()))
     }
 
-    // TODO: rename to list_vectorsets
-    pub fn get_vectorset<'p>(&mut self, _request: RawProtos, _py: Python<'p>) -> PyResult<&'p PyAny> {
+    // TODO
+    pub fn add_vectorset<'p>(&mut self, _request: RawProtos, _py: Python<'p>) -> PyResult<&'p PyAny> {
         Err(IndexNodeException::new_err("Coming soon.."))
     }
 
     // TODO
-    pub fn set_vectorset<'p>(&mut self, _request: RawProtos, _py: Python<'p>) -> PyResult<&'p PyAny> {
+    pub fn list_vectorsets<'p>(&mut self, _request: RawProtos, _py: Python<'p>) -> PyResult<&'p PyAny> {
         Err(IndexNodeException::new_err("Coming soon.."))
     }
 
     // TODO
-    pub fn del_vectorset<'p>(&mut self, _request: RawProtos, _py: Python<'p>) -> PyResult<&'p PyAny> {
+    pub fn remove_vectorset<'p>(&mut self, _request: RawProtos, _py: Python<'p>) -> PyResult<&'p PyAny> {
         Err(IndexNodeException::new_err("Coming soon.."))
     }
 

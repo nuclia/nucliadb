@@ -116,14 +116,7 @@ class AbstractIndexNode(metaclass=ABCMeta):
         resp: noderesources_pb2.ShardId = await self.writer.DeleteShard(req)  # type: ignore
         return resp.id
 
-    async def del_vectorset(self, shard_id: str, vectorset: str) -> OpStatus:
-        req = noderesources_pb2.VectorSetID()
-        req.shard.id = shard_id
-        req.vectorset = vectorset
-        resp = await self.writer.RemoveVectorSet(req)  # type: ignore
-        return resp
-
-    async def set_vectorset(
+    async def add_vectorset(
         self,
         shard_id: str,
         vectorset: str,
@@ -136,8 +129,15 @@ class AbstractIndexNode(metaclass=ABCMeta):
         resp = await self.writer.AddVectorSet(req)  # type: ignore
         return resp
 
-    async def get_vectorset(self, shard_id: str) -> noderesources_pb2.VectorSetList:
+    async def list_vectorsets(self, shard_id: str) -> noderesources_pb2.VectorSetList:
         req = noderesources_pb2.ShardId()
         req.id = shard_id
         resp = await self.writer.ListVectorSets(req)  # type: ignore
+        return resp
+
+    async def remove_vectorset(self, shard_id: str, vectorset: str) -> OpStatus:
+        req = noderesources_pb2.VectorSetID()
+        req.shard.id = shard_id
+        req.vectorset = vectorset
+        resp = await self.writer.RemoveVectorSet(req)  # type: ignore
         return resp
