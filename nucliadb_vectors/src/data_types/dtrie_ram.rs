@@ -69,6 +69,17 @@ impl DTrie {
     pub fn prune(&mut self, time: SystemTime) {
         self.inner_prune(time);
     }
+    pub fn size(&self) -> usize {
+        if self.go_table.is_empty() {
+            if self.value.is_some() {
+                1
+            } else {
+                0
+            }
+        } else {
+            self.go_table.values().map(|v| v.size()).sum()
+        }
+    }
 }
 
 #[cfg(test)]

@@ -228,6 +228,7 @@ pub struct EnvSettings {
     pub merge_scheduler_segments_before_merge: usize,
     pub merge_on_commit_max_nodes_in_merge: usize,
     pub merge_on_commit_segments_before_merge: usize,
+    pub merge_maximum_deleted_entries: usize,
 
     pub max_open_shards: Option<NonZeroUsize>,
 
@@ -311,6 +312,7 @@ impl Default for EnvSettings {
             merge_scheduler_segments_before_merge: 2,
             merge_on_commit_max_nodes_in_merge: 10_000,
             merge_on_commit_segments_before_merge: 100,
+            merge_maximum_deleted_entries: 15_000,
             max_open_shards: None,
             file_backend: ObjectStoreType::NOTSET,
             gcs_indexing_bucket: Default::default(),
