@@ -159,7 +159,7 @@ async def delete_resource_from_shard(
     resource_id: str,
     shard: writer_pb2.ShardObject,
 ) -> None:
-    logger.warning(
+    logger.info(
         "Deleting resource", extra={"kbid": kbid, "resource_id": resource_id}
     )
 
