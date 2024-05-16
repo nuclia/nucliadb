@@ -18,22 +18,25 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::path::PathBuf;
 
+use nucliadb_protos::nodereader;
+use nucliadb_protos::utils;
 use uuid::Uuid;
 
 use crate::metrics::vectors::MergeSource;
 use crate::prelude::*;
-use crate::protos::*;
 use crate::query_language::BooleanExpression;
 use crate::Channel;
 use crate::IndexFiles;
+use nucliadb_protos::noderesources;
 
 pub type VectorsReaderPointer = Box<dyn VectorReader>;
 pub type VectorsWriterPointer = Box<dyn VectorWriter>;
-pub type ProtosRequest = VectorSearchRequest;
-pub type ProtosResponse = VectorSearchResponse;
+pub type ProtosRequest = nodereader::VectorSearchRequest;
+pub type ProtosResponse = nodereader::VectorSearchResponse;
 
 #[derive(Debug, Clone, Copy)]
 pub struct MergeParameters {
@@ -49,7 +52,7 @@ pub struct MergeContext {
 
 #[derive(Clone)]
 pub struct VectorConfig {
-    pub similarity: VectorSimilarity,
+    pub similarity: utils::VectorSimilarity,
     pub path: PathBuf,
     pub channel: Channel,
     pub shard_id: String,
@@ -94,9 +97,76 @@ pub trait VectorWriter: std::fmt::Debug + Send + Sync {
 
     fn prepare_merge(&self, parameters: MergeParameters) -> NodeResult<Option<Box<dyn MergeRunner>>>;
     fn record_merge(&mut self, merge_result: Box<dyn MergeResults>, source: MergeSource) -> NodeResult<MergeMetrics>;
-    fn set_resource(&mut self, resource: &Resource) -> NodeResult<()>;
-    fn delete_resource(&mut self, resource_id: &ResourceId) -> NodeResult<()>;
+    fn set_resource(&mut self, resource: ResourceWrapper) -> NodeResult<()>;
+    fn delete_resource(&mut self, resource_id: &noderesources::ResourceId) -> NodeResult<()>;
     fn garbage_collection(&mut self) -> NodeResult<()>;
     fn force_garbage_collection(&mut self) -> NodeResult<()>;
     fn reload(&mut self) -> NodeResult<()>;
+}
+
+pub struct ResourceWrapper<'a> {
+    resource: &'a noderesources::Resource,
+    vectorset: Option<String>,
+}
+
+impl<'a> From<&'a noderesources::Resource> for ResourceWrapper<'a> {
+    fn from(value: &'a noderesources::Resource) -> Self {
+        Self {
+            resource: value,
+            vectorset: None,
+        }
+    }
+}
+
+impl<'a> ResourceWrapper<'a> {
+    pub fn new_vectorset_resource(resource: &'a noderesources::Resource, vectorset: &str) -> Self {
+        Self {
+            resource,
+            vectorset: Some(vectorset.to_string()),
+        }
+    }
+
+    pub fn id(&self) -> &String {
+        &self.resource.shard_id
+    }
+
+    pub fn fields(&self) -> impl Iterator<Item = (&String, impl Iterator<Item = ParagraphVectors>)> {
+        let vectorset = &self.vectorset;
+        self.resource
+            .paragraphs
+            .iter()
+            .map(|(field_id, field_paragraphs_wrapper)| (field_id, &field_paragraphs_wrapper.paragraphs))
+            .map(|(field_id, field_paragraphs)| {
+                let sentences_iterator = field_paragraphs.iter().filter_map(|(_paragraph_id, paragraph)| {
+                    match vectorset.as_ref() {
+                        None => {
+                            // Default vectors index (no vectorset)
+                            Some(ParagraphVectors {
+                                vectors: &paragraph.sentences,
+                                labels: &paragraph.labels,
+                            })
+                        }
+                        Some(vectorset) => {
+                            // indexing a vectorset, we should return only
+                            // paragraphs from this vectorset. If vectorset
+                            // is not found, we'll skip this paragraph
+                            paragraph.vectorsets_sentences.get(vectorset).map(|vectorset_sentences| ParagraphVectors {
+                                vectors: &vectorset_sentences.sentences,
+                                labels: &paragraph.labels,
+                            })
+                        }
+                    }
+                });
+                (field_id, sentences_iterator)
+            })
+    }
+
+    pub fn sentences_to_delete(&self) -> impl Iterator<Item = &str> {
+        self.resource.paragraphs_to_delete.iter().map(|paragraph_id| paragraph_id.as_str())
+    }
+}
+
+pub struct ParagraphVectors<'a> {
+    pub vectors: &'a HashMap<String, noderesources::VectorSentence>,
+    pub labels: &'a Vec<String>,
 }
