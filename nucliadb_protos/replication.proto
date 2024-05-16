@@ -11,8 +11,8 @@ message PrimaryShardReplicationState {
     // if there is a new version of the shard available to download
     string generation_id = 2;
     string kbid = 3;
-    string similarity = 4;
-    bool normalize_vectors = 5;
+    optional string similarity = 4 [ deprecated = true ];
+    optional bool normalize_vectors = 5 [ deprecated = true ];
     utils.ReleaseChannel release_channel = 6;
 }
 

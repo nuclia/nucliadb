@@ -10,10 +10,12 @@ pub struct PrimaryShardReplicationState {
     pub generation_id: ::prost::alloc::string::String,
     #[prost(string, tag = "3")]
     pub kbid: ::prost::alloc::string::String,
-    #[prost(string, tag = "4")]
-    pub similarity: ::prost::alloc::string::String,
-    #[prost(bool, tag = "5")]
-    pub normalize_vectors: bool,
+    #[deprecated]
+    #[prost(string, optional, tag = "4")]
+    pub similarity: ::core::option::Option<::prost::alloc::string::String>,
+    #[deprecated]
+    #[prost(bool, optional, tag = "5")]
+    pub normalize_vectors: ::core::option::Option<bool>,
     #[prost(enumeration = "super::utils::ReleaseChannel", tag = "6")]
     pub release_channel: i32,
 }

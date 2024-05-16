@@ -26,6 +26,7 @@ use std::time::Duration;
 
 use nucliadb_core::tracing::debug;
 use nucliadb_core::{node_error, NodeResult};
+use nucliadb_vectors::config::VectorConfig;
 
 use super::resource_cache::{CacheResult, ResourceCache, ResourceLoadGuard};
 use crate::disk_structure;
@@ -121,10 +122,10 @@ impl ShardWriterCache {
         self.cache.lock().expect("Poisoned cache lock")
     }
 
-    pub fn create(&self, metadata: ShardMetadata) -> NodeResult<Arc<ShardWriter>> {
+    pub fn create(&self, metadata: ShardMetadata, vector_config: VectorConfig) -> NodeResult<Arc<ShardWriter>> {
         let shard_id = metadata.id();
         let metadata = Arc::new(metadata);
-        let shard = Arc::new(ShardWriter::new(metadata.clone())?);
+        let shard = Arc::new(ShardWriter::new(metadata.clone(), vector_config)?);
 
         self.metadata_manager.add_metadata(metadata);
         self.cache().add_active_shard(&shard_id, &shard);
@@ -237,11 +238,12 @@ mod tests {
 
     use crossbeam_utils::thread::scope;
     use nucliadb_core::Channel;
+    use nucliadb_vectors::config::VectorConfig;
     use tempfile::tempdir;
 
     use super::ShardWriterCache;
     use crate::settings::{EnvSettings, Settings};
-    use crate::shards::metadata::{ShardMetadata, Similarity};
+    use crate::shards::metadata::ShardMetadata;
     use crate::shards::ShardId;
 
     #[test]
@@ -258,15 +260,9 @@ mod tests {
         let shard_0_path = settings.shards_path().join(shard_id_0.clone());
         fs::create_dir(settings.shards_path()).unwrap();
 
-        let shard_meta = ShardMetadata::new(
-            shard_0_path.clone(),
-            shard_id_0.clone(),
-            "kbid".to_string(),
-            Similarity::Cosine,
-            Channel::EXPERIMENTAL,
-            false,
-        );
-        cache.create(shard_meta).unwrap();
+        let shard_meta =
+            ShardMetadata::new(shard_0_path.clone(), shard_id_0.clone(), "kbid".to_string(), Channel::EXPERIMENTAL);
+        cache.create(shard_meta, VectorConfig::default()).unwrap();
 
         let shard_0 = cache.get(&shard_id_0).unwrap();
 
@@ -305,15 +301,9 @@ mod tests {
         assert!(cache.get(&shard_id_0).is_err());
 
         // Recreating the shard should work (i.e: it's not stuck in the deletion state)
-        let shard_meta = ShardMetadata::new(
-            shard_0_path.clone(),
-            shard_id_0.clone(),
-            "kbid".to_string(),
-            Similarity::Cosine,
-            Channel::EXPERIMENTAL,
-            false,
-        );
-        cache.create(shard_meta).unwrap();
+        let shard_meta =
+            ShardMetadata::new(shard_0_path.clone(), shard_id_0.clone(), "kbid".to_string(), Channel::EXPERIMENTAL);
+        cache.create(shard_meta, VectorConfig::default()).unwrap();
 
         assert!(cache.get(&shard_id_0).is_ok());
     }

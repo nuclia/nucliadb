@@ -19,15 +19,12 @@
 //
 
 use std::collections::HashSet;
-use std::path::PathBuf;
-
 use uuid::Uuid;
 
 use crate::metrics::vectors::MergeSource;
 use crate::prelude::*;
 use crate::protos::*;
 use crate::query_language::BooleanExpression;
-use crate::Channel;
 use crate::IndexFiles;
 
 pub type VectorsReaderPointer = Box<dyn VectorReader>;
@@ -45,15 +42,6 @@ pub struct MergeParameters {
 pub struct MergeContext {
     pub parameters: MergeParameters,
     pub source: MergeSource,
-}
-
-#[derive(Clone)]
-pub struct VectorConfig {
-    pub similarity: VectorSimilarity,
-    pub path: PathBuf,
-    pub channel: Channel,
-    pub shard_id: String,
-    pub normalize_vectors: bool,
 }
 
 // In an ideal world this should be part of the actual request, but since

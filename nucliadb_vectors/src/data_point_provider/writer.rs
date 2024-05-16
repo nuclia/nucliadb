@@ -18,7 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::data_point::{self, DataPointPin, DpId, Journal, OpenDataPoint, Similarity};
+use crate::config::{Similarity, VectorConfig};
+use crate::data_point::{self, DataPointPin, DpId, Journal, OpenDataPoint};
 use crate::data_point_provider::state::*;
 use crate::data_point_provider::state::{read_state, write_state};
 use crate::data_point_provider::TimeSensitiveDLog;
@@ -149,7 +150,7 @@ struct OnlineDataPoint {
 
 pub struct Writer {
     has_uncommitted_changes: bool,
-    metadata: IndexMetadata,
+    config: VectorConfig,
     path: PathBuf,
     added_data_points: Vec<DataPointPin>,
     added_to_delete_log: Vec<(Vec<u8>, SystemTime)>,
@@ -229,7 +230,7 @@ impl Writer {
             dtrie_copy,
             destination: Some(destination),
             inputs,
-            similarity: self.metadata.similarity,
+            similarity: self.config.similarity,
             segments_left: live_segments.len() + 1,
             merge_time: SystemTime::now(),
         })))
@@ -348,7 +349,7 @@ impl Writer {
         Ok(())
     }
 
-    pub fn new(path: &Path, metadata: IndexMetadata, shard_id: String) -> VectorR<Writer> {
+    pub fn new(path: &Path, config: VectorConfig, shard_id: String) -> VectorR<Writer> {
         std::fs::create_dir(path)?;
         File::create(path.join(OPENING_FLAG))?;
 
@@ -359,11 +360,11 @@ impl Writer {
             return Err(VectorErr::MultipleWritersError);
         }
 
-        metadata.write(path)?;
+        IndexMetadata::write(&config, path)?;
         persist_state(path, &State::default())?;
 
         Ok(Writer {
-            metadata,
+            config,
             path: path.to_path_buf(),
             added_data_points: Vec::new(),
             added_to_delete_log: Vec::new(),
@@ -389,11 +390,11 @@ impl Writer {
         let lock_file = File::create(lock_path)?;
         lock_file.lock_shared()?;
 
-        let metadata = IndexMetadata::open(path)?.map(Ok).unwrap_or_else(|| {
+        let config = IndexMetadata::open(path)?.map(Ok).unwrap_or_else(|| {
             // Old indexes may not have this file so in that case the
             // metadata file they should have is created.
-            let metadata = IndexMetadata::default();
-            metadata.write(path).map(|_| metadata)
+            let config = VectorConfig::default();
+            IndexMetadata::write(&config, path).map(|_| config)
         })?;
 
         let state_path = path.join(STATE);
@@ -425,7 +426,7 @@ impl Writer {
         }
 
         Ok(Writer {
-            metadata,
+            config,
             online_data_points,
             delete_log,
             dimension,
@@ -485,8 +486,8 @@ impl Writer {
         &self.path
     }
 
-    pub fn metadata(&self) -> &IndexMetadata {
-        &self.metadata
+    pub fn config(&self) -> &VectorConfig {
+        &self.config
     }
 
     pub fn size(&self) -> usize {
@@ -500,7 +501,6 @@ mod test {
     use std::time::Duration;
 
     use super::*;
-    use crate::data_point::Similarity;
     use data_point::create;
 
     #[test]
@@ -508,7 +508,7 @@ mod test {
         let dir = tempfile::tempdir().unwrap();
         let vectors_path = dir.path().join("vectors");
 
-        let mut writer = Writer::new(&vectors_path, IndexMetadata::default(), "abc".into()).unwrap();
+        let mut writer = Writer::new(&vectors_path, VectorConfig::default(), "abc".into()).unwrap();
         let mut data_points = vec![];
         let merge_parameters = MergeParameters {
             segments_before_merge: 10,
@@ -543,7 +543,7 @@ mod test {
         let dir = tempfile::tempdir().unwrap();
         let vectors_path = dir.path().join("vectors");
 
-        let mut writer = Writer::new(&vectors_path, IndexMetadata::default(), "abc".into()).unwrap();
+        let mut writer = Writer::new(&vectors_path, VectorConfig::default(), "abc".into()).unwrap();
         let mut data_points = vec![];
         let merge_parameters = MergeParameters {
             segments_before_merge: 1000,
@@ -576,7 +576,7 @@ mod test {
         let dir = tempfile::tempdir().unwrap();
         let vectors_path = dir.path().join("vectors");
 
-        let mut writer = Writer::new(&vectors_path, IndexMetadata::default(), "abc".into()).unwrap();
+        let mut writer = Writer::new(&vectors_path, VectorConfig::default(), "abc".into()).unwrap();
         let mut data_points = vec![];
         let merge_parameters = MergeParameters {
             segments_before_merge: 100,
@@ -616,7 +616,7 @@ mod test {
         let vectors_path = dir.path().join("vectors");
 
         // Writer with a single empty vector
-        let mut writer = Writer::new(&vectors_path, IndexMetadata::default(), "abc".into()).unwrap();
+        let mut writer = Writer::new(&vectors_path, VectorConfig::default(), "abc".into()).unwrap();
         let merge_parameters = MergeParameters {
             segments_before_merge: 1,
             max_nodes_in_merge: 50_000,

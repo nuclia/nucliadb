@@ -18,9 +18,9 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 use byte_unit::Byte;
+use nucliadb_vectors::config::VectorConfig;
 use nucliadb_vectors::data_point_provider::reader::Reader;
 use nucliadb_vectors::data_point_provider::writer::Writer;
-use nucliadb_vectors::data_point_provider::IndexMetadata;
 use serde_json::json;
 use std::error::Error;
 use std::path::Path;
@@ -68,7 +68,7 @@ fn main() -> std::io::Result<()> {
     let location = at.path().join("vectors");
     println!("Vector location: {:?}", location);
 
-    let writer = Writer::new(&location, IndexMetadata::default(), "abc".into()).unwrap();
+    let writer = Writer::new(&location, VectorConfig::default(), "abc".into()).unwrap();
     let batch_size = args.batch_size();
     let plotw = PlotWriter::new(args.writer_plot().unwrap());
     let vector_it = RandomVectors::new(args.embedding_dim()).take(args.index_len());

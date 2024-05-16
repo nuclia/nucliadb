@@ -21,6 +21,7 @@
 use crate::data_point::{self, DataPointPin, OpenDataPoint, SearchParams};
 pub use crate::data_point::{DpId, Neighbour};
 use crate::data_point_provider::state::read_state;
+use crate::data_point_provider::VectorConfig;
 use crate::data_point_provider::{IndexMetadata, SearchRequest, OPENING_FLAG, STATE};
 use crate::data_types::dtrie_ram::DTrie;
 use crate::data_types::DeleteLog;
@@ -99,7 +100,7 @@ impl Fssc {
 }
 
 pub struct Reader {
-    metadata: IndexMetadata,
+    config: VectorConfig,
     path: PathBuf,
     open_data_points: FxHashMap<DpId, OpenDataPoint>,
     delete_log: DTrie,
@@ -118,11 +119,11 @@ impl Reader {
         let lock_file = File::create(lock_path)?;
         lock_file.lock_shared()?;
 
-        let metadata = IndexMetadata::open(path)?.map(Ok).unwrap_or_else(|| {
+        let config = IndexMetadata::open(path)?.map(Ok).unwrap_or_else(|| {
             // Old indexes may not have this file so in that case the
             // metadata file they should have is created.
-            let metadata = IndexMetadata::default();
-            metadata.write(path).map(|_| metadata)
+            let metadata = VectorConfig::default();
+            IndexMetadata::write(&metadata, path).map(|_| metadata)
         })?;
 
         let state_path = path.join(STATE);
@@ -152,7 +153,7 @@ impl Reader {
         }
 
         Ok(Reader {
-            metadata,
+            config,
             open_data_points,
             delete_log,
             number_of_embeddings,
@@ -168,7 +169,7 @@ impl Reader {
         };
 
         let normalized_query;
-        let query = if self.metadata.normalize_vectors {
+        let query = if self.config.normalize_vectors {
             normalized_query = utils::normalize_vector(request.get_query());
             &normalized_query
         } else {
@@ -179,7 +180,7 @@ impl Reader {
             return Err(VectorErr::InconsistentDimensions);
         }
 
-        let similarity = self.metadata.similarity;
+        let similarity = self.config.similarity;
         let filter = request.get_filter();
         let with_duplicates = request.with_duplicates();
         let no_results = request.no_results();
@@ -235,8 +236,8 @@ impl Reader {
         &self.path
     }
 
-    pub fn metadata(&self) -> &IndexMetadata {
-        &self.metadata
+    pub fn config(&self) -> &VectorConfig {
+        &self.config
     }
 
     pub fn embedding_dimension(&self) -> Option<u64> {

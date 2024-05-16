@@ -22,8 +22,9 @@ use std::time::{Duration, SystemTime};
 
 use nucliadb_core::{vectors::MergeParameters, NodeResult};
 use nucliadb_vectors::{
+    config::VectorConfig,
     data_point::{self, DataPointPin, Elem, LabelDictionary},
-    data_point_provider::{reader::Reader, writer::Writer, IndexMetadata},
+    data_point_provider::{reader::Reader, writer::Writer},
 };
 use tempfile::tempdir;
 
@@ -38,9 +39,9 @@ fn elem(index: usize) -> Elem {
 fn test_concurrent_merge_delete() -> NodeResult<()> {
     let workdir = tempdir()?;
     let index_path = workdir.path().join("vectors");
-    let metadata = IndexMetadata::default();
-    let similarity = metadata.similarity;
-    let mut writer = Writer::new(&index_path, metadata, "abc".into())?;
+    let config = VectorConfig::default();
+    let similarity = config.similarity;
+    let mut writer = Writer::new(&index_path, config, "abc".into())?;
 
     let now = SystemTime::now();
     let past = now - Duration::from_secs(5);

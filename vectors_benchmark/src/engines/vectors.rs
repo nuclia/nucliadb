@@ -19,7 +19,8 @@
 //
 
 use super::VectorEngine;
-use nucliadb_vectors::data_point::{self, DataPointPin, Elem, LabelDictionary, Similarity};
+use nucliadb_vectors::config::Similarity;
+use nucliadb_vectors::data_point::{self, DataPointPin, Elem, LabelDictionary};
 use nucliadb_vectors::data_point_provider::reader::Reader;
 use nucliadb_vectors::data_point_provider::writer::Writer;
 use nucliadb_vectors::data_point_provider::*;

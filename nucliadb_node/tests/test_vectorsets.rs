@@ -38,6 +38,8 @@ use tonic::Request;
 async fn test_vectorsets(
     #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)] release_channel: ReleaseChannel,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    use nucliadb_core::protos::VectorIndexConfig;
+
     let mut fixture = NodeFixture::new();
     fixture.with_writer().await?.with_reader().await?;
     let mut writer = fixture.writer_client();
@@ -74,8 +76,12 @@ async fn test_vectorsets(
                 }),
                 vectorset: vectorset.clone(),
             }),
-            similarity: VectorSimilarity::Dot.into(),
-            normalize_vectors: true,
+            config: Some(VectorIndexConfig {
+                similarity: VectorSimilarity::Dot.into(),
+                normalize_vectors: true,
+                ..Default::default()
+            }),
+            ..Default::default()
         }))
         .await?;
     assert_eq!(response.get_ref().status(), Status::Ok);

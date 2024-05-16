@@ -20,6 +20,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
+use nucliadb_core::paragraphs::*;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::shard_created::{DocumentService, ParagraphService, RelationService, VectorService};
 use nucliadb_core::protos::{Resource, ResourceId};
@@ -27,10 +28,9 @@ use nucliadb_core::relations::*;
 use nucliadb_core::texts::*;
 use nucliadb_core::tracing::{self, *};
 use nucliadb_core::vectors::*;
-use nucliadb_core::{paragraphs::*, Channel};
 use nucliadb_core::{thread, IndexFiles};
 use nucliadb_procs::measure;
-use nucliadb_protos::utils::VectorSimilarity;
+use nucliadb_vectors::config::VectorConfig;
 use nucliadb_vectors::VectorErr;
 
 use super::indexes::{ShardIndexes, DEFAULT_VECTORS_INDEX_NAME};
@@ -153,7 +153,7 @@ impl ShardWriter {
     }
 
     #[measure(actor = "shard", metric = "new")]
-    pub fn new(metadata: Arc<ShardMetadata>) -> NodeResult<ShardWriter> {
+    pub fn new(metadata: Arc<ShardMetadata>, vector_config: VectorConfig) -> NodeResult<ShardWriter> {
         let shard_path = metadata.shard_path();
         let indexes = ShardIndexes::new(&shard_path);
 
@@ -162,13 +162,6 @@ impl ShardWriter {
         };
         let psc = ParagraphConfig {
             path: indexes.paragraphs_path(),
-        };
-        let vsc = VectorConfig {
-            similarity: metadata.similarity(),
-            path: indexes.vectors_path(),
-            channel: metadata.channel(),
-            shard_id: metadata.id(),
-            normalize_vectors: metadata.normalize_vectors(),
         };
         let rsc = RelationConfig {
             path: indexes.relations_path(),
@@ -188,7 +181,13 @@ impl ShardWriter {
 
         let text_task = || Some(nucliadb_texts2::writer::TextWriterService::create(tsc));
         let paragraph_task = || Some(nucliadb_paragraphs3::writer::ParagraphWriterService::create(psc));
-        let vector_task = || Some(nucliadb_vectors::service::VectorWriterService::create(vsc));
+        let vector_task = || {
+            Some(nucliadb_vectors::service::VectorWriterService::create(
+                &indexes.vectors_path(),
+                metadata.id(),
+                vector_config,
+            ))
+        };
         let relation_task = || Some(nucliadb_relations2::writer::RelationsWriterService::create(rsc));
 
         let span = tracing::Span::current();
@@ -321,18 +320,12 @@ impl ShardWriter {
         })
     }
 
-    pub fn create_vectors_index(&self, new: NewVectorsIndex) -> NodeResult<()> {
+    pub fn create_vectors_index(&self, shard_id: String, name: String, new: VectorConfig) -> NodeResult<()> {
         let mut indexes = ShardIndexes::load(&self.metadata.shard_path())?;
-        let path = indexes.add_vectors_index(new.name.clone())?;
-        let vectors_writer = nucliadb_vectors::service::VectorWriterService::create(VectorConfig {
-            path,
-            shard_id: new.shard_id,
-            channel: new.channel,
-            similarity: new.similarity,
-            normalize_vectors: new.normalize_vectors,
-        })?;
+        let path = indexes.add_vectors_index(name.clone())?;
+        let vectors_writer = nucliadb_vectors::service::VectorWriterService::create(&path, shard_id, new)?;
         indexes.store()?;
-        write_rw_lock(&self.indexes).vectors_indexes.insert(new.name, Box::new(vectors_writer));
+        write_rw_lock(&self.indexes).vectors_indexes.insert(name, Box::new(vectors_writer));
         Ok(())
     }
 
@@ -660,14 +653,6 @@ impl ShardWriter {
         files.push((PathBuf::from(RELATIONS_DIR), relation_files));
         Ok(files)
     }
-}
-
-pub struct NewVectorsIndex {
-    pub shard_id: String,
-    pub name: String,
-    pub channel: Channel,
-    pub similarity: VectorSimilarity,
-    pub normalize_vectors: bool,
 }
 
 pub enum GarbageCollectorStatus {

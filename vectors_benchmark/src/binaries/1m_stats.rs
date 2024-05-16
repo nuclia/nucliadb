@@ -1,5 +1,6 @@
 use clap::Parser;
-use nucliadb_vectors::data_point::{self, DataPointPin, Elem, LabelDictionary, Similarity};
+use nucliadb_vectors::config::{Similarity, VectorConfig};
+use nucliadb_vectors::data_point::{self, DataPointPin, Elem, LabelDictionary};
 use nucliadb_vectors::data_point_provider::garbage_collector;
 use nucliadb_vectors::data_point_provider::reader::Reader;
 use nucliadb_vectors::data_point_provider::writer::Writer;
@@ -164,7 +165,7 @@ fn generate_vecs(count: usize) -> Vec<RandomVectors> {
 
 fn create_db(db_location: &Path, index_size: usize, batch_size: usize, vecs: &[RandomVectors]) -> f64 {
     println!("Writing starts..");
-    let mut writer = Writer::new(db_location, IndexMetadata::default(), "abc".into()).unwrap();
+    let mut writer = Writer::new(db_location, VectorConfig::default(), "abc".into()).unwrap();
     let mut writing_time: f64 = 0.0;
     for (i, vec) in vecs.iter().enumerate().take(index_size / batch_size) {
         let elems = vec.take(batch_size).enumerate().map(|(i, q)| (i.to_string(), q)).collect();

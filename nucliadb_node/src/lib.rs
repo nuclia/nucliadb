@@ -44,3 +44,5 @@ pub mod telemetry;
 pub mod utils;
 
 mod disk_structure;
+
+pub use nucliadb_vectors::config::VectorConfig;

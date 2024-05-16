@@ -22,17 +22,5 @@ mod query_io;
 pub mod reader;
 pub mod writer;
 
-use nucliadb_core::protos::VectorSimilarity as GrpcSimilarity;
 pub use reader::*;
 pub use writer::*;
-
-use crate::data_point::Similarity;
-
-impl From<GrpcSimilarity> for Similarity {
-    fn from(value: GrpcSimilarity) -> Self {
-        match value {
-            GrpcSimilarity::Cosine => Similarity::Cosine,
-            GrpcSimilarity::Dot => Similarity::Dot,
-        }
-    }
-}
