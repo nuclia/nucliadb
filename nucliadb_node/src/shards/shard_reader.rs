@@ -271,34 +271,51 @@ impl ShardReader {
         let indexes = ShardIndexes::load(shard_path).unwrap_or_else(|_| ShardIndexes::new(shard_path));
 
         let versions = Versions::load(&shard_path.join(VERSION_FILE))?;
-        let text_task = || Some(open_texts_reader(versions.texts, &indexes.texts_path()));
-        let paragraph_task = || Some(open_paragraphs_reader(versions.paragraphs, &indexes.paragraphs_path()));
-        let vector_task = || Some(open_vectors_reader(versions.vectors, &indexes.vectors_path()));
-        let relation_task = || Some(open_relations_reader(versions.relations, &indexes.relations_path()));
 
+        let text_task = || Some(open_texts_reader(versions.texts, &indexes.texts_path()));
         let info = info_span!(parent: &span, "text open");
         let text_task = || run_with_telemetry(info, text_task);
+
+        let paragraph_task = || Some(open_paragraphs_reader(versions.paragraphs, &indexes.paragraphs_path()));
         let info = info_span!(parent: &span, "paragraph open");
         let paragraph_task = || run_with_telemetry(info, paragraph_task);
-        let info = info_span!(parent: &span, "vector open");
-        let vector_task = || run_with_telemetry(info, vector_task);
+
+        let mut vector_tasks = vec![];
+        for (name, path) in indexes.iter_vectors_indexes() {
+            vector_tasks.push(|| {
+                run_with_telemetry(info_span!(parent: &span, "vector open"), move || {
+                    Some((name, open_vectors_reader(versions.vectors, &path)))
+                })
+            });
+        }
+
+        let relation_task = || Some(open_relations_reader(versions.relations, &indexes.relations_path()));
         let info = info_span!(parent: &span, "relation open");
         let relation_task = || run_with_telemetry(info, relation_task);
 
         let mut text_result = None;
         let mut paragraph_result = None;
-        let mut vector_result = None;
+        let mut vector_results = Vec::with_capacity(vector_tasks.len());
+        for _ in 0..vector_tasks.len() {
+            vector_results.push(None);
+        }
         let mut relation_result = None;
         crossbeam_thread::scope(|s| {
             s.spawn(|_| text_result = text_task());
             s.spawn(|_| paragraph_result = paragraph_task());
-            s.spawn(|_| vector_result = vector_task());
+            for (vector_task, vector_result) in vector_tasks.into_iter().zip(vector_results.iter_mut()) {
+                s.spawn(|_| *vector_result = vector_task());
+            }
             s.spawn(|_| relation_result = relation_task());
         })
         .expect("Failed to join threads");
         let fields = text_result.transpose()?;
         let paragraphs = paragraph_result.transpose()?;
-        let vectors = vector_result.transpose()?;
+        let mut vectors = HashMap::with_capacity(vector_results.len());
+        for result in vector_results {
+            let (name, vector_writer) = result.unwrap();
+            vectors.insert(name, vector_writer?);
+        }
         let relations = relation_result.transpose()?;
         let suffixed_root_path = shard_path.to_str().unwrap().to_owned() + "/";
 
@@ -309,7 +326,7 @@ impl ShardReader {
             root_path: shard_path.to_path_buf(),
             text_reader: RwLock::new(fields.unwrap()),
             paragraph_reader: RwLock::new(paragraphs.unwrap()),
-            vector_readers: RwLock::new(HashMap::from([(DEFAULT_VECTORS_INDEX_NAME.to_string(), vectors.unwrap())])),
+            vector_readers: RwLock::new(vectors),
             relation_reader: RwLock::new(relations.unwrap()),
             versions,
         })
