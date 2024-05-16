@@ -62,6 +62,7 @@ fn test_concurrent_merge_delete() -> NodeResult<()> {
         .prepare_merge(MergeParameters {
             max_nodes_in_merge: 1000,
             segments_before_merge: 2,
+            maximum_deleted_entries: 25_000,
         })?
         .unwrap();
 
