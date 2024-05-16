@@ -270,7 +270,11 @@ impl ShardWriter {
         let mut vector_tasks = vec![];
         for (name, path) in indexes.iter_vectors_indexes() {
             let id = metadata.id();
-            vector_tasks.push(move || Some((name, open_vectors_writer(versions.vectors, &path, id))));
+            vector_tasks.push(|| {
+                run_with_telemetry(info_span!(parent: &span, "Open vectors index writer"), move || {
+                    Some((name, open_vectors_writer(versions.vectors, &path, id)))
+                })
+            });
         }
 
         let rsc = RelationConfig {
