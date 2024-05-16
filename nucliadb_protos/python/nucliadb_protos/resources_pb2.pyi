@@ -817,6 +817,8 @@ class ExtractedVectorsWrapper(google.protobuf.message.Message):
     VECTORS_FIELD_NUMBER: builtins.int
     FILE_FIELD_NUMBER: builtins.int
     FIELD_FIELD_NUMBER: builtins.int
+    VECTORSET_ID_FIELD_NUMBER: builtins.int
+    vectorset_id: builtins.str
     @property
     def vectors(self) -> nucliadb_protos.utils_pb2.VectorObject: ...
     @property
@@ -829,9 +831,10 @@ class ExtractedVectorsWrapper(google.protobuf.message.Message):
         vectors: nucliadb_protos.utils_pb2.VectorObject | None = ...,
         file: global___CloudFile | None = ...,
         field: global___FieldID | None = ...,
+        vectorset_id: builtins.str = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["field", b"field", "file", b"file", "file_or_data", b"file_or_data", "vectors", b"vectors"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["field", b"field", "file", b"file", "file_or_data", b"file_or_data", "vectors", b"vectors"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["field", b"field", "file", b"file", "file_or_data", b"file_or_data", "vectors", b"vectors", "vectorset_id", b"vectorset_id"]) -> None: ...
     def WhichOneof(self, oneof_group: typing.Literal["file_or_data", b"file_or_data"]) -> typing.Literal["vectors", "file"] | None: ...
 
 global___ExtractedVectorsWrapper = ExtractedVectorsWrapper
