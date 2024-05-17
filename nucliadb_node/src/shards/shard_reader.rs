@@ -637,24 +637,6 @@ impl ShardReader {
         })
     }
 
-    #[tracing::instrument(skip_all)]
-    pub fn paragraph_count(&self) -> NodeResult<usize> {
-        read_rw_lock(&self.paragraph_reader).count()
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub fn vector_count(&self) -> NodeResult<usize> {
-        read_rw_lock(&self.vector_readers)
-            .get(DEFAULT_VECTORS_INDEX_NAME)
-            .expect("Default vectors index should never be deleted (yet)")
-            .count()
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub fn text_count(&self) -> NodeResult<usize> {
-        read_rw_lock(&self.text_reader).count()
-    }
-
     pub fn update(&self) -> NodeResult<()> {
         let shard_path = self.metadata.shard_path();
         // TODO: while we don't have all shards migrated, we still have to
