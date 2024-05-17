@@ -51,6 +51,8 @@ from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import (
 )
 from nucliadb_utils.nuclia_usage.utils.kb_usage_report import KbUsageReportUtility
 
+KB_USAGE_STREAM_AUDIT = "kb-usage.audit"
+
 
 class StreamAuditStorage(AuditStorage):
     task: Optional[asyncio.Task] = None
@@ -113,8 +115,8 @@ class StreamAuditStorage(AuditStorage):
         self.task = asyncio.create_task(self.run())
 
         self.kb_usage_utility = KbUsageReportUtility(
-            nats_stream=self.js, nats_subject="TODO"
-        )  # TODO
+            nats_stream=self.js, nats_subject=KB_USAGE_STREAM_AUDIT
+        )
         await self.kb_usage_utility.initialize()
 
         self.initialized = True
