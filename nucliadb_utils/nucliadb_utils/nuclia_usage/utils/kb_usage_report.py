@@ -25,7 +25,6 @@ from datetime import datetime, timezone
 from typing import Optional, Union
 
 from nats.js.client import JetStreamContext
-from sentry_sdk import capture_exception
 
 from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import (
     KBSource,
@@ -70,9 +69,8 @@ class KbUsageReportUtility:
             message: KbUsage = await self.queue.get()
             try:
                 await self._send(message)
-            except Exception as e:
+            except Exception:
                 logger.exception("Could not send KbUsage message")
-                capture_exception(e)
             finally:
                 self.queue.task_done()
 
