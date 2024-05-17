@@ -120,12 +120,15 @@ class AbstractIndexNode(metaclass=ABCMeta):
         self,
         shard_id: str,
         vectorset: str,
+        *,
         similarity: utils_pb2.VectorSimilarity.ValueType = utils_pb2.VectorSimilarity.COSINE,
+        normalize_vectors: bool = False,
     ) -> OpStatus:
         req = NewVectorSetRequest()
         req.id.shard.id = shard_id
         req.id.vectorset = vectorset
         req.similarity = similarity
+        req.normalize_vectors = normalize_vectors
         resp = await self.writer.AddVectorSet(req)  # type: ignore
         return resp
 
@@ -133,7 +136,7 @@ class AbstractIndexNode(metaclass=ABCMeta):
         req = noderesources_pb2.ShardId()
         req.id = shard_id
         resp = await self.writer.ListVectorSets(req)  # type: ignore
-        return resp
+        return [v for v in resp.vectorsets]
 
     async def remove_vectorset(self, shard_id: str, vectorset: str) -> OpStatus:
         req = noderesources_pb2.VectorSetID()
