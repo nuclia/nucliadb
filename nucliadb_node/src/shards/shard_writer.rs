@@ -269,7 +269,11 @@ impl ShardWriter {
         let mut vector_tasks = vec![];
         for (name, path) in indexes.iter_vectors_indexes() {
             let id = metadata.id();
-            vector_tasks.push(move || Some((name, open_vectors_writer(versions.vectors, &path, id))));
+            vector_tasks.push(|| {
+                run_with_telemetry(info_span!(parent: &span, "Open vectors index writer"), move || {
+                    Some((name, open_vectors_writer(versions.vectors, &path, id)))
+                })
+            });
         }
 
         let rsc = RelationConfig {
@@ -323,7 +327,7 @@ impl ShardWriter {
     pub fn create_vectors_index(&self, name: String, new: VectorConfig) -> NodeResult<()> {
         let mut indexes = ShardIndexes::load(&self.metadata.shard_path())?;
         let path = indexes.add_vectors_index(name.clone())?;
-        let vectors_writer = nucliadb_vectors::service::VectorWriterService::create(&path, self.id, new)?;
+        let vectors_writer = nucliadb_vectors::service::VectorWriterService::create(&path, self.id.clone(), new)?;
         indexes.store()?;
         write_rw_lock(&self.indexes).vectors_indexes.insert(name, Box::new(vectors_writer));
         Ok(())
@@ -376,11 +380,17 @@ impl ShardWriter {
         };
 
         let mut vector_tasks = vec![];
-        for (_, vector_writer) in indexes.vectors_indexes.iter_mut() {
+        for (vectorset, vector_writer) in indexes.vectors_indexes.iter_mut() {
             vector_tasks.push(|| {
                 run_with_telemetry(info_span!(parent: &span, "vector set_resource"), || {
                     debug!("Vector service starts set_resource");
-                    let result = vector_writer.set_resource(&resource);
+                    let vectorset_resource = match vectorset.as_str() {
+                        "" | DEFAULT_VECTORS_INDEX_NAME => (&resource).into(),
+                        vectorset => {
+                            nucliadb_core::vectors::ResourceWrapper::new_vectorset_resource(&resource, vectorset)
+                        }
+                    };
+                    let result = vector_writer.set_resource(vectorset_resource);
                     debug!("Vector service ends set_resource");
                     result
                 })

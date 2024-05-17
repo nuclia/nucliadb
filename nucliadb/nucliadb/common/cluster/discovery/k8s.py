@@ -137,7 +137,7 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
         if ready:
             node = manager.get_index_node(node_data.node_id)
             if node is None:
-                logger.warning(
+                logger.info(
                     "Adding node",
                     extra={
                         "node_id": node_data.node_id,

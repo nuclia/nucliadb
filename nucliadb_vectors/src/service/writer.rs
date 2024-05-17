@@ -28,8 +28,7 @@ use nucliadb_core::metrics::request_time;
 use nucliadb_core::metrics::vectors::MergeSource;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::prost::Message;
-use nucliadb_core::protos::resource::ResourceStatus;
-use nucliadb_core::protos::{Resource, ResourceId};
+use nucliadb_core::protos::ResourceId;
 use nucliadb_core::tracing::{self, *};
 use nucliadb_core::vectors::MergeMetrics;
 use nucliadb_core::vectors::*;
@@ -104,10 +103,10 @@ impl VectorWriter for VectorWriterService {
 
     #[measure(actor = "vectors", metric = "set_resource")]
     #[tracing::instrument(skip_all)]
-    fn set_resource(&mut self, resource: &Resource) -> NodeResult<()> {
+    fn set_resource(&mut self, resource: nucliadb_core::vectors::ResourceWrapper) -> NodeResult<()> {
         let time = Instant::now();
 
-        let id = resource.resource.as_ref().map(|i| &i.shard_id);
+        let id = resource.id();
         debug!("{id:?} - Updating main index");
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Creating elements for the main index: starts {v} ms");
@@ -116,26 +115,24 @@ impl VectorWriter for VectorWriterService {
         let mut lengths: HashMap<usize, Vec<_>> = HashMap::new();
         let mut elems = Vec::new();
         let normalize_vectors = self.index.config().normalize_vectors;
-        if resource.status != ResourceStatus::Delete as i32 {
-            for (field_id, field_paragraphs) in resource.paragraphs.iter() {
-                for paragraph in field_paragraphs.paragraphs.values() {
-                    let mut inner_labels = paragraph.labels.clone();
-                    inner_labels.push(field_id.clone());
-                    let labels = LabelDictionary::new(inner_labels);
+        for (field_id, field_paragraphs) in resource.fields() {
+            for paragraph in field_paragraphs {
+                let mut inner_labels = paragraph.labels.clone();
+                inner_labels.push(field_id.clone());
+                let labels = LabelDictionary::new(inner_labels);
 
-                    for (key, sentence) in paragraph.sentences.iter().clone() {
-                        let key = key.to_string();
-                        let labels = labels.clone();
-                        let vector = if normalize_vectors {
-                            utils::normalize_vector(&sentence.vector)
-                        } else {
-                            sentence.vector.clone()
-                        };
-                        let metadata = sentence.metadata.as_ref().map(|m| m.encode_to_vec());
-                        let bucket = lengths.entry(vector.len()).or_default();
-                        elems.push(Elem::new(key, vector, labels, metadata));
-                        bucket.push(field_id);
-                    }
+                for (key, sentence) in paragraph.vectors.iter().clone() {
+                    let key = key.to_string();
+                    let labels = labels.clone();
+                    let vector = if normalize_vectors {
+                        utils::normalize_vector(&sentence.vector)
+                    } else {
+                        sentence.vector.clone()
+                    };
+                    let metadata = sentence.metadata.as_ref().map(|m| m.encode_to_vec());
+                    let bucket = lengths.entry(vector.len()).or_default();
+                    elems.push(Elem::new(key, vector, labels, metadata));
+                    bucket.push(field_id);
                 }
             }
         }
@@ -158,7 +155,7 @@ impl VectorWriter for VectorWriterService {
             self.index.add_data_point(data_point_pin)?;
         }
 
-        for to_delete in &resource.sentences_to_delete {
+        for to_delete in resource.sentences_to_delete() {
             let key_as_bytes = to_delete.as_bytes();
             self.index.record_delete(key_as_bytes, temporal_mark);
         }
@@ -320,11 +317,11 @@ mod tests {
         };
         // insert - delete - insert sequence
         let mut writer = VectorWriterService::create(&dir.path().join("vectors"), "abc".into(), vsc).unwrap();
-        let res = writer.set_resource(&resource);
+        let res = writer.set_resource(nucliadb_core::vectors::ResourceWrapper::from(&resource));
         assert!(res.is_ok());
         let res = writer.delete_resource(&resource_id);
         assert!(res.is_ok());
-        let res = writer.set_resource(&resource);
+        let res = writer.set_resource(nucliadb_core::vectors::ResourceWrapper::from(&resource));
         assert!(res.is_ok());
     }
 
@@ -389,11 +386,11 @@ mod tests {
         };
         // insert - delete - insert sequence
         let mut writer = VectorWriterService::create(&dir.path().join("vectors"), "abc".into(), vsc).unwrap();
-        let res = writer.set_resource(&resource);
+        let res = writer.set_resource(nucliadb_core::vectors::ResourceWrapper::from(&resource));
         assert!(res.is_ok());
         let res = writer.delete_resource(&resource_id);
         assert!(res.is_ok());
-        let res = writer.set_resource(&resource);
+        let res = writer.set_resource(nucliadb_core::vectors::ResourceWrapper::from(&resource));
         assert!(res.is_ok());
 
         let segments = writer.get_segment_ids().unwrap();

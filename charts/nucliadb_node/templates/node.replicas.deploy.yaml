@@ -92,6 +92,9 @@ spec:
       volumes:
       - name: data-dir
         emptyDir:
+{{- with $values.readReplicas.emptyDirSizeLimit }}
+          sizeLimit: {{ . }}
+{{- end }}
 {{- with $values.nats.secretName }}
       - name: nats-creds
         secret:

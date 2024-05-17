@@ -272,7 +272,7 @@ class KBShardManager:
             node = get_index_node(node_id)
             if node is not None:
                 try:
-                    logger.warning(
+                    logger.info(
                         "Deleting shard replica",
                         extra={"shard": replica_id, "node": node_id},
                     )
@@ -377,7 +377,7 @@ class KBShardManager:
         if not self.should_create_new_shard(num_paragraphs):
             return
 
-        logger.warning({"message": "Adding shard", "kbid": kbid})
+        logger.info({"message": "Adding shard", "kbid": kbid})
 
         async with datamanagers.with_transaction() as txn:
             await self.create_shard_by_kbid(txn, kbid)

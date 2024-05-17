@@ -23,6 +23,7 @@ from typing import Optional
 
 from nucliadb.common import locking
 from nucliadb.common.cluster.rollover import rollover_kb_shards
+from nucliadb.common.cluster.settings import in_standalone_mode
 from nucliadb.migrator.context import ExecutionContext
 from nucliadb.migrator.utils import get_migrations
 from nucliadb_telemetry import errors, metrics
@@ -57,12 +58,12 @@ async def run_kb_migrations(
             }
 
             try:
-                logger.warning("Migrating KB", extra=migration_info)
+                logger.info("Migrating KB", extra=migration_info)
                 with migration_observer(
                     {"type": "kb", "target_version": str(migration.version)}
                 ):
                     await migration.module.migrate_kb(context, kbid)  # type: ignore
-                logger.warning("Finished KB Migration", extra=migration_info)
+                logger.info("Finished KB Migration", extra=migration_info)
                 await context.data_manager.update_kb_info(
                     kbid=kbid, current_version=migration.version
                 )
@@ -91,8 +92,10 @@ async def run_all_kb_migrations(context: ExecutionContext, target_version: int) 
 
     if len(to_migrate) == 0:
         return
-
-    max_concurrent = context.settings.max_concurrent_migrations
+    if in_standalone_mode():
+        max_concurrent = 1
+    else:
+        max_concurrent = context.settings.max_concurrent_migrations
     semaphore = asyncio.Semaphore(max_concurrent)
 
     logger.info(
@@ -150,7 +153,7 @@ async def run_global_migrations(context: ExecutionContext, target_version: int) 
             "to_version": migration.version,
         }
         try:
-            logger.warning("Migrating", extra=migration_info)
+            logger.info("Migrating", extra=migration_info)
             with migration_observer(
                 {"type": "global", "target_version": str(migration.version)}
             ):
@@ -158,7 +161,7 @@ async def run_global_migrations(context: ExecutionContext, target_version: int) 
             await context.data_manager.update_global_info(
                 current_version=migration.version
             )
-            logger.warning("Finished migration", extra=migration_info)
+            logger.info("Finished migration", extra=migration_info)
         except Exception as exc:
             errors.capture_exception(exc)
             logger.exception("Failed to migrate", extra=migration_info)

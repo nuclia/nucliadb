@@ -115,7 +115,7 @@ def cached_back_pressure(kbid: str, resource_uuid: Optional[str] = None):
         RATE_LIMITED_REQUESTS_COUNTER.inc(
             {"type": back_pressure_type, "cached": "true"}
         )
-        logger.warning(
+        logger.info(
             "Back pressure applied from cache",
             extra={
                 "type": back_pressure_type,
