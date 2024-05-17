@@ -310,7 +310,7 @@ async def test_ask_rag_options_validation(nucliadb_reader):
     assert resp.status_code == 422
     detail = resp.json()["detail"]
     detail[0]["loc"][-1] == "fields"
-    assert detail[0]["msg"] == "field required"
+    assert detail[0]["msg"] == "Field required"
 
     # fields must be in the right format: field_type/field_name
     resp = await nucliadb_reader.post(
@@ -325,7 +325,7 @@ async def test_ask_rag_options_validation(nucliadb_reader):
     detail[0]["loc"][-1] == "fields"
     assert (
         detail[0]["msg"]
-        == "Field 'foo/t/text' is not in the format {field_type}/{field_name}"
+        == "Value error, Field 'foo/t/text' is not in the format {field_type}/{field_name}"
     )
 
     # But fields can have leading and trailing slashes and they will be ignored
@@ -350,7 +350,7 @@ async def test_ask_rag_options_validation(nucliadb_reader):
     detail = resp.json()["detail"]
     detail[0]["loc"][-1] == "fields"
     assert detail[0]["msg"].startswith(
-        "Field 'X/fieldname' does not have a valid field type. Valid field types are"
+        "Value error, Field 'X/fieldname' does not have a valid field type. Valid field types are"
     )
 
 
