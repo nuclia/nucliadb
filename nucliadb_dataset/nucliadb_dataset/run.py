@@ -20,24 +20,29 @@
 from pathlib import Path
 from urllib.parse import urlparse
 
-import pydantic_argparse
+import argdantic
 from nucliadb_protos.dataset_pb2 import TrainSet
 
 from nucliadb_dataset import ExportType
 from nucliadb_dataset.dataset import TASK_DEFINITIONS
 from nucliadb_dataset.export import FileSystemExport, NucliaDatasetsExport
+from nucliadb_dataset.settings import RunningSettings
 from nucliadb_sdk.v2.sdk import NucliaDB
+
+parser = argdantic.ArgParser()
+
+
+@parser.command(
+    singleton=True,
+    name="NucliaDB Dataset",
+    help="Generate Arrow files from NucliaDB KBs",
+)
+def setting(settings: RunningSettings) -> RunningSettings:
+    return settings
 
 
 def run():
-    from nucliadb_dataset.settings import RunningSettings
-
-    parser = pydantic_argparse.ArgumentParser(
-        model=RunningSettings,
-        prog="NucliaDB Datasets",
-        description="Generate Arrow files from NucliaDB KBs",
-    )
-    nucliadb_args = parser.parse_typed_args()
+    nucliadb_args = parser()
 
     trainset = TrainSet()
     definition = TASK_DEFINITIONS[nucliadb_args.type]

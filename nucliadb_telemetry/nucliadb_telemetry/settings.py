@@ -44,12 +44,12 @@ class LogLevel(enum.Enum):
     CRITICAL = "CRITICAL"
 
 
-class LogOutputType(str, enum.Enum):
+class LogOutputType(enum.Enum):
     STDOUT = "stdout"
     FILE = "file"
 
 
-class LogFormatType(str, enum.Enum):
+class LogFormatType(enum.Enum):
     PLAIN = "plain"
     STRUCTURED = "structured"
 

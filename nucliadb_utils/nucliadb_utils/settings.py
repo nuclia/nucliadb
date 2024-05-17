@@ -48,7 +48,7 @@ class HTTPSettings(BaseSettings):
 http_settings = HTTPSettings()
 
 
-class FileBackendConfig(str, Enum):
+class FileBackendConfig(Enum):
     GCS = "gcs"
     S3 = "s3"
     PG = "pg"

@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.exceptions import UnsetUtility
-from nucliadb.ingest.settings import settings
+from nucliadb.ingest.settings import DriverConfig, settings
 from nucliadb_utils.exceptions import ConfigurationError
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
 
@@ -64,7 +64,7 @@ async def setup_driver() -> Driver:
     if driver is not None:
         return driver
 
-    if settings.driver == "redis":
+    if settings.driver == DriverConfig.REDIS:
         if not REDIS:
             raise ConfigurationError("`redis` python package not installed.")
         if settings.driver_redis_url is None:
@@ -72,7 +72,7 @@ async def setup_driver() -> Driver:
 
         redis_driver = RedisDriver(settings.driver_redis_url)
         set_utility(Utility.MAINDB_DRIVER, redis_driver)
-    elif settings.driver == "tikv":
+    elif settings.driver == DriverConfig.TIKV:
         if not TIKV:
             raise ConfigurationError("`tikv_client` python package not installed.")
         if settings.driver_tikv_url is None:
@@ -82,7 +82,7 @@ async def setup_driver() -> Driver:
             settings.driver_tikv_url, settings.driver_tikv_connection_pool_size
         )
         set_utility(Utility.MAINDB_DRIVER, tikv_driver)
-    elif settings.driver == "pg":
+    elif settings.driver == DriverConfig.PG:
         if not PG:
             raise ConfigurationError("`asyncpg` python package not installed.")
         if settings.driver_pg_url is None:
@@ -92,7 +92,7 @@ async def setup_driver() -> Driver:
             connection_pool_max_size=settings.driver_pg_connection_pool_max_size,
         )
         set_utility(Utility.MAINDB_DRIVER, pg_driver)
-    elif settings.driver == "local":
+    elif settings.driver == DriverConfig.LOCAL:
         if not FILES:
             raise ConfigurationError("`aiofiles` python package not installed.")
         if settings.driver_local_url is None:

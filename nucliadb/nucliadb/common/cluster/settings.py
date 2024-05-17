@@ -29,7 +29,7 @@ class ClusterDiscoveryMode(str, enum.Enum):
     SINGLE_NODE = "single_node"
 
 
-class StandaloneNodeRole(str, enum.Enum):
+class StandaloneNodeRole(enum.Enum):
     ALL = "all"
     INDEX = "index"
     WORKER = "worker"

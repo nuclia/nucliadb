@@ -31,9 +31,7 @@ STANDALONE_RUN = "nucliadb.standalone.run"
 def mocked_deps():
     with (
         mock.patch("uvicorn.Server.run"),
-        mock.patch(
-            "pydantic_argparse.ArgumentParser.parse_typed_args", return_value=Settings()
-        ),
+        mock.patch("nucliadb.standalone.run.parser", return_value=Settings()),
         mock.patch(f"{STANDALONE_RUN}.get_latest_nucliadb", return_value="1.0.0"),
         mock.patch("uvicorn.Server.startup"),
         mock.patch(f"{STANDALONE_RUN}.run_migrations"),
