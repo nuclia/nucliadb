@@ -298,8 +298,8 @@ async def test_ask_rag_options_validation(nucliadb_reader):
     assert resp.status_code == 422
     detail = resp.json()["detail"]
     assert (
-        detail[0]["msg"]
-        == "If 'full_resource' strategy is chosen, it must be the only strategy"
+        "If 'full_resource' strategy is chosen, it must be the only strategy"
+        in detail[0]["msg"]
     )
 
     # field_extension requires fields
