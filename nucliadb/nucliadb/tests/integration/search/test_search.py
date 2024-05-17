@@ -19,7 +19,7 @@
 #
 import asyncio
 import math
-from datetime import datetime
+from datetime import datetime, timedelta
 from unittest import mock
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -1726,3 +1726,46 @@ async def test_catalog_pagination(
             break
         page_number += 1
     assert len(resource_uuids) == n_resources
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_catalog_date_range_filtering(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox,
+):
+    now = datetime.now()
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/resources",
+        json={
+            "title": f"Resource",
+            "texts": {
+                "text": {
+                    "body": f"Text for resource",
+                }
+            },
+        },
+    )
+    assert resp.status_code == 201
+
+    one_hour_ago = now - timedelta(hours=1)
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/catalog",
+        params={
+            "range_creation_start": one_hour_ago.isoformat(),
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == 1
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/catalog",
+        params={
+            "range_creation_end": one_hour_ago.isoformat(),
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == 0
