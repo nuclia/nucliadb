@@ -21,6 +21,7 @@ import base64
 import json
 from typing import Any, Optional, Union
 
+from nucliadb.search.search.chat.ask import AskResult, ask
 import pydantic
 from fastapi import Body, Header, Request, Response
 from fastapi.openapi.models import Example
@@ -34,8 +35,8 @@ from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.predict import AnswerStatusCode
 from nucliadb.search.search.chat.query import (
     START_OF_CITATIONS,
-    chat,
-    get_relations_results,
+    to_chat_stream_response,
+    to_chat_sync_response,
 )
 from nucliadb.search.search.exceptions import (
     IncompleteFindResultsError,
@@ -43,6 +44,7 @@ from nucliadb.search.search.exceptions import (
 )
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
+    AskRequest,
     ChatOptions,
     ChatRequest,
     KnowledgeboxFindResults,
@@ -155,16 +157,47 @@ async def create_chat_response(
     x_synchronous: bool,
     resource: Optional[str] = None,
 ) -> Response:
+    """
+    Chat endpoint is deprecated.
+    Internally, we use the ask logic but convert the responses to keep the same
+    behavior as the chat endpoint until it is removed.
+    """
     chat_request.max_tokens = parse_max_tokens(chat_request.max_tokens)
-    chat_result = await chat(
+    ask_request = AskRequest.parse_obj(chat_request.dict())
+    ask_result: AskResult = await ask(
         kbid,
-        chat_request,
+        ask_request,
         user_id,
         client_type,
         origin,
         resource=resource,
     )
+    headers = {
+        "NUCLIA-LEARNING-ID": ask_result.nuclia_learning_id or "unknown",
+        "Access-Control-Expose-Headers": "NUCLIA-LEARNING-ID",
+    }
     if x_synchronous:
+        sync_ask_response = await ask_result.sync_response()
+        sync_chat_response = to_chat_sync_response(sync_ask_response)
+        return Response(
+            content=sync_chat_response.json(exclude_unset=True),
+            status_code=200,
+            headers=headers,
+            media_type="application/json",
+        )
+    else:
+        return StreamingResponse(
+            content=to_chat_stream_response(ask_result),
+            status_code=200,
+            headers=headers,
+            media_type="application/octet-stream",
+        )
+
+
+"""
+    if x_synchronous:
+
+
         streamed_answer = b""
         async for chunk in chat_result.answer_stream:
             streamed_answer += chunk
@@ -230,7 +263,7 @@ async def create_chat_response(
                 "Access-Control-Expose-Headers": "NUCLIA-LEARNING-ID",
             },
         )
-
+"""
 
 def parse_streamed_answer(
     streamed_bytes: bytes, requested_citations: bool

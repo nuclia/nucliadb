@@ -90,8 +90,9 @@ async def create_ask_response(
         "Access-Control-Expose-Headers": "NUCLIA-LEARNING-ID",
     }
     if x_synchronous:
+        sync_resp = await ask_result.sync_response()
         return Response(
-            content=await ask_result.json(),
+            content=sync_resp.json(exclude_unset=True),
             status_code=200,
             headers=headers,
             media_type="application/json",

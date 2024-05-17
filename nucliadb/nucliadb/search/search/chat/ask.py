@@ -123,7 +123,7 @@ class AskResult:
 
     async def ndjson_stream(self) -> AsyncGenerator[str, None]:
         try:
-            async for item in self._stream():
+            async for item in self.stream():
                 yield self._ndjson_encode(item)
         except Exception as exc:
             # Handle any unexpected error that might happen
@@ -140,7 +140,7 @@ class AskResult:
         result_item = AskResponseItem(item=item)
         return result_item.json(exclude_unset=False, exclude_none=True) + "\n"
 
-    async def _stream(self) -> AsyncGenerator[AskResponseItemType, None]:
+    async def stream(self) -> AsyncGenerator[AskResponseItemType, None]:
         # First stream out the find results
         yield RetrievalAskResponseItem(results=self.find_results)
 
@@ -197,9 +197,9 @@ class AskResult:
                 }
             )
 
-    async def json(self) -> str:
+    async def sync_response(self) -> SyncAskResponse:
         # First, run the stream in memory to get all the data in memory
-        async for _ in self._stream():
+        async for _ in self.stream():
             ...
 
         metadata = None
@@ -233,7 +233,7 @@ class AskResult:
                 self.prompt_context, self.prompt_context_order
             )
             response.prompt_context = sorted_prompt_context
-        return response.json(exclude_unset=True)
+        return response
 
     async def get_relations_results(self) -> Relations:
         if self._relations is None:
@@ -293,12 +293,12 @@ class NotEnoughContextAskResult(AskResult):
             StatusAskResponseItem(code=status.value, status=status.prettify())
         )
 
-    async def json(self) -> str:
+    async def sync_response(self) -> SyncAskResponse:
         return SyncAskResponse(
             answer=NOT_ENOUGH_CONTEXT_ANSWER,
             retrieval_results=self.find_results,
             status=AnswerStatusCode.NO_CONTEXT,
-        ).json(exclude_unset=True)
+        )
 
 
 async def ask(
