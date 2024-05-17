@@ -93,7 +93,7 @@ def test_ask_on_resource(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
     )
 
 
-def test_ask_response_parser():
+def test_ask_response_parser_stream():
     items = [
         AnswerAskResponseItem(text="This is"),
         AnswerAskResponseItem(text=" your Nuclia answer."),
@@ -124,7 +124,10 @@ def test_ask_response_parser():
     ]
     raw_lines = [AskResponseItem(item=item).json() for item in items]
     response = unittest.mock.Mock()
-    response.headers = {"NUCLIA-LEARNING-ID": "learning_id"}
+    response.headers = {
+        "NUCLIA-LEARNING-ID": "learning_id",
+        "Content-Type": "application/x-ndjson",
+    }
     response.iter_lines = unittest.mock.Mock(return_value=raw_lines)
 
     ask_response: SyncAskResponse = ask_response_parser(response)
@@ -146,8 +149,9 @@ def test_ask_response_parser():
 
 def test_ask_synchronous(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
     sdk.session.headers["X-Synchronous"] = "true"
-    sdk.ask(
+    resp = sdk.ask(
         kbid=docs_dataset,
         query="Nuclia loves Semantic Search",
     )
+    assert isinstance(resp, SyncAskResponse)
     sdk.session.headers.pop("X-Synchronous", None)
