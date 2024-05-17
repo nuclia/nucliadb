@@ -38,7 +38,7 @@ class SemanticModelMetadata(BaseModel):
         description="Vector similarity algorithm that is applied on search"
     )
     vector_dimension: Optional[int] = Field(
-        description="Dimension of the indexed vectors/embeddings"
+        None, description="Dimension of the indexed vectors/embeddings"
     )
 
     # We no longer need this field as we're fetching the minimum

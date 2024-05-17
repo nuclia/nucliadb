@@ -21,11 +21,7 @@ import enum
 from typing import Dict, Optional
 
 import pydantic
-
-try:
-    from pydantic import BaseSettings
-except ImportError:  # pragma: no cover
-    from pydantic_settings import BaseSettings  # type: ignore
+from pydantic_settings import BaseSettings
 
 
 class TelemetrySettings(BaseSettings):
@@ -48,12 +44,12 @@ class LogLevel(enum.Enum):
     CRITICAL = "CRITICAL"
 
 
-class LogOutputType(str, enum.Enum):
+class LogOutputType(enum.Enum):
     STDOUT = "stdout"
     FILE = "file"
 
 
-class LogFormatType(str, enum.Enum):
+class LogFormatType(enum.Enum):
     PLAIN = "plain"
     STRUCTURED = "structured"
 

@@ -37,9 +37,9 @@ def config_standalone_driver(nucliadb_args: Settings):
     )
 
     # update global settings with arg values
-    for fieldname in DriverSettings.__fields__.keys():
+    for fieldname in DriverSettings.model_fields.keys():
         setattr(ingest_settings, fieldname, getattr(nucliadb_args, fieldname))
-    for fieldname in StorageSettings.__fields__.keys():
+    for fieldname in StorageSettings.model_fields.keys():
         setattr(storage_settings, fieldname, getattr(nucliadb_args, fieldname))
 
     if ingest_settings.driver == DriverConfig.NOT_SET:

@@ -24,6 +24,8 @@ pub mod indexes;
 pub mod metadata;
 pub mod shard_reader;
 pub mod shard_writer;
+#[cfg(test)]
+mod tests;
 pub mod versioning;
 
 // Alias for more readable imports

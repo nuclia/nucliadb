@@ -90,7 +90,7 @@ async def annotated_file_field(
             ],
         },
     )
-    assert resp.status_code == 201
+    assert resp.status_code == 201, f"{resp}: {resp.text}"
     rid = resp.json()["uuid"]
 
     yield (rid, field_id)

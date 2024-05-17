@@ -20,10 +20,11 @@
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseSettings, Field
+from pydantic import Field
+from pydantic_settings import BaseSettings
 
 
-class DriverConfig(str, Enum):
+class DriverConfig(Enum):
     REDIS = "redis"
     TIKV = "tikv"
     PG = "pg"

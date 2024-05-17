@@ -269,7 +269,7 @@ async def test_classification_labels_are_shown_in_resource_basic(
 
     # Check resource get
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}?show=basic")
-    assert resp.status_code == 200
+    assert resp.status_code == 200, f"Response {resp}: {resp.text}"
     resource = Resource.parse_raw(resp.content)
     assert resource.computedmetadata == expected_computedmetadata
 

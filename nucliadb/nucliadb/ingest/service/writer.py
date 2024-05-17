@@ -154,7 +154,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             kbid = await self.create_kb(request)
             logger.info("KB created successfully", extra={"kbid": kbid})
         except KnowledgeBoxConflict:
-            logger.warning("KB already exists", extra={"slug": request.slug})
+            logger.info("KB already exists", extra={"slug": request.slug})
             return NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.CONFLICT)
         except Exception as exc:
             errors.capture_exception(exc)

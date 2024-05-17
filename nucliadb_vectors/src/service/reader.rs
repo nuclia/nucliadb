@@ -139,6 +139,10 @@ impl VectorReader for VectorReaderService {
 
         Ok(result)
     }
+
+    fn needs_update(&self) -> NodeResult<bool> {
+        Ok(self.index.needs_update()?)
+    }
 }
 
 impl TryFrom<Neighbour> for DocumentScored {
@@ -257,7 +261,7 @@ mod tests {
         };
         // insert - delete - insert sequence
         let mut writer = VectorWriterService::create(vsc).unwrap();
-        writer.set_resource(&resource).unwrap();
+        writer.set_resource((&resource).into()).unwrap();
 
         let reader = VectorReaderService::open(&shard_path).unwrap();
         let mut request = VectorSearchRequest {
@@ -347,7 +351,7 @@ mod tests {
         };
         // insert - delete - insert sequence
         let mut writer = VectorWriterService::create(vsc).unwrap();
-        let res = writer.set_resource(&resource);
+        let res = writer.set_resource((&resource).into());
         assert!(res.is_ok());
         let reader = VectorReaderService::open(&shard_path).unwrap();
         let request = VectorSearchRequest {
@@ -471,7 +475,7 @@ mod tests {
             ..Default::default()
         };
         let mut writer = VectorWriterService::create(vsc).unwrap();
-        let res = writer.set_resource(&resource);
+        let res = writer.set_resource((&resource).into());
         assert!(res.is_ok());
         let reader = VectorReaderService::open(&shard_path).unwrap();
         let request = VectorSearchRequest {

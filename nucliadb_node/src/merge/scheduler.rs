@@ -42,11 +42,6 @@ use tokio::sync::oneshot::{Receiver, Sender};
 use super::work::WorkQueue;
 use crate::merge::{MergePriority, MergeRequest, MergeWaiter};
 
-const SCHEDULER_MAX_NODES_IN_MERGE: &str = "SCHEDULER_MAX_NODES_IN_MERGE";
-const SCHEDULER_SEGMENTS_BEFORE_MERGE: &str = "SCHEDULER_SEGMENTS_BEFORE_MERGE";
-const ON_COMMIT_MAX_NODES_IN_MERGE: &str = "MAX_NODES_IN_MERGE";
-const ON_COMMIT_SEGMENTS_BEFORE_MERGE: &str = "SEGMENTS_BEFORE_MERGE";
-
 /// Merge scheduler is the responsible for scheduling merges in the vectors
 /// index. When running, it takes the most prioritary merge request, takes a
 /// shard writer and executes the merge.
@@ -63,25 +58,15 @@ pub struct MergeScheduler {
 impl MergeScheduler {
     pub fn new(shard_cache: Arc<ShardWriterCache>, settings: Settings) -> Self {
         let idle_parameters = MergeParameters {
-            max_nodes_in_merge: match std::env::var(SCHEDULER_MAX_NODES_IN_MERGE) {
-                Ok(v) => v.parse().unwrap_or(50_000),
-                Err(_) => 50_000,
-            },
-            segments_before_merge: match std::env::var(SCHEDULER_SEGMENTS_BEFORE_MERGE) {
-                Ok(v) => v.parse().unwrap_or(2),
-                Err(_) => 2,
-            },
+            max_nodes_in_merge: settings.merge_scheduler_max_nodes_in_merge,
+            segments_before_merge: settings.merge_scheduler_segments_before_merge,
+            maximum_deleted_entries: settings.merge_maximum_deleted_entries,
         };
 
         let on_commit_parameters = MergeParameters {
-            max_nodes_in_merge: match std::env::var(ON_COMMIT_MAX_NODES_IN_MERGE) {
-                Ok(v) => v.parse().unwrap_or(50_000),
-                Err(_) => 50_000,
-            },
-            segments_before_merge: match std::env::var(ON_COMMIT_SEGMENTS_BEFORE_MERGE) {
-                Ok(v) => v.parse().unwrap_or(2),
-                Err(_) => 100,
-            },
+            max_nodes_in_merge: settings.merge_on_commit_max_nodes_in_merge,
+            segments_before_merge: settings.merge_on_commit_segments_before_merge,
+            maximum_deleted_entries: settings.merge_maximum_deleted_entries,
         };
 
         Self {

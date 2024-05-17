@@ -115,7 +115,7 @@ def cached_back_pressure(kbid: str, resource_uuid: Optional[str] = None):
         RATE_LIMITED_REQUESTS_COUNTER.inc(
             {"type": back_pressure_type, "cached": "true"}
         )
-        logger.warning(
+        logger.info(
             "Back pressure applied from cache",
             extra={
                 "type": back_pressure_type,
@@ -385,7 +385,7 @@ async def check_processing_behind(materializer: Materializer, kbid: str):
             max_wait=settings.max_wait_time,
         )
         data = BackPressureData(type="processing", try_after=try_after)
-        logger.warning(
+        logger.info(
             "Processing back pressure applied",
             extra={
                 "kbid": kbid,
@@ -447,7 +447,7 @@ async def check_indexing_behind(
             max_wait=settings.max_wait_time,
         )
         data = BackPressureData(type="indexing", try_after=try_after)
-        logger.warning(
+        logger.info(
             "Indexing back pressure applied",
             extra={
                 "kbid": kbid,
@@ -472,7 +472,7 @@ def check_ingest_behind(ingest_pending: int):
             max_wait=settings.max_wait_time,
         )
         data = BackPressureData(type="ingest", try_after=try_after)
-        logger.warning(
+        logger.info(
             "Ingest back pressure applied",
             extra={"try_after": try_after, "pending": ingest_pending},
         )

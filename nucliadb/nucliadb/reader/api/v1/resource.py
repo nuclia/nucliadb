@@ -419,6 +419,6 @@ async def _get_resource_field(
                 resource_field.error = Error(body=error.error, code=error.code)
 
     return Response(
-        content=resource_field.json(exclude_unset=True, by_alias=True),
+        content=resource_field.model_dump_json(exclude_unset=True, by_alias=True),
         media_type="application/json",
     )
