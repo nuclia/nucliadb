@@ -95,7 +95,7 @@ async def move_set_of_kb_resources(
         )
         return
 
-    logger.warning(
+    logger.info(
         "Rebalancing kb shards",
         extra={"kbid": kbid, "from": from_shard_id, "to": to_shard_id, "count": count},
     )

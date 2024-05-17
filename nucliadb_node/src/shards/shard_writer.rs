@@ -20,7 +20,6 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
-use nucliadb_core::paragraphs::*;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::shard_created::{DocumentService, ParagraphService, RelationService, VectorService};
 use nucliadb_core::protos::{Resource, ResourceId};
@@ -28,11 +27,13 @@ use nucliadb_core::relations::*;
 use nucliadb_core::texts::*;
 use nucliadb_core::tracing::{self, *};
 use nucliadb_core::vectors::*;
+use nucliadb_core::{paragraphs::*, Channel};
 use nucliadb_core::{thread, IndexFiles};
 use nucliadb_procs::measure;
+use nucliadb_protos::utils::VectorSimilarity;
 use nucliadb_vectors::VectorErr;
 
-use super::indexes::ShardIndexes;
+use super::indexes::{ShardIndexes, DEFAULT_VECTORS_INDEX_NAME};
 use super::metadata::ShardMetadata;
 use super::versioning::{self, Versions};
 use crate::disk_structure::*;
@@ -100,17 +101,17 @@ pub struct ShardWriter {
     pub metadata: Arc<ShardMetadata>,
     pub id: String,
     pub path: PathBuf,
-    indexes: RwLock<InnerShardWriter>,
+    indexes: RwLock<ShardWriterIndexes>,
     versions: Versions,
     pub gc_lock: tokio::sync::Mutex<()>, // lock to be able to do GC or not
 }
 
 #[derive(Debug)]
-struct InnerShardWriter {
-    text_writer: TextsWriterPointer,
-    paragraph_writer: ParagraphsWriterPointer,
-    vector_writer: VectorsWriterPointer,
-    relation_writer: RelationsWriterPointer,
+struct ShardWriterIndexes {
+    texts_index: TextsWriterPointer,
+    paragraphs_index: ParagraphsWriterPointer,
+    vectors_indexes: HashMap<String, VectorsWriterPointer>,
+    relations_index: RelationsWriterPointer,
 }
 
 impl ShardWriter {
@@ -223,11 +224,14 @@ impl ShardWriter {
             id: metadata.id(),
             path: metadata.shard_path(),
             metadata,
-            indexes: RwLock::new(InnerShardWriter {
-                text_writer: Box::new(fields.unwrap()),
-                paragraph_writer: Box::new(paragraphs.unwrap()),
-                vector_writer: Box::new(vectors.unwrap()),
-                relation_writer: Box::new(relations.unwrap()),
+            indexes: RwLock::new(ShardWriterIndexes {
+                texts_index: Box::new(fields.unwrap()),
+                paragraphs_index: Box::new(paragraphs.unwrap()),
+                vectors_indexes: HashMap::from([(
+                    DEFAULT_VECTORS_INDEX_NAME.to_string(),
+                    Box::new(vectors.unwrap()) as VectorsWriterPointer,
+                )]),
+                relations_index: Box::new(relations.unwrap()),
             }),
             versions,
             gc_lock: tokio::sync::Mutex::new(()),
@@ -236,72 +240,123 @@ impl ShardWriter {
 
     #[measure(actor = "shard", metric = "open")]
     pub fn open(metadata: Arc<ShardMetadata>) -> NodeResult<ShardWriter> {
+        let span = tracing::Span::current();
         let shard_path = metadata.shard_path();
+
+        // fallback to default indexes while there are shards without the file
         let indexes = ShardIndexes::load(&shard_path).unwrap_or_else(|_| ShardIndexes::new(&shard_path));
 
-        // TODO: this call will generate the shard indexes file, as a lazy
-        // migration. When every shard has the file, this line should be
-        // removed
+        // This call will generate the shard indexes file, as a lazy migration.
+        // TODO: When every shard has the file, this line should be removed
         indexes.store()?;
-
-        let tsc = TextConfig {
-            path: indexes.texts_path(),
-        };
-        let psc = ParagraphConfig {
-            path: indexes.paragraphs_path(),
-        };
-        let rsc = RelationConfig {
-            path: indexes.relations_path(),
-            channel: metadata.channel(),
-        };
 
         let versions_path = metadata.shard_path().join(VERSION_FILE);
         let versions = Versions::load(&versions_path)?;
 
+        let tsc = TextConfig {
+            path: indexes.texts_path(),
+        };
         let text_task = || Some(open_texts_writer(versions.texts, &tsc));
-        let paragraph_task = || Some(open_paragraphs_writer(versions.paragraphs, &psc));
-        let vector_task = || Some(open_vectors_writer(versions.vectors, &indexes.vectors_path(), metadata.id()));
-        let relation_task = || Some(open_relations_writer(versions.relations, &rsc));
-
-        let span = tracing::Span::current();
-        let info = info_span!(parent: &span, "text start");
+        let info = info_span!(parent: &span, "Open texts index writer");
         let text_task = || run_with_telemetry(info, text_task);
-        let info = info_span!(parent: &span, "paragraph start");
+
+        let psc = ParagraphConfig {
+            path: indexes.paragraphs_path(),
+        };
+        let paragraph_task = || Some(open_paragraphs_writer(versions.paragraphs, &psc));
+        let info = info_span!(parent: &span, "Open paragraphs index writer");
         let paragraph_task = || run_with_telemetry(info, paragraph_task);
-        let info = info_span!(parent: &span, "vector start");
-        let vector_task = || run_with_telemetry(info, vector_task);
-        let info = info_span!(parent: &span, "relation start");
+
+        let mut vector_tasks = vec![];
+        for (name, path) in indexes.iter_vectors_indexes() {
+            let id = metadata.id();
+            vector_tasks.push(|| {
+                run_with_telemetry(info_span!(parent: &span, "Open vectors index writer"), move || {
+                    Some((name, open_vectors_writer(versions.vectors, &path, id)))
+                })
+            });
+        }
+
+        let rsc = RelationConfig {
+            path: indexes.relations_path(),
+            channel: metadata.channel(),
+        };
+        let info = info_span!(parent: &span, "Open relations index writer");
+        let relation_task = || Some(open_relations_writer(versions.relations, &rsc));
         let relation_task = || run_with_telemetry(info, relation_task);
 
         let mut text_result = None;
         let mut paragraph_result = None;
-        let mut vector_result = None;
+        let mut vector_results = Vec::with_capacity(vector_tasks.len());
+        for _ in 0..vector_tasks.len() {
+            vector_results.push(None);
+        }
         let mut relation_result = None;
         thread::scope(|s| {
             s.spawn(|_| text_result = text_task());
             s.spawn(|_| paragraph_result = paragraph_task());
-            s.spawn(|_| vector_result = vector_task());
+            for (vector_task, vector_result) in vector_tasks.into_iter().zip(vector_results.iter_mut()) {
+                s.spawn(|_| *vector_result = vector_task());
+            }
             s.spawn(|_| relation_result = relation_task());
         });
 
-        let fields = text_result.transpose()?;
-        let paragraphs = paragraph_result.transpose()?;
-        let vectors = vector_result.transpose()?;
-        let relations = relation_result.transpose()?;
+        let texts = text_result.unwrap()?;
+        let paragraphs = paragraph_result.unwrap()?;
+        let mut vectors = HashMap::with_capacity(vector_results.len());
+        for result in vector_results {
+            let (name, vector_writer) = result.unwrap();
+            vectors.insert(name, vector_writer?);
+        }
+        let relations = relation_result.unwrap()?;
 
         Ok(ShardWriter {
             id: metadata.id(),
             path: metadata.shard_path(),
             metadata,
-            indexes: RwLock::new(InnerShardWriter {
-                text_writer: fields.unwrap(),
-                paragraph_writer: paragraphs.unwrap(),
-                vector_writer: vectors.unwrap(),
-                relation_writer: relations.unwrap(),
+            indexes: RwLock::new(ShardWriterIndexes {
+                texts_index: texts,
+                paragraphs_index: paragraphs,
+                vectors_indexes: vectors,
+                relations_index: relations,
             }),
             versions,
             gc_lock: tokio::sync::Mutex::new(()),
         })
+    }
+
+    pub fn create_vectors_index(&self, new: NewVectorsIndex) -> NodeResult<()> {
+        let mut indexes = ShardIndexes::load(&self.metadata.shard_path())?;
+        let path = indexes.add_vectors_index(new.name.clone())?;
+        let vectors_writer = nucliadb_vectors::service::VectorWriterService::create(VectorConfig {
+            path,
+            shard_id: new.shard_id,
+            channel: new.channel,
+            similarity: new.similarity,
+            normalize_vectors: new.normalize_vectors,
+        })?;
+        indexes.store()?;
+        write_rw_lock(&self.indexes).vectors_indexes.insert(new.name, Box::new(vectors_writer));
+        Ok(())
+    }
+
+    pub fn remove_vectors_index(&self, name: String) -> NodeResult<()> {
+        let mut indexes = ShardIndexes::load(&self.metadata.shard_path())?;
+        let path = indexes.remove_vectors_index(&name)?;
+        indexes.store()?;
+        write_rw_lock(&self.indexes).vectors_indexes.remove(&name);
+        if let Some(path) = path {
+            // Although there can be a reader with this index open, readers
+            // currently open all vectors index files so we rely on Linux not
+            // deleting the files until it closes the index. Readers then should
+            // be able to keep answering for that vectorset until closing it
+            std::fs::remove_dir_all(path)?;
+        }
+        Ok(())
+    }
+
+    pub fn list_vectors_indexes(&self) -> Vec<String> {
+        read_rw_lock(&self.indexes).vectors_indexes.keys().cloned().collect::<Vec<String>>()
     }
 
     #[measure(actor = "shard", metric = "set_resource")]
@@ -311,60 +366,75 @@ impl ShardWriter {
 
         remove_invalid_labels(&mut resource);
 
-        let indexes: &mut InnerShardWriter = &mut write_rw_lock(&self.indexes);
+        let indexes: &mut ShardWriterIndexes = &mut write_rw_lock(&self.indexes);
 
-        let text_task = || {
-            debug!("Field service starts set_resource");
-            let result = indexes.text_writer.set_resource(&resource);
-            debug!("Field service ends set_resource");
-            result
+        let mut text_task = || {
+            run_with_telemetry(info_span!(parent: &span, "text set_resource"), || {
+                debug!("Field service starts set_resource");
+                let result = indexes.texts_index.set_resource(&resource);
+                debug!("Field service ends set_resource");
+                result
+            })
         };
 
-        let paragraph_task = || {
-            debug!("Paragraph service starts set_resource");
-            let result = indexes.paragraph_writer.set_resource(&resource);
-            debug!("Paragraph service ends set_resource");
-            result
+        let mut paragraph_task = || {
+            run_with_telemetry(info_span!(parent: &span, "paragraph set_resource"), || {
+                debug!("Paragraph service starts set_resource");
+                let result = indexes.paragraphs_index.set_resource(&resource);
+                debug!("Paragraph service ends set_resource");
+                result
+            })
         };
 
-        let vector_task = || {
-            debug!("Vector service starts set_resource");
-            let result = indexes.vector_writer.set_resource(&resource);
-            debug!("Vector service ends set_resource");
-            result
-        };
+        let mut vector_tasks = vec![];
+        for (vectorset, vector_writer) in indexes.vectors_indexes.iter_mut() {
+            vector_tasks.push(|| {
+                run_with_telemetry(info_span!(parent: &span, "vector set_resource"), || {
+                    debug!("Vector service starts set_resource");
+                    let vectorset_resource = match vectorset.as_str() {
+                        "" | DEFAULT_VECTORS_INDEX_NAME => (&resource).into(),
+                        vectorset => {
+                            nucliadb_core::vectors::ResourceWrapper::new_vectorset_resource(&resource, vectorset)
+                        }
+                    };
+                    let result = vector_writer.set_resource(vectorset_resource);
+                    debug!("Vector service ends set_resource");
+                    result
+                })
+            });
+        }
 
-        let relation_task = || {
-            debug!("Relation service starts set_resource");
-            let result = indexes.relation_writer.set_resource(&resource);
-            debug!("Relation service ends set_resource");
-            result
+        let mut relation_task = || {
+            run_with_telemetry(info_span!(parent: &span, "relation set_resource"), || {
+                debug!("Relation service starts set_resource");
+                let result = indexes.relations_index.set_resource(&resource);
+                debug!("Relation service ends set_resource");
+                result
+            })
         };
-
-        let info = info_span!(parent: &span, "text set_resource");
-        let text_task = || run_with_telemetry(info, text_task);
-        let info = info_span!(parent: &span, "paragraph set_resource");
-        let paragraph_task = || run_with_telemetry(info, paragraph_task);
-        let info = info_span!(parent: &span, "vector set_resource");
-        let vector_task = || run_with_telemetry(info, vector_task);
-        let info = info_span!(parent: &span, "relation set_resource");
-        let relation_task = || run_with_telemetry(info, relation_task);
 
         let mut text_result = Ok(());
         let mut paragraph_result = Ok(());
-        let mut vector_result = Ok(());
+        let mut vector_results = Vec::with_capacity(vector_tasks.len());
+        for _ in 0..vector_tasks.len() {
+            vector_results.push(Ok(()));
+        }
         let mut relation_result = Ok(());
 
         thread::scope(|s| {
             s.spawn(|_| text_result = text_task());
             s.spawn(|_| paragraph_result = paragraph_task());
-            s.spawn(|_| vector_result = vector_task());
+            for (mut vector_task, vector_result) in vector_tasks.into_iter().zip(vector_results.iter_mut()) {
+                s.spawn(move |_| *vector_result = vector_task());
+            }
             s.spawn(|_| relation_result = relation_task());
         });
 
         text_result?;
         paragraph_result?;
-        vector_result?;
+        for result in vector_results {
+            result?
+        }
         relation_result?;
         self.metadata.new_generation_id(); // VERY NAIVE, SHOULD BE DONE AFTER MERGE AS WELL
 
@@ -376,40 +446,57 @@ impl ShardWriter {
     pub fn remove_resource(&self, resource: &ResourceId) -> NodeResult<()> {
         let span = tracing::Span::current();
 
-        let indexes: &mut InnerShardWriter = &mut write_rw_lock(&self.indexes);
+        let indexes: &mut ShardWriterIndexes = &mut write_rw_lock(&self.indexes);
 
-        let text_task = || indexes.text_writer.delete_resource(resource);
+        let mut text_task = || {
+            run_with_telemetry(info_span!(parent: &span, "text remove"), || {
+                indexes.texts_index.delete_resource(resource)
+            })
+        };
 
-        let paragraph_task = || indexes.paragraph_writer.delete_resource(resource);
+        let mut paragraph_task = || {
+            run_with_telemetry(info_span!(parent: &span, "paragraph remove"), || {
+                indexes.paragraphs_index.delete_resource(resource)
+            })
+        };
 
-        let vector_task = || indexes.vector_writer.delete_resource(resource);
+        let mut vector_tasks = vec![];
+        for (_, vector_writer) in indexes.vectors_indexes.iter_mut() {
+            vector_tasks.push(|| {
+                run_with_telemetry(info_span!(parent: &span, "vector remove"), || {
+                    vector_writer.delete_resource(resource)
+                })
+            });
+        }
 
-        let relation_task = || indexes.relation_writer.delete_resource(resource);
-
-        let info = info_span!(parent: &span, "text remove");
-        let text_task = || run_with_telemetry(info, text_task);
-        let info = info_span!(parent: &span, "paragraph remove");
-        let paragraph_task = || run_with_telemetry(info, paragraph_task);
-        let info = info_span!(parent: &span, "vector remove");
-        let vector_task = || run_with_telemetry(info, vector_task);
-        let info = info_span!(parent: &span, "relation remove");
-        let relation_task = || run_with_telemetry(info, relation_task);
+        let mut relation_task = || {
+            run_with_telemetry(info_span!(parent: &span, "relation remove"), || {
+                indexes.relations_index.delete_resource(resource)
+            })
+        };
 
         let mut text_result = Ok(());
         let mut paragraph_result = Ok(());
-        let mut vector_result = Ok(());
+        let mut vector_results = Vec::with_capacity(vector_tasks.len());
+        for _ in 0..vector_tasks.len() {
+            vector_results.push(Ok(()));
+        }
         let mut relation_result = Ok(());
 
         thread::scope(|s| {
             s.spawn(|_| text_result = text_task());
             s.spawn(|_| paragraph_result = paragraph_task());
-            s.spawn(|_| vector_result = vector_task());
+            for (mut vector_task, vector_result) in vector_tasks.into_iter().zip(vector_results.iter_mut()) {
+                s.spawn(move |_| *vector_result = vector_task());
+            }
             s.spawn(|_| relation_result = relation_task());
         });
 
         text_result?;
         paragraph_result?;
-        vector_result?;
+        for result in vector_results {
+            result?
+        }
         relation_result?;
 
         self.metadata.new_generation_id();
@@ -420,59 +507,138 @@ impl ShardWriter {
     #[tracing::instrument(skip_all)]
     pub fn collect_garbage(&self) -> NodeResult<GarbageCollectorStatus> {
         let _lock = self.gc_lock.blocking_lock();
-        let result = write_rw_lock(&self.indexes).vector_writer.garbage_collection();
-        match result {
-            Ok(()) => Ok(GarbageCollectorStatus::GarbageCollected),
-            Err(error) => match error.downcast_ref::<VectorErr>() {
-                Some(VectorErr::WorkDelayed) => Ok(GarbageCollectorStatus::TryLater),
-                _ => Err(error),
-            },
+        let indexes: &mut ShardWriterIndexes = &mut write_rw_lock(&self.indexes);
+
+        let mut gc_results = Vec::with_capacity(indexes.vectors_indexes.len());
+        for (_, vector_writer) in indexes.vectors_indexes.iter_mut() {
+            let result = vector_writer.garbage_collection();
+            gc_results.push(result);
         }
+
+        for result in gc_results {
+            if let Err(error) = result {
+                return match error.downcast_ref::<VectorErr>() {
+                    Some(VectorErr::WorkDelayed) => Ok(GarbageCollectorStatus::TryLater),
+                    _ => Err(error),
+                };
+            }
+        }
+        Ok(GarbageCollectorStatus::GarbageCollected)
     }
 
     #[tracing::instrument(skip_all)]
     pub fn force_garbage_collection(&self) -> NodeResult<GarbageCollectorStatus> {
         let _lock = self.gc_lock.blocking_lock();
-        let result = write_rw_lock(&self.indexes).vector_writer.force_garbage_collection();
-        match result {
-            Ok(()) => Ok(GarbageCollectorStatus::GarbageCollected),
-            Err(error) => match error.downcast_ref::<VectorErr>() {
-                Some(VectorErr::WorkDelayed) => Ok(GarbageCollectorStatus::TryLater),
-                _ => Err(error),
-            },
+        let indexes: &mut ShardWriterIndexes = &mut write_rw_lock(&self.indexes);
+
+        let mut gc_results = Vec::with_capacity(indexes.vectors_indexes.len());
+        for (_, vector_writer) in indexes.vectors_indexes.iter_mut() {
+            let result = vector_writer.force_garbage_collection();
+            gc_results.push(result);
         }
+
+        for result in gc_results {
+            if let Err(error) = result {
+                return match error.downcast_ref::<VectorErr>() {
+                    Some(VectorErr::WorkDelayed) => Ok(GarbageCollectorStatus::TryLater),
+                    _ => Err(error),
+                };
+            }
+        }
+        Ok(GarbageCollectorStatus::GarbageCollected)
     }
 
     #[tracing::instrument(skip_all)]
     pub fn merge(&self, context: MergeContext) -> NodeResult<MergeMetrics> {
-        let runner = read_rw_lock(&self.indexes).vector_writer.prepare_merge(context.parameters)?;
-        let Some(mut runner) = runner else {
-            return Ok(MergeMetrics {
+        let mut runners = HashMap::new();
+        {
+            let indexes: &ShardWriterIndexes = &read_rw_lock(&self.indexes);
+            for (name, vectors_index) in indexes.vectors_indexes.iter() {
+                let runner = vectors_index.prepare_merge(context.parameters);
+                if let Ok(Some(runner)) = runner {
+                    runners.insert(name.clone(), runner);
+                }
+            }
+        }
+
+        // Running merge is costly, so we don't want a lock indexes while merging
+        let mut merge_results = HashMap::new();
+        for (name, mut runner) in runners.into_iter() {
+            let result = runner.run();
+            merge_results.insert(name, result);
+        }
+
+        {
+            let indexes: &mut ShardWriterIndexes = &mut write_rw_lock(&self.indexes);
+
+            let mut metrics = MergeMetrics {
                 merged: 0,
                 left: 0,
-            });
-        };
-        let merge_result = runner.run()?;
-        let metrics = write_rw_lock(&self.indexes).vector_writer.record_merge(merge_result, context.source)?;
-        self.metadata.new_generation_id();
+            };
+            let mut prepare_merge_errors = Vec::new();
+            let mut record_merge_errors = Vec::new();
+            for (name, vectors_index) in indexes.vectors_indexes.iter_mut() {
+                let result = merge_results.remove(name);
+                if result.is_none() {
+                    // new index have been added while acquiring indexes a
+                    // second time. Ignore
+                    continue;
+                }
+                let result = result.unwrap();
 
-        Ok(metrics)
+                if let Ok(merge_result) = result {
+                    let recorded = vectors_index.record_merge(merge_result, context.source);
+                    if let Ok(m) = recorded {
+                        metrics.merged += m.merged;
+                        metrics.left += m.left;
+                    } else {
+                        record_merge_errors.push(recorded);
+                    }
+                } else {
+                    prepare_merge_errors.push(result);
+                }
+            }
+
+            // return one of the errors we found if there are
+            for error in prepare_merge_errors {
+                error?;
+            }
+            for error in record_merge_errors {
+                error?;
+            }
+
+            Ok(metrics)
+        }
     }
 
     /// This must be used only by replication and should be
     /// deleted as soon as possible.
     #[tracing::instrument(skip_all)]
     pub fn reload(&self) -> NodeResult<()> {
-        write_rw_lock(&self.indexes).vector_writer.reload()
+        let indexes: &mut ShardWriterIndexes = &mut write_rw_lock(&self.indexes);
+        let mut results = Vec::with_capacity(indexes.vectors_indexes.len());
+        for (_, vector_writer) in indexes.vectors_indexes.iter_mut() {
+            results.push(vector_writer.reload());
+        }
+        for result in results {
+            result?;
+        }
+        Ok(())
     }
 
     pub fn get_shard_segments(&self) -> NodeResult<HashMap<String, Vec<String>>> {
         let mut segments = HashMap::new();
+        let indexes: &ShardWriterIndexes = &read_rw_lock(&self.indexes);
 
-        segments.insert("paragraph".to_string(), read_rw_lock(&self.indexes).paragraph_writer.get_segment_ids()?);
-        segments.insert("text".to_string(), read_rw_lock(&self.indexes).text_writer.get_segment_ids()?);
-        segments.insert("vector".to_string(), read_rw_lock(&self.indexes).vector_writer.get_segment_ids()?);
-        segments.insert("relation".to_string(), read_rw_lock(&self.indexes).relation_writer.get_segment_ids()?);
+        segments.insert("paragraph".to_string(), indexes.paragraphs_index.get_segment_ids()?);
+        segments.insert("text".to_string(), indexes.texts_index.get_segment_ids()?);
+        // TODO: return segments for all vector indexes
+        let default_vectors_index = indexes
+            .vectors_indexes
+            .get(DEFAULT_VECTORS_INDEX_NAME)
+            .expect("Default vectors index should never be deleted (yet)");
+        segments.insert("vector".to_string(), default_vectors_index.get_segment_ids()?);
+        segments.insert("relation".to_string(), indexes.relations_index.get_segment_ids()?);
 
         Ok(segments)
     }
@@ -486,19 +652,32 @@ impl ShardWriter {
         // while we retrieve the list of files
         let indexes = write_rw_lock(&self.indexes);
         let paragraph_files =
-            indexes.paragraph_writer.get_index_files(ignored_segement_ids.get("paragraph").unwrap_or(&Vec::new()))?;
+            indexes.paragraphs_index.get_index_files(ignored_segement_ids.get("paragraph").unwrap_or(&Vec::new()))?;
         let text_files =
-            indexes.text_writer.get_index_files(ignored_segement_ids.get("text").unwrap_or(&Vec::new()))?;
+            indexes.texts_index.get_index_files(ignored_segement_ids.get("text").unwrap_or(&Vec::new()))?;
+        // TODO: return files for all vector indexes
+        let default_vectors_index = indexes
+            .vectors_indexes
+            .get(DEFAULT_VECTORS_INDEX_NAME)
+            .expect("Default vectors index should never be deleted (yet)");
         let vector_files =
-            indexes.vector_writer.get_index_files(ignored_segement_ids.get("vector").unwrap_or(&Vec::new()))?;
+            default_vectors_index.get_index_files(ignored_segement_ids.get("vector").unwrap_or(&Vec::new()))?;
         let relation_files =
-            indexes.relation_writer.get_index_files(ignored_segement_ids.get("relation").unwrap_or(&Vec::new()))?;
+            indexes.relations_index.get_index_files(ignored_segement_ids.get("relation").unwrap_or(&Vec::new()))?;
         files.push((PathBuf::from(PARAGRAPHS_DIR), paragraph_files));
         files.push((PathBuf::from(TEXTS_DIR), text_files));
         files.push((PathBuf::from(VECTORS_DIR), vector_files));
         files.push((PathBuf::from(RELATIONS_DIR), relation_files));
         Ok(files)
     }
+}
+
+pub struct NewVectorsIndex {
+    pub shard_id: String,
+    pub name: String,
+    pub channel: Channel,
+    pub similarity: VectorSimilarity,
+    pub normalize_vectors: bool,
 }
 
 pub enum GarbageCollectorStatus {

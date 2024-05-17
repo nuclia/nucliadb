@@ -56,7 +56,7 @@ class Settings(BaseSettings):
 
     # Node limits
     max_shard_paragraphs: int = Field(
-        default=250_000,
+        default=500_000,
         title="Max shard paragraphs",
         description="Maximum number of paragraphs to target per shard",
     )
@@ -69,6 +69,12 @@ class Settings(BaseSettings):
         default=50_000,
         title="Max paragraphs per resource",
         description="Maximum number of paragraphs allowed on a single resource",
+    )
+
+    drain_nodes: list[str] = Field(
+        default=[],
+        title="Drain nodes",
+        description="List of node IDs to ignore when creating new shards. It is used for draining nodes from a cluster. Example: ['1bf3bfe7-e164-4a19-a4d9-41372fc15aca',]",  # noqa: E501
     )
 
     local_reader_threads: int = 5

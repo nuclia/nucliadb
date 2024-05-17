@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, Mock
 
 import aiohttp
@@ -25,14 +26,20 @@ import pytest
 from yarl import URL
 
 from nucliadb.search.predict import (
+    CitationsGenerativeResponse,
     DummyPredictEngine,
+    GenerativeChunk,
+    MetaGenerativeResponse,
     PredictEngine,
     ProxiedPredictAPIError,
     RephraseError,
     RephraseMissingContextError,
     SendToPredictError,
+    StatusGenerativeResponse,
+    TextGenerativeResponse,
     _parse_rephrase_response,
     get_answer_generator,
+    get_chat_ndjson_generator,
 )
 from nucliadb.tests.utils.aiohttp_session import get_mocked_session
 from nucliadb_models.search import (
@@ -446,3 +453,73 @@ async def test_get_answer_generator():
 
     answer_chunks = [chunk async for chunk in get_answer_generator(resp)]
     assert answer_chunks == [b"foobar", b"baz"]
+
+
+async def test_get_chat_ndjson_generator():
+    streamed_elements = [
+        TextGenerativeResponse(text="foo"),
+        MetaGenerativeResponse(input_tokens=1, output_tokens=1, timings={"foo": 1}),
+        CitationsGenerativeResponse(citations={"foo": "bar"}),
+        StatusGenerativeResponse(code="-1", details="foo"),
+    ]
+
+    async def _content():
+        for element in streamed_elements:
+            gen_chunk = GenerativeChunk(chunk=element)
+            yield gen_chunk.json() + "\n"
+        # yield an unknown chunk, to make sure it is ignored
+        yield '{"unknown": "chunk"}\n'
+
+    response = mock.Mock()
+    response.content = _content()
+
+    gen = get_chat_ndjson_generator(response)
+
+    parsed = [line async for line in gen]
+    assert len(parsed) == 4
+    assert parsed[0].chunk == TextGenerativeResponse(text="foo")
+    assert parsed[1].chunk == MetaGenerativeResponse(
+        input_tokens=1, output_tokens=1, timings={"foo": 1}
+    )
+    assert parsed[2].chunk == CitationsGenerativeResponse(citations={"foo": "bar"})
+    assert parsed[3].chunk == StatusGenerativeResponse(code="-1", details="foo")
+
+
+async def test_chat_query_ndjson():
+    pe = PredictEngine(
+        "cluster",
+        "public-{zone}",
+        zone="europe1",
+        onprem=False,
+    )
+    streamed_elements = [
+        TextGenerativeResponse(text="foo"),
+        StatusGenerativeResponse(code="-1", details="foo"),
+    ]
+
+    async def _content():
+        for element in streamed_elements:
+            gen_chunk = GenerativeChunk(chunk=element)
+            yield gen_chunk.json() + "\n"
+
+    chat_query_response = Mock()
+    chat_query_response.status = 200
+    chat_query_response.headers = {"NUCLIA-LEARNING-ID": "learning-id"}
+    chat_query_response.content = _content()
+    pe.session = mock.Mock()
+    pe.session.post = AsyncMock(return_value=chat_query_response)
+
+    item = ChatModel(question="foo", user_id="bar")
+
+    learning_id, generator = await pe.chat_query_ndjson("kbid", item)
+
+    assert learning_id == "learning-id"
+    parsed = [line async for line in generator]
+    assert len(parsed) == 2
+    assert parsed[0].chunk == TextGenerativeResponse(text="foo")
+    assert parsed[1].chunk == StatusGenerativeResponse(code="-1", details="foo")
+
+    # Make sure the request was made with the correct headers
+    pe.session.post.call_args_list[0].kwargs["headers"][
+        "Accept"
+    ] == "application/ndjson"

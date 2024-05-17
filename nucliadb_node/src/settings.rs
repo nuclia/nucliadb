@@ -119,7 +119,6 @@ pub fn build_object_store_driver(settings: &EnvSettings) -> Arc<dyn ObjectStore>
             let mut builder = AmazonS3Builder::new()
                 .with_region(settings.s3_region_name.clone())
                 .with_bucket_name(settings.s3_indexing_bucket.clone());
-
             // Unless client_id and client_secret are specified, the library will try to use the credentials by looking
             // at the standard AWS_WEB_IDENTITY_TOKEN_FILE environment variable
             if !settings.s3_client_id.is_empty() && !settings.s3_client_secret.is_empty() {
@@ -229,6 +228,7 @@ pub struct EnvSettings {
     pub merge_scheduler_segments_before_merge: usize,
     pub merge_on_commit_max_nodes_in_merge: usize,
     pub merge_on_commit_segments_before_merge: usize,
+    pub merge_maximum_deleted_entries: usize,
 
     pub max_open_shards: Option<NonZeroUsize>,
 
@@ -312,6 +312,7 @@ impl Default for EnvSettings {
             merge_scheduler_segments_before_merge: 2,
             merge_on_commit_max_nodes_in_merge: 10_000,
             merge_on_commit_segments_before_merge: 100,
+            merge_maximum_deleted_entries: 15_000,
             max_open_shards: None,
             file_backend: ObjectStoreType::NOTSET,
             gcs_indexing_bucket: Default::default(),

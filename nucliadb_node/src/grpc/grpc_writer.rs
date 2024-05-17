@@ -26,7 +26,7 @@ use crate::grpc::collect_garbage::{garbage_collection_loop, GCParameters};
 use crate::merge::{global_merger, MergePriority, MergeRequest, MergeWaiter};
 use crate::settings::Settings;
 use crate::shards::metadata::ShardMetadata;
-use crate::shards::writer::ShardWriter;
+use crate::shards::writer::{NewVectorsIndex, ShardWriter};
 use crate::telemetry::run_with_telemetry;
 use crate::utils::{get_primary_node_id, list_shards, read_host_key};
 use nucliadb_core::metrics::get_metrics;
@@ -38,7 +38,7 @@ use nucliadb_core::protos::{
     ShardId, ShardIds, VectorSetId, VectorSetList,
 };
 use nucliadb_core::tracing::{self, Span, *};
-use nucliadb_core::Channel;
+use nucliadb_core::{Channel, NodeResult};
 use object_store::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
@@ -280,16 +280,123 @@ impl NodeWriter for NodeWriterGRPCDriver {
         Ok(tonic::Response::new(status))
     }
 
-    async fn add_vector_set(&self, _: Request<NewVectorSetRequest>) -> Result<Response<OpStatus>, Status> {
-        Err(tonic::Status::internal("Coming soon.."))
+    async fn add_vector_set(&self, request: Request<NewVectorSetRequest>) -> Result<Response<OpStatus>, Status> {
+        let span = Span::current();
+
+        let request = request.into_inner();
+        let similarity = request.similarity();
+        let normalize_vectors = request.normalize_vectors;
+        let Some(VectorSetId {
+            shard: Some(ShardId {
+                id: shard_id,
+            }),
+            vectorset,
+        }) = request.id
+        else {
+            return Ok(tonic::Response::new(OpStatus {
+                status: op_status::Status::Error.into(),
+                detail: "Vectorset ID must be provided".to_string(),
+                ..Default::default()
+            }));
+        };
+
+        let shards = Arc::clone(&self.shards);
+        let task = move || {
+            run_with_telemetry(info_span!(parent: &span, "Add a vectorset"), move || {
+                let shard = obtain_shard(shards, shard_id.clone())?;
+                shard.create_vectors_index(NewVectorsIndex {
+                    shard_id,
+                    name: vectorset,
+                    channel: shard.metadata.channel(),
+                    similarity,
+                    normalize_vectors,
+                })
+            })
+        };
+        let result = tokio::task::spawn_blocking(task)
+            .await
+            .map_err(|error| tonic::Status::internal(format!("Blocking task panicked: {error:?}")))?;
+        let status = match result {
+            Ok(()) => OpStatus {
+                status: op_status::Status::Ok.into(),
+                detail: "Vectorset successfully created".to_string(),
+                ..Default::default()
+            },
+            Err(error) => OpStatus {
+                status: op_status::Status::Error.into(),
+                detail: error.to_string(),
+                ..Default::default()
+            },
+        };
+        Ok(tonic::Response::new(status))
     }
 
-    async fn remove_vector_set(&self, _: Request<VectorSetId>) -> Result<Response<OpStatus>, Status> {
-        Err(tonic::Status::internal("Coming soon.."))
+    async fn remove_vector_set(&self, request: Request<VectorSetId>) -> Result<Response<OpStatus>, Status> {
+        let span = Span::current();
+
+        let VectorSetId {
+            shard: Some(ShardId {
+                id: shard_id,
+            }),
+            vectorset,
+        } = request.into_inner()
+        else {
+            return Ok(tonic::Response::new(OpStatus {
+                status: op_status::Status::Error.into(),
+                detail: "Vectorset ID must be provided".to_string(),
+                ..Default::default()
+            }));
+        };
+
+        let shards = Arc::clone(&self.shards);
+        let task = move || {
+            run_with_telemetry(info_span!(parent: &span, "Remove vectorset"), move || {
+                let shard = obtain_shard(shards, shard_id.clone())?;
+                shard.remove_vectors_index(vectorset)
+            })
+        };
+        let result = tokio::task::spawn_blocking(task)
+            .await
+            .map_err(|error| tonic::Status::internal(format!("Blocking task panicked: {error:?}")))?;
+        let status = match result {
+            Ok(()) => OpStatus {
+                status: op_status::Status::Ok.into(),
+                detail: "Vectorset successfully deleted".to_string(),
+                ..Default::default()
+            },
+            Err(error) => OpStatus {
+                status: op_status::Status::Error.into(),
+                detail: error.to_string(),
+                ..Default::default()
+            },
+        };
+        Ok(tonic::Response::new(status))
     }
 
-    async fn list_vector_sets(&self, _: Request<ShardId>) -> Result<Response<VectorSetList>, Status> {
-        Err(tonic::Status::internal("Coming soon.."))
+    async fn list_vector_sets(&self, request: Request<ShardId>) -> Result<Response<VectorSetList>, Status> {
+        let span = Span::current();
+
+        let shard_id = request.into_inner().id;
+        let shard_id_clone = shard_id.clone();
+        let shards = Arc::clone(&self.shards);
+        let task = move || {
+            run_with_telemetry(info_span!(parent: &span, "Remove vectorset"), move || {
+                let shard = obtain_shard(shards, shard_id_clone)?;
+                Ok(shard.list_vectors_indexes())
+            })
+        };
+        let result: NodeResult<Vec<String>> = tokio::task::spawn_blocking(task)
+            .await
+            .map_err(|error| tonic::Status::internal(format!("Blocking task panicked: {error:?}")))?;
+        match result {
+            Ok(vectorsets) => Ok(tonic::Response::new(VectorSetList {
+                shard: Some(ShardId {
+                    id: shard_id,
+                }),
+                vectorsets,
+            })),
+            Err(error) => Err(tonic::Status::internal(error.to_string())),
+        }
     }
 
     async fn get_metadata(&self, _request: Request<EmptyQuery>) -> Result<Response<NodeMetadata>, Status> {

@@ -128,9 +128,7 @@ async def index_resource_to_shard(
     resource_id: str,
     shard: writer_pb2.ShardObject,
 ) -> Optional[noderesources_pb2.Resource]:
-    logger.warning(
-        "Indexing resource", extra={"kbid": kbid, "resource_id": resource_id}
-    )
+    logger.info("Indexing resource", extra={"kbid": kbid, "resource_id": resource_id})
 
     sm = app_context.shard_manager
     partitioning = app_context.partitioning
@@ -161,9 +159,7 @@ async def delete_resource_from_shard(
     resource_id: str,
     shard: writer_pb2.ShardObject,
 ) -> None:
-    logger.warning(
-        "Deleting resource", extra={"kbid": kbid, "resource_id": resource_id}
-    )
+    logger.info("Deleting resource", extra={"kbid": kbid, "resource_id": resource_id})
 
     sm = app_context.shard_manager
     partitioning = app_context.partitioning

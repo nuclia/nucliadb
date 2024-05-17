@@ -771,6 +771,17 @@ class MaxTokens(BaseModel):
     )
 
 
+def parse_max_tokens(
+    max_tokens: Optional[Union[int, MaxTokens]]
+) -> Optional[MaxTokens]:
+    if isinstance(max_tokens, int):
+        # If the max_tokens is an integer, it is interpreted as the max_tokens value for the generated answer.
+        # The max tokens for the context is set to None to use the default value for the model (comes in the
+        # NUA's query endpoint response).
+        return MaxTokens(answer=max_tokens, context=None)
+    return max_tokens
+
+
 class ChatModel(BaseModel):
     """
     This is the model for the predict request payload on the chat endpoint
@@ -1255,7 +1266,7 @@ class KnowledgeboxFindResults(JsonBaseModel):
     )
     autofilters: List[str] = ModelParamDefaults.applied_autofilters.to_pydantic_field()
     min_score: Optional[Union[float, MinScore]] = Field(
-        None,
+        default=MinScore(),
         title="Minimum result score",
         description="The minimum scores that have been used for the search operation.",
     )
@@ -1313,3 +1324,140 @@ def validate_facets(facets):
                 )
         facet = next_facet
     return facets
+
+
+class AskRequest(ChatRequest): ...
+
+
+class AskTokens(BaseModel):
+    input: int = Field(
+        title="Input tokens",
+        description="Number of LLM tokens used for the context in the query",
+    )
+    output: int = Field(
+        title="Output tokens",
+        description="Number of LLM tokens used for the answer",
+    )
+
+
+class AskTimings(BaseModel):
+    generative_first_chunk: Optional[float] = Field(
+        title="Generative first chunk",
+        description="Time the LLM took to generate the first chunk of the answer",
+    )
+    generative_total: Optional[float] = Field(
+        title="Generative total",
+        description="Total time the LLM took to generate the answer",
+    )
+
+
+class SyncAskMetadata(BaseModel):
+    tokens: Optional[AskTokens] = Field(
+        default=None,
+        title="Tokens",
+        description="Number of tokens used in the LLM context and answer",
+    )
+    timings: Optional[AskTimings] = Field(
+        default=None,
+        title="Timings",
+        description="Timings of the generative model",
+    )
+
+
+class SyncAskResponse(BaseModel):
+    answer: str = Field(
+        title="Answer",
+        description="The generative answer to the query",
+    )
+    status: str = Field(
+        title="Status",
+        description="The status of the query execution. It can be 'success', 'error' or 'no_context'",  # noqa
+    )
+    retrieval_results: KnowledgeboxFindResults = Field(
+        title="Retrieval results",
+        description="The retrieval results of the query",
+    )
+    learning_id: str = Field(
+        default="",
+        title="Learning id",
+        description="The id of the learning request. This id can be used to provide feedback on the learning process.",  # noqa
+    )
+    relations: Optional[Relations] = Field(
+        default=None,
+        title="Relations",
+        description="The detected relations of the answer",
+    )
+    citations: dict[str, Any] = Field(
+        default={},
+        title="Citations",
+        description="The citations of the answer. List of references to the resources used to generate the answer.",
+    )
+    prompt_context: Optional[list[str]] = Field(
+        default=None,
+        title="Prompt context",
+        description="The prompt context used to generate the answer. Returned only if the debug flag is set to true",
+    )
+    metadata: Optional[SyncAskMetadata] = Field(
+        default=None,
+        title="Metadata",
+        description="Metadata of the query execution. This includes the number of tokens used in the LLM context and answer, and the timings of the generative model.",  # noqa
+    )
+
+
+class RetrievalAskResponseItem(BaseModel):
+    type: Literal["retrieval"] = "retrieval"
+    results: KnowledgeboxFindResults
+
+
+class AnswerAskResponseItem(BaseModel):
+    type: Literal["answer"] = "answer"
+    text: str
+
+
+class MetadataAskResponseItem(BaseModel):
+    type: Literal["metadata"] = "metadata"
+    tokens: AskTokens
+    timings: AskTimings
+
+
+class CitationsAskResponseItem(BaseModel):
+    type: Literal["citations"] = "citations"
+    citations: dict[str, Any]
+
+
+class StatusAskResponseItem(BaseModel):
+    type: Literal["status"] = "status"
+    code: str
+    status: str
+    details: Optional[str] = None
+
+
+class ErrorAskResponseItem(BaseModel):
+    type: Literal["error"] = "error"
+    error: str
+
+
+class RelationsAskResponseItem(BaseModel):
+    type: Literal["relations"] = "relations"
+    relations: Relations
+
+
+class DebugAskResponseItem(BaseModel):
+    type: Literal["debug"] = "debug"
+    metadata: dict[str, Any]
+
+
+AskResponseItemType = Union[
+    AnswerAskResponseItem,
+    MetadataAskResponseItem,
+    CitationsAskResponseItem,
+    StatusAskResponseItem,
+    ErrorAskResponseItem,
+    RetrievalAskResponseItem,
+    RelationsAskResponseItem,
+    DebugAskResponseItem,
+]
+
+
+class AskResponseItem(BaseModel):
+    item: AskResponseItemType = Field(..., discriminator="type")

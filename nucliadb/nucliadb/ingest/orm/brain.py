@@ -375,6 +375,7 @@ class ResourceBrain:
         sentence_pb.metadata.position.index = paragraph_pb.metadata.position.index
 
     def delete_vectors(self, field_key: str, vo: VectorObject):
+        # TODO: no need to iterate over all vectors, just delete the whole field
         for subfield, vectors in vo.split_vectors.items():
             for vector in vectors.vectors:
                 self.brain.sentences_to_delete.append(
