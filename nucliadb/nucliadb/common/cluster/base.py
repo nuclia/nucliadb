@@ -132,7 +132,7 @@ class AbstractIndexNode(metaclass=ABCMeta):
         resp = await self.writer.AddVectorSet(req)  # type: ignore
         return resp
 
-    async def list_vectorsets(self, shard_id: str) -> noderesources_pb2.VectorSetList:
+    async def list_vectorsets(self, shard_id: str) -> list[str]:
         req = noderesources_pb2.ShardId()
         req.id = shard_id
         resp = await self.writer.ListVectorSets(req)  # type: ignore
