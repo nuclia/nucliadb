@@ -443,16 +443,16 @@ def _inject_signature_and_annotations(
     # Body params
     if request_type is not None:
         if isinstance(request_type, type) and issubclass(request_type, BaseModel):
-            for field in request_type.__fields__.values():
+            for field_name, field in request_type.model_fields.items():
                 parameters.append(
                     inspect.Parameter(
-                        field.name,
+                        field_name,
                         kind=inspect.Parameter.KEYWORD_ONLY,
                         annotation=field.annotation,
                         default=field.default,
                     )
                 )
-                annotations[field.name] = field.annotation  # type: ignore
+                annotations[field_name] = field.annotation  # type: ignore
         parameters.append(
             inspect.Parameter(
                 "content",
@@ -515,11 +515,9 @@ def _inject_docstring(
         params.append(f":type {path_param}: <class 'str'>")
     if request_type is not None:
         if isinstance(request_type, type) and issubclass(request_type, BaseModel):
-            for field in request_type.__fields__.values():
-                params.append(
-                    f":param {field.name}: {field.field_info.description or ''}"
-                )
-                params.append(f":type {field.name}: {field.outer_type_}")
+            for field_name, field in request_type.model_fields.items():
+                params.append(f":param {field_name}: {field.description or ''}")
+                params.append(f":type {field_name}: {field.annotation}")
             params.append(f":param content: the request content model")
             params.append(f":type content: {request_type}")
         elif typing.get_origin(request_type) == list:

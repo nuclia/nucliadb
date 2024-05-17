@@ -102,8 +102,8 @@ class Region(str, enum.Enum):
 class ChatResponse(BaseModel):
     result: KnowledgeboxFindResults
     answer: str
-    relations: Optional[Relations]
-    learning_id: Optional[str]
+    relations: Optional[Relations] = None
+    learning_id: Optional[str] = None
     citations: dict[str, Any] = {}
 
 
@@ -276,7 +276,7 @@ def _request_builder(
                 # pull properties out of kwargs now
                 content_data = {}
                 for key in list(kwargs.keys()):
-                    if key in request_type.__fields__:  # type: ignore
+                    if key in request_type.model_fields:  # type: ignore
                         content_data[key] = kwargs.pop(key)
                 data = request_type.parse_obj(content_data).json(by_alias=True)  # type: ignore
         elif is_raw_request_content(content):

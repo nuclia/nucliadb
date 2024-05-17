@@ -36,14 +36,14 @@ _T = TypeVar("_T")
 
 
 class FieldLink(BaseModel):
-    added: Optional[datetime]
-    headers: Optional[Dict[str, str]]
-    cookies: Optional[Dict[str, str]]
-    uri: Optional[str]
-    language: Optional[str]
-    localstorage: Optional[Dict[str, str]]
-    css_selector: Optional[str]
-    xpath: Optional[str]
+    added: Optional[datetime] = None
+    headers: Optional[Dict[str, str]] = None
+    cookies: Optional[Dict[str, str]] = None
+    uri: Optional[str] = None
+    language: Optional[str] = None
+    localstorage: Optional[Dict[str, str]] = None
+    css_selector: Optional[str] = None
+    xpath: Optional[str] = None
 
     @classmethod
     def from_message(cls: Type[_T], message: resources_pb2.FieldLink) -> _T:

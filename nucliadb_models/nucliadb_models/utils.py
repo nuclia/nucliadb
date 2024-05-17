@@ -18,49 +18,52 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import json
-import re
 
 import pydantic
+from typing_extensions import Annotated
 
 
-class FieldIdString(pydantic.ConstrainedStr):
-    """A string that is used as a field id."""
-
-    regex = re.compile(r"^[a-zA-Z0-9:_-]+$")
-
-    @classmethod
-    def validate(cls, value: str) -> str:
-        try:
-            return super().validate(value)
-        except pydantic.errors.StrRegexError:
-            raise InvalidFieldIdError(value=value)
-
-
-class InvalidFieldIdError(pydantic.errors.PydanticValueError):
-    code = "wrong_field_id"
-    msg_template = (
-        "Invalid field id: '{value}'. Field ids must be a string with only "
-        "letters, numbers, underscores, colons and dashes."
-    )
+def validate_field_id(value, handler, info):
+    try:
+        return handler(value)
+    except pydantic.ValidationError as e:
+        if any(x["type"] == "string_pattern_mismatch" for x in e.errors()):
+            raise ValueError(
+                f"Invalid field_id: '{value}'. Field ID must be a string with only "
+                "letters, numbers, underscores, colons and dashes."
+            )
+        else:
+            raise e
 
 
-class InvalidSlugError(pydantic.errors.PydanticValueError):
-    code = "str.slug"
-    msg_template = (
-        "Invalid slug: '{value}'. Slug must be a string with only "
-        "letters, numbers, underscores, colons and dashes."
-    )
+FieldIdPattern = r"^[a-zA-Z0-9:_-]+$"
 
 
-class SlugString(pydantic.ConstrainedStr):
-    regex = re.compile(r"^[a-zA-Z0-9:_-]+$")
+FieldIdString = Annotated[
+    str,
+    pydantic.StringConstraints(pattern=FieldIdPattern),
+    pydantic.WrapValidator(validate_field_id),
+]
 
-    @classmethod
-    def validate(cls, value: str) -> str:
-        try:
-            return super().validate(value)
-        except pydantic.errors.StrRegexError:
-            raise InvalidSlugError(value=value)
+
+def validate_slug(value, handler, info):
+    try:
+        return handler(value)
+    except pydantic.ValidationError as e:
+        if any(x["type"] == "string_pattern_mismatch" for x in e.errors()):
+            raise ValueError(
+                f"Invalid slug: '{value}'. Slug must be a string with only "
+                "letters, numbers, underscores, colons and dashes."
+            )
+        else:
+            raise e
+
+
+SlugString = Annotated[
+    str,
+    pydantic.StringConstraints(pattern=r"^[a-zA-Z0-9:_-]+$"),
+    pydantic.WrapValidator(validate_slug),
+]
 
 
 def validate_json(value: str):

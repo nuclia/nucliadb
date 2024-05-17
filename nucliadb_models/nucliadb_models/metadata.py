@@ -22,8 +22,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Type, TypeVar
 
 from google.protobuf.json_format import MessageToDict
-from pydantic import BaseModel, Field
-from pydantic.class_validators import root_validator
+from pydantic import BaseModel, Field, model_validator
 
 from nucliadb_models.common import FIELD_TYPES_MAP
 from nucliadb_protos import resources_pb2, utils_pb2
@@ -97,7 +96,8 @@ class RelationEntity(BaseModel):
     type: RelationNodeType
     group: Optional[str] = None
 
-    @root_validator(pre=True)
+    @model_validator(mode="before")
+    @classmethod
     def check_relation_is_valid(cls, values):
         if values["type"] == RelationNodeType.ENTITY.value:
             if "group" not in values:
@@ -108,11 +108,11 @@ class RelationEntity(BaseModel):
 
 
 class RelationMetadata(BaseModel):
-    paragraph_id: Optional[str]
-    source_start: Optional[int]
-    source_end: Optional[int]
-    to_start: Optional[int]
-    to_end: Optional[int]
+    paragraph_id: Optional[str] = None
+    source_start: Optional[int] = None
+    source_end: Optional[int] = None
+    to_start: Optional[int] = None
+    to_end: Optional[int] = None
 
     @classmethod
     def from_message(cls: Type[_T], message: utils_pb2.RelationMetadata) -> _T:
@@ -128,15 +128,12 @@ class RelationMetadata(BaseModel):
 class Relation(BaseModel):
     relation: RelationType
     label: Optional[str] = None
-    metadata: Optional[RelationMetadata]
+    metadata: Optional[RelationMetadata] = None
 
-    from_: Optional[RelationEntity]
+    from_: Optional[RelationEntity] = Field(None, alias="from")
     to: RelationEntity
 
-    class Config:
-        fields = {"from_": "from"}
-
-    @root_validator
+    @model_validator(mode="before")
     def check_relation_is_valid(cls, values):
         if values["relation"] == RelationType.CHILD.value:
             if values["to"].get("type") != RelationNodeType.RESOURCE.value:
@@ -166,8 +163,8 @@ class Relation(BaseModel):
 
 class InputMetadata(BaseModel):
     metadata: Dict[str, str] = {}
-    language: Optional[str]
-    languages: Optional[List[str]]
+    language: Optional[str] = None
+    languages: Optional[List[str]] = None
 
 
 class ResourceProcessingStatus(Enum):
@@ -234,7 +231,7 @@ class ComputedMetadata(BaseModel):
                 FieldClassification(
                     field=FieldID(
                         field=fc.field.field,
-                        field_type=FIELD_TYPES_MAP[fc.field.field_type],  # type: ignore
+                        field_type=FIELD_TYPES_MAP[fc.field.field_type].value,  # type: ignore
                     ),
                     classifications=[
                         Classification(label=c.label, labelset=c.labelset)
@@ -322,25 +319,28 @@ class UserFieldMetadata(BaseModel):
             )
             for selections in message.page_selections
         ]
-        value["field"]["field_type"] = FIELD_TYPES_MAP[value["field"]["field_type"]]
+
+        value["field"]["field_type"] = FIELD_TYPES_MAP[
+            value["field"]["field_type"]
+        ].value
         return cls(**value)
 
 
 class Basic(BaseModel):
-    icon: Optional[str]
-    title: Optional[str]
-    summary: Optional[str]
-    thumbnail: Optional[str]
-    layout: Optional[str]
-    created: Optional[datetime]
-    modified: Optional[datetime]
-    metadata: Optional[Metadata]
-    usermetadata: Optional[UserMetadata]
-    fieldmetadata: Optional[List[UserFieldMetadata]]
-    computedmetadata: Optional[ComputedMetadata]
-    uuid: Optional[str]
-    last_seqid: Optional[int]
-    last_account_seq: Optional[int]
+    icon: Optional[str] = None
+    title: Optional[str] = None
+    summary: Optional[str] = None
+    thumbnail: Optional[str] = None
+    layout: Optional[str] = None
+    created: Optional[datetime] = None
+    modified: Optional[datetime] = None
+    metadata: Optional[Metadata] = None
+    usermetadata: Optional[UserMetadata] = None
+    fieldmetadata: Optional[List[UserFieldMetadata]] = None
+    computedmetadata: Optional[ComputedMetadata] = None
+    uuid: Optional[str] = None
+    last_seqid: Optional[int] = None
+    last_account_seq: Optional[int] = None
 
 
 class InputOrigin(BaseModel):
@@ -398,4 +398,4 @@ class Extra(BaseModel):
 
 
 class Relations(BaseModel):
-    relations: Optional[List[Relation]]
+    relations: Optional[List[Relation]] = None

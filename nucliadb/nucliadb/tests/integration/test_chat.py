@@ -433,8 +433,8 @@ async def test_chat_rag_options_validation(nucliadb_reader):
     assert resp.status_code == 422
     detail = resp.json()["detail"]
     assert (
-        detail[0]["msg"]
-        == "If 'full_resource' strategy is chosen, it must be the only strategy"
+        "If 'full_resource' strategy is chosen, it must be the only strategy"
+        in detail[0]["msg"]
     )
 
     # field_extension requires fields
@@ -445,7 +445,7 @@ async def test_chat_rag_options_validation(nucliadb_reader):
     assert resp.status_code == 422
     detail = resp.json()["detail"]
     detail[0]["loc"][-1] == "fields"
-    assert detail[0]["msg"] == "field required"
+    assert detail[0]["msg"] == "Field required"
 
     # fields must be in the right format: field_type/field_name
     resp = await nucliadb_reader.post(
@@ -460,7 +460,7 @@ async def test_chat_rag_options_validation(nucliadb_reader):
     detail[0]["loc"][-1] == "fields"
     assert (
         detail[0]["msg"]
-        == "Field 'foo/t/text' is not in the format {field_type}/{field_name}"
+        == "Value error, Field 'foo/t/text' is not in the format {field_type}/{field_name}"
     )
 
     # But fields can have leading and trailing slashes and they will be ignored
@@ -484,8 +484,9 @@ async def test_chat_rag_options_validation(nucliadb_reader):
     assert resp.status_code == 422
     detail = resp.json()["detail"]
     detail[0]["loc"][-1] == "fields"
-    assert detail[0]["msg"].startswith(
+    assert (
         "Field 'X/fieldname' does not have a valid field type. Valid field types are"
+        in detail[0]["msg"]
     )
 
 
