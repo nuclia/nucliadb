@@ -320,10 +320,10 @@ impl ShardWriter {
         })
     }
 
-    pub fn create_vectors_index(&self, shard_id: String, name: String, new: VectorConfig) -> NodeResult<()> {
+    pub fn create_vectors_index(&self, name: String, new: VectorConfig) -> NodeResult<()> {
         let mut indexes = ShardIndexes::load(&self.metadata.shard_path())?;
         let path = indexes.add_vectors_index(name.clone())?;
-        let vectors_writer = nucliadb_vectors::service::VectorWriterService::create(&path, shard_id, new)?;
+        let vectors_writer = nucliadb_vectors::service::VectorWriterService::create(&path, self.id, new)?;
         indexes.store()?;
         write_rw_lock(&self.indexes).vectors_indexes.insert(name, Box::new(vectors_writer));
         Ok(())

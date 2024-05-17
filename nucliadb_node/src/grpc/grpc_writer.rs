@@ -322,7 +322,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let task = move || {
             run_with_telemetry(info_span!(parent: &span, "Add a vectorset"), move || {
                 let shard = obtain_shard(shards, shard_id.clone())?;
-                shard.create_vectors_index(shard_id, vectorset, config)
+                shard.create_vectors_index(vectorset, config)
             })
         };
         let result = tokio::task::spawn_blocking(task)
