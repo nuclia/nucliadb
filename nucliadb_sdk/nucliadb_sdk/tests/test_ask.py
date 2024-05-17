@@ -155,3 +155,13 @@ def test_ask_synchronous(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
     )
     assert isinstance(resp, SyncAskResponse)
     sdk.session.headers.pop("X-Synchronous", None)
+
+
+def test_ask_stream(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
+    sdk.session.headers["X-Synchronous"] = "false"
+    resp = sdk.ask(
+        kbid=docs_dataset,
+        query="Nuclia loves Semantic Search",
+    )
+    assert isinstance(resp, SyncAskResponse)
+    sdk.session.headers.pop("X-Synchronous", None)
