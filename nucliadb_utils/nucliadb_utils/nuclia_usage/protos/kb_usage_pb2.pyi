@@ -402,6 +402,7 @@ class KbUsage(google.protobuf.message.Message):
         global___Process
     ]:
         """Data"""
+
     @property
     def predicts(
         self,
