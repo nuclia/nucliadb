@@ -29,14 +29,14 @@ from nucliadb_telemetry.settings import LogFormatType, LogLevel, LogOutputType
 from nucliadb_utils.settings import StorageSettings
 
 
-class StandaloneDiscoveryMode(str, Enum):
+class StandaloneDiscoveryMode(Enum):
     DEFAULT = "default"
     MANUAL = "manual"
     KUBERNETES = "kubernetes"
     SINGLE_NODE = "single_node"
 
 
-class AuthPolicy(str, Enum):
+class AuthPolicy(Enum):
     UPSTREAM_NAIVE = "upstream_naive"
     UPSTREAM_AUTH_HEADER = "upstream_auth_header"
     UPSTREAM_OAUTH2 = "upstream_oauth2"

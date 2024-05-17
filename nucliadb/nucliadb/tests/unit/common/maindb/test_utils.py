@@ -22,6 +22,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from nucliadb.common.maindb.utils import settings, setup_driver
+from nucliadb.ingest.settings import DriverConfig
 from nucliadb_utils.exceptions import ConfigurationError
 from nucliadb_utils.utilities import Utility, clean_utility
 
@@ -37,7 +38,7 @@ def reset_driver_utils():
 async def test_setup_driver_redis():
     mock = AsyncMock(initialized=False)
     with (
-        patch.object(settings, "driver", "redis"),
+        patch.object(settings, "driver", DriverConfig("redis")),
         patch.object(settings, "driver_redis_url", "driver_redis_url"),
         patch("nucliadb.common.maindb.utils.RedisDriver", return_value=mock),
     ):
@@ -49,7 +50,7 @@ async def test_setup_driver_redis():
 async def test_setup_driver_tikv():
     mock = AsyncMock(initialized=False)
     with (
-        patch.object(settings, "driver", "tikv"),
+        patch.object(settings, "driver", DriverConfig("tikv")),
         patch.object(settings, "driver_tikv_url", "driver_tikv_url"),
         patch("nucliadb.common.maindb.utils.TiKVDriver", return_value=mock),
     ):
@@ -61,7 +62,7 @@ async def test_setup_driver_tikv():
 async def test_setup_driver_pg():
     mock = AsyncMock(initialized=False)
     with (
-        patch.object(settings, "driver", "pg"),
+        patch.object(settings, "driver", DriverConfig("pg")),
         patch.object(settings, "driver_pg_url", "driver_pg_url"),
         patch("nucliadb.common.maindb.utils.PGDriver", return_value=mock),
     ):
@@ -73,7 +74,7 @@ async def test_setup_driver_pg():
 async def test_setup_driver_local():
     mock = AsyncMock(initialized=False)
     with (
-        patch.object(settings, "driver", "local"),
+        patch.object(settings, "driver", DriverConfig("local")),
         patch.object(settings, "driver_local_url", "driver_local_url"),
         patch("nucliadb.common.maindb.utils.LocalDriver", return_value=mock),
     ):
@@ -84,7 +85,7 @@ async def test_setup_driver_local():
 @pytest.mark.asyncio
 async def test_setup_driver_error():
     with (
-        patch.object(settings, "driver", "pg"),
+        patch.object(settings, "driver", DriverConfig("pg")),
         patch.object(settings, "driver_pg_url", None),
         pytest.raises(ConfigurationError),
     ):

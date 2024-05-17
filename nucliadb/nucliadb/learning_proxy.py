@@ -48,7 +48,7 @@ WHITELISTED_HEADERS = {
 }
 
 
-class LearningService(str, Enum):
+class LearningService(Enum):
     CONFIG = "config"
     COLLECTOR = "collector-api"
 

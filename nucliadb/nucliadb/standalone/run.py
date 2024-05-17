@@ -23,7 +23,7 @@ import os
 import sys
 from typing import Optional
 
-import pydantic_argparse
+import argdantic
 import uvicorn  # type: ignore
 from fastapi import FastAPI
 
@@ -42,14 +42,17 @@ from nucliadb_utils.settings import nuclia_settings, storage_settings
 logger = logging.getLogger(__name__)
 
 
+parser = argdantic.ArgParser()
+
+
+@parser.command(singleton=True, name="NucliaDB", help="NucliaDB Starting script")
+def setting_parser(settings: Settings) -> Settings:
+    return settings
+
+
 def setup() -> Settings:
     errors.setup_error_handling(versions.get_installed_version("nucliadb"))
-    parser = pydantic_argparse.ArgumentParser(
-        model=Settings,
-        prog="NucliaDB",
-        description="NucliaDB Starting script",
-    )
-    nucliadb_args = parser.parse_typed_args()
+    nucliadb_args = parser()
 
     log_settings = LogSettings(
         # change default settings for standalone
