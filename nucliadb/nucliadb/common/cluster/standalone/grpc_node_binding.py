@@ -317,20 +317,10 @@ class StandaloneWriterWrapper:
         shard_ids.ParseFromString(pb_bytes)
         return shard_ids
 
-    async def RemoveVectorSet(self, request: VectorSetID):
-        loop = asyncio.get_running_loop()
-        resp = await loop.run_in_executor(
-            self.executor, self.writer.del_vectorset, request.SerializeToString()
-        )
-        pb_bytes = bytes(resp)
-        resp = OpStatus()
-        resp.ParseFromString(pb_bytes)
-        return resp
-
     async def AddVectorSet(self, request: VectorSetID):
         loop = asyncio.get_running_loop()
         resp = await loop.run_in_executor(
-            self.executor, self.writer.set_vectorset, request.SerializeToString()
+            self.executor, self.writer.add_vectorset, request.SerializeToString()
         )
         pb_bytes = bytes(resp)
         resp = OpStatus()
@@ -340,10 +330,20 @@ class StandaloneWriterWrapper:
     async def ListVectorSets(self, request: ShardId):
         loop = asyncio.get_running_loop()
         resp = await loop.run_in_executor(
-            self.executor, self.writer.get_vectorset, request.SerializeToString()
+            self.executor, self.writer.list_vectorsets, request.SerializeToString()
         )
         pb_bytes = bytes(resp)
         resp = VectorSetList()
+        resp.ParseFromString(pb_bytes)
+        return resp
+
+    async def RemoveVectorSet(self, request: VectorSetID):
+        loop = asyncio.get_running_loop()
+        resp = await loop.run_in_executor(
+            self.executor, self.writer.remove_vectorset, request.SerializeToString()
+        )
+        pb_bytes = bytes(resp)
+        resp = OpStatus()
         resp.ParseFromString(pb_bytes)
         return resp
 
