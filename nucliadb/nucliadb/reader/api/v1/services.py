@@ -47,7 +47,6 @@ from nucliadb.models.responses import HTTPClientError
 from nucliadb.reader import SERVICE_NAME
 from nucliadb.reader.api.v1.router import KB_PREFIX, api
 from nucliadb.reader.reader.notifications import kb_notifications_stream
-from nucliadb.writer import logger
 from nucliadb_models.entities import (
     EntitiesGroup,
     EntitiesGroupSummary,
@@ -56,7 +55,6 @@ from nucliadb_models.entities import (
 from nucliadb_models.labels import KnowledgeBoxLabels, LabelSet
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.synonyms import KnowledgeBoxSynonyms
-from nucliadb_telemetry import errors
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.utilities import get_ingest, get_storage
 
@@ -220,15 +218,7 @@ async def get_custom_synonyms(request: Request, kbid: str):
     async with datamanagers.with_transaction(read_only=True) as txn:
         if not datamanagers.kb.exists_kb(txn, kbid=kbid):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
-
-        try:
-            synonyms = await datamanagers.synonyms.get(txn, kbid=kbid)
-        except Exception as exc:
-            errors.capture_exception(exc)
-            logger.exception("Errors getting synonyms")
-            raise HTTPException(
-                status_code=500, detail="Error getting synonyms of a Knowledge box"
-            )
+        synonyms = await datamanagers.synonyms.get(txn, kbid=kbid)
 
     if synonyms is None:
         synonyms = Synonyms()

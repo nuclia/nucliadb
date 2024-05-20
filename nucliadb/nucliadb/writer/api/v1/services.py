@@ -39,7 +39,6 @@ from nucliadb.models.responses import (
     HTTPInternalServerError,
     HTTPNotFound,
 )
-from nucliadb.writer import logger
 from nucliadb.writer.api.v1.router import KB_PREFIX, api
 from nucliadb_models.entities import (
     CreateEntitiesGroupPayload,
@@ -48,7 +47,6 @@ from nucliadb_models.entities import (
 from nucliadb_models.labels import LabelSet
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.synonyms import KnowledgeBoxSynonyms
-from nucliadb_telemetry import errors
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.utilities import get_ingest
 
@@ -261,15 +259,9 @@ async def set_custom_synonyms(request: Request, kbid: str, item: KnowledgeBoxSyn
         if not datamanagers.kb.exists_kb(txn, kbid=kbid):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
-        try:
-            await datamanagers.synonyms.set(txn, kbid=kbid, synonyms=synonyms)
-            await txn.commit()
-        except Exception as exc:
-            errors.capture_exception(exc)
-            logger.exception("Errors setting synonyms")
-            raise HTTPException(
-                status_code=500, detail="Error setting synonyms of a Knowledge box"
-            )
+        await datamanagers.synonyms.set(txn, kbid=kbid, synonyms=synonyms)
+        await txn.commit()
+
     return Response(status_code=204)
 
 
@@ -287,13 +279,7 @@ async def delete_custom_synonyms(request: Request, kbid: str):
         if not datamanagers.kb.exists_kb(txn, kbid=kbid):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
-        try:
-            await datamanagers.synonyms.delete(txn, kbid=kbid)
-            await txn.commit()
-        except Exception as exc:
-            errors.capture_exception(exc)
-            logger.exception("Errors deleting synonyms")
-            raise HTTPException(
-                status_code=500, detail="Error deleting synonyms of a Knowledge box"
-            )
+        await datamanagers.synonyms.delete(txn, kbid=kbid)
+        await txn.commit()
+
     return Response(status_code=204)
