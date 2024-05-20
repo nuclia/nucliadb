@@ -17,38 +17,30 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+
 from typing import Optional
 
-from nucliadb_protos.knowledgebox_pb2 import Synonyms as PBSynonyms
-
+from nucliadb.common.datamanagers.utils import get_kv_pb
 from nucliadb.common.maindb.driver import Transaction
+from nucliadb_protos import knowledgebox_pb2
 
 KB_SYNONYMS = "/kbs/{kbid}/synonyms"
 
 
-class Synonyms:
-    def __init__(self, txn: Transaction, kbid: str):
-        self.txn = txn
-        self.kbid = kbid
+async def get_kb_synonyms(
+    txn: Transaction, *, kbid: str
+) -> Optional[knowledgebox_pb2.Synonyms]:
+    key = KB_SYNONYMS.format(kbid=kbid)
+    return await get_kv_pb(txn, key, knowledgebox_pb2.Synonyms)
 
-    @property
-    def key(self) -> str:
-        return KB_SYNONYMS.format(kbid=self.kbid)
 
-    async def set(self, synonyms: PBSynonyms):
-        body = synonyms.SerializeToString()
-        await self.txn.set(self.key, body)
+async def set_kb_synonyms(
+    txn: Transaction, *, kbid: str, synonyms: knowledgebox_pb2.Synonyms
+):
+    key = KB_SYNONYMS.format(kbid=kbid)
+    await txn.set(key, synonyms.SerializeToString())
 
-    async def get(self) -> Optional[PBSynonyms]:
-        try:
-            payload = await self.txn.get(self.key)
-        except KeyError:
-            return None
-        if payload is None:
-            return None
-        body = PBSynonyms()
-        body.ParseFromString(payload)
-        return body
 
-    async def clear(self):
-        await self.txn.delete(self.key)
+async def delete_kb_synonyms(txn: Transaction, *, kbid: str):
+    key = KB_SYNONYMS.format(kbid=kbid)
+    await txn.delete(key)

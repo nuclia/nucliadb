@@ -46,7 +46,6 @@ from nucliadb.ingest.orm.resource import (
     KB_RESOURCE_SLUG_BASE,
     Resource,
 )
-from nucliadb.ingest.orm.synonyms import Synonyms
 from nucliadb.ingest.orm.utils import (
     choose_matryoshka_dimension,
     compute_paragraph_key,
@@ -76,7 +75,6 @@ class KnowledgeBox:
         self.storage = storage
         self.kbid = kbid
         self._config: Optional[KnowledgeBoxConfig] = None
-        self.synonyms = Synonyms(self.txn, self.kbid)
 
     async def get_config(self) -> Optional[KnowledgeBoxConfig]:
         if self._config is None:
@@ -260,15 +258,17 @@ class KnowledgeBox:
         )
 
     async def get_synonyms(self, synonyms: PBSynonyms):
-        pbsyn = await self.synonyms.get()
+        pbsyn = await datamanagers.synonyms.get_kb_synonyms(self.txn, kbid=self.kbid)
         if pbsyn is not None:
             synonyms.CopyFrom(pbsyn)
 
     async def set_synonyms(self, synonyms: PBSynonyms):
-        await self.synonyms.set(synonyms)
+        await datamanagers.synonyms.set_kb_synonyms(
+            self.txn, kbid=self.kbid, synonyms=synonyms
+        )
 
     async def delete_synonyms(self):
-        await self.synonyms.clear()
+        await datamanagers.synonyms.delete_kb_synonyms(self.txn, kbid=self.kbid)
 
     @classmethod
     async def purge(cls, driver: Driver, kbid: str):
