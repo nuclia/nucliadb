@@ -39,6 +39,7 @@ async def test_kb_synonyms(maindb_driver: Driver):
 
     async with maindb_driver.transaction() as txn:
         await datamanagers.synonyms.set(txn, kbid=kbid, synonyms=synonyms)
+        await txn.commit()
 
     async with maindb_driver.transaction(read_only=True) as txn:
         stored = await datamanagers.synonyms.get(txn, kbid=kbid)
@@ -47,6 +48,7 @@ async def test_kb_synonyms(maindb_driver: Driver):
     # Delete and validate
     async with maindb_driver.transaction() as txn:
         await datamanagers.synonyms.delete(txn, kbid=kbid)
+        await txn.commit()
 
     async with maindb_driver.transaction(read_only=True) as txn:
         assert await datamanagers.synonyms.get(txn, kbid=kbid) is None
