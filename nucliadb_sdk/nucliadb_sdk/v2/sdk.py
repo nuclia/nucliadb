@@ -93,7 +93,7 @@ from nucliadb_models.writer import (
 from nucliadb_sdk.v2 import docstrings, exceptions
 
 
-class Region(str, enum.Enum):
+class Region(enum.Enum):
     EUROPE1 = "europe-1"
     ON_PREM = "on-prem"
     AWS_US_EAST_2_1 = "aws-us-east-2-1"
@@ -330,18 +330,18 @@ class _NucliaDBBase:
         timeout: Optional[float] = None,
     ):
         try:
-            self.region = Region(region).value
+            self.region: str = Region(region).value
         except ValueError:
             warnings.warn(
                 f"Unknown region '{region}'. Supported regions are: {[r.value for r in Region]}"
             )
-            self.region = region
+            self.region = region  # type: ignore
         self.api_key = api_key
         headers = headers or {}
-        if self.region == Region.ON_PREM:
+        if self.region == Region.ON_PREM.value:
             if url is None:
                 raise ValueError("url must be provided for on-prem")
-            self.base_url = url.rstrip("/")
+            self.base_url: str = url.rstrip("/")
             # By default, on prem should utilize all headers available
             # For custom auth schemes, the user will need to provide custom
             # auth headers

@@ -231,6 +231,18 @@ async def catalog_get(
         SearchParamDefaults.with_status
     ),
     debug: bool = fastapi_query(SearchParamDefaults.debug),
+    range_creation_start: Optional[datetime] = fastapi_query(
+        SearchParamDefaults.range_creation_start
+    ),
+    range_creation_end: Optional[datetime] = fastapi_query(
+        SearchParamDefaults.range_creation_end
+    ),
+    range_modification_start: Optional[datetime] = fastapi_query(
+        SearchParamDefaults.range_modification_start
+    ),
+    range_modification_end: Optional[datetime] = fastapi_query(
+        SearchParamDefaults.range_modification_end
+    ),
 ) -> Union[KnowledgeboxSearchResults, HTTPClientError]:
     item = CatalogRequest(
         query=query,
@@ -241,6 +253,10 @@ async def catalog_get(
         shards=shards,
         debug=debug,
         with_status=with_status,
+        range_creation_start=range_creation_start,
+        range_creation_end=range_creation_end,
+        range_modification_start=range_modification_start,
+        range_modification_end=range_modification_end,
     )
     if sort_field:
         item.sort = SortOptions(field=sort_field, limit=sort_limit, order=sort_order)
@@ -297,6 +313,10 @@ async def catalog(
             min_score=MinScore(bm25=0, semantic=0),
             fields=["a/title"],
             with_status=item.with_status,
+            range_creation_start=item.range_creation_start,
+            range_creation_end=item.range_creation_end,
+            range_modification_start=item.range_modification_start,
+            range_modification_end=item.range_modification_end,
         )
         pb_query, _, _ = await query_parser.parse()
 

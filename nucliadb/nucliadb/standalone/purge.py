@@ -20,21 +20,22 @@
 # Standalone purge command
 import asyncio
 
-import pydantic_argparse
+import argdantic
 
 from nucliadb.standalone.config import config_nucliadb
 from nucliadb.standalone.settings import Settings
+
+parser = argdantic.ArgParser()
+
+
+@parser.command(singleton=True, name="NucliaDB", help="NucliaDB Starting script")
+def setting(settings: Settings) -> Settings:
+    return settings
 
 
 def purge():
     from nucliadb.purge import main
 
-    parser = pydantic_argparse.ArgumentParser(
-        model=Settings,
-        prog="NucliaDB",
-        description="NucliaDB Starting script",
-    )
-    nucliadb_args = parser.parse_typed_args()
-
+    nucliadb_args = parser()
     config_nucliadb(nucliadb_args)
     asyncio.run(main())

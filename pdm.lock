@@ -9,19 +9,19 @@ content_hash = "sha256:78f3698532569bc54c10fd96a288cf05539c698cdac623ddee1908fe3
 
 [[package]]
 name = "aiobotocore"
-version = "2.12.3"
+version = "2.13.0"
 requires_python = ">=3.8"
 summary = "Async client for aws services using botocore and aiohttp"
 groups = ["dev"]
 dependencies = [
-    "aiohttp<4.0.0,>=3.7.4.post0",
+    "aiohttp<4.0.0,>=3.9.2",
     "aioitertools<1.0.0,>=0.5.1",
-    "botocore<1.34.70,>=1.34.41",
+    "botocore<1.34.107,>=1.34.70",
     "wrapt<2.0.0,>=1.10.10",
 ]
 files = [
-    {file = "aiobotocore-2.12.3-py3-none-any.whl", hash = "sha256:86737685f4625e8f05c4e7a608a07cc97607263279f66cf6b02b640c4eafd324"},
-    {file = "aiobotocore-2.12.3.tar.gz", hash = "sha256:e2a2929207bc5d62eb556106c2224c1fd106d5c65be2eb69f15cc8c34c44c236"},
+    {file = "aiobotocore-2.13.0-py3-none-any.whl", hash = "sha256:f812afc678d71b0038fd1ce712ff111ab7f47bab81ce5b4c7d222d4b83bc0cb2"},
+    {file = "aiobotocore-2.13.0.tar.gz", hash = "sha256:4badf5cab6ad400216319d14278e2c99ad9b708e28a0f231605a412e632de401"},
 ]
 
 [[package]]
@@ -196,6 +196,20 @@ files = [
 ]
 
 [[package]]
+name = "argdantic"
+version = "1.1.0"
+summary = "Typed command line interfaces with argparse and pydantic"
+groups = ["dev"]
+dependencies = [
+    "pydantic-settings<3,>=2.0.0",
+    "pydantic<3.0,>=2.3.0",
+]
+files = [
+    {file = "argdantic-1.1.0-py2.py3-none-any.whl", hash = "sha256:0ddabe399bf9577fcd73c02aa484c0b66be95b1d1d53ed536c7738b5fe5c3726"},
+    {file = "argdantic-1.1.0.tar.gz", hash = "sha256:6778204f926cb7d23aa1eaedf34d374a4d137977c8699843d7e1d2684df571ed"},
+]
+
+[[package]]
 name = "asgiref"
 version = "3.8.1"
 requires_python = ">=3.8"
@@ -338,19 +352,8 @@ files = [
 ]
 
 [[package]]
-name = "boltons"
-version = "24.0.0"
-requires_python = ">=3.7"
-summary = "When they're not builtins, they're boltons."
-groups = ["dev"]
-files = [
-    {file = "boltons-24.0.0-py3-none-any.whl", hash = "sha256:9618695a6ec4f50412e7072e5d78910a00b4111d0b9b549e4a3d60bc321e7807"},
-    {file = "boltons-24.0.0.tar.gz", hash = "sha256:7153feccaea1ff2e1472f68d4b57fadb796a2ee49d29f638f1c9cd8fb5ebd916"},
-]
-
-[[package]]
 name = "botocore"
-version = "1.34.69"
+version = "1.34.106"
 requires_python = ">=3.8"
 summary = "Low-level, data-driven core of boto 3."
 groups = ["dev"]
@@ -361,8 +364,8 @@ dependencies = [
     "urllib3<1.27,>=1.25.4; python_version < \"3.10\"",
 ]
 files = [
-    {file = "botocore-1.34.69-py3-none-any.whl", hash = "sha256:d3802d076d4d507bf506f9845a6970ce43adc3d819dd57c2791f5c19ed6e5950"},
-    {file = "botocore-1.34.69.tar.gz", hash = "sha256:d1ab2bff3c2fd51719c2021d9fa2f30fbb9ed0a308f69e9a774ac92c8091380a"},
+    {file = "botocore-1.34.106-py3-none-any.whl", hash = "sha256:4baf0e27c2dfc4f4d0dee7c217c716e0782f9b30e8e1fff983fce237d88f73ae"},
+    {file = "botocore-1.34.106.tar.gz", hash = "sha256:921fa5202f88c3e58fdcb4b3acffd56d65b24bca47092ee4b27aa988556c0be6"},
 ]
 
 [[package]]
@@ -755,15 +758,6 @@ files = [
 ]
 
 [[package]]
-name = "ed25519"
-version = "1.5"
-summary = "Ed25519 public-key signatures"
-groups = ["dev"]
-files = [
-    {file = "ed25519-1.5.tar.gz", hash = "sha256:02053ee019ceef0df97294be2d4d5a8fc120fc86e81e08bec1245fc0f9403358"},
-]
-
-[[package]]
 name = "email-validator"
 version = "2.1.1"
 requires_python = ">=3.8"
@@ -959,13 +953,13 @@ files = [
 
 [[package]]
 name = "fsspec"
-version = "2024.3.1"
+version = "2024.5.0"
 requires_python = ">=3.8"
 summary = "File-system specification"
 groups = ["dev"]
 files = [
-    {file = "fsspec-2024.3.1-py3-none-any.whl", hash = "sha256:918d18d41bf73f0e2b261824baeb1b124bcf771767e3a26425cd7dec3332f512"},
-    {file = "fsspec-2024.3.1.tar.gz", hash = "sha256:f39780e282d7d117ffb42bb96992f8a90795e4d0fb0f661a70ca39fe9c43ded9"},
+    {file = "fsspec-2024.5.0-py3-none-any.whl", hash = "sha256:e0fdbc446d67e182f49a70b82cf7889028a63588fde6b222521f10937b2b670c"},
+    {file = "fsspec-2024.5.0.tar.gz", hash = "sha256:1d021b0b0f933e3b3029ed808eb400c08ba101ca2de4b3483fbc9ca23fcee94a"},
 ]
 
 [[package]]
@@ -2104,15 +2098,12 @@ files = [
 
 [[package]]
 name = "nkeys"
-version = "0.1.0"
-requires_python = ">=3.6.0"
+version = "0.2.0"
+requires_python = ">=3.6"
 summary = "A public-key signature system based on Ed25519 for the NATS ecosystem."
 groups = ["dev"]
-dependencies = [
-    "ed25519",
-]
 files = [
-    {file = "nkeys-0.1.0.tar.gz", hash = "sha256:93482ab08ff9625882b988c3ea58fd1a6ef0061b60f95946742cc1394578760a"},
+    {file = "nkeys-0.2.0.tar.gz", hash = "sha256:e7d12a31b3126b4620589ea2013aa2889497cb5c4bd8e806ceb39816f7cc1bb7"},
 ]
 
 [[package]]
@@ -2131,7 +2122,7 @@ files = [
 
 [[package]]
 name = "nucliadb"
-version = "3.1.0"
+version = "4.0.0"
 requires_python = ">=3.9, <4"
 editable = true
 path = "./nucliadb"
@@ -2142,6 +2133,7 @@ dependencies = [
     "aiodns>=3.0.0",
     "aiofiles>=0.8.0",
     "aiohttp>=3.9.4",
+    "argdantic",
     "asgiref>=3.3.2",
     "async-lru>=2.0.4",
     "async-timeout>=4.0.3",
@@ -2180,7 +2172,6 @@ dependencies = [
     "orjson>=3.6.7",
     "protobuf>=4.22.3",
     "psutil>=5.9.7",
-    "pydantic-argparse @ https://codeload.github.com/cody-mar10/pydantic-argparse/zip/4a79a48aa393a8b8947229d40f297fbad5802ac1",
     "pydantic-settings>=2.2",
     "pydantic>=2.7",
     "pyjwt>=2.4.0",
@@ -2208,7 +2199,7 @@ files = [
 
 [[package]]
 name = "nucliadb-models"
-version = "3.1.0"
+version = "4.0.0"
 requires_python = ">=3.9, <4"
 editable = true
 path = "./nucliadb_models"
@@ -2221,7 +2212,7 @@ dependencies = [
 
 [[package]]
 name = "nucliadb-node"
-version = "3.1.0"
+version = "4.0.0"
 requires_python = ">=3.9, <4"
 editable = true
 path = "./nucliadb_node"
@@ -2252,7 +2243,7 @@ groups = ["dev"]
 
 [[package]]
 name = "nucliadb-protos"
-version = "3.1.0"
+version = "4.0.0"
 editable = true
 path = "./nucliadb_protos/python"
 summary = "protos for nucliadb"
@@ -2267,7 +2258,7 @@ dependencies = [
 
 [[package]]
 name = "nucliadb-telemetry"
-version = "3.1.0"
+version = "4.0.0"
 requires_python = ">=3.9"
 editable = true
 path = "./nucliadb_telemetry"
@@ -2283,12 +2274,13 @@ dependencies = [
 
 [[package]]
 name = "nucliadb-telemetry"
-version = "3.1.0"
+version = "4.0.0"
 extras = ["all"]
 requires_python = ">=3.9"
 summary = "NucliaDB Telemetry Library Python process"
 groups = ["dev"]
 dependencies = [
+    "PyNaCl",
     "fastapi",
     "grpcio-channelz<1.63.0,>=1.44.0",
     "grpcio-health-checking<1.63.0,>=1.44.0",
@@ -2298,7 +2290,7 @@ dependencies = [
     "grpcio-tools<1.63.0,>=1.44.0",
     "grpcio<1.63.0,>=1.44.0",
     "nats-py[nkeys]>=2.5.0",
-    "nucliadb-telemetry==3.1.0",
+    "nucliadb-telemetry==4.0.0",
     "opentelemetry-api==1.21.0",
     "opentelemetry-exporter-jaeger==1.21.0",
     "opentelemetry-instrumentation-aiohttp-client>=0.42b0",
@@ -2312,13 +2304,14 @@ dependencies = [
 
 [[package]]
 name = "nucliadb-utils"
-version = "3.1.0"
+version = "4.0.0"
 requires_python = ">=3.9, <4"
 editable = true
 path = "./nucliadb_utils"
 summary = ""
 groups = ["dev"]
 dependencies = [
+    "PyNaCl",
     "aiohttp>=3.9.4",
     "memorylru>=1.1.2",
     "mmh3>=3.0.0",
@@ -2335,7 +2328,7 @@ dependencies = [
 
 [[package]]
 name = "nucliadb-utils"
-version = "3.1.0"
+version = "4.0.0"
 extras = ["cache", "fastapi", "storages"]
 requires_python = ">=3.9, <4"
 summary = ""
@@ -2348,7 +2341,7 @@ dependencies = [
     "google-api-python-client>=2.37.0",
     "google-auth>=2.4.1",
     "lru-dict>=1.1.7",
-    "nucliadb-utils==3.1.0",
+    "nucliadb-utils==4.0.0",
     "oauth2client>=4.1.3",
     "orjson>=3.6.7",
     "redis>=4.3.4",
@@ -2927,21 +2920,6 @@ files = [
 ]
 
 [[package]]
-name = "pydantic-argparse"
-version = "1.0.0"
-requires_python = "<4.0,>=3.7"
-url = "https://codeload.github.com/cody-mar10/pydantic-argparse/zip/4a79a48aa393a8b8947229d40f297fbad5802ac1"
-summary = "Typed Argument Parsing with Pydantic"
-groups = ["dev"]
-dependencies = [
-    "boltons",
-    "pydantic<3,>=2",
-]
-files = [
-    {file = "4a79a48aa393a8b8947229d40f297fbad5802ac1", hash = "sha256:bb55a8e16e01cafd384b73dde96523406369dcaec0f27f46bd21e0794cc2df00"},
-]
-
-[[package]]
 name = "pydantic-core"
 version = "2.18.2"
 requires_python = ">=3.8"
@@ -3066,6 +3044,28 @@ groups = ["dev"]
 files = [
     {file = "PyJWT-2.8.0-py3-none-any.whl", hash = "sha256:59127c392cc44c2da5bb3192169a91f429924e17aff6534d70fdc02ab3e04320"},
     {file = "PyJWT-2.8.0.tar.gz", hash = "sha256:57e28d156e3d5c10088e0c68abb90bfac3df82b40a71bd0daa20c65ccd5c23de"},
+]
+
+[[package]]
+name = "pynacl"
+version = "1.5.0"
+requires_python = ">=3.6"
+summary = "Python binding to the Networking and Cryptography (NaCl) library"
+groups = ["dev"]
+dependencies = [
+    "cffi>=1.4.1",
+]
+files = [
+    {file = "PyNaCl-1.5.0-cp36-abi3-macosx_10_10_universal2.whl", hash = "sha256:401002a4aaa07c9414132aaed7f6836ff98f59277a234704ff66878c2ee4a0d1"},
+    {file = "PyNaCl-1.5.0-cp36-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.manylinux_2_24_aarch64.whl", hash = "sha256:52cb72a79269189d4e0dc537556f4740f7f0a9ec41c1322598799b0bdad4ef92"},
+    {file = "PyNaCl-1.5.0-cp36-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:a36d4a9dda1f19ce6e03c9a784a2921a4b726b02e1c736600ca9c22029474394"},
+    {file = "PyNaCl-1.5.0-cp36-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.manylinux_2_24_x86_64.whl", hash = "sha256:0c84947a22519e013607c9be43706dd42513f9e6ae5d39d3613ca1e142fba44d"},
+    {file = "PyNaCl-1.5.0-cp36-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:06b8f6fa7f5de8d5d2f7573fe8c863c051225a27b61e6860fd047b1775807858"},
+    {file = "PyNaCl-1.5.0-cp36-abi3-musllinux_1_1_aarch64.whl", hash = "sha256:a422368fc821589c228f4c49438a368831cb5bbc0eab5ebe1d7fac9dded6567b"},
+    {file = "PyNaCl-1.5.0-cp36-abi3-musllinux_1_1_x86_64.whl", hash = "sha256:61f642bf2378713e2c2e1de73444a3778e5f0a38be6fee0fe532fe30060282ff"},
+    {file = "PyNaCl-1.5.0-cp36-abi3-win32.whl", hash = "sha256:e46dae94e34b085175f8abb3b0aaa7da40767865ac82c928eeb9e57e1ea8a543"},
+    {file = "PyNaCl-1.5.0-cp36-abi3-win_amd64.whl", hash = "sha256:20f42270d27e1b6a29f54032090b972d97f0a1b0948cc52392041ef7831fee93"},
+    {file = "PyNaCl-1.5.0.tar.gz", hash = "sha256:8ac7448f09ab85811607bdd21ec2464495ac8b7c66d146bf545b0f08fb9220ba"},
 ]
 
 [[package]]
@@ -3509,18 +3509,18 @@ files = [
 
 [[package]]
 name = "s3fs"
-version = "2024.3.1"
-requires_python = ">= 3.8"
+version = "2024.5.0"
+requires_python = ">=3.8"
 summary = "Convenient Filesystem interface over S3"
 groups = ["dev"]
 dependencies = [
     "aiobotocore<3.0.0,>=2.5.4",
     "aiohttp!=4.0.0a0,!=4.0.0a1",
-    "fsspec==2024.3.1",
+    "fsspec==2024.5.0.*",
 ]
 files = [
-    {file = "s3fs-2024.3.1-py3-none-any.whl", hash = "sha256:f4566a5446c473740d272ec08e0b4aae8db1aa05f662c42ff0aa2c89bb5060ea"},
-    {file = "s3fs-2024.3.1.tar.gz", hash = "sha256:1b8bc8dbd65e7b60f5487378f6eeffe1de59aa72caa9efca6dad6ab877405487"},
+    {file = "s3fs-2024.5.0-py3-none-any.whl", hash = "sha256:edccd9cc9f33a344a090e54b71e9f507e5b2d79369353b0e101237b20a720bc6"},
+    {file = "s3fs-2024.5.0.tar.gz", hash = "sha256:b03471ae0d066b275b7dd0b0383cc5a93538ef40b2f6e730ce447bce849c1e32"},
 ]
 
 [[package]]
@@ -3785,13 +3785,13 @@ files = [
 
 [[package]]
 name = "types-setuptools"
-version = "69.5.0.20240513"
+version = "69.5.0.20240519"
 requires_python = ">=3.8"
 summary = "Typing stubs for setuptools"
 groups = ["dev"]
 files = [
-    {file = "types-setuptools-69.5.0.20240513.tar.gz", hash = "sha256:3a8ccea3e3f1f639856a1dd622be282f74e94e00fdc364630240f999cc9594fc"},
-    {file = "types_setuptools-69.5.0.20240513-py3-none-any.whl", hash = "sha256:bd3964c08cffd5a057d9cabe61641c86a41a1b5dd2b652b8d371eed64d89d726"},
+    {file = "types-setuptools-69.5.0.20240519.tar.gz", hash = "sha256:275fb72048b0203d3fbef268298ea78a0913cd114a74872d93f8638ccc5b7c63"},
+    {file = "types_setuptools-69.5.0.20240519-py3-none-any.whl", hash = "sha256:52b264eff8913b5d85848d83bd98efea935fc6129d681d370eb957783880b720"},
 ]
 
 [[package]]

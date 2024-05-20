@@ -34,7 +34,7 @@ from pydantic import BaseModel
 
 from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.standalone.settings import Settings
-from nucliadb_telemetry.settings import LogSettings
+from nucliadb_telemetry.settings import LogOutputType, LogSettings
 
 MB = 1024 * 1024
 CHUNK_SIZE = 2 * MB
@@ -86,7 +86,7 @@ async def stream_tar(app: FastAPI) -> AsyncGenerator[bytes, None]:
             await add_cluster_info(temp_dir, tar)
             settings: Settings = app.settings.copy()  # type: ignore
             await add_settings(temp_dir, tar, settings)
-            if settings.log_output_type == "file":
+            if settings.log_output_type == LogOutputType.FILE:
                 await add_logs(tar)
 
         async for chunk in stream_out_tar(tar_file):
