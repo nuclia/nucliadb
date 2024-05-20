@@ -21,6 +21,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use nucliadb_core::protos::ReleaseChannel;
 use nucliadb_core::tantivy_replica::TantivyReplicaState;
 use nucliadb_core::tracing::{debug, error, info, warn};
 use nucliadb_core::{node_error, IndexFiles, NodeResult, RawReplicaState};
@@ -33,7 +34,6 @@ use tonic::Response;
 use crate::cache::ShardWriterCache;
 use crate::replication::NodeRole;
 use crate::settings::Settings;
-use crate::shards::metadata::Similarity;
 use crate::shards::writer::ShardWriter;
 use crate::utils::{get_primary_node_id, list_shards, read_host_key};
 
@@ -222,15 +222,12 @@ impl replication::replication_service_server::ReplicationService for Replication
                     .map(|s| s.generation_id != gen_id)
                     .unwrap_or(true);
                 if shard_changed_or_not_present {
-                    let similarity: Similarity = metadata.similarity().into();
-
                     resp_shard_states.push(replication::PrimaryShardReplicationState {
                         shard_id,
                         generation_id: gen_id,
                         kbid: metadata.kbid(),
-                        similarity: similarity.to_string(),
-                        normalize_vectors: metadata.normalize_vectors(),
-                        release_channel: metadata.channel().into(),
+                        release_channel: ReleaseChannel::from(metadata.channel()).into(),
+                        ..Default::default()
                     });
                 }
             } else {

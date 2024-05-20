@@ -133,7 +133,20 @@ pub mod garbage_collector_response {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct VectorIndexConfig {
+    #[prost(enumeration = "super::utils::VectorSimilarity", tag = "1")]
+    pub similarity: i32,
+    #[prost(bool, tag = "2")]
+    pub normalize_vectors: bool,
+    #[prost(enumeration = "VectorType", tag = "3")]
+    pub vector_type: i32,
+    #[prost(uint32, optional, tag = "4")]
+    pub vector_dimension: ::core::option::Option<u32>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NewShardRequest {
+    #[deprecated]
     #[prost(enumeration = "super::utils::VectorSimilarity", tag = "1")]
     pub similarity: i32,
     #[prost(string, tag = "2")]
@@ -141,19 +154,25 @@ pub struct NewShardRequest {
     #[prost(enumeration = "super::utils::ReleaseChannel", tag = "3")]
     pub release_channel: i32,
     /// indicates whether the shard should normalize vectors on indexing or not
+    #[deprecated]
     #[prost(bool, tag = "4")]
     pub normalize_vectors: bool,
+    #[prost(message, optional, tag = "5")]
+    pub config: ::core::option::Option<VectorIndexConfig>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NewVectorSetRequest {
     #[prost(message, optional, tag = "1")]
     pub id: ::core::option::Option<super::noderesources::VectorSetId>,
+    #[deprecated]
     #[prost(enumeration = "super::utils::VectorSimilarity", tag = "2")]
     pub similarity: i32,
-    /// indicates whether the shard should normalize vectors on indexing or not
+    #[deprecated]
     #[prost(bool, tag = "3")]
     pub normalize_vectors: bool,
+    #[prost(message, optional, tag = "4")]
+    pub config: ::core::option::Option<VectorIndexConfig>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -249,6 +268,29 @@ impl IndexMessageSource {
         match value {
             "PROCESSOR" => Some(Self::Processor),
             "WRITER" => Some(Self::Writer),
+            _ => None,
+        }
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+#[repr(i32)]
+pub enum VectorType {
+    DenseF32 = 0,
+}
+impl VectorType {
+    /// String value of the enum field names used in the ProtoBuf definition.
+    ///
+    /// The values are not transformed in any way and thus are considered stable
+    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
+    pub fn as_str_name(&self) -> &'static str {
+        match self {
+            VectorType::DenseF32 => "DENSE_F32",
+        }
+    }
+    /// Creates an enum from field names used in the ProtoBuf definition.
+    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+        match value {
+            "DENSE_F32" => Some(Self::DenseF32),
             _ => None,
         }
     }

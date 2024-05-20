@@ -25,13 +25,11 @@ pub mod writer;
 pub mod replication;
 mod state;
 
-use crate::data_point::Similarity;
+use crate::config::VectorConfig;
 use crate::data_types::dtrie_ram::DTrie;
 use crate::data_types::DeleteLog;
 use crate::formula::Formula;
 use crate::VectorR;
-use nucliadb_core::Channel;
-use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Write};
 use std::path::Path;
@@ -64,22 +62,14 @@ impl<'a> DeleteLog for TimeSensitiveDLog<'a> {
     }
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
-pub struct IndexMetadata {
-    #[serde(default)]
-    pub similarity: Similarity,
-    #[serde(default)]
-    pub channel: Channel,
-    #[serde(default)]
-    pub normalize_vectors: bool,
-}
+struct IndexMetadata;
 impl IndexMetadata {
-    pub fn write(&self, path: &Path) -> VectorR<()> {
+    pub fn write(config: &VectorConfig, path: &Path) -> VectorR<()> {
         let mut writer = BufWriter::new(File::create(path.join(METADATA))?);
-        serde_json::to_writer(&mut writer, self)?;
+        serde_json::to_writer(&mut writer, config)?;
         Ok(writer.flush()?)
     }
-    pub fn open(path: &Path) -> VectorR<Option<IndexMetadata>> {
+    pub fn open(path: &Path) -> VectorR<Option<VectorConfig>> {
         let path = &path.join(METADATA);
         if !path.is_file() {
             return Ok(None);

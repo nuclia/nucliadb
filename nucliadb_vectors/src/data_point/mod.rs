@@ -27,6 +27,7 @@ mod params;
 #[cfg(test)]
 mod tests;
 
+use crate::config::Similarity;
 use crate::data_types::{data_store, trie, trie_ram, vector, DeleteLog};
 use crate::formula::Formula;
 use crate::VectorR;
@@ -367,13 +368,6 @@ impl DeleteLog for NoDLog {
     fn is_deleted(&self, _: &[u8]) -> bool {
         false
     }
-}
-
-#[derive(Default, Debug, Clone, Copy, Serialize, Deserialize)]
-pub enum Similarity {
-    Dot,
-    #[default]
-    Cosine,
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug)]

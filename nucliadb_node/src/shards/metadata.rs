@@ -74,8 +74,6 @@ pub struct ShardMetadataFile {
     pub kbid: String,
     pub id: String,
     pub channel: Channel,
-    pub similarity: Similarity,
-    pub normalize_vectors: Option<bool>,
 }
 
 #[derive(Default, Debug)]
@@ -84,10 +82,6 @@ pub struct ShardMetadata {
     id: String,
     kbid: String,
     channel: Channel,
-
-    // redundant configuration
-    similarity: Similarity,
-    normalize_vectors: bool,
 
     // A generation id is a way to track if a shard has changed.
     // A new id means that something in the shard has changed.
@@ -108,29 +102,18 @@ impl ShardMetadata {
         Ok(ShardMetadata {
             shard_path,
             kbid: metadata.kbid,
-            similarity: metadata.similarity,
             id: metadata.id,
             channel: metadata.channel,
-            normalize_vectors: metadata.normalize_vectors.unwrap_or(false),
             generation_id: RwLock::new(None),
         })
     }
 
-    pub fn new(
-        shard_path: PathBuf,
-        id: String,
-        kbid: String,
-        similarity: Similarity,
-        channel: Channel,
-        normalize_vectors: bool,
-    ) -> ShardMetadata {
+    pub fn new(shard_path: PathBuf, id: String, kbid: String, channel: Channel) -> ShardMetadata {
         ShardMetadata {
             shard_path,
             kbid,
-            similarity,
             id,
             channel,
-            normalize_vectors,
             generation_id: RwLock::new(None),
         }
     }
@@ -149,10 +132,8 @@ impl ShardMetadata {
             &mut writer,
             &ShardMetadataFile {
                 kbid: self.kbid.clone(),
-                similarity: self.similarity,
                 id: self.id.clone(),
                 channel: self.channel,
-                normalize_vectors: Some(self.normalize_vectors),
             },
         )?;
         writer.flush()?;
@@ -172,16 +153,8 @@ impl ShardMetadata {
         self.kbid.clone()
     }
 
-    pub fn similarity(&self) -> protos::VectorSimilarity {
-        self.similarity.into()
-    }
-
     pub fn channel(&self) -> Channel {
         self.channel
-    }
-
-    pub fn normalize_vectors(&self) -> bool {
-        self.normalize_vectors
     }
 
     pub fn id(&self) -> String {
@@ -274,21 +247,13 @@ mod test {
     #[test]
     fn create() {
         let dir = TempDir::new().unwrap();
-        let meta = ShardMetadata::new(
-            dir.path().to_path_buf(),
-            "ID".to_string(),
-            "KB".to_string(),
-            Similarity::Cosine,
-            Channel::EXPERIMENTAL,
-            false,
-        );
+        let meta =
+            ShardMetadata::new(dir.path().to_path_buf(), "ID".to_string(), "KB".to_string(), Channel::EXPERIMENTAL);
         meta.serialize_metadata().unwrap();
         let meta_disk = ShardMetadata::open(dir.path().to_path_buf()).unwrap();
         assert_eq!(meta.kbid, meta_disk.kbid);
-        assert_eq!(meta.similarity, meta_disk.similarity);
         assert_eq!(meta.id, meta_disk.id);
         assert_eq!(meta.channel, meta_disk.channel);
-        assert_eq!(meta.normalize_vectors, meta_disk.normalize_vectors);
     }
 
     #[test]
@@ -316,14 +281,8 @@ mod test {
     #[test]
     fn test_cache_generation_id() {
         let dir = TempDir::new().unwrap();
-        let meta = ShardMetadata::new(
-            dir.path().to_path_buf(),
-            "ID".to_string(),
-            "KB".to_string(),
-            Similarity::Cosine,
-            Channel::EXPERIMENTAL,
-            false,
-        );
+        let meta =
+            ShardMetadata::new(dir.path().to_path_buf(), "ID".to_string(), "KB".to_string(), Channel::EXPERIMENTAL);
         let gen_id = meta.get_generation_id();
         assert_eq!(gen_id, meta.get_generation_id());
         // assert!(meta.generation_id.read().unwrap().is_none());

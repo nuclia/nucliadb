@@ -1,7 +1,10 @@
 use std::collections::BTreeMap;
 
 use nucliadb_core::NodeResult;
-use nucliadb_vectors::data_point::{create, DataPointPin, Elem, NoDLog, SearchParams, Similarity};
+use nucliadb_vectors::{
+    config::Similarity,
+    data_point::{create, DataPointPin, Elem, NoDLog, SearchParams},
+};
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use tempfile::tempdir;
 

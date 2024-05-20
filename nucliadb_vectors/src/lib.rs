@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+pub mod config;
 pub mod data_point;
 pub mod data_point_provider;
 mod data_types;
@@ -56,6 +57,8 @@ pub enum VectorErr {
     FromUtf8Error(#[from] std::string::FromUtf8Error),
     #[error("Some of the merged segments were not found")]
     MissingMergedSegments,
+    #[error("Invalid configuration: {0}")]
+    InvalidConfiguration(&'static str),
 }
 
 pub type VectorR<O> = Result<O, VectorErr>;

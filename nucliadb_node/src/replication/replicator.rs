@@ -24,9 +24,10 @@ use std::sync::Arc;
 use futures::Future;
 use nucliadb_core::metrics::replication as replication_metrics;
 use nucliadb_core::tracing::{debug, error, info, warn};
-use nucliadb_core::{metrics, Channel, Error, NodeResult};
+use nucliadb_core::{metrics, Error, NodeResult};
 use nucliadb_protos::prelude::EmptyQuery;
 use nucliadb_protos::replication;
+use nucliadb_vectors::config::VectorConfig;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Semaphore;
 use tokio::time::Duration; // Import the Future trait
@@ -266,14 +267,15 @@ pub async fn connect_to_primary_and_replicate(
                     shards_path.join(shard_id.clone()),
                     shard_state.shard_id.clone(),
                     shard_state.kbid.clone(),
-                    shard_state.similarity.clone().into(),
-                    Channel::from(shard_state.release_channel),
-                    shard_state.normalize_vectors,
+                    shard_state.release_channel().into(),
                 );
                 let shard_cache_clone = Arc::clone(&shard_cache);
 
                 info!("Creating shard to replicate: {shard_id}");
-                let shard_create = tokio::task::spawn_blocking(move || shard_cache_clone.create(metadata)).await?;
+                // Create the default vectorset with a default config, it will get overwritten on first sync
+                let shard_create =
+                    tokio::task::spawn_blocking(move || shard_cache_clone.create(metadata, VectorConfig::default()))
+                        .await?;
                 if shard_create.is_err() {
                     warn!("Failed to create shard: {:?}", shard_create);
                     continue;
