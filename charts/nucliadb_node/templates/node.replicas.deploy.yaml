@@ -5,12 +5,12 @@
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: node-replicas-{{ $i }}
+  name: node-replica-{{ $i }}
   labels:
-    app: node-replicas
+    app: node-replica
     appType: node
     readReplica: "true"
-    app.kubernetes.io/name: node-replicas-{{ $i }}
+    app.kubernetes.io/name: node-replica-{{ $i }}
     app.kubernetes.io/instance: "{{ $release.Name }}"
     app.kubernetes.io/managed-by: {{ $release.Service }}
     version: "{{ $chart.Version | replace "+" "_" }}"
@@ -22,8 +22,8 @@ spec:
   revisionHistoryLimit: {{ $values.revisionHistoryLimit }}
   selector:
     matchLabels:
-      app: node-replicas
-      app.kubernetes.io/name: node-replicas-{{ $i }}
+      app: node-replica
+      app.kubernetes.io/name: node-replica-{{ $i }}
       app.kubernetes.io/instance: "{{ $release.Name }}"
       app.kubernetes.io/managed-by: {{ $release.Service }}
   template:
@@ -34,12 +34,12 @@ spec:
         {{- if hasKey $values "extra_pod_annotations" }}
 {{ toYaml $values.extra_pod_annotations | indent 8 }}
         {{- end }}
-      name: node-replicas-{{ $i }}
+      name: node-replica-{{ $i }}
       labels:
-        app: node-replicas
+        app: node-replica
         appType: node
         readReplica: "true"
-        app.kubernetes.io/name: node-replicas-{{ $i }}
+        app.kubernetes.io/name: node-replica-{{ $i }}
         app.kubernetes.io/instance: "{{ $release.Name }}"
         app.kubernetes.io/managed-by: {{ $release.Service }}
         version: "{{ $chart.Version | replace "+" "_" }}"
