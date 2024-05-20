@@ -174,15 +174,6 @@ class Resource:
         new_key = KB_RESOURCE_SLUG.format(kbid=self.kb.kbid, slug=basic.slug)
         await self.txn.set(new_key, self.uuid.encode())
 
-    @staticmethod
-    def parse_basic(payload: bytes) -> PBBasic:
-        pb = PBBasic()
-        if payload is None:
-            return None
-
-        pb.ParseFromString(payload)
-        return pb
-
     async def exists(self) -> bool:
         exists = True
         if self.basic is None:
