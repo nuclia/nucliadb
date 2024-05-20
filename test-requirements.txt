@@ -18,3 +18,6 @@ aioresponses==0.7.5
 asyncpg>=0.27.0
 # required for pytest-docker-fixtures
 psycopg2-binary
+
+# docker api (required by pytest-docker-fixtures) has problems with requests 2.32
+requests<2.32
