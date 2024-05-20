@@ -39,7 +39,10 @@ KB_SHARDS_LOCK = "shards-kb-{kbid}"
 MIGRATIONS_LOCK = "migration"
 
 
-class ResourceLocked(Exception): ...
+class ResourceLocked(Exception):
+    def __init__(self, key: str):
+        self.key = key
+        super().__init__(f"{key} is locked")
 
 
 @dataclass
@@ -59,7 +62,8 @@ class _Lock:
         expire_timeout: float,
         refresh_timeout: float,
     ):
-        self.key = "/distributed/locks/" + key
+        self.user_key = key
+        self.key = "/distributed/locks/" + self.user_key
         self.lock_timeout = lock_timeout
         self.expire_timeout = expire_timeout
         self.refresh_timeout = refresh_timeout
@@ -86,7 +90,7 @@ class _Lock:
                         if time.time() > start + self.lock_timeout:
                             # if current time > start time + lock timeout
                             # we've waited too long, raise exception that, we can't get the lock
-                            raise ResourceLocked()
+                            raise ResourceLocked(key=self.user_key)
             except ConflictError:
                 # if we get a conflict error, retry
                 pass
