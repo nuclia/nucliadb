@@ -34,16 +34,25 @@ from nucliadb_utils.utilities import get_storage
 
 from .utils import with_transaction
 
-KB_RESOURCE_SHARD = "/kbs/{kbid}/r/{uuid}/shard"
-KB_RESOURCE_ALL_FIELDS = "/kbs/{kbid}/r/{uuid}/allfields"
 KB_RESOURCE_BASIC = "/kbs/{kbid}/r/{uuid}"
 KB_RESOURCE_BASIC_FS = "/kbs/{kbid}/r/{uuid}/basic"  # Only used on FS driver
+KB_RESOURCE_ORIGIN = "/kbs/{kbid}/r/{uuid}/origin"
+KB_RESOURCE_EXTRA = "/kbs/{kbid}/r/{uuid}/extra"
+KB_RESOURCE_SECURITY = "/kbs/{kbid}/r/{uuid}/security"
+KB_RESOURCE_RELATIONS = "/kbs/{kbid}/r/{uuid}/relations"
+
+KB_RESOURCE_SHARD = "/kbs/{kbid}/r/{uuid}/shard"
+
+KB_RESOURCE_ALL_FIELDS = "/kbs/{kbid}/r/{uuid}/allfields"
 KB_MATERIALIZED_RESOURCES_COUNT = "/kbs/{kbid}/materialized/resources/count"
 
 
 async def resource_exists(txn: Transaction, *, kbid: str, rid: str) -> bool:
     basic = await get_basic_raw(txn, kbid=kbid, rid=rid)
     return basic is not None
+
+
+# Basic
 
 
 async def get_basic(
@@ -78,6 +87,77 @@ async def set_basic(
             KB_RESOURCE_BASIC.format(kbid=kbid, uuid=rid),
             basic.SerializeToString(),
         )
+
+
+# Origin
+
+
+async def get_origin(
+    txn: Transaction, *, kbid: str, rid: str
+) -> Optional[resources_pb2.Origin]:
+    key = KB_RESOURCE_ORIGIN.format(kbid=kbid, rid=rid)
+    return await get_kv_pb(txn, key, resources_pb2.Origin)
+
+
+async def set_origin(
+    txn: Transaction, *, kbid: str, rid: str, origin: resources_pb2.Origin
+):
+    key = KB_RESOURCE_ORIGIN.format(kbid=kbid, rid=rid)
+    await txn.set(key, origin.SerializeToString())
+
+
+# Extra
+
+
+async def get_extra(
+    txn: Transaction, *, kbid: str, rid: str
+) -> Optional[resources_pb2.Extra]:
+    key = KB_RESOURCE_EXTRA.format(kbid=kbid, rid=rid)
+    return await get_kv_pb(txn, key, resources_pb2.Extra)
+
+
+async def set_extra(
+    txn: Transaction, *, kbid: str, rid: str, extra: resources_pb2.Extra
+):
+    key = KB_RESOURCE_EXTRA.format(kbid=kbid, rid=rid)
+    await txn.set(key, extra.SerializeToString())
+
+
+# Security
+
+
+async def get_security(
+    txn: Transaction, *, kbid: str, rid: str
+) -> Optional[resources_pb2.Security]:
+    key = KB_RESOURCE_SECURITY.format(kbid=kbid, rid=rid)
+    return await get_kv_pb(txn, key, resources_pb2.Security)
+
+
+async def set_security(
+    txn: Transaction, *, kbid: str, rid: str, security: resources_pb2.Security
+):
+    key = KB_RESOURCE_SECURITY.format(kbid=kbid, rid=rid)
+    await txn.set(key, security.SerializeToString())
+
+
+# Relations
+
+
+async def get_relations(
+    txn: Transaction, *, kbid: str, rid: str
+) -> Optional[resources_pb2.Relations]:
+    key = KB_RESOURCE_RELATIONS.format(kbid=kbid, rid=rid)
+    return await get_kv_pb(txn, key, resources_pb2.Relations)
+
+
+async def set_relations(
+    txn: Transaction, *, kbid: str, rid: str, relations: resources_pb2.Relations
+):
+    key = KB_RESOURCE_RELATIONS.format(kbid=kbid, rid=rid)
+    await txn.set(key, relations.SerializeToString())
+
+
+# other functions
 
 
 async def iterate_resource_ids(*, kbid: str) -> AsyncGenerator[str, None]:

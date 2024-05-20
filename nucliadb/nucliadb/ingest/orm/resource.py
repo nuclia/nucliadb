@@ -85,10 +85,6 @@ if TYPE_CHECKING:  # pragma: no cover
 
 logger = logging.getLogger(__name__)
 
-KB_RESOURCE_ORIGIN = "/kbs/{kbid}/r/{uuid}/origin"
-KB_RESOURCE_EXTRA = "/kbs/{kbid}/r/{uuid}/extra"
-KB_RESOURCE_SECURITY = "/kbs/{kbid}/r/{uuid}/security"
-KB_RESOURCE_RELATIONS = "/kbs/{kbid}/r/{uuid}/relations"
 KB_RESOURCE_FIELDS = "/kbs/{kbid}/r/{uuid}/f/"
 KB_RESOURCE_SLUG_BASE = "/kbs/{kbid}/s/"
 KB_RESOURCE_SLUG = f"{KB_RESOURCE_SLUG_BASE}{{slug}}"
@@ -268,21 +264,15 @@ class Resource:
     # Origin
     async def get_origin(self) -> Optional[PBOrigin]:
         if self.origin is None:
-            pb = PBOrigin()
-            payload = await self.txn.get(
-                KB_RESOURCE_ORIGIN.format(kbid=self.kb.kbid, uuid=self.uuid)
+            origin = await datamanagers.resources.get_origin(
+                self.txn, kbid=self.kb.kbid, rid=self.uuid
             )
-            if payload is None:
-                return None
-
-            pb.ParseFromString(payload)
-            self.origin = pb
+            self.origin = origin
         return self.origin
 
     async def set_origin(self, payload: PBOrigin):
-        await self.txn.set(
-            KB_RESOURCE_ORIGIN.format(kbid=self.kb.kbid, uuid=self.uuid),
-            payload.SerializeToString(),
+        await datamanagers.resources.set_origin(
+            self.txn, kbid=self.kb.kbid, rid=self.uuid, origin=payload
         )
         self.modified = True
         self.origin = payload
@@ -290,21 +280,15 @@ class Resource:
     # Extra
     async def get_extra(self) -> Optional[PBExtra]:
         if self.extra is None:
-            pb = PBExtra()
-            payload = await self.txn.get(
-                KB_RESOURCE_EXTRA.format(kbid=self.kb.kbid, uuid=self.uuid)
+            extra = await datamanagers.resources.get_extra(
+                self.txn, kbid=self.kb.kbid, rid=self.uuid
             )
-            if payload is None:
-                return None
-            pb.ParseFromString(payload)
-            self.extra = pb
+            self.extra = extra
         return self.extra
 
     async def set_extra(self, payload: PBExtra):
-        key = KB_RESOURCE_EXTRA.format(kbid=self.kb.kbid, uuid=self.uuid)
-        await self.txn.set(
-            key,
-            payload.SerializeToString(),
+        await datamanagers.resources.set_extra(
+            self.txn, kbid=self.kb.kbid, rid=self.uuid, extra=payload
         )
         self.modified = True
         self.extra = payload
@@ -312,20 +296,15 @@ class Resource:
     # Security
     async def get_security(self) -> Optional[utils_pb2.Security]:
         if self.security is None:
-            pb = utils_pb2.Security()
-            key = KB_RESOURCE_SECURITY.format(kbid=self.kb.kbid, uuid=self.uuid)
-            payload = await self.txn.get(key)
-            if payload is None:
-                return None
-            pb.ParseFromString(payload)
-            self.security = pb
+            security = await datamanagers.resources.get_security(
+                self.txn, kbid=self.kb.kbid, rid=self.uuid
+            )
+            self.security = security
         return self.security
 
     async def set_security(self, payload: utils_pb2.Security) -> None:
-        key = KB_RESOURCE_SECURITY.format(kbid=self.kb.kbid, uuid=self.uuid)
-        await self.txn.set(
-            key,
-            payload.SerializeToString(),
+        await datamanagers.resources.set_security(
+            self.txn, kbid=self.kb.kbid, rid=self.uuid, security=payload
         )
         self.modified = True
         self.security = payload
@@ -333,23 +312,18 @@ class Resource:
     # Relations
     async def get_relations(self) -> Optional[PBRelations]:
         if self.relations is None:
-            pb = PBRelations()
-            payload = await self.txn.get(
-                KB_RESOURCE_RELATIONS.format(kbid=self.kb.kbid, uuid=self.uuid)
+            relations = await datamanagers.resources.get_relations(
+                self.txn, kbid=self.kb.kbid, rid=self.uuid
             )
-            if payload is None:
-                return None
-            pb.ParseFromString(payload)
-            self.relations = pb
+            self.relations = relations
         return self.relations
 
     async def set_relations(self, payload: list[PBRelation]):
         relations = PBRelations()
         for relation in payload:
             relations.relations.append(relation)
-        await self.txn.set(
-            KB_RESOURCE_RELATIONS.format(kbid=self.kb.kbid, uuid=self.uuid),
-            relations.SerializeToString(),
+        await datamanagers.resources.set_relations(
+            self.txn, kbid=self.kb.kbid, rid=self.uuid, relations=relations
         )
         self.modified = True
         self.relations = relations
