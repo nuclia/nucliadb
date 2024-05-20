@@ -23,7 +23,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::collect_garbage::{garbage_collection_loop, GCParameters};
-use crate::errors::{IndexNodeException, LoadShardError};
+use crate::errors::{op_status_error, IndexNodeException, LoadShardError};
 use crate::RawProtos;
 use nucliadb_core::merge::MergerError;
 use nucliadb_core::protos::*;
@@ -33,7 +33,6 @@ use nucliadb_node::analytics::payload::AnalyticsEvent;
 use nucliadb_node::cache::ShardWriterCache;
 use nucliadb_node::settings::load_settings;
 use nucliadb_node::shards::metadata::ShardMetadata;
-use nucliadb_node::shards::shard_writer::NewVectorsIndex;
 use nucliadb_node::shards::writer::ShardWriter;
 use nucliadb_node::{lifecycle, VectorConfig};
 use prost::Message;
@@ -209,8 +208,6 @@ impl NodeWriter {
     pub fn add_vectorset<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         let request = NewVectorSetRequest::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
 
-        let similarity = request.similarity();
-        let normalize_vectors = request.normalize_vectors;
         let Some(VectorSetId {
             shard: Some(ShardId {
                 id: shard_id,
@@ -218,25 +215,16 @@ impl NodeWriter {
             vectorset,
         }) = request.id
         else {
-            return Ok(PyList::new(
-                py,
-                OpStatus {
-                    status: op_status::Status::Error.into(),
-                    detail: "Vectorset ID must be provided".to_string(),
-                    ..Default::default()
-                }
-                .encode_to_vec(),
-            ));
+            return Ok(op_status_error(py, "Vectorset ID must be provided"));
+        };
+        let config = match request.config.map(VectorConfig::try_from) {
+            Some(Ok(config)) => config,
+            Some(Err(error)) => return Ok(op_status_error(py, error.to_string())),
+            None => return Ok(op_status_error(py, "Vector index config must be provided")),
         };
 
         let shard = self.obtain_shard(shard_id.clone())?;
-        let result = shard.create_vectors_index(NewVectorsIndex {
-            shard_id,
-            name: vectorset,
-            channel: shard.metadata.channel(),
-            similarity,
-            normalize_vectors,
-        });
+        let result = shard.create_vectors_index(vectorset, config);
 
         let status = match result {
             Ok(()) => OpStatus {
