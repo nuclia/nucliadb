@@ -524,7 +524,9 @@ class Processor:
         message_audit.kbid = message.kbid
         message_audit.uuid = message.uuid
         message_audit.message_source = message.source
-        message_audit.field_metadata.extend([fcmw.field for fcmw in message.field_metadata])
+        message_audit.field_metadata.extend(
+            [fcmw.field for fcmw in message.field_metadata]
+        )
         audit_fields = await collect_audit_fields(self.driver, self.storage, message)
         message_audit.audit_fields.extend(audit_fields)
         return message_audit
