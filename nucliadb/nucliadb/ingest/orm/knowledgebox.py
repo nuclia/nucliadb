@@ -258,17 +258,15 @@ class KnowledgeBox:
         )
 
     async def get_synonyms(self, synonyms: PBSynonyms):
-        pbsyn = await datamanagers.synonyms.get_kb_synonyms(self.txn, kbid=self.kbid)
+        pbsyn = await datamanagers.synonyms.get(self.txn, kbid=self.kbid)
         if pbsyn is not None:
             synonyms.CopyFrom(pbsyn)
 
     async def set_synonyms(self, synonyms: PBSynonyms):
-        await datamanagers.synonyms.set_kb_synonyms(
-            self.txn, kbid=self.kbid, synonyms=synonyms
-        )
+        await datamanagers.synonyms.set(self.txn, kbid=self.kbid, synonyms=synonyms)
 
     async def delete_synonyms(self):
-        await datamanagers.synonyms.delete_kb_synonyms(self.txn, kbid=self.kbid)
+        await datamanagers.synonyms.delete(self.txn, kbid=self.kbid)
 
     @classmethod
     async def purge(cls, driver: Driver, kbid: str):

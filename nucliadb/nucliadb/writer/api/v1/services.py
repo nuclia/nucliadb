@@ -262,9 +262,7 @@ async def set_custom_synonyms(request: Request, kbid: str, item: KnowledgeBoxSyn
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
         try:
-            await datamanagers.synonyms.set_kb_synonyms(
-                txn, kbid=kbid, synonyms=synonyms
-            )
+            await datamanagers.synonyms.set(txn, kbid=kbid, synonyms=synonyms)
             await txn.commit()
         except Exception as exc:
             errors.capture_exception(exc)
@@ -290,7 +288,7 @@ async def delete_custom_synonyms(request: Request, kbid: str):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
         try:
-            await datamanagers.synonyms.delete_kb_synonyms(txn, kbid=kbid)
+            await datamanagers.synonyms.delete(txn, kbid=kbid)
             await txn.commit()
         except Exception as exc:
             errors.capture_exception(exc)

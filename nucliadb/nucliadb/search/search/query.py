@@ -706,7 +706,7 @@ PROCESSING_STATUS_TO_PB_MAP = {
 @query_parse_dependency_observer.wrap({"type": "synonyms"})
 async def get_kb_synonyms(kbid: str) -> Optional[knowledgebox_pb2.Synonyms]:
     txn = await get_read_only_transaction()
-    return await datamanagers.synonyms.get_kb_synonyms(txn, kbid=kbid)
+    return await datamanagers.synonyms.get(txn, kbid=kbid)
 
 
 @query_parse_dependency_observer.wrap({"type": "entities_meta_cache"})

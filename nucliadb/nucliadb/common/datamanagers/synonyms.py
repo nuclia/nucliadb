@@ -27,20 +27,16 @@ from nucliadb_protos import knowledgebox_pb2
 KB_SYNONYMS = "/kbs/{kbid}/synonyms"
 
 
-async def get_kb_synonyms(
-    txn: Transaction, *, kbid: str
-) -> Optional[knowledgebox_pb2.Synonyms]:
+async def get(txn: Transaction, *, kbid: str) -> Optional[knowledgebox_pb2.Synonyms]:
     key = KB_SYNONYMS.format(kbid=kbid)
     return await get_kv_pb(txn, key, knowledgebox_pb2.Synonyms)
 
 
-async def set_kb_synonyms(
-    txn: Transaction, *, kbid: str, synonyms: knowledgebox_pb2.Synonyms
-):
+async def set(txn: Transaction, *, kbid: str, synonyms: knowledgebox_pb2.Synonyms):
     key = KB_SYNONYMS.format(kbid=kbid)
     await txn.set(key, synonyms.SerializeToString())
 
 
-async def delete_kb_synonyms(txn: Transaction, *, kbid: str):
+async def delete(txn: Transaction, *, kbid: str):
     key = KB_SYNONYMS.format(kbid=kbid)
     await txn.delete(key)

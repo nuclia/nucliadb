@@ -222,7 +222,7 @@ async def get_custom_synonyms(request: Request, kbid: str):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
         try:
-            synonyms = await datamanagers.synonyms.get_kb_synonyms(txn, kbid=kbid)
+            synonyms = await datamanagers.synonyms.get(txn, kbid=kbid)
         except Exception as exc:
             errors.capture_exception(exc)
             logger.exception("Errors getting synonyms")
