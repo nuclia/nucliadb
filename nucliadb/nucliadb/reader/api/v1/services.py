@@ -24,7 +24,7 @@ from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 from fastapi_versioning import version  # type: ignore
 from google.protobuf.json_format import MessageToDict
-from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxID
+from nucliadb_protos.knowledgebox_pb2 import Synonyms
 from nucliadb_protos.writer_pb2 import (
     GetEntitiesGroupRequest,
     GetEntitiesGroupResponse,
@@ -32,10 +32,8 @@ from nucliadb_protos.writer_pb2 import (
     GetLabelSetResponse,
     GetLabelsRequest,
     GetLabelsResponse,
-    GetSynonymsResponse,
     ListEntitiesGroupsRequest,
     ListEntitiesGroupsResponse,
-    OpStatusWriter,
 )
 from starlette.requests import Request
 
@@ -49,6 +47,7 @@ from nucliadb.models.responses import HTTPClientError
 from nucliadb.reader import SERVICE_NAME
 from nucliadb.reader.api.v1.router import KB_PREFIX, api
 from nucliadb.reader.reader.notifications import kb_notifications_stream
+from nucliadb.writer import logger
 from nucliadb_models.entities import (
     EntitiesGroup,
     EntitiesGroupSummary,
@@ -57,6 +56,7 @@ from nucliadb_models.entities import (
 from nucliadb_models.labels import KnowledgeBoxLabels, LabelSet
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.synonyms import KnowledgeBoxSynonyms
+from nucliadb_telemetry import errors
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.utilities import get_ingest, get_storage
 
@@ -217,17 +217,23 @@ async def get_labelset(request: Request, kbid: str, labelset: str) -> LabelSet:
 @requires(NucliaDBRoles.READER)
 @version(1)
 async def get_custom_synonyms(request: Request, kbid: str):
-    ingest = get_ingest()
-    pbrequest = KnowledgeBoxID(uuid=kbid)
-    pbresponse: GetSynonymsResponse = await ingest.GetSynonyms(pbrequest)  # type: ignore
-    if pbresponse.status.status == OpStatusWriter.Status.OK:
-        return KnowledgeBoxSynonyms.from_message(pbresponse.synonyms)
-    elif pbresponse.status.status == OpStatusWriter.Status.NOTFOUND:
-        raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
-    elif pbresponse.status.status == OpStatusWriter.Status.ERROR:
-        raise HTTPException(
-            status_code=500, detail="Error getting synonyms of a Knowledge box"
-        )
+    async with datamanagers.with_transaction(read_only=True) as txn:
+        if not datamanagers.kb.exists_kb(txn, kbid=kbid):
+            raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
+
+        try:
+            synonyms = await datamanagers.synonyms.get_kb_synonyms(txn, kbid=kbid)
+        except Exception as exc:
+            errors.capture_exception(exc)
+            logger.exception("Errors getting synonyms")
+            raise HTTPException(
+                status_code=500, detail="Error getting synonyms of a Knowledge box"
+            )
+
+    if synonyms is None:
+        synonyms = Synonyms()
+
+    return KnowledgeBoxSynonyms.from_message(synonyms)
 
 
 @api.get(
