@@ -100,21 +100,6 @@ class WriterStub(object):
                 request_serializer=nucliadb__protos_dot_writer__pb2.DelEntitiesRequest.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
                 )
-        self.GetSynonyms = channel.unary_unary(
-                '/fdbwriter.Writer/GetSynonyms',
-                request_serializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxID.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_writer__pb2.GetSynonymsResponse.FromString,
-                )
-        self.SetSynonyms = channel.unary_unary(
-                '/fdbwriter.Writer/SetSynonyms',
-                request_serializer=nucliadb__protos_dot_writer__pb2.SetSynonymsRequest.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
-                )
-        self.DelSynonyms = channel.unary_unary(
-                '/fdbwriter.Writer/DelSynonyms',
-                request_serializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxID.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
-                )
         self.Status = channel.unary_unary(
                 '/fdbwriter.Writer/Status',
                 request_serializer=nucliadb__protos_dot_writer__pb2.WriterStatusRequest.SerializeToString,
@@ -254,25 +239,6 @@ class WriterServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def GetSynonyms(self, request, context):
-        """Synonyms
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def SetSynonyms(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def DelSynonyms(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
     def Status(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -395,21 +361,6 @@ def add_WriterServicer_to_server(servicer, server):
             'DelEntities': grpc.unary_unary_rpc_method_handler(
                     servicer.DelEntities,
                     request_deserializer=nucliadb__protos_dot_writer__pb2.DelEntitiesRequest.FromString,
-                    response_serializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.SerializeToString,
-            ),
-            'GetSynonyms': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetSynonyms,
-                    request_deserializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxID.FromString,
-                    response_serializer=nucliadb__protos_dot_writer__pb2.GetSynonymsResponse.SerializeToString,
-            ),
-            'SetSynonyms': grpc.unary_unary_rpc_method_handler(
-                    servicer.SetSynonyms,
-                    request_deserializer=nucliadb__protos_dot_writer__pb2.SetSynonymsRequest.FromString,
-                    response_serializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.SerializeToString,
-            ),
-            'DelSynonyms': grpc.unary_unary_rpc_method_handler(
-                    servicer.DelSynonyms,
-                    request_deserializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxID.FromString,
                     response_serializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.SerializeToString,
             ),
             'Status': grpc.unary_unary_rpc_method_handler(
@@ -737,57 +688,6 @@ class Writer(object):
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/DelEntities',
             nucliadb__protos_dot_writer__pb2.DelEntitiesRequest.SerializeToString,
-            nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def GetSynonyms(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/GetSynonyms',
-            nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxID.SerializeToString,
-            nucliadb__protos_dot_writer__pb2.GetSynonymsResponse.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def SetSynonyms(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/SetSynonyms',
-            nucliadb__protos_dot_writer__pb2.SetSynonymsRequest.SerializeToString,
-            nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def DelSynonyms(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/DelSynonyms',
-            nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxID.SerializeToString,
             nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

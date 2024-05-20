@@ -249,22 +249,6 @@ class WriterStub:
         nucliadb_protos.writer_pb2.OpStatusWriter,
     ]
 
-    GetSynonyms: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
-        nucliadb_protos.writer_pb2.GetSynonymsResponse,
-    ]
-    """Synonyms"""
-
-    SetSynonyms: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.SetSynonymsRequest,
-        nucliadb_protos.writer_pb2.OpStatusWriter,
-    ]
-
-    DelSynonyms: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
-        nucliadb_protos.writer_pb2.OpStatusWriter,
-    ]
-
     Status: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.WriterStatusRequest,
         nucliadb_protos.writer_pb2.WriterStatusResponse,
@@ -380,22 +364,6 @@ class WriterAsyncStub:
 
     DelEntities: grpc.aio.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.DelEntitiesRequest,
-        nucliadb_protos.writer_pb2.OpStatusWriter,
-    ]
-
-    GetSynonyms: grpc.aio.UnaryUnaryMultiCallable[
-        nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
-        nucliadb_protos.writer_pb2.GetSynonymsResponse,
-    ]
-    """Synonyms"""
-
-    SetSynonyms: grpc.aio.UnaryUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.SetSynonymsRequest,
-        nucliadb_protos.writer_pb2.OpStatusWriter,
-    ]
-
-    DelSynonyms: grpc.aio.UnaryUnaryMultiCallable[
-        nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
         nucliadb_protos.writer_pb2.OpStatusWriter,
     ]
 
@@ -548,28 +516,6 @@ class WriterServicer(metaclass=abc.ABCMeta):
     def DelEntities(
         self,
         request: nucliadb_protos.writer_pb2.DelEntitiesRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[nucliadb_protos.writer_pb2.OpStatusWriter, collections.abc.Awaitable[nucliadb_protos.writer_pb2.OpStatusWriter]]: ...
-
-    @abc.abstractmethod
-    def GetSynonyms(
-        self,
-        request: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
-        context: _ServicerContext,
-    ) -> typing.Union[nucliadb_protos.writer_pb2.GetSynonymsResponse, collections.abc.Awaitable[nucliadb_protos.writer_pb2.GetSynonymsResponse]]:
-        """Synonyms"""
-
-    @abc.abstractmethod
-    def SetSynonyms(
-        self,
-        request: nucliadb_protos.writer_pb2.SetSynonymsRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[nucliadb_protos.writer_pb2.OpStatusWriter, collections.abc.Awaitable[nucliadb_protos.writer_pb2.OpStatusWriter]]: ...
-
-    @abc.abstractmethod
-    def DelSynonyms(
-        self,
-        request: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
         context: _ServicerContext,
     ) -> typing.Union[nucliadb_protos.writer_pb2.OpStatusWriter, collections.abc.Awaitable[nucliadb_protos.writer_pb2.OpStatusWriter]]: ...
 
