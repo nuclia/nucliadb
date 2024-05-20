@@ -37,6 +37,7 @@ from nucliadb.ingest.orm.exceptions import (
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb.ingest.orm.processor import sequence_manager
+from nucliadb.ingest.orm.processor.auditing import collect_audit_fields
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos import (
     knowledgebox_pb2,
@@ -515,6 +516,21 @@ class Processor:
             deleted_fields=message.delete_fields,  # type: ignore
         )
 
+    async def get_extended_audit_data(
+        self, message: writer_pb2.BrokerMessage
+    ) -> writer_pb2.Audit:
+        message_audit = writer_pb2.Audit()
+        message_audit.CopyFrom(message.audit)
+        message_audit.kbid = message.kbid
+        message_audit.uuid = message.uuid
+        message_audit.message_source = message.source
+        message_audit.field_metadata.extend(
+            [fcmw.field for fcmw in message.field_metadata]
+        )
+        audit_fields = await collect_audit_fields(self.driver, self.storage, message)
+        message_audit.audit_fields.extend(audit_fields)
+        return message_audit
+
     async def notify_commit(
         self,
         *,
@@ -524,6 +540,7 @@ class Processor:
         message: writer_pb2.BrokerMessage,
         write_type: writer_pb2.Notification.WriteType.ValueType,
     ):
+        message_audit = await self.get_extended_audit_data(message)
         notification = writer_pb2.Notification(
             partition=int(partition),
             seqid=seqid,
@@ -533,10 +550,8 @@ class Processor:
             action=writer_pb2.Notification.Action.COMMIT,
             write_type=write_type,
             source=MESSAGE_TO_NOTIFICATION_SOURCE[message.source],
-            # including the message here again might feel a bit unusual but allows
-            # us to react to these notifications with the original payload
-            message=message,
             processing_errors=len(message.errors) > 0,
+            message_audit=message_audit,
         )
 
         await self.notify(

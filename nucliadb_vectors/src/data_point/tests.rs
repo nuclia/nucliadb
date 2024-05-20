@@ -21,7 +21,8 @@
 use std::collections::HashSet;
 use std::time::{Instant, SystemTime};
 
-use crate::data_point::{self, DataPointPin, DeleteLog, Elem, LabelDictionary, SearchParams, Similarity};
+use crate::config::Similarity;
+use crate::data_point::{self, DataPointPin, DeleteLog, Elem, LabelDictionary, SearchParams};
 use crate::formula::{AtomClause, Formula};
 use crate::VectorR;
 

@@ -17,6 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use crate::config::VectorConfig;
 use crate::data_point::{self, DataPointPin, Elem, LabelDictionary};
 use crate::data_point_provider::garbage_collector;
 use crate::data_point_provider::writer::Writer;
@@ -113,7 +114,7 @@ impl VectorWriter for VectorWriterService {
         let temporal_mark = SystemTime::now();
         let mut lengths: HashMap<usize, Vec<_>> = HashMap::new();
         let mut elems = Vec::new();
-        let normalize_vectors = self.index.metadata().normalize_vectors;
+        let normalize_vectors = self.index.config().normalize_vectors;
         for (field_id, field_paragraphs) in resource.fields() {
             for paragraph in field_paragraphs {
                 let mut inner_labels = paragraph.labels.clone();
@@ -148,7 +149,7 @@ impl VectorWriter for VectorWriterService {
         if !elems.is_empty() {
             let location = self.index.location();
             let time = Some(temporal_mark);
-            let similarity = self.index.metadata().similarity;
+            let similarity = self.index.config().similarity;
             let data_point_pin = DataPointPin::create_pin(location)?;
             data_point::create(&data_point_pin, elems, time, similarity)?;
             self.index.add_data_point(data_point_pin)?;
@@ -214,18 +215,12 @@ impl VectorWriterService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn create(config: VectorConfig) -> NodeResult<Self> {
-        let path = std::path::Path::new(&config.path);
+    pub fn create(path: &Path, shard_id: String, config: VectorConfig) -> NodeResult<Self> {
         if path.exists() {
             Err(node_error!("Shard does exist".to_string()))
         } else {
-            let index_metadata = IndexMetadata {
-                similarity: config.similarity.into(),
-                channel: config.channel,
-                normalize_vectors: config.normalize_vectors,
-            };
             Ok(VectorWriterService {
-                index: Writer::new(path, index_metadata, config.shard_id)?,
+                index: Writer::new(path, config, shard_id)?,
                 path: path.to_path_buf(),
             })
         }
@@ -248,11 +243,12 @@ impl VectorWriterService {
 mod tests {
     use nucliadb_core::protos::resource::ResourceStatus;
     use nucliadb_core::protos::{
-        IndexParagraph, IndexParagraphs, Resource, ResourceId, VectorSentence, VectorSimilarity, VectorsetSentences,
+        IndexParagraph, IndexParagraphs, Resource, ResourceId, VectorSentence, VectorsetSentences,
     };
-    use nucliadb_core::Channel;
     use std::collections::HashMap;
     use tempfile::TempDir;
+
+    use crate::config::{Similarity, VectorType};
 
     use super::*;
 
@@ -260,11 +256,11 @@ mod tests {
     fn test_new_vector_writer() {
         let dir = TempDir::new().unwrap();
         let vsc = VectorConfig {
-            similarity: VectorSimilarity::Cosine,
-            path: dir.path().join("vectors"),
-            channel: Channel::EXPERIMENTAL,
-            shard_id: "abc".into(),
+            similarity: Similarity::Cosine,
             normalize_vectors: false,
+            vector_type: VectorType::DenseF32 {
+                dimension: 3,
+            },
         };
         let raw_sentences = [
             ("DOC/KEY/1/1".to_string(), vec![1.0, 3.0, 4.0]),
@@ -320,7 +316,7 @@ mod tests {
             ..Default::default()
         };
         // insert - delete - insert sequence
-        let mut writer = VectorWriterService::create(vsc).unwrap();
+        let mut writer = VectorWriterService::create(&dir.path().join("vectors"), "abc".into(), vsc).unwrap();
         let res = writer.set_resource(nucliadb_core::vectors::ResourceWrapper::from(&resource));
         assert!(res.is_ok());
         let res = writer.delete_resource(&resource_id);
@@ -333,11 +329,11 @@ mod tests {
     fn test_get_segments() {
         let dir = TempDir::new().unwrap();
         let vsc = VectorConfig {
-            similarity: VectorSimilarity::Cosine,
-            path: dir.path().join("vectors"),
-            channel: Channel::EXPERIMENTAL,
-            shard_id: "abc".into(),
+            similarity: Similarity::Cosine,
             normalize_vectors: false,
+            vector_type: VectorType::DenseF32 {
+                dimension: 3,
+            },
         };
         let resource_id = ResourceId {
             shard_id: "DOC".to_string(),
@@ -389,7 +385,7 @@ mod tests {
             ..Default::default()
         };
         // insert - delete - insert sequence
-        let mut writer = VectorWriterService::create(vsc).unwrap();
+        let mut writer = VectorWriterService::create(&dir.path().join("vectors"), "abc".into(), vsc).unwrap();
         let res = writer.set_resource(nucliadb_core::vectors::ResourceWrapper::from(&resource));
         assert!(res.is_ok());
         let res = writer.delete_resource(&resource_id);

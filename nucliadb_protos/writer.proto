@@ -7,6 +7,7 @@ import "google/protobuf/timestamp.proto";
 import public "nucliadb_protos/noderesources.proto";
 import public "nucliadb_protos/resources.proto";
 import public "nucliadb_protos/knowledgebox.proto";
+import public "nucliadb_protos/audit.proto";
 
 // We receive this information throw an stream system
 
@@ -20,6 +21,11 @@ message Audit {
         DESKTOP = 2;
     }
     Source source = 4;
+    string kbid = 5;
+    string uuid = 6;
+    BrokerMessage.MessageSource message_source = 7;
+    repeated resources.FieldID field_metadata = 8;
+    repeated audit.AuditField audit_fields = 9;
 }
 
 message Error {
@@ -337,7 +343,6 @@ enum NotificationSource {
     PROCESSOR = 2;
 }
 
-
 message Notification {
     int32 partition = 1;
     string multi = 2;
@@ -358,9 +363,10 @@ message Notification {
         DELETED = 3;
     }
     WriteType write_type = 7;
-    BrokerMessage message = 8;
+    BrokerMessage message = 8 [deprecated = true];
     NotificationSource source = 9;
     bool processing_errors = 10;
+    Audit message_audit = 11;
 }
 
 

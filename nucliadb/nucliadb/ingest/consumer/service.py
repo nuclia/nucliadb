@@ -159,15 +159,14 @@ async def start_ingest_processed_consumer(
 
 
 async def start_auditor() -> Callable[[], Awaitable[None]]:
-    driver = await setup_driver()
     audit = get_audit()
     assert audit is not None
     pubsub = await get_pubsub()
     assert pubsub is not None, "Pubsub is not configured"
     storage = await get_storage(service_name=SERVICE_NAME)
-    index_auditor = IndexAuditHandler(driver=driver, audit=audit, pubsub=pubsub)
+    index_auditor = IndexAuditHandler(audit=audit, pubsub=pubsub)
     resource_writes_auditor = ResourceWritesAuditHandler(
-        driver=driver, storage=storage, audit=audit, pubsub=pubsub
+        storage=storage, audit=audit, pubsub=pubsub
     )
 
     await index_auditor.initialize()

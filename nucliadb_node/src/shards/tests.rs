@@ -22,18 +22,15 @@ use std::{sync::Arc, time::SystemTime};
 use nucliadb_core::protos::prost_types::Timestamp;
 use nucliadb_core::{Channel, NodeResult};
 use nucliadb_protos::nodereader;
-use nucliadb_protos::{noderesources, utils::VectorSimilarity};
+use nucliadb_protos::noderesources;
+use nucliadb_vectors::config::{Similarity, VectorConfig};
 use tempfile;
 use uuid::Uuid;
 
 use crate::shards::indexes::DEFAULT_VECTORS_INDEX_NAME;
 use crate::shards::reader::ShardReader;
 
-use super::*;
-use super::{
-    metadata::{ShardMetadata, Similarity},
-    writer::ShardWriter,
-};
+use super::{metadata::ShardMetadata, writer::ShardWriter};
 
 #[test]
 fn test_vectorsets() -> NodeResult<()> {
@@ -42,23 +39,17 @@ fn test_vectorsets() -> NodeResult<()> {
     let shard_id = "shard".to_string();
     let kbid = "kbid".to_string();
 
-    let metadata = Arc::new(ShardMetadata::new(
-        shard_path.clone(),
-        shard_id.clone(),
-        kbid.clone(),
-        Similarity::default(),
-        Channel::default(),
-        false,
-    ));
+    let metadata = Arc::new(ShardMetadata::new(shard_path.clone(), shard_id.clone(), kbid.clone(), Channel::default()));
 
-    let writer = ShardWriter::new(Arc::clone(&metadata))?;
-    writer.create_vectors_index(writer::NewVectorsIndex {
-        shard_id: shard_id.clone(),
-        name: "myvectorset".to_string(),
-        channel: Channel::STABLE,
-        similarity: VectorSimilarity::Cosine,
-        normalize_vectors: true,
-    })?;
+    let writer = ShardWriter::new(Arc::clone(&metadata), VectorConfig::default())?;
+    writer.create_vectors_index(
+        "myvectorset".to_string(),
+        VectorConfig {
+            similarity: Similarity::Cosine,
+            normalize_vectors: true,
+            ..Default::default()
+        },
+    )?;
 
     let vectorsets = writer.list_vectors_indexes();
     assert_eq!(vectorsets.len(), 2);

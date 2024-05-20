@@ -26,7 +26,7 @@ use crate::grpc::collect_garbage::{garbage_collection_loop, GCParameters};
 use crate::merge::{global_merger, MergePriority, MergeRequest, MergeWaiter};
 use crate::settings::Settings;
 use crate::shards::metadata::ShardMetadata;
-use crate::shards::writer::{NewVectorsIndex, ShardWriter};
+use crate::shards::writer::ShardWriter;
 use crate::telemetry::run_with_telemetry;
 use crate::utils::{get_primary_node_id, list_shards, read_host_key};
 use nucliadb_core::metrics::get_metrics;
@@ -39,6 +39,7 @@ use nucliadb_core::protos::{
 };
 use nucliadb_core::tracing::{self, Span, *};
 use nucliadb_core::{Channel, NodeResult};
+use nucliadb_vectors::config::VectorConfig;
 use object_store::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
@@ -124,13 +125,22 @@ impl NodeWriter for NodeWriterGRPCDriver {
             self.shards.shards_path.join(shard_id.clone()),
             shard_id,
             kbid,
-            request.similarity().into(),
-            Channel::from(request.release_channel),
-            request.normalize_vectors,
+            Channel::from(request.release_channel()),
         );
 
+        let vector_config = if let Some(req_config) = request.config {
+            VectorConfig::try_from(req_config).map_err(|e| tonic::Status::internal(e.to_string()))?
+        } else {
+            #[allow(deprecated)]
+            VectorConfig {
+                similarity: request.similarity().into(),
+                normalize_vectors: request.normalize_vectors,
+                ..Default::default()
+            }
+        };
+
         let shards = Arc::clone(&self.shards);
-        let new_shard = tokio::task::spawn_blocking(move || shards.create(metadata))
+        let new_shard = tokio::task::spawn_blocking(move || shards.create(metadata, vector_config))
             .await
             .map_err(|error| tonic::Status::internal(format!("Error creating shard: {error:?}")))?;
 
@@ -284,8 +294,16 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let span = Span::current();
 
         let request = request.into_inner();
-        let similarity = request.similarity();
-        let normalize_vectors = request.normalize_vectors;
+        let config = if let Some(req_config) = request.config {
+            VectorConfig::try_from(req_config).map_err(|e| tonic::Status::internal(e.to_string()))?
+        } else {
+            #[allow(deprecated)]
+            VectorConfig {
+                similarity: request.similarity().into(),
+                normalize_vectors: request.normalize_vectors,
+                ..Default::default()
+            }
+        };
         let Some(VectorSetId {
             shard: Some(ShardId {
                 id: shard_id,
@@ -304,13 +322,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let task = move || {
             run_with_telemetry(info_span!(parent: &span, "Add a vectorset"), move || {
                 let shard = obtain_shard(shards, shard_id.clone())?;
-                shard.create_vectors_index(NewVectorsIndex {
-                    shard_id,
-                    name: vectorset,
-                    channel: shard.metadata.channel(),
-                    similarity,
-                    normalize_vectors,
-                })
+                shard.create_vectors_index(vectorset, config)
             })
         };
         let result = tokio::task::spawn_blocking(task)

@@ -53,19 +53,31 @@ message GarbageCollectorResponse {
     Status status = 1;
 }
 
-message NewShardRequest {
+enum VectorType {
+    DENSE_F32 = 0;
+}
+
+message VectorIndexConfig {
     utils.VectorSimilarity similarity = 1;
+    bool normalize_vectors = 2;
+    VectorType vector_type = 3;
+    optional uint32 vector_dimension = 4;
+}
+
+message NewShardRequest {
+    utils.VectorSimilarity similarity = 1 [deprecated = true];
     string kbid = 2;
     utils.ReleaseChannel release_channel = 3;
     // indicates whether the shard should normalize vectors on indexing or not
-    bool normalize_vectors = 4;
+    bool normalize_vectors = 4 [deprecated = true];
+    VectorIndexConfig config = 5;
 }
 
 message NewVectorSetRequest {
     noderesources.VectorSetID id = 1;
-    utils.VectorSimilarity similarity = 2;
-    // indicates whether the shard should normalize vectors on indexing or not
-    bool normalize_vectors = 3;
+    utils.VectorSimilarity similarity = 2 [deprecated = true];
+    bool normalize_vectors = 3 [deprecated = true];
+    VectorIndexConfig config = 4;
 }
 
 message MergeResponse {

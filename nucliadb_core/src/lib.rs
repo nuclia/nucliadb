@@ -64,20 +64,20 @@ pub enum Channel {
     EXPERIMENTAL,
 }
 
-impl From<i32> for Channel {
-    fn from(value: i32) -> Self {
+impl From<ReleaseChannel> for Channel {
+    fn from(value: ReleaseChannel) -> Self {
         match value {
-            1 => Channel::EXPERIMENTAL,
-            _ => Channel::STABLE,
+            ReleaseChannel::Experimental => Channel::EXPERIMENTAL,
+            ReleaseChannel::Stable => Channel::STABLE,
         }
     }
 }
 
-impl From<Channel> for i32 {
+impl From<Channel> for ReleaseChannel {
     fn from(value: Channel) -> Self {
         match value {
-            Channel::STABLE => ReleaseChannel::Stable as i32,
-            Channel::EXPERIMENTAL => ReleaseChannel::Experimental as i32,
+            Channel::STABLE => ReleaseChannel::Stable,
+            Channel::EXPERIMENTAL => ReleaseChannel::Experimental,
         }
     }
 }

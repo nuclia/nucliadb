@@ -31,10 +31,10 @@ use nucliadb_core::Channel;
 use nucliadb_node::analytics::blocking::send_analytics_event;
 use nucliadb_node::analytics::payload::AnalyticsEvent;
 use nucliadb_node::cache::ShardWriterCache;
-use nucliadb_node::lifecycle;
 use nucliadb_node::settings::load_settings;
 use nucliadb_node::shards::metadata::ShardMetadata;
 use nucliadb_node::shards::writer::ShardWriter;
+use nucliadb_node::{lifecycle, VectorConfig};
 use prost::Message;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
@@ -96,16 +96,23 @@ impl NodeWriter {
 
         let request = NewShardRequest::decode(&mut Cursor::new(metadata)).expect("Error decoding arguments");
         let shard_id = uuid::Uuid::new_v4().to_string();
-        let similarity = VectorSimilarity::try_from(request.similarity).unwrap();
         let metadata = ShardMetadata::new(
             self.shards_path.join(shard_id.clone()),
             shard_id,
-            request.kbid,
-            similarity.into(),
-            Channel::from(request.release_channel),
-            request.normalize_vectors,
+            request.kbid.clone(),
+            Channel::from(request.release_channel()),
         );
-        let new_shard = self.shards.create(metadata);
+        let vector_config = if let Some(req_config) = request.config {
+            VectorConfig::try_from(req_config).map_err(|err| IndexNodeException::new_err(err.to_string()))?
+        } else {
+            #[allow(deprecated)]
+            VectorConfig {
+                similarity: request.similarity().into(),
+                normalize_vectors: request.normalize_vectors,
+                ..Default::default()
+            }
+        };
+        let new_shard = self.shards.create(metadata, vector_config);
         match new_shard {
             Ok(new_shard) => Ok(PyList::new(
                 py,

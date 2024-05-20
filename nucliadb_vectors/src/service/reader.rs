@@ -186,12 +186,12 @@ mod tests {
 
     use nucliadb_core::protos::resource::ResourceStatus;
     use nucliadb_core::protos::{
-        IndexParagraph, IndexParagraphs, Resource, ResourceId, VectorSentence, VectorSimilarity, VectorsetSentences,
+        IndexParagraph, IndexParagraphs, Resource, ResourceId, VectorSentence, VectorsetSentences,
     };
-    use nucliadb_core::Channel;
     use tempfile::TempDir;
 
     use super::*;
+    use crate::config::{Similarity, VectorConfig, VectorType};
     use crate::service::writer::VectorWriterService;
 
     #[test]
@@ -199,11 +199,11 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let shard_path = dir.path().join("vectors");
         let vsc = VectorConfig {
-            similarity: VectorSimilarity::Cosine,
-            path: shard_path.clone(),
-            channel: Channel::EXPERIMENTAL,
-            shard_id: "abc".into(),
+            similarity: Similarity::Cosine,
             normalize_vectors: false,
+            vector_type: VectorType::DenseF32 {
+                dimension: 3,
+            },
         };
         let raw_sentences = [
             ("DOC/KEY/1/1".to_string(), vec![1.0, 3.0, 4.0]),
@@ -260,7 +260,7 @@ mod tests {
             ..Default::default()
         };
         // insert - delete - insert sequence
-        let mut writer = VectorWriterService::create(vsc).unwrap();
+        let mut writer = VectorWriterService::create(&shard_path, "abc".into(), vsc).unwrap();
         writer.set_resource((&resource).into()).unwrap();
 
         let reader = VectorReaderService::open(&shard_path).unwrap();
@@ -289,11 +289,11 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let shard_path = dir.path().join("vectors");
         let vsc = VectorConfig {
-            similarity: VectorSimilarity::Cosine,
-            path: shard_path.clone(),
-            channel: Channel::EXPERIMENTAL,
-            shard_id: "abc".into(),
+            similarity: Similarity::Cosine,
             normalize_vectors: false,
+            vector_type: VectorType::DenseF32 {
+                dimension: 3,
+            },
         };
         let raw_sentences = [
             ("DOC/KEY/1/1".to_string(), vec![1.0, 3.0, 4.0]),
@@ -350,7 +350,7 @@ mod tests {
             ..Default::default()
         };
         // insert - delete - insert sequence
-        let mut writer = VectorWriterService::create(vsc).unwrap();
+        let mut writer = VectorWriterService::create(&shard_path, "abc".into(), vsc).unwrap();
         let res = writer.set_resource((&resource).into());
         assert!(res.is_ok());
         let reader = VectorReaderService::open(&shard_path).unwrap();
@@ -418,11 +418,11 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let shard_path = dir.path().join("vectors");
         let vsc = VectorConfig {
-            similarity: VectorSimilarity::Cosine,
-            path: shard_path.clone(),
-            channel: Channel::EXPERIMENTAL,
-            shard_id: "abc".into(),
+            similarity: Similarity::Cosine,
             normalize_vectors: false,
+            vector_type: VectorType::DenseF32 {
+                dimension: 3,
+            },
         };
         let raw_sentences =
             [("DOC/KEY/1/1".to_string(), vec![1.0, 2.0, 3.0]), ("DOC/KEY/1/2".to_string(), vec![1.0, 2.0, 3.0])];
@@ -474,7 +474,7 @@ mod tests {
             shard_id: "DOC".to_string(),
             ..Default::default()
         };
-        let mut writer = VectorWriterService::create(vsc).unwrap();
+        let mut writer = VectorWriterService::create(&shard_path, "abc".into(), vsc).unwrap();
         let res = writer.set_resource((&resource).into());
         assert!(res.is_ok());
         let reader = VectorReaderService::open(&shard_path).unwrap();

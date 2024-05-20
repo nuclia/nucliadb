@@ -23,14 +23,9 @@ import logging
 import uuid
 from functools import partial
 
-from nucliadb_protos.resources_pb2 import FieldType
-
 from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.cluster.manager import choose_node
 from nucliadb.common.cluster.utils import get_shard_manager
-from nucliadb.common.maindb.driver import Driver
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos import audit_pb2, nodereader_pb2, noderesources_pb2, writer_pb2
 from nucliadb_utils import const
 from nucliadb_utils.audit.audit import AuditStorage
@@ -62,12 +57,10 @@ class IndexAuditHandler:
     def __init__(
         self,
         *,
-        driver: Driver,
         audit: AuditStorage,
         pubsub: PubSubDriver,
         check_delay: float = 5.0,
     ):
-        self.driver = driver
         self.audit = audit
         self.pubsub = pubsub
         self.shard_manager = get_shard_manager()
@@ -147,12 +140,10 @@ class ResourceWritesAuditHandler:
     def __init__(
         self,
         *,
-        driver: Driver,
         storage: Storage,
         audit: AuditStorage,
         pubsub: PubSubDriver,
     ):
-        self.driver = driver
         self.storage = storage
         self.audit = audit
         self.pubsub = pubsub
@@ -169,117 +160,6 @@ class ResourceWritesAuditHandler:
     async def finalize(self) -> None:
         await self.pubsub.unsubscribe(self.subscription_id)
 
-    def iterate_auditable_fields(
-        self,
-        resource_keys: list[tuple[FieldType.ValueType, str]],
-        message: writer_pb2.BrokerMessage,
-    ):
-        """
-        Generator that emits the combined list of field ids from both
-        the existing resource and message that needs to be considered
-        in the audit of fields.
-        """
-        yielded = set()
-
-        # Include all fields present in the message we are processing
-        for field_id in message.files.keys():
-            key = (field_id, writer_pb2.FieldType.FILE)
-            yield key
-            yielded.add(key)
-
-        for field_id in message.conversations.keys():
-            key = (field_id, writer_pb2.FieldType.CONVERSATION)
-            yield key
-            yielded.add(key)
-
-        for field_id in message.layouts.keys():
-            key = (field_id, writer_pb2.FieldType.LAYOUT)
-            yield key
-            yielded.add(key)
-
-        for field_id in message.texts.keys():
-            key = (field_id, writer_pb2.FieldType.TEXT)
-            yield key
-            yielded.add(key)
-
-        for field_id in message.keywordsets.keys():
-            key = (field_id, writer_pb2.FieldType.KEYWORDSET)
-            yield key
-            yielded.add(key)
-
-        for field_id in message.datetimes.keys():
-            key = (field_id, writer_pb2.FieldType.DATETIME)
-            yield key
-            yielded.add(key)
-
-        for field_id in message.links.keys():
-            key = (field_id, writer_pb2.FieldType.LINK)
-            yield key
-            yielded.add(key)
-
-        for field_type, field_id in resource_keys:
-            if field_type is writer_pb2.FieldType.GENERIC:
-                continue
-
-            if not (
-                field_id in message.files
-                or message.type is writer_pb2.BrokerMessage.MessageType.DELETE
-            ):
-                continue
-
-            # Avoid duplicates
-            if (field_type, field_id) in yielded:
-                continue
-
-            yield (field_id, field_type)
-
-    async def collect_audit_fields(
-        self, message: writer_pb2.BrokerMessage
-    ) -> list[audit_pb2.AuditField]:
-        if message.type == writer_pb2.BrokerMessage.MessageType.DELETE:
-            # If we are fully deleting a resource we won't iterate the delete_fields (if any).
-            # Make no sense as we already collected all resource fields as deleted
-            return []
-
-        audit_storage_fields: list[audit_pb2.AuditField] = []
-        async with self.driver.transaction() as txn:
-            kb = KnowledgeBox(txn, self.storage, message.kbid)
-            resource = Resource(txn, self.storage, kb, message.uuid)
-            field_keys = await resource.get_fields_ids()
-
-            for field_id, field_type in self.iterate_auditable_fields(
-                field_keys, message
-            ):
-                auditfield = audit_pb2.AuditField()
-                auditfield.field_type = field_type
-                auditfield.field_id = field_id
-                if field_type is writer_pb2.FieldType.FILE:
-                    auditfield.filename = message.files[field_id].file.filename
-                # The field did exist, so we are overwriting it, with a modified file
-                # in case of a file
-                auditfield.action = audit_pb2.AuditField.FieldAction.MODIFIED
-                if field_type is writer_pb2.FieldType.FILE:
-                    auditfield.size = message.files[field_id].file.size
-
-                audit_storage_fields.append(auditfield)
-
-            for fieldid in message.delete_fields or []:
-                field = await resource.get_field(
-                    fieldid.field, writer_pb2.FieldType.FILE, load=True
-                )
-                audit_field = audit_pb2.AuditField()
-                audit_field.action = audit_pb2.AuditField.FieldAction.DELETED
-                audit_field.field_id = fieldid.field
-                audit_field.field_type = fieldid.field_type
-                if fieldid.field_type is writer_pb2.FieldType.FILE:
-                    val = await field.get_value()
-                    audit_field.size = 0
-                    if val is not None:
-                        audit_field.filename = val.file.filename
-                audit_storage_fields.append(audit_field)
-
-        return audit_storage_fields
-
     async def handle_message(self, raw_data) -> None:
         data = self.pubsub.parse(raw_data)
         notification = writer_pb2.Notification()
@@ -289,8 +169,11 @@ class ResourceWritesAuditHandler:
             metrics.total_messages.inc({"action": "ignored", "type": "audit_fields"})
             return
 
-        message = notification.message
-        if message.source == message.MessageSource.PROCESSOR:
+        message_audit: writer_pb2.Audit = notification.message_audit
+        if (
+            message_audit.message_source
+            == writer_pb2.BrokerMessage.MessageSource.PROCESSOR
+        ):
             metrics.total_messages.inc({"action": "ignored", "type": "audit_fields"})
             return
 
@@ -300,16 +183,14 @@ class ResourceWritesAuditHandler:
 
         metrics.total_messages.inc({"action": "scheduled", "type": "audit_fields"})
         with metrics.handler_histo({"type": "audit_fields"}):
-            audit_fields = await self.collect_audit_fields(message)
-            field_metadata = [fi.field for fi in message.field_metadata]
-            when = message.audit.when if message.audit.HasField("when") else None
+            when = message_audit.when if message_audit.HasField("when") else None
             await self.audit.report(
-                kbid=message.kbid,
+                kbid=message_audit.kbid,
                 when=when,
-                user=message.audit.user,
-                rid=message.uuid,
-                origin=message.audit.origin,
-                field_metadata=field_metadata,
+                user=message_audit.user,
+                rid=message_audit.uuid,
+                origin=message_audit.origin,
+                field_metadata=list(message_audit.field_metadata),
                 audit_type=AUDIT_TYPES.get(notification.write_type),
-                audit_fields=audit_fields,
+                audit_fields=list(message_audit.audit_fields),
             )

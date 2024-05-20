@@ -38,6 +38,8 @@ const VECTOR_DIMENSION: usize = 10;
 async fn test_vector_normalization_shard(
     #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)] release_channel: ReleaseChannel,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    use nucliadb_core::protos::VectorIndexConfig;
+
     let mut fixture = NodeFixture::new();
     fixture.with_writer().await?.with_reader().await?;
     let mut writer = fixture.writer_client();
@@ -50,7 +52,10 @@ async fn test_vector_normalization_shard(
         .new_shard(Request::new(NewShardRequest {
             kbid: KBID.to_string(),
             release_channel: release_channel.into(),
-            normalize_vectors: true,
+            config: Some(VectorIndexConfig {
+                normalize_vectors: true,
+                ..Default::default()
+            }),
             ..Default::default()
         }))
         .await?
