@@ -28,15 +28,76 @@ from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
 # These should be refactored
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG, KB_RESOURCE_SLUG_BASE
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
-from nucliadb.ingest.orm.utils import get_basic, set_basic
+from nucliadb.ingest.settings import settings as ingest_settings
 from nucliadb_protos import noderesources_pb2, resources_pb2, writer_pb2
 from nucliadb_utils.utilities import get_storage
 
 from .utils import with_transaction
 
-KB_MATERIALIZED_RESOURCES_COUNT = "/kbs/{kbid}/materialized/resources/count"
 KB_RESOURCE_SHARD = "/kbs/{kbid}/r/{uuid}/shard"
 KB_RESOURCE_ALL_FIELDS = "/kbs/{kbid}/r/{uuid}/allfields"
+KB_RESOURCE_BASIC = "/kbs/{kbid}/r/{uuid}"
+KB_RESOURCE_BASIC_FS = "/kbs/{kbid}/r/{uuid}/basic"  # Only used on FS driver
+KB_MATERIALIZED_RESOURCES_COUNT = "/kbs/{kbid}/materialized/resources/count"
+
+
+async def resource_exists(txn: Transaction, *, kbid: str, rid: str) -> bool:
+    basic = await get_basic_raw(txn, kbid=kbid, rid=rid)
+    return basic is not None
+
+
+async def get_basic(
+    txn: Transaction, *, kbid: str, rid: str
+) -> Optional[resources_pb2.Basic]:
+    raw = await get_basic_raw(txn, kbid=kbid, rid=rid)
+    if raw is None:
+        return None
+    basic = resources_pb2.Basic()
+    basic.ParseFromString(raw)
+    return basic
+
+
+async def get_basic_raw(txn: Transaction, *, kbid: str, rid: str) -> Optional[bytes]:
+    if ingest_settings.driver == "local":
+        raw_basic = await txn.get(KB_RESOURCE_BASIC_FS.format(kbid=kbid, uuid=rid))
+    else:
+        raw_basic = await txn.get(KB_RESOURCE_BASIC.format(kbid=kbid, uuid=rid))
+    return raw_basic
+
+
+async def set_basic(
+    txn: Transaction, *, kbid: str, rid: str, basic: resources_pb2.Basic
+):
+    if ingest_settings.driver == "local":
+        await txn.set(
+            KB_RESOURCE_BASIC_FS.format(kbid=kbid, uuid=rid),
+            basic.SerializeToString(),
+        )
+    else:
+        await txn.set(
+            KB_RESOURCE_BASIC.format(kbid=kbid, uuid=rid),
+            basic.SerializeToString(),
+        )
+
+
+async def iterate_resource_ids(*, kbid: str) -> AsyncGenerator[str, None]:
+    """
+    Currently, the implementation of this is optimizing for reducing
+    how long a transaction will be open since the caller controls
+    how long each item that is yielded will be processed.
+
+    For this reason, it is not using the `txn` argument passed in.
+    """
+    batch = []
+    async for slug in _iter_resource_slugs(kbid=kbid):
+        batch.append(slug)
+        if len(batch) >= 200:
+            for rid in await _get_resource_ids_from_slugs(kbid=kbid, slugs=batch):
+                yield rid
+            batch = []
+    if len(batch) > 0:
+        for rid in await _get_resource_ids_from_slugs(kbid=kbid, slugs=batch):
+            yield rid
 
 
 @backoff.on_exception(
@@ -59,26 +120,6 @@ async def _get_resource_ids_from_slugs(kbid: str, slugs: list[str]) -> list[str]
             [KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug) for slug in slugs]
         )
     return [rid.decode() for rid in rids if rid is not None]
-
-
-async def iterate_resource_ids(*, kbid: str) -> AsyncGenerator[str, None]:
-    """
-    Currently, the implementation of this is optimizing for reducing
-    how long a transaction will be open since the caller controls
-    how long each item that is yielded will be processed.
-
-    For this reason, it is not using the `txn` argument passed in.
-    """
-    batch = []
-    async for slug in _iter_resource_slugs(kbid=kbid):
-        batch.append(slug)
-        if len(batch) >= 200:
-            for rid in await _get_resource_ids_from_slugs(kbid=kbid, slugs=batch):
-                yield rid
-            batch = []
-    if len(batch) > 0:
-        for rid in await _get_resource_ids_from_slugs(kbid=kbid, slugs=batch):
-            yield rid
 
 
 @backoff.on_exception(
@@ -111,11 +152,6 @@ async def get_resource(
 
     kb_orm = KnowledgeBoxORM(txn, await get_storage(), kbid)
     return await kb_orm.get(rid)
-
-
-async def resource_exists(txn: Transaction, *, kbid: str, rid: str) -> bool:
-    basic = await get_basic(txn, kbid, rid)
-    return basic is not None
 
 
 @backoff.on_exception(
@@ -184,12 +220,7 @@ async def get_broker_message(
 async def get_resource_basic(
     txn: Transaction, *, kbid: str, rid: str
 ) -> Optional[resources_pb2.Basic]:
-    raw_basic = await get_basic(txn, kbid, rid)
-    if not raw_basic:
-        return None
-    basic = resources_pb2.Basic()
-    basic.ParseFromString(raw_basic)
-    return basic
+    return await get_basic(txn, kbid=kbid, rid=rid)
 
 
 async def get_resource_uuid_from_slug(
@@ -219,7 +250,7 @@ async def modify_slug(txn: Transaction, *, kbid: str, rid: str, new_slug: str) -
     key = KB_RESOURCE_SLUG.format(kbid=kbid, slug=new_slug)
     await txn.set(key, rid.encode())
     basic.slug = new_slug
-    await set_basic(txn, kbid, rid, basic)
+    await set_basic(txn, kbid=kbid, rid=rid, basic=basic)
     return old_slug
 
 
