@@ -66,7 +66,6 @@ def audit():
 @pytest.fixture()
 async def index_audit_handler(pubsub, audit, shard_manager):
     iah = auditing.IndexAuditHandler(
-        driver=AsyncMock(transaction=MagicMock(return_value=AsyncMock())),
         audit=audit,
         pubsub=pubsub,
         check_delay=0.05,
@@ -79,7 +78,6 @@ async def index_audit_handler(pubsub, audit, shard_manager):
 @pytest.fixture()
 async def writes_audit_handler(pubsub, audit, shard_manager):
     rwah = auditing.ResourceWritesAuditHandler(
-        driver=AsyncMock(transaction=MagicMock(return_value=AsyncMock())),
         storage=AsyncMock(),
         audit=audit,
         pubsub=pubsub,

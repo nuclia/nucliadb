@@ -69,16 +69,12 @@ EXAMPLE_VECTOR = base64.b64decode(
 
 
 @pytest.fixture(autouse=True)
-async def audit_consumers(
-    maindb_driver: Driver, storage, pubsub, stream_audit: StreamAuditStorage
-):
+async def audit_consumers(storage, pubsub, stream_audit: StreamAuditStorage):
     index_auditor = IndexAuditHandler(
-        driver=maindb_driver,
         audit=stream_audit,
         pubsub=pubsub,
     )
     resource_writes_auditor = ResourceWritesAuditHandler(
-        driver=maindb_driver,
         storage=storage,
         audit=stream_audit,
         pubsub=pubsub,

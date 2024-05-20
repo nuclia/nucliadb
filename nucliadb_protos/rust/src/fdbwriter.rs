@@ -10,6 +10,16 @@ pub struct Audit {
     pub origin: ::prost::alloc::string::String,
     #[prost(enumeration = "audit::Source", tag = "4")]
     pub source: i32,
+    #[prost(string, tag = "5")]
+    pub kbid: ::prost::alloc::string::String,
+    #[prost(string, tag = "6")]
+    pub uuid: ::prost::alloc::string::String,
+    #[prost(enumeration = "broker_message::MessageSource", tag = "7")]
+    pub message_source: i32,
+    #[prost(message, repeated, tag = "8")]
+    pub field_metadata: ::prost::alloc::vec::Vec<super::resources::FieldId>,
+    #[prost(message, repeated, tag = "9")]
+    pub audit_fields: ::prost::alloc::vec::Vec<super::audit::AuditField>,
 }
 /// Nested message and enum types in `Audit`.
 pub mod audit {
@@ -970,12 +980,15 @@ pub struct Notification {
     pub action: i32,
     #[prost(enumeration = "notification::WriteType", tag = "7")]
     pub write_type: i32,
+    #[deprecated]
     #[prost(message, optional, tag = "8")]
     pub message: ::core::option::Option<BrokerMessage>,
     #[prost(enumeration = "NotificationSource", tag = "9")]
     pub source: i32,
     #[prost(bool, tag = "10")]
     pub processing_errors: bool,
+    #[prost(message, optional, tag = "11")]
+    pub message_audit: ::core::option::Option<Audit>,
 }
 /// Nested message and enum types in `Notification`.
 pub mod notification {
