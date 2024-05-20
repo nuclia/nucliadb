@@ -23,7 +23,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from nucliadb_protos.audit_pb2 import AuditKBCounter, AuditRequest
-from nucliadb_protos.writer_pb2 import BrokerMessage, Notification, ShardObject
+from nucliadb_protos.writer_pb2 import Audit, BrokerMessage, Notification, ShardObject
 
 from nucliadb.ingest.consumer import auditing
 from nucliadb_protos import nodereader_pb2
@@ -124,13 +124,13 @@ async def test_handle_message_ignore_not_indexed(
 async def test_resource_handle_message_processor_messages_are_not_audited(
     writes_audit_handler: auditing.ResourceWritesAuditHandler, audit
 ):
-    message = BrokerMessage()
-    message.source = BrokerMessage.MessageSource.PROCESSOR
+    message_audit = Audit()
+    message_audit.message_source = BrokerMessage.MessageSource.PROCESSOR
     notif = Notification(
         kbid="kbid",
         action=Notification.Action.COMMIT,
-        message=message,
         write_type=Notification.WriteType.MODIFIED,
+        message_audit=message_audit,
     )
     await writes_audit_handler.handle_message(notif.SerializeToString())
 
