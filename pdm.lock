@@ -758,15 +758,6 @@ files = [
 ]
 
 [[package]]
-name = "ed25519"
-version = "1.5"
-summary = "Ed25519 public-key signatures"
-groups = ["dev"]
-files = [
-    {file = "ed25519-1.5.tar.gz", hash = "sha256:02053ee019ceef0df97294be2d4d5a8fc120fc86e81e08bec1245fc0f9403358"},
-]
-
-[[package]]
 name = "email-validator"
 version = "2.1.1"
 requires_python = ">=3.8"
@@ -2107,15 +2098,12 @@ files = [
 
 [[package]]
 name = "nkeys"
-version = "0.1.0"
-requires_python = ">=3.6.0"
+version = "0.2.0"
+requires_python = ">=3.6"
 summary = "A public-key signature system based on Ed25519 for the NATS ecosystem."
 groups = ["dev"]
-dependencies = [
-    "ed25519",
-]
 files = [
-    {file = "nkeys-0.1.0.tar.gz", hash = "sha256:93482ab08ff9625882b988c3ea58fd1a6ef0061b60f95946742cc1394578760a"},
+    {file = "nkeys-0.2.0.tar.gz", hash = "sha256:e7d12a31b3126b4620589ea2013aa2889497cb5c4bd8e806ceb39816f7cc1bb7"},
 ]
 
 [[package]]
@@ -2292,6 +2280,7 @@ requires_python = ">=3.9"
 summary = "NucliaDB Telemetry Library Python process"
 groups = ["dev"]
 dependencies = [
+    "PyNaCl",
     "fastapi",
     "grpcio-channelz<1.63.0,>=1.44.0",
     "grpcio-health-checking<1.63.0,>=1.44.0",
@@ -2322,6 +2311,7 @@ path = "./nucliadb_utils"
 summary = ""
 groups = ["dev"]
 dependencies = [
+    "PyNaCl",
     "aiohttp>=3.9.4",
     "memorylru>=1.1.2",
     "mmh3>=3.0.0",
@@ -3057,6 +3047,28 @@ files = [
 ]
 
 [[package]]
+name = "pynacl"
+version = "1.5.0"
+requires_python = ">=3.6"
+summary = "Python binding to the Networking and Cryptography (NaCl) library"
+groups = ["dev"]
+dependencies = [
+    "cffi>=1.4.1",
+]
+files = [
+    {file = "PyNaCl-1.5.0-cp36-abi3-macosx_10_10_universal2.whl", hash = "sha256:401002a4aaa07c9414132aaed7f6836ff98f59277a234704ff66878c2ee4a0d1"},
+    {file = "PyNaCl-1.5.0-cp36-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.manylinux_2_24_aarch64.whl", hash = "sha256:52cb72a79269189d4e0dc537556f4740f7f0a9ec41c1322598799b0bdad4ef92"},
+    {file = "PyNaCl-1.5.0-cp36-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:a36d4a9dda1f19ce6e03c9a784a2921a4b726b02e1c736600ca9c22029474394"},
+    {file = "PyNaCl-1.5.0-cp36-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.manylinux_2_24_x86_64.whl", hash = "sha256:0c84947a22519e013607c9be43706dd42513f9e6ae5d39d3613ca1e142fba44d"},
+    {file = "PyNaCl-1.5.0-cp36-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:06b8f6fa7f5de8d5d2f7573fe8c863c051225a27b61e6860fd047b1775807858"},
+    {file = "PyNaCl-1.5.0-cp36-abi3-musllinux_1_1_aarch64.whl", hash = "sha256:a422368fc821589c228f4c49438a368831cb5bbc0eab5ebe1d7fac9dded6567b"},
+    {file = "PyNaCl-1.5.0-cp36-abi3-musllinux_1_1_x86_64.whl", hash = "sha256:61f642bf2378713e2c2e1de73444a3778e5f0a38be6fee0fe532fe30060282ff"},
+    {file = "PyNaCl-1.5.0-cp36-abi3-win32.whl", hash = "sha256:e46dae94e34b085175f8abb3b0aaa7da40767865ac82c928eeb9e57e1ea8a543"},
+    {file = "PyNaCl-1.5.0-cp36-abi3-win_amd64.whl", hash = "sha256:20f42270d27e1b6a29f54032090b972d97f0a1b0948cc52392041ef7831fee93"},
+    {file = "PyNaCl-1.5.0.tar.gz", hash = "sha256:8ac7448f09ab85811607bdd21ec2464495ac8b7c66d146bf545b0f08fb9220ba"},
+]
+
+[[package]]
 name = "pyparsing"
 version = "3.1.2"
 requires_python = ">=3.6.8"
@@ -3773,13 +3785,13 @@ files = [
 
 [[package]]
 name = "types-setuptools"
-version = "69.5.0.20240513"
+version = "69.5.0.20240519"
 requires_python = ">=3.8"
 summary = "Typing stubs for setuptools"
 groups = ["dev"]
 files = [
-    {file = "types-setuptools-69.5.0.20240513.tar.gz", hash = "sha256:3a8ccea3e3f1f639856a1dd622be282f74e94e00fdc364630240f999cc9594fc"},
-    {file = "types_setuptools-69.5.0.20240513-py3-none-any.whl", hash = "sha256:bd3964c08cffd5a057d9cabe61641c86a41a1b5dd2b652b8d371eed64d89d726"},
+    {file = "types-setuptools-69.5.0.20240519.tar.gz", hash = "sha256:275fb72048b0203d3fbef268298ea78a0913cd114a74872d93f8638ccc5b7c63"},
+    {file = "types_setuptools-69.5.0.20240519-py3-none-any.whl", hash = "sha256:52b264eff8913b5d85848d83bd98efea935fc6129d681d370eb957783880b720"},
 ]
 
 [[package]]
