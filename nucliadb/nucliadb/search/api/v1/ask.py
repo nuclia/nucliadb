@@ -25,7 +25,7 @@ from starlette.responses import StreamingResponse
 
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
-from nucliadb.search.search.chat.ask import AskResult, ask, handled_ask_exceptions
+from nucliadb.search.search.ask import AskResult, ask, handled_ask_exceptions
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
     AskRequest,

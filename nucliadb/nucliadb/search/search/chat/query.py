@@ -19,13 +19,8 @@
 #
 import asyncio
 from dataclasses import dataclass
-import re
 from time import monotonic as time
 from typing import AsyncGenerator, AsyncIterator, Optional
-
-from click import prompt
-from nucliadb.search.api.v1.chat import SyncChatResponse
-from nucliadb.search.search.chat.ask import AskResult
 from nucliadb_protos.nodereader_pb2 import RelationSearchRequest, RelationSearchResponse
 
 from nucliadb.search import logger
@@ -52,7 +47,6 @@ from nucliadb_models.search import (
     Relations,
     RephraseModel,
     SearchOptions,
-    SyncAskResponse,
     UserPrompt,
 )
 from nucliadb_protos import audit_pb2
@@ -385,38 +379,6 @@ def _parse_answer_status_code(chunk: bytes) -> AnswerStatusCode:
         if chunk.endswith(b"0"):
             return AnswerStatusCode.SUCCESS
         return AnswerStatusCode(chunk[-2:].decode())
-
-
-def to_chat_sync_response(ask_result: AskResult) -> SyncChatResponse:
-    citations = {}
-    if ask_result._citations is not None:
-        citations = ask_result._citations.citations
-    return SyncChatResponse(
-        answer=ask_result.answer,
-        relations=ask_result._relations,
-        results=ask_result.find_results,
-        status=ask_result.status_code,
-        citations=citations,
-        prompt_context=ask_result.prompt_context,
-        prompt_context_order=ask_result.prompt_context_order,
-    )
-
-
-async def to_chat_stream_response(ask_result: AskResult) -> AsyncGenerator[bytes, None]:
-    # First stream the find results
-    # Then the stream anwser
-    # Append status at the end
-    # Then the citations
-    # Then relations
-    find_results = None
-    answer = b""
-    status_code = None
-    citations = None
-    relations = None
-    async for ask_response_item in ask_result.stream():
-        # TODO
-        pass
-
 
 
 async def maybe_audit_chat(

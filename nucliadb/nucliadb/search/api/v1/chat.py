@@ -17,11 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import base64
-import json
-from typing import Any, Optional, Union
+from typing import Any, AsyncGenerator, Optional, Union
 
-from nucliadb.search.search.chat.ask import AskResult, ask
+from nucliadb.search.search.ask import AskResult, ask
 import pydantic
 from fastapi import Body, Header, Request, Response
 from fastapi.openapi.models import Example
@@ -30,14 +28,9 @@ from starlette.responses import StreamingResponse
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.models.responses import HTTPClientError
-from nucliadb.search import logger, predict
+from nucliadb.search import predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.predict import AnswerStatusCode
-from nucliadb.search.search.chat.query import (
-    START_OF_CITATIONS,
-    to_chat_stream_response,
-    to_chat_sync_response,
-)
 from nucliadb.search.search.exceptions import (
     IncompleteFindResultsError,
     InvalidQueryError,
@@ -45,7 +38,6 @@ from nucliadb.search.search.exceptions import (
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
     AskRequest,
-    ChatOptions,
     ChatRequest,
     KnowledgeboxFindResults,
     NucliaDBClientType,
@@ -54,11 +46,8 @@ from nucliadb_models.search import (
     Relations,
     parse_max_tokens,
 )
-from nucliadb_telemetry.errors import capture_exception
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
-
-END_OF_STREAM = "_END_"
 
 
 class SyncChatResponse(pydantic.BaseModel):
@@ -177,6 +166,7 @@ async def create_chat_response(
         "Access-Control-Expose-Headers": "NUCLIA-LEARNING-ID",
     }
     if x_synchronous:
+        breakpoint()
         sync_ask_response = await ask_result.sync_response()
         sync_chat_response = to_chat_sync_response(sync_ask_response)
         return Response(
@@ -265,32 +255,36 @@ async def create_chat_response(
         )
 """
 
-def parse_streamed_answer(
-    streamed_bytes: bytes, requested_citations: bool
-) -> tuple[str, dict[str, Any]]:
-    try:
-        text_answer, tail = streamed_bytes.split(START_OF_CITATIONS, 1)
-    except ValueError:
-        if requested_citations:
-            logger.warning(
-                "Citations were requested but not found in the answer. "
-                "Returning the answer without citations."
-            )
-        return streamed_bytes.decode("utf-8"), {}
-    if not requested_citations:
-        logger.warning(
-            "Citations were not requested but found in the answer. "
-            "Returning the answer without citations."
-        )
-        return text_answer.decode("utf-8"), {}
-    try:
-        citations_length = int.from_bytes(tail[:4], byteorder="big", signed=False)
-        citations_bytes = tail[4 : 4 + citations_length]
-        citations = json.loads(base64.b64decode(citations_bytes).decode())
-        return text_answer.decode("utf-8"), citations
-    except Exception as exc:
-        capture_exception(exc)
-        logger.exception(
-            "Error parsing citations. Returning the answer without citations."
-        )
-        return text_answer.decode("utf-8"), {}
+
+
+
+def to_chat_sync_response(ask_result: AskResult) -> SyncChatResponse:
+    citations = {}
+    if ask_result._citations is not None:
+        citations = ask_result._citations.citations
+    return SyncChatResponse(
+        answer=ask_result.answer,
+        relations=ask_result._relations,
+        results=ask_result.find_results,
+        status=ask_result.status_code,
+        citations=citations,
+        prompt_context=ask_result.prompt_context,
+        prompt_context_order=ask_result.prompt_context_order,
+    )
+
+
+async def to_chat_stream_response(ask_result: AskResult) -> AsyncGenerator[bytes, None]:
+    # First stream the find results
+    # Then the stream anwser
+    # Append status at the end
+    # Then the citations
+    # Then relations
+    breakpoint()
+    find_results = None
+    answer = b""
+    status_code = None
+    citations = None
+    relations = None
+    async for ask_response_item in ask_result.stream():
+        # TODO
+        pass
