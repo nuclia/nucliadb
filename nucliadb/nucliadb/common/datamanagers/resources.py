@@ -297,12 +297,6 @@ async def get_broker_message(
     return bm
 
 
-async def get_resource_basic(
-    txn: Transaction, *, kbid: str, rid: str
-) -> Optional[resources_pb2.Basic]:
-    return await get_basic(txn, kbid=kbid, rid=rid)
-
-
 async def get_resource_uuid_from_slug(
     txn: Transaction, *, kbid: str, slug: str
 ) -> Optional[str]:
@@ -313,7 +307,7 @@ async def get_resource_uuid_from_slug(
 
 
 async def modify_slug(txn: Transaction, *, kbid: str, rid: str, new_slug: str) -> str:
-    basic = await get_resource_basic(txn, kbid=kbid, rid=rid)
+    basic = await get_basic(txn, kbid=kbid, rid=rid)
     if basic is None:
         raise NotFoundError()
     old_slug = basic.slug

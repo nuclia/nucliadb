@@ -30,7 +30,7 @@ pytestmark = pytest.mark.asyncio
 
 async def check_slug(driver: Driver, kbid, rid, slug):
     async with driver.transaction() as txn:
-        basic = await datamanagers.resources.get_resource_basic(txn, kbid=kbid, rid=rid)
+        basic = await datamanagers.resources.get_basic(txn, kbid=kbid, rid=rid)
         assert basic is not None
         assert basic.slug == slug
         uuid = await datamanagers.resources.get_resource_uuid_from_slug(

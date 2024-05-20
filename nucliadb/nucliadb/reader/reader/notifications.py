@@ -217,7 +217,7 @@ async def get_resource_title(
     kv_driver: Driver, kbid: str, resource_uuid: str
 ) -> Optional[str]:
     async with kv_driver.transaction(read_only=True) as txn:
-        basic = await datamanagers.resources.get_resource_basic(
+        basic = await datamanagers.resources.get_basic(
             txn, kbid=kbid, rid=resource_uuid
         )
         if basic is None:
