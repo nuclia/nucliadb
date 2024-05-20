@@ -18,7 +18,7 @@ metadata:
     metrics: "enabled"
 spec:
   selector:
-    app: node-replicas-{{ $i }}
+    app: node-replicas
     chart: "{{ $chart.Name }}"
   clusterIP: None
   ports:
