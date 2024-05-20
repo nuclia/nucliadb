@@ -190,9 +190,9 @@ impl VectorWriter for VectorWriterService {
         Ok(replication::get_segment_ids(&self.path)?)
     }
 
-    fn get_index_files(&self, ignored_segment_ids: &[String]) -> NodeResult<IndexFiles> {
+    fn get_index_files(&self, prefix: &str, ignored_segment_ids: &[String]) -> NodeResult<IndexFiles> {
         // Should be called along with a lock at a higher level to be safe
-        let replica_state = replication::get_index_files(&self.path, "vectors", ignored_segment_ids)?;
+        let replica_state = replication::get_index_files(&self.path, prefix, ignored_segment_ids)?;
 
         if replica_state.files.is_empty() {
             // exit with no changes
@@ -396,7 +396,7 @@ mod tests {
         let segments = writer.get_segment_ids().unwrap();
         assert_eq!(segments.len(), 2);
         let existing_secs: Vec<String> = Vec::new();
-        let Ok(IndexFiles::Other(index_files)) = writer.get_index_files(&existing_secs) else {
+        let Ok(IndexFiles::Other(index_files)) = writer.get_index_files("vectors", &existing_secs) else {
             panic!("Expected another outcome");
         };
         let mut expected_files = Vec::new();
