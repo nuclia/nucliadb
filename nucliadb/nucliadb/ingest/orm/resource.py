@@ -174,18 +174,6 @@ class Resource:
         new_key = KB_RESOURCE_SLUG.format(kbid=self.kb.kbid, slug=basic.slug)
         await self.txn.set(new_key, self.uuid.encode())
 
-    async def exists(self) -> bool:
-        exists = True
-        if self.basic is None:
-            basic = await datamanagers.resources.get_basic(
-                self.txn, kbid=self.kb.kbid, rid=self.uuid
-            )
-            if basic is not None:
-                self.basic = basic
-            else:
-                exists = False
-        return exists
-
     # Basic
     async def get_basic(self) -> Optional[PBBasic]:
         if self.basic is None:
