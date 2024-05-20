@@ -17,9 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import base64
+import json
 from typing import Any, AsyncGenerator, Optional, Union
 
-from nucliadb.search.search.ask import AskResult, ask
 import pydantic
 from fastapi import Body, Header, Request, Response
 from fastapi.openapi.models import Example
@@ -31,23 +32,35 @@ from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.predict import AnswerStatusCode
+from nucliadb.search.search.ask import AskResult, ask
+from nucliadb.search.search.chat.query import START_OF_CITATIONS
 from nucliadb.search.search.exceptions import (
     IncompleteFindResultsError,
     InvalidQueryError,
 )
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
+    AnswerAskResponseItem,
     AskRequest,
+    AskResponseItem,
     ChatRequest,
+    CitationsAskResponseItem,
+    DebugAskResponseItem,
     KnowledgeboxFindResults,
+    MetadataAskResponseItem,
     NucliaDBClientType,
     PromptContext,
     PromptContextOrder,
     Relations,
+    RelationsAskResponseItem,
+    RetrievalAskResponseItem,
+    StatusAskResponseItem,
     parse_max_tokens,
 )
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
+
+END_OF_STREAM = b"_END_"
 
 
 class SyncChatResponse(pydantic.BaseModel):
@@ -154,11 +167,11 @@ async def create_chat_response(
     chat_request.max_tokens = parse_max_tokens(chat_request.max_tokens)
     ask_request = AskRequest.parse_obj(chat_request.dict())
     ask_result: AskResult = await ask(
-        kbid,
-        ask_request,
-        user_id,
-        client_type,
-        origin,
+        kbid=kbid,
+        ask_request=ask_request,
+        user_id=user_id,
+        client_type=client_type,
+        origin=origin,
         resource=resource,
     )
     headers = {
@@ -166,7 +179,6 @@ async def create_chat_response(
         "Access-Control-Expose-Headers": "NUCLIA-LEARNING-ID",
     }
     if x_synchronous:
-        breakpoint()
         sync_ask_response = await ask_result.sync_response()
         sync_chat_response = to_chat_sync_response(sync_ask_response)
         return Response(
@@ -256,8 +268,6 @@ async def create_chat_response(
 """
 
 
-
-
 def to_chat_sync_response(ask_result: AskResult) -> SyncChatResponse:
     citations = {}
     if ask_result._citations is not None:
@@ -274,17 +284,48 @@ def to_chat_sync_response(ask_result: AskResult) -> SyncChatResponse:
 
 
 async def to_chat_stream_response(ask_result: AskResult) -> AsyncGenerator[bytes, None]:
-    # First stream the find results
-    # Then the stream anwser
-    # Append status at the end
-    # Then the citations
-    # Then relations
-    breakpoint()
-    find_results = None
-    answer = b""
-    status_code = None
-    citations = None
-    relations = None
-    async for ask_response_item in ask_result.stream():
-        # TODO
-        pass
+    # First off, stream the find results
+    find_results = ask_result.find_results
+    bytes_results = base64.b64encode(find_results.json().encode())
+    yield len(bytes_results).to_bytes(length=4, byteorder="big", signed=False)
+    yield bytes_results
+
+    end_of_string_yielded = False
+
+    # Then stream the answer, the status code and the citations
+    async for nd_json_line in ask_result.ndjson_stream():
+        ask_response_item = AskResponseItem.model_validate_json(nd_json_line).item
+        if isinstance(
+            ask_response_item,
+            (
+                RetrievalAskResponseItem,  # already streamed
+                MetadataAskResponseItem,  # not supported in chat
+                DebugAskResponseItem,  # not supported in chat
+            ),
+        ):
+            continue
+
+        if isinstance(ask_response_item, AnswerAskResponseItem):
+            yield ask_response_item.text.encode()
+
+        elif isinstance(ask_response_item, StatusAskResponseItem):
+            yield ask_response_item.code.encode()
+
+        elif isinstance(ask_response_item, CitationsAskResponseItem):
+            yield START_OF_CITATIONS
+            citations = ask_response_item.citations
+            encoded_citations = base64.b64encode(json.dumps(citations).encode())
+            yield len(encoded_citations).to_bytes(
+                length=4, byteorder="big", signed=False
+            )
+            yield encoded_citations
+
+        elif isinstance(ask_response_item, RelationsAskResponseItem):
+            yield END_OF_STREAM
+            end_of_string_yielded = True
+
+            relations = ask_response_item.relations
+            yield base64.b64encode(relations.json().encode())
+
+    if not end_of_string_yielded:
+        yield END_OF_STREAM

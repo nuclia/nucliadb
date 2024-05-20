@@ -325,28 +325,6 @@ class PredictEngine:
         await self.check_response(resp, expected_status=200)
         return await _parse_rephrase_response(resp)
 
-    @predict_observer.wrap({"type": "chat"})
-    async def chat_query(
-        self, kbid: str, item: ChatModel
-    ) -> tuple[str, AsyncIterator[bytes]]:
-        try:
-            self.check_nua_key_is_configured_for_onprem()
-        except NUAKeyMissingError:
-            error = "Nuclia Service account is not defined so the chat operation could not be performed"
-            logger.warning(error)
-            raise SendToPredictError(error)
-
-        resp = await self.make_request(
-            "POST",
-            url=self.get_predict_url(CHAT, kbid),
-            json=item.dict(),
-            headers=self.get_predict_headers(kbid),
-            timeout=None,
-        )
-        await self.check_response(resp, expected_status=200)
-        ident = resp.headers.get(NUCLIA_LEARNING_ID_HEADER)
-        return ident, get_answer_generator(resp)
-
     @predict_observer.wrap({"type": "chat_ndjson"})
     async def chat_query_ndjson(
         self, kbid: str, item: ChatModel
@@ -457,12 +435,6 @@ class DummyPredictEngine(PredictEngine):
         self.cluster_url = "http://localhost:8000"
         self.public_url = "http://localhost:8000"
         self.calls = []
-        self.generated_answer = [
-            b"valid ",
-            b"answer ",
-            b" to",
-            AnswerStatusCode.SUCCESS.encode(),
-        ]
         self.ndjson_answer = [
             b'{"chunk": {"type": "text", "text": "valid "}}\n',
             b'{"chunk": {"type": "text", "text": "answer "}}\n',
@@ -500,17 +472,6 @@ class DummyPredictEngine(PredictEngine):
     async def rephrase_query(self, kbid: str, item: RephraseModel) -> str:
         self.calls.append(("rephrase_query", item))
         return DUMMY_REPHRASE_QUERY
-
-    async def chat_query(
-        self, kbid: str, item: ChatModel
-    ) -> tuple[str, AsyncIterator[bytes]]:
-        self.calls.append(("chat_query", item))
-
-        async def generate():
-            for i in self.generated_answer:
-                yield i
-
-        return (DUMMY_LEARNING_ID, generate())
 
     async def chat_query_ndjson(
         self, kbid: str, item: ChatModel
@@ -581,24 +542,6 @@ class DummyPredictEngine(PredictEngine):
                 summary="\n\n".join(rsummary), tokens=10
             )
         return response
-
-
-def get_answer_generator(response: aiohttp.ClientResponse):
-    """
-    Returns an async generator that yields the chunks of the response
-    in the same way as received from the server.
-    See: https://docs.aiohttp.org/en/stable/streams.html#aiohttp.StreamReader.iter_chunks
-    """
-
-    async def _iter_answer_chunks(gen):
-        buffer = b""
-        async for chunk, end_of_chunk in gen:
-            buffer += chunk
-            if end_of_chunk:
-                yield buffer
-                buffer = b""
-
-    return _iter_answer_chunks(response.content.iter_chunks())
 
 
 def get_chat_ndjson_generator(

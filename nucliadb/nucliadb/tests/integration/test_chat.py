@@ -98,57 +98,6 @@ async def resource(nucliadb_writer, knowledgebox):
     yield rid
 
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_chat_handles_status_codes_in_a_different_chunk(
-    nucliadb_reader: AsyncClient, knowledgebox, resource
-):
-    predict = get_predict()
-    predict.generated_answer = [b"some ", b"text ", b"with ", b"status.", b"-2"]  # type: ignore
-
-    resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/chat", json={"query": "title"}
-    )
-    assert resp.status_code == 200
-    _, answer, _, _ = parse_chat_response(resp.content)
-
-    assert answer == b"some text with status."
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_chat_handles_status_codes_in_the_same_chunk(
-    nucliadb_reader: AsyncClient, knowledgebox, resource
-):
-    predict = get_predict()
-    predict.generated_answer = [b"some ", b"text ", b"with ", b"status.-2"]  # type: ignore
-
-    resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/chat", json={"query": "title"}
-    )
-    assert resp.status_code == 200
-    _, answer, _, _ = parse_chat_response(resp.content)
-
-    assert answer == b"some text with status."
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_chat_handles_status_codes_with_last_chunk_empty(
-    nucliadb_reader: AsyncClient, knowledgebox, resource
-):
-    predict = get_predict()
-    predict.generated_answer = [b"some ", b"text ", b"with ", b"status.", b"-2", b""]  # type: ignore
-
-    resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/chat", json={"query": "title"}
-    )
-    assert resp.status_code == 200
-    _, answer, _, _ = parse_chat_response(resp.content)
-
-    assert answer == b"some text with status."
-
-
 def parse_chat_response(content: bytes):
     raw = io.BytesIO(content)
     header = raw.read(4)
@@ -202,7 +151,7 @@ async def test_chat_synchronous(nucliadb_reader: AsyncClient, knowledgebox, reso
         headers={"X-Synchronous": "True"},
     )
     assert resp.status_code == 200
-    resp_data = SyncChatResponse.parse_raw(resp.content)
+    resp_data = SyncChatResponse.model_validate_json(resp.content)
 
     assert resp_data.answer == "some text with status."
     assert len(resp_data.results.resources) == 1
@@ -240,7 +189,7 @@ async def test_chat_with_citations(
     assert resp.status_code == 200
 
     if sync_chat:
-        resp_data = SyncChatResponse.parse_raw(resp.content)
+        resp_data = SyncChatResponse.model_validate_json(resp.content)
         resp_citations = resp_data.citations
     else:
         resp_citations = parse_chat_response(resp.content)[-1]
@@ -271,7 +220,7 @@ async def test_chat_without_citations(
     assert resp.status_code == 200
 
     if sync_chat:
-        resp_data = SyncChatResponse.parse_raw(resp.content)
+        resp_data = SyncChatResponse.model_validate_json(resp.content)
         resp_citations = resp_data.citations
     else:
         resp_citations = parse_chat_response(resp.content)[-1]
@@ -291,7 +240,7 @@ async def test_sync_chat_returns_prompt_context(
         headers={"X-Synchronous": "True"},
     )
     assert resp.status_code == 200
-    resp_data = SyncChatResponse.parse_raw(resp.content)
+    resp_data = SyncChatResponse.model_validate_json(resp.content)
     if debug:
         assert resp_data.prompt_context
         assert resp_data.prompt_context_order
@@ -338,7 +287,7 @@ async def test_chat_rag_options_full_resource(
     _ = parse_chat_response(resp.content)
 
     # Make sure the prompt context is properly crafted
-    assert predict.calls[-2][0] == "chat_query"  # type: ignore
+    assert predict.calls[-2][0] == "chat_query_ndjson"  # type: ignore
     prompt_context = predict.calls[-2][1].query_context  # type: ignore
 
     # All fields of the matching resource should be in the prompt context
@@ -507,7 +456,7 @@ async def test_chat_capped_context(
         timeout=None,
     )
     assert resp.status_code == 200
-    resp_data = SyncChatResponse.parse_raw(resp.content)
+    resp_data = SyncChatResponse.model_validate_json(resp.content)
     assert resp_data.prompt_context is not None
     assert len(resp_data.prompt_context) == 6
     total_size = sum(len(v) for v in resp_data.prompt_context.values())
@@ -527,7 +476,7 @@ async def test_chat_capped_context(
         timeout=None,
     )
     assert resp.status_code == 200, resp.text
-    resp_data = SyncChatResponse.parse_raw(resp.content)
+    resp_data = SyncChatResponse.model_validate_json(resp.content)
     assert resp_data.prompt_context is not None
     total_size = sum(len(v) for v in resp_data.prompt_context.values())
     assert total_size <= max_size * 3
