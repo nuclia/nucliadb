@@ -27,6 +27,7 @@ fn main() -> Result<()> {
     println!("cargo:rerun-if-changed=../resources.proto");
     println!("cargo:rerun-if-changed=../noderesources.proto");
     println!("cargo:rerun-if-changed=../utils.proto");
+    println!("cargo:rerun-if-changed=../audit.proto");
     println!("cargo:rerun-if-changed=../writer.proto");
     println!("cargo:rerun-if-changed=../nodewriter.proto");
     println!("cargo:rerun-if-changed=../nodereader.proto");
@@ -40,6 +41,7 @@ fn main() -> Result<()> {
             "nucliadb_protos/knowledgebox.proto",
             "nucliadb_protos/resources.proto",
             "nucliadb_protos/noderesources.proto",
+            "nucliadb_protos/audit.proto",
             "nucliadb_protos/writer.proto",
             "nucliadb_protos/nodewriter.proto",
             "nucliadb_protos/nodereader.proto",

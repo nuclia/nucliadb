@@ -101,9 +101,6 @@ async def kb_notifications(kbid: str) -> AsyncGenerator[writer_pb2.Notification,
         data = pubsub.parse(raw_data)
         notification = writer_pb2.Notification()
         notification.ParseFromString(data)
-        # We don't need the whole broker message, so we clear it to
-        # save space, as it can potentially be very big
-        notification.ClearField("message")
         try:
             queue.put_nowait(notification)
         except asyncio.QueueFull:  # pragma: no cover

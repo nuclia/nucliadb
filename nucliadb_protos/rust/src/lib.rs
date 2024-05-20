@@ -22,6 +22,7 @@
 #![allow(clippy::large_enum_variant)]
 
 pub mod fdbwriter;
+pub mod audit;
 pub mod knowledgebox;
 pub mod nodereader;
 pub mod noderesources;

@@ -31,7 +31,6 @@ pytestmark = pytest.mark.asyncio
 
 
 async def test_audit_counters(
-    maindb_driver,
     stream_audit: StreamAuditStorage,
     pubsub,
     nats_manager,
@@ -50,7 +49,6 @@ async def test_audit_counters(
     psub = await nats_manager.js.pull_subscribe(subject, "psub")
 
     iah = auditing.IndexAuditHandler(
-        driver=maindb_driver,
         audit=stream_audit,
         pubsub=pubsub,
         check_delay=0.05,
