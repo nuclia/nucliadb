@@ -7,7 +7,7 @@ apiVersion: apps/v1
 metadata:
   name: node-replica-{{ $i }}
   labels:
-    app: node-replica-{{ $i }}
+    app: node-replica
     appType: node
     readReplica: "true"
     app.kubernetes.io/name: node-replica-{{ $i }}
@@ -22,7 +22,7 @@ spec:
   revisionHistoryLimit: {{ $values.revisionHistoryLimit }}
   selector:
     matchLabels:
-      app: node-replica-{{ $i }}
+      app: node-replica
       app.kubernetes.io/name: node-replica-{{ $i }}
       app.kubernetes.io/instance: "{{ $release.Name }}"
       app.kubernetes.io/managed-by: {{ $release.Service }}
@@ -36,7 +36,7 @@ spec:
         {{- end }}
       name: node-replica-{{ $i }}
       labels:
-        app: node-replica-{{ $i }}
+        app: node-replica
         appType: node
         readReplica: "true"
         app.kubernetes.io/name: node-replica-{{ $i }}
