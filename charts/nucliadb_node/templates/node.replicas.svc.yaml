@@ -7,7 +7,7 @@ kind: Service
 metadata:
   name: node-replicas-{{ $i }}
   labels:
-    app: node-replicas-{{ $i }}
+    app: node-replicas
     appType: node
     readReplica: "true"
     app.kubernetes.io/name: node-replicas-{{ $i }}
@@ -18,7 +18,7 @@ metadata:
     metrics: "enabled"
 spec:
   selector:
-    app: node-replicas-{{ $i }}
+    app: node-replicas
     chart: "{{ $chart.Name }}"
   clusterIP: None
   ports:

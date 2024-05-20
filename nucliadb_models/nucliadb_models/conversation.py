@@ -51,9 +51,9 @@ class MessageFormat(Enum):  # type: ignore
 
 
 class MessageContent(BaseModel):
-    text: Optional[str]
-    format: Optional[MessageFormat]
-    attachments: Optional[List[CloudLink]]
+    text: Optional[str] = None
+    format: Optional[MessageFormat] = None
+    attachments: Optional[List[CloudLink]] = None
 
 
 class MessageType(Enum):
@@ -67,7 +67,7 @@ class Message(BaseModel):
     who: Optional[str] = None
     to: Optional[List[str]] = []
     content: MessageContent
-    ident: Optional[str]
+    ident: Optional[str] = None
     type_: Optional[MessageType] = Field(None, alias="type")
 
 
@@ -98,9 +98,9 @@ class FieldConversation(BaseModel):
     This class is used mainly when exposing a conversation in the resource level
     """
 
-    pages: Optional[int]
-    size: Optional[int]
-    total: Optional[int]
+    pages: Optional[int] = None
+    size: Optional[int] = None
+    total: Optional[int] = None
 
     @classmethod
     def from_message(cls: Type[_T], message: resources_pb2.FieldConversation) -> _T:

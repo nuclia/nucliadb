@@ -20,8 +20,8 @@
 from enum import Enum
 from typing import Dict, List, Optional
 
-from pydantic import BaseSettings, Field
-from pydantic.class_validators import root_validator
+from pydantic import AliasChoices, Field, model_validator
+from pydantic_settings import BaseSettings
 
 
 class RunningSettings(BaseSettings):
@@ -29,7 +29,7 @@ class RunningSettings(BaseSettings):
     sentry_url: Optional[str] = None
     running_environment: str = Field(
         default="local",
-        env=["environment", "running_environment"],
+        validation_alias=AliasChoices("environment", "running_environment"),
         description="Running environment. One of: local, test, stage, prod",
     )
     metrics_port: int = 3030
@@ -48,7 +48,7 @@ class HTTPSettings(BaseSettings):
 http_settings = HTTPSettings()
 
 
-class FileBackendConfig(str, Enum):
+class FileBackendConfig(Enum):
     GCS = "gcs"
     S3 = "s3"
     PG = "pg"
@@ -130,7 +130,9 @@ class NucliaSettings(BaseSettings):
         "http://processing-api.processing.svc.cluster.local:8080"
     )
     nuclia_inner_predict_url: str = "http://predict.learning.svc.cluster.local:8080"
-    learning_internal_svc_base_url = "http://{service}.learning.svc.cluster.local:8080"
+    learning_internal_svc_base_url: str = (
+        "http://{service}.learning.svc.cluster.local:8080"
+    )
 
     nuclia_zone: str = "europe-1"
     onprem: bool = True
@@ -145,7 +147,8 @@ class NucliaSettings(BaseSettings):
     local_predict: bool = False
     local_predict_headers: Dict[str, str] = {}
 
-    @root_validator(pre=True)
+    @model_validator(mode="before")
+    @classmethod
     def check_onprem_does_not_use_jwt_key(cls, values):
         if values.get("onprem") and values.get("jwt_key") is not None:
             raise ValueError("Invalid validation")

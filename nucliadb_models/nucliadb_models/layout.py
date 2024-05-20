@@ -60,15 +60,15 @@ class Block(BaseModel):
     y: int
     cols: int
     rows: int
-    type: Optional[TypeBlock]
-    ident: Optional[str]
-    payload: Optional[str]
-    file: Optional[CloudLink]
+    type: Optional[TypeBlock] = None
+    ident: Optional[str] = None
+    payload: Optional[str] = None
+    file: Optional[CloudLink] = None
 
 
 class LayoutContent(BaseModel):
     blocks: Dict[str, Block] = {}
-    deleted_blocks: Optional[List[str]]
+    deleted_blocks: Optional[List[str]] = None
 
 
 class FieldLayout(BaseModel):

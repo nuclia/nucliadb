@@ -29,14 +29,14 @@ from nucliadb_telemetry.settings import LogFormatType, LogLevel, LogOutputType
 from nucliadb_utils.settings import StorageSettings
 
 
-class StandaloneDiscoveryMode(str, Enum):
+class StandaloneDiscoveryMode(Enum):
     DEFAULT = "default"
     MANUAL = "manual"
     KUBERNETES = "kubernetes"
     SINGLE_NODE = "single_node"
 
 
-class AuthPolicy(str, Enum):
+class AuthPolicy(Enum):
     UPSTREAM_NAIVE = "upstream_naive"
     UPSTREAM_AUTH_HEADER = "upstream_auth_header"
     UPSTREAM_OAUTH2 = "upstream_oauth2"
@@ -53,9 +53,12 @@ class Settings(DriverSettings, StorageSettings):
     # in the app. These are helper settings to make things easier to
     # use with standalone app vs cluster app.
     nua_api_key: Optional[str] = pydantic.Field(
-        description="Nuclia Understanding API Key. Read how to generate a NUA Key here: https://docs.nuclia.dev/docs/docs/using/understanding/intro#get-a-nua-key"  # noqa
+        default=None,
+        description="Nuclia Understanding API Key. Read how to generate a NUA Key here: https://docs.nuclia.dev/docs/docs/using/understanding/intro#get-a-nua-key",  # noqa
     )
-    zone: Optional[str] = pydantic.Field(description="Nuclia Understanding API Zone ID")
+    zone: Optional[str] = pydantic.Field(
+        default=None, description="Nuclia Understanding API Zone ID"
+    )
     http_host: str = pydantic.Field(default="0.0.0.0", description="HTTP Port")
     http_port: int = pydantic.Field(default=8080, description="HTTP Port")
     ingest_grpc_port: int = pydantic.Field(default=8030, description="Ingest GRPC Port")

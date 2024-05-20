@@ -34,7 +34,7 @@ from pydantic import BaseModel
 
 from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.standalone.settings import Settings
-from nucliadb_telemetry.settings import LogSettings
+from nucliadb_telemetry.settings import LogOutputType, LogSettings
 
 MB = 1024 * 1024
 CHUNK_SIZE = 2 * MB
@@ -70,7 +70,7 @@ class NodeInfo(BaseModel):
     id: str
     address: str
     shard_count: int
-    primary_id: Optional[str]
+    primary_id: Optional[str] = None
 
 
 class ClusterInfo(BaseModel):
@@ -86,7 +86,7 @@ async def stream_tar(app: FastAPI) -> AsyncGenerator[bytes, None]:
             await add_cluster_info(temp_dir, tar)
             settings: Settings = app.settings.copy()  # type: ignore
             await add_settings(temp_dir, tar, settings)
-            if settings.log_output_type == "file":
+            if settings.log_output_type == LogOutputType.FILE:
                 await add_logs(tar)
 
         async for chunk in stream_out_tar(tar_file):
@@ -164,7 +164,7 @@ def _add_cluster_info_to_tar(temp_dir: str, tar: tarfile.TarFile):
     )
     cluster_info_file = os.path.join(temp_dir, "cluster_info.txt")
     with open(cluster_info_file, "w") as f:
-        f.write(cluster_info.json(indent=4))
+        f.write(cluster_info.model_dump_json(indent=4))
     tar.add(cluster_info_file, arcname="cluster_info.txt")
 
 
@@ -177,7 +177,7 @@ def _add_settings_to_tar(temp_dir: str, tar: tarfile.TarFile, settings: Settings
     remove_sensitive_settings(settings)
     settings_file = os.path.join(temp_dir, "settings.json")
     with open(settings_file, "w") as f:
-        f.write(settings.json(indent=4))
+        f.write(settings.model_dump_json(indent=4))
     tar.add(settings_file, arcname="settings.json")
 
 

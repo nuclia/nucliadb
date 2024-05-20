@@ -69,7 +69,7 @@ async def pull_processor_api():
         return {
             "status": "ok",
             "payload": base64.b64encode(message.SerializeToString()).decode(),
-            "msgid": len(messages),
+            "msgid": str(len(messages)),
         }
 
     port = free_port()

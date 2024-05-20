@@ -61,7 +61,7 @@ END_OF_STREAM = "_END_"
 
 class SyncChatResponse(pydantic.BaseModel):
     answer: str
-    relations: Optional[Relations]
+    relations: Optional[Relations] = None
     results: KnowledgeboxFindResults
     status: AnswerStatusCode
     citations: dict[str, Any] = {}

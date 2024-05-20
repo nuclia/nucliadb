@@ -19,7 +19,8 @@
 #
 import enum
 
-from pydantic import BaseSettings, Field
+from pydantic import Field
+from pydantic_settings import BaseSettings
 
 
 class ClusterDiscoveryMode(str, enum.Enum):
@@ -28,7 +29,7 @@ class ClusterDiscoveryMode(str, enum.Enum):
     SINGLE_NODE = "single_node"
 
 
-class StandaloneNodeRole(str, enum.Enum):
+class StandaloneNodeRole(enum.Enum):
     ALL = "all"
     INDEX = "index"
     WORKER = "worker"

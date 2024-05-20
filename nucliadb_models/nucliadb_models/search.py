@@ -20,7 +20,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional, Type, TypeVar, Union
+from typing import Any, Dict, List, Literal, Optional, Set, Type, TypeVar, Union
 
 from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.audit_pb2 import ClientType
@@ -29,7 +29,7 @@ from nucliadb_protos.nodereader_pb2 import ParagraphResult as PBParagraphResult
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb_protos.writer_pb2 import Shards as PBShards
-from pydantic import BaseModel, Field, root_validator, validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing_extensions import Annotated
 
 from nucliadb_models.common import FieldTypeName, ParamDefault
@@ -408,7 +408,7 @@ class KnowledgeboxShards(BaseModel):
     actual: int
     similarity: VectorSimilarity
     shards: List[ShardObject]
-    model: Optional[SemanticModelMetadata]
+    model: Optional[SemanticModelMetadata] = None
 
     @classmethod
     def from_message(cls: Type[_T], message: PBShards) -> _T:
@@ -609,12 +609,13 @@ class SearchParamDefaults:
 
 
 class Filter(BaseModel):
-    all: Optional[List[str]] = Field(default=None, min_items=1)
-    any: Optional[List[str]] = Field(default=None, min_items=1)
-    none: Optional[List[str]] = Field(default=None, min_items=1)
-    not_all: Optional[List[str]] = Field(default=None, min_items=1)
+    all: Optional[List[str]] = Field(default=None, min_length=1)
+    any: Optional[List[str]] = Field(default=None, min_length=1)
+    none: Optional[List[str]] = Field(default=None, min_length=1)
+    not_all: Optional[List[str]] = Field(default=None, min_length=1)
 
-    @root_validator(pre=True)
+    @model_validator(mode="before")
+    @classmethod
     def validate_filter(cls, values):
         if len({k for k, v in values.items() if v is not None}) != 1:
             raise ValueError("Only one of 'all', 'any', 'none' or 'not_all' can be set")
@@ -640,7 +641,8 @@ class CatalogRequest(BaseModel):
         description="Filter results by resource processing status",
     )
 
-    @validator("faceted")
+    @field_validator("faceted")
+    @classmethod
     def nested_facets_not_supported(cls, facets):
         return validate_facets(facets)
 
@@ -727,7 +729,8 @@ class SearchRequest(BaseSearchRequest):
     faceted: List[str] = SearchParamDefaults.faceted.to_pydantic_field()
     sort: Optional[SortOptions] = SearchParamDefaults.sort.to_pydantic_field()
 
-    @validator("faceted")
+    @field_validator("faceted")
+    @classmethod
     def nested_facets_not_supported(cls, facets):
         return validate_facets(facets)
 
@@ -875,14 +878,14 @@ ALLOWED_FIELD_TYPES: dict[str, str] = {
 
 class FieldExtensionStrategy(RagStrategy):
     name: Literal["field_extension"]
-    fields: List[str] = Field(
+    fields: Set[str] = Field(
         title="Fields",
         description="List of field ids to extend the context with. It will try to extend the retrieval context with the specified fields in the matching resources. The field ids have to be in the format `{field_type}/{field_name}`, like 'a/title', 'a/summary' for title and summary fields or 't/amend' for a text field named 'amend'.",  # noqa
-        min_items=1,
-        unique_items=True,
+        min_length=1,
     )
 
-    @root_validator(pre=True)
+    @model_validator(mode="before")
+    @classmethod
     def fields_validator(cls, values):
         if values.get("fields") is None:
             return values
@@ -1054,7 +1057,8 @@ class ChatRequest(BaseModel):
         description="If set to true, the response will be in markdown format",
     )
 
-    @root_validator(pre=True)
+    @model_validator(mode="before")
+    @classmethod
     def rag_features_validator(cls, values):
         chosen_strategies = []
         for s in values.get("rag_strategies") or []:
@@ -1120,8 +1124,8 @@ class SummarizeRequest(BaseModel):
 
     resources: List[str] = Field(
         ...,
-        min_items=1,
-        max_items=100,
+        min_length=1,
+        max_length=100,
         title="Resources",
         description="Uids or slugs of the resources to summarize. If the resources are not found, they will be ignored.",
     )
@@ -1161,7 +1165,8 @@ class FindRequest(BaseSearchRequest):
         )
     )
 
-    @validator("features")
+    @field_validator("features")
+    @classmethod
     def fulltext_not_supported(cls, v):
         if SearchOptions.DOCUMENT in v or SearchOptions.DOCUMENT == v:
             raise ValueError("fulltext search not supported")
@@ -1175,7 +1180,7 @@ class SCORE_TYPE(str, Enum):
 
 
 class FindTextPosition(BaseModel):
-    page_number: Optional[int]
+    page_number: Optional[int] = None
     start_seconds: Optional[List[int]] = None
     end_seconds: Optional[List[int]] = None
     index: int
@@ -1235,7 +1240,7 @@ class FindResource(Resource):
     fields: Dict[str, FindField]
 
     def updated_from(self, origin: Resource):
-        for key in origin.__fields__.keys():
+        for key in origin.model_fields.keys():
             self.__setattr__(key, getattr(origin, key))
 
 
@@ -1286,7 +1291,7 @@ class FeedbackRequest(BaseModel):
         title="Task",
         description="The task the feedback is for. For now, only `CHAT` task is available",
     )
-    feedback: Optional[str] = Field(title="Feedback", description="Feedback text")
+    feedback: Optional[str] = Field(None, title="Feedback", description="Feedback text")
 
 
 def validate_facets(facets):

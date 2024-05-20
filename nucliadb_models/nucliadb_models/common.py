@@ -23,7 +23,7 @@ import re
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, root_validator
+from pydantic import BaseModel, Field, field_serializer, model_validator
 
 from nucliadb_protos import resources_pb2
 
@@ -50,7 +50,7 @@ _NOT_SET = object()
 
 
 class ParamDefault(BaseModel):
-    default: Any
+    default: Any = None
     title: str
     description: str
     le: Optional[float] = None
@@ -68,7 +68,7 @@ class ParamDefault(BaseModel):
             description=self.description,
             gt=self.gt,
             le=self.le,
-            max_items=self.max_items,
+            max_length=self.max_items,
         )
 
 
@@ -88,29 +88,30 @@ class FieldID(BaseModel):
 
 
 class File(BaseModel):
-    filename: Optional[str]
+    filename: Optional[str] = None
     content_type: str = "application/octet-stream"
-    payload: Optional[str] = Field(description="Base64 encoded file content")
+    payload: Optional[str] = Field(None, description="Base64 encoded file content")
     md5: Optional[str] = None
     # These are to be used for external files
     uri: Optional[str] = None
     extra_headers: Dict[str, str] = {}
 
-    @root_validator(pre=False)
+    @model_validator(mode="after")
+    @classmethod
     def _check_internal_file_fields(cls, values):
-        if values.get("uri"):
+        if values.uri:
             # Externally hosted file
             return values
 
         required_keys = ["filename", "payload"]
         for key in required_keys:
-            if values.get(key) is None:
+            if getattr(values, key) is None:
                 raise ValueError(f"{key} is required")
-        if values.get("md5") is None:
+        if values.md5 is None:
             # In case md5 is not supplied, compute it
             try:
-                result = hashlib.md5(base64.b64decode(values.get("payload")))
-                values["md5"] = result.hexdigest()
+                result = hashlib.md5(base64.b64decode(values.payload))
+                values.md5 = result.hexdigest()
             except Exception:
                 raise ValueError("MD5 could not be computed")
         return values
@@ -128,10 +129,10 @@ class FileB64(BaseModel):
 
 
 class CloudFile(BaseModel):
-    uri: Optional[str]
-    size: Optional[int]
-    content_type: Optional[str]
-    bucket_name: Optional[str]
+    uri: Optional[str] = None
+    size: Optional[int] = None
+    content_type: Optional[str] = None
+    bucket_name: Optional[str] = None
 
     class Source(Enum):
         FLAPS = "FLAPS"
@@ -152,11 +153,11 @@ class CloudFile(BaseModel):
 
 
 class CloudLink(BaseModel):
-    uri: Optional[str]
-    size: Optional[int]
-    content_type: Optional[str]
-    filename: Optional[str]
-    md5: Optional[str]
+    uri: Optional[str] = None
+    size: Optional[int] = None
+    content_type: Optional[str] = None
+    filename: Optional[str] = None
+    md5: Optional[str] = None
 
     @staticmethod
     def format_reader_download_uri(uri: str) -> str:
@@ -169,9 +170,9 @@ class CloudLink(BaseModel):
         url_params["field_type"] = FIELD_TYPE_CHAR_MAP[url_params["field_type"]]
         return DOWNLOAD_URI.format(**url_params).rstrip("/")
 
-    def dict(self, **kwargs):
-        self.uri = self.format_reader_download_uri(self.uri)
-        return BaseModel.dict(self)
+    @field_serializer("uri")
+    def serialize_uri(uri):
+        return CloudLink.format_reader_download_uri(uri)
 
 
 class FieldTypeName(str, Enum):
@@ -201,26 +202,26 @@ class UserClassification(Classification):
 
 
 class Sentence(BaseModel):
-    start: Optional[int]
-    end: Optional[int]
-    key: Optional[str]
+    start: Optional[int] = None
+    end: Optional[int] = None
+    key: Optional[str] = None
 
 
 class PageInformation(BaseModel):
-    page: Optional[int]
-    page_with_visual: Optional[bool]
+    page: Optional[int] = None
+    page_with_visual: Optional[bool] = None
 
 
 class Representation(BaseModel):
-    is_a_table: Optional[bool]
-    reference_file: Optional[str]
+    is_a_table: Optional[bool] = None
+    reference_file: Optional[str] = None
 
 
 class Paragraph(BaseModel):
-    start: Optional[int]
-    end: Optional[int]
-    start_seconds: Optional[List[int]]
-    end_seconds: Optional[List[int]]
+    start: Optional[int] = None
+    end: Optional[int] = None
+    start_seconds: Optional[List[int]] = None
+    end_seconds: Optional[List[int]] = None
 
     class TypeParagraph(str, Enum):
         TEXT = "TEXT"
@@ -231,16 +232,16 @@ class Paragraph(BaseModel):
         TITLE = "TITLE"
         TABLE = "TABLE"
 
-    kind: Optional[TypeParagraph]
-    classifications: Optional[List[Classification]]
-    sentences: Optional[List[Sentence]]
-    key: Optional[str]
-    page: Optional[PageInformation]
-    representation: Optional[Representation]
+    kind: Optional[TypeParagraph] = None
+    classifications: Optional[List[Classification]] = None
+    sentences: Optional[List[Sentence]] = None
+    key: Optional[str] = None
+    page: Optional[PageInformation] = None
+    representation: Optional[Representation] = None
 
 
 class Shards(BaseModel):
-    shards: Optional[List[str]]
+    shards: Optional[List[str]] = None
 
 
 FIELD_TYPES_MAP: Dict[resources_pb2.FieldType.ValueType, FieldTypeName] = {

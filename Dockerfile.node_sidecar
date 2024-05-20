@@ -24,13 +24,6 @@ COPY nucliadb_utils/requirements-storages.txt /usr/src/app/requirements-storages
 COPY nucliadb_node/requirements.txt /usr/src/app/requirements-node.txt
 COPY nucliadb_telemetry/requirements.txt /usr/src/app/requirements-telemetry.txt
 
-RUN set -eux; \
-    pip install --no-cache-dir \
-    -r /usr/src/app/requirements-utils.txt \
-    -r /usr/src/app/requirements-storages.txt \
-    -r /usr/src/app/requirements-telemetry.txt \
-    -r /usr/src/app/requirements-node.txt
-
 # Copy source code
 COPY nucliadb_utils /usr/src/app/nucliadb_utils
 COPY nucliadb_telemetry /usr/src/app/nucliadb_telemetry
@@ -41,7 +34,13 @@ WORKDIR /usr/src/app
 
 # Install all dependendencies on packages on the nucliadb repo
 # and finally the main component.
-RUN pip install -r nucliadb_node/requirements-sources.txt
+RUN set -eux; \
+    pip install --no-cache-dir \
+    -r /usr/src/app/requirements-utils.txt \
+    -r /usr/src/app/requirements-storages.txt \
+    -r /usr/src/app/requirements-telemetry.txt \
+    -r /usr/src/app/requirements-node.txt \
+    -r nucliadb_node/requirements-sources.txt
 RUN pip install --no-deps -e /usr/src/app/nucliadb_node
 
 WORKDIR /usr/src/app

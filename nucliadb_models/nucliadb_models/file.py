@@ -35,10 +35,10 @@ _T = TypeVar("_T")
 
 
 class FieldFile(BaseModel):
-    added: Optional[datetime]
-    file: Optional[CloudLink]
-    language: Optional[str]
-    password: Optional[str]
+    added: Optional[datetime] = None
+    file: Optional[CloudLink] = None
+    language: Optional[str] = None
+    password: Optional[str] = None
     external: bool = False
 
     @classmethod

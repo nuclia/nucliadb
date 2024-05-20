@@ -70,8 +70,8 @@ class Source(SourceValue, Enum):  # type: ignore
 
 
 class ProcessingInfo(BaseModel):
-    seqid: Optional[int]
-    account_seq: Optional[int]
+    seqid: Optional[int] = None
+    account_seq: Optional[int] = None
     queue: Optional[QueueType] = None
 
 

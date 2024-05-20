@@ -20,9 +20,10 @@
 from typing import Optional
 
 import pydantic
+import pydantic_settings
 
 
-class Settings(pydantic.BaseSettings):
+class Settings(pydantic_settings.BaseSettings):
     redis_url: Optional[str] = None
     max_concurrent_migrations: int = pydantic.Field(
         default=5,

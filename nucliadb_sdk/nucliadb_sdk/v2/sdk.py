@@ -93,7 +93,7 @@ from nucliadb_models.writer import (
 from nucliadb_sdk.v2 import docstrings, exceptions
 
 
-class Region(str, enum.Enum):
+class Region(enum.Enum):
     EUROPE1 = "europe-1"
     ON_PREM = "on-prem"
     AWS_US_EAST_2_1 = "aws-us-east-2-1"
@@ -102,8 +102,8 @@ class Region(str, enum.Enum):
 class ChatResponse(BaseModel):
     result: KnowledgeboxFindResults
     answer: str
-    relations: Optional[Relations]
-    learning_id: Optional[str]
+    relations: Optional[Relations] = None
+    learning_id: Optional[str] = None
     citations: dict[str, Any] = {}
 
 
@@ -147,6 +147,13 @@ def chat_response_parser(response: httpx.Response) -> ChatResponse:
 
 
 def ask_response_parser(response: httpx.Response) -> SyncAskResponse:
+    content_type = response.headers.get("Content-Type")
+    if content_type not in ("application/json", "application/x-ndjson"):
+        raise ValueError(f"Unknown content type in response: {content_type}")
+
+    if content_type == "application/json":
+        # This comes from a request with the X-Synchronous header set to true
+        return SyncAskResponse.parse_raw(response.content)
     answer = ""
     status = ""
     retrieval_results = None
@@ -269,7 +276,7 @@ def _request_builder(
                 # pull properties out of kwargs now
                 content_data = {}
                 for key in list(kwargs.keys()):
-                    if key in request_type.__fields__:  # type: ignore
+                    if key in request_type.model_fields:  # type: ignore
                         content_data[key] = kwargs.pop(key)
                 data = request_type.parse_obj(content_data).json(by_alias=True)  # type: ignore
         elif is_raw_request_content(content):
@@ -323,18 +330,18 @@ class _NucliaDBBase:
         timeout: Optional[float] = None,
     ):
         try:
-            self.region = Region(region).value
+            self.region: str = Region(region).value
         except ValueError:
             warnings.warn(
                 f"Unknown region '{region}'. Supported regions are: {[r.value for r in Region]}"
             )
-            self.region = region
+            self.region = region  # type: ignore
         self.api_key = api_key
         headers = headers or {}
-        if self.region == Region.ON_PREM:
+        if self.region == Region.ON_PREM.value:
             if url is None:
                 raise ValueError("url must be provided for on-prem")
-            self.base_url = url.rstrip("/")
+            self.base_url: str = url.rstrip("/")
             # By default, on prem should utilize all headers available
             # For custom auth schemes, the user will need to provide custom
             # auth headers
