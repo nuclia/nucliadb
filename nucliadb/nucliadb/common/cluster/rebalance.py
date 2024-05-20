@@ -36,6 +36,8 @@ from .utils import delete_resource_from_shard, index_resource_to_shard, wait_for
 
 logger = logging.getLogger(__name__)
 
+REBALANCE_LOCK = "rebalance"
+
 
 async def get_shards_paragraphs(kbid: str) -> list[tuple[str, int]]:
     """
@@ -195,7 +197,7 @@ async def rebalance_kb(context: ApplicationContext, kbid: str) -> None:
 
 async def run(context: ApplicationContext) -> None:
     try:
-        async with locking.distributed_lock("rebalance"):
+        async with locking.distributed_lock(REBALANCE_LOCK):
             # go through each kb and see if shards need to be reduced in size
             async with datamanagers.with_transaction() as txn:
                 async for kbid, _ in datamanagers.kb.get_kbs(txn):
@@ -204,7 +206,7 @@ async def run(context: ApplicationContext) -> None:
                     ):
                         await rebalance_kb(context, kbid)
     except locking.ResourceLocked as exc:
-        if exc.key == "rebalance":
+        if exc.key == REBALANCE_LOCK:
             logger.warning("Another rebalance process is already running.")
             return
         raise
