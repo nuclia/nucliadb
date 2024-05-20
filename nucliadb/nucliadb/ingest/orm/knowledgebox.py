@@ -44,12 +44,7 @@ from nucliadb.ingest.orm.resource import (
     KB_RESOURCE_SLUG_BASE,
     Resource,
 )
-from nucliadb.ingest.orm.utils import (
-    choose_matryoshka_dimension,
-    compute_paragraph_key,
-    get_basic,
-    set_basic,
-)
+from nucliadb.ingest.orm.utils import choose_matryoshka_dimension, compute_paragraph_key
 from nucliadb.migrator.utils import get_latest_version
 from nucliadb_protos import writer_pb2
 from nucliadb_utils.storages.storage import Storage
@@ -335,25 +330,24 @@ class KnowledgeBox:
         return None
 
     async def get(self, uuid: str) -> Optional[Resource]:
-        raw_basic = await get_basic(self.txn, self.kbid, uuid)
-        if raw_basic:
-            return Resource(
-                txn=self.txn,
-                storage=self.storage,
-                kb=self,
-                uuid=uuid,
-                basic=Resource.parse_basic(raw_basic),
-                disable_vectors=False,
-            )
-        else:
+        basic = await datamanagers.resources.get_basic(
+            self.txn, kbid=self.kbid, rid=uuid
+        )
+        if basic is None:
             return None
+        return Resource(
+            txn=self.txn,
+            storage=self.storage,
+            kb=self,
+            uuid=uuid,
+            basic=basic,
+            disable_vectors=False,
+        )
 
     async def delete_resource(self, uuid: str):
-        raw_basic = await get_basic(self.txn, self.kbid, uuid)
-        if raw_basic:
-            basic = Resource.parse_basic(raw_basic)
-        else:
-            basic = None
+        basic = await datamanagers.resources.get_basic(
+            self.txn, kbid=self.kbid, rid=uuid
+        )
 
         async for key in self.txn.keys(
             KB_RESOURCE.format(kbid=self.kbid, uuid=uuid), count=-1
@@ -406,7 +400,9 @@ class KnowledgeBox:
         slug = await self.get_unique_slug(uuid, slug)
         basic.slug = slug
         fix_paragraph_annotation_keys(uuid, basic)
-        await set_basic(self.txn, self.kbid, uuid, basic)
+        await datamanagers.resources.set_basic(
+            self.txn, kbid=self.kbid, rid=uuid, basic=basic
+        )
         return Resource(
             storage=self.storage,
             txn=self.txn,

@@ -75,7 +75,6 @@ from nucliadb.ingest.fields.link import Link
 from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.orm.brain import FilePagePositions, ResourceBrain
 from nucliadb.ingest.orm.metrics import processor_observer
-from nucliadb.ingest.orm.utils import get_basic, set_basic
 from nucliadb_models.common import CloudLink
 from nucliadb_models.writer import GENERIC_MIME_TYPE
 from nucliadb_protos import utils_pb2, writer_pb2
@@ -187,11 +186,11 @@ class Resource:
     async def exists(self) -> bool:
         exists = True
         if self.basic is None:
-            payload = await get_basic(self.txn, self.kb.kbid, self.uuid)
-            if payload is not None:
-                pb = PBBasic()
-                pb.ParseFromString(payload)
-                self.basic = pb
+            basic = await datamanagers.resources.get_basic(
+                self.txn, kbid=self.kb.kbid, rid=self.uuid
+            )
+            if basic is not None:
+                self.basic = basic
             else:
                 exists = False
         return exists
@@ -199,8 +198,10 @@ class Resource:
     # Basic
     async def get_basic(self) -> Optional[PBBasic]:
         if self.basic is None:
-            payload = await get_basic(self.txn, self.kb.kbid, self.uuid)
-            self.basic = self.parse_basic(payload) if payload is not None else PBBasic()
+            basic = await datamanagers.resources.get_basic(
+                self.txn, kbid=self.kb.kbid, rid=self.uuid
+            )
+            self.basic = basic if basic is not None else PBBasic()
         return self.basic
 
     def set_processing_status(self, current_basic: PBBasic, basic_in_payload: PBBasic):
@@ -280,7 +281,9 @@ class Resource:
         if deleted_fields is not None and len(deleted_fields) > 0:
             remove_field_classifications(self.basic, deleted_fields=deleted_fields)
 
-        await set_basic(self.txn, self.kb.kbid, self.uuid, self.basic)
+        await datamanagers.resources.set_basic(
+            self.txn, kbid=self.kb.kbid, rid=self.uuid, basic=self.basic
+        )
         self.modified = True
 
     # Origin

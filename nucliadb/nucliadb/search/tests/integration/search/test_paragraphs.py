@@ -22,8 +22,8 @@ import uuid
 from nucliadb_protos.resources_pb2 import Basic, ExtractedTextWrapper
 from nucliadb_protos.utils_pb2 import ExtractedText
 
+from nucliadb.common import datamanagers
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.orm.utils import set_basic
 from nucliadb.search.search import paragraphs
 
 
@@ -33,7 +33,7 @@ async def test_get_paragraph_text(
     kbid = knowledgebox_ingest
     uid = uuid.uuid4().hex
     basic = Basic(slug="slug", uuid=uid)
-    await set_basic(txn, kbid, uid, basic)
+    await datamanagers.resources.set_basic(txn, kbid=kbid, rid=uid, basic=basic)
     kb = KnowledgeBox(txn, storage, kbid)
     orm_resource = await kb.get(uid)
     field_obj = await orm_resource.get_field("field", 4, load=False)

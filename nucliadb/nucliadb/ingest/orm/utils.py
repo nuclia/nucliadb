@@ -18,10 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import urllib.parse
-from typing import Optional
 
 from nucliadb_protos.resources_pb2 import (
-    Basic,
     ExtractedTextWrapper,
     FieldComputedMetadataWrapper,
     FieldType,
@@ -30,21 +28,8 @@ from nucliadb_protos.resources_pb2 import (
 )
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
-from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.processing import PushPayload
 from nucliadb_models.text import PushTextFormat, Text
-
-
-async def set_basic(txn: Transaction, kbid: str, uuid: str, basic: Basic):
-    from nucliadb.common import datamanagers
-
-    await datamanagers.resources.set_basic(txn, kbid=kbid, rid=uuid, basic=basic)
-
-
-async def get_basic(txn: Transaction, kbid: str, uuid: str) -> Optional[bytes]:
-    from nucliadb.common import datamanagers
-
-    return await datamanagers.resources.get_basic_raw(txn, kbid=kbid, rid=uuid)
 
 
 def set_title(writer: BrokerMessage, toprocess: PushPayload, title: str):
