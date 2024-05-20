@@ -640,6 +640,18 @@ class CatalogRequest(BaseModel):
         title="With processing status",
         description="Filter results by resource processing status",
     )
+    range_creation_start: Optional[datetime] = (
+        SearchParamDefaults.range_creation_start.to_pydantic_field()
+    )
+    range_creation_end: Optional[datetime] = (
+        SearchParamDefaults.range_creation_end.to_pydantic_field()
+    )
+    range_modification_start: Optional[datetime] = (
+        SearchParamDefaults.range_modification_start.to_pydantic_field()
+    )
+    range_modification_end: Optional[datetime] = (
+        SearchParamDefaults.range_modification_end.to_pydantic_field()
+    )
 
     @field_validator("faceted")
     @classmethod
