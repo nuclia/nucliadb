@@ -143,7 +143,7 @@ class ProcessingEngine:
         onprem: Optional[bool] = False,
         nuclia_jwt_key: Optional[str] = None,
         days_to_keep: int = 3,
-        driver: str = "gcs",
+        driver: FileBackendConfig = FileBackendConfig.GCS,
     ):
         self.nuclia_service_account = nuclia_service_account
         self.nuclia_zone = nuclia_zone
