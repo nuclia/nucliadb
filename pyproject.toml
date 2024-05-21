@@ -37,7 +37,7 @@ dev = [
     "pytest-mock",
     "faker>=25.1.0",
     "grpc-stubs>=1.44.0",
-    "aioresponses==0.7.5",
+    "aioresponses",
     "asyncpg>=0.27.0",
     "psycopg2-binary",
     "httpx>=0.23.0",

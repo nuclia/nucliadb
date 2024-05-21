@@ -58,7 +58,7 @@ jobs:
             platform: linux
           - os: macos
             target: aarch64
-            interpreter: 3.9 3.10 3.11
+            interpreter: 3.9 3.10 3.11 3.12
           # - os: ubuntu
           #   platform: linux
           #   target: i686
@@ -85,9 +85,9 @@ jobs:
       - name: set up python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.11"
+          python-version: "3.12"
           architecture: ${{ matrix.python-architecture || 'x64' }}
-      
+
       - name: Setup env
         run: |
           python bump.py --build=${{github.run_number}}
@@ -113,7 +113,7 @@ jobs:
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux || 'auto' }}
           container: ${{ matrix.container }}
-          args: -m nucliadb_node_binding/Cargo.toml --release --out dist --profile release-wheel --interpreter ${{ matrix.interpreter || '3.9 3.10 3.11' }}
+          args: -m nucliadb_node_binding/Cargo.toml --release --out dist --profile release-wheel --interpreter ${{ matrix.interpreter || '3.9 3.10 3.11 3.12' }}
 
       - run: ${{ matrix.ls || 'ls -lh' }} dist/
 
@@ -153,7 +153,7 @@ jobs:
       - name: set up python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
       - run: pip install -U twine
 

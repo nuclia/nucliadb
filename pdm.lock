@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["cross_platform", "inherit_metadata"]
 lock_version = "4.4.1"
-content_hash = "sha256:78f3698532569bc54c10fd96a288cf05539c698cdac623ddee1908fe3abb7710"
+content_hash = "sha256:cd3d236f9633ecf7de7fde0eff9d737f5978927ad60e632904e5063dbe7cf8f8"
 
 [[package]]
 name = "aiobotocore"
@@ -142,15 +142,15 @@ files = [
 
 [[package]]
 name = "aioresponses"
-version = "0.7.5"
+version = "0.7.6"
 summary = "Mock out requests made by ClientSession from aiohttp package"
 groups = ["dev"]
 dependencies = [
     "aiohttp<4.0.0,>=3.3.0",
 ]
 files = [
-    {file = "aioresponses-0.7.5-py2.py3-none-any.whl", hash = "sha256:0af13b077bde04ae965bc21981a1c6afd7dd17b861150d858de477d1c39c26a6"},
-    {file = "aioresponses-0.7.5.tar.gz", hash = "sha256:794b3e04837a683fd2c0c099bdf77f8d7ecdd284bc2c15203003518bf5cb8da8"},
+    {file = "aioresponses-0.7.6-py2.py3-none-any.whl", hash = "sha256:d2c26defbb9b440ea2685ec132e90700907fd10bcca3e85ec2f157219f0d26f7"},
+    {file = "aioresponses-0.7.6.tar.gz", hash = "sha256:f795d9dbda2d61774840e7e32f5366f45752d1adc1b74c9362afd017296c7ee1"},
 ]
 
 [[package]]

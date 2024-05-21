@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.9', '3.10', '3.11']
+        python-version: ['3.9', '3.12']
 
     steps:
       - name: Checkout the repository
@@ -47,7 +47,7 @@ jobs:
     strategy:
       max-parallel: 2
       matrix:
-        python-version: ['3.11']
+        python-version: ['3.12']
         storage_backend: ["gcs", "s3"]
     steps:
       - name: Checkout the repository
