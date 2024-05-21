@@ -17,11 +17,27 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use nucliadb_core::protos::{op_status, OpStatus};
+use prost::Message;
 use pyo3::create_exception;
 use pyo3::exceptions::PyException;
+use pyo3::prelude::Python;
+use pyo3::types::PyList;
 
 // Base exception for all custom errors produced by this library
 create_exception!(nucliadb_node_binding, IndexNodeException, PyException);
 
 create_exception!(nucliadb_node_binding, LoadShardError, IndexNodeException);
 create_exception!(nucliadb_node_binding, ShardNotFound, IndexNodeException);
+
+pub fn op_status_error(py: Python<'_>, msg: impl Into<String>) -> &PyList {
+    PyList::new(
+        py,
+        OpStatus {
+            status: op_status::Status::Error.into(),
+            detail: msg.into(),
+            ..Default::default()
+        }
+        .encode_to_vec(),
+    )
+}

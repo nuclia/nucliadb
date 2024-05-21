@@ -116,28 +116,31 @@ class AbstractIndexNode(metaclass=ABCMeta):
         resp: noderesources_pb2.ShardId = await self.writer.DeleteShard(req)  # type: ignore
         return resp.id
 
-    async def del_vectorset(self, shard_id: str, vectorset: str) -> OpStatus:
-        req = noderesources_pb2.VectorSetID()
-        req.shard.id = shard_id
-        req.vectorset = vectorset
-        resp = await self.writer.RemoveVectorSet(req)  # type: ignore
-        return resp
-
-    async def set_vectorset(
+    async def add_vectorset(
         self,
         shard_id: str,
         vectorset: str,
+        *,
         similarity: utils_pb2.VectorSimilarity.ValueType = utils_pb2.VectorSimilarity.COSINE,
+        normalize_vectors: bool = False,
     ) -> OpStatus:
         req = NewVectorSetRequest()
         req.id.shard.id = shard_id
         req.id.vectorset = vectorset
         req.similarity = similarity
+        req.normalize_vectors = normalize_vectors
         resp = await self.writer.AddVectorSet(req)  # type: ignore
         return resp
 
-    async def get_vectorset(self, shard_id: str) -> noderesources_pb2.VectorSetList:
+    async def list_vectorsets(self, shard_id: str) -> list[str]:
         req = noderesources_pb2.ShardId()
         req.id = shard_id
         resp = await self.writer.ListVectorSets(req)  # type: ignore
+        return [v for v in resp.vectorsets]
+
+    async def remove_vectorset(self, shard_id: str, vectorset: str) -> OpStatus:
+        req = noderesources_pb2.VectorSetID()
+        req.shard.id = shard_id
+        req.vectorset = vectorset
+        resp = await self.writer.RemoveVectorSet(req)  # type: ignore
         return resp

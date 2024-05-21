@@ -23,7 +23,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::collect_garbage::{garbage_collection_loop, GCParameters};
-use crate::errors::{IndexNodeException, LoadShardError};
+use crate::errors::{op_status_error, IndexNodeException, LoadShardError};
 use crate::RawProtos;
 use nucliadb_core::merge::MergerError;
 use nucliadb_core::protos::*;
@@ -205,19 +205,95 @@ impl NodeWriter {
         Ok(PyList::new(py, status.encode_to_vec()))
     }
 
-    // TODO: rename to list_vectorsets
-    pub fn get_vectorset<'p>(&mut self, _request: RawProtos, _py: Python<'p>) -> PyResult<&'p PyAny> {
-        Err(IndexNodeException::new_err("Coming soon.."))
+    pub fn add_vectorset<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let request = NewVectorSetRequest::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
+
+        let Some(VectorSetId {
+            shard: Some(ShardId {
+                id: shard_id,
+            }),
+            vectorset,
+        }) = request.id
+        else {
+            return Ok(op_status_error(py, "Vectorset ID must be provided"));
+        };
+        let config = match request.config.map(VectorConfig::try_from) {
+            Some(Ok(config)) => config,
+            Some(Err(error)) => return Ok(op_status_error(py, error.to_string())),
+            None => return Ok(op_status_error(py, "Vector index config must be provided")),
+        };
+
+        let shard = self.obtain_shard(shard_id.clone())?;
+        let result = shard.create_vectors_index(vectorset, config);
+
+        let status = match result {
+            Ok(()) => OpStatus {
+                status: op_status::Status::Ok.into(),
+                detail: "Vectorset successfully created".to_string(),
+                ..Default::default()
+            },
+            Err(error) => OpStatus {
+                status: op_status::Status::Error.into(),
+                detail: error.to_string(),
+                ..Default::default()
+            },
+        };
+        Ok(PyList::new(py, status.encode_to_vec()))
     }
 
-    // TODO
-    pub fn set_vectorset<'p>(&mut self, _request: RawProtos, _py: Python<'p>) -> PyResult<&'p PyAny> {
-        Err(IndexNodeException::new_err("Coming soon.."))
+    pub fn list_vectorsets<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let request = ShardId::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
+
+        let shard_id = request.id;
+        let shard = self.obtain_shard(shard_id.clone())?;
+        let vectorsets = shard.list_vectors_indexes();
+
+        let vectorsets = VectorSetList {
+            shard: Some(ShardId {
+                id: shard_id,
+            }),
+            vectorsets,
+        };
+        Ok(PyList::new(py, vectorsets.encode_to_vec()))
     }
 
-    // TODO
-    pub fn del_vectorset<'p>(&mut self, _request: RawProtos, _py: Python<'p>) -> PyResult<&'p PyAny> {
-        Err(IndexNodeException::new_err("Coming soon.."))
+    pub fn remove_vectorset<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let request = VectorSetId::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
+
+        let VectorSetId {
+            shard: Some(ShardId {
+                id: shard_id,
+            }),
+            vectorset,
+        } = request
+        else {
+            return Ok(PyList::new(
+                py,
+                OpStatus {
+                    status: op_status::Status::Error.into(),
+                    detail: "Vectorset ID must be provided".to_string(),
+                    ..Default::default()
+                }
+                .encode_to_vec(),
+            ));
+        };
+
+        let shard = self.obtain_shard(shard_id.clone())?;
+        let result = shard.remove_vectors_index(vectorset);
+
+        let status = match result {
+            Ok(()) => OpStatus {
+                status: op_status::Status::Ok.into(),
+                detail: "Vectorset successfully deleted".to_string(),
+                ..Default::default()
+            },
+            Err(error) => OpStatus {
+                status: op_status::Status::Error.into(),
+                detail: error.to_string(),
+                ..Default::default()
+            },
+        };
+        Ok(PyList::new(py, status.encode_to_vec()))
     }
 
     pub fn gc<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
