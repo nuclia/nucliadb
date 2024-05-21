@@ -17,10 +17,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use std::mem::size_of;
+
 use nucliadb_core::protos::VectorIndexConfig;
 use nucliadb_core::protos::{VectorSimilarity, VectorType as ProtoVectorType};
 use serde::{Deserialize, Serialize};
 
+use crate::vector_types::*;
 use crate::VectorErr;
 
 #[derive(Default, Debug, Clone, Copy, Serialize, Deserialize)]
@@ -39,7 +42,7 @@ impl From<VectorSimilarity> for Similarity {
     }
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "snake_case", tag = "type")]
 pub enum VectorType {
     #[default]
@@ -49,7 +52,7 @@ pub enum VectorType {
     },
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct VectorConfig {
     #[serde(default)]
     pub similarity: Similarity,
@@ -57,6 +60,50 @@ pub struct VectorConfig {
     pub normalize_vectors: bool,
     #[serde(default)]
     pub vector_type: VectorType,
+}
+
+impl VectorConfig {
+    /// Whether the dimensions of this vector are known ahead of time
+    pub fn known_dimensions(&self) -> bool {
+        !matches!(self.vector_type, VectorType::DenseF32Unaligned)
+    }
+
+    /// The length of bytes of each vector
+    pub fn vector_len_bytes(&self) -> Option<usize> {
+        match self.vector_type {
+            VectorType::DenseF32Unaligned => None,
+            VectorType::DenseF32 {
+                dimension,
+            } => Some(dimension * size_of::<f32>()),
+        }
+    }
+
+    pub fn similarity_function(&self) -> fn(&[u8], &[u8]) -> f32 {
+        match (&self.similarity, &self.vector_type) {
+            (Similarity::Dot, VectorType::DenseF32Unaligned) => dense_f32_unaligned::dot_similarity,
+            (Similarity::Cosine, VectorType::DenseF32Unaligned) => dense_f32_unaligned::cosine_similarity,
+            #[rustfmt::skip]
+            (Similarity::Dot, VectorType::DenseF32 { .. }) => dense_f32::dot_similarity,
+            #[rustfmt::skip]
+            (Similarity::Cosine, VectorType::DenseF32 { .. }) => dense_f32::cosine_similarity,
+        }
+    }
+
+    pub fn encode_function(&self) -> fn(&[f32]) -> Vec<u8> {
+        match &self.vector_type {
+            VectorType::DenseF32Unaligned => dense_f32_unaligned::encode_vector,
+            #[rustfmt::skip]
+            VectorType::DenseF32 { .. } => dense_f32::encode_vector,
+        }
+    }
+
+    pub fn vector_alignment(&self) -> usize {
+        match &self.vector_type {
+            VectorType::DenseF32Unaligned => 1,
+            #[rustfmt::skip]
+            VectorType::DenseF32 { .. } => size_of::<f32>(),
+        }
+    }
 }
 
 impl TryFrom<VectorIndexConfig> for VectorConfig {

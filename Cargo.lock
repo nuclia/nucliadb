@@ -1797,6 +1797,7 @@ dependencies = [
  "rand",
  "serde",
  "serde_json",
+ "simsimd",
  "tempfile",
  "thiserror",
  "uuid 1.8.0",
@@ -3087,6 +3088,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a9e9e0b4211b72e7b8b6e85c807d36c212bdb33ea8587f7569562a84df5465b1"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "simsimd"
+version = "4.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cc9b7427cabeed25b18b43cc7d7ec466d8d1953a13ed56c46dc414c99ca4754e"
+dependencies = [
+ "cc",
 ]
 
 [[package]]

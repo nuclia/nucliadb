@@ -22,7 +22,6 @@ pub mod data_store;
 pub mod dtrie_ram;
 pub mod trie;
 pub mod trie_ram;
-pub mod vector;
 
 pub mod usize_utils {
     pub const USIZE_LEN: usize = (usize::BITS / 8) as usize;

@@ -68,11 +68,18 @@ pub trait Interpreter {
 }
 
 pub trait IntoBuffer {
-    fn serialize_into<W: io::Write>(self, w: W) -> io::Result<()>;
+    fn serialize_into<W: io::Write>(
+        self,
+        w: W,
+        encode_vector: fn(&[f32]) -> Vec<u8>,
+        alignment: usize,
+        adress: u64,
+    ) -> io::Result<()>;
 }
 
+#[cfg(test)]
 impl<T: AsRef<[u8]>> IntoBuffer for T {
-    fn serialize_into<W: io::Write>(self, mut w: W) -> io::Result<()> {
+    fn serialize_into<W: io::Write>(self, mut w: W, _: fn(&[f32]) -> Vec<u8>, _: usize, _: u64) -> io::Result<()> {
         w.write_all(self.as_ref())
     }
 }
@@ -93,7 +100,7 @@ use lazy_static::lazy_static;
 use libc;
 
 #[cfg(not(target_os = "windows"))]
-pub fn will_need(src: &[u8], id: usize, dimension: usize) {
+pub fn will_need(src: &[u8], id: usize, vector_len: usize) {
     lazy_static! {
         static ref PAGE_SIZE: usize = unsafe { libc::sysconf(libc::_SC_PAGESIZE) } as usize;
     };
@@ -102,7 +109,6 @@ pub fn will_need(src: &[u8], id: usize, dimension: usize) {
     // Will only load up to the vectors section, it ignores the key/labels because
     // they are harder to estimate and less useful (only when filtering, similarity is always used)
     let metadata_len = 16; // Estimate
-    let vector_len = dimension * 4 + 4;
     let node_size = HEADER_LEN + metadata_len + vector_len;
 
     // Align node pointer to the start page, as required by madvise
@@ -118,9 +124,14 @@ pub fn will_need(src: &[u8], id: usize, dimension: usize) {
 }
 
 #[cfg(target_os = "windows")]
-pub fn will_need(src: &[u8], id: usize, dimension: usize) {}
+pub fn will_need(src: &[u8], id: usize, vector_len: usize) {}
 
-pub fn create_key_value<D: IntoBuffer>(recipient: &mut File, slots: Vec<D>) -> io::Result<()> {
+pub fn create_key_value<D: IntoBuffer>(
+    recipient: &mut File,
+    slots: Vec<D>,
+    encode_vector: fn(&[f32]) -> Vec<u8>,
+    alignment: usize,
+) -> io::Result<()> {
     let fixed_size = (HEADER_LEN + (POINTER_LEN * slots.len())) as u64;
     recipient.set_len(fixed_size)?;
 
@@ -137,7 +148,7 @@ pub fn create_key_value<D: IntoBuffer>(recipient: &mut File, slots: Vec<D>) -> i
     for slot in slots {
         // slot serialization
         let slot_address = recipient_buffer.seek(SeekFrom::End(0))?;
-        slot.serialize_into(&mut recipient_buffer)?;
+        slot.serialize_into(&mut recipient_buffer, encode_vector, alignment, slot_address)?;
 
         // The slot address needs to be written in the pointer section
         recipient_buffer.seek(SeekFrom::Start(pointer_section_cursor))?;
@@ -228,7 +239,7 @@ pub fn merge<S: Interpreter + Copy>(recipient: &mut File, producers: &[(S, &[u8]
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::data_types::DeleteLog;
+    use crate::{data_types::DeleteLog, vector_types::dense_f32_unaligned::encode_vector};
 
     const ZERO: [u8; 4] = [0, 0, 0, 0];
     const ONE: [u8; 4] = [0, 0, 0, 1];
@@ -263,7 +274,7 @@ mod tests {
         let elems: [u32; 5] = [0, 1, 2, 3, 4];
         let expected: Vec<_> = elems.iter().map(|x| x.to_be_bytes()).collect();
         let mut buf = tempfile::tempfile().unwrap();
-        create_key_value(&mut buf, expected.clone()).unwrap();
+        create_key_value(&mut buf, expected.clone(), encode_vector, 1).unwrap();
 
         let buf_map = unsafe { memmap2::Mmap::map(&buf).unwrap() };
         let no_values = stored_elements(&buf_map);
@@ -288,9 +299,9 @@ mod tests {
         let mut v1_store = tempfile::tempfile().unwrap();
         let mut v2_store = tempfile::tempfile().unwrap();
 
-        create_key_value(&mut v0_store, v0).unwrap();
-        create_key_value(&mut v1_store, v1).unwrap();
-        create_key_value(&mut v2_store, v2).unwrap();
+        create_key_value(&mut v0_store, v0, encode_vector, 1).unwrap();
+        create_key_value(&mut v1_store, v1, encode_vector, 1).unwrap();
+        create_key_value(&mut v2_store, v2, encode_vector, 1).unwrap();
 
         let v0_map = unsafe { memmap2::Mmap::map(&v0_store).unwrap() };
         let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
@@ -322,9 +333,9 @@ mod tests {
         let mut v1_store = tempfile::tempfile().unwrap();
         let mut v2_store = tempfile::tempfile().unwrap();
 
-        create_key_value(&mut v0_store, v0).unwrap();
-        create_key_value(&mut v1_store, v1).unwrap();
-        create_key_value(&mut v2_store, v2).unwrap();
+        create_key_value(&mut v0_store, v0, encode_vector, 1).unwrap();
+        create_key_value(&mut v1_store, v1, encode_vector, 1).unwrap();
+        create_key_value(&mut v2_store, v2, encode_vector, 1).unwrap();
 
         let v0_map = unsafe { memmap2::Mmap::map(&v0_store).unwrap() };
         let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
@@ -364,9 +375,9 @@ mod tests {
         let mut v1_store = tempfile::tempfile().unwrap();
         let mut v2_store = tempfile::tempfile().unwrap();
 
-        create_key_value(&mut v0_store, v0).unwrap();
-        create_key_value(&mut v1_store, v1).unwrap();
-        create_key_value(&mut v2_store, v2).unwrap();
+        create_key_value(&mut v0_store, v0, encode_vector, 1).unwrap();
+        create_key_value(&mut v1_store, v1, encode_vector, 1).unwrap();
+        create_key_value(&mut v2_store, v2, encode_vector, 1).unwrap();
 
         let v0_map = unsafe { memmap2::Mmap::map(&v0_store).unwrap() };
         let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
@@ -406,9 +417,9 @@ mod tests {
         let mut v1_store = tempfile::tempfile().unwrap();
         let mut v2_store = tempfile::tempfile().unwrap();
 
-        create_key_value(&mut v0_store, v0).unwrap();
-        create_key_value(&mut v1_store, v1).unwrap();
-        create_key_value(&mut v2_store, v2).unwrap();
+        create_key_value(&mut v0_store, v0, encode_vector, 1).unwrap();
+        create_key_value(&mut v1_store, v1, encode_vector, 1).unwrap();
+        create_key_value(&mut v2_store, v2, encode_vector, 1).unwrap();
 
         let v0_map = unsafe { memmap2::Mmap::map(&v0_store).unwrap() };
         let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
@@ -447,9 +458,9 @@ mod tests {
         let mut v1_store = tempfile::tempfile().unwrap();
         let mut v2_store = tempfile::tempfile().unwrap();
 
-        create_key_value(&mut v0_store, v0).unwrap();
-        create_key_value(&mut v1_store, v1).unwrap();
-        create_key_value(&mut v2_store, v2).unwrap();
+        create_key_value(&mut v0_store, v0, encode_vector, 1).unwrap();
+        create_key_value(&mut v1_store, v1, encode_vector, 1).unwrap();
+        create_key_value(&mut v2_store, v2, encode_vector, 1).unwrap();
 
         let v0_map = unsafe { memmap2::Mmap::map(&v0_store).unwrap() };
         let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
@@ -489,9 +500,9 @@ mod tests {
         let mut v1_store = tempfile::tempfile().unwrap();
         let mut v2_store = tempfile::tempfile().unwrap();
 
-        create_key_value(&mut v0_store, v0).unwrap();
-        create_key_value(&mut v1_store, v1).unwrap();
-        create_key_value(&mut v2_store, v2).unwrap();
+        create_key_value(&mut v0_store, v0, encode_vector, 1).unwrap();
+        create_key_value(&mut v1_store, v1, encode_vector, 1).unwrap();
+        create_key_value(&mut v2_store, v2, encode_vector, 1).unwrap();
 
         let v0_map = unsafe { memmap2::Mmap::map(&v0_store).unwrap() };
         let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
@@ -532,9 +543,9 @@ mod tests {
         let mut v1_store = tempfile::tempfile().unwrap();
         let mut v2_store = tempfile::tempfile().unwrap();
 
-        create_key_value(&mut v0_store, v0).unwrap();
-        create_key_value(&mut v1_store, v1).unwrap();
-        create_key_value(&mut v2_store, v2).unwrap();
+        create_key_value(&mut v0_store, v0, encode_vector, 1).unwrap();
+        create_key_value(&mut v1_store, v1, encode_vector, 1).unwrap();
+        create_key_value(&mut v2_store, v2, encode_vector, 1).unwrap();
 
         let v0_map = unsafe { memmap2::Mmap::map(&v0_store).unwrap() };
         let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };

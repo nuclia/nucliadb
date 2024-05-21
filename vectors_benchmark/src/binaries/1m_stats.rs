@@ -133,13 +133,13 @@ fn random_labels(batch_no: usize, key: String, index_size: usize) -> LabelDictio
 fn add_batch(batch_no: usize, writer: &mut Writer, elems: Vec<(String, Vec<f32>)>, index_size: usize) {
     let new_data_point_pin = DataPointPin::create_pin(writer.location()).unwrap();
     let temporal_mark = SystemTime::now();
-    let similarity = Similarity::Cosine;
+    let config = VectorConfig::default();
     let elems = elems
         .into_iter()
         .map(|(key, vector)| Elem::new(key.clone(), vector, random_labels(batch_no, key.clone(), index_size), None))
         .collect();
 
-    data_point::create(&new_data_point_pin, elems, Some(temporal_mark), similarity).unwrap();
+    data_point::create(&new_data_point_pin, elems, Some(temporal_mark), &config).unwrap();
 
     writer.add_data_point(new_data_point_pin).unwrap();
     writer.commit().unwrap();
