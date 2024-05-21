@@ -27,7 +27,7 @@ mod params;
 #[cfg(test)]
 mod tests;
 
-use crate::config::VectorConfig;
+use crate::config::{VectorConfig, VectorType};
 use crate::data_types::{data_store, trie, trie_ram, DeleteLog};
 use crate::formula::Formula;
 use crate::vector_types::dense_f32_unaligned;
@@ -296,7 +296,7 @@ pub fn create(
 
     // Serializing nodes on disk
     // Nodes are stored on disk and mmaped.
-    data_store::create_key_value(&mut nodesf, elems, config.encode_function(), config.vector_alignment())?;
+    data_store::create_key_value(&mut nodesf, elems, &config.vector_type)?;
     let nodes = unsafe { Mmap::map(&nodesf)? };
     let no_nodes = data_store::stored_elements(&nodes);
 
@@ -537,13 +537,15 @@ impl Elem {
 }
 
 impl data_store::IntoBuffer for Elem {
-    fn serialize_into<W: io::Write>(
-        self,
-        w: W,
-        encode_vector: fn(&[f32]) -> Vec<u8>,
-        alignment: usize,
-    ) -> io::Result<()> {
-        Node::serialize_into(w, self.key, encode_vector(&self.vector), alignment, self.labels.0, self.metadata.as_ref())
+    fn serialize_into<W: io::Write>(self, w: W, vector_type: &VectorType) -> io::Result<()> {
+        Node::serialize_into(
+            w,
+            self.key,
+            vector_type.encode(&self.vector),
+            vector_type.vector_alignment(),
+            self.labels.0,
+            self.metadata.as_ref(),
+        )
     }
 }
 
@@ -660,7 +662,7 @@ impl OpenDataPoint {
         config: &VectorConfig,
         min_score: f32,
     ) -> impl Iterator<Item = Neighbour> + '_ {
-        let encoded_query = config.encode_function()(query);
+        let encoded_query = config.vector_type.encode(query);
         let tracker = Retriever::new(&encoded_query, &self.nodes, delete_log, config, min_score);
         let filter = FormulaFilter::new(filter);
         let ops = HnswOps::new(&tracker);

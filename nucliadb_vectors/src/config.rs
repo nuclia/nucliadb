@@ -52,6 +52,24 @@ pub enum VectorType {
     },
 }
 
+impl VectorType {
+    pub fn encode(&self, vector: &[f32]) -> Vec<u8> {
+        match self {
+            VectorType::DenseF32Unaligned => dense_f32_unaligned::encode_vector(vector),
+            #[rustfmt::skip]
+            VectorType::DenseF32 { .. } => dense_f32::encode_vector(vector),
+        }
+    }
+
+    pub fn vector_alignment(&self) -> usize {
+        match self {
+            VectorType::DenseF32Unaligned => 1,
+            #[rustfmt::skip]
+            VectorType::DenseF32 { .. } => size_of::<f32>(),
+        }
+    }
+}
+
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct VectorConfig {
     #[serde(default)]
@@ -86,22 +104,6 @@ impl VectorConfig {
             (Similarity::Dot, VectorType::DenseF32 { .. }) => dense_f32::dot_similarity,
             #[rustfmt::skip]
             (Similarity::Cosine, VectorType::DenseF32 { .. }) => dense_f32::cosine_similarity,
-        }
-    }
-
-    pub fn encode_function(&self) -> fn(&[f32]) -> Vec<u8> {
-        match &self.vector_type {
-            VectorType::DenseF32Unaligned => dense_f32_unaligned::encode_vector,
-            #[rustfmt::skip]
-            VectorType::DenseF32 { .. } => dense_f32::encode_vector,
-        }
-    }
-
-    pub fn vector_alignment(&self) -> usize {
-        match &self.vector_type {
-            VectorType::DenseF32Unaligned => 1,
-            #[rustfmt::skip]
-            VectorType::DenseF32 { .. } => size_of::<f32>(),
         }
     }
 }

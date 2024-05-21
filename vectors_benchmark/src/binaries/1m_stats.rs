@@ -1,5 +1,5 @@
 use clap::Parser;
-use nucliadb_vectors::config::{Similarity, VectorConfig};
+use nucliadb_vectors::config::VectorConfig;
 use nucliadb_vectors::data_point::{self, DataPointPin, Elem, LabelDictionary};
 use nucliadb_vectors::data_point_provider::garbage_collector;
 use nucliadb_vectors::data_point_provider::reader::Reader;

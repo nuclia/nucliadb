@@ -21,6 +21,8 @@
 use std::fs::File;
 use std::io::{self, BufWriter, Seek, SeekFrom, Write};
 
+use crate::config::VectorType;
+
 use super::usize_utils::*;
 
 // A data store schema.
@@ -68,17 +70,12 @@ pub trait Interpreter {
 }
 
 pub trait IntoBuffer {
-    fn serialize_into<W: io::Write>(
-        self,
-        w: W,
-        encode_vector: fn(&[f32]) -> Vec<u8>,
-        alignment: usize,
-    ) -> io::Result<()>;
+    fn serialize_into<W: io::Write>(self, w: W, vector_type: &VectorType) -> io::Result<()>;
 }
 
 #[cfg(test)]
 impl<T: AsRef<[u8]>> IntoBuffer for T {
-    fn serialize_into<W: io::Write>(self, mut w: W, _: fn(&[f32]) -> Vec<u8>, _: usize) -> io::Result<()> {
+    fn serialize_into<W: io::Write>(self, mut w: W, _: &VectorType) -> io::Result<()> {
         w.write_all(self.as_ref())
     }
 }
@@ -128,8 +125,7 @@ pub fn will_need(src: &[u8], id: usize, vector_len: usize) {}
 pub fn create_key_value<D: IntoBuffer>(
     recipient: &mut File,
     slots: Vec<D>,
-    encode_vector: fn(&[f32]) -> Vec<u8>,
-    alignment: usize,
+    vector_type: &VectorType,
 ) -> io::Result<()> {
     let fixed_size = (HEADER_LEN + (POINTER_LEN * slots.len())) as u64;
     recipient.set_len(fixed_size)?;
@@ -144,6 +140,7 @@ pub fn create_key_value<D: IntoBuffer>(
     // Serializing values into the recipient. Each slot is serialized at the end of the
     // loop and its address pointer is written in the pointer section.
     let mut pointer_section_cursor = HEADER_LEN as u64;
+    let alignment = vector_type.vector_alignment();
     for slot in slots {
         // slot serialization
         let mut slot_address = recipient_buffer.seek(SeekFrom::End(0))?;
@@ -152,7 +149,7 @@ pub fn create_key_value<D: IntoBuffer>(
             recipient_buffer.seek(SeekFrom::Current(pad as i64))?;
             slot_address += pad as u64;
         }
-        slot.serialize_into(&mut recipient_buffer, encode_vector, alignment)?;
+        slot.serialize_into(&mut recipient_buffer, vector_type)?;
 
         // The slot address needs to be written in the pointer section
         recipient_buffer.seek(SeekFrom::Start(pointer_section_cursor))?;
@@ -243,7 +240,7 @@ pub fn merge<S: Interpreter + Copy>(recipient: &mut File, producers: &[(S, &[u8]
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{data_types::DeleteLog, vector_types::dense_f32_unaligned::encode_vector};
+    use crate::data_types::DeleteLog;
 
     const ZERO: [u8; 4] = [0, 0, 0, 0];
     const ONE: [u8; 4] = [0, 0, 0, 1];
@@ -278,7 +275,7 @@ mod tests {
         let elems: [u32; 5] = [0, 1, 2, 3, 4];
         let expected: Vec<_> = elems.iter().map(|x| x.to_be_bytes()).collect();
         let mut buf = tempfile::tempfile().unwrap();
-        create_key_value(&mut buf, expected.clone(), encode_vector, 1).unwrap();
+        create_key_value(&mut buf, expected.clone(), &VectorType::DenseF32Unaligned).unwrap();
 
         let buf_map = unsafe { memmap2::Mmap::map(&buf).unwrap() };
         let no_values = stored_elements(&buf_map);
@@ -303,9 +300,9 @@ mod tests {
         let mut v1_store = tempfile::tempfile().unwrap();
         let mut v2_store = tempfile::tempfile().unwrap();
 
-        create_key_value(&mut v0_store, v0, encode_vector, 1).unwrap();
-        create_key_value(&mut v1_store, v1, encode_vector, 1).unwrap();
-        create_key_value(&mut v2_store, v2, encode_vector, 1).unwrap();
+        create_key_value(&mut v0_store, v0, &VectorType::DenseF32Unaligned).unwrap();
+        create_key_value(&mut v1_store, v1, &VectorType::DenseF32Unaligned).unwrap();
+        create_key_value(&mut v2_store, v2, &VectorType::DenseF32Unaligned).unwrap();
 
         let v0_map = unsafe { memmap2::Mmap::map(&v0_store).unwrap() };
         let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
@@ -337,9 +334,9 @@ mod tests {
         let mut v1_store = tempfile::tempfile().unwrap();
         let mut v2_store = tempfile::tempfile().unwrap();
 
-        create_key_value(&mut v0_store, v0, encode_vector, 1).unwrap();
-        create_key_value(&mut v1_store, v1, encode_vector, 1).unwrap();
-        create_key_value(&mut v2_store, v2, encode_vector, 1).unwrap();
+        create_key_value(&mut v0_store, v0, &VectorType::DenseF32Unaligned).unwrap();
+        create_key_value(&mut v1_store, v1, &VectorType::DenseF32Unaligned).unwrap();
+        create_key_value(&mut v2_store, v2, &VectorType::DenseF32Unaligned).unwrap();
 
         let v0_map = unsafe { memmap2::Mmap::map(&v0_store).unwrap() };
         let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
@@ -379,9 +376,9 @@ mod tests {
         let mut v1_store = tempfile::tempfile().unwrap();
         let mut v2_store = tempfile::tempfile().unwrap();
 
-        create_key_value(&mut v0_store, v0, encode_vector, 1).unwrap();
-        create_key_value(&mut v1_store, v1, encode_vector, 1).unwrap();
-        create_key_value(&mut v2_store, v2, encode_vector, 1).unwrap();
+        create_key_value(&mut v0_store, v0, &VectorType::DenseF32Unaligned).unwrap();
+        create_key_value(&mut v1_store, v1, &VectorType::DenseF32Unaligned).unwrap();
+        create_key_value(&mut v2_store, v2, &VectorType::DenseF32Unaligned).unwrap();
 
         let v0_map = unsafe { memmap2::Mmap::map(&v0_store).unwrap() };
         let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
@@ -421,9 +418,9 @@ mod tests {
         let mut v1_store = tempfile::tempfile().unwrap();
         let mut v2_store = tempfile::tempfile().unwrap();
 
-        create_key_value(&mut v0_store, v0, encode_vector, 1).unwrap();
-        create_key_value(&mut v1_store, v1, encode_vector, 1).unwrap();
-        create_key_value(&mut v2_store, v2, encode_vector, 1).unwrap();
+        create_key_value(&mut v0_store, v0, &VectorType::DenseF32Unaligned).unwrap();
+        create_key_value(&mut v1_store, v1, &VectorType::DenseF32Unaligned).unwrap();
+        create_key_value(&mut v2_store, v2, &VectorType::DenseF32Unaligned).unwrap();
 
         let v0_map = unsafe { memmap2::Mmap::map(&v0_store).unwrap() };
         let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
@@ -462,9 +459,9 @@ mod tests {
         let mut v1_store = tempfile::tempfile().unwrap();
         let mut v2_store = tempfile::tempfile().unwrap();
 
-        create_key_value(&mut v0_store, v0, encode_vector, 1).unwrap();
-        create_key_value(&mut v1_store, v1, encode_vector, 1).unwrap();
-        create_key_value(&mut v2_store, v2, encode_vector, 1).unwrap();
+        create_key_value(&mut v0_store, v0, &VectorType::DenseF32Unaligned).unwrap();
+        create_key_value(&mut v1_store, v1, &VectorType::DenseF32Unaligned).unwrap();
+        create_key_value(&mut v2_store, v2, &VectorType::DenseF32Unaligned).unwrap();
 
         let v0_map = unsafe { memmap2::Mmap::map(&v0_store).unwrap() };
         let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
@@ -504,9 +501,9 @@ mod tests {
         let mut v1_store = tempfile::tempfile().unwrap();
         let mut v2_store = tempfile::tempfile().unwrap();
 
-        create_key_value(&mut v0_store, v0, encode_vector, 1).unwrap();
-        create_key_value(&mut v1_store, v1, encode_vector, 1).unwrap();
-        create_key_value(&mut v2_store, v2, encode_vector, 1).unwrap();
+        create_key_value(&mut v0_store, v0, &VectorType::DenseF32Unaligned).unwrap();
+        create_key_value(&mut v1_store, v1, &VectorType::DenseF32Unaligned).unwrap();
+        create_key_value(&mut v2_store, v2, &VectorType::DenseF32Unaligned).unwrap();
 
         let v0_map = unsafe { memmap2::Mmap::map(&v0_store).unwrap() };
         let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
@@ -547,9 +544,9 @@ mod tests {
         let mut v1_store = tempfile::tempfile().unwrap();
         let mut v2_store = tempfile::tempfile().unwrap();
 
-        create_key_value(&mut v0_store, v0, encode_vector, 1).unwrap();
-        create_key_value(&mut v1_store, v1, encode_vector, 1).unwrap();
-        create_key_value(&mut v2_store, v2, encode_vector, 1).unwrap();
+        create_key_value(&mut v0_store, v0, &VectorType::DenseF32Unaligned).unwrap();
+        create_key_value(&mut v1_store, v1, &VectorType::DenseF32Unaligned).unwrap();
+        create_key_value(&mut v2_store, v2, &VectorType::DenseF32Unaligned).unwrap();
 
         let v0_map = unsafe { memmap2::Mmap::map(&v0_store).unwrap() };
         let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
