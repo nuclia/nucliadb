@@ -26,7 +26,6 @@ from async_lru import alru_cache
 from nucliadb_protos.noderesources_pb2 import Resource
 
 from nucliadb.common import datamanagers
-from nucliadb.ingest.orm.synonyms import Synonyms
 from nucliadb.middleware.transaction import get_read_only_transaction
 from nucliadb.search import logger
 from nucliadb.search.predict import SendToPredictError, convert_relations
@@ -707,7 +706,7 @@ PROCESSING_STATUS_TO_PB_MAP = {
 @query_parse_dependency_observer.wrap({"type": "synonyms"})
 async def get_kb_synonyms(kbid: str) -> Optional[knowledgebox_pb2.Synonyms]:
     txn = await get_read_only_transaction()
-    return await Synonyms(txn, kbid).get()
+    return await datamanagers.synonyms.get(txn, kbid=kbid)
 
 
 @query_parse_dependency_observer.wrap({"type": "entities_meta_cache"})

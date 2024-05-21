@@ -74,6 +74,19 @@ PROCESSOR: IndexMessageSource.ValueType  # 0
 WRITER: IndexMessageSource.ValueType  # 1
 global___IndexMessageSource = IndexMessageSource
 
+class _VectorType:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _VectorTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_VectorType.ValueType], builtins.type):
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    DENSE_F32: _VectorType.ValueType  # 0
+
+class VectorType(_VectorType, metaclass=_VectorTypeEnumTypeWrapper): ...
+
+DENSE_F32: VectorType.ValueType  # 0
+global___VectorType = VectorType
+
 @typing.final
 class OpStatus(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -193,6 +206,32 @@ class GarbageCollectorResponse(google.protobuf.message.Message):
 global___GarbageCollectorResponse = GarbageCollectorResponse
 
 @typing.final
+class VectorIndexConfig(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SIMILARITY_FIELD_NUMBER: builtins.int
+    NORMALIZE_VECTORS_FIELD_NUMBER: builtins.int
+    VECTOR_TYPE_FIELD_NUMBER: builtins.int
+    VECTOR_DIMENSION_FIELD_NUMBER: builtins.int
+    similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType
+    normalize_vectors: builtins.bool
+    vector_type: global___VectorType.ValueType
+    vector_dimension: builtins.int
+    def __init__(
+        self,
+        *,
+        similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType = ...,
+        normalize_vectors: builtins.bool = ...,
+        vector_type: global___VectorType.ValueType = ...,
+        vector_dimension: builtins.int | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_vector_dimension", b"_vector_dimension", "vector_dimension", b"vector_dimension"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_vector_dimension", b"_vector_dimension", "normalize_vectors", b"normalize_vectors", "similarity", b"similarity", "vector_dimension", b"vector_dimension", "vector_type", b"vector_type"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_vector_dimension", b"_vector_dimension"]) -> typing.Literal["vector_dimension"] | None: ...
+
+global___VectorIndexConfig = VectorIndexConfig
+
+@typing.final
 class NewShardRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -200,11 +239,14 @@ class NewShardRequest(google.protobuf.message.Message):
     KBID_FIELD_NUMBER: builtins.int
     RELEASE_CHANNEL_FIELD_NUMBER: builtins.int
     NORMALIZE_VECTORS_FIELD_NUMBER: builtins.int
+    CONFIG_FIELD_NUMBER: builtins.int
     similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType
     kbid: builtins.str
     release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType
     normalize_vectors: builtins.bool
     """indicates whether the shard should normalize vectors on indexing or not"""
+    @property
+    def config(self) -> global___VectorIndexConfig: ...
     def __init__(
         self,
         *,
@@ -212,8 +254,10 @@ class NewShardRequest(google.protobuf.message.Message):
         kbid: builtins.str = ...,
         release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType = ...,
         normalize_vectors: builtins.bool = ...,
+        config: global___VectorIndexConfig | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["kbid", b"kbid", "normalize_vectors", b"normalize_vectors", "release_channel", b"release_channel", "similarity", b"similarity"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["config", b"config"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["config", b"config", "kbid", b"kbid", "normalize_vectors", b"normalize_vectors", "release_channel", b"release_channel", "similarity", b"similarity"]) -> None: ...
 
 global___NewShardRequest = NewShardRequest
 
@@ -224,20 +268,23 @@ class NewVectorSetRequest(google.protobuf.message.Message):
     ID_FIELD_NUMBER: builtins.int
     SIMILARITY_FIELD_NUMBER: builtins.int
     NORMALIZE_VECTORS_FIELD_NUMBER: builtins.int
+    CONFIG_FIELD_NUMBER: builtins.int
     similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType
     normalize_vectors: builtins.bool
-    """indicates whether the shard should normalize vectors on indexing or not"""
     @property
     def id(self) -> nucliadb_protos.noderesources_pb2.VectorSetID: ...
+    @property
+    def config(self) -> global___VectorIndexConfig: ...
     def __init__(
         self,
         *,
         id: nucliadb_protos.noderesources_pb2.VectorSetID | None = ...,
         similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType = ...,
         normalize_vectors: builtins.bool = ...,
+        config: global___VectorIndexConfig | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["id", b"id"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["id", b"id", "normalize_vectors", b"normalize_vectors", "similarity", b"similarity"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["config", b"config", "id", b"id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["config", b"config", "id", b"id", "normalize_vectors", b"normalize_vectors", "similarity", b"similarity"]) -> None: ...
 
 global___NewVectorSetRequest = NewVectorSetRequest
 

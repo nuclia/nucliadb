@@ -1299,22 +1299,6 @@ pub struct SynonymsRequest {
     #[prost(string, tag = "1")]
     pub kbid: ::prost::alloc::string::String,
 }
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct SetSynonymsRequest {
-    #[prost(message, optional, tag = "1")]
-    pub kbid: ::core::option::Option<super::knowledgebox::KnowledgeBoxId>,
-    #[prost(message, optional, tag = "2")]
-    pub synonyms: ::core::option::Option<super::knowledgebox::Synonyms>,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct GetSynonymsResponse {
-    #[prost(message, optional, tag = "1")]
-    pub status: ::core::option::Option<OpStatusWriter>,
-    #[prost(message, optional, tag = "2")]
-    pub synonyms: ::core::option::Option<super::knowledgebox::Synonyms>,
-}
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
 pub enum NotificationSource {

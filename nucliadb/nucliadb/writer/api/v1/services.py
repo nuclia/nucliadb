@@ -19,7 +19,6 @@
 #
 from fastapi import HTTPException, Response
 from fastapi_versioning import version
-from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxID
 from nucliadb_protos.knowledgebox_pb2 import Label as LabelPB
 from nucliadb_protos.knowledgebox_pb2 import LabelSet as LabelSetPB
 from nucliadb_protos.writer_pb2 import (
@@ -29,12 +28,12 @@ from nucliadb_protos.writer_pb2 import (
     NewEntitiesGroupResponse,
     OpStatusWriter,
     SetLabelsRequest,
-    SetSynonymsRequest,
     UpdateEntitiesGroupRequest,
     UpdateEntitiesGroupResponse,
 )
 from starlette.requests import Request
 
+from nucliadb.common import datamanagers
 from nucliadb.models.responses import (
     HTTPConflict,
     HTTPInternalServerError,
@@ -254,19 +253,16 @@ async def delete_labels(request: Request, kbid: str, labelset: str):
 @requires(NucliaDBRoles.WRITER)
 @version(1)
 async def set_custom_synonyms(request: Request, kbid: str, item: KnowledgeBoxSynonyms):
-    ingest = get_ingest()
-    pbrequest = SetSynonymsRequest()
-    pbrequest.kbid.uuid = kbid
-    pbrequest.synonyms.CopyFrom(item.to_message())
-    status: OpStatusWriter = await ingest.SetSynonyms(pbrequest)  # type: ignore
-    if status.status == OpStatusWriter.Status.OK:
-        return Response(status_code=204)
-    elif status.status == OpStatusWriter.Status.NOTFOUND:
-        raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
-    elif status.status == OpStatusWriter.Status.ERROR:
-        raise HTTPException(
-            status_code=500, detail="Error setting synonyms of a Knowledge box"
-        )
+    synonyms = item.to_message()
+
+    async with datamanagers.with_transaction() as txn:
+        if not datamanagers.kb.exists_kb(txn, kbid=kbid):
+            raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
+
+        await datamanagers.synonyms.set(txn, kbid=kbid, synonyms=synonyms)
+        await txn.commit()
+
+    return Response(status_code=204)
 
 
 @api.delete(
@@ -279,14 +275,11 @@ async def set_custom_synonyms(request: Request, kbid: str, item: KnowledgeBoxSyn
 @requires(NucliaDBRoles.WRITER)
 @version(1)
 async def delete_custom_synonyms(request: Request, kbid: str):
-    ingest = get_ingest()
-    pbrequest = KnowledgeBoxID(uuid=kbid)
-    status: OpStatusWriter = await ingest.DelSynonyms(pbrequest)  # type: ignore
-    if status.status == OpStatusWriter.Status.OK:
-        return Response(status_code=204)
-    elif status.status == OpStatusWriter.Status.NOTFOUND:
-        raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
-    elif status.status == OpStatusWriter.Status.ERROR:
-        raise HTTPException(
-            status_code=500, detail="Error deleting synonyms of a Knowledge box"
-        )
+    async with datamanagers.with_transaction() as txn:
+        if not datamanagers.kb.exists_kb(txn, kbid=kbid):
+            raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
+
+        await datamanagers.synonyms.delete(txn, kbid=kbid)
+        await txn.commit()
+
+    return Response(status_code=204)

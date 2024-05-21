@@ -62,11 +62,16 @@ class PrimaryShardReplicationState(google.protobuf.message.Message):
         shard_id: builtins.str = ...,
         generation_id: builtins.str = ...,
         kbid: builtins.str = ...,
-        similarity: builtins.str = ...,
-        normalize_vectors: builtins.bool = ...,
+        similarity: builtins.str | None = ...,
+        normalize_vectors: builtins.bool | None = ...,
         release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["generation_id", b"generation_id", "kbid", b"kbid", "normalize_vectors", b"normalize_vectors", "release_channel", b"release_channel", "shard_id", b"shard_id", "similarity", b"similarity"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_normalize_vectors", b"_normalize_vectors", "_similarity", b"_similarity", "normalize_vectors", b"normalize_vectors", "similarity", b"similarity"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_normalize_vectors", b"_normalize_vectors", "_similarity", b"_similarity", "generation_id", b"generation_id", "kbid", b"kbid", "normalize_vectors", b"normalize_vectors", "release_channel", b"release_channel", "shard_id", b"shard_id", "similarity", b"similarity"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_normalize_vectors", b"_normalize_vectors"]) -> typing.Literal["normalize_vectors"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_similarity", b"_similarity"]) -> typing.Literal["similarity"] | None: ...
 
 global___PrimaryShardReplicationState = PrimaryShardReplicationState
 

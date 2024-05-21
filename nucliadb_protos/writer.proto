@@ -494,16 +494,6 @@ message SynonymsRequest {
     string kbid = 1;
 }
 
-message SetSynonymsRequest {
-    knowledgebox.KnowledgeBoxID kbid = 1;
-    knowledgebox.Synonyms synonyms = 2;
-}
-
-message GetSynonymsResponse {
-    OpStatusWriter status = 1;
-    knowledgebox.Synonyms synonyms = 2;
-}
-
 
 service Writer {
     rpc NewKnowledgeBox(knowledgebox.KnowledgeBoxNew) returns (knowledgebox.NewKnowledgeBoxResponse) {}
@@ -528,11 +518,6 @@ service Writer {
     rpc SetEntities(SetEntitiesRequest) returns (OpStatusWriter) {}
     rpc UpdateEntitiesGroup(UpdateEntitiesGroupRequest) returns (UpdateEntitiesGroupResponse) {}
     rpc DelEntities(DelEntitiesRequest) returns (OpStatusWriter) {}
-
-    // Synonyms
-    rpc GetSynonyms(knowledgebox.KnowledgeBoxID) returns (GetSynonymsResponse) {}
-    rpc SetSynonyms(SetSynonymsRequest) returns (OpStatusWriter) {}
-    rpc DelSynonyms(knowledgebox.KnowledgeBoxID) returns (OpStatusWriter) {}
 
     rpc Status(WriterStatusRequest) returns (WriterStatusResponse) {}
 
