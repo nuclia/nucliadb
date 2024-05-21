@@ -37,6 +37,7 @@ import nucliadb_models as models
 from nucliadb_models.resource import QueueType
 from nucliadb_telemetry import metrics
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
+from nucliadb_utils.nucliadb_utils.settings import FileBackendConfig
 from nucliadb_utils.settings import nuclia_settings, storage_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import Utility, set_utility
@@ -178,11 +179,11 @@ class ProcessingEngine:
 
         self.nuclia_jwt_key = nuclia_jwt_key
         self.days_to_keep = days_to_keep
-        if driver == "gcs":
+        if driver == FileBackendConfig.GCS:
             self.driver = 0
-        elif driver == "s3":
+        elif driver == FileBackendConfig.S3:
             self.driver = 1
-        elif driver in ("local", "pg"):
+        elif driver in (FileBackendConfig.LOCAL, FileBackendConfig.PG):
             self.driver = 2
         else:
             logger.error(
