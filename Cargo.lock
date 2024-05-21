@@ -1648,7 +1648,7 @@ dependencies = [
  "rand",
  "regex",
  "reqwest 0.11.27",
- "rstest",
+ "rstest 0.18.2",
  "sentry",
  "sentry-tracing",
  "serde",
@@ -1795,6 +1795,7 @@ dependencies = [
  "nucliadb_core",
  "nucliadb_procs",
  "rand",
+ "rstest 0.19.0",
  "serde",
  "serde_json",
  "simsimd",
@@ -2658,7 +2659,19 @@ checksum = "97eeab2f3c0a199bc4be135c36c924b6590b88c377d416494288c14f2db30199"
 dependencies = [
  "futures",
  "futures-timer",
- "rstest_macros",
+ "rstest_macros 0.18.2",
+ "rustc_version",
+]
+
+[[package]]
+name = "rstest"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d5316d2a1479eeef1ea21e7f9ddc67c191d497abc8fc3ba2467857abbb68330"
+dependencies = [
+ "futures",
+ "futures-timer",
+ "rstest_macros 0.19.0",
  "rustc_version",
 ]
 
@@ -2667,6 +2680,23 @@ name = "rstest_macros"
 version = "0.18.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d428f8247852f894ee1be110b375111b586d4fa431f6c46e64ba5a0dcccbe605"
+dependencies = [
+ "cfg-if",
+ "glob",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "relative-path",
+ "rustc_version",
+ "syn 2.0.61",
+ "unicode-ident",
+]
+
+[[package]]
+name = "rstest_macros"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "04a9df72cc1f67020b0d63ad9bfe4a323e459ea7eb68e03bd9824db49f9a4c25"
 dependencies = [
  "cfg-if",
  "glob",
