@@ -7,3 +7,6 @@ datasets
 requests
 types-requests
 sentence_transformers
+
+# docker api (required by pytest-docker-fixtures) has problems with requests 2.32
+requests<2.32
