@@ -68,14 +68,7 @@ impl Node {
         let metadata_len = metadata.map(|m| m.as_ref().len()).unwrap_or_default();
         HEADER_LEN + svector_len + skey_len + slabels_len + metadata_len
     }
-    pub fn serialize<S, V, T, M>(
-        key: S,
-        vector: V,
-        alignment: usize,
-        address: u64,
-        labels: T,
-        metadata: Option<M>,
-    ) -> Vec<u8>
+    pub fn serialize<S, V, T, M>(key: S, vector: V, alignment: usize, labels: T, metadata: Option<M>) -> Vec<u8>
     where
         S: AsRef<[u8]>,
         V: AsRef<[u8]>,
@@ -83,7 +76,7 @@ impl Node {
         M: AsRef<[u8]>,
     {
         let mut buf = vec![];
-        Node::serialize_into(&mut buf, key, vector, alignment, address, labels, metadata).unwrap();
+        Node::serialize_into(&mut buf, key, vector, alignment, labels, metadata).unwrap();
         buf
     }
     // labels must be sorted.
@@ -92,7 +85,6 @@ impl Node {
         key: S,
         vector: V,
         alignment: usize,
-        address: u64,
         trie: T,
         metadata: Option<M>,
     ) -> io::Result<()>
@@ -116,13 +108,11 @@ impl Node {
         // Pointer computations
         let len = HEADER_LEN + svector_len + skey_len + slabels_len + metadata_len;
         let mut vector_start = HEADER_LEN + metadata_len;
-        let abs_vector_start = vector_start + address as usize;
-        let vector_pad = if abs_vector_start % alignment > 0 {
-            alignment - (abs_vector_start % alignment)
+        let vector_pad = if vector_start % alignment > 0 {
+            alignment - (vector_start % alignment)
         } else {
             0
         };
-        println!("Pad by {vector_pad} for {alignment} ({metadata_len})");
         vector_start += vector_pad;
         let key_start = vector_start + svector_len;
         let labels_start = key_start + skey_len;
@@ -205,7 +195,7 @@ mod tests {
         let key = b"NODE1";
         let vector = dense_f32_unaligned::encode_vector(&[12.; 1000]);
         let mut buf = Vec::new();
-        Node::serialize_into(&mut buf, key, &vector, 1, 0, NO_LABELS_TRIE.clone(), NO_METADATA).unwrap();
+        Node::serialize_into(&mut buf, key, &vector, 1, NO_LABELS_TRIE.clone(), NO_METADATA).unwrap();
         let len = usize_from_slice_le(&buf[LEN.0..LEN.1]);
         let vector_start = usize_from_slice_le(&buf[VECTOR_START.0..VECTOR_START.1]);
         let key_start = usize_from_slice_le(&buf[KEY_START.0..KEY_START.1]);
@@ -227,7 +217,7 @@ mod tests {
         let metadata = b"THIS ARE THE METADATA CONTENTS";
         let vector = dense_f32_unaligned::encode_vector(&[13.; 1000]);
         let mut buf = Vec::new();
-        Node::serialize_into(&mut buf, key, &vector, 1, 0, LABELS_TRIE.clone(), Some(metadata)).unwrap();
+        Node::serialize_into(&mut buf, key, &vector, 1, LABELS_TRIE.clone(), Some(metadata)).unwrap();
         let len = usize_from_slice_le(&buf[LEN.0..LEN.1]);
         let vector_start = usize_from_slice_le(&buf[VECTOR_START.0..VECTOR_START.1]);
         let key_start = usize_from_slice_le(&buf[KEY_START.0..KEY_START.1]);
@@ -254,12 +244,12 @@ mod tests {
         let metadata1 = b"The node 1 has metadata";
         let vector1 = dense_f32_unaligned::encode_vector(&[12.; 1000]);
         let node1 = buf.len();
-        Node::serialize_into(&mut buf, key1, &vector1, 1, 0, NO_LABELS_TRIE.clone(), Some(&metadata1)).unwrap();
+        Node::serialize_into(&mut buf, key1, &vector1, 1, NO_LABELS_TRIE.clone(), Some(&metadata1)).unwrap();
         let key2 = b"NODE2";
         let metadata2 = b"Tuns out node 2 also has metadata";
         let vector2 = dense_f32_unaligned::encode_vector(&[15.; 1000]);
         let node2 = buf.len();
-        Node::serialize_into(&mut buf, key2, &vector2, 1, 0, NO_LABELS_TRIE.clone(), Some(&metadata2)).unwrap();
+        Node::serialize_into(&mut buf, key2, &vector2, 1, NO_LABELS_TRIE.clone(), Some(&metadata2)).unwrap();
         assert_eq!(Node::key(&buf[node1..]), key1);
         assert_eq!(Node::key(&buf[node2..]), key2);
         assert_eq!(Node::vector(&buf[node1..]), vector1);

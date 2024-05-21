@@ -48,9 +48,6 @@ pub fn dot_similarity(x: &[u8], y: &[u8]) -> Dist {
     let (p, y, s) = unsafe { y.align_to() };
     debug_assert!(p.is_empty());
     debug_assert!(s.is_empty());
-    if x.len() != y.len() {
-        println!("{} {}", x.len(), y.len());
-    }
     f32::dot(x, y).unwrap() as f32
 }
 

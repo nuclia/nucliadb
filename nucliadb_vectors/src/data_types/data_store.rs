@@ -73,13 +73,12 @@ pub trait IntoBuffer {
         w: W,
         encode_vector: fn(&[f32]) -> Vec<u8>,
         alignment: usize,
-        adress: u64,
     ) -> io::Result<()>;
 }
 
 #[cfg(test)]
 impl<T: AsRef<[u8]>> IntoBuffer for T {
-    fn serialize_into<W: io::Write>(self, mut w: W, _: fn(&[f32]) -> Vec<u8>, _: usize, _: u64) -> io::Result<()> {
+    fn serialize_into<W: io::Write>(self, mut w: W, _: fn(&[f32]) -> Vec<u8>, _: usize) -> io::Result<()> {
         w.write_all(self.as_ref())
     }
 }
@@ -147,8 +146,13 @@ pub fn create_key_value<D: IntoBuffer>(
     let mut pointer_section_cursor = HEADER_LEN as u64;
     for slot in slots {
         // slot serialization
-        let slot_address = recipient_buffer.seek(SeekFrom::End(0))?;
-        slot.serialize_into(&mut recipient_buffer, encode_vector, alignment, slot_address)?;
+        let mut slot_address = recipient_buffer.seek(SeekFrom::End(0))?;
+        if slot_address as usize % alignment > 0 {
+            let pad = alignment - (slot_address as usize % alignment);
+            recipient_buffer.seek(SeekFrom::Current(pad as i64))?;
+            slot_address += pad as u64;
+        }
+        slot.serialize_into(&mut recipient_buffer, encode_vector, alignment)?;
 
         // The slot address needs to be written in the pointer section
         recipient_buffer.seek(SeekFrom::Start(pointer_section_cursor))?;

@@ -542,17 +542,8 @@ impl data_store::IntoBuffer for Elem {
         w: W,
         encode_vector: fn(&[f32]) -> Vec<u8>,
         alignment: usize,
-        address: u64,
     ) -> io::Result<()> {
-        Node::serialize_into(
-            w,
-            self.key,
-            encode_vector(&self.vector),
-            alignment,
-            address,
-            self.labels.0,
-            self.metadata.as_ref(),
-        )
+        Node::serialize_into(w, self.key, encode_vector(&self.vector), alignment, self.labels.0, self.metadata.as_ref())
     }
 }
 
@@ -588,7 +579,7 @@ impl Neighbour {
     pub fn dummy_neighbour(key: &[u8], score: f32) -> Neighbour {
         Neighbour {
             score,
-            node: Node::serialize(key, [1, 2, 3, 4], 1, 0, [], None as Option<&[u8]>),
+            node: Node::serialize(key, [1, 2, 3, 4], 1, [], None as Option<&[u8]>),
         }
     }
     fn new(Address(addr): Address, data: &[u8], score: f32) -> Neighbour {
