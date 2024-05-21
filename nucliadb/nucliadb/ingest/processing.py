@@ -37,8 +37,7 @@ import nucliadb_models as models
 from nucliadb_models.resource import QueueType
 from nucliadb_telemetry import metrics
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
-from nucliadb_utils.settings import FileBackendConfig
-from nucliadb_utils.settings import nuclia_settings, storage_settings
+from nucliadb_utils.settings import FileBackendConfig, nuclia_settings, storage_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import Utility, set_utility
 
