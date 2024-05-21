@@ -77,6 +77,10 @@ impl ShardIndexes {
         self.inner.vectorsets.get(name).map(|vectorset| self.shard_path.join(vectorset))
     }
 
+    pub fn vectorset_relative_path(&self, name: &str) -> Option<PathBuf> {
+        self.inner.vectorsets.get(name).map(PathBuf::from)
+    }
+
     pub fn relations_path(&self) -> PathBuf {
         self.shard_path.join(&self.inner.relations)
     }

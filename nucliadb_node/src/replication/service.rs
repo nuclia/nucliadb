@@ -185,7 +185,7 @@ async fn replica_shard(
     }
 
     // top level additional files
-    for filename in ["metadata.json", "versions.json"] {
+    for filename in ["metadata.json", "versions.json", "indexes.json"] {
         stream_file(chunk_size, &shard_path, generation_id, &PathBuf::from(filename), &sender).await?;
     }
     Ok(())
