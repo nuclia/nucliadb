@@ -374,7 +374,6 @@ class PromptContextBuilder:
         ccontext = CappedPromptContext(max_size=self.max_context_characters)
         self.prepend_user_context(ccontext)
         await self._build_context(ccontext)
-
         if self.visual_llm:
             await self._build_context_images(ccontext)
 
@@ -414,12 +413,11 @@ class PromptContextBuilder:
                         context.images[page_id] = await get_page_image(
                             self.kbid, paragraph.id, page
                         )
-            if (
-                gather_tables
-                and paragraph.is_a_table
-                and paragraph.reference
-                and paragraph.reference != ""
-            ):
+            # Only send tables if enabled by strategy, by default, send paragraph images
+            send_images = (
+                gather_tables and paragraph.is_a_table
+            ) or not paragraph.is_a_table
+            if send_images and paragraph.reference and paragraph.reference != "":
                 image = paragraph.reference
                 context.images[paragraph.id] = await get_paragraph_image(
                     self.kbid, paragraph.id, image
