@@ -56,7 +56,7 @@ def test_run_migrations_runs_on_worker_nodes_only(is_worker_node, run_migrator):
 
 
 def test_run_migrations_waits_for_lock(is_worker_node, run_migrator):
-    run_migrator.side_effect = [locking.ResourceLocked, None]
+    run_migrator.side_effect = [locking.ResourceLocked(key="migrations"), None]
 
     run_migrations()
 
