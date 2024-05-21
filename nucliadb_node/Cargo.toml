@@ -110,9 +110,6 @@ tonic-build = "0.11.0"
 ci-test = []
 release-feature-set = []
 
-[profile.release]
-lto = true
-
 [dev-dependencies]
 backoff = { version = "0.4.0", features = ["tokio"] }
 

@@ -23,6 +23,10 @@ build-backend = "maturin"
 
 [tool.maturin]
 profile = "release-wheel"
+include = [
+    { path = ".cargo/config.toml", format = "sdist" },
+    { path = "nucliadb_protos/*.proto", format = "sdist" },
+]
 
 [project]
 name = "nucliadb_node_binding"
