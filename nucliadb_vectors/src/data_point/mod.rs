@@ -274,6 +274,13 @@ pub fn create(
     time: Option<SystemTime>,
     config: &VectorConfig,
 ) -> VectorR<OpenDataPoint> {
+    // Check dimensions
+    if let Some(dim) = config.vector_type.dimension() {
+        if elems.iter().any(|elem| elem.vector.len() != dim) {
+            return Err(crate::VectorErr::InconsistentDimensions);
+        }
+    }
+
     let data_point_id = pin.data_point_id;
     let data_point_path = &pin.data_point_path;
     let mut nodes_file_options = OpenOptions::new();

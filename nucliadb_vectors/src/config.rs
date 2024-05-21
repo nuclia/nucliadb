@@ -68,6 +68,14 @@ impl VectorType {
             VectorType::DenseF32 { .. } => size_of::<f32>(),
         }
     }
+
+    pub fn dimension(&self) -> Option<usize> {
+        match self {
+            VectorType::DenseF32Unaligned => None,
+            #[rustfmt::skip]
+            VectorType::DenseF32 { dimension } => Some(*dimension),
+        }
+    }
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
