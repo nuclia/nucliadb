@@ -97,19 +97,24 @@ def run():
     settings_to_output = {
         "API": f"http://{settings.http_host}:{settings.http_port}/api",
         "Admin UI": f"http://{settings.http_host}:{settings.http_port}/admin",
-        "Key-value backend": ingest_settings.driver,
-        "Blog storage backend": storage_settings.file_backend,
-        "Cluster discovery mode": cluster_settings.cluster_discovery_mode,
+        "Key-value backend": ingest_settings.driver.value,
+        "Blog storage backend": storage_settings.file_backend.value,
+        "Cluster discovery mode": cluster_settings.cluster_discovery_mode.value,
         "Node replicas": cluster_settings.node_replicas,
         "Index data path": os.path.realpath(cluster_settings.data_path),
         "Node port": cluster_settings.standalone_node_port,
-        "Auth policy": settings.auth_policy,
-        "Log output type": settings.log_output_type,
-        "Node role": cluster_settings.standalone_node_role,
+        "Auth policy": settings.auth_policy.value,
+        "Node role": cluster_settings.standalone_node_role.value,
+    }
+    log_settings = {
+        "Log output type": settings.log_output_type.value,
+        "Log format type": settings.log_format_type.value,
+        "Log level": settings.log_level.value,
     }
     if settings.log_output_type == LogOutputType.FILE:
         log_folder = os.path.realpath(os.path.dirname(LogSettings().access_log))
-        settings_to_output["Log folder path"] = log_folder
+        log_settings["Log folder path"] = log_folder
+    settings_to_output.update(log_settings)
 
     if nuclia_settings.nuclia_service_account:
         settings_to_output["NUA API key"] = "Configured ✔"
