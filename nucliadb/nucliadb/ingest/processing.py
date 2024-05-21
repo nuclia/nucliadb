@@ -133,6 +133,24 @@ async def start_processing_engine():
     set_utility(Utility.PROCESSING, processing_engine)
 
 
+def to_processing_driver_type(file_backend_driver: FileBackendConfig) -> int:
+    """
+    Outputs a nuclia-internal backend driver identifier that is used by processing
+    to store the blobs of processed metadata in the right bucket folder.
+    """
+    if file_backend_driver == FileBackendConfig.GCS:
+        return 0
+    elif file_backend_driver == FileBackendConfig.S3:
+        return 1
+    elif file_backend_driver in (FileBackendConfig.LOCAL, FileBackendConfig.PG):
+        return 2
+    else:
+        logger.error(
+            f"Not a valid file backend driver to processing, fallback to local: {file_backend_driver}"
+        )
+        return 2
+
+
 class ProcessingEngine:
     def __init__(
         self,
@@ -178,17 +196,7 @@ class ProcessingEngine:
 
         self.nuclia_jwt_key = nuclia_jwt_key
         self.days_to_keep = days_to_keep
-        if driver == FileBackendConfig.GCS:
-            self.driver = 0
-        elif driver == FileBackendConfig.S3:
-            self.driver = 1
-        elif driver in (FileBackendConfig.LOCAL, FileBackendConfig.PG):
-            self.driver = 2
-        else:
-            logger.error(
-                f"Not a valid driver to processing, fallback to local: {driver}"
-            )
-            self.driver = 2
+        self.driver = to_processing_driver_type(driver)
         self._exit_stack = AsyncExitStack()
 
     async def initialize(self):
