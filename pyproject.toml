@@ -2,6 +2,10 @@
 name = "nucliadb_workspace"
 requires-python = ">=3.9"
 version = "0.0.0"
+dependencies = [
+    "azure-storage-blob>=12.20.0",
+    "pdbpp>=0.10.3",
+]
 
 [tool.pdm.dev-dependencies]
 dev = [

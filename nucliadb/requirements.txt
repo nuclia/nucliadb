@@ -36,6 +36,7 @@ google-cloud-storage
 gcloud
 oauth2client
 jwcrypto>=1.5.6
+azure-storage-blob
 
 fastapi-versioning>=0.10.0
 # At some point FastAPI will drop support for pydantic v1

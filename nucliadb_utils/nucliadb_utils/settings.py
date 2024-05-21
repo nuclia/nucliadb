@@ -53,6 +53,7 @@ class FileBackendConfig(Enum):
     S3 = "s3"
     PG = "pg"
     LOCAL = "local"
+    AZURE = "azure"
     NOT_SET = "notset"  # setting not provided
 
     @classmethod

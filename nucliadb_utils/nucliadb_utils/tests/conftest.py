@@ -28,6 +28,7 @@ pytest_plugins = [
     "nucliadb_utils.tests.s3",
     "nucliadb_utils.tests.pg",
     "nucliadb_utils.tests.local",
+    "nucliadb_utils.tests.azure",
 ]
 
 

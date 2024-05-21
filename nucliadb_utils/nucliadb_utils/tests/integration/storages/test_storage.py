@@ -21,6 +21,7 @@ from uuid import uuid4
 
 import pytest
 
+from nucliadb_utils.storages.azure import AzureStorage
 from nucliadb_utils.storages.gcs import GCSStorage
 from nucliadb_utils.storages.local import LocalStorage
 from nucliadb_utils.storages.pg import PostgresStorage
@@ -46,6 +47,11 @@ async def test_pg_driver(pg_storage: PostgresStorage):
 @pytest.mark.asyncio
 async def test_local_driver(local_storage: LocalStorage):
     await storage_test(local_storage)
+
+
+@pytest.mark.asyncio
+async def test_azure_driver(azure_storage: AzureStorage):
+    await storage_test(azure_storage)
 
 
 async def storage_test(storage: Storage):
