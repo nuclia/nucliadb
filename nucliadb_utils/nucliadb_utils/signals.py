@@ -56,8 +56,8 @@ class Signal:
 
     async def dispatch(self, payload: Any):
         """Send signal to all registered callbacks by they priority order."""
-        assert (
-            type(payload) == self.payload_model_type
+        assert isinstance(
+            payload, self.payload_model_type
         ), "Can't dispatch a signal with an invalid model"
 
         awaitables = [

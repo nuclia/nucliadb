@@ -93,9 +93,7 @@ class BatchSpanProcessor(SpanProcessor):
         # flag that indicates that spans are being dropped
         self._spans_dropped = False
         # precallocated list to send spans to exporter
-        self.spans_list = [
-            None
-        ] * self.max_export_batch_size  # type: List[Optional[Span]]
+        self.spans_list: List[Optional[Span]] = [None] * self.max_export_batch_size
 
     def on_start(self, span: Span, parent_context: Optional[Context] = None) -> None:
         pass
