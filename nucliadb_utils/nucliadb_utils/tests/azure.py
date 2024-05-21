@@ -32,7 +32,14 @@ images.settings["azurite"] = {
     "version": "3.30.0",
     "options": {
         "ports": {"10000": None},
-        "command": " ".join(["azurite-blob", "--blobHost 0.0.0.0"]),
+        "command": " ".join(
+            [
+                # To start the blob service only -- by default is on port 10000
+                "azurite-blob",
+                # So we can access it from outside the container
+                "--blobHost 0.0.0.0",
+            ]
+        ),
     },
     "env": {},
 }
@@ -46,8 +53,10 @@ class Azurite(BaseImage):
         try:
             from azure.storage.blob import BlobServiceClient
 
-            host_port = self.get_port(port=self.port)
+            container_port = self.port
+            host_port = self.get_port(port=container_port)
             conn_string = get_connection_string(self.host, host_port)
+
             client = BlobServiceClient.from_connection_string(conn_string)
             container_client = client.get_container_client("foo")
             container_client.create_container()
@@ -99,8 +108,11 @@ async def azure_storage(azurite):
     storage = AzureStorage(
         connection_string=azurite.connection_string,
     )
+    MAIN[Utility.STORAGE] = storage
     await storage.initialize()
     try:
         yield storage
     finally:
         await storage.finalize()
+        if Utility.STORAGE in MAIN:
+            del MAIN[Utility.STORAGE]
