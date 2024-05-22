@@ -45,7 +45,7 @@ from nucliadb_utils.utilities import get_storage
 async def extract_file_field_from_pb(field_pb: resources_pb2.FieldFile) -> str:
     processing = get_processing()
 
-    if field_pb.file.uri is not None:
+    if field_pb.file.source == resources_pb2.CloudFile.Source.EXTERNAL:
         file_field = models.FileField(
             language=field_pb.language,
             password=field_pb.password,
