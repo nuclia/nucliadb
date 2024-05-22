@@ -52,6 +52,60 @@ async def resource_exists(txn: Transaction, *, kbid: str, rid: str) -> bool:
     return basic is not None
 
 
+# id and slug
+
+
+async def get_resource_uuid_from_slug(
+    txn: Transaction, *, kbid: str, slug: str
+) -> Optional[str]:
+    encoded_uuid = await txn.get(KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug))
+    if not encoded_uuid:
+        return None
+    return encoded_uuid.decode()
+
+
+async def modify_slug(txn: Transaction, *, kbid: str, rid: str, new_slug: str) -> str:
+    basic = await get_basic(txn, kbid=kbid, rid=rid)
+    if basic is None:
+        raise NotFoundError()
+    old_slug = basic.slug
+
+    uuid_for_new_slug = await get_resource_uuid_from_slug(txn, kbid=kbid, slug=new_slug)
+    if uuid_for_new_slug is not None:
+        if uuid_for_new_slug == rid:
+            # Nothing to change
+            return old_slug
+        else:
+            raise ConflictError(f"Slug {new_slug} already exists")
+    key = KB_RESOURCE_SLUG.format(kbid=kbid, slug=old_slug)
+    await txn.delete(key)
+    key = KB_RESOURCE_SLUG.format(kbid=kbid, slug=new_slug)
+    await txn.set(key, rid.encode())
+    basic.slug = new_slug
+    await set_basic(txn, kbid=kbid, rid=rid, basic=basic)
+    return old_slug
+
+
+# resource-shard
+
+
+@backoff.on_exception(
+    backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3
+)
+async def get_resource_shard_id(
+    txn: Transaction, *, kbid: str, rid: str
+) -> Optional[str]:
+    shard = await txn.get(KB_RESOURCE_SHARD.format(kbid=kbid, uuid=rid))
+    if shard is not None:
+        return shard.decode()
+    else:
+        return None
+
+
+async def set_resource_shard_id(txn: Transaction, *, kbid: str, rid: str, shard: str):
+    await txn.set(KB_RESOURCE_SHARD.format(kbid=kbid, uuid=rid), shard.encode())
+
+
 # Basic
 
 
@@ -157,7 +211,8 @@ async def set_relations(
     await txn.set(key, relations.SerializeToString())
 
 
-# other functions
+# KB resource ids (this functions use internal transactions, breaking the
+# datamanager contract. We should rethink them at some point)
 
 
 async def iterate_resource_ids(*, kbid: str) -> AsyncGenerator[str, None]:
@@ -202,52 +257,7 @@ async def _get_resource_ids_from_slugs(kbid: str, slugs: list[str]) -> list[str]
     return [rid.decode() for rid in rids if rid is not None]
 
 
-@backoff.on_exception(
-    backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3
-)
-async def get_resource_shard_id(
-    txn: Transaction, *, kbid: str, rid: str
-) -> Optional[str]:
-    shard = await txn.get(KB_RESOURCE_SHARD.format(kbid=kbid, uuid=rid))
-    if shard is not None:
-        return shard.decode()
-    else:
-        return None
-
-
-@backoff.on_exception(
-    backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3
-)
-async def get_resource(
-    txn: Transaction, *, kbid: str, rid: str
-) -> Optional[ResourceORM]:
-    """
-    Not ideal to return Resource type here but refactoring would
-    require a lot of changes.
-
-    At least this isolated that dependency here.
-    """
-    # prevent circulat imports -- this is not ideal that we have the ORM mix here.
-    from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
-
-    kb_orm = KnowledgeBoxORM(txn, await get_storage(), kbid)
-    return await kb_orm.get(rid)
-
-
-@backoff.on_exception(
-    backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3
-)
-async def get_resource_index_message(
-    txn: Transaction, *, kbid: str, rid: str
-) -> Optional[noderesources_pb2.Resource]:
-    # prevent circulat imports -- this is not ideal that we have the ORM mix here.
-    from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
-
-    kb_orm = KnowledgeBoxORM(txn, await get_storage(), kbid)
-    res = await kb_orm.get(rid)
-    if res is None:
-        return None
-    return (await res.generate_index_message()).brain
+# KB resource count (materialized key)
 
 
 async def calculate_number_of_resources(txn: Transaction, *, kbid: str) -> int:
@@ -284,52 +294,7 @@ async def set_number_of_resources(txn: Transaction, kbid: str, value: int) -> No
     )
 
 
-async def get_broker_message(
-    txn: Transaction, *, kbid: str, rid: str
-) -> Optional[writer_pb2.BrokerMessage]:
-    resource = await get_resource(txn, kbid=kbid, rid=rid)
-    if resource is None:
-        return None
-
-    resource.disable_vectors = False
-    resource.txn = txn
-    bm = await resource.generate_broker_message()
-    return bm
-
-
-async def get_resource_uuid_from_slug(
-    txn: Transaction, *, kbid: str, slug: str
-) -> Optional[str]:
-    encoded_uuid = await txn.get(KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug))
-    if not encoded_uuid:
-        return None
-    return encoded_uuid.decode()
-
-
-async def modify_slug(txn: Transaction, *, kbid: str, rid: str, new_slug: str) -> str:
-    basic = await get_basic(txn, kbid=kbid, rid=rid)
-    if basic is None:
-        raise NotFoundError()
-    old_slug = basic.slug
-
-    uuid_for_new_slug = await get_resource_uuid_from_slug(txn, kbid=kbid, slug=new_slug)
-    if uuid_for_new_slug is not None:
-        if uuid_for_new_slug == rid:
-            # Nothing to change
-            return old_slug
-        else:
-            raise ConflictError(f"Slug {new_slug} already exists")
-    key = KB_RESOURCE_SLUG.format(kbid=kbid, slug=old_slug)
-    await txn.delete(key)
-    key = KB_RESOURCE_SLUG.format(kbid=kbid, slug=new_slug)
-    await txn.set(key, rid.encode())
-    basic.slug = new_slug
-    await set_basic(txn, kbid=kbid, rid=rid, basic=basic)
-    return old_slug
-
-
-async def set_resource_shard_id(txn: Transaction, *, kbid: str, rid: str, shard: str):
-    await txn.set(KB_RESOURCE_SHARD.format(kbid=kbid, uuid=rid), shard.encode())
+# Fields (materialized key with all field ids)
 
 
 async def get_all_field_ids(
@@ -356,3 +321,54 @@ async def has_field(
         if field_id == resource_field_id:
             return True
     return False
+
+
+# ORM mix (this functions shouldn't belong here)
+
+
+async def get_broker_message(
+    txn: Transaction, *, kbid: str, rid: str
+) -> Optional[writer_pb2.BrokerMessage]:
+    resource = await get_resource(txn, kbid=kbid, rid=rid)
+    if resource is None:
+        return None
+
+    resource.disable_vectors = False
+    resource.txn = txn
+    bm = await resource.generate_broker_message()
+    return bm
+
+
+@backoff.on_exception(
+    backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3
+)
+async def get_resource(
+    txn: Transaction, *, kbid: str, rid: str
+) -> Optional[ResourceORM]:
+    """
+    Not ideal to return Resource type here but refactoring would
+    require a lot of changes.
+
+    At least this isolated that dependency here.
+    """
+    # prevent circulat imports -- this is not ideal that we have the ORM mix here.
+    from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
+
+    kb_orm = KnowledgeBoxORM(txn, await get_storage(), kbid)
+    return await kb_orm.get(rid)
+
+
+@backoff.on_exception(
+    backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3
+)
+async def get_resource_index_message(
+    txn: Transaction, *, kbid: str, rid: str
+) -> Optional[noderesources_pb2.Resource]:
+    # prevent circulat imports -- this is not ideal that we have the ORM mix here.
+    from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
+
+    kb_orm = KnowledgeBoxORM(txn, await get_storage(), kbid)
+    res = await kb_orm.get(rid)
+    if res is None:
+        return None
+    return (await res.generate_index_message()).brain
