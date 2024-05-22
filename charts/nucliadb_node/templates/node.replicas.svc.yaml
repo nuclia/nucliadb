@@ -1,0 +1,34 @@
+{{- $release := .Release }}
+{{- $values := .Values }}
+{{- $chart := .Chart }}
+{{- range $i, $e := until (int .Values.replicaCount) }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: node-replica-{{ $i }}
+  labels:
+    app: node-replica
+    appType: node
+    readReplica: "true"
+    app.kubernetes.io/name: node-replica-{{ $i }}
+    app.kubernetes.io/instance: {{ $release.Name }}
+    app.kubernetes.io/managed-by: {{ $release.Service }}
+    version: "{{ $chart.Version | replace "+" "_" }}"
+    chart: "{{ $chart.Name }}"
+    metrics: "enabled"
+spec:
+  selector:
+    app: node-replica
+    chart: "{{ $chart.Name }}"
+  clusterIP: None
+  ports:
+  - name: grpc-reader
+    port: {{ $values.serving.grpc_reader }}
+    protocol: TCP
+    appProtocol: grpc
+  - name: grpc-writer
+    port: {{ $values.serving.grpc_writer }}
+    protocol: TCP
+    appProtocol: grpc
+---
+{{- end }}
