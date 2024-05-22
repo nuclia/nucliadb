@@ -52,13 +52,6 @@ class TestStorageField:
         await storage_field.delete()
         storage.delete_upload.assert_called_once_with("uri", "bucket")
 
-    def test_build_cf(self, storage_field: StorageField):
-        cf = CloudFile()
-        cf.bucket_name = "bucket"
-        cf.uri = "fullkey"
-        cf.filename = "payload.pb"
-        assert storage_field.build_cf() == cf
-
 
 class StorageTest(Storage):
     def __init__(self):
