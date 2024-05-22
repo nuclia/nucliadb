@@ -117,12 +117,3 @@ class File(Field):
                 sf, FileExtractedData
             )
         return self.file_extracted_data
-
-    async def get_file_extracted_data_cf(self) -> Optional[CloudFile]:
-        sf: StorageField = self.storage.file_extracted(
-            self.kbid, self.uuid, self.type, self.id, FILE_METADATA
-        )
-        if await sf.exists() is not None:
-            return sf.build_cf()
-        else:
-            return None

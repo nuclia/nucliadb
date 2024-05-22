@@ -20,7 +20,7 @@
 import logging
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional, Union
+from typing import Optional
 
 from nucliadb_protos.noderesources_pb2 import IndexParagraph as BrainParagraph
 from nucliadb_protos.noderesources_pb2 import ParagraphMetadata
@@ -47,11 +47,6 @@ from nucliadb.ingest.orm.utils import compute_paragraph_key
 from nucliadb_models.labels import BASE_LABELS, flatten_resource_labels
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_protos import utils_pb2
-
-if TYPE_CHECKING:  # pragma: no cover
-    StatusValue = Union[Metadata.Status.V, int]
-else:
-    StatusValue = int
 
 FilePagePositions = dict[int, tuple[int, int]]
 

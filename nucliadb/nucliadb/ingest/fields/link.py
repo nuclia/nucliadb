@@ -100,12 +100,3 @@ class Link(Field):
                 sf, LinkExtractedData
             )
         return self.link_extracted_data
-
-    async def get_link_extracted_data_cf(self) -> Optional[CloudFile]:
-        sf: StorageField = self.storage.file_extracted(
-            self.kbid, self.uuid, self.type, self.id, LINK_METADATA
-        )
-        if await sf.exists() is not None:
-            return sf.build_cf()
-        else:
-            return None

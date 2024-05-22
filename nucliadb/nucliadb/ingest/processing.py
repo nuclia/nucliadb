@@ -111,10 +111,6 @@ class PushPayload(BaseModel):
     )
 
 
-class PushResponse(BaseModel):
-    seqid: Optional[int] = None
-
-
 async def start_processing_engine():
     if nuclia_settings.dummy_processing:
         processing_engine = DummyProcessingEngine()
