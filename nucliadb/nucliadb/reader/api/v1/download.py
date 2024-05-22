@@ -36,6 +36,7 @@ from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires_one
 from nucliadb_utils.storages.storage import StorageField  # type: ignore
+from nucliadb_utils.storages.storage import FileInfo
 from nucliadb_utils.utilities import get_storage
 
 from .router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
@@ -282,13 +283,13 @@ async def _download_field_conversation(
 
 
 async def download_api(sf: StorageField, headers: Headers, inline: bool = False):
-    metadata = await sf.exists()
+    metadata: FileInfo = await sf.exists()
     if metadata is None:
         raise HTTPException(status_code=404, detail="Specified file doesn't exist")
 
-    file_size = int(metadata.get("SIZE", -1))
-    content_type = metadata.get("CONTENT_TYPE", "application/octet-stream")
-    filename = metadata.get("FILENAME", "file")
+    file_size = metadata.size
+    content_type = metadata.content_type or "application/octet-stream"
+    filename = metadata.filename or "file"
     filename = safe_http_header_encode(filename)
 
     status_code = 200
@@ -348,7 +349,7 @@ async def download_api(sf: StorageField, headers: Headers, inline: bool = False)
         download_headers["Range"] = range_request
 
     return StreamingResponse(
-        sf.storage.download(sf.bucket, sf.key, headers=download_headers),  # type: ignore
+        sf.storage.download(sf.bucket, sf.key, start=start, end=end, range_size=range_size, headers=download_headers),  # type: ignore
         status_code=status_code,
         media_type=content_type,
         headers=extra_headers,

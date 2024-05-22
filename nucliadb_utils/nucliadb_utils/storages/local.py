@@ -24,13 +24,14 @@ import json
 import os
 import shutil
 from datetime import datetime
-from typing import Any, AsyncIterator, Dict, Optional
+from typing import AsyncIterator, Dict, Optional
 
 import aiofiles
 from nucliadb_protos.resources_pb2 import CloudFile
 
+from nucliadb_utils.nucliadb_utils.storages.storage import FileInfo
 from nucliadb_utils.storages import CHUNK_SIZE
-from nucliadb_utils.storages.storage import Storage, StorageField
+from nucliadb_utils.storages.storage import BucketItem, Storage, StorageField
 
 
 class LocalStorageField(StorageField):
@@ -142,9 +143,13 @@ class LocalStorageField(StorageField):
 
         init_url = self.storage.get_file_path(self.bucket, upload_uri)
         metadata_init_url = self.metadata_key(init_url)
-        metadata = json.dumps(
-            {"FILENAME": cf.filename, "SIZE": cf.size, "CONTENT_TYPE": cf.content_type}
+        file_info = FileInfo(
+            filename=cf.filename,
+            size=cf.size,
+            content_type=cf.content_type,
+            key=upload_uri,
         )
+        metadata = json.dumps(file_info)
 
         path_to_create = os.path.dirname(metadata_init_url)
         os.makedirs(path_to_create, exist_ok=True)
@@ -190,12 +195,12 @@ class LocalStorageField(StorageField):
         self.field.ClearField("offset")
         self.field.ClearField("upload_uri")
 
-    async def exists(self) -> Optional[Dict[str, str]]:
+    async def exists(self) -> Optional[FileInfo]:
         file_path = self.storage.get_file_path(self.bucket, self.key)
         metadata_path = self.metadata_key(file_path)
         if os.path.exists(metadata_path):
             async with aiofiles.open(metadata_path, "r") as metadata:
-                return json.loads(await metadata.read())
+                FileInfo(**json.loads(await metadata.read()))
         return None
 
     async def upload(self, iterator: AsyncIterator, origin: CloudFile) -> CloudFile:
@@ -269,10 +274,11 @@ class LocalStorage(Storage):
             deleted = False
         return deleted
 
-    async def iterate_bucket(self, bucket: str, prefix: str) -> AsyncIterator[Any]:
+    async def iterate_bucket(
+        self, bucket: str, prefix: str
+    ) -> AsyncIterator[BucketItem]:
         for key in glob.glob(f"{bucket}/{prefix}*"):
-            item = {"name": key}
-            yield item
+            yield BucketItem(name=key)
 
     async def download(
         self, bucket_name: str, key: str, headers: Optional[Dict[str, str]] = None

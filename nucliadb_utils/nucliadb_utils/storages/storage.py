@@ -32,10 +32,12 @@ from typing import (
     Optional,
     Tuple,
     Type,
+    TypedDict,
     Union,
     cast,
 )
 
+from attr import dataclass
 from nucliadb_protos.noderesources_pb2 import Resource as BrainResource
 from nucliadb_protos.nodewriter_pb2 import IndexMessage
 from nucliadb_protos.resources_pb2 import CloudFile
@@ -58,6 +60,18 @@ OLD_INDEXING_KEY = "index/{node}/{shard}/{txid}"
 INDEXING_KEY = "index/{kb}/{shard}/{resource}/{txid}"
 # temporary storage for large stream data
 MESSAGE_KEY = "message/{kbid}/{rid}/{mid}"
+
+
+@dataclass
+class BucketItem:
+    name: str
+
+
+class FileInfo(TypedDict):
+    filename: str
+    size: int
+    content_type: str
+    key: str
 
 
 class StorageField:
@@ -98,7 +112,7 @@ class StorageField:
             deleted = True
         return deleted
 
-    async def exists(self) -> Optional[Dict[str, str]]:
+    async def exists(self) -> Optional[FileInfo]:
         raise NotImplementedError
 
     def build_cf(self) -> CloudFile:
@@ -149,10 +163,10 @@ class Storage:
         # Delete all keys inside a resource
         bucket = self.get_bucket_name(kbid)
         resource_storage_base_path = STORAGE_RESOURCE.format(kbid=kbid, uuid=uuid)
-        async for bucket_info in self.iterate_bucket(
+        async for bucket_item in self.iterate_bucket(
             bucket, resource_storage_base_path
         ):
-            await self.delete_upload(bucket_info["name"], bucket)
+            await self.delete_upload(bucket_item.name, bucket)
 
     async def deadletter(
         self, message: BrokerMessage, seq: int, seqid: int, partition: str
@@ -430,14 +444,19 @@ class Storage:
         return await destination.upload(safe_iterator, origin)
 
     async def download(
-        self, bucket: str, key: str, headers: Optional[Dict[str, str]] = None
+        self,
+        bucket: str,
+        key: str,
+        range_start: Optional[int] = None,
+        range_end: Optional[int] = None,
+        range_size: Optional[int] = None,
+        headers: Optional[Dict[str, str]] = None,
     ):
         destination: StorageField = self.field_klass(
             storage=self, bucket=bucket, fullkey=key
         )
         if headers is None:
             headers = {}
-
         try:
             async for data in destination.iter_data(headers=headers):
                 yield data
@@ -519,7 +538,7 @@ class Storage:
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def iterate_bucket(self, bucket: str, prefix: str) -> AsyncIterator[Any]:
+    def iterate_bucket(self, bucket: str, prefix: str) -> AsyncIterator[BucketItem]:
         raise NotImplementedError()
 
     async def copy(self, file: CloudFile, destination: StorageField):

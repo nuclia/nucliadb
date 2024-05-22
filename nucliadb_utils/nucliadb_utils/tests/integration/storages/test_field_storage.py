@@ -63,9 +63,9 @@ async def storage_field_test(storage: Storage):
     # Check that object's metadata is stored properly
     metadata = await sfield.exists()
     assert metadata is not None
-    assert metadata["CONTENT_TYPE"] == "text/plain"
-    assert str(metadata["SIZE"]) == str(len(binary_data))
-    assert metadata["FILENAME"] == "myfile.txt"
+    assert metadata.content_type == "text/plain"
+    assert str(metadata.size) == str(len(binary_data))
+    assert metadata.filename == "myfile.txt"
 
     # Download the file and check that it's the same
     downloaded_data = b""

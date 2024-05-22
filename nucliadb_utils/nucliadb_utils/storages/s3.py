@@ -33,7 +33,7 @@ from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_telemetry import errors
 from nucliadb_utils import logger
 from nucliadb_utils.storages.exceptions import UnparsableResponse
-from nucliadb_utils.storages.storage import Storage, StorageField
+from nucliadb_utils.storages.storage import FileInfo, Storage, StorageField
 
 MB = 1024 * 1024
 MIN_UPLOAD_SIZE = 5 * MB
@@ -271,7 +271,7 @@ class S3StorageField(StorageField):
             MultipartUpload=part_info,
         )
 
-    async def exists(self):
+    async def exists(self) -> Optional[FileInfo]:
         """
         Existence can be checked either with a CloudFile data in the field attribute
         or own StorageField key and bucket. Field takes precendece
@@ -292,12 +292,12 @@ class S3StorageField(StorageField):
             obj = await self.storage._s3aioclient.head_object(Bucket=bucket, Key=key)
             if obj is not None:
                 metadata = obj.get("Metadata", {})
-                return {
-                    "SIZE": metadata.get("size") or obj.get("ContentLength"),
-                    "CONTENT_TYPE": metadata.get("content_type")
-                    or obj.get("ContentType"),
-                    "FILENAME": metadata.get("filename") or key.split("/")[-1],
-                }
+                return FileInfo(
+                    size=metadata.get("size") or obj.get("ContentLength"),
+                    content_type=metadata.get("content_type") or obj.get("ContentType"),
+                    filename=metadata.get("filename") or key.split("/")[-1],
+                    key=key,
+                )
             else:
                 return None
         except botocore.exceptions.ClientError as e:

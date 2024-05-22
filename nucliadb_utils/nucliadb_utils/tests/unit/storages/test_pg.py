@@ -543,11 +543,11 @@ class TestPostgresStorage:
             )
         )
 
-        chunks = []
-        async for chunk in storage.iterate_bucket("kb_id", "file_id"):
-            chunks.append(chunk)
+        item_names = []
+        async for item in storage.iterate_bucket("kb_id", "file_id"):
+            item_names.append(item.name)
 
-        assert chunks == [{"name": "file_id1"}, {"name": "file_id2"}]
+        assert item_names == ["file_id1", "file_id2"]
 
     async def test_download(
         self, storage: pg.PostgresStorage, connection, chunk_info, chunk_data

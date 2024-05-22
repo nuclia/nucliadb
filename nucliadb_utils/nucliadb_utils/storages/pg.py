@@ -28,7 +28,7 @@ import asyncpg
 from nucliadb_protos.resources_pb2 import CloudFile
 
 from nucliadb_utils.storages import CHUNK_SIZE
-from nucliadb_utils.storages.storage import Storage, StorageField
+from nucliadb_utils.storages.storage import BucketItem, FileInfo, Storage, StorageField
 
 logger = logging.getLogger(__name__)
 
@@ -54,13 +54,6 @@ CREATE TABLE IF NOT EXISTS kb_files_fileparts (
     PRIMARY KEY(kb_id, file_id, part_id)
 );
 """
-
-
-class FileInfo(TypedDict):
-    filename: str
-    size: int
-    content_type: str
-    key: str
 
 
 class ChunkInfo(TypedDict):
@@ -588,11 +581,13 @@ class PostgresStorage(Storage):
         await self.delete_kb(kbid)
         return True
 
-    async def iterate_bucket(self, bucket: str, prefix: str) -> AsyncIterator[Any]:
+    async def iterate_bucket(
+        self, bucket: str, prefix: str
+    ) -> AsyncIterator[BucketItem]:
         async with self.pool.acquire() as conn:
             dl = PostgresFileDataLayer(conn)
             async for file_data in dl.iterate_kb(bucket, prefix):
-                yield {"name": file_data["key"]}
+                yield BucketItem(name=file_data["key"])
 
     async def download(
         self, bucket_name: str, key: str, headers: Optional[dict[str, str]] = None

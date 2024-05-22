@@ -73,8 +73,8 @@ async def storage_test(storage: Storage):
 
     await storage.delete_upload(key2, bucket)
 
-    async for keys in storage.iterate_bucket(bucket, ""):
-        assert keys["name"] == key1
+    async for item in storage.iterate_bucket(bucket, ""):
+        assert item.name == key1
 
     deleted = await storage.schedule_delete_kb(kbid1)
     assert deleted

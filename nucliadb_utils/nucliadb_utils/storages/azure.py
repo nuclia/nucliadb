@@ -20,13 +20,14 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, AsyncIterator, Optional
+from typing import AsyncIterator, Optional
 
+from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
 from azure.storage.blob.aio import BlobServiceClient
 from nucliadb_protos.resources_pb2 import CloudFile
 
 from nucliadb_utils.storages import CHUNK_SIZE
-from nucliadb_utils.storages.storage import Storage, StorageField
+from nucliadb_utils.storages.storage import BucketItem, Storage, StorageField
 
 logger = logging.getLogger(__name__)
 
@@ -107,13 +108,11 @@ class AzureStorage(Storage):
     def __init__(self, connection_string: str):
         self.connection_string = connection_string
         self.service_client: Optional[BlobServiceClient] = None
-        self.initialized = False
 
     async def initialize(self):
         self.service_client = BlobServiceClient.from_connection_string(
             self.connection_string
         )
-        self.initialized = True
 
     async def finalize(self):
         try:
@@ -121,27 +120,79 @@ class AzureStorage(Storage):
         except Exception as e:
             logger.warning(f"Error closing Azure client: {e}")
         self.service_client = None
-        self.initialized = False
 
-    def get_bucket_name(self, kbid: str):
-        raise NotImplementedError()
+    def get_bucket_name(self, kbid: str) -> str:
+        return f"nucliadb_{kbid}"
 
-    async def create_kb(self, kbid: str):
-        raise NotImplementedError()
+    async def create_kb(self, kbid: str) -> bool:
+        """
+        Create bucket if it does not exist. Returns True if the bucket was created.
+        """
+        assert self.service_client is not None
+        container_name = self.get_bucket_name(kbid)
+        container_client = self.service_client.get_container_client(container_name)
+        try:
+            await container_client.create_container()
+            return True
+        except ResourceExistsError:
+            return False
 
     async def delete_kb(self, kbid: str) -> tuple[bool, bool]:
-        raise NotImplementedError()
+        """
+        Delete bucket if it exists. Returns a tuple with the first element being True if the bucket was deleted.
+        The second element can be ignored for azure's use case.
+        """
+        assert self.service_client is not None
+        container_name = self.get_bucket_name(kbid)
+        container_client = self.service_client.get_container_client(container_name)
+        # There's never a conflict on Azure
+        conflict = False
+        deleted = False
+        try:
+            await container_client.delete_container()
+            deleted = True
+        except ResourceNotFoundError:
+            deleted = False
+        return deleted, conflict
 
     async def delete_upload(self, uri: str, bucket_name: str):
-        raise NotImplementedError()
+        assert self.service_client is not None
+        # Buckets are mapped to Azure's container concept
+        container_name = bucket_name
+        container_client = self.service_client.get_container_client(container_name)
+        await container_client.delete_blob(uri, delete_snapshots="include")
 
     async def schedule_delete_kb(self, kbid: str) -> bool:
-        raise NotImplementedError()
+        """
+        In Azure blob storage there is no option to schedule
+        for deletion, so we will delete immediately.
 
-    async def iterate_bucket(self, bucket: str, prefix: str) -> AsyncIterator[Any]:
-        raise NotImplementedError()
+        Returns whether the container was deleted or not
+        """
+        deleted, _ = await self.delete_kb(kbid)
+        return deleted
+
+    async def iterate_bucket(
+        self, bucket: str, prefix: str
+    ) -> AsyncIterator[BucketItem]:
+        assert self.service_client is not None
+        # Buckets are mapped to Azure's container concept
+        container_name = bucket
+        container_client = self.service_client.get_container_client(container_name)
+        async for blob_name in container_client.list_blob_names(
+            name_starts_with=prefix
+        ):
+            yield BucketItem(name=blob_name)
 
     async def download(
         self, bucket_name: str, key: str, headers: Optional[dict[str, str]] = None
     ) -> AsyncIterator[bytes]:
-        raise NotImplementedError()
+        # TODO: download headers is used for range downloads.
+        # [refactor] We need to pass these as specific parameters instead.
+        assert self.service_client is not None
+        # Buckets are mapped to Azure's container concept
+        container_name = bucket_name
+        container_client = self.service_client.get_container_client(container_name)
+        downloader = await container_client.download_blob(blob=key)
+        async for chunk in downloader.chunks():
+            yield chunk
