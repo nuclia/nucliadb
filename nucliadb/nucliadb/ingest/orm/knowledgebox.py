@@ -364,11 +364,9 @@ class KnowledgeBox:
         await self.storage.delete_resource(self.kbid, uuid)
 
     async def get_resource_uuid_by_slug(self, slug: str) -> Optional[str]:
-        uuid = await self.txn.get(KB_RESOURCE_SLUG.format(kbid=self.kbid, slug=slug))
-        if uuid is not None:
-            return uuid.decode()
-        else:
-            return None
+        return await datamanagers.resources.get_resource_uuid_from_slug(
+            self.txn, kbid=self.kbid, slug=slug
+        )
 
     async def get_unique_slug(self, uuid: str, slug: str) -> str:
         key = KB_RESOURCE_SLUG.format(kbid=self.kbid, slug=slug)
@@ -381,14 +379,6 @@ class KnowledgeBox:
             else:
                 key_ok = True
         return slug
-
-    @classmethod
-    async def resource_slug_exists(
-        self, txn: Transaction, kbid: str, slug: str
-    ) -> bool:
-        key = KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug)
-        encoded_slug: Optional[bytes] = await txn.get(key)
-        return encoded_slug not in (None, b"")
 
     async def add_resource(
         self, uuid: str, slug: str, basic: Optional[Basic] = None

@@ -64,6 +64,12 @@ async def get_resource_uuid_from_slug(
     return encoded_uuid.decode()
 
 
+async def slug_exists(txn: Transaction, *, kbid: str, slug: str) -> bool:
+    key = KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug)
+    encoded_slug: Optional[bytes] = await txn.get(key)
+    return encoded_slug not in (None, b"")
+
+
 async def modify_slug(txn: Transaction, *, kbid: str, rid: str, new_slug: str) -> str:
     basic = await get_basic(txn, kbid=kbid, rid=rid)
     if basic is None:
