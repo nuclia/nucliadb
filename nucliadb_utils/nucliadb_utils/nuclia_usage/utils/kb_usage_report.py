@@ -16,13 +16,13 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-#
 
 import asyncio
 import logging
+from collections.abc import Iterable
 from contextlib import suppress
 from datetime import datetime, timezone
-from typing import Optional, Union
+from typing import Optional
 
 from nats.js.client import JetStreamContext
 
@@ -93,9 +93,9 @@ class KbUsageReportUtility:
         account_id: Optional[str],
         kb_id: Optional[str],
         kb_source: KBSource,
-        processes: list[Process] = [],
-        predicts: list[Predict] = [],
-        searches: list[Search] = [],
+        processes: Iterable[Process] = (),
+        predicts: Iterable[Predict] = (),
+        searches: Iterable[Search] = (),
         storage: Optional[Storage] = None,
     ):
         usage = KbUsage()
@@ -119,19 +119,3 @@ class KbUsageReportUtility:
                 usage.storage.resources = storage.resources
 
         self.send(usage)
-
-
-class DummyKbUsageReportUtility(KbUsageReportUtility):
-    queue: asyncio.Queue
-
-    def __init__(self):
-        self.queue = asyncio.Queue()
-
-    async def initialize(self):
-        pass
-
-    async def finalize(self):
-        pass
-
-
-KbUsageReportUtilType = Union[KbUsageReportUtility, DummyKbUsageReportUtility, None]
