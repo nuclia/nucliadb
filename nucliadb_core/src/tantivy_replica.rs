@@ -24,6 +24,7 @@
 //! last resort.
 //! Ideally we should find a way of implementing safe replication inside Tantivy.
 
+use std::fs::File;
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
@@ -37,7 +38,7 @@ pub type Json = Value;
 /// value is dropped the files it has access to are not modified.
 
 pub struct TantivyReplicaState {
-    pub files: Vec<PathBuf>,
+    pub files: Vec<(PathBuf, File)>,
     pub metadata_path: PathBuf,
     pub index_metadata: Json,
 }
@@ -83,6 +84,10 @@ pub fn compute_safe_replica_state(params: ReplicationParameters, index: &Index) 
     let searcher = index.reader()?.searcher();
     let index_metadata = index.load_metas()?;
     let mut segment_files = vec![];
+    let mut add_segment_file = |rel_path: PathBuf| -> Result<()> {
+        segment_files.push((rel_path.clone(), File::open(params.path.join(rel_path))?));
+        Ok(())
+    };
     let mut safe_metadata = SafeMetadata {
         index_settings: index_metadata.index_settings,
         schema: index_metadata.schema,
@@ -110,7 +115,7 @@ pub fn compute_safe_replica_state(params: ReplicationParameters, index: &Index) 
         let deletes = delete_opstamp.map(|stamp| PathBuf::from(format!("{raw_segment_id}.{stamp}.del")));
 
         if let Some(deletes) = deletes {
-            segment_files.push(deletes);
+            add_segment_file(deletes)?;
         }
 
         if params.on_replica.contains(&raw_segment_id) {
@@ -128,22 +133,22 @@ pub fn compute_safe_replica_state(params: ReplicationParameters, index: &Index) 
         let field_norms = PathBuf::from(format!("{raw_segment_id}.fieldnorm"));
 
         if params.path.join(&postings).exists() {
-            segment_files.push(postings);
+            add_segment_file(postings)?;
         }
         if params.path.join(&positions).exists() {
-            segment_files.push(positions);
+            add_segment_file(positions)?;
         }
         if params.path.join(&terms).exists() {
-            segment_files.push(terms);
+            add_segment_file(terms)?;
         }
         if params.path.join(&store).exists() {
-            segment_files.push(store);
+            add_segment_file(store)?;
         }
         if params.path.join(&fast_fields).exists() {
-            segment_files.push(fast_fields);
+            add_segment_file(fast_fields)?;
         }
         if params.path.join(&field_norms).exists() {
-            segment_files.push(field_norms);
+            add_segment_file(field_norms)?;
         }
     }
 
@@ -215,10 +220,9 @@ mod tests {
         let mut metadata_file = File::create(replica_workspace.path().join("meta.json")).unwrap();
         serde_json::to_writer(&mut metadata_file, &safe_state.index_metadata).unwrap();
 
-        for file_in_replica in &safe_state.files {
-            let source = workspace.path().join(file_in_replica);
-            let target = replica_workspace.path().join(file_in_replica);
-            std::fs::copy(source, target).unwrap();
+        for (path_in_replica, ref mut file_in_replica) in safe_state.files {
+            let mut target = File::create(replica_workspace.path().join(path_in_replica)).unwrap();
+            std::io::copy(file_in_replica, &mut target).unwrap();
         }
 
         let replica_index = Index::open_in_dir(replica_workspace.path()).unwrap();

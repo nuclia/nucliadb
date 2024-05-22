@@ -405,7 +405,7 @@ mod tests {
             expected_files.push(format!("vectors/{}/journal.json", segment));
             expected_files.push(format!("vectors/{}/nodes.kv", segment));
         }
-        assert_eq!(index_files.files, expected_files);
+        assert_eq!(index_files.files.into_iter().map(|x| x.0).collect::<Vec<_>>(), expected_files);
         assert_eq!(index_files.metadata_files.len(), 2);
     }
 }
