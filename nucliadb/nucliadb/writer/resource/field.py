@@ -42,15 +42,27 @@ from nucliadb_utils.storages.storage import StorageField
 from nucliadb_utils.utilities import get_storage
 
 
+async def extract_file_field_from_pb(field_pb: resources_pb2.FieldFile) -> str:
+    processing = get_processing()
+
+    if field_pb.file.uri is not None:
+        file_field = models.FileField(
+            language=field_pb.language,
+            password=field_pb.password,
+            file=models.File(payload=None, uri=field_pb.file.uri),
+        )
+        return processing.convert_external_filefield_to_str(file_field)
+    else:
+        storage = await get_storage(service_name=SERVICE_NAME)
+        return await processing.convert_internal_filefield_to_str(field_pb, storage)
+
+
 async def extract_file_field(
     field_id: str,
     resource: ORMResource,
     toprocess: PushPayload,
     password: Optional[str] = None,
 ):
-    processing = get_processing()
-    storage = await get_storage(service_name=SERVICE_NAME)
-
     field_type = resources_pb2.FieldType.FILE
     field = await resource.get_field(field_id, field_type)
     field_pb = await field.get_value()
@@ -60,9 +72,7 @@ async def extract_file_field(
     if password is not None:
         field_pb.password = password
 
-    toprocess.filefield[field_id] = await processing.convert_internal_filefield_to_str(
-        field_pb, storage
-    )
+    toprocess.filefield[field_id] = await extract_file_field_from_pb(field_pb)
 
 
 async def extract_fields(resource: ORMResource, toprocess: PushPayload):
@@ -84,9 +94,7 @@ async def extract_fields(resource: ORMResource, toprocess: PushPayload):
         field_pb = await field.get_value()
 
         if field_type_name is FieldTypeName.FILE:
-            toprocess.filefield[field_id] = (
-                await processing.convert_internal_filefield_to_str(field_pb, storage)
-            )
+            toprocess.filefield[field_id] = await extract_file_field_from_pb(field_pb)
 
         if field_type_name is FieldTypeName.LINK:
             parsed_link = MessageToDict(
