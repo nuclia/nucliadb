@@ -67,6 +67,10 @@ from nucliadb_utils.utilities import (
     get_utility,
     set_utility,
 )
+from nucliadb_protos.knowledgebox_pb2 import (
+    KnowledgeBoxNew,
+    SemanticModelMetadata,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -210,16 +214,17 @@ async def nucliadb_manager(nucliadb: Settings):
 
 
 @pytest.fixture(scope="function")
-async def knowledgebox(nucliadb_manager: AsyncClient, request):
-    resp = await nucliadb_manager.post(
-        "/kbs", json={"slug": "knowledgebox", "release_channel": request.param}
+async def knowledgebox(nucliadb_grpc: AsyncClient, nucliadb_manager: AsyncClient, request):
+    request = KnowledgeBoxNew(
+        slug="knowledgebox",
+        release_channel=request.param,
+        vector_dimension=512
     )
-    assert resp.status_code == 201
-    uuid = resp.json().get("uuid")
+    resp = await nucliadb_grpc.NewKnowledgeBox(request)
 
-    yield uuid
+    yield resp.uuid
 
-    resp = await nucliadb_manager.delete(f"/kb/{uuid}")
+    resp = await nucliadb_manager.delete(f"/kb/{resp.uuid}")
     assert resp.status_code == 200
 
 

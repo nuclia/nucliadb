@@ -106,7 +106,6 @@ impl Node {
         let metadata_len = metadata.as_ref().map(|m| m.as_ref().len()).unwrap_or_default();
 
         // Pointer computations
-        let len = HEADER_LEN + svector_len + skey_len + slabels_len + metadata_len;
         let mut vector_start = HEADER_LEN + metadata_len;
         let vector_pad = if vector_start % alignment > 0 {
             alignment - (vector_start % alignment)
@@ -116,6 +115,8 @@ impl Node {
         vector_start += vector_pad;
         let key_start = vector_start + svector_len;
         let labels_start = key_start + skey_len;
+
+        let len = HEADER_LEN + vector_pad + svector_len + skey_len + slabels_len + metadata_len;
 
         // Write pointers
         w.write_all(&len.to_le_bytes())?;
