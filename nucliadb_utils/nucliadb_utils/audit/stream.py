@@ -51,7 +51,7 @@ from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import (
 )
 from nucliadb_utils.nuclia_usage.utils.kb_usage_report import KbUsageReportUtility
 
-KB_USAGE_STREAM_AUDIT = "kb-usage.audit"
+KB_USAGE_STREAM_AUDIT = "kb-usage.nuclia_db"
 
 
 class StreamAuditStorage(AuditStorage):
