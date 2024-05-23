@@ -713,37 +713,34 @@ def parse_model_metadata_from_learning_config(
 def parse_model_metadata_from_request(
     request: KnowledgeBoxNew,
 ) -> SemanticModelMetadata:
-    # Try the normal path, request comes from direct grpc call, with parameters in the request object
-    model = SemanticModelMetadata()
-    model.similarity_function = request.similarity
-
     if request.HasField("vector_dimension"):
+        # Try the normal path, request comes from direct grpc call, with parameters in the request object
+        model = SemanticModelMetadata()
+        model.similarity_function = request.similarity
         model.vector_dimension = request.vector_dimension
 
-    if len(request.matryoshka_dimensions) > 0:
-        if model.vector_dimension not in request.matryoshka_dimensions:
-            logger.warning(
-                "Vector dimensions is inconsistent with matryoshka dimensions! Ignoring them",
-                extra={
-                    "kbid": request.forceuuid,
-                    "kbslug": request.slug,
-                },
-            )
-        else:
-            model.matryoshka_dimensions.extend(request.matryoshka_dimensions)
+        if len(request.matryoshka_dimensions) > 0:
+            if model.vector_dimension not in request.matryoshka_dimensions:
+                logger.warning(
+                    "Vector dimensions is inconsistent with matryoshka dimensions! Ignoring them",
+                    extra={
+                        "kbid": request.forceuuid,
+                        "kbslug": request.slug,
+                    },
+                )
+            else:
+                model.matryoshka_dimensions.extend(request.matryoshka_dimensions)
 
-    if model.vector_dimension is None:
-        if request.learning_config:
-            # Comes from POST to nucliadb API, parameters passed as a json learning_config
-            # Since this function is only called for hosted nucliadb, this should not happen
-            # but it's here to support SDK tests
-            config = json.loads(request.learning_config)
-            return SemanticModelMetadata(**config)
-        else:
-            # This should only happen in tests that test KB creation without data
-            logger.warning(
-                "Vector dimension not set. Will fail if trying to insert any data."
-            )
+    elif request.learning_config:
+        # Comes from POST to nucliadb API, parameters passed as a json learning_config
+        # Since this function is only called for hosted nucliadb, this should not happen
+        # but it's here to support SDK tests (which run in hosted mode to avoid depending
+        # on predict API)
+        config = json.loads(request.learning_config)
+        model = SemanticModelMetadata(**config)
+
+    else:
+        raise Exception("Vector index configuration is required")
 
     return model
 

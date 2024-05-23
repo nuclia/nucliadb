@@ -34,7 +34,7 @@ async def test_upload_download(grpc_servicer: IngestFixture):
     stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)  # type: ignore
 
     # Create a KB
-    pb = knowledgebox_pb2.KnowledgeBoxNew(slug=f"test-{uuid4()}")
+    pb = knowledgebox_pb2.KnowledgeBoxNew(slug=f"test-{uuid4()}", vector_dimension=512)
     pb.config.title = "My Title"
     result: knowledgebox_pb2.NewKnowledgeBoxResponse = await stub.NewKnowledgeBox(pb)  # type: ignore
     assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK

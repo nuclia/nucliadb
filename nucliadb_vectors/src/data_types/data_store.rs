@@ -321,7 +321,7 @@ mod tests {
         let mut merge_store = tempfile::tempfile().unwrap();
         let elems = vec![(TElem, v0_map.as_ref()), (TElem, v1_map.as_ref()), (TElem, v2_map.as_ref())];
 
-        merge(&mut merge_store, &elems).unwrap();
+        merge(&mut merge_store, &elems, &VectorConfig::default()).unwrap();
         let merge_map = unsafe { memmap2::Mmap::map(&merge_store).unwrap() };
         let number_of_elements = stored_elements(&merge_map);
         let values: Vec<u32> = (0..number_of_elements)
@@ -363,7 +363,7 @@ mod tests {
             (interpreter, v2_map.as_ref()),
         ];
 
-        merge::<(GreaterThan, TElem)>(&mut merge_store, elems.as_slice()).unwrap();
+        merge::<(GreaterThan, TElem)>(&mut merge_store, elems.as_slice(), &VectorConfig::default()).unwrap();
         let expected: Vec<u32> = vec![2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
         let merge_map = unsafe { memmap2::Mmap::map(&merge_store).unwrap() };
         let number_of_elements = stored_elements(&merge_map);
@@ -405,7 +405,7 @@ mod tests {
             (interpreter, v2_map.as_ref()),
         ];
 
-        merge::<(GreaterThan, TElem)>(&mut merge_store, elems.as_slice()).unwrap();
+        merge::<(GreaterThan, TElem)>(&mut merge_store, elems.as_slice(), &VectorConfig::default()).unwrap();
         let expected: Vec<u32> = vec![2, 3, 4, 5, 6, 7, 8];
         let merge_map = unsafe { memmap2::Mmap::map(&merge_store).unwrap() };
         let number_of_elements = stored_elements(&merge_map);
@@ -446,7 +446,7 @@ mod tests {
             ((GreaterThan(SIX), TElem), v2_map.as_ref()),
         ];
 
-        merge::<(GreaterThan, TElem)>(&mut merge_store, elems.as_slice()).unwrap();
+        merge::<(GreaterThan, TElem)>(&mut merge_store, elems.as_slice(), &VectorConfig::default()).unwrap();
         let expected: Vec<u32> = vec![1, 2, 4, 5, 7, 8];
         let merge_map = unsafe { memmap2::Mmap::map(&merge_store).unwrap() };
         let number_of_elements = stored_elements(&merge_map);
@@ -488,7 +488,7 @@ mod tests {
             (interpreter, v2_map.as_ref()),
         ];
 
-        merge::<(GreaterThan, TElem)>(&mut merge_storage, elems.as_slice()).unwrap();
+        merge::<(GreaterThan, TElem)>(&mut merge_storage, elems.as_slice(), &VectorConfig::default()).unwrap();
         let expected: Vec<u32> = vec![3, 4, 5, 6, 7, 8];
         let merge_store = unsafe { memmap2::Mmap::map(&merge_storage).unwrap() };
         let number_of_elements = stored_elements(&merge_store);
@@ -531,7 +531,7 @@ mod tests {
             (greater_than_10, v2_map.as_ref()),
         ];
 
-        merge::<(GreaterThan, TElem)>(&mut merge_storage, elems.as_slice()).unwrap();
+        merge::<(GreaterThan, TElem)>(&mut merge_storage, elems.as_slice(), &VectorConfig::default()).unwrap();
         let expected: Vec<u32> = vec![3, 4, 5];
         let merge_store = unsafe { memmap2::Mmap::map(&merge_storage).unwrap() };
         let number_of_elements = stored_elements(&merge_store);
@@ -574,7 +574,7 @@ mod tests {
             (interpreter, v2_map.as_ref()),
         ];
 
-        merge::<(GreaterThan, TElem)>(&mut file, elems.as_slice()).unwrap();
+        merge::<(GreaterThan, TElem)>(&mut file, elems.as_slice(), &VectorConfig::default()).unwrap();
         let expected: Vec<u32> = vec![];
         let merge_store = unsafe { memmap2::Mmap::map(&file).unwrap() };
         let number_of_elements = stored_elements(&merge_store);

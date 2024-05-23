@@ -35,6 +35,7 @@ async def test_service_lifecycle_entities(writer_api, entities_manager_mock):
             json={
                 "slug": "kbid1",
                 "title": "My Knowledge Box",
+                "learning_configuration": {"vector_dimension": 512},
             },
         )
         assert resp.status_code == 201
@@ -92,6 +93,7 @@ async def test_entities_custom_field_for_user_defined_groups(
             json={
                 "slug": "kbid1",
                 "title": "My Knowledge Box",
+                "learning_configuration": {"vector_dimension": 512},
             },
         )
         assert resp.status_code == 201
@@ -118,6 +120,7 @@ async def test_service_lifecycle_labels(writer_api):
             json={
                 "slug": "kbid1",
                 "title": "My Knowledge Box",
+                "learning_configuration": {"vector_dimension": 512},
             },
         )
         assert resp.status_code == 201

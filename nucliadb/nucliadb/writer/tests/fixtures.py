@@ -153,6 +153,7 @@ async def knowledgebox_writer(writer_api):
             json={
                 "slug": "kbid1",
                 "title": "My Knowledge Box",
+                "learning_configuration": {"vector_dimension": 512},
             },
         )
         assert resp.status_code == 201
