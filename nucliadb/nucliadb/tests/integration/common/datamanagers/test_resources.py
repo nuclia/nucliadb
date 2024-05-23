@@ -23,7 +23,6 @@ from nucliadb_protos.resources_pb2 import Basic
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG
-from nucliadb.ingest.orm.utils import set_basic
 from nucliadb_protos import resources_pb2
 
 pytestmark = pytest.mark.asyncio
@@ -31,7 +30,7 @@ pytestmark = pytest.mark.asyncio
 
 async def check_slug(driver: Driver, kbid, rid, slug):
     async with driver.transaction() as txn:
-        basic = await datamanagers.resources.get_resource_basic(txn, kbid=kbid, rid=rid)
+        basic = await datamanagers.resources.get_basic(txn, kbid=kbid, rid=rid)
         assert basic is not None
         assert basic.slug == slug
         uuid = await datamanagers.resources.get_resource_uuid_from_slug(
@@ -49,7 +48,7 @@ async def resource_with_slug(maindb_driver: Driver):
     async with maindb_driver.transaction() as txn:
         await txn.set(KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug), rid.encode())
         basic = Basic(slug=slug)
-        await set_basic(txn, kbid, rid, basic)
+        await datamanagers.resources.set_basic(txn, kbid=kbid, rid=rid, basic=basic)
         await txn.commit()
 
     await check_slug(maindb_driver, kbid, rid, slug)
