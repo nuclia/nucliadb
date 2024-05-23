@@ -200,7 +200,9 @@ async def knowledgebox_ingest(
     kbid = str(uuid.uuid4())
     kbslug = str(uuid.uuid4())
     async with maindb_driver.transaction() as txn:
-        model = SemanticModelMetadata(similarity_function=upb.VectorSimilarity.COSINE)
+        model = SemanticModelMetadata(
+            similarity_function=upb.VectorSimilarity.COSINE, vector_dimension=len(V1)
+        )
         await KnowledgeBox.create(txn, kbslug, model, uuid=kbid)
         await txn.commit()
 
