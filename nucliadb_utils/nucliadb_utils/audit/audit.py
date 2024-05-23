@@ -46,6 +46,14 @@ class AuditStorage:
     ):  # type: ignore
         raise NotImplementedError
 
+    def report_resources(
+        self,
+        *,
+        kbid: str,
+        resources: int,
+    ):
+        raise NotImplementedError
+
     async def initialize(self):
         pass
 

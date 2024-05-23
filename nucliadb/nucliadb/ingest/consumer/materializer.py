@@ -29,6 +29,7 @@ from nucliadb_protos import writer_pb2
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.storages.storage import Storage
+from nucliadb_utils.utilities import get_audit
 
 from .utils import DelayedTaskHandler
 
@@ -104,3 +105,7 @@ class MaterializerHandler:
                 txn, kbid=kbid, value=value
             )
             await txn.commit()
+
+        audit = get_audit()
+        if audit:
+            audit.report_resources(kbid=kbid, resources=value)

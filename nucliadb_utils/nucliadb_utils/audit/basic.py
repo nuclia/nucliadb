@@ -55,6 +55,14 @@ class BasicAuditStorage(AuditStorage):
             f"AUDIT {audit_type} {kbid} {user} {origin} {rid} {audit_fields} {kb_counter}"
         )
 
+    def report_resources(
+        self,
+        *,
+        kbid: str,
+        resources: int,
+    ):
+        logger.debug(f"REPORT RESOURCES {kbid} {resources}")
+
     async def visited(self, kbid: str, uuid: str, user: str, origin: str):
         logger.debug(f"VISITED {kbid} {uuid} {user} {origin}")
 
