@@ -35,23 +35,31 @@ it's transaction
 
 """
 
+import sys
 from functools import wraps
-from typing import _ParamSpec  # type: ignore
 
-from nucliadb.common import datamanagers
+from . import kb as kb_dm
+from . import resources as resources_dm
+from .utils import with_transaction
 
 # XXX: we are using the not exported _ParamSpec to support 3.9. Whenever we
 # upgrade to >= 3.10 we'll be able to use ParamSpecKwargs and improve the
 # typing. We are abusing of ParamSpec anywat to better support text editors, so
 # we also need to ignore some mypy complains
 
-P = _ParamSpec("P")
+__python_version = (sys.version_info.major, sys.version_info.minor)
+if __python_version == (3, 9):
+    from typing import _ParamSpec as ParamSpec  # type: ignore
+else:
+    from typing import ParamSpec  # type: ignore
+
+P = ParamSpec("P")
 
 
 def ro_txn_wrap(fun: P) -> P:  # type: ignore
     @wraps(fun)
     async def wrapper(**kwargs: P.kwargs):
-        async with datamanagers.with_transaction(read_only=True) as txn:
+        async with with_transaction(read_only=True) as txn:
             return await fun(txn, **kwargs)
 
     return wrapper
@@ -60,19 +68,17 @@ def ro_txn_wrap(fun: P) -> P:  # type: ignore
 def rw_txn_wrap(fun: P) -> P:  # type: ignore
     @wraps(fun)
     async def wrapper(**kwargs: P.kwargs):
-        async with datamanagers.with_transaction() as txn:
+        async with with_transaction() as txn:
             return await fun(txn, **kwargs)
 
     return wrapper
 
 
 class kb:
-    exists_kb = ro_txn_wrap(datamanagers.kb.exists_kb)
+    exists_kb = ro_txn_wrap(kb_dm.exists_kb)
 
 
 class resources:
-    get_resource_uuid_from_slug = ro_txn_wrap(
-        datamanagers.resources.get_resource_uuid_from_slug
-    )
-    resource_exists = ro_txn_wrap(datamanagers.resources.resource_exists)
-    slug_exists = ro_txn_wrap(datamanagers.resources.slug_exists)
+    get_resource_uuid_from_slug = ro_txn_wrap(resources_dm.get_resource_uuid_from_slug)
+    resource_exists = ro_txn_wrap(resources_dm.resource_exists)
+    slug_exists = ro_txn_wrap(resources_dm.slug_exists)
