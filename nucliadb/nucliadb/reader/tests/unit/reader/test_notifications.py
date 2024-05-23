@@ -176,9 +176,9 @@ async def test_serialize_notification_caches_resource_titles(get_resource_title_
 
 
 @pytest.fixture(scope="function")
-def get_resource_basic():
+def get_basic():
     with mock.patch(
-        "nucliadb.reader.reader.notifications.datamanagers.resources.get_resource_basic"
+        "nucliadb.reader.reader.notifications.datamanagers.resources.get_basic"
     ) as m:
         yield m
 
@@ -191,11 +191,11 @@ def kv_driver():
     return driver
 
 
-async def test_get_resource_title(kv_driver, get_resource_basic):
+async def test_get_resource_title(kv_driver, get_basic):
     basic = mock.Mock(title="Resource")
-    get_resource_basic.return_value = basic
+    get_basic.return_value = basic
 
     assert await get_resource_title(kv_driver, "kbid", "rid") == "Resource"
 
-    get_resource_basic.return_value = None
+    get_basic.return_value = None
     assert await get_resource_title(kv_driver, "kbid", "rid") is None
