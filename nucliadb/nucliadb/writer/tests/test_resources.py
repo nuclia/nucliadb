@@ -25,11 +25,11 @@ import pytest
 from httpx import AsyncClient
 
 import nucliadb_models
+from nucliadb.common import datamanagers
 from nucliadb.common.maindb.local import LocalDriver
 from nucliadb.common.maindb.redis import RedisDriver
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.processing import PushPayload
-from nucliadb.writer.api.v1.resource import resource_exists
 from nucliadb.writer.api.v1.router import (
     KB_PREFIX,
     RESOURCE_PREFIX,
@@ -219,7 +219,11 @@ async def test_resource_crud_sync(
         assert "elapsed" in data
         rid = data["uuid"]
 
-        assert (await resource_exists(knowledgebox_id, rid)) is True
+        assert (
+            await datamanagers.atomic.resources.resource_exists(
+                kbid=knowledgebox_id, rid=rid
+            )
+        ) is True
 
         # Test update resource
         resp = await client.patch(
@@ -241,7 +245,11 @@ async def test_resource_crud_sync(
         )
         assert resp.status_code == 204
 
-        assert (await resource_exists(knowledgebox_id, rid)) is False
+        assert (
+            await datamanagers.atomic.resources.resource_exists(
+                kbid=knowledgebox_id, rid=rid
+            )
+        ) is False
 
 
 @pytest.mark.asyncio

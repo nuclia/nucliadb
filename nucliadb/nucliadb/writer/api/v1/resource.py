@@ -55,7 +55,6 @@ from nucliadb.writer.resource.basic import (
 )
 from nucliadb.writer.resource.field import extract_fields, parse_fields
 from nucliadb.writer.resource.origin import parse_extra, parse_origin
-from nucliadb.writer.resource.slug import resource_slug_exists
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.writer import (
@@ -119,7 +118,9 @@ async def create_resource(
     toprocess.title = item.title
 
     if item.slug:
-        if await resource_slug_exists(kbid, item.slug):
+        from nucliadb.common import datamanagers
+
+        if await datamanagers.atomic.resources.slug_exists(kbid=kbid, slug=item.slug):
             raise HTTPException(
                 status_code=409, detail=f"Resource slug {item.slug} already exists"
             )
@@ -575,26 +576,16 @@ async def _reindex_resource(
 
 
 async def get_rid_from_slug_or_raise_error(kbid: str, rslug: str) -> str:
-    async with datamanagers.with_transaction(read_only=True) as txn:
-        rid = await datamanagers.resources.get_resource_uuid_from_slug(
-            txn, kbid=kbid, slug=rslug
-        )
+    rid = await datamanagers.atomic.resources.get_resource_uuid_from_slug(
+        kbid=kbid, slug=rslug
+    )
     if not rid:
         raise HTTPException(status_code=404, detail="Resource does not exist")
     return rid
 
 
-async def resource_exists(kbid: str, rid: str) -> bool:
-    async with datamanagers.with_transaction(read_only=True) as txn:
-        exists = await datamanagers.resources.resource_exists(txn, kbid=kbid, rid=rid)
-    return exists
-
-
-async def validate_rid_exists_or_raise_error(
-    kbid: str,
-    rid: str,
-):
-    if not (await resource_exists(kbid, rid)):
+async def validate_rid_exists_or_raise_error(kbid: str, rid: str):
+    if not (await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid)):
         raise HTTPException(status_code=404, detail="Resource does not exist")
 
 

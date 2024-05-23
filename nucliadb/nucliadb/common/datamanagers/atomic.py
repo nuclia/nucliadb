@@ -18,8 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-"""A
-
+"""
 Atomic datamanagers
 
 This module aims to provide a simple way to call a datamanager function in a

@@ -126,7 +126,7 @@ async def test_validate_field_upload(rid, field, md5, exists: bool, result):
     with (
         patch("nucliadb.writer.api.v1.upload.uuid", mock_uuid),
         patch(
-            "nucliadb.writer.api.v1.upload.resource_exists",
+            "nucliadb.writer.api.v1.upload.datamanagers.atomic.resources.resource_exists",
             AsyncMock(return_value=exists),
         ),
     ):
