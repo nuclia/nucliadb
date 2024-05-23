@@ -108,7 +108,6 @@ async def test_matryoshka_embeddings(
     await inject_message(nucliadb_grpc, bm)
 
     # Search
-
     from nucliadb.search import predict
 
     with patch.object(predict, "Q", [10.0] * vector_dimension):

@@ -214,14 +214,29 @@ async def nucliadb_manager(nucliadb: Settings):
 
 
 @pytest.fixture(scope="function")
-async def knowledgebox(nucliadb_grpc: AsyncClient, nucliadb_manager: AsyncClient, request):
+async def knowledgebox(nucliadb_grpc: WriterStub, nucliadb_manager: AsyncClient, request):
     request = KnowledgeBoxNew(
         slug="knowledgebox",
         release_channel=request.param,
         vector_dimension=512
     )
     resp = await nucliadb_grpc.NewKnowledgeBox(request)
+    assert resp.status == 0
+    yield resp.uuid
 
+    resp = await nucliadb_manager.delete(f"/kb/{resp.uuid}")
+    assert resp.status_code == 200
+
+
+@pytest.fixture(scope="function")
+async def knowledgebox_3(nucliadb_grpc: WriterStub, nucliadb_manager: AsyncClient, request):
+    request = KnowledgeBoxNew(
+        slug="knowledgebox",
+        release_channel=request.param,
+        vector_dimension=3
+    )
+    resp = await nucliadb_grpc.NewKnowledgeBox(request)
+    assert resp.status == 0
     yield resp.uuid
 
     resp = await nucliadb_manager.delete(f"/kb/{resp.uuid}")
