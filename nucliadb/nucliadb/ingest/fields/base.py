@@ -37,11 +37,9 @@ from nucliadb_protos.resources_pb2 import (
 from nucliadb_protos.utils_pb2 import ExtractedText, VectorObject
 from nucliadb_protos.writer_pb2 import Error
 
+from nucliadb.common import datamanagers
 from nucliadb.ingest.fields.exceptions import InvalidFieldClass, InvalidPBClass
 from nucliadb_utils.storages.storage import Storage, StorageField
-
-KB_RESOURCE_FIELD = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}"
-KB_RESOURCE_ERROR = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}/error"
 
 SUBFIELDFIELDS = ["l", "c"]
 
@@ -118,10 +116,12 @@ class Field:
 
     async def db_get_value(self):
         if self.value is None:
-            payload = await self.resource.txn.get(
-                KB_RESOURCE_FIELD.format(
-                    kbid=self.kbid, uuid=self.uuid, type=self.type, field=self.id
-                )
+            payload = await datamanagers.fields.get_raw(
+                self.resource.txn,
+                kbid=self.kbid,
+                rid=self.uuid,
+                field_type=self.type,
+                field_id=self.id,
             )
             if payload is None:
                 return
@@ -131,25 +131,25 @@ class Field:
         return self.value
 
     async def db_set_value(self, payload: Any):
-        await self.resource.txn.set(
-            KB_RESOURCE_FIELD.format(
-                kbid=self.kbid, uuid=self.uuid, type=self.type, field=self.id
-            ),
-            payload.SerializeToString(),
+        await datamanagers.fields.set(
+            self.resource.txn,
+            kbid=self.kbid,
+            rid=self.uuid,
+            field_type=self.type,
+            field_id=self.id,
+            value=payload,
         )
         self.value = payload
         self.resource.modified = True
 
     async def delete(self):
-        field_base_key = KB_RESOURCE_FIELD.format(
-            kbid=self.kbid, uuid=self.uuid, type=self.type, field=self.id
+        await datamanagers.fields.delete(
+            self.resource.txn,
+            kbid=self.kbid,
+            rid=self.uuid,
+            field_type=self.type,
+            field_id=self.id,
         )
-        # Make sure we explicitly delete the field and any nested key
-        keys_to_delete = []
-        async for key in self.resource.txn.keys(field_base_key):
-            keys_to_delete.append(key)
-        for key in keys_to_delete:
-            await self.resource.txn.delete(key)
         await self.delete_extracted_text()
         await self.delete_vectors()
         await self.delete_metadata()
@@ -185,23 +185,22 @@ class Field:
             pass
 
     async def get_error(self) -> Optional[Error]:
-        payload = await self.resource.txn.get(
-            KB_RESOURCE_ERROR.format(
-                kbid=self.kbid, uuid=self.uuid, type=self.type, field=self.id
-            )
+        return await datamanagers.fields.get_error(
+            self.resource.txn,
+            kbid=self.kbid,
+            rid=self.uuid,
+            field_type=self.type,
+            field_id=self.id,
         )
-        if payload is None:
-            return None
-        pberror = Error()
-        pberror.ParseFromString(payload)
-        return pberror
 
     async def set_error(self, error: Error) -> None:
-        await self.resource.txn.set(
-            KB_RESOURCE_ERROR.format(
-                kbid=self.kbid, uuid=self.uuid, type=self.type, field=self.id
-            ),
-            error.SerializeToString(),
+        await datamanagers.fields.set_error(
+            self.resource.txn,
+            kbid=self.kbid,
+            rid=self.uuid,
+            field_type=self.type,
+            field_id=self.id,
+            error=error,
         )
 
     async def get_question_answers(self) -> Optional[QuestionAnswers]:
