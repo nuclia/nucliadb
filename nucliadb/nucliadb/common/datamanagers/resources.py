@@ -155,14 +155,14 @@ async def set_basic(
 async def get_origin(
     txn: Transaction, *, kbid: str, rid: str
 ) -> Optional[resources_pb2.Origin]:
-    key = KB_RESOURCE_ORIGIN.format(kbid=kbid, rid=rid)
+    key = KB_RESOURCE_ORIGIN.format(kbid=kbid, uuid=rid)
     return await get_kv_pb(txn, key, resources_pb2.Origin)
 
 
 async def set_origin(
     txn: Transaction, *, kbid: str, rid: str, origin: resources_pb2.Origin
 ):
-    key = KB_RESOURCE_ORIGIN.format(kbid=kbid, rid=rid)
+    key = KB_RESOURCE_ORIGIN.format(kbid=kbid, uuid=rid)
     await txn.set(key, origin.SerializeToString())
 
 
@@ -172,14 +172,14 @@ async def set_origin(
 async def get_extra(
     txn: Transaction, *, kbid: str, rid: str
 ) -> Optional[resources_pb2.Extra]:
-    key = KB_RESOURCE_EXTRA.format(kbid=kbid, rid=rid)
+    key = KB_RESOURCE_EXTRA.format(kbid=kbid, uuid=rid)
     return await get_kv_pb(txn, key, resources_pb2.Extra)
 
 
 async def set_extra(
     txn: Transaction, *, kbid: str, rid: str, extra: resources_pb2.Extra
 ):
-    key = KB_RESOURCE_EXTRA.format(kbid=kbid, rid=rid)
+    key = KB_RESOURCE_EXTRA.format(kbid=kbid, uuid=rid)
     await txn.set(key, extra.SerializeToString())
 
 
@@ -189,14 +189,14 @@ async def set_extra(
 async def get_security(
     txn: Transaction, *, kbid: str, rid: str
 ) -> Optional[resources_pb2.Security]:
-    key = KB_RESOURCE_SECURITY.format(kbid=kbid, rid=rid)
+    key = KB_RESOURCE_SECURITY.format(kbid=kbid, uuid=rid)
     return await get_kv_pb(txn, key, resources_pb2.Security)
 
 
 async def set_security(
     txn: Transaction, *, kbid: str, rid: str, security: resources_pb2.Security
 ):
-    key = KB_RESOURCE_SECURITY.format(kbid=kbid, rid=rid)
+    key = KB_RESOURCE_SECURITY.format(kbid=kbid, uuid=rid)
     await txn.set(key, security.SerializeToString())
 
 
@@ -206,14 +206,14 @@ async def set_security(
 async def get_relations(
     txn: Transaction, *, kbid: str, rid: str
 ) -> Optional[resources_pb2.Relations]:
-    key = KB_RESOURCE_RELATIONS.format(kbid=kbid, rid=rid)
+    key = KB_RESOURCE_RELATIONS.format(kbid=kbid, uuid=rid)
     return await get_kv_pb(txn, key, resources_pb2.Relations)
 
 
 async def set_relations(
     txn: Transaction, *, kbid: str, rid: str, relations: resources_pb2.Relations
 ):
-    key = KB_RESOURCE_RELATIONS.format(kbid=kbid, rid=rid)
+    key = KB_RESOURCE_RELATIONS.format(kbid=kbid, uuid=rid)
     await txn.set(key, relations.SerializeToString())
 
 
