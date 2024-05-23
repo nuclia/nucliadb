@@ -106,14 +106,13 @@ impl Node {
         let metadata_len = metadata.as_ref().map(|m| m.as_ref().len()).unwrap_or_default();
 
         // Pointer computations
-        let mut vector_start = HEADER_LEN + metadata_len;
+        let vector_start = HEADER_LEN + metadata_len;
         let vector_pad = if vector_start % alignment > 0 {
             alignment - (vector_start % alignment)
         } else {
             0
         };
-        vector_start += vector_pad;
-        let key_start = vector_start + svector_len;
+        let key_start = vector_start + svector_len + vector_pad;
         let labels_start = key_start + skey_len;
 
         let len = HEADER_LEN + vector_pad + svector_len + skey_len + slabels_len + metadata_len;
@@ -126,8 +125,9 @@ impl Node {
         // Metadata segment
         metadata.map_or(Ok(()), |m| w.write_all(m.as_ref()))?;
         // Values
+        w.write_all(&(svector.len() as u32).to_le_bytes())?;
+        w.write_all(&(vector_pad as u32).to_le_bytes())?;
         w.write_all(&[0].repeat(vector_pad))?;
-        w.write_all(&svector.len().to_le_bytes())?;
         w.write_all(svector)?;
         w.write_all(&skey.len().to_le_bytes())?;
         w.write_all(skey)?;
@@ -159,8 +159,9 @@ impl Node {
     // x must be serialized using Node, may have trailing bytes.
     pub fn vector(x: &[u8]) -> &[u8] {
         let xvec_ptr = usize_from_slice_le(&x[VECTOR_START.0..VECTOR_START.1]);
-        let xvec_len = usize_from_slice_le(&x[xvec_ptr..(xvec_ptr + USIZE_LEN)]);
-        let xvec_start = xvec_ptr + USIZE_LEN;
+        let xvec_len = u32_from_slice_le(&x[xvec_ptr..(xvec_ptr + U32_LEN)]) as usize;
+        let xvec_pad = u32_from_slice_le(&x[(xvec_ptr + U32_LEN)..(xvec_ptr + 2 * U32_LEN)]);
+        let xvec_start = xvec_ptr + 2 * U32_LEN + xvec_pad as usize;
         &x[xvec_start..(xvec_start + xvec_len)]
     }
     // x must be serialized using Node, may have trailing bytes.

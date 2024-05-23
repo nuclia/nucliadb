@@ -681,18 +681,23 @@ impl OpenDataPoint {
 
 #[cfg(test)]
 mod test {
-    use std::collections::BTreeMap;
+    use std::{collections::BTreeMap, time::SystemTime};
 
-    use nucliadb_core::NodeResult;
+    use nucliadb_core::{
+        protos::{Position, Representation, SentenceMetadata},
+        NodeResult,
+    };
     use rand::{rngs::SmallRng, Rng, SeedableRng};
     use tempfile::tempdir;
 
     use crate::{
         config::{Similarity, VectorConfig},
+        data_types::data_store,
         vector_types::dense_f32_unaligned::{dot_similarity, encode_vector},
     };
+    use nucliadb_core::protos::prost::Message;
 
-    use super::{create, DataPointPin, Elem, NoDLog};
+    use super::{create, merge, node::Node, DataPointPin, Elem, LabelDictionary, NoDLog};
 
     const DIMENSION: usize = 128;
 
@@ -722,8 +727,128 @@ mod test {
         format!("{:032x?}", rng.gen::<u128>())
     }
 
+    fn random_string(rng: &mut impl Rng) -> String {
+        String::from_utf8_lossy(&[rng.gen_range(40..110)].repeat(rng.gen_range(1..16))).to_string()
+    }
+
     fn similarity(x: &[f32], y: &[f32]) -> f32 {
         dot_similarity(&encode_vector(x), &encode_vector(y))
+    }
+
+    fn random_elem(rng: &mut impl Rng) -> (Elem, Vec<String>) {
+        let labels: Vec<_> = (0..rng.gen_range(0..=2)).map(|_| random_string(rng)).collect();
+        let metadata = SentenceMetadata {
+            position: Some(Position {
+                index: 1,
+                start: 2,
+                end: 3,
+                page_number: 4,
+                in_page: true,
+                start_seconds: vec![],
+                end_seconds: vec![],
+            }),
+            page_with_visual: false,
+            representation: Some(Representation {
+                is_a_table: false,
+                file: random_string(rng),
+            }),
+        };
+        (
+            Elem::new(
+                random_key(rng),
+                random_vector(rng),
+                LabelDictionary::new(labels.clone()),
+                Some(metadata.encode_to_vec()),
+            ),
+            labels,
+        )
+    }
+
+    #[test]
+    fn test_save_recall_aligned_data() -> NodeResult<()> {
+        let config = VectorConfig {
+            similarity: Similarity::Dot,
+            vector_type: crate::config::VectorType::DenseF32 {
+                dimension: DIMENSION,
+            },
+            normalize_vectors: false,
+        };
+        let mut rng = SmallRng::seed_from_u64(1234567890);
+        let temp_dir = tempdir()?;
+
+        // Create a data point with random data of different length
+        let pin = DataPointPin::create_pin(temp_dir.path())?;
+        let elems = (0..100).map(|_| random_elem(&mut rng)).collect::<Vec<_>>();
+        let dp = create(&pin, elems.iter().cloned().map(|x| x.0).collect(), None, &config)?;
+        let nodes = dp.nodes;
+
+        for (i, (elem, mut labels)) in elems.into_iter().enumerate() {
+            let node = data_store::get_value(Node, &nodes, i);
+            assert_eq!(elem.key, Node::key(node));
+            assert_eq!(config.vector_type.encode(&elem.vector), Node::vector(node));
+
+            // Compare metadata as the decoded protobug. Tthe absolute stored value may have trailing padding
+            // from vectors, but the decoding step should ignore it
+            assert_eq!(
+                SentenceMetadata::decode(elem.metadata.as_ref().unwrap().as_slice()),
+                SentenceMetadata::decode(Node::metadata(node))
+            );
+
+            // Compare labels
+            labels.sort();
+            let mut node_labels = Node::labels(node);
+            node_labels.sort();
+            assert_eq!(labels, node_labels);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_save_recall_aligned_data_after_merge() -> NodeResult<()> {
+        let config = VectorConfig {
+            similarity: Similarity::Dot,
+            vector_type: crate::config::VectorType::DenseF32 {
+                dimension: DIMENSION,
+            },
+            normalize_vectors: false,
+        };
+        let mut rng = SmallRng::seed_from_u64(1234567890);
+        let temp_dir = tempdir()?;
+
+        // Create two data points with random data of different length
+        let pin1 = DataPointPin::create_pin(temp_dir.path())?;
+        let elems1 = (0..10).map(|_| random_elem(&mut rng)).collect::<Vec<_>>();
+        let dp1 = create(&pin1, elems1.iter().cloned().map(|x| x.0).collect(), None, &config)?;
+
+        let pin2 = DataPointPin::create_pin(temp_dir.path())?;
+        let elems2 = (0..10).map(|_| random_elem(&mut rng)).collect::<Vec<_>>();
+        let dp2 = create(&pin2, elems2.iter().cloned().map(|x| x.0).collect(), None, &config)?;
+
+        let pin_merged = DataPointPin::create_pin(temp_dir.path())?;
+        let merged_dp = merge(&pin_merged, &[(NoDLog, &dp1), (NoDLog, &dp2)], &config, SystemTime::now())?;
+        let nodes = merged_dp.nodes;
+
+        for (i, (elem, mut labels)) in elems1.into_iter().chain(elems2.into_iter()).enumerate() {
+            let node = data_store::get_value(Node, &nodes, i);
+            assert_eq!(elem.key, Node::key(node));
+            assert_eq!(config.vector_type.encode(&elem.vector), Node::vector(node));
+
+            // Compare metadata as the decoded protobug. Tthe absolute stored value may have trailing padding
+            // from vectors, but the decoding step should ignore it
+            assert_eq!(
+                SentenceMetadata::decode(elem.metadata.as_ref().unwrap().as_slice()),
+                SentenceMetadata::decode(Node::metadata(node))
+            );
+
+            // Compare labels
+            labels.sort();
+            let mut node_labels = Node::labels(node);
+            node_labels.sort();
+            assert_eq!(labels, node_labels);
+        }
+
+        Ok(())
     }
 
     #[test]
