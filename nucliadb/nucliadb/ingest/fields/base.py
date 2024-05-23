@@ -271,13 +271,6 @@ class Field:
                 self.extracted_text = payload
         return self.extracted_text
 
-    async def get_extracted_text_cf(self) -> Optional[CloudFile]:
-        sf = self.get_storage_field(FieldTypes.FIELD_TEXT)
-        if await sf.exists() is not None:
-            return sf.build_cf()
-        else:
-            return None
-
     async def set_vectors(
         self, payload: ExtractedVectorsWrapper
     ) -> tuple[Optional[VectorObject], bool, list[str]]:
@@ -333,13 +326,6 @@ class Field:
             if payload is not None:
                 self.extracted_vectors = payload
         return self.extracted_vectors
-
-    async def get_vectors_cf(self) -> Optional[CloudFile]:
-        sf = self.get_storage_field(FieldTypes.FIELD_VECTORS)
-        if await sf.exists() is not None:
-            return sf.build_cf()
-        else:
-            return None
 
     async def set_field_metadata(
         self, payload: FieldComputedMetadataWrapper
@@ -408,13 +394,6 @@ class Field:
                 self.computed_metadata = payload
         return self.computed_metadata
 
-    async def get_field_metadata_cf(self) -> Optional[CloudFile]:
-        sf = self.get_storage_field(FieldTypes.FIELD_METADATA)
-        if await sf.exists() is not None:
-            return sf.build_cf()
-        else:
-            return None
-
     async def set_large_field_metadata(self, payload: LargeComputedMetadataWrapper):
         if self.type in SUBFIELDFIELDS:
             try:
@@ -467,13 +446,6 @@ class Field:
             if payload is not None:
                 self.large_computed_metadata = payload
         return self.large_computed_metadata
-
-    async def get_large_field_metadata_cf(self) -> Optional[CloudFile]:
-        sf = self.get_storage_field(FieldTypes.FIELD_LARGE_METADATA)
-        if await sf.exists() is not None:
-            return sf.build_cf()
-        else:
-            return None
 
     def serialize(self):
         return self.value.SerializeToString()

@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from typing import AsyncGenerator, AsyncIterator, Optional, Sequence
+from typing import AsyncGenerator, Optional, Sequence
 from uuid import uuid4
 
 from grpc import StatusCode
@@ -29,13 +29,11 @@ from nucliadb_protos.knowledgebox_pb2 import (
     LabelSet,
     SemanticModelMetadata,
 )
-from nucliadb_protos.knowledgebox_pb2 import Synonyms as PBSynonyms
 from nucliadb_protos.resources_pb2 import Basic
 from nucliadb_protos.utils_pb2 import ReleaseChannel
 
 from nucliadb.common import datamanagers
-from nucliadb.common.cluster.base import AbstractIndexNode
-from nucliadb.common.cluster.exceptions import ShardNotFound, ShardsNotFound
+from nucliadb.common.cluster.exceptions import ShardNotFound
 from nucliadb.common.cluster.manager import get_index_node
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.maindb.driver import Driver, Transaction
@@ -220,18 +218,6 @@ class KnowledgeBox:
 
         return uuid
 
-    async def iterate_kb_nodes(self) -> AsyncIterator[tuple[AbstractIndexNode, str]]:
-        async with datamanagers.with_transaction() as txn:
-            shards_obj = await datamanagers.cluster.get_kb_shards(txn, kbid=self.kbid)
-            if shards_obj is None:
-                raise ShardsNotFound(self.kbid)
-
-        for shard in shards_obj.shards:
-            for replica in shard.replicas:
-                node = get_index_node(replica.node)
-                if node is not None:
-                    yield node, replica.shard.id
-
     # Labels
     async def set_labelset(self, id: str, labelset: LabelSet):
         await datamanagers.labels.set_labelset(
@@ -256,17 +242,6 @@ class KnowledgeBox:
         await datamanagers.labels.delete_labelset(
             self.txn, kbid=self.kbid, labelset_id=id
         )
-
-    async def get_synonyms(self, synonyms: PBSynonyms):
-        pbsyn = await datamanagers.synonyms.get(self.txn, kbid=self.kbid)
-        if pbsyn is not None:
-            synonyms.CopyFrom(pbsyn)
-
-    async def set_synonyms(self, synonyms: PBSynonyms):
-        await datamanagers.synonyms.set(self.txn, kbid=self.kbid, synonyms=synonyms)
-
-    async def delete_synonyms(self):
-        await datamanagers.synonyms.delete(self.txn, kbid=self.kbid)
 
     @classmethod
     async def purge(cls, driver: Driver, kbid: str):

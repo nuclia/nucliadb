@@ -101,14 +101,6 @@ class StorageField:
     async def exists(self) -> Optional[Dict[str, str]]:
         raise NotImplementedError
 
-    def build_cf(self) -> CloudFile:
-        cf = CloudFile()
-        cf.bucket_name = self.bucket
-        cf.uri = self.key
-        cf.filename = "payload.pb"
-        cf.source = self.storage.source  # type: ignore
-        return cf
-
     async def copy(
         self,
         origin_uri: str,
