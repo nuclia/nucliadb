@@ -714,6 +714,7 @@ def parse_model_metadata_from_request(
     request: KnowledgeBoxNew,
 ) -> SemanticModelMetadata:
     if request.HasField("vector_dimension"):
+        # Comes from direct grpc call, with parameters in the request object
         model = SemanticModelMetadata()
         model.similarity_function = request.similarity
         model.vector_dimension = request.vector_dimension
@@ -732,6 +733,9 @@ def parse_model_metadata_from_request(
 
         return model
     else:
+        # Comes from POST to nucliadb API, parameters passed as a json learning_config
+        # Since this function is only called for hosted nucliadb, this should not happen
+        # but it's here to support SDK tests
         config = json.loads(request.learning_config)
         return SemanticModelMetadata(**config)
 
