@@ -48,6 +48,7 @@ pub mod prelude {
 }
 
 use std::collections::HashMap;
+use std::fs::File;
 use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 pub use anyhow::{anyhow as node_error, Context, Error};
@@ -85,7 +86,7 @@ impl From<Channel> for ReleaseChannel {
 #[derive(Debug, Default)]
 pub struct RawReplicaState {
     pub metadata_files: HashMap<String, Vec<u8>>,
-    pub files: Vec<String>,
+    pub files: Vec<(String, File)>,
 }
 
 impl RawReplicaState {
