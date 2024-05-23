@@ -162,7 +162,7 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
         else:
             node = manager.get_index_node(node_data.node_id)
             if node is not None:
-                logger.warning(
+                logger.info(
                     f"Remove node",
                     extra={
                         "node_id": node_data.node_id,
