@@ -76,14 +76,17 @@ async def test_kb_creation_allows_setting_learning_configuration(
         json={
             "title": "My KB with english semantic model",
             "slug": "english",
-            "learning_configuration": {"semantic_model": "english"},
+            "learning_configuration": {
+                "semantic_model": "english",
+                "vector_dimension": 512,
+            },
         },
     )
     assert resp.status_code == 201
     kbid = resp.json()["uuid"]
 
     learning_config.set_configuration.assert_called_once_with(
-        kbid, config={"semantic_model": "english"}
+        kbid, config={"semantic_model": "english", "vector_dimension": 512}
     )
 
 
@@ -222,7 +225,11 @@ async def test_can_create_knowledgebox_with_colon_in_slug(
 ):
     resp = await nucliadb_manager.post(
         "/kbs",
-        json={"slug": "something:else", "release_channel": channel},
+        json={
+            "slug": "something:else",
+            "release_channel": channel,
+            "learning_configuration": {"vector_dimension": 512},
+        },
     )
     assert resp.status_code == 201
 

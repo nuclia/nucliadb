@@ -33,7 +33,11 @@ def src_kbid(docs_dataset: str):
 @pytest.fixture(scope="function")
 def dst_kbid(sdk: nucliadb_sdk.NucliaDB):
     kbslug = uuid4().hex
-    kb = sdk.create_knowledge_box(slug=kbslug)
+    learning_config = {
+        "similarity_function": "COSINE",
+        "vector_dimension": 768,
+    }
+    kb = sdk.create_knowledge_box(slug=kbslug, learning_configuration=learning_config)
 
     yield kb.uuid
 

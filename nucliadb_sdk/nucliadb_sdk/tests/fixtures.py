@@ -122,7 +122,13 @@ def sdk_async(nucliadb: NucliaFixture):
 @pytest.fixture(scope="function")
 def kb(sdk: nucliadb_sdk.NucliaDB):
     kbslug = uuid4().hex
-    kb = sdk.create_knowledge_box(slug=kbslug)
+    kb = sdk.create_knowledge_box(
+        slug=kbslug,
+        learning_configuration={
+            "similarity_function": "COSINE",
+            "vector_dimension": 768,
+        },
+    )
 
     yield kb
 

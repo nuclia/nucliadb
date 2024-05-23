@@ -37,7 +37,11 @@ def test_constructor():
 
 
 def test_kb_management(sdk: nucliadb_sdk.NucliaDB):
-    sdk.create_knowledge_box(slug="foo")
+    learning_config = {
+        "similarity_function": "COSINE",
+        "vector_dimension": 768,
+    }
+    sdk.create_knowledge_box(slug="foo", learning_configuration=learning_config)
     kb = sdk.get_knowledge_box_by_slug(slug="foo")
     assert sdk.get_knowledge_box(kbid=kb.uuid)
     kbs = sdk.list_knowledge_boxes()

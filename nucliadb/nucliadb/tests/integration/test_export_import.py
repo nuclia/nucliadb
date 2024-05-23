@@ -37,7 +37,9 @@ from nucliadb.learning_proxy import LearningConfiguration
 async def src_kb(nucliadb_writer, nucliadb_manager):
     slug = uuid.uuid4().hex
 
-    resp = await nucliadb_manager.post("/kbs", json={"slug": slug})
+    resp = await nucliadb_manager.post(
+        "/kbs", json={"slug": slug, "learning_configuration": {"vector_dimension": 512}}
+    )
     assert resp.status_code == 201
     kbid = resp.json().get("uuid")
 
@@ -105,7 +107,10 @@ async def src_kb(nucliadb_writer, nucliadb_manager):
 
 @pytest.fixture(scope="function")
 async def dst_kb(nucliadb_manager):
-    resp = await nucliadb_manager.post("/kbs", json={"slug": "dst_kb"})
+    resp = await nucliadb_manager.post(
+        "/kbs",
+        json={"slug": "dst_kb", "learning_configuration": {"vector_dimension": 512}},
+    )
     assert resp.status_code == 201
     uuid = resp.json().get("uuid")
     yield uuid

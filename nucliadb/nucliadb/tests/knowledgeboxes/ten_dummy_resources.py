@@ -40,7 +40,13 @@ async def ten_dummy_resources_kb(
         for i in range(N_RESOURCES)
     ]
 
-    resp = await nucliadb_manager.post("/kbs", json={"slug": "ten-dummy-resources"})
+    resp = await nucliadb_manager.post(
+        "/kbs",
+        json={
+            "slug": "ten-dummy-resources",
+            "learning_configuration": {"vector_dimension": 512},
+        },
+    )
     assert resp.status_code == 201
     kbid = resp.json().get("uuid")
 
@@ -83,7 +89,13 @@ async def ten_quick_dummy_resources_kb(
         for i in range(N_RESOURCES)
     ]
 
-    resp = await nucliadb_manager.post("/kbs", json={"slug": "ten-dummy-resources"})
+    resp = await nucliadb_manager.post(
+        "/kbs",
+        json={
+            "slug": "ten-dummy-resources",
+            "learning_configuration": {"vector_dimension": 512},
+        },
+    )
     assert resp.status_code == 201
     kbid = resp.json().get("uuid")
 

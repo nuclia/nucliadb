@@ -69,7 +69,13 @@ async def test_migrate_kb(execution_context: ExecutionContext, knowledgebox):
 async def two_knowledgeboxes(nucliadb_manager):
     kbs = []
     for _ in range(2):
-        resp = await nucliadb_manager.post("/kbs", json={"slug": uuid.uuid4().hex})
+        resp = await nucliadb_manager.post(
+            "/kbs",
+            json={
+                "slug": uuid.uuid4().hex,
+                "learning_configuration": {"vector_dimension": 512},
+            },
+        )
         assert resp.status_code == 201
         kbs.append(resp.json().get("uuid"))
 
