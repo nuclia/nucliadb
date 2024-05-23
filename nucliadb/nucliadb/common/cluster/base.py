@@ -124,10 +124,12 @@ class AbstractIndexNode(metaclass=ABCMeta):
         vectorset: str,
         config: VectorIndexConfig,
     ) -> OpStatus:
-        req = NewVectorSetRequest()
-        req.id.shard.id = shard_id
-        req.id.vectorset = vectorset
-        req.config = config
+        req = NewVectorSetRequest(
+            id=noderesources_pb2.VectorSetID(
+                shard=noderesources_pb2.ShardId(id=shard_id), vectorset=vectorset
+            ),
+            config=config,
+        )
 
         resp = await self.writer.AddVectorSet(req)  # type: ignore
         return resp
