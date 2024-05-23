@@ -22,9 +22,9 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 from httpx import AsyncClient
 
+from nucliadb.ingest.tests.vectors import Q
 from nucliadb_models.search import Ner, QueryInfo, SentenceSearch, TokenSearch
 from nucliadb_utils.utilities import Utility, set_utility
-from nucliadb.ingest.tests.vectors import Q
 
 
 @pytest.mark.asyncio

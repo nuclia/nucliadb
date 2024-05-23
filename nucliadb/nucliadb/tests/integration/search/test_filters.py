@@ -39,11 +39,11 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb.common.cluster import rollover
 from nucliadb.common.context import ApplicationContext
+from nucliadb.ingest.tests.vectors import V1, V2, Q
 from nucliadb.tests.utils import broker_resource, inject_message
 from nucliadb_models.labels import LabelSetKind
 from nucliadb_models.search import MinScore
 from nucliadb_protos import writer_pb2
-from nucliadb.ingest.tests.vectors import V1, V2, Q
 
 RELEASE_CHANNELS = (
     "STABLE",

@@ -23,6 +23,7 @@ from httpx import AsyncClient
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxNew
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
+
 @pytest.fixture(scope="function")
 async def philosophy_books_kb(
     nucliadb_grpc: WriterStub,
@@ -187,11 +188,8 @@ async def philosophy_books_kb(
         },
     ]
 
-    request = KnowledgeBoxNew(
-        slug="knowledgebox",
-        vector_dimension=512
-    )
-    resp = await nucliadb_grpc.NewKnowledgeBox(request)
+    request = KnowledgeBoxNew(slug="philosophy-books", vector_dimension=512)
+    resp = await nucliadb_grpc.NewKnowledgeBox(request)  # type: ignore
     assert resp.status == 0
     kbid = resp.uuid
 
