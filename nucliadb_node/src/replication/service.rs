@@ -24,7 +24,7 @@ use std::sync::Arc;
 use nucliadb_core::protos::ReleaseChannel;
 use nucliadb_core::tantivy_replica::TantivyReplicaState;
 use nucliadb_core::tracing::{debug, error, info, warn};
-use nucliadb_core::{node_error, IndexFiles, NodeResult, RawReplicaState};
+use nucliadb_core::{IndexFiles, NodeResult, RawReplicaState};
 use nucliadb_protos::{noderesources, replication};
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
@@ -55,19 +55,12 @@ impl ReplicationServiceGRPCDriver {
 
 async fn stream_file(
     chunk_size: u64,
-    shard_path: &Path,
     generation_id: &str,
     rel_filepath: &Path,
     file: std::fs::File,
     sender: &tokio::sync::mpsc::Sender<Result<replication::ReplicateShardResponse, tonic::Status>>,
 ) -> NodeResult<()> {
-    let filepath = shard_path.join(rel_filepath);
-
-    if !filepath.exists() {
-        return Err(node_error!("This file can not be streamed because it does not exist"));
-    }
-
-    debug!("Streaming file {}", filepath.to_string_lossy());
+    debug!("Streaming file {}", rel_filepath.to_string_lossy());
     let mut total = 0;
     let mut chunk = 1;
     let mut file = File::from_std(file);
@@ -127,7 +120,7 @@ async fn replicate_from_raw(
     sender: &tokio::sync::mpsc::Sender<Result<replication::ReplicateShardResponse, tonic::Status>>,
 ) -> NodeResult<()> {
     for (segment_path, segment_file) in replica_state.files {
-        stream_file(chunk_size, shard_path, generation_id, &PathBuf::from(segment_path), segment_file, sender).await?;
+        stream_file(chunk_size, generation_id, &PathBuf::from(segment_path), segment_file, sender).await?;
     }
     for (metadata_file, data) in replica_state.metadata_files {
         stream_data(shard_path, generation_id, &PathBuf::from(metadata_file), data, sender).await?;
@@ -146,7 +139,7 @@ async fn replicate_from_tantivy(
     let metadata_bytes = replica_state.metadata_as_bytes();
 
     for (rel_path, segment_file) in replica_state.files {
-        stream_file(chunk_size, shard_path, generation_id, &index_prefix.join(rel_path), segment_file, sender).await?;
+        stream_file(chunk_size, generation_id, &index_prefix.join(rel_path), segment_file, sender).await?;
     }
 
     stream_data(shard_path, generation_id, &index_prefix.join(&replica_state.metadata_path), metadata_bytes, sender)
@@ -184,7 +177,7 @@ async fn replica_shard(
     // top level additional files
     for filename in ["metadata.json", "versions.json", "indexes.json"] {
         let file = std::fs::File::open(shard_path.join(filename))?;
-        stream_file(chunk_size, &shard_path, generation_id, &PathBuf::from(filename), file, &sender).await?;
+        stream_file(chunk_size, generation_id, &PathBuf::from(filename), file, &sender).await?;
     }
     Ok(())
 }
