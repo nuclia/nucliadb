@@ -713,28 +713,27 @@ def parse_model_metadata_from_learning_config(
 def parse_model_metadata_from_request(
     request: KnowledgeBoxNew,
 ) -> SemanticModelMetadata:
-    model = SemanticModelMetadata()
-    model.similarity_function = request.similarity
     if request.HasField("vector_dimension"):
+        model = SemanticModelMetadata()
+        model.similarity_function = request.similarity
         model.vector_dimension = request.vector_dimension
+
+        if len(request.matryoshka_dimensions) > 0:
+            if model.vector_dimension not in request.matryoshka_dimensions:
+                logger.warning(
+                    "Vector dimensions is inconsistent with matryoshka dimensions! Ignoring them",
+                    extra={
+                        "kbid": request.forceuuid,
+                        "kbslug": request.slug,
+                    },
+                )
+            else:
+                model.matryoshka_dimensions.extend(request.matryoshka_dimensions)
+
+        return model
     else:
-        logger.warning(
-            "Vector dimension not set. Will be detected automatically on the first vector set."
-        )
-
-    if len(request.matryoshka_dimensions) > 0:
-        if model.vector_dimension not in request.matryoshka_dimensions:
-            logger.warning(
-                "Vector dimensions is inconsistent with matryoshka dimensions! Ignoring them",
-                extra={
-                    "kbid": request.forceuuid,
-                    "kbslug": request.slug,
-                },
-            )
-        else:
-            model.matryoshka_dimensions.extend(request.matryoshka_dimensions)
-
-    return model
+        config = json.loads(request.learning_config)
+        return SemanticModelMetadata(**config)
 
 
 def get_release_channel(request: KnowledgeBoxNew) -> utils_pb2.ReleaseChannel.ValueType:

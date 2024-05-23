@@ -136,7 +136,13 @@ async def init_fixture(
 ):
     sdk = nucliadb_sdk.NucliaDB(region=nucliadb_sdk.Region.ON_PREM, url=nucliadb.url)
     slug = uuid.uuid4().hex
-    kb_obj = sdk.create_knowledge_box(slug=slug)
+    kb_obj = sdk.create_knowledge_box(
+        slug=slug,
+        learning_configuration={
+            "similarity_function": "COSINE",
+            "vector_dimension": 768,
+        },
+    )
     kbid = kb_obj.uuid
 
     import_resp = requests.get(dataset_location)
