@@ -25,6 +25,7 @@ from nucliadb_protos.nodewriter_pb2 import (
     NewShardRequest,
     NewVectorSetRequest,
     OpStatus,
+    VectorIndexConfig,
 )
 from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
 
@@ -93,15 +94,16 @@ class AbstractIndexNode(metaclass=ABCMeta):
     async def new_shard(
         self,
         kbid: str,
-        similarity: utils_pb2.VectorSimilarity.ValueType,
         release_channel: utils_pb2.ReleaseChannel.ValueType,
-        normalize_vectors: bool,
+        config: VectorIndexConfig,
     ) -> noderesources_pb2.ShardCreated:
         req = NewShardRequest(
             kbid=kbid,
-            similarity=similarity,
             release_channel=release_channel,
-            normalize_vectors=normalize_vectors,
+            config=config,
+            # Deprecated fields, only for backwards compatibility with older nodes
+            similarity=config.similarity,
+            normalize_vectors=config.normalize_vectors,
         )
 
         resp = await self.writer.NewShard(req)  # type: ignore
@@ -120,15 +122,13 @@ class AbstractIndexNode(metaclass=ABCMeta):
         self,
         shard_id: str,
         vectorset: str,
-        *,
-        similarity: utils_pb2.VectorSimilarity.ValueType = utils_pb2.VectorSimilarity.COSINE,
-        normalize_vectors: bool = False,
+        config: VectorIndexConfig,
     ) -> OpStatus:
         req = NewVectorSetRequest()
         req.id.shard.id = shard_id
         req.id.vectorset = vectorset
-        req.similarity = similarity
-        req.normalize_vectors = normalize_vectors
+        req.config = config
+
         resp = await self.writer.AddVectorSet(req)  # type: ignore
         return resp
 

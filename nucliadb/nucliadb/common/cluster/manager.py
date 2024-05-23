@@ -229,12 +229,15 @@ class KBShardManager:
                     logger.error(f"Node {node_id} is not found or not available")
                     continue
                 is_matryoshka = len(kb_shards.model.matryoshka_dimensions) > 0
+                config = nodewriter_pb2.VectorIndexConfig(
+                    similarity=kb_shards.similarity,
+                    vector_type=nodewriter_pb2.VectorType.DENSE_F32,
+                    vector_dimension=kb_shards.model.vector_dimension,
+                    normalize_vectors=is_matryoshka,
+                )
                 try:
                     shard_created = await node.new_shard(
-                        kbid,
-                        similarity=kb_shards.similarity,
-                        release_channel=kb_shards.release_channel,
-                        normalize_vectors=is_matryoshka,
+                        kbid, release_channel=kb_shards.release_channel, config=config
                     )
                 except Exception as e:
                     errors.capture_exception(e)
