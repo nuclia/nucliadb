@@ -61,13 +61,7 @@ async fn stream_file(
     file: std::fs::File,
     sender: &tokio::sync::mpsc::Sender<Result<replication::ReplicateShardResponse, tonic::Status>>,
 ) -> NodeResult<()> {
-    let filepath = shard_path.join(rel_filepath);
-
-    if !filepath.exists() {
-        return Err(node_error!("This file can not be streamed because it does not exist"));
-    }
-
-    debug!("Streaming file {}", filepath.to_string_lossy());
+    debug!("Streaming file {}", rel_filepath.to_string_lossy());
     let mut total = 0;
     let mut chunk = 1;
     let mut file = File::from_std(file);
