@@ -22,8 +22,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from nucliadb.common import datamanagers
 from nucliadb.ingest.processing import ProcessingInfo
-from nucliadb.writer.api.v1.resource import resource_exists
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_PREFIX
 from nucliadb.writer.tests.utils import load_file_as_FileB64_payload
 from nucliadb.writer.utilities import get_processing
@@ -71,7 +71,9 @@ async def file_field(
         assert resp.status_code == 201
         rid = resp.json()["uuid"]
 
-        assert (await resource_exists(kbid, rid)) is True
+        assert (
+            await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid)
+        ) is True
 
     yield kbid, rid, field_id
 

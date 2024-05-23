@@ -35,13 +35,13 @@ from nucliadb_protos.resources_pb2 import FieldFile, Metadata
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from starlette.requests import Request as StarletteRequest
 
+from nucliadb.common import datamanagers
 from nucliadb.ingest.orm.utils import set_title
 from nucliadb.ingest.processing import PushPayload, Source
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.writer import SERVICE_NAME
 from nucliadb.writer.api.v1.resource import (
     get_rid_from_slug_or_raise_error,
-    resource_exists,
     validate_rid_exists_or_raise_error,
 )
 from nucliadb.writer.back_pressure import maybe_back_pressure
@@ -791,7 +791,9 @@ async def validate_field_upload(
     if rid is None:
         # we are going to create a new resource and a field
         if md5 is not None:
-            exists = await resource_exists(kbid, md5)
+            exists = await datamanagers.atomic.resources.resource_exists(
+                kbid=kbid, rid=md5
+            )
             if exists:
                 raise HTTPConflict(
                     "A resource with the same uploaded file already exists"
@@ -801,7 +803,7 @@ async def validate_field_upload(
             rid = uuid.uuid4().hex
     else:
         # we're adding a field to a resource
-        exists = await resource_exists(kbid, rid)
+        exists = await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid)
         if not exists:
             raise HTTPNotFound("Resource is not found or not yet available")
 

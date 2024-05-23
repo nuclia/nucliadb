@@ -29,6 +29,7 @@
 #     (better for readability and code editors)
 # ==============================================================================
 from . import (
+    atomic,
     cluster,
     entities,
     exceptions,
@@ -42,6 +43,7 @@ from . import (
 from .utils import with_transaction
 
 __all__ = (
+    "atomic",
     "cluster",
     "entities",
     "exceptions",
