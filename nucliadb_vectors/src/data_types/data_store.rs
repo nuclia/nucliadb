@@ -21,7 +21,7 @@
 use std::fs::File;
 use std::io::{self, BufWriter, Seek, SeekFrom, Write};
 
-use crate::config::VectorType;
+use crate::config::{VectorConfig, VectorType};
 
 use super::usize_utils::*;
 
@@ -164,7 +164,11 @@ pub fn create_key_value<D: IntoBuffer>(
 }
 
 // Merge algorithm. Returns the number of elements merged into the file.
-pub fn merge<S: Interpreter + Copy>(recipient: &mut File, producers: &[(S, &[u8])]) -> io::Result<bool> {
+pub fn merge<S: Interpreter + Copy>(
+    recipient: &mut File,
+    producers: &[(S, &[u8])],
+    config: &VectorConfig,
+) -> io::Result<bool> {
     // Number of elements, deleted or alive.
     let mut prologue_section_size = HEADER_LEN;
     // To know the range of valid ids per producer
@@ -196,6 +200,7 @@ pub fn merge<S: Interpreter + Copy>(recipient: &mut File, producers: &[(S, &[u8]
     let mut id_section_cursor = HEADER_LEN;
     let mut has_deletions = false;
 
+    let alignment = config.vector_type.vector_alignment();
     while producer_cursor < producers.len() {
         // If the end of the current producer was reached we move
         // to the start of the next producer.
@@ -213,7 +218,12 @@ pub fn merge<S: Interpreter + Copy>(recipient: &mut File, producers: &[(S, &[u8]
         if interpreter.keep_in_merge(element_slice) {
             // Moving to the end of the file to write the current element.
             let (exact_element, _) = interpreter.read_exact(element_slice);
-            let element_pointer = recipient_buffer.seek(SeekFrom::End(0))?;
+            let mut element_pointer = recipient_buffer.seek(SeekFrom::End(0))?;
+            if element_pointer as usize % alignment > 0 {
+                let pad = alignment - (element_pointer as usize % alignment);
+                recipient_buffer.seek(SeekFrom::Current(pad as i64))?;
+                element_pointer += pad as u64;
+            }
             recipient_buffer.write_all(exact_element)?;
             // Moving to the next free slot in the section id to write
             // the offset where the element was written.

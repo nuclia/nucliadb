@@ -211,7 +211,7 @@ where
 
     // Creating the node store
     let node_producers: Vec<_> = operants.iter().map(|dp| ((&dp.0, Node), dp.1.nodes.as_ref())).collect();
-    let has_deletions = data_store::merge(&mut nodes_file, &node_producers)?;
+    let has_deletions = data_store::merge(&mut nodes_file, &node_producers, config)?;
     let nodes = unsafe { Mmap::map(&nodes_file)? };
     let no_nodes = data_store::stored_elements(&nodes);
 
