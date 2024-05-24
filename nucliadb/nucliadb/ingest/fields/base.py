@@ -47,6 +47,7 @@ SUBFIELDFIELDS = ["l", "c"]
 class FieldTypes(str, enum.Enum):
     FIELD_TEXT = "extracted_text"
     FIELD_VECTORS = "extracted_vectors"
+    FIELD_VECTORSET = "{vectorset}/extracted_vectors"
     FIELD_METADATA = "metadata"
     FIELD_LARGE_METADATA = "large_metadata"
     THUMBNAIL = "thumbnail"
@@ -114,6 +115,17 @@ class Field:
             self.kbid, self.uuid, self.type, self.id, field_type.value
         )
 
+    def _get_extracted_vectors_storage_field(
+        self, vectorset: Optional[str] = None
+    ) -> StorageField:
+        if vectorset:
+            key = FieldTypes.FIELD_VECTORSET.format(vectorset=vectorset)
+        else:
+            key = FieldTypes.FIELD_VECTORS
+        return self.storage.file_extracted(
+            self.kbid, self.uuid, self.type, self.id, key
+        )
+
     async def db_get_value(self):
         if self.value is None:
             payload = await datamanagers.fields.get_raw(
@@ -169,9 +181,9 @@ class Field:
         except KeyError:
             pass
 
-    async def delete_vectors(self) -> None:
+    async def delete_vectors(self, vectorset: Optional[str] = None) -> None:
         # Try delete vectors
-        sf = self.get_storage_field(FieldTypes.FIELD_VECTORS)
+        sf = self._get_extracted_vectors_storage_field(vectorset)
         try:
             await self.storage.delete_upload(sf.key, sf.bucket)
         except KeyError:
@@ -283,7 +295,8 @@ class Field:
         else:
             actual_payload = None
 
-        sf = self.get_storage_field(FieldTypes.FIELD_VECTORS)
+        vectorset = payload.vectorset_id
+        sf = self._get_extracted_vectors_storage_field(vectorset)
         vo: Optional[VectorObject] = None
         replace_field: bool = True
         replace_splits = []
@@ -318,9 +331,11 @@ class Field:
             self.extracted_vectors = actual_payload
         return vo, replace_field, replace_splits
 
-    async def get_vectors(self, force=False) -> Optional[VectorObject]:
+    async def get_vectors(
+        self, vectorset: Optional[str] = None, force: bool = False
+    ) -> Optional[VectorObject]:
         if self.extracted_vectors is None or force:
-            sf = self.get_storage_field(FieldTypes.FIELD_VECTORS)
+            sf = self._get_extracted_vectors_storage_field(vectorset)
             payload = await self.storage.download_pb(sf, VectorObject)
             if payload is not None:
                 self.extracted_vectors = payload
