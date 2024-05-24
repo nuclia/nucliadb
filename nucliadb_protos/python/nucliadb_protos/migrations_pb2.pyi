@@ -14,7 +14,7 @@ DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 class MigrationInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    CDURRENT_VERSION_FIELD_NUMBER: builtins.int
+    CURRENT_VERSION_FIELD_NUMBER: builtins.int
     TARGET_VERSION_FIELD_NUMBER: builtins.int
     current_version: builtins.int
     target_version: builtins.int
