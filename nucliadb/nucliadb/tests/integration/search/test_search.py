@@ -29,7 +29,6 @@ from httpx import AsyncClient
 from nats.aio.client import Client
 from nats.js import JetStreamContext
 from nucliadb_protos.audit_pb2 import AuditRequest, ClientType
-from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxNew
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
@@ -1265,10 +1264,9 @@ async def kb_with_one_logic_shard(
     nucliadb_writer: AsyncClient,
     nucliadb_grpc: WriterStub,
 ):
-    request = KnowledgeBoxNew(vector_dimension=512)
-    resp = await nucliadb_grpc.NewKnowledgeBox(request)  # type: ignore
-    assert resp.status == 0
-    kbid = resp.uuid
+    resp = await nucliadb_manager.post("/kbs", json={})
+    assert resp.status_code == 201
+    kbid = resp.json().get("uuid")
 
     await create_dummy_resources(nucliadb_writer, nucliadb_grpc, kbid, n=10)
 
@@ -1294,10 +1292,9 @@ async def kb_with_two_logic_shards(
     sc = shard_creator.ShardCreatorHandler(
         driver=get_driver(), storage=await get_storage(), pubsub=None  # type: ignore
     )
-    request = KnowledgeBoxNew(vector_dimension=512)
-    resp = await nucliadb_grpc.NewKnowledgeBox(request)  # type: ignore
-    assert resp.status == 0
-    kbid = resp.uuid
+    resp = await nucliadb_manager.post("/kbs", json={})
+    assert resp.status_code == 201
+    kbid = resp.json().get("uuid")
 
     await create_dummy_resources(nucliadb_writer, nucliadb_grpc, kbid, n=8)
 

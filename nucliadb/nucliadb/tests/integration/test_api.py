@@ -221,11 +221,7 @@ async def test_can_create_knowledgebox_with_colon_in_slug(
     nucliadb_manager: AsyncClient, channel
 ):
     resp = await nucliadb_manager.post(
-        "/kbs",
-        json={
-            "slug": "something:else",
-            "release_channel": channel,
-        },
+        "/kbs", json={"slug": "something:else", "release_channel": channel}
     )
     assert resp.status_code == 201
 
