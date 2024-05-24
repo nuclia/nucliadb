@@ -122,13 +122,7 @@ def sdk_async(nucliadb: NucliaFixture):
 @pytest.fixture(scope="function")
 def kb(sdk: nucliadb_sdk.NucliaDB):
     kbslug = uuid4().hex
-    kb = sdk.create_knowledge_box(
-        slug=kbslug,
-        learning_configuration={
-            "similarity_function": "COSINE",
-            "vector_dimension": 768,
-        },
-    )
+    kb = sdk.create_knowledge_box(slug=kbslug)
 
     yield kb
 
@@ -142,13 +136,7 @@ async def init_fixture(
 ):
     sdk = nucliadb_sdk.NucliaDB(region=nucliadb_sdk.Region.ON_PREM, url=nucliadb.url)
     slug = uuid.uuid4().hex
-    kb_obj = sdk.create_knowledge_box(
-        slug=slug,
-        learning_configuration={
-            "similarity_function": "COSINE",
-            "vector_dimension": 768,
-        },
-    )
+    kb_obj = sdk.create_knowledge_box(slug=slug)
     kbid = kb_obj.uuid
 
     import_resp = requests.get(dataset_location)

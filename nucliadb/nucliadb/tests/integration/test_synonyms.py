@@ -76,6 +76,7 @@ async def test_custom_synonyms_api(
 @pytest.fixture(scope="function")
 async def knowledgebox_with_synonyms(nucliadb_writer, knowledgebox):
     kbid = knowledgebox
+    breakpoint()
     synonyms_url = f"/kb/{kbid}/custom-synonyms"
     kb_synonyms = {
         "synonyms": {

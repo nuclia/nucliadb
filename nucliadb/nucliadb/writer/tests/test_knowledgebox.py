@@ -32,7 +32,6 @@ async def test_knowledgebox_lifecycle(writer_api):
                 "slug": "kbid1",
                 "title": "My Knowledge Box",
                 "description": "My lovely knowledgebox",
-                "learning_configuration": {"vector_dimension": 512},
             },
         )
         assert resp.status_code == 201

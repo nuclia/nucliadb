@@ -27,7 +27,7 @@ from nucliadb.search.api.v1.router import KB_PREFIX, KBS_PREFIX
 @pytest.fixture(scope="function")
 async def knowledgebox_one(nucliadb_manager):
     kbslug = str(uuid.uuid4())
-    data = {"slug": kbslug, "learning_configuration": {"vector_dimension": 512}}
+    data = {"slug": kbslug}
     resp = await nucliadb_manager.post(f"/{KBS_PREFIX}", json=data)
     assert resp.status_code == 201
     kbid = resp.json()["uuid"]

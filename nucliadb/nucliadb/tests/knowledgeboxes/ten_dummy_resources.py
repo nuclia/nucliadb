@@ -44,7 +44,6 @@ async def ten_dummy_resources_kb(
         "/kbs",
         json={
             "slug": "ten-dummy-resources",
-            "learning_configuration": {"vector_dimension": 512},
         },
     )
     assert resp.status_code == 201
@@ -93,7 +92,6 @@ async def ten_quick_dummy_resources_kb(
         "/kbs",
         json={
             "slug": "ten-dummy-resources",
-            "learning_configuration": {"vector_dimension": 512},
         },
     )
     assert resp.status_code == 201

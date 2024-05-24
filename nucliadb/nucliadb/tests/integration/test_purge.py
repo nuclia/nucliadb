@@ -60,7 +60,6 @@ async def test_purge_deletes_everything_from_maindb(
         json={
             "slug": kb_slug,
             "release_channel": release_channel,
-            "learning_configuration": {"vector_dimension": 512},
         },
     )
     assert resp.status_code == 201
@@ -133,7 +132,6 @@ async def test_purge_orphan_shards(
         json={
             "slug": kb_slug,
             "release_channel": release_channel,
-            "learning_configuration": {"vector_dimension": 512},
         },
     )
     assert resp.status_code == 201
@@ -209,7 +207,6 @@ async def test_purge_orphan_shard_detection(
         json={
             "slug": kb_slug,
             "release_channel": release_channel,
-            "learning_configuration": {"vector_dimension": 512},
         },
     )
     assert resp.status_code == 201

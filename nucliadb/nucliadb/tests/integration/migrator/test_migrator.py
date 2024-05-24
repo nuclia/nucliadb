@@ -73,7 +73,6 @@ async def two_knowledgeboxes(nucliadb_manager):
             "/kbs",
             json={
                 "slug": uuid.uuid4().hex,
-                "learning_configuration": {"vector_dimension": 512},
             },
         )
         assert resp.status_code == 201

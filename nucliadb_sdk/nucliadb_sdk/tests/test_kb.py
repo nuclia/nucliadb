@@ -24,15 +24,9 @@ from nucliadb_models.resource import KnowledgeBoxObj
 
 
 def test_create_kb(sdk: nucliadb_sdk.NucliaDB):
-    learning_config = {
-        "similarity_function": "COSINE",
-        "vector_dimension": 768,
-    }
-    kb: KnowledgeBoxObj = sdk.create_knowledge_box(
-        slug="hola", learning_configuration=learning_config
-    )
+    kb: KnowledgeBoxObj = sdk.create_knowledge_box(slug="hola")
     assert sdk.get_knowledge_box(kbid=kb.uuid) is not None
     assert sdk.get_knowledge_box_by_slug(slug="hola") is not None
 
     with pytest.raises(nucliadb_sdk.exceptions.ConflictError):
-        sdk.create_knowledge_box(slug="hola", learning_configuration=learning_config)
+        sdk.create_knowledge_box(slug="hola")

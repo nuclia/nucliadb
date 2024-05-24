@@ -27,10 +27,6 @@ class KnowledgeBoxConflict(Exception):
     pass
 
 
-class MissingVectorConfig(Exception):
-    pass
-
-
 class DeadletteredError(Exception):
     pass
 

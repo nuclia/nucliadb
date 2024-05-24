@@ -24,13 +24,7 @@ from nucliadb_models.search import FeedbackTasks
 
 
 async def test_kb_management(sdk_async: nucliadb_sdk.NucliaDBAsync):
-    learning_config = {
-        "similarity_function": "COSINE",
-        "vector_dimension": 768,
-    }
-    await sdk_async.create_knowledge_box(
-        slug="foo", learning_configuration=learning_config
-    )
+    await sdk_async.create_knowledge_box(slug="foo")
     kb = await sdk_async.get_knowledge_box_by_slug(slug="foo")
     assert await sdk_async.get_knowledge_box(kbid=kb.uuid)
     kbs = await sdk_async.list_knowledge_boxes()

@@ -76,17 +76,14 @@ async def test_kb_creation_allows_setting_learning_configuration(
         json={
             "title": "My KB with english semantic model",
             "slug": "english",
-            "learning_configuration": {
-                "semantic_model": "english",
-                "vector_dimension": 512,
-            },
+            "learning_configuration": {"semantic_model": "english"},
         },
     )
     assert resp.status_code == 201
     kbid = resp.json()["uuid"]
 
     learning_config.set_configuration.assert_called_once_with(
-        kbid, config={"semantic_model": "english", "vector_dimension": 512}
+        kbid, config={"semantic_model": "english"}
     )
 
 
@@ -228,7 +225,6 @@ async def test_can_create_knowledgebox_with_colon_in_slug(
         json={
             "slug": "something:else",
             "release_channel": channel,
-            "learning_configuration": {"vector_dimension": 512},
         },
     )
     assert resp.status_code == 201
