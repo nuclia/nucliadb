@@ -381,24 +381,6 @@ class Resource:
                     )
         return brain
 
-    async def get_full_conversation(
-        self,
-        conversation_field: Conversation,
-    ) -> Optional[PBConversation]:
-        """
-        Messages of a conversations may be stored across several pages.
-        This method fetches them all and returns a single complete conversation.
-        """
-        full_conv = PBConversation()
-        n_page = 1
-        while True:
-            page = await conversation_field.get_value(page=n_page)
-            if page is None:
-                break
-            full_conv.messages.extend(page.messages)
-            n_page += 1
-        return full_conv
-
     # Fields
     async def get_fields(
         self, force: bool = False

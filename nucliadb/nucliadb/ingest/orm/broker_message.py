@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from typing import cast
 
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
@@ -29,6 +30,7 @@ from nucliadb_protos.resources_pb2 import (
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb.ingest.fields.base import Field
+from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.fields.link import Link
 from nucliadb.ingest.orm.resource import Resource
@@ -113,7 +115,8 @@ class _BrokerMessageBuilder:
             value = await field.get_value()
             self.bm.files[field_id].CopyFrom(value)
         elif type_id == FieldType.CONVERSATION:
-            value = await self.get_full_conversation(field)  # type: ignore
+            field = cast(Conversation, field)
+            value = await field.get_full_conversation()
             self.bm.conversations[field_id].CopyFrom(value)
         elif type_id == FieldType.KEYWORDSET:
             value = await field.get_value()
