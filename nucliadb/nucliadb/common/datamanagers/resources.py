@@ -29,7 +29,7 @@ from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG, KB_RESOURCE_SLUG_BASE
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.settings import settings as ingest_settings
-from nucliadb_protos import noderesources_pb2, resources_pb2, writer_pb2
+from nucliadb_protos import noderesources_pb2, resources_pb2
 from nucliadb_utils.utilities import get_storage
 
 from .utils import with_transaction
@@ -330,19 +330,6 @@ async def has_field(
 
 
 # ORM mix (this functions shouldn't belong here)
-
-
-async def get_broker_message(
-    txn: Transaction, *, kbid: str, rid: str
-) -> Optional[writer_pb2.BrokerMessage]:
-    resource = await get_resource(txn, kbid=kbid, rid=rid)
-    if resource is None:
-        return None
-
-    resource.disable_vectors = False
-    resource.txn = txn
-    bm = await resource.generate_broker_message()
-    return bm
 
 
 @backoff.on_exception(

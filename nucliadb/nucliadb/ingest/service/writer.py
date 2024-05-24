@@ -84,6 +84,7 @@ from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest import SERVICE_NAME, logger
+from nucliadb.ingest.orm.broker_message import generate_broker_message
 from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict, VectorSetConflict
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
@@ -585,7 +586,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         async with self.driver.transaction() as txn:
             kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
             resobj = ResourceORM(txn, self.storage, kbobj, request.rid)
-            bm = await resobj.generate_broker_message()
+            bm = await generate_broker_message(resobj)
             transaction = get_transaction_utility()
             partitioning = get_partitioning()
             partition = partitioning.generate_partition(request.kbid, request.rid)
