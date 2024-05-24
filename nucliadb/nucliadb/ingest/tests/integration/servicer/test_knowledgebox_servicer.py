@@ -37,17 +37,17 @@ async def test_create_knowledgebox(grpc_servicer: IngestFixture, maindb_driver):
     kbs = await list_all_kb_slugs(maindb_driver)
     assert len(kbs) == 0
 
-    pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test", vector_dimension=512)
+    pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test")
     pb.config.title = "My Title"
     result = await stub.NewKnowledgeBox(pb)  # type: ignore
     assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
 
-    pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test", vector_dimension=512)
+    pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test")
     pb.config.title = "My Title 2"
     result = await stub.NewKnowledgeBox(pb)  # type: ignore
     assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.CONFLICT
 
-    pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test2", vector_dimension=512)
+    pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test2")
     result = await stub.NewKnowledgeBox(pb)  # type: ignore
     assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
 
@@ -97,7 +97,7 @@ async def test_create_knowledgebox_release_channel(
 ):
     stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)  # type: ignore
     pb = knowledgebox_pb2.KnowledgeBoxNew(
-        slug="test-default", release_channel=release_channel, vector_dimension=512
+        slug="test-default", release_channel=release_channel
     )
     pb.config.title = "My Title"
     result = await stub.NewKnowledgeBox(pb)  # type: ignore

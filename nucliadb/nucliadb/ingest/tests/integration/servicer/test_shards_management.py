@@ -30,9 +30,7 @@ async def test_create_cleansup_on_error(grpc_servicer, fake_node):
     stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
     # Create a KB
     kbid = str(uuid4())
-    pb = knowledgebox_pb2.KnowledgeBoxNew(
-        slug="test", forceuuid=kbid, vector_dimension=512
-    )
+    pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test", forceuuid=kbid)
     pb.config.title = "My Title"
     result = await stub.NewKnowledgeBox(pb)
     assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK

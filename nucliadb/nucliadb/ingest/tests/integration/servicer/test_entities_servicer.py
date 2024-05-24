@@ -33,9 +33,7 @@ async def test_create_entities_group(
     stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)  # type: ignore
 
     kb_id = str(uuid4())
-    pb = knowledgebox_pb2.KnowledgeBoxNew(
-        slug="test", forceuuid=kb_id, vector_dimension=512
-    )
+    pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test", forceuuid=kb_id)
     pb.config.title = "My Title"
     result = await stub.NewKnowledgeBox(pb)  # type: ignore
     assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK

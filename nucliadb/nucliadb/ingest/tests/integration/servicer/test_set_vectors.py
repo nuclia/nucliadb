@@ -34,9 +34,7 @@ async def test_set_vectors(grpc_servicer, storage):
 
     # Create a kb
     kb_id = str(uuid4())
-    pb = knowledgebox_pb2.KnowledgeBoxNew(
-        slug="test", forceuuid=kb_id, vector_dimension=512
-    )
+    pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test", forceuuid=kb_id)
     pb.config.title = "My Title"
     result = await stub.NewKnowledgeBox(pb)
     assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
