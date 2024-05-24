@@ -36,14 +36,16 @@ from nucliadb.common import datamanagers
 from nucliadb.common.cluster.exceptions import ShardNotFound
 from nucliadb.common.cluster.manager import get_index_node
 from nucliadb.common.cluster.utils import get_shard_manager
+
+# XXX: this keys shouldn't be exposed outside datamanagers
+from nucliadb.common.datamanagers.resources import (
+    KB_RESOURCE_SLUG,
+    KB_RESOURCE_SLUG_BASE,
+)
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict, VectorSetConflict
-from nucliadb.ingest.orm.resource import (
-    KB_RESOURCE_SLUG,
-    KB_RESOURCE_SLUG_BASE,
-    Resource,
-)
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.orm.utils import choose_matryoshka_dimension, compute_paragraph_key
 from nucliadb.migrator.utils import get_latest_version
 from nucliadb_protos import knowledgebox_pb2, writer_pb2
