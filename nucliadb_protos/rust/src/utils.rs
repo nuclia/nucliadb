@@ -6,7 +6,7 @@
 pub struct Relation {
     #[prost(message, optional, tag = "6")]
     pub source: ::core::option::Option<RelationNode>,
-    #[prost(message, optional, tag = "7")]
+    #[prost(message, optional, tag = "17")]
     pub to: ::core::option::Option<RelationNode>,
     #[prost(enumeration = "relation::RelationType", tag = "5")]
     pub relation: i32,
@@ -17,17 +17,7 @@ pub struct Relation {
 }
 /// Nested message and enum types in `Relation`.
 pub mod relation {
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum RelationType {
         /// Child resource
@@ -102,17 +92,7 @@ pub struct RelationNode {
 }
 /// Nested message and enum types in `RelationNode`.
 pub mod relation_node {
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum NodeType {
         Entity = 0,
@@ -151,10 +131,7 @@ pub struct ExtractedText {
     #[prost(string, tag = "1")]
     pub text: ::prost::alloc::string::String,
     #[prost(map = "string, string", tag = "2")]
-    pub split_text: ::std::collections::HashMap<
-        ::prost::alloc::string::String,
-        ::prost::alloc::string::String,
-    >,
+    pub split_text: ::std::collections::HashMap<::prost::alloc::string::String, ::prost::alloc::string::String>,
     #[prost(string, repeated, tag = "3")]
     pub deleted_splits: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
@@ -184,10 +161,7 @@ pub struct VectorObject {
     #[prost(message, optional, tag = "1")]
     pub vectors: ::core::option::Option<Vectors>,
     #[prost(map = "string, message", tag = "2")]
-    pub split_vectors: ::std::collections::HashMap<
-        ::prost::alloc::string::String,
-        Vectors,
-    >,
+    pub split_vectors: ::std::collections::HashMap<::prost::alloc::string::String, Vectors>,
     #[prost(string, repeated, tag = "3")]
     pub deleted_splits: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
@@ -215,10 +189,7 @@ pub struct UserVectors {
 pub struct UserVectorSet {
     /// vectorsets
     #[prost(map = "string, message", tag = "1")]
-    pub vectors: ::std::collections::HashMap<
-        ::prost::alloc::string::String,
-        UserVectors,
-    >,
+    pub vectors: ::std::collections::HashMap<::prost::alloc::string::String, UserVectors>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
