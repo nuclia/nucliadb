@@ -29,7 +29,6 @@ import pytest
 import tikv_client  # type: ignore
 from grpc import aio
 from httpx import AsyncClient
-from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxNew
 from nucliadb_protos.train_pb2_grpc import TrainStub
 from nucliadb_protos.utils_pb2 import Relation, RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage
@@ -211,17 +210,16 @@ async def nucliadb_manager(nucliadb: Settings):
 
 
 @pytest.fixture(scope="function")
-async def knowledgebox(
-    nucliadb_grpc: WriterStub, nucliadb_manager: AsyncClient, request
-):
-    request = KnowledgeBoxNew(
-        slug="knowledgebox", release_channel=request.param, vector_dimension=512
+async def knowledgebox(nucliadb_manager: AsyncClient, request):
+    resp = await nucliadb_manager.post(
+        "/kbs", json={"slug": "knowledgebox", "release_channel": request.param}
     )
-    resp = await nucliadb_grpc.NewKnowledgeBox(request)  # type: ignore
-    assert resp.status == 0
-    yield resp.uuid
+    assert resp.status_code == 201
+    uuid = resp.json().get("uuid")
 
-    resp = await nucliadb_manager.delete(f"/kb/{resp.uuid}")
+    yield uuid
+
+    resp = await nucliadb_manager.delete(f"/kb/{uuid}")
     assert resp.status_code == 200
 
 

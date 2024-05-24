@@ -20,13 +20,10 @@
 
 import pytest
 from httpx import AsyncClient
-from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxNew
-from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 
 @pytest.fixture(scope="function")
 async def philosophy_books_kb(
-    nucliadb_grpc: WriterStub,
     nucliadb_manager: AsyncClient,
     nucliadb_writer: AsyncClient,
 ):
@@ -188,10 +185,9 @@ async def philosophy_books_kb(
         },
     ]
 
-    request = KnowledgeBoxNew(slug="philosophy-books", vector_dimension=512)
-    resp = await nucliadb_grpc.NewKnowledgeBox(request)  # type: ignore
-    assert resp.status == 0
-    kbid = resp.uuid
+    resp = await nucliadb_manager.post("/kbs", json={"slug": "philosophy-books"})
+    assert resp.status_code == 201
+    kbid = resp.json().get("uuid")
 
     for payload in payloads:
         resp = await nucliadb_writer.post(
