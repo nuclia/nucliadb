@@ -105,10 +105,7 @@ async def src_kb(nucliadb_writer, nucliadb_manager):
 
 @pytest.fixture(scope="function")
 async def dst_kb(nucliadb_manager):
-    resp = await nucliadb_manager.post(
-        "/kbs",
-        json={"slug": "dst_kb"},
-    )
+    resp = await nucliadb_manager.post("/kbs", json={"slug": "dst_kb"})
     assert resp.status_code == 201
     uuid = resp.json().get("uuid")
     yield uuid

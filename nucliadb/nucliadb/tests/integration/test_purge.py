@@ -57,10 +57,7 @@ async def test_purge_deletes_everything_from_maindb(
     kb_slug = str(uuid.uuid4())
     resp = await nucliadb_manager.post(
         "/kbs",
-        json={
-            "slug": kb_slug,
-            "release_channel": release_channel,
-        },
+        json={"slug": kb_slug, "release_channel": release_channel},
     )
     assert resp.status_code == 201
     kbid = resp.json().get("uuid")
@@ -129,10 +126,7 @@ async def test_purge_orphan_shards(
     kb_slug = str(uuid.uuid4())
     resp = await nucliadb_manager.post(
         "/kbs",
-        json={
-            "slug": kb_slug,
-            "release_channel": release_channel,
-        },
+        json={"slug": kb_slug, "release_channel": release_channel},
     )
     assert resp.status_code == 201
     kbid = resp.json().get("uuid")
@@ -204,10 +198,7 @@ async def test_purge_orphan_shard_detection(
     kb_slug = str(uuid.uuid4())
     resp = await nucliadb_manager.post(
         "/kbs",
-        json={
-            "slug": kb_slug,
-            "release_channel": release_channel,
-        },
+        json={"slug": kb_slug, "release_channel": release_channel},
     )
     assert resp.status_code == 201
     kbid = resp.json().get("uuid")

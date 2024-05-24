@@ -183,7 +183,7 @@ def learning_config():
     lconfig = LearningConfiguration(
         semantic_model="multilingual",
         semantic_threshold=None,
-        semantic_vector_size=None,
+        semantic_vector_size=len(V1),
         semantic_vector_similarity="cosine",
     )
     with patch("nucliadb.ingest.service.writer.learning_proxy") as mocked:

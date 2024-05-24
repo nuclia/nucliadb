@@ -42,9 +42,7 @@ async def ten_dummy_resources_kb(
 
     resp = await nucliadb_manager.post(
         "/kbs",
-        json={
-            "slug": "ten-dummy-resources",
-        },
+        json={"slug": "ten-dummy-resources"},
     )
     assert resp.status_code == 201
     kbid = resp.json().get("uuid")
@@ -90,9 +88,7 @@ async def ten_quick_dummy_resources_kb(
 
     resp = await nucliadb_manager.post(
         "/kbs",
-        json={
-            "slug": "ten-dummy-resources",
-        },
+        json={"slug": "ten-dummy-resources"},
     )
     assert resp.status_code == 201
     kbid = resp.json().get("uuid")
