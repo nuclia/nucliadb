@@ -60,7 +60,7 @@ INDEXING_KEY = "index/{kb}/{shard}/{resource}/{txid}"
 MESSAGE_KEY = "message/{kbid}/{rid}/{mid}"
 
 
-class StorageField:
+class StorageField(abc.ABC, metaclass=abc.ABCMeta):
     storage: Storage
     bucket: str
     key: str
@@ -78,18 +78,18 @@ class StorageField:
         self.key = fullkey
         self.field = field
 
-    async def upload(self, iterator: AsyncIterator, origin: CloudFile) -> CloudFile:
-        raise NotImplementedError()
+    @abc.abstractmethod
+    async def upload(self, iterator: AsyncIterator, origin: CloudFile) -> CloudFile: ...
 
-    async def iter_data(self, headers=None):
+    @abc.abstractmethod
+    async def iter_data(self, headers=None) -> AsyncGenerator[bytes, None]:  # type: ignore
         raise NotImplementedError()
+        yield b""
 
-    async def read_range(self, start: int, end: int) -> AsyncIterator[bytes]:
-        """
-        Iterate through ranges of data
-        """
+    @abc.abstractmethod
+    async def read_range(self, start: int, end: int) -> AsyncGenerator[bytes, None]:
         raise NotImplementedError()
-        yield b""  # pragma: no cover
+        yield b""
 
     async def delete(self) -> bool:
         deleted = False
@@ -98,38 +98,38 @@ class StorageField:
             deleted = True
         return deleted
 
-    async def exists(self) -> Optional[Dict[str, str]]:
-        raise NotImplementedError
+    @abc.abstractmethod
+    async def exists(self) -> Optional[Dict[str, str]]: ...
 
+    @abc.abstractmethod
     async def copy(
         self,
         origin_uri: str,
         destination_uri: str,
         origin_bucket_name: str,
         destination_bucket_name: str,
-    ):
-        raise NotImplementedError()
+    ): ...
 
+    @abc.abstractmethod
     async def move(
         self,
         origin_uri: str,
         destination_uri: str,
         origin_bucket_name: str,
         destination_bucket_name: str,
-    ):
-        raise NotImplementedError()
+    ): ...
 
-    async def start(self, cf: CloudFile) -> CloudFile:
-        raise NotImplementedError()
+    @abc.abstractmethod
+    async def start(self, cf: CloudFile) -> CloudFile: ...
 
-    async def append(self, cf: CloudFile, iterable: AsyncIterator) -> int:
-        raise NotImplementedError()
+    @abc.abstractmethod
+    async def append(self, cf: CloudFile, iterable: AsyncIterator) -> int: ...
 
-    async def finish(self):
-        raise NotImplementedError()
+    @abc.abstractmethod
+    async def finish(self): ...
 
 
-class Storage:
+class Storage(abc.ABC, metaclass=abc.ABCMeta):
     source: int
     field_klass: Type
     deadletter_bucket: Optional[str] = None
@@ -498,40 +498,39 @@ class Storage:
         pb.ParseFromString(payload.read())
         return pb
 
-    async def delete_upload(self, uri: str, bucket_name: str):
-        raise NotImplementedError()
-
-    def get_bucket_name(self, kbid: str):
-        raise NotImplementedError()
-
-    async def initialize(self):
-        raise NotImplementedError()
-
-    async def finalize(self):
-        raise NotImplementedError()
+    @abc.abstractmethod
+    async def delete_upload(self, uri: str, bucket_name: str): ...
 
     @abc.abstractmethod
-    def iterate_bucket(self, bucket: str, prefix: str) -> AsyncIterator[Any]:
-        raise NotImplementedError()
+    def get_bucket_name(self, kbid: str) -> str: ...
 
-    async def copy(self, file: CloudFile, destination: StorageField):
+    @abc.abstractmethod
+    async def initialize(self) -> None: ...
+
+    @abc.abstractmethod
+    async def finalize(self) -> None: ...
+
+    @abc.abstractmethod
+    def iterate_bucket(self, bucket: str, prefix: str) -> AsyncIterator[Any]: ...
+
+    async def copy(self, file: CloudFile, destination: StorageField) -> None:
         await destination.copy(
             file.uri, destination.key, file.bucket_name, destination.bucket
         )
 
-    async def move(self, file: CloudFile, destination: StorageField):
+    async def move(self, file: CloudFile, destination: StorageField) -> None:
         await destination.move(
             file.uri, destination.key, file.bucket_name, destination.bucket
         )
 
-    async def create_kb(self, kbid: str) -> bool:
-        raise NotImplementedError()
+    @abc.abstractmethod
+    async def create_kb(self, kbid: str) -> bool: ...
 
-    async def delete_kb(self, kbid: str) -> Tuple[bool, bool]:
-        raise NotImplementedError()
+    @abc.abstractmethod
+    async def delete_kb(self, kbid: str) -> Tuple[bool, bool]: ...
 
-    async def schedule_delete_kb(self, kbid: str) -> bool:
-        raise NotImplementedError()
+    @abc.abstractmethod
+    async def schedule_delete_kb(self, kbid: str) -> bool: ...
 
     async def set_stream_message(self, kbid: str, rid: str, data: bytes) -> str:
         key = MESSAGE_KEY.format(kbid=kbid, rid=rid, mid=uuid.uuid4())

@@ -26,6 +26,7 @@ from nucliadb_protos.noderesources_pb2 import ResourceID
 from nucliadb_protos.nodewriter_pb2 import IndexMessage
 from nucliadb_protos.resources_pb2 import CloudFile
 
+from nucliadb_utils.storages.local import LocalStorageField
 from nucliadb_utils.storages.storage import (
     Storage,
     StorageField,
@@ -45,7 +46,7 @@ class TestStorageField:
 
     @pytest.fixture
     def storage_field(self, storage, field):
-        yield StorageField(storage, "bucket", "fullkey", field)
+        yield LocalStorageField(storage, "bucket", "fullkey", field)
 
     @pytest.mark.asyncio
     async def test_delete(self, storage_field: StorageField, storage):
@@ -72,6 +73,24 @@ class StorageTest(Storage):
     async def download(self, bucket_name, uri):
         br = BrainResource(labels=["label"])
         yield br.SerializeToString()
+
+    async def create_kb(self, kbid):
+        return True
+
+    async def delete_kb(self, kbid):
+        return True
+
+    async def delete_upload(self, uri, bucket):
+        return True
+
+    async def initialize(self) -> None:
+        pass
+
+    async def finalize(self) -> None:
+        pass
+
+    async def schedule_delete_kb(self, kbid: str) -> bool:
+        return True
 
 
 class TestStorage:
@@ -136,7 +155,7 @@ class TestStorage:
     async def test_download_pb(self, storage: StorageTest):
         assert isinstance(
             await storage.download_pb(
-                StorageField(storage, "bucket", "fullkey"), BrainResource
+                LocalStorageField(storage, "bucket", "fullkey"), BrainResource
             ),
             BrainResource,
         )
