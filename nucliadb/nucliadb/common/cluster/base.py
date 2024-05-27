@@ -95,15 +95,15 @@ class AbstractIndexNode(metaclass=ABCMeta):
         self,
         kbid: str,
         release_channel: utils_pb2.ReleaseChannel.ValueType,
-        config: VectorIndexConfig,
+        vector_index_config: VectorIndexConfig,
     ) -> noderesources_pb2.ShardCreated:
         req = NewShardRequest(
             kbid=kbid,
             release_channel=release_channel,
-            config=config,
+            config=vector_index_config,
             # Deprecated fields, only for backwards compatibility with older nodes
-            similarity=config.similarity,
-            normalize_vectors=config.normalize_vectors,
+            similarity=vector_index_config.similarity,
+            normalize_vectors=vector_index_config.normalize_vectors,
         )
 
         resp = await self.writer.NewShard(req)  # type: ignore

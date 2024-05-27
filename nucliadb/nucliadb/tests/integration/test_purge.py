@@ -206,7 +206,7 @@ async def test_purge_orphan_shard_detection(
     orphan_shard = await node.new_shard(
         kbid="deleted-kb",
         release_channel=utils_pb2.ReleaseChannel.STABLE,
-        config=nodewriter_pb2.VectorIndexConfig(
+        vector_index_config=nodewriter_pb2.VectorIndexConfig(
             similarity=utils_pb2.VectorSimilarity.COSINE,
             normalize_vectors=False,
             vector_type=nodewriter_pb2.VectorType.DENSE_F32,
