@@ -26,7 +26,7 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
-      
+
       - name: Setup Ubuntu
         # see if this is affecting microk8s
         run: |
@@ -38,10 +38,10 @@ jobs:
           channel: '1.27/stable'
           devMode: 'true'
           addons: '["dns", "rbac", "hostpath-storage", "registry", "helm", "storage"]'
-      
+
       - name: "Set up Helm"
         uses: azure/setup-helm@v3
-      
+
       - name: Install PostgreSQL with Helm
         run: |
           helm repo add bitnami https://charts.bitnami.com/bitnami
@@ -82,11 +82,11 @@ jobs:
             kubectl get pods -n nucliadb -l app=nucliadb-worker -o name | while read pod; do kubectl logs -n nucliadb $pod; done &&
             exit 1)
           kubectl -n nucliadb wait --timeout=1m --for=condition=Ready pod -l statefulset.kubernetes.io/pod-name=nucliadb-1
-      
+
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: 3.11
+          python-version: 3.12
           cache: "pip"
 
       - name: Install test deps
@@ -137,12 +137,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
-      
+
       - name: Install NucliaDB
         # tests that installation script works
         run: |
           ./scripts/install-vm.sh
-        
+
       - name: Install local nucliadb
         # Now, let's install the current version of nucliadb to
         # run the tests against.
