@@ -1,4 +1,4 @@
-FROM python:3.11 as python_rust
+FROM python:3.12 as python_rust
 
 ARG RUST_BUILD_PROFILE=release
 
@@ -43,7 +43,7 @@ RUN set -eux; \
     maturin build --profile ${RUST_BUILD_PROFILE}
 
 
-FROM python:3.11
+FROM python:3.12
 ENV TIKV_CLIENT_VERSION=0.0.3
 
 

@@ -66,7 +66,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.9", "3.10", "3.11"]
+        python-version: ["3.9", "3.12"]
 
     steps:
       - name: Checkout the repository
@@ -95,7 +95,7 @@ jobs:
       - name: Set up PDM
         uses: pdm-project/setup-pdm@v3
         with:
-          python-version: "3.11"
+          python-version: "3.12"
       - name: Restore venv
         uses: actions/cache/restore@v4
         with:
@@ -141,7 +141,7 @@ jobs:
       - name: Set up PDM
         uses: pdm-project/setup-pdm@v3
         with:
-          python-version: "3.11"
+          python-version: "3.12"
       - name: Install venv
         run: pdm sync -d
       - name: Upload virtualenv to cache
@@ -162,7 +162,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.11"
+          python-version: "3.12"
       - name: Restore venv
         uses: actions/cache/restore@v4
         with:
@@ -216,7 +216,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
       - name: Restore venv
         uses: actions/cache/restore@v4
