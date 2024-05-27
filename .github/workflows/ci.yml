@@ -41,6 +41,26 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           args: --all-targets
 
+  updated-protos:
+    name: "Pre-checks: Protos up-to-date"
+    runs-on: ubuntu-latest
+    permissions: write-all
+    needs:
+      - build-virtual-env
+    steps:
+      - uses: actions/checkout@v3
+      - uses: Swatinem/rust-cache@v2
+      - name: Restore venv
+        uses: actions/cache/restore@v4
+        with:
+          path: .venv
+          key: venv-${{ github.sha }}
+          fail-on-cache-miss: true
+      - name: Compile protos
+        run: source .venv/bin/activate && make protos
+      - name: Fail if something changed
+        run: git status && [[ -z "$(git status -s)" ]]
+
   pre-checks-python:
     name: "Pre-checks: Node python lint"
     runs-on: ubuntu-latest
@@ -113,7 +133,7 @@ jobs:
           key: node-bin-${{ github.sha }}
 
   build-virtual-env:
-    name: Build node bindings
+    name: Build virtual environment
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3

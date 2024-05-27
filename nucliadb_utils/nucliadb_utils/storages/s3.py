@@ -21,12 +21,13 @@ from __future__ import annotations
 
 from contextlib import AsyncExitStack
 from datetime import datetime
-from typing import Any, AsyncIterator, Optional
+from typing import Any, AsyncGenerator, AsyncIterator, Optional
 
 import aiobotocore  # type: ignore
 import aiohttp
 import backoff  # type: ignore
 import botocore  # type: ignore
+from aiobotocore.client import AioBaseClient  # type: ignore
 from aiobotocore.session import AioSession, get_session  # type: ignore
 from nucliadb_protos.resources_pb2 import CloudFile
 
@@ -111,7 +112,7 @@ class S3StorageField(StorageField):
             yield data
             data = await stream.read(CHUNK_SIZE)
 
-    async def read_range(self, start: int, end: int) -> AsyncIterator[bytes]:
+    async def read_range(self, start: int, end: int) -> AsyncGenerator[bytes, None]:
         """
         Iterate through ranges of data
         """
@@ -319,6 +320,18 @@ class S3StorageField(StorageField):
             Key=destination_uri,
         )
 
+    async def move(
+        self,
+        origin_uri: str,
+        destination_uri: str,
+        origin_bucket_name: str,
+        destination_bucket_name: str,
+    ):
+        await self.copy(
+            origin_uri, destination_uri, origin_bucket_name, destination_bucket_name
+        )
+        await self.storage.delete_upload(origin_uri, origin_bucket_name)
+
     async def upload(self, iterator: AsyncIterator, origin: CloudFile) -> CloudFile:
         self.field = await self.start(origin)
         await self.append(origin, iterator)
@@ -384,7 +397,7 @@ class S3Storage(Storage):
 
     async def initialize(self):
         session = AioSession()
-        self._s3aioclient = await self._exit_stack.enter_async_context(
+        self._s3aioclient: AioBaseClient = await self._exit_stack.enter_async_context(
             session.create_client("s3", **self.opts)
         )
         for bucket in (self.deadletter_bucket, self.indexing_bucket):
