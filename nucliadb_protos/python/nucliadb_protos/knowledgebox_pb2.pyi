@@ -9,6 +9,7 @@ import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
+import nucliadb_protos.nodewriter_pb2
 import nucliadb_protos.utils_pb2
 import sys
 import typing
@@ -17,6 +18,23 @@ if sys.version_info >= (3, 10):
     import typing as typing_extensions
 else:
     import typing_extensions
+from nucliadb_protos.nodewriter_pb2 import (
+    CREATION as CREATION,
+    DELETION as DELETION,
+    DENSE_F32 as DENSE_F32,
+    GarbageCollectorResponse as GarbageCollectorResponse,
+    IndexMessage as IndexMessage,
+    IndexMessageSource as IndexMessageSource,
+    MergeResponse as MergeResponse,
+    NewShardRequest as NewShardRequest,
+    NewVectorSetRequest as NewVectorSetRequest,
+    OpStatus as OpStatus,
+    PROCESSOR as PROCESSOR,
+    TypeMessage as TypeMessage,
+    VectorIndexConfig as VectorIndexConfig,
+    VectorType as VectorType,
+    WRITER as WRITER,
+)
 from nucliadb_protos.utils_pb2 import (
     COSINE as COSINE,
     DOT as DOT,
@@ -651,6 +669,54 @@ class VectorSets(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["vectorsets", b"vectorsets"]) -> None: ...
 
 global___VectorSets = VectorSets
+
+@typing.final
+class VectorSetConfig(google.protobuf.message.Message):
+    """Configuration values for a vectorset"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    VECTORSET_ID_FIELD_NUMBER: builtins.int
+    INDEX_CONFIG_FIELD_NUMBER: builtins.int
+    MATRYOSHKA_DIMENSIONS_FIELD_NUMBER: builtins.int
+    vectorset_id: builtins.str
+    @property
+    def index_config(self) -> nucliadb_protos.nodewriter_pb2.VectorIndexConfig: ...
+    @property
+    def matryoshka_dimensions(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
+        """list of possible subdivisions of the matryoshka embeddings (if the model
+        supports it)
+        """
+
+    def __init__(
+        self,
+        *,
+        vectorset_id: builtins.str = ...,
+        index_config: nucliadb_protos.nodewriter_pb2.VectorIndexConfig | None = ...,
+        matryoshka_dimensions: collections.abc.Iterable[builtins.int] | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["index_config", b"index_config"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["index_config", b"index_config", "matryoshka_dimensions", b"matryoshka_dimensions", "vectorset_id", b"vectorset_id"]) -> None: ...
+
+global___VectorSetConfig = VectorSetConfig
+
+@typing.final
+class KnowledgeBoxVectorSetsConfig(google.protobuf.message.Message):
+    """KB vectorsets and their configuration"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    VECTORSETS_FIELD_NUMBER: builtins.int
+    @property
+    def vectorsets(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___VectorSetConfig]: ...
+    def __init__(
+        self,
+        *,
+        vectorsets: collections.abc.Iterable[global___VectorSetConfig] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["vectorsets", b"vectorsets"]) -> None: ...
+
+global___KnowledgeBoxVectorSetsConfig = KnowledgeBoxVectorSetsConfig
 
 @typing.final
 class TermSynonyms(google.protobuf.message.Message):
