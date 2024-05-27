@@ -68,21 +68,35 @@ async def storage_field_test(storage: Storage):
     assert metadata["FILENAME"] == "myfile.txt"
 
     # Download the file and check that it's the same
-    downloaded_data = b""
-    async for data in sfield.iter_data():
-        downloaded_data += data
-    assert downloaded_data == binary_data
+    async def check_downloaded_data(sfield, expected_data: bytes):
+        downloaded_data = b""
+        async for data in sfield.iter_data():
+            downloaded_data += data
+        assert downloaded_data == expected_data
+
+    await check_downloaded_data(sfield, binary_data)
 
     # Test
     if storage.source == CloudFile.Source.LOCAL:
         # There is a bug to be fixed in the copy method on the local storage driver
         return
 
+    # Copy the file to another bucket (with the same key)
     kbid2 = uuid.uuid4().hex
     assert await storage.create_kb(kbid2)
     bucket2 = storage.get_bucket_name(kbid2)
-    rid = "rid"
-    field_id = "field1"
     field_key = KB_RESOURCE_FIELD.format(kbid=kbid2, uuid=rid, field=field_id)
+    sfield_kb2 = storage.file_field(kbid2, rid, field=field_id)
 
     await sfield.copy(sfield.key, field_key, bucket, bucket2)
+
+    await check_downloaded_data(sfield_kb2, binary_data)
+
+    # Move the file to another key (same bucket)
+    new_field_id = "field3"
+    new_field_key = KB_RESOURCE_FIELD.format(kbid=kbid2, uuid=rid, field=new_field_id)
+    new_sfield = storage.file_field(kbid2, rid, field=new_field_id)
+
+    await sfield_kb2.move(sfield_kb2.key, new_field_key, bucket2, bucket2)
+
+    await check_downloaded_data(new_sfield, binary_data)

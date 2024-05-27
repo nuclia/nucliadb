@@ -26,7 +26,7 @@ import socket
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from datetime import datetime
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, AsyncGenerator, AsyncIterator, Dict, List, Optional
 from urllib.parse import quote_plus
 
 import aiohttp
@@ -221,7 +221,7 @@ class GCSStorageField(StorageField):
                     break
 
     @storage_ops_observer.wrap({"type": "read_range"})
-    async def read_range(self, start: int, end: int) -> AsyncIterator[bytes]:
+    async def read_range(self, start: int, end: int) -> AsyncGenerator[bytes, None]:
         """
         Iterate through ranges of data
         """

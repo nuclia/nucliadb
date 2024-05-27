@@ -24,7 +24,7 @@ import json
 import os
 import shutil
 from datetime import datetime
-from typing import Any, AsyncIterator, Dict, Optional
+from typing import Any, AsyncGenerator, AsyncIterator, Dict, Optional
 
 import aiofiles
 from nucliadb_protos.resources_pb2 import CloudFile
@@ -87,7 +87,7 @@ class LocalStorageField(StorageField):
                     break
                 yield data
 
-    async def read_range(self, start: int, end: int) -> AsyncIterator[bytes]:
+    async def read_range(self, start: int, end: int) -> AsyncGenerator[bytes, None]:
         """
         Iterate through ranges of data
         """

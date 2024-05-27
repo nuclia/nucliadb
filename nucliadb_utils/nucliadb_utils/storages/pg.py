@@ -22,7 +22,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from typing import Any, AsyncIterator, Optional, TypedDict
+from typing import Any, AsyncGenerator, AsyncIterator, Optional, TypedDict
 
 import asyncpg
 from nucliadb_protos.resources_pb2 import CloudFile
@@ -427,7 +427,7 @@ class PostgresStorageField(StorageField):
             async for chunk in dl.iterate_chunks(bucket, key):
                 yield chunk["data"]
 
-    async def read_range(self, start: int, end: int) -> AsyncIterator[bytes]:
+    async def read_range(self, start: int, end: int) -> AsyncGenerator[bytes, None]:
         """
         Iterate through ranges of data
         """
