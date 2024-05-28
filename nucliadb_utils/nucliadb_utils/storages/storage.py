@@ -522,7 +522,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
     async def finalize(self) -> None: ...
 
     @abc.abstractmethod
-    def iterate_objects(
+    async def iterate_objects(
         self, bucket: str, prefix: str
     ) -> AsyncGenerator[ObjectInfo, None]:
         raise NotImplementedError()
