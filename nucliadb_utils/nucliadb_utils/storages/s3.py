@@ -304,7 +304,7 @@ class S3StorageField(StorageField):
                 )
                 filename = metadata.get("filename") or key.split("/")[-1]
                 return ObjectMetadata(
-                    size=size, content_type=content_type, filename=filename
+                    size=int(size), content_type=content_type, filename=filename
                 )
             else:
                 return None
