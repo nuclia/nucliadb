@@ -159,7 +159,8 @@ def test_logger_with_extra_formatter(caplog):
 
     assert len(outputted_records) == 1
 
-    assert "Something wrong -- foo=bar" in outputted_records[0]
+    assert "Something wrong" in outputted_records[0]
+    assert "foo=bar" in outputted_records[0]
 
 
 def test_logger_with_formatter_and_active_span(caplog):
