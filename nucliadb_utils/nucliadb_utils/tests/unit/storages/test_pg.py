@@ -21,6 +21,7 @@ from unittest.mock import ANY, AsyncMock, MagicMock, call, patch
 import pytest
 from nucliadb_protos.resources_pb2 import CloudFile
 
+from nucliadb_utils.storages.storage import ObjectInfo
 from nucliadb_utils.storages import pg
 
 pytestmark = pytest.mark.asyncio
@@ -173,7 +174,7 @@ class TestPostgresFileDataLayer:
         connection.fetchrow.return_value = record
         assert await data_layer.get_file_info(
             kb_id="kb_id", file_id="file_id"
-        ) == pg.FileInfo(
+        ) == ObjectInfo(
             filename=record["filename"],  # type: ignore
             size=record["size"],  # type: ignore
             content_type=record["content_type"],  # type: ignore
@@ -253,7 +254,7 @@ class TestPostgresFileDataLayer:
         )
 
         async for file_info in data_layer.iterate_kb("kb_id", "prefix"):
-            assert file_info == pg.FileInfo(
+            assert file_info == ObjectInfo(
                 filename="filename",
                 size=1,
                 content_type="content_type",
@@ -523,7 +524,7 @@ class TestPostgresStorage:
         await storage.delete_upload("file_id", "kb_id")
         connection.execute.assert_awaited_with(ANY, "kb_id", "file_id")
 
-    async def test_iterate_bucket(self, storage: pg.PostgresStorage, connection):
+    async def test_iterate_objects(self, storage: pg.PostgresStorage, connection):
         connection.cursor = MagicMock(
             return_value=iter_result(
                 [
@@ -543,11 +544,10 @@ class TestPostgresStorage:
             )
         )
 
-        chunks = []
-        async for chunk in storage.iterate_bucket("kb_id", "file_id"):
-            chunks.append(chunk)
-
-        assert chunks == [{"name": "file_id1"}, {"name": "file_id2"}]
+        object_names = []
+        async for object_info in storage.iterate_objects("kb_id", "file_id"):
+            object_names.append(object_info.name)
+        assert object_names == ["file_id1", "file_id2"]
 
     async def test_download(
         self, storage: pg.PostgresStorage, connection, chunk_info, chunk_data

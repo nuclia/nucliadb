@@ -30,7 +30,12 @@ import aiofiles
 from nucliadb_protos.resources_pb2 import CloudFile
 
 from nucliadb_utils.storages import CHUNK_SIZE
-from nucliadb_utils.storages.storage import Storage, StorageField
+from nucliadb_utils.storages.storage import (
+    ObjectInfo,
+    ObjectMetadata,
+    Storage,
+    StorageField,
+)
 
 
 class LocalStorageField(StorageField):
@@ -142,6 +147,8 @@ class LocalStorageField(StorageField):
 
         init_url = self.storage.get_file_path(self.bucket, upload_uri)
         metadata_init_url = self.metadata_key(init_url)
+        object_metadata = ObjectMetadata()
+
         metadata = json.dumps(
             {"FILENAME": cf.filename, "SIZE": cf.size, "CONTENT_TYPE": cf.content_type}
         )
@@ -190,12 +197,12 @@ class LocalStorageField(StorageField):
         self.field.ClearField("offset")
         self.field.ClearField("upload_uri")
 
-    async def exists(self) -> Optional[Dict[str, str]]:
+    async def exists(self) -> Optional[ObjectMetadata]:
         file_path = self.storage.get_file_path(self.bucket, self.key)
         metadata_path = self.metadata_key(file_path)
         if os.path.exists(metadata_path):
             async with aiofiles.open(metadata_path, "r") as metadata:
-                return json.loads(await metadata.read())
+                return ObjectMetadata.parse_raw(await metadata.read())
         return None
 
     async def upload(self, iterator: AsyncIterator, origin: CloudFile) -> CloudFile:
@@ -269,10 +276,11 @@ class LocalStorage(Storage):
             deleted = False
         return deleted
 
-    async def iterate_bucket(self, bucket: str, prefix: str) -> AsyncIterator[Any]:
+    async def iterate_objects(
+        self, bucket: str, prefix: str
+    ) -> AsyncGenerator[ObjectInfo, None]:
         for key in glob.glob(f"{bucket}/{prefix}*"):
-            item = {"name": key}
-            yield item
+            yield ObjectInfo(name=key)
 
     async def download(
         self, bucket_name: str, key: str, headers: Optional[Dict[str, str]] = None

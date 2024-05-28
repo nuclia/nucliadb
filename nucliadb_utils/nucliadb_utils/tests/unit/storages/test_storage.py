@@ -67,7 +67,7 @@ class StorageTest(Storage):
     def get_bucket_name(self, kbid):
         return "bucket"
 
-    async def iterate_bucket(self, bucket_name, prefix):
+    async def iterate_objects(self, bucket_name, prefix):
         yield {"name": "uri"}
 
     async def download(self, bucket_name, uri):

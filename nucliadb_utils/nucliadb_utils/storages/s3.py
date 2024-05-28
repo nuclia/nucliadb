@@ -34,7 +34,12 @@ from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_telemetry import errors
 from nucliadb_utils import logger
 from nucliadb_utils.storages.exceptions import UnparsableResponse
-from nucliadb_utils.storages.storage import Storage, StorageField
+from nucliadb_utils.storages.storage import (
+    ObjectInfo,
+    ObjectMetadata,
+    Storage,
+    StorageField,
+)
 
 MB = 1024 * 1024
 MIN_UPLOAD_SIZE = 5 * MB
@@ -272,7 +277,7 @@ class S3StorageField(StorageField):
             MultipartUpload=part_info,
         )
 
-    async def exists(self):
+    async def exists(self) -> Optional[ObjectMetadata]:
         """
         Existence can be checked either with a CloudFile data in the field attribute
         or own StorageField key and bucket. Field takes precendece
@@ -292,13 +297,15 @@ class S3StorageField(StorageField):
         try:
             obj = await self.storage._s3aioclient.head_object(Bucket=bucket, Key=key)
             if obj is not None:
-                metadata = obj.get("Metadata", {})
-                return {
-                    "SIZE": metadata.get("size") or obj.get("ContentLength"),
-                    "CONTENT_TYPE": metadata.get("content_type")
-                    or obj.get("ContentType"),
-                    "FILENAME": metadata.get("filename") or key.split("/")[-1],
-                }
+                metadata = obj.get("Metadata") or {}
+                size = metadata.get("size") or obj.get("ContentLength") or 0
+                content_type = (
+                    metadata.get("content_type") or obj.get("ContentType") or ""
+                )
+                filename = metadata.get("filename") or key.split("/")[-1]
+                return ObjectMetadata(
+                    size=size, content_type=content_type, filename=filename
+                )
             else:
                 return None
         except botocore.exceptions.ClientError as e:
@@ -424,9 +431,9 @@ class S3Storage(Storage):
         else:
             raise AttributeError("No valid uri")
 
-    async def iterate_bucket(
+    async def iterate_objects(
         self, bucket: str, prefix: str = "/"
-    ) -> AsyncIterator[Any]:
+    ) -> AsyncGenerator[ObjectInfo, None]:
         paginator = self._s3aioclient.get_paginator("list_objects")
         async for result in paginator.paginate(Bucket=bucket, Prefix=prefix):
             for item in result.get("Contents", []):
