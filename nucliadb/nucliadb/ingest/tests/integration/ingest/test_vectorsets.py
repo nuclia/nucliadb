@@ -25,7 +25,7 @@ import pytest
 from nucliadb.ingest import SERVICE_NAME
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.tests.fixtures import make_extracted_text
-from nucliadb_protos import resources_pb2, utils_pb2, writer_pb2
+from nucliadb_protos import noderesources_pb2, resources_pb2, utils_pb2, writer_pb2
 from nucliadb_utils.utilities import get_indexing, get_storage
 
 
@@ -86,21 +86,39 @@ async def test_ingest_broker_message_with_vectorsets(
         )
     bm.field_vectors.append(field_vectors)
 
-    await processor.process(message=bm, seqid=1)
+    def validate_index_message(resource: noderesources_pb2.Resource):
+        assert len(resource.paragraphs) == 1
+        assert f"t/{field_id}" in resource.paragraphs
+        field_paragraphs = resource.paragraphs[f"t/{field_id}"]
+        for paragraph_id, paragraph in field_paragraphs.paragraphs.items():
+            for vector_id, sentence in paragraph.sentences.items():
+                assert len(sentence.vector) == default_vectorset_dimension
+
+            assert len(paragraph.vectorsets_sentences) == 1
+            assert vectorset_id in paragraph.vectorsets_sentences
+            vectorset_sentences = paragraph.vectorsets_sentences[vectorset_id]
+            for vector_id, sentence in vectorset_sentences.sentences.items():
+                assert len(sentence.vector) == vectorset_dimension
 
     index = get_indexing()
     storage = await get_storage(service_name=SERVICE_NAME)
 
-    pb = await storage.get_indexing(index._calls[0][1])
-    assert len(pb.paragraphs) == 1
-    assert f"t/{field_id}" in pb.paragraphs
-    field_paragraphs = pb.paragraphs[f"t/{field_id}"]
-    for paragraph_id, paragraph in field_paragraphs.paragraphs.items():
-        for vector_id, sentence in paragraph.sentences.items():
-            assert len(sentence.vector) == default_vectorset_dimension
+    # process the broker message with vectorsets
+    await processor.process(message=bm, seqid=1)
 
-        assert len(paragraph.vectorsets_sentences) == 1
-        assert vectorset_id in paragraph.vectorsets_sentences
-        vectorset_sentences = paragraph.vectorsets_sentences[vectorset_id]
-        for vector_id, sentence in vectorset_sentences.sentences.items():
-            assert len(sentence.vector) == vectorset_dimension
+    pb = await storage.get_indexing(index._calls[0][1])
+    validate_index_message(pb)
+
+    # Generate a reindex to validate storage.
+    #
+    # A BrokerMessage with reindex=True will trigger a full brain generation
+    # from the stored resource
+    bm = writer_pb2.BrokerMessage(
+        kbid=kbid, uuid=rid, slug=slug, type=writer_pb2.BrokerMessage.AUTOCOMMIT
+    )
+    bm.reindex = True
+
+    await processor.process(message=bm, seqid=2)
+
+    pb = await storage.get_indexing(index._calls[1][1])
+    validate_index_message(pb)
