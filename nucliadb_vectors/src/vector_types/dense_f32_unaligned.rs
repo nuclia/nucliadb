@@ -19,9 +19,9 @@
 //
 
 use std::io::{Read, Write};
+
 type Len = u64;
 type Unit = f32;
-type Dist = f32;
 
 fn encode_length(mut buff: Vec<u8>, vec: &[Unit]) -> Vec<u8> {
     let len = vec.len() as Len;
@@ -41,7 +41,7 @@ pub fn vector_len(mut x: &[u8]) -> u64 {
     Len::from_le_bytes(buff_x)
 }
 
-pub fn cosine_similarity(mut x: &[u8], mut y: &[u8]) -> Dist {
+pub fn cosine_similarity(mut x: &[u8], mut y: &[u8]) -> f32 {
     let mut buff_x = [0; 8];
     let mut buff_y = [0; 8];
     x.read_exact(&mut buff_x).unwrap();
@@ -67,7 +67,7 @@ pub fn cosine_similarity(mut x: &[u8], mut y: &[u8]) -> Dist {
     sum / (f32::sqrt(dem_x) * f32::sqrt(dem_y))
 }
 
-pub fn dot_similarity(mut x: &[u8], mut y: &[u8]) -> Dist {
+pub fn dot_similarity(mut x: &[u8], mut y: &[u8]) -> f32 {
     let mut buff_x = [0; 8];
     let mut buff_y = [0; 8];
     x.read_exact(&mut buff_x).unwrap();
@@ -96,7 +96,7 @@ pub fn encode_vector(vec: &[Unit]) -> Vec<u8> {
 #[cfg(test)]
 mod test {
     use super::*;
-    fn naive_cosine_similatiry(a: &[f32], b: &[f32]) -> f32 {
+    fn naive_cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
         let ab: f32 = a.iter().cloned().zip(b.iter().cloned()).map(|(a, b)| a * b).sum();
         let aa: f32 = a.iter().cloned().map(|a| a * a).sum();
         let bb: f32 = b.iter().cloned().map(|b| b * b).sum();
@@ -113,8 +113,8 @@ mod test {
         let v1: Vec<_> = (0..758).map(|i| ((i * 2) + 1) as f32).collect();
         let v0_r = encode_vector(&v0);
         let v1_r = encode_vector(&v1);
-        assert_eq!(naive_cosine_similatiry(&v0, &v1), cosine_similarity(&v0_r, &v1_r));
-        assert_eq!(naive_cosine_similatiry(&v0, &v0), cosine_similarity(&v0_r, &v0_r));
+        assert_eq!(naive_cosine_similarity(&v0, &v1), cosine_similarity(&v0_r, &v1_r));
+        assert_eq!(naive_cosine_similarity(&v0, &v0), cosine_similarity(&v0_r, &v0_r));
     }
 
     #[test]
@@ -124,6 +124,6 @@ mod test {
         let v0_r = encode_vector(&v0);
         let v1_r = encode_vector(&v1);
         assert_eq!(naive_dot_similatiry(&v0, &v1), dot_similarity(&v0_r, &v1_r));
-        assert_eq!(naive_dot_similatiry(&v0, &v1), dot_similarity(&v0_r, &v1_r));
+        assert_eq!(naive_dot_similatiry(&v0, &v0), dot_similarity(&v0_r, &v0_r));
     }
 }

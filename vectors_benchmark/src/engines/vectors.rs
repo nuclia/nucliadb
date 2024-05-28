@@ -19,7 +19,7 @@
 //
 
 use super::VectorEngine;
-use nucliadb_vectors::config::Similarity;
+use nucliadb_vectors::config::VectorConfig;
 use nucliadb_vectors::data_point::{self, DataPointPin, Elem, LabelDictionary};
 use nucliadb_vectors::data_point_provider::reader::Reader;
 use nucliadb_vectors::data_point_provider::writer::Writer;
@@ -55,7 +55,7 @@ impl<'a> SearchRequest for Request<'a> {
 impl VectorEngine for Writer {
     fn add_batch(&mut self, batch_id: String, keys: Vec<String>, embeddings: Vec<Vec<f32>>) {
         let temporal_mark = SystemTime::now();
-        let similarity = Similarity::Cosine;
+        let config = VectorConfig::default();
 
         let mut elems = vec![];
         for (key, vector) in keys.into_iter().zip(embeddings.into_iter()) {
@@ -64,7 +64,7 @@ impl VectorEngine for Writer {
         }
 
         let data_point_pin = DataPointPin::create_pin(self.location()).unwrap();
-        data_point::create(&data_point_pin, elems, Some(temporal_mark), similarity).unwrap();
+        data_point::create(&data_point_pin, elems, Some(temporal_mark), &config).unwrap();
 
         self.add_data_point(data_point_pin).unwrap();
         self.record_delete(batch_id.as_bytes(), temporal_mark);

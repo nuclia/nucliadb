@@ -22,7 +22,6 @@ pub mod data_store;
 pub mod dtrie_ram;
 pub mod trie;
 pub mod trie_ram;
-pub mod vector;
 
 pub mod usize_utils {
     pub const USIZE_LEN: usize = (usize::BITS / 8) as usize;
@@ -30,6 +29,12 @@ pub mod usize_utils {
         let mut buff = [0; USIZE_LEN];
         buff.copy_from_slice(v);
         usize::from_le_bytes(buff)
+    }
+    pub const U32_LEN: usize = (u32::BITS / 8) as usize;
+    pub fn u32_from_slice_le(v: &[u8]) -> u32 {
+        let mut buff = [0; U32_LEN];
+        buff.copy_from_slice(v);
+        u32::from_le_bytes(buff)
     }
 }
 

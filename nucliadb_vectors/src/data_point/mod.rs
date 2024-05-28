@@ -27,9 +27,10 @@ mod params;
 #[cfg(test)]
 mod tests;
 
-use crate::config::Similarity;
-use crate::data_types::{data_store, trie, trie_ram, vector, DeleteLog};
+use crate::config::{VectorConfig, VectorType};
+use crate::data_types::{data_store, trie, trie_ram, DeleteLog};
 use crate::formula::Formula;
+use crate::vector_types::dense_f32_unaligned;
 use crate::VectorR;
 use data_store::Interpreter;
 use disk_hnsw::DiskHnsw;
@@ -174,7 +175,7 @@ pub fn open(pin: &DataPointPin) -> VectorR<OpenDataPoint> {
 pub fn merge<Dlog>(
     pin: &DataPointPin,
     operants: &[(Dlog, &OpenDataPoint)],
-    similarity: Similarity,
+    config: &VectorConfig,
     merge_time: SystemTime,
 ) -> VectorR<OpenDataPoint>
 where
@@ -210,7 +211,7 @@ where
 
     // Creating the node store
     let node_producers: Vec<_> = operants.iter().map(|dp| ((&dp.0, Node), dp.1.nodes.as_ref())).collect();
-    let has_deletions = data_store::merge(&mut nodes_file, &node_producers)?;
+    let has_deletions = data_store::merge(&mut nodes_file, &node_producers, config)?;
     let nodes = unsafe { Mmap::map(&nodes_file)? };
     let no_nodes = data_store::stored_elements(&nodes);
 
@@ -227,16 +228,7 @@ where
     }
 
     // Creating the hnsw for the new node store.
-    let tracker = Retriever::new(
-        &[],
-        &nodes,
-        &NoDLog,
-        SearchParams {
-            similarity,
-            min_score: -1.0,
-            dimension: operants[0].1.stored_len().unwrap_or(0) as usize,
-        },
-    );
+    let tracker = Retriever::new(&[], &nodes, &NoDLog, config, -1.0);
     let mut ops = HnswOps::new(&tracker);
     for id in start_node_index..no_nodes {
         ops.insert(Address(id), &mut index)
@@ -280,8 +272,15 @@ pub fn create(
     pin: &DataPointPin,
     elems: Vec<Elem>,
     time: Option<SystemTime>,
-    similarity: Similarity,
+    config: &VectorConfig,
 ) -> VectorR<OpenDataPoint> {
+    // Check dimensions
+    if let Some(dim) = config.vector_type.dimension() {
+        if elems.iter().any(|elem| elem.vector.len() != dim) {
+            return Err(crate::VectorErr::InconsistentDimensions);
+        }
+    }
+
     let data_point_id = pin.data_point_id;
     let data_point_path = &pin.data_point_path;
     let mut nodes_file_options = OpenOptions::new();
@@ -304,28 +303,16 @@ pub fn create(
 
     // Serializing nodes on disk
     // Nodes are stored on disk and mmaped.
-    let dimension = elems.first().map(|e| e.vector.len());
-    data_store::create_key_value(&mut nodesf, elems)?;
+    data_store::create_key_value(&mut nodesf, elems, &config.vector_type)?;
     let nodes = unsafe { Mmap::map(&nodesf)? };
     let no_nodes = data_store::stored_elements(&nodes);
 
     // Creating the HNSW using the mmaped nodes
     let mut index = RAMHnsw::new();
-    if let Some(dimension) = dimension {
-        let tracker = Retriever::new(
-            &[],
-            &nodes,
-            &NoDLog,
-            SearchParams {
-                similarity,
-                min_score: -1.0,
-                dimension,
-            },
-        );
-        let mut ops = HnswOps::new(&tracker);
-        for id in 0..no_nodes {
-            ops.insert(Address(id), &mut index)
-        }
+    let tracker = Retriever::new(&[], &nodes, &NoDLog, config, -1.0);
+    let mut ops = HnswOps::new(&tracker);
+    for id in 0..no_nodes {
+        ops.insert(Address(id), &mut index)
     }
 
     {
@@ -415,12 +402,6 @@ impl FormulaFilter<'_> {
     }
 }
 
-pub struct SearchParams {
-    pub similarity: Similarity,
-    pub min_score: f32,
-    pub dimension: usize,
-}
-
 pub struct Retriever<'a, Dlog> {
     similarity_function: fn(&[u8], &[u8]) -> f32,
     no_nodes: usize,
@@ -428,28 +409,33 @@ pub struct Retriever<'a, Dlog> {
     nodes: &'a Mmap,
     delete_log: &'a Dlog,
     min_score: f32,
-    dimension: usize,
+    vector_len_bytes: Option<usize>,
 }
 impl<'a, Dlog: DeleteLog> Retriever<'a, Dlog> {
     pub fn new(
         temp: &'a [u8],
         nodes: &'a Mmap,
         delete_log: &'a Dlog,
-        search_params: SearchParams,
+        config: &VectorConfig,
+        min_score: f32,
     ) -> Retriever<'a, Dlog> {
         let no_nodes = data_store::stored_elements(nodes);
-        let similarity_function = match search_params.similarity {
-            Similarity::Cosine => vector::cosine_similarity,
-            Similarity::Dot => vector::dot_similarity,
+        let vector_len_bytes = if config.known_dimensions() {
+            config.vector_len_bytes()
+        } else if data_store::stored_elements(nodes) > 0 {
+            let node = data_store::get_value(Node, nodes, 0);
+            Some(dense_f32_unaligned::vector_len(Node::vector(node)) as usize)
+        } else {
+            None
         };
         Retriever {
             temp,
             nodes,
             delete_log,
-            similarity_function,
+            similarity_function: config.similarity_function(),
             no_nodes,
-            min_score: search_params.min_score,
-            dimension: search_params.dimension,
+            min_score,
+            vector_len_bytes,
         }
     }
     fn find_node(&self, Address(x): Address) -> &[u8] {
@@ -472,7 +458,9 @@ impl<'a, Dlog: DeleteLog> DataRetriever for Retriever<'a, Dlog> {
     }
 
     fn will_need(&self, Address(x): Address) {
-        data_store::will_need(self.nodes, x, self.dimension);
+        if let Some(len) = self.vector_len_bytes {
+            data_store::will_need(self.nodes, x, len);
+        }
     }
 
     fn get_vector(&self, x @ Address(addr): Address) -> &[u8] {
@@ -540,7 +528,7 @@ impl LabelDictionary {
 #[derive(Clone, Debug)]
 pub struct Elem {
     pub key: Vec<u8>,
-    pub vector: Vec<u8>,
+    pub vector: Vec<f32>,
     pub metadata: Option<Vec<u8>>,
     pub labels: LabelDictionary,
 }
@@ -550,14 +538,21 @@ impl Elem {
             labels,
             metadata,
             key: key.as_bytes().to_vec(),
-            vector: vector::encode_vector(&vector),
+            vector,
         }
     }
 }
 
 impl data_store::IntoBuffer for Elem {
-    fn serialize_into<W: io::Write>(self, w: W) -> io::Result<()> {
-        Node::serialize_into(w, self.key, self.vector, self.labels.0, self.metadata.as_ref())
+    fn serialize_into<W: io::Write>(self, w: W, vector_type: &VectorType) -> io::Result<()> {
+        Node::serialize_into(
+            w,
+            self.key,
+            vector_type.encode(&self.vector),
+            vector_type.vector_alignment(),
+            self.labels.0,
+            self.metadata.as_ref(),
+        )
     }
 }
 
@@ -593,7 +588,7 @@ impl Neighbour {
     pub fn dummy_neighbour(key: &[u8], score: f32) -> Neighbour {
         Neighbour {
             score,
-            node: Node::serialize(key, [1, 2, 3, 4], [], None as Option<&[u8]>),
+            node: Node::serialize(key, [1, 2, 3, 4], 1, [], None as Option<&[u8]>),
         }
     }
     fn new(Address(addr): Address, data: &[u8], score: f32) -> Neighbour {
@@ -635,12 +630,12 @@ impl AsRef<OpenDataPoint> for OpenDataPoint {
 }
 
 impl OpenDataPoint {
-    pub fn stored_len(&self) -> Option<u64> {
+    pub fn stored_len(&self) -> Option<usize> {
         if data_store::stored_elements(&self.nodes) == 0 {
             return None;
         }
         let node = data_store::get_value(Node, &self.nodes, 0);
-        Some(vector::vector_len(Node::vector(node)))
+        Some(dense_f32_unaligned::vector_len(Node::vector(node)) as usize)
     }
     pub fn get_id(&self) -> DpId {
         self.journal.uid
@@ -671,10 +666,11 @@ impl OpenDataPoint {
         filter: &Formula,
         with_duplicates: bool,
         results: usize,
-        search_params: SearchParams,
+        config: &VectorConfig,
+        min_score: f32,
     ) -> impl Iterator<Item = Neighbour> + '_ {
-        let encoded_query = vector::encode_vector(query);
-        let tracker = Retriever::new(&encoded_query, &self.nodes, delete_log, search_params);
+        let encoded_query = config.vector_type.encode(query);
+        let tracker = Retriever::new(&encoded_query, &self.nodes, delete_log, config, min_score);
         let filter = FormulaFilter::new(filter);
         let ops = HnswOps::new(&tracker);
         let neighbours = ops.search(Address(self.journal.nodes), self.index.as_ref(), results, filter, with_duplicates);
@@ -685,15 +681,23 @@ impl OpenDataPoint {
 
 #[cfg(test)]
 mod test {
-    use std::collections::BTreeMap;
+    use std::{collections::BTreeMap, time::SystemTime};
 
-    use nucliadb_core::NodeResult;
+    use nucliadb_core::{
+        protos::{Position, Representation, SentenceMetadata},
+        NodeResult,
+    };
     use rand::{rngs::SmallRng, Rng, SeedableRng};
     use tempfile::tempdir;
 
-    use crate::data_types::vector::{dot_similarity, encode_vector};
+    use crate::{
+        config::{Similarity, VectorConfig},
+        data_types::data_store,
+        vector_types::dense_f32_unaligned::{dot_similarity, encode_vector},
+    };
+    use nucliadb_core::protos::prost::Message;
 
-    use super::{create, DataPointPin, Elem, NoDLog, SearchParams, Similarity};
+    use super::{create, merge, node::Node, DataPointPin, Elem, LabelDictionary, NoDLog};
 
     const DIMENSION: usize = 128;
 
@@ -723,8 +727,128 @@ mod test {
         format!("{:032x?}", rng.gen::<u128>())
     }
 
+    fn random_string(rng: &mut impl Rng) -> String {
+        String::from_utf8_lossy(&[rng.gen_range(40..110)].repeat(rng.gen_range(1..16))).to_string()
+    }
+
     fn similarity(x: &[f32], y: &[f32]) -> f32 {
         dot_similarity(&encode_vector(x), &encode_vector(y))
+    }
+
+    fn random_elem(rng: &mut impl Rng) -> (Elem, Vec<String>) {
+        let labels: Vec<_> = (0..rng.gen_range(0..=2)).map(|_| random_string(rng)).collect();
+        let metadata = SentenceMetadata {
+            position: Some(Position {
+                index: 1,
+                start: 2,
+                end: 3,
+                page_number: 4,
+                in_page: true,
+                start_seconds: vec![],
+                end_seconds: vec![],
+            }),
+            page_with_visual: false,
+            representation: Some(Representation {
+                is_a_table: false,
+                file: random_string(rng),
+            }),
+        };
+        (
+            Elem::new(
+                random_key(rng),
+                random_vector(rng),
+                LabelDictionary::new(labels.clone()),
+                Some(metadata.encode_to_vec()),
+            ),
+            labels,
+        )
+    }
+
+    #[test]
+    fn test_save_recall_aligned_data() -> NodeResult<()> {
+        let config = VectorConfig {
+            similarity: Similarity::Dot,
+            vector_type: crate::config::VectorType::DenseF32 {
+                dimension: DIMENSION,
+            },
+            normalize_vectors: false,
+        };
+        let mut rng = SmallRng::seed_from_u64(1234567890);
+        let temp_dir = tempdir()?;
+
+        // Create a data point with random data of different length
+        let pin = DataPointPin::create_pin(temp_dir.path())?;
+        let elems = (0..100).map(|_| random_elem(&mut rng)).collect::<Vec<_>>();
+        let dp = create(&pin, elems.iter().cloned().map(|x| x.0).collect(), None, &config)?;
+        let nodes = dp.nodes;
+
+        for (i, (elem, mut labels)) in elems.into_iter().enumerate() {
+            let node = data_store::get_value(Node, &nodes, i);
+            assert_eq!(elem.key, Node::key(node));
+            assert_eq!(config.vector_type.encode(&elem.vector), Node::vector(node));
+
+            // Compare metadata as the decoded protobug. Tthe absolute stored value may have trailing padding
+            // from vectors, but the decoding step should ignore it
+            assert_eq!(
+                SentenceMetadata::decode(elem.metadata.as_ref().unwrap().as_slice()),
+                SentenceMetadata::decode(Node::metadata(node))
+            );
+
+            // Compare labels
+            labels.sort();
+            let mut node_labels = Node::labels(node);
+            node_labels.sort();
+            assert_eq!(labels, node_labels);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_save_recall_aligned_data_after_merge() -> NodeResult<()> {
+        let config = VectorConfig {
+            similarity: Similarity::Dot,
+            vector_type: crate::config::VectorType::DenseF32 {
+                dimension: DIMENSION,
+            },
+            normalize_vectors: false,
+        };
+        let mut rng = SmallRng::seed_from_u64(1234567890);
+        let temp_dir = tempdir()?;
+
+        // Create two data points with random data of different length
+        let pin1 = DataPointPin::create_pin(temp_dir.path())?;
+        let elems1 = (0..10).map(|_| random_elem(&mut rng)).collect::<Vec<_>>();
+        let dp1 = create(&pin1, elems1.iter().cloned().map(|x| x.0).collect(), None, &config)?;
+
+        let pin2 = DataPointPin::create_pin(temp_dir.path())?;
+        let elems2 = (0..10).map(|_| random_elem(&mut rng)).collect::<Vec<_>>();
+        let dp2 = create(&pin2, elems2.iter().cloned().map(|x| x.0).collect(), None, &config)?;
+
+        let pin_merged = DataPointPin::create_pin(temp_dir.path())?;
+        let merged_dp = merge(&pin_merged, &[(NoDLog, &dp1), (NoDLog, &dp2)], &config, SystemTime::now())?;
+        let nodes = merged_dp.nodes;
+
+        for (i, (elem, mut labels)) in elems1.into_iter().chain(elems2.into_iter()).enumerate() {
+            let node = data_store::get_value(Node, &nodes, i);
+            assert_eq!(elem.key, Node::key(node));
+            assert_eq!(config.vector_type.encode(&elem.vector), Node::vector(node));
+
+            // Compare metadata as the decoded protobug. Tthe absolute stored value may have trailing padding
+            // from vectors, but the decoding step should ignore it
+            assert_eq!(
+                SentenceMetadata::decode(elem.metadata.as_ref().unwrap().as_slice()),
+                SentenceMetadata::decode(Node::metadata(node))
+            );
+
+            // Compare labels
+            labels.sort();
+            let mut node_labels = Node::labels(node);
+            node_labels.sort();
+            assert_eq!(labels, node_labels);
+        }
+
+        Ok(())
     }
 
     #[test]
@@ -750,6 +874,14 @@ mod test {
             center = random_nearby_vector(&mut rng, &center, 0.1);
         }
 
+        let config = VectorConfig {
+            similarity: Similarity::Dot,
+            vector_type: crate::config::VectorType::DenseF32 {
+                dimension: DIMENSION,
+            },
+            normalize_vectors: false,
+        };
+
         // Create a data point
         let temp_dir = tempdir()?;
         let pin = DataPointPin::create_pin(temp_dir.path())?;
@@ -757,7 +889,7 @@ mod test {
             &pin,
             elems.iter().map(|(k, v)| Elem::new(k.clone(), v.clone(), Default::default(), None)).collect(),
             None,
-            Similarity::Dot,
+            &config,
         )?;
 
         // Search a few times
@@ -770,20 +902,7 @@ mod test {
                 let mut similarities: Vec<_> = elems.iter().map(|(k, v)| (k, similarity(v, &query))).collect();
                 similarities.sort_unstable_by(|a, b| a.1.total_cmp(&b.1).reverse());
 
-                let results: Vec<_> = dp
-                    .search(
-                        &NoDLog,
-                        &query,
-                        &Default::default(),
-                        false,
-                        5,
-                        SearchParams {
-                            similarity: Similarity::Dot,
-                            min_score: 0.0,
-                            dimension: DIMENSION,
-                        },
-                    )
-                    .collect();
+                let results: Vec<_> = dp.search(&NoDLog, &query, &Default::default(), false, 5, &config, 0.0).collect();
 
                 let search: Vec<_> = results.iter().map(|r| String::from_utf8(r.id().to_vec()).unwrap()).collect();
                 let brute_force: Vec<_> = similarities.iter().take(5).map(|r| r.0.clone()).collect();

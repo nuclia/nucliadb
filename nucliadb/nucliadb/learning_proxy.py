@@ -20,6 +20,7 @@
 import contextlib
 import json
 import logging
+import os
 from collections.abc import AsyncIterator
 from enum import Enum
 from typing import Any, Optional, Union
@@ -327,7 +328,11 @@ class DummyClient(httpx.AsyncClient):
         lconfig = LearningConfiguration(
             semantic_model="multilingual",
             semantic_vector_similarity="cosine",
-            semantic_vector_size=None,
+            semantic_vector_size=(
+                768
+                if os.environ.get("TEST_SENTENCE_ENCODER") == "multilingual-2023-02-21"
+                else 512
+            ),
             semantic_threshold=None,
             semantic_matryoshka_dims=[],
         )

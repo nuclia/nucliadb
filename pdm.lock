@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["cross_platform", "inherit_metadata"]
 lock_version = "4.4.1"
-content_hash = "sha256:361e8673dd9b82416e19c8d33c0670a0518ccfef4aab281f25cd28b44c473f73"
+content_hash = "sha256:f1de635cfec4cd2dd3b9717c62475f49a7e89b556ed285058898ac5b9d84a94d"
 
 [[package]]
 name = "aiobotocore"
@@ -784,6 +784,17 @@ files = [
 ]
 
 [[package]]
+name = "execnet"
+version = "2.1.1"
+requires_python = ">=3.8"
+summary = "execnet: rapid multi-Python deployment"
+groups = ["dev"]
+files = [
+    {file = "execnet-2.1.1-py3-none-any.whl", hash = "sha256:26dee51f1b80cebd6d0ca8e74dd8745419761d3bef34163928cbebbdc4749fdc"},
+    {file = "execnet-2.1.1.tar.gz", hash = "sha256:5189b52c6121c24feae288166ab41b32549c7e2348652736540b9e6e7d4e72e3"},
+]
+
+[[package]]
 name = "faker"
 version = "25.2.0"
 requires_python = ">=3.8"
@@ -795,6 +806,20 @@ dependencies = [
 files = [
     {file = "Faker-25.2.0-py3-none-any.whl", hash = "sha256:cfe97c4857c4c36ee32ea4aaabef884895992e209bae4cbd26807cf3e05c6918"},
     {file = "Faker-25.2.0.tar.gz", hash = "sha256:45b84f47ff1ef86e3d1a8d11583ca871ecf6730fad0660edadc02576583a2423"},
+]
+
+[[package]]
+name = "fancycompleter"
+version = "0.9.1"
+summary = "colorful TAB completion for Python prompt"
+groups = ["dev"]
+dependencies = [
+    "pyreadline; platform_system == \"Windows\"",
+    "pyrepl>=0.8.2",
+]
+files = [
+    {file = "fancycompleter-0.9.1-py3-none-any.whl", hash = "sha256:dd076bca7d9d524cc7f25ec8f35ef95388ffef9ef46def4d3d25e9b044ad7080"},
+    {file = "fancycompleter-0.9.1.tar.gz", hash = "sha256:09e0feb8ae242abdfd7ef2ba55069a46f011814a80fe5476be48f51b00247272"},
 ]
 
 [[package]]
@@ -2122,7 +2147,7 @@ files = [
 
 [[package]]
 name = "nucliadb"
-version = "4.0.0"
+version = "4.0.1"
 requires_python = ">=3.9, <4"
 editable = true
 path = "./nucliadb"
@@ -2199,7 +2224,7 @@ files = [
 
 [[package]]
 name = "nucliadb-models"
-version = "4.0.0"
+version = "4.0.1"
 requires_python = ">=3.9, <4"
 editable = true
 path = "./nucliadb_models"
@@ -2212,7 +2237,7 @@ dependencies = [
 
 [[package]]
 name = "nucliadb-node"
-version = "4.0.0"
+version = "4.0.1"
 requires_python = ">=3.9, <4"
 editable = true
 path = "./nucliadb_node"
@@ -2243,7 +2268,7 @@ groups = ["dev"]
 
 [[package]]
 name = "nucliadb-protos"
-version = "4.0.0"
+version = "4.0.1"
 editable = true
 path = "./nucliadb_protos/python"
 summary = "protos for nucliadb"
@@ -2258,7 +2283,7 @@ dependencies = [
 
 [[package]]
 name = "nucliadb-telemetry"
-version = "4.0.0"
+version = "4.0.1"
 requires_python = ">=3.9"
 editable = true
 path = "./nucliadb_telemetry"
@@ -2274,7 +2299,7 @@ dependencies = [
 
 [[package]]
 name = "nucliadb-telemetry"
-version = "4.0.0"
+version = "4.0.1"
 extras = ["all"]
 requires_python = ">=3.9"
 summary = "NucliaDB Telemetry Library Python process"
@@ -2290,7 +2315,7 @@ dependencies = [
     "grpcio-tools<1.63.0,>=1.44.0",
     "grpcio<1.63.0,>=1.44.0",
     "nats-py[nkeys]>=2.5.0",
-    "nucliadb-telemetry==4.0.0",
+    "nucliadb-telemetry==4.0.1",
     "opentelemetry-api==1.21.0",
     "opentelemetry-exporter-jaeger==1.21.0",
     "opentelemetry-instrumentation-aiohttp-client>=0.42b0",
@@ -2304,7 +2329,7 @@ dependencies = [
 
 [[package]]
 name = "nucliadb-utils"
-version = "4.0.0"
+version = "4.0.1"
 requires_python = ">=3.9, <4"
 editable = true
 path = "./nucliadb_utils"
@@ -2328,7 +2353,7 @@ dependencies = [
 
 [[package]]
 name = "nucliadb-utils"
-version = "4.0.0"
+version = "4.0.1"
 extras = ["cache", "fastapi", "storages"]
 requires_python = ">=3.9, <4"
 summary = ""
@@ -2341,7 +2366,7 @@ dependencies = [
     "google-api-python-client>=2.37.0",
     "google-auth>=2.4.1",
     "lru-dict>=1.1.7",
-    "nucliadb-utils==4.0.0",
+    "nucliadb-utils==4.0.1",
     "oauth2client>=4.1.3",
     "orjson>=3.6.7",
     "redis>=4.3.4",
@@ -2633,6 +2658,21 @@ groups = ["dev"]
 files = [
     {file = "pathspec-0.12.1-py3-none-any.whl", hash = "sha256:a0d503e138a4c123b27490a4f7beda6a01c6f288df0e4a8b79c7eb0dc7b4cc08"},
     {file = "pathspec-0.12.1.tar.gz", hash = "sha256:a482d51503a1ab33b1c67a6c3813a26953dbdc71c31dacaef9a838c4e29f5712"},
+]
+
+[[package]]
+name = "pdbpp"
+version = "0.10.3"
+summary = "pdb++, a drop-in replacement for pdb"
+groups = ["dev"]
+dependencies = [
+    "fancycompleter>=0.8",
+    "pygments",
+    "wmctrl",
+]
+files = [
+    {file = "pdbpp-0.10.3-py2.py3-none-any.whl", hash = "sha256:79580568e33eb3d6f6b462b1187f53e10cd8e4538f7d31495c9181e2cf9665d1"},
+    {file = "pdbpp-0.10.3.tar.gz", hash = "sha256:d9e43f4fda388eeb365f2887f4e7b66ac09dce9b6236b76f63616530e2f669f5"},
 ]
 
 [[package]]
@@ -3081,6 +3121,25 @@ files = [
 ]
 
 [[package]]
+name = "pyreadline"
+version = "2.1"
+summary = "A python implmementation of GNU readline."
+groups = ["dev"]
+marker = "platform_system == \"Windows\""
+files = [
+    {file = "pyreadline-2.1.zip", hash = "sha256:4530592fc2e85b25b1a9f79664433da09237c1a270e4d78ea5aa3a2c7229e2d1"},
+]
+
+[[package]]
+name = "pyrepl"
+version = "0.9.0"
+summary = "A library for building flexible command line interfaces"
+groups = ["dev"]
+files = [
+    {file = "pyrepl-0.9.0.tar.gz", hash = "sha256:292570f34b5502e871bbb966d639474f2b57fbfcd3373c2d6a2f3d56e681a775"},
+]
+
+[[package]]
 name = "pytest"
 version = "7.4.2"
 requires_python = ">=3.7"
@@ -3213,6 +3272,21 @@ dependencies = [
 files = [
     {file = "pytest-shard-0.1.2.tar.gz", hash = "sha256:b86a967fbfd1c8e50295095ccda031b7e890862ee06531d5142844f4c1d1cd67"},
     {file = "pytest_shard-0.1.2-py3-none-any.whl", hash = "sha256:407a1df385cebe1feb9b4d2e7eeee8b044f8a24f0919421233159a17c59be2b9"},
+]
+
+[[package]]
+name = "pytest-xdist"
+version = "3.6.1"
+requires_python = ">=3.8"
+summary = "pytest xdist plugin for distributed testing, most importantly across multiple CPUs"
+groups = ["dev"]
+dependencies = [
+    "execnet>=2.1",
+    "pytest>=7.0.0",
+]
+files = [
+    {file = "pytest_xdist-3.6.1-py3-none-any.whl", hash = "sha256:9ed4adfb68a016610848639bb7e02c9352d5d9f03d04809919e2dafc3be4cca7"},
+    {file = "pytest_xdist-3.6.1.tar.gz", hash = "sha256:ead156a4db231eec769737f57668ef58a2084a34b2e55c4a8fa20d861107300d"},
 ]
 
 [[package]]
@@ -3785,13 +3859,13 @@ files = [
 
 [[package]]
 name = "types-setuptools"
-version = "69.5.0.20240519"
+version = "70.0.0.20240524"
 requires_python = ">=3.8"
 summary = "Typing stubs for setuptools"
 groups = ["dev"]
 files = [
-    {file = "types-setuptools-69.5.0.20240519.tar.gz", hash = "sha256:275fb72048b0203d3fbef268298ea78a0913cd114a74872d93f8638ccc5b7c63"},
-    {file = "types_setuptools-69.5.0.20240519-py3-none-any.whl", hash = "sha256:52b264eff8913b5d85848d83bd98efea935fc6129d681d370eb957783880b720"},
+    {file = "types-setuptools-70.0.0.20240524.tar.gz", hash = "sha256:e31fee7b9d15ef53980526579ac6089b3ae51a005a281acf97178e90ac71aff6"},
+    {file = "types_setuptools-70.0.0.20240524-py3-none-any.whl", hash = "sha256:8f5379b9948682d72a9ab531fbe52932e84c4f38deda570255f9bae3edd766bc"},
 ]
 
 [[package]]
@@ -4132,6 +4206,20 @@ files = [
     {file = "websockets-12.0-pp39-pypy39_pp73-win_amd64.whl", hash = "sha256:2cb388a5bfb56df4d9a406783b7f9dbefb888c09b71629351cc6b036e9259370"},
     {file = "websockets-12.0-py3-none-any.whl", hash = "sha256:dc284bbc8d7c78a6c69e0c7325ab46ee5e40bb4d50e494d8131a07ef47500e9e"},
     {file = "websockets-12.0.tar.gz", hash = "sha256:81df9cbcbb6c260de1e007e58c011bfebe2dafc8435107b0537f393dd38c8b1b"},
+]
+
+[[package]]
+name = "wmctrl"
+version = "0.5"
+requires_python = ">=2.7"
+summary = "A tool to programmatically control windows inside X"
+groups = ["dev"]
+dependencies = [
+    "attrs",
+]
+files = [
+    {file = "wmctrl-0.5-py2.py3-none-any.whl", hash = "sha256:ae695c1863a314c899e7cf113f07c0da02a394b968c4772e1936219d9234ddd7"},
+    {file = "wmctrl-0.5.tar.gz", hash = "sha256:7839a36b6fe9e2d6fd22304e5dc372dbced2116ba41283ea938b2da57f53e962"},
 ]
 
 [[package]]

@@ -25,6 +25,7 @@ from httpx import AsyncClient
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb.common.maindb.driver import Driver
+from nucliadb.learning_proxy import LearningConfiguration
 from nucliadb.tests.utils import inject_message
 from nucliadb.tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
 from nucliadb_protos import knowledgebox_pb2, resources_pb2, utils_pb2
@@ -37,6 +38,7 @@ async def test_matryoshka_embeddings(
     nucliadb_grpc: WriterStub,
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
+    learning_config,
 ):
 
     # Create a KB with matryoshka configuration (using ingest gRPC)
@@ -45,6 +47,13 @@ async def test_matryoshka_embeddings(
     slug = "matryoshka-tests-kb"
     vector_dimension = 1024
     matryoshka_dimensions = [2048, 1024, 512]
+
+    learning_config.get_configuration.return_value = LearningConfiguration(
+        semantic_model="matryoshka",
+        semantic_vector_similarity="dot",
+        semantic_vector_size=matryoshka_dimensions[0],
+        semantic_matryoshka_dims=matryoshka_dimensions,
+    )
 
     new_kb_response = await nucliadb_grpc.NewKnowledgeBox(  # type: ignore
         knowledgebox_pb2.KnowledgeBoxNew(

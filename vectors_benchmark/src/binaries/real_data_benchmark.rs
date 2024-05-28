@@ -161,7 +161,7 @@ fn create_request(
 
 fn get_num_dimensions(vectors_path: &Path) -> usize {
     let reader = Reader::open(vectors_path).unwrap();
-    reader.embedding_dimension().unwrap() as usize
+    reader.embedding_dimension().unwrap()
 }
 
 fn test_search(dataset: &Dataset, cycles: usize) -> Vec<(String, Vec<u128>)> {

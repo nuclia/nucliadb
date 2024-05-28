@@ -51,7 +51,7 @@ pub struct MergeContext {
 }
 
 #[derive(Clone)]
-pub struct VectorConfig {
+pub struct VectorIndexConfig {
     pub similarity: utils::VectorSimilarity,
     pub path: PathBuf,
     pub channel: Channel,
