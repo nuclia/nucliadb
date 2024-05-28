@@ -20,7 +20,8 @@
 
 import uuid
 
-from nucliadb.ingest.orm.brain import FIELD_PARAGRAPH_ID, FIELD_VECTOR_ID, ResourceBrain
+from nucliadb.common import ids
+from nucliadb.ingest.orm.brain import ResourceBrain
 from nucliadb_protos import utils_pb2
 
 
@@ -43,13 +44,13 @@ def test_apply_field_vectors_for_matryoshka_embeddings():
             ]
         )
     )
-    paragraph_key = FIELD_PARAGRAPH_ID.format(
+    paragraph_key = ids.ParagraphId(
         rid=rid,
         field_id=field_id,
         paragraph_start=0,
         paragraph_end=10,
     )
-    vector_key = FIELD_VECTOR_ID.format(
+    vector_key = ids.VectorId(
         rid=rid,
         field_id=field_id,
         index=0,
