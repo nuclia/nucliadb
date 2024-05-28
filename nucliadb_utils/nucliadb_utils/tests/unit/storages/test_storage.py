@@ -29,7 +29,6 @@ from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_utils.storages.local import LocalStorageField
 from nucliadb_utils.storages.storage import (
     ObjectInfo,
-    ObjectMetadata,
     Storage,
     StorageField,
     iter_and_add_size,
