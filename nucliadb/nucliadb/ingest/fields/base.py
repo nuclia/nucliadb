@@ -285,17 +285,18 @@ class Field:
     async def set_vectors(
         self, payload: ExtractedVectorsWrapper
     ) -> tuple[Optional[VectorObject], bool, list[str]]:
+        vectorset = payload.vectorset_id
         if self.type in SUBFIELDFIELDS:
             try:
                 actual_payload: Optional[VectorObject] = await self.get_vectors(
-                    force=True
+                    vectorset=vectorset,
+                    force=True,
                 )
             except KeyError:
                 actual_payload = None
         else:
             actual_payload = None
 
-        vectorset = payload.vectorset_id
         sf = self._get_extracted_vectors_storage_field(vectorset)
         vo: Optional[VectorObject] = None
         replace_field: bool = True

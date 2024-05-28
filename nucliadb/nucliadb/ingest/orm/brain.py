@@ -258,6 +258,7 @@ class ResourceBrain:
         field_id: str,
         vo: utils_pb2.VectorObject,
         *,
+        vectorset: Optional[str],
         replace_field: bool = False,
         replace_splits: Optional[list[str]] = None,
         matryoshka_vector_dimension: Optional[int] = None,
@@ -287,6 +288,7 @@ class ResourceBrain:
                     paragraph_key,
                     sentence_key,
                     vector,
+                    vectorset=vectorset,
                     matryoshka_vector_dimension=matryoshka_vector_dimension,
                 )
 
@@ -309,6 +311,7 @@ class ResourceBrain:
                 paragraph_key,
                 sentence_key,
                 vector,
+                vectorset=vectorset,
                 matryoshka_vector_dimension=matryoshka_vector_dimension,
             )
 
@@ -329,10 +332,16 @@ class ResourceBrain:
         sentence_key: ids.VectorId,
         vector: utils_pb2.Vector,
         *,
+        vectorset: Optional[str],
         matryoshka_vector_dimension: Optional[int] = None,
     ):
         paragraph_pb = self.brain.paragraphs[field_id].paragraphs[paragraph_key.full()]
-        sentence_pb = paragraph_pb.sentences[sentence_key.full()]
+        if vectorset:
+            sentence_pb = paragraph_pb.vectorsets_sentences[vectorset].sentences[
+                sentence_key.full()
+            ]
+        else:
+            sentence_pb = paragraph_pb.sentences[sentence_key.full()]
 
         sentence_pb.ClearField("vector")  # clear first to prevent duplicates
 

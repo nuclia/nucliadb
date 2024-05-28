@@ -369,6 +369,8 @@ class Resource:
                 )
 
             if self.disable_vectors is False:
+                # XXX: while we don't remove the "default" vectorset concept, we
+                # need to do use None as the default one
                 vo = await field.get_vectors()
                 if vo is not None:
                     dimension = await datamanagers.kb.get_matryoshka_vector_dimension(
@@ -377,8 +379,26 @@ class Resource:
                     brain.apply_field_vectors(
                         field_key,
                         vo,
+                        vectorset=None,
                         matryoshka_vector_dimension=dimension,
                     )
+
+                async for vectorset_config in datamanagers.vectorsets.iter(
+                    self.txn, kbid=self.kb.kbid
+                ):
+                    vo = await field.get_vectors(
+                        vectorset=vectorset_config.vectorset_id
+                    )
+                    if vo is not None:
+                        dimension = (
+                            vectorset_config.vectorset_index_config.vector_dimension
+                        )
+                        brain.apply_field_vectors(
+                            field_key,
+                            vo,
+                            vectorset=vectorset_config.vectorset_id,
+                            matryoshka_vector_dimension=dimension,
+                        )
         return brain
 
     # Fields
@@ -803,13 +823,31 @@ class Resource:
         ) = await field_obj.set_vectors(field_vectors)
         field_key = self.generate_field_id(field_vectors.field)
         if vo is not None:
-            dimension = await datamanagers.kb.get_matryoshka_vector_dimension(
-                self.txn, kbid=self.kb.kbid
-            )
+            vectorset_id = field_vectors.vectorset_id or None
+            if vectorset_id is None:
+                dimension = await datamanagers.kb.get_matryoshka_vector_dimension(
+                    self.txn, kbid=self.kb.kbid
+                )
+            else:
+                config = await datamanagers.vectorsets.get(
+                    self.txn, kbid=self.kb.kbid, vectorset_id=vectorset_id
+                )
+                if config is None:
+                    # TODO: should we create the vectorset here?
+                    raise ValueError(
+                        f"Trying to apply a resource on vectorset '{vectorset_id}' that doesn't exist"
+                    )
+                dimension = config.vectorset_index_config.vector_dimension
+                if not dimension:
+                    raise ValueError(
+                        f"Vector dimension not set for vectorset '{vectorset_id}'"
+                    )
+
             apply_field_vectors_partial = partial(
                 self.indexer.apply_field_vectors,
                 field_key,
                 vo,
+                vectorset=vectorset_id,
                 replace_field=replace_field_sentences,
                 replace_splits=replace_splits_sentences,
                 matryoshka_vector_dimension=dimension,
