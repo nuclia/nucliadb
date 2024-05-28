@@ -23,19 +23,19 @@ fmt-check-package: check-rustfmt
 protos: proto-py proto-rust
 
 proto-py:
-	python -m grpc_tools.protoc nucliadb_protos/noderesources.proto -I ./ --python_out=./nucliadb_protos/python/ --mypy_out=./nucliadb_protos/python/
-	python -m grpc_tools.protoc nucliadb_protos/utils.proto         -I ./ --python_out=./nucliadb_protos/python/ --mypy_out=./nucliadb_protos/python/
-	python -m grpc_tools.protoc nucliadb_protos/resources.proto     -I ./ --python_out=./nucliadb_protos/python/ --mypy_out=./nucliadb_protos/python/
-	python -m grpc_tools.protoc nucliadb_protos/knowledgebox.proto  -I ./ --python_out=./nucliadb_protos/python/ --mypy_out=./nucliadb_protos/python/
-	python -m grpc_tools.protoc nucliadb_protos/audit.proto 		-I ./ --python_out=./nucliadb_protos/python/ --mypy_out=./nucliadb_protos/python/
-	python -m grpc_tools.protoc nucliadb_protos/nodewriter.proto    -I ./ --python_out=./nucliadb_protos/python/ --mypy_out=./nucliadb_protos/python/ --grpc_python_out=./nucliadb_protos/python/ --mypy_grpc_out=./nucliadb_protos/python/
-	python -m grpc_tools.protoc nucliadb_protos/nodereader.proto    -I ./ --python_out=./nucliadb_protos/python/ --mypy_out=./nucliadb_protos/python/ --grpc_python_out=./nucliadb_protos/python/ --mypy_grpc_out=./nucliadb_protos/python/
-	python -m grpc_tools.protoc nucliadb_protos/writer.proto        -I ./ --python_out=./nucliadb_protos/python/ --mypy_out=./nucliadb_protos/python/ --grpc_python_out=./nucliadb_protos/python/ --mypy_grpc_out=./nucliadb_protos/python/
-	python -m grpc_tools.protoc nucliadb_protos/train.proto         -I ./ --python_out=./nucliadb_protos/python/ --mypy_out=./nucliadb_protos/python/ --grpc_python_out=./nucliadb_protos/python/ --mypy_grpc_out=./nucliadb_protos/python/
-	python -m grpc_tools.protoc nucliadb_protos/dataset.proto       -I ./ --python_out=./nucliadb_protos/python/ --mypy_out=./nucliadb_protos/python/
-	python -m grpc_tools.protoc nucliadb_protos/migrations.proto    -I ./ --python_out=./nucliadb_protos/python/ --mypy_out=./nucliadb_protos/python/
-	python -m grpc_tools.protoc nucliadb_protos/standalone.proto    -I ./ --python_out=./nucliadb_protos/python/ --mypy_out=./nucliadb_protos/python/ --grpc_python_out=./nucliadb_protos/python/ --mypy_grpc_out=./nucliadb_protos/python/
-	python -m grpc_tools.protoc nucliadb_protos/replication.proto    -I ./ --python_out=./nucliadb_protos/python/ --mypy_out=./nucliadb_protos/python/ --grpc_python_out=./nucliadb_protos/python/ --mypy_grpc_out=./nucliadb_protos/python/
+	python -m grpc_tools.protoc nucliadb_protos/noderesources.proto -I ./ --python_out=./nucliadb_protos/python/src/ --mypy_out=./nucliadb_protos/python/src/
+	python -m grpc_tools.protoc nucliadb_protos/utils.proto         -I ./ --python_out=./nucliadb_protos/python/src/ --mypy_out=./nucliadb_protos/python/src/
+	python -m grpc_tools.protoc nucliadb_protos/resources.proto     -I ./ --python_out=./nucliadb_protos/python/src/ --mypy_out=./nucliadb_protos/python/src/
+	python -m grpc_tools.protoc nucliadb_protos/knowledgebox.proto  -I ./ --python_out=./nucliadb_protos/python/src/ --mypy_out=./nucliadb_protos/python/src/
+	python -m grpc_tools.protoc nucliadb_protos/audit.proto 		-I ./ --python_out=./nucliadb_protos/python/src/ --mypy_out=./nucliadb_protos/python/src/
+	python -m grpc_tools.protoc nucliadb_protos/nodewriter.proto    -I ./ --python_out=./nucliadb_protos/python/src/ --mypy_out=./nucliadb_protos/python/src/ --grpc_python_out=./nucliadb_protos/python/src/ --mypy_grpc_out=./nucliadb_protos/python/src/
+	python -m grpc_tools.protoc nucliadb_protos/nodereader.proto    -I ./ --python_out=./nucliadb_protos/python/src/ --mypy_out=./nucliadb_protos/python/src/ --grpc_python_out=./nucliadb_protos/python/src/ --mypy_grpc_out=./nucliadb_protos/python/src/
+	python -m grpc_tools.protoc nucliadb_protos/writer.proto        -I ./ --python_out=./nucliadb_protos/python/src/ --mypy_out=./nucliadb_protos/python/src/ --grpc_python_out=./nucliadb_protos/python/src/ --mypy_grpc_out=./nucliadb_protos/python/src/
+	python -m grpc_tools.protoc nucliadb_protos/train.proto         -I ./ --python_out=./nucliadb_protos/python/src/ --mypy_out=./nucliadb_protos/python/src/ --grpc_python_out=./nucliadb_protos/python/src/ --mypy_grpc_out=./nucliadb_protos/python/src/
+	python -m grpc_tools.protoc nucliadb_protos/dataset.proto       -I ./ --python_out=./nucliadb_protos/python/src/ --mypy_out=./nucliadb_protos/python/src/
+	python -m grpc_tools.protoc nucliadb_protos/migrations.proto    -I ./ --python_out=./nucliadb_protos/python/src/ --mypy_out=./nucliadb_protos/python/src/
+	python -m grpc_tools.protoc nucliadb_protos/standalone.proto    -I ./ --python_out=./nucliadb_protos/python/src/ --mypy_out=./nucliadb_protos/python/src/ --grpc_python_out=./nucliadb_protos/python/src/ --mypy_grpc_out=./nucliadb_protos/python/src/
+	python -m grpc_tools.protoc nucliadb_protos/replication.proto    -I ./ --python_out=./nucliadb_protos/python/src/ --mypy_out=./nucliadb_protos/python/src/ --grpc_python_out=./nucliadb_protos/python/src/ --mypy_grpc_out=./nucliadb_protos/python/src/
 
 proto-rust:
 	cargo build --locked -p nucliadb_protos
@@ -51,7 +51,7 @@ python-code-lint:
 	make -C nucliadb_dataset/ format
 	make -C nucliadb_models/ format
 	make -C nucliadb_sdk/ format
-	make -C nucliadb_node/ format
+	make -C nucliadb_sidecar/ format
 	make -C nucliadb_node_binding/ format
 	make -C nucliadb_utils/ format
 	make -C nucliadb/ format
@@ -64,7 +64,7 @@ python-code-lint:
 	make -C nucliadb_sdk/ lint
 	make -C nucliadb_dataset/ lint
 	make -C nucliadb_models/ lint
-	make -C nucliadb_node/ lint
+	make -C nucliadb_sidecar/ lint
 	make -C nucliadb_node_binding/ lint
 	make -C nucliadb_performance/ lint
 

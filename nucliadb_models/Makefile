@@ -15,7 +15,7 @@ format:
 
 .PHONY: lint
 lint:
-	flake8 nucliadb_models --config=setup.cfg
+	flake8 . --config=setup.cfg
 	cd .. && isort -c --profile black nucliadb_models
 	black --check .
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini .

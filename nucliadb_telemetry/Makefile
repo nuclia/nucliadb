@@ -20,15 +20,15 @@ format:
 
 .PHONY: lint
 lint:
-	flake8 nucliadb_telemetry --config=setup.cfg
+	flake8 . --config=setup.cfg
 	cd .. && isort -c --profile black nucliadb_telemetry
 	black --check .
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini . --show-traceback
 
 .PHONY: test
 test:
-	pytest -s --tb=native -v nucliadb_telemetry
+	pytest -s --tb=native -v tests
 
 .PHONY: test-cov
 test-cov:
-	pytest -rfE --cov=nucliadb_telemetry --cov-config=../.coveragerc -s --tb=native -v --cov-report term-missing:skip-covered --cov-report xml nucliadb_telemetry
+	pytest -rfE --cov=nucliadb_telemetry --cov-config=../.coveragerc -s --tb=native -v --cov-report term-missing:skip-covered --cov-report xml tests

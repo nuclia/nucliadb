@@ -20,6 +20,7 @@ on:
       - "nucliadb_models/**"
       - "nucliadb_protos/**"
       - "nucliadb_node/**"
+      - "nucliadb_sidecar/**"
       - "nucliadb_vectors/**"
       - "nucliadb_texts/**"
       - "nucliadb_texts2/**"
@@ -120,7 +121,7 @@ jobs:
               - 'nucliadb_texts2/**'
               - 'nucliadb_vectors/**'
             sidecar_modified:
-              - 'nucliadb_node/nucliadb_node/**'
+              - 'nucliadb_sidecar/**'
 
       - name: Calc git info
         id: git

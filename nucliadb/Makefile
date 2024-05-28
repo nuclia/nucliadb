@@ -1,4 +1,4 @@
-subpackages := standalone reader search train writer ingest
+subpackages := nucliadb standalone reader search train writer ingest
 
 format_target_prefix := format-
 lint_target_prefix := lint-
@@ -53,14 +53,14 @@ freeze-requirements:
 format:
 	cd .. && isort --profile black nucliadb
 	black .
-	ruff check --fix --config=../ruff.toml nucliadb/
+	ruff check --fix --config=../ruff.toml .
 
 $(format_subpackages_targets):
 
 
 .PHONY: lint
 lint:
-	ruff check nucliadb --config=../ruff.toml
+	ruff check . --config=../ruff.toml
 	cd .. && isort -c --profile black nucliadb
 	black --check .
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini .
@@ -70,18 +70,7 @@ $(lint_subpackages_targets):
 # pytest doesn't support test discovery across our multiple "top-level folders"
 # so we need to run all test targets one by one
 .PHONY: test-all
-test-all: test-nucliadb $(test_subpackages_targets)
-
-test-nucliadb:
-	$(PYTEST) nucliadb/tests
-
-test-cov-nucliadb:
-	$(PYTEST) \
-		--cov-config=../.coveragerc \
-		--cov-report xml \
-		--cov-report term-missing:skip-covered \
-		--cov-append \
-		nucliadb/tests
+test-all: $(test_subpackages_targets)
 
 $(test_subpackages_targets):
 
@@ -96,13 +85,13 @@ format-%:
 	ruff check --fix nucliadb/$* --config=../ruff.toml
 
 lint-%:
-	ruff check nucliadb/$* --config=../ruff.toml
-	cd .. && isort -c --profile black nucliadb/nucliadb/$*
-	black --check nucliadb/$*
-	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini nucliadb/$*
+	ruff check src/nucliadb/$* --config=../ruff.toml
+	cd .. && isort -c --profile black nucliadb/src/nucliadb/$*
+	black --check src/nucliadb/$*
+	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini src/nucliadb/$*
 
 test-%:
-	$(PYTEST) nucliadb/$*/tests
+	$(PYTEST) tests/$*
 
 test-cov-%:
 	$(PYTEST) \
@@ -111,4 +100,4 @@ test-cov-%:
 		--cov-report xml \
 		--cov-report term-missing:skip-covered \
 		--cov-append \
-		nucliadb/$*/tests
+		tests/$*

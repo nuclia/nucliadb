@@ -16,11 +16,11 @@ format:
 
 .PHONY: lint
 lint:
-	flake8 nucliadb_dataset --config=setup.cfg
+	flake8 . --config=setup.cfg
 	cd .. && isort -c --profile black nucliadb_dataset
 	black --check .
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini .
 
 .PHONY: test
 test:
-	pytest -rfE --cov=nucliadb_dataset -s --tb=native -v --cov-report xml --cov-append nucliadb_dataset
+	pytest -rfE --cov=nucliadb_dataset -s --tb=native -v --cov-report xml --cov-append tests

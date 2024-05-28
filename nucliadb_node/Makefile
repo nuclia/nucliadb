@@ -4,8 +4,8 @@ install-dev: check-system
 	cd .. && pip install \
 		-r test-requirements.txt \
 		-r code-requirements.txt \
-		-r nucliadb_node/requirements-sources.txt \
-		-r nucliadb_node/requirements.txt
+		-r nucliadb_sidecar/requirements-sources.txt \
+		-r nucliadb_sidecar/requirements.txt
 	pip install -e .
 
 .PHONY: check-system
@@ -15,23 +15,23 @@ check-system:
 
 .PHONY: format
 format:
-	cd .. && isort --profile black nucliadb_node
+	cd .. && isort --profile black nucliadb_sidecar
 	black .
 
 .PHONY: lint
 lint:
-	flake8 nucliadb_node --config=setup.cfg
-	cd .. && isort -c --profile black nucliadb_node
+	flake8 . --config=setup.cfg
+	cd .. && isort -c --profile black nucliadb_sidecar
 	black --check .
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini .
 
 .PHONY: test
 test:
-	pytest -s --tb=native -v nucliadb_node
+	pytest -s --tb=native -v nucliadb_sidecar
 
 .PHONY: test-cov
 test-cov:
-	pytest -rfE --cov=nucliadb_node --cov-config=../.coveragerc -s --tb=native -v --cov-report term-missing:skip-covered --cov-report xml nucliadb_node
+	pytest -rfE --cov=nucliadb_sidecar --cov-config=../.coveragerc -s --tb=native -v --cov-report term-missing:skip-covered --cov-report xml nucliadb_sidecar
 
 .PHONY: build
 build:

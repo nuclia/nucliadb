@@ -80,9 +80,9 @@ jobs:
       - name: Run pre-checks
         run: |
           pip install -r code-requirements.txt
-          isort -c --profile black nucliadb_node
-          cd nucliadb_node
-          flake8 nucliadb_node --config=setup.cfg
+          isort -c --profile black nucliadb_sidecar
+          cd nucliadb_sidecar
+          flake8 src/nucliadb_sidecar --config=setup.cfg
           black --check .
 
   mypy-check:
@@ -103,7 +103,7 @@ jobs:
           key: venv-${{ github.sha }}
           fail-on-cache-miss: true
       - name: Run mypy
-        run: pdm run mypy nucliadb_node
+        run: pdm run mypy nucliadb_sidecar
 
   licenses:
     name: Check Licenses
@@ -180,7 +180,7 @@ jobs:
         run: mkdir builds && mv target/release/node_* builds && docker build -t europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node:latest -f Dockerfile.node_prebuilt .
 
       - name: Run tests
-        run: .venv/bin/pytest -rfE --cov=nucliadb_node -s --tb=native -v --cov-report xml --cov-append nucliadb_node/nucliadb_node
+        run: source .venv/bin/activate && make -C nucliadb_sidecar test-cov
 
 
   node-rust-tests:
