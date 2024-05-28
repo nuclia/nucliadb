@@ -174,7 +174,7 @@ class TestPostgresFileDataLayer:
         connection.fetchrow.return_value = record
         assert await data_layer.get_file_info(
             kb_id="kb_id", file_id="file_id"
-        ) == ObjectInfo(
+        ) == pg.FileInfo(
             filename=record["filename"],  # type: ignore
             size=record["size"],  # type: ignore
             content_type=record["content_type"],  # type: ignore
@@ -258,7 +258,6 @@ class TestPostgresFileDataLayer:
                 filename="filename",
                 size=1,
                 content_type="content_type",
-                key="file_id",
             )
 
         connection.cursor.assert_called_once_with(ANY, "kb_id", "prefix%")
