@@ -270,6 +270,28 @@ pub struct VectorSets {
         VectorSet,
     >,
 }
+/// Configuration values for a vectorset
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct VectorSetConfig {
+    #[prost(string, tag = "1")]
+    pub vectorset_id: ::prost::alloc::string::String,
+    #[prost(message, optional, tag = "2")]
+    pub vectorset_index_config: ::core::option::Option<
+        super::nodewriter::VectorIndexConfig,
+    >,
+    /// list of possible subdivisions of the matryoshka embeddings (if the model
+    /// supports it)
+    #[prost(uint32, repeated, tag = "3")]
+    pub matryoshka_dimensions: ::prost::alloc::vec::Vec<u32>,
+}
+/// KB vectorsets and their configuration
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct KnowledgeBoxVectorSetsConfig {
+    #[prost(message, repeated, tag = "1")]
+    pub vectorsets: ::prost::alloc::vec::Vec<VectorSetConfig>,
+}
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct TermSynonyms {

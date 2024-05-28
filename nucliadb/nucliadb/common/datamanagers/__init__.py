@@ -39,6 +39,7 @@ from . import (
     resources,
     rollover,
     synonyms,
+    vectorsets,
 )
 from .utils import with_transaction
 
@@ -53,5 +54,6 @@ __all__ = (
     "resources",
     "rollover",
     "synonyms",
+    "vectorsets",
     "with_transaction",
 )
