@@ -81,6 +81,9 @@ class ObjectMetadata:
         lowercase = {k.lower(): v for k, v in decoded.items()}
         return cls(**lowercase)
 
+    def to_dict(self) -> dict[str, Any]:
+        return dataclasses.asdict(self)
+
 
 class StorageField(abc.ABC, metaclass=abc.ABCMeta):
     storage: Storage

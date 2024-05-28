@@ -147,16 +147,16 @@ class LocalStorageField(StorageField):
 
         init_url = self.storage.get_file_path(self.bucket, upload_uri)
         metadata_init_url = self.metadata_key(init_url)
-        object_metadata = ObjectMetadata()
-
-        metadata = json.dumps(
-            {"FILENAME": cf.filename, "SIZE": cf.size, "CONTENT_TYPE": cf.content_type}
+        object_metadata = ObjectMetadata(
+            filename=cf.filename,
+            content_type=cf.content_type,
+            size=cf.size,
         )
-
+        raw_metadata = json.dumps(object_metadata.to_dict())
         path_to_create = os.path.dirname(metadata_init_url)
         os.makedirs(path_to_create, exist_ok=True)
         async with aiofiles.open(metadata_init_url, "w+") as resp:
-            await resp.write(metadata)
+            await resp.write(raw_metadata)
 
         self._handler = await aiofiles.threadpool.open(init_url, "wb+")
         field.offset = 0
