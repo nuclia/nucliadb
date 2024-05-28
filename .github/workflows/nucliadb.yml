@@ -27,7 +27,7 @@ jobs:
     uses: ./.github/workflows/_component_prechecks.yml
     with:
       component: "nucliadb"
-      python_version: "3.11"
+      python_version: "3.12"
 
   # Job to run Python tests
   tests:
@@ -37,7 +37,7 @@ jobs:
     strategy:
       max-parallel: 6
       matrix:
-        python-version: ["3.11"]
+        python-version: ["3.12"]
         maindb_driver: ["tikv", "tikv_2", "tikv_3", "pg", "pg_2", "pg_3"]
     steps:
       - name: Checkout the repository

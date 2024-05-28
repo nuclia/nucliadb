@@ -149,9 +149,8 @@ impl VectorWriter for VectorWriterService {
         if !elems.is_empty() {
             let location = self.index.location();
             let time = Some(temporal_mark);
-            let similarity = self.index.config().similarity;
             let data_point_pin = DataPointPin::create_pin(location)?;
-            data_point::create(&data_point_pin, elems, time, similarity)?;
+            data_point::create(&data_point_pin, elems, time, self.index.config())?;
             self.index.add_data_point(data_point_pin)?;
         }
 

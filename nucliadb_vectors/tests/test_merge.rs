@@ -40,20 +40,19 @@ fn test_concurrent_merge_delete() -> NodeResult<()> {
     let workdir = tempdir()?;
     let index_path = workdir.path().join("vectors");
     let config = VectorConfig::default();
-    let similarity = config.similarity;
-    let mut writer = Writer::new(&index_path, config, "abc".into())?;
+    let mut writer = Writer::new(&index_path, config.clone(), "abc".into())?;
 
     let now = SystemTime::now();
     let past = now - Duration::from_secs(5);
 
     // Create two segments
     let data_point_pin = DataPointPin::create_pin(&index_path)?;
-    data_point::create(&data_point_pin, vec![elem(0)], Some(past), similarity)?;
+    data_point::create(&data_point_pin, vec![elem(0)], Some(past), &config)?;
     writer.add_data_point(data_point_pin)?;
     writer.commit()?;
 
     let data_point_pin = DataPointPin::create_pin(&index_path)?;
-    data_point::create(&data_point_pin, vec![elem(1)], Some(past), similarity)?;
+    data_point::create(&data_point_pin, vec![elem(1)], Some(past), &config)?;
     writer.add_data_point(data_point_pin)?;
     writer.commit()?;
 

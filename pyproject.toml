@@ -15,7 +15,7 @@ dev = [
     # Linting
     "mypy-protobuf>=3.6.0",
     "mypy==1.10",
-    "flake8==4.0.1",
+    "flake8==7.0.0",
     "ruff==0.3.5",
     "black==24.3.0",
     "isort==5.10.1",
@@ -37,7 +37,7 @@ dev = [
     "pytest-mock",
     "faker>=25.1.0",
     "grpc-stubs>=1.44.0",
-    "aioresponses==0.7.5",
+    "aioresponses",
     "asyncpg>=0.27.0",
     "psycopg2-binary",
     "httpx>=0.23.0",
@@ -48,6 +48,8 @@ dev = [
     "pytest-rerunfailures>=11.1.2",
     "pytest-shard",
     "jsonschema",
+    "pytest-xdist>=3.6.1",
+    "pdbpp>=0.10.3",
 ]
 
 [tool.setuptools]

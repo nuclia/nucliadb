@@ -27,7 +27,7 @@ from typing import Optional
 from nucliadb.common import datamanagers, locking
 from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.common.context import ApplicationContext
-from nucliadb_protos import writer_pb2
+from nucliadb_protos import nodewriter_pb2, writer_pb2
 from nucliadb_telemetry import errors
 
 from .manager import get_index_node
@@ -105,12 +105,17 @@ async def create_rollover_shards(
                         logger.error(f"Node {node_id} is not found or not available")
                         continue
                     is_matryoshka = len(kb_shards.model.matryoshka_dimensions) > 0
+                    vector_index_config = nodewriter_pb2.VectorIndexConfig(
+                        similarity=kb_shards.similarity,
+                        vector_type=nodewriter_pb2.VectorType.DENSE_F32,
+                        vector_dimension=kb_shards.model.vector_dimension,
+                        normalize_vectors=is_matryoshka,
+                    )
                     try:
                         shard_created = await node.new_shard(
                             kbid,
-                            similarity=kb_shards.similarity,
                             release_channel=kb_shards.release_channel,
-                            normalize_vectors=is_matryoshka,
+                            vector_index_config=vector_index_config,
                         )
                     except Exception as e:
                         errors.capture_exception(e)

@@ -183,7 +183,7 @@ class OpenTelemetryServerInterceptor(aio.ServerInterceptor):
 
                 except Exception as error:
                     # pylint:disable=unidiomatic-typecheck
-                    if type(error) != Exception:
+                    if not isinstance(error, Exception):
                         span.record_exception(error)
                     raise error
 
@@ -232,7 +232,7 @@ class OpenTelemetryServerInterceptor(aio.ServerInterceptor):
                             # we handle in our context wrapper.
                             # Here, we're interested in uncaught exceptions.
                             # pylint:disable=unidiomatic-typecheck
-                            if type(error) != Exception:
+                            if not isinstance(error, Exception):
                                 span.record_exception(error)
                             raise error
                 return value
@@ -261,7 +261,7 @@ class UnaryUnaryClientInterceptor(aio.UnaryUnaryClientInterceptor):
         try:
             call = await continuation(client_call_details, request)
         except Exception as error:
-            if type(error) != Exception:
+            if not isinstance(error, Exception):
                 set_span_exception(span, error)
             raise error
         else:
@@ -286,7 +286,7 @@ class UnaryStreamClientInterceptor(aio.UnaryStreamClientInterceptor):
         try:
             call = await continuation(client_call_details, request)
         except Exception as error:
-            if type(error) != Exception:
+            if not isinstance(error, Exception):
                 set_span_exception(span, error)
             raise error
         else:
@@ -311,7 +311,7 @@ class StreamStreamClientInterceptor(aio.StreamStreamClientInterceptor):
         try:
             call = await continuation(client_call_details, request_iterator)
         except Exception as error:
-            if type(error) != Exception:
+            if not isinstance(error, Exception):
                 set_span_exception(span, error)
             raise error
         else:
@@ -336,7 +336,7 @@ class StreamUnaryClientInterceptor(aio.StreamUnaryClientInterceptor):
         try:
             call = await continuation(client_call_details, request_iterator)
         except Exception as error:
-            if type(error) != Exception:
+            if not isinstance(error, Exception):
                 set_span_exception(span, error)
             raise error
         else:

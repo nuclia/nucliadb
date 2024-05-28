@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.9", "3.10", "3.11"]
+        python-version: ["3.9", "3.12"]
 
     steps:
       - name: Checkout the repository
@@ -51,13 +51,13 @@ jobs:
         include:
           - maindb_driver: "tikv"
             storage_backend: "gcs"
-            python-version: "3.11"
+            python-version: "3.12"
           - maindb_driver: "tikv"
             storage_backend: "s3"
-            python-version: "3.11"
+            python-version: "3.12"
           - maindb_driver: "pg"
             storage_backend: "gcs"
-            python-version: "3.11"
+            python-version: "3.12"
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v3

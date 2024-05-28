@@ -22,6 +22,7 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 from httpx import AsyncClient
 
+from nucliadb.ingest.tests.vectors import Q
 from nucliadb_models.search import Ner, QueryInfo, SentenceSearch, TokenSearch
 from nucliadb_utils.utilities import Utility, set_utility
 
@@ -46,7 +47,7 @@ async def test_autofilters_are_returned(
                 ],
                 time=0.1,
             ),
-            sentence=SentenceSearch(data=[0.1, 0.2, 0.3], time=0.1),
+            sentence=SentenceSearch(data=Q, time=0.1),
             visual_llm=False,
             max_context=10000,
             query="What relates Newton and Becquer?",

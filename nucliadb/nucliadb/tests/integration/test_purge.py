@@ -34,7 +34,7 @@ from nucliadb.ingest.orm.knowledgebox import (
 from nucliadb.purge import purge_kb, purge_kb_storage
 from nucliadb.purge.orphan_shards import detect_orphan_shards, purge_orphan_shards
 from nucliadb_models.resource import ReleaseChannel
-from nucliadb_protos import utils_pb2, writer_pb2
+from nucliadb_protos import nodewriter_pb2, utils_pb2, writer_pb2
 from nucliadb_utils.storages.storage import Storage
 
 
@@ -205,9 +205,13 @@ async def test_purge_orphan_shard_detection(
     node = random.choice(available_nodes)
     orphan_shard = await node.new_shard(
         kbid="deleted-kb",
-        similarity=utils_pb2.VectorSimilarity.COSINE,
         release_channel=utils_pb2.ReleaseChannel.STABLE,
-        normalize_vectors=False,
+        vector_index_config=nodewriter_pb2.VectorIndexConfig(
+            similarity=utils_pb2.VectorSimilarity.COSINE,
+            normalize_vectors=False,
+            vector_type=nodewriter_pb2.VectorType.DENSE_F32,
+            vector_dimension=128,
+        ),
     )
     orphan_shard_id = orphan_shard.id
 

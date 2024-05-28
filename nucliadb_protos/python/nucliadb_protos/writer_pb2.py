@@ -28,6 +28,18 @@ try:
   nucliadb__protos_dot_utils__pb2 = nucliadb__protos_dot_knowledgebox__pb2.nucliadb__protos_dot_utils__pb2
 except AttributeError:
   nucliadb__protos_dot_utils__pb2 = nucliadb__protos_dot_knowledgebox__pb2.nucliadb_protos.utils_pb2
+try:
+  nucliadb__protos_dot_nodewriter__pb2 = nucliadb__protos_dot_knowledgebox__pb2.nucliadb__protos_dot_nodewriter__pb2
+except AttributeError:
+  nucliadb__protos_dot_nodewriter__pb2 = nucliadb__protos_dot_knowledgebox__pb2.nucliadb_protos.nodewriter_pb2
+try:
+  nucliadb__protos_dot_noderesources__pb2 = nucliadb__protos_dot_knowledgebox__pb2.nucliadb__protos_dot_noderesources__pb2
+except AttributeError:
+  nucliadb__protos_dot_noderesources__pb2 = nucliadb__protos_dot_knowledgebox__pb2.nucliadb_protos.noderesources_pb2
+try:
+  nucliadb__protos_dot_utils__pb2 = nucliadb__protos_dot_knowledgebox__pb2.nucliadb__protos_dot_utils__pb2
+except AttributeError:
+  nucliadb__protos_dot_utils__pb2 = nucliadb__protos_dot_knowledgebox__pb2.nucliadb_protos.utils_pb2
 from nucliadb_protos import audit_pb2 as nucliadb__protos_dot_audit__pb2
 
 from nucliadb_protos.noderesources_pb2 import *

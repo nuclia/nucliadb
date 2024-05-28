@@ -23,7 +23,7 @@ jobs:
 
       - uses: actions/setup-python@v4
         with:
-          python-version: 3.11
+          python-version: 3.12
 
       - name: Setup env
         run: |
@@ -33,7 +33,7 @@ jobs:
       - name: Set dependency versions in requirements
         run: |
           python bump.py --build=${{github.run_number}}
-      
+
       - uses: dorny/paths-filter@v2
         id: component_changes
         with:
@@ -71,7 +71,7 @@ jobs:
         if: steps.component_changes.outputs.nucliadb_utils == 'true'
         with:
           ref: main
-          check-name: NucliaDBUtilsTests (3.11)
+          check-name: NucliaDBUtilsTests (3.12)
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           wait-interval: 10
       - name: Wait for sdk tests
@@ -79,7 +79,7 @@ jobs:
         if: steps.component_changes.outputs.nucliadb_sdk == 'true'
         with:
           ref: main
-          check-name: NucliaDBSDKTests (3.11)
+          check-name: NucliaDBSDKTests (3.12)
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           wait-interval: 10
       - name: Wait for dataset tests
@@ -87,7 +87,7 @@ jobs:
         if: steps.component_changes.outputs.nucliadb_dataset == 'true'
         with:
           ref: main
-          check-name: NucliaDBDatasetTests (3.11)
+          check-name: NucliaDBDatasetTests (3.12)
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           wait-interval: 10
       - name: Wait for telemetry tests
@@ -95,14 +95,14 @@ jobs:
         if: steps.component_changes.outputs.nucliadb_telemetry == 'true'
         with:
           ref: main
-          check-name: NucliaDBTelemetryTests (3.11)
+          check-name: NucliaDBTelemetryTests (3.12)
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           wait-interval: 10
       - name: Wait for nucliadb tests
         uses: lewagon/wait-on-check-action@v1.3.1
         with:
           ref: main
-          check-name: NucliaDBTests (3.11, pg)
+          check-name: NucliaDBTests (3.12, pg)
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           wait-interval: 10
 
@@ -120,7 +120,7 @@ jobs:
       #     repository: nuclia/nuclia.py
       #     event-type: test-stage
       #     client-payload: '{"component": "nucliadb", "commit": "${{ github.sha }}", "user": "${{ github.actor }}"}'
-  
+
   push-docker:
     name: Build and push nucliadb docker image
     runs-on: ubuntu-latest

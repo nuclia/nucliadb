@@ -39,6 +39,7 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb.common.cluster import rollover
 from nucliadb.common.context import ApplicationContext
+from nucliadb.ingest.tests.vectors import V1, V2, Q
 from nucliadb.tests.utils import broker_resource, inject_message
 from nucliadb_models.labels import LabelSetKind
 from nucliadb_models.search import MinScore
@@ -148,11 +149,11 @@ def broker_message_with_entities(kbid):
     p1vec = Vector()
     p1vec.start = p1vec.start_paragraph = par1.start
     p1vec.end = p1vec.end_paragraph = par1.end
-    p1vec.vector.extend([1, 1, 1])
+    p1vec.vector.extend(V1)
     p2vec = Vector()
     p2vec.start = p2vec.start_paragraph = par2.start
     p2vec.end = p2vec.end_paragraph = par2.end
-    p2vec.vector.extend([2, 2, 2])
+    p2vec.vector.extend(V2)
     evw.vectors.vectors.vectors.append(p1vec)
     evw.vectors.vectors.vectors.append(p2vec)
     bm.field_vectors.append(evw)
@@ -244,13 +245,13 @@ def broker_message_with_labels(kbid):
     p1vec = Vector()
     p1vec.start = p1vec.start_paragraph = par1.start
     p1vec.end = p1vec.end_paragraph = par1.end
-    p1vec.vector.extend([1, 1, 1])
+    p1vec.vector.extend(V1)
 
     p2vec = Vector()
     p2vec.start = p2vec.start_paragraph = par2.start
     p2vec.end = p2vec.end_paragraph = par2.end
     p2vec.start_paragraph
-    p2vec.vector.extend([2, 2, 2])
+    p2vec.vector.extend(V2)
     evw.vectors.vectors.vectors.append(p1vec)
     evw.vectors.vectors.vectors.append(p2vec)
     bm.field_vectors.append(evw)
@@ -370,7 +371,7 @@ async def _test_filtering(nucliadb_reader: AsyncClient, kbid: str, filters):
             query="",
             filters=filters,
             features=["paragraph", "vector"],
-            vector=[0.5, 0.5, 0.5],
+            vector=Q,
             min_score=MinScore(semantic=-1).dict(),
         ),
         timeout=None,

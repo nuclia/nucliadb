@@ -25,6 +25,7 @@ mod data_types;
 pub mod formula;
 pub mod service;
 mod utils;
+mod vector_types;
 
 use thiserror::Error;
 #[derive(Debug, Error)]

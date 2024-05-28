@@ -29,6 +29,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     KnowledgeBoxNew as KnowledgeBoxNew,
     KnowledgeBoxResponseStatus as KnowledgeBoxResponseStatus,
     KnowledgeBoxUpdate as KnowledgeBoxUpdate,
+    KnowledgeBoxVectorSetsConfig as KnowledgeBoxVectorSetsConfig,
     Label as Label,
     LabelSet as LabelSet,
     Labels as Labels,
@@ -40,6 +41,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     TermSynonyms as TermSynonyms,
     UpdateKnowledgeBoxResponse as UpdateKnowledgeBoxResponse,
     VectorSet as VectorSet,
+    VectorSetConfig as VectorSetConfig,
     VectorSets as VectorSets,
 )
 from nucliadb_protos.resources_pb2 import (

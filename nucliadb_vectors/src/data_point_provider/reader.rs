@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::data_point::{self, DataPointPin, OpenDataPoint, SearchParams};
+use crate::data_point::{self, DataPointPin, OpenDataPoint};
 pub use crate::data_point::{DpId, Neighbour};
 use crate::data_point_provider::state::read_state;
 use crate::data_point_provider::VectorConfig;
@@ -105,7 +105,7 @@ pub struct Reader {
     open_data_points: FxHashMap<DpId, OpenDataPoint>,
     delete_log: DTrie,
     number_of_embeddings: usize,
-    dimension: Option<u64>,
+    dimension: Option<usize>,
     state_last_modified: SystemTime,
 }
 
@@ -164,10 +164,6 @@ impl Reader {
     }
 
     pub fn search(&self, request: &dyn SearchRequest) -> VectorR<Vec<Neighbour>> {
-        let Some(dimension) = self.dimension else {
-            return Ok(Vec::with_capacity(0));
-        };
-
         let normalized_query;
         let query = if self.config.normalize_vectors {
             normalized_query = utils::normalize_vector(request.get_query());
@@ -176,11 +172,22 @@ impl Reader {
             request.get_query()
         };
 
-        if dimension != query.len() as u64 {
+        // Validate vector dimensions
+        let valid_dims = match self.config.vector_type {
+            crate::config::VectorType::DenseF32Unaligned => {
+                let Some(dimension) = self.dimension else {
+                    return Ok(Vec::with_capacity(0));
+                };
+                dimension == query.len()
+            }
+            crate::config::VectorType::DenseF32 {
+                dimension,
+            } => dimension == query.len(),
+        };
+        if !valid_dims {
             return Err(VectorErr::InconsistentDimensions);
         }
 
-        let similarity = self.config.similarity;
         let filter = request.get_filter();
         let with_duplicates = request.with_duplicates();
         let no_results = request.no_results();
@@ -193,18 +200,14 @@ impl Reader {
                 time: data_point_journal.time(),
                 dlog: &self.delete_log,
             };
-            // Skipping the formatter only because the search interface is quite bad right now.
-            #[rustfmt::skip] let partial_solution = open_data_point.search(
+            let partial_solution = open_data_point.search(
                 &delete_log,
                 query,
                 filter,
                 with_duplicates,
                 no_results,
-                SearchParams {
-                    similarity,
-                    min_score,
-                    dimension: dimension as usize,
-                }
+                &self.config,
+                min_score,
             );
             for candidate in partial_solution {
                 ffsv.add(candidate);
@@ -240,7 +243,7 @@ impl Reader {
         &self.config
     }
 
-    pub fn embedding_dimension(&self) -> Option<u64> {
+    pub fn embedding_dimension(&self) -> Option<usize> {
         self.dimension
     }
 
