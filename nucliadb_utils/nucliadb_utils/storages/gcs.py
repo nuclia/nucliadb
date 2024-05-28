@@ -26,7 +26,7 @@ import socket
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from datetime import datetime
-from typing import Any, AsyncGenerator, AsyncIterator, Dict, List, Optional
+from typing import AsyncGenerator, AsyncIterator, Dict, List, Optional
 from urllib.parse import quote_plus
 
 import aiohttp
@@ -444,11 +444,12 @@ class GCSStorageField(StorageField):
             if api_resp.status == 200:
                 data = await api_resp.json()
                 metadata = data.get("metadata") or {}
-                size = metadata.get("SIZE") or data.get("size") or 0
+                metadata = {k.lower(): v for k, v in metadata.items()}
+                size = metadata.get("size") or data.get("size") or 0
                 content_type = (
-                    metadata.get("CONTENT_TYPE") or data.get("contentType") or ""
+                    metadata.get("content_type") or data.get("contentType") or ""
                 )
-                filename = metadata.get("FILENAME") or key.split("/")[-1]
+                filename = metadata.get("filename") or key.split("/")[-1]
                 return ObjectMetadata(
                     filename=filename,
                     size=int(size),

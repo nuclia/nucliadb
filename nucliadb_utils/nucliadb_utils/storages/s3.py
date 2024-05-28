@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from contextlib import AsyncExitStack
 from datetime import datetime
-from typing import Any, AsyncGenerator, AsyncIterator, Optional
+from typing import AsyncGenerator, AsyncIterator, Optional
 
 import aiobotocore  # type: ignore
 import aiohttp

@@ -24,7 +24,7 @@ import json
 import os
 import shutil
 from datetime import datetime
-from typing import Any, AsyncGenerator, AsyncIterator, Dict, Optional
+from typing import AsyncGenerator, AsyncIterator, Dict, Optional
 
 import aiofiles
 from nucliadb_protos.resources_pb2 import CloudFile
@@ -202,7 +202,8 @@ class LocalStorageField(StorageField):
         metadata_path = self.metadata_key(file_path)
         if os.path.exists(metadata_path):
             async with aiofiles.open(metadata_path, "r") as metadata:
-                return ObjectMetadata.parse_raw(await metadata.read())
+                raw_metadata = await metadata.read()
+                return ObjectMetadata.model_validate_json(raw_metadata)
         return None
 
     async def upload(self, iterator: AsyncIterator, origin: CloudFile) -> CloudFile:

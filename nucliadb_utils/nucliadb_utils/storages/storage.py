@@ -20,9 +20,7 @@
 from __future__ import annotations
 
 import abc
-import dataclasses
 import hashlib
-import json
 import uuid
 from io import BytesIO
 from typing import (
@@ -42,6 +40,7 @@ from nucliadb_protos.noderesources_pb2 import Resource as BrainResource
 from nucliadb_protos.nodewriter_pb2 import IndexMessage
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.writer_pb2 import BrokerMessage
+from pydantic import BaseModel
 
 from nucliadb_utils import logger
 from nucliadb_utils.helpers import async_gen_lookahead
@@ -62,25 +61,17 @@ INDEXING_KEY = "index/{kb}/{shard}/{resource}/{txid}"
 MESSAGE_KEY = "message/{kbid}/{rid}/{mid}"
 
 
-@dataclasses.dataclass
-class ObjectInfo:
+class ObjectInfo(BaseModel):
     name: str
 
 
-@dataclasses.dataclass
-class ObjectMetadata:
+class ObjectMetadata(BaseModel):
     filename: str
     content_type: str
     size: int
 
-    @classmethod
-    def parse_raw(cls, raw: bytes) -> ObjectMetadata:
-        decoded = cast(dict, json.loads(raw))
-        lowercase = {k.lower(): v for k, v in decoded.items()}
-        return cls(**lowercase)
-
-    def to_dict(self) -> dict[str, Any]:
-        return dataclasses.asdict(self)
+    class Config:
+        case_insensitive = True
 
 
 class StorageField(abc.ABC, metaclass=abc.ABCMeta):
@@ -309,7 +300,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         elif file.source == self.source:
             # This is the case for NucliaDB hosted deployment (Nuclia's cloud deployment):
             # The data is already stored in the right place by the processing
-            logger.debug(f"[Nuclia hosted]")
+            logger.debug("[Nuclia hosted]")
             return file
         elif file.source == CloudFile.EXPORT:
             # This is for files coming from an export
