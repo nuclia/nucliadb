@@ -19,13 +19,13 @@ check-system:
 .PHONY: format
 format:
 	isort --profile black tests
-	black .
+	black tests
 
 .PHONY: lint
 lint:
 	flake8 tests --config=pyproject.toml
 	isort -c --profile black tests
-	black --check .
+	black --check tests
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini .
 
 .PHONY: test
