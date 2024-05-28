@@ -21,7 +21,6 @@ from unittest.mock import ANY, AsyncMock, MagicMock, call, patch
 import pytest
 from nucliadb_protos.resources_pb2 import CloudFile
 
-from nucliadb_utils.storages.storage import ObjectInfo
 from nucliadb_utils.storages import pg
 
 pytestmark = pytest.mark.asyncio
@@ -254,10 +253,11 @@ class TestPostgresFileDataLayer:
         )
 
         async for file_info in data_layer.iterate_kb("kb_id", "prefix"):
-            assert file_info == ObjectInfo(
+            assert file_info == pg.FileInfo(
                 filename="filename",
                 size=1,
                 content_type="content_type",
+                key="file_id",
             )
 
         connection.cursor.assert_called_once_with(ANY, "kb_id", "prefix%")

@@ -28,6 +28,7 @@ from nucliadb_protos.resources_pb2 import CloudFile
 
 from nucliadb_utils.storages.local import LocalStorageField
 from nucliadb_utils.storages.storage import (
+    ObjectInfo,
     Storage,
     StorageField,
     iter_and_add_size,
@@ -68,7 +69,7 @@ class StorageTest(Storage):
         return "bucket"
 
     async def iterate_objects(self, bucket_name, prefix):
-        yield {"name": "uri"}
+        yield ObjectInfo(name="uri")
 
     async def download(self, bucket_name, uri):
         br = BrainResource(labels=["label"])
