@@ -277,7 +277,9 @@ pub struct VectorSetConfig {
     #[prost(string, tag = "1")]
     pub vectorset_id: ::prost::alloc::string::String,
     #[prost(message, optional, tag = "2")]
-    pub index_config: ::core::option::Option<super::nodewriter::VectorIndexConfig>,
+    pub vectorset_index_config: ::core::option::Option<
+        super::nodewriter::VectorIndexConfig,
+    >,
     /// list of possible subdivisions of the matryoshka embeddings (if the model
     /// supports it)
     #[prost(uint32, repeated, tag = "3")]

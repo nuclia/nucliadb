@@ -677,11 +677,11 @@ class VectorSetConfig(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     VECTORSET_ID_FIELD_NUMBER: builtins.int
-    INDEX_CONFIG_FIELD_NUMBER: builtins.int
+    VECTORSET_INDEX_CONFIG_FIELD_NUMBER: builtins.int
     MATRYOSHKA_DIMENSIONS_FIELD_NUMBER: builtins.int
     vectorset_id: builtins.str
     @property
-    def index_config(self) -> nucliadb_protos.nodewriter_pb2.VectorIndexConfig: ...
+    def vectorset_index_config(self) -> nucliadb_protos.nodewriter_pb2.VectorIndexConfig: ...
     @property
     def matryoshka_dimensions(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
         """list of possible subdivisions of the matryoshka embeddings (if the model
@@ -692,11 +692,11 @@ class VectorSetConfig(google.protobuf.message.Message):
         self,
         *,
         vectorset_id: builtins.str = ...,
-        index_config: nucliadb_protos.nodewriter_pb2.VectorIndexConfig | None = ...,
+        vectorset_index_config: nucliadb_protos.nodewriter_pb2.VectorIndexConfig | None = ...,
         matryoshka_dimensions: collections.abc.Iterable[builtins.int] | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["index_config", b"index_config"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["index_config", b"index_config", "matryoshka_dimensions", b"matryoshka_dimensions", "vectorset_id", b"vectorset_id"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["vectorset_index_config", b"vectorset_index_config"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["matryoshka_dimensions", b"matryoshka_dimensions", "vectorset_id", b"vectorset_id", "vectorset_index_config", b"vectorset_index_config"]) -> None: ...
 
 global___VectorSetConfig = VectorSetConfig
 

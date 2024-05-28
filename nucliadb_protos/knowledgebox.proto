@@ -185,7 +185,7 @@ message VectorSets {
 message VectorSetConfig {
     string vectorset_id = 1;
 
-    nodewriter.VectorIndexConfig index_config = 2;
+    nodewriter.VectorIndexConfig vectorset_index_config = 2;
 
     // list of possible subdivisions of the matryoshka embeddings (if the model
     // supports it)
