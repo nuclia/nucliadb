@@ -203,7 +203,9 @@ class LocalStorageField(StorageField):
         if os.path.exists(metadata_path):
             async with aiofiles.open(metadata_path, "r") as metadata:
                 raw_metadata = await metadata.read()
-                return ObjectMetadata.model_validate_json(raw_metadata)
+                metadata_dict = json.loads(raw_metadata)
+                metadata_dict = {k.lower(): v for k, v in metadata_dict.items()}
+                return ObjectMetadata.model_validate(metadata_dict)
         return None
 
     async def upload(self, iterator: AsyncIterator, origin: CloudFile) -> CloudFile:

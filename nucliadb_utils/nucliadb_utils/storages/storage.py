@@ -70,9 +70,6 @@ class ObjectMetadata(BaseModel):
     content_type: str
     size: int
 
-    class Config:
-        case_insensitive = True
-
 
 class StorageField(abc.ABC, metaclass=abc.ABCMeta):
     storage: Storage
