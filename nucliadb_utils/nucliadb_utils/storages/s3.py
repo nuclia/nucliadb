@@ -437,8 +437,7 @@ class S3Storage(Storage):
         paginator = self._s3aioclient.get_paginator("list_objects")
         async for result in paginator.paginate(Bucket=bucket, Prefix=prefix):
             for item in result.get("Contents", []):
-                item["name"] = item["Key"]
-                yield item
+                yield ObjectInfo(name=item["Key"])
 
     async def create_kb(self, kbid: str):
         bucket_name = self.get_bucket_name(kbid)

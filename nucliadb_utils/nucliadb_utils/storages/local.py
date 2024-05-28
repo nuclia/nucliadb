@@ -152,7 +152,7 @@ class LocalStorageField(StorageField):
             content_type=cf.content_type,
             size=cf.size,
         )
-        raw_metadata = json.dumps(object_metadata.to_dict())
+        raw_metadata = json.dumps(object_metadata.model_dump())
         path_to_create = os.path.dirname(metadata_init_url)
         os.makedirs(path_to_create, exist_ok=True)
         async with aiofiles.open(metadata_init_url, "w+") as resp:
