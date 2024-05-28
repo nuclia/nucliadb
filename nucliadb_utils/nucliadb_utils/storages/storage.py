@@ -25,7 +25,6 @@ import hashlib
 import json
 import uuid
 from io import BytesIO
-from os import name
 from typing import (
     Any,
     AsyncGenerator,
@@ -35,7 +34,6 @@ from typing import (
     Optional,
     Tuple,
     Type,
-    TypedDict,
     Union,
     cast,
 )
