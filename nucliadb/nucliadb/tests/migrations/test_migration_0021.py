@@ -54,3 +54,29 @@ async def test_migration_0021(maindb_driver: Driver):
         assert (await txn.get(f"/kbs/{kbid}")) == b"my kb"
         assert (await txn.get(f"/kbs/{kbid}/vectorsets")) is None
         assert (await txn.get(f"/kbs/{kbid}/other")) == b"other data"
+
+
+@pytest.mark.asyncio
+async def test_migration_0021_kb_without_vectorset_key(maindb_driver: Driver):
+    execution_context = Mock()
+    execution_context.kv_driver = maindb_driver
+
+    kbid = str(uuid.uuid4())
+
+    # Create a bunch of deprecated vectorsets keys and add
+    async with maindb_driver.transaction() as txn:
+        await txn.set(f"/kbs/{kbid}", b"my kb")
+        await txn.set(f"/kbs/{kbid}/other", b"other data")
+        await txn.commit()
+
+    async with maindb_driver.transaction(read_only=True) as txn:
+        assert (await txn.get(f"/kbs/{kbid}")) == b"my kb"
+        assert (await txn.get(f"/kbs/{kbid}/vectorsets")) is None
+        assert (await txn.get(f"/kbs/{kbid}/other")) == b"other data"
+
+    await migration.module.migrate_kb(execution_context, kbid)
+
+    async with maindb_driver.transaction(read_only=True) as txn:
+        assert (await txn.get(f"/kbs/{kbid}")) == b"my kb"
+        assert (await txn.get(f"/kbs/{kbid}/vectorsets")) is None
+        assert (await txn.get(f"/kbs/{kbid}/other")) == b"other data"
