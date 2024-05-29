@@ -20,8 +20,9 @@
 
 """Migration #21
 
-Remove the old vectorsets maindb key to be able to reuse it with new data. The
-old key was: "/kbs/{kbid}/vectorsets"
+With the new vectorsets implementation, we need to store some information on
+maindb. As the key "/kbs/{kbid}/vectorsets" was already used at some point, this
+migration will ensure to overwrite the key and set the new value
 
 """
 import logging
@@ -40,6 +41,6 @@ async def migrate(context: ExecutionContext) -> None: ...
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
     key = f"/kbs/{kbid}/vectorsets"
     async with context.kv_driver.transaction() as txn:
-        logger.info(f"Removing vectorsets key: {key}")
-        await txn.delete(key)
+        logger.info(f"Overwriting vectorsets key", extra={"kbid": kbid})
+        await datamanagers.vectorsets.initialize(txn, kbid=kbid)
         await txn.commit()

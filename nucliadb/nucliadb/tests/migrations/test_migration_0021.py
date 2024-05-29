@@ -25,6 +25,7 @@ import pytest
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.migrator.models import Migration
 from nucliadb.tests.migrations import get_migration
+from nucliadb_protos import knowledgebox_pb2
 
 migration: Migration = get_migration(21)
 
@@ -52,7 +53,9 @@ async def test_migration_0021(maindb_driver: Driver):
 
     async with maindb_driver.transaction(read_only=True) as txn:
         assert (await txn.get(f"/kbs/{kbid}")) == b"my kb"
-        assert (await txn.get(f"/kbs/{kbid}/vectorsets")) is None
+        assert (
+            await txn.get(f"/kbs/{kbid}/vectorsets")
+        ) == knowledgebox_pb2.KnowledgeBoxVectorSetsConfig().SerializeToString()
         assert (await txn.get(f"/kbs/{kbid}/other")) == b"other data"
 
 
@@ -78,5 +81,7 @@ async def test_migration_0021_kb_without_vectorset_key(maindb_driver: Driver):
 
     async with maindb_driver.transaction(read_only=True) as txn:
         assert (await txn.get(f"/kbs/{kbid}")) == b"my kb"
-        assert (await txn.get(f"/kbs/{kbid}/vectorsets")) is None
+        assert (
+            await txn.get(f"/kbs/{kbid}/vectorsets")
+        ) == knowledgebox_pb2.KnowledgeBoxVectorSetsConfig().SerializeToString()
         assert (await txn.get(f"/kbs/{kbid}/other")) == b"other data"
