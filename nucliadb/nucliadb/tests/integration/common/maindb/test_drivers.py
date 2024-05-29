@@ -43,11 +43,12 @@ async def test_redis_driver(redis):
     await driver_basic(driver)
 
 
-@pytest.mark.flaky(reruns=5)
+# @pytest.mark.flaky(reruns=5)
 @pytest.mark.skipif(
     "tikv" not in TESTING_MAINDB_DRIVERS, reason="tikv not in TESTING_MAINDB_DRIVERS"
 )
 async def test_tikv_driver(tikvd):
+    breakpoint()
     url = [f"{tikvd[0]}:{tikvd[2]}"]
     driver = TiKVDriver(url=url)
     await driver_basic(driver)
