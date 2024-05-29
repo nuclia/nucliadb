@@ -38,6 +38,7 @@ from nucliadb.common.cluster.exceptions import (
 )
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb_protos import (
+    knowledgebox_pb2,
     nodereader_pb2,
     noderesources_pb2,
     nodewriter_pb2,
@@ -410,6 +411,16 @@ class KBShardManager:
         async with datamanagers.with_transaction() as txn:
             await self.create_shard_by_kbid(txn, kbid)
             await txn.commit()
+
+    async def create_vectorset(
+        self, kbid: str, config: knowledgebox_pb2.VectorSetConfig
+    ):
+        """Create a new vectorset in all KB shards."""
+        # TODO
+
+    async def delete_vectorset(self, kbid: str, vectorset_id: str):
+        """Delete a vectorset from all KB shards"""
+        # TODO
 
 
 class StandaloneKBShardManager(KBShardManager):
