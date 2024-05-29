@@ -26,6 +26,7 @@ from nucliadb.common.maindb.tikv import (
     LeaderNotFoundError,
     TiKVDataLayer,
     TikvTimeoutError,
+    TikvUnavailableError,
 )
 
 
@@ -35,6 +36,12 @@ from nucliadb.common.maindb.tikv import (
         (
             Exception("gRPC error: RpcFailure: 4-DEADLINE_EXCEEDED Deadline Exceeded"),
             TikvTimeoutError,
+        ),
+        (
+            Exception(
+                "gRPC error: RpcFailure: 14-UNAVAILABLE failed to connect to all addresses"
+            ),
+            TikvUnavailableError,
         ),
         (Exception("Leader of region 34234 is not found"), LeaderNotFoundError),
     ],
