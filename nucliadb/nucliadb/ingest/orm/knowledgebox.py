@@ -38,7 +38,7 @@ from nucliadb.common.cluster.manager import get_index_node
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.ingest import SERVICE_NAME, logger
-from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict
+from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict, VectorSetConflict
 from nucliadb.ingest.orm.resource import (
     KB_RESOURCE_SLUG,
     KB_RESOURCE_SLUG_BASE,
@@ -46,7 +46,7 @@ from nucliadb.ingest.orm.resource import (
 )
 from nucliadb.ingest.orm.utils import choose_matryoshka_dimension, compute_paragraph_key
 from nucliadb.migrator.utils import get_latest_version
-from nucliadb_protos import writer_pb2
+from nucliadb_protos import knowledgebox_pb2, writer_pb2
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_audit, get_storage
 
@@ -417,6 +417,23 @@ class KnowledgeBox:
                     uuid,
                     disable_vectors=False,
                 )
+
+    async def create_vectorset(self, config: knowledgebox_pb2.VectorSetConfig):
+        if await datamanagers.vectorsets.exists(
+            self.txn, kbid=self.kbid, vectorset_id=config.vectorset_id
+        ):
+            raise VectorSetConflict(f"Vectorset {config.vectorset_id} already exists")
+        await datamanagers.vectorsets.set(self.txn, kbid=self.kbid, config=config)
+        shard_manager = get_shard_manager()
+        await shard_manager.create_vectorset(self.kbid, config)
+
+    async def delete_vectorset(self, vectorset_id: str):
+        await datamanagers.vectorsets.delete(
+            self.txn, kbid=self.kbid, vectorset_id=vectorset_id
+        )
+        # TODO: delete or mark delete in storage
+        shard_manager = get_shard_manager()
+        await shard_manager.delete_vectorset(self.kbid, vectorset_id)
 
 
 def chunker(seq: Sequence, size: int):
