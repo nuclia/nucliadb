@@ -268,17 +268,18 @@ class ResourceBrain:
         for subfield, vectors in vo.split_vectors.items():
             # For each split of this field
             for index, vector in enumerate(vectors.vectors):
-                paragraph_key = ids.ParagraphId(
+                _field_id = ids.FieldId(
                     rid=self.rid,
                     field_id=field_id,
                     subfield_id=subfield,
+                )
+                paragraph_key = ids.ParagraphId(
+                    field_id=_field_id,
                     paragraph_start=vector.start_paragraph,
                     paragraph_end=vector.end_paragraph,
                 )
                 sentence_key = ids.VectorId(
-                    rid=self.rid,
-                    field_id=field_id,
-                    subfield_id=subfield,
+                    field_id=_field_id,
                     index=index,
                     vector_start=vector.start,
                     vector_end=vector.end,
@@ -293,15 +294,17 @@ class ResourceBrain:
                 )
 
         for index, vector in enumerate(vo.vectors.vectors):
-            paragraph_key = ids.ParagraphId(
+            _field_id = ids.FieldId(
                 rid=self.rid,
                 field_id=field_id,
+            )
+            paragraph_key = ids.ParagraphId(
+                field_id=_field_id,
                 paragraph_start=vector.start_paragraph,
                 paragraph_end=vector.end_paragraph,
             )
             sentence_key = ids.VectorId(
-                rid=self.rid,
-                field_id=field_id,
+                field_id=_field_id,
                 index=index,
                 vector_start=vector.start,
                 vector_end=vector.end,

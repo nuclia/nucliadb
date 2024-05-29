@@ -45,30 +45,22 @@ class FieldId:
 
 @dataclass
 class ParagraphId:
-    rid: str
-    field_id: str
+    field_id: FieldId
     paragraph_start: int
     paragraph_end: int
-    subfield_id: Optional[str] = None
 
     def full(self) -> str:
-        if self.subfield_id is None:
-            return f"{self.rid}/{self.field_id}/{self.paragraph_start}-{self.paragraph_end}"
-        else:
-            return f"{self.rid}/{self.field_id}/{self.subfield_id}/{self.paragraph_start}-{self.paragraph_end}"
+        return f"{self.field_id.full()}/{self.paragraph_start}-{self.paragraph_end}"
 
 
 @dataclass
 class VectorId:
-    rid: str
-    field_id: str
+    field_id: FieldId
     index: int
     vector_start: int
     vector_end: int
-    subfield_id: Optional[str] = None
 
     def full(self) -> str:
-        if self.subfield_id is None:
-            return f"{self.rid}/{self.field_id}/{self.index}/{self.vector_start}-{self.vector_end}"
-        else:
-            return f"{self.rid}/{self.field_id}/{self.subfield_id}/{self.index}/{self.vector_start}-{self.vector_end}"
+        return (
+            f"{self.field_id.full()}/{self.index}/{self.vector_start}-{self.vector_end}"
+        )
