@@ -33,7 +33,7 @@ from nucliadb.common.maindb.driver import (
     Driver,
     Transaction,
 )
-from nucliadb.common.maindb.exceptions import ConflictError
+from nucliadb.common.maindb.exceptions import ConflictError, MaindbServerError
 from nucliadb_telemetry import metrics
 
 try:
@@ -44,7 +44,31 @@ except ImportError:  # pragma: no cover
     TiKV = False
 
 
-class LeaderNotFoundError(Exception):
+class TikvTimeoutError(MaindbServerError):
+    """
+    Raised when the tikv client raises a grpc timeout error.
+    """
+
+    pass
+
+
+class TikvUnavailableError(MaindbServerError):
+    """
+    Raised when the tikv client raises an exception indicating that the tikv server is unavailable.
+    """
+
+    pass
+
+
+class BeginTikvTransactionError(MaindbServerError):
+    """
+    Raised when the tikv client raises an exception indicating that the transaction could not be started.
+    """
+
+    pass
+
+
+class LeaderNotFoundError(MaindbServerError):
     """
     Raised when the tikv client raises an exception indicating that the leader of a region is not found.
     This is a transient error and the operation should be retried.
@@ -53,7 +77,7 @@ class LeaderNotFoundError(Exception):
     pass
 
 
-class PdClusterTimeout(Exception):
+class PdClusterTimeout(MaindbServerError):
     """
     Raised with PD cluster fails to respond
     """
@@ -66,7 +90,7 @@ tikv_observer = metrics.Observer(
     labels={"type": ""},
     error_mappings={
         "conflict_error": ConflictError,
-        "timeout_error": TimeoutError,
+        "timeout_error": TikvTimeoutError,
         "leader_not_found_error": LeaderNotFoundError,
     },
 )
@@ -100,7 +124,7 @@ class TiKVDataLayer:
 
     @backoff.on_exception(
         backoff.expo,
-        (TimeoutError, LeaderNotFoundError),
+        (TikvTimeoutError, LeaderNotFoundError, TikvUnavailableError),
         jitter=backoff.random_jitter,
         max_tries=2,
     )
@@ -122,9 +146,11 @@ class TiKVDataLayer:
             if "WriteConflict" in exc_text:
                 raise ConflictError(exc_text) from exc
             elif "4-DEADLINE_EXCEEDED" in exc_text:
-                raise TimeoutError(exc_text) from exc
+                raise TikvTimeoutError(exc_text) from exc
             elif "Leader of region" in exc_text and "not found" in exc_text:
                 raise LeaderNotFoundError(exc_text) from exc
+            elif "14-UNAVAILABLE" in exc_text:
+                raise TikvUnavailableError(exc_text) from exc
             else:
                 raise
 
@@ -259,7 +285,7 @@ class TiKVTransaction(Transaction):
 
     @backoff.on_exception(
         backoff.expo,
-        (TimeoutError, LeaderNotFoundError),
+        (TikvTimeoutError, LeaderNotFoundError, TikvUnavailableError),
         jitter=backoff.random_jitter,
         max_tries=2,
     )
@@ -391,7 +417,10 @@ class ConnectionHolder:
                 f"Error getting transaction for tikv. Retrying once and then failing."
             )
             await self.reinitialize()
-            return await self._txn_connection.begin(pessimistic=False)
+            try:
+                return await self._txn_connection.begin(pessimistic=False)
+            except Exception as exc:
+                raise BeginTikvTransactionError from exc
 
     async def reinitialize(self) -> None:
         if self.connect_lock.locked():

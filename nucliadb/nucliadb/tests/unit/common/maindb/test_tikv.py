@@ -22,7 +22,12 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from nucliadb.common.maindb.exceptions import ConflictError
-from nucliadb.common.maindb.tikv import LeaderNotFoundError, TiKVDataLayer
+from nucliadb.common.maindb.tikv import (
+    LeaderNotFoundError,
+    TiKVDataLayer,
+    TikvTimeoutError,
+    TikvUnavailableError,
+)
 
 
 @pytest.mark.parametrize(
@@ -30,7 +35,13 @@ from nucliadb.common.maindb.tikv import LeaderNotFoundError, TiKVDataLayer
     [
         (
             Exception("gRPC error: RpcFailure: 4-DEADLINE_EXCEEDED Deadline Exceeded"),
-            TimeoutError,
+            TikvTimeoutError,
+        ),
+        (
+            Exception(
+                "gRPC error: RpcFailure: 14-UNAVAILABLE failed to connect to all addresses"
+            ),
+            TikvUnavailableError,
         ),
         (Exception("Leader of region 34234 is not found"), LeaderNotFoundError),
     ],

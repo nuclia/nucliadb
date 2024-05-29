@@ -27,7 +27,7 @@ from nucliadb.common import datamanagers, locking
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.maindb.driver import Driver, Transaction
-from nucliadb.common.maindb.exceptions import ConflictError
+from nucliadb.common.maindb.exceptions import ConflictError, MaindbServerError
 from nucliadb.ingest.orm.exceptions import (
     DeadletteredError,
     KnowledgeBoxConflict,
@@ -322,6 +322,7 @@ class Processor:
             asyncio.CancelledError,
             aiohttp.client_exceptions.ClientError,
             ConflictError,
+            MaindbServerError,
         ):  # pragma: no cover
             # Unhandled exceptions here that should bubble and hard fail
             # XXX We swallow too many exceptions here!
