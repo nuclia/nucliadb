@@ -26,6 +26,13 @@ from nucliadb_protos import knowledgebox_pb2
 KB_VECTORSETS = "/kbs/{kbid}/vectorsets"
 
 
+async def initialize(txn: Transaction, *, kbid: str):
+    key = KB_VECTORSETS.format(kbid=kbid)
+    await txn.set(
+        key, knowledgebox_pb2.KnowledgeBoxVectorSetsConfig().SerializeToString()
+    )
+
+
 async def get(
     txn: Transaction, *, kbid: str, vectorset_id: str
 ) -> Optional[knowledgebox_pb2.VectorSetConfig]:
