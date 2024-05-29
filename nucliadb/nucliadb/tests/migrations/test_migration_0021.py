@@ -34,32 +34,23 @@ async def test_migration_0021(maindb_driver: Driver):
     execution_context = Mock()
     execution_context.kv_driver = maindb_driver
 
-    key = "/kbs/{kbid}/vectorsets"
-
-    kv = {}
-    for _ in range(200):
-        kbid = str(uuid.uuid4())
-        kv[f"/kbs/{kbid}"] = b"my kb"
-        kv[f"/kbs/{kbid}/vectorsets"] = b"vectorset data"
-        kv[f"/kbs/{kbid}/other"] = b"other data"
+    kbid = str(uuid.uuid4())
 
     # Create a bunch of deprecated vectorsets keys and add
     async with maindb_driver.transaction() as txn:
-        for key, value in kv.items():
-            await txn.set(key, value)
+        await txn.set(f"/kbs/{kbid}", b"my kb")
+        await txn.set(f"/kbs/{kbid}/vectorsets", b"vectorset data")
+        await txn.set(f"/kbs/{kbid}/other", b"other data")
         await txn.commit()
 
     async with maindb_driver.transaction(read_only=True) as txn:
-        for key, value in kv.items():
-            stored = await txn.get(key)
-            assert stored == value
+        assert (await txn.get(f"/kbs/{kbid}")) == b"my kb"
+        assert (await txn.get(f"/kbs/{kbid}/vectorsets")) == b"vectorset data"
+        assert (await txn.get(f"/kbs/{kbid}/other")) == b"other data"
 
-    await migration.module.migrate(execution_context)
+    await migration.module.migrate_kb(execution_context, kbid)
 
     async with maindb_driver.transaction(read_only=True) as txn:
-        for key, value in kv.items():
-            stored = await txn.get(key)
-            if key.endswith("/vectorsets"):
-                assert stored is None
-            else:
-                assert stored == value
+        assert (await txn.get(f"/kbs/{kbid}")) == b"my kb"
+        assert (await txn.get(f"/kbs/{kbid}/vectorsets")) is None
+        assert (await txn.get(f"/kbs/{kbid}/other")) == b"other data"
