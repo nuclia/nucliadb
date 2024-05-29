@@ -18,13 +18,14 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-"""Migration #18
+"""Migration #21
 
-Due to a bug on backend services, some kbslugs were not properly deleted and got
-orphan. Let's delete them!
+Remove the old vectorsets maindb key to be able to reuse it with new data. The
+old key was: "/kbs/{kbid}/vectorsets"
 
 """
 import logging
+import re
 
 from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.kb import KB_SLUGS_BASE
@@ -34,28 +35,25 @@ from nucliadb.migrator.context import ExecutionContext
 logger = logging.getLogger(__name__)
 
 
-async def migrate(context: ExecutionContext) -> None:
-    async with context.kv_driver.transaction() as txn:
-        async for key in txn.keys(KB_SLUGS_BASE, count=-1):
-            slug = key.replace(KB_SLUGS_BASE, "")
-            value = await txn.get(key)
-            if value is None:
-                # KB with slug but without uuid? Seems wrong, let's remove it too
-                logger.info(
-                    "Removing /kbslugs with empty value", extra={"maindb_key": key}
-                )
-                await txn.delete(key)
-                continue
+DEPRECATED_KEY_REGEX = re.compile(r"^/kbs/[a-zA-Z0-9-]+/vectorsets$")
 
-            kbid = value.decode()
-            if not (await datamanagers.kb.exists_kb(txn, kbid=kbid)):
-                # log data too just in case
-                logger.info(
-                    "Removing orphan /kbslugs key",
-                    extra={"kbid": kbid, "kb_slug": slug, "maindb_key": key},
-                )
+
+async def migrate(context: ExecutionContext) -> None:
+    keys_to_delete = []
+    async with context.kv_driver.transaction(read_only=True) as txn:
+        async for key in txn.keys("/kbs/", count=-1):
+            if re.fullmatch(DEPRECATED_KEY_REGEX, key):
+                keys_to_delete.append(key)
+
+    batch_size = 50
+    while keys_to_delete:
+        async with context.kv_driver.transaction() as txn:
+            batch = keys_to_delete[:batch_size]
+            for key in batch:
+                logger.info(f"Removing vectorsets key: {key}")
                 await txn.delete(key)
-        await txn.commit()
+            await txn.commit()
+            del keys_to_delete[:batch_size]
 
 
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None: ...
