@@ -266,13 +266,13 @@ class ResourceBrain:
         replace_splits = replace_splits or []
 
         for subfield, vectors in vo.split_vectors.items():
+            _field_id = ids.FieldId(
+                rid=self.rid,
+                field_id=field_id,
+                subfield_id=subfield,
+            )
             # For each split of this field
             for index, vector in enumerate(vectors.vectors):
-                _field_id = ids.FieldId(
-                    rid=self.rid,
-                    field_id=field_id,
-                    subfield_id=subfield,
-                )
                 paragraph_key = ids.ParagraphId(
                     field_id=_field_id,
                     paragraph_start=vector.start_paragraph,
@@ -293,11 +293,11 @@ class ResourceBrain:
                     matryoshka_vector_dimension=matryoshka_vector_dimension,
                 )
 
+        _field_id = ids.FieldId(
+            rid=self.rid,
+            field_id=field_id,
+        )
         for index, vector in enumerate(vo.vectors.vectors):
-            _field_id = ids.FieldId(
-                rid=self.rid,
-                field_id=field_id,
-            )
             paragraph_key = ids.ParagraphId(
                 field_id=_field_id,
                 paragraph_start=vector.start_paragraph,
