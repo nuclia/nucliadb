@@ -63,15 +63,19 @@ async def storage_field_test(storage: Storage):
     # Check that object's metadata is stored properly
     metadata = await sfield.exists()
     assert metadata is not None
-    assert metadata["CONTENT_TYPE"] == "text/plain"
-    assert str(metadata["SIZE"]) == str(len(binary_data))
-    assert metadata["FILENAME"] == "myfile.txt"
+    assert metadata.content_type == "text/plain"
+    assert metadata.size == len(binary_data)
+    assert metadata.filename == "myfile.txt"
 
     # Download the file and check that it's the same
     async def check_downloaded_data(sfield, expected_data: bytes):
         downloaded_data = b""
-        async for data in sfield.iter_data():
-            downloaded_data += data
+        try:
+            async for data in sfield.iter_data():
+                downloaded_data += data
+        except KeyError:
+            # The file does not exist
+            pass
         assert downloaded_data == expected_data
 
     await check_downloaded_data(sfield, binary_data)
@@ -91,6 +95,8 @@ async def storage_field_test(storage: Storage):
     await sfield.copy(sfield.key, field_key, bucket, bucket2)
 
     await check_downloaded_data(sfield_kb2, binary_data)
+    # Check that the old key is still there
+    await check_downloaded_data(sfield, binary_data)
 
     # Move the file to another key (same bucket)
     new_field_id = "field3"
@@ -100,3 +106,5 @@ async def storage_field_test(storage: Storage):
     await sfield_kb2.move(sfield_kb2.key, new_field_key, bucket2, bucket2)
 
     await check_downloaded_data(new_sfield, binary_data)
+    # Check that the old key is empty
+    await check_downloaded_data(sfield_kb2, b"")

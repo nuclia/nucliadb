@@ -26,7 +26,7 @@ import socket
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from datetime import datetime
-from typing import Any, AsyncGenerator, AsyncIterator, Dict, List, Optional
+from typing import AsyncGenerator, AsyncIterator, Dict, List, Optional
 from urllib.parse import quote_plus
 
 import aiohttp
@@ -47,7 +47,12 @@ from nucliadb_utils.storages.exceptions import (
     InvalidOffset,
     ResumableUploadGone,
 )
-from nucliadb_utils.storages.storage import Storage, StorageField
+from nucliadb_utils.storages.storage import (
+    ObjectInfo,
+    ObjectMetadata,
+    Storage,
+    StorageField,
+)
 
 storage_ops_observer = metrics.Observer("gcs_ops", labels={"type": ""})
 
@@ -411,7 +416,7 @@ class GCSStorageField(StorageField):
         max_tries=MAX_TRIES,
     )
     @storage_ops_observer.wrap({"type": "exists"})
-    async def exists(self) -> Optional[Dict[str, str]]:
+    async def exists(self) -> Optional[ObjectMetadata]:
         """
         Existence can be checked either with a CloudFile data in the field attribute
         or own StorageField key and bucket. Field takes precendece
@@ -438,16 +443,18 @@ class GCSStorageField(StorageField):
         async with self.storage.session.get(url, headers=headers) as api_resp:
             if api_resp.status == 200:
                 data = await api_resp.json()
-                metadata = data.get("metadata")
-                if metadata is None:
-                    metadata = {}
-                if metadata.get("SIZE") is None:
-                    metadata["SIZE"] = data.get("size")
-                if metadata.get("CONTENT_TYPE") is None:
-                    metadata["CONTENT_TYPE"] = data.get("contentType")
-                if metadata.get("FILENAME") is None:
-                    metadata["FILENAME"] = key.split("/")[-1]
-                return metadata
+                metadata = data.get("metadata") or {}
+                metadata = {k.lower(): v for k, v in metadata.items()}
+                size = metadata.get("size") or data.get("size") or 0
+                content_type = (
+                    metadata.get("content_type") or data.get("contentType") or ""
+                )
+                filename = metadata.get("filename") or key.split("/")[-1]
+                return ObjectMetadata(
+                    filename=filename,
+                    size=int(size),
+                    content_type=content_type,
+                )
             else:
                 return None
 
@@ -718,7 +725,9 @@ class GCSStorage(Storage):
                     errors.capture_message(msg, "error", scope)
         return deleted, conflict
 
-    async def iterate_bucket(self, bucket: str, prefix: str) -> AsyncIterator[Any]:
+    async def iterate_objects(
+        self, bucket: str, prefix: str
+    ) -> AsyncGenerator[ObjectInfo, None]:
         if self.session is None:
             raise AttributeError()
         url = "{}/{}/o".format(self.object_base_url, bucket)
@@ -732,7 +741,7 @@ class GCSStorage(Storage):
             data = await resp.json()
             if "items" in data:
                 for item in data["items"]:
-                    yield item
+                    yield ObjectInfo(name=item["name"])
 
         page_token = data.get("nextPageToken")
         while page_token is not None:
@@ -747,5 +756,5 @@ class GCSStorage(Storage):
                 if len(items) == 0:
                     break
                 for item in items:
-                    yield item
+                    yield ObjectInfo(name=item["name"])
                 page_token = data.get("nextPageToken")
