@@ -40,8 +40,6 @@ from ..ask import create_ask_response
     description="Ask questions to a resource",
     tags=["Search"],
     response_model=SyncAskResponse,
-    # Add this to OpenAPI schema when endpoint is not in beta anymore
-    include_in_schema=False,
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
