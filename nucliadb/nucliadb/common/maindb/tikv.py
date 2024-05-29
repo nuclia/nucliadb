@@ -48,6 +48,7 @@ class TikvTimeoutError(MaindbServerError):
     """
     Raised when the tikv client raises a grpc timeout error.
     """
+
     pass
 
 
@@ -55,6 +56,7 @@ class TikvUnavailableError(MaindbServerError):
     """
     Raised when the tikv client raises an exception indicating that the tikv server is unavailable.
     """
+
     pass
 
 
