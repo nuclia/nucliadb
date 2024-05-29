@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional
+from typing import AsyncIterator, Optional
 
 from nucliadb.common.datamanagers.utils import get_kv_pb
 from nucliadb.common.maindb.driver import Transaction
@@ -41,7 +41,15 @@ async def exists(txn, *, kbid: str, vectorset_id: str) -> bool:
     return _find_vectorset(kb_vectorsets, vectorset_id) is not None
 
 
-async def set(txn, *, kbid: str, config: knowledgebox_pb2.VectorSetConfig):
+async def iter(
+    txn: Transaction, *, kbid: str
+) -> AsyncIterator[knowledgebox_pb2.VectorSetConfig]:
+    kb_vectorsets = await _get_or_default(txn, kbid=kbid)
+    for config in kb_vectorsets.vectorsets:
+        yield config
+
+
+async def set(txn: Transaction, *, kbid: str, config: knowledgebox_pb2.VectorSetConfig):
     """Create or update a vectorset configuration"""
     kb_vectorsets = await _get_or_default(txn, kbid=kbid)
     index = _find_vectorset(kb_vectorsets, config.vectorset_id)
@@ -56,7 +64,7 @@ async def set(txn, *, kbid: str, config: knowledgebox_pb2.VectorSetConfig):
     await txn.set(key, kb_vectorsets.SerializeToString())
 
 
-async def delete(txn, *, kbid: str, vectorset_id: str):
+async def delete(txn: Transaction, *, kbid: str, vectorset_id: str):
     kb_vectorsets = await _get_or_default(txn, kbid=kbid)
     index = _find_vectorset(kb_vectorsets, vectorset_id)
     if index is None:

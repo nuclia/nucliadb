@@ -246,6 +246,29 @@ class KBShardManager:
                     logger.exception(f"Error creating new shard at {node}: {e}")
                     continue
 
+                shard_id = shard_created.id
+                try:
+                    async for vectorset_config in datamanagers.vectorsets.iter(
+                        txn, kbid=kbid
+                    ):
+                        response = await node.add_vectorset(
+                            shard_id,
+                            vectorset=vectorset_config.vectorset_id,
+                            config=vectorset_config.vectorset_index_config,
+                        )
+                        if response.status != response.Status.OK:
+                            raise Exception(response.detail)
+                except Exception as e:
+                    errors.capture_exception(e)
+                    logger.exception(
+                        "Error creating vectorset '{vectorset_id}' new shard at {node}: {details}".format(
+                            vectorset_id=vectorset_config.vectorset_id,
+                            node=node,
+                            details=e,
+                        )
+                    )
+                    continue
+
                 replica = writer_pb2.ShardReplica(node=str(node_id))
                 replica.shard.CopyFrom(shard_created)
                 shard.replicas.append(replica)
