@@ -43,7 +43,7 @@ async def test_redis_driver(redis):
     await driver_basic(driver)
 
 
-# @pytest.mark.flaky(reruns=5)
+@pytest.mark.flaky(reruns=5)
 @pytest.mark.skipif(
     "tikv" not in TESTING_MAINDB_DRIVERS, reason="tikv not in TESTING_MAINDB_DRIVERS"
 )
