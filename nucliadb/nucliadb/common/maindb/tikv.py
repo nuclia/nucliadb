@@ -46,9 +46,15 @@ except ImportError:  # pragma: no cover
 
 class TikvTimeoutError(MaindbServerError):
     """
-    Raised when the tikv client raises a timeout error.
+    Raised when the tikv client raises a grpc timeout error.
     """
+    pass
 
+
+class TikvUnavailableError(MaindbServerError):
+    """
+    Raised when the tikv client raises an exception indicating that the tikv server is unavailable.
+    """
     pass
 
 
@@ -116,7 +122,7 @@ class TiKVDataLayer:
 
     @backoff.on_exception(
         backoff.expo,
-        (TikvTimeoutError, LeaderNotFoundError),
+        (TikvTimeoutError, LeaderNotFoundError, TikvUnavailableError),
         jitter=backoff.random_jitter,
         max_tries=2,
     )
@@ -141,6 +147,8 @@ class TiKVDataLayer:
                 raise TikvTimeoutError(exc_text) from exc
             elif "Leader of region" in exc_text and "not found" in exc_text:
                 raise LeaderNotFoundError(exc_text) from exc
+            elif "14-UNAVAILABLE" in exc_text:
+                raise TikvUnavailableError(exc_text) from exc
             else:
                 raise
 
@@ -275,7 +283,7 @@ class TiKVTransaction(Transaction):
 
     @backoff.on_exception(
         backoff.expo,
-        (TikvTimeoutError, LeaderNotFoundError),
+        (TikvTimeoutError, LeaderNotFoundError, TikvUnavailableError),
         jitter=backoff.random_jitter,
         max_tries=2,
     )
