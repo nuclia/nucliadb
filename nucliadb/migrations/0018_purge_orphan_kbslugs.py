@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-"""Migration #17
+"""Migration #18
 
 Due to a bug on backend services, some kbslugs were not properly deleted and got
 orphan. Let's delete them!
