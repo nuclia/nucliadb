@@ -258,7 +258,7 @@ class ResourceBrain:
         field_id: str,
         vo: utils_pb2.VectorObject,
         *,
-        vectorset: Optional[str],
+        vectorset: Optional[str] = None,
         replace_field: bool = False,
         replace_splits: Optional[list[str]] = None,
         matryoshka_vector_dimension: Optional[int] = None,

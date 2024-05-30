@@ -379,7 +379,6 @@ class Resource:
                     brain.apply_field_vectors(
                         field_key,
                         vo,
-                        vectorset=None,
                         matryoshka_vector_dimension=dimension,
                     )
 

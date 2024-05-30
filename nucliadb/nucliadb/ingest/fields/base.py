@@ -119,9 +119,9 @@ class Field:
         self, vectorset: Optional[str] = None
     ) -> StorageField:
         if vectorset:
-            key = str(FieldTypes.FIELD_VECTORSET).format(vectorset=vectorset)
+            key = FieldTypes.FIELD_VECTORSET.value.format(vectorset=vectorset)
         else:
-            key = FieldTypes.FIELD_VECTORS
+            key = FieldTypes.FIELD_VECTORS.value
         return self.storage.file_extracted(
             self.kbid, self.uuid, self.type, self.id, key
         )
@@ -298,6 +298,8 @@ class Field:
             actual_payload = None
 
         sf = self._get_extracted_vectors_storage_field(vectorset)
+        print("Vectorset", vectorset)
+        print("Storage field:", sf)
         vo: Optional[VectorObject] = None
         replace_field: bool = True
         replace_splits = []

@@ -45,14 +45,18 @@ def test_apply_field_vectors_for_matryoshka_embeddings():
         )
     )
     paragraph_key = ids.ParagraphId(
-        rid=rid,
-        field_id=field_id,
+        field_id=ids.FieldId(
+            rid=rid,
+            field_id=field_id,
+        ),
         paragraph_start=0,
         paragraph_end=10,
     )
     vector_key = ids.VectorId(
-        rid=rid,
-        field_id=field_id,
+        field_id=ids.FieldId(
+            rid=rid,
+            field_id=field_id,
+        ),
         index=0,
         vector_start=0,
         vector_end=10,
@@ -61,7 +65,9 @@ def test_apply_field_vectors_for_matryoshka_embeddings():
     brain = ResourceBrain(rid=rid)
     brain.apply_field_vectors(field_id, vectors, matryoshka_vector_dimension=None)
     vector = (
-        brain.brain.paragraphs[field_id].paragraphs[paragraph_key].sentences[vector_key]
+        brain.brain.paragraphs[field_id]
+        .paragraphs[paragraph_key.full()]
+        .sentences[vector_key.full()]
     )
     assert len(vector.vector) == STORED_VECTOR_DIMENSION
 
@@ -70,6 +76,8 @@ def test_apply_field_vectors_for_matryoshka_embeddings():
         field_id, vectors, matryoshka_vector_dimension=MATRYOSHKA_DIMENSION
     )
     vector = (
-        brain.brain.paragraphs[field_id].paragraphs[paragraph_key].sentences[vector_key]
+        brain.brain.paragraphs[field_id]
+        .paragraphs[paragraph_key.full()]
+        .sentences[vector_key.full()]
     )
     assert len(vector.vector) == MATRYOSHKA_DIMENSION
