@@ -802,6 +802,8 @@ class Resource:
         add_field_classifications(self.basic, field_metadata)
 
     async def _apply_extracted_vectors(self, field_vectors: ExtractedVectorsWrapper):
+        # Store vectors in the resource
+
         if not self.has_field(
             field_vectors.field.field_type, field_vectors.field.field
         ):
@@ -821,6 +823,9 @@ class Resource:
             replace_field_sentences,
             replace_splits_sentences,
         ) = await field_obj.set_vectors(field_vectors)
+
+        # Prepare vectors to be indexed
+
         field_key = self.generate_field_id(field_vectors.field)
         if vo is not None:
             vectorset_id = field_vectors.vectorset_id or None
@@ -833,15 +838,11 @@ class Resource:
                     self.txn, kbid=self.kb.kbid, vectorset_id=vectorset_id
                 )
                 if config is None:
-                    # TODO: should we create the vectorset here?
-                    # XXX: this is only to validate tests while the question
-                    # above is unresolved
-                    dimension = 512
-                    # raise ValueError(
-                    #     f"Trying to apply a resource on vectorset '{vectorset_id}' that doesn't exist"
-                    # )
-                else:
-                    dimension = config.vectorset_index_config.vector_dimension
+                    logger.warning(
+                        f"Trying to apply a resource on vectorset '{vectorset_id}' that doesn't exist."
+                    )
+                    return
+                dimension = config.vectorset_index_config.vector_dimension
                 if not dimension:
                     raise ValueError(
                         f"Vector dimension not set for vectorset '{vectorset_id}'"

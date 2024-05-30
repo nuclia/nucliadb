@@ -22,10 +22,19 @@ import uuid
 
 import pytest
 
+from nucliadb.common import datamanagers
+from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest import SERVICE_NAME
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.tests.fixtures import make_extracted_text
-from nucliadb_protos import noderesources_pb2, resources_pb2, utils_pb2, writer_pb2
+from nucliadb_protos import (
+    knowledgebox_pb2,
+    noderesources_pb2,
+    nodewriter_pb2,
+    resources_pb2,
+    utils_pb2,
+    writer_pb2,
+)
 from nucliadb_utils.utilities import get_indexing, get_storage
 
 
@@ -35,6 +44,7 @@ async def test_ingest_broker_message_with_vectorsets(
     storage,
     knowledgebox_ingest: str,
     processor: Processor,
+    maindb_driver: Driver,
 ):
     """Validate ingestion of a BrokerMessage containing vectors for the default
     vectors index and an additional vectorset.
@@ -48,6 +58,21 @@ async def test_ingest_broker_message_with_vectorsets(
     body = "Lorem ipsum dolor sit amet..."
     default_vectorset_dimension = 10
     vectorset_dimension = 7
+
+    # HACK: add a vectorset directly in maindb so the ingestion founds it and
+    # produces the correct brain
+    async with datamanagers.with_transaction() as txn:
+        await datamanagers.vectorsets.set(
+            txn,
+            kbid=kbid,
+            config=knowledgebox_pb2.VectorSetConfig(
+                vectorset_id=vectorset_id,
+                vectorset_index_config=nodewriter_pb2.VectorIndexConfig(
+                    vector_dimension=vectorset_dimension
+                ),
+            ),
+        )
+        await txn.commit()
 
     bm = writer_pb2.BrokerMessage(
         kbid=kbid, uuid=rid, slug=slug, type=writer_pb2.BrokerMessage.AUTOCOMMIT
