@@ -119,7 +119,7 @@ class Field:
         self, vectorset: Optional[str] = None
     ) -> StorageField:
         if vectorset:
-            key = FieldTypes.FIELD_VECTORSET.format(vectorset=vectorset)
+            key = str(FieldTypes.FIELD_VECTORSET).format(vectorset=vectorset)
         else:
             key = FieldTypes.FIELD_VECTORS
         return self.storage.file_extracted(
