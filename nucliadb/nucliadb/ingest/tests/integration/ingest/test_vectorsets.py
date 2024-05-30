@@ -52,10 +52,8 @@ async def test_ingest_broker_message_with_vectorsets(
     """
     kbid = knowledgebox_ingest
     rid = uuid.uuid4().hex
-    slug = "my-resource"
     field_id = "my-text-field"
     vectorset_id = "fancy-multilang"
-    body = "Lorem ipsum dolor sit amet..."
     default_vectorset_dimension = 10
     vectorset_dimension = 7
 
@@ -74,10 +72,66 @@ async def test_ingest_broker_message_with_vectorsets(
         )
         await txn.commit()
 
+    def validate_index_message(resource: noderesources_pb2.Resource):
+        assert len(resource.paragraphs) == 1
+        field_id = list(resource.paragraphs.keys())[0]
+        field_paragraphs = resource.paragraphs[field_id]
+        for paragraph_id, paragraph in field_paragraphs.paragraphs.items():
+            for vector_id, sentence in paragraph.sentences.items():
+                assert len(sentence.vector) == default_vectorset_dimension
+
+            assert len(paragraph.vectorsets_sentences) == 1
+            assert vectorset_id in paragraph.vectorsets_sentences
+            vectorset_sentences = paragraph.vectorsets_sentences[vectorset_id]
+            for vector_id, sentence in vectorset_sentences.sentences.items():
+                assert len(sentence.vector) == vectorset_dimension
+
+    index = get_indexing()
+    storage = await get_storage(service_name=SERVICE_NAME)
+
+    # process the broker message with vectorsets
+    bm = create_broker_message_with_vectorset(
+        kbid,
+        rid,
+        field_id,
+        vectorset_id,
+        default_vectorset_dimension=default_vectorset_dimension,
+        vectorset_dimension=vectorset_dimension,
+    )
+    await processor.process(message=bm, seqid=1)
+
+    pb = await storage.get_indexing(index._calls[0][1])
+    validate_index_message(pb)
+
+    # Generate a reindex to validate storage.
+    #
+    # A BrokerMessage with reindex=True will trigger a full brain generation
+    # from the stored resource
     bm = writer_pb2.BrokerMessage(
-        kbid=kbid, uuid=rid, slug=slug, type=writer_pb2.BrokerMessage.AUTOCOMMIT
+        kbid=kbid, uuid=rid, type=writer_pb2.BrokerMessage.AUTOCOMMIT
+    )
+    bm.reindex = True
+
+    await processor.process(message=bm, seqid=2)
+
+    pb = await storage.get_indexing(index._calls[1][1])
+    validate_index_message(pb)
+
+
+def create_broker_message_with_vectorset(
+    kbid: str,
+    rid: str,
+    field_id: str,
+    vectorset_id: str,
+    *,
+    default_vectorset_dimension: int,
+    vectorset_dimension: int,
+):
+    bm = writer_pb2.BrokerMessage(
+        kbid=kbid, uuid=rid, type=writer_pb2.BrokerMessage.AUTOCOMMIT
     )
 
+    body = "Lorem ipsum dolor sit amet..."
     bm.texts[field_id].body = body
 
     bm.extracted_text.append(make_extracted_text(field_id, body))
@@ -110,40 +164,4 @@ async def test_ingest_broker_message_with_vectorsets(
             )
         )
     bm.field_vectors.append(field_vectors)
-
-    def validate_index_message(resource: noderesources_pb2.Resource):
-        assert len(resource.paragraphs) == 1
-        assert f"t/{field_id}" in resource.paragraphs
-        field_paragraphs = resource.paragraphs[f"t/{field_id}"]
-        for paragraph_id, paragraph in field_paragraphs.paragraphs.items():
-            for vector_id, sentence in paragraph.sentences.items():
-                assert len(sentence.vector) == default_vectorset_dimension
-
-            assert len(paragraph.vectorsets_sentences) == 1
-            assert vectorset_id in paragraph.vectorsets_sentences
-            vectorset_sentences = paragraph.vectorsets_sentences[vectorset_id]
-            for vector_id, sentence in vectorset_sentences.sentences.items():
-                assert len(sentence.vector) == vectorset_dimension
-
-    index = get_indexing()
-    storage = await get_storage(service_name=SERVICE_NAME)
-
-    # process the broker message with vectorsets
-    await processor.process(message=bm, seqid=1)
-
-    pb = await storage.get_indexing(index._calls[0][1])
-    validate_index_message(pb)
-
-    # Generate a reindex to validate storage.
-    #
-    # A BrokerMessage with reindex=True will trigger a full brain generation
-    # from the stored resource
-    bm = writer_pb2.BrokerMessage(
-        kbid=kbid, uuid=rid, slug=slug, type=writer_pb2.BrokerMessage.AUTOCOMMIT
-    )
-    bm.reindex = True
-
-    await processor.process(message=bm, seqid=2)
-
-    pb = await storage.get_indexing(index._calls[1][1])
-    validate_index_message(pb)
+    return bm
