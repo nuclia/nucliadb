@@ -95,6 +95,7 @@ CHAT_EXAMPLES = {
     description="Chat on a Knowledge Box",
     tags=["Search"],
     response_model=None,
+    deprecated=True,
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
