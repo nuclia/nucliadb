@@ -18,24 +18,13 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import Optional, Union
+from typing import Optional
 
 from google.protobuf.message import Message
 
 from nucliadb.common.datamanagers.utils import get_kv_pb
 from nucliadb.common.maindb.driver import Transaction
-from nucliadb_protos import resources_pb2, writer_pb2
-
-PbFieldTypes = Union[
-    resources_pb2.Conversation,
-    resources_pb2.FieldDatetime,
-    resources_pb2.FieldFile,
-    str,
-    resources_pb2.FieldKeywordset,
-    resources_pb2.FieldLayout,
-    resources_pb2.FieldLink,
-    resources_pb2.FieldText,
-]
+from nucliadb_protos import writer_pb2
 
 KB_RESOURCE_FIELD = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}"
 KB_RESOURCE_FIELD_ERROR = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}/error"
