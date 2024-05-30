@@ -80,7 +80,7 @@ async def test_vectorsets(
         )
         with pytest.raises(Exception) as exc:
             results = await node.reader.Search(query_pb)  # type: ignore
-            assert "inconsistent dimensions" in str(exc).lower()
+        assert "inconsistent dimensions" in str(exc).lower()
 
 
 async def create_vectorset(nucliadb_grpc: WriterStub, kbid: str, vectorset_id: str):
