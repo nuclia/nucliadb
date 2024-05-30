@@ -90,7 +90,7 @@ from nucliadb_models.writer import (
     ResourceUpdated,
     UpdateResourcePayload,
 )
-from nucliadb_sdk.v2 import docstrings, exceptions
+from nucliadb_sdk.v2 import exceptions
 
 
 class Region(enum.Enum):
@@ -119,7 +119,7 @@ def chat_response_parser(response: httpx.Response) -> ChatResponse:
     header = raw.read(4)
     payload_size = int.from_bytes(header, byteorder="big", signed=False)
     data = raw.read(payload_size)
-    find_result = KnowledgeboxFindResults.parse_raw(base64.b64decode(data))
+    find_result = KnowledgeboxFindResults.model_validate_json(base64.b64decode(data))
     data = raw.read()
     try:
         answer, relations_payload = data.split(b"_END_")
@@ -129,7 +129,9 @@ def chat_response_parser(response: httpx.Response) -> ChatResponse:
     learning_id = response.headers.get("NUCLIA-LEARNING-ID")
     relations_result = None
     if len(relations_payload) > 0:
-        relations_result = Relations.parse_raw(base64.b64decode(relations_payload))
+        relations_result = Relations.model_validate_json(
+            base64.b64decode(relations_payload)
+        )
     try:
         answer, tail = answer.split(b"_CIT_")
         citations_length = int.from_bytes(tail[:4], byteorder="big", signed=False)
@@ -153,7 +155,7 @@ def ask_response_parser(response: httpx.Response) -> SyncAskResponse:
 
     if content_type == "application/json":
         # This comes from a request with the X-Synchronous header set to true
-        return SyncAskResponse.parse_raw(response.content)
+        return SyncAskResponse.model_validate_json(response.content)
     answer = ""
     status = ""
     retrieval_results = None
@@ -164,7 +166,7 @@ def ask_response_parser(response: httpx.Response) -> SyncAskResponse:
     timings = None
     for line in response.iter_lines():
         try:
-            item = AskResponseItem.parse_raw(line).item
+            item = AskResponseItem.model_validate_json(line).item
             if isinstance(item, AnswerAskResponseItem):
                 answer += item.text
             elif isinstance(item, RelationsAskResponseItem):
@@ -214,7 +216,7 @@ def _parse_list_of_pydantic(
 def _parse_response(response_type, resp: httpx.Response) -> Any:
     if response_type is not None:
         if isinstance(response_type, type) and issubclass(response_type, BaseModel):
-            return response_type.parse_raw(resp.content)  # type: ignore
+            return response_type.model_validate_json(resp.content)  # type: ignore
         else:
             return response_type(resp)  # type: ignore
     else:
@@ -247,7 +249,6 @@ def _request_builder(
         ]
     ],
     stream_response: bool = False,
-    docstring: Optional[docstrings.Docstring] = None,
 ):
     def _func(
         self: "NucliaDB | NucliaDBAsync", content: Optional[Any] = None, **kwargs
@@ -278,7 +279,7 @@ def _request_builder(
                 for key in list(kwargs.keys()):
                     if key in request_type.model_fields:  # type: ignore
                         content_data[key] = kwargs.pop(key)
-                data = request_type.parse_obj(content_data).json(by_alias=True)  # type: ignore
+                data = request_type.model_validate(content_data).json(by_alias=True)  # type: ignore
         elif is_raw_request_content(content):
             raw_content = content
 
@@ -304,17 +305,6 @@ def _request_builder(
                 path, method, data=data, query_params=query_params
             )
             return resp
-
-    docstrings.inject_documentation(
-        _func,
-        name,
-        method,
-        path_template,
-        path_params,
-        request_type,
-        response_type,
-        docstring,
-    )
 
     return _func
 
@@ -452,7 +442,6 @@ class _NucliaDBBase:
         path_params=("kbid",),
         request_type=CreateResourcePayload,
         response_type=ResourceCreated,
-        docstring=docstrings.CREATE_RESOURCE,
     )
     update_resource = _request_builder(
         name="update_resource",
@@ -461,7 +450,6 @@ class _NucliaDBBase:
         path_params=("kbid", "rid"),
         request_type=UpdateResourcePayload,
         response_type=ResourceUpdated,
-        docstring=docstrings.UPDATE_RESOURCE,
     )
     update_resource_by_slug = _request_builder(
         name="update_resource_by_slug",
@@ -470,7 +458,6 @@ class _NucliaDBBase:
         path_params=("kbid", "rslug"),
         request_type=UpdateResourcePayload,
         response_type=ResourceUpdated,
-        docstring=docstrings.UPDATE_RESOURCE_BY_SLUG,
     )
     delete_resource = _request_builder(
         name="delete_resource",
@@ -495,7 +482,6 @@ class _NucliaDBBase:
         path_params=("kbid", "slug"),
         request_type=None,
         response_type=Resource,
-        docstring=docstrings.GET_RESOURCE_BY_SLUG,
     )
     get_resource_by_id = _request_builder(
         name="get_resource_by_id",
@@ -504,7 +490,6 @@ class _NucliaDBBase:
         path_params=("kbid", "rid"),
         request_type=None,
         response_type=Resource,
-        docstring=docstrings.GET_RESOURCE_BY_ID,
     )
     list_resources = _request_builder(
         name="list_resources",
@@ -513,7 +498,6 @@ class _NucliaDBBase:
         path_params=("kbid",),
         request_type=None,
         response_type=ResourceList,
-        docstring=docstrings.LIST_RESOURCES,
     )
 
     # reindex/reprocess
@@ -524,7 +508,6 @@ class _NucliaDBBase:
         path_params=("kbid", "rid"),
         request_type=None,
         response_type=None,
-        docstring=docstrings.REINDEX_RESOURCE,
     )
     reindex_resource_by_slug = _request_builder(
         name="reindex_resource_by_slug",
@@ -533,7 +516,6 @@ class _NucliaDBBase:
         path_params=("kbid", "slug"),
         request_type=None,
         response_type=None,
-        docstring=docstrings.REINDEX_RESOURCE_BY_SLUG,
     )
     reprocess_resource = _request_builder(
         name="reprocess_resource",
@@ -542,7 +524,6 @@ class _NucliaDBBase:
         path_params=("kbid", "rid"),
         request_type=None,
         response_type=None,
-        docstring=docstrings.REPROCESS_RESOURCE,
     )
     reprocess_resource_by_slug = _request_builder(
         name="reprocess_resource_by_slug",
@@ -551,7 +532,6 @@ class _NucliaDBBase:
         path_params=("kbid", "slug"),
         request_type=None,
         response_type=None,
-        docstring=docstrings.REPROCESS_RESOURCE_BY_SLUG,
     )
 
     # Conversation endpoints
@@ -580,7 +560,6 @@ class _NucliaDBBase:
         path_params=("kbid", "labelset"),
         request_type=None,
         response_type=None,
-        docstring=docstrings.DELETE_LABELSET,
     )
     get_labelsets = _request_builder(
         name="get_labelsets",
@@ -649,7 +628,6 @@ class _NucliaDBBase:
         path_params=("kbid",),
         request_type=FindRequest,
         response_type=KnowledgeboxFindResults,
-        docstring=docstrings.FIND,
     )
     search = _request_builder(
         name="search",
@@ -658,7 +636,6 @@ class _NucliaDBBase:
         path_params=("kbid",),
         request_type=SearchRequest,
         response_type=KnowledgeboxSearchResults,
-        docstring=docstrings.SEARCH,
     )
     chat = _request_builder(
         name="chat",
@@ -667,7 +644,6 @@ class _NucliaDBBase:
         path_params=("kbid",),
         request_type=ChatRequest,
         response_type=chat_response_parser,
-        docstring=docstrings.CHAT,
     )
 
     ask = _request_builder(
@@ -686,7 +662,6 @@ class _NucliaDBBase:
         path_params=("kbid", "rid"),
         request_type=ChatRequest,
         response_type=chat_response_parser,
-        docstring=docstrings.RESOURCE_CHAT,
     )
 
     chat_on_resource_by_slug = _request_builder(
@@ -696,7 +671,6 @@ class _NucliaDBBase:
         path_params=("kbid", "slug"),
         request_type=ChatRequest,
         response_type=chat_response_parser,
-        docstring=docstrings.RESOURCE_CHAT,
     )
 
     ask_on_resource = _request_builder(
@@ -724,7 +698,6 @@ class _NucliaDBBase:
         path_params=("kbid",),
         request_type=SummarizeRequest,
         response_type=SummarizedResponse,
-        docstring=docstrings.SUMMARIZE,
     )
 
     feedback = _request_builder(
@@ -743,7 +716,6 @@ class _NucliaDBBase:
         path_params=("kbid",),
         request_type=None,
         response_type=CreateExportResponse,
-        docstring=docstrings.START_EXPORT,
     )
 
     export_status = _request_builder(
@@ -753,7 +725,6 @@ class _NucliaDBBase:
         path_params=("kbid", "export_id"),
         request_type=None,
         response_type=StatusResponse,
-        docstring=docstrings.EXPORT_STATUS,
     )
 
     download_export = _request_builder(
@@ -764,7 +735,6 @@ class _NucliaDBBase:
         request_type=None,
         response_type=None,
         stream_response=True,
-        docstring=docstrings.DOWNLOAD_EXPORT,
     )
 
     start_import = _request_builder(
@@ -774,7 +744,6 @@ class _NucliaDBBase:
         path_params=("kbid",),
         request_type=None,
         response_type=CreateImportResponse,
-        docstring=docstrings.START_IMPORT,
     )
 
     import_status = _request_builder(
@@ -784,7 +753,6 @@ class _NucliaDBBase:
         path_params=("kbid", "import_id"),
         request_type=None,
         response_type=StatusResponse,
-        docstring=docstrings.IMPORT_STATUS,
     )
 
     trainset = _request_builder(
@@ -794,7 +762,6 @@ class _NucliaDBBase:
         path_params=("kbid",),
         request_type=None,
         response_type=TrainSetPartitions,
-        docstring=docstrings.TRAINSET_PARTITIONS,
     )
 
     # Learning Configuration
