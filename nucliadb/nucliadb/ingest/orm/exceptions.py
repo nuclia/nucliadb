@@ -48,3 +48,7 @@ class ResourceNotIndexable(Exception):
 
 class EntityManagementException(Exception):
     pass
+
+
+class VectorSetConflict(Exception):
+    pass

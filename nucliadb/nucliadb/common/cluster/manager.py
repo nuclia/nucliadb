@@ -38,6 +38,7 @@ from nucliadb.common.cluster.exceptions import (
 )
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb_protos import (
+    knowledgebox_pb2,
     nodereader_pb2,
     noderesources_pb2,
     nodewriter_pb2,
@@ -410,6 +411,38 @@ class KBShardManager:
         async with datamanagers.with_transaction() as txn:
             await self.create_shard_by_kbid(txn, kbid)
             await txn.commit()
+
+    async def create_vectorset(
+        self, kbid: str, config: knowledgebox_pb2.VectorSetConfig
+    ):
+        """Create a new vectorset in all KB shards."""
+
+        async def _create_vectorset(node: AbstractIndexNode, shard_id: str):
+            vectorset_id = config.vectorset_id
+            index_config = config.vectorset_index_config
+            result = await node.add_vectorset(shard_id, vectorset_id, index_config)
+            if result.status != result.Status.OK:
+                raise NodeError(
+                    f"Unable to create vectorset {vectorset_id} in kb {kbid} shard {shard_id}"
+                )
+
+        await self.apply_for_all_shards(
+            kbid, _create_vectorset, timeout=10, use_read_replica_nodes=False
+        )
+
+    async def delete_vectorset(self, kbid: str, vectorset_id: str):
+        """Delete a vectorset from all KB shards"""
+
+        async def _delete_vectorset(node: AbstractIndexNode, shard_id: str):
+            result = await node.remove_vectorset(shard_id, vectorset_id)
+            if result.status != result.Status.OK:
+                raise NodeError(
+                    f"Unable to delete vectorset {vectorset_id} in kb {kbid} shard {shard_id}"
+                )
+
+        await self.apply_for_all_shards(
+            kbid, _delete_vectorset, timeout=10, use_read_replica_nodes=False
+        )
 
 
 class StandaloneKBShardManager(KBShardManager):

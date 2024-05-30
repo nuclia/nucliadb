@@ -899,24 +899,6 @@ pub mod get_vector_sets_response {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct DelVectorSetRequest {
-    #[prost(message, optional, tag = "1")]
-    pub kb: ::core::option::Option<super::knowledgebox::KnowledgeBoxId>,
-    #[prost(string, tag = "2")]
-    pub vectorset: ::prost::alloc::string::String,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct SetVectorSetRequest {
-    #[prost(message, optional, tag = "1")]
-    pub kb: ::core::option::Option<super::knowledgebox::KnowledgeBoxId>,
-    #[prost(string, tag = "2")]
-    pub id: ::prost::alloc::string::String,
-    #[prost(message, optional, tag = "3")]
-    pub vectorset: ::core::option::Option<super::knowledgebox::VectorSet>,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct OpStatusWriter {
     #[prost(enumeration = "op_status_writer::Status", tag = "1")]
     pub status: i32,
@@ -1298,6 +1280,128 @@ pub struct FileUploaded {}
 pub struct SynonymsRequest {
     #[prost(string, tag = "1")]
     pub kbid: ::prost::alloc::string::String,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct NewVectorSetRequest {
+    #[prost(string, tag = "1")]
+    pub kbid: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub vectorset_id: ::prost::alloc::string::String,
+    #[prost(enumeration = "super::nodewriter::VectorType", tag = "3")]
+    pub vector_type: i32,
+    #[prost(enumeration = "super::utils::VectorSimilarity", tag = "4")]
+    pub similarity: i32,
+    #[prost(uint32, tag = "5")]
+    pub vector_dimension: u32,
+    #[prost(bool, tag = "6")]
+    pub normalize_vectors: bool,
+    #[prost(uint32, repeated, tag = "7")]
+    pub matryoshka_dimensions: ::prost::alloc::vec::Vec<u32>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct NewVectorSetResponse {
+    #[prost(enumeration = "new_vector_set_response::Status", tag = "1")]
+    pub status: i32,
+    #[prost(string, tag = "2")]
+    pub details: ::prost::alloc::string::String,
+}
+/// Nested message and enum types in `NewVectorSetResponse`.
+pub mod new_vector_set_response {
+    #[derive(
+        Clone,
+        Copy,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+        PartialOrd,
+        Ord,
+        ::prost::Enumeration
+    )]
+    #[repr(i32)]
+    pub enum Status {
+        Ok = 0,
+        /// generic error
+        Error = 1,
+    }
+    impl Status {
+        /// String value of the enum field names used in the ProtoBuf definition.
+        ///
+        /// The values are not transformed in any way and thus are considered stable
+        /// (if the ProtoBuf definition does not change) and safe for programmatic use.
+        pub fn as_str_name(&self) -> &'static str {
+            match self {
+                Status::Ok => "OK",
+                Status::Error => "ERROR",
+            }
+        }
+        /// Creates an enum from field names used in the ProtoBuf definition.
+        pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+            match value {
+                "OK" => Some(Self::Ok),
+                "ERROR" => Some(Self::Error),
+                _ => None,
+            }
+        }
+    }
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DelVectorSetRequest {
+    #[prost(string, tag = "1")]
+    pub kbid: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub vectorset_id: ::prost::alloc::string::String,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DelVectorSetResponse {
+    #[prost(enumeration = "del_vector_set_response::Status", tag = "1")]
+    pub status: i32,
+    #[prost(string, tag = "2")]
+    pub details: ::prost::alloc::string::String,
+}
+/// Nested message and enum types in `DelVectorSetResponse`.
+pub mod del_vector_set_response {
+    #[derive(
+        Clone,
+        Copy,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+        PartialOrd,
+        Ord,
+        ::prost::Enumeration
+    )]
+    #[repr(i32)]
+    pub enum Status {
+        Ok = 0,
+        /// generic error
+        Error = 1,
+    }
+    impl Status {
+        /// String value of the enum field names used in the ProtoBuf definition.
+        ///
+        /// The values are not transformed in any way and thus are considered stable
+        /// (if the ProtoBuf definition does not change) and safe for programmatic use.
+        pub fn as_str_name(&self) -> &'static str {
+            match self {
+                Status::Ok => "OK",
+                Status::Error => "ERROR",
+            }
+        }
+        /// Creates an enum from field names used in the ProtoBuf definition.
+        pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+            match value {
+                "OK" => Some(Self::Ok),
+                "ERROR" => Some(Self::Error),
+                _ => None,
+            }
+        }
+    }
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
