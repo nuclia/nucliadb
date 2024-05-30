@@ -194,27 +194,6 @@ class WriterStub:
         nucliadb_protos.writer_pb2.OpStatusWriter,
     ]
 
-    GetLabels: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.GetLabelsRequest,
-        nucliadb_protos.writer_pb2.GetLabelsResponse,
-    ]
-    """Labels"""
-
-    GetLabelSet: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.GetLabelSetRequest,
-        nucliadb_protos.writer_pb2.GetLabelSetResponse,
-    ]
-
-    SetLabels: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.SetLabelsRequest,
-        nucliadb_protos.writer_pb2.OpStatusWriter,
-    ]
-
-    DelLabels: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.DelLabelsRequest,
-        nucliadb_protos.writer_pb2.OpStatusWriter,
-    ]
-
     NewEntitiesGroup: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.NewEntitiesGroupRequest,
         nucliadb_protos.writer_pb2.NewEntitiesGroupResponse,
@@ -319,27 +298,6 @@ class WriterAsyncStub:
 
     ProcessMessage: grpc.aio.StreamUnaryMultiCallable[
         nucliadb_protos.writer_pb2.BrokerMessage,
-        nucliadb_protos.writer_pb2.OpStatusWriter,
-    ]
-
-    GetLabels: grpc.aio.UnaryUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.GetLabelsRequest,
-        nucliadb_protos.writer_pb2.GetLabelsResponse,
-    ]
-    """Labels"""
-
-    GetLabelSet: grpc.aio.UnaryUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.GetLabelSetRequest,
-        nucliadb_protos.writer_pb2.GetLabelSetResponse,
-    ]
-
-    SetLabels: grpc.aio.UnaryUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.SetLabelsRequest,
-        nucliadb_protos.writer_pb2.OpStatusWriter,
-    ]
-
-    DelLabels: grpc.aio.UnaryUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.DelLabelsRequest,
         nucliadb_protos.writer_pb2.OpStatusWriter,
     ]
 
@@ -459,35 +417,6 @@ class WriterServicer(metaclass=abc.ABCMeta):
     def ProcessMessage(
         self,
         request_iterator: _MaybeAsyncIterator[nucliadb_protos.writer_pb2.BrokerMessage],
-        context: _ServicerContext,
-    ) -> typing.Union[nucliadb_protos.writer_pb2.OpStatusWriter, collections.abc.Awaitable[nucliadb_protos.writer_pb2.OpStatusWriter]]: ...
-
-    @abc.abstractmethod
-    def GetLabels(
-        self,
-        request: nucliadb_protos.writer_pb2.GetLabelsRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[nucliadb_protos.writer_pb2.GetLabelsResponse, collections.abc.Awaitable[nucliadb_protos.writer_pb2.GetLabelsResponse]]:
-        """Labels"""
-
-    @abc.abstractmethod
-    def GetLabelSet(
-        self,
-        request: nucliadb_protos.writer_pb2.GetLabelSetRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[nucliadb_protos.writer_pb2.GetLabelSetResponse, collections.abc.Awaitable[nucliadb_protos.writer_pb2.GetLabelSetResponse]]: ...
-
-    @abc.abstractmethod
-    def SetLabels(
-        self,
-        request: nucliadb_protos.writer_pb2.SetLabelsRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[nucliadb_protos.writer_pb2.OpStatusWriter, collections.abc.Awaitable[nucliadb_protos.writer_pb2.OpStatusWriter]]: ...
-
-    @abc.abstractmethod
-    def DelLabels(
-        self,
-        request: nucliadb_protos.writer_pb2.DelLabelsRequest,
         context: _ServicerContext,
     ) -> typing.Union[nucliadb_protos.writer_pb2.OpStatusWriter, collections.abc.Awaitable[nucliadb_protos.writer_pb2.OpStatusWriter]]: ...
 

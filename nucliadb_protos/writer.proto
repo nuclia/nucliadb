@@ -147,31 +147,7 @@ message WriterStatusResponse {
 message WriterStatusRequest {
 }
 
-message SetLabelsRequest {
-    knowledgebox.KnowledgeBoxID kb = 1;
-    string id = 2;
-    knowledgebox.LabelSet labelset = 3;
-}
 
-message DelLabelsRequest {
-    knowledgebox.KnowledgeBoxID kb = 1;
-    string id = 2;
-}
-
-message GetLabelsResponse {
-    knowledgebox.KnowledgeBoxID kb = 1;
-    knowledgebox.Labels labels = 2;
-    enum Status {
-        OK = 0;
-        NOTFOUND = 1;
-    }
-    Status status = 3;
-
-}
-
-message GetLabelsRequest {
-    knowledgebox.KnowledgeBoxID kb = 1;
-}
 
 message NewEntitiesGroupRequest {
     knowledgebox.KnowledgeBoxID kb = 1;
@@ -269,14 +245,9 @@ message MergeEntitiesRequest {
     EntityID to = 3;
 }
 
-message GetLabelSetRequest {
+message GetLabelsResponse {
     knowledgebox.KnowledgeBoxID kb = 1;
-    string labelset = 2;
-}
-
-message GetLabelSetResponse {
-    knowledgebox.KnowledgeBoxID kb = 1;
-    knowledgebox.LabelSet labelset = 2;
+    knowledgebox.Labels labels = 2;
     enum Status {
         OK = 0;
         NOTFOUND = 1;
@@ -284,6 +255,9 @@ message GetLabelSetResponse {
     Status status = 3;
 }
 
+message GetLabelsRequest {
+    knowledgebox.KnowledgeBoxID kb = 1;
+}
 
 message GetEntitiesGroupRequest {
     knowledgebox.KnowledgeBoxID kb = 1;
@@ -526,12 +500,6 @@ service Writer {
     rpc SetVectors(SetVectorsRequest) returns (SetVectorsResponse) {}
 
     rpc ProcessMessage(stream BrokerMessage) returns (OpStatusWriter) {}
-
-    // Labels
-    rpc GetLabels(GetLabelsRequest) returns (GetLabelsResponse) {}
-    rpc GetLabelSet(GetLabelSetRequest) returns (GetLabelSetResponse) {}
-    rpc SetLabels(SetLabelsRequest) returns (OpStatusWriter) {}
-    rpc DelLabels(DelLabelsRequest) returns (OpStatusWriter) {}
 
     // Entities
     rpc NewEntitiesGroup(NewEntitiesGroupRequest) returns (NewEntitiesGroupResponse) {}

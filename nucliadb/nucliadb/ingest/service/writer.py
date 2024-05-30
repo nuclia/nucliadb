@@ -29,7 +29,6 @@ from nucliadb_protos.knowledgebox_pb2 import (
     KnowledgeBoxNew,
     KnowledgeBoxResponseStatus,
     KnowledgeBoxUpdate,
-    Labels,
     NewKnowledgeBoxResponse,
     SemanticModelMetadata,
     UpdateKnowledgeBoxResponse,
@@ -40,7 +39,6 @@ from nucliadb_protos.writer_pb2 import (
     BinaryData,
     BrokerMessage,
     DelEntitiesRequest,
-    DelLabelsRequest,
     DelVectorSetRequest,
     DelVectorSetResponse,
     ExtractedVectorsWrapper,
@@ -50,10 +48,6 @@ from nucliadb_protos.writer_pb2 import (
     GetEntitiesGroupResponse,
     GetEntitiesRequest,
     GetEntitiesResponse,
-    GetLabelSetRequest,
-    GetLabelSetResponse,
-    GetLabelsRequest,
-    GetLabelsResponse,
     IndexResource,
     IndexStatus,
     ListEntitiesGroupsRequest,
@@ -66,7 +60,6 @@ from nucliadb_protos.writer_pb2 import (
     NewVectorSetResponse,
     OpStatusWriter,
     SetEntitiesRequest,
-    SetLabelsRequest,
     SetVectorsRequest,
     SetVectorsResponse,
     UpdateEntitiesGroupRequest,
@@ -306,71 +299,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             response.status = OpStatusWriter.Status.OK
             logger.info(f"Processed {message.uuid}")
         return response
-
-    async def SetLabels(self, request: SetLabelsRequest, context=None) -> OpStatusWriter:  # type: ignore
-        async with self.driver.transaction() as txn:
-            kbobj = await self.proc.get_kb_obj(txn, request.kb)
-            response = OpStatusWriter()
-            if kbobj is not None:
-                try:
-                    await kbobj.set_labelset(request.id, request.labelset)
-                    await txn.commit()
-                    response.status = OpStatusWriter.Status.OK
-                except Exception as e:
-                    errors.capture_exception(e)
-                    logger.error("Error in ingest gRPC servicer", exc_info=True)
-                    response.status = OpStatusWriter.Status.ERROR
-            else:
-                response.status = OpStatusWriter.Status.NOTFOUND
-            return response
-
-    async def DelLabels(self, request: DelLabelsRequest, context=None) -> OpStatusWriter:  # type: ignore
-        async with self.driver.transaction() as txn:
-            kbobj = await self.proc.get_kb_obj(txn, request.kb)
-            response = OpStatusWriter()
-            if kbobj is not None:
-                try:
-                    await kbobj.del_labelset(request.id)
-                    await txn.commit()
-                    response.status = OpStatusWriter.Status.OK
-                except Exception as e:
-                    errors.capture_exception(e)
-                    logger.error("Error in ingest gRPC servicer", exc_info=True)
-                    response.status = OpStatusWriter.Status.ERROR
-            else:
-                response.status = OpStatusWriter.Status.NOTFOUND
-
-            return response
-
-    async def GetLabels(self, request: GetLabelsRequest, context=None) -> GetLabelsResponse:  # type: ignore
-        async with self.driver.transaction() as txn:
-            kbobj = await self.proc.get_kb_obj(txn, request.kb)
-            labels: Optional[Labels] = None
-            if kbobj is not None:
-                labels = await kbobj.get_labels()
-        response = GetLabelsResponse()
-        if kbobj is None:
-            response.status = GetLabelsResponse.Status.NOTFOUND
-        else:
-            response.kb.uuid = kbobj.kbid
-            if labels is not None:
-                response.labels.CopyFrom(labels)
-
-        return response
-
-    async def GetLabelSet(  # type: ignore
-        self, request: GetLabelSetRequest, context=None
-    ) -> GetLabelSetResponse:
-        async with self.driver.transaction() as txn:
-            kbobj = await self.proc.get_kb_obj(txn, request.kb)
-            response = GetLabelSetResponse()
-            if kbobj is not None:
-                await kbobj.get_labelset(request.labelset, response)
-                response.kb.uuid = kbobj.kbid
-                response.status = GetLabelSetResponse.Status.OK
-            else:
-                response.status = GetLabelSetResponse.Status.NOTFOUND
-            return response
 
     async def NewEntitiesGroup(  # type: ignore
         self, request: NewEntitiesGroupRequest, context=None
@@ -693,7 +621,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         result = FileUploaded()
         return result
 
-    async def NewVectorSet(
+    async def NewVectorSet(  # type: ignore
         self, request: NewVectorSetRequest, context=None
     ) -> NewVectorSetResponse:
         config = VectorSetConfig(
@@ -726,7 +654,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             response.status = NewVectorSetResponse.Status.OK
         return response
 
-    async def DelVectorSet(
+    async def DelVectorSet(  # type: ignore
         self, request: DelVectorSetRequest, context=None
     ) -> DelVectorSetResponse:
         response = DelVectorSetResponse()

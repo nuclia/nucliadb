@@ -23,12 +23,7 @@ from uuid import uuid4
 
 from grpc import StatusCode
 from grpc.aio import AioRpcError
-from nucliadb_protos.knowledgebox_pb2 import (
-    KnowledgeBoxConfig,
-    Labels,
-    LabelSet,
-    SemanticModelMetadata,
-)
+from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig, SemanticModelMetadata
 from nucliadb_protos.resources_pb2 import Basic
 from nucliadb_protos.utils_pb2 import ReleaseChannel
 
@@ -219,31 +214,6 @@ class KnowledgeBox:
         await datamanagers.kb.set_config(txn, kbid=uuid, config=exist)
 
         return uuid
-
-    # Labels
-    async def set_labelset(self, id: str, labelset: LabelSet):
-        await datamanagers.labels.set_labelset(
-            self.txn, kbid=self.kbid, labelset_id=id, labelset=labelset
-        )
-
-    async def get_labels(self) -> Labels:
-        return await datamanagers.labels.get_labels(self.txn, kbid=self.kbid)
-
-    async def get_labelset(
-        self, labelset: str, labelset_response: writer_pb2.GetLabelSetResponse
-    ):
-        ls = await datamanagers.labels.get_labelset(
-            self.txn,
-            kbid=self.kbid,
-            labelset_id=labelset,
-        )
-        if ls is not None:
-            labelset_response.labelset.CopyFrom(ls)
-
-    async def del_labelset(self, id: str):
-        await datamanagers.labels.delete_labelset(
-            self.txn, kbid=self.kbid, labelset_id=id
-        )
 
     @classmethod
     async def purge(cls, driver: Driver, kbid: str):

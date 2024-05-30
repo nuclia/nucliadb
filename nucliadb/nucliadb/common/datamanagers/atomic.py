@@ -39,7 +39,9 @@ import sys
 from functools import wraps
 
 from . import kb as kb_dm
+from . import labels as labels_dm
 from . import resources as resources_dm
+from . import synonyms as synonyms_dm
 from .utils import with_transaction
 
 # XXX: we are using the not exported _ParamSpec to support 3.9. Whenever we
@@ -69,7 +71,9 @@ def rw_txn_wrap(fun: P) -> P:  # type: ignore
     @wraps(fun)
     async def wrapper(**kwargs: P.kwargs):
         async with with_transaction() as txn:
-            return await fun(txn, **kwargs)
+            result = await fun(txn, **kwargs)
+            await txn.commit()
+            return result
 
     return wrapper
 
@@ -82,3 +86,15 @@ class resources:
     get_resource_uuid_from_slug = ro_txn_wrap(resources_dm.get_resource_uuid_from_slug)
     resource_exists = ro_txn_wrap(resources_dm.resource_exists)
     slug_exists = ro_txn_wrap(resources_dm.slug_exists)
+
+
+class labelset:
+    get = ro_txn_wrap(labels_dm.get_labelset)
+    set = rw_txn_wrap(labels_dm.set_labelset)
+    delete = rw_txn_wrap(labels_dm.delete_labelset)
+    get_all = ro_txn_wrap(labels_dm.get_labels)
+
+
+class synonyms:
+    get = ro_txn_wrap(synonyms_dm.get)
+    set = rw_txn_wrap(synonyms_dm.set)
