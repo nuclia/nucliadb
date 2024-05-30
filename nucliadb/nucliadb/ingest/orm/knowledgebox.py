@@ -61,8 +61,8 @@ KB_TO_DELETE_STORAGE_BASE = "/storagetodelete/"
 KB_TO_DELETE = f"{KB_TO_DELETE_BASE}{{kbid}}"
 KB_TO_DELETE_STORAGE = f"{KB_TO_DELETE_STORAGE_BASE}{{kbid}}"
 
-KB_VECTORSET_TO_DELETE_BASE = "/kbvectorsettodelete"
-KB_VECTORSET_TO_DELETE = f"{KB_VECTORSET_TO_DELETE_BASE}/{{kbid}}"
+KB_VECTORSET_TO_DELETE_BASE = "/vectorsettodelete"
+KB_VECTORSET_TO_DELETE = f"{KB_VECTORSET_TO_DELETE_BASE}/{{kbid}}/{{vectorset}}"
 
 
 class KnowledgeBox:
@@ -435,7 +435,9 @@ class KnowledgeBox:
             self.txn, kbid=self.kbid, vectorset_id=vectorset_id
         )
         # mark vectorset for async deletion
-        await self.txn.set(KB_VECTORSET_TO_DELETE.format(kbid=self.kbid), b"")
+        await self.txn.set(
+            KB_VECTORSET_TO_DELETE.format(kbid=self.kbid, vectorset=vectorset_id), b""
+        )
         shard_manager = get_shard_manager()
         await shard_manager.delete_vectorset(self.kbid, vectorset_id)
 
