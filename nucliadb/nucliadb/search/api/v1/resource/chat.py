@@ -46,6 +46,7 @@ from ..chat import create_chat_response
     description="Chat with a resource",
     tags=["Search"],
     response_model=None,
+    deprecated=True,
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
@@ -82,6 +83,7 @@ async def resource_chat_endpoint_by_uuid(
     description="Chat with a resource",
     tags=["Search"],
     response_model=None,
+    deprecated=True,
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
