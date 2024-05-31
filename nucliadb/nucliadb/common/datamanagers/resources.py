@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import AsyncGenerator, Optional
+from typing import TYPE_CHECKING, AsyncGenerator, Optional
 
 import backoff
 
@@ -26,13 +26,15 @@ from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
 
 # These should be refactored
-from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG, KB_RESOURCE_SLUG_BASE
-from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.settings import settings as ingest_settings
-from nucliadb_protos import noderesources_pb2, resources_pb2, writer_pb2
+from nucliadb_protos import noderesources_pb2, resources_pb2
 from nucliadb_utils.utilities import get_storage
 
 from .utils import with_transaction
+
+if TYPE_CHECKING:
+    from nucliadb.ingest.orm.resource import Resource as ResourceORM
+
 
 KB_RESOURCE_BASIC = "/kbs/{kbid}/r/{uuid}"
 KB_RESOURCE_BASIC_FS = "/kbs/{kbid}/r/{uuid}/basic"  # Only used on FS driver
@@ -41,10 +43,15 @@ KB_RESOURCE_EXTRA = "/kbs/{kbid}/r/{uuid}/extra"
 KB_RESOURCE_SECURITY = "/kbs/{kbid}/r/{uuid}/security"
 KB_RESOURCE_RELATIONS = "/kbs/{kbid}/r/{uuid}/relations"
 
-KB_RESOURCE_SHARD = "/kbs/{kbid}/r/{uuid}/shard"
+KB_RESOURCE_SLUG_BASE = "/kbs/{kbid}/s/"
+KB_RESOURCE_SLUG = f"{KB_RESOURCE_SLUG_BASE}{{slug}}"
+
+KB_RESOURCE_FIELDS = "/kbs/{kbid}/r/{uuid}/f/"
 
 KB_RESOURCE_ALL_FIELDS = "/kbs/{kbid}/r/{uuid}/allfields"
 KB_MATERIALIZED_RESOURCES_COUNT = "/kbs/{kbid}/materialized/resources/count"
+
+KB_RESOURCE_SHARD = "/kbs/{kbid}/r/{uuid}/shard"
 
 
 async def resource_exists(txn: Transaction, *, kbid: str, rid: str) -> bool:
@@ -332,25 +339,12 @@ async def has_field(
 # ORM mix (this functions shouldn't belong here)
 
 
-async def get_broker_message(
-    txn: Transaction, *, kbid: str, rid: str
-) -> Optional[writer_pb2.BrokerMessage]:
-    resource = await get_resource(txn, kbid=kbid, rid=rid)
-    if resource is None:
-        return None
-
-    resource.disable_vectors = False
-    resource.txn = txn
-    bm = await resource.generate_broker_message()
-    return bm
-
-
 @backoff.on_exception(
     backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3
 )
 async def get_resource(
     txn: Transaction, *, kbid: str, rid: str
-) -> Optional[ResourceORM]:
+) -> Optional["ResourceORM"]:
     """
     Not ideal to return Resource type here but refactoring would
     require a lot of changes.

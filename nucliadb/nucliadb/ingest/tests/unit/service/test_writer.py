@@ -668,6 +668,10 @@ class TestWriterServicer:
                 "nucliadb.ingest.service.writer.get_transaction_utility",
                 MagicMock(return_value=txn),
             ),
+            patch(
+                "nucliadb.ingest.service.writer.generate_broker_message",
+                AsyncMock(return_value=writer_pb2.BrokerMessage()),
+            ),
         ):
             resp = await writer.Index(request)
 

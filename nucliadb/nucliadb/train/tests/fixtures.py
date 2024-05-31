@@ -41,10 +41,10 @@ from nucliadb_protos.writer_pb2 import (
 )
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
+from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG_BASE
 from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor import Processor
-from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
 from nucliadb.standalone.settings import Settings
 from nucliadb.train.utils import start_shard_manager, stop_shard_manager
 from nucliadb_utils.tests import free_port

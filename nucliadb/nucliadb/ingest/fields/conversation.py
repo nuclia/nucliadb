@@ -120,6 +120,21 @@ class Conversation(Field):
         except PageNotFound:
             return None
 
+    async def get_full_conversation(self) -> Optional[PBConversation]:
+        """
+        Messages of a conversations may be stored across several pages.
+        This method fetches them all and returns a single complete conversation.
+        """
+        full_conv = PBConversation()
+        n_page = 1
+        while True:
+            page = await self.get_value(page=n_page)
+            if page is None:
+                break
+            full_conv.messages.extend(page.messages)
+            n_page += 1
+        return full_conv
+
     async def get_metadata(self) -> FieldConversation:
         if self.metadata is None:
             payload = await self.resource.txn.get(

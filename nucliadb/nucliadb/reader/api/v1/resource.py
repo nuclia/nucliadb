@@ -23,10 +23,10 @@ from fastapi import Header, HTTPException, Query, Request, Response
 from fastapi_versioning import version
 
 import nucliadb_models as models
+from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG_BASE
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as ORMKnowledgeBox
-from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
 from nucliadb.ingest.orm.resource import Resource as ORMResource
 from nucliadb.ingest.serialize import (
     managed_serialize,

@@ -63,6 +63,7 @@ from nucliadb_protos.utils_pb2 import Relation as PBRelation
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb.common import datamanagers
+from nucliadb.common.datamanagers.resources import KB_RESOURCE_FIELDS, KB_RESOURCE_SLUG
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
@@ -85,9 +86,6 @@ if TYPE_CHECKING:  # pragma: no cover
 
 logger = logging.getLogger(__name__)
 
-KB_RESOURCE_FIELDS = "/kbs/{kbid}/r/{uuid}/f/"
-KB_RESOURCE_SLUG_BASE = "/kbs/{kbid}/s/"
-KB_RESOURCE_SLUG = f"{KB_RESOURCE_SLUG_BASE}{{slug}}"
 KB_FIELDS: dict[int, Type] = {
     FieldType.LAYOUT: Layout,
     FieldType.TEXT: Text,
@@ -371,6 +369,8 @@ class Resource:
                 )
 
             if self.disable_vectors is False:
+                # XXX: while we don't remove the "default" vectorset concept, we
+                # need to do use None as the default one
                 vo = await field.get_vectors()
                 if vo is not None:
                     dimension = await datamanagers.kb.get_matryoshka_vector_dimension(
@@ -381,171 +381,24 @@ class Resource:
                         vo,
                         matryoshka_vector_dimension=dimension,
                     )
+
+                async for vectorset_config in datamanagers.vectorsets.iter(
+                    self.txn, kbid=self.kb.kbid
+                ):
+                    vo = await field.get_vectors(
+                        vectorset=vectorset_config.vectorset_id
+                    )
+                    if vo is not None:
+                        dimension = (
+                            vectorset_config.vectorset_index_config.vector_dimension
+                        )
+                        brain.apply_field_vectors(
+                            field_key,
+                            vo,
+                            vectorset=vectorset_config.vectorset_id,
+                            matryoshka_vector_dimension=dimension,
+                        )
         return brain
-
-    async def generate_field_vectors(
-        self,
-        bm: BrokerMessage,
-        type_id: FieldType.ValueType,
-        field_id: str,
-        field: Field,
-    ):
-        vo = await field.get_vectors()
-        if vo is None:
-            return
-        evw = ExtractedVectorsWrapper()
-        evw.field.field = field_id
-        evw.field.field_type = type_id  # type: ignore
-        evw.vectors.CopyFrom(vo)
-        bm.field_vectors.append(evw)
-
-    async def generate_field_large_computed_metadata(
-        self,
-        bm: BrokerMessage,
-        type_id: FieldType.ValueType,
-        field_id: str,
-        field: Field,
-    ):
-        lcm = await field.get_large_field_metadata()
-        if lcm is None:
-            return
-        lcmw = LargeComputedMetadataWrapper()
-        lcmw.field.field = field_id
-        lcmw.field.field_type = type_id  # type: ignore
-        lcmw.real.CopyFrom(lcm)
-        bm.field_large_metadata.append(lcmw)
-
-    async def generate_field_computed_metadata(
-        self,
-        bm: BrokerMessage,
-        type_id: FieldType.ValueType,
-        field_id: str,
-        field: Field,
-    ):
-        fcmw = FieldComputedMetadataWrapper()
-        fcmw.field.field = field_id
-        fcmw.field.field_type = type_id  # type: ignore
-
-        field_metadata = await field.get_field_metadata()
-        if field_metadata is not None:
-            fcmw.metadata.CopyFrom(field_metadata)
-            fcmw.field.field = field_id
-            fcmw.field.field_type = type_id  # type: ignore
-            bm.field_metadata.append(fcmw)
-            # Make sure cloud files are removed for exporting
-
-    async def generate_extracted_text(
-        self,
-        bm: BrokerMessage,
-        type_id: FieldType.ValueType,
-        field_id: str,
-        field: Field,
-    ):
-        etw = ExtractedTextWrapper()
-        etw.field.field = field_id
-        etw.field.field_type = type_id  # type: ignore
-        extracted_text = await field.get_extracted_text()
-        if extracted_text is not None:
-            etw.body.CopyFrom(extracted_text)
-            bm.extracted_text.append(etw)
-
-    async def generate_field(
-        self,
-        bm: BrokerMessage,
-        type_id: FieldType.ValueType,
-        field_id: str,
-        field: Field,
-    ):
-        # Used for exporting a field
-        if type_id == FieldType.TEXT:
-            value = await field.get_value()
-            bm.texts[field_id].CopyFrom(value)
-        elif type_id == FieldType.LINK:
-            value = await field.get_value()
-            bm.links[field_id].CopyFrom(value)
-        elif type_id == FieldType.FILE:
-            value = await field.get_value()
-            bm.files[field_id].CopyFrom(value)
-        elif type_id == FieldType.CONVERSATION:
-            value = await self.get_full_conversation(field)  # type: ignore
-            bm.conversations[field_id].CopyFrom(value)
-        elif type_id == FieldType.KEYWORDSET:
-            value = await field.get_value()
-            bm.keywordsets[field_id].CopyFrom(value)
-        elif type_id == FieldType.DATETIME:
-            value = await field.get_value()
-            bm.datetimes[field_id].CopyFrom(value)
-        elif type_id == FieldType.LAYOUT:
-            value = await field.get_value()
-            bm.layouts[field_id].CopyFrom(value)
-
-    async def get_full_conversation(
-        self,
-        conversation_field: Conversation,
-    ) -> Optional[PBConversation]:
-        """
-        Messages of a conversations may be stored across several pages.
-        This method fetches them all and returns a single complete conversation.
-        """
-        full_conv = PBConversation()
-        n_page = 1
-        while True:
-            page = await conversation_field.get_value(page=n_page)
-            if page is None:
-                break
-            full_conv.messages.extend(page.messages)
-            n_page += 1
-        return full_conv
-
-    async def generate_broker_message(self) -> BrokerMessage:
-        # full means downloading all the pointers
-        # minuts the ones to external files that are not PB
-        # Go for all fields and recreate brain
-        bm = BrokerMessage()
-        bm.kbid = self.kb.kbid
-        bm.uuid = self.uuid
-        basic = await self.get_basic()
-        if basic is not None:
-            bm.basic.CopyFrom(basic)
-        bm.slug = bm.basic.slug
-        origin = await self.get_origin()
-        if origin is not None:
-            bm.origin.CopyFrom(origin)
-        relations = await self.get_relations()
-        if relations is not None:
-            for relation in relations.relations:
-                bm.relations.append(relation)
-
-        fields = await self.get_fields(force=True)
-        for (type_id, field_id), field in fields.items():
-            # Value
-            await self.generate_field(bm, type_id, field_id, field)
-
-            # Extracted text
-            await self.generate_extracted_text(bm, type_id, field_id, field)
-
-            # Field Computed Metadata
-            await self.generate_field_computed_metadata(bm, type_id, field_id, field)
-
-            if type_id == FieldType.FILE and isinstance(field, File):
-                field_extracted_data = await field.get_file_extracted_data()
-                if field_extracted_data is not None:
-                    bm.file_extracted_data.append(field_extracted_data)
-
-            elif type_id == FieldType.LINK and isinstance(field, Link):
-                link_extracted_data = await field.get_link_extracted_data()
-                if link_extracted_data is not None:
-                    bm.link_extracted_data.append(link_extracted_data)
-
-            # Field vectors
-            await self.generate_field_vectors(bm, type_id, field_id, field)
-
-            # Large metadata
-            await self.generate_field_large_computed_metadata(
-                bm, type_id, field_id, field
-            )
-
-        return bm
 
     # Fields
     async def get_fields(
@@ -948,6 +801,8 @@ class Resource:
         add_field_classifications(self.basic, field_metadata)
 
     async def _apply_extracted_vectors(self, field_vectors: ExtractedVectorsWrapper):
+        # Store vectors in the resource
+
         if not self.has_field(
             field_vectors.field.field_type, field_vectors.field.field
         ):
@@ -967,15 +822,36 @@ class Resource:
             replace_field_sentences,
             replace_splits_sentences,
         ) = await field_obj.set_vectors(field_vectors)
+
+        # Prepare vectors to be indexed
+
         field_key = self.generate_field_id(field_vectors.field)
         if vo is not None:
-            dimension = await datamanagers.kb.get_matryoshka_vector_dimension(
-                self.txn, kbid=self.kb.kbid
-            )
+            vectorset_id = field_vectors.vectorset_id or None
+            if vectorset_id is None:
+                dimension = await datamanagers.kb.get_matryoshka_vector_dimension(
+                    self.txn, kbid=self.kb.kbid
+                )
+            else:
+                config = await datamanagers.vectorsets.get(
+                    self.txn, kbid=self.kb.kbid, vectorset_id=vectorset_id
+                )
+                if config is None:
+                    logger.warning(
+                        f"Trying to apply a resource on vectorset '{vectorset_id}' that doesn't exist."
+                    )
+                    return
+                dimension = config.vectorset_index_config.vector_dimension
+                if not dimension:
+                    raise ValueError(
+                        f"Vector dimension not set for vectorset '{vectorset_id}'"
+                    )
+
             apply_field_vectors_partial = partial(
                 self.indexer.apply_field_vectors,
                 field_key,
                 vo,
+                vectorset=vectorset_id,
                 replace_field=replace_field_sentences,
                 replace_splits=replace_splits_sentences,
                 matryoshka_vector_dimension=dimension,
