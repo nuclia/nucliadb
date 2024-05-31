@@ -18,18 +18,14 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import uuid
 
 import pytest
 from httpx import AsyncClient
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb.common.cluster import manager
-from nucliadb.tests.utils import inject_message
-from nucliadb_protos import nodereader_pb2, writer_pb2
-
-DEFAULT_VECTOR_DIMENSION = 512
-VECTORSET_DIMENSION = 12
+from nucliadb.tests.knowledgeboxes.vectorsets import KbSpecs
+from nucliadb_protos import nodereader_pb2
 
 
 @pytest.mark.asyncio
@@ -38,13 +34,12 @@ async def test_vectorsets(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     nucliadb_grpc: WriterStub,
-    knowledgebox: str,
+    kb_with_vectorset: KbSpecs,
 ):
-    kbid = knowledgebox
-    vectorset_id = "my-vectorset"
-
-    await create_vectorset(nucliadb_grpc, kbid, vectorset_id)
-    await inject_broker_message_with_vectorset_data(nucliadb_grpc, kbid, vectorset_id)
+    kbid = kb_with_vectorset.kbid
+    vectorset_id = kb_with_vectorset.vectorset_id
+    default_vector_dimension = kb_with_vectorset.default_vector_dimension
+    vectorset_dimension = kb_with_vectorset.vectorset_dimension
 
     # TODO: change this to use search REST API when implemented
     shards = await manager.KBShardManager().get_shards_by_kbid(kbid)
@@ -52,8 +47,8 @@ async def test_vectorsets(
     node, shard_id = manager.choose_node(logic_shard)
 
     test_cases = [
-        (DEFAULT_VECTOR_DIMENSION, ""),
-        (VECTORSET_DIMENSION, vectorset_id),
+        (default_vector_dimension, ""),
+        (vectorset_dimension, vectorset_id),
     ]
     for dimension, vectorset in test_cases:
         query_pb = nodereader_pb2.SearchRequest(
@@ -67,8 +62,8 @@ async def test_vectorsets(
         assert len(results.vector.documents) == 5
 
     test_cases = [
-        (DEFAULT_VECTOR_DIMENSION, vectorset_id),
-        (VECTORSET_DIMENSION, ""),
+        (default_vector_dimension, vectorset_id),
+        (vectorset_dimension, ""),
     ]
     for dimension, vectorset in test_cases:
         query_pb = nodereader_pb2.SearchRequest(
@@ -81,32 +76,3 @@ async def test_vectorsets(
         with pytest.raises(Exception) as exc:
             results = await node.reader.Search(query_pb)  # type: ignore
         assert "inconsistent dimensions" in str(exc).lower()
-
-
-async def create_vectorset(nucliadb_grpc: WriterStub, kbid: str, vectorset_id: str):
-    response = await nucliadb_grpc.NewVectorSet(
-        writer_pb2.NewVectorSetRequest(
-            kbid=kbid,
-            vectorset_id=vectorset_id,
-            vector_dimension=VECTORSET_DIMENSION,
-        )
-    )  # type: ignore
-    assert response.status == response.Status.OK
-
-
-async def inject_broker_message_with_vectorset_data(
-    nucliadb_grpc: WriterStub, kbid: str, vectorset_id: str
-):
-    from nucliadb.ingest.tests.integration.ingest.test_vectorsets import (
-        create_broker_message_with_vectorset,
-    )
-
-    bm = create_broker_message_with_vectorset(
-        kbid,
-        rid=uuid.uuid4().hex,
-        field_id=uuid.uuid4().hex,
-        vectorset_id=vectorset_id,
-        default_vectorset_dimension=DEFAULT_VECTOR_DIMENSION,
-        vectorset_dimension=VECTORSET_DIMENSION,
-    )
-    await inject_message(nucliadb_grpc, bm)
