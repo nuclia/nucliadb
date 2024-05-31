@@ -298,8 +298,6 @@ class Field:
             actual_payload = None
 
         sf = self._get_extracted_vectors_storage_field(vectorset)
-        print("Vectorset", vectorset)
-        print("Storage field:", sf)
         vo: Optional[VectorObject] = None
         replace_field: bool = True
         replace_splits = []
