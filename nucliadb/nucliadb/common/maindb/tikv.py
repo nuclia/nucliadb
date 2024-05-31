@@ -36,6 +36,8 @@ from nucliadb.common.maindb.driver import (
 from nucliadb.common.maindb.exceptions import ConflictError, MaindbServerError
 from nucliadb_telemetry import metrics
 
+from .pg import PGDriver, PGTransaction
+
 try:
     from tikv_client import asynchronous  # type: ignore
 
@@ -262,21 +264,33 @@ class TiKVDataLayer:
 class TiKVTransaction(Transaction):
     driver: TiKVDriver
 
-    def __init__(self, txn: Any, driver: TiKVDriver):
+    def __init__(
+        self,
+        txn: Any,
+        driver: TiKVDriver,
+        replication_tx: Optional[PGTransaction] = None,
+    ):
         self.txn = txn
         self.driver = driver
         self.data_layer = TiKVDataLayer(txn)
         self.open = True
+        self.replication_tx = replication_tx
+        self.replication_ops: List[int] = []
 
     async def abort(self):
         if not self.open:
             return
         await self.data_layer.abort()
+        if self.replication_tx:
+            await self.replication_tx.abort()
         self.open = False
 
     async def commit(self):
         assert self.open
         await self.data_layer.commit()
+        if self.replication_tx:
+            await self.replication_tx.create_replication_commit(self.replication_ops)
+            await self.replication_tx.commit()
         self.open = False
 
     async def batch_get(self, keys: list[str]) -> list[Optional[bytes]]:
@@ -295,10 +309,18 @@ class TiKVTransaction(Transaction):
 
     async def set(self, key: str, value: bytes) -> None:
         assert self.open
+        if self.replication_tx:
+            self.replication_ops.append(
+                await self.replication_tx.set_replication(key, value)
+            )
         return await self.data_layer.set(key, value)
 
     async def delete(self, key: str) -> None:
         assert self.open
+        if self.replication_tx:
+            self.replication_ops.append(
+                await self.replication_tx.delete_replication(key)
+            )
         return await self.data_layer.delete(key)
 
     async def keys(
@@ -311,49 +333,6 @@ class TiKVTransaction(Transaction):
         dl = TiKVDataLayer(txn)
 
         async for key in dl.keys(match, count, include_start):
-            yield key
-
-    async def count(self, match: str) -> int:
-        assert self.open
-        return await self.data_layer.count(match)
-
-
-class ReadOnlyTiKVTransaction(Transaction):
-    driver: TiKVDriver
-
-    def __init__(self, connection: asynchronous.Snapshot, driver: TiKVDriver):
-        self.connection = connection
-        self.data_layer = TiKVDataLayer(connection)
-        self.driver = driver
-        self.open = True
-
-    async def abort(self):
-        self.open = False
-        # Read only transactions are implemented as snapshots, which
-        # are read only and isolated, and they don't need to be aborted.
-
-    async def commit(self):
-        raise Exception("Cannot commit transaction in read only mode")
-
-    async def batch_get(self, keys: list[str]) -> list[Optional[bytes]]:
-        assert self.open
-        return await self.data_layer.batch_get(keys)
-
-    async def get(self, key: str) -> Optional[bytes]:
-        assert self.open
-        return await self.data_layer.get(key)
-
-    async def set(self, key: str, value: bytes) -> None:
-        raise Exception("Cannot set in read only transaction")
-
-    async def delete(self, key: str) -> None:
-        raise Exception("Cannot delete in read only transaction")
-
-    async def keys(
-        self, match: str, count: int = DEFAULT_SCAN_LIMIT, include_start: bool = True
-    ):
-        assert self.open
-        async for key in self.data_layer.keys(match, count, include_start):
             yield key
 
     async def count(self, match: str) -> int:
@@ -434,29 +413,38 @@ class ConnectionHolder:
 
 
 class TiKVDriver(Driver):
-    def __init__(self, url: List[str], pool_size: int = 3):
+    def __init__(
+        self, url: List[str], pool_size: int = 3, replication_url: Optional[str] = None
+    ):
         if TiKV is False:
             raise ImportError("TiKV is not installed")
         self.url = url
         self.pool: list[ConnectionHolder] = []
         self.pool_size = pool_size
+        if replication_url:
+            self.replication_driver: Optional[PGDriver] = PGDriver(replication_url)
+        else:
+            self.replication_driver = None
 
     async def initialize(self):
         self.pool = [ConnectionHolder(self.url) for _ in range(self.pool_size)]
         for holder in self.pool:
             await holder.reinitialize()
+        if self.replication_driver:
+            await self.replication_driver.initialize(for_replication=True)
 
     async def finalize(self):
         self.pool.clear()
+        if self.replication_driver:
+            await self.replication_driver.finalize()
 
     def get_connection_holder(self) -> ConnectionHolder:
         return random.choice(self.pool)
 
-    async def begin(
-        self, read_only: bool = False
-    ) -> Union[TiKVTransaction, ReadOnlyTiKVTransaction]:
+    async def begin(self, read_only: bool = False) -> TiKVTransaction:
         conn = self.get_connection_holder()
-        # if read_only:
-        #     return ReadOnlyTiKVTransaction(await conn.get_snapshot(), self)
-        # else:
-        return TiKVTransaction(await conn.begin_transaction(), self)
+        if self.replication_driver and not read_only:
+            replication_tx: PGTransaction = await self.replication_driver.begin()  # type: ignore
+            return TiKVTransaction(await conn.begin_transaction(), self, replication_tx)
+        else:
+            return TiKVTransaction(await conn.begin_transaction(), self)
