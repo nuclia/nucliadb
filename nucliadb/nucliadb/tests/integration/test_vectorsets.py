@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import AsyncClient
@@ -41,7 +42,6 @@ async def test_vectorsets(
     default_vector_dimension = kb_with_vectorset.default_vector_dimension
     vectorset_dimension = kb_with_vectorset.vectorset_dimension
 
-    # TODO: change this to use search REST API when implemented
     shards = await manager.KBShardManager().get_shards_by_kbid(kbid)
     logic_shard = shards[0]
     node, shard_id = manager.choose_node(logic_shard)
@@ -76,3 +76,56 @@ async def test_vectorsets(
         with pytest.raises(Exception) as exc:
             results = await node.reader.Search(query_pb)  # type: ignore
         assert "inconsistent dimensions" in str(exc).lower()
+
+
+@pytest.mark.parametrize(
+    "vectorset,expected",
+    [(None, ""), ("", ""), ("myvectorset", "myvectorset")],
+)
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_vectorset_parameter(
+    nucliadb_reader: AsyncClient,
+    knowledgebox: str,
+    vectorset,
+    expected,
+):
+    kbid = knowledgebox
+
+    calls: list[nodereader_pb2.SearchRequest] = []
+
+    async def mock_node_query(
+        kbid: str, method, pb_query: nodereader_pb2.SearchRequest, **kwargs
+    ):
+        calls.append(pb_query)
+        results = [nodereader_pb2.SearchResponse()]
+        incomplete_results = False
+        queried_nodes = []  # type: ignore
+        return (results, incomplete_results, queried_nodes)
+
+    with (
+        patch(
+            "nucliadb.search.api.v1.search.node_query",
+            new=AsyncMock(side_effect=mock_node_query),
+        ),
+        patch(
+            "nucliadb.search.search.find.node_query",
+            new=AsyncMock(side_effect=mock_node_query),
+        ),
+    ):
+        resp = await nucliadb_reader.get(
+            f"/kb/{kbid}/search",
+            params={"query": "foo", "vectorset": vectorset},
+        )
+        assert resp.status_code == 200
+        assert calls[-1].vectorset == expected
+
+        resp = await nucliadb_reader.get(
+            f"/kb/{kbid}/find",
+            params={
+                "query": "foo",
+                "vectorset": vectorset,
+            },
+        )
+        assert resp.status_code == 200
+        assert calls[-1].vectorset == expected

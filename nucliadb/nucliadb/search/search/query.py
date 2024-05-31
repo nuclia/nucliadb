@@ -107,6 +107,7 @@ class QueryParser:
         range_modification_end: Optional[datetime] = None,
         fields: Optional[list[str]] = None,
         user_vector: Optional[list[float]] = None,
+        vectorset: Optional[str] = None,
         with_duplicates: bool = False,
         with_status: Optional[ResourceProcessingStatus] = None,
         with_synonyms: bool = False,
@@ -133,6 +134,7 @@ class QueryParser:
         self.range_modification_end = range_modification_end
         self.fields = fields or []
         self.user_vector = user_vector
+        self.vectorset = vectorset
         self.with_duplicates = with_duplicates
         self.with_status = with_status
         self.with_synonyms = with_synonyms
@@ -403,13 +405,35 @@ class QueryParser:
                     incomplete = True
         else:
             query_vector = self.user_vector
+
+        # XXX: Do we need some vectorset validation?
+        if self.vectorset:
+            request.vectorset = self.vectorset
+
         if query_vector is not None:
-            matryoshka_dimension = await self._get_matryoshka_dimension()
-            if matryoshka_dimension is not None:
+            matryoshka_dimension = None
+            if not request.vectorset:
+                # XXX this should be migrated once we remove the "default"
+                # vectorset concept
+                matryoshka_dimension = await self._get_matryoshka_dimension()
+            else:
+                vectorset_config = await datamanagers.atomic.vectorsets.get(
+                    kbid=self.kbid, vectorset_id=request.vectorset
+                )
+                if (
+                    vectorset_config is not None
+                    and vectorset_config.vectors_index_config.vector_dimension
+                ):
+                    matryoshka_dimension = (
+                        vectorset_config.vectors_index_config.vector_dimension
+                    )
+
+            if matryoshka_dimension:
                 # KB using a matryoshka embeddings model, cut the query vector
                 # accordingly
                 query_vector = query_vector[:matryoshka_dimension]
             request.vector.extend(query_vector)
+
         return incomplete
 
     async def parse_relation_search(

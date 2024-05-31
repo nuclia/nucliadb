@@ -122,6 +122,7 @@ async def search_knowledgebox(
         description="Minimum bm25 score to filter paragraph and document index results",
         ge=0,
     ),
+    vectorset: Optional[str] = fastapi_query(SearchParamDefaults.vectorset),
     range_creation_start: Optional[datetime] = fastapi_query(
         SearchParamDefaults.range_creation_start
     ),
@@ -179,6 +180,7 @@ async def search_knowledgebox(
             min_score=min_score_from_query_params(
                 min_score_bm25, min_score_semantic, min_score
             ),
+            vectorset=vectorset,
             range_creation_end=range_creation_end,
             range_creation_start=range_creation_start,
             range_modification_end=range_modification_end,
@@ -452,6 +454,7 @@ async def search(
         range_modification_end=item.range_modification_end,
         fields=item.fields,
         user_vector=item.vector,
+        vectorset=item.vectorset,
         with_duplicates=item.with_duplicates,
         with_status=with_status,
         with_synonyms=item.with_synonyms,
