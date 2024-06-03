@@ -362,7 +362,11 @@ async def get_resource(
     backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3
 )
 async def get_resource_index_message(
-    txn: Transaction, *, kbid: str, rid: str, reindex: bool = False,
+    txn: Transaction,
+    *,
+    kbid: str,
+    rid: str,
+    reindex: bool = False,
 ) -> Optional[noderesources_pb2.Resource]:
     # prevent circulat imports -- this is not ideal that we have the ORM mix here.
     from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM

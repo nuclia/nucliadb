@@ -274,7 +274,9 @@ class Processor:
                 await resource.compute_security(resource.indexer)
                 if message.reindex:
                     # when reindexing, let's just generate full new index message
-                    resource.replace_indexer(await resource.generate_index_message(reindex=True))
+                    resource.replace_indexer(
+                        await resource.generate_index_message(reindex=True)
+                    )
 
             if resource and resource.modified:
                 await self.index_resource(  # noqa

@@ -359,7 +359,9 @@ class Resource:
                         None,
                     )
                 if reindex:
-                    replace_field = [f"{p.start}-{p.end}" for p in field_metadata.metadata.paragraphs]
+                    replace_field = [
+                        f"{p.start}-{p.end}" for p in field_metadata.metadata.paragraphs
+                    ]
                 else:
                     replace_field = []
                 brain.apply_field_metadata(

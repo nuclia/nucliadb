@@ -379,14 +379,10 @@ class ResourceBrain:
 
     def delete_vectors(self, field_key: str, vo: VectorObject):
         for subfield, vectors in vo.split_vectors.items():
-            self.brain.sentences_to_delete.append(
-                f"{self.rid}/{field_key}/{subfield}"
-            )
+            self.brain.sentences_to_delete.append(f"{self.rid}/{field_key}/{subfield}")
 
         for vector in vo.vectors.vectors:
-            self.brain.sentences_to_delete.append(
-                f"{self.rid}/{field_key}"
-            )
+            self.brain.sentences_to_delete.append(f"{self.rid}/{field_key}")
 
     def set_processing_status(
         self, basic: Basic, previous_status: Optional[Metadata.Status.ValueType]
