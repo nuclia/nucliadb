@@ -129,13 +129,8 @@ async def test_labelsets_service_handles_conflicts(
         if resp.status_code == 409:
             conflict_reproduced.set()
 
-    for _ in range(10):
-        await asyncio.sleep(0.5)
-        tasks = [post_labelset() for _ in range(10)]
-        await asyncio.gather(*tasks)
-        if conflict_reproduced.is_set():
-            break
-
+    tasks = [post_labelset() for _ in range(5)]
+    await asyncio.gather(*tasks)
     assert conflict_reproduced.is_set(), "Conflict was not reproduced"
 
 
