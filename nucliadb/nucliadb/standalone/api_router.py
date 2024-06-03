@@ -183,7 +183,7 @@ class UpdatePullPosition(pydantic.BaseModel):
 async def update_pull_position(
     request: Request, item: UpdatePullPosition
 ) -> JSONResponse:
-    async with datamanagers.with_rw_transaction() as txn:
+    async with datamanagers.with_transaction() as txn:
         # standalone assumes 1 partition
         await datamanagers.processing.set_pull_offset(
             txn,

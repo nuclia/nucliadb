@@ -100,7 +100,7 @@ class MaterializerHandler:
             value = await datamanagers.resources.calculate_number_of_resources(
                 txn, kbid=kbid
             )
-        async with datamanagers.with_rw_transaction() as txn:
+        async with datamanagers.with_transaction() as txn:
             await datamanagers.resources.set_number_of_resources(
                 txn, kbid=kbid, value=value
             )

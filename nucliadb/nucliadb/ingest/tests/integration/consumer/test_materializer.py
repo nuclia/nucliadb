@@ -83,7 +83,7 @@ async def test_materialize_kb_data(
     )
     await mz.initialize()
 
-    async with datamanagers.with_rw_transaction() as txn:
+    async with datamanagers.with_transaction() as txn:
         assert (
             await datamanagers.resources.get_number_of_resources(
                 txn, kbid=knowledgebox_ingest
@@ -107,7 +107,7 @@ async def test_materialize_kb_data(
 
     await asyncio.sleep(0.2)
 
-    async with datamanagers.with_rw_transaction() as txn:
+    async with datamanagers.with_transaction() as txn:
         assert (
             await datamanagers.resources.get_number_of_resources(
                 txn, kbid=knowledgebox_ingest

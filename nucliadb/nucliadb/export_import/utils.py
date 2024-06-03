@@ -151,7 +151,7 @@ async def import_binary(
 async def set_entities_groups(
     context: ApplicationContext, kbid: str, entities_groups: kb_pb2.EntitiesGroups
 ) -> None:
-    async with datamanagers.with_rw_transaction() as txn:
+    async with datamanagers.with_transaction() as txn:
         await datamanagers.entities.set_entities_groups(
             txn, kbid=kbid, entities_groups=entities_groups
         )
@@ -161,7 +161,7 @@ async def set_entities_groups(
 async def set_labels(
     context: ApplicationContext, kbid: str, labels: kb_pb2.Labels
 ) -> None:
-    async with datamanagers.with_rw_transaction() as txn:
+    async with datamanagers.with_transaction() as txn:
         await datamanagers.labels.set_labels(txn, kbid=kbid, labels=labels)
         await txn.commit()
 

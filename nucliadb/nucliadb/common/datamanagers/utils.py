@@ -48,6 +48,10 @@ async def with_rw_transaction(wait_for_abort: bool = True):
         yield txn
 
 
+# For backwards compatibility
+with_transaction = with_rw_transaction
+
+
 @contextlib.asynccontextmanager
 async def with_ro_transaction(wait_for_abort: bool = True):
     driver = get_driver()

@@ -180,7 +180,7 @@ class PullWorker:
                                 "Error while pulling and processing message/s"
                             )
                             raise e
-                        async with datamanagers.with_rw_transaction() as txn:
+                        async with datamanagers.with_transaction() as txn:
                             await datamanagers.processing.set_pull_offset(
                                 txn,
                                 pull_type_id=pull_type_id,

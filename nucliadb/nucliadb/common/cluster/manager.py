@@ -408,7 +408,7 @@ class KBShardManager:
 
         logger.info({"message": "Adding shard", "kbid": kbid})
 
-        async with datamanagers.with_rw_transaction() as txn:
+        async with datamanagers.with_transaction() as txn:
             await self.create_shard_by_kbid(txn, kbid)
             await txn.commit()
 

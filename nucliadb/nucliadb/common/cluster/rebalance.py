@@ -76,7 +76,7 @@ async def maybe_add_shard(kbid: str) -> None:
             settings.max_shard_paragraphs * 0.9  # 90% of the max
         ):
             # create new shard
-            async with datamanagers.with_rw_transaction() as txn:
+            async with datamanagers.with_transaction() as txn:
                 sm = get_shard_manager()
                 await sm.create_shard_by_kbid(txn, kbid)
                 await txn.commit()
@@ -89,7 +89,7 @@ async def move_set_of_kb_resources(
     to_shard_id: str,
     count: int = 20,
 ) -> None:
-    async with datamanagers.with_rw_transaction() as txn:
+    async with datamanagers.with_transaction() as txn:
         kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
     if kb_shards is None:  # pragma: no cover
         logger.warning(
@@ -120,7 +120,7 @@ async def move_set_of_kb_resources(
         resource_id = result.uuid
         try:
             async with (
-                datamanagers.with_rw_transaction() as txn,
+                datamanagers.with_transaction() as txn,
                 locking.distributed_lock(
                     locking.RESOURCE_INDEX_LOCK.format(
                         kbid=kbid, resource_id=resource_id
@@ -199,7 +199,7 @@ async def run(context: ApplicationContext) -> None:
     try:
         async with locking.distributed_lock(REBALANCE_LOCK):
             # go through each kb and see if shards need to be reduced in size
-            async with datamanagers.with_rw_transaction() as txn:
+            async with datamanagers.with_transaction() as txn:
                 async for kbid, _ in datamanagers.kb.get_kbs(txn):
                     async with locking.distributed_lock(
                         locking.KB_SHARDS_LOCK.format(kbid=kbid)
