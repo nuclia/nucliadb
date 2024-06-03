@@ -327,7 +327,7 @@ class Resource:
         self.relations = relations
 
     @processor_observer.wrap({"type": "generate_index_message"})
-    async def generate_index_message(self) -> ResourceBrain:
+    async def generate_index_message(self, reindex: bool = False) -> ResourceBrain:
         brain = ResourceBrain(rid=self.uuid)
         origin = await self.get_origin()
         basic = await self.get_basic()
@@ -358,10 +358,14 @@ class Resource:
                         ),
                         None,
                     )
+                if reindex:
+                    replace_field = [f"{p.start}-{p.end}" for p in field_metadata.metadata.paragraphs]
+                else:
+                    replace_field = []
                 brain.apply_field_metadata(
                     field_key,
                     field_metadata,
-                    replace_field=[],
+                    replace_field=replace_field,
                     replace_splits={},
                     page_positions=page_positions,
                     extracted_text=await field.get_extracted_text(),
@@ -380,6 +384,7 @@ class Resource:
                         field_key,
                         vo,
                         matryoshka_vector_dimension=dimension,
+                        replace_field=reindex,
                     )
 
                 async for vectorset_config in datamanagers.vectorsets.iter(

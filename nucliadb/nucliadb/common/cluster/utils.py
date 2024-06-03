@@ -136,7 +136,7 @@ async def index_resource_to_shard(
     async with datamanagers.with_transaction() as txn:
         resource_index_message = (
             await datamanagers.resources.get_resource_index_message(
-                txn, kbid=kbid, rid=resource_id
+                txn, kbid=kbid, rid=resource_id, reindex=False
             )
         )
 
