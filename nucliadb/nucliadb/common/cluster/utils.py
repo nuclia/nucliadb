@@ -133,7 +133,7 @@ async def index_resource_to_shard(
     sm = app_context.shard_manager
     partitioning = app_context.partitioning
 
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_ro_transaction() as txn:
         resource_index_message = (
             await datamanagers.resources.get_resource_index_message(
                 txn, kbid=kbid, rid=resource_id

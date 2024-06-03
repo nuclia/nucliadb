@@ -257,7 +257,7 @@ async def notifications_endpoint(
 
 
 async def exists_kb(kbid: str) -> bool:
-    async with datamanagers.with_transaction(read_only=True) as txn:
+    async with datamanagers.with_ro_transaction() as txn:
         return await datamanagers.kb.exists_kb(txn, kbid=kbid)
 
 

@@ -25,7 +25,7 @@ import orjson
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb_protos import writer_pb2
 
-from .utils import get_kv_pb, with_transaction
+from .utils import get_kv_pb, with_ro_transaction
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +122,7 @@ async def iter_indexed_keys(*, kbid: str) -> AsyncGenerator[str, None]:
     internally managed
     """
     start_key = KB_ROLLOVER_RESOURCES_INDEXED.format(kbid=kbid, resource="")
-    async with with_transaction() as txn:
+    async with with_ro_transaction() as txn:
         async for key in txn.keys(match=start_key, count=-1):
             yield key.split("/")[-1]
 
@@ -130,7 +130,7 @@ async def iter_indexed_keys(*, kbid: str) -> AsyncGenerator[str, None]:
 async def _get_batch_indexed_data(
     *, kbid, batch: list[str]
 ) -> list[tuple[str, tuple[str, int]]]:
-    async with with_transaction() as txn:
+    async with with_ro_transaction() as txn:
         values = await txn.batch_get(
             [
                 KB_ROLLOVER_RESOURCES_INDEXED.format(kbid=kbid, resource=resource_id)

@@ -59,7 +59,7 @@ async def test_ingest_broker_message_with_vectorsets(
 
     # HACK: add a vectorset directly in maindb so the ingestion founds it and
     # produces the correct brain
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_rw_transaction() as txn:
         await datamanagers.vectorsets.set(
             txn,
             kbid=kbid,

@@ -280,7 +280,7 @@ async def set_custom_synonyms(request: Request, kbid: str, item: KnowledgeBoxSyn
 @requires(NucliaDBRoles.WRITER)
 @version(1)
 async def delete_custom_synonyms(request: Request, kbid: str):
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_rw_transaction() as txn:
         if not datamanagers.kb.exists_kb(txn, kbid=kbid):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 

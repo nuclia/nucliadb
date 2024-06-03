@@ -151,7 +151,7 @@ async def import_binary(
 async def set_entities_groups(
     context: ApplicationContext, kbid: str, entities_groups: kb_pb2.EntitiesGroups
 ) -> None:
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_rw_transaction() as txn:
         await datamanagers.entities.set_entities_groups(
             txn, kbid=kbid, entities_groups=entities_groups
         )
@@ -161,7 +161,7 @@ async def set_entities_groups(
 async def set_labels(
     context: ApplicationContext, kbid: str, labels: kb_pb2.Labels
 ) -> None:
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_rw_transaction() as txn:
         await datamanagers.labels.set_labels(txn, kbid=kbid, labels=labels)
         await txn.commit()
 
@@ -176,7 +176,7 @@ async def iter_kb_resource_uuids(
 async def get_broker_message(
     context: ApplicationContext, kbid: str, rid: str
 ) -> Optional[writer_pb2.BrokerMessage]:
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_ro_transaction() as txn:
         resource = await datamanagers.resources.get_resource(txn, kbid=kbid, rid=rid)
         if resource is None:
             return None
@@ -252,12 +252,12 @@ async def download_binary(
 
 
 async def get_entities(context: ApplicationContext, kbid: str) -> kb_pb2.EntitiesGroups:
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_ro_transaction() as txn:
         return await datamanagers.entities.get_entities_groups(txn, kbid=kbid)
 
 
 async def get_labels(context: ApplicationContext, kbid: str) -> kb_pb2.Labels:
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_ro_transaction() as txn:
         return await datamanagers.labels.get_labels(txn, kbid=kbid)
 
 

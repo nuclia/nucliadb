@@ -40,9 +40,18 @@ async def get_kv_pb(
 
 
 @contextlib.asynccontextmanager
-async def with_transaction(read_only: bool = False, wait_for_abort: bool = True):
+async def with_rw_transaction(wait_for_abort: bool = True):
     driver = get_driver()
     async with driver.transaction(
-        read_only=read_only, wait_for_abort=wait_for_abort
+        read_only=False, wait_for_abort=wait_for_abort
     ) as txn:
         yield txn
+
+
+@contextlib.asynccontextmanager
+async def with_ro_transaction(wait_for_abort: bool = True):
+    driver = get_driver()
+    async with driver.transaction(
+        read_only=True, wait_for_abort=wait_for_abort
+    ) as ro_txn:
+        yield ro_txn

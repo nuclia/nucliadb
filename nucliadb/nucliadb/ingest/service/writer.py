@@ -327,7 +327,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request: GetEntitiesRequest, context=None
     ) -> GetEntitiesResponse:
         response = GetEntitiesResponse()
-        async with self.driver.transaction() as txn:
+        async with self.driver.transaction(read_only=True) as txn:
             kbobj = await self.proc.get_kb_obj(txn, request.kb)
 
             if kbobj is None:
@@ -350,7 +350,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request: ListEntitiesGroupsRequest, context=None
     ) -> ListEntitiesGroupsResponse:
         response = ListEntitiesGroupsResponse()
-        async with self.driver.transaction() as txn:
+        async with self.driver.transaction(read_only=True) as txn:
             kbobj = await self.proc.get_kb_obj(txn, request.kb)
 
             if kbobj is None:
@@ -375,7 +375,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request: GetEntitiesGroupRequest, context=None
     ) -> GetEntitiesGroupResponse:
         response = GetEntitiesGroupResponse()
-        async with self.driver.transaction() as txn:
+        async with self.driver.transaction(read_only=True) as txn:
             kbobj = await self.proc.get_kb_obj(txn, request.kb)
             if kbobj is None:
                 response.status = GetEntitiesGroupResponse.Status.KB_NOT_FOUND
@@ -480,7 +480,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     ) -> WriterStatusResponse:
         logger.info("Status Call")
         response = WriterStatusResponse()
-        async with self.driver.transaction() as txn:
+        async with self.driver.transaction(read_only=True) as txn:
             async for _, slug in datamanagers.kb.get_kbs(txn):
                 response.knowledgeboxes.append(slug)
 

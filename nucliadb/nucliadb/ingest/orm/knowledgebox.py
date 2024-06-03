@@ -71,7 +71,7 @@ class KnowledgeBox:
 
     async def get_config(self) -> Optional[KnowledgeBoxConfig]:
         if self._config is None:
-            async with datamanagers.with_transaction() as txn:
+            async with datamanagers.with_ro_transaction() as txn:
                 config = await datamanagers.kb.get_config(txn, kbid=self.kbid)
             if config is not None:
                 self._config = config
@@ -279,7 +279,7 @@ class KnowledgeBox:
     ):
         prefix = KB_KEYS.format(kbid=kbid)
         while True:
-            async with driver.transaction() as txn:
+            async with driver.transaction(read_only=True) as txn:
                 all_keys = [key async for key in txn.keys(match=prefix, count=-1)]
 
             if len(all_keys) == 0:
@@ -296,7 +296,7 @@ class KnowledgeBox:
     async def get_resource_shard(
         self, shard_id: str
     ) -> Optional[writer_pb2.ShardObject]:
-        async with datamanagers.with_transaction() as txn:
+        async with datamanagers.with_ro_transaction() as txn:
             pb = await datamanagers.cluster.get_kb_shards(txn, kbid=self.kbid)
             if pb is None:
                 logger.warning("Shards not found for kbid", extra={"kbid": self.kbid})

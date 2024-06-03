@@ -125,7 +125,7 @@ def remove_index_node(node_id: str, primary_id: Optional[str] = None) -> None:
 class KBShardManager:
     # TODO: move to data manager
     async def get_shards_by_kbid_inner(self, kbid: str) -> writer_pb2.Shards:
-        async with datamanagers.with_transaction(read_only=True) as txn:
+        async with datamanagers.with_ro_transaction() as txn:
             result = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
             if result is None:
                 # could be None because /shards doesn't exist, or beacause the
@@ -408,7 +408,7 @@ class KBShardManager:
 
         logger.info({"message": "Adding shard", "kbid": kbid})
 
-        async with datamanagers.with_transaction() as txn:
+        async with datamanagers.with_rw_transaction() as txn:
             await self.create_shard_by_kbid(txn, kbid)
             await txn.commit()
 

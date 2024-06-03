@@ -60,7 +60,7 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
 
 
 async def kb_has_shards_on_drain_nodes(kbid: str, drain_node_ids: list[str]) -> bool:
-    async with datamanagers.with_transaction(read_only=True) as txn:
+    async with datamanagers.with_ro_transaction() as txn:
         shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
         if not shards:
             logger.warning("Shards object not found", extra={"kbid": kbid})

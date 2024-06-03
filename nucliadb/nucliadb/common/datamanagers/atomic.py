@@ -26,7 +26,7 @@ single transaction, avoiding the need of encapsulating like in this example:
 
 ```
 async def <function>(...):
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_rw_transaction() as txn:
         await datamanagers.<module>.<function>(...)
 ```
 
@@ -42,7 +42,7 @@ from . import kb as kb_dm
 from . import labels as labels_dm
 from . import resources as resources_dm
 from . import synonyms as synonyms_dm
-from .utils import with_transaction
+from .utils import with_ro_transaction, with_rw_transaction
 
 # XXX: we are using the not exported _ParamSpec to support 3.9. Whenever we
 # upgrade to >= 3.10 we'll be able to use ParamSpecKwargs and improve the
@@ -61,7 +61,7 @@ P = ParamSpec("P")
 def ro_txn_wrap(fun: P) -> P:  # type: ignore
     @wraps(fun)
     async def wrapper(**kwargs: P.kwargs):
-        async with with_transaction(read_only=True) as txn:
+        async with with_ro_transaction() as txn:
             return await fun(txn, **kwargs)
 
     return wrapper
@@ -70,7 +70,7 @@ def ro_txn_wrap(fun: P) -> P:  # type: ignore
 def rw_txn_wrap(fun: P) -> P:  # type: ignore
     @wraps(fun)
     async def wrapper(**kwargs: P.kwargs):
-        async with with_transaction() as txn:
+        async with with_rw_transaction() as txn:
             result = await fun(txn, **kwargs)
             await txn.commit()
             return result
