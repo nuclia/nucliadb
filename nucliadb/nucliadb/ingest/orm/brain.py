@@ -249,7 +249,7 @@ class ResourceBrain:
                 )
 
         for paragraph in metadata.metadata.paragraphs:
-            self.brain.sentences_to_delete.append(
+            self.brain.paragraphs_to_delete.append(
                 f"{self.rid}/{field_key}/{paragraph.start}-{paragraph.end}"
             )
 
@@ -378,20 +378,14 @@ class ResourceBrain:
         sentence_pb.metadata.position.index = paragraph_pb.metadata.position.index
 
     def delete_vectors(self, field_key: str, vo: VectorObject):
-        # TODO: no need to iterate over all vectors, just delete the whole field
         for subfield, vectors in vo.split_vectors.items():
-            for vector in vectors.vectors:
-                # BUG: this ids seem malformed, as they don't contain the
-                # `index`, so this is probably useless
-                self.brain.sentences_to_delete.append(
-                    f"{self.rid}/{field_key}/{subfield}/{vector.start}-{vector.end}"
-                )
+            self.brain.sentences_to_delete.append(
+                f"{self.rid}/{field_key}/{subfield}"
+            )
 
         for vector in vo.vectors.vectors:
-            # BUG: this ids seem malformed, as they don't contain the `index`,
-            # so this is probably useless
             self.brain.sentences_to_delete.append(
-                f"{self.rid}/{field_key}/{vector.start}-{vector.end}"
+                f"{self.rid}/{field_key}"
             )
 
     def set_processing_status(
