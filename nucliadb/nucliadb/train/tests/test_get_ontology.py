@@ -31,4 +31,4 @@ async def test_get_ontology(
     req.kb.uuid = knowledgebox_ingest
 
     labels: GetLabelsResponse = await train_client.GetOntology(req)  # type: ignore
-    assert labels.labels.labelset["label1"].labels[0].title == "label1"
+    assert labels.labels.labelset["ls1"].labels[0].title == "label1"

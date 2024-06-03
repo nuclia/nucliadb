@@ -19,10 +19,6 @@
 #
 
 
-class ConflictError(Exception):
-    pass
-
-
 class ResourceNotFound(Exception):
     pass
 

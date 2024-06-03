@@ -531,7 +531,7 @@ async def get_kb_active_shard(
 async def get_resource_shard(
     context: ApplicationContext, kbid: str, resource_uuid: str
 ) -> Optional[ShardObject]:
-    async with datamanagers.with_transaction(read_only=True) as txn:
+    async with datamanagers.with_ro_transaction() as txn:
         shard_id = await datamanagers.resources.get_resource_shard_id(
             txn, kbid=kbid, rid=resource_uuid
         )

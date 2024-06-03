@@ -45,26 +45,6 @@ class WriterStub(object):
                 request_serializer=nucliadb__protos_dot_writer__pb2.BrokerMessage.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
                 )
-        self.GetLabels = channel.unary_unary(
-                '/fdbwriter.Writer/GetLabels',
-                request_serializer=nucliadb__protos_dot_writer__pb2.GetLabelsRequest.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_writer__pb2.GetLabelsResponse.FromString,
-                )
-        self.GetLabelSet = channel.unary_unary(
-                '/fdbwriter.Writer/GetLabelSet',
-                request_serializer=nucliadb__protos_dot_writer__pb2.GetLabelSetRequest.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_writer__pb2.GetLabelSetResponse.FromString,
-                )
-        self.SetLabels = channel.unary_unary(
-                '/fdbwriter.Writer/SetLabels',
-                request_serializer=nucliadb__protos_dot_writer__pb2.SetLabelsRequest.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
-                )
-        self.DelLabels = channel.unary_unary(
-                '/fdbwriter.Writer/DelLabels',
-                request_serializer=nucliadb__protos_dot_writer__pb2.DelLabelsRequest.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
-                )
         self.NewEntitiesGroup = channel.unary_unary(
                 '/fdbwriter.Writer/NewEntitiesGroup',
                 request_serializer=nucliadb__protos_dot_writer__pb2.NewEntitiesGroupRequest.SerializeToString,
@@ -176,31 +156,6 @@ class WriterServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def ProcessMessage(self, request_iterator, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def GetLabels(self, request, context):
-        """Labels
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def GetLabelSet(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def SetLabels(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def DelLabels(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -328,26 +283,6 @@ def add_WriterServicer_to_server(servicer, server):
             'ProcessMessage': grpc.stream_unary_rpc_method_handler(
                     servicer.ProcessMessage,
                     request_deserializer=nucliadb__protos_dot_writer__pb2.BrokerMessage.FromString,
-                    response_serializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.SerializeToString,
-            ),
-            'GetLabels': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetLabels,
-                    request_deserializer=nucliadb__protos_dot_writer__pb2.GetLabelsRequest.FromString,
-                    response_serializer=nucliadb__protos_dot_writer__pb2.GetLabelsResponse.SerializeToString,
-            ),
-            'GetLabelSet': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetLabelSet,
-                    request_deserializer=nucliadb__protos_dot_writer__pb2.GetLabelSetRequest.FromString,
-                    response_serializer=nucliadb__protos_dot_writer__pb2.GetLabelSetResponse.SerializeToString,
-            ),
-            'SetLabels': grpc.unary_unary_rpc_method_handler(
-                    servicer.SetLabels,
-                    request_deserializer=nucliadb__protos_dot_writer__pb2.SetLabelsRequest.FromString,
-                    response_serializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.SerializeToString,
-            ),
-            'DelLabels': grpc.unary_unary_rpc_method_handler(
-                    servicer.DelLabels,
-                    request_deserializer=nucliadb__protos_dot_writer__pb2.DelLabelsRequest.FromString,
                     response_serializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.SerializeToString,
             ),
             'NewEntitiesGroup': grpc.unary_unary_rpc_method_handler(
@@ -533,74 +468,6 @@ class Writer(object):
             metadata=None):
         return grpc.experimental.stream_unary(request_iterator, target, '/fdbwriter.Writer/ProcessMessage',
             nucliadb__protos_dot_writer__pb2.BrokerMessage.SerializeToString,
-            nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def GetLabels(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/GetLabels',
-            nucliadb__protos_dot_writer__pb2.GetLabelsRequest.SerializeToString,
-            nucliadb__protos_dot_writer__pb2.GetLabelsResponse.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def GetLabelSet(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/GetLabelSet',
-            nucliadb__protos_dot_writer__pb2.GetLabelSetRequest.SerializeToString,
-            nucliadb__protos_dot_writer__pb2.GetLabelSetResponse.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def SetLabels(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/SetLabels',
-            nucliadb__protos_dot_writer__pb2.SetLabelsRequest.SerializeToString,
-            nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def DelLabels(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/DelLabels',
-            nucliadb__protos_dot_writer__pb2.DelLabelsRequest.SerializeToString,
             nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

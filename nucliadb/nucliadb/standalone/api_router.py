@@ -163,7 +163,7 @@ def introspect_endpoint(request: Request) -> StreamingResponse:
 
 @standalone_api_router.get("/pull/position")
 async def pull_status(request: Request) -> JSONResponse:
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_ro_transaction() as txn:
         # standalone assumes 1 partition
         current_offset = await datamanagers.processing.get_pull_offset(
             txn, pull_type_id=processing.get_nua_api_id(), partition="1"

@@ -46,11 +46,12 @@ class DataLayer:
         self.connection = connection
         self.lock = asyncio.Lock()
 
-    async def get(self, key: str) -> Optional[bytes]:
+    async def get(self, key: str, select_for_update: bool = False) -> Optional[bytes]:
         async with self.lock:
-            return await self.connection.fetchval(
-                "SELECT value FROM resources WHERE key = $1", key
-            )
+            statement = "SELECT value FROM resources WHERE key = $1"
+            if select_for_update:
+                statement += " FOR UPDATE"
+            return await self.connection.fetchval(statement, key)
 
     async def set(self, key: str, value: bytes) -> None:
         async with self.lock:
@@ -69,13 +70,16 @@ DO UPDATE SET value = EXCLUDED.value
         async with self.lock:
             await self.connection.execute("DELETE FROM resources WHERE key = $1", key)
 
-    async def batch_get(self, keys: list[str]) -> list[Optional[bytes]]:
+    async def batch_get(
+        self, keys: list[str], select_for_update: bool = False
+    ) -> list[Optional[bytes]]:
         async with self.lock:
+            statement = "SELECT key, value FROM resources WHERE key = ANY($1)"
+            if select_for_update:
+                statement += " FOR UPDATE"
             records = {
                 record["key"]: record["value"]
-                for record in await self.connection.fetch(
-                    "SELECT key, value FROM resources WHERE key = ANY($1)", keys
-                )
+                for record in await self.connection.fetch(statement, keys)
             }
         # get sorted by keys
         return [records.get(key) for key in keys]
@@ -147,10 +151,10 @@ class PGTransaction(Transaction):
                 await self.connection.close()
 
     async def batch_get(self, keys: list[str]):
-        return await self.data_layer.batch_get(keys)
+        return await self.data_layer.batch_get(keys, select_for_update=True)
 
     async def get(self, key: str) -> Optional[bytes]:
-        return await self.data_layer.get(key)
+        return await self.data_layer.get(key, select_for_update=True)
 
     async def set(self, key: str, value: bytes):
         await self.data_layer.set(key, value)

@@ -53,7 +53,7 @@ class ExportImportDataManager:
 
     async def get_metadata(self, type: str, kbid: str, id: str) -> Metadata:
         key = self._get_maindb_metadata_key(type, kbid, id)
-        async with self.driver.transaction() as txn:
+        async with self.driver.transaction(read_only=True) as txn:
             data = await txn.get(key)
         if data is None or data == b"":
             raise MetadataNotFound()

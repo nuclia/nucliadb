@@ -142,6 +142,10 @@ def rollover_datamanager(resource_ids, cluster_datamanager):
             return_value=AsyncMock(),
         ),
         patch(
+            "nucliadb.common.cluster.rollover.datamanagers.with_ro_transaction",
+            return_value=AsyncMock(),
+        ),
+        patch(
             "nucliadb.ingest.consumer.shard_creator.locking.distributed_lock",
             return_value=AsyncMock(),
         ),
@@ -193,7 +197,6 @@ async def test_index_rollover_shards(
     app_context, rollover_datamanager, resources_datamanager, shards, resource_ids
 ):
     rollover_datamanager.get_kb_rollover_shards.return_value = shards
-
     await rollover.index_rollover_shards(app_context, "kbid")
     rollover_datamanager.add_indexed.assert_called_with(
         ANY, kbid="kbid", resource_id="1", shard_id="1", modification_time=1

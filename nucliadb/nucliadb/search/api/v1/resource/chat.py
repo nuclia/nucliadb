@@ -170,7 +170,7 @@ async def resource_chat_endpoint(
 
 
 async def get_resource_uuid_by_slug(kbid: str, slug: str) -> Optional[str]:
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_ro_transaction() as txn:
         return await datamanagers.resources.get_resource_uuid_from_slug(
             txn, kbid=kbid, slug=slug
         )
