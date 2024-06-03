@@ -44,6 +44,7 @@ from nucliadb_protos.writer_pb2 import (
 )
 from tests.ingest.fixtures import create_resource
 
+from nucliadb.ingest.orm.broker_message import generate_broker_message
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import utils_pb2
@@ -297,7 +298,7 @@ async def test_generate_broker_message(
 
     async with maindb_driver.transaction() as txn:
         r.txn = txn
-        bm = await r.generate_broker_message()
+        bm = await generate_broker_message(r)
 
     # Check generated broker message has the same metadata as the created resource
 

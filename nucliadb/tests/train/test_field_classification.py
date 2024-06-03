@@ -21,9 +21,8 @@ import asyncio
 
 import aiohttp
 import pytest
+from httpx import AsyncClient
 from nucliadb_protos.dataset_pb2 import FieldClassificationBatch, TaskType, TrainSet
-from nucliadb_protos.knowledgebox_pb2 import Label, LabelSet
-from nucliadb_protos.writer_pb2 import SetLabelsRequest
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.train.utils import get_batches_from_train_response_stream
 from tests.utils import inject_message
@@ -31,6 +30,7 @@ from tests.utils.broker_messages import BrokerMessageBuilder
 
 from nucliadb.train import API_PREFIX
 from nucliadb.train.api.v1.router import KB_PREFIX
+from nucliadb_models.labels import LabelSetKind
 
 
 @pytest.mark.asyncio
@@ -85,24 +85,34 @@ async def test_generator_field_classification(
 
 @pytest.fixture(scope="function")
 @pytest.mark.asyncio
-async def knowledgebox_with_labels(nucliadb_grpc: WriterStub, knowledgebox: str):
-    slr = SetLabelsRequest()
-    slr.kb.uuid = knowledgebox
-    slr.id = "labelset_paragraphs"
-    slr.labelset.kind.append(LabelSet.LabelSetKind.PARAGRAPHS)
-    slr.labelset.labels.append(Label(title="label_machine"))
-    slr.labelset.labels.append(Label(title="label_user"))
-    slr.labelset.labels.append(Label(title="label_alien"))
-    await nucliadb_grpc.SetLabels(slr)  # type: ignore
+async def knowledgebox_with_labels(
+    nucliadb_grpc: WriterStub, nucliadb_writer: AsyncClient, knowledgebox: str
+):
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/labelset/labelset_paragraphs",
+        json={
+            "kind": [LabelSetKind.PARAGRAPHS],
+            "labels": [
+                {"title": "label_machine"},
+                {"title": "label_user"},
+                {"title": "label_alien"},
+            ],
+        },
+    )
+    assert resp.status_code == 200
 
-    slr = SetLabelsRequest()
-    slr.kb.uuid = knowledgebox
-    slr.id = "labelset_resources"
-    slr.labelset.kind.append(LabelSet.LabelSetKind.RESOURCES)
-    slr.labelset.labels.append(Label(title="label_machine"))
-    slr.labelset.labels.append(Label(title="label_user"))
-    slr.labelset.labels.append(Label(title="label_alien"))
-    await nucliadb_grpc.SetLabels(slr)  # type: ignore
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/labelset/labelset_resources",
+        json={
+            "kind": [LabelSetKind.RESOURCES],
+            "labels": [
+                {"title": "label_machine"},
+                {"title": "label_user"},
+                {"title": "label_alien"},
+            ],
+        },
+    )
+    assert resp.status_code == 200
 
     bmb = BrokerMessageBuilder(kbid=knowledgebox)
     bmb.with_title("First resource")

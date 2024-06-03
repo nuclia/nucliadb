@@ -19,7 +19,6 @@
 #
 import pytest
 from httpx import AsyncClient
-from nucliadb_protos.knowledgebox_pb2 import Label
 from nucliadb_protos.resources_pb2 import (
     Classification,
     ExtractedTextWrapper,
@@ -34,16 +33,14 @@ from nucliadb_protos.resources_pb2 import (
     UserFieldMetadata,
 )
 from nucliadb_protos.utils_pb2 import Vector
-from nucliadb_protos.writer_pb2 import OpStatusWriter, SetLabelsRequest
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import broker_resource, inject_message
 
 from nucliadb.common.cluster import rollover
 from nucliadb.common.context import ApplicationContext
 from nucliadb.tests.vectors import V1, V2, Q
-from nucliadb_models.labels import LabelSetKind
+from nucliadb_models.labels import Label, LabelSetKind
 from nucliadb_models.search import MinScore
-from nucliadb_protos import writer_pb2
 
 RELEASE_CHANNELS = (
     "STABLE",
@@ -259,7 +256,7 @@ def broker_message_with_labels(kbid):
     return bm
 
 
-async def create_test_labelsets(nucliadb_grpc, kbid: str):
+async def create_test_labelsets(nucliadb_writer, kbid: str):
     for kind, _label in (
         (LabelSetKind.RESOURCES, ClassificationLabels.RESOURCE_ANNOTATED),
         (LabelSetKind.RESOURCES, ClassificationLabels.FIELD_DETECTED),
@@ -267,34 +264,23 @@ async def create_test_labelsets(nucliadb_grpc, kbid: str):
         (LabelSetKind.PARAGRAPHS, ClassificationLabels.PARAGRAPH_ANNOTATED),
     ):
         labelset, label = _label.split("/")
-        req = set_labelset_request(
-            kbid,
-            labelset,
-            kind=kind,
-            labels=[Label(title=label)],
+        resp = await nucliadb_writer.post(
+            f"/kb/{kbid}/labelset/{labelset}",
+            json=dict(
+                kind=[kind],
+                labels=[Label(title=label).model_dump()],
+            ),
         )
-        resp = await nucliadb_grpc.SetLabels(req)
-        assert resp.status == OpStatusWriter.OK
-
-
-def set_labelset_request(
-    kbid, labelset_id, kind, labels: list[Label]
-) -> writer_pb2.SetLabelsRequest:
-    req = SetLabelsRequest()
-    req.kb.uuid = kbid
-    req.id = labelset_id
-    req.labelset.multiple = True
-    req.labelset.kind.append(kind)
-    req.labelset.labels.extend(labels)
-    return req
+        assert resp.status_code == 200
 
 
 @pytest.fixture(scope="function")
 async def kbid(
     nucliadb_grpc: WriterStub,
+    nucliadb_writer,
     knowledgebox,
 ):
-    await create_test_labelsets(nucliadb_grpc, knowledgebox)
+    await create_test_labelsets(nucliadb_writer, knowledgebox)
     await inject_message(nucliadb_grpc, broker_message_with_entities(knowledgebox))
     await inject_message(nucliadb_grpc, broker_message_with_labels(knowledgebox))
     return knowledgebox

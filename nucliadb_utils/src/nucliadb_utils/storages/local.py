@@ -24,13 +24,18 @@ import json
 import os
 import shutil
 from datetime import datetime
-from typing import Any, AsyncGenerator, AsyncIterator, Dict, Optional
+from typing import AsyncGenerator, AsyncIterator, Dict, Optional
 
 import aiofiles
 from nucliadb_protos.resources_pb2 import CloudFile
 
 from nucliadb_utils.storages import CHUNK_SIZE
-from nucliadb_utils.storages.storage import Storage, StorageField
+from nucliadb_utils.storages.storage import (
+    ObjectInfo,
+    ObjectMetadata,
+    Storage,
+    StorageField,
+)
 
 
 class LocalStorageField(StorageField):
@@ -142,14 +147,16 @@ class LocalStorageField(StorageField):
 
         init_url = self.storage.get_file_path(self.bucket, upload_uri)
         metadata_init_url = self.metadata_key(init_url)
-        metadata = json.dumps(
-            {"FILENAME": cf.filename, "SIZE": cf.size, "CONTENT_TYPE": cf.content_type}
+        object_metadata = ObjectMetadata(
+            filename=cf.filename,
+            content_type=cf.content_type,
+            size=cf.size,
         )
-
+        raw_metadata = json.dumps(object_metadata.model_dump())
         path_to_create = os.path.dirname(metadata_init_url)
         os.makedirs(path_to_create, exist_ok=True)
         async with aiofiles.open(metadata_init_url, "w+") as resp:
-            await resp.write(metadata)
+            await resp.write(raw_metadata)
 
         self._handler = await aiofiles.threadpool.open(init_url, "wb+")
         field.offset = 0
@@ -190,12 +197,15 @@ class LocalStorageField(StorageField):
         self.field.ClearField("offset")
         self.field.ClearField("upload_uri")
 
-    async def exists(self) -> Optional[Dict[str, str]]:
+    async def exists(self) -> Optional[ObjectMetadata]:
         file_path = self.storage.get_file_path(self.bucket, self.key)
         metadata_path = self.metadata_key(file_path)
         if os.path.exists(metadata_path):
             async with aiofiles.open(metadata_path, "r") as metadata:
-                return json.loads(await metadata.read())
+                raw_metadata = await metadata.read()
+                metadata_dict = json.loads(raw_metadata)
+                metadata_dict = {k.lower(): v for k, v in metadata_dict.items()}
+                return ObjectMetadata.model_validate(metadata_dict)
         return None
 
     async def upload(self, iterator: AsyncIterator, origin: CloudFile) -> CloudFile:
@@ -269,10 +279,11 @@ class LocalStorage(Storage):
             deleted = False
         return deleted
 
-    async def iterate_bucket(self, bucket: str, prefix: str) -> AsyncIterator[Any]:
+    async def iterate_objects(
+        self, bucket: str, prefix: str
+    ) -> AsyncGenerator[ObjectInfo, None]:
         for key in glob.glob(f"{bucket}/{prefix}*"):
-            item = {"name": key}
-            yield item
+            yield ObjectInfo(name=key)
 
     async def download(
         self, bucket_name: str, key: str, headers: Optional[Dict[str, str]] = None

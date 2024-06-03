@@ -35,6 +35,7 @@ from nucliadb_protos.writer_pb2 import (
     GetLabelsResponse,
 )
 
+from nucliadb.common import datamanagers
 from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.processor import Processor
@@ -90,20 +91,16 @@ class UploadServicer:
     async def GetOntology(  # type: ignore
         self, request: GetLabelsRequest, context=None
     ) -> GetLabelsResponse:
-        async with self.proc.driver.transaction() as txn:
-            kbobj = await self.proc.get_kb_obj(txn, request.kb)
-            labels: Optional[Labels] = None
-            if kbobj is not None:
-                labels = await kbobj.get_labels()
-
+        kbid = request.kb.uuid
         response = GetLabelsResponse()
-        if kbobj is None:
+        kb_exists = await datamanagers.atomic.kb.exists_kb(kbid=kbid)
+        if not kb_exists:
             response.status = GetLabelsResponse.Status.NOTFOUND
-        else:
-            response.kb.uuid = kbobj.kbid
-            if labels is not None:
-                response.labels.CopyFrom(labels)
-
+            return response
+        response.kb.uuid = kbid
+        labels: Optional[Labels] = await datamanagers.atomic.labelset.get_all(kbid=kbid)
+        if labels is not None:
+            response.labels.CopyFrom(labels)
         return response
 
 

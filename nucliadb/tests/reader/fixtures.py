@@ -26,7 +26,7 @@ import pytest
 from httpx import AsyncClient
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
-from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
+from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG_BASE
 from nucliadb.reader import API_PREFIX
 from nucliadb_utils.utilities import clear_global_cache
 

@@ -37,11 +37,9 @@ from nucliadb_protos.resources_pb2 import (
 from nucliadb_protos.utils_pb2 import ExtractedText, VectorObject
 from nucliadb_protos.writer_pb2 import Error
 
+from nucliadb.common import datamanagers
 from nucliadb.ingest.fields.exceptions import InvalidFieldClass, InvalidPBClass
 from nucliadb_utils.storages.storage import Storage, StorageField
-
-KB_RESOURCE_FIELD = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}"
-KB_RESOURCE_ERROR = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}/error"
 
 SUBFIELDFIELDS = ["l", "c"]
 
@@ -49,6 +47,7 @@ SUBFIELDFIELDS = ["l", "c"]
 class FieldTypes(str, enum.Enum):
     FIELD_TEXT = "extracted_text"
     FIELD_VECTORS = "extracted_vectors"
+    FIELD_VECTORSET = "{vectorset}/extracted_vectors"
     FIELD_METADATA = "metadata"
     FIELD_LARGE_METADATA = "large_metadata"
     THUMBNAIL = "thumbnail"
@@ -116,12 +115,25 @@ class Field:
             self.kbid, self.uuid, self.type, self.id, field_type.value
         )
 
+    def _get_extracted_vectors_storage_field(
+        self, vectorset: Optional[str] = None
+    ) -> StorageField:
+        if vectorset:
+            key = FieldTypes.FIELD_VECTORSET.value.format(vectorset=vectorset)
+        else:
+            key = FieldTypes.FIELD_VECTORS.value
+        return self.storage.file_extracted(
+            self.kbid, self.uuid, self.type, self.id, key
+        )
+
     async def db_get_value(self):
         if self.value is None:
-            payload = await self.resource.txn.get(
-                KB_RESOURCE_FIELD.format(
-                    kbid=self.kbid, uuid=self.uuid, type=self.type, field=self.id
-                )
+            payload = await datamanagers.fields.get_raw(
+                self.resource.txn,
+                kbid=self.kbid,
+                rid=self.uuid,
+                field_type=self.type,
+                field_id=self.id,
             )
             if payload is None:
                 return
@@ -131,25 +143,25 @@ class Field:
         return self.value
 
     async def db_set_value(self, payload: Any):
-        await self.resource.txn.set(
-            KB_RESOURCE_FIELD.format(
-                kbid=self.kbid, uuid=self.uuid, type=self.type, field=self.id
-            ),
-            payload.SerializeToString(),
+        await datamanagers.fields.set(
+            self.resource.txn,
+            kbid=self.kbid,
+            rid=self.uuid,
+            field_type=self.type,
+            field_id=self.id,
+            value=payload,
         )
         self.value = payload
         self.resource.modified = True
 
     async def delete(self):
-        field_base_key = KB_RESOURCE_FIELD.format(
-            kbid=self.kbid, uuid=self.uuid, type=self.type, field=self.id
+        await datamanagers.fields.delete(
+            self.resource.txn,
+            kbid=self.kbid,
+            rid=self.uuid,
+            field_type=self.type,
+            field_id=self.id,
         )
-        # Make sure we explicitly delete the field and any nested key
-        keys_to_delete = []
-        async for key in self.resource.txn.keys(field_base_key):
-            keys_to_delete.append(key)
-        for key in keys_to_delete:
-            await self.resource.txn.delete(key)
         await self.delete_extracted_text()
         await self.delete_vectors()
         await self.delete_metadata()
@@ -169,9 +181,9 @@ class Field:
         except KeyError:
             pass
 
-    async def delete_vectors(self) -> None:
+    async def delete_vectors(self, vectorset: Optional[str] = None) -> None:
         # Try delete vectors
-        sf = self.get_storage_field(FieldTypes.FIELD_VECTORS)
+        sf = self._get_extracted_vectors_storage_field(vectorset)
         try:
             await self.storage.delete_upload(sf.key, sf.bucket)
         except KeyError:
@@ -185,23 +197,22 @@ class Field:
             pass
 
     async def get_error(self) -> Optional[Error]:
-        payload = await self.resource.txn.get(
-            KB_RESOURCE_ERROR.format(
-                kbid=self.kbid, uuid=self.uuid, type=self.type, field=self.id
-            )
+        return await datamanagers.fields.get_error(
+            self.resource.txn,
+            kbid=self.kbid,
+            rid=self.uuid,
+            field_type=self.type,
+            field_id=self.id,
         )
-        if payload is None:
-            return None
-        pberror = Error()
-        pberror.ParseFromString(payload)
-        return pberror
 
     async def set_error(self, error: Error) -> None:
-        await self.resource.txn.set(
-            KB_RESOURCE_ERROR.format(
-                kbid=self.kbid, uuid=self.uuid, type=self.type, field=self.id
-            ),
-            error.SerializeToString(),
+        await datamanagers.fields.set_error(
+            self.resource.txn,
+            kbid=self.kbid,
+            rid=self.uuid,
+            field_type=self.type,
+            field_id=self.id,
+            error=error,
         )
 
     async def get_question_answers(self) -> Optional[QuestionAnswers]:
@@ -274,17 +285,19 @@ class Field:
     async def set_vectors(
         self, payload: ExtractedVectorsWrapper
     ) -> tuple[Optional[VectorObject], bool, list[str]]:
+        vectorset = payload.vectorset_id
         if self.type in SUBFIELDFIELDS:
             try:
                 actual_payload: Optional[VectorObject] = await self.get_vectors(
-                    force=True
+                    vectorset=vectorset,
+                    force=True,
                 )
             except KeyError:
                 actual_payload = None
         else:
             actual_payload = None
 
-        sf = self.get_storage_field(FieldTypes.FIELD_VECTORS)
+        sf = self._get_extracted_vectors_storage_field(vectorset)
         vo: Optional[VectorObject] = None
         replace_field: bool = True
         replace_splits = []
@@ -319,9 +332,11 @@ class Field:
             self.extracted_vectors = actual_payload
         return vo, replace_field, replace_splits
 
-    async def get_vectors(self, force=False) -> Optional[VectorObject]:
+    async def get_vectors(
+        self, vectorset: Optional[str] = None, force: bool = False
+    ) -> Optional[VectorObject]:
         if self.extracted_vectors is None or force:
-            sf = self.get_storage_field(FieldTypes.FIELD_VECTORS)
+            sf = self._get_extracted_vectors_storage_field(vectorset)
             payload = await self.storage.download_pb(sf, VectorObject)
             if payload is not None:
                 self.extracted_vectors = payload
@@ -359,7 +374,7 @@ class Field:
                 metadata.thumbnail.CopyFrom(cf_split)
             metadata.last_index.FromDatetime(datetime.now())
 
-        replace_field = []
+        paragraphs_to_replace = []
         replace_splits = {}
         if actual_payload is None:
             # Its first metadata
@@ -378,11 +393,13 @@ class Field:
                     del actual_payload.split_metadata[key]
             if payload.metadata.metadata:
                 actual_payload.metadata.CopyFrom(payload.metadata.metadata)
-                replace_field = [f"{x.start}-{x.end}" for x in metadata.paragraphs]
+                paragraphs_to_replace = [
+                    f"{x.start}-{x.end}" for x in metadata.paragraphs
+                ]
             await self.storage.upload_pb(sf, actual_payload)
             self.computed_metadata = actual_payload
 
-        return self.computed_metadata, replace_field, replace_splits
+        return self.computed_metadata, paragraphs_to_replace, replace_splits
 
     async def get_field_metadata(
         self, force: bool = False

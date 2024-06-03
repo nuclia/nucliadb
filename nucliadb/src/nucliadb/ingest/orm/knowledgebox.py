@@ -23,12 +23,7 @@ from uuid import uuid4
 
 from grpc import StatusCode
 from grpc.aio import AioRpcError
-from nucliadb_protos.knowledgebox_pb2 import (
-    KnowledgeBoxConfig,
-    Labels,
-    LabelSet,
-    SemanticModelMetadata,
-)
+from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig, SemanticModelMetadata
 from nucliadb_protos.resources_pb2 import Basic
 from nucliadb_protos.utils_pb2 import ReleaseChannel
 
@@ -36,17 +31,19 @@ from nucliadb.common import datamanagers
 from nucliadb.common.cluster.exceptions import ShardNotFound
 from nucliadb.common.cluster.manager import get_index_node
 from nucliadb.common.cluster.utils import get_shard_manager
-from nucliadb.common.maindb.driver import Driver, Transaction
-from nucliadb.ingest import SERVICE_NAME, logger
-from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict
-from nucliadb.ingest.orm.resource import (
+
+# XXX: this keys shouldn't be exposed outside datamanagers
+from nucliadb.common.datamanagers.resources import (
     KB_RESOURCE_SLUG,
     KB_RESOURCE_SLUG_BASE,
-    Resource,
 )
+from nucliadb.common.maindb.driver import Driver, Transaction
+from nucliadb.ingest import SERVICE_NAME, logger
+from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict, VectorSetConflict
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.orm.utils import choose_matryoshka_dimension, compute_paragraph_key
 from nucliadb.migrator.utils import get_latest_version
-from nucliadb_protos import writer_pb2
+from nucliadb_protos import knowledgebox_pb2, writer_pb2
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_audit, get_storage
 
@@ -61,6 +58,9 @@ KB_TO_DELETE_STORAGE_BASE = "/storagetodelete/"
 KB_TO_DELETE = f"{KB_TO_DELETE_BASE}{{kbid}}"
 KB_TO_DELETE_STORAGE = f"{KB_TO_DELETE_STORAGE_BASE}{{kbid}}"
 
+KB_VECTORSET_TO_DELETE_BASE = "/vectorsettodelete"
+KB_VECTORSET_TO_DELETE = f"{KB_VECTORSET_TO_DELETE_BASE}/{{kbid}}/{{vectorset}}"
+
 
 class KnowledgeBox:
     def __init__(self, txn: Transaction, storage: Storage, kbid: str):
@@ -71,7 +71,7 @@ class KnowledgeBox:
 
     async def get_config(self) -> Optional[KnowledgeBoxConfig]:
         if self._config is None:
-            async with datamanagers.with_transaction() as txn:
+            async with datamanagers.with_ro_transaction() as txn:
                 config = await datamanagers.kb.get_config(txn, kbid=self.kbid)
             if config is not None:
                 self._config = config
@@ -131,6 +131,8 @@ class KnowledgeBox:
         )
         if config is None:
             config = KnowledgeBoxConfig()
+
+        await datamanagers.vectorsets.initialize(txn, kbid=uuid)
 
         config.migration_version = get_latest_version()
         config.slug = slug
@@ -213,31 +215,6 @@ class KnowledgeBox:
 
         return uuid
 
-    # Labels
-    async def set_labelset(self, id: str, labelset: LabelSet):
-        await datamanagers.labels.set_labelset(
-            self.txn, kbid=self.kbid, labelset_id=id, labelset=labelset
-        )
-
-    async def get_labels(self) -> Labels:
-        return await datamanagers.labels.get_labels(self.txn, kbid=self.kbid)
-
-    async def get_labelset(
-        self, labelset: str, labelset_response: writer_pb2.GetLabelSetResponse
-    ):
-        ls = await datamanagers.labels.get_labelset(
-            self.txn,
-            kbid=self.kbid,
-            labelset_id=labelset,
-        )
-        if ls is not None:
-            labelset_response.labelset.CopyFrom(ls)
-
-    async def del_labelset(self, id: str):
-        await datamanagers.labels.delete_labelset(
-            self.txn, kbid=self.kbid, labelset_id=id
-        )
-
     @classmethod
     async def purge(cls, driver: Driver, kbid: str):
         """
@@ -302,7 +279,7 @@ class KnowledgeBox:
     ):
         prefix = KB_KEYS.format(kbid=kbid)
         while True:
-            async with driver.transaction() as txn:
+            async with driver.transaction(read_only=True) as txn:
                 all_keys = [key async for key in txn.keys(match=prefix, count=-1)]
 
             if len(all_keys) == 0:
@@ -319,7 +296,7 @@ class KnowledgeBox:
     async def get_resource_shard(
         self, shard_id: str
     ) -> Optional[writer_pb2.ShardObject]:
-        async with datamanagers.with_transaction() as txn:
+        async with datamanagers.with_ro_transaction() as txn:
             pb = await datamanagers.cluster.get_kb_shards(txn, kbid=self.kbid)
             if pb is None:
                 logger.warning("Shards not found for kbid", extra={"kbid": self.kbid})
@@ -415,6 +392,26 @@ class KnowledgeBox:
                     uuid,
                     disable_vectors=False,
                 )
+
+    async def create_vectorset(self, config: knowledgebox_pb2.VectorSetConfig):
+        if await datamanagers.vectorsets.exists(
+            self.txn, kbid=self.kbid, vectorset_id=config.vectorset_id
+        ):
+            raise VectorSetConflict(f"Vectorset {config.vectorset_id} already exists")
+        await datamanagers.vectorsets.set(self.txn, kbid=self.kbid, config=config)
+        shard_manager = get_shard_manager()
+        await shard_manager.create_vectorset(self.kbid, config)
+
+    async def delete_vectorset(self, vectorset_id: str):
+        await datamanagers.vectorsets.delete(
+            self.txn, kbid=self.kbid, vectorset_id=vectorset_id
+        )
+        # mark vectorset for async deletion
+        await self.txn.set(
+            KB_VECTORSET_TO_DELETE.format(kbid=self.kbid, vectorset=vectorset_id), b""
+        )
+        shard_manager = get_shard_manager()
+        await shard_manager.delete_vectorset(self.kbid, vectorset_id)
 
 
 def chunker(seq: Sequence, size: int):

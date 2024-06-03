@@ -34,10 +34,12 @@ from nucliadb_protos.writer_pb2 import ShardObject
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.base import AbstractIndexNode
+
+# XXX: this keys shouldn't be exposed outside datamanagers
+from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG_BASE
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
 from nucliadb_utils.storages.storage import Storage
 
 

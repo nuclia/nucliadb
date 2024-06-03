@@ -523,7 +523,7 @@ class TestPostgresStorage:
         await storage.delete_upload("file_id", "kb_id")
         connection.execute.assert_awaited_with(ANY, "kb_id", "file_id")
 
-    async def test_iterate_bucket(self, storage: pg.PostgresStorage, connection):
+    async def test_iterate_objects(self, storage: pg.PostgresStorage, connection):
         connection.cursor = MagicMock(
             return_value=iter_result(
                 [
@@ -543,11 +543,10 @@ class TestPostgresStorage:
             )
         )
 
-        chunks = []
-        async for chunk in storage.iterate_bucket("kb_id", "file_id"):
-            chunks.append(chunk)
-
-        assert chunks == [{"name": "file_id1"}, {"name": "file_id2"}]
+        object_names = []
+        async for object_info in storage.iterate_objects("kb_id", "file_id"):
+            object_names.append(object_info.name)
+        assert object_names == ["file_id1", "file_id2"]
 
     async def test_download(
         self, storage: pg.PostgresStorage, connection, chunk_info, chunk_data

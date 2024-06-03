@@ -13,6 +13,7 @@ import google.protobuf.timestamp_pb2
 import nucliadb_protos.audit_pb2
 import nucliadb_protos.knowledgebox_pb2
 import nucliadb_protos.noderesources_pb2
+import nucliadb_protos.nodewriter_pb2
 import nucliadb_protos.resources_pb2
 import nucliadb_protos.utils_pb2
 import sys
@@ -685,104 +686,6 @@ class WriterStatusRequest(google.protobuf.message.Message):
 global___WriterStatusRequest = WriterStatusRequest
 
 @typing.final
-class SetLabelsRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    KB_FIELD_NUMBER: builtins.int
-    ID_FIELD_NUMBER: builtins.int
-    LABELSET_FIELD_NUMBER: builtins.int
-    id: builtins.str
-    @property
-    def kb(self) -> nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID: ...
-    @property
-    def labelset(self) -> nucliadb_protos.knowledgebox_pb2.LabelSet: ...
-    def __init__(
-        self,
-        *,
-        kb: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID | None = ...,
-        id: builtins.str = ...,
-        labelset: nucliadb_protos.knowledgebox_pb2.LabelSet | None = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing.Literal["kb", b"kb", "labelset", b"labelset"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["id", b"id", "kb", b"kb", "labelset", b"labelset"]) -> None: ...
-
-global___SetLabelsRequest = SetLabelsRequest
-
-@typing.final
-class DelLabelsRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    KB_FIELD_NUMBER: builtins.int
-    ID_FIELD_NUMBER: builtins.int
-    id: builtins.str
-    @property
-    def kb(self) -> nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID: ...
-    def __init__(
-        self,
-        *,
-        kb: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID | None = ...,
-        id: builtins.str = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing.Literal["kb", b"kb"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["id", b"id", "kb", b"kb"]) -> None: ...
-
-global___DelLabelsRequest = DelLabelsRequest
-
-@typing.final
-class GetLabelsResponse(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    class _Status:
-        ValueType = typing.NewType("ValueType", builtins.int)
-        V: typing_extensions.TypeAlias = ValueType
-
-    class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[GetLabelsResponse._Status.ValueType], builtins.type):
-        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-        OK: GetLabelsResponse._Status.ValueType  # 0
-        NOTFOUND: GetLabelsResponse._Status.ValueType  # 1
-
-    class Status(_Status, metaclass=_StatusEnumTypeWrapper): ...
-    OK: GetLabelsResponse.Status.ValueType  # 0
-    NOTFOUND: GetLabelsResponse.Status.ValueType  # 1
-
-    KB_FIELD_NUMBER: builtins.int
-    LABELS_FIELD_NUMBER: builtins.int
-    STATUS_FIELD_NUMBER: builtins.int
-    status: global___GetLabelsResponse.Status.ValueType
-    @property
-    def kb(self) -> nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID: ...
-    @property
-    def labels(self) -> nucliadb_protos.knowledgebox_pb2.Labels: ...
-    def __init__(
-        self,
-        *,
-        kb: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID | None = ...,
-        labels: nucliadb_protos.knowledgebox_pb2.Labels | None = ...,
-        status: global___GetLabelsResponse.Status.ValueType = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing.Literal["kb", b"kb", "labels", b"labels"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["kb", b"kb", "labels", b"labels", "status", b"status"]) -> None: ...
-
-global___GetLabelsResponse = GetLabelsResponse
-
-@typing.final
-class GetLabelsRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    KB_FIELD_NUMBER: builtins.int
-    @property
-    def kb(self) -> nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID: ...
-    def __init__(
-        self,
-        *,
-        kb: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID | None = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing.Literal["kb", b"kb"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["kb", b"kb"]) -> None: ...
-
-global___GetLabelsRequest = GetLabelsRequest
-
-@typing.final
 class NewEntitiesGroupRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1176,61 +1079,58 @@ class MergeEntitiesRequest(google.protobuf.message.Message):
 global___MergeEntitiesRequest = MergeEntitiesRequest
 
 @typing.final
-class GetLabelSetRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    KB_FIELD_NUMBER: builtins.int
-    LABELSET_FIELD_NUMBER: builtins.int
-    labelset: builtins.str
-    @property
-    def kb(self) -> nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID: ...
-    def __init__(
-        self,
-        *,
-        kb: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID | None = ...,
-        labelset: builtins.str = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing.Literal["kb", b"kb"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["kb", b"kb", "labelset", b"labelset"]) -> None: ...
-
-global___GetLabelSetRequest = GetLabelSetRequest
-
-@typing.final
-class GetLabelSetResponse(google.protobuf.message.Message):
+class GetLabelsResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     class _Status:
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[GetLabelSetResponse._Status.ValueType], builtins.type):
+    class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[GetLabelsResponse._Status.ValueType], builtins.type):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-        OK: GetLabelSetResponse._Status.ValueType  # 0
-        NOTFOUND: GetLabelSetResponse._Status.ValueType  # 1
+        OK: GetLabelsResponse._Status.ValueType  # 0
+        NOTFOUND: GetLabelsResponse._Status.ValueType  # 1
 
     class Status(_Status, metaclass=_StatusEnumTypeWrapper): ...
-    OK: GetLabelSetResponse.Status.ValueType  # 0
-    NOTFOUND: GetLabelSetResponse.Status.ValueType  # 1
+    OK: GetLabelsResponse.Status.ValueType  # 0
+    NOTFOUND: GetLabelsResponse.Status.ValueType  # 1
 
     KB_FIELD_NUMBER: builtins.int
-    LABELSET_FIELD_NUMBER: builtins.int
+    LABELS_FIELD_NUMBER: builtins.int
     STATUS_FIELD_NUMBER: builtins.int
-    status: global___GetLabelSetResponse.Status.ValueType
+    status: global___GetLabelsResponse.Status.ValueType
     @property
     def kb(self) -> nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID: ...
     @property
-    def labelset(self) -> nucliadb_protos.knowledgebox_pb2.LabelSet: ...
+    def labels(self) -> nucliadb_protos.knowledgebox_pb2.Labels: ...
     def __init__(
         self,
         *,
         kb: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID | None = ...,
-        labelset: nucliadb_protos.knowledgebox_pb2.LabelSet | None = ...,
-        status: global___GetLabelSetResponse.Status.ValueType = ...,
+        labels: nucliadb_protos.knowledgebox_pb2.Labels | None = ...,
+        status: global___GetLabelsResponse.Status.ValueType = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["kb", b"kb", "labelset", b"labelset"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["kb", b"kb", "labelset", b"labelset", "status", b"status"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["kb", b"kb", "labels", b"labels"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["kb", b"kb", "labels", b"labels", "status", b"status"]) -> None: ...
 
-global___GetLabelSetResponse = GetLabelSetResponse
+global___GetLabelsResponse = GetLabelsResponse
+
+@typing.final
+class GetLabelsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    KB_FIELD_NUMBER: builtins.int
+    @property
+    def kb(self) -> nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID: ...
+    def __init__(
+        self,
+        *,
+        kb: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["kb", b"kb"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["kb", b"kb"]) -> None: ...
+
+global___GetLabelsRequest = GetLabelsRequest
 
 @typing.final
 class GetEntitiesGroupRequest(google.protobuf.message.Message):
@@ -1348,50 +1248,6 @@ class GetVectorSetsResponse(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["kb", b"kb", "status", b"status", "vectorsets", b"vectorsets"]) -> None: ...
 
 global___GetVectorSetsResponse = GetVectorSetsResponse
-
-@typing.final
-class DelVectorSetRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    KB_FIELD_NUMBER: builtins.int
-    VECTORSET_FIELD_NUMBER: builtins.int
-    vectorset: builtins.str
-    @property
-    def kb(self) -> nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID: ...
-    def __init__(
-        self,
-        *,
-        kb: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID | None = ...,
-        vectorset: builtins.str = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing.Literal["kb", b"kb"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["kb", b"kb", "vectorset", b"vectorset"]) -> None: ...
-
-global___DelVectorSetRequest = DelVectorSetRequest
-
-@typing.final
-class SetVectorSetRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    KB_FIELD_NUMBER: builtins.int
-    ID_FIELD_NUMBER: builtins.int
-    VECTORSET_FIELD_NUMBER: builtins.int
-    id: builtins.str
-    @property
-    def kb(self) -> nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID: ...
-    @property
-    def vectorset(self) -> nucliadb_protos.knowledgebox_pb2.VectorSet: ...
-    def __init__(
-        self,
-        *,
-        kb: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID | None = ...,
-        id: builtins.str = ...,
-        vectorset: nucliadb_protos.knowledgebox_pb2.VectorSet | None = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing.Literal["kb", b"kb", "vectorset", b"vectorset"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["id", b"id", "kb", b"kb", "vectorset", b"vectorset"]) -> None: ...
-
-global___SetVectorSetRequest = SetVectorSetRequest
 
 @typing.final
 class OpStatusWriter(google.protobuf.message.Message):
@@ -1881,3 +1737,121 @@ class SynonymsRequest(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["kbid", b"kbid"]) -> None: ...
 
 global___SynonymsRequest = SynonymsRequest
+
+@typing.final
+class NewVectorSetRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    KBID_FIELD_NUMBER: builtins.int
+    VECTORSET_ID_FIELD_NUMBER: builtins.int
+    VECTOR_TYPE_FIELD_NUMBER: builtins.int
+    SIMILARITY_FIELD_NUMBER: builtins.int
+    VECTOR_DIMENSION_FIELD_NUMBER: builtins.int
+    NORMALIZE_VECTORS_FIELD_NUMBER: builtins.int
+    MATRYOSHKA_DIMENSIONS_FIELD_NUMBER: builtins.int
+    kbid: builtins.str
+    vectorset_id: builtins.str
+    vector_type: nucliadb_protos.nodewriter_pb2.VectorType.ValueType
+    similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType
+    vector_dimension: builtins.int
+    normalize_vectors: builtins.bool
+    @property
+    def matryoshka_dimensions(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]: ...
+    def __init__(
+        self,
+        *,
+        kbid: builtins.str = ...,
+        vectorset_id: builtins.str = ...,
+        vector_type: nucliadb_protos.nodewriter_pb2.VectorType.ValueType = ...,
+        similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType = ...,
+        vector_dimension: builtins.int = ...,
+        normalize_vectors: builtins.bool = ...,
+        matryoshka_dimensions: collections.abc.Iterable[builtins.int] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["kbid", b"kbid", "matryoshka_dimensions", b"matryoshka_dimensions", "normalize_vectors", b"normalize_vectors", "similarity", b"similarity", "vector_dimension", b"vector_dimension", "vector_type", b"vector_type", "vectorset_id", b"vectorset_id"]) -> None: ...
+
+global___NewVectorSetRequest = NewVectorSetRequest
+
+@typing.final
+class NewVectorSetResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class _Status:
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+
+    class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[NewVectorSetResponse._Status.ValueType], builtins.type):
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        OK: NewVectorSetResponse._Status.ValueType  # 0
+        ERROR: NewVectorSetResponse._Status.ValueType  # 1
+        """generic error"""
+
+    class Status(_Status, metaclass=_StatusEnumTypeWrapper): ...
+    OK: NewVectorSetResponse.Status.ValueType  # 0
+    ERROR: NewVectorSetResponse.Status.ValueType  # 1
+    """generic error"""
+
+    STATUS_FIELD_NUMBER: builtins.int
+    DETAILS_FIELD_NUMBER: builtins.int
+    status: global___NewVectorSetResponse.Status.ValueType
+    details: builtins.str
+    def __init__(
+        self,
+        *,
+        status: global___NewVectorSetResponse.Status.ValueType = ...,
+        details: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["details", b"details", "status", b"status"]) -> None: ...
+
+global___NewVectorSetResponse = NewVectorSetResponse
+
+@typing.final
+class DelVectorSetRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    KBID_FIELD_NUMBER: builtins.int
+    VECTORSET_ID_FIELD_NUMBER: builtins.int
+    kbid: builtins.str
+    vectorset_id: builtins.str
+    def __init__(
+        self,
+        *,
+        kbid: builtins.str = ...,
+        vectorset_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["kbid", b"kbid", "vectorset_id", b"vectorset_id"]) -> None: ...
+
+global___DelVectorSetRequest = DelVectorSetRequest
+
+@typing.final
+class DelVectorSetResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class _Status:
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+
+    class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[DelVectorSetResponse._Status.ValueType], builtins.type):
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        OK: DelVectorSetResponse._Status.ValueType  # 0
+        ERROR: DelVectorSetResponse._Status.ValueType  # 1
+        """generic error"""
+
+    class Status(_Status, metaclass=_StatusEnumTypeWrapper): ...
+    OK: DelVectorSetResponse.Status.ValueType  # 0
+    ERROR: DelVectorSetResponse.Status.ValueType  # 1
+    """generic error"""
+
+    STATUS_FIELD_NUMBER: builtins.int
+    DETAILS_FIELD_NUMBER: builtins.int
+    status: global___DelVectorSetResponse.Status.ValueType
+    details: builtins.str
+    def __init__(
+        self,
+        *,
+        status: global___DelVectorSetResponse.Status.ValueType = ...,
+        details: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["details", b"details", "status", b"status"]) -> None: ...
+
+global___DelVectorSetResponse = DelVectorSetResponse

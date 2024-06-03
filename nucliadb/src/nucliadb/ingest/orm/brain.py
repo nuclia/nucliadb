@@ -42,6 +42,7 @@ from nucliadb_protos.resources_pb2 import (
 )
 from nucliadb_protos.utils_pb2 import Relation, RelationNode, VectorObject
 
+from nucliadb.common import ids
 from nucliadb.ingest import logger
 from nucliadb.ingest.orm.utils import compute_paragraph_key
 from nucliadb_models.labels import BASE_LABELS, flatten_resource_labels
@@ -49,15 +50,6 @@ from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_protos import utils_pb2
 
 FilePagePositions = dict[int, tuple[int, int]]
-
-FIELD_PARAGRAPH_ID = "{rid}/{field_id}/{paragraph_start}-{paragraph_end}"
-SPLIT_FIELD_PARAGRAPH_ID = (
-    "{rid}/{field_id}/{subfield_id}/{paragraph_start}-{paragraph_end}"
-)
-FIELD_VECTOR_ID = "{rid}/{field_id}/{index}/{vector_start}-{vector_end}"
-SPLIT_FIELD_VECTOR_ID = (
-    "{rid}/{field_id}/{subfield_id}/{index}/{vector_start}-{vector_end}"
-)
 
 METADATA_STATUS_PB_TYPE_TO_NAME_MAP = {
     Metadata.Status.ERROR: ResourceProcessingStatus.ERROR.name,
@@ -104,7 +96,7 @@ class ResourceBrain:
         self,
         field_key: str,
         metadata: FieldComputedMetadata,
-        replace_field: list[str],
+        paragraphs_to_replace: list[str],
         replace_splits: dict[str, list[str]],
         page_positions: Optional[FilePagePositions],
         extracted_text: Optional[ExtractedText],
@@ -244,9 +236,9 @@ class ResourceBrain:
                     f"{self.rid}/{field_key}/{split}/{sentence}"
                 )
 
-        for sentence_to_delete in replace_field:
+        for paragraph_to_delete in paragraphs_to_replace:
             self.brain.paragraphs_to_delete.append(
-                f"{self.rid}/{field_key}/{sentence_to_delete}"
+                f"{self.rid}/{field_key}/{paragraph_to_delete}"
             )
 
     def delete_metadata(self, field_key: str, metadata: FieldComputedMetadata):
@@ -257,7 +249,7 @@ class ResourceBrain:
                 )
 
         for paragraph in metadata.metadata.paragraphs:
-            self.brain.sentences_to_delete.append(
+            self.brain.paragraphs_to_delete.append(
                 f"{self.rid}/{field_key}/{paragraph.start}-{paragraph.end}"
             )
 
@@ -266,6 +258,7 @@ class ResourceBrain:
         field_id: str,
         vo: utils_pb2.VectorObject,
         *,
+        vectorset: Optional[str] = None,
         replace_field: bool = False,
         replace_splits: Optional[list[str]] = None,
         matryoshka_vector_dimension: Optional[int] = None,
@@ -273,19 +266,20 @@ class ResourceBrain:
         replace_splits = replace_splits or []
 
         for subfield, vectors in vo.split_vectors.items():
+            _field_id = ids.FieldId(
+                rid=self.rid,
+                field_id=field_id,
+                subfield_id=subfield,
+            )
             # For each split of this field
             for index, vector in enumerate(vectors.vectors):
-                paragraph_key = SPLIT_FIELD_PARAGRAPH_ID.format(
-                    rid=self.rid,
-                    field_id=field_id,
-                    subfield_id=subfield,
+                paragraph_key = ids.ParagraphId(
+                    field_id=_field_id,
                     paragraph_start=vector.start_paragraph,
                     paragraph_end=vector.end_paragraph,
                 )
-                sentence_key = SPLIT_FIELD_VECTOR_ID.format(
-                    rid=self.rid,
-                    field_id=field_id,
-                    subfield_id=subfield,
+                sentence_key = ids.VectorId(
+                    field_id=_field_id,
                     index=index,
                     vector_start=vector.start,
                     vector_end=vector.end,
@@ -295,19 +289,22 @@ class ResourceBrain:
                     paragraph_key,
                     sentence_key,
                     vector,
+                    vectorset=vectorset,
                     matryoshka_vector_dimension=matryoshka_vector_dimension,
                 )
 
+        _field_id = ids.FieldId(
+            rid=self.rid,
+            field_id=field_id,
+        )
         for index, vector in enumerate(vo.vectors.vectors):
-            paragraph_key = FIELD_PARAGRAPH_ID.format(
-                rid=self.rid,
-                field_id=field_id,
+            paragraph_key = ids.ParagraphId(
+                field_id=_field_id,
                 paragraph_start=vector.start_paragraph,
                 paragraph_end=vector.end_paragraph,
             )
-            sentence_key = FIELD_VECTOR_ID.format(
-                rid=self.rid,
-                field_id=field_id,
+            sentence_key = ids.VectorId(
+                field_id=_field_id,
                 index=index,
                 vector_start=vector.start,
                 vector_end=vector.end,
@@ -317,26 +314,37 @@ class ResourceBrain:
                 paragraph_key,
                 sentence_key,
                 vector,
+                vectorset=vectorset,
                 matryoshka_vector_dimension=matryoshka_vector_dimension,
             )
 
         for split in replace_splits:
-            self.brain.sentences_to_delete.append(f"{self.rid}/{field_id}/{split}")
+            self.brain.sentences_to_delete.append(
+                ids.FieldId(rid=self.rid, field_id=field_id, subfield_id=split).full()
+            )
 
         if replace_field:
-            self.brain.sentences_to_delete.append(f"{self.rid}/{field_id}")
+            self.brain.sentences_to_delete.append(
+                ids.FieldId(rid=self.rid, field_id=field_id).full()
+            )
 
     def _apply_field_vector(
         self,
         field_id: str,
-        paragraph_key: str,
-        sentence_key: str,
+        paragraph_key: ids.ParagraphId,
+        sentence_key: ids.VectorId,
         vector: utils_pb2.Vector,
         *,
+        vectorset: Optional[str],
         matryoshka_vector_dimension: Optional[int] = None,
     ):
-        paragraph_pb = self.brain.paragraphs[field_id].paragraphs[paragraph_key]
-        sentence_pb = paragraph_pb.sentences[sentence_key]
+        paragraph_pb = self.brain.paragraphs[field_id].paragraphs[paragraph_key.full()]
+        if vectorset:
+            sentence_pb = paragraph_pb.vectorsets_sentences[vectorset].sentences[
+                sentence_key.full()
+            ]
+        else:
+            sentence_pb = paragraph_pb.sentences[sentence_key.full()]
 
         sentence_pb.ClearField("vector")  # clear first to prevent duplicates
 
@@ -370,17 +378,11 @@ class ResourceBrain:
         sentence_pb.metadata.position.index = paragraph_pb.metadata.position.index
 
     def delete_vectors(self, field_key: str, vo: VectorObject):
-        # TODO: no need to iterate over all vectors, just delete the whole field
         for subfield, vectors in vo.split_vectors.items():
-            for vector in vectors.vectors:
-                self.brain.sentences_to_delete.append(
-                    f"{self.rid}/{field_key}/{subfield}/{vector.start}-{vector.end}"
-                )
+            self.brain.sentences_to_delete.append(f"{self.rid}/{field_key}/{subfield}")
 
         for vector in vo.vectors.vectors:
-            self.brain.sentences_to_delete.append(
-                f"{self.rid}/{field_key}/{vector.start}-{vector.end}"
-            )
+            self.brain.sentences_to_delete.append(f"{self.rid}/{field_key}")
 
     def set_processing_status(
         self, basic: Basic, previous_status: Optional[Metadata.Status.ValueType]

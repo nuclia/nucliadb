@@ -29,17 +29,18 @@ from nucliadb_protos.knowledgebox_pb2 import (
     KnowledgeBoxNew,
     KnowledgeBoxResponseStatus,
     KnowledgeBoxUpdate,
-    Labels,
     NewKnowledgeBoxResponse,
     SemanticModelMetadata,
     UpdateKnowledgeBoxResponse,
+    VectorSetConfig,
 )
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.writer_pb2 import (
     BinaryData,
     BrokerMessage,
     DelEntitiesRequest,
-    DelLabelsRequest,
+    DelVectorSetRequest,
+    DelVectorSetResponse,
     ExtractedVectorsWrapper,
     FileRequest,
     FileUploaded,
@@ -47,10 +48,6 @@ from nucliadb_protos.writer_pb2 import (
     GetEntitiesGroupResponse,
     GetEntitiesRequest,
     GetEntitiesResponse,
-    GetLabelSetRequest,
-    GetLabelSetResponse,
-    GetLabelsRequest,
-    GetLabelsResponse,
     IndexResource,
     IndexStatus,
     ListEntitiesGroupsRequest,
@@ -59,9 +56,10 @@ from nucliadb_protos.writer_pb2 import (
     ListMembersResponse,
     NewEntitiesGroupRequest,
     NewEntitiesGroupResponse,
+    NewVectorSetRequest,
+    NewVectorSetResponse,
     OpStatusWriter,
     SetEntitiesRequest,
-    SetLabelsRequest,
     SetVectorsRequest,
     SetVectorsResponse,
     UpdateEntitiesGroupRequest,
@@ -79,13 +77,14 @@ from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest import SERVICE_NAME, logger
+from nucliadb.ingest.orm.broker_message import generate_broker_message
 from nucliadb.ingest.orm.entities import EntitiesManager
-from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict
+from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict, VectorSetConflict
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.processor import Processor, sequence_manager
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.settings import settings
-from nucliadb_protos import utils_pb2, writer_pb2, writer_pb2_grpc
+from nucliadb_protos import nodewriter_pb2, utils_pb2, writer_pb2, writer_pb2_grpc
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
 from nucliadb_utils.settings import is_onprem_nucliadb, running_settings
@@ -301,71 +300,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             logger.info(f"Processed {message.uuid}")
         return response
 
-    async def SetLabels(self, request: SetLabelsRequest, context=None) -> OpStatusWriter:  # type: ignore
-        async with self.driver.transaction() as txn:
-            kbobj = await self.proc.get_kb_obj(txn, request.kb)
-            response = OpStatusWriter()
-            if kbobj is not None:
-                try:
-                    await kbobj.set_labelset(request.id, request.labelset)
-                    await txn.commit()
-                    response.status = OpStatusWriter.Status.OK
-                except Exception as e:
-                    errors.capture_exception(e)
-                    logger.error("Error in ingest gRPC servicer", exc_info=True)
-                    response.status = OpStatusWriter.Status.ERROR
-            else:
-                response.status = OpStatusWriter.Status.NOTFOUND
-            return response
-
-    async def DelLabels(self, request: DelLabelsRequest, context=None) -> OpStatusWriter:  # type: ignore
-        async with self.driver.transaction() as txn:
-            kbobj = await self.proc.get_kb_obj(txn, request.kb)
-            response = OpStatusWriter()
-            if kbobj is not None:
-                try:
-                    await kbobj.del_labelset(request.id)
-                    await txn.commit()
-                    response.status = OpStatusWriter.Status.OK
-                except Exception as e:
-                    errors.capture_exception(e)
-                    logger.error("Error in ingest gRPC servicer", exc_info=True)
-                    response.status = OpStatusWriter.Status.ERROR
-            else:
-                response.status = OpStatusWriter.Status.NOTFOUND
-
-            return response
-
-    async def GetLabels(self, request: GetLabelsRequest, context=None) -> GetLabelsResponse:  # type: ignore
-        async with self.driver.transaction() as txn:
-            kbobj = await self.proc.get_kb_obj(txn, request.kb)
-            labels: Optional[Labels] = None
-            if kbobj is not None:
-                labels = await kbobj.get_labels()
-        response = GetLabelsResponse()
-        if kbobj is None:
-            response.status = GetLabelsResponse.Status.NOTFOUND
-        else:
-            response.kb.uuid = kbobj.kbid
-            if labels is not None:
-                response.labels.CopyFrom(labels)
-
-        return response
-
-    async def GetLabelSet(  # type: ignore
-        self, request: GetLabelSetRequest, context=None
-    ) -> GetLabelSetResponse:
-        async with self.driver.transaction() as txn:
-            kbobj = await self.proc.get_kb_obj(txn, request.kb)
-            response = GetLabelSetResponse()
-            if kbobj is not None:
-                await kbobj.get_labelset(request.labelset, response)
-                response.kb.uuid = kbobj.kbid
-                response.status = GetLabelSetResponse.Status.OK
-            else:
-                response.status = GetLabelSetResponse.Status.NOTFOUND
-            return response
-
     async def NewEntitiesGroup(  # type: ignore
         self, request: NewEntitiesGroupRequest, context=None
     ) -> NewEntitiesGroupResponse:
@@ -393,7 +327,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request: GetEntitiesRequest, context=None
     ) -> GetEntitiesResponse:
         response = GetEntitiesResponse()
-        async with self.driver.transaction() as txn:
+        async with self.driver.transaction(read_only=True) as txn:
             kbobj = await self.proc.get_kb_obj(txn, request.kb)
 
             if kbobj is None:
@@ -416,7 +350,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request: ListEntitiesGroupsRequest, context=None
     ) -> ListEntitiesGroupsResponse:
         response = ListEntitiesGroupsResponse()
-        async with self.driver.transaction() as txn:
+        async with self.driver.transaction(read_only=True) as txn:
             kbobj = await self.proc.get_kb_obj(txn, request.kb)
 
             if kbobj is None:
@@ -441,7 +375,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request: GetEntitiesGroupRequest, context=None
     ) -> GetEntitiesGroupResponse:
         response = GetEntitiesGroupResponse()
-        async with self.driver.transaction() as txn:
+        async with self.driver.transaction(read_only=True) as txn:
             kbobj = await self.proc.get_kb_obj(txn, request.kb)
             if kbobj is None:
                 response.status = GetEntitiesGroupResponse.Status.KB_NOT_FOUND
@@ -546,7 +480,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     ) -> WriterStatusResponse:
         logger.info("Status Call")
         response = WriterStatusResponse()
-        async with self.driver.transaction() as txn:
+        async with self.driver.transaction(read_only=True) as txn:
             async for _, slug in datamanagers.kb.get_kbs(txn):
                 response.knowledgeboxes.append(slug)
 
@@ -580,7 +514,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         async with self.driver.transaction() as txn:
             kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
             resobj = ResourceORM(txn, self.storage, kbobj, request.rid)
-            bm = await resobj.generate_broker_message()
+            bm = await generate_broker_message(resobj)
             transaction = get_transaction_utility()
             partitioning = get_partitioning()
             partition = partitioning.generate_partition(request.kbid, request.rid)
@@ -596,7 +530,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 resobj = ResourceORM(txn, self.storage, kbobj, request.rid)
                 resobj.disable_vectors = not request.reindex_vectors
 
-                brain = await resobj.generate_index_message()
+                brain = await resobj.generate_index_message(reindex=True)
                 shard_id = await datamanagers.resources.get_resource_shard_id(
                     txn, kbid=request.kbid, rid=request.rid
                 )
@@ -686,6 +620,59 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         )
         result = FileUploaded()
         return result
+
+    async def NewVectorSet(  # type: ignore
+        self, request: NewVectorSetRequest, context=None
+    ) -> NewVectorSetResponse:
+        config = VectorSetConfig(
+            vectorset_id=request.vectorset_id,
+            vectorset_index_config=nodewriter_pb2.VectorIndexConfig(
+                similarity=request.similarity,
+                normalize_vectors=request.normalize_vectors,
+                vector_type=request.vector_type,
+                vector_dimension=request.vector_dimension,
+            ),
+            matryoshka_dimensions=request.matryoshka_dimensions,
+        )
+        response = NewVectorSetResponse()
+        try:
+            async with self.driver.transaction() as txn:
+                kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
+                await kbobj.create_vectorset(config)
+                await txn.commit()
+        except VectorSetConflict as exc:
+            response.status = NewVectorSetResponse.Status.ERROR
+            response.details = str(exc)
+        except Exception as exc:
+            errors.capture_exception(exc)
+            logger.error(
+                "Error in ingest gRPC while creating a vectorset", exc_info=True
+            )
+            response.status = NewVectorSetResponse.Status.ERROR
+            response.details = str(exc)
+        else:
+            response.status = NewVectorSetResponse.Status.OK
+        return response
+
+    async def DelVectorSet(  # type: ignore
+        self, request: DelVectorSetRequest, context=None
+    ) -> DelVectorSetResponse:
+        response = DelVectorSetResponse()
+        try:
+            async with self.driver.transaction() as txn:
+                kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
+                await kbobj.delete_vectorset(request.vectorset_id)
+                await txn.commit()
+        except Exception as exc:
+            errors.capture_exception(exc)
+            logger.error(
+                "Error in ingest gRPC while deleting a vectorset", exc_info=True
+            )
+            response.status = DelVectorSetResponse.Status.ERROR
+            response.details = str(exc)
+        else:
+            response.status = DelVectorSetResponse.Status.OK
+        return response
 
 
 LEARNING_SIMILARITY_FUNCTION_TO_PROTO = {

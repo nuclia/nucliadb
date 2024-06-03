@@ -40,8 +40,6 @@ from ..ask import create_ask_response
     description="Ask questions to a resource",
     tags=["Search"],
     response_model=SyncAskResponse,
-    # Add this to OpenAPI schema when endpoint is not in beta anymore
-    include_in_schema=False,
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
@@ -77,8 +75,6 @@ async def resource_ask_endpoint_by_uuid(
     description="Ask questions to a resource",
     tags=["Search"],
     response_model=SyncAskResponse,
-    # Add this to OpenAPI schema when endpoint is not in beta anymore
-    include_in_schema=False,
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
@@ -111,7 +107,7 @@ async def resource_ask_endpoint_by_slug(
 
 
 async def get_resource_uuid_by_slug(kbid: str, slug: str) -> Optional[str]:
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_ro_transaction() as txn:
         return await datamanagers.resources.get_resource_uuid_from_slug(
             txn, kbid=kbid, slug=slug
         )

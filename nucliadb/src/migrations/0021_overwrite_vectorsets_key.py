@@ -17,18 +17,27 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import pytest
-from nucliadb_protos.train_pb2 import GetLabelsRequest
-from nucliadb_protos.train_pb2_grpc import TrainStub
-from nucliadb_protos.writer_pb2 import GetLabelsResponse
+
+"""Migration #21
+
+With the new vectorsets implementation, we need to store some information on
+maindb. As the key "/kbs/{kbid}/vectorsets" was already used at some point, this
+migration will ensure to overwrite the key and set the new value
+
+"""
+import logging
+
+from nucliadb.common import datamanagers
+from nucliadb.migrator.context import ExecutionContext
+
+logger = logging.getLogger(__name__)
 
 
-@pytest.mark.asyncio
-async def test_get_ontology(
-    train_client: TrainStub, knowledgebox_ingest: str, test_pagination_resources
-) -> None:
-    req = GetLabelsRequest()
-    req.kb.uuid = knowledgebox_ingest
+async def migrate(context: ExecutionContext) -> None: ...
 
-    labels: GetLabelsResponse = await train_client.GetOntology(req)  # type: ignore
-    assert labels.labels.labelset["ls1"].labels[0].title == "label1"
+
+async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
+    async with context.kv_driver.transaction() as txn:
+        logger.info(f"Overwriting vectorsets key", extra={"kbid": kbid})
+        await datamanagers.vectorsets.initialize(txn, kbid=kbid)
+        await txn.commit()

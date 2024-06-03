@@ -40,6 +40,7 @@ from nucliadb_protos.noderesources_pb2 import Resource as BrainResource
 from nucliadb_protos.nodewriter_pb2 import IndexMessage
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.writer_pb2 import BrokerMessage
+from pydantic import BaseModel
 
 from nucliadb_utils import logger
 from nucliadb_utils.helpers import async_gen_lookahead
@@ -58,6 +59,16 @@ OLD_INDEXING_KEY = "index/{node}/{shard}/{txid}"
 INDEXING_KEY = "index/{kb}/{shard}/{resource}/{txid}"
 # temporary storage for large stream data
 MESSAGE_KEY = "message/{kbid}/{rid}/{mid}"
+
+
+class ObjectInfo(BaseModel):
+    name: str
+
+
+class ObjectMetadata(BaseModel):
+    filename: str
+    content_type: str
+    size: int
 
 
 class StorageField(abc.ABC, metaclass=abc.ABCMeta):
@@ -99,7 +110,7 @@ class StorageField(abc.ABC, metaclass=abc.ABCMeta):
         return deleted
 
     @abc.abstractmethod
-    async def exists(self) -> Optional[Dict[str, str]]: ...
+    async def exists(self) -> Optional[ObjectMetadata]: ...
 
     @abc.abstractmethod
     async def copy(
@@ -141,10 +152,10 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         # Delete all keys inside a resource
         bucket = self.get_bucket_name(kbid)
         resource_storage_base_path = STORAGE_RESOURCE.format(kbid=kbid, uuid=uuid)
-        async for bucket_info in self.iterate_bucket(
+        async for object_info in self.iterate_objects(
             bucket, resource_storage_base_path
         ):
-            await self.delete_upload(bucket_info["name"], bucket)
+            await self.delete_upload(object_info.name, bucket)
 
     async def deadletter(
         self, message: BrokerMessage, seq: int, seqid: int, partition: str
@@ -286,7 +297,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         elif file.source == self.source:
             # This is the case for NucliaDB hosted deployment (Nuclia's cloud deployment):
             # The data is already stored in the right place by the processing
-            logger.debug(f"[Nuclia hosted]")
+            logger.debug("[Nuclia hosted]")
             return file
         elif file.source == CloudFile.EXPORT:
             # This is for files coming from an export
@@ -511,7 +522,11 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
     async def finalize(self) -> None: ...
 
     @abc.abstractmethod
-    def iterate_bucket(self, bucket: str, prefix: str) -> AsyncIterator[Any]: ...
+    async def iterate_objects(
+        self, bucket: str, prefix: str
+    ) -> AsyncGenerator[ObjectInfo, None]:
+        raise NotImplementedError()
+        yield ObjectInfo(name="")
 
     async def copy(self, file: CloudFile, destination: StorageField) -> None:
         await destination.copy(

@@ -28,7 +28,12 @@ import asyncpg
 from nucliadb_protos.resources_pb2 import CloudFile
 
 from nucliadb_utils.storages import CHUNK_SIZE
-from nucliadb_utils.storages.storage import Storage, StorageField
+from nucliadb_utils.storages.storage import (
+    ObjectInfo,
+    ObjectMetadata,
+    Storage,
+    StorageField,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -288,7 +293,7 @@ where kb_id = $1 and file_id = $2
 
     async def iterate_kb(
         self, bucket: str, prefix: Optional[str] = None
-    ) -> AsyncIterator[FileInfo]:
+    ) -> AsyncGenerator[FileInfo, None]:
         query = """
 SELECT filename, size, content_type, file_id
 FROM kb_files
@@ -517,10 +522,17 @@ class PostgresStorageField(StorageField):
         self.field.ClearField("offset")
         self.field.ClearField("upload_uri")
 
-    async def exists(self) -> Optional[FileInfo]:  # type:ignore
+    async def exists(self) -> Optional[ObjectMetadata]:
         async with self.storage.pool.acquire() as conn:
             dl = PostgresFileDataLayer(conn)
-            return await dl.get_file_info(self.bucket, self.key)
+            file_info = await dl.get_file_info(self.bucket, self.key)
+            if file_info is None:
+                return None
+            return ObjectMetadata(
+                filename=file_info["filename"],
+                size=file_info["size"],
+                content_type=file_info["content_type"],
+            )
 
     async def upload(self, iterator: AsyncIterator, origin: CloudFile) -> CloudFile:
         self.field = await self.start(origin)
@@ -588,11 +600,13 @@ class PostgresStorage(Storage):
         await self.delete_kb(kbid)
         return True
 
-    async def iterate_bucket(self, bucket: str, prefix: str) -> AsyncIterator[Any]:
+    async def iterate_objects(
+        self, bucket: str, prefix: str
+    ) -> AsyncGenerator[ObjectInfo, None]:
         async with self.pool.acquire() as conn:
             dl = PostgresFileDataLayer(conn)
             async for file_data in dl.iterate_kb(bucket, prefix):
-                yield {"name": file_data["key"]}
+                yield ObjectInfo(name=file_data["key"])
 
     async def download(
         self, bucket_name: str, key: str, headers: Optional[dict[str, str]] = None

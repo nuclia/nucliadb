@@ -34,6 +34,7 @@ from nucliadb.export_import.exceptions import (
     WrongExportStreamFormat,
 )
 from nucliadb.export_import.models import ExportedItemType, ExportItem, Metadata
+from nucliadb.ingest.orm.broker_message import generate_broker_message
 from nucliadb_models.export_import import Status
 from nucliadb_protos import knowledgebox_pb2 as kb_pb2
 from nucliadb_protos import resources_pb2, writer_pb2
@@ -175,8 +176,13 @@ async def iter_kb_resource_uuids(
 async def get_broker_message(
     context: ApplicationContext, kbid: str, rid: str
 ) -> Optional[writer_pb2.BrokerMessage]:
-    async with datamanagers.with_transaction() as txn:
-        return await datamanagers.resources.get_broker_message(txn, kbid=kbid, rid=rid)
+    async with datamanagers.with_ro_transaction() as txn:
+        resource = await datamanagers.resources.get_resource(txn, kbid=kbid, rid=rid)
+        if resource is None:
+            return None
+        resource.disable_vectors = False
+        resource.txn = txn
+        return await generate_broker_message(resource)
 
 
 def get_cloud_files(bm: writer_pb2.BrokerMessage) -> list[resources_pb2.CloudFile]:
@@ -246,12 +252,12 @@ async def download_binary(
 
 
 async def get_entities(context: ApplicationContext, kbid: str) -> kb_pb2.EntitiesGroups:
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_ro_transaction() as txn:
         return await datamanagers.entities.get_entities_groups(txn, kbid=kbid)
 
 
 async def get_labels(context: ApplicationContext, kbid: str) -> kb_pb2.Labels:
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_ro_transaction() as txn:
         return await datamanagers.labels.get_labels(txn, kbid=kbid)
 
 
