@@ -236,9 +236,9 @@ class ResourceBrain:
                     f"{self.rid}/{field_key}/{split}/{sentence}"
                 )
 
-        for sentence_to_delete in replace_field:
+        for paragraph_to_delete in replace_field:
             self.brain.paragraphs_to_delete.append(
-                f"{self.rid}/{field_key}/{sentence_to_delete}"
+                f"{self.rid}/{field_key}/{paragraph_to_delete}"
             )
 
     def delete_metadata(self, field_key: str, metadata: FieldComputedMetadata):
