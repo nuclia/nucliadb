@@ -261,7 +261,7 @@ async def test_validate_indexed_data(
     assert len(indexed_res) == len(resource_ids)
     [
         resources_datamanager.get_resource_index_message.assert_any_call(
-            ANY, kbid="kbid", rid=res_id
+            ANY, kbid="kbid", rid=res_id, reindex=False
         )
         for res_id in resource_ids
     ]

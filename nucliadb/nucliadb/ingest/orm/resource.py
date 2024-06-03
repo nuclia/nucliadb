@@ -242,7 +242,7 @@ class Resource:
                         self.indexer.apply_field_metadata(
                             field_id,
                             field_metadata,
-                            replace_field=[],
+                            paragraphs_to_replace=[],
                             replace_splits={},
                             page_positions=page_positions,
                             extracted_text=await field_obj.get_extracted_text(),
@@ -359,15 +359,15 @@ class Resource:
                         None,
                     )
                 if reindex:
-                    replace_field = [
+                    paragraphs_to_replace = [
                         f"{p.start}-{p.end}" for p in field_metadata.metadata.paragraphs
                     ]
                 else:
-                    replace_field = []
+                    paragraphs_to_replace = []
                 brain.apply_field_metadata(
                     field_key,
                     field_metadata,
-                    replace_field=replace_field,
+                    paragraphs_to_replace=paragraphs_to_replace,
                     replace_splits={},
                     page_positions=page_positions,
                     extracted_text=await field.get_extracted_text(),
@@ -766,7 +766,7 @@ class Resource:
         )
         (
             metadata,
-            replace_field,
+            paragraphs_to_replace,
             replace_splits,
         ) = await field_obj.set_field_metadata(field_metadata)
         field_key = self.generate_field_id(field_metadata.field)
@@ -792,7 +792,7 @@ class Resource:
             self.indexer.apply_field_metadata,
             field_key,
             metadata,
-            replace_field=replace_field,
+            paragraphs_to_replace=paragraphs_to_replace,
             replace_splits=replace_splits,
             page_positions=page_positions,
             extracted_text=extracted_text,

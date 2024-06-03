@@ -96,7 +96,7 @@ class ResourceBrain:
         self,
         field_key: str,
         metadata: FieldComputedMetadata,
-        replace_field: list[str],
+        paragraphs_to_replace: list[str],
         replace_splits: dict[str, list[str]],
         page_positions: Optional[FilePagePositions],
         extracted_text: Optional[ExtractedText],
@@ -236,7 +236,7 @@ class ResourceBrain:
                     f"{self.rid}/{field_key}/{split}/{sentence}"
                 )
 
-        for paragraph_to_delete in replace_field:
+        for paragraph_to_delete in paragraphs_to_replace:
             self.brain.paragraphs_to_delete.append(
                 f"{self.rid}/{field_key}/{paragraph_to_delete}"
             )
