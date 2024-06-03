@@ -417,15 +417,16 @@ class QueryParser:
                 # vectorset concept
                 matryoshka_dimension = await self._get_matryoshka_dimension()
             else:
-                vectorset_config = await datamanagers.atomic.vectorsets.get(
-                    kbid=self.kbid, vectorset_id=request.vectorset
+                txn = await get_read_only_transaction()
+                vectorset_config = await datamanagers.vectorsets.get(
+                    txn, kbid=self.kbid, vectorset_id=request.vectorset
                 )
                 if (
                     vectorset_config is not None
-                    and vectorset_config.vectors_index_config.vector_dimension
+                    and vectorset_config.vectorset_index_config.vector_dimension
                 ):
                     matryoshka_dimension = (
-                        vectorset_config.vectors_index_config.vector_dimension
+                        vectorset_config.vectorset_index_config.vector_dimension
                     )
 
             if matryoshka_dimension:

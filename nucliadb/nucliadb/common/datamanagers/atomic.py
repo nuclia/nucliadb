@@ -42,7 +42,6 @@ from . import kb as kb_dm
 from . import labels as labels_dm
 from . import resources as resources_dm
 from . import synonyms as synonyms_dm
-from . import vectorsets as vectorsets_dm
 from .utils import with_ro_transaction, with_transaction
 
 # XXX: we are using the not exported _ParamSpec to support 3.9. Whenever we
@@ -99,7 +98,3 @@ class labelset:
 class synonyms:
     get = ro_txn_wrap(synonyms_dm.get)
     set = rw_txn_wrap(synonyms_dm.set)
-
-
-class vectorsets:
-    get = ro_txn_wrap(vectorsets_dm.get)
