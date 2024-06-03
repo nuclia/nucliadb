@@ -129,7 +129,6 @@ async def index_resource_to_shard(
     shard: writer_pb2.ShardObject,
 ) -> Optional[noderesources_pb2.Resource]:
     logger.info("Indexing resource", extra={"kbid": kbid, "resource_id": resource_id})
-
     sm = app_context.shard_manager
     partitioning = app_context.partitioning
 
