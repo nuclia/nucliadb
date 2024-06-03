@@ -166,10 +166,12 @@ class QueryParser:
             )
         return self._query_information_task
 
-    def _get_matryoshka_dimension(self) -> Awaitable[Optional[int]]:
+    def _get_matryoshka_dimension(
+        self, vectorset: Optional[str] = None
+    ) -> Awaitable[Optional[int]]:
         if self._get_matryoshka_dimension_task is None:
             self._get_matryoshka_dimension_task = asyncio.create_task(
-                get_matryoshka_dimension_cached(self.kbid)
+                get_matryoshka_dimension_cached(self.kbid, vectorset)
             )
         return self._get_matryoshka_dimension_task
 
@@ -411,25 +413,8 @@ class QueryParser:
             request.vectorset = self.vectorset
 
         if query_vector is not None:
-            matryoshka_dimension = None
-            if not request.vectorset:
-                # XXX this should be migrated once we remove the "default"
-                # vectorset concept
-                matryoshka_dimension = await self._get_matryoshka_dimension()
-            else:
-                txn = await get_read_only_transaction()
-                vectorset_config = await datamanagers.vectorsets.get(
-                    txn, kbid=self.kbid, vectorset_id=request.vectorset
-                )
-                if (
-                    vectorset_config is not None
-                    and vectorset_config.vectorset_index_config.vector_dimension
-                ):
-                    matryoshka_dimension = (
-                        vectorset_config.vectorset_index_config.vector_dimension
-                    )
-
-            if matryoshka_dimension:
+            matryoshka_dimension = await self._get_matryoshka_dimension(self.vectorset)
+            if matryoshka_dimension is not None:
                 # KB using a matryoshka embeddings model, cut the query vector
                 # accordingly
                 query_vector = query_vector[:matryoshka_dimension]
@@ -779,12 +764,35 @@ def check_supported_filters(filters: dict[str, Any], paragraph_labels: list[str]
 
 
 @alru_cache(maxsize=None)
-async def get_matryoshka_dimension_cached(kbid: str) -> Optional[int]:
+async def get_matryoshka_dimension_cached(
+    kbid: str, vectorset: Optional[str]
+) -> Optional[int]:
     # This can be safely cached as the matryoshka dimension is not expected to change
-    return await get_matryoshka_dimension(kbid)
+    return await get_matryoshka_dimension(kbid, vectorset)
 
 
 @query_parse_dependency_observer.wrap({"type": "matryoshka_dimension"})
-async def get_matryoshka_dimension(kbid: str) -> Optional[int]:
+async def get_matryoshka_dimension(
+    kbid: str, vectorset: Optional[str]
+) -> Optional[int]:
     txn = await get_read_only_transaction()
-    return await datamanagers.kb.get_matryoshka_vector_dimension(txn, kbid=kbid)
+    matryoshka_dimension = None
+    if not vectorset:
+        # XXX this should be migrated once we remove the "default" vectorset
+        # concept
+        matryoshka_dimension = await datamanagers.kb.get_matryoshka_vector_dimension(
+            txn, kbid=kbid
+        )
+    else:
+        vectorset_config = await datamanagers.vectorsets.get(
+            txn, kbid=kbid, vectorset_id=vectorset
+        )
+        if (
+            vectorset_config is not None
+            and vectorset_config.vectorset_index_config.vector_dimension
+        ):
+            matryoshka_dimension = (
+                vectorset_config.vectorset_index_config.vector_dimension
+            )
+
+    return matryoshka_dimension
