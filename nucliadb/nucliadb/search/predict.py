@@ -616,7 +616,9 @@ def get_chat_ndjson_generator(
                     continue
         except aiohttp.ClientPayloadError as ex:
             # Most likely it's an error in the predict api that caused the stream to break prematurely
-            raise ProxiedPredictAPIError(status=500, detail="LLM stream error") from ex
+            raise ProxiedPredictAPIError(
+                status=500, detail="LLM stream error. Please try again later"
+            ) from ex
 
     return _parse_generative_chunks(response.content)
 

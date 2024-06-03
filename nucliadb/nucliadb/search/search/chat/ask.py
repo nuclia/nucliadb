@@ -165,7 +165,9 @@ class AskResult:
                 f"Unexpected error while generating the answer: {exc}",
                 extra={"kbid": self.kbid},
             )
-            error = str(exc)
+            error = (
+                "Unhandled error while generating the answer. Please try again later."
+            )
 
         if error is not None:
             yield ErrorAskResponseItem(error=error)
