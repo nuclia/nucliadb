@@ -282,13 +282,14 @@ class TiKVTransaction(Transaction):
             return
         await self.data_layer.abort()
         if self.replication_tx:
+            self.replication_ops.clear()
             await self.replication_tx.abort()
         self.open = False
 
     async def commit(self):
         assert self.open
         await self.data_layer.commit()
-        if self.replication_tx:
+        if self.replication_tx and self.replication_ops:
             await self.replication_tx.create_replication_commit(self.replication_ops)
             await self.replication_tx.commit()
         self.open = False
