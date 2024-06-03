@@ -28,10 +28,6 @@ from nucliadb_protos.knowledgebox_pb2 import Synonyms
 from nucliadb_protos.writer_pb2 import (
     GetEntitiesGroupRequest,
     GetEntitiesGroupResponse,
-    GetLabelSetRequest,
-    GetLabelSetResponse,
-    GetLabelsRequest,
-    GetLabelsResponse,
     ListEntitiesGroupsRequest,
     ListEntitiesGroupsResponse,
 )
@@ -40,6 +36,7 @@ from starlette.requests import Request
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.settings import in_standalone_mode
 from nucliadb.common.context.fastapi import get_app_context
+from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.http_clients import processing
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -55,6 +52,7 @@ from nucliadb_models.entities import (
 from nucliadb_models.labels import KnowledgeBoxLabels, LabelSet
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.synonyms import KnowledgeBoxSynonyms
+from nucliadb_protos import writer_pb2
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.utilities import get_ingest, get_storage
 
@@ -145,30 +143,29 @@ async def get_entity(request: Request, kbid: str, group: str) -> EntitiesGroup:
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def get_labelsets(request: Request, kbid: str) -> KnowledgeBoxLabels:
-    ingest = get_ingest()
-    l_request: GetLabelsRequest = GetLabelsRequest()
-    l_request.kb.uuid = kbid
-
-    kbobj: GetLabelsResponse = await ingest.GetLabels(l_request)  # type: ignore
-    if kbobj.status == GetLabelsResponse.Status.OK:
-        response = KnowledgeBoxLabels(uuid=kbid)
-        for labelset, labelset_data in kbobj.labels.labelset.items():
-            labelset_response = LabelSet(
-                **MessageToDict(
-                    labelset_data,
-                    preserving_proto_field_name=True,
-                    including_default_value_fields=True,
-                )
-            )
-            response.labelsets[labelset] = labelset_response
-        return response
-    elif kbobj.status == GetLabelsResponse.Status.NOTFOUND:
+async def get_labelsets_endoint(request: Request, kbid: str) -> KnowledgeBoxLabels:
+    try:
+        return await get_labelsets(kbid)
+    except KnowledgeBoxNotFound:
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
-    else:
-        raise HTTPException(
-            status_code=500, detail="Error on getting Knowledge box labels"
+
+
+async def get_labelsets(kbid: str) -> KnowledgeBoxLabels:
+    kb_exists = await datamanagers.atomic.kb.exists_kb(kbid=kbid)
+    if not kb_exists:
+        raise KnowledgeBoxNotFound()
+    labelsets: writer_pb2.Labels = await datamanagers.atomic.labelset.get_all(kbid=kbid)
+    response = KnowledgeBoxLabels(uuid=kbid)
+    for labelset, labelset_data in labelsets.labelset.items():
+        labelset_response = LabelSet(
+            **MessageToDict(
+                labelset_data,
+                preserving_proto_field_name=True,
+                including_default_value_fields=True,
+            )
         )
+        response.labelsets[labelset] = labelset_response
+    return response
 
 
 @api.get(
@@ -180,28 +177,31 @@ async def get_labelsets(request: Request, kbid: str) -> KnowledgeBoxLabels:
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def get_labelset(request: Request, kbid: str, labelset: str) -> LabelSet:
-    ingest = get_ingest()
-    l_request: GetLabelSetRequest = GetLabelSetRequest()
-    l_request.kb.uuid = kbid
-    l_request.labelset = labelset
+async def get_labelset_endpoint(request: Request, kbid: str, labelset: str) -> LabelSet:
+    try:
+        return await get_labelset(kbid, labelset)
+    except KnowledgeBoxNotFound:
+        raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
-    kbobj: GetLabelSetResponse = await ingest.GetLabelSet(l_request)  # type: ignore
-    if kbobj.status == GetLabelSetResponse.Status.OK:
+
+async def get_labelset(kbid: str, labelset_id: str) -> LabelSet:
+    kb_exists = await datamanagers.atomic.kb.exists_kb(kbid=kbid)
+    if not kb_exists:
+        raise KnowledgeBoxNotFound()
+    labelset: Optional[writer_pb2.LabelSet] = await datamanagers.atomic.labelset.get(
+        kbid=kbid, labelset_id=labelset_id
+    )
+    if labelset is None:
+        response = LabelSet()
+    else:
         response = LabelSet(
             **MessageToDict(
-                kbobj.labelset,
+                labelset,
                 preserving_proto_field_name=True,
                 including_default_value_fields=True,
             )
         )
-        return response
-    elif kbobj.status == GetLabelSetResponse.Status.NOTFOUND:
-        raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
-    else:
-        raise HTTPException(
-            status_code=500, detail="Error on getting labelset on a Knowledge box"
-        )
+    return response
 
 
 @api.get(
@@ -215,14 +215,9 @@ async def get_labelset(request: Request, kbid: str, labelset: str) -> LabelSet:
 @requires(NucliaDBRoles.READER)
 @version(1)
 async def get_custom_synonyms(request: Request, kbid: str):
-    async with datamanagers.with_transaction(read_only=True) as txn:
-        if not datamanagers.kb.exists_kb(txn, kbid=kbid):
-            raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
-        synonyms = await datamanagers.synonyms.get(txn, kbid=kbid)
-
-    if synonyms is None:
-        synonyms = Synonyms()
-
+    if not await datamanagers.atomic.kb.exists_kb(kbid=kbid):
+        raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
+    synonyms = await datamanagers.atomic.synonyms.get(kbid=kbid) or Synonyms()
     return KnowledgeBoxSynonyms.from_message(synonyms)
 
 
@@ -262,7 +257,7 @@ async def notifications_endpoint(
 
 
 async def exists_kb(kbid: str) -> bool:
-    async with datamanagers.with_transaction(read_only=True) as txn:
+    async with datamanagers.with_ro_transaction() as txn:
         return await datamanagers.kb.exists_kb(txn, kbid=kbid)
 
 

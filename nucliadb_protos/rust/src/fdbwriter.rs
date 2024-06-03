@@ -350,79 +350,6 @@ pub struct WriterStatusResponse {
 pub struct WriterStatusRequest {}
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct SetLabelsRequest {
-    #[prost(message, optional, tag = "1")]
-    pub kb: ::core::option::Option<super::knowledgebox::KnowledgeBoxId>,
-    #[prost(string, tag = "2")]
-    pub id: ::prost::alloc::string::String,
-    #[prost(message, optional, tag = "3")]
-    pub labelset: ::core::option::Option<super::knowledgebox::LabelSet>,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct DelLabelsRequest {
-    #[prost(message, optional, tag = "1")]
-    pub kb: ::core::option::Option<super::knowledgebox::KnowledgeBoxId>,
-    #[prost(string, tag = "2")]
-    pub id: ::prost::alloc::string::String,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct GetLabelsResponse {
-    #[prost(message, optional, tag = "1")]
-    pub kb: ::core::option::Option<super::knowledgebox::KnowledgeBoxId>,
-    #[prost(message, optional, tag = "2")]
-    pub labels: ::core::option::Option<super::knowledgebox::Labels>,
-    #[prost(enumeration = "get_labels_response::Status", tag = "3")]
-    pub status: i32,
-}
-/// Nested message and enum types in `GetLabelsResponse`.
-pub mod get_labels_response {
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
-    #[repr(i32)]
-    pub enum Status {
-        Ok = 0,
-        Notfound = 1,
-    }
-    impl Status {
-        /// String value of the enum field names used in the ProtoBuf definition.
-        ///
-        /// The values are not transformed in any way and thus are considered stable
-        /// (if the ProtoBuf definition does not change) and safe for programmatic use.
-        pub fn as_str_name(&self) -> &'static str {
-            match self {
-                Status::Ok => "OK",
-                Status::Notfound => "NOTFOUND",
-            }
-        }
-        /// Creates an enum from field names used in the ProtoBuf definition.
-        pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
-            match value {
-                "OK" => Some(Self::Ok),
-                "NOTFOUND" => Some(Self::Notfound),
-                _ => None,
-            }
-        }
-    }
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct GetLabelsRequest {
-    #[prost(message, optional, tag = "1")]
-    pub kb: ::core::option::Option<super::knowledgebox::KnowledgeBoxId>,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NewEntitiesGroupRequest {
     #[prost(message, optional, tag = "1")]
     pub kb: ::core::option::Option<super::knowledgebox::KnowledgeBoxId>,
@@ -721,24 +648,16 @@ pub mod merge_entities_request {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct GetLabelSetRequest {
-    #[prost(message, optional, tag = "1")]
-    pub kb: ::core::option::Option<super::knowledgebox::KnowledgeBoxId>,
-    #[prost(string, tag = "2")]
-    pub labelset: ::prost::alloc::string::String,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct GetLabelSetResponse {
+pub struct GetLabelsResponse {
     #[prost(message, optional, tag = "1")]
     pub kb: ::core::option::Option<super::knowledgebox::KnowledgeBoxId>,
     #[prost(message, optional, tag = "2")]
-    pub labelset: ::core::option::Option<super::knowledgebox::LabelSet>,
-    #[prost(enumeration = "get_label_set_response::Status", tag = "3")]
+    pub labels: ::core::option::Option<super::knowledgebox::Labels>,
+    #[prost(enumeration = "get_labels_response::Status", tag = "3")]
     pub status: i32,
 }
-/// Nested message and enum types in `GetLabelSetResponse`.
-pub mod get_label_set_response {
+/// Nested message and enum types in `GetLabelsResponse`.
+pub mod get_labels_response {
     #[derive(
         Clone,
         Copy,
@@ -775,6 +694,12 @@ pub mod get_label_set_response {
             }
         }
     }
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetLabelsRequest {
+    #[prost(message, optional, tag = "1")]
+    pub kb: ::core::option::Option<super::knowledgebox::KnowledgeBoxId>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

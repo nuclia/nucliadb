@@ -23,12 +23,7 @@ from uuid import uuid4
 
 from grpc import StatusCode
 from grpc.aio import AioRpcError
-from nucliadb_protos.knowledgebox_pb2 import (
-    KnowledgeBoxConfig,
-    Labels,
-    LabelSet,
-    SemanticModelMetadata,
-)
+from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig, SemanticModelMetadata
 from nucliadb_protos.resources_pb2 import Basic
 from nucliadb_protos.utils_pb2 import ReleaseChannel
 
@@ -76,7 +71,7 @@ class KnowledgeBox:
 
     async def get_config(self) -> Optional[KnowledgeBoxConfig]:
         if self._config is None:
-            async with datamanagers.with_transaction() as txn:
+            async with datamanagers.with_ro_transaction() as txn:
                 config = await datamanagers.kb.get_config(txn, kbid=self.kbid)
             if config is not None:
                 self._config = config
@@ -220,31 +215,6 @@ class KnowledgeBox:
 
         return uuid
 
-    # Labels
-    async def set_labelset(self, id: str, labelset: LabelSet):
-        await datamanagers.labels.set_labelset(
-            self.txn, kbid=self.kbid, labelset_id=id, labelset=labelset
-        )
-
-    async def get_labels(self) -> Labels:
-        return await datamanagers.labels.get_labels(self.txn, kbid=self.kbid)
-
-    async def get_labelset(
-        self, labelset: str, labelset_response: writer_pb2.GetLabelSetResponse
-    ):
-        ls = await datamanagers.labels.get_labelset(
-            self.txn,
-            kbid=self.kbid,
-            labelset_id=labelset,
-        )
-        if ls is not None:
-            labelset_response.labelset.CopyFrom(ls)
-
-    async def del_labelset(self, id: str):
-        await datamanagers.labels.delete_labelset(
-            self.txn, kbid=self.kbid, labelset_id=id
-        )
-
     @classmethod
     async def purge(cls, driver: Driver, kbid: str):
         """
@@ -309,7 +279,7 @@ class KnowledgeBox:
     ):
         prefix = KB_KEYS.format(kbid=kbid)
         while True:
-            async with driver.transaction() as txn:
+            async with driver.transaction(read_only=True) as txn:
                 all_keys = [key async for key in txn.keys(match=prefix, count=-1)]
 
             if len(all_keys) == 0:
@@ -326,7 +296,7 @@ class KnowledgeBox:
     async def get_resource_shard(
         self, shard_id: str
     ) -> Optional[writer_pb2.ShardObject]:
-        async with datamanagers.with_transaction() as txn:
+        async with datamanagers.with_ro_transaction() as txn:
             pb = await datamanagers.cluster.get_kb_shards(txn, kbid=self.kbid)
             if pb is None:
                 logger.warning("Shards not found for kbid", extra={"kbid": self.kbid})

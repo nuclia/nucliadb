@@ -24,6 +24,7 @@ from datetime import datetime
 import aiohttp
 import pytest
 from grpc import aio
+from httpx import AsyncClient
 from nucliadb_protos.knowledgebox_pb2 import EntitiesGroup, Label, LabelSet
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
@@ -34,13 +35,10 @@ from nucliadb_protos.resources_pb2 import (
     Position,
     Sentence,
 )
-from nucliadb_protos.writer_pb2 import (
-    BrokerMessage,
-    SetEntitiesRequest,
-    SetLabelsRequest,
-)
+from nucliadb_protos.writer_pb2 import BrokerMessage, SetEntitiesRequest
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
+from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG_BASE
 from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -70,26 +68,24 @@ async def writer_rest_api(nucliadb: Settings):  # type: ignore
 
 
 @pytest.fixture(scope="function")
-async def knowledgebox_with_labels(nucliadb_grpc: WriterStub, knowledgebox: str):
-    slr = SetLabelsRequest()
-    slr.kb.uuid = knowledgebox
-    slr.id = "labelset_paragraphs"
-    slr.labelset.kind.append(LabelSet.LabelSetKind.PARAGRAPHS)
-    l1 = Label(title="label_machine")
-    l2 = Label(title="label_user")
-    slr.labelset.labels.append(l1)
-    slr.labelset.labels.append(l2)
-    await nucliadb_grpc.SetLabels(slr)  # type: ignore
+async def knowledgebox_with_labels(nucliadb_writer: AsyncClient, knowledgebox: str):
+    resp = await nucliadb_writer.post(
+        f"kb/{knowledgebox}/labelset/labelset_paragraphs",
+        json={
+            "kind": ["PARAGRAPHS"],
+            "labels": [{"title": "label_machine"}, {"title": "label_user"}],
+        },
+    )
+    assert resp.status_code == 200
 
-    slr = SetLabelsRequest()
-    slr.kb.uuid = knowledgebox
-    slr.id = "labelset_resources"
-    slr.labelset.kind.append(LabelSet.LabelSetKind.RESOURCES)
-    l1 = Label(title="label_machine")
-    l2 = Label(title="label_user")
-    slr.labelset.labels.append(l1)
-    slr.labelset.labels.append(l2)
-    await nucliadb_grpc.SetLabels(slr)  # type: ignore
+    resp = await nucliadb_writer.post(
+        f"kb/{knowledgebox}/labelset/labelset_resources",
+        json={
+            "kind": ["RESOURCES"],
+            "labels": [{"title": "label_machine"}, {"title": "label_user"}],
+        },
+    )
+    assert resp.status_code == 200
 
     yield knowledgebox
 
@@ -286,8 +282,9 @@ async def test_pagination_resources(
     label_title = "label1"
     label.title = label_title
     labelset.labels.append(label)
-    await kb.set_labelset(label_title, labelset)
-    await txn.commit()
+    await datamanagers.atomic.labelset.set(
+        kbid=knowledgebox_ingest, labelset_id="ls1", labelset=labelset
+    )
 
     yield knowledgebox_ingest
 

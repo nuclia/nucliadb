@@ -18,10 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import traceback
-from typing import Optional
 
 import aiohttp
-from nucliadb_protos.knowledgebox_pb2 import Labels
 from nucliadb_protos.train_pb2 import (
     GetFieldsRequest,
     GetInfoRequest,
@@ -39,6 +37,7 @@ from nucliadb_protos.writer_pb2 import (
     GetLabelsResponse,
 )
 
+from nucliadb.common import datamanagers
 from nucliadb.train.settings import settings
 from nucliadb.train.utils import get_shard_manager
 from nucliadb_protos import train_pb2_grpc
@@ -111,20 +110,15 @@ class TrainServicer(train_pb2_grpc.TrainServicer):
     async def GetOntology(  # type: ignore
         self, request: GetLabelsRequest, context=None
     ) -> GetLabelsResponse:
-        async with self.proc.driver.transaction() as txn:
-            kbobj = await self.proc.get_kb_obj(txn, request.kb.uuid)
-            labels: Optional[Labels] = None
-            if kbobj is not None:
-                labels = await kbobj.get_labels()
-
         response = GetLabelsResponse()
-        if kbobj is None:
-            response.status = GetLabelsResponse.Status.NOTFOUND
+        kbid = request.kb.uuid
+        labels = await datamanagers.atomic.labelset.get_all(kbid=kbid)
+        if labels is not None:
+            response.kb.uuid = kbid
+            response.status = GetLabelsResponse.Status.OK
+            response.labels.CopyFrom(labels)
         else:
-            response.kb.uuid = kbobj.kbid
-            if labels is not None:
-                response.labels.CopyFrom(labels)
-
+            response.status = GetLabelsResponse.Status.NOTFOUND
         return response
 
     async def GetOntologyCount(  # type: ignore

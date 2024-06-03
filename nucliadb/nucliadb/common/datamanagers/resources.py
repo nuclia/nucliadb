@@ -30,7 +30,7 @@ from nucliadb.ingest.settings import settings as ingest_settings
 from nucliadb_protos import noderesources_pb2, resources_pb2
 from nucliadb_utils.utilities import get_storage
 
-from .utils import with_transaction
+from .utils import with_ro_transaction
 
 if TYPE_CHECKING:
     from nucliadb.ingest.orm.resource import Resource as ResourceORM
@@ -252,7 +252,7 @@ async def iterate_resource_ids(*, kbid: str) -> AsyncGenerator[str, None]:
     backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3
 )
 async def _iter_resource_slugs(*, kbid: str) -> AsyncGenerator[str, None]:
-    async with with_transaction() as txn:
+    async with with_ro_transaction() as txn:
         async for key in txn.keys(
             match=KB_RESOURCE_SLUG_BASE.format(kbid=kbid), count=-1
         ):
@@ -263,7 +263,7 @@ async def _iter_resource_slugs(*, kbid: str) -> AsyncGenerator[str, None]:
     backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3
 )
 async def _get_resource_ids_from_slugs(kbid: str, slugs: list[str]) -> list[str]:
-    async with with_transaction() as txn:
+    async with with_ro_transaction() as txn:
         rids = await txn.batch_get(
             [KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug) for slug in slugs]
         )

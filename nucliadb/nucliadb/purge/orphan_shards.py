@@ -86,7 +86,7 @@ async def detect_orphan_shards(driver: Driver) -> dict[str, ShardLocation]:
     orphan_shard_ids = indexed_shards.keys() - stored_shards.keys()
     orphan_shards: dict[str, ShardLocation] = {}
     unavailable_nodes: set[str] = set()
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_ro_transaction() as txn:
         for shard_id in orphan_shard_ids:
             node_id = indexed_shards[shard_id].node_id
             node = manager.get_index_node(node_id)  # type: ignore
