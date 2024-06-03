@@ -21,7 +21,7 @@ import base64
 import uuid
 from datetime import datetime
 from os.path import dirname, getsize
-from unittest.mock import patch
+from unittest.mock import patch, Mock, DEFAULT
 from uuid import uuid4
 
 import nats
@@ -38,6 +38,8 @@ from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
     ExtractedVectorsWrapper,
     FieldComputedMetadataWrapper,
+    FieldComputedMetadata,
+    FieldMetadata,
     FieldID,
     FieldQuestionAnswerWrapper,
     FieldType,
@@ -46,7 +48,7 @@ from nucliadb_protos.resources_pb2 import (
 )
 from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
 from nucliadb_protos.resources_pb2 import Origin, Paragraph, QuestionAnswer
-from nucliadb_protos.utils_pb2 import Vector
+from nucliadb_protos.utils_pb2 import Vector, Vectors, VectorObject
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb.common.maindb.driver import Driver
@@ -682,3 +684,135 @@ async def test_ingest_autocommit_deadletter_marks_resource(
 
     mock_notify.assert_called_once()
     assert resource.basic.metadata.status == PBMetadata.Status.ERROR  # type: ignore
+
+def message_resource_with_vectors(knowledgebox_ingest, rid):
+    message = make_message(knowledgebox_ingest, rid)
+    add_filefields(message, [("some_text", "file.png")])
+    message.field_metadata.append(FieldComputedMetadataWrapper(
+        field=FieldID(field="some_text", field_type=0),
+        metadata=FieldComputedMetadata(
+            metadata=FieldMetadata(
+                paragraphs=[
+                    Paragraph(
+                        start=0,
+                        end=5,
+                        kind=0,
+                    )
+                ]
+            )
+        )
+    ))
+    message.field_vectors.append(ExtractedVectorsWrapper(
+        field=FieldID(field="some_text", field_type=0),
+        vectors=VectorObject(
+            vectors=Vectors(
+                vectors=[
+                    Vector(
+                        start=0,
+                        end=5,
+                        start_paragraph=0,
+                        end_paragraph=5,
+                        vector=[1.0]
+                    )
+                ]
+            )
+        )
+    ))
+    return message
+
+@pytest.mark.asyncio
+async def test_ingest_delete_field(
+    local_files,
+    storage: Storage,
+    txn,
+    cache,
+    fake_node,
+    knowledgebox_ingest,
+    stream_processor,
+    stream_audit: StreamAuditStorage,
+    maindb_driver: Driver,
+):
+    def brain_extractor_mock(mock):
+        new_mock = Mock()
+        def extract_brain(resource, *args, **kwargs):
+            new_mock(resource.indexer.brain)
+            return DEFAULT
+        mock.side_effect = extract_brain
+        return new_mock
+
+    rid = str(uuid.uuid4())
+
+    # Create a resource
+    with patch.object(stream_processor, "index_resource") as mock_index_resource:
+        brain_mock = brain_extractor_mock(mock_index_resource)
+
+        message = message_resource_with_vectors(knowledgebox_ingest, rid)
+        await stream_processor.process(message=message, seqid=1)
+
+        brain_mock.assert_called_once()
+        brain = brain_mock.call_args[0][0]
+        assert len(brain.paragraphs['f/some_text'].paragraphs) == 1
+
+    # Delete the field
+    with patch.object(stream_processor, "index_resource") as mock_index_resource:
+        brain_mock = brain_extractor_mock(mock_index_resource)
+
+        message = make_message(knowledgebox_ingest, rid)
+        message.delete_fields.append(FieldID(field="some_text"))
+        await stream_processor.process(message=message, seqid=2)
+
+        # Field is deleted
+        brain_mock.assert_called_once()
+        brain = brain_mock.call_args[0][0]
+        assert brain.paragraphs_to_delete == [f"{rid}/f/some_text/0-5"]
+        assert brain.sentences_to_delete == [f"{rid}/f/some_text"]
+
+
+@pytest.mark.asyncio
+async def test_ingest_update_labels(
+    local_files,
+    storage: Storage,
+    txn,
+    cache,
+    fake_node,
+    knowledgebox_ingest,
+    stream_processor,
+    stream_audit: StreamAuditStorage,
+    maindb_driver: Driver,
+):
+    def brain_extractor_mock(mock):
+        new_mock = Mock()
+        def extract_brain(resource, *args, **kwargs):
+            new_mock(resource.indexer.brain)
+            return DEFAULT
+        mock.side_effect = extract_brain
+        return new_mock
+
+    rid = str(uuid.uuid4())
+
+    # Create a resource
+    with patch.object(stream_processor, "index_resource") as mock_index_resource:
+        brain_mock = brain_extractor_mock(mock_index_resource)
+
+        message = message_resource_with_vectors(knowledgebox_ingest, rid)
+        await stream_processor.process(message=message, seqid=1)
+
+        brain_mock.assert_called_once()
+        brain = brain_mock.call_args[0][0]
+        assert len(brain.paragraphs['f/some_text'].paragraphs) == 1
+
+    # Apply labels
+    with patch.object(stream_processor, "index_resource") as mock_index_resource:
+        brain_mock = brain_extractor_mock(mock_index_resource)
+
+        message = make_message(knowledgebox_ingest, rid)
+        message.basic.usermetadata.classifications.append(Classification(labelset="names",label="john"))
+        message.reindex = True
+        await stream_processor.process(message=message, seqid=2)
+
+        # Field is reindexed
+        brain_mock.assert_called_once()
+        brain = brain_mock.call_args[0][0]
+        assert brain.paragraphs_to_delete == [f"{rid}/f/some_text/0-5"]
+        assert f"{rid}/f/some_text" in brain.sentences_to_delete
+        assert "/l/names/john" in brain.labels
