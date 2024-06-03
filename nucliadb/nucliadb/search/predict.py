@@ -606,13 +606,17 @@ def get_chat_ndjson_generator(
 ) -> AsyncIterator[GenerativeChunk]:
 
     async def _parse_generative_chunks(gen):
-        async for chunk in gen:
-            try:
-                yield GenerativeChunk.parse_raw(chunk.strip())
-            except ValidationError as ex:
-                errors.capture_exception(ex)
-                logger.error(f"Invalid chunk received: {chunk}")
-                continue
+        try:
+            async for chunk in gen:
+                try:
+                    yield GenerativeChunk.model_validate_json(chunk.strip())
+                except ValidationError as ex:
+                    errors.capture_exception(ex)
+                    logger.error(f"Invalid chunk received: {chunk}")
+                    continue
+        except aiohttp.ClientPayloadError as ex:
+            # Most likely it's an error in the predict api that caused the stream to break prematurely
+            raise ProxiedPredictAPIError(status=500, detail="LLM stream error") from ex
 
     return _parse_generative_chunks(response.content)
 

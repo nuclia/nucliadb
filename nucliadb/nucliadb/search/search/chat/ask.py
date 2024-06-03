@@ -29,6 +29,7 @@ from nucliadb.search.predict import (
     CitationsGenerativeResponse,
     GenerativeChunk,
     MetaGenerativeResponse,
+    ProxiedPredictAPIError,
     StatusGenerativeResponse,
     TextGenerativeResponse,
 )
@@ -74,6 +75,7 @@ from nucliadb_models.search import (
     SyncAskResponse,
     UserPrompt,
 )
+from nucliadb_telemetry import errors
 from nucliadb_utils.exceptions import LimitsExceededError
 
 
@@ -138,15 +140,48 @@ class AskResult:
 
     def _ndjson_encode(self, item: AskResponseItemType) -> str:
         result_item = AskResponseItem(item=item)
-        return result_item.json(exclude_unset=False, exclude_none=True) + "\n"
+        return (
+            result_item.model_dump_json(exclude_unset=False, exclude_none=True) + "\n"
+        )
 
     async def _stream(self) -> AsyncGenerator[AskResponseItemType, None]:
         # First stream out the find results
         yield RetrievalAskResponseItem(results=self.find_results)
 
         # Then stream out the predict answer
-        async for answer_chunk in self._stream_predict_answer_text():
-            yield AnswerAskResponseItem(text=answer_chunk)
+        error: Optional[str] = None
+        try:
+            async for answer_chunk in self._stream_predict_answer_text():
+                yield AnswerAskResponseItem(text=answer_chunk)
+        except ProxiedPredictAPIError as exc:
+            logger.warning(
+                f"Predict API error while generating the answer: {exc}",
+                extra={"kbid": self.kbid},
+            )
+            error = exc.detail
+        except Exception as exc:
+            errors.capture_exception(exc)
+            logger.error(
+                f"Unexpected error while generating the answer: {exc}",
+                extra={"kbid": self.kbid},
+            )
+            error = str(exc)
+
+        if error is not None:
+            yield ErrorAskResponseItem(error=error)
+            yield StatusAskResponseItem(
+                code=AnswerStatusCode.ERROR.value,
+                status=AnswerStatusCode.ERROR.prettify(),
+            )
+            if self.ask_request_with_debug_flag:
+                yield DebugAskResponseItem(
+                    metadata={
+                        "prompt_context": sorted_prompt_context_list(
+                            self.prompt_context, self.prompt_context_order
+                        )
+                    }
+                )
+                return
 
         # Then the status code
         yield StatusAskResponseItem(
