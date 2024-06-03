@@ -42,7 +42,7 @@ from . import (
     synonyms,
     vectorsets,
 )
-from .utils import with_transaction
+from .utils import with_ro_transaction, with_rw_transaction, with_transaction
 
 __all__ = (
     "atomic",
@@ -58,4 +58,6 @@ __all__ = (
     "synonyms",
     "vectorsets",
     "with_transaction",
+    "with_rw_transaction",
+    "with_ro_transaction",
 )

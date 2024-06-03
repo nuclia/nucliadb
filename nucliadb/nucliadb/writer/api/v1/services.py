@@ -23,17 +23,17 @@ from nucliadb_protos.knowledgebox_pb2 import Label as LabelPB
 from nucliadb_protos.knowledgebox_pb2 import LabelSet as LabelSetPB
 from nucliadb_protos.writer_pb2 import (
     DelEntitiesRequest,
-    DelLabelsRequest,
     NewEntitiesGroupRequest,
     NewEntitiesGroupResponse,
     OpStatusWriter,
-    SetLabelsRequest,
     UpdateEntitiesGroupRequest,
     UpdateEntitiesGroupResponse,
 )
 from starlette.requests import Request
 
 from nucliadb.common import datamanagers
+from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
+from nucliadb.common.maindb.exceptions import ConflictError
 from nucliadb.models.responses import (
     HTTPConflict,
     HTTPInternalServerError,
@@ -47,6 +47,7 @@ from nucliadb_models.entities import (
 from nucliadb_models.labels import LabelSet
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.synonyms import KnowledgeBoxSynonyms
+from nucliadb_protos import writer_pb2
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.utilities import get_ingest
 
@@ -180,21 +181,33 @@ async def delete_entities(request: Request, kbid: str, group: str):
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def set_labels(request: Request, kbid: str, labelset: str, item: LabelSet):
-    ingest = get_ingest()
-    pbrequest: SetLabelsRequest = SetLabelsRequest(id=labelset)
-    pbrequest.kb.uuid = kbid
+async def set_labelset_endpoint(
+    request: Request, kbid: str, labelset: str, item: LabelSet
+):
+    try:
+        await set_labelset(kbid, labelset, item)
+    except KnowledgeBoxNotFound:
+        raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
+    except ConflictError:
+        # TODO: Remove conflict error handling once we drop tikv support
+        raise HTTPException(
+            status_code=409,
+            detail="Conflict setting labelset on a Knowledge box. Please retry.",
+        )
 
-    if item.title:
-        pbrequest.labelset.title = item.title
 
-    if item.color:
-        pbrequest.labelset.color = item.color
-
-    pbrequest.labelset.multiple = item.multiple
+async def set_labelset(kbid: str, labelset_id: str, item: LabelSet):
+    kb_exists = await datamanagers.atomic.kb.exists_kb(kbid=kbid)
+    if not kb_exists:
+        raise KnowledgeBoxNotFound()
+    labelset = writer_pb2.LabelSet()
+    if item.title is not None:
+        labelset.title = item.title
+    if item.color is not None:
+        labelset.color = item.color
+    labelset.multiple = item.multiple
     for kind in item.kind:
-        pbrequest.labelset.kind.append(LabelSetPB.LabelSetKind.Value(kind))
-
+        labelset.kind.append(LabelSetPB.LabelSetKind.Value(kind))
     for label_input in item.labels:
         lbl = LabelPB()
         if label_input.uri:
@@ -205,16 +218,10 @@ async def set_labels(request: Request, kbid: str, labelset: str, item: LabelSet)
             lbl.related = label_input.related
         if label_input.title:
             lbl.title = label_input.title
-        pbrequest.labelset.labels.append(lbl)
-    status: OpStatusWriter = await ingest.SetLabels(pbrequest)  # type: ignore
-    if status.status == OpStatusWriter.Status.OK:
-        return None
-    elif status.status == OpStatusWriter.Status.NOTFOUND:
-        raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
-    elif status.status == OpStatusWriter.Status.ERROR:
-        raise HTTPException(
-            status_code=500, detail="Error on settings labels on a Knowledge box"
-        )
+        labelset.labels.append(lbl)
+    await datamanagers.atomic.labelset.set(
+        kbid=kbid, labelset_id=labelset_id, labelset=labelset
+    )
 
 
 @api.delete(
@@ -226,21 +233,24 @@ async def set_labels(request: Request, kbid: str, labelset: str, item: LabelSet)
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def delete_labels(request: Request, kbid: str, labelset: str):
-    ingest = get_ingest()
-    pbrequest: DelLabelsRequest = DelLabelsRequest()
-    pbrequest.kb.uuid = kbid
-    pbrequest.id = labelset
-    status: OpStatusWriter = await ingest.DelLabels(pbrequest)  # type: ignore
-    if status.status == OpStatusWriter.Status.OK:
-        return None
-    elif status.status == OpStatusWriter.Status.NOTFOUND:
+async def delete_labelset_endpoint(request: Request, kbid: str, labelset: str):
+    try:
+        await delete_labelset(kbid, labelset)
+    except KnowledgeBoxNotFound:
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
-    elif status.status == OpStatusWriter.Status.ERROR:
+    except ConflictError:
+        # TODO: Remove conflict error handling once we drop tikv support
         raise HTTPException(
-            status_code=500, detail="Error on deleting labels from a Knowledge box"
+            status_code=409,
+            detail="Conflict deleting labelset from a Knowledge box. Please retry.",
         )
-    return Response(status_code=204)
+
+
+async def delete_labelset(kbid: str, labelset_id: str):
+    kb_exists = await datamanagers.atomic.kb.exists_kb(kbid=kbid)
+    if not kb_exists:
+        raise KnowledgeBoxNotFound()
+    await datamanagers.atomic.labelset.delete(kbid=kbid, labelset_id=labelset_id)
 
 
 @api.put(
@@ -253,15 +263,10 @@ async def delete_labels(request: Request, kbid: str, labelset: str):
 @requires(NucliaDBRoles.WRITER)
 @version(1)
 async def set_custom_synonyms(request: Request, kbid: str, item: KnowledgeBoxSynonyms):
+    if not await datamanagers.atomic.kb.exists_kb(kbid=kbid):
+        raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
     synonyms = item.to_message()
-
-    async with datamanagers.with_transaction() as txn:
-        if not datamanagers.kb.exists_kb(txn, kbid=kbid):
-            raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
-
-        await datamanagers.synonyms.set(txn, kbid=kbid, synonyms=synonyms)
-        await txn.commit()
-
+    await datamanagers.atomic.synonyms.set(kbid=kbid, synonyms=synonyms)
     return Response(status_code=204)
 
 

@@ -154,7 +154,7 @@ async def knowledgebox_counters(
         paragraph_count += shard.paragraphs
         sentence_count += shard.sentences
 
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_ro_transaction() as txn:
         try:
             if len(shard_groups) <= 1:
                 # for smaller kbs, this is faster and more up to date
