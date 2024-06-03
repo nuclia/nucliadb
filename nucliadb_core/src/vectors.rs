@@ -151,7 +151,7 @@ impl<'a> ResourceWrapper<'a> {
     }
 
     pub fn sentences_to_delete(&self) -> impl Iterator<Item = &str> {
-        self.resource.paragraphs_to_delete.iter().map(|paragraph_id| paragraph_id.as_str())
+        self.resource.sentences_to_delete.iter().map(String::as_str)
     }
 }
 

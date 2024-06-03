@@ -242,7 +242,7 @@ class Resource:
                         self.indexer.apply_field_metadata(
                             field_id,
                             field_metadata,
-                            replace_field=[],
+                            paragraphs_to_replace=[],
                             replace_splits={},
                             page_positions=page_positions,
                             extracted_text=await field_obj.get_extracted_text(),
@@ -327,7 +327,7 @@ class Resource:
         self.relations = relations
 
     @processor_observer.wrap({"type": "generate_index_message"})
-    async def generate_index_message(self) -> ResourceBrain:
+    async def generate_index_message(self, reindex: bool = False) -> ResourceBrain:
         brain = ResourceBrain(rid=self.uuid)
         origin = await self.get_origin()
         basic = await self.get_basic()
@@ -358,10 +358,16 @@ class Resource:
                         ),
                         None,
                     )
+                if reindex:
+                    paragraphs_to_replace = [
+                        f"{p.start}-{p.end}" for p in field_metadata.metadata.paragraphs
+                    ]
+                else:
+                    paragraphs_to_replace = []
                 brain.apply_field_metadata(
                     field_key,
                     field_metadata,
-                    replace_field=[],
+                    paragraphs_to_replace=paragraphs_to_replace,
                     replace_splits={},
                     page_positions=page_positions,
                     extracted_text=await field.get_extracted_text(),
@@ -380,6 +386,7 @@ class Resource:
                         field_key,
                         vo,
                         matryoshka_vector_dimension=dimension,
+                        replace_field=reindex,
                     )
 
                 async for vectorset_config in datamanagers.vectorsets.iter(
@@ -759,7 +766,7 @@ class Resource:
         )
         (
             metadata,
-            replace_field,
+            paragraphs_to_replace,
             replace_splits,
         ) = await field_obj.set_field_metadata(field_metadata)
         field_key = self.generate_field_id(field_metadata.field)
@@ -785,7 +792,7 @@ class Resource:
             self.indexer.apply_field_metadata,
             field_key,
             metadata,
-            replace_field=replace_field,
+            paragraphs_to_replace=paragraphs_to_replace,
             replace_splits=replace_splits,
             page_positions=page_positions,
             extracted_text=extracted_text,
