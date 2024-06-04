@@ -1414,6 +1414,11 @@ class SyncAskResponse(BaseModel):
         title="Metadata",
         description="Metadata of the query execution. This includes the number of tokens used in the LLM context and answer, and the timings of the generative model.",  # noqa
     )
+    error_details: Optional[str] = Field(
+        default=None,
+        title="Error details",
+        description="Error details message in case there was an error",
+    )
 
 
 class RetrievalAskResponseItem(BaseModel):

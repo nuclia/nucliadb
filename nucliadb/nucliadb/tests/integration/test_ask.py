@@ -26,6 +26,7 @@ from nucliadb.search.predict import (
     AnswerStatusCode,
     CitationsGenerativeResponse,
     GenerativeChunk,
+    StatusGenerativeResponse,
 )
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import AskResponseItem, SyncAskResponse
@@ -108,7 +109,7 @@ async def test_ask_synchronous(nucliadb_reader: AsyncClient, knowledgebox, resou
         headers={"X-Synchronous": "True"},
     )
     assert resp.status_code == 200
-    resp_data = SyncAskResponse.parse_raw(resp.content)
+    resp_data = SyncAskResponse.model_validate_json(resp.content)
     assert resp_data.answer == "valid answer to"
     assert len(resp_data.retrieval_results.resources) == 1
     assert resp_data.status == AnswerStatusCode.SUCCESS.prettify()
@@ -132,7 +133,7 @@ async def test_ask_with_citations(nucliadb_reader: AsyncClient, knowledgebox, re
     )
     assert resp.status_code == 200
 
-    resp_data = SyncAskResponse.parse_raw(resp.content)
+    resp_data = SyncAskResponse.model_validate_json(resp.content)
     resp_citations = resp_data.citations
     assert resp_citations == citations
 
@@ -150,7 +151,7 @@ async def test_sync_ask_returns_prompt_context(
         headers={"X-Synchronous": "True"},
     )
     assert resp.status_code == 200
-    resp_data = SyncAskResponse.parse_raw(resp.content)
+    resp_data = SyncAskResponse.model_validate_json(resp.content)
     if debug:
         assert resp_data.prompt_context
     else:
@@ -179,7 +180,7 @@ async def resources(nucliadb_writer, knowledgebox):
 def parse_ask_response(resp):
     results = []
     for line in resp.iter_lines():
-        result_item = AskResponseItem.parse_raw(line)
+        result_item = AskResponseItem.model_validate_json(line)
         results.append(result_item)
     return results
 
@@ -371,7 +372,7 @@ async def test_ask_capped_context(
         timeout=None,
     )
     assert resp.status_code == 200
-    resp_data = SyncAskResponse.parse_raw(resp.content)
+    resp_data = SyncAskResponse.model_validate_json(resp.content)
     assert resp_data.prompt_context is not None
     assert len(resp_data.prompt_context) == 6
     total_size = sum(len(v) for v in resp_data.prompt_context)
@@ -391,7 +392,7 @@ async def test_ask_capped_context(
         timeout=None,
     )
     assert resp.status_code == 200, resp.text
-    resp_data = SyncAskResponse.parse_raw(resp.content)
+    resp_data = SyncAskResponse.model_validate_json(resp.content)
     assert resp_data.prompt_context is not None
     total_size = sum(len(v) for v in resp_data.prompt_context)
     assert total_size <= max_size * 3
@@ -449,4 +450,75 @@ async def test_ask_on_resource(nucliadb_reader: AsyncClient, knowledgebox, resou
         headers={"X-Synchronous": "True"},
     )
     assert resp.status_code == 200
-    SyncAskResponse.parse_raw(resp.content)
+    SyncAskResponse.model_validate_json(resp.content)
+
+
+@pytest.mark.asyncio()
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_ask_handles_stream_errors_on_predict(
+    nucliadb_reader, knowledgebox, resource
+):
+    predict = get_predict()
+    prev = predict.ndjson_answer.copy()
+
+    predict.ndjson_answer.pop(-1)
+    error_status = StatusGenerativeResponse(code="-1", details="unexpected LLM error")
+    status_chunk = GenerativeChunk(chunk=error_status)
+    predict.ndjson_answer.append(status_chunk.model_dump_json() + "\n")
+
+    # Sync ask
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/ask",
+        json={"query": "title"},
+        headers={"X-Synchronous": "True"},
+    )
+    assert resp.status_code == 200
+    ask_resp = SyncAskResponse.model_validate_json(resp.content)
+    assert ask_resp.status == AnswerStatusCode.ERROR.prettify()
+    assert ask_resp.error_details == "unexpected LLM error"
+
+    # Stream ask
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/ask",
+        json={"query": "title"},
+    )
+    assert resp.status_code == 200
+    results = parse_ask_response(resp)
+    status_item = results[-1].item
+    assert status_item.type == "status"
+    assert status_item.status == AnswerStatusCode.ERROR.prettify()
+    assert status_item.details == "unexpected LLM error"
+
+    predict.ndjson_answer = prev
+
+
+@pytest.mark.asyncio()
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_ask_handles_stream_unexpected_errors(
+    nucliadb_reader, knowledgebox, resource
+):
+    with mock.patch(
+        "nucliadb.search.search.chat.ask.AskResult._stream",
+        side_effect=ValueError("foobar"),
+    ):
+        # Sync ask -- should return a 500
+        resp = await nucliadb_reader.post(
+            f"/kb/{knowledgebox}/ask",
+            json={"query": "title"},
+            headers={"X-Synchronous": "True"},
+        )
+        assert resp.status_code == 500
+
+        # Stream ask -- should handle by yielding the error item
+        resp = await nucliadb_reader.post(
+            f"/kb/{knowledgebox}/ask",
+            json={"query": "title"},
+        )
+        assert resp.status_code == 200
+        results = parse_ask_response(resp)
+        error_item = results[-1].item
+        assert error_item.type == "error"
+        assert (
+            error_item.error
+            == "Unexpected error while generating the answer. Please try again later."
+        )
