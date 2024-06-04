@@ -116,6 +116,12 @@ class AskResult:
         return AnswerStatusCode(self._status.code)
 
     @property
+    def status_error_details(self) -> Optional[str]:
+        if self._status is None:
+            return None
+        return self._status.details
+
+    @property
     def ask_request_with_relations(self) -> bool:
         return ChatOptions.RELATIONS in self.ask_request.features
 
@@ -124,17 +130,31 @@ class AskResult:
         return self.ask_request.debug
 
     async def ndjson_stream(self) -> AsyncGenerator[str, None]:
+        stream_error: Optional[Exception] = None
         try:
             async for item in self._stream():
                 yield self._ndjson_encode(item)
+        except ProxiedPredictAPIError as exc:
+            stream_error = exc
+            logger.warning(
+                f"Predict API error while generating the answer: {exc}",
+                extra={"kbid": self.kbid},
+            )
         except Exception as exc:
+            stream_error = exc
+            errors.capture_exception(exc)
+            logger.error(
+                f"Unexpected error while generating the answer: {exc}",
+                extra={"kbid": self.kbid},
+            )
+        finally:
+            if stream_error is None:
+                return
             # Handle any unexpected error that might happen
             # during the streaming and halt the stream
-            item = ErrorAskResponseItem(error=str(exc))
-            yield self._ndjson_encode(item)
-
-            staus = AnswerStatusCode.ERROR
-            item = StatusAskResponseItem(code=staus.value, status=staus.prettify())
+            item = ErrorAskResponseItem(
+                error="Unexpected error while generating the answer. Please try again later."
+            )
             yield self._ndjson_encode(item)
             return
 
@@ -149,45 +169,22 @@ class AskResult:
         yield RetrievalAskResponseItem(results=self.find_results)
 
         # Then stream out the predict answer
-        error: Optional[str] = None
-        try:
-            async for answer_chunk in self._stream_predict_answer_text():
-                yield AnswerAskResponseItem(text=answer_chunk)
-        except ProxiedPredictAPIError as exc:
-            logger.warning(
-                f"Predict API error while generating the answer: {exc}",
-                extra={"kbid": self.kbid},
-            )
-            error = exc.detail
-        except Exception as exc:
-            errors.capture_exception(exc)
-            logger.error(
-                f"Unexpected error while generating the answer: {exc}",
-                extra={"kbid": self.kbid},
-            )
-            error = (
-                "Unhandled error while generating the answer. Please try again later."
-            )
+        async for answer_chunk in self._stream_predict_answer_text():
+            yield AnswerAskResponseItem(text=answer_chunk)
 
-        if error is not None:
-            yield ErrorAskResponseItem(error=error)
+        # Then the status
+        if self.status_code == AnswerStatusCode.ERROR:
+            # If predict yielded an error status, we yield it too and halt the stream immediately
             yield StatusAskResponseItem(
-                code=AnswerStatusCode.ERROR.value,
-                status=AnswerStatusCode.ERROR.prettify(),
+                code=self.status_code.value,
+                status=self.status_code.prettify(),
+                details=self.status_error_details or "Unknown error",
             )
-            if self.ask_request_with_debug_flag:
-                yield DebugAskResponseItem(
-                    metadata={
-                        "prompt_context": sorted_prompt_context_list(
-                            self.prompt_context, self.prompt_context_order
-                        )
-                    }
-                )
-                return
+            return
 
-        # Then the status code
         yield StatusAskResponseItem(
-            code=self.status_code.value, status=self.status_code.prettify()
+            code=self.status_code.value,
+            status=self.status_code.prettify(),
         )
 
         # Audit the answer
@@ -218,7 +215,7 @@ class AskResult:
         # Stream out the relations results
         should_query_relations = (
             self.ask_request_with_relations
-            and self.status_code != AnswerStatusCode.NO_CONTEXT
+            and self.status_code == AnswerStatusCode.SUCCESS
         )
         if should_query_relations:
             relations = await self.get_relations_results()
@@ -265,12 +262,14 @@ class AskResult:
             metadata=metadata,
             learning_id=self.nuclia_learning_id or "",
         )
+        if self.status_code == AnswerStatusCode.ERROR and self.status_error_details:
+            response.error_details = self.status_error_details
         if self.ask_request_with_debug_flag:
             sorted_prompt_context = sorted_prompt_context_list(
                 self.prompt_context, self.prompt_context_order
             )
             response.prompt_context = sorted_prompt_context
-        return response.json(exclude_unset=True)
+        return response.model_dump_json(exclude_unset=True)
 
     async def get_relations_results(self) -> Relations:
         if self._relations is None:
@@ -296,10 +295,8 @@ class AskResult:
                 yield item.text
             elif isinstance(item, StatusGenerativeResponse):
                 self._status = item
-                continue
             elif isinstance(item, CitationsGenerativeResponse):
                 self._citations = item
-                continue
             elif isinstance(item, MetaGenerativeResponse):
                 self._metadata = item
             else:
