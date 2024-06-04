@@ -67,6 +67,7 @@ from nucliadb_models.search import (
     AskResponseItem,
     ChatRequest,
     CitationsAskResponseItem,
+    ErrorAskResponseItem,
     FeedbackRequest,
     FindRequest,
     KnowledgeboxFindResults,
@@ -108,6 +109,9 @@ class ChatResponse(BaseModel):
 
 
 RawRequestContent = Union[str, bytes, Iterable[bytes], AsyncIterable[bytes]]
+
+
+ASK_STATUS_CODE_ERROR = "-1"
 
 
 def json_response_parser(response: httpx.Response) -> Any:
@@ -156,6 +160,7 @@ def ask_response_parser(response: httpx.Response) -> SyncAskResponse:
     if content_type == "application/json":
         # This comes from a request with the X-Synchronous header set to true
         return SyncAskResponse.model_validate_json(response.content)
+
     answer = ""
     status = ""
     retrieval_results = None
@@ -164,6 +169,7 @@ def ask_response_parser(response: httpx.Response) -> SyncAskResponse:
     citations: dict[str, Any] = {}
     tokens = None
     timings = None
+    error: Optional[str] = None
     for line in response.iter_lines():
         try:
             item = AskResponseItem.model_validate_json(line).item
@@ -173,6 +179,8 @@ def ask_response_parser(response: httpx.Response) -> SyncAskResponse:
                 relations = item.relations
             elif isinstance(item, StatusAskResponseItem):
                 status = item.status
+                if item.code == ASK_STATUS_CODE_ERROR:
+                    error = item.details or "Unknown error"
             elif isinstance(item, RetrievalAskResponseItem):
                 retrieval_results = item.results
             elif isinstance(item, MetadataAskResponseItem):
@@ -180,11 +188,16 @@ def ask_response_parser(response: httpx.Response) -> SyncAskResponse:
                 timings = item.timings
             elif isinstance(item, CitationsAskResponseItem):
                 citations = item.citations
+            elif isinstance(item, ErrorAskResponseItem):
+                error = item.error
             else:
                 warnings.warn(f"Unknown item in ask endpoint response: {item}")
         except ValidationError:
             warnings.warn(f"Unknown line in ask endpoint response: {line}")
             continue
+
+    if error is not None:
+        raise exceptions.AskResponseError(error)
 
     if retrieval_results is None:
         warnings.warn("No retrieval results found in ask response")
