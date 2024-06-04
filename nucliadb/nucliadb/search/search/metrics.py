@@ -22,7 +22,6 @@ import time
 from typing import Optional
 
 from nucliadb_telemetry import metrics
-from nucliadb_telemetry.nucliadb_telemetry.metrics import INF  # type: ignore
 
 merge_observer = metrics.Observer("merge_results", labels={"type": ""})
 node_features = metrics.Counter("nucliadb_node_features", labels={"type": ""})
@@ -47,7 +46,7 @@ buckets = [
     10.0,
     30.0,
     60.0,
-    INF,
+    metrics.INF,
 ]
 
 generative_first_chunk_histogram = metrics.Histogram(
