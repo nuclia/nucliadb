@@ -226,6 +226,7 @@ async def chat(
     origin: str,
     resource: Optional[str] = None,
 ) -> ChatResult:
+    metrics = SearchMetrics()
     start_time = time()
     nuclia_learning_id: Optional[str] = None
     chat_history = chat_request.context or []
@@ -236,14 +237,15 @@ async def chat(
     prompt_context_order: PromptContextOrder = {}
 
     if len(chat_history) > 0 or len(user_context) > 0:
-        rephrased_query = await rephrase_query(
-            kbid,
-            chat_history=chat_history,
-            query=user_query,
-            user_id=user_id,
-            user_context=user_context,
-            generative_model=chat_request.generative_model,
-        )
+        with metrics.time("rephrase"):
+            rephrased_query = await rephrase_query(
+                kbid,
+                chat_history=chat_history,
+                query=user_query,
+                user_id=user_id,
+                user_context=user_context,
+                generative_model=chat_request.generative_model,
+            )
 
     # Retrieval is not needed if we are chatting on a specific
     # resource and the full_resource strategy is enabled
@@ -256,14 +258,16 @@ async def chat(
             needs_retrieval = False
 
     if needs_retrieval:
-        find_results, query_parser = await get_find_results(
-            kbid=kbid,
-            query=rephrased_query or user_query,
-            chat_request=chat_request,
-            ndb_client=client_type,
-            user=user_id,
-            origin=origin,
-        )
+        with metrics.time("retrieval"):
+            find_results, query_parser = await get_find_results(
+                kbid=kbid,
+                query=rephrased_query or user_query,
+                chat_request=chat_request,
+                ndb_client=client_type,
+                user=user_id,
+                origin=origin,
+                metrics=metrics,
+            )
         status_code = FoundStatusCode()
         if len(find_results.resources) == 0:
             # If no resources were found on the retrieval, we return
@@ -292,23 +296,24 @@ async def chat(
             min_score=MinScore(),
         )
 
-    query_parser.max_tokens = chat_request.max_tokens  # type: ignore
-    max_tokens_context = await query_parser.get_max_tokens_context()
-    prompt_context_builder = PromptContextBuilder(
-        kbid=kbid,
-        find_results=find_results,
-        resource=resource,
-        user_context=user_context,
-        strategies=chat_request.rag_strategies,
-        image_strategies=chat_request.rag_images_strategies,
-        max_context_characters=tokens_to_chars(max_tokens_context),
-        visual_llm=await query_parser.get_visual_llm_enabled(),
-    )
-    (
-        prompt_context,
-        prompt_context_order,
-        prompt_context_images,
-    ) = await prompt_context_builder.build()
+    with metrics.time("context_building"):
+        query_parser.max_tokens = chat_request.max_tokens  # type: ignore
+        max_tokens_context = await query_parser.get_max_tokens_context()
+        prompt_context_builder = PromptContextBuilder(
+            kbid=kbid,
+            find_results=find_results,
+            resource=resource,
+            user_context=user_context,
+            strategies=chat_request.rag_strategies,
+            image_strategies=chat_request.rag_images_strategies,
+            max_context_characters=tokens_to_chars(max_tokens_context),
+            visual_llm=await query_parser.get_visual_llm_enabled(),
+        )
+        (
+            prompt_context,
+            prompt_context_order,
+            prompt_context_images,
+        ) = await prompt_context_builder.build()
     user_prompt = None
     if chat_request.prompt is not None:
         user_prompt = UserPrompt(prompt=chat_request.prompt)
@@ -333,6 +338,9 @@ async def chat(
         # so we can audit after streamed out answer
         text_answer = b""
         async for chunk in format_generated_answer(predict_generator, status_code):
+            if text_answer == b"":
+                # first chunk
+                metrics.record_first_chunk_yielded()
             text_answer += chunk
             yield chunk
 
