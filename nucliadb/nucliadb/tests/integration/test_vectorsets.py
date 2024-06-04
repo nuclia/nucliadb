@@ -112,6 +112,10 @@ async def test_vectorset_parameter(
             "nucliadb.search.search.find.node_query",
             new=AsyncMock(side_effect=mock_node_query),
         ),
+        patch(
+            "nucliadb.search.search.query.datamanagers.vectorsets.exists",
+            new=AsyncMock(return_value=True),
+        ),
     ):
         resp = await nucliadb_reader.get(
             f"/kb/{kbid}/search",
