@@ -19,7 +19,7 @@
 
 import asyncio
 from enum import Enum
-from typing import Optional
+from typing import AsyncIterable, Optional
 
 import pytest
 from httpx import AsyncClient
@@ -32,8 +32,16 @@ from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.cache import clear_ingest_cache
 from nucliadb.ingest.tests.fixtures import broker_resource
 from nucliadb.search import API_PREFIX
+from nucliadb.search.predict import DummyPredictEngine
+from nucliadb_utils.settings import nuclia_settings
 from nucliadb_utils.tests import free_port
-from nucliadb_utils.utilities import clear_global_cache
+from nucliadb_utils.utilities import (
+    Utility,
+    clean_utility,
+    clear_global_cache,
+    get_utility,
+    set_utility,
+)
 
 
 @pytest.fixture(scope="function")
@@ -61,6 +69,27 @@ def test_settings_search(storage, natsd, node, maindb_driver):  # type: ignore
     ingest_settings.grpc_port = free_port()
 
     nucliadb_settings.nucliadb_ingest = f"localhost:{ingest_settings.grpc_port}"
+
+
+@pytest.mark.asyncio
+@pytest.fixture(scope="function")
+async def dummy_predict() -> AsyncIterable[DummyPredictEngine]:
+    original_setting = nuclia_settings.dummy_predict
+    nuclia_settings.dummy_predict = True
+
+    predict_util = DummyPredictEngine()
+    await predict_util.initialize()
+    original_predict = get_utility(Utility.PREDICT)
+    set_utility(Utility.PREDICT, predict_util)
+
+    yield predict_util
+
+    nuclia_settings.dummy_predict = original_setting
+
+    if original_predict is None:
+        clean_utility(Utility.PREDICT)
+    else:
+        set_utility(Utility.PREDICT, original_predict)
 
 
 @pytest.mark.asyncio

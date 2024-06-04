@@ -153,6 +153,7 @@ async def get_find_results(
     find_request.filters = chat_request.filters
     find_request.field_type_filter = chat_request.field_type_filter
     find_request.min_score = chat_request.min_score
+    find_request.vectorset = chat_request.vectorset
     find_request.range_creation_start = chat_request.range_creation_start
     find_request.range_creation_end = chat_request.range_creation_end
     find_request.range_modification_start = chat_request.range_modification_start

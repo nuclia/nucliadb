@@ -568,6 +568,11 @@ class SearchParamDefaults:
         title="Search Vector",
         description="The vector to perform the search with. If not provided, NucliaDB will use Nuclia Predict API to create the vector off from the query.",  # noqa
     )
+    vectorset = ParamDefault(
+        default=None,
+        title="Vectorset",
+        description="Vectors index to perform the search in. If not provided, NucliaDB will use the default one",
+    )
     chat_context = ParamDefault(
         default=None,
         title="Chat history",
@@ -720,6 +725,7 @@ class BaseSearchRequest(BaseModel):
     )
     shards: List[str] = SearchParamDefaults.shards.to_pydantic_field()
     vector: Optional[List[float]] = SearchParamDefaults.vector.to_pydantic_field()
+    vectorset: Optional[str] = SearchParamDefaults.vectorset.to_pydantic_field()
     with_duplicates: bool = SearchParamDefaults.with_duplicates.to_pydantic_field()
     with_synonyms: bool = SearchParamDefaults.with_synonyms.to_pydantic_field()
     autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
@@ -980,6 +986,7 @@ class ChatRequest(BaseModel):
         title="Filters",
         description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/docs/using/search/#filters",  # noqa: E501
     )
+    vectorset: Optional[str] = SearchParamDefaults.vectorset.to_pydantic_field()
     min_score: Optional[Union[float, MinScore]] = Field(
         default=None,
         title="Minimum score",
