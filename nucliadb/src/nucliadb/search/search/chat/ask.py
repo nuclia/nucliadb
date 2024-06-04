@@ -46,6 +46,7 @@ from nucliadb.search.search.exceptions import (
     IncompleteFindResultsError,
     InvalidQueryError,
 )
+from nucliadb.search.search.metrics import RAGMetrics
 from nucliadb.search.search.query import QueryParser
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import (
@@ -74,6 +75,7 @@ from nucliadb_models.search import (
     SyncAskResponse,
     UserPrompt,
 )
+from nucliadb_telemetry import errors
 from nucliadb_utils.exceptions import LimitsExceededError
 
 
@@ -89,6 +91,7 @@ class AskResult:
         prompt_context: PromptContext,
         prompt_context_order: PromptContextOrder,
         auditor: ChatAuditor,
+        metrics: RAGMetrics,
     ):
         # Initial attributes
         self.kbid = kbid
@@ -98,7 +101,8 @@ class AskResult:
         self.predict_answer_stream = predict_answer_stream
         self.prompt_context = prompt_context
         self.prompt_context_order = prompt_context_order
-        self.auditor = auditor
+        self.auditor: ChatAuditor = auditor
+        self.metrics: RAGMetrics = metrics
 
         # Computed from the predict chat answer stream
         self._answer_text = ""
@@ -112,6 +116,12 @@ class AskResult:
         if self._status is None:
             return AnswerStatusCode.SUCCESS
         return AnswerStatusCode(self._status.code)
+
+    @property
+    def status_error_details(self) -> Optional[str]:
+        if self._status is None:
+            return None
+        return self._status.details
 
     @property
     def ask_request_with_relations(self) -> bool:
@@ -128,17 +138,25 @@ class AskResult:
         except Exception as exc:
             # Handle any unexpected error that might happen
             # during the streaming and halt the stream
-            item = ErrorAskResponseItem(error=str(exc))
-            yield self._ndjson_encode(item)
-
-            staus = AnswerStatusCode.ERROR
-            item = StatusAskResponseItem(code=staus.value, status=staus.prettify())
+            errors.capture_exception(exc)
+            logger.error(
+                f"Unexpected error while generating the answer: {exc}",
+                extra={"kbid": self.kbid},
+            )
+            error_message = (
+                "Unexpected error while generating the answer. Please try again later."
+            )
+            if self.ask_request_with_debug_flag:
+                error_message += f" Error: {exc}"
+            item = ErrorAskResponseItem(error=error_message)
             yield self._ndjson_encode(item)
             return
 
     def _ndjson_encode(self, item: AskResponseItemType) -> str:
         result_item = AskResponseItem(item=item)
-        return result_item.json(exclude_unset=False, exclude_none=True) + "\n"
+        return (
+            result_item.model_dump_json(exclude_unset=False, exclude_none=True) + "\n"
+        )
 
     async def _stream(self) -> AsyncGenerator[AskResponseItemType, None]:
         # First stream out the find results
@@ -148,9 +166,19 @@ class AskResult:
         async for answer_chunk in self._stream_predict_answer_text():
             yield AnswerAskResponseItem(text=answer_chunk)
 
-        # Then the status code
+        # Then the status
+        if self.status_code == AnswerStatusCode.ERROR:
+            # If predict yielded an error status, we yield it too and halt the stream immediately
+            yield StatusAskResponseItem(
+                code=self.status_code.value,
+                status=self.status_code.prettify(),
+                details=self.status_error_details or "Unknown error",
+            )
+            return
+
         yield StatusAskResponseItem(
-            code=self.status_code.value, status=self.status_code.prettify()
+            code=self.status_code.value,
+            status=self.status_code.prettify(),
         )
 
         # Audit the answer
@@ -181,7 +209,7 @@ class AskResult:
         # Stream out the relations results
         should_query_relations = (
             self.ask_request_with_relations
-            and self.status_code != AnswerStatusCode.NO_CONTEXT
+            and self.status_code == AnswerStatusCode.SUCCESS
         )
         if should_query_relations:
             relations = await self.get_relations_results()
@@ -228,20 +256,23 @@ class AskResult:
             metadata=metadata,
             learning_id=self.nuclia_learning_id or "",
         )
+        if self.status_code == AnswerStatusCode.ERROR and self.status_error_details:
+            response.error_details = self.status_error_details
         if self.ask_request_with_debug_flag:
             sorted_prompt_context = sorted_prompt_context_list(
                 self.prompt_context, self.prompt_context_order
             )
             response.prompt_context = sorted_prompt_context
-        return response.json(exclude_unset=True)
+        return response.model_dump_json(exclude_unset=True)
 
     async def get_relations_results(self) -> Relations:
         if self._relations is None:
-            self._relations = await get_relations_results(
-                kbid=self.kbid,
-                text_answer=self._answer_text,
-                target_shard_replicas=self.ask_request.shards,
-            )
+            with self.metrics.time("relations"):
+                self._relations = await get_relations_results(
+                    kbid=self.kbid,
+                    text_answer=self._answer_text,
+                    target_shard_replicas=self.ask_request.shards,
+                )
         return self._relations
 
     async def _stream_predict_answer_text(self) -> AsyncGenerator[str, None]:
@@ -252,17 +283,19 @@ class AskResult:
         This method does not assume any order in the stream of items, but it assumes that at least
         the answer text is streamed in order.
         """
+        first_answer_chunk_yielded = False
         async for generative_chunk in self.predict_answer_stream:
             item = generative_chunk.chunk
             if isinstance(item, TextGenerativeResponse):
                 self._answer_text += item.text
+                if not first_answer_chunk_yielded:
+                    self.metrics.record_first_chunk_yielded()
+                    first_answer_chunk_yielded = True
                 yield item.text
             elif isinstance(item, StatusGenerativeResponse):
                 self._status = item
-                continue
             elif isinstance(item, CitationsGenerativeResponse):
                 self._citations = item
-                continue
             elif isinstance(item, MetaGenerativeResponse):
                 self._metadata = item
             else:
@@ -298,7 +331,7 @@ class NotEnoughContextAskResult(AskResult):
             answer=NOT_ENOUGH_CONTEXT_ANSWER,
             retrieval_results=self.find_results,
             status=AnswerStatusCode.NO_CONTEXT,
-        ).json(exclude_unset=True)
+        ).model_dump_json(exclude_unset=True)
 
 
 async def ask(
@@ -311,6 +344,7 @@ async def ask(
     resource: Optional[str] = None,
 ) -> AskResult:
     start_time = time()
+    metrics = RAGMetrics()
     chat_history = ask_request.context or []
     user_context = ask_request.extra_context or []
     user_query = ask_request.query
@@ -318,14 +352,15 @@ async def ask(
     # Maybe rephrase the query
     rephrased_query = None
     if len(chat_history) > 0 or len(user_context) > 0:
-        rephrased_query = await rephrase_query(
-            kbid,
-            chat_history=chat_history,
-            query=user_query,
-            user_id=user_id,
-            user_context=user_context,
-            generative_model=ask_request.generative_model,
-        )
+        with metrics.time("rephrase"):
+            rephrased_query = await rephrase_query(
+                kbid,
+                chat_history=chat_history,
+                query=user_query,
+                user_id=user_id,
+                user_context=user_context,
+                generative_model=ask_request.generative_model,
+            )
 
     # Retrieval is not needed if we are chatting on a specific
     # resource and the full_resource strategy is enabled
@@ -339,15 +374,17 @@ async def ask(
 
     # Maybe do a retrieval query
     if needs_retrieval:
-        find_results, query_parser = await get_find_results(
-            kbid=kbid,
-            # Prefer the rephrased query if available
-            query=rephrased_query or user_query,
-            chat_request=ask_request,
-            ndb_client=client_type,
-            user=user_id,
-            origin=origin,
-        )
+        with metrics.time("retrieval"):
+            find_results, query_parser = await get_find_results(
+                kbid=kbid,
+                # Prefer the rephrased query if available
+                query=rephrased_query or user_query,
+                chat_request=ask_request,
+                ndb_client=client_type,
+                user=user_id,
+                origin=origin,
+                metrics=metrics,
+            )
         if len(find_results.resources) == 0:
             return NotEnoughContextAskResult(find_results=find_results)
 
@@ -364,23 +401,24 @@ async def ask(
         )
 
     # Now we build the prompt context
-    query_parser.max_tokens = ask_request.max_tokens  # type: ignore
-    max_tokens_context = await query_parser.get_max_tokens_context()
-    prompt_context_builder = PromptContextBuilder(
-        kbid=kbid,
-        find_results=find_results,
-        resource=resource,
-        user_context=user_context,
-        strategies=ask_request.rag_strategies,
-        image_strategies=ask_request.rag_images_strategies,
-        max_context_characters=tokens_to_chars(max_tokens_context),
-        visual_llm=await query_parser.get_visual_llm_enabled(),
-    )
-    (
-        prompt_context,
-        prompt_context_order,
-        prompt_context_images,
-    ) = await prompt_context_builder.build()
+    with metrics.time("context_building"):
+        query_parser.max_tokens = ask_request.max_tokens  # type: ignore
+        max_tokens_context = await query_parser.get_max_tokens_context()
+        prompt_context_builder = PromptContextBuilder(
+            kbid=kbid,
+            find_results=find_results,
+            resource=resource,
+            user_context=user_context,
+            strategies=ask_request.rag_strategies,
+            image_strategies=ask_request.rag_images_strategies,
+            max_context_characters=tokens_to_chars(max_tokens_context),
+            visual_llm=await query_parser.get_visual_llm_enabled(),
+        )
+        (
+            prompt_context,
+            prompt_context_order,
+            prompt_context_images,
+        ) = await prompt_context_builder.build()
 
     # Parse the user prompt (if any)
     user_prompt = None
@@ -401,10 +439,11 @@ async def ask(
         max_tokens=query_parser.get_max_tokens_answer(),
         query_context_images=prompt_context_images,
     )
-    predict = get_predict()
-    nuclia_learning_id, predict_answer_stream = await predict.chat_query_ndjson(
-        kbid, chat_model
-    )
+    with metrics.time("stream_start"):
+        predict = get_predict()
+        nuclia_learning_id, predict_answer_stream = await predict.chat_query_ndjson(
+            kbid, chat_model
+        )
 
     auditor = ChatAuditor(
         kbid=kbid,
@@ -419,7 +458,6 @@ async def ask(
         query_context=prompt_context,
         query_context_order=prompt_context_order,
     )
-
     return AskResult(
         kbid=kbid,
         ask_request=ask_request,
@@ -429,6 +467,7 @@ async def ask(
         prompt_context=prompt_context,
         prompt_context_order=prompt_context_order,
         auditor=auditor,
+        metrics=metrics,
     )
 
 

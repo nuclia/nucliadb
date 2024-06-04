@@ -19,6 +19,7 @@
 
 import json
 import unittest
+from typing import Optional
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -26,13 +27,15 @@ from nucliadb_protos.knowledgebox_pb2 import Synonyms
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.utils_pb2 import RelationNode
 
+from nucliadb.search.predict import PredictEngine
 from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.query import (
     QueryParser,
     check_supported_filters,
     parse_entities_to_filters,
 )
-from nucliadb_models.search import MinScore
+from nucliadb.tests.vectors import Q
+from nucliadb_models.search import MinScore, SearchOptions
 
 QUERY_MODULE = "nucliadb.search.search.query"
 
@@ -151,3 +154,51 @@ def test_check_supported_filters():
             {"and": [{"literal": "a"}, {"and": [{"literal": "c"}, {"literal": "b"}]}]},
             ["b"],
         )
+
+
+class TestVectorSetAndMatryoshkaParsing:
+    @pytest.mark.parametrize(
+        "vectorset,matryoshka_dimension,expected_vectorset,expected_dimension",
+        [
+            (None, None, "", len(Q)),
+            (None, len(Q) - 20, "", len(Q) - 20),
+            ("vectorset_id", None, "vectorset_id", len(Q)),
+            ("vectorset_id", len(Q) - 20, "vectorset_id", len(Q) - 20),
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_query_without_vectorset_nor_matryoshka(
+        self,
+        dummy_predict: PredictEngine,
+        vectorset: Optional[str],
+        matryoshka_dimension: Optional[int],
+        expected_vectorset: Optional[str],
+        expected_dimension: Optional[int],
+    ):
+        parser = QueryParser(
+            kbid="kbid",
+            features=[SearchOptions.VECTOR],
+            vectorset=vectorset,
+            # irrelevant mandatory args
+            query="my query",
+            filters=[],
+            page_number=0,
+            page_size=20,
+            min_score=MinScore(bm25=0, semantic=0),
+        )
+        with (
+            patch("nucliadb.search.search.query.get_read_only_transaction"),
+            patch(
+                "nucliadb.search.search.query.datamanagers.vectorsets.exists",
+                new=AsyncMock(return_value=(vectorset is not None)),
+            ),
+            patch(
+                "nucliadb.search.search.query.get_matryoshka_dimension_cached",
+                new=AsyncMock(return_value=matryoshka_dimension),
+            ),
+        ):
+            request, incomplete, _ = await parser.parse()
+            assert not incomplete
+
+            assert request.vectorset == expected_vectorset
+            assert len(request.vector) == expected_dimension

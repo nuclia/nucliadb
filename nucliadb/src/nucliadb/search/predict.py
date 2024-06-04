@@ -608,7 +608,7 @@ def get_chat_ndjson_generator(
     async def _parse_generative_chunks(gen):
         async for chunk in gen:
             try:
-                yield GenerativeChunk.parse_raw(chunk.strip())
+                yield GenerativeChunk.model_validate_json(chunk.strip())
             except ValidationError as ex:
                 errors.capture_exception(ex)
                 logger.error(f"Invalid chunk received: {chunk}")

@@ -42,3 +42,7 @@ class ConflictError(ClientError):
 
 class UnknownError(ClientError):
     pass
+
+
+class AskResponseError(ClientError):
+    pass

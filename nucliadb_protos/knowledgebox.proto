@@ -77,12 +77,6 @@ message UpdateKnowledgeBoxResponse {
     string uuid = 2;
 }
 
-// GC
-
-message GCKnowledgeBoxResponse {
-
-}
-
 // DELETE
 
 message DeleteKnowledgeBoxResponse {

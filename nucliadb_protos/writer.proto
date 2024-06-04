@@ -413,46 +413,6 @@ message IndexStatus {
 
 }
 
-message SetVectorsRequest {
-    utils.VectorObject vectors = 1;
-    string kbid = 2;
-    string rid = 3;
-    resources.FieldID field = 4;
-}
-
-message SetVectorsResponse {
-    bool found = 1;
-}
-
-message FileRequest {
-    string bucket = 1;
-    string key = 2;
-}
-
-message BinaryData {
-    bytes data = 1;
-}
-
-message BinaryMetadata {
-    string kbid = 2;
-    string key = 3;
-    int32 size = 4;
-    string filename = 5;
-    string content_type = 6;
-}
-
-message UploadBinaryData {
-    int32 count = 1;
-    oneof data {
-        BinaryMetadata metadata = 2;
-        bytes payload = 3;
-    }
-}
-
-message FileUploaded {
-
-}
-
 message SynonymsRequest {
     string kbid = 1;
 }
@@ -496,8 +456,6 @@ service Writer {
     rpc NewKnowledgeBox(knowledgebox.KnowledgeBoxNew) returns (knowledgebox.NewKnowledgeBoxResponse) {}
     rpc DeleteKnowledgeBox(knowledgebox.KnowledgeBoxID) returns (knowledgebox.DeleteKnowledgeBoxResponse) {}
     rpc UpdateKnowledgeBox(knowledgebox.KnowledgeBoxUpdate) returns (knowledgebox.UpdateKnowledgeBoxResponse) {}
-    rpc GCKnowledgeBox(knowledgebox.KnowledgeBoxID) returns (knowledgebox.GCKnowledgeBoxResponse) {}
-    rpc SetVectors(SetVectorsRequest) returns (SetVectorsResponse) {}
 
     rpc ProcessMessage(stream BrokerMessage) returns (OpStatusWriter) {}
 
@@ -516,9 +474,6 @@ service Writer {
 
     rpc Index(IndexResource) returns (IndexStatus) {}
     rpc ReIndex(IndexResource) returns (IndexStatus) {}
-
-    rpc DownloadFile(FileRequest) returns (stream BinaryData) {}
-    rpc UploadFile(stream UploadBinaryData) returns (FileUploaded) {}
 
     rpc NewVectorSet(NewVectorSetRequest) returns (NewVectorSetResponse) {}
     rpc DelVectorSet(DelVectorSetRequest) returns (DelVectorSetResponse) {}

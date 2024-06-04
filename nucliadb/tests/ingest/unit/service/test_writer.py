@@ -23,7 +23,7 @@ from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxNew, SemanticModelMetadata
-from nucliadb_protos.resources_pb2 import FieldID, FieldText, FieldType
+from nucliadb_protos.resources_pb2 import FieldText
 from nucliadb_protos.utils_pb2 import ReleaseChannel, VectorSimilarity
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
@@ -81,44 +81,6 @@ class TestWriterServicer:
         mock.get_field.return_value = field
         with patch("nucliadb.ingest.service.writer.ResourceORM", return_value=mock):
             yield mock
-
-    async def test_SetVectors(self, writer: WriterServicer, resource):
-        request = writer_pb2.SetVectorsRequest(
-            kbid="kbid",
-            rid="rid",
-            field=FieldID(field_type=FieldType.TEXT, field="field"),
-        )
-
-        resp = await writer.SetVectors(request)
-
-        txn = writer.driver.transaction.return_value.__aenter__.return_value
-        txn.commit.assert_called_once()
-
-        assert resp.found
-
-    async def test_SetVectors_not_found(self, writer: WriterServicer, resource):
-        request = writer_pb2.SetVectorsRequest(
-            kbid="kbid",
-            rid="rid",
-            field=FieldID(field_type=FieldType.TEXT, field="field"),
-        )
-
-        resource.get_field.return_value = Text("id", Mock())
-        resp = await writer.SetVectors(request)
-
-        assert not resp.found
-
-    async def test_SetVectors_error(self, writer: WriterServicer, resource, field):
-        request = writer_pb2.SetVectorsRequest(
-            kbid="kbid",
-            rid="rid",
-            field=FieldID(field_type=FieldType.TEXT, field="field"),
-        )
-        field.set_vectors.side_effect = Exception("error")
-
-        resp = await writer.SetVectors(request)
-
-        assert resp.found
 
     async def test_NewKnowledgeBox(self, writer: WriterServicer):
         request = writer_pb2.KnowledgeBoxNew(slug="slug", forceuuid="kbid")
@@ -334,13 +296,6 @@ class TestWriterServicer:
         resp = await writer.DeleteKnowledgeBox(request)
 
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.ERROR
-
-    async def test_GCKnowledgeBox(self, writer: WriterServicer):
-        request = writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid")
-
-        resp = await writer.GCKnowledgeBox(request)
-
-        assert isinstance(resp, writer_pb2.GCKnowledgeBoxResponse)
 
     async def test_GetEntities(self, writer: WriterServicer):
         request = writer_pb2.GetEntitiesRequest(
