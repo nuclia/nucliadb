@@ -148,6 +148,7 @@ async def find(
                 "query": item.model_dump_json(),
                 "time": search_time,
                 "nodes": debug_nodes_info(queried_nodes),
+                # Include step times in the log
                 **{step: metrics.elapsed(step) for step in metrics.steps()},
             },
         )
