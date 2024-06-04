@@ -46,6 +46,7 @@ from nucliadb.search.search.exceptions import (
     IncompleteFindResultsError,
     InvalidQueryError,
 )
+from nucliadb.search.search.metrics import SearchMetrics
 from nucliadb.search.search.query import QueryParser
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import (
@@ -90,6 +91,7 @@ class AskResult:
         prompt_context: PromptContext,
         prompt_context_order: PromptContextOrder,
         auditor: ChatAuditor,
+        metrics: SearchMetrics,
     ):
         # Initial attributes
         self.kbid = kbid
@@ -99,7 +101,8 @@ class AskResult:
         self.predict_answer_stream = predict_answer_stream
         self.prompt_context = prompt_context
         self.prompt_context_order = prompt_context_order
-        self.auditor = auditor
+        self.auditor: ChatAuditor = auditor
+        self.metrics: SearchMetrics = metrics
 
         # Computed from the predict chat answer stream
         self._answer_text = ""
@@ -279,10 +282,14 @@ class AskResult:
         This method does not assume any order in the stream of items, but it assumes that at least
         the answer text is streamed in order.
         """
+        first_answer_chunk_yielded = False
         async for generative_chunk in self.predict_answer_stream:
             item = generative_chunk.chunk
             if isinstance(item, TextGenerativeResponse):
                 self._answer_text += item.text
+                if not first_answer_chunk_yielded:
+                    self.metrics.record_first_chunk_yielded()
+                    first_answer_chunk_yielded = True
                 yield item.text
             elif isinstance(item, StatusGenerativeResponse):
                 self._status = item
@@ -336,6 +343,7 @@ async def ask(
     resource: Optional[str] = None,
 ) -> AskResult:
     start_time = time()
+    metrics = SearchMetrics()
     chat_history = ask_request.context or []
     user_context = ask_request.extra_context or []
     user_query = ask_request.query
@@ -343,14 +351,15 @@ async def ask(
     # Maybe rephrase the query
     rephrased_query = None
     if len(chat_history) > 0 or len(user_context) > 0:
-        rephrased_query = await rephrase_query(
-            kbid,
-            chat_history=chat_history,
-            query=user_query,
-            user_id=user_id,
-            user_context=user_context,
-            generative_model=ask_request.generative_model,
-        )
+        with metrics.time("rephrase"):
+            rephrased_query = await rephrase_query(
+                kbid,
+                chat_history=chat_history,
+                query=user_query,
+                user_id=user_id,
+                user_context=user_context,
+                generative_model=ask_request.generative_model,
+            )
 
     # Retrieval is not needed if we are chatting on a specific
     # resource and the full_resource strategy is enabled
@@ -364,15 +373,17 @@ async def ask(
 
     # Maybe do a retrieval query
     if needs_retrieval:
-        find_results, query_parser = await get_find_results(
-            kbid=kbid,
-            # Prefer the rephrased query if available
-            query=rephrased_query or user_query,
-            chat_request=ask_request,
-            ndb_client=client_type,
-            user=user_id,
-            origin=origin,
-        )
+        with metrics.time("retrieval"):
+            find_results, query_parser = await get_find_results(
+                kbid=kbid,
+                # Prefer the rephrased query if available
+                query=rephrased_query or user_query,
+                chat_request=ask_request,
+                ndb_client=client_type,
+                user=user_id,
+                origin=origin,
+                metrics=metrics,
+            )
         if len(find_results.resources) == 0:
             return NotEnoughContextAskResult(find_results=find_results)
 
@@ -389,23 +400,24 @@ async def ask(
         )
 
     # Now we build the prompt context
-    query_parser.max_tokens = ask_request.max_tokens  # type: ignore
-    max_tokens_context = await query_parser.get_max_tokens_context()
-    prompt_context_builder = PromptContextBuilder(
-        kbid=kbid,
-        find_results=find_results,
-        resource=resource,
-        user_context=user_context,
-        strategies=ask_request.rag_strategies,
-        image_strategies=ask_request.rag_images_strategies,
-        max_context_characters=tokens_to_chars(max_tokens_context),
-        visual_llm=await query_parser.get_visual_llm_enabled(),
-    )
-    (
-        prompt_context,
-        prompt_context_order,
-        prompt_context_images,
-    ) = await prompt_context_builder.build()
+    with metrics.time("context_building"):
+        query_parser.max_tokens = ask_request.max_tokens  # type: ignore
+        max_tokens_context = await query_parser.get_max_tokens_context()
+        prompt_context_builder = PromptContextBuilder(
+            kbid=kbid,
+            find_results=find_results,
+            resource=resource,
+            user_context=user_context,
+            strategies=ask_request.rag_strategies,
+            image_strategies=ask_request.rag_images_strategies,
+            max_context_characters=tokens_to_chars(max_tokens_context),
+            visual_llm=await query_parser.get_visual_llm_enabled(),
+        )
+        (
+            prompt_context,
+            prompt_context_order,
+            prompt_context_images,
+        ) = await prompt_context_builder.build()
 
     # Parse the user prompt (if any)
     user_prompt = None
@@ -444,7 +456,6 @@ async def ask(
         query_context=prompt_context,
         query_context_order=prompt_context_order,
     )
-
     return AskResult(
         kbid=kbid,
         ask_request=ask_request,
@@ -454,6 +465,7 @@ async def ask(
         prompt_context=prompt_context,
         prompt_context_order=prompt_context_order,
         auditor=auditor,
+        metrics=metrics,
     )
 
 

@@ -31,6 +31,7 @@ from nucliadb.search.search.chat.prompt import PromptContextBuilder
 from nucliadb.search.search.exceptions import IncompleteFindResultsError
 from nucliadb.search.search.find import find
 from nucliadb.search.search.merge import merge_relations_results
+from nucliadb.search.search.metrics import SearchMetrics
 from nucliadb.search.search.query import QueryParser
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import (
@@ -138,6 +139,7 @@ async def get_find_results(
     ndb_client: NucliaDBClientType,
     user: str,
     origin: str,
+    metrics: SearchMetrics = SearchMetrics(),
 ) -> tuple[KnowledgeboxFindResults, QueryParser]:
     find_request = FindRequest()
     find_request.resource_filters = chat_request.resource_filters
@@ -173,6 +175,7 @@ async def get_find_results(
         user,
         origin,
         generative_model=chat_request.generative_model,
+        metrics=metrics,
     )
     if incomplete:
         raise IncompleteFindResultsError()
