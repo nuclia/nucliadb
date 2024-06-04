@@ -239,11 +239,6 @@ class WriterStub:
         nucliadb_protos.writer_pb2.IndexStatus,
     ]
 
-    DownloadFile: grpc.UnaryStreamMultiCallable[
-        nucliadb_protos.writer_pb2.FileRequest,
-        nucliadb_protos.writer_pb2.BinaryData,
-    ]
-
     NewVectorSet: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.NewVectorSetRequest,
         nucliadb_protos.writer_pb2.NewVectorSetResponse,
@@ -329,11 +324,6 @@ class WriterAsyncStub:
     ReIndex: grpc.aio.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.IndexResource,
         nucliadb_protos.writer_pb2.IndexStatus,
-    ]
-
-    DownloadFile: grpc.aio.UnaryStreamMultiCallable[
-        nucliadb_protos.writer_pb2.FileRequest,
-        nucliadb_protos.writer_pb2.BinaryData,
     ]
 
     NewVectorSet: grpc.aio.UnaryUnaryMultiCallable[
@@ -452,13 +442,6 @@ class WriterServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.writer_pb2.IndexResource,
         context: _ServicerContext,
     ) -> typing.Union[nucliadb_protos.writer_pb2.IndexStatus, collections.abc.Awaitable[nucliadb_protos.writer_pb2.IndexStatus]]: ...
-
-    @abc.abstractmethod
-    def DownloadFile(
-        self,
-        request: nucliadb_protos.writer_pb2.FileRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[collections.abc.Iterator[nucliadb_protos.writer_pb2.BinaryData], collections.abc.AsyncIterator[nucliadb_protos.writer_pb2.BinaryData]]: ...
 
     @abc.abstractmethod
     def NewVectorSet(

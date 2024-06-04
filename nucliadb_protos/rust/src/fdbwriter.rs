@@ -1134,56 +1134,6 @@ pub struct IndexResource {
 pub struct IndexStatus {}
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct FileRequest {
-    #[prost(string, tag = "1")]
-    pub bucket: ::prost::alloc::string::String,
-    #[prost(string, tag = "2")]
-    pub key: ::prost::alloc::string::String,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct BinaryData {
-    #[prost(bytes = "vec", tag = "1")]
-    pub data: ::prost::alloc::vec::Vec<u8>,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct BinaryMetadata {
-    #[prost(string, tag = "2")]
-    pub kbid: ::prost::alloc::string::String,
-    #[prost(string, tag = "3")]
-    pub key: ::prost::alloc::string::String,
-    #[prost(int32, tag = "4")]
-    pub size: i32,
-    #[prost(string, tag = "5")]
-    pub filename: ::prost::alloc::string::String,
-    #[prost(string, tag = "6")]
-    pub content_type: ::prost::alloc::string::String,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct UploadBinaryData {
-    #[prost(int32, tag = "1")]
-    pub count: i32,
-    #[prost(oneof = "upload_binary_data::Data", tags = "2, 3")]
-    pub data: ::core::option::Option<upload_binary_data::Data>,
-}
-/// Nested message and enum types in `UploadBinaryData`.
-pub mod upload_binary_data {
-    #[allow(clippy::derive_partial_eq_without_eq)]
-    #[derive(Clone, PartialEq, ::prost::Oneof)]
-    pub enum Data {
-        #[prost(message, tag = "2")]
-        Metadata(super::BinaryMetadata),
-        #[prost(bytes, tag = "3")]
-        Payload(::prost::alloc::vec::Vec<u8>),
-    }
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct FileUploaded {}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SynonymsRequest {
     #[prost(string, tag = "1")]
     pub kbid: ::prost::alloc::string::String,

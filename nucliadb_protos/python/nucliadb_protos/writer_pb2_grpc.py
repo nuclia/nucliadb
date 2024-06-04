@@ -90,11 +90,6 @@ class WriterStub(object):
                 request_serializer=nucliadb__protos_dot_writer__pb2.IndexResource.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_writer__pb2.IndexStatus.FromString,
                 )
-        self.DownloadFile = channel.unary_stream(
-                '/fdbwriter.Writer/DownloadFile',
-                request_serializer=nucliadb__protos_dot_writer__pb2.FileRequest.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_writer__pb2.BinaryData.FromString,
-                )
         self.NewVectorSet = channel.unary_unary(
                 '/fdbwriter.Writer/NewVectorSet',
                 request_serializer=nucliadb__protos_dot_writer__pb2.NewVectorSetRequest.SerializeToString,
@@ -201,12 +196,6 @@ class WriterServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def DownloadFile(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
     def NewVectorSet(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -296,11 +285,6 @@ def add_WriterServicer_to_server(servicer, server):
                     servicer.ReIndex,
                     request_deserializer=nucliadb__protos_dot_writer__pb2.IndexResource.FromString,
                     response_serializer=nucliadb__protos_dot_writer__pb2.IndexStatus.SerializeToString,
-            ),
-            'DownloadFile': grpc.unary_stream_rpc_method_handler(
-                    servicer.DownloadFile,
-                    request_deserializer=nucliadb__protos_dot_writer__pb2.FileRequest.FromString,
-                    response_serializer=nucliadb__protos_dot_writer__pb2.BinaryData.SerializeToString,
             ),
             'NewVectorSet': grpc.unary_unary_rpc_method_handler(
                     servicer.NewVectorSet,
@@ -574,23 +558,6 @@ class Writer(object):
         return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/ReIndex',
             nucliadb__protos_dot_writer__pb2.IndexResource.SerializeToString,
             nucliadb__protos_dot_writer__pb2.IndexStatus.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def DownloadFile(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_stream(request, target, '/fdbwriter.Writer/DownloadFile',
-            nucliadb__protos_dot_writer__pb2.FileRequest.SerializeToString,
-            nucliadb__protos_dot_writer__pb2.BinaryData.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 

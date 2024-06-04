@@ -19,7 +19,6 @@
 #
 import json
 import uuid
-from io import BytesIO
 from typing import AsyncIterator, Optional
 
 from nucliadb_protos.knowledgebox_pb2 import (
@@ -33,15 +32,11 @@ from nucliadb_protos.knowledgebox_pb2 import (
     UpdateKnowledgeBoxResponse,
     VectorSetConfig,
 )
-from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.writer_pb2 import (
-    BinaryData,
     BrokerMessage,
     DelEntitiesRequest,
     DelVectorSetRequest,
     DelVectorSetResponse,
-    FileRequest,
-    FileUploaded,
     GetEntitiesGroupRequest,
     GetEntitiesGroupResponse,
     GetEntitiesRequest,
@@ -60,7 +55,6 @@ from nucliadb_protos.writer_pb2 import (
     SetEntitiesRequest,
     UpdateEntitiesGroupRequest,
     UpdateEntitiesGroupResponse,
-    UploadBinaryData,
     WriterStatusRequest,
     WriterStatusResponse,
 )
@@ -84,7 +78,6 @@ from nucliadb_protos import nodewriter_pb2, utils_pb2, writer_pb2, writer_pb2_gr
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
 from nucliadb_utils.settings import is_onprem_nucliadb, running_settings
-from nucliadb_utils.storages.storage import Storage, StorageField
 from nucliadb_utils.utilities import (
     get_partitioning,
     get_pubsub,
@@ -527,58 +520,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             errors.capture_exception(e)
             logger.error("Error in ingest gRPC servicer", exc_info=True)
             raise
-
-    async def DownloadFile(self, request: FileRequest, context=None):
-        async for data in self.storage.download(request.bucket, request.key):
-            yield BinaryData(data=data)
-
-    async def UploadFile(self, request: AsyncIterator[UploadBinaryData], context=None) -> FileUploaded:  # type: ignore
-        data: UploadBinaryData
-
-        destination: Optional[StorageField] = None
-        cf = CloudFile()
-        data = await request.__anext__()
-        if data.HasField("metadata"):
-            bucket = self.storage.get_bucket_name(data.metadata.kbid)
-            destination = self.storage.field_klass(
-                storage=self.storage, bucket=bucket, fullkey=data.metadata.key
-            )
-            cf.content_type = data.metadata.content_type
-            cf.filename = data.metadata.filename
-            cf.size = data.metadata.size
-        else:
-            raise AttributeError("Metadata not found")
-
-        async def generate_buffer(
-            storage: Storage, request: AsyncIterator[UploadBinaryData]  # type: ignore
-        ):
-            # Storage requires uploading chunks of a specified size, this is
-            # why we need to have an intermediate buffer
-            buf = BytesIO()
-            async for chunk in request:
-                if not chunk.HasField("payload"):
-                    raise AttributeError("Payload not found")
-                buf.write(chunk.payload)
-                while buf.tell() > storage.chunk_size:
-                    buf.seek(0)
-                    data = buf.read(storage.chunk_size)
-                    if len(data):
-                        yield data
-                    old_data = buf.read()
-                    buf = BytesIO()
-                    buf.write(old_data)
-            buf.seek(0)
-            data = buf.read()
-            if len(data):
-                yield data
-
-        if destination is None:
-            raise AttributeError("No destination file")
-        await self.storage.uploaditerator(
-            generate_buffer(self.storage, request), destination, cf
-        )
-        result = FileUploaded()
-        return result
 
     async def NewVectorSet(  # type: ignore
         self, request: NewVectorSetRequest, context=None
