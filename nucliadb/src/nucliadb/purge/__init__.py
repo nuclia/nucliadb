@@ -31,6 +31,8 @@ from nucliadb.ingest.orm.knowledgebox import (
     KB_TO_DELETE,
     KB_TO_DELETE_BASE,
     KB_TO_DELETE_STORAGE_BASE,
+    KB_VECTORSET_TO_DELETE,
+    KB_VECTORSET_TO_DELETE_BASE,
     KnowledgeBox,
 )
 from nucliadb_telemetry import errors
@@ -142,6 +144,52 @@ async def purge_kb_storage(driver: Driver, storage: Storage):
     logger.info("FINISH PURGING KB STORAGE")
 
 
+async def purge_kb_vectorsets(driver: Driver, storage: Storage):
+    """Vectors for a vectorset are stored in a key inside each resource. Iterate
+    through all resources of the KB and remove any storage object containing
+    vectors for the specific vectorset to purge.
+
+    """
+    logger.info("START PURGING KB VECTORSETS")
+
+    purged = []
+    async for key in _iter_keys(driver, KB_VECTORSET_TO_DELETE_BASE):
+        logger.info(f"Purging vectorsets {key}")
+        try:
+            _base, kbid, vectorset = key.lstrip("/").split("/")
+        except ValueError:
+            logger.info(
+                f"  X Skipping purge {key}, wrong key format, expected {KB_VECTORSET_TO_DELETE}"
+            )
+            continue
+
+        try:
+            async with driver.transaction(read_only=True) as txn:
+                kb = KnowledgeBox(txn, storage, kbid)
+                async for resource in kb.iterate_resources():
+                    fields = await resource.get_fields(force=True)
+            # we don't need the maindb transaction anymore to remove vectors from storage
+            for field in fields.values():
+                await field.delete_vectors(vectorset)
+        except Exception as exc:
+            errors.capture_exception(exc)
+            logger.error(
+                f"  X ERROR while executing KB vectorset purge, skipping",
+                exc_info=exc,
+                extra={"kbid": kbid},
+            )
+            continue
+
+        purged.append(key)
+
+    async with driver.transaction() as txn:
+        for key in purged:
+            await txn.delete(key)
+        await txn.commit()
+
+    logger.info("FINISH PURGING KB VECTORSETS")
+
+
 async def main():
     """
     This script will purge all knowledge boxes marked to be deleted in maindb.
@@ -155,6 +203,7 @@ async def main():
     try:
         await purge_kb(driver)
         await purge_kb_storage(driver, storage)
+        await purge_kb_vectorsets(driver, storage)
     finally:
         await storage.finalize()
         await teardown_driver()
