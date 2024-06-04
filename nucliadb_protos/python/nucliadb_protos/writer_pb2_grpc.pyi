@@ -34,7 +34,6 @@ from nucliadb_protos.knowledgebox_pb2 import (
     EntitiesGroups as EntitiesGroups,
     Entity as Entity,
     EntityGroupDuplicateIndex as EntityGroupDuplicateIndex,
-    GCKnowledgeBoxResponse as GCKnowledgeBoxResponse,
     KBConfiguration as KBConfiguration,
     KnowledgeBoxConfig as KnowledgeBoxConfig,
     KnowledgeBoxID as KnowledgeBoxID,
@@ -179,16 +178,6 @@ class WriterStub:
         nucliadb_protos.knowledgebox_pb2.UpdateKnowledgeBoxResponse,
     ]
 
-    GCKnowledgeBox: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
-        nucliadb_protos.knowledgebox_pb2.GCKnowledgeBoxResponse,
-    ]
-
-    SetVectors: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.SetVectorsRequest,
-        nucliadb_protos.writer_pb2.SetVectorsResponse,
-    ]
-
     ProcessMessage: grpc.StreamUnaryMultiCallable[
         nucliadb_protos.writer_pb2.BrokerMessage,
         nucliadb_protos.writer_pb2.OpStatusWriter,
@@ -250,16 +239,6 @@ class WriterStub:
         nucliadb_protos.writer_pb2.IndexStatus,
     ]
 
-    DownloadFile: grpc.UnaryStreamMultiCallable[
-        nucliadb_protos.writer_pb2.FileRequest,
-        nucliadb_protos.writer_pb2.BinaryData,
-    ]
-
-    UploadFile: grpc.StreamUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.UploadBinaryData,
-        nucliadb_protos.writer_pb2.FileUploaded,
-    ]
-
     NewVectorSet: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.NewVectorSetRequest,
         nucliadb_protos.writer_pb2.NewVectorSetResponse,
@@ -284,16 +263,6 @@ class WriterAsyncStub:
     UpdateKnowledgeBox: grpc.aio.UnaryUnaryMultiCallable[
         nucliadb_protos.knowledgebox_pb2.KnowledgeBoxUpdate,
         nucliadb_protos.knowledgebox_pb2.UpdateKnowledgeBoxResponse,
-    ]
-
-    GCKnowledgeBox: grpc.aio.UnaryUnaryMultiCallable[
-        nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
-        nucliadb_protos.knowledgebox_pb2.GCKnowledgeBoxResponse,
-    ]
-
-    SetVectors: grpc.aio.UnaryUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.SetVectorsRequest,
-        nucliadb_protos.writer_pb2.SetVectorsResponse,
     ]
 
     ProcessMessage: grpc.aio.StreamUnaryMultiCallable[
@@ -357,16 +326,6 @@ class WriterAsyncStub:
         nucliadb_protos.writer_pb2.IndexStatus,
     ]
 
-    DownloadFile: grpc.aio.UnaryStreamMultiCallable[
-        nucliadb_protos.writer_pb2.FileRequest,
-        nucliadb_protos.writer_pb2.BinaryData,
-    ]
-
-    UploadFile: grpc.aio.StreamUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.UploadBinaryData,
-        nucliadb_protos.writer_pb2.FileUploaded,
-    ]
-
     NewVectorSet: grpc.aio.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.NewVectorSetRequest,
         nucliadb_protos.writer_pb2.NewVectorSetResponse,
@@ -398,20 +357,6 @@ class WriterServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxUpdate,
         context: _ServicerContext,
     ) -> typing.Union[nucliadb_protos.knowledgebox_pb2.UpdateKnowledgeBoxResponse, collections.abc.Awaitable[nucliadb_protos.knowledgebox_pb2.UpdateKnowledgeBoxResponse]]: ...
-
-    @abc.abstractmethod
-    def GCKnowledgeBox(
-        self,
-        request: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
-        context: _ServicerContext,
-    ) -> typing.Union[nucliadb_protos.knowledgebox_pb2.GCKnowledgeBoxResponse, collections.abc.Awaitable[nucliadb_protos.knowledgebox_pb2.GCKnowledgeBoxResponse]]: ...
-
-    @abc.abstractmethod
-    def SetVectors(
-        self,
-        request: nucliadb_protos.writer_pb2.SetVectorsRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[nucliadb_protos.writer_pb2.SetVectorsResponse, collections.abc.Awaitable[nucliadb_protos.writer_pb2.SetVectorsResponse]]: ...
 
     @abc.abstractmethod
     def ProcessMessage(
@@ -497,20 +442,6 @@ class WriterServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.writer_pb2.IndexResource,
         context: _ServicerContext,
     ) -> typing.Union[nucliadb_protos.writer_pb2.IndexStatus, collections.abc.Awaitable[nucliadb_protos.writer_pb2.IndexStatus]]: ...
-
-    @abc.abstractmethod
-    def DownloadFile(
-        self,
-        request: nucliadb_protos.writer_pb2.FileRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[collections.abc.Iterator[nucliadb_protos.writer_pb2.BinaryData], collections.abc.AsyncIterator[nucliadb_protos.writer_pb2.BinaryData]]: ...
-
-    @abc.abstractmethod
-    def UploadFile(
-        self,
-        request_iterator: _MaybeAsyncIterator[nucliadb_protos.writer_pb2.UploadBinaryData],
-        context: _ServicerContext,
-    ) -> typing.Union[nucliadb_protos.writer_pb2.FileUploaded, collections.abc.Awaitable[nucliadb_protos.writer_pb2.FileUploaded]]: ...
 
     @abc.abstractmethod
     def NewVectorSet(

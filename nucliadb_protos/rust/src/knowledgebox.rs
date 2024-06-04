@@ -88,9 +88,6 @@ pub struct UpdateKnowledgeBoxResponse {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct GcKnowledgeBoxResponse {}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DeleteKnowledgeBoxResponse {
     #[prost(enumeration = "KnowledgeBoxResponseStatus", tag = "1")]
     pub status: i32,
