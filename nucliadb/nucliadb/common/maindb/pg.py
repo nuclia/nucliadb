@@ -20,7 +20,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, AsyncGenerator, Optional, Union
+from typing import Any, AsyncGenerator, List, Optional, Union
 
 import asyncpg
 import backoff
@@ -37,6 +37,19 @@ CREATE_TABLE = """
 CREATE TABLE IF NOT EXISTS resources (
     key TEXT PRIMARY KEY,
     value BYTEA
+);
+"""
+
+CREATE_REPLICATION_TABLE = """
+CREATE TABLE IF NOT EXISTS replication (
+    id BIGSERIAL PRIMARY KEY,
+    delete bool NOT NULL,
+    key TEXT NOT NULL,
+    value BYTEA
+);
+CREATE TABLE IF NOT EXISTS replication_commit (
+    commit_id BIGSERIAL PRIMARY KEY,
+    operations BIGINT[]
 );
 """
 
@@ -66,9 +79,35 @@ DO UPDATE SET value = EXCLUDED.value
                 value,
             )
 
+    async def set_replication(self, key: str, value: bytes) -> int:
+        async with self.lock:
+            return (
+                await self.connection.fetchrow(
+                    "INSERT INTO replication (delete, key, value) VALUES (false, $1, $2) RETURNING ID",
+                    key,
+                    value,
+                )
+            )["id"]
+
+    async def create_replication_commit(self, replication_ops: List[int]):
+        async with self.lock:
+            await self.connection.execute(
+                "INSERT INTO replication_commit (operations) VALUES ($1)",
+                replication_ops,
+            )
+
     async def delete(self, key: str) -> None:
         async with self.lock:
             await self.connection.execute("DELETE FROM resources WHERE key = $1", key)
+
+    async def delete_replication(self, key: str) -> int:
+        async with self.lock:
+            return (
+                await self.connection.fetchrow(
+                    "INSERT INTO replication (delete, key) VALUES (true, $1) RETURNING id",
+                    key,
+                )
+            )["id"]
 
     async def batch_get(
         self, keys: list[str], select_for_update: bool = False
@@ -150,6 +189,9 @@ class PGTransaction(Transaction):
                 self.open = False
                 await self.connection.close()
 
+    async def create_replication_commit(self, replication_ops: List[int]):
+        return await self.data_layer.create_replication_commit(replication_ops)
+
     async def batch_get(self, keys: list[str]):
         return await self.data_layer.batch_get(keys, select_for_update=True)
 
@@ -159,8 +201,14 @@ class PGTransaction(Transaction):
     async def set(self, key: str, value: bytes):
         await self.data_layer.set(key, value)
 
+    async def set_replication(self, key: str, value: bytes) -> int:
+        return await self.data_layer.set_replication(key, value)
+
     async def delete(self, key: str):
         await self.data_layer.delete(key)
+
+    async def delete_replication(self, key: str) -> int:
+        return await self.data_layer.delete_replication(key)
 
     @backoff.on_exception(
         backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=2
@@ -232,7 +280,7 @@ class PGDriver(Driver):
         self.connection_pool_max_size = connection_pool_max_size
         self._lock = asyncio.Lock()
 
-    async def initialize(self):
+    async def initialize(self, for_replication: bool = False):
         async with self._lock:
             if self.initialized is False:
                 self.pool = await asyncpg.create_pool(
@@ -241,9 +289,12 @@ class PGDriver(Driver):
                 )
 
                 # check if table exists
+                create_table = (
+                    CREATE_REPLICATION_TABLE if for_replication else CREATE_TABLE
+                )
                 try:
                     async with self.pool.acquire() as conn:
-                        await conn.execute(CREATE_TABLE)
+                        await conn.execute(create_table)
                 except asyncpg.exceptions.UniqueViolationError:  # pragma: no cover
                     pass
 

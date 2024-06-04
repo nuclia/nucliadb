@@ -79,7 +79,9 @@ async def setup_driver() -> Driver:
             raise ConfigurationError("No DRIVER_TIKV_URL env var defined.")
 
         tikv_driver = TiKVDriver(
-            settings.driver_tikv_url, settings.driver_tikv_connection_pool_size
+            settings.driver_tikv_url,
+            settings.driver_tikv_connection_pool_size,
+            settings.driver_tikv_replication_pg_url,
         )
         set_utility(Utility.MAINDB_DRIVER, tikv_driver)
     elif settings.driver == DriverConfig.PG:

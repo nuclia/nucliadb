@@ -530,7 +530,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 resobj = ResourceORM(txn, self.storage, kbobj, request.rid)
                 resobj.disable_vectors = not request.reindex_vectors
 
-                brain = await resobj.generate_index_message()
+                brain = await resobj.generate_index_message(reindex=True)
                 shard_id = await datamanagers.resources.get_resource_shard_id(
                     txn, kbid=request.kbid, rid=request.rid
                 )

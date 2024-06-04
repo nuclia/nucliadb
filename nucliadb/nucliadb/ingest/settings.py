@@ -71,6 +71,10 @@ class DriverSettings(BaseSettings):
         default=3,
         description="TiKV max pool size. The maximum number of connections to the TiKV server.",
     )
+    driver_tikv_replication_pg_url: Optional[str] = Field(
+        default=None,
+        description="PostgreSQL DSN for replication",
+    )
 
 
 class Settings(DriverSettings):
