@@ -29,7 +29,6 @@ from nucliadb.search.predict import (
     CitationsGenerativeResponse,
     GenerativeChunk,
     MetaGenerativeResponse,
-    ProxiedPredictAPIError,
     StatusGenerativeResponse,
     TextGenerativeResponse,
 )
@@ -130,28 +129,17 @@ class AskResult:
         return self.ask_request.debug
 
     async def ndjson_stream(self) -> AsyncGenerator[str, None]:
-        stream_error: Optional[Exception] = None
         try:
             async for item in self._stream():
                 yield self._ndjson_encode(item)
-        except ProxiedPredictAPIError as exc:
-            stream_error = exc
-            logger.warning(
-                f"Predict API error while generating the answer: {exc}",
-                extra={"kbid": self.kbid},
-            )
         except Exception as exc:
-            stream_error = exc
+            # Handle any unexpected error that might happen
+            # during the streaming and halt the stream
             errors.capture_exception(exc)
             logger.error(
                 f"Unexpected error while generating the answer: {exc}",
                 extra={"kbid": self.kbid},
             )
-        finally:
-            if stream_error is None:
-                return
-            # Handle any unexpected error that might happen
-            # during the streaming and halt the stream
             item = ErrorAskResponseItem(
                 error="Unexpected error while generating the answer. Please try again later."
             )
