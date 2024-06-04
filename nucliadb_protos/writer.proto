@@ -413,17 +413,6 @@ message IndexStatus {
 
 }
 
-message SetVectorsRequest {
-    utils.VectorObject vectors = 1;
-    string kbid = 2;
-    string rid = 3;
-    resources.FieldID field = 4;
-}
-
-message SetVectorsResponse {
-    bool found = 1;
-}
-
 message FileRequest {
     string bucket = 1;
     string key = 2;
@@ -496,7 +485,6 @@ service Writer {
     rpc NewKnowledgeBox(knowledgebox.KnowledgeBoxNew) returns (knowledgebox.NewKnowledgeBoxResponse) {}
     rpc DeleteKnowledgeBox(knowledgebox.KnowledgeBoxID) returns (knowledgebox.DeleteKnowledgeBoxResponse) {}
     rpc UpdateKnowledgeBox(knowledgebox.KnowledgeBoxUpdate) returns (knowledgebox.UpdateKnowledgeBoxResponse) {}
-    rpc SetVectors(SetVectorsRequest) returns (SetVectorsResponse) {}
 
     rpc ProcessMessage(stream BrokerMessage) returns (OpStatusWriter) {}
 
@@ -517,7 +505,6 @@ service Writer {
     rpc ReIndex(IndexResource) returns (IndexStatus) {}
 
     rpc DownloadFile(FileRequest) returns (stream BinaryData) {}
-    rpc UploadFile(stream UploadBinaryData) returns (FileUploaded) {}
 
     rpc NewVectorSet(NewVectorSetRequest) returns (NewVectorSetResponse) {}
     rpc DelVectorSet(DelVectorSetRequest) returns (DelVectorSetResponse) {}

@@ -1134,24 +1134,6 @@ pub struct IndexResource {
 pub struct IndexStatus {}
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct SetVectorsRequest {
-    #[prost(message, optional, tag = "1")]
-    pub vectors: ::core::option::Option<super::utils::VectorObject>,
-    #[prost(string, tag = "2")]
-    pub kbid: ::prost::alloc::string::String,
-    #[prost(string, tag = "3")]
-    pub rid: ::prost::alloc::string::String,
-    #[prost(message, optional, tag = "4")]
-    pub field: ::core::option::Option<super::resources::FieldId>,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct SetVectorsResponse {
-    #[prost(bool, tag = "1")]
-    pub found: bool,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FileRequest {
     #[prost(string, tag = "1")]
     pub bucket: ::prost::alloc::string::String,

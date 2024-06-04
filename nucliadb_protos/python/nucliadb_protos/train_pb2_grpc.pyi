@@ -152,8 +152,6 @@ from nucliadb_protos.writer_pb2 import (
     OpStatusWriter as OpStatusWriter,
     PROCESSOR as PROCESSOR,
     SetEntitiesRequest as SetEntitiesRequest,
-    SetVectorsRequest as SetVectorsRequest,
-    SetVectorsResponse as SetVectorsResponse,
     ShardObject as ShardObject,
     ShardReplica as ShardReplica,
     Shards as Shards,

@@ -30,11 +30,6 @@ class WriterStub(object):
                 request_serializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxUpdate.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_knowledgebox__pb2.UpdateKnowledgeBoxResponse.FromString,
                 )
-        self.SetVectors = channel.unary_unary(
-                '/fdbwriter.Writer/SetVectors',
-                request_serializer=nucliadb__protos_dot_writer__pb2.SetVectorsRequest.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_writer__pb2.SetVectorsResponse.FromString,
-                )
         self.ProcessMessage = channel.stream_unary(
                 '/fdbwriter.Writer/ProcessMessage',
                 request_serializer=nucliadb__protos_dot_writer__pb2.BrokerMessage.SerializeToString,
@@ -100,11 +95,6 @@ class WriterStub(object):
                 request_serializer=nucliadb__protos_dot_writer__pb2.FileRequest.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_writer__pb2.BinaryData.FromString,
                 )
-        self.UploadFile = channel.stream_unary(
-                '/fdbwriter.Writer/UploadFile',
-                request_serializer=nucliadb__protos_dot_writer__pb2.UploadBinaryData.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_writer__pb2.FileUploaded.FromString,
-                )
         self.NewVectorSet = channel.unary_unary(
                 '/fdbwriter.Writer/NewVectorSet',
                 request_serializer=nucliadb__protos_dot_writer__pb2.NewVectorSetRequest.SerializeToString,
@@ -133,12 +123,6 @@ class WriterServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def UpdateKnowledgeBox(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def SetVectors(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -223,12 +207,6 @@ class WriterServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def UploadFile(self, request_iterator, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
     def NewVectorSet(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -258,11 +236,6 @@ def add_WriterServicer_to_server(servicer, server):
                     servicer.UpdateKnowledgeBox,
                     request_deserializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxUpdate.FromString,
                     response_serializer=nucliadb__protos_dot_knowledgebox__pb2.UpdateKnowledgeBoxResponse.SerializeToString,
-            ),
-            'SetVectors': grpc.unary_unary_rpc_method_handler(
-                    servicer.SetVectors,
-                    request_deserializer=nucliadb__protos_dot_writer__pb2.SetVectorsRequest.FromString,
-                    response_serializer=nucliadb__protos_dot_writer__pb2.SetVectorsResponse.SerializeToString,
             ),
             'ProcessMessage': grpc.stream_unary_rpc_method_handler(
                     servicer.ProcessMessage,
@@ -328,11 +301,6 @@ def add_WriterServicer_to_server(servicer, server):
                     servicer.DownloadFile,
                     request_deserializer=nucliadb__protos_dot_writer__pb2.FileRequest.FromString,
                     response_serializer=nucliadb__protos_dot_writer__pb2.BinaryData.SerializeToString,
-            ),
-            'UploadFile': grpc.stream_unary_rpc_method_handler(
-                    servicer.UploadFile,
-                    request_deserializer=nucliadb__protos_dot_writer__pb2.UploadBinaryData.FromString,
-                    response_serializer=nucliadb__protos_dot_writer__pb2.FileUploaded.SerializeToString,
             ),
             'NewVectorSet': grpc.unary_unary_rpc_method_handler(
                     servicer.NewVectorSet,
@@ -402,23 +370,6 @@ class Writer(object):
         return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/UpdateKnowledgeBox',
             nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxUpdate.SerializeToString,
             nucliadb__protos_dot_knowledgebox__pb2.UpdateKnowledgeBoxResponse.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def SetVectors(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/SetVectors',
-            nucliadb__protos_dot_writer__pb2.SetVectorsRequest.SerializeToString,
-            nucliadb__protos_dot_writer__pb2.SetVectorsResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -640,23 +591,6 @@ class Writer(object):
         return grpc.experimental.unary_stream(request, target, '/fdbwriter.Writer/DownloadFile',
             nucliadb__protos_dot_writer__pb2.FileRequest.SerializeToString,
             nucliadb__protos_dot_writer__pb2.BinaryData.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def UploadFile(request_iterator,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.stream_unary(request_iterator, target, '/fdbwriter.Writer/UploadFile',
-            nucliadb__protos_dot_writer__pb2.UploadBinaryData.SerializeToString,
-            nucliadb__protos_dot_writer__pb2.FileUploaded.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 

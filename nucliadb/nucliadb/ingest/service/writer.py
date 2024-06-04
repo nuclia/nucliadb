@@ -40,7 +40,6 @@ from nucliadb_protos.writer_pb2 import (
     DelEntitiesRequest,
     DelVectorSetRequest,
     DelVectorSetResponse,
-    ExtractedVectorsWrapper,
     FileRequest,
     FileUploaded,
     GetEntitiesGroupRequest,
@@ -59,8 +58,6 @@ from nucliadb_protos.writer_pb2 import (
     NewVectorSetResponse,
     OpStatusWriter,
     SetEntitiesRequest,
-    SetVectorsRequest,
-    SetVectorsResponse,
     UpdateEntitiesGroupRequest,
     UpdateEntitiesGroupResponse,
     UploadBinaryData,
@@ -110,37 +107,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self.shards_manager = get_shard_manager()
 
     async def finalize(self): ...
-
-    async def SetVectors(  # type: ignore
-        self, request: SetVectorsRequest, context=None
-    ) -> SetVectorsResponse:
-        response = SetVectorsResponse()
-        response.found = True
-
-        async with self.driver.transaction() as txn:
-            kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
-            resobj = ResourceORM(txn, self.storage, kbobj, request.rid)
-
-            field = await resobj.get_field(
-                request.field.field, request.field.field_type, load=True
-            )
-            if field.value is None:
-                response.found = False
-                return response
-
-            evw = ExtractedVectorsWrapper()
-            evw.field.CopyFrom(request.field)
-            evw.vectors.CopyFrom(request.vectors)
-            logger.debug(f"Setting {len(request.vectors.vectors.vectors)} vectors")
-
-            try:
-                await field.set_vectors(evw)
-                await txn.commit()
-            except Exception as e:
-                errors.capture_exception(e)
-                logger.error("Error in ingest gRPC servicer", exc_info=True)
-
-            return response
 
     async def NewKnowledgeBox(  # type: ignore
         self, request: KnowledgeBoxNew, context=None

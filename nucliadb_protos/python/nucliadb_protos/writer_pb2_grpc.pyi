@@ -178,11 +178,6 @@ class WriterStub:
         nucliadb_protos.knowledgebox_pb2.UpdateKnowledgeBoxResponse,
     ]
 
-    SetVectors: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.SetVectorsRequest,
-        nucliadb_protos.writer_pb2.SetVectorsResponse,
-    ]
-
     ProcessMessage: grpc.StreamUnaryMultiCallable[
         nucliadb_protos.writer_pb2.BrokerMessage,
         nucliadb_protos.writer_pb2.OpStatusWriter,
@@ -249,11 +244,6 @@ class WriterStub:
         nucliadb_protos.writer_pb2.BinaryData,
     ]
 
-    UploadFile: grpc.StreamUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.UploadBinaryData,
-        nucliadb_protos.writer_pb2.FileUploaded,
-    ]
-
     NewVectorSet: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.NewVectorSetRequest,
         nucliadb_protos.writer_pb2.NewVectorSetResponse,
@@ -278,11 +268,6 @@ class WriterAsyncStub:
     UpdateKnowledgeBox: grpc.aio.UnaryUnaryMultiCallable[
         nucliadb_protos.knowledgebox_pb2.KnowledgeBoxUpdate,
         nucliadb_protos.knowledgebox_pb2.UpdateKnowledgeBoxResponse,
-    ]
-
-    SetVectors: grpc.aio.UnaryUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.SetVectorsRequest,
-        nucliadb_protos.writer_pb2.SetVectorsResponse,
     ]
 
     ProcessMessage: grpc.aio.StreamUnaryMultiCallable[
@@ -351,11 +336,6 @@ class WriterAsyncStub:
         nucliadb_protos.writer_pb2.BinaryData,
     ]
 
-    UploadFile: grpc.aio.StreamUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.UploadBinaryData,
-        nucliadb_protos.writer_pb2.FileUploaded,
-    ]
-
     NewVectorSet: grpc.aio.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.NewVectorSetRequest,
         nucliadb_protos.writer_pb2.NewVectorSetResponse,
@@ -387,13 +367,6 @@ class WriterServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxUpdate,
         context: _ServicerContext,
     ) -> typing.Union[nucliadb_protos.knowledgebox_pb2.UpdateKnowledgeBoxResponse, collections.abc.Awaitable[nucliadb_protos.knowledgebox_pb2.UpdateKnowledgeBoxResponse]]: ...
-
-    @abc.abstractmethod
-    def SetVectors(
-        self,
-        request: nucliadb_protos.writer_pb2.SetVectorsRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[nucliadb_protos.writer_pb2.SetVectorsResponse, collections.abc.Awaitable[nucliadb_protos.writer_pb2.SetVectorsResponse]]: ...
 
     @abc.abstractmethod
     def ProcessMessage(
@@ -486,13 +459,6 @@ class WriterServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.writer_pb2.FileRequest,
         context: _ServicerContext,
     ) -> typing.Union[collections.abc.Iterator[nucliadb_protos.writer_pb2.BinaryData], collections.abc.AsyncIterator[nucliadb_protos.writer_pb2.BinaryData]]: ...
-
-    @abc.abstractmethod
-    def UploadFile(
-        self,
-        request_iterator: _MaybeAsyncIterator[nucliadb_protos.writer_pb2.UploadBinaryData],
-        context: _ServicerContext,
-    ) -> typing.Union[nucliadb_protos.writer_pb2.FileUploaded, collections.abc.Awaitable[nucliadb_protos.writer_pb2.FileUploaded]]: ...
 
     @abc.abstractmethod
     def NewVectorSet(

@@ -1587,48 +1587,6 @@ class IndexStatus(google.protobuf.message.Message):
 global___IndexStatus = IndexStatus
 
 @typing.final
-class SetVectorsRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    VECTORS_FIELD_NUMBER: builtins.int
-    KBID_FIELD_NUMBER: builtins.int
-    RID_FIELD_NUMBER: builtins.int
-    FIELD_FIELD_NUMBER: builtins.int
-    kbid: builtins.str
-    rid: builtins.str
-    @property
-    def vectors(self) -> nucliadb_protos.utils_pb2.VectorObject: ...
-    @property
-    def field(self) -> nucliadb_protos.resources_pb2.FieldID: ...
-    def __init__(
-        self,
-        *,
-        vectors: nucliadb_protos.utils_pb2.VectorObject | None = ...,
-        kbid: builtins.str = ...,
-        rid: builtins.str = ...,
-        field: nucliadb_protos.resources_pb2.FieldID | None = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing.Literal["field", b"field", "vectors", b"vectors"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["field", b"field", "kbid", b"kbid", "rid", b"rid", "vectors", b"vectors"]) -> None: ...
-
-global___SetVectorsRequest = SetVectorsRequest
-
-@typing.final
-class SetVectorsResponse(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    FOUND_FIELD_NUMBER: builtins.int
-    found: builtins.bool
-    def __init__(
-        self,
-        *,
-        found: builtins.bool = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["found", b"found"]) -> None: ...
-
-global___SetVectorsResponse = SetVectorsResponse
-
-@typing.final
 class FileRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
