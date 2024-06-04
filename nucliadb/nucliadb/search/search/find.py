@@ -23,6 +23,7 @@ from typing import Optional
 
 from nucliadb.search.requesters.utils import Method, debug_nodes_info, node_query
 from nucliadb.search.search.find_merge import find_merge_results
+from nucliadb.search.search.metrics import RAGMetrics
 from nucliadb.search.search.query import QueryParser
 from nucliadb.search.search.utils import (
     min_score_from_payload,
@@ -47,6 +48,7 @@ async def find(
     x_nucliadb_user: str,
     x_forwarded_for: str,
     generative_model: Optional[str] = None,
+    metrics: RAGMetrics = RAGMetrics(),
 ) -> tuple[KnowledgeboxFindResults, bool, QueryParser]:
     audit = get_audit()
     start_time = time()
@@ -82,26 +84,30 @@ async def find(
         generative_model=generative_model,
         rephrase=item.rephrase,
     )
-    pb_query, incomplete_results, autofilters = await query_parser.parse()
-    results, query_incomplete_results, queried_nodes = await node_query(
-        kbid, Method.SEARCH, pb_query, target_shard_replicas=item.shards
-    )
+    with metrics.time("query_parse"):
+        pb_query, incomplete_results, autofilters = await query_parser.parse()
+
+    with metrics.time("node_query"):
+        results, query_incomplete_results, queried_nodes = await node_query(
+            kbid, Method.SEARCH, pb_query, target_shard_replicas=item.shards
+        )
     incomplete_results = incomplete_results or query_incomplete_results
 
     # We need to merge
-    search_results = await find_merge_results(
-        results,
-        count=item.page_size,
-        page=item.page_number,
-        kbid=kbid,
-        show=item.show,
-        field_type_filter=item.field_type_filter,
-        extracted=item.extracted,
-        requested_relations=pb_query.relation_subgraph,
-        min_score_bm25=query_parser.min_score.bm25,
-        min_score_semantic=query_parser.min_score.semantic,
-        highlight=item.highlight,
-    )
+    with metrics.time("results_merge"):
+        search_results = await find_merge_results(
+            results,
+            count=item.page_size,
+            page=item.page_number,
+            kbid=kbid,
+            show=item.show,
+            field_type_filter=item.field_type_filter,
+            extracted=item.extracted,
+            requested_relations=pb_query.relation_subgraph,
+            min_score_bm25=query_parser.min_score.bm25,
+            min_score_semantic=query_parser.min_score.semantic,
+            highlight=item.highlight,
+        )
 
     search_time = time() - start_time
     if audit is not None:
@@ -121,16 +127,30 @@ async def find(
     search_results.shards = queried_shards
     search_results.autofilters = autofilters
 
-    if search_time > settings.slow_find_log_threshold:
+    if metrics.elapsed("node_query") > settings.slow_node_query_log_threshold:
         logger.warning(
-            "Slow query",
+            "Slow node query",
             extra={
                 "kbid": kbid,
                 "user": x_nucliadb_user,
                 "client": x_ndb_client,
-                "query": item.json(),
+                "query": item.model_dump_json(),
                 "time": search_time,
                 "nodes": debug_nodes_info(queried_nodes),
+            },
+        )
+    elif search_time > settings.slow_find_log_threshold:
+        logger.warning(
+            "Slow find query",
+            extra={
+                "kbid": kbid,
+                "user": x_nucliadb_user,
+                "client": x_ndb_client,
+                "query": item.model_dump_json(),
+                "time": search_time,
+                "nodes": debug_nodes_info(queried_nodes),
+                # Include step times in the log
+                **{step: metrics.elapsed(step) for step in metrics.steps()},
             },
         )
 
