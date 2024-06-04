@@ -71,6 +71,8 @@ data:
   DRIVER: {{ .Values.maindb.driver }}
 {{- if eq .Values.maindb.driver "redis" }}
   DRIVER_REDIS_URL: {{ .Values.maindb.driver_redis_url }}
+{{- else if eq .Values.maindb.driver "pg" }}
+  DRIVER_PG_URL: {{ .Values.maindb.driver_pg_url }}
 {{- else if eq .Values.maindb.driver "tikv" }}
   DRIVER_TIKV_URL: {{ toJson .Values.maindb.driver_tikv_url | quote }}
 {{- if .Values.maindb.driver_tikv_replication_pg_url }}
