@@ -34,7 +34,6 @@ from nucliadb_protos.knowledgebox_pb2 import (
     EntitiesGroups as EntitiesGroups,
     Entity as Entity,
     EntityGroupDuplicateIndex as EntityGroupDuplicateIndex,
-    GCKnowledgeBoxResponse as GCKnowledgeBoxResponse,
     KBConfiguration as KBConfiguration,
     KnowledgeBoxConfig as KnowledgeBoxConfig,
     KnowledgeBoxID as KnowledgeBoxID,
@@ -179,11 +178,6 @@ class WriterStub:
         nucliadb_protos.knowledgebox_pb2.UpdateKnowledgeBoxResponse,
     ]
 
-    GCKnowledgeBox: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
-        nucliadb_protos.knowledgebox_pb2.GCKnowledgeBoxResponse,
-    ]
-
     SetVectors: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.SetVectorsRequest,
         nucliadb_protos.writer_pb2.SetVectorsResponse,
@@ -284,11 +278,6 @@ class WriterAsyncStub:
     UpdateKnowledgeBox: grpc.aio.UnaryUnaryMultiCallable[
         nucliadb_protos.knowledgebox_pb2.KnowledgeBoxUpdate,
         nucliadb_protos.knowledgebox_pb2.UpdateKnowledgeBoxResponse,
-    ]
-
-    GCKnowledgeBox: grpc.aio.UnaryUnaryMultiCallable[
-        nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
-        nucliadb_protos.knowledgebox_pb2.GCKnowledgeBoxResponse,
     ]
 
     SetVectors: grpc.aio.UnaryUnaryMultiCallable[
@@ -398,13 +387,6 @@ class WriterServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxUpdate,
         context: _ServicerContext,
     ) -> typing.Union[nucliadb_protos.knowledgebox_pb2.UpdateKnowledgeBoxResponse, collections.abc.Awaitable[nucliadb_protos.knowledgebox_pb2.UpdateKnowledgeBoxResponse]]: ...
-
-    @abc.abstractmethod
-    def GCKnowledgeBox(
-        self,
-        request: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
-        context: _ServicerContext,
-    ) -> typing.Union[nucliadb_protos.knowledgebox_pb2.GCKnowledgeBoxResponse, collections.abc.Awaitable[nucliadb_protos.knowledgebox_pb2.GCKnowledgeBoxResponse]]: ...
 
     @abc.abstractmethod
     def SetVectors(

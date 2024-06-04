@@ -335,13 +335,6 @@ class TestWriterServicer:
 
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.ERROR
 
-    async def test_GCKnowledgeBox(self, writer: WriterServicer):
-        request = writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid")
-
-        resp = await writer.GCKnowledgeBox(request)
-
-        assert isinstance(resp, writer_pb2.GCKnowledgeBoxResponse)
-
     async def test_GetEntities(self, writer: WriterServicer):
         request = writer_pb2.GetEntitiesRequest(
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid")

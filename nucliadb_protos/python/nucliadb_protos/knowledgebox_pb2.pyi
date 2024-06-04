@@ -255,18 +255,6 @@ class UpdateKnowledgeBoxResponse(google.protobuf.message.Message):
 global___UpdateKnowledgeBoxResponse = UpdateKnowledgeBoxResponse
 
 @typing.final
-class GCKnowledgeBoxResponse(google.protobuf.message.Message):
-    """GC"""
-
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    def __init__(
-        self,
-    ) -> None: ...
-
-global___GCKnowledgeBoxResponse = GCKnowledgeBoxResponse
-
-@typing.final
 class DeleteKnowledgeBoxResponse(google.protobuf.message.Message):
     """DELETE"""
 

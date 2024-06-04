@@ -24,7 +24,6 @@ from typing import AsyncIterator, Optional
 
 from nucliadb_protos.knowledgebox_pb2 import (
     DeleteKnowledgeBoxResponse,
-    GCKnowledgeBoxResponse,
     KnowledgeBoxID,
     KnowledgeBoxNew,
     KnowledgeBoxResponseStatus,
@@ -276,12 +275,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                     exc_info=True,
                     extra={"kbid": kbid},
                 )
-
-    async def GCKnowledgeBox(  # type: ignore
-        self, request: KnowledgeBoxID, context=None
-    ) -> GCKnowledgeBoxResponse:
-        response = GCKnowledgeBoxResponse()
-        return response
 
     async def ProcessMessage(  # type: ignore
         self, request_stream: AsyncIterator[BrokerMessage], context=None

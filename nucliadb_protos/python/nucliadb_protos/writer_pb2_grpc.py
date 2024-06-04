@@ -30,11 +30,6 @@ class WriterStub(object):
                 request_serializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxUpdate.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_knowledgebox__pb2.UpdateKnowledgeBoxResponse.FromString,
                 )
-        self.GCKnowledgeBox = channel.unary_unary(
-                '/fdbwriter.Writer/GCKnowledgeBox',
-                request_serializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxID.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_knowledgebox__pb2.GCKnowledgeBoxResponse.FromString,
-                )
         self.SetVectors = channel.unary_unary(
                 '/fdbwriter.Writer/SetVectors',
                 request_serializer=nucliadb__protos_dot_writer__pb2.SetVectorsRequest.SerializeToString,
@@ -138,12 +133,6 @@ class WriterServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def UpdateKnowledgeBox(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def GCKnowledgeBox(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -269,11 +258,6 @@ def add_WriterServicer_to_server(servicer, server):
                     servicer.UpdateKnowledgeBox,
                     request_deserializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxUpdate.FromString,
                     response_serializer=nucliadb__protos_dot_knowledgebox__pb2.UpdateKnowledgeBoxResponse.SerializeToString,
-            ),
-            'GCKnowledgeBox': grpc.unary_unary_rpc_method_handler(
-                    servicer.GCKnowledgeBox,
-                    request_deserializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxID.FromString,
-                    response_serializer=nucliadb__protos_dot_knowledgebox__pb2.GCKnowledgeBoxResponse.SerializeToString,
             ),
             'SetVectors': grpc.unary_unary_rpc_method_handler(
                     servicer.SetVectors,
@@ -418,23 +402,6 @@ class Writer(object):
         return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/UpdateKnowledgeBox',
             nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxUpdate.SerializeToString,
             nucliadb__protos_dot_knowledgebox__pb2.UpdateKnowledgeBoxResponse.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def GCKnowledgeBox(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/GCKnowledgeBox',
-            nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxID.SerializeToString,
-            nucliadb__protos_dot_knowledgebox__pb2.GCKnowledgeBoxResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
