@@ -28,7 +28,13 @@ class Settings(DriverSettings):
     slow_find_log_threshold: float = Field(
         default=3.0,
         title="Slow query log threshold",
-        description="The threshold in seconds for logging slow queries",
+        description="The threshold in seconds for logging slow find queries",
+    )
+
+    slow_node_query_log_threshold: float = Field(
+        default=2.0,
+        title="Slow node query log threshold",
+        description="The threshold in seconds for logging slow node queries",
     )
 
 

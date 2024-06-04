@@ -126,9 +126,9 @@ async def find(
     search_results.shards = queried_shards
     search_results.autofilters = autofilters
 
-    if metrics.elapsed("node_query") > settings.slow_node_query_threshold:
+    if metrics.elapsed("node_query") > settings.slow_node_query_log_threshold:
         logger.warning(
-            "Slow query",
+            "Slow node query",
             extra={
                 "kbid": kbid,
                 "user": x_nucliadb_user,
@@ -136,6 +136,19 @@ async def find(
                 "query": item.model_dump_json(),
                 "time": search_time,
                 "nodes": debug_nodes_info(queried_nodes),
+            },
+        )
+    elif search_time > settings.slow_find_log_threshold:
+        logger.warning(
+            "Slow find query",
+            extra={
+                "kbid": kbid,
+                "user": x_nucliadb_user,
+                "client": x_ndb_client,
+                "query": item.model_dump_json(),
+                "time": search_time,
+                "nodes": debug_nodes_info(queried_nodes),
+                **{step: metrics.elapsed(step) for step in metrics.steps()},
             },
         )
 
