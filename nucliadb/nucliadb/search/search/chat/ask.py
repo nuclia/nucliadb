@@ -46,7 +46,7 @@ from nucliadb.search.search.exceptions import (
     IncompleteFindResultsError,
     InvalidQueryError,
 )
-from nucliadb.search.search.metrics import SearchMetrics
+from nucliadb.search.search.metrics import RAGMetrics
 from nucliadb.search.search.query import QueryParser
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import (
@@ -91,7 +91,7 @@ class AskResult:
         prompt_context: PromptContext,
         prompt_context_order: PromptContextOrder,
         auditor: ChatAuditor,
-        metrics: SearchMetrics,
+        metrics: RAGMetrics,
     ):
         # Initial attributes
         self.kbid = kbid
@@ -102,7 +102,7 @@ class AskResult:
         self.prompt_context = prompt_context
         self.prompt_context_order = prompt_context_order
         self.auditor: ChatAuditor = auditor
-        self.metrics: SearchMetrics = metrics
+        self.metrics: RAGMetrics = metrics
 
         # Computed from the predict chat answer stream
         self._answer_text = ""
@@ -267,11 +267,12 @@ class AskResult:
 
     async def get_relations_results(self) -> Relations:
         if self._relations is None:
-            self._relations = await get_relations_results(
-                kbid=self.kbid,
-                text_answer=self._answer_text,
-                target_shard_replicas=self.ask_request.shards,
-            )
+            with self.metrics.time("relations"):
+                self._relations = await get_relations_results(
+                    kbid=self.kbid,
+                    text_answer=self._answer_text,
+                    target_shard_replicas=self.ask_request.shards,
+                )
         return self._relations
 
     async def _stream_predict_answer_text(self) -> AsyncGenerator[str, None]:
@@ -330,7 +331,7 @@ class NotEnoughContextAskResult(AskResult):
             answer=NOT_ENOUGH_CONTEXT_ANSWER,
             retrieval_results=self.find_results,
             status=AnswerStatusCode.NO_CONTEXT,
-        ).json(exclude_unset=True)
+        ).model_dump_json(exclude_unset=True)
 
 
 async def ask(
@@ -343,7 +344,7 @@ async def ask(
     resource: Optional[str] = None,
 ) -> AskResult:
     start_time = time()
-    metrics = SearchMetrics()
+    metrics = RAGMetrics()
     chat_history = ask_request.context or []
     user_context = ask_request.extra_context or []
     user_query = ask_request.query
@@ -438,10 +439,11 @@ async def ask(
         max_tokens=query_parser.get_max_tokens_answer(),
         query_context_images=prompt_context_images,
     )
-    predict = get_predict()
-    nuclia_learning_id, predict_answer_stream = await predict.chat_query_ndjson(
-        kbid, chat_model
-    )
+    with metrics.time("stream_start"):
+        predict = get_predict()
+        nuclia_learning_id, predict_answer_stream = await predict.chat_query_ndjson(
+            kbid, chat_model
+        )
 
     auditor = ChatAuditor(
         kbid=kbid,

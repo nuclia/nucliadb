@@ -23,7 +23,7 @@ from typing import Optional
 
 from nucliadb.search.requesters.utils import Method, debug_nodes_info, node_query
 from nucliadb.search.search.find_merge import find_merge_results
-from nucliadb.search.search.metrics import SearchMetrics
+from nucliadb.search.search.metrics import RAGMetrics
 from nucliadb.search.search.query import QueryParser
 from nucliadb.search.search.utils import (
     min_score_from_payload,
@@ -48,7 +48,7 @@ async def find(
     x_nucliadb_user: str,
     x_forwarded_for: str,
     generative_model: Optional[str] = None,
-    metrics: SearchMetrics = SearchMetrics(),
+    metrics: RAGMetrics = RAGMetrics(),
 ) -> tuple[KnowledgeboxFindResults, bool, QueryParser]:
     audit = get_audit()
     start_time = time()

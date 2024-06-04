@@ -22,19 +22,46 @@ import time
 from typing import Optional
 
 from nucliadb_telemetry import metrics
+from nucliadb_telemetry.nucliadb_telemetry.metrics import INF  # type: ignore
 
 merge_observer = metrics.Observer("merge_results", labels={"type": ""})
 node_features = metrics.Counter("nucliadb_node_features", labels={"type": ""})
 query_parse_dependency_observer = metrics.Observer(
     "query_parse_dependency", labels={"type": ""}
 )
+
+buckets = [
+    0.005,
+    0.01,
+    0.025,
+    0.05,
+    0.075,
+    0.1,
+    0.25,
+    0.5,
+    0.75,
+    1.0,
+    2.5,
+    5.0,
+    7.5,
+    10.0,
+    30.0,
+    60.0,
+    INF,
+]
+
 generative_first_chunk_histogram = metrics.Histogram(
     name="generative_first_chunk",
-    buckets=[0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 30, 60, 120],
+    buckets=buckets,
+)
+rag_histogram = metrics.Histogram(
+    name="rag",
+    labels={"step": ""},
+    buckets=buckets,
 )
 
 
-class SearchMetrics:
+class RAGMetrics:
     def __init__(self):
         self.global_start = time.monotonic()
         self._start_times: dict[str, float] = {}
@@ -66,3 +93,5 @@ class SearchMetrics:
 
     def _end(self, step: str):
         self._end_times[step] = time.monotonic()
+        elapsed = self.elapsed(step)
+        rag_histogram.observe(elapsed, labels={"step": step})
