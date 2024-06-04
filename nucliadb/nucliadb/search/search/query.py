@@ -166,12 +166,10 @@ class QueryParser:
             )
         return self._query_information_task
 
-    def _get_matryoshka_dimension(
-        self, vectorset: Optional[str] = None
-    ) -> Awaitable[Optional[int]]:
+    def _get_matryoshka_dimension(self) -> Awaitable[Optional[int]]:
         if self._get_matryoshka_dimension_task is None:
             self._get_matryoshka_dimension_task = asyncio.create_task(
-                get_matryoshka_dimension_cached(self.kbid, vectorset)
+                get_matryoshka_dimension_cached(self.kbid, self.vectorset)
             )
         return self._get_matryoshka_dimension_task
 
@@ -408,12 +406,19 @@ class QueryParser:
         else:
             query_vector = self.user_vector
 
-        # XXX: Do we need some vectorset validation?
         if self.vectorset:
+            txn = await get_read_only_transaction()
+            if not await datamanagers.vectorsets.exists(
+                txn, kbid=self.kbid, vectorset_id=self.vectorset
+            ):
+                raise InvalidQueryError(
+                    "vectorset",
+                    f"Vectorset {self.vectorset} doesn't exist in you Knowledge Box",
+                )
             request.vectorset = self.vectorset
 
         if query_vector is not None:
-            matryoshka_dimension = await self._get_matryoshka_dimension(self.vectorset)
+            matryoshka_dimension = await self._get_matryoshka_dimension()
             if matryoshka_dimension is not None:
                 # KB using a matryoshka embeddings model, cut the query vector
                 # accordingly
