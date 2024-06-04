@@ -162,11 +162,15 @@ class GCSStorageField(StorageField):
                 assert data["resource"]["name"] == destination_uri
 
     @storage_ops_observer.wrap({"type": "iter_data"})
-    async def iter_data(self, headers=None):
+    async def iter_data(
+        self, range_start: Optional[int] = None, range_end: Optional[int] = None
+    ):
         attempt = 1
         while True:
             try:
-                async for chunk in self._inner_iter_data(headers=headers):
+                async for chunk in self._inner_iter_data(
+                    range_start=range_start, range_end=range_end
+                ):
                     yield chunk
                 break
             except ReadingResponseContentException:
@@ -185,23 +189,30 @@ class GCSStorageField(StorageField):
                 attempt += 1
 
     @storage_ops_observer.wrap({"type": "inner_iter_data"})
-    async def _inner_iter_data(self, headers=None):
-        if headers is None:
-            headers = {}
+    async def _inner_iter_data(
+        self, range_start: Optional[int] = None, range_end: Optional[int] = None
+    ):
+        """
+        Iterate through object data.
+        """
+        assert self.storage.session is not None
 
+        headers = await self.storage.get_access_headers()
+        if range_start is not None or range_end is not None:
+            headers["Range"] = "bytes={start}-{end}".format(
+                start=range_start or "",
+                end=range_end or "",
+            )
         key = self.field.uri if self.field else self.key
         if self.field is None:
             bucket = self.bucket
         else:
             bucket = self.field.bucket_name
-
         url = "{}/{}/o/{}".format(
             self.storage.object_base_url,
             bucket,
             quote_plus(key),
         )
-        headers.update(await self.storage.get_access_headers())
-
         async with self.storage.session.get(
             url, headers=headers, params={"alt": "media"}, timeout=-1
         ) as api_resp:
@@ -209,11 +220,6 @@ class GCSStorageField(StorageField):
                 text = await api_resp.text()
                 if api_resp.status == 404:
                     raise KeyError(f"Google cloud file not found : \n {text}")
-                elif api_resp.status == 401:
-                    logger.warning(f"Invalid google cloud credentials error: {text}")
-                    raise KeyError(
-                        content={f"Google cloud invalid credentials : \n {text}"}
-                    )
                 raise GoogleCloudException(f"{api_resp.status}: {text}")
             while True:
                 try:
@@ -224,16 +230,6 @@ class GCSStorageField(StorageField):
                     yield chunk
                 else:
                     break
-
-    @storage_ops_observer.wrap({"type": "read_range"})
-    async def read_range(self, start: int, end: int) -> AsyncGenerator[bytes, None]:
-        """
-        Iterate through ranges of data
-        """
-        async for chunk in self.iter_data(
-            headers={"Range": f"bytes={start}-{end - 1}"}
-        ):
-            yield chunk
 
     @backoff.on_exception(
         backoff.expo,

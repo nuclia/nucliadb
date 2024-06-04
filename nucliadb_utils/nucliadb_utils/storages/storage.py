@@ -97,11 +97,6 @@ class StorageField(abc.ABC, metaclass=abc.ABCMeta):
         raise NotImplementedError()
         yield b""
 
-    @abc.abstractmethod
-    async def read_range(self, start: int, end: int) -> AsyncGenerator[bytes, None]:
-        raise NotImplementedError()
-        yield b""
-
     async def delete(self) -> bool:
         deleted = False
         if self.field is not None:

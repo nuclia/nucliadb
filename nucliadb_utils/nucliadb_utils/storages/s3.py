@@ -117,13 +117,6 @@ class S3StorageField(StorageField):
             yield data
             data = await stream.read(CHUNK_SIZE)
 
-    async def read_range(self, start: int, end: int) -> AsyncGenerator[bytes, None]:
-        """
-        Iterate through ranges of data
-        """
-        async for chunk in self.iter_data(Range=f"bytes={start}-{end - 1}"):
-            yield chunk
-
     async def _abort_multipart(self):
         try:
             mpu = self.field.resumable_uri

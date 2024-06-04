@@ -92,29 +92,6 @@ class LocalStorageField(StorageField):
                     break
                 yield data
 
-    async def read_range(self, start: int, end: int) -> AsyncGenerator[bytes, None]:
-        """
-        Iterate through ranges of data
-        """
-        key = self.field.uri if self.field else self.key
-        if self.field is None:
-            bucket = self.bucket
-        else:
-            bucket = self.field.bucket_name
-
-        path = self.storage.get_file_path(bucket, key)
-        async with aiofiles.open(path, "rb") as resp:
-            await resp.seek(start)
-            count = 0
-            data = await resp.read(CHUNK_SIZE)
-            while data and count < end:
-                if count + len(data) > end:
-                    new_end = end - count
-                    data = data[:new_end]
-                yield data
-                count += len(data)
-                data = await resp.read(CHUNK_SIZE)
-
     async def start(self, cf: CloudFile) -> CloudFile:
         if self.field is not None and self.field.upload_uri != "":
             # If there is a temporal url

@@ -25,7 +25,6 @@ import pytest
 
 from nucliadb.writer.settings import settings
 from nucliadb.writer.tus import get_dm
-from nucliadb.writer.tus.exceptions import CloudFileNotFound
 from nucliadb.writer.tus.gcs import GCloudBlobStore, GCloudFileStorageManager
 from nucliadb.writer.tus.local import LocalBlobStore, LocalFileStorageManager
 from nucliadb.writer.tus.pg import PGBlobStore, PGFileStorageManager
@@ -192,12 +191,4 @@ async def storage_test(storage: BlobStore, file_storage_manager: FileStorageMana
     await dm.update(offset=size)
     assert size == len(example)
     await file_storage_manager.finish(dm)
-
-    async for data in file_storage_manager.read_range(path, kbid, 1, size):
-        assert data == example[1:]
-
     await file_storage_manager.delete_upload(path, kbid)
-
-    with pytest.raises(CloudFileNotFound):
-        async for data in file_storage_manager.read_range(path, kbid, 1, size):
-            assert data == example[1:]

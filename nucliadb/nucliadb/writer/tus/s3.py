@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import uuid
 from contextlib import AsyncExitStack
-from typing import AsyncIterator, Optional
+from typing import Optional
 
 import aiobotocore  # type: ignore
 import aiohttp
@@ -32,7 +32,7 @@ from nucliadb_protos.resources_pb2 import CloudFile
 
 from nucliadb.writer import logger
 from nucliadb.writer.tus.dm import FileDataManager
-from nucliadb.writer.tus.exceptions import CloudFileNotFound, ResumableURINotAvailable
+from nucliadb.writer.tus.exceptions import ResumableURINotAvailable
 from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
 from nucliadb_utils.storages.s3 import (
     CHUNK_SIZE,
@@ -156,37 +156,6 @@ class S3FileStorageManager(FileStorageManager):
         return await self.storage._s3aioclient.get_object(
             Bucket=bucket, Key=uri, **kwargs
         )
-
-    async def iter_data(
-        self, uri: str, kbid: str, headers: Optional[dict[str, str]] = None
-    ):
-        if headers is None:
-            headers = {}
-        try:
-            downloader = await self._download(uri, kbid, **headers)
-        except self.storage._s3aioclient.exceptions.NoSuchKey:
-            raise CloudFileNotFound()
-
-        # we do not want to timeout ever from this...
-        # downloader['Body'].set_socket_timeout(999999)
-        stream = downloader["Body"]
-        data = await stream.read(CHUNK_SIZE)
-        while True:
-            if not data:
-                break
-            yield data
-            data = await stream.read(CHUNK_SIZE)
-
-    async def read_range(
-        self, uri, kbid: str, start: int, end: int
-    ) -> AsyncIterator[bytes]:
-        """
-        Iterate through ranges of data
-        """
-        async for chunk in self.iter_data(
-            uri, kbid, headers={"Range": f"bytes={start}-{end - 1}"}
-        ):
-            yield chunk
 
     async def delete_upload(self, uri: str, kbid: str):
         bucket = self.storage.get_bucket_name(kbid)

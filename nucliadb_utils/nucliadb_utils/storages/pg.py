@@ -432,23 +432,6 @@ class PostgresStorageField(StorageField):
             async for chunk in dl.iterate_chunks(bucket, key):
                 yield chunk["data"]
 
-    async def read_range(self, start: int, end: int) -> AsyncGenerator[bytes, None]:
-        """
-        Iterate through ranges of data
-        """
-        key = self.field.uri if self.field else self.key
-        if self.field is None:
-            bucket = self.bucket
-        else:
-            bucket = self.field.bucket_name
-
-        async with self.storage.pool.acquire() as conn:
-            dl = PostgresFileDataLayer(conn)
-            async for data in dl.iterate_range(
-                kb_id=bucket, file_id=key, start=start, end=end
-            ):
-                yield data
-
     async def start(self, cf: CloudFile) -> CloudFile:
         field = CloudFile(
             filename=cf.filename,

@@ -22,13 +22,11 @@ from __future__ import annotations
 import json
 import os
 import uuid
-from typing import AsyncIterator
 
 import aiofiles
 from nucliadb_protos.resources_pb2 import CloudFile
 
 from nucliadb.writer.tus.dm import FileDataManager
-from nucliadb.writer.tus.exceptions import CloudFileNotFound
 from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
 from nucliadb_utils.storages import CHUNK_SIZE
 
@@ -63,38 +61,6 @@ class LocalFileStorageManager(FileStorageManager):
             await aio_fi.write(b"")
 
         await dm.update(upload_file_id=upload_file_id, path=path, bucket=bucket)
-
-    async def iter_data(self, uri, kbid: str, headers=None):
-        bucket = self.storage.get_bucket_name(kbid)
-        file_path = self.get_file_path(bucket, uri)
-        async with aiofiles.open(file_path) as resp:
-            data = await resp.read(CHUNK_SIZE)
-            while data is not None:
-                yield data
-                data = await resp.read(CHUNK_SIZE)
-
-    async def read_range(
-        self, uri: str, kbid: str, start: int, end: int
-    ) -> AsyncIterator[bytes]:
-        """
-        Iterate through ranges of data
-        """
-        bucket = self.storage.get_bucket_name(kbid)
-        file_path = self.get_file_path(bucket, uri)
-        try:
-            async with aiofiles.open(file_path, "rb") as resp:
-                await resp.seek(start)
-                count = 0
-                data = await resp.read(CHUNK_SIZE)
-                while data and count < end:
-                    if count + len(data) > end:
-                        new_end = end - count
-                        data = data[:new_end]
-                    yield data
-                    count += len(data)
-                    data = await resp.read(CHUNK_SIZE)
-        except FileNotFoundError:
-            raise CloudFileNotFound()
 
     async def append(self, dm: FileDataManager, iterable, offset) -> int:
         count = 0

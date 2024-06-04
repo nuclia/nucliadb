@@ -21,15 +21,9 @@ from __future__ import annotations
 
 from typing import AsyncIterator, Optional
 
-from lru import LRU  # type: ignore
 from nucliadb_protos.resources_pb2 import CloudFile
-from starlette.responses import StreamingResponse
 
-from nucliadb.writer import logger
 from nucliadb.writer.tus.dm import FileDataManager
-from nucliadb.writer.tus.exceptions import HTTPRangeNotSatisfiable
-
-CACHED_BUCKETS = LRU(50)  # type: ignore
 
 
 class BlobStore:
@@ -59,11 +53,6 @@ class FileStorageManager:
     def __init__(self, storage):
         self.storage = storage
 
-    def read_range(
-        self, uri: str, kbid: str, start: int, end: int
-    ) -> AsyncIterator[bytes]:
-        raise NotImplementedError()
-
     def iter_data(
         self, uri: str, kbid: str, headers: Optional[dict[str, str]] = None
     ) -> AsyncIterator[bytes]:
@@ -80,48 +69,6 @@ class FileStorageManager:
 
     async def delete_upload(self, uri, kbid):
         raise NotImplementedError()
-
-    async def full_download(self, content_length, content_type, upload_id):
-        return StreamingResponse(
-            self.iter_data(upload_id),
-            media_type=content_type,
-            headers={
-                "Content-Length": str(content_length),
-                "Content-Type": content_type,
-            },
-        )
-
-    async def range_download(
-        self, content_length, content_type, upload_id, range_header
-    ):
-        try:
-            start, _, end = range_header.split("bytes=")[-1].partition("-")
-            start = int(start)
-            if len(end) == 0:
-                # bytes=0- is valid
-                end = content_length - 1
-            end = int(end) + 1  # python is inclusive, http is exclusive
-        except (IndexError, ValueError):
-            # range errors fallback to full download
-            raise HTTPRangeNotSatisfiable(detail=f"Range not parsable {range_header}")
-        if start > end or start < 0:
-            raise HTTPRangeNotSatisfiable(detail="Invalid range {start}-{end}")
-        if end > content_length:
-            raise HTTPRangeNotSatisfiable(
-                detail="Invalid range {start}-{end}, too large end value"
-            )
-
-        logger.debug(f"Range request: {range_header}")
-        headers = {
-            "Content-Range": f"bytes {start}-{end - 1}/{content_length}",
-            "Content-Type": content_type,
-        }
-
-        return StreamingResponse(
-            self.read_range(upload_id, start, end),
-            media_type=content_type,
-            headers=headers,
-        )
 
     async def iterate_body_chunks(self, request, chunk_size):
         partial = b""

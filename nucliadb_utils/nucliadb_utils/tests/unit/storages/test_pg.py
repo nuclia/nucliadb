@@ -416,24 +416,6 @@ class TestPostgresStorageField:
 
         assert chunks == [b"data1", b"data2", b"data3"]
 
-    async def test_read_range(
-        self,
-        storage_field: pg.PostgresStorageField,
-        connection,
-        chunk_info,
-        chunk_data,
-        field,
-    ):
-        storage_field.field = field
-        connection.fetch.return_value = chunk_info
-        connection.fetchrow.side_effect = chunk_data
-
-        chunks = []
-        async for chunk in storage_field.read_range(0, 15):
-            chunks.append(chunk)
-
-        assert chunks == [b"data1", b"data2", b"data3"]
-
     async def test_start(
         self,
         storage_field: pg.PostgresStorageField,

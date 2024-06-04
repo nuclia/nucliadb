@@ -19,13 +19,10 @@
 #
 from __future__ import annotations
 
-from typing import AsyncIterator
-
 import asyncpg
 from nucliadb_protos.resources_pb2 import CloudFile
 
 from nucliadb.writer.tus.dm import FileDataManager
-from nucliadb.writer.tus.exceptions import CloudFileNotFound
 from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
 from nucliadb_utils.storages import CHUNK_SIZE
 from nucliadb_utils.storages.pg import PostgresFileDataLayer
@@ -54,32 +51,6 @@ class PGFileStorageManager(FileStorageManager):
                 )
 
         await dm.update(upload_file_id=path, path=path, bucket=bucket)
-
-    async def iter_data(self, uri, kbid: str, headers=None):
-        bucket = self.storage.get_bucket_name(kbid)
-
-        async with self.storage.pool.acquire() as conn:
-            dl = PostgresFileDataLayer(conn)
-            async for chunk in dl.iterate_chunks(bucket, uri):
-                yield chunk["data"]
-
-    async def read_range(
-        self, uri: str, kbid: str, start: int, end: int
-    ) -> AsyncIterator[bytes]:
-        """
-        Iterate through ranges of data
-        """
-        bucket = self.storage.get_bucket_name(kbid)
-
-        async with self.storage.pool.acquire() as conn:
-            dl = PostgresFileDataLayer(conn)
-            file_info = await dl.get_file_info(kbid, uri)
-            if file_info is None:
-                raise CloudFileNotFound()
-            async for data in dl.iterate_range(
-                kb_id=bucket, file_id=uri, start=start, end=end
-            ):
-                yield data
 
     async def append(self, dm: FileDataManager, iterable, offset) -> int:
         bucket = dm.get("bucket")
