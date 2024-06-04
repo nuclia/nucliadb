@@ -111,6 +111,9 @@ class ChatResponse(BaseModel):
 RawRequestContent = Union[str, bytes, Iterable[bytes], AsyncIterable[bytes]]
 
 
+ASK_STATUS_CODE_ERROR = "-1"
+
+
 def json_response_parser(response: httpx.Response) -> Any:
     return orjson.loads(response.content.decode())
 
@@ -176,7 +179,7 @@ def ask_response_parser(response: httpx.Response) -> SyncAskResponse:
                 relations = item.relations
             elif isinstance(item, StatusAskResponseItem):
                 status = item.status
-                if status == "error":
+                if item.code == ASK_STATUS_CODE_ERROR:
                     error = item.details or "Unknown error"
             elif isinstance(item, RetrievalAskResponseItem):
                 retrieval_results = item.results
