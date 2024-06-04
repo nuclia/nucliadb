@@ -140,9 +140,12 @@ class AskResult:
                 f"Unexpected error while generating the answer: {exc}",
                 extra={"kbid": self.kbid},
             )
-            item = ErrorAskResponseItem(
-                error="Unexpected error while generating the answer. Please try again later."
+            error_message = (
+                "Unexpected error while generating the answer. Please try again later."
             )
+            if self.ask_request_with_debug_flag:
+                error_message += f" Error: {exc}"
+            item = ErrorAskResponseItem(error=error_message)
             yield self._ndjson_encode(item)
             return
 
