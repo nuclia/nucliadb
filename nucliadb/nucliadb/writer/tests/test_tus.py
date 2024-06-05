@@ -131,7 +131,6 @@ async def storage_test(storage: BlobStore, file_storage_manager: FileStorageMana
         "mykb_tus_test",
     ]
 
-    # this is silly, but we don't need this for pg
     assert await storage.check_exists(bucket_name) is False
 
     exists = await storage.create_bucket(bucket_name)
