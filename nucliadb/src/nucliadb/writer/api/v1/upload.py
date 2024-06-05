@@ -579,14 +579,6 @@ def validate_intermediate_tus_chunk(
     except ValueError as err:
         raise HTTPPreconditionFailed(detail=str(err))
 
-    if (
-        storage_manager.min_upload_size is not None
-        and read_bytes % storage_manager.min_upload_size != 0
-    ):
-        raise HTTPPreconditionFailed(
-            detail=f"Intermediate chunks need to be multiples of {storage_manager.min_upload_size} bytes"
-        )
-
 
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/file/{{field}}/{UPLOAD}",
