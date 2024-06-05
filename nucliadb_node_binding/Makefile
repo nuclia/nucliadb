@@ -23,7 +23,7 @@ format:
 
 .PHONY: lint
 lint:
-	flake8 tests --config=pyproject.toml
+	flake8 tests --config=setup.cfg
 	isort -c --profile black tests
 	black --check tests
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini .

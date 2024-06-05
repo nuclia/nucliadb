@@ -68,6 +68,7 @@ jobs:
           filters: |
             workflows:
               - 'nucliadb_node/**'
+              - "nucliadb_sidecar/**"
               - 'nucliadb_texts2/**'
               - 'nucliadb_paragraphs2/**'
               - 'nucliadb_paragraphs3/**'
