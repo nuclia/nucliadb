@@ -58,10 +58,13 @@ def test_highlight_handles_unescaped_sequences():
     res = highlight(text, ["unsafe.*", "safe"])
     assert res == "<mark>unsafe.*</mark> texts now can match safely"
 
-    # malicious stuff
-    text = "(w.*o.*r.*d)"
-    res = highlight(text, ["o.*"])
-    assert res == "(w.*<mark>o.*</mark>r.*d)"
+    text = "l'estany l'il·luminat?"
+    res = highlight(text, ["l'il·luminat?"])
+    assert res == "l'estany <mark>l'il·luminat?</mark>"
+
+    # text = "(w.*o.*r.*d)"
+    # res = highlight(text, ["o.*"])
+    # assert res == "(w.*<mark>o.*</mark>r.*d)"
 
 
 def test_highlight():

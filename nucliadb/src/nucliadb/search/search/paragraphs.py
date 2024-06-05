@@ -216,47 +216,19 @@ async def get_text_sentence(
     return splitted_text
 
 
-def get_regex(text: str) -> str:
-    # This function creates a regex to match `text` as a word (not part of a
-    # word). To do it, we need to suround the regex by '\b'. However, texts
-    # including non word characters won't match. For instance, r'\b\(text\b'
-    # wont match in "(text", although r'\(\btext\b' would.
-    #
-    # To fix this, we first split the non-words from the start and end of the
-    # string (we don't care about the middle). To handle all situations, we
-    # accept the middle (word) section to be empty, have only word characters or
-    # be something non word surrounded by words. In any case, surrounding this
-    # word with '\b' will work
-    match = re.match(r"^(\W*)(|\w+|\w+.*\w+)(\W*)$", text)
-    try:
-        nonword_start, word, nonword_end = match.groups()  # type: ignore
-    except ValueError:
-        logger.warning(f"Regex parsing failed for text: {text}")
-        return r"\b" + re.escape(text) + r"\b"
-
-    # now, we suround the escaped word with '\b' and join the string with the
-    # escaped nonwords.
-    return (
-        re.escape(nonword_start)
-        + r"\b"
-        + re.escape(word)
-        + r"\b"
-        + re.escape(nonword_end)
-    )
-
-
 def highlight_paragraph(
     text: str, words: Optional[list[str]] = None, ematches: Optional[list[str]] = None
 ) -> str:
+    REGEX_TEMPLATE = r"(^|\s)({text})(\s|$)"
     text_lower = text.lower()
 
     marks = [0] * (len(text_lower) + 1)
     if ematches is not None:
         for quote in ematches:
-            quote_regex = get_regex(quote.lower())
+            quote_regex = REGEX_TEMPLATE.format(text=re.escape(quote.lower()))
             try:
                 for match in re.finditer(quote_regex, text_lower):
-                    start, end = match.span()
+                    start, end = match.span(2)
                     marks[start] = 1
                     marks[end] = 2
             except re.error:
@@ -267,10 +239,10 @@ def highlight_paragraph(
 
     words = words or []
     for word in words:
-        word_regex = get_regex(word.lower())
+        word_regex = REGEX_TEMPLATE.format(text=re.escape(word.lower()))
         try:
             for match in re.finditer(word_regex, text_lower):
-                start, end = match.span()
+                start, end = match.span(2)
                 if marks[start] == 0 and marks[end] == 0:
                     marks[start] = 1
                     marks[end] = 2
