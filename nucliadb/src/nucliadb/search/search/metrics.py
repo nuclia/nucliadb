@@ -75,8 +75,8 @@ class RAGMetrics:
         finally:
             self._end(step)
 
-    def steps(self):
-        return list(self._start_times.keys())
+    def steps(self) -> dict[str, float]:
+        return {step: self.elapsed(step) for step in self._end_times.keys()}
 
     def elapsed(self, step: str) -> float:
         return self._end_times[step] - self._start_times[step]

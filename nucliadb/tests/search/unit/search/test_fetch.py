@@ -45,6 +45,28 @@ def test_highligh_error(benchmark: BenchmarkFixture):
     )
 
 
+def test_highlight_handles_unescaped_sequences():
+    text = "this is (not unsafe), just normal text"
+    res = highlight(text, ["(not", ".*unsafe.*"])
+    assert res == "this is <mark>(not</mark> unsafe), just normal text"
+
+    text = "should this match? The answer is..."
+    res = highlight(text, ["match?)"])
+    assert res == text
+
+    text = "unsafe.* texts now can match safely"
+    res = highlight(text, ["unsafe.*", "safe"])
+    assert res == "<mark>unsafe.*</mark> texts now can match safely"
+
+    text = "l'estany l'il·luminat?"
+    res = highlight(text, ["l'il·luminat?"])
+    assert res == "l'estany <mark>l'il·luminat?</mark>"
+
+    # text = "(w.*o.*r.*d)"
+    # res = highlight(text, ["o.*"])
+    # assert res == "(w.*<mark>o.*</mark>r.*d)"
+
+
 def test_highlight():
     res = highlight(
         "Query whatever you want my to make it work my query with this",

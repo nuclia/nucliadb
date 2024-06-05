@@ -216,22 +216,19 @@ async def get_text_sentence(
     return splitted_text
 
 
-def get_regex(some_string: str) -> str:
-    return r"\b" + some_string.lower() + r"\b"
-
-
 def highlight_paragraph(
     text: str, words: Optional[list[str]] = None, ematches: Optional[list[str]] = None
 ) -> str:
+    REGEX_TEMPLATE = r"(^|\s)({text})(\s|$)"
     text_lower = text.lower()
 
     marks = [0] * (len(text_lower) + 1)
     if ematches is not None:
         for quote in ematches:
-            quote_regex = get_regex(quote.lower())
+            quote_regex = REGEX_TEMPLATE.format(text=re.escape(quote.lower()))
             try:
                 for match in re.finditer(quote_regex, text_lower):
-                    start, end = match.span()
+                    start, end = match.span(2)
                     marks[start] = 1
                     marks[end] = 2
             except re.error:
@@ -242,10 +239,10 @@ def highlight_paragraph(
 
     words = words or []
     for word in words:
-        word_regex = get_regex(word.lower())
+        word_regex = REGEX_TEMPLATE.format(text=re.escape(word.lower()))
         try:
             for match in re.finditer(word_regex, text_lower):
-                start, end = match.span()
+                start, end = match.span(2)
                 if marks[start] == 0 and marks[end] == 0:
                     marks[start] = 1
                     marks[end] = 2
