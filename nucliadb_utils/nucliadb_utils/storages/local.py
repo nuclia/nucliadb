@@ -24,7 +24,7 @@ import json
 import os
 import shutil
 from datetime import datetime
-from typing import AsyncGenerator, AsyncIterator, Dict, Optional
+from typing import AsyncGenerator, AsyncIterator, Optional
 
 import aiofiles
 from nucliadb_protos.resources_pb2 import CloudFile
@@ -77,7 +77,9 @@ class LocalStorageField(StorageField):
         destination_path = f"{destination_bucket_path}/{destination_uri}"
         shutil.copy(origin_path, destination_path)
 
-    async def iter_data(self, headers=None):
+    async def iter_data(
+        self, range_start: Optional[int] = None, range_end: Optional[int] = None
+    ) -> AsyncGenerator[bytes, None]:
         key = self.field.uri if self.field else self.key
         if self.field is None:
             bucket = self.bucket
@@ -86,11 +88,32 @@ class LocalStorageField(StorageField):
 
         path = self.storage.get_file_path(bucket, key)
         async with aiofiles.open(path, mode="rb") as resp:
+
+            if range_start is not None:
+                # Seek to the start of the range
+                await resp.seek(range_start)
+
+            bytes_read = range_start or 0
+            bytes_to_read = None  # If None, read until EOF
+            if range_end is not None:
+                bytes_to_read = range_end - (range_start or 0)
+
             while True:
-                data = await resp.read(CHUNK_SIZE)
-                if not data:
+                chunk_size = CHUNK_SIZE
+                if bytes_to_read is not None:
+                    chunk_size = min(CHUNK_SIZE, bytes_to_read - bytes_read)
+
+                if chunk_size <= 0:
+                    # No more data to read
                     break
+
+                data = await resp.read(chunk_size)
+                if not data:
+                    # EOF
+                    break
+
                 yield data
+                bytes_read += len(data)
 
     async def start(self, cf: CloudFile) -> CloudFile:
         if self.field is not None and self.field.upload_uri != "":
@@ -261,18 +284,3 @@ class LocalStorage(Storage):
     ) -> AsyncGenerator[ObjectInfo, None]:
         for key in glob.glob(f"{bucket}/{prefix}*"):
             yield ObjectInfo(name=key)
-
-    async def download(
-        self, bucket_name: str, key: str, headers: Optional[Dict[str, str]] = None
-    ):
-        key_path = self.get_file_path(bucket_name, key)
-        if not os.path.exists(key_path):
-            return
-
-        async with aiofiles.open(key_path, mode="rb") as f:
-            while True:
-                body = await f.read(self.chunk_size)
-                if body == b"" or body is None:
-                    break
-                else:
-                    yield body

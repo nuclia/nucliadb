@@ -164,7 +164,7 @@ class GCSStorageField(StorageField):
     @storage_ops_observer.wrap({"type": "iter_data"})
     async def iter_data(
         self, range_start: Optional[int] = None, range_end: Optional[int] = None
-    ):
+    ) -> AsyncGenerator[bytes, None]:
         attempt = 1
         while True:
             try:

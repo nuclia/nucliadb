@@ -301,6 +301,8 @@ async def download_api(sf: StorageField, headers: Headers, inline: bool = False)
         "Content-Disposition": content_disposition,
     }
     download_headers = {}
+    range_start = None
+    range_end = None
     if "range" in headers and file_size > -1:
         range_request = headers["range"]
         try:
@@ -347,9 +349,13 @@ async def download_api(sf: StorageField, headers: Headers, inline: bool = False)
         extra_headers["Content-Length"] = f"{range_size}"
         extra_headers["Content-Range"] = f"bytes {start}-{end}/{file_size}"
         download_headers["Range"] = range_request
+        range_start = start
+        range_end = end
 
     return StreamingResponse(
-        sf.storage.download(sf.bucket, sf.key, headers=download_headers),  # type: ignore
+        sf.storage.download(
+            sf.bucket, sf.key, range_start=range_start, range_end=range_end
+        ),
         status_code=status_code,
         media_type=content_type,
         headers=extra_headers,

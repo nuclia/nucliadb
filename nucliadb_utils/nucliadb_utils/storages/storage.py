@@ -27,7 +27,6 @@ from typing import (
     Any,
     AsyncGenerator,
     AsyncIterator,
-    Dict,
     List,
     Optional,
     Tuple,
@@ -93,7 +92,9 @@ class StorageField(abc.ABC, metaclass=abc.ABCMeta):
     async def upload(self, iterator: AsyncIterator, origin: CloudFile) -> CloudFile: ...
 
     @abc.abstractmethod
-    async def iter_data(self, headers=None) -> AsyncGenerator[bytes, None]:  # type: ignore
+    async def iter_data(
+        self, range_start: Optional[int] = None, range_end: Optional[int] = None
+    ) -> AsyncGenerator[bytes, None]:
         raise NotImplementedError()
         yield b""
 
@@ -428,16 +429,19 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         return await destination.upload(safe_iterator, origin)
 
     async def download(
-        self, bucket: str, key: str, headers: Optional[Dict[str, str]] = None
+        self,
+        bucket: str,
+        key: str,
+        range_start: Optional[int] = None,
+        range_end: Optional[int] = None,
     ):
         destination: StorageField = self.field_klass(
             storage=self, bucket=bucket, fullkey=key
         )
-        if headers is None:
-            headers = {}
-
         try:
-            async for data in destination.iter_data(headers=headers):
+            async for data in destination.iter_data(
+                range_start=range_start, range_end=range_end
+            ):
                 yield data
         except KeyError:
             yield None

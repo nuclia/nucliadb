@@ -81,11 +81,16 @@ class S3StorageField(StorageField):
         jitter=backoff.random_jitter,
         max_tries=MAX_TRIES,
     )
-    async def _download(self, uri, bucket, **kwargs):
-        if "headers" in kwargs:
-            for key, value in kwargs["headers"].items():
-                kwargs[key] = value
-            del kwargs["headers"]
+    async def _download(
+        self,
+        uri,
+        bucket,
+        range_start: Optional[int] = None,
+        range_end: Optional[int] = None,
+    ):
+        kwargs = {}
+        if range_start is not None or range_end is not None:
+            kwargs["Range"] = f"bytes={range_start or ''}-{range_end or ''}"
         try:
             return await self.storage._s3aioclient.get_object(
                 Bucket=bucket, Key=uri, **kwargs
@@ -97,7 +102,9 @@ class S3StorageField(StorageField):
             else:
                 raise
 
-    async def iter_data(self, **kwargs):
+    async def iter_data(
+        self, range_start: Optional[int] = None, range_end: Optional[int] = None
+    ) -> AsyncGenerator[bytes, None]:
         # Suports field and key based iter
         uri = self.field.uri if self.field else self.key
         if self.field is None:
@@ -105,10 +112,10 @@ class S3StorageField(StorageField):
         else:
             bucket = self.field.bucket_name
 
-        downloader = await self._download(uri, bucket, **kwargs)
+        downloader = await self._download(
+            uri, bucket, range_start=range_start, range_end=range_end
+        )
 
-        # we do not want to timeout ever from this...
-        # downloader['Body'].set_socket_timeout(999999)
         stream = downloader["Body"]
         data = await stream.read(CHUNK_SIZE)
         while True:

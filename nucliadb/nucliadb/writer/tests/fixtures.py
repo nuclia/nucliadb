@@ -112,21 +112,12 @@ def s3_storage_writer(s3):
     storage_settings.s3_bucket = "test-{kbid}"
 
 
-@pytest.fixture(scope="function")
-def pg_storage_writer(pg):
-    storage_settings.file_backend = FileBackendConfig.PG
-    url = f"postgresql://postgres:postgres@{pg[0]}:{pg[1]}/postgres"
-    storage_settings.driver_pg_url = url
-
-
 def lazy_storage_writer_fixture():
     backend = get_testing_storage_backend()
     if backend == "gcs":
         return [lazy_fixture.lf("gcs_storage_writer")]
     elif backend == "s3":
         return [lazy_fixture.lf("s3_storage_writer")]
-    elif backend == "pg":
-        return [lazy_fixture.lf("pg_storage_writer")]
     else:
         print(f"Unknown storage backend {backend}, using gcs")
         return [lazy_fixture.lf("gcs_storage_writer")]
