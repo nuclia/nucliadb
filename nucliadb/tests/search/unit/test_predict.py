@@ -380,7 +380,6 @@ async def test_summarize():
         url="cluster/api/v1/internal/predict/summarize",
         json=item.dict(),
         headers={"X-STF-KBID": "kbid"},
-        timeout=None,
     )
 
 
@@ -411,7 +410,6 @@ async def test_summarize_onprem():
         url="public-europe1/api/v1/predict/summarize/kbid",
         json=item.dict(),
         headers={"X-STF-NUAKEY": "Bearer nuakey"},
-        timeout=None,
     )
 
 

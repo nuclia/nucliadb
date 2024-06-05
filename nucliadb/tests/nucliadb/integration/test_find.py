@@ -86,7 +86,6 @@ async def test_find_with_label_changes(
                 "relations": [],
             }
         },
-        timeout=None,
     )
     assert resp.status_code == 200
     await asyncio.sleep(1)

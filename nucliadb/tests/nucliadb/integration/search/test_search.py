@@ -711,7 +711,6 @@ async def test_processing_status_doesnt_change_on_search_after_processed(
             json={
                 "title": "My new title",
             },
-            timeout=None,
         )
     ).status_code == 200
 

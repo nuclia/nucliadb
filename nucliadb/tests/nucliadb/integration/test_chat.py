@@ -183,7 +183,6 @@ async def test_chat_always_returns_relations(
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/chat",
         json={"query": "summary", "features": ["relations"]},
-        timeout=None,
     )
     assert resp.status_code == 200
     _, answer, relations_result, _ = parse_chat_response(resp.content)
@@ -235,7 +234,6 @@ async def test_chat_with_citations(
         f"/kb/{knowledgebox}/chat",
         json={"query": "title", "citations": True},
         headers={"X-Synchronous": str(sync_chat)},
-        timeout=None,
     )
     assert resp.status_code == 200
 
@@ -266,7 +264,6 @@ async def test_chat_without_citations(
         f"/kb/{knowledgebox}/chat",
         json={"query": "title", "citations": False},
         headers={"X-Synchronous": str(sync_chat)},
-        timeout=None,
     )
     assert resp.status_code == 200
 
@@ -332,7 +329,6 @@ async def test_chat_rag_options_full_resource(
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/chat",
         json={"query": "title", "rag_strategies": [{"name": "full_resource"}]},
-        timeout=None,
     )
     assert resp.status_code == 200
     _ = parse_chat_response(resp.content)
@@ -367,7 +363,6 @@ async def test_chat_rag_options_extend_with_fields(
             "query": "title",
             "rag_strategies": [{"name": "field_extension", "fields": ["a/summary"]}],
         },
-        timeout=None,
     )
     assert resp.status_code == 200
     _ = parse_chat_response(resp.content)
@@ -504,7 +499,6 @@ async def test_chat_capped_context(
             "debug": True,
         },
         headers={"X-Synchronous": "True"},
-        timeout=None,
     )
     assert resp.status_code == 200
     resp_data = SyncChatResponse.parse_raw(resp.content)
@@ -524,7 +518,6 @@ async def test_chat_capped_context(
             "max_tokens": {"context": max_size},
         },
         headers={"X-Synchronous": "True"},
-        timeout=None,
     )
     assert resp.status_code == 200, resp.text
     resp_data = SyncChatResponse.parse_raw(resp.content)

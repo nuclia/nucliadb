@@ -77,6 +77,7 @@ class Range:
     Represents a range of bytes to be downloaded from a file. The range is inclusive.
     The start and end values are 0-based.
     """
+
     start: Optional[int] = None
     end: Optional[int] = None
 

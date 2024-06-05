@@ -97,7 +97,6 @@ async def test_file_tus_upload_and_download(
             "content-type": content_type,
             "upload-defer-length": "1",
         },
-        timeout=None,
     )
     assert resp.status_code == 201
     # Get the URL to upload the file to
@@ -136,7 +135,6 @@ async def test_file_tus_upload_and_download(
             url,
             data=chunk,
             headers=headers,
-            timeout=None,
         )
         assert resp.status_code == 200
         offset += len(chunk)
@@ -167,7 +165,6 @@ async def test_file_tus_upload_and_download(
         headers={
             "Range": "bytes=0-100",
         },
-        timeout=None,
     )
     assert resp.status_code == 206
     range_downloaded.write(resp.content)
@@ -178,7 +175,6 @@ async def test_file_tus_upload_and_download(
         headers={
             "Range": "bytes=101-200",
         },
-        timeout=None,
     )
     assert resp.status_code == 206
     range_downloaded.write(resp.content)
@@ -189,7 +185,6 @@ async def test_file_tus_upload_and_download(
         headers={
             "Range": "bytes=201-",
         },
-        timeout=None,
     )
     assert resp.status_code == 206
     range_downloaded.write(resp.content)
@@ -205,7 +200,6 @@ async def test_file_tus_upload_and_download(
         headers={
             "Range": "bytes=99900000-",
         },
-        timeout=None,
     )
     assert resp.status_code == 416
 

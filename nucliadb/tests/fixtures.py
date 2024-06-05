@@ -190,6 +190,7 @@ async def nucliadb_reader(nucliadb: Settings):
     async with AsyncClient(
         headers={"X-NUCLIADB-ROLES": "READER"},
         base_url=f"http://localhost:{nucliadb.http_port}/{API_PREFIX}/v1",
+        timeout=None,
     ) as client:
         yield client
 
@@ -199,6 +200,7 @@ async def nucliadb_writer(nucliadb: Settings):
     async with AsyncClient(
         headers={"X-NUCLIADB-ROLES": "WRITER"},
         base_url=f"http://localhost:{nucliadb.http_port}/{API_PREFIX}/v1",
+        timeout=None,
     ) as client:
         yield client
 
@@ -208,6 +210,7 @@ async def nucliadb_manager(nucliadb: Settings):
     async with AsyncClient(
         headers={"X-NUCLIADB-ROLES": "MANAGER"},
         base_url=f"http://localhost:{nucliadb.http_port}/{API_PREFIX}/v1",
+        timeout=None,
     ) as client:
         yield client
 

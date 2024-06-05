@@ -360,7 +360,6 @@ async def _test_filtering(nucliadb_reader: AsyncClient, kbid: str, filters):
             vector=Q,
             min_score=MinScore(semantic=-1).dict(),
         ),
-        timeout=None,
     )
     assert resp.status_code == 200
     content = resp.json()
