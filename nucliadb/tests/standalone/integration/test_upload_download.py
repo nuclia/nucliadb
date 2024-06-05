@@ -24,7 +24,7 @@ import pytest
 
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_PREFIX
 from nucliadb.writer.settings import settings as writer_settings
-from nucliadb.writer.tus import TUSUPLOAD
+from nucliadb.writer.tus import TUSUPLOAD, get_storage_manager
 
 
 @pytest.fixture(scope="function")
@@ -85,11 +85,13 @@ async def test_file_tus_upload_and_download(
 
     # Create a 2Mb file in memory
     mb = 1024 * 1024
-    file_content = BytesIO(b"A" * 2 * mb)
+    file_content = BytesIO(b"A" * 10 * mb)
     file_content.seek(0)
 
     # Upload the file part by part
-    chunk_size = (1 * mb) - 1
+    file_storage_manager = get_storage_manager()
+    chunk_size = file_storage_manager.min_upload_size or file_storage_manager.chunk_size
+
     chunks_uploaded = 0
     offset = 0
     chunk = file_content.read(chunk_size)
@@ -105,7 +107,7 @@ async def test_file_tus_upload_and_download(
             "upload-offset": f"{offset}",
             "content-length": f"{len(chunk)}",
         }
-        if len(chunk) < chunk_size:
+        if file_content.tell() == file_content.getbuffer().nbytes:
             # If this is the last part, we need to set the upload-length header
             headers["upload-length"] = f"{offset + len(chunk)}"
 
@@ -138,6 +140,7 @@ async def test_file_tus_upload_and_download(
     # Download the file with range headers
     range_downloaded = BytesIO()
     download_url = f"{kb_path}/{RESOURCE_PREFIX}/{resource}/file/field1/download/field"
+
     # One chunk first
     resp = await nucliadb_reader.get(
         download_url,

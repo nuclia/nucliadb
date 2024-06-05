@@ -565,19 +565,26 @@ async def _tus_patch(
 
         headers["NDB-Seq"] = f"{seqid}"
     else:
-        check_uploaded_chunk_size(read_bytes, storage_manager)
+        validate_intermediate_tus_chunk(read_bytes, storage_manager)
         await dm.save()
 
     return Response(headers=headers)
 
 
-def check_uploaded_chunk_size(read_bytes: int, storage_manager: FileStorageManager):
+def validate_intermediate_tus_chunk(
+    read_bytes: int, storage_manager: FileStorageManager
+):
+    try:
+        storage_manager.validate_intermediate_chunk(read_bytes)
+    except ValueError as err:
+        raise HTTPPreconditionFailed(detail=str(err))
+
     if (
         storage_manager.min_upload_size is not None
-        and read_bytes < storage_manager.min_upload_size
+        and read_bytes % storage_manager.min_upload_size != 0
     ):
         raise HTTPPreconditionFailed(
-            detail=f"Intermediate chunks cannot be smaller than {storage_manager.min_upload_size} bytes"
+            detail=f"Intermediate chunks need to be multiples of {storage_manager.min_upload_size} bytes"
         )
 
 

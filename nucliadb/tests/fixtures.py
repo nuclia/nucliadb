@@ -664,7 +664,7 @@ def maindb_settings(request):
     """
     Allows dynamically loading the driver fixtures via env vars.
 
-    MAINDB_DRIVER=redis,local pytest nucliadb/nucliadb/tests/
+    TESTING_MAINDB_DRIVERS=redis,local pytest nucliadb/nucliadb/tests/
 
     Any test using the nucliadb fixture will be run twice, once with redis driver and once with local driver.
     """
@@ -699,20 +699,20 @@ def local_storage_settings(tmpdir):
     }
 
 
-def storage_settings_lazy_fixtures(default_drivers="gcs"):
-    driver_types = os.environ.get("STORAGE_DRIVER", default_drivers)
+def blobstorage_settings_lazy_fixtures(default_drivers="gcs"):
+    driver_types = os.environ.get("TESTING_STORAGE_BACKEND", default_drivers)
     return [
         lazy_fixture.lf(f"{driver_type}_storage_settings")
         for driver_type in driver_types.split(",")
     ]
 
 
-@pytest.fixture(scope="function", params=storage_settings_lazy_fixtures())
+@pytest.fixture(scope="function", params=blobstorage_settings_lazy_fixtures())
 def blobstorage_settings(request):
     """
     Allows dynamically loading the storage fixtures via env vars.
 
-    STORAGE_DRIVER=local,gcs,s3 pytest nucliadb/nucliadb/tests/
+    TESTING_STORAGE_BACKEND=local,gcs,s3 pytest nucliadb/nucliadb/tests/
     """
     yield request.param
 

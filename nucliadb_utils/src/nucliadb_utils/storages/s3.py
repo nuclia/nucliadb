@@ -88,13 +88,15 @@ class S3StorageField(StorageField):
         range_start: Optional[int] = None,
         range_end: Optional[int] = None,
     ):
-        kwargs = {}
         if range_start is not None or range_end is not None:
-            kwargs["Range"] = f"bytes={range_start or ''}-{range_end or ''}"
-        try:
-            return await self.storage._s3aioclient.get_object(
-                Bucket=bucket, Key=uri, **kwargs
+            range = f"bytes={range_start or 0}-{range_end or ''}"
+            coro = self.storage._s3aioclient.get_object(
+                Bucket=bucket, Key=uri, Range=range
             )
+        else:
+            coro = self.storage._s3aioclient.get_object(Bucket=bucket, Key=uri)
+        try:
+            return await coro
         except botocore.exceptions.ClientError as e:
             error_code = parse_status_code(e)
             if error_code == 404:
@@ -111,11 +113,9 @@ class S3StorageField(StorageField):
             bucket = self.bucket
         else:
             bucket = self.field.bucket_name
-
         downloader = await self._download(
             uri, bucket, range_start=range_start, range_end=range_end
         )
-
         stream = downloader["Body"]
         data = await stream.read(CHUNK_SIZE)
         while True:
@@ -296,18 +296,9 @@ class S3StorageField(StorageField):
 
         try:
             obj = await self.storage._s3aioclient.head_object(Bucket=bucket, Key=key)
-            if obj is not None:
-                metadata = obj.get("Metadata") or {}
-                size = metadata.get("size") or obj.get("ContentLength") or 0
-                content_type = (
-                    metadata.get("content_type") or obj.get("ContentType") or ""
-                )
-                filename = metadata.get("filename") or key.split("/")[-1]
-                return ObjectMetadata(
-                    size=int(size), content_type=content_type, filename=filename
-                )
-            else:
+            if obj is None:
                 return None
+            return parse_object_metadata(obj, key)
         except botocore.exceptions.ClientError as e:
             error_code = parse_status_code(e)
             if error_code == 404:
@@ -560,3 +551,21 @@ def parse_status_code(error: botocore.exceptions.ClientError) -> int:
         errors.capture_message(msg, "error", scope)
 
     raise UnparsableResponse(msg) from error
+
+
+def parse_object_metadata(obj: dict, key: str) -> ObjectMetadata:
+    custom_metadata = obj.get("Metadata") or {}
+    # Parse size
+    custom_size = custom_metadata.get("size")
+    if custom_size is None or custom_size == "0":
+        size = 0
+        content_lenght = obj.get("ContentLength")
+        if content_lenght is not None:
+            size = int(content_lenght)
+    else:
+        size = int(custom_size)
+    # Content type
+    content_type = custom_metadata.get("content_type") or obj.get("ContentType") or ""
+    # Filename
+    filename = custom_metadata.get("filename") or key.split("/")[-1]
+    return ObjectMetadata(size=size, content_type=content_type, filename=filename)

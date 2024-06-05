@@ -72,21 +72,27 @@ class S3FileStorageManager(FileStorageManager):
         if dm.get("mpu") is not None:
             await self._abort_multipart(dm)
 
+        custom_metadata: dict[str, str] = {
+            "filename": dm.filename or "",
+            "content_type": dm.content_type,
+            "size": str(dm.size),
+        }
+
         await dm.update(
             path=path,
             upload_file_id=upload_file_id,
             multipart={"Parts": []},
             block=1,
-            mpu=await self._create_multipart(path, bucket),
+            mpu=await self._create_multipart(path, bucket, custom_metadata),
             bucket=bucket,
         )
 
     @backoff.on_exception(
         backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=3
     )
-    async def _create_multipart(self, path, bucket):
+    async def _create_multipart(self, path, bucket, custom_metadata: dict[str, str]):
         return await self.storage._s3aioclient.create_multipart_upload(
-            Bucket=bucket, Key=path
+            Bucket=bucket, Key=path, Metadata=custom_metadata
         )
 
     async def append(self, dm: FileDataManager, iterable, offset) -> int:
@@ -166,6 +172,12 @@ class S3FileStorageManager(FileStorageManager):
                 logger.warning("Error deleting object", exc_info=True)
         else:
             raise AttributeError("No valid uri")
+
+    def validate_intermediate_chunk(self, uploaded_bytes: int):
+        if uploaded_bytes % self.min_upload_size != 0:
+            raise ValueError(
+                f"Intermediate chunks need to be multiples of {self.min_upload_size} bytes"
+            )
 
 
 class S3BlobStore(BlobStore):

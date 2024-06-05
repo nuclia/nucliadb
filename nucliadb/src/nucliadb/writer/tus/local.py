@@ -123,6 +123,9 @@ class LocalFileStorageManager(FileStorageManager):
         file_path = self.get_file_path(bucket, uri)
         os.remove(file_path)
 
+    def validate_intermediate_chunk(self, uploaded_bytes: int):
+        pass
+
 
 class LocalBlobStore(BlobStore):
     def __init__(self, local_testing_files: str):

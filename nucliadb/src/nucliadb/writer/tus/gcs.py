@@ -369,3 +369,9 @@ class GCloudFileStorageManager(FileStorageManager):
         path = dm.get("path")
         await dm.finish()
         return path
+
+    def validate_intermediate_chunk(self, uploaded_bytes: int):
+        if uploaded_bytes < self.min_upload_size:
+            raise ValueError(
+                f"Intermediate chunks cannot be smaller than {self.min_upload_size} bytes"
+            )

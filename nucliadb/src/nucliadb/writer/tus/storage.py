@@ -93,3 +93,6 @@ class FileStorageManager:
 
         if partial or remaining:
             yield partial + remaining
+
+    def validate_intermediate_chunk(self, uploaded_bytes: int):
+        raise NotImplementedError()
