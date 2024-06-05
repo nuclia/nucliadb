@@ -74,7 +74,7 @@ class S3FileStorageManager(FileStorageManager):
 
         custom_metadata: dict[str, str] = {
             "filename": dm.filename or "",
-            "content_type": dm.content_type,
+            "content_type": dm.content_type or "",
             "size": str(dm.size),
         }
 

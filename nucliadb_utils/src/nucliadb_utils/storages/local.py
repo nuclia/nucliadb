@@ -289,3 +289,10 @@ class LocalStorage(Storage):
     ) -> AsyncGenerator[ObjectInfo, None]:
         for key in glob.glob(f"{bucket}/{prefix}*"):
             yield ObjectInfo(name=key)
+
+    async def download(self, bucket_name: str, key: str, range: Optional[Range] = None):
+        key_path = self.get_file_path(bucket_name, key)
+        if not os.path.exists(key_path):
+            return
+        async for chunk in super().download(bucket_name, key, range=range):
+            yield chunk
