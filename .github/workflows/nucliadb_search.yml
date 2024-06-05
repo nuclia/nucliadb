@@ -15,6 +15,7 @@ on:
       - 'nucliadb_telemetry/**'
       - 'nucliadb_protos/python/**'
       - 'nucliadb_node/**'
+      - "nucliadb_sidecar/**"
       - 'nucliadb_vectors/**'
       - 'nucliadb_texts2/**'
       - 'nucliadb_paragraphs2/**'
@@ -35,6 +36,7 @@ on:
       - 'nucliadb_telemetry/**'
       - 'nucliadb_protos/python/**'
       - 'nucliadb_node/**'
+      - "nucliadb_sidecar/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -139,7 +141,7 @@ jobs:
               - 'nucliadb_texts2/**'
               - 'nucliadb_vectors/**'
             sidecar_modified:
-              - 'nucliadb_node/nucliadb_node/**'
+              - 'nucliadb_sidecar/**'
 
       - name: Calc git info
         id: git

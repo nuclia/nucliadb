@@ -41,7 +41,3 @@ dynamic = ["version"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-
-[flake8]
-max-line-length = 120
-extend-ignore = "E203"

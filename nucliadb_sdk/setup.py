@@ -46,6 +46,7 @@ setup(
     zip_safe=True,
     include_package_data=True,
     package_data={"": ["*.txt", "*.md"], "nucliadb_sdk": ["py.typed"]},
-    packages=find_packages(),
+    packages=find_packages("src"),
+    package_dir={"": "src"},
     install_requires=requirements,
 )

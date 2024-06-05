@@ -57,7 +57,7 @@ format: # Format the code
 
 .PHONY: lint
 lint: # Run lint checks
-	flake8 nucliadb_performance --config=setup.cfg
+	flake8 . --config=setup.cfg
 	cd .. && isort -c --profile black nucliadb_performance
 	black --check .
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini . --show-traceback

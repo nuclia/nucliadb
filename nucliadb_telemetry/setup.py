@@ -87,6 +87,7 @@ setup(
         ),
     },
     package_data={"": ["*.txt", "*.md"], "nucliadb_telemetry": ["py.typed"]},
-    packages=find_packages(),
+    packages=find_packages("src"),
+    package_dir={"": "src"},
     install_requires=requirements,
 )

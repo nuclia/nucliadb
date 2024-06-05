@@ -16,11 +16,11 @@ format:
 
 .PHONY: lint
 lint:
-	flake8 nucliadb_sdk --config=setup.cfg
+	flake8 . --config=setup.cfg
 	cd .. && isort -c --profile black nucliadb_sdk
 	black --check .
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini .
 
 .PHONY: test
 test:
-	pytest -s --tb=native -v nucliadb_sdk
+	pytest -s --tb=native -v tests
