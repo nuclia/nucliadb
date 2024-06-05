@@ -283,7 +283,6 @@ async def _download_field_conversation(
 
 
 async def download_api(sf: StorageField, headers: Headers, inline: bool = False):
-    breakpoint()
     metadata: Optional[ObjectMetadata] = await sf.exists()
     if metadata is None:
         raise HTTPException(status_code=404, detail="Specified file doesn't exist")
@@ -305,7 +304,6 @@ async def download_api(sf: StorageField, headers: Headers, inline: bool = False)
     range_start = None
     range_end = None
 
-    breakpoint()
     if "range" in headers and file_size > -1:
         range_request = headers["range"]
         try:

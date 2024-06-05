@@ -93,15 +93,18 @@ class LocalStorageField(StorageField):
                 # Seek to the start of the range
                 await resp.seek(range_start)
 
-            bytes_read = range_start or 0
+            bytes_read = 0
             bytes_to_read = None  # If None, read until EOF
             if range_end is not None:
-                bytes_to_read = range_end - (range_start or 0)
+                # Range is inclusive
+                bytes_to_read = range_end - (range_start or 0) + 1
 
             while True:
                 chunk_size = CHUNK_SIZE
                 if bytes_to_read is not None:
-                    chunk_size = min(CHUNK_SIZE, bytes_to_read - bytes_read)
+                    if bytes_read >= bytes_to_read:
+                        break
+                    chunk_size = min(CHUNK_SIZE, bytes_to_read)
 
                 if chunk_size <= 0:
                     # No more data to read

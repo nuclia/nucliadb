@@ -63,11 +63,13 @@ async def test_file_tus_upload_and_download(
 
     # Start TUS upload
     url = f"{kb_path}/{RESOURCE_PREFIX}/{resource}/file/field1/{TUSUPLOAD}"
-    upload_metadata = ",".join([
-        f"filename {header_encode(filename)}",
-        f"language {header_encode(language)}",
-        f"md5 {header_encode(md5)}",
-    ])
+    upload_metadata = ",".join(
+        [
+            f"filename {header_encode(filename)}",
+            f"language {header_encode(language)}",
+            f"md5 {header_encode(md5)}",
+        ]
+    )
     resp = await nucliadb_writer.post(
         url,
         headers={
@@ -132,7 +134,6 @@ async def test_file_tus_upload_and_download(
     assert resp.headers["Content-Type"] == content_type
     assert resp.content == file_content.getvalue()
 
-    breakpoint()
     # Download the file with range headers
     range_downloaded = BytesIO()
     download_url = f"{kb_path}/{RESOURCE_PREFIX}/{resource}/file/field1/download/field"
@@ -144,9 +145,8 @@ async def test_file_tus_upload_and_download(
         },
         timeout=None,
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 206
     range_downloaded.write(resp.content)
-    breakpoint()
 
     # Some more
     resp = await nucliadb_reader.get(
@@ -154,10 +154,10 @@ async def test_file_tus_upload_and_download(
         headers={
             "Range": "bytes=101-200",
         },
+        timeout=None,
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 206
     range_downloaded.write(resp.content)
-    breakpoint()
 
     # The rest of the file
     resp = await nucliadb_reader.get(
@@ -167,15 +167,23 @@ async def test_file_tus_upload_and_download(
         },
         timeout=None,
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 206
     range_downloaded.write(resp.content)
-    breakpoint()
 
     # Make sure the downloaded content is the same as the original file
     file_content.seek(0)
     range_downloaded.seek(0)
     assert file_content.getvalue() == range_downloaded.getvalue()
 
+    # Test with a range that is too big
+    resp = await nucliadb_reader.get(
+        download_url,
+        headers={
+            "Range": "bytes=1000000-",
+        },
+        timeout=None,
+    )
+    assert resp.status_code == 416
 
 
 @pytest.mark.asyncio
