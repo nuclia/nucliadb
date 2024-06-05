@@ -37,6 +37,7 @@ from nucliadb_utils.storages.exceptions import UnparsableResponse
 from nucliadb_utils.storages.storage import (
     ObjectInfo,
     ObjectMetadata,
+    Range,
     Storage,
     StorageField,
 )
@@ -85,13 +86,13 @@ class S3StorageField(StorageField):
         self,
         uri,
         bucket,
-        range_start: Optional[int] = None,
-        range_end: Optional[int] = None,
+        range: Optional[Range] = None,
     ):
-        if range_start is not None or range_end is not None:
-            range = f"bytes={range_start or 0}-{range_end or ''}"
+        range = range or Range()
+        if range.start is not None or range.end is not None:
+            s3_range = f"bytes={range.start or 0}-{range.end or ''}"
             coro = self.storage._s3aioclient.get_object(
-                Bucket=bucket, Key=uri, Range=range
+                Bucket=bucket, Key=uri, Range=s3_range
             )
         else:
             coro = self.storage._s3aioclient.get_object(Bucket=bucket, Key=uri)
@@ -105,7 +106,7 @@ class S3StorageField(StorageField):
                 raise
 
     async def iter_data(
-        self, range_start: Optional[int] = None, range_end: Optional[int] = None
+        self, range: Optional[Range] = None
     ) -> AsyncGenerator[bytes, None]:
         # Suports field and key based iter
         uri = self.field.uri if self.field else self.key
@@ -113,9 +114,7 @@ class S3StorageField(StorageField):
             bucket = self.bucket
         else:
             bucket = self.field.bucket_name
-        downloader = await self._download(
-            uri, bucket, range_start=range_start, range_end=range_end
-        )
+        downloader = await self._download(uri, bucket, range=range)
         stream = downloader["Body"]
         data = await stream.read(CHUNK_SIZE)
         while True:

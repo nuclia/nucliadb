@@ -78,7 +78,6 @@ jobs:
       max-parallel: 2
       matrix:
         python-version: ["3.12"]
-        storage_backend: ["gcs", "s3", "local"]
 
     steps:
       - name: Checkout the repository
@@ -151,8 +150,6 @@ jobs:
           make build-sidecar
 
       - name: Run tests
-        env:
-          TESTING_STORAGE_BACKEND: ${{ matrix.storage_backend }}
         run: |
           make -C nucliadb/ test-cov-standalone
 

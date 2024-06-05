@@ -22,6 +22,7 @@ from __future__ import annotations
 import abc
 import hashlib
 import uuid
+from dataclasses import dataclass
 from io import BytesIO
 from typing import (
     Any,
@@ -70,6 +71,12 @@ class ObjectMetadata(BaseModel):
     size: int
 
 
+@dataclass
+class Range:
+    start: Optional[int] = None
+    end: Optional[int] = None
+
+
 class StorageField(abc.ABC, metaclass=abc.ABCMeta):
     storage: Storage
     bucket: str
@@ -93,7 +100,7 @@ class StorageField(abc.ABC, metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     async def iter_data(
-        self, range_start: Optional[int] = None, range_end: Optional[int] = None
+        self, range: Optional[Range] = None
     ) -> AsyncGenerator[bytes, None]:
         raise NotImplementedError()
         yield b""
@@ -432,16 +439,13 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         self,
         bucket: str,
         key: str,
-        range_start: Optional[int] = None,
-        range_end: Optional[int] = None,
+        range: Optional[Range] = None,
     ):
         destination: StorageField = self.field_klass(
             storage=self, bucket=bucket, fullkey=key
         )
         try:
-            async for data in destination.iter_data(
-                range_start=range_start, range_end=range_end
-            ):
+            async for data in destination.iter_data(range=range):
                 yield data
         except KeyError:
             yield None

@@ -50,6 +50,7 @@ from nucliadb_utils.storages.exceptions import (
 from nucliadb_utils.storages.storage import (
     ObjectInfo,
     ObjectMetadata,
+    Range,
     Storage,
     StorageField,
 )
@@ -163,14 +164,12 @@ class GCSStorageField(StorageField):
 
     @storage_ops_observer.wrap({"type": "iter_data"})
     async def iter_data(
-        self, range_start: Optional[int] = None, range_end: Optional[int] = None
+        self, range: Optional[Range] = None
     ) -> AsyncGenerator[bytes, None]:
         attempt = 1
         while True:
             try:
-                async for chunk in self._inner_iter_data(
-                    range_start=range_start, range_end=range_end
-                ):
+                async for chunk in self._inner_iter_data(range=range):
                     yield chunk
                 break
             except ReadingResponseContentException:
@@ -189,20 +188,16 @@ class GCSStorageField(StorageField):
                 attempt += 1
 
     @storage_ops_observer.wrap({"type": "inner_iter_data"})
-    async def _inner_iter_data(
-        self, range_start: Optional[int] = None, range_end: Optional[int] = None
-    ):
+    async def _inner_iter_data(self, range: Optional[Range] = None):
         """
         Iterate through object data.
         """
+        range = range or Range()
         assert self.storage.session is not None
 
         headers = await self.storage.get_access_headers()
-        if range_start is not None or range_end is not None:
-            headers["Range"] = "bytes={start}-{end}".format(
-                start=str(range_start or 0),
-                end=str(range_end) if range_end is not None else "",
-            )
+        if range.start is not None or range.end is not None:
+            headers["Range"] = f"bytes={range.start or 0}-{range.end or ''}"
         key = self.field.uri if self.field else self.key
         if self.field is None:
             bucket = self.bucket

@@ -33,6 +33,7 @@ from nucliadb_utils.storages import CHUNK_SIZE
 from nucliadb_utils.storages.storage import (
     ObjectInfo,
     ObjectMetadata,
+    Range,
     Storage,
     StorageField,
 )
@@ -78,7 +79,7 @@ class LocalStorageField(StorageField):
         shutil.copy(origin_path, destination_path)
 
     async def iter_data(
-        self, range_start: Optional[int] = None, range_end: Optional[int] = None
+        self, range: Optional[Range] = None
     ) -> AsyncGenerator[bytes, None]:
         key = self.field.uri if self.field else self.key
         if self.field is None:
@@ -89,15 +90,15 @@ class LocalStorageField(StorageField):
         path = self.storage.get_file_path(bucket, key)
         async with aiofiles.open(path, mode="rb") as resp:
 
-            if range_start is not None:
+            if range and range.start is not None:
                 # Seek to the start of the range
-                await resp.seek(range_start)
+                await resp.seek(range.start)
 
             bytes_read = 0
             bytes_to_read = None  # If None, read until EOF
-            if range_end is not None:
+            if range and range.end is not None:
                 # Range is inclusive
-                bytes_to_read = range_end - (range_start or 0) + 1
+                bytes_to_read = range.end - (range.start or 0) + 1
 
             while True:
                 chunk_size = CHUNK_SIZE
