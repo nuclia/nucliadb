@@ -21,7 +21,6 @@ import base64
 from io import BytesIO
 
 import pytest
-from tests.writer.test_files import ASSETS_PATH as WRITER_ASSETS_PATH
 
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_PREFIX
 from nucliadb.writer.settings import settings as writer_settings
@@ -78,19 +77,19 @@ async def test_file_tus_upload_and_download(
             "content-type": content_type,
             "upload-defer-length": "1",
         },
+        timeout=None,
     )
     assert resp.status_code == 201
     # Get the URL to upload the file to
     url = resp.headers["location"]
 
-    # Read file in memory
-    file_content = BytesIO()
-    with open(f"{WRITER_ASSETS_PATH}/image001.jpg", "rb") as f:
-        file_content.write(f.read())
+    # Create a 2Mb file in memory
+    mb = 1024 * 1024
+    file_content = BytesIO(b"A" * 2 * mb)
     file_content.seek(0)
 
     # Upload the file part by part
-    chunk_size = 10_000
+    chunk_size = (1 * mb) - 1
     chunks_uploaded = 0
     offset = 0
     chunk = file_content.read(chunk_size)
@@ -98,7 +97,7 @@ async def test_file_tus_upload_and_download(
         chunks_uploaded += 1
 
         # Make sure the upload is at the right offset
-        resp = await nucliadb_writer.head(url)
+        resp = await nucliadb_writer.head(url, timeout=None)
         assert resp.headers["Upload-Length"] == f"0"
         assert resp.headers["Upload-Offset"] == f"{offset}"
 
@@ -115,7 +114,9 @@ async def test_file_tus_upload_and_download(
             url,
             data=chunk,
             headers=headers,
+            timeout=None,
         )
+        assert resp.status_code == 200
         offset += len(chunk)
         chunk = file_content.read(chunk_size)
 
@@ -127,7 +128,7 @@ async def test_file_tus_upload_and_download(
 
     # Now download the file
     download_url = f"{kb_path}/{RESOURCE_PREFIX}/{resource}/file/field1/download/field"
-    resp = await nucliadb_reader.get(download_url)
+    resp = await nucliadb_reader.get(download_url, timeout=None)
     assert resp.status_code == 200
     # Make sure the filename and contents are correct
     assert resp.headers["Content-Disposition"] == f'attachment; filename="{filename}"'
@@ -179,7 +180,7 @@ async def test_file_tus_upload_and_download(
     resp = await nucliadb_reader.get(
         download_url,
         headers={
-            "Range": "bytes=1000000-",
+            "Range": "bytes=99900000-",
         },
         timeout=None,
     )

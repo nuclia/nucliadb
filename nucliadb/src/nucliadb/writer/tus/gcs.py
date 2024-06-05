@@ -185,6 +185,7 @@ class GCloudFileStorageManager(FileStorageManager):
         _resumable_uri : uri to resumable upload
         _uri : finished uploaded image
         """
+
         if self.storage.session is None:
             raise AttributeError()
 
@@ -311,6 +312,7 @@ class GCloudFileStorageManager(FileStorageManager):
             return call
 
     async def append(self, dm: FileDataManager, iterable, offset) -> int:
+
         count = 0
 
         async for chunk in iterable:

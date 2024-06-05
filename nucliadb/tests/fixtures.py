@@ -58,6 +58,7 @@ from nucliadb_telemetry.settings import (
     LogOutputType,
     LogSettings,
 )
+from nucliadb_utils.settings import FileBackendConfig
 from nucliadb_utils.storages.settings import settings as storage_settings
 from nucliadb_utils.tests import free_port
 from nucliadb_utils.utilities import (
@@ -131,7 +132,12 @@ def tmpdir():
 
 @pytest.fixture(scope="function")
 async def nucliadb(
-    dummy_processing, analytics_disabled, driver_settings, storage_settings, tmpdir, learning_config
+    dummy_processing,
+    analytics_disabled,
+    maindb_settings,
+    blobstorage_settings,
+    tmpdir,
+    learning_config,
 ):
     from nucliadb.common.cluster import manager
 
@@ -140,12 +146,8 @@ async def nucliadb(
     # we need to force DATA_PATH updates to run every test on the proper
     # temporary directory
     data_path = f"{tmpdir}/node"
-    local_files = f"{tmpdir}/blob"
     os.environ["DATA_PATH"] = data_path
-
     settings = Settings(
-        file_backend="local",
-        local_files=local_files,
         data_path=data_path,
         http_port=free_port(),
         ingest_grpc_port=free_port(),
@@ -153,8 +155,8 @@ async def nucliadb(
         standalone_node_port=free_port(),
         log_format_type=LogFormatType.PLAIN,
         log_output_type=LogOutputType.FILE,
-        **driver_settings.dict(),
-        **storage_settings.dict(),
+        **maindb_settings.dict(),
+        **blobstorage_settings,
     )
 
     config_nucliadb(settings)
@@ -528,7 +530,7 @@ async def redis_config(redis):
 
 
 @pytest.fixture(scope="function")
-def local_driver_settings(tmpdir):
+def local_maindb_settings(tmpdir):
     return DriverSettings(
         driver=DriverConfig.LOCAL,
         driver_local_url=f"{tmpdir}/main",
@@ -536,8 +538,8 @@ def local_driver_settings(tmpdir):
 
 
 @pytest.fixture(scope="function")
-async def local_driver(local_driver_settings) -> AsyncIterator[Driver]:
-    path = local_driver_settings.driver_local_url
+async def local_driver(local_maindb_settings) -> AsyncIterator[Driver]:
+    path = local_maindb_settings.driver_local_url
     ingest_settings.driver = DriverConfig.LOCAL
     ingest_settings.driver_local_url = path
 
@@ -553,7 +555,7 @@ async def local_driver(local_driver_settings) -> AsyncIterator[Driver]:
 
 
 @pytest.fixture(scope="function")
-def tikv_driver_settings(tikvd):
+def tikv_maindb_settings(tikvd):
     if os.environ.get("TESTING_TIKV_LOCAL", None):
         url = "localhost:2379"
     else:
@@ -573,8 +575,8 @@ def tikv_driver_settings(tikvd):
 
 
 @pytest.fixture(scope="function")
-async def tikv_driver(tikv_driver_settings) -> AsyncIterator[Driver]:
-    url = tikv_driver_settings.driver_tikv_url
+async def tikv_driver(tikv_maindb_settings) -> AsyncIterator[Driver]:
+    url = tikv_maindb_settings.driver_tikv_url
     ingest_settings.driver = DriverConfig.TIKV
     ingest_settings.driver_tikv_url = url
 
@@ -589,7 +591,7 @@ async def tikv_driver(tikv_driver_settings) -> AsyncIterator[Driver]:
 
 
 @pytest.fixture(scope="function")
-def redis_driver_settings(redis):
+def redis_maindb_settings(redis):
     return DriverSettings(
         driver=DriverConfig.REDIS,
         driver_redis_url=f"redis://{redis[0]}:{redis[1]}",
@@ -597,8 +599,8 @@ def redis_driver_settings(redis):
 
 
 @pytest.fixture(scope="function")
-async def redis_driver(redis_driver_settings) -> AsyncIterator[RedisDriver]:
-    url = redis_driver_settings.driver_redis_url
+async def redis_driver(redis_maindb_settings) -> AsyncIterator[RedisDriver]:
+    url = redis_maindb_settings.driver_redis_url
     ingest_settings.driver = DriverConfig.REDIS
     ingest_settings.driver_redis_url = url
 
@@ -619,7 +621,7 @@ async def redis_driver(redis_driver_settings) -> AsyncIterator[RedisDriver]:
 
 
 @pytest.fixture(scope="function")
-def pg_driver_settings(pg):
+def pg_maindb_settings(pg):
     url = f"postgresql://postgres:postgres@{pg[0]}:{pg[1]}/postgres"
     return DriverSettings(
         driver=DriverConfig.PG,
@@ -628,8 +630,8 @@ def pg_driver_settings(pg):
 
 
 @pytest.fixture(scope="function")
-async def pg_driver(pg_driver_settings):
-    url = pg_driver_settings.driver_pg_url
+async def pg_driver(pg_maindb_settings):
+    url = pg_maindb_settings.driver_pg_url
     ingest_settings.driver = DriverConfig.PG
     ingest_settings.driver_pg_url = url
 
@@ -649,16 +651,16 @@ DROP table IF EXISTS resources;
     ingest_settings.driver_pg_url = None
 
 
-def driver_settings_lazy_fixtures(default_drivers="local"):
+def maindb_settings_lazy_fixtures(default_drivers="local"):
     driver_types = os.environ.get("TESTING_MAINDB_DRIVERS", default_drivers)
     return [
-        lazy_fixture.lf(f"{driver_type}_driver_settings")
+        lazy_fixture.lf(f"{driver_type}_maindb_settings")
         for driver_type in driver_types.split(",")
     ]
 
 
-@pytest.fixture(scope="function", params=driver_settings_lazy_fixtures())
-def driver_settings(request):
+@pytest.fixture(scope="function", params=maindb_settings_lazy_fixtures())
+def maindb_settings(request):
     """
     Allows dynamically loading the driver fixtures via env vars.
 
@@ -669,21 +671,50 @@ def driver_settings(request):
     yield request.param
 
 
-def storage_settings_lazy_fixtures(default_drivers="local"):
+@pytest.fixture(scope="function")
+def gcs_storage_settings(gcs):
+    return {
+        "file_backend": FileBackendConfig.GCS,
+        "gcs_endpoint_url": gcs,
+        "gcs_bucket": "test_{kbid}",
+    }
+
+
+@pytest.fixture(scope="function")
+def s3_storage_settings(s3):
+    return {
+        "file_backend": FileBackendConfig.S3,
+        "s3_endpoint": s3,
+        "s3_client_id": "",
+        "s3_client_secret": "",
+        "s3_bucket": "test-{kbid}",
+    }
+
+
+@pytest.fixture(scope="function")
+def local_storage_settings(tmpdir):
+    return {
+        "file_backend": FileBackendConfig.LOCAL,
+        "local_files": f"{tmpdir}/blob",
+    }
+
+
+def storage_settings_lazy_fixtures(default_drivers="gcs"):
     driver_types = os.environ.get("STORAGE_DRIVER", default_drivers)
     return [
-        lazy_fixture.lf(f"{driver_type}_driver_settings")
+        lazy_fixture.lf(f"{driver_type}_storage_settings")
         for driver_type in driver_types.split(",")
     ]
 
 
 @pytest.fixture(scope="function", params=storage_settings_lazy_fixtures())
-def storage_settings(request):
+def blobstorage_settings(request):
     """
     Allows dynamically loading the storage fixtures via env vars.
 
     STORAGE_DRIVER=local,gcs,s3 pytest nucliadb/nucliadb/tests/
     """
+    yield request.param
 
 
 def driver_lazy_fixtures(default_drivers: str = "redis"):

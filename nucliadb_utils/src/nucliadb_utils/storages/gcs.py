@@ -26,7 +26,7 @@ import socket
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from datetime import datetime
-from typing import AsyncGenerator, AsyncIterator, Dict, List, Optional
+from typing import Any, AsyncGenerator, AsyncIterator, Dict, List, Optional, cast
 from urllib.parse import quote_plus
 
 import aiohttp
@@ -200,8 +200,8 @@ class GCSStorageField(StorageField):
         headers = await self.storage.get_access_headers()
         if range_start is not None or range_end is not None:
             headers["Range"] = "bytes={start}-{end}".format(
-                start=range_start or "",
-                end=range_end or "",
+                start=str(range_start or 0),
+                end=str(range_end) if range_end is not None else "",
             )
         key = self.field.uri if self.field else self.key
         if self.field is None:
@@ -439,18 +439,8 @@ class GCSStorageField(StorageField):
         async with self.storage.session.get(url, headers=headers) as api_resp:
             if api_resp.status == 200:
                 data = await api_resp.json()
-                metadata = data.get("metadata") or {}
-                metadata = {k.lower(): v for k, v in metadata.items()}
-                size = metadata.get("size") or data.get("size") or 0
-                content_type = (
-                    metadata.get("content_type") or data.get("contentType") or ""
-                )
-                filename = metadata.get("filename") or key.split("/")[-1]
-                return ObjectMetadata(
-                    filename=filename,
-                    size=int(size),
-                    content_type=content_type,
-                )
+                data = cast(dict[str, Any], data)
+                return parse_object_metadata(data, key)
             else:
                 return None
 
@@ -754,3 +744,31 @@ class GCSStorage(Storage):
                 for item in items:
                     yield ObjectInfo(name=item["name"])
                 page_token = data.get("nextPageToken")
+
+
+def parse_object_metadata(object_data: dict[str, Any], key: str) -> ObjectMetadata:
+    custom_metadata: dict[str, str] = object_data.get("metadata") or {}
+    # Lowercase all keys for backwards compatibility with old custom metadata
+    custom_metadata = {k.lower(): v for k, v in custom_metadata.items()}
+
+    # Parse size
+    custom_size = custom_metadata.get("size")
+    if not custom_size or custom_size == "0":
+        data_size = object_data.get("size")
+        size = int(data_size) if data_size else 0
+    else:
+        size = int(custom_size)
+
+    # Parse content-type
+    content_type = (
+        custom_metadata.get("content_type") or object_data.get("contentType") or ""
+    )
+
+    # Parse filename
+    filename = custom_metadata.get("filename") or key.split("/")[-1]
+
+    return ObjectMetadata(
+        filename=filename,
+        size=int(size),
+        content_type=content_type,
+    )
