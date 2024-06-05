@@ -126,9 +126,3 @@ def get_storage_manager() -> FileStorageManager:
     if DRIVER is None:
         raise ManagerNotAvailable()
     return DRIVER.manager
-
-
-def clear_storage():
-    global DRIVER
-
-    DRIVER = None

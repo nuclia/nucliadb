@@ -27,10 +27,9 @@ from pytest_lazy_fixtures import lazy_fixture
 from redis import asyncio as aioredis
 
 from nucliadb.ingest.tests.fixtures import IngestFixture
-from nucliadb.writer import API_PREFIX
+from nucliadb.writer import API_PREFIX, tus
 from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX
 from nucliadb.writer.settings import settings
-from nucliadb.writer.tus import clear_storage
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.settings import (
     FileBackendConfig,
@@ -90,7 +89,7 @@ async def writer_api(
     yield make_client_fixture
 
     await application.router.shutdown()
-    clear_storage()
+    await tus.finalize()
 
     await driver.flushall()
     await driver.close(close_connection_pool=True)

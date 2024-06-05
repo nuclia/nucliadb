@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import os
+from typing import Any
 import uuid
 
 import aiofiles
@@ -48,19 +49,24 @@ class LocalFileStorageManager(FileStorageManager):
         bucket = self.storage.get_bucket_name(kbid)
         upload_file_id = dm.get("upload_file_id", str(uuid.uuid4()))
         init_url = self.get_file_path(bucket, upload_file_id)
-        metadata_init_url = self.metadata_key(init_url)
         metadata = {
             "FILENAME": dm.filename,
             "CONTENT_TYPE": dm.content_type,
             "SIZE": dm.size,
         }
-        async with aiofiles.open(metadata_init_url, "w+") as resp:
-            await resp.write(json.dumps(metadata))
+        await self.set_metadata(kbid, upload_file_id, metadata)
 
         async with aiofiles.open(init_url, "wb+") as aio_fi:
             await aio_fi.write(b"")
 
         await dm.update(upload_file_id=upload_file_id, path=path, bucket=bucket)
+
+    async def set_metadata(self, kbid: str, upload_file_id: str, metadata: dict[str, Any]):
+        bucket = self.storage.get_bucket_name(kbid)
+        init_url = self.get_file_path(bucket, upload_file_id)
+        metadata_init_url = self.metadata_key(init_url)
+        async with aiofiles.open(metadata_init_url, "w+") as resp:
+            await resp.write(json.dumps(metadata))
 
     async def append(self, dm: FileDataManager, iterable, offset) -> int:
         count = 0
