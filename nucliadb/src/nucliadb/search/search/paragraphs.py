@@ -235,7 +235,7 @@ def highlight_paragraph(
                     marks[start] = 1
                     marks[end] = 2
             except re.error:
-                logger.warning(
+                logger.info(
                     f"Regex errors while highlighting text. Regex: {quote_regex}"
                 )
                 continue

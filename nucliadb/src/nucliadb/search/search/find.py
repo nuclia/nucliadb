@@ -140,7 +140,7 @@ async def find(
             },
         )
     elif search_time > settings.slow_find_log_threshold:
-        logger.warning(
+        logger.info(
             "Slow find query",
             extra={
                 "kbid": kbid,
