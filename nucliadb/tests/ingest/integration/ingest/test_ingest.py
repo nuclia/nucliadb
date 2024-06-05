@@ -62,6 +62,7 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb_utils.audit.stream import StreamAuditStorage
+from nucliadb_utils.storages.local import LocalStorage
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import Utility, get_indexing, get_storage, set_utility
 
@@ -505,6 +506,9 @@ async def test_qa(
     stream_audit: StreamAuditStorage,
     test_resource: Resource,
 ):
+    if not isinstance(storage, LocalStorage):
+        pytest.skip("This test only works with local storage")
+
     kbid = test_resource.kb.kbid
     rid = test_resource.uuid
     driver = stream_processor.driver

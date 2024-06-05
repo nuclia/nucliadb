@@ -297,7 +297,6 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
     async def normalize_binary(
         self, file: CloudFile, destination: StorageField
     ):  # pragma: no cover
-        breakpoint()
         if file.source == self.source and file.uri != destination.key:
             # This MAY BE the case for NucliaDB hosted deployment (Nuclia's cloud deployment):
             # The data has been pushed to the bucket but with a different key.

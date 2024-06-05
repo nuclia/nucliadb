@@ -22,14 +22,6 @@ import os
 import pytest
 from pytest_lazy_fixtures import lazy_fixture
 
-pytest_plugins = [
-    "pytest_docker_fixtures",
-    "nucliadb_utils.tests.gcs",
-    "nucliadb_utils.tests.nats",
-    "nucliadb_utils.tests.s3",
-    "nucliadb_utils.tests.local",
-]
-
 
 def get_testing_storage_backend(default="gcs"):
     return os.environ.get("TESTING_STORAGE_BACKEND", default)
@@ -41,6 +33,8 @@ def lazy_storage_fixture():
         return [lazy_fixture.lf("gcs_storage")]
     elif backend == "s3":
         return [lazy_fixture.lf("s3_storage")]
+    elif backend == "local":
+        return [lazy_fixture.lf("local_storage")]
     else:
         print(f"Unknown storage backend {backend}, using gcs")
         return [lazy_fixture.lf("gcs_storage")]
