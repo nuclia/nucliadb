@@ -131,7 +131,7 @@ def tmpdir():
 
 @pytest.fixture(scope="function")
 async def nucliadb(
-    dummy_processing, analytics_disabled, driver_settings, tmpdir, learning_config
+    dummy_processing, analytics_disabled, driver_settings, storage_settings, tmpdir, learning_config
 ):
     from nucliadb.common.cluster import manager
 
@@ -154,6 +154,7 @@ async def nucliadb(
         log_format_type=LogFormatType.PLAIN,
         log_output_type=LogOutputType.FILE,
         **driver_settings.dict(),
+        **storage_settings.dict(),
     )
 
     config_nucliadb(settings)
@@ -666,6 +667,23 @@ def driver_settings(request):
     Any test using the nucliadb fixture will be run twice, once with redis driver and once with local driver.
     """
     yield request.param
+
+
+def storage_settings_lazy_fixtures(default_drivers="local"):
+    driver_types = os.environ.get("STORAGE_DRIVER", default_drivers)
+    return [
+        lazy_fixture.lf(f"{driver_type}_driver_settings")
+        for driver_type in driver_types.split(",")
+    ]
+
+
+@pytest.fixture(scope="function", params=storage_settings_lazy_fixtures())
+def storage_settings(request):
+    """
+    Allows dynamically loading the storage fixtures via env vars.
+
+    STORAGE_DRIVER=local,gcs,s3 pytest nucliadb/nucliadb/tests/
+    """
 
 
 def driver_lazy_fixtures(default_drivers: str = "redis"):
