@@ -196,8 +196,8 @@ class GCSStorageField(StorageField):
         assert self.storage.session is not None
 
         headers = await self.storage.get_access_headers()
-        if range.start is not None or range.end is not None:
-            headers["Range"] = f"bytes={range.start or 0}-{range.end or ''}"
+        if range.any():
+            headers["Range"] = range.to_header()
         key = self.field.uri if self.field else self.key
         if self.field is None:
             bucket = self.bucket

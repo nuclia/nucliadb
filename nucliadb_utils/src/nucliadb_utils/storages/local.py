@@ -104,6 +104,7 @@ class LocalStorageField(StorageField):
                 chunk_size = CHUNK_SIZE
                 if bytes_to_read is not None:
                     if bytes_read >= bytes_to_read:
+                        # Reached the end of the range
                         break
                     chunk_size = min(CHUNK_SIZE, bytes_to_read)
 

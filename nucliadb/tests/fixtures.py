@@ -699,7 +699,7 @@ def local_storage_settings(tmpdir):
     }
 
 
-def blobstorage_settings_lazy_fixtures(default_drivers="gcs"):
+def blobstorage_settings_lazy_fixtures(default_drivers="local"):
     driver_types = os.environ.get("TESTING_STORAGE_BACKEND", default_drivers)
     return [
         lazy_fixture.lf(f"{driver_type}_storage_settings")

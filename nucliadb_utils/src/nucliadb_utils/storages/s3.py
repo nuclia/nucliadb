@@ -89,10 +89,9 @@ class S3StorageField(StorageField):
         range: Optional[Range] = None,
     ):
         range = range or Range()
-        if range.start is not None or range.end is not None:
-            s3_range = f"bytes={range.start or 0}-{range.end or ''}"
+        if range.any():
             coro = self.storage._s3aioclient.get_object(
-                Bucket=bucket, Key=uri, Range=s3_range
+                Bucket=bucket, Key=uri, Range=range.to_header()
             )
         else:
             coro = self.storage._s3aioclient.get_object(Bucket=bucket, Key=uri)

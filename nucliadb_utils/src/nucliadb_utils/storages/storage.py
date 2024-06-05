@@ -73,8 +73,18 @@ class ObjectMetadata(BaseModel):
 
 @dataclass
 class Range:
+    """
+    Represents a range of bytes to be downloaded from a file. The range is inclusive.
+    The start and end values are 0-based.
+    """
     start: Optional[int] = None
     end: Optional[int] = None
+
+    def any(self) -> bool:
+        return self.start is not None or self.end is not None
+
+    def to_header(self) -> str:
+        return f"bytes={self.start or 0}-{self.end or ''}"
 
 
 class StorageField(abc.ABC, metaclass=abc.ABCMeta):
@@ -286,6 +296,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
     async def normalize_binary(
         self, file: CloudFile, destination: StorageField
     ):  # pragma: no cover
+        breakpoint()
         if file.source == self.source and file.uri != destination.key:
             # This MAY BE the case for NucliaDB hosted deployment (Nuclia's cloud deployment):
             # The data has been pushed to the bucket but with a different key.

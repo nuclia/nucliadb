@@ -21,6 +21,7 @@ import base64
 from io import BytesIO
 
 import pytest
+from pytest_lazy_fixtures import lazy_fixture
 
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_PREFIX
 from nucliadb.writer.settings import settings as writer_settings
@@ -39,9 +40,28 @@ def header_encode(some_string):
     return base64.b64encode(some_string.encode()).decode()
 
 
+@pytest.fixture(
+    scope="function",
+    params=[
+        lazy_fixture.lf("gcs_storage_settings"),
+        lazy_fixture.lf("s3_storage_settings"),
+        lazy_fixture.lf("local_storage_settings"),
+    ],
+)
+def blobstorage_settings(request):
+    """
+    Fixture to parametrize the tests with different storage backends
+    """
+    yield request.param
+
+
 @pytest.mark.asyncio
 async def test_file_tus_upload_and_download(
-    configure_redis_dm, nucliadb_writer, nucliadb_reader, knowledgebox_one
+    blobstorage_settings,
+    configure_redis_dm,
+    nucliadb_writer,
+    nucliadb_reader,
+    knowledgebox_one,
 ):
     language = "ca"
     filename = "image.jpg"
