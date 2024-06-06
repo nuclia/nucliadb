@@ -67,8 +67,6 @@ fn open_vectors_reader(version: u32, path: &Path) -> NodeResult<VectorsReaderPoi
 }
 fn open_paragraphs_reader(version: u32, path: &Path) -> NodeResult<ParagraphsReaderPointer> {
     match version {
-        2 => nucliadb_paragraphs2::reader::ParagraphReaderService::open(path)
-            .map(|i| Box::new(i) as ParagraphsReaderPointer),
         3 => nucliadb_paragraphs3::reader::ParagraphReaderService::open(path)
             .map(|i| Box::new(i) as ParagraphsReaderPointer),
         v => Err(node_error!("Invalid paragraphs version {v}")),
@@ -364,8 +362,7 @@ impl ShardReader {
 
         // Prefilter to apply field label filters
         if let Some(filter) = &mut request.filter {
-            // nucliadb_paragraphs2 has all the labels and doesn't need a prefilter
-            if !filter.field_labels.is_empty() && suggest_paragraphs && self.versions.paragraphs != 2 {
+            if !filter.field_labels.is_empty() && suggest_paragraphs {
                 let labels = std::mem::take(&mut filter.field_labels);
                 let operands = labels.into_iter().map(BooleanExpression::Literal).collect();
                 let op = BooleanOperation {
