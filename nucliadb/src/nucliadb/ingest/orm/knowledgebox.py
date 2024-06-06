@@ -70,30 +70,6 @@ class KnowledgeBox:
         self._config: Optional[KnowledgeBoxConfig] = None
 
     @classmethod
-    async def delete_kb(cls, txn: Transaction, kbid: str):
-        # Mark storage to be deleted
-        # Mark keys to be deleted
-        kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
-        if kb_config is None:
-            # consider KB as deleted
-            return
-        slug = kb_config.slug
-
-        # Delete main anchor
-        async with txn.driver.transaction() as subtxn:
-            key_match = datamanagers.kb.KB_SLUGS.format(slug=slug)
-            await subtxn.delete(key_match)
-
-            when = datetime.now().isoformat()
-            await subtxn.set(KB_TO_DELETE.format(kbid=kbid), when.encode())
-            await subtxn.commit()
-
-        audit_util = get_audit()
-        if audit_util is not None:
-            await audit_util.delete_kb(kbid)
-        return kbid
-
-    @classmethod
     async def create(
         cls,
         txn: Transaction,
@@ -200,6 +176,30 @@ class KnowledgeBox:
         await datamanagers.kb.set_config(txn, kbid=uuid, config=exist)
 
         return uuid
+
+    @classmethod
+    async def delete_kb(cls, txn: Transaction, kbid: str):
+        # Mark storage to be deleted
+        # Mark keys to be deleted
+        kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
+        if kb_config is None:
+            # consider KB as deleted
+            return
+        slug = kb_config.slug
+
+        # Delete main anchor
+        async with txn.driver.transaction() as subtxn:
+            key_match = datamanagers.kb.KB_SLUGS.format(slug=slug)
+            await subtxn.delete(key_match)
+
+            when = datetime.now().isoformat()
+            await subtxn.set(KB_TO_DELETE.format(kbid=kbid), when.encode())
+            await subtxn.commit()
+
+        audit_util = get_audit()
+        if audit_util is not None:
+            await audit_util.delete_kb(kbid)
+        return kbid
 
     @classmethod
     async def purge(cls, driver: Driver, kbid: str):
