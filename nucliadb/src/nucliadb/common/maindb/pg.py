@@ -26,6 +26,7 @@ import asyncpg
 import backoff
 
 from nucliadb.common.maindb.driver import DEFAULT_SCAN_LIMIT, Driver, Transaction
+from nucliadb_telemetry import metrics
 
 RETRIABLE_EXCEPTIONS = (
     asyncpg.CannotConnectNowError,
@@ -54,30 +55,36 @@ CREATE TABLE IF NOT EXISTS replication_commit (
 """
 
 
+pg_observer = metrics.Observer(
+    "pg_client",
+    labels={"type": ""},
+)
+
+
 class DataLayer:
     def __init__(self, connection: Union[asyncpg.Connection, asyncpg.Pool]):
         self.connection = connection
         self.lock = asyncio.Lock()
 
     async def get(self, key: str, select_for_update: bool = False) -> Optional[bytes]:
-        async with self.lock:
-            statement = "SELECT value FROM resources WHERE key = $1"
-            if select_for_update:
-                statement += " FOR UPDATE"
-            return await self.connection.fetchval(statement, key)
+        with pg_observer({"type": "get"}):
+            async with self.lock:
+                statement = "SELECT value FROM resources WHERE key = $1"
+                if select_for_update:
+                    statement += " FOR UPDATE"
+                return await self.connection.fetchval(statement, key)
 
     async def set(self, key: str, value: bytes) -> None:
-        async with self.lock:
-            await self.connection.execute(
-                """
-INSERT INTO resources (key, value)
-VALUES ($1, $2)
-ON CONFLICT (key)
-DO UPDATE SET value = EXCLUDED.value
-""",
-                key,
-                value,
-            )
+        with pg_observer({"type": "set"}):
+            async with self.lock:
+                await self.connection.execute(
+                    "INSERT INTO resources (key, value) "
+                    "VALUES ($1, $2) "
+                    "ON CONFLICT (key) "
+                    "DO UPDATE SET value = EXCLUDED.value",
+                    key,
+                    value,
+                )
 
     async def set_replication(self, key: str, value: bytes) -> int:
         async with self.lock:
@@ -97,8 +104,11 @@ DO UPDATE SET value = EXCLUDED.value
             )
 
     async def delete(self, key: str) -> None:
-        async with self.lock:
-            await self.connection.execute("DELETE FROM resources WHERE key = $1", key)
+        with pg_observer({"type": "delete"}):
+            async with self.lock:
+                await self.connection.execute(
+                    "DELETE FROM resources WHERE key = $1", key
+                )
 
     async def delete_replication(self, key: str) -> int:
         async with self.lock:
@@ -112,16 +122,17 @@ DO UPDATE SET value = EXCLUDED.value
     async def batch_get(
         self, keys: list[str], select_for_update: bool = False
     ) -> list[Optional[bytes]]:
-        async with self.lock:
-            statement = "SELECT key, value FROM resources WHERE key = ANY($1)"
-            if select_for_update:
-                statement += " FOR UPDATE"
-            records = {
-                record["key"]: record["value"]
-                for record in await self.connection.fetch(statement, keys)
-            }
-        # get sorted by keys
-        return [records.get(key) for key in keys]
+        with pg_observer({"type": "batch_get"}):
+            async with self.lock:
+                statement = "SELECT key, value FROM resources WHERE key = ANY($1)"
+                if select_for_update:
+                    statement += " FOR UPDATE"
+                records = {
+                    record["key"]: record["value"]
+                    for record in await self.connection.fetch(statement, keys)
+                }
+            # get sorted by keys
+            return [records.get(key) for key in keys]
 
     async def scan_keys(
         self,
@@ -129,26 +140,26 @@ DO UPDATE SET value = EXCLUDED.value
         limit: int = DEFAULT_SCAN_LIMIT,
         include_start: bool = True,
     ) -> AsyncGenerator[str, None]:
-        query = """SELECT key FROM resources
-WHERE key LIKE $1
-ORDER BY key
-"""
+        query = "SELECT key FROM resources WHERE key LIKE $1 ORDER BY key"
+
         args: list[Any] = [prefix + "%"]
         if limit > 0:
             query += " LIMIT $2"
             args.append(limit)
-        async with self.lock:
-            async for record in self.connection.cursor(query, *args):
-                if not include_start and record["key"] == prefix:
-                    continue
-                yield record["key"]
+        with pg_observer({"type": "scan_keys"}):
+            async with self.lock:
+                async for record in self.connection.cursor(query, *args):
+                    if not include_start and record["key"] == prefix:
+                        continue
+                    yield record["key"]
 
     async def count(self, match: str) -> int:
-        async with self.lock:
-            results = await self.connection.fetch(
-                "SELECT count(*) FROM resources WHERE key LIKE $1", match + "%"
-            )
-        return results[0]["count"]
+        with pg_observer({"type": "count"}):
+            async with self.lock:
+                results = await self.connection.fetch(
+                    "SELECT count(*) FROM resources WHERE key LIKE $1", match + "%"
+                )
+            return results[0]["count"]
 
 
 class PGTransaction(Transaction):
@@ -170,24 +181,26 @@ class PGTransaction(Transaction):
         self._lock = asyncio.Lock()
 
     async def abort(self):
-        async with self._lock:
-            if self.open:
+        with pg_observer({"type": "rollback"}):
+            async with self._lock:
+                if self.open:
+                    try:
+                        await self.txn.rollback()
+                    finally:
+                        self.open = False
+                        await self.connection.close()
+
+    async def commit(self):
+        with pg_observer({"type": "commit"}):
+            async with self._lock:
                 try:
+                    await self.txn.commit()
+                except Exception:
                     await self.txn.rollback()
+                    raise
                 finally:
                     self.open = False
                     await self.connection.close()
-
-    async def commit(self):
-        async with self._lock:
-            try:
-                await self.txn.commit()
-            except Exception:
-                await self.txn.rollback()
-                raise
-            finally:
-                self.open = False
-                await self.connection.close()
 
     async def create_replication_commit(self, replication_ops: List[int]):
         return await self.data_layer.create_replication_commit(replication_ops)
@@ -315,6 +328,7 @@ class PGDriver(Driver):
             return ReadOnlyPGTransaction(self.pool, driver=self)
         else:
             conn: asyncpg.Connection = await self.pool.acquire()
-            txn = conn.transaction()
-            await txn.start()
-            return PGTransaction(self.pool, conn, txn, driver=self)
+            with pg_observer({"type": "begin"}):
+                txn = conn.transaction()
+                await txn.start()
+                return PGTransaction(self.pool, conn, txn, driver=self)
