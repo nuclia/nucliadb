@@ -13,16 +13,16 @@ flag_management:
   default_rules: # the rules that will be followed for any flag added, generally
     carryforward: true # needed for monorepos: total coverage is not uploaded at every commit.
   individual_flags:
-    - name: one
+    - name: standalone
       paths:
-        - nucliadb/nucliadb/one/**
+        - nucliadb/src/nucliadb/standalone/**
       carryforward: true
       statuses:
         - type: project
           target: 80%
     - name: ingest
       paths:
-        - nucliadb/nucliadb/ingest/**
+        - nucliadb/src/nucliadb/ingest/**
       carryforward: true
       statuses:
         - type: project
@@ -36,7 +36,7 @@ flag_management:
           target: 80%
     - name: train
       paths:
-        - nucliadb/nucliadb/train/**
+        - nucliadb/src/nucliadb/train/**
       carryforward: true
       statuses:
         - type: project
@@ -50,42 +50,42 @@ flag_management:
           target: 78%
     - name: search
       paths:
-        - nucliadb/nucliadb/search/**
+        - nucliadb/src/nucliadb/search/**
       carryforward: true
       statuses:
         - type: project
           target: 74%
     - name: writer
       paths:
-        - nucliadb/nucliadb/writer/**
+        - nucliadb/src/nucliadb/writer/**
       carryforward: true
       statuses:
         - type: project
           target: 83%
     - name: reader
       paths:
-        - nucliadb/nucliadb/reader/**
+        - nucliadb/src/nucliadb/reader/**
       carryforward: true
       statuses:
         - type: project
           target: 60%
     - name: sdk
       paths:
-        - nucliadb_sdk/nucliadb_sdk/**
+        - nucliadb_sdk/src/nucliadb_sdk/**
       carryforward: true
       statuses:
         - type: project
           target: 38%
     - name: dataset
       paths:
-        - nucliadb_dataset/nucliadb_dataset/**
+        - nucliadb_dataset/src/nucliadb_dataset/**
       carryforward: true
       statuses:
         - type: project
           target: 60%
     - name: node-sidecar
       paths:
-        - nucliadb_node/nucliadb_node/**
+        - nucliadb_sidecar/src/nucliadb_sidecar/**
       carryforward: true
       statuses:
         - type: project
