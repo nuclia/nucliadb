@@ -160,7 +160,7 @@ class Gnatsd(object):
         if self.proc.returncode is not None:
             if self.debug:
                 print(
-                    "[\033[0;31mDEBUG\033[0;0m] Server listening on port {port} finished running already with exit {ret}".format(
+                    "[\033[0;31mDEBUG\033[0;0m] Server listening on port {port} finished running already with exit {ret}".format(  # noqa: E501
                         port=self.port, ret=self.proc.returncode
                     )
                 )
@@ -195,7 +195,7 @@ def start_gnatsd(gnatsd: Gnatsd):  # pragma: no cover
             response = httpclient.getresponse()
             if response.status == 200:
                 break
-        except:
+        except Exception:
             retries += 1
             time.sleep(0.1)
 
@@ -250,7 +250,7 @@ class NatsImage(BaseImage):  # pragma: no cover
         try:
             s.connect((self.host, int(self.get_port())))
             return True
-        except:
+        except Exception:
             return False
 
 

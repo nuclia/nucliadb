@@ -19,4 +19,8 @@ ignore = [
 exclude = [
     "*.pyi",
     "nucliadb_protos/python/*",
+    "src/nucliadb_telemetry/tests/grpc/hellostreamingworld_pb2_grpc.py",
+    "src/nucliadb_telemetry/tests/grpc/helloworld_pb2_grpc.py",
+    "src/nucliadb_telemetry/tests/grpc/hellostreamingworld_pb2.py",
+    "src/nucliadb_telemetry/tests/grpc/helloworld_pb2.py",
 ]

@@ -262,8 +262,8 @@ class OpenTelemetryMiddleware:
     requests it is invoked with.
     Args:
         app: The ASGI application callable to forward requests to.
-        default_span_details: Callback which should return a string and a tuple, representing the desired default span name and a
-                      dictionary with any additional span attributes to set.
+        default_span_details: Callback which should return a string and a tuple, representing the desired default
+                      span name and a dictionary with any additional span attributes to set.
                       Optional: Defaults to get_default_span_details.
         server_request_hook: Optional callback which is called with the server span and ASGI
                       scope object for every incoming request.
