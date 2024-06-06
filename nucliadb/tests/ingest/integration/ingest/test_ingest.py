@@ -395,7 +395,7 @@ async def test_ingest_audit_stream_files_only(
 
     # Minimal assert to make sure we get the information from the node on the audit
     # gets from the sidecar to the audit report when adding or modifying a resource
-    # The values are hardcoded on nucliadb/nucliadb/ingest/orm/grpc_node_dummy.py
+    # The values are hardcoded on nucliadb/src/nucliadb/ingest/orm/grpc_node_dummy.py
 
     assert auditreq.kbid == knowledgebox_ingest
     assert auditreq.rid == rid
@@ -427,7 +427,7 @@ async def test_ingest_audit_stream_files_only(
 
     # Minimal assert to make sure we get the information from the node on the audit
     # gets from the sidecar to the audit report when adding or modifying a resource
-    # The values are hardcoded on nucliadb/nucliadb/ingest/orm/grpc_node_dummy.py
+    # The values are hardcoded on nucliadb/src/nucliadb/ingest/orm/grpc_node_dummy.py
 
     assert auditreq.kbid == knowledgebox_ingest
     assert auditreq.rid == rid
@@ -447,7 +447,7 @@ async def test_ingest_audit_stream_files_only(
 
     # Minimal assert to make sure we get the information from the node on the audit
     # gets from the sidecar to the audit report when adding or modifying a resource
-    # The values are hardcoded on nucliadb/nucliadb/ingest/orm/grpc_node_dummy.py
+    # The values are hardcoded on nucliadb/src/nucliadb/ingest/orm/grpc_node_dummy.py
 
     assert auditreq.kbid == knowledgebox_ingest
     assert auditreq.rid == rid
@@ -594,7 +594,7 @@ async def test_ingest_audit_stream_mixed(
 
     # Minimal assert to make sure we get the information from the node on the audit
     # gets from the sidecar to the audit report when adding or modifying a resource
-    # The values are hardcoded on nucliadb/nucliadb/ingest/orm/grpc_node_dummy.py
+    # The values are hardcoded on nucliadb/src/nucliadb/ingest/orm/grpc_node_dummy.py
 
     assert auditreq.kbid == kbid
     assert auditreq.rid == rid

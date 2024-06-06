@@ -118,7 +118,7 @@ build-sidecar:
 
 
 debug-test-nucliadb:
-	RUST_BACKTRACE=1 RUST_LOG=nucliadb_node=DEBUG,nucliadb_paragraphs_tantivy=DEBUG,nucliadb_fields_tantivy=DEBUG pytest nucliadb/nucliadb -sxv
+	RUST_BACKTRACE=1 RUST_LOG=nucliadb_node=DEBUG,nucliadb_paragraphs_tantivy=DEBUG,nucliadb_fields_tantivy=DEBUG pytest nucliadb/tests -sxv
 
 debug-run-nucliadb:
 	RUST_BACKTRACE=1 MAX_RECEIVE_MESSAGE_LENGTH=1024 RUST_LOG=nucliadb_node=DEBUG,nucliadb_paragraphs_tantivy=DEBUG,nucliadb_fields_tantivy=DEBUG nucliadb --maindb=data/maindb --blob=data/blob --node=data/node --zone=europe-1 --log=DEBUG

@@ -80,7 +80,7 @@ $(test_cov_subpackages_targets):
 # Generic implicit rules
 
 format-%:
-	cd .. && isort --profile black nucliadb/nucliadb/$*
+	cd .. && isort --profile black nucliadb/src/nucliadb/$*
 	black nucliadb/$*
 	ruff check --fix nucliadb/$* --config=../ruff.toml
 
