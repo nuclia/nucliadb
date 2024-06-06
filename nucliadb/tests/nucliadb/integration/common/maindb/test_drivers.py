@@ -21,11 +21,9 @@ import asyncio
 import os
 from unittest.mock import patch
 
-import asyncpg
 import pytest
 
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.common.maindb.redis import RedisDriver
 from nucliadb.common.maindb.tikv import TiKVDriver
 
@@ -81,22 +79,6 @@ async def test_tikv_driver_against_restarts(tikvd):
             # after server is restarted, old connection is bad and connection needs
             # to be re-established but having many simultaneous requests should not stomp on each other
             await asyncio.gather(*[_runtest(i) for i in range(10)])
-
-
-@pytest.mark.skipif(
-    "pg" not in TESTING_MAINDB_DRIVERS, reason="pg not in TESTING_MAINDB_DRIVERS"
-)
-async def test_pg_driver(pg):
-    url = f"postgresql://postgres:postgres@{pg[0]}:{pg[1]}/postgres"
-    conn = await asyncpg.connect(url)
-    await conn.execute(
-        """
-DROP table IF EXISTS resources;
-"""
-    )
-    await conn.close()
-    driver = PGDriver(url=url)
-    await driver_basic(driver)
 
 
 @pytest.mark.skip(

@@ -37,6 +37,7 @@ from nucliadb_utils.storages.exceptions import UnparsableResponse
 from nucliadb_utils.storages.storage import (
     ObjectInfo,
     ObjectMetadata,
+    Range,
     Storage,
     StorageField,
 )
@@ -81,15 +82,21 @@ class S3StorageField(StorageField):
         jitter=backoff.random_jitter,
         max_tries=MAX_TRIES,
     )
-    async def _download(self, uri, bucket, **kwargs):
-        if "headers" in kwargs:
-            for key, value in kwargs["headers"].items():
-                kwargs[key] = value
-            del kwargs["headers"]
-        try:
-            return await self.storage._s3aioclient.get_object(
-                Bucket=bucket, Key=uri, **kwargs
+    async def _download(
+        self,
+        uri,
+        bucket,
+        range: Optional[Range] = None,
+    ):
+        range = range or Range()
+        if range.any():
+            coro = self.storage._s3aioclient.get_object(
+                Bucket=bucket, Key=uri, Range=range.to_header()
             )
+        else:
+            coro = self.storage._s3aioclient.get_object(Bucket=bucket, Key=uri)
+        try:
+            return await coro
         except botocore.exceptions.ClientError as e:
             error_code = parse_status_code(e)
             if error_code == 404:
@@ -97,18 +104,16 @@ class S3StorageField(StorageField):
             else:
                 raise
 
-    async def iter_data(self, **kwargs):
+    async def iter_data(
+        self, range: Optional[Range] = None
+    ) -> AsyncGenerator[bytes, None]:
         # Suports field and key based iter
         uri = self.field.uri if self.field else self.key
         if self.field is None:
             bucket = self.bucket
         else:
             bucket = self.field.bucket_name
-
-        downloader = await self._download(uri, bucket, **kwargs)
-
-        # we do not want to timeout ever from this...
-        # downloader['Body'].set_socket_timeout(999999)
+        downloader = await self._download(uri, bucket, range=range)
         stream = downloader["Body"]
         data = await stream.read(CHUNK_SIZE)
         while True:
@@ -116,13 +121,6 @@ class S3StorageField(StorageField):
                 break
             yield data
             data = await stream.read(CHUNK_SIZE)
-
-    async def read_range(self, start: int, end: int) -> AsyncGenerator[bytes, None]:
-        """
-        Iterate through ranges of data
-        """
-        async for chunk in self.iter_data(Range=f"bytes={start}-{end - 1}"):
-            yield chunk
 
     async def _abort_multipart(self):
         try:
@@ -296,18 +294,9 @@ class S3StorageField(StorageField):
 
         try:
             obj = await self.storage._s3aioclient.head_object(Bucket=bucket, Key=key)
-            if obj is not None:
-                metadata = obj.get("Metadata") or {}
-                size = metadata.get("size") or obj.get("ContentLength") or 0
-                content_type = (
-                    metadata.get("content_type") or obj.get("ContentType") or ""
-                )
-                filename = metadata.get("filename") or key.split("/")[-1]
-                return ObjectMetadata(
-                    size=int(size), content_type=content_type, filename=filename
-                )
-            else:
+            if obj is None:
                 return None
+            return parse_object_metadata(obj, key)
         except botocore.exceptions.ClientError as e:
             error_code = parse_status_code(e)
             if error_code == 404:
@@ -560,3 +549,21 @@ def parse_status_code(error: botocore.exceptions.ClientError) -> int:
         errors.capture_message(msg, "error", scope)
 
     raise UnparsableResponse(msg) from error
+
+
+def parse_object_metadata(obj: dict, key: str) -> ObjectMetadata:
+    custom_metadata = obj.get("Metadata") or {}
+    # Parse size
+    custom_size = custom_metadata.get("size")
+    if custom_size is None or custom_size == "0":
+        size = 0
+        content_lenght = obj.get("ContentLength")
+        if content_lenght is not None:
+            size = int(content_lenght)
+    else:
+        size = int(custom_size)
+    # Content type
+    content_type = custom_metadata.get("content_type") or obj.get("ContentType") or ""
+    # Filename
+    filename = custom_metadata.get("filename") or key.split("/")[-1]
+    return ObjectMetadata(size=size, content_type=content_type, filename=filename)

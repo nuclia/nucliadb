@@ -27,10 +27,9 @@ from pytest_lazy_fixtures import lazy_fixture
 from redis import asyncio as aioredis
 from tests.ingest.fixtures import IngestFixture
 
-from nucliadb.writer import API_PREFIX
+from nucliadb.writer import API_PREFIX, tus
 from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX
 from nucliadb.writer.settings import settings
-from nucliadb.writer.tus import clear_storage
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.settings import (
     FileBackendConfig,
@@ -90,7 +89,7 @@ async def writer_api(
     yield make_client_fixture
 
     await application.router.shutdown()
-    clear_storage()
+    await tus.finalize()
 
     await driver.flushall()
     await driver.close(close_connection_pool=True)
@@ -112,21 +111,12 @@ def s3_storage_writer(s3):
     storage_settings.s3_bucket = "test-{kbid}"
 
 
-@pytest.fixture(scope="function")
-def pg_storage_writer(pg):
-    storage_settings.file_backend = FileBackendConfig.PG
-    url = f"postgresql://postgres:postgres@{pg[0]}:{pg[1]}/postgres"
-    storage_settings.driver_pg_url = url
-
-
 def lazy_storage_writer_fixture():
     backend = get_testing_storage_backend()
     if backend == "gcs":
         return [lazy_fixture.lf("gcs_storage_writer")]
     elif backend == "s3":
         return [lazy_fixture.lf("s3_storage_writer")]
-    elif backend == "pg":
-        return [lazy_fixture.lf("pg_storage_writer")]
     else:
         print(f"Unknown storage backend {backend}, using gcs")
         return [lazy_fixture.lf("gcs_storage_writer")]

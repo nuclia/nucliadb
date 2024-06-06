@@ -51,7 +51,6 @@ http_settings = HTTPSettings()
 class FileBackendConfig(Enum):
     GCS = "gcs"
     S3 = "s3"
-    PG = "pg"
     LOCAL = "local"
     NOT_SET = "notset"  # setting not provided
 

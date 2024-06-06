@@ -20,18 +20,14 @@
 import tempfile
 import uuid
 
-import asyncpg
 import pytest
 
 from nucliadb.writer.settings import settings
 from nucliadb.writer.tus import get_dm
-from nucliadb.writer.tus.exceptions import CloudFileNotFound
 from nucliadb.writer.tus.gcs import GCloudBlobStore, GCloudFileStorageManager
 from nucliadb.writer.tus.local import LocalBlobStore, LocalFileStorageManager
-from nucliadb.writer.tus.pg import PGBlobStore, PGFileStorageManager
 from nucliadb.writer.tus.s3 import S3BlobStore, S3FileStorageManager
 from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
-from nucliadb_utils.storages.pg import PostgresStorage
 from nucliadb_utils.storages.storage import KB_RESOURCE_FIELD
 
 
@@ -78,27 +74,6 @@ async def local_storage_tus():
     folder.cleanup()
 
 
-@pytest.fixture(scope="function")
-async def pg_storage_tus(pg):
-    dsn = f"postgresql://postgres:postgres@{pg[0]}:{pg[1]}/postgres"
-    conn = await asyncpg.connect(dsn)
-    await conn.execute(
-        """
-DROP table IF EXISTS kb_files;
-DROP table IF EXISTS kb_files_fileparts;
-"""
-    )
-    await conn.close()
-    fstorage = PostgresStorage(dsn)  # set everything up
-    await fstorage.initialize()
-    await fstorage.finalize()
-
-    storage = PGBlobStore(dsn)
-    await storage.initialize()
-    yield storage
-    await storage.finalize()
-
-
 async def clean_dm():
     from nucliadb.writer.tus import REDIS_FILE_DATA_MANAGER_FACTORY
 
@@ -122,11 +97,6 @@ async def redis_dm(redis):
     await clean_dm()
 
     settings.dm_enabled = prev
-
-
-@pytest.mark.asyncio
-async def test_pg_driver(redis_dm, pg_storage_tus: PGBlobStore):
-    await storage_test(pg_storage_tus, PGFileStorageManager(pg_storage_tus))
 
 
 @pytest.mark.asyncio
@@ -161,12 +131,10 @@ async def storage_test(storage: BlobStore, file_storage_manager: FileStorageMana
         "mykb_tus_test",
     ]
 
-    if not isinstance(storage, PGBlobStore):
-        # this is silly, but we don't need this for pg
-        assert await storage.check_exists(bucket_name) is False
+    assert await storage.check_exists(bucket_name) is False
 
-        exists = await storage.create_bucket(bucket_name)
-        assert exists is False
+    exists = await storage.create_bucket(bucket_name)
+    assert exists is False
 
     upload_id = uuid.uuid4().hex
     dm = get_dm()
@@ -192,12 +160,4 @@ async def storage_test(storage: BlobStore, file_storage_manager: FileStorageMana
     await dm.update(offset=size)
     assert size == len(example)
     await file_storage_manager.finish(dm)
-
-    async for data in file_storage_manager.read_range(path, kbid, 1, size):
-        assert data == example[1:]
-
     await file_storage_manager.delete_upload(path, kbid)
-
-    with pytest.raises(CloudFileNotFound):
-        async for data in file_storage_manager.read_range(path, kbid, 1, size):
-            assert data == example[1:]

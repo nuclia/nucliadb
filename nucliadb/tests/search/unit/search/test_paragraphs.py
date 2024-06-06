@@ -36,22 +36,8 @@ def extracted_text():
 
 
 @pytest.fixture()
-def storage_field(extracted_text):
+def field(extracted_text):
     mock = MagicMock()
-
-    data = extracted_text.SerializeToString()
-
-    async def _read_range(start, end):
-        yield data[start:end]
-
-    mock.read_range = _read_range
-    yield mock
-
-
-@pytest.fixture()
-def field(storage_field, extracted_text):
-    mock = MagicMock()
-    mock.get_storage_field.return_value = storage_field
     mock.get_extracted_text = AsyncMock(return_value=extracted_text)
     yield mock
 

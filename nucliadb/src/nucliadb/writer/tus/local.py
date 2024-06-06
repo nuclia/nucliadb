@@ -22,13 +22,12 @@ from __future__ import annotations
 import json
 import os
 import uuid
-from typing import AsyncIterator
+from typing import Any
 
 import aiofiles
 from nucliadb_protos.resources_pb2 import CloudFile
 
 from nucliadb.writer.tus.dm import FileDataManager
-from nucliadb.writer.tus.exceptions import CloudFileNotFound
 from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
 from nucliadb_utils.storages import CHUNK_SIZE
 
@@ -50,51 +49,28 @@ class LocalFileStorageManager(FileStorageManager):
         bucket = self.storage.get_bucket_name(kbid)
         upload_file_id = dm.get("upload_file_id", str(uuid.uuid4()))
         init_url = self.get_file_path(bucket, upload_file_id)
-        metadata_init_url = self.metadata_key(init_url)
         metadata = {
             "FILENAME": dm.filename,
             "CONTENT_TYPE": dm.content_type,
             "SIZE": dm.size,
         }
-        async with aiofiles.open(metadata_init_url, "w+") as resp:
-            await resp.write(json.dumps(metadata))
+        await self.set_metadata(kbid, upload_file_id, metadata)
 
         async with aiofiles.open(init_url, "wb+") as aio_fi:
             await aio_fi.write(b"")
 
-        await dm.update(upload_file_id=upload_file_id, path=path, bucket=bucket)
+        await dm.update(
+            upload_file_id=upload_file_id, path=path, bucket=bucket, kbid=kbid
+        )
 
-    async def iter_data(self, uri, kbid: str, headers=None):
+    async def set_metadata(
+        self, kbid: str, upload_file_id: str, metadata: dict[str, Any]
+    ):
         bucket = self.storage.get_bucket_name(kbid)
-        file_path = self.get_file_path(bucket, uri)
-        async with aiofiles.open(file_path) as resp:
-            data = await resp.read(CHUNK_SIZE)
-            while data is not None:
-                yield data
-                data = await resp.read(CHUNK_SIZE)
-
-    async def read_range(
-        self, uri: str, kbid: str, start: int, end: int
-    ) -> AsyncIterator[bytes]:
-        """
-        Iterate through ranges of data
-        """
-        bucket = self.storage.get_bucket_name(kbid)
-        file_path = self.get_file_path(bucket, uri)
-        try:
-            async with aiofiles.open(file_path, "rb") as resp:
-                await resp.seek(start)
-                count = 0
-                data = await resp.read(CHUNK_SIZE)
-                while data and count < end:
-                    if count + len(data) > end:
-                        new_end = end - count
-                        data = data[:new_end]
-                    yield data
-                    count += len(data)
-                    data = await resp.read(CHUNK_SIZE)
-        except FileNotFoundError:
-            raise CloudFileNotFound()
+        init_url = self.get_file_path(bucket, upload_file_id)
+        metadata_init_url = self.metadata_key(init_url)
+        async with aiofiles.open(metadata_init_url, "w+") as resp:
+            await resp.write(json.dumps(metadata))
 
     async def append(self, dm: FileDataManager, iterable, offset) -> int:
         count = 0
@@ -118,6 +94,15 @@ class LocalFileStorageManager(FileStorageManager):
         upload_file_id = dm.get("upload_file_id")
         from_url = self.get_file_path(bucket, upload_file_id)
 
+        if dm.size > 0:
+            kbid = dm.get("kbid")
+            metadata = {
+                "FILENAME": dm.filename,
+                "CONTENT_TYPE": dm.content_type,
+                "SIZE": dm.size,
+            }
+            await self.set_metadata(kbid, upload_file_id, metadata)
+
         path = dm.get("path")
         to_url = self.get_file_path(bucket, path)
         to_url_dirs = os.path.dirname(to_url)
@@ -137,6 +122,9 @@ class LocalFileStorageManager(FileStorageManager):
         bucket = self.storage.get_bucket_name(kbid)
         file_path = self.get_file_path(bucket, uri)
         os.remove(file_path)
+
+    def validate_intermediate_chunk(self, uploaded_bytes: int):
+        pass
 
 
 class LocalBlobStore(BlobStore):

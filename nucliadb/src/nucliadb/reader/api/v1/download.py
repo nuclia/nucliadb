@@ -35,8 +35,11 @@ from nucliadb.reader.api.models import FIELD_NAMES_TO_PB_TYPE_MAP
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires_one
-from nucliadb_utils.storages.storage import StorageField  # type: ignore
-from nucliadb_utils.storages.storage import ObjectMetadata
+from nucliadb_utils.storages.storage import (  # type: ignore
+    ObjectMetadata,
+    Range,
+    StorageField,
+)
 from nucliadb_utils.utilities import get_storage
 
 from .router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
@@ -300,8 +303,10 @@ async def download_api(sf: StorageField, headers: Headers, inline: bool = False)
         "Content-Type": content_type,
         "Content-Disposition": content_disposition,
     }
-    download_headers = {}
+
+    range = Range()
     if "range" in headers and file_size > -1:
+        status_code = 206
         range_request = headers["range"]
         try:
             start, end, range_size = parse_media_range(range_request, file_size)
@@ -342,14 +347,14 @@ async def download_api(sf: StorageField, headers: Headers, inline: bool = False)
                 headers={"Content-Range": f"bytes */{file_size}"},
                 status_code=416,
             )
-        status_code = 206
         logger.debug(f"Range request: {range_request}")
         extra_headers["Content-Length"] = f"{range_size}"
         extra_headers["Content-Range"] = f"bytes {start}-{end}/{file_size}"
-        download_headers["Range"] = range_request
+        range.start = start
+        range.end = end
 
     return StreamingResponse(
-        sf.storage.download(sf.bucket, sf.key, headers=download_headers),  # type: ignore
+        sf.storage.download(sf.bucket, sf.key, range=range),
         status_code=status_code,
         media_type=content_type,
         headers=extra_headers,

@@ -8,7 +8,8 @@ services:
       - NUCLIA_ZONE=europe-1
       - CORS_ORIGINS=["http://localhost:8080"]
       - DRIVER=PG
-      - FILE_BACKEND=PG
+      - FILE_BACKEND=LOCAL
+      - LOCAL_FILES=/data/blob
       - DEBUG=true
       - DRIVER_PG_URL=postgres://nucliadb:nucliadb@postgres:5432/nucliadb
       # - auth_policy=upstream_oauth2

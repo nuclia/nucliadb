@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import uuid
 from contextlib import AsyncExitStack
-from typing import AsyncIterator, Optional
+from typing import Optional
 
 import aiobotocore  # type: ignore
 import aiohttp
@@ -32,7 +32,7 @@ from nucliadb_protos.resources_pb2 import CloudFile
 
 from nucliadb.writer import logger
 from nucliadb.writer.tus.dm import FileDataManager
-from nucliadb.writer.tus.exceptions import CloudFileNotFound, ResumableURINotAvailable
+from nucliadb.writer.tus.exceptions import ResumableURINotAvailable
 from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
 from nucliadb_utils.storages.s3 import (
     CHUNK_SIZE,
@@ -72,21 +72,27 @@ class S3FileStorageManager(FileStorageManager):
         if dm.get("mpu") is not None:
             await self._abort_multipart(dm)
 
+        custom_metadata: dict[str, str] = {
+            "filename": dm.filename or "",
+            "content_type": dm.content_type or "",
+            "size": str(dm.size),
+        }
+
         await dm.update(
             path=path,
             upload_file_id=upload_file_id,
             multipart={"Parts": []},
             block=1,
-            mpu=await self._create_multipart(path, bucket),
+            mpu=await self._create_multipart(path, bucket, custom_metadata),
             bucket=bucket,
         )
 
     @backoff.on_exception(
         backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=3
     )
-    async def _create_multipart(self, path, bucket):
+    async def _create_multipart(self, path, bucket, custom_metadata: dict[str, str]):
         return await self.storage._s3aioclient.create_multipart_upload(
-            Bucket=bucket, Key=path
+            Bucket=bucket, Key=path, Metadata=custom_metadata
         )
 
     async def append(self, dm: FileDataManager, iterable, offset) -> int:
@@ -157,37 +163,6 @@ class S3FileStorageManager(FileStorageManager):
             Bucket=bucket, Key=uri, **kwargs
         )
 
-    async def iter_data(
-        self, uri: str, kbid: str, headers: Optional[dict[str, str]] = None
-    ):
-        if headers is None:
-            headers = {}
-        try:
-            downloader = await self._download(uri, kbid, **headers)
-        except self.storage._s3aioclient.exceptions.NoSuchKey:
-            raise CloudFileNotFound()
-
-        # we do not want to timeout ever from this...
-        # downloader['Body'].set_socket_timeout(999999)
-        stream = downloader["Body"]
-        data = await stream.read(CHUNK_SIZE)
-        while True:
-            if not data:
-                break
-            yield data
-            data = await stream.read(CHUNK_SIZE)
-
-    async def read_range(
-        self, uri, kbid: str, start: int, end: int
-    ) -> AsyncIterator[bytes]:
-        """
-        Iterate through ranges of data
-        """
-        async for chunk in self.iter_data(
-            uri, kbid, headers={"Range": f"bytes={start}-{end - 1}"}
-        ):
-            yield chunk
-
     async def delete_upload(self, uri: str, kbid: str):
         bucket = self.storage.get_bucket_name(kbid)
         if uri is not None:
@@ -197,6 +172,12 @@ class S3FileStorageManager(FileStorageManager):
                 logger.warning("Error deleting object", exc_info=True)
         else:
             raise AttributeError("No valid uri")
+
+    def validate_intermediate_chunk(self, uploaded_bytes: int):
+        if uploaded_bytes % self.min_upload_size != 0:
+            raise ValueError(
+                f"Intermediate chunks need to be multiples of {self.min_upload_size} bytes"
+            )
 
 
 class S3BlobStore(BlobStore):

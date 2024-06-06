@@ -180,7 +180,6 @@ async def test_creation(
 
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/resource/{rid}?show=errors&show=values&show=basic",
-        timeout=None,
     )
     assert resp.status_code == 200
 
@@ -488,7 +487,6 @@ async def test_extra(
             "title": "Foo",
             "extra": extra,
         },
-        timeout=None,
     )
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
@@ -538,7 +536,6 @@ async def test_icon_doesnt_change_after_labeling_resource_sc_5625(
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
         json={"title": "Foo", "icon": "application/pdf"},
-        timeout=None,
     )
     assert resp.status_code == 201
     uuid = resp.json()["uuid"]
@@ -552,7 +549,6 @@ async def test_icon_doesnt_change_after_labeling_resource_sc_5625(
         json={
             "usermetadata": {"classifications": [{"labelset": "foo", "label": "bar"}]}
         },
-        timeout=None,
     )
     assert resp.status_code == 200
 
@@ -610,7 +606,6 @@ async def test_icon_doesnt_change_after_adding_file_field_sc_2388(
             "icon": "text/plain",
             "texts": {"text": {"body": "my text"}},
         },
-        timeout=None,
     )
     assert resp.status_code == 201
     uuid = resp.json()["uuid"]
@@ -622,7 +617,6 @@ async def test_icon_doesnt_change_after_adding_file_field_sc_2388(
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resource/{uuid}/file/file/upload",
         content=b"foo" * 200,
-        timeout=None,
     )
     assert resp.status_code == 201
 
@@ -642,7 +636,6 @@ async def test_language_metadata(
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
         json={"title": "My resource"},
-        timeout=None,
     )
     assert resp.status_code == 201
     uuid = resp.json()["uuid"]
@@ -683,7 +676,6 @@ async def test_language_metadata(
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
         json={"metadata": {"language": "en"}},
-        timeout=None,
     )
     assert resp.status_code == 201
     uuid = resp.json()["uuid"]
@@ -699,7 +691,6 @@ async def test_language_metadata(
     resp = await nucliadb_writer.patch(
         f"/kb/{kbid}/resource/{uuid}",
         json={"metadata": {"language": "de"}},
-        timeout=None,
     )
     assert resp.status_code == 200
 
@@ -739,7 +730,6 @@ async def test_story_7081(
 
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/resource/{rid}?show=origin",
-        timeout=None,
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -800,7 +790,6 @@ async def test_question_answer(
 
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/resource/{rid}?show=extracted&extracted=question_answers",
-        timeout=None,
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -877,7 +866,6 @@ async def test_question_answer_annotations(
 
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/resource/{rid}?show=basic",
-        timeout=None,
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -911,7 +899,6 @@ async def test_link_fields_store_css_selector(
 
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/resource/{rid}?show=values",
-        timeout=None,
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -953,7 +940,6 @@ async def test_link_fields_store_xpath(
 
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/resource/{rid}?show=values",
-        timeout=None,
     )
     assert resp.status_code == 200
     data = resp.json()

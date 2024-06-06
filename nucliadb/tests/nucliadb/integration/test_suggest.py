@@ -285,7 +285,6 @@ async def test_suggestion_on_link_computed_titles_sc6088(
                 }
             },
         },
-        timeout=None,
     )
     assert resp.status_code == 201
     rid = resp.json()["uuid"]

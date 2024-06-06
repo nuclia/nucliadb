@@ -129,7 +129,6 @@ async def test_ask_with_citations(nucliadb_reader: AsyncClient, knowledgebox, re
         f"/kb/{knowledgebox}/ask",
         json={"query": "title", "citations": True},
         headers={"X-Synchronous": "true"},
-        timeout=None,
     )
     assert resp.status_code == 200
 
@@ -198,7 +197,6 @@ async def test_ask_rag_options_full_resource(
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/ask",
         json={"query": "title", "rag_strategies": [{"name": "full_resource"}]},
-        timeout=None,
     )
     assert resp.status_code == 200
     _ = parse_ask_response(resp)
@@ -233,7 +231,6 @@ async def test_ask_rag_options_extend_with_fields(
             "query": "title",
             "rag_strategies": [{"name": "field_extension", "fields": ["a/summary"]}],
         },
-        timeout=None,
     )
     assert resp.status_code == 200
     _ = parse_ask_response(resp)
@@ -369,7 +366,6 @@ async def test_ask_capped_context(
             "debug": True,
         },
         headers={"X-Synchronous": "True"},
-        timeout=None,
     )
     assert resp.status_code == 200
     resp_data = SyncAskResponse.model_validate_json(resp.content)
@@ -389,7 +385,6 @@ async def test_ask_capped_context(
             "max_tokens": {"context": max_size},
         },
         headers={"X-Synchronous": "True"},
-        timeout=None,
     )
     assert resp.status_code == 200, resp.text
     resp_data = SyncAskResponse.model_validate_json(resp.content)

@@ -50,7 +50,6 @@ async def src_kb(nucliadb_writer, nucliadb_manager):
                 "icon": "application/pdf",
                 "slug": f"test-{i}",
             },
-            timeout=None,
         )
         assert resp.status_code == 201
         body = resp.json()
@@ -64,7 +63,6 @@ async def src_kb(nucliadb_writer, nucliadb_manager):
                 "Content-Type": "text/plain",
             },
             content=base64.b64encode(content),
-            timeout=None,
         )
         assert resp.status_code == 201
 
