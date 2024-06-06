@@ -82,9 +82,6 @@ nucliadb_performance/exports
 ### Others. Still in use?
 
 
-nucliadb/nucliadb/static/tmp
-nucliadb_ingest/ingest.key
-nucliadb_search/search.key
 host_key
 ingest.key
 

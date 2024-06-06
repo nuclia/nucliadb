@@ -86,7 +86,7 @@ header:
     - "**/__pycache__"
     - "nucliadb_telemetry/src/nucliadb_telemetry/tests/grpc/*"
     - "**/Makefile"
-    - "nucliadb/nucliadb/ingest/tests/orm/assets"
+    - "nucliadb/src/nucliadb/ingest/tests/orm/assets"
     - "VERSION"
     - "LICENSE"
     - "NOTICE"

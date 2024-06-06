@@ -7,14 +7,14 @@ on:
     paths:
       - ".github/workflows/nucliadb_migrations.yml"
       - "nucliadb/migrations/**"
-      - "nucliadb/nucliadb/migrator/**"
+      - "nucliadb/src/nucliadb/migrator/**"
 
   push:
     branches:
       - main
       - ".github/workflows/nucliadb_migrations.yml"
       - "nucliadb/migrations/**"
-      - "nucliadb/nucliadb/migrator/**"
+      - "nucliadb/src/nucliadb/migrator/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

@@ -667,7 +667,7 @@ def maindb_settings(request):
     """
     Allows dynamically loading the driver fixtures via env vars.
 
-    TESTING_MAINDB_DRIVERS=redis,local pytest nucliadb/nucliadb/tests/
+    TESTING_MAINDB_DRIVERS=redis,local pytest nucliadb/tests/
 
     Any test using the nucliadb fixture will be run twice, once with redis driver and once with local driver.
     """
@@ -715,7 +715,7 @@ def maindb_driver_lazy_fixtures(default_drivers: str = "redis"):
     """
     Allows running tests using maindb_driver for each supported driver type via env vars.
 
-    TESTING_MAINDB_DRIVERS=redis,local pytest nucliadb/nucliadb/ingest/tests/
+    TESTING_MAINDB_DRIVERS=redis,local pytest nucliadb/tests/ingest
 
     Any test using the maindb_driver fixture will be run twice, once with redis_driver and once with local_driver.
     """
