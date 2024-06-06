@@ -19,9 +19,9 @@
 #
 
 import asyncio
+import importlib.metadata
 import uuid
 from typing import Optional
-import importlib.metadata
 
 from nucliadb_sidecar import SERVICE_NAME, logger
 from nucliadb_sidecar.listeners import IndexedPublisher
