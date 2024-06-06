@@ -135,7 +135,7 @@ async def nucliadb(
     dummy_processing,
     analytics_disabled,
     maindb_settings,
-    local_storage_settings,
+    blobstorage_settings,
     tmpdir,
     learning_config,
 ):
@@ -156,7 +156,7 @@ async def nucliadb(
         log_format_type=LogFormatType.PLAIN,
         log_output_type=LogOutputType.FILE,
         **maindb_settings.dict(),
-        **local_storage_settings,
+        **blobstorage_settings,
     )
 
     config_nucliadb(settings)
