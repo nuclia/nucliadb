@@ -21,8 +21,7 @@
 import asyncio
 import uuid
 from typing import Optional
-
-import pkg_resources
+import importlib.metadata
 
 from nucliadb_sidecar import SERVICE_NAME, logger
 from nucliadb_sidecar.listeners import IndexedPublisher
@@ -126,7 +125,7 @@ def run():  # pragma: no cover
     setup_logging()
 
     errors.setup_error_handling(
-        pkg_resources.get_distribution("nucliadb_sidecar").version
+        importlib.metadata.distribution("nucliadb_sidecar").version
     )
 
     asyncio.run(main())

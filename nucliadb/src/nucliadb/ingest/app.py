@@ -18,9 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+import importlib.metadata
 from typing import Awaitable, Callable
-
-import pkg_resources
 
 from nucliadb import health
 from nucliadb.common.cluster.discovery.utils import (
@@ -184,7 +183,7 @@ def setup_configuration():  # pragma: no cover
 
     assign_partitions(settings)
 
-    errors.setup_error_handling(pkg_resources.get_distribution("nucliadb").version)
+    errors.setup_error_handling(importlib.metadata.distribution("nucliadb").version)
 
     if asyncio._get_running_loop() is not None:
         raise RuntimeError("cannot be called from a running event loop")
