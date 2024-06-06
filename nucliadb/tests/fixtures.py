@@ -541,7 +541,7 @@ def local_maindb_settings(tmpdir):
 
 
 @pytest.fixture(scope="function")
-async def local_driver(local_maindb_settings) -> AsyncIterator[Driver]:
+async def local_maindb_driver(local_maindb_settings) -> AsyncIterator[Driver]:
     path = local_maindb_settings.driver_local_url
     ingest_settings.driver = DriverConfig.LOCAL
     ingest_settings.driver_local_url = path
@@ -578,7 +578,7 @@ def tikv_maindb_settings(tikvd):
 
 
 @pytest.fixture(scope="function")
-async def tikv_driver(tikv_maindb_settings) -> AsyncIterator[Driver]:
+async def tikv_maindb_driver(tikv_maindb_settings) -> AsyncIterator[Driver]:
     url = tikv_maindb_settings.driver_tikv_url
     ingest_settings.driver = DriverConfig.TIKV
     ingest_settings.driver_tikv_url = url
@@ -602,7 +602,7 @@ def redis_maindb_settings(redis):
 
 
 @pytest.fixture(scope="function")
-async def redis_driver(redis_maindb_settings) -> AsyncIterator[RedisDriver]:
+async def redis_maindb_driver(redis_maindb_settings) -> AsyncIterator[RedisDriver]:
     url = redis_maindb_settings.driver_redis_url
     ingest_settings.driver = DriverConfig.REDIS
     ingest_settings.driver_redis_url = url
@@ -633,7 +633,7 @@ def pg_maindb_settings(pg):
 
 
 @pytest.fixture(scope="function")
-async def pg_driver(pg_maindb_settings):
+async def pg_maindb_driver(pg_maindb_settings):
     url = pg_maindb_settings.driver_pg_url
     ingest_settings.driver = DriverConfig.PG
     ingest_settings.driver_pg_url = url
@@ -702,42 +702,33 @@ def local_storage_settings(tmpdir):
     }
 
 
-def blobstorage_settings_lazy_fixtures(default_drivers="local"):
-    driver_types = os.environ.get("TESTING_STORAGE_BACKEND", default_drivers)
-    return [
-        lazy_fixture.lf(f"{driver_type}_storage_settings")
-        for driver_type in driver_types.split(",")
-    ]
-
-
-@pytest.fixture(scope="function", params=blobstorage_settings_lazy_fixtures())
-def blobstorage_settings(request):
+@pytest.fixture(scope="function")
+def blobstorage_settings(local_blobstorage_settings):
     """
-    Allows dynamically loading the storage fixtures via env vars.
-
-    TESTING_STORAGE_BACKEND=local,gcs,s3 pytest nucliadb/nucliadb/tests/
+    Redefine this fixture in your test using the params argument
+    to allow running tests using each supported driver type.
     """
-    yield request.param
+    yield local_blobstorage_settings
 
 
-def driver_lazy_fixtures(default_drivers: str = "redis"):
+def maindb_driver_lazy_fixtures(default_drivers: str = "redis"):
     """
     Allows running tests using maindb_driver for each supported driver type via env vars.
 
-    MAINDB_DRIVER=redis,local pytest nucliadb/nucliadb/ingest/tests/
+    TESTING_MAINDB_DRIVERS=redis,local pytest nucliadb/nucliadb/ingest/tests/
 
     Any test using the maindb_driver fixture will be run twice, once with redis_driver and once with local_driver.
     """
     driver_types = os.environ.get("TESTING_MAINDB_DRIVERS", default_drivers)
     return [
-        lazy_fixture.lf(f"{driver_type}_driver")
+        lazy_fixture.lf(f"{driver_type}_maindb_driver")
         for driver_type in driver_types.split(",")
     ]
 
 
 @pytest.fixture(
     scope="function",
-    params=driver_lazy_fixtures(),
+    params=maindb_driver_lazy_fixtures(),
 )
 async def maindb_driver(request):
     driver = request.param
