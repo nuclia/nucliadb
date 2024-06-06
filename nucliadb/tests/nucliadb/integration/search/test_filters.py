@@ -358,7 +358,7 @@ async def _test_filtering(nucliadb_reader: AsyncClient, kbid: str, filters):
             filters=filters,
             features=["paragraph", "vector"],
             vector=Q,
-            min_score=MinScore(semantic=-1).dict(),
+            min_score=MinScore(semantic=-1).model_dump(),
         ),
     )
     assert resp.status_code == 200

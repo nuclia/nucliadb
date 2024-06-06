@@ -85,7 +85,7 @@ class TestProducer:
         assert publish_args[0] == stream.subject
 
         raw_message = publish_args[1]
-        sent_message = Message.parse_raw(raw_message)
+        sent_message = Message.model_validate_json(raw_message)
         assert sent_message == msg
 
     async def test_produce_raises_publish_errors(self, producer, nats_manager):

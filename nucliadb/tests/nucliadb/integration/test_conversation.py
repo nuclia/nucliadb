@@ -127,7 +127,7 @@ async def test_conversations(
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}?show=values")
     assert resp.status_code == 200
 
-    res_resp = ResponseResponse.parse_obj(resp.json())
+    res_resp = ResponseResponse.model_validate(resp.json())
 
     assert res_resp.data.conversations["faq"] == ConversationFieldData(  # type: ignore
         value=FieldConversation(pages=2, size=200, total=301),
@@ -140,7 +140,7 @@ async def test_conversations(
         f"/kb/{knowledgebox}/resource/{rid}/conversation/faq?page=1"
     )
     assert resp.status_code == 200
-    field_resp = ResourceField.parse_obj(resp.json())
+    field_resp = ResourceField.model_validate(resp.json())
     msgs = field_resp.value["messages"]  # type: ignore
     assert len(msgs) == 200
     assert [m["ident"] for m in msgs] == [str(i) for i in range(200)]
@@ -151,7 +151,7 @@ async def test_conversations(
         f"/kb/{knowledgebox}/resource/{rid}/conversation/faq?page=2"
     )
     assert resp.status_code == 200
-    field_resp = ResourceField.parse_obj(resp.json())
+    field_resp = ResourceField.model_validate(resp.json())
     msgs = field_resp.value["messages"]  # type: ignore
     assert len(msgs) == 101
     assert [m["ident"] for m in msgs] == [str(i) for i in range(200, 300)] + [
@@ -173,7 +173,7 @@ async def test_extracted_text_is_serialized_properly(
         f"/kb/{knowledgebox}/resource/{rid}?show=values&show=extracted&extracted=text",
     )
     assert resp.status_code == 200
-    resource = Resource.parse_obj(resp.json())
+    resource = Resource.model_validate(resp.json())
     extracted = resource.data.conversations["faq"].extracted  # type: ignore
     assert extracted.text.text == ""  # type: ignore
     assert extracted.text.split_text["1"] == "Split text 1"  # type: ignore
@@ -193,7 +193,7 @@ async def test_find_conversations(
         f"/kb/{knowledgebox}/find?query=&show=values&show=extracted&extracted=text",
     )
     assert resp.status_code == 200
-    results = KnowledgeboxFindResults.parse_obj(resp.json())
+    results = KnowledgeboxFindResults.model_validate(resp.json())
     resource = results.resources[rid]
 
     # Check extracted

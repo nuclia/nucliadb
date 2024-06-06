@@ -294,7 +294,7 @@ class PredictEngine:
             )
             return
 
-        data = item.dict()
+        data = item.model_dump()
         data["user_id"] = x_nucliadb_user
         data["client"] = x_ndb_client
         data["forwarded"] = x_forwarded_for
@@ -319,7 +319,7 @@ class PredictEngine:
         resp = await self.make_request(
             "POST",
             url=self.get_predict_url(REPHRASE, kbid),
-            json=item.dict(),
+            json=item.model_dump(),
             headers=self.get_predict_headers(kbid),
         )
         await self.check_response(resp, expected_status=200)
@@ -339,7 +339,7 @@ class PredictEngine:
         resp = await self.make_request(
             "POST",
             url=self.get_predict_url(CHAT, kbid),
-            json=item.dict(),
+            json=item.model_dump(),
             headers=self.get_predict_headers(kbid),
             timeout=None,
         )
@@ -369,7 +369,7 @@ class PredictEngine:
         resp = await self.make_request(
             "POST",
             url=self.get_predict_url(CHAT, kbid),
-            json=item.dict(),
+            json=item.model_dump(),
             headers=headers,
             timeout=None,
         )
@@ -448,7 +448,7 @@ class PredictEngine:
         )
         await self.check_response(resp, expected_status=200)
         data = await resp.json()
-        return SummarizedResponse.parse_obj(data)
+        return SummarizedResponse.model_validate(data)
 
 
 class DummyPredictEngine(PredictEngine):

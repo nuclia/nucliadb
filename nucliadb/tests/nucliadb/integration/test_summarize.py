@@ -60,7 +60,7 @@ async def test_summarize(
     assert resp.status_code == 200, resp.text
 
     content = resp.json()
-    response = SummarizedResponse.parse_obj(content)
+    response = SummarizedResponse.model_validate(content)
     assert set(response.resources.keys()) == set(resources)
 
 

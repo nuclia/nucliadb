@@ -155,7 +155,7 @@ async def nucliadb(
         standalone_node_port=free_port(),
         log_format_type=LogFormatType.PLAIN,
         log_output_type=LogOutputType.FILE,
-        **maindb_settings.dict(),
+        **maindb_settings.model_dump(),
         **blobstorage_settings,
     )
 
