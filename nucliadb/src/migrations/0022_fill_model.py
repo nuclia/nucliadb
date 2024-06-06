@@ -38,33 +38,40 @@ async def migrate(context: ExecutionContext) -> None: ...
 
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
     if not await needs_fixing(kbid):
-        print("Model metadata already filled")
+        logger.info("Model metadata already filled", extra={"kbid": kbid})
         return
+
     # Get learning config
     learning_config = await learning_proxy.get_configuration(kbid)
     if learning_config is None:
-        print("KB has no learning configuration")
+        logger.error("KB has no learning configuration", extra={"kbid": kbid})
         return
+
     model_metadata = parse_model_metadata_from_learning_config(learning_config)
     if model_metadata.vector_dimension is None:
-        logger.error("Vector dimension not set in learning config")
+        logger.error(
+            "Vector dimension not set in learning config", extra={"kbid": kbid}
+        )
         return
+
     async with datamanagers.with_rw_transaction() as txn:
         shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
         if shards is None:
-            print("KB has no shards")
+            logger.error("KB has no shards", extra={"kbid": kbid})
             return
+
         shards.model.CopyFrom(model_metadata)
         await datamanagers.cluster.update_kb_shards(txn, kbid=kbid, shards=shards)
         await txn.commit()
-    print("Model metadata filled")
+
+    logger.info("Model metadata filled", extra={"kbid": kbid})
 
 
 async def needs_fixing(kbid: str) -> bool:
     async with datamanagers.with_ro_transaction() as txn:
         shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
         if shards is None:
-            logger.warning("KB has no shards")
+            logger.error("KB has no shards", extra={"kbid": kbid})
             return False
-        print(shards.model)
+
         return shards.model is None or shards.model.vector_dimension == 0

@@ -121,9 +121,12 @@ impl TryFrom<VectorIndexConfig> for VectorConfig {
 
     fn try_from(proto: VectorIndexConfig) -> Result<Self, Self::Error> {
         let vector_type = match (proto.vector_type(), proto.vector_dimension) {
-            (ProtoVectorType::DenseF32, Some(dim)) => VectorType::DenseF32 {
+            (ProtoVectorType::DenseF32, Some(dim)) if dim > 0 => VectorType::DenseF32 {
                 dimension: dim as usize,
             },
+            (ProtoVectorType::DenseF32, Some(_)) => {
+                return Err(VectorErr::InvalidConfiguration("Vector dimensionc cannot be 0"));
+            }
             (ProtoVectorType::DenseF32, None) => VectorType::DenseF32Unaligned,
         };
         Ok(VectorConfig {
