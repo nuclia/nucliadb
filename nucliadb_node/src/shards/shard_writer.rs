@@ -52,8 +52,6 @@ pub fn open_vectors_writer(version: u32, path: &Path, shard_id: String) -> NodeR
 }
 pub fn open_paragraphs_writer(version: u32, config: &ParagraphConfig) -> NodeResult<ParagraphsWriterPointer> {
     match version {
-        2 => nucliadb_paragraphs2::writer::ParagraphWriterService::open(config)
-            .map(|i| Box::new(i) as ParagraphsWriterPointer),
         3 => nucliadb_paragraphs3::writer::ParagraphWriterService::open(config)
             .map(|i| Box::new(i) as ParagraphsWriterPointer),
         v => Err(node_error!("Invalid paragraphs version {v}")),

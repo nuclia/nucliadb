@@ -1678,7 +1678,6 @@ dependencies = [
  "lru 0.12.3",
  "md5",
  "nucliadb_core",
- "nucliadb_paragraphs2",
  "nucliadb_paragraphs3",
  "nucliadb_procs",
  "nucliadb_protos",
@@ -1738,24 +1737,6 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid 1.8.0",
-]
-
-[[package]]
-name = "nucliadb_paragraphs2"
-version = "0.1.0"
-dependencies = [
- "itertools 0.12.1",
- "lazy_static",
- "levenshtein_automata",
- "nucliadb_core",
- "nucliadb_procs",
- "once_cell",
- "regex",
- "serde_json",
- "tantivy",
- "tantivy-common 0.2.0",
- "tantivy-fst",
- "tempfile",
 ]
 
 [[package]]
