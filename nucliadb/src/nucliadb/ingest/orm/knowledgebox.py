@@ -69,18 +69,6 @@ class KnowledgeBox:
         self.kbid = kbid
         self._config: Optional[KnowledgeBoxConfig] = None
 
-    async def get_config(self) -> Optional[KnowledgeBoxConfig]:
-        if self._config is None:
-            async with datamanagers.with_ro_transaction() as txn:
-                config = await datamanagers.kb.get_config(txn, kbid=self.kbid)
-            if config is not None:
-                self._config = config
-                return config
-            else:
-                return None
-        else:
-            return self._config
-
     @classmethod
     async def delete_kb(cls, txn: Transaction, kbid: str):
         # Mark storage to be deleted
