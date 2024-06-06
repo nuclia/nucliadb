@@ -22,7 +22,6 @@ from __future__ import annotations
 import abc
 import hashlib
 import uuid
-from dataclasses import dataclass
 from io import BytesIO
 from typing import (
     Any,
@@ -40,12 +39,12 @@ from nucliadb_protos.noderesources_pb2 import Resource as BrainResource
 from nucliadb_protos.nodewriter_pb2 import IndexMessage
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.writer_pb2 import BrokerMessage
-from pydantic import BaseModel
 
 from nucliadb_utils import logger
 from nucliadb_utils.helpers import async_gen_lookahead
 from nucliadb_utils.storages import CHUNK_SIZE
 from nucliadb_utils.storages.exceptions import IndexDataNotFound, InvalidCloudFile
+from nucliadb_utils.storages.utils import ObjectInfo, ObjectMetadata, Range
 from nucliadb_utils.utilities import get_local_storage, get_nuclia_storage
 
 STORAGE_RESOURCE = "kbs/{kbid}/r/{uuid}"
@@ -59,33 +58,6 @@ OLD_INDEXING_KEY = "index/{node}/{shard}/{txid}"
 INDEXING_KEY = "index/{kb}/{shard}/{resource}/{txid}"
 # temporary storage for large stream data
 MESSAGE_KEY = "message/{kbid}/{rid}/{mid}"
-
-
-class ObjectInfo(BaseModel):
-    name: str
-
-
-class ObjectMetadata(BaseModel):
-    filename: str
-    content_type: str
-    size: int
-
-
-@dataclass
-class Range:
-    """
-    Represents a range of bytes to be downloaded from a file. The range is inclusive.
-    The start and end values are 0-based.
-    """
-
-    start: Optional[int] = None
-    end: Optional[int] = None
-
-    def any(self) -> bool:
-        return self.start is not None or self.end is not None
-
-    def to_header(self) -> str:
-        return f"bytes={self.start or 0}-{self.end or ''}"
 
 
 class StorageField(abc.ABC, metaclass=abc.ABCMeta):

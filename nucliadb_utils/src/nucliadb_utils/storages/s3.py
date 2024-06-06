@@ -34,13 +34,8 @@ from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_telemetry import errors
 from nucliadb_utils import logger
 from nucliadb_utils.storages.exceptions import UnparsableResponse
-from nucliadb_utils.storages.storage import (
-    ObjectInfo,
-    ObjectMetadata,
-    Range,
-    Storage,
-    StorageField,
-)
+from nucliadb_utils.storages.storage import Storage, StorageField
+from nucliadb_utils.storages.utils import ObjectInfo, ObjectMetadata, Range
 
 MB = 1024 * 1024
 MIN_UPLOAD_SIZE = 5 * MB

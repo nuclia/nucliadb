@@ -47,13 +47,8 @@ from nucliadb_utils.storages.exceptions import (
     InvalidOffset,
     ResumableUploadGone,
 )
-from nucliadb_utils.storages.storage import (
-    ObjectInfo,
-    ObjectMetadata,
-    Range,
-    Storage,
-    StorageField,
-)
+from nucliadb_utils.storages.storage import Storage, StorageField
+from nucliadb_utils.storages.utils import ObjectInfo, ObjectMetadata, Range
 
 storage_ops_observer = metrics.Observer("gcs_ops", labels={"type": ""})
 
@@ -590,8 +585,8 @@ class GCSStorage(Storage):
     async def create_bucket(self, bucket_name: str, kbid: Optional[str] = None):
         if self.session is None:
             raise AttributeError()
-        exists = await self.check_exists(bucket_name=bucket_name)
-        if exists:
+
+        if await self.check_exists(bucket_name=bucket_name):
             return
 
         headers = await self.get_access_headers()
