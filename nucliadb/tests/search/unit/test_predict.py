@@ -225,7 +225,7 @@ async def test_rephrase():
 
     pe.session.post.assert_awaited_once_with(
         url="cluster/api/v1/internal/predict/rephrase",
-        json=item.dict(),
+        json=item.model_dump(),
         headers={"X-STF-KBID": "kbid"},
     )
 
@@ -252,7 +252,7 @@ async def test_rephrase_onprem():
 
     pe.session.post.assert_awaited_once_with(
         url="public-europe1/api/v1/predict/rephrase/kbid",
-        json=item.dict(),
+        json=item.model_dump(),
         headers={"X-STF-NUAKEY": "Bearer nuakey"},
     )
 
@@ -272,7 +272,7 @@ async def test_feedback():
     item = FeedbackRequest(ident="foo", good=True, task=FeedbackTasks.CHAT)
     await pe.send_feedback("kbid", item, x_nucliadb_user, x_ndb_client, x_forwarded_for)
 
-    json_data = item.dict()
+    json_data = item.model_dump()
     json_data["user_id"] = x_nucliadb_user
     json_data["client"] = x_ndb_client
     json_data["forwarded"] = x_forwarded_for
@@ -301,7 +301,7 @@ async def test_feedback_onprem():
     item = FeedbackRequest(ident="foo", good=True, task=FeedbackTasks.CHAT)
     await pe.send_feedback("kbid", item, x_nucliadb_user, x_ndb_client, x_forwarded_for)
 
-    json_data = item.dict()
+    json_data = item.model_dump()
     json_data["user_id"] = x_nucliadb_user
     json_data["client"] = x_ndb_client
     json_data["forwarded"] = x_forwarded_for
@@ -366,7 +366,7 @@ async def test_summarize():
         resources={"r1": SummarizedResource(summary="resource summary", tokens=10)}
     )
     pe.session = get_mocked_session(
-        "POST", 200, json=summarized.dict(), context_manager=False
+        "POST", 200, json=summarized.model_dump(), context_manager=False
     )
 
     item = SummarizeModel(
@@ -378,8 +378,9 @@ async def test_summarize():
 
     pe.session.post.assert_awaited_once_with(
         url="cluster/api/v1/internal/predict/summarize",
-        json=item.dict(),
+        json=item.model_dump(),
         headers={"X-STF-KBID": "kbid"},
+        timeout=None,
     )
 
 
@@ -396,7 +397,7 @@ async def test_summarize_onprem():
         resources={"r1": SummarizedResource(summary="resource summary", tokens=10)}
     )
     pe.session = get_mocked_session(
-        "POST", 200, json=summarized.dict(), context_manager=False
+        "POST", 200, json=summarized.model_dump(), context_manager=False
     )
 
     item = SummarizeModel(
@@ -408,8 +409,9 @@ async def test_summarize_onprem():
 
     pe.session.post.assert_awaited_once_with(
         url="public-europe1/api/v1/predict/summarize/kbid",
-        json=item.dict(),
+        json=item.model_dump(),
         headers={"X-STF-NUAKEY": "Bearer nuakey"},
+        timeout=None,
     )
 
 
