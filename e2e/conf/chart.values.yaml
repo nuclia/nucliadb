@@ -4,7 +4,7 @@ imageVersion: test
 
 env:
   DRIVER: PG
-  FILE_BACKEND: PG
+  FILE_BACKEND: local
   NUCLIA_PUBLIC_URL: https://{zone}.stashify.cloud
   cluster_discovery_mode: kubernetes
   cluster_discovery_kubernetes_namespace: nucliadb
