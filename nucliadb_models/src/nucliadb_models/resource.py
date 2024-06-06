@@ -29,7 +29,6 @@ from nucliadb_protos.utils_pb2 import ReleaseChannel as PBReleaseChannel
 from pydantic import BaseModel, Field, field_validator
 
 from nucliadb_models.conversation import FieldConversation
-from nucliadb_models.datetime import FieldDatetime
 from nucliadb_models.extracted import (
     ExtractedText,
     FieldComputedMetadata,
@@ -40,8 +39,6 @@ from nucliadb_models.extracted import (
     VectorObject,
 )
 from nucliadb_models.file import FieldFile
-from nucliadb_models.keywordset import FieldKeywordset
-from nucliadb_models.layout import FieldLayout
 from nucliadb_models.link import FieldLink
 from nucliadb_models.metadata import (
     ComputedMetadata,
@@ -197,19 +194,7 @@ class LinkFieldExtractedData(ExtractedData):
     link: Optional[LinkExtractedData] = None
 
 
-class LayoutFieldExtractedData(ExtractedData):
-    pass
-
-
 class ConversationFieldExtractedData(ExtractedData):
-    pass
-
-
-class KeywordsetFieldExtractedData(ExtractedData):
-    pass
-
-
-class DatetimeFieldExtractedData(ExtractedData):
     pass
 
 
@@ -218,10 +203,7 @@ ExtractedDataType = Optional[
         TextFieldExtractedData,
         FileFieldExtractedData,
         LinkFieldExtractedData,
-        LayoutFieldExtractedData,
         ConversationFieldExtractedData,
-        KeywordsetFieldExtractedData,
-        DatetimeFieldExtractedData,
     ]
 ]
 
@@ -252,27 +234,9 @@ class LinkFieldData(BaseModel):
     error: Optional[Error] = None
 
 
-class LayoutFieldData(BaseModel):
-    value: Optional[FieldLayout] = None
-    extracted: Optional[LayoutFieldExtractedData] = None
-    error: Optional[Error] = None
-
-
 class ConversationFieldData(BaseModel):
     value: Optional[FieldConversation] = None
     extracted: Optional[ConversationFieldExtractedData] = None
-    error: Optional[Error] = None
-
-
-class KeywordsetFieldData(BaseModel):
-    value: Optional[FieldKeywordset] = None
-    extracted: Optional[KeywordsetFieldExtractedData] = None
-    error: Optional[Error] = None
-
-
-class DatetimeFieldData(BaseModel):
-    value: Optional[FieldDatetime] = None
-    extracted: Optional[DatetimeFieldExtractedData] = None
     error: Optional[Error] = None
 
 
@@ -286,10 +250,7 @@ class ResourceData(BaseModel):
     texts: Optional[Dict[str, TextFieldData]] = None
     files: Optional[Dict[str, FileFieldData]] = None
     links: Optional[Dict[str, LinkFieldData]] = None
-    layouts: Optional[Dict[str, LayoutFieldData]] = None
     conversations: Optional[Dict[str, ConversationFieldData]] = None
-    keywordsets: Optional[Dict[str, KeywordsetFieldData]] = None
-    datetimes: Optional[Dict[str, DatetimeFieldData]] = None
     generics: Optional[Dict[str, GenericFieldData]] = None
 
 

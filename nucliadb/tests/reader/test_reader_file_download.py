@@ -119,26 +119,6 @@ async def test_resource_download_field_file(
 
 
 @pytest.mark.asyncio
-async def test_resource_download_field_layout(
-    reader_api: Callable[..., AsyncClient], test_resource: Resource
-) -> None:
-    rsc = test_resource
-    kbid = rsc.kb.kbid
-    rid = rsc.uuid
-    field_id = "layout1"
-    download_field = "field1"
-
-    async with reader_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/layout/{field_id}/download/field/{download_field}",
-        )
-        assert resp.status_code == 200
-        filename = f"{os.path.dirname(tests.ingest.fixtures.__file__)}/{TEST_CLOUDFILE.bucket_name}/{TEST_CLOUDFILE.uri}"  # noqa
-
-        open(filename, "rb").read() == resp.content
-
-
-@pytest.mark.asyncio
 async def test_resource_download_field_conversation(
     reader_api: Callable[..., AsyncClient], test_resource: Resource
 ) -> None:
@@ -166,10 +146,6 @@ async def test_resource_download_field_conversation(
             {"field_type": "text", "field_id": "text1", "download_field": "thumbnail"},
         ],  # noqa
         ["file/{field_id}/download/field", {"field_id": "file1"}],
-        [
-            "layout/{field_id}/download/field/{download_field}",
-            {"field_id": "layout1", "download_field": "field1"},
-        ],
         [
             "conversation/{field_id}/download/field/{message_id}/{file_num}",
             {"field_id": "conv1"},

@@ -448,12 +448,9 @@ async def test_generate_index_message_contains_all_metadata(
         "a/title",
         "a/summary",
         "u/link1",
-        "d/datetime1",
         "c/conv1",
         "f/file1",
         "t/text1",
-        "k/keywordset1",
-        "l/layout1",
     }
     fields_to_be_found = expected_fields.copy()
     for field, text in index_message.texts.items():

@@ -118,15 +118,6 @@ class _BrokerMessageBuilder:
             field = cast(Conversation, field)
             value = await field.get_full_conversation()
             self.bm.conversations[field_id].CopyFrom(value)
-        elif type_id == FieldType.KEYWORDSET:
-            value = await field.get_value()
-            self.bm.keywordsets[field_id].CopyFrom(value)
-        elif type_id == FieldType.DATETIME:
-            value = await field.get_value()
-            self.bm.datetimes[field_id].CopyFrom(value)
-        elif type_id == FieldType.LAYOUT:
-            value = await field.get_value()
-            self.bm.layouts[field_id].CopyFrom(value)
 
     async def generate_extracted_text(
         self,

@@ -25,11 +25,8 @@ import pytest
 from httpx import AsyncClient
 from tests.writer.test_fields import (
     TEST_CONVERSATION_PAYLOAD,
-    TEST_DATETIMES_PAYLOAD,
     TEST_EXTERNAL_FILE_PAYLOAD,
     TEST_FILE_PAYLOAD,
-    TEST_KEYWORDSETS_PAYLOAD,
-    TEST_LAYOUT_PAYLOAD,
     TEST_LINK_PAYLOAD,
     TEST_TEXT_PAYLOAD,
 )
@@ -113,10 +110,7 @@ async def test_resource_crud(
                     "file1": TEST_FILE_PAYLOAD,
                     "external1": TEST_EXTERNAL_FILE_PAYLOAD,
                 },
-                "layouts": {"layout1": TEST_LAYOUT_PAYLOAD},
                 "conversations": {"conv1": TEST_CONVERSATION_PAYLOAD},
-                "keywordsets": {"keywordset1": TEST_KEYWORDSETS_PAYLOAD},
-                "datetimes": {"datetime1": TEST_DATETIMES_PAYLOAD},
             },
         )
 
@@ -205,10 +199,7 @@ async def test_resource_crud_sync(
                 "texts": {"text1": TEST_TEXT_PAYLOAD},
                 "links": {"link1": TEST_LINK_PAYLOAD},
                 "files": {"file1": TEST_FILE_PAYLOAD},
-                "layouts": {"layout1": TEST_LAYOUT_PAYLOAD},
                 "conversations": {"conv1": TEST_CONVERSATION_PAYLOAD},
-                "keywordsets": {"keywordset1": TEST_KEYWORDSETS_PAYLOAD},
-                "datetimes": {"datetime1": TEST_DATETIMES_PAYLOAD},
             },
         )
 
@@ -290,13 +281,6 @@ async def test_reprocess_resource(
         assert payload.filefield["file1"] == "convert_internal_filefield_to_str,0"
         assert isinstance(payload.linkfield.get("link1"), nucliadb_models.LinkUpload)
         assert isinstance(payload.textfield.get("text1"), nucliadb_models.Text)
-        assert isinstance(
-            payload.layoutfield.get("layout1"), nucliadb_models.LayoutDiff
-        )
-        assert (
-            payload.layoutfield["layout1"].blocks["field1"].file
-            == "convert_internal_cf_to_str,2"
-        )
         assert isinstance(
             payload.conversationfield.get("conv1"), nucliadb_models.PushConversation
         )

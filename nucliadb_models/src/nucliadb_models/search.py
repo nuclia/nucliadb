@@ -883,12 +883,9 @@ class ImageRagStrategy(BaseModel):
 
 
 ALLOWED_FIELD_TYPES: dict[str, str] = {
-    "l": "layout",
     "t": "text",
     "f": "file",
     "u": "link",
-    "d": "datetime",
-    "k": "keywordset",
     "a": "generic",
     "c": "conversation",
 }

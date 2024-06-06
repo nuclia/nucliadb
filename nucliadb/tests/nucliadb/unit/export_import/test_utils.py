@@ -80,13 +80,6 @@ def broker_message():
     conversation.messages.append(message)
     bm.conversations["conversation"].CopyFrom(conversation)
 
-    # Add a layout with a file
-    layout = resources_pb2.FieldLayout()
-    block = resources_pb2.Block()
-    block.file.CopyFrom(get_cf("layout"))
-    layout.body.blocks["foo"].CopyFrom(block)
-    bm.layouts["layout"].CopyFrom(layout)
-
     # Field extracted data
     fed = resources_pb2.FileExtractedData()
     fed.file_generated["foo"].CopyFrom(get_cf("field_file_generated"))

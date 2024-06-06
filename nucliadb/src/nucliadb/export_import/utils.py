@@ -60,9 +60,6 @@ WRITER_BM_FIELDS = [
     "files",
     "texts",
     "conversations",
-    "layouts",
-    "keywordsets",
-    "datetimes",
 ]
 
 
@@ -196,11 +193,6 @@ def get_cloud_files(bm: writer_pb2.BrokerMessage) -> list[resources_pb2.CloudFil
         for message in conversation.messages:
             for attachment in message.content.attachments:
                 _clone_collect_cf(binaries, attachment)
-
-    for layout in bm.layouts.values():
-        for block in layout.body.blocks.values():
-            if block.HasField("file"):
-                _clone_collect_cf(binaries, block.file)
 
     for field_extracted_data in bm.file_extracted_data:
         if field_extracted_data.HasField("file_thumbnail"):

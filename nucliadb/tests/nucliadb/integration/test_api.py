@@ -251,10 +251,7 @@ async def test_serialize_errors(
         (rpb.FieldType.TEXT, "text", "texts"),
         (rpb.FieldType.FILE, "file", "files"),
         (rpb.FieldType.LINK, "link", "links"),
-        (rpb.FieldType.KEYWORDSET, "kws", "keywordsets"),
-        (rpb.FieldType.LAYOUT, "layout", "layouts"),
         (rpb.FieldType.CONVERSATION, "conversation", "conversations"),
-        (rpb.FieldType.DATETIME, "datetime", "datetimes"),
     ]
     for ftype, fid, _ in fields_to_test:
         field = rpb.FieldID(field_type=ftype, field=fid)

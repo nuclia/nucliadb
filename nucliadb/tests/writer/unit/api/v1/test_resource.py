@@ -26,7 +26,6 @@ from nucliadb.writer.api.v1.resource import needs_reprocess, needs_resource_rein
 from nucliadb_models import File
 from nucliadb_models.conversation import Conversation
 from nucliadb_models.file import FileField
-from nucliadb_models.layout import FieldLayout, LayoutContent, LayoutFormat
 from nucliadb_models.link import LinkField
 from nucliadb_models.metadata import Origin, UserMetadata
 from nucliadb_models.text import TextField
@@ -81,17 +80,6 @@ def push_payload(**kwargs):
         (push_payload(textfield={"foo": TextField(body="foo")}), True),
         (
             push_payload(linkfield={"foo": LinkField(uri="foo")}),
-            True,
-        ),
-        (
-            push_payload(
-                layoutfield={
-                    "foo": FieldLayout(
-                        body=LayoutContent(deleted_blocks=[]),
-                        format=LayoutFormat.NUCLIAv1,
-                    )
-                }
-            ),
             True,
         ),
     ],

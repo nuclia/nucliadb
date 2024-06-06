@@ -45,8 +45,6 @@ TEST_LINK_PAYLOAD = {
     "css_selector": "main",
     "xpath": "my_xpath",
 }
-TEST_KEYWORDSETS_PAYLOAD = {"keywords": [{"value": "kw1"}, {"value": "kw2"}]}
-TEST_DATETIMES_PAYLOAD = {"value": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")}
 TEST_CONVERSATION_PAYLOAD = {
     "messages": [
         {
@@ -63,25 +61,6 @@ TEST_CONVERSATION_PAYLOAD = {
             "ident": "message_id_001",
         }
     ]
-}
-TEST_LAYOUT_PAYLOAD = {
-    "body": {
-        "blocks": {
-            "block1": {
-                "x": 0,
-                "y": 0,
-                "cols": 1,
-                "rows": 2,
-                "type": "TITLE",
-                "ident": "main_title",
-                "payload": "This is a Test Title",
-                "file": load_file_as_FileB64_payload(
-                    "/assets/image001.jpg", "image/jpg"
-                ),
-            }
-        }
-    },
-    "format": "NUCLIAv1",
 }
 
 TEST_FILE_PAYLOAD = {
@@ -112,19 +91,6 @@ TEST_CONVERSATION_APPEND_MESSAGES_PAYLOAD = [
         "ident": "message_id_001",
     }
 ]
-
-TEST_LAYOUT_APPEND_BLOCKS_PAYLOAD = {
-    "block1": {
-        "x": 0,
-        "y": 0,
-        "cols": 1,
-        "rows": 2,
-        "type": "TITLE",
-        "ident": "main_title",
-        "payload": "This is a Test Title",
-        "file": load_file_as_FileB64_payload("/assets/image001.jpg", "image/jpg"),
-    }
-}
 
 
 @pytest.mark.asyncio
@@ -159,39 +125,10 @@ async def test_resource_field_add(writer_api, knowledgebox_writer):
         data = resp.json()
         assert "seqid" in data
 
-        # Keywordset
-        resp = await client.put(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/keywordset/kws1",
-            json=TEST_KEYWORDSETS_PAYLOAD,
-        )
-        assert resp.status_code == 201
-        data = resp.json()
-        assert "seqid" in data
-
-        # Datetimes
-
-        resp = await client.put(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/datetime/date1",
-            json=TEST_DATETIMES_PAYLOAD,
-        )
-        assert resp.status_code == 201
-        data = resp.json()
-        assert "seqid" in data
-
         # Conversation
         resp = await client.put(
             f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/conversation/conv1",
             json=TEST_CONVERSATION_PAYLOAD,
-        )
-
-        assert resp.status_code == 201
-        data = resp.json()
-        assert "seqid" in data
-
-        # Layout
-        resp = await client.put(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/layout/layout1",
-            json=TEST_LAYOUT_PAYLOAD,
         )
 
         assert resp.status_code == 201
@@ -228,45 +165,6 @@ async def test_resource_field_add(writer_api, knowledgebox_writer):
 
 
 @pytest.mark.asyncio
-async def test_resource_field_append_extra(writer_api, knowledgebox_writer):
-    knowledgebox_id = knowledgebox_writer
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
-            json={
-                "slug": "resource1",
-                "title": "My resource",
-                "layouts": {"layout1": TEST_LAYOUT_PAYLOAD},
-                "conversations": {"conv1": TEST_CONVERSATION_PAYLOAD},
-            },
-        )
-        assert resp.status_code == 201
-        data = resp.json()
-        assert "uuid" in data
-        assert "seqid" in data
-        rid = data["uuid"]
-
-        # Conversation
-        resp = await client.put(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/conversation/conv1/messages",
-            json=TEST_CONVERSATION_APPEND_MESSAGES_PAYLOAD,
-        )
-        assert resp.status_code == 200
-        data = resp.json()
-        assert "seqid" in data
-
-        # Layout
-        resp = await client.put(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/layout/layout1/blocks",
-            json=TEST_LAYOUT_APPEND_BLOCKS_PAYLOAD,
-        )
-
-        assert resp.status_code == 200
-        data = resp.json()
-        assert "seqid" in data
-
-
-@pytest.mark.asyncio
 async def test_resource_field_delete(writer_api, knowledgebox_writer):
     knowledgebox_id = knowledgebox_writer
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
@@ -278,10 +176,7 @@ async def test_resource_field_delete(writer_api, knowledgebox_writer):
                 "texts": {"text1": TEST_TEXT_PAYLOAD},
                 "links": {"link1": TEST_LINK_PAYLOAD},
                 "files": {"file1": TEST_FILE_PAYLOAD},
-                "layouts": {"layout1": TEST_LAYOUT_PAYLOAD},
                 "conversations": {"conv1": TEST_CONVERSATION_PAYLOAD},
-                "keywordsets": {"keywordset1": TEST_KEYWORDSETS_PAYLOAD},
-                "datetimes": {"datetime1": TEST_DATETIMES_PAYLOAD},
             },
         )
 
@@ -301,29 +196,10 @@ async def test_resource_field_delete(writer_api, knowledgebox_writer):
         )
         assert resp.status_code == 204
 
-        # Keywords
-        resp = await client.delete(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/keywordset/kws1"
-        )
-        assert resp.status_code == 204
-
-        # Datetimes
-
-        resp = await client.delete(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/datetime/date1"
-        )
-        assert resp.status_code == 204
-
         # Conversation
         resp = await client.delete(
             f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/conversation/conv1"
         )
-
-        # Layout
-        resp = await client.delete(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/layout/layout1"
-        )
-        assert resp.status_code == 204
 
         # File
         resp = await client.delete(
@@ -338,12 +214,8 @@ async def test_resource_field_delete(writer_api, knowledgebox_writer):
     [
         ("text/text1", TEST_TEXT_PAYLOAD),
         ("link/link1", TEST_LINK_PAYLOAD),
-        ("keywordset/kws1", TEST_KEYWORDSETS_PAYLOAD),
-        ("datetime/date1", TEST_DATETIMES_PAYLOAD),
         ("conversation/conv1", TEST_CONVERSATION_PAYLOAD),
         ("conversation/conv1/messages", TEST_CONVERSATION_APPEND_MESSAGES_PAYLOAD),
-        ("layout/layout1", TEST_LAYOUT_PAYLOAD),
-        ("layout/layout1/blocks", TEST_LAYOUT_APPEND_BLOCKS_PAYLOAD),
         ("file/file1", TEST_FILE_PAYLOAD),
     ],
 )
@@ -356,7 +228,6 @@ async def test_sync_ops(writer_api, knowledgebox_writer, endpoint, payload):
             json={
                 "slug": "resource1",
                 "title": "My resource",
-                "layouts": {"layout1": TEST_LAYOUT_PAYLOAD},
                 "conversations": {"conv1": TEST_CONVERSATION_PAYLOAD},
             },
         )
@@ -418,9 +289,6 @@ async def test_file_field_validation(writer_api, knowledgebox_writer):
     [
         ["put", "/text/{field_id}", TEST_TEXT_PAYLOAD],
         ["put", "/link/{field_id}", TEST_LINK_PAYLOAD],
-        ["put", "/keywordset/{field_id}", TEST_KEYWORDSETS_PAYLOAD],
-        ["put", "/datetime/{field_id}", TEST_DATETIMES_PAYLOAD],
-        ["put", "/layout/{field_id}", TEST_LAYOUT_PAYLOAD],
         ["put", "/conversation/{field_id}", TEST_CONVERSATION_PAYLOAD],
         ["put", "/file/{field_id}", TEST_FILE_PAYLOAD],
         ["delete", "", None],

@@ -169,63 +169,6 @@ async def _download_field_file(
 
 
 @api.get(
-    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/layout/{{field_id}}/download/field/{{download_field}}",
-    tags=["Resource fields"],
-    status_code=200,
-    summary="Download layout binary field (by slug)",
-)
-@requires_one([NucliaDBRoles.READER])
-@version(1)
-async def download_field_layout_rslug_prefix(
-    request: Request,
-    kbid: str,
-    rslug: str,
-    field_id: str,
-    download_field: str,
-) -> Response:
-    return await _download_field_layout(
-        request, kbid, field_id, download_field, rslug=rslug
-    )
-
-
-@api.get(
-    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/layout/{{field_id}}/download/field/{{download_field}}",
-    tags=["Resource fields"],
-    status_code=200,
-    summary="Download layout binary field (by id)",
-)
-@requires_one([NucliaDBRoles.READER])
-@version(1)
-async def download_field_layout_rid_prefix(
-    request: Request,
-    kbid: str,
-    rid: str,
-    field_id: str,
-    download_field: str,
-) -> Response:
-    return await _download_field_layout(
-        request, kbid, field_id, download_field, rid=rid
-    )
-
-
-async def _download_field_layout(
-    request: Request,
-    kbid: str,
-    field_id: str,
-    download_field: str,
-    rid: Optional[str] = None,
-    rslug: Optional[str] = None,
-) -> Response:
-    rid = await _get_resource_uuid_from_params(kbid, rid, rslug)
-
-    storage = await get_storage(service_name=SERVICE_NAME)
-
-    sf = storage.layout_field(kbid, rid, field_id, download_field)
-
-    return await download_api(sf, request.headers)
-
-
-@api.get(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/conversation/{{field_id}}/download/field/{{message_id}}/{{file_num}}",  # noqa
     tags=["Resource fields"],
     status_code=200,

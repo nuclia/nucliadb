@@ -107,7 +107,7 @@ async def test_create_resource_orm_vector_split(
     assert r is not None
 
     ex1 = ExtractedVectorsWrapper()
-    ex1.field.CopyFrom(FieldID(field_type=FieldType.LAYOUT, field="text1"))
+    ex1.field.CopyFrom(FieldID(field_type=FieldType.CONVERSATION, field="text1"))
     v1 = Vector(start=1, vector=b"ansjkdn")
     vs1 = Vectors()
     vs1.vectors.append(v1)
@@ -120,7 +120,7 @@ async def test_create_resource_orm_vector_split(
     await field_obj.set_vectors(ex1)
 
     ex1 = ExtractedVectorsWrapper()
-    ex1.field.CopyFrom(FieldID(field_type=FieldType.LAYOUT, field="text1"))
+    ex1.field.CopyFrom(FieldID(field_type=FieldType.CONVERSATION, field="text1"))
     v1 = Vector(start=1, vector=b"ansjkdn")
     vs1 = Vectors()
     vs1.vectors.append(v1)

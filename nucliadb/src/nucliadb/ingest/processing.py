@@ -96,9 +96,6 @@ class PushPayload(BaseModel):
     # Diff on Text Field
     textfield: dict[str, models.Text] = {}
 
-    # Diff on a Layout Field
-    layoutfield: dict[str, models.LayoutDiff] = {}
-
     # New conversations to process
     conversationfield: dict[str, models.PushConversation] = {}
 

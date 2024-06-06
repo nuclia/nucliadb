@@ -29,10 +29,7 @@ from nucliadb_protos import resources_pb2
 
 FIELD_TYPE_CHAR_MAP = {
     "c": "conversation",
-    "d": "datetime",
     "f": "file",
-    "k": "keywordset",
-    "l": "layout",
     "u": "link",
     "t": "text",
     # "a": "generic",
@@ -76,10 +73,7 @@ class FieldID(BaseModel):
     class FieldType(Enum):
         FILE = "file"
         LINK = "link"
-        DATETIME = "datetime"
-        KEYWORDSET = "keywordset"
         TEXT = "text"
-        LAYOUT = "layout"
         GENERIC = "generic"
         CONVERSATION = "conversation"
 
@@ -185,10 +179,7 @@ class FieldTypeName(str, Enum):
     TEXT = "text"
     FILE = "file"
     LINK = "link"
-    LAYOUT = "layout"
     CONVERSATION = "conversation"
-    KEYWORDSET = "keywordset"
-    DATETIME = "datetime"
     GENERIC = "generic"
 
 
@@ -247,10 +238,7 @@ class Shards(BaseModel):
 FIELD_TYPES_MAP: Dict[resources_pb2.FieldType.ValueType, FieldTypeName] = {
     resources_pb2.FieldType.LINK: FieldTypeName.LINK,
     resources_pb2.FieldType.FILE: FieldTypeName.FILE,
-    resources_pb2.FieldType.DATETIME: FieldTypeName.DATETIME,
-    resources_pb2.FieldType.KEYWORDSET: FieldTypeName.KEYWORDSET,
     resources_pb2.FieldType.TEXT: FieldTypeName.TEXT,
-    resources_pb2.FieldType.LAYOUT: FieldTypeName.LAYOUT,
     resources_pb2.FieldType.GENERIC: FieldTypeName.GENERIC,
     resources_pb2.FieldType.CONVERSATION: FieldTypeName.CONVERSATION,
 }

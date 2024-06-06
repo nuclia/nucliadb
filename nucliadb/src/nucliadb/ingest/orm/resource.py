@@ -67,11 +67,8 @@ from nucliadb.common.datamanagers.resources import KB_RESOURCE_FIELDS, KB_RESOUR
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
-from nucliadb.ingest.fields.date import Datetime
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.fields.generic import VALID_GENERIC_FIELDS, Generic
-from nucliadb.ingest.fields.keywordset import Keywordset
-from nucliadb.ingest.fields.layout import Layout
 from nucliadb.ingest.fields.link import Link
 from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.orm.brain import FilePagePositions, ResourceBrain
@@ -87,23 +84,17 @@ if TYPE_CHECKING:  # pragma: no cover
 logger = logging.getLogger(__name__)
 
 KB_FIELDS: dict[int, Type] = {
-    FieldType.LAYOUT: Layout,
     FieldType.TEXT: Text,
     FieldType.FILE: File,
     FieldType.LINK: Link,
-    FieldType.DATETIME: Datetime,
-    FieldType.KEYWORDSET: Keywordset,
     FieldType.GENERIC: Generic,
     FieldType.CONVERSATION: Conversation,
 }
 
 KB_REVERSE: dict[str, FieldType.ValueType] = {
-    "l": FieldType.LAYOUT,
     "t": FieldType.TEXT,
     "f": FieldType.FILE,
     "u": FieldType.LINK,
-    "d": FieldType.DATETIME,
-    "k": FieldType.KEYWORDSET,
     "a": FieldType.GENERIC,
     "c": FieldType.CONVERSATION,
 }
@@ -564,24 +555,9 @@ class Resource:
     @processor_observer.wrap({"type": "apply_fields"})
     async def apply_fields(self, message: BrokerMessage):
         message_updated_fields = []
-        for field, layout in message.layouts.items():
-            fid = FieldID(field_type=FieldType.LAYOUT, field=field)
-            await self.set_field(fid.field_type, fid.field, layout)
-            message_updated_fields.append(fid)
-
         for field, text in message.texts.items():
             fid = FieldID(field_type=FieldType.TEXT, field=field)
             await self.set_field(fid.field_type, fid.field, text)
-            message_updated_fields.append(fid)
-
-        for field, keywordset in message.keywordsets.items():
-            fid = FieldID(field_type=FieldType.KEYWORDSET, field=field)
-            await self.set_field(fid.field_type, fid.field, keywordset)
-            message_updated_fields.append(fid)
-
-        for field, datetimeobj in message.datetimes.items():
-            fid = FieldID(field_type=FieldType.DATETIME, field=field)
-            await self.set_field(fid.field_type, fid.field, datetimeobj)
             message_updated_fields.append(fid)
 
         for field, link in message.links.items():
@@ -916,9 +892,6 @@ class Resource:
                 basic.usermetadata,
                 valid_user_field_metadata,
             )
-            if type == FieldType.KEYWORDSET:
-                field_data = await fieldobj.db_get_value()
-                brain.process_keywordset_fields(fieldkey, field_data)
 
     @processor_observer.wrap({"type": "compute_global_text"})
     async def compute_global_text(self):

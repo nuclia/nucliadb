@@ -50,7 +50,6 @@ from nucliadb_utils.utilities import get_local_storage, get_nuclia_storage
 
 STORAGE_RESOURCE = "kbs/{kbid}/r/{uuid}"
 KB_RESOURCE_FIELD = "kbs/{kbid}/r/{uuid}/f/f/{field}"
-KB_LAYOUT_FIELD = "kbs/{kbid}/r/{uuid}/f/l/{field}/{ident}"
 KB_CONVERSATION_FIELD = "kbs/{kbid}/r/{uuid}/f/c/{field}/{ident}/{count}"
 STORAGE_FILE_EXTRACTED = "kbs/{kbid}/r/{uuid}/e/{field_type}/{field}/{key}"
 
@@ -349,13 +348,6 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         key = KB_CONVERSATION_FIELD.format(
             kbid=kbid, uuid=uuid, field=field, ident=ident, count=count
         )
-        return self.field_klass(storage=self, bucket=bucket, fullkey=key)
-
-    def layout_field(
-        self, kbid: str, uuid: str, field: str, ident: str
-    ) -> StorageField:
-        bucket = self.get_bucket_name(kbid)
-        key = KB_LAYOUT_FIELD.format(kbid=kbid, uuid=uuid, field=field, ident=ident)
         return self.field_klass(storage=self, bucket=bucket, fullkey=key)
 
     def file_field(

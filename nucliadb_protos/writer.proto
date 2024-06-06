@@ -71,17 +71,8 @@ message BrokerMessage {
     // Field Conversations
     map<string, resources.Conversation> conversations = 11;
 
-    // Field Layout
-    map<string, resources.FieldLayout> layouts = 12;
-
     // Field Text
     map<string, resources.FieldText> texts = 13;
-
-    // Field keyword
-    map<string, resources.FieldKeywordset> keywordsets = 14;
-
-    // Field Datetime
-    map<string, resources.FieldDatetime> datetimes = 15;
 
     // Field Links
     map<string, resources.FieldLink> links = 16;

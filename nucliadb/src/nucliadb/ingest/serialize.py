@@ -33,18 +33,12 @@ from nucliadb_models.common import FIELD_TYPES_MAP, FieldTypeName
 from nucliadb_models.resource import (
     ConversationFieldData,
     ConversationFieldExtractedData,
-    DatetimeFieldData,
-    DatetimeFieldExtractedData,
     Error,
     ExtractedDataType,
     ExtractedDataTypeName,
     FileFieldData,
     FileFieldExtractedData,
     GenericFieldData,
-    KeywordsetFieldData,
-    KeywordsetFieldExtractedData,
-    LayoutFieldData,
-    LayoutFieldExtractedData,
     LinkFieldData,
     LinkFieldExtractedData,
     QueueType,
@@ -335,33 +329,6 @@ async def managed_serialize(
                         field_type_name,
                         extracted,
                     )
-            elif field_type_name is FieldTypeName.LAYOUT:
-                if resource.data.layouts is None:
-                    resource.data.layouts = {}
-                if field.id not in resource.data.layouts:
-                    resource.data.layouts[field.id] = LayoutFieldData()
-                if include_value:
-                    resource.data.layouts[
-                        field.id
-                    ].value = models.FieldLayout.from_message(
-                        value  # type: ignore
-                    )
-                if include_errors:
-                    error = await field.get_error()
-                    if error is not None:
-                        resource.data.layouts[field.id].error = Error(
-                            body=error.error, code=error.code
-                        )
-                if include_extracted_data:
-                    resource.data.layouts[field.id].extracted = (
-                        LayoutFieldExtractedData()
-                    )
-                    await set_resource_field_extracted_data(
-                        field,
-                        resource.data.layouts[field.id].extracted,
-                        field_type_name,
-                        extracted,
-                    )
             elif field_type_name is FieldTypeName.CONVERSATION:
                 if resource.data.conversations is None:
                     resource.data.conversations = {}
@@ -385,60 +352,6 @@ async def managed_serialize(
                     await set_resource_field_extracted_data(
                         field,
                         resource.data.conversations[field.id].extracted,
-                        field_type_name,
-                        extracted,
-                    )
-            elif field_type_name is FieldTypeName.DATETIME:
-                if resource.data.datetimes is None:
-                    resource.data.datetimes = {}
-                if field.id not in resource.data.datetimes:
-                    resource.data.datetimes[field.id] = DatetimeFieldData()
-                if include_errors:
-                    error = await field.get_error()
-                    if error is not None:
-                        resource.data.datetimes[field.id].error = Error(
-                            body=error.error, code=error.code
-                        )
-                if include_value:
-                    resource.data.datetimes[
-                        field.id
-                    ].value = models.FieldDatetime.from_message(
-                        value  # type: ignore
-                    )
-                if include_extracted_data:
-                    resource.data.datetimes[field.id].extracted = (
-                        DatetimeFieldExtractedData()
-                    )
-                    await set_resource_field_extracted_data(
-                        field,
-                        resource.data.datetimes[field.id].extracted,
-                        field_type_name,
-                        extracted,
-                    )
-            elif field_type_name is FieldTypeName.KEYWORDSET:
-                if resource.data.keywordsets is None:
-                    resource.data.keywordsets = {field.id: KeywordsetFieldData()}
-                if field.id not in resource.data.keywordsets:
-                    resource.data.keywordsets[field.id] = KeywordsetFieldData()
-                if include_errors:
-                    error = await field.get_error()
-                    if error is not None:
-                        resource.data.keywordsets[field.id].error = Error(
-                            body=error.error, code=error.code
-                        )
-                if include_value:
-                    resource.data.keywordsets[
-                        field.id
-                    ].value = models.FieldKeywordset.from_message(
-                        value  # type: ignore
-                    )
-                if include_extracted_data:
-                    resource.data.keywordsets[field.id].extracted = (
-                        KeywordsetFieldExtractedData()
-                    )
-                    await set_resource_field_extracted_data(
-                        field,
-                        resource.data.keywordsets[field.id].extracted,
                         field_type_name,
                         extracted,
                     )

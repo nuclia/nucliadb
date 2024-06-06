@@ -642,7 +642,6 @@ def needs_reprocess(processing_payload: PushPayload) -> bool:
         "filefield",
         "linkfield",
         "textfield",
-        "layoutfield",
         "conversationfield",
     ):
         if len(getattr(processing_payload, field)) > 0:

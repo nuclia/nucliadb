@@ -99,39 +99,3 @@ async def test_create_resource_orm_extracted_file(
         data2 = testfile.read()
     ex3.ParseFromString(data2)
     assert ex3.text == ex2.text
-
-
-@pytest.mark.asyncio
-async def test_create_resource_orm_extracted_delta(
-    storage: Storage, txn, cache, fake_node, knowledgebox_ingest: str
-):
-    uuid = str(uuid4())
-    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
-    r = await kb_obj.add_resource(uuid=uuid, slug="slug")
-    assert r is not None
-    ex1 = ExtractedTextWrapper()
-    ex1.field.CopyFrom(FieldID(field_type=FieldType.LAYOUT, field="text1"))
-    ex1.body.split_text["ident1"] = "My text"
-    ex1.body.text = "all text"
-
-    field_obj: Text = await r.get_field(
-        ex1.field.field, ex1.field.field_type, load=False
-    )
-    await field_obj.set_extracted_text(ex1)
-
-    ex2: Optional[ExtractedText] = await field_obj.get_extracted_text()
-    assert ex2 is not None
-    assert ex2.text == ex1.body.text
-
-    ex1 = ExtractedTextWrapper()
-    ex1.field.CopyFrom(FieldID(field_type=FieldType.LAYOUT, field="text1"))
-    ex1.body.split_text["ident2"] = "My text"
-    ex1.body.text = "all text 2"
-
-    field_obj = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
-    await field_obj.set_extracted_text(ex1)
-
-    ex2 = await field_obj.get_extracted_text()
-    assert ex2 is not None
-    assert ex2.text == ex1.body.text
-    assert len(ex2.split_text) == 2

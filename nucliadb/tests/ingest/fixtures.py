@@ -646,29 +646,6 @@ async def create_resource(
     await add_field_id(test_resource, textfield)
     await make_field(textfield, "MyText")
 
-    # 2.4 LAYOUT FIELD
-
-    l2 = rpb.FieldLayout(format=rpb.FieldLayout.Format.NUCLIAv1)
-    l2.body.blocks["field1"].x = 0
-    l2.body.blocks["field1"].y = 0
-    l2.body.blocks["field1"].cols = 1
-    l2.body.blocks["field1"].rows = 1
-    l2.body.blocks["field1"].type = rpb.Block.TypeBlock.TITLE
-    l2.body.blocks["field1"].payload = "{}"
-    l2.body.blocks["field1"].file.CopyFrom(TEST_CLOUDFILE)
-
-    layoutfield = await test_resource.set_field(rpb.FieldType.LAYOUT, "layout1", l2)
-    await add_field_id(test_resource, layoutfield)
-
-    await layoutfield.set_extracted_text(
-        make_extracted_text(layoutfield.id, body="MyText")
-    )
-    await layoutfield.set_field_metadata(make_field_metadata(layoutfield.id))
-    await layoutfield.set_large_field_metadata(
-        make_field_large_metadata(layoutfield.id)
-    )
-    await layoutfield.set_vectors(make_extracted_vectors(layoutfield.id))
-
     # 2.5 CONVERSATION FIELD
 
     def make_message(
@@ -698,29 +675,6 @@ async def create_resource(
     await add_field_id(test_resource, convfield)
     await make_field(convfield, extracted_text="MyText")
 
-    # 2.6 KEYWORDSET FIELD
-
-    k2 = rpb.FieldKeywordset(
-        keywords=[rpb.Keyword(value="kw1"), rpb.Keyword(value="kw2")]
-    )
-    kws_field = await test_resource.set_field(
-        rpb.FieldType.KEYWORDSET, "keywordset1", k2
-    )
-    await add_field_id(test_resource, kws_field)
-    await make_field(kws_field, "MyText")
-
-    # 2.7 DATETIMES FIELD
-
-    d2 = rpb.FieldDatetime()
-    d2.value.FromDatetime(datetime.now())
-    datetime_field = await test_resource.set_field(
-        rpb.FieldType.DATETIME, "datetime1", d2
-    )
-    await add_field_id(test_resource, datetime_field)
-    await make_field(datetime_field, "MyText")
-
-    field_obj = await test_resource.get_field("datetime1", type=rpb.FieldType.DATETIME)
-
     # Q/A
     question_answers = rpb.FieldQuestionAnswerWrapper()
     for i in range(10):
@@ -737,7 +691,7 @@ async def create_resource(
         qa.answers.append(answer)
         question_answers.question_answers.question_answer.append(qa)
 
-    await field_obj.set_question_answers(question_answers)
+    await convfield.set_question_answers(question_answers)
 
     await txn.commit()
     return test_resource

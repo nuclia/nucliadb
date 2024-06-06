@@ -28,7 +28,6 @@ from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.resource import Resource as ORMResource
 from nucliadb.ingest.processing import PushPayload
 from nucliadb.writer import SERVICE_NAME
-from nucliadb.writer.layouts import serialize_blocks
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models.common import FIELD_TYPES_MAP, FieldTypeName
 from nucliadb_models.conversation import PushConversation
@@ -85,7 +84,6 @@ async def extract_fields(resource: ORMResource, toprocess: PushPayload):
         if field_type_name not in {
             FieldTypeName.TEXT,
             FieldTypeName.FILE,
-            FieldTypeName.LAYOUT,
             FieldTypeName.CONVERSATION,
             FieldTypeName.LINK,
         }:
@@ -113,25 +111,6 @@ async def extract_fields(resource: ORMResource, toprocess: PushPayload):
             )
             parsed_text["format"] = models.PushTextFormat[parsed_text["format"]]
             toprocess.textfield[field_id] = models.Text(**parsed_text)
-
-        if field_type_name is FieldTypeName.LAYOUT:
-            parsed_layout = MessageToDict(
-                field_pb,
-                preserving_proto_field_name=True,
-                including_default_value_fields=True,
-            )
-            parsed_layout["format"] = resources_pb2.FieldLayout.Format.Value(
-                parsed_layout["format"]
-            )
-
-            for blockid, block in parsed_layout["body"]["blocks"].items():
-                cf = field_pb.body.blocks[blockid].file
-                block["file"] = await processing.convert_internal_cf_to_str(cf, storage)
-
-            parsed_layout["blocks"] = parsed_layout.get("body", {}).get("blocks", {})
-            del parsed_layout["body"]
-
-            toprocess.layoutfield[field_id] = models.LayoutDiff(**parsed_layout)
 
         if field_type_name is FieldTypeName.CONVERSATION and isinstance(
             field, Conversation
@@ -186,19 +165,10 @@ async def parse_fields(
     for key, text_field in item.texts.items():
         parse_text_field(key, text_field, writer, toprocess)
 
-    for key, layout_field in item.layouts.items():
-        await parse_layout_field(key, layout_field, writer, toprocess, kbid, uuid)
-
     for key, conversation_field in item.conversations.items():
         await parse_conversation_field(
             key, conversation_field, writer, toprocess, kbid, uuid
         )
-
-    for key, datetime_field in item.datetimes.items():
-        parse_datetime_field(key, datetime_field, writer, toprocess)
-
-    for key, keywordset_field in item.keywordsets.items():
-        parse_keywordset_field(key, keywordset_field, writer, toprocess)
 
 
 def parse_text_field(
@@ -335,78 +305,6 @@ def parse_link_field(
         localstorage=link_field.localstorage or {},
         css_selector=link_field.css_selector,
         xpath=link_field.xpath,
-    )
-
-
-def parse_keywordset_field(
-    key: str,
-    keywordset_field: models.FieldKeywordset,
-    writer: BrokerMessage,
-    toprocess: PushPayload,
-) -> None:
-    if keywordset_field.keywords is None:
-        return
-
-    for keyword in keywordset_field.keywords:
-        fieldpb = resources_pb2.Keyword()
-        fieldpb.value = keyword.value
-        writer.keywordsets[key].keywords.append(fieldpb)
-
-
-def parse_datetime_field(
-    key: str,
-    datetime_field: models.FieldDatetime,
-    writer: BrokerMessage,
-    toprocess: PushPayload,
-) -> None:
-    if datetime_field.value is None:
-        return
-
-    writer.datetimes[key].value.FromDatetime(datetime_field.value)
-
-
-async def parse_layout_field(
-    key: str,
-    layout_field: models.InputLayoutField,
-    writer: BrokerMessage,
-    toprocess: PushPayload,
-    kbid: str,
-    uuid: str,
-) -> None:
-    storage = await get_storage(service_name=SERVICE_NAME)
-    processing = get_processing()
-
-    lc: resources_pb2.FieldLayout = await serialize_blocks(
-        layout_field, kbid, uuid, key, storage
-    )
-    writer.layouts[key].CopyFrom(lc)
-
-    toprocess_blocks = {}
-    for blockid, block in layout_field.body.blocks.items():
-        sf_conv_field: StorageField = storage.layout_field(
-            kbid, uuid, field=key, ident=block.ident
-        )
-        cf_conv_field = await storage.upload_b64file_to_cloudfile(
-            sf_conv_field,
-            block.file.payload.encode(),
-            block.file.filename,
-            block.file.content_type,
-            block.file.md5,
-        )
-
-        toprocess_blocks[blockid] = models.PushLayoutBlock(
-            x=block.x,
-            y=block.y,
-            cols=block.cols,
-            rows=block.rows,
-            type=block.type,
-            ident=block.ident,
-            payload=block.payload,
-            file=await processing.convert_internal_cf_to_str(cf_conv_field, storage),
-        )
-
-    toprocess.layoutfield[key] = models.LayoutDiff(
-        format=lc.format, blocks=toprocess_blocks  # type: ignore
     )
 
 

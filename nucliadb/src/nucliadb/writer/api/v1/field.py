@@ -46,10 +46,7 @@ from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.field import (
     extract_file_field,
     parse_conversation_field,
-    parse_datetime_field,
     parse_file_field,
-    parse_keywordset_field,
-    parse_layout_field,
     parse_link_field,
     parse_text_field,
 )
@@ -77,9 +74,6 @@ else:
 FieldModelType = Union[
     models.TextField,
     models.LinkField,
-    models.FieldKeywordset,
-    models.FieldDatetime,
-    models.InputLayoutField,
     models.InputConversationField,
     models.FileField,
 ]
@@ -87,10 +81,7 @@ FieldModelType = Union[
 FIELD_TYPE_NAME_TO_FIELD_TYPE_MAP = {
     models.FieldTypeName.FILE: resources_pb2.FieldType.FILE,
     models.FieldTypeName.LINK: resources_pb2.FieldType.LINK,
-    models.FieldTypeName.DATETIME: resources_pb2.FieldType.DATETIME,
-    models.FieldTypeName.KEYWORDSET: resources_pb2.FieldType.KEYWORDSET,
     models.FieldTypeName.TEXT: resources_pb2.FieldType.TEXT,
-    models.FieldTypeName.LAYOUT: resources_pb2.FieldType.LAYOUT,
     # models.FieldTypeName.GENERIC: resources_pb2.FieldType.GENERIC,
     models.FieldTypeName.CONVERSATION: resources_pb2.FieldType.CONVERSATION,
 }
@@ -251,41 +242,6 @@ def parse_link_field_adapter(
     return parse_link_field(field_id, field_payload, writer, toprocess)
 
 
-def parse_keywordset_field_adapter(
-    _kbid: str,
-    _rid: str,
-    field_id: FieldIdString,
-    field_payload: models.FieldKeywordset,
-    writer: BrokerMessage,
-    toprocess: PushPayload,
-):
-    return parse_keywordset_field(field_id, field_payload, writer, toprocess)
-
-
-def parse_datetime_field_adapter(
-    _kbid: str,
-    _rid: str,
-    field_id: FieldIdString,
-    field_payload: models.FieldDatetime,
-    writer: BrokerMessage,
-    toprocess: PushPayload,
-):
-    return parse_datetime_field(field_id, field_payload, writer, toprocess)
-
-
-async def parse_layout_field_adapter(
-    kbid: str,
-    rid: str,
-    field_id: FieldIdString,
-    field_payload: models.InputLayoutField,
-    writer: BrokerMessage,
-    toprocess: PushPayload,
-):
-    return await parse_layout_field(
-        field_id, field_payload, writer, toprocess, kbid, rid
-    )
-
-
 async def parse_conversation_field_adapter(
     kbid: str,
     rid: str,
@@ -316,9 +272,6 @@ async def parse_file_field_adapter(
 FIELD_PARSERS_MAP: dict[Type, Union[Callable]] = {
     models.TextField: parse_text_field_adapter,
     models.LinkField: parse_link_field_adapter,
-    models.FieldKeywordset: parse_keywordset_field_adapter,
-    models.FieldDatetime: parse_datetime_field_adapter,
-    models.InputLayoutField: parse_layout_field_adapter,
     models.InputConversationField: parse_conversation_field_adapter,
     models.FileField: parse_file_field_adapter,
 }
@@ -403,126 +356,6 @@ async def add_resource_field_link_rid_prefix(
     rid: str,
     field_id: FieldIdString,
     field_payload: models.LinkField,
-) -> ResourceFieldAdded:
-    return await add_field_to_resource(request, kbid, rid, field_id, field_payload)
-
-
-@api.put(
-    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/keywordset/{{field_id}}",
-    status_code=201,
-    summary="Add resource keywordset field (by slug)",
-    response_model=ResourceFieldAdded,
-    tags=["Resource fields"],
-)
-@requires(NucliaDBRoles.WRITER)
-@version(1)
-async def add_resource_field_keywordset_rslug_prefix(
-    request: Request,
-    kbid: str,
-    rslug: str,
-    field_id: FieldIdString,
-    field_payload: models.FieldKeywordset,
-) -> ResourceFieldAdded:
-    return await add_field_to_resource_by_slug(
-        request, kbid, rslug, field_id, field_payload
-    )
-
-
-@api.put(
-    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/keywordset/{{field_id}}",
-    status_code=201,
-    summary="Add resource keywordset field (by id)",
-    response_model=ResourceFieldAdded,
-    tags=["Resource fields"],
-)
-@requires(NucliaDBRoles.WRITER)
-@version(1)
-async def add_resource_field_keywordset_rid_prefix(
-    request: Request,
-    kbid: str,
-    rid: str,
-    field_id: FieldIdString,
-    field_payload: models.FieldKeywordset,
-) -> ResourceFieldAdded:
-    return await add_field_to_resource(request, kbid, rid, field_id, field_payload)
-
-
-@api.put(
-    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/datetime/{{field_id}}",
-    status_code=201,
-    summary="Add resource datetime field (by slug)",
-    response_model=ResourceFieldAdded,
-    tags=["Resource fields"],
-)
-@requires(NucliaDBRoles.WRITER)
-@version(1)
-async def add_resource_field_datetime_rslug_prefix(
-    request: Request,
-    kbid: str,
-    rslug: str,
-    field_id: FieldIdString,
-    field_payload: models.FieldDatetime,
-) -> ResourceFieldAdded:
-    return await add_field_to_resource_by_slug(
-        request, kbid, rslug, field_id, field_payload
-    )
-
-
-@api.put(
-    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/datetime/{{field_id}}",
-    status_code=201,
-    summary="Add resource datetime field (by id)",
-    response_model=ResourceFieldAdded,
-    tags=["Resource fields"],
-)
-@requires(NucliaDBRoles.WRITER)
-@version(1)
-async def add_resource_field_datetime_rid_prefix(
-    request: Request,
-    kbid: str,
-    rid: str,
-    field_id: FieldIdString,
-    field_payload: models.FieldDatetime,
-) -> ResourceFieldAdded:
-    return await add_field_to_resource(request, kbid, rid, field_id, field_payload)
-
-
-@api.put(
-    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/layout/{{field_id}}",
-    status_code=201,
-    summary="Add resource layout field (by slug)",
-    response_model=ResourceFieldAdded,
-    tags=["Resource fields"],
-)
-@requires(NucliaDBRoles.WRITER)
-@version(1)
-async def add_resource_field_layout_rslug_prefix(
-    request: Request,
-    kbid: str,
-    rslug: str,
-    field_id: FieldIdString,
-    field_payload: models.InputLayoutField,
-) -> ResourceFieldAdded:
-    return await add_field_to_resource_by_slug(
-        request, kbid, rslug, field_id, field_payload
-    )
-
-
-@api.put(
-    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/layout/{{field_id}}",
-    status_code=201,
-    summary="Add resource layout field (by id)",
-    response_model=ResourceFieldAdded,
-    tags=["Resource fields"],
-)
-@requires(NucliaDBRoles.WRITER)
-@version(1)
-async def add_resource_field_layout_rid_prefix(
-    request: Request,
-    kbid: str,
-    rid: str,
-    field_id: FieldIdString,
-    field_payload: models.InputLayoutField,
 ) -> ResourceFieldAdded:
     return await add_field_to_resource(request, kbid, rid, field_id, field_payload)
 
@@ -650,48 +483,6 @@ async def append_messages_to_conversation_field_rid_prefix(
 ) -> ResourceFieldAdded:
     field = models.InputConversationField()
     field.messages.extend(messages)
-    return await add_field_to_resource(request, kbid, rid, field_id, field)
-
-
-@api.put(
-    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/layout/{{field_id}}/blocks",
-    status_code=200,
-    summary="Append blocks to layout field (by slug)",
-    response_model=ResourceFieldAdded,
-    tags=["Resource fields"],
-)
-@requires(NucliaDBRoles.WRITER)
-@version(1)
-async def append_blocks_to_layout_field_rslug_prefix(
-    request: Request,
-    kbid: str,
-    rslug: str,
-    field_id: FieldIdString,
-    blocks: dict[str, models.InputBlock],
-) -> ResourceFieldAdded:
-    field = models.InputLayoutField(body=models.InputLayoutContent())
-    field.body.blocks.update(blocks)
-    return await add_field_to_resource_by_slug(request, kbid, rslug, field_id, field)
-
-
-@api.put(
-    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/layout/{{field_id}}/blocks",
-    status_code=200,
-    summary="Append blocks to layout field (by id)",
-    response_model=ResourceFieldAdded,
-    tags=["Resource fields"],
-)
-@requires(NucliaDBRoles.WRITER)
-@version(1)
-async def append_blocks_to_layout_field_rid_prefix(
-    request: Request,
-    kbid: str,
-    rid: str,
-    field_id: FieldIdString,
-    blocks: dict[str, models.InputBlock],
-) -> ResourceFieldAdded:
-    field = models.InputLayoutField(body=models.InputLayoutContent())
-    field.body.blocks.update(blocks)
     return await add_field_to_resource(request, kbid, rid, field_id, field)
 
 

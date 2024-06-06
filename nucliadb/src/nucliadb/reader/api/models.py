@@ -25,12 +25,9 @@ import nucliadb_models as models
 from nucliadb_models.common import FIELD_TYPES_MAP, FieldTypeName
 from nucliadb_models.resource import (
     ConversationFieldExtractedData,
-    DatetimeFieldExtractedData,
     Error,
     ExtractedDataType,
     FileFieldExtractedData,
-    KeywordsetFieldExtractedData,
-    LayoutFieldExtractedData,
     LinkFieldExtractedData,
     TextFieldExtractedData,
 )
@@ -41,10 +38,7 @@ if TYPE_CHECKING:  # pragma: no cover
             models.FieldText,
             models.FieldFile,
             models.FieldLink,
-            models.FieldLayout,
             models.Conversation,
-            models.FieldKeywordset,
-            models.FieldDatetime,
         ]
     ]
 else:
@@ -66,8 +60,5 @@ FIELD_NAME_TO_EXTRACTED_DATA_FIELD_MAP: dict[FieldTypeName, Any] = {
     FieldTypeName.TEXT: TextFieldExtractedData,
     FieldTypeName.FILE: FileFieldExtractedData,
     FieldTypeName.LINK: LinkFieldExtractedData,
-    FieldTypeName.DATETIME: DatetimeFieldExtractedData,
-    FieldTypeName.KEYWORDSET: KeywordsetFieldExtractedData,
-    FieldTypeName.LAYOUT: LayoutFieldExtractedData,
     FieldTypeName.CONVERSATION: ConversationFieldExtractedData,
 }
