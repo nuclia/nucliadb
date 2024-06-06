@@ -186,6 +186,6 @@ async def test_processing_status(
             resp = await client.get(f"/{KB_PREFIX}/{kbid}/processing-status")
             assert resp.status_code == 200
 
-            data = processing.RequestsResults.parse_obj(resp.json())
+            data = processing.RequestsResults.model_validate(resp.json())
 
             assert all([result.title is not None for result in data.results])

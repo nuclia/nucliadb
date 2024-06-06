@@ -229,4 +229,4 @@ class ProcessingHTTPClient:
         ) as resp:
             resp_text = await resp.text()
             check_status(resp, resp_text)
-            return StatsResponse.parse_raw(resp_text)
+            return StatsResponse.model_validate_json(resp_text)

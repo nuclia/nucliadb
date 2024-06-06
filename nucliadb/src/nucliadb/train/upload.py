@@ -19,10 +19,9 @@
 #
 import argparse
 import asyncio
+import importlib.metadata
 from asyncio import tasks
 from typing import Callable
-
-import pkg_resources
 
 from nucliadb.train.uploader import start_upload
 from nucliadb_telemetry import errors
@@ -75,7 +74,7 @@ def _cancel_all_tasks(loop):
 def run() -> None:
     setup_logging()
 
-    errors.setup_error_handling(pkg_resources.get_distribution("nucliadb").version)
+    errors.setup_error_handling(importlib.metadata.distribution("nucliadb").version)
 
     if asyncio._get_running_loop() is not None:
         raise RuntimeError("cannot be called from a running event loop")

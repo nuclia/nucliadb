@@ -97,7 +97,7 @@ async def get_configuration(
             if err.response.status_code == 404:
                 return None
             raise
-        return LearningConfiguration.parse_obj(resp.json())
+        return LearningConfiguration.model_validate(resp.json())
 
 
 async def set_configuration(
@@ -107,7 +107,7 @@ async def set_configuration(
     async with learning_config_client() as client:
         resp = await client.post(f"config/{kbid}", json=config)
         resp.raise_for_status()
-        return LearningConfiguration.parse_obj(resp.json())
+        return LearningConfiguration.model_validate(resp.json())
 
 
 async def delete_configuration(
@@ -336,7 +336,7 @@ class DummyClient(httpx.AsyncClient):
             semantic_threshold=None,
             semantic_matryoshka_dims=[],
         )
-        return self._response(content=lconfig.dict())
+        return self._response(content=lconfig.model_dump())
 
     async def request(  # type: ignore
         self,

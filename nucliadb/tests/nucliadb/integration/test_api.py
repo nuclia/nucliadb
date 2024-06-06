@@ -855,7 +855,7 @@ async def test_question_answer_annotations(
                         "field": "text1",
                         "field_type": "text",
                     },
-                    "question_answers": [qa_annotation.dict()],
+                    "question_answers": [qa_annotation.model_dump()],
                 }
             ],
         },
@@ -869,7 +869,7 @@ async def test_question_answer_annotations(
     )
     assert resp.status_code == 200
     data = resp.json()
-    resource = Resource.parse_obj(data)
+    resource = Resource.model_validate(data)
     assert resource.fieldmetadata[0].question_answers[0] == qa_annotation  # type: ignore
 
 
@@ -902,7 +902,7 @@ async def test_link_fields_store_css_selector(
     )
     assert resp.status_code == 200
     data = resp.json()
-    resource = Resource.parse_obj(data)
+    resource = Resource.model_validate(data)
     css_selector = None
     if (
         resource.data is not None
@@ -943,7 +943,7 @@ async def test_link_fields_store_xpath(
     )
     assert resp.status_code == 200
     data = resp.json()
-    resource = Resource.parse_obj(data)
+    resource = Resource.model_validate(data)
     xpath = None
     if (
         resource.data is not None

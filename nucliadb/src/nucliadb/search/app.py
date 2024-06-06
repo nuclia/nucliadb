@@ -17,7 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import pkg_resources
+import importlib.metadata
+
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from starlette.middleware import Middleware
@@ -71,7 +72,7 @@ middleware.extend(
 if running_settings.debug:
     middleware.append(Middleware(ProcessTimeHeaderMiddleware))
 
-errors.setup_error_handling(pkg_resources.get_distribution("nucliadb").version)
+errors.setup_error_handling(importlib.metadata.distribution("nucliadb").version)
 
 
 on_startup = [initialize]

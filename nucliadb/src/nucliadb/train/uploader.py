@@ -120,9 +120,9 @@ async def start_upload(request: str, kb: str):
         }
     ) as sess:
         req = await sess.get(f"{url}/request")
-        request_data = RequestData.parse_raw(await req.read())
+        request_data = RequestData.model_validate_json(await req.read())
 
-        metadata = EnabledMetadata(**request_data.metadata.dict())
+        metadata = EnabledMetadata(**request_data.metadata.model_dump())
 
         if request_data.sentences:
             pbsr = GetSentencesRequest()

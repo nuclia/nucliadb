@@ -18,9 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+import importlib.metadata
 from typing import AsyncGenerator
-
-import pkg_resources
 
 from nucliadb.common.cluster.exceptions import NodeError, ShardNotFound
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
@@ -213,6 +212,6 @@ async def main():
 def run() -> int:  # pragma: no cover
     setup_logging()
 
-    errors.setup_error_handling(pkg_resources.get_distribution("nucliadb").version)
+    errors.setup_error_handling(importlib.metadata.distribution("nucliadb").version)
 
     return asyncio.run(main())

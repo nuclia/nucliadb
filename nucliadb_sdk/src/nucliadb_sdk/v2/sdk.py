@@ -220,7 +220,7 @@ def _parse_list_of_pydantic(
     output = []
     for item in data:
         if isinstance(item, BaseModel):
-            output.append(item.dict())
+            output.append(item.model_dump())
         else:
             output.append(item)
     return orjson.dumps(output).decode("utf-8")

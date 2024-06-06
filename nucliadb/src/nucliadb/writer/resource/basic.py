@@ -231,7 +231,7 @@ def validate_classifications(paragraph: ParagraphAnnotation):
             status_code=422, detail="ensure classifications has at least 1 items"
         )
 
-    unique_classifications = {tuple(cf.dict().values()) for cf in classifications}
+    unique_classifications = {tuple(cf.model_dump().values()) for cf in classifications}
     if len(unique_classifications) != len(classifications):
         raise HTTPException(
             status_code=422, detail="Paragraph classifications need to be unique"

@@ -62,10 +62,6 @@ def test_highlight_handles_unescaped_sequences():
     res = highlight(text, ["l'il·luminat?"])
     assert res == "l'estany <mark>l'il·luminat?</mark>"
 
-    # text = "(w.*o.*r.*d)"
-    # res = highlight(text, ["o.*"])
-    # assert res == "(w.*<mark>o.*</mark>r.*d)"
-
 
 def test_highlight():
     res = highlight(

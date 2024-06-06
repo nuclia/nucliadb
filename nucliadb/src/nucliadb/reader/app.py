@@ -18,7 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import pkg_resources
+import importlib.metadata
+
 from fastapi import FastAPI
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
@@ -65,7 +66,7 @@ middleware.extend(
     ]
 )
 
-errors.setup_error_handling(pkg_resources.get_distribution("nucliadb").version)
+errors.setup_error_handling(importlib.metadata.distribution("nucliadb").version)
 
 on_startup = [initialize]
 on_shutdown = [finalize]
