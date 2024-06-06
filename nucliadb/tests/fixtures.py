@@ -703,12 +703,12 @@ def local_storage_settings(tmpdir):
 
 
 @pytest.fixture(scope="function")
-def blobstorage_settings(local_blobstorage_settings):
+def blobstorage_settings(local_storage_settings):
     """
     Redefine this fixture in your test using the params argument
     to allow running tests using each supported driver type.
     """
-    yield local_blobstorage_settings
+    yield local_storage_settings
 
 
 def maindb_driver_lazy_fixtures(default_drivers: str = "redis"):

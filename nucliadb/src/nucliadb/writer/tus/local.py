@@ -94,7 +94,7 @@ class LocalFileStorageManager(FileStorageManager):
         upload_file_id = dm.get("upload_file_id")
         from_url = self.get_file_path(bucket, upload_file_id)
 
-        if dm.get("size", 0) > 0:
+        if dm.size > 0:
             kbid = dm.get("kbid")
             metadata = {
                 "FILENAME": dm.filename,
