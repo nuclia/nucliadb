@@ -66,7 +66,11 @@ class ObjectStore(abc.ABC, metaclass=abc.ABCMeta):
         ...
 
     @abc.abstractmethod
-    async def schedule_delete_bucket(self, bucket: str) -> None: ...
+    async def schedule_delete_bucket(self, bucket: str) -> None:
+        """
+        Mark a bucket for deletion. The bucket will be deleted asynchronously.
+        """
+        ...
 
     @abc.abstractmethod
     async def move_object(
@@ -91,7 +95,11 @@ class ObjectStore(abc.ABC, metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     async def upload_object(
-        self, bucket: str, key: str, data: Union[bytes, AsyncGenerator[bytes, None]]
+        self,
+        bucket: str,
+        key: str,
+        data: Union[bytes, AsyncGenerator[bytes, None]],
+        metadata: ObjectMetadata,
     ) -> None: ...
 
     @abc.abstractmethod

@@ -24,19 +24,15 @@ import logging
 from typing import AsyncGenerator, AsyncIterator, Optional, Union
 
 from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
+from azure.storage.blob import BlobProperties, BlobType, ContentSettings
 from azure.storage.blob.aio import BlobServiceClient
 from nucliadb_protos.resources_pb2 import CloudFile
 
 from nucliadb_utils.storages import CHUNK_SIZE
+from nucliadb_utils.storages.exceptions import ObjectNotFoundError
 from nucliadb_utils.storages.object_store import ObjectStore
-from nucliadb_utils.storages.storage import (
-    BucketItem,
-    ObjectInfo,
-    ObjectMetadata,
-    Range,
-    Storage,
-    StorageField,
-)
+from nucliadb_utils.storages.storage import Storage, StorageField
+from nucliadb_utils.storages.utils import ObjectInfo, ObjectMetadata, Range
 
 logger = logging.getLogger(__name__)
 
@@ -152,7 +148,7 @@ class AzureStorage(Storage):
 
     async def iterate_bucket(
         self, bucket: str, prefix: str
-    ) -> AsyncIterator[BucketItem]:
+    ) -> AsyncIterator[ObjectInfo]:
         assert self.service_client is not None
         # Buckets are mapped to Azure's container concept
         container_name = bucket
@@ -160,7 +156,7 @@ class AzureStorage(Storage):
         async for blob_name in container_client.list_blob_names(
             name_starts_with=prefix
         ):
-            yield BucketItem(name=blob_name)
+            yield ObjectInfo(name=blob_name)
 
     async def download(
         self, bucket_name: str, key: str, headers: Optional[dict[str, str]] = None
@@ -174,6 +170,12 @@ class AzureStorage(Storage):
         downloader = await container_client.download_blob(blob=key)
         async for chunk in downloader.chunks():
             yield chunk
+
+    async def iterate_objects(
+        self, bucket: str, prefix: str
+    ) -> AsyncGenerator[ObjectInfo, None]:
+        raise NotImplementedError()
+        yield ObjectInfo(name="")
 
 
 class AzureObjectStore(ObjectStore):
@@ -250,33 +252,96 @@ class AzureObjectStore(ObjectStore):
         destination_bucket: str,
         destination_key: str,
     ) -> None:
-        raise NotImplementedError()
+        assert self.service_client is not None
+        container_client = self.service_client.get_container_client(origin_bucket)
+        blob_client = container_client.get_blob_client(origin_key)
+        if destination_bucket != origin_bucket:
+            destination_container_client = self.service_client.get_container_client(
+                destination_bucket
+            )
+        else:
+            destination_container_client = container_client
 
     async def delete_object(self, bucket: str, key: str) -> None:
-        raise NotImplementedError()
+        assert self.service_client is not None
+        container_client = self.service_client.get_container_client(bucket)
+        try:
+            await container_client.delete_blob(key, delete_snapshots="include")
+        except ResourceNotFoundError:
+            raise ObjectNotFoundError()
 
     async def upload_object(
-        self, bucket: str, key: str, data: Union[bytes, AsyncGenerator[bytes, None]]
+        self,
+        bucket: str,
+        key: str,
+        data: Union[bytes, AsyncGenerator[bytes, None]],
+        metadata: ObjectMetadata,
     ) -> None:
-        raise NotImplementedError()
+        assert self.service_client is not None
+        container_client = self.service_client.get_container_client(bucket)
+        if isinstance(data, bytes):
+            length = len(data)
+            metadata.size = length
+        else:
+            length = metadata.size or None
+        custom_metadata = {
+            key: str(value) for key, value in metadata.model_dump().items()
+        }
+        await container_client.upload_blob(
+            name=key,
+            data=data,
+            length=length,
+            blob_type=BlobType.BLOCKBLOB,
+            metadata=custom_metadata,
+            content_settings=ContentSettings(
+                content_type=metadata.content_type,
+                content_disposition=f"attachment; filename={metadata.filename}",
+            ),
+        )
 
     async def download_object(self, bucket: str, key: str) -> bytes:
-        raise NotImplementedError()
+        assert self.service_client is not None
+        container_client = self.service_client.get_container_client(bucket)
+        blob_client = container_client.get_blob_client(key)
+        downloader = await blob_client.download_blob()
+        return await downloader.readall()
 
     async def download_object_stream(
         self, bucket: str, key: str, range: Optional[Range] = None
     ) -> AsyncGenerator[bytes, None]:
-        raise NotImplementedError()
-        yield b""
+        range = range or Range()
+        assert self.service_client is not None
+        container_client = self.service_client.get_container_client(bucket)
+        blob_client = container_client.get_blob_client(key)
+        offset = None
+        length = None
+        if range.any():
+            offset = range.start or 0
+            length = range.end - offset + 1 if range.end else None
+        downloader = await blob_client.download_blob(
+            offset=offset,
+            length=length,
+        )
+        async for chunk in downloader.chunks():
+            yield chunk
 
     async def iter_objects(
         self, bucket: str, prefix: str
     ) -> AsyncGenerator[ObjectInfo, None]:
-        raise NotImplementedError()
-        yield ObjectInfo(name="")
+        assert self.service_client is not None
+        container_client = self.service_client.get_container_client(bucket)
+        async for blob in container_client.list_blobs(name_starts_with=prefix):
+            yield ObjectInfo(name=blob.name)
 
     async def get_object_metadata(self, bucket: str, key: str) -> ObjectMetadata:
-        raise NotImplementedError()
+        assert self.service_client is not None
+        container_client = self.service_client.get_container_client(bucket)
+        blob_client = container_client.get_blob_client(key)
+        try:
+            properties: BlobProperties = await blob_client.get_blob_properties()
+            return parse_object_metadata(properties, key)
+        except ResourceNotFoundError:
+            raise ObjectNotFoundError()
 
     async def multipart_upload_start(
         self, bucket: str, key: str, metadata: ObjectMetadata
@@ -290,3 +355,23 @@ class AzureObjectStore(ObjectStore):
 
     async def multipart_upload_finish(self, bucket: str, key: str) -> None:
         raise NotImplementedError()
+
+
+def parse_object_metadata(properties: BlobProperties, key: str) -> ObjectMetadata:
+    custom_metadata = properties.metadata or {}
+    custom_metadata_size = custom_metadata.get("size")
+    if custom_metadata_size and custom_metadata_size != "0":
+        size = int(custom_metadata_size)
+    else:
+        size = properties.size
+    filename = custom_metadata.get("filename") or key.split("/")[-1]
+    content_type = (
+        custom_metadata.get("content_type")
+        or properties.content_settings.content_type
+        or ""
+    )
+    return ObjectMetadata(
+        filename=filename,
+        size=size,
+        content_type=content_type,
+    )
