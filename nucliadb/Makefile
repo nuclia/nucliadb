@@ -21,7 +21,6 @@ install-dev: check-system
 	pip install --upgrade pip wheel
 	cd .. && pip install \
 		-r test-requirements.txt \
-		-r code-requirements.txt \
 		-r nucliadb/requirements-sources.txt \
 		-r nucliadb/requirements.txt \
 		-r nucliadb/requirements-test.txt
@@ -78,17 +77,6 @@ $(test_cov_subpackages_targets):
 
 
 # Generic implicit rules
-
-format-%:
-	cd .. && isort --profile black nucliadb/src/nucliadb/$*
-	black nucliadb/$*
-	ruff check --fix nucliadb/$* --config=../ruff.toml
-
-lint-%:
-	ruff check src/nucliadb/$* --config=../ruff.toml
-	cd .. && isort -c --profile black nucliadb/src/nucliadb/$*
-	black --check src/nucliadb/$*
-	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini src/nucliadb/$*
 
 test-%:
 	$(PYTEST) tests/$*

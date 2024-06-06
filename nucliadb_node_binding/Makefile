@@ -5,7 +5,6 @@ install-dev: check-system
 	pip install --upgrade pip wheel
 	cd .. && pip install \
 		-r test-requirements.txt \
-		-r code-requirements.txt \
 		-r nucliadb_node/requirements-sources.txt \
 		-r nucliadb_node/requirements.txt \
 		./nucliadb_node/
@@ -23,7 +22,7 @@ format:
 
 .PHONY: lint
 lint:
-	flake8 tests --config=setup.cfg
+	ruff check --config=../ruff.toml .
 	isort -c --profile black tests
 	black --check tests
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini .

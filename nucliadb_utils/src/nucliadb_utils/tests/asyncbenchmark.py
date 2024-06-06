@@ -29,12 +29,11 @@ from typing import Any, Awaitable, Callable, Coroutine, Dict, TypeVar
 
 import pytest
 from pytest_benchmark.session import BenchmarkSession  # type: ignore
+from pytest_benchmark.stats import Metadata  # type: ignore
 from pytest_benchmark.timers import compute_timer_precision  # type: ignore
 from pytest_benchmark.utils import NameWrapper, format_time  # type: ignore
 
 T = TypeVar("T")
-
-from pytest_benchmark.stats import Metadata  # type: ignore
 
 
 class FixtureAlreadyUsed(Exception): ...  # noqa

@@ -13,16 +13,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Job to run pre-checks
-  pre-checks:
-    strategy:
-      matrix:
-        python-version: ["3.9", "3.12"]
-    uses: ./.github/workflows/_component_prechecks.yml
-    with:
-      python_version: "${{ matrix.python-version }}"
-      component: "nucliadb_utils"
-
   # Job to run tests
   tests:
     name: NucliaDBUtilsTests

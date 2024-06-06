@@ -3,7 +3,6 @@ install-dev: check-system
 	pip install --upgrade pip wheel
 	cd .. && pip install \
 		-r test-requirements.txt \
-		-r code-requirements.txt \
 		-r nucliadb_sidecar/requirements-sources.txt \
 		-r nucliadb_sidecar/requirements.txt
 	pip install -e .
@@ -20,7 +19,7 @@ format:
 
 .PHONY: lint
 lint:
-	flake8 . --config=setup.cfg
+	ruff check --config=../ruff.toml .
 	cd .. && isort -c --profile black nucliadb_sidecar
 	black --check .
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini .

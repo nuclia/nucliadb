@@ -46,7 +46,7 @@ install: # Install the package
 .PHONY: install-dev
 install-dev: # Install the package for development
 	pip install --upgrade pip wheel
-	pip install -r ../test-requirements.txt -r ../code-requirements.txt -r requirements.txt
+	pip install -r ../test-requirements.txt -r requirements.txt
 	pip install -e .
 
 
@@ -57,7 +57,7 @@ format: # Format the code
 
 .PHONY: lint
 lint: # Run lint checks
-	flake8 . --config=setup.cfg
+	ruff check --config=../ruff.toml .
 	cd .. && isort -c --profile black nucliadb_performance
 	black --check .
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini . --show-traceback

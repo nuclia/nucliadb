@@ -673,7 +673,7 @@ class MinScore(BaseModel):
     bm25: float = Field(
         default=0,
         title="Minimum bm25 score",
-        description="Minimum score used to filter bm25 index search. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/docs/using/search/#minimum-score",
+        description="Minimum score used to filter bm25 index search. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/docs/using/search/#minimum-score",  # noqa: E501
         ge=0,
     )
 
@@ -833,7 +833,7 @@ class ChatModel(BaseModel):
     generative_model: Optional[str] = Field(
         default=None,
         title="Generative model",
-        description="The generative model to use for the predict chat endpoint. If not provided, the model configured for the Knowledge Box is used.",
+        description="The generative model to use for the predict chat endpoint. If not provided, the model configured for the Knowledge Box is used.",  # noqa: E501
     )
 
     max_tokens: Optional[int] = Field(
@@ -859,7 +859,7 @@ class RephraseModel(BaseModel):
     generative_model: Optional[str] = Field(
         default=None,
         title="Generative model",
-        description="The generative model to use for the rephrase endpoint. If not provided, the model configured for the Knowledge Box is used.",
+        description="The generative model to use for the rephrase endpoint. If not provided, the model configured for the Knowledge Box is used.",  # noqa: E501
     )
 
 
@@ -1055,7 +1055,7 @@ class ChatRequest(BaseModel):
     generative_model: Optional[str] = Field(
         default=None,
         title="Generative model",
-        description="The generative model to use for the chat endpoint. If not provided, the model configured for the Knowledge Box is used.",
+        description="The generative model to use for the chat endpoint. If not provided, the model configured for the Knowledge Box is used.",  # noqa: E501
     )
 
     max_tokens: Optional[Union[int, MaxTokens]] = Field(
@@ -1132,7 +1132,7 @@ class SummarizeRequest(BaseModel):
     generative_model: Optional[str] = Field(
         default=None,
         title="Generative model",
-        description="The generative model to use for the summarization. If not provided, the model configured for the Knowledge Box is used.",
+        description="The generative model to use for the summarization. If not provided, the model configured for the Knowledge Box is used.",  # noqa: E501
     )
 
     user_prompt: Optional[str] = Field(
@@ -1146,7 +1146,7 @@ class SummarizeRequest(BaseModel):
         min_length=1,
         max_length=100,
         title="Resources",
-        description="Uids or slugs of the resources to summarize. If the resources are not found, they will be ignored.",
+        description="Uids or slugs of the resources to summarize. If the resources are not found, they will be ignored.",  # noqa: E501
     )
 
     summary_kind: SummaryKind = Field(
