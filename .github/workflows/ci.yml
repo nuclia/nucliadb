@@ -124,6 +124,7 @@ jobs:
         uses: pdm-project/setup-pdm@v3
         with:
           python-version: "3.12"
+          cache: true
       - name: Install venv
         run: pdm sync -d
       - name: Upload virtualenv to cache
