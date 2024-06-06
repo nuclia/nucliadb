@@ -1054,12 +1054,6 @@ pub struct FieldLink {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct FieldDatetime {
-    #[prost(message, optional, tag = "1")]
-    pub value: ::core::option::Option<::prost_types::Timestamp>,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FieldFile {
     #[prost(message, optional, tag = "1")]
     pub added: ::core::option::Option<::prost_types::Timestamp>,

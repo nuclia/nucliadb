@@ -436,10 +436,6 @@ message FieldLink {
 }
 
 
-message FieldDatetime {
-    google.protobuf.Timestamp value = 1;
-}
-
 message FieldFile {
     google.protobuf.Timestamp added = 1;
     CloudFile file = 2;

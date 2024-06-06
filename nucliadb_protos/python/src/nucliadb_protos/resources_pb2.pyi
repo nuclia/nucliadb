@@ -1790,23 +1790,6 @@ class FieldLink(google.protobuf.message.Message):
 global___FieldLink = FieldLink
 
 @typing.final
-class FieldDatetime(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    VALUE_FIELD_NUMBER: builtins.int
-    @property
-    def value(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
-    def __init__(
-        self,
-        *,
-        value: google.protobuf.timestamp_pb2.Timestamp | None = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing.Literal["value", b"value"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["value", b"value"]) -> None: ...
-
-global___FieldDatetime = FieldDatetime
-
-@typing.final
 class FieldFile(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
