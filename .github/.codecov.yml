@@ -85,7 +85,7 @@ flag_management:
           target: 60%
     - name: node-sidecar
       paths:
-        - nucliadb_node/nucliadb_node/**
+        - nucliadb_sidecar/src/nucliadb_sidecar/**
       carryforward: true
       statuses:
         - type: project
