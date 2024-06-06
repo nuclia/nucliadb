@@ -470,7 +470,7 @@ async def test_ingest_audit_stream_files_only(
 
     async with maindb_driver.transaction() as txn:
         set_utility(Utility.AUDIT, stream_audit)
-        await KnowledgeBox.delete_kb(txn, knowledgebox_ingest)
+        await KnowledgeBox.delete(txn, knowledgebox_ingest)
 
         auditreq = await get_audit_messages(psub)
         assert auditreq.kbid == knowledgebox_ingest

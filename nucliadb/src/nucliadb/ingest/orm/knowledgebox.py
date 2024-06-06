@@ -178,7 +178,7 @@ class KnowledgeBox:
         return uuid
 
     @classmethod
-    async def delete_kb(cls, txn: Transaction, kbid: str):
+    async def delete(cls, txn: Transaction, kbid: str):
         # Mark storage to be deleted
         # Mark keys to be deleted
         kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
