@@ -442,7 +442,7 @@ class PredictEngine:
         resp = await self.make_request(
             "POST",
             url=self.get_predict_url(SUMMARIZE, kbid),
-            json=item.dict(),
+            json=item.model_dump(),
             headers=self.get_predict_headers(kbid),
             timeout=None,
         )

@@ -138,7 +138,7 @@ def to_processing_driver_type(file_backend_driver: FileBackendConfig) -> int:
         return 0
     elif file_backend_driver == FileBackendConfig.S3:
         return 1
-    elif file_backend_driver in (FileBackendConfig.LOCAL, FileBackendConfig.PG):
+    elif file_backend_driver == FileBackendConfig.LOCAL:
         return 2
     else:
         logger.error(

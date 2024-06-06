@@ -735,6 +735,4 @@ async def test_tus_validates_intermediate_chunks_length(
             headers=headers,
         )
         assert resp.status_code == 412
-        assert resp.json()["detail"].startswith(
-            "Intermediate chunks cannot be smaller than"
-        )
+        assert "Intermediate chunks" in resp.json()["detail"]

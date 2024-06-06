@@ -18,13 +18,14 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import base64
+from io import BytesIO
 
 import pytest
-from tests.writer.test_files import ASSETS_PATH as WRITER_ASSETS_PATH
+from pytest_lazy_fixtures import lazy_fixture
 
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_PREFIX
 from nucliadb.writer.settings import settings as writer_settings
-from nucliadb.writer.tus import TUSUPLOAD
+from nucliadb.writer.tus import TUSUPLOAD, get_storage_manager
 
 
 @pytest.fixture(scope="function")
@@ -35,15 +36,39 @@ def configure_redis_dm(redis):
     yield
 
 
+def header_encode(some_string):
+    return base64.b64encode(some_string.encode()).decode()
+
+
+@pytest.fixture(
+    scope="function",
+    params=[
+        lazy_fixture.lf("gcs_storage_settings"),
+        lazy_fixture.lf("s3_storage_settings"),
+        lazy_fixture.lf("local_storage_settings"),
+    ],
+)
+def blobstorage_settings(request):
+    """
+    Fixture to parametrize the tests with different storage backends
+    """
+    yield request.param
+
+
 @pytest.mark.asyncio
 async def test_file_tus_upload_and_download(
-    configure_redis_dm, nucliadb_writer, nucliadb_reader, knowledgebox_one
+    blobstorage_settings,
+    configure_redis_dm,
+    nucliadb_writer,
+    nucliadb_reader,
+    knowledgebox_one,
 ):
-    language = base64.b64encode(b"ca").decode()
+    language = "ca"
     filename = "image.jpg"
-    encoded_filename = base64.b64encode(filename.encode()).decode()
-    md5 = base64.b64encode(b"7af0916dba8b70e29d99e72941923529").decode()
+    md5 = "7af0916dba8b70e29d99e72941923529"
+    content_type = "image/jpg"
 
+    # Create a resource
     kb_path = f"/{KB_PREFIX}/{knowledgebox_one}"
     resp = await nucliadb_writer.post(
         f"{kb_path}/{RESOURCES_PREFIX}",
@@ -55,52 +80,128 @@ async def test_file_tus_upload_and_download(
     assert resp.status_code == 201
     resource = resp.json().get("uuid")
 
-    # Make the TUSUPLOAD post
+    # Start TUS upload
     url = f"{kb_path}/{RESOURCE_PREFIX}/{resource}/file/field1/{TUSUPLOAD}"
+    upload_metadata = ",".join(
+        [
+            f"filename {header_encode(filename)}",
+            f"language {header_encode(language)}",
+            f"md5 {header_encode(md5)}",
+        ]
+    )
     resp = await nucliadb_writer.post(
         url,
         headers={
             "tus-resumable": "1.0.0",
-            "upload-metadata": f"filename {encoded_filename},language {language},md5 {md5}",
-            "content-type": "image/jpg",
+            "upload-metadata": upload_metadata,
+            "content-type": content_type,
             "upload-defer-length": "1",
         },
     )
     assert resp.status_code == 201
+    # Get the URL to upload the file to
     url = resp.headers["location"]
 
+    # Create a 2Mb file in memory
+    mb = 1024 * 1024
+    file_content = BytesIO(b"A" * 10 * mb)
+    file_content.seek(0)
+
+    # Upload the file part by part
+    file_storage_manager = get_storage_manager()
+    chunk_size = file_storage_manager.min_upload_size or file_storage_manager.chunk_size
+
+    chunks_uploaded = 0
     offset = 0
-    with open(f"{WRITER_ASSETS_PATH}/image001.jpg", "rb") as f:
-        data = f.read(10000)
-        while data != b"":
-            resp = await nucliadb_writer.head(
-                url,
-            )
+    chunk = file_content.read(chunk_size)
+    while chunk != b"":
+        chunks_uploaded += 1
 
-            assert resp.headers["Upload-Length"] == f"0"
-            assert resp.headers["Upload-Offset"] == f"{offset}"
+        # Make sure the upload is at the right offset
+        resp = await nucliadb_writer.head(url, timeout=None)
+        assert resp.headers["Upload-Length"] == f"0"
+        assert resp.headers["Upload-Offset"] == f"{offset}"
 
-            headers = {
-                "upload-offset": f"{offset}",
-                "content-length": f"{len(data)}",
-            }
-            if len(data) < 10000:
-                headers["upload-length"] = f"{offset + len(data)}"
+        headers = {
+            "upload-offset": f"{offset}",
+            "content-length": f"{len(chunk)}",
+        }
+        if file_content.tell() == file_content.getbuffer().nbytes:
+            # If this is the last part, we need to set the upload-length header
+            headers["upload-length"] = f"{offset + len(chunk)}"
 
-            resp = await nucliadb_writer.patch(
-                url,
-                data=data,
-                headers=headers,
-            )
-            offset += len(data)
-            data = f.read(10000)
+        # Upload the chunk
+        resp = await nucliadb_writer.patch(
+            url,
+            data=chunk,
+            headers=headers,
+        )
+        assert resp.status_code == 200
+        offset += len(chunk)
+        chunk = file_content.read(chunk_size)
 
+    # Check that we tested at least with 2 chunks
+    assert chunks_uploaded >= 2
+
+    # Make sure the upload is finished on the server side
     assert resp.headers["Tus-Upload-Finished"] == "1"
 
+    # Now download the file
     download_url = f"{kb_path}/{RESOURCE_PREFIX}/{resource}/file/field1/download/field"
-    resp = await nucliadb_reader.get(download_url)
+    resp = await nucliadb_reader.get(download_url, timeout=None)
     assert resp.status_code == 200
+    # Make sure the filename and contents are correct
     assert resp.headers["Content-Disposition"] == f'attachment; filename="{filename}"'
+    assert resp.headers["Content-Type"] == content_type
+    assert resp.content == file_content.getvalue()
+
+    # Download the file with range headers
+    range_downloaded = BytesIO()
+    download_url = f"{kb_path}/{RESOURCE_PREFIX}/{resource}/file/field1/download/field"
+
+    # One chunk first
+    resp = await nucliadb_reader.get(
+        download_url,
+        headers={
+            "Range": "bytes=0-100",
+        },
+    )
+    assert resp.status_code == 206
+    range_downloaded.write(resp.content)
+
+    # Some more
+    resp = await nucliadb_reader.get(
+        download_url,
+        headers={
+            "Range": "bytes=101-200",
+        },
+    )
+    assert resp.status_code == 206
+    range_downloaded.write(resp.content)
+
+    # The rest of the file
+    resp = await nucliadb_reader.get(
+        download_url,
+        headers={
+            "Range": "bytes=201-",
+        },
+    )
+    assert resp.status_code == 206
+    range_downloaded.write(resp.content)
+
+    # Make sure the downloaded content is the same as the original file
+    file_content.seek(0)
+    range_downloaded.seek(0)
+    assert file_content.getvalue() == range_downloaded.getvalue()
+
+    # Test with a range that is too big
+    resp = await nucliadb_reader.get(
+        download_url,
+        headers={
+            "Range": "bytes=99900000-",
+        },
+    )
+    assert resp.status_code == 416
 
 
 @pytest.mark.asyncio

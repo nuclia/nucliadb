@@ -26,7 +26,7 @@ import socket
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from datetime import datetime
-from typing import AsyncGenerator, AsyncIterator, Dict, List, Optional
+from typing import Any, AsyncGenerator, AsyncIterator, Dict, List, Optional, cast
 from urllib.parse import quote_plus
 
 import aiohttp
@@ -50,6 +50,7 @@ from nucliadb_utils.storages.exceptions import (
 from nucliadb_utils.storages.storage import (
     ObjectInfo,
     ObjectMetadata,
+    Range,
     Storage,
     StorageField,
 )
@@ -162,11 +163,13 @@ class GCSStorageField(StorageField):
                 assert data["resource"]["name"] == destination_uri
 
     @storage_ops_observer.wrap({"type": "iter_data"})
-    async def iter_data(self, headers=None):
+    async def iter_data(
+        self, range: Optional[Range] = None
+    ) -> AsyncGenerator[bytes, None]:
         attempt = 1
         while True:
             try:
-                async for chunk in self._inner_iter_data(headers=headers):
+                async for chunk in self._inner_iter_data(range=range):
                     yield chunk
                 break
             except ReadingResponseContentException:
@@ -185,23 +188,26 @@ class GCSStorageField(StorageField):
                 attempt += 1
 
     @storage_ops_observer.wrap({"type": "inner_iter_data"})
-    async def _inner_iter_data(self, headers=None):
-        if headers is None:
-            headers = {}
+    async def _inner_iter_data(self, range: Optional[Range] = None):
+        """
+        Iterate through object data.
+        """
+        range = range or Range()
+        assert self.storage.session is not None
 
+        headers = await self.storage.get_access_headers()
+        if range.any():
+            headers["Range"] = range.to_header()
         key = self.field.uri if self.field else self.key
         if self.field is None:
             bucket = self.bucket
         else:
             bucket = self.field.bucket_name
-
         url = "{}/{}/o/{}".format(
             self.storage.object_base_url,
             bucket,
             quote_plus(key),
         )
-        headers.update(await self.storage.get_access_headers())
-
         async with self.storage.session.get(
             url, headers=headers, params={"alt": "media"}, timeout=-1
         ) as api_resp:
@@ -209,11 +215,6 @@ class GCSStorageField(StorageField):
                 text = await api_resp.text()
                 if api_resp.status == 404:
                     raise KeyError(f"Google cloud file not found : \n {text}")
-                elif api_resp.status == 401:
-                    logger.warning(f"Invalid google cloud credentials error: {text}")
-                    raise KeyError(
-                        content={f"Google cloud invalid credentials : \n {text}"}
-                    )
                 raise GoogleCloudException(f"{api_resp.status}: {text}")
             while True:
                 try:
@@ -224,16 +225,6 @@ class GCSStorageField(StorageField):
                     yield chunk
                 else:
                     break
-
-    @storage_ops_observer.wrap({"type": "read_range"})
-    async def read_range(self, start: int, end: int) -> AsyncGenerator[bytes, None]:
-        """
-        Iterate through ranges of data
-        """
-        async for chunk in self.iter_data(
-            headers={"Range": f"bytes={start}-{end - 1}"}
-        ):
-            yield chunk
 
     @backoff.on_exception(
         backoff.expo,
@@ -443,18 +434,8 @@ class GCSStorageField(StorageField):
         async with self.storage.session.get(url, headers=headers) as api_resp:
             if api_resp.status == 200:
                 data = await api_resp.json()
-                metadata = data.get("metadata") or {}
-                metadata = {k.lower(): v for k, v in metadata.items()}
-                size = metadata.get("size") or data.get("size") or 0
-                content_type = (
-                    metadata.get("content_type") or data.get("contentType") or ""
-                )
-                filename = metadata.get("filename") or key.split("/")[-1]
-                return ObjectMetadata(
-                    filename=filename,
-                    size=int(size),
-                    content_type=content_type,
-                )
+                data = cast(dict[str, Any], data)
+                return parse_object_metadata(data, key)
             else:
                 return None
 
@@ -758,3 +739,31 @@ class GCSStorage(Storage):
                 for item in items:
                     yield ObjectInfo(name=item["name"])
                 page_token = data.get("nextPageToken")
+
+
+def parse_object_metadata(object_data: dict[str, Any], key: str) -> ObjectMetadata:
+    custom_metadata: dict[str, str] = object_data.get("metadata") or {}
+    # Lowercase all keys for backwards compatibility with old custom metadata
+    custom_metadata = {k.lower(): v for k, v in custom_metadata.items()}
+
+    # Parse size
+    custom_size = custom_metadata.get("size")
+    if not custom_size or custom_size == "0":
+        data_size = object_data.get("size")
+        size = int(data_size) if data_size else 0
+    else:
+        size = int(custom_size)
+
+    # Parse content-type
+    content_type = (
+        custom_metadata.get("content_type") or object_data.get("contentType") or ""
+    )
+
+    # Parse filename
+    filename = custom_metadata.get("filename") or key.split("/")[-1]
+
+    return ObjectMetadata(
+        filename=filename,
+        size=int(size),
+        content_type=content_type,
+    )

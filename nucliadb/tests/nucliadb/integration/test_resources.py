@@ -235,7 +235,6 @@ async def test_resource_slug_modification(
             "slug": new_slug,
             "title": "New title",
         },
-        timeout=None,
     )
     assert resp.status_code == 200
 
@@ -271,7 +270,6 @@ async def test_resource_slug_modification_rollbacks(
             "title": "Old title",
             "slug": old_slug,
         },
-        timeout=None,
     )
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
@@ -289,7 +287,6 @@ async def test_resource_slug_modification_rollbacks(
                 "slug": "my-resource-2",
                 "title": "New title",
             },
-            timeout=None,
         )
         assert resp.status_code == 506
 

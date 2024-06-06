@@ -64,18 +64,6 @@ async def test_get_storage_gcs():
 
 
 @pytest.mark.asyncio
-async def test_get_storage_pg():
-    pg = AsyncMock()
-    with (
-        patch.object(
-            utilities.storage_settings, "file_backend", FileBackendConfig("pg")
-        ),
-        patch("nucliadb_utils.storages.pg.PostgresStorage", return_value=pg),
-    ):
-        assert await utilities.get_storage() == pg
-
-
-@pytest.mark.asyncio
 async def test_get_storage_local():
     local = AsyncMock()
     with (

@@ -22,12 +22,12 @@ from __future__ import annotations
 import abc
 import hashlib
 import uuid
+from dataclasses import dataclass
 from io import BytesIO
 from typing import (
     Any,
     AsyncGenerator,
     AsyncIterator,
-    Dict,
     List,
     Optional,
     Tuple,
@@ -71,6 +71,23 @@ class ObjectMetadata(BaseModel):
     size: int
 
 
+@dataclass
+class Range:
+    """
+    Represents a range of bytes to be downloaded from a file. The range is inclusive.
+    The start and end values are 0-based.
+    """
+
+    start: Optional[int] = None
+    end: Optional[int] = None
+
+    def any(self) -> bool:
+        return self.start is not None or self.end is not None
+
+    def to_header(self) -> str:
+        return f"bytes={self.start or 0}-{self.end or ''}"
+
+
 class StorageField(abc.ABC, metaclass=abc.ABCMeta):
     storage: Storage
     bucket: str
@@ -93,12 +110,9 @@ class StorageField(abc.ABC, metaclass=abc.ABCMeta):
     async def upload(self, iterator: AsyncIterator, origin: CloudFile) -> CloudFile: ...
 
     @abc.abstractmethod
-    async def iter_data(self, headers=None) -> AsyncGenerator[bytes, None]:  # type: ignore
-        raise NotImplementedError()
-        yield b""
-
-    @abc.abstractmethod
-    async def read_range(self, start: int, end: int) -> AsyncGenerator[bytes, None]:
+    async def iter_data(
+        self, range: Optional[Range] = None
+    ) -> AsyncGenerator[bytes, None]:
         raise NotImplementedError()
         yield b""
 
@@ -433,16 +447,16 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         return await destination.upload(safe_iterator, origin)
 
     async def download(
-        self, bucket: str, key: str, headers: Optional[Dict[str, str]] = None
+        self,
+        bucket: str,
+        key: str,
+        range: Optional[Range] = None,
     ):
         destination: StorageField = self.field_klass(
             storage=self, bucket=bucket, fullkey=key
         )
-        if headers is None:
-            headers = {}
-
         try:
-            async for data in destination.iter_data(headers=headers):
+            async for data in destination.iter_data(range=range):
                 yield data
         except KeyError:
             yield None

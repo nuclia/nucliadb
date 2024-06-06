@@ -86,7 +86,6 @@ async def test_filtering_expression(nucliadb_reader, nucliadb_writer, knowledgeb
         resp = await nucliadb_reader.post(
             f"/kb/{kbid}/find",
             json={"query": "", "filters": filters},
-            timeout=None,
         )
         assert resp.status_code == 200
         body = resp.json()

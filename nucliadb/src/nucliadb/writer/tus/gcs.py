@@ -29,7 +29,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from datetime import datetime
-from typing import AsyncIterator, Optional
+from typing import Optional
 from urllib.parse import quote_plus
 
 import aiohttp
@@ -40,9 +40,7 @@ from oauth2client.service_account import ServiceAccountCredentials  # type: igno
 from nucliadb.writer import logger
 from nucliadb.writer.tus.dm import FileDataManager
 from nucliadb.writer.tus.exceptions import (
-    CloudFileNotFound,
     HTTPBadRequest,
-    HTTPNotFound,
     HTTPPreconditionFailed,
     ResumableURINotAvailable,
 )
@@ -187,6 +185,7 @@ class GCloudFileStorageManager(FileStorageManager):
         _resumable_uri : uri to resumable upload
         _uri : finished uploaded image
         """
+
         if self.storage.session is None:
             raise AttributeError()
 
@@ -313,6 +312,7 @@ class GCloudFileStorageManager(FileStorageManager):
             return call
 
     async def append(self, dm: FileDataManager, iterable, offset) -> int:
+
         count = 0
 
         async for chunk in iterable:
@@ -370,46 +370,8 @@ class GCloudFileStorageManager(FileStorageManager):
         await dm.finish()
         return path
 
-    async def iter_data(self, uri, kbid: str, headers: Optional[dict[str, str]] = None):
-        if self.storage.session is None:
-            raise AttributeError()
-        if headers is None:
-            headers = {}
-
-        url = "{}/{}/o/{}".format(
-            self.storage.object_base_url,
-            self.storage.get_bucket_name(kbid),
-            quote_plus(uri),
-        )
-        headers_auth = await self.storage.get_access_headers()
-        headers.update(headers_auth)
-        async with self.storage.session.get(
-            url, headers=headers, params={"alt": "media"}, timeout=-1
-        ) as api_resp:
-            if api_resp.status not in (200, 206):
-                text = await api_resp.text()
-                if api_resp.status == 404:
-                    raise CloudFileNotFound("Google cloud file not found")
-                elif api_resp.status == 401:
-                    logger.warning(f"Invalid google cloud credentials error: {text}")
-                    raise HTTPNotFound(
-                        detail=f"Google cloud invalid credentials: {text}"
-                    )
-                raise GoogleCloudException(f"{api_resp.status}: {text}")
-            while True:
-                chunk = await api_resp.content.read(1024 * 1024)
-                if len(chunk) > 0:
-                    yield chunk
-                else:
-                    break
-
-    async def read_range(
-        self, uri: str, kbid: str, start: int, end: int
-    ) -> AsyncIterator[bytes]:
-        """
-        Iterate through ranges of data
-        """
-        async for chunk in self.iter_data(
-            uri, kbid, headers={"Range": f"bytes={start}-{end - 1}"}
-        ):
-            yield chunk
+    def validate_intermediate_chunk(self, uploaded_bytes: int):
+        if uploaded_bytes < self.min_upload_size:
+            raise ValueError(
+                f"Intermediate chunks cannot be smaller than {self.min_upload_size} bytes"
+            )
