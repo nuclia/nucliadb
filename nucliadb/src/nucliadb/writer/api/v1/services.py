@@ -281,7 +281,7 @@ async def set_custom_synonyms(request: Request, kbid: str, item: KnowledgeBoxSyn
 @version(1)
 async def delete_custom_synonyms(request: Request, kbid: str):
     async with datamanagers.with_transaction() as txn:
-        if not datamanagers.kb.exists_kb(txn, kbid=kbid):
+        if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
         await datamanagers.synonyms.delete(txn, kbid=kbid)
