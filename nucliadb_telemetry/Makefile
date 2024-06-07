@@ -17,6 +17,7 @@ install-dev:
 format:
 	cd .. && isort --profile black nucliadb_telemetry
 	black .
+	ruff check --fix --config=../ruff.toml .
 
 .PHONY: lint
 lint:

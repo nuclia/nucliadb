@@ -54,6 +54,7 @@ install-dev: # Install the package for development
 format: # Format the code
 	cd .. && isort --profile black nucliadb_performance
 	black .
+	ruff check --fix --config=../ruff.toml .
 
 .PHONY: lint
 lint: # Run lint checks
