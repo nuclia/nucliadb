@@ -11,6 +11,7 @@ install-dev:
 format:
 	cd .. && isort --profile black nucliadb_models
 	black .
+	ruff check --fix --config=../ruff.toml .
 
 .PHONY: lint
 lint:

@@ -22,7 +22,7 @@ from typing import Optional, Union
 
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
-from fastapi_versioning import version  # type: ignore
+from fastapi_versioning import version
 from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.knowledgebox_pb2 import Synonyms
 from nucliadb_protos.writer_pb2 import (

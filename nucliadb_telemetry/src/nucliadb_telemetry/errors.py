@@ -79,7 +79,7 @@ def push_scope(**kwargs: Any) -> ContextManager[Scope]:
     if SENTRY:
         return sentry_sdk.push_scope(**kwargs)
     else:
-        return NoopScope()  # type: ignore
+        return NoopScope()
 
 
 class ErrorHandlingSettings(BaseSettings):

@@ -203,7 +203,7 @@ class NucliaDBDataset(NucliaDataset):
                 kbid=self.kbid,
                 content=SearchRequest(
                     features=[SearchOptions.DOCUMENT], faceted=[base_label], page_size=0
-                ),  # type: ignore
+                ),
             )
             if (
                 fsearch_result.fulltext is None
@@ -305,7 +305,7 @@ class NucliaDBDataset(NucliaDataset):
 
 
 def download_all_partitions(
-    task: str,  # type: ignore
+    task: str,
     slug: Optional[str] = None,
     kbid: Optional[str] = None,
     nucliadb_base_url: Optional[str] = "http://localhost:8080",

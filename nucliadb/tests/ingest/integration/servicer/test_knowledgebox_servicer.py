@@ -32,7 +32,7 @@ async def test_create_knowledgebox(grpc_servicer: IngestFixture, maindb_driver):
     if isinstance(maindb_driver, LocalDriver):
         pytest.skip("There is a bug in the local driver that needs to be fixed")
 
-    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)  # type: ignore
+    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
 
     kbs = await list_all_kb_slugs(maindb_driver)
     assert len(kbs) == 0
@@ -71,7 +71,7 @@ async def list_all_kb_slugs(driver: Driver) -> list[str]:
 async def test_delete_knowledgebox_handles_unexisting_kb(
     grpc_servicer: IngestFixture,
 ) -> None:
-    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)  # type: ignore
+    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
 
     pbid = knowledgebox_pb2.KnowledgeBoxID(slug="idonotexist")
     result = await stub.DeleteKnowledgeBox(pbid)  # type: ignore
@@ -95,7 +95,7 @@ async def test_create_knowledgebox_release_channel(
     grpc_servicer: IngestFixture,
     release_channel,
 ):
-    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)  # type: ignore
+    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
     pb = knowledgebox_pb2.KnowledgeBoxNew(
         slug="test-default", release_channel=release_channel
     )

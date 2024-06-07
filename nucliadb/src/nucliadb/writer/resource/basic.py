@@ -147,7 +147,7 @@ def parse_basic_modify(
                 userfieldmetadata.question_answers.append(qa_annotation_pb)
 
             userfieldmetadata.field.field = fieldmetadata.field.field
-            userfieldmetadata.field.field_type = FIELD_TYPES_MAP_REVERSE[  # type: ignore
+            userfieldmetadata.field.field_type = FIELD_TYPES_MAP_REVERSE[
                 fieldmetadata.field.field_type.value
             ]
 

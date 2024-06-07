@@ -26,10 +26,9 @@ from nats.aio.msg import Msg
 from nats.js.client import JetStreamContext
 from opentelemetry.context import attach
 from opentelemetry.propagate import extract, inject
-from opentelemetry.sdk.trace import TracerProvider  # type: ignore
-from opentelemetry.semconv.trace import SpanAttributes  # type: ignore
-from opentelemetry.trace import SpanKind  # type: ignore
-from opentelemetry.trace import Tracer  # type: ignore
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.semconv.trace import SpanAttributes
+from opentelemetry.trace import SpanKind, Tracer
 
 from nucliadb_telemetry import logger, metrics
 from nucliadb_telemetry.common import set_span_exception
@@ -276,7 +275,7 @@ class NatsClientTelemetry:
         with start_span_message_publisher(tracer, subject) as span:
             try:
                 result = await self.nc.request(
-                    subject, payload, timeout, old_style, headers  # type: ignore
+                    subject, payload, timeout, old_style, headers
                 )
             except Exception as error:
                 set_span_exception(span, error)

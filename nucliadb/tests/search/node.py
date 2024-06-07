@@ -341,7 +341,7 @@ class _NodeRunner:
         for container_id in container_ids:
             for _ in range(5):
                 try:
-                    self.docker_client.containers.get(container_id)  # type: ignore
+                    self.docker_client.containers.get(container_id)
                 except docker.errors.NotFound:
                     break
                 time.sleep(2)

@@ -38,7 +38,7 @@ else:
 # Shared classes
 
 
-class TextFormat(Enum):  # type: ignore
+class TextFormat(Enum):
     PLAIN = "PLAIN"
     HTML = "HTML"
     RST = "RST"

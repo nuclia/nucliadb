@@ -126,7 +126,7 @@ async def search_api(test_settings_search, transaction_utility, redis):  # type:
         if root is False:
             client_base_url = f"{client_base_url}/{API_PREFIX}/v{version}"
 
-        client = AsyncClient(app=application, base_url=client_base_url)  # type: ignore
+        client = AsyncClient(app=application, base_url=client_base_url)
         client.headers["X-NUCLIADB-ROLES"] = ";".join([role.value for role in roles])
         client.headers["X-NUCLIADB-USER"] = user
 

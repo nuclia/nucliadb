@@ -438,7 +438,7 @@ def _inject_signature_and_annotations(
                 path_param, kind=inspect.Parameter.KEYWORD_ONLY, annotation=str
             )
         )
-        annotations[path_param] = str  # type: ignore
+        annotations[path_param] = str
 
     # Body params
     if request_type is not None:

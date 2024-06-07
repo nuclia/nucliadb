@@ -31,7 +31,7 @@ from urllib.parse import quote_plus
 
 import aiohttp
 import aiohttp.client_exceptions
-import backoff  # type: ignore
+import backoff
 import google.auth.transport.requests  # type: ignore
 import yarl
 from google.oauth2 import service_account  # type: ignore

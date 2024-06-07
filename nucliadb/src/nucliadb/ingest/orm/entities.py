@@ -199,7 +199,7 @@ class EntitiesManager:
         elif stored is not None and indexed is not None:
             entities_group = self.merge_entities_groups(indexed, stored)
         else:
-            entities_group = stored or indexed  # type: ignore
+            entities_group = stored or indexed
         return entities_group
 
     async def get_stored_entities_group(self, group: str) -> Optional[EntitiesGroup]:

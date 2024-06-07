@@ -68,8 +68,7 @@ except ImportError:  # pragma: no cover
     IndexNodeException = Exception
 
 try:
-    from nucliadb_node_binding import NodeReader  # type: ignore
-    from nucliadb_node_binding import NodeWriter  # type: ignore
+    from nucliadb_node_binding import NodeReader, NodeWriter
 except ImportError:  # pragma: no cover
     NodeReader = None
     NodeWriter = None

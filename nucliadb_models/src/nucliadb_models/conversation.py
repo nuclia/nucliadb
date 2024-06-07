@@ -39,7 +39,7 @@ else:
 # Shared classes
 
 
-class MessageFormat(Enum):  # type: ignore
+class MessageFormat(Enum):
     PLAIN = "PLAIN"
     HTML = "HTML"
     RST = "RST"

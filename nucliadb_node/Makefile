@@ -16,6 +16,7 @@ check-system:
 format:
 	cd .. && isort --profile black nucliadb_sidecar
 	black .
+	ruff check --fix --config=../ruff.toml .
 
 .PHONY: lint
 lint:

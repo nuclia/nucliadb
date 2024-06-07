@@ -23,7 +23,7 @@ from grpc import aio
 from grpc_health.v1 import health, health_pb2_grpc
 
 from nucliadb.common.maindb.utils import setup_driver, teardown_driver
-from nucliadb.train.nodes import TrainShardManager  # type: ignore
+from nucliadb.train.nodes import TrainShardManager
 from nucliadb.train.settings import settings
 from nucliadb_protos import train_pb2_grpc
 from nucliadb_telemetry.utils import setup_telemetry

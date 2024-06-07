@@ -514,7 +514,7 @@ class DummyPredictEngine(PredictEngine):
 
     async def chat_query_ndjson(
         self, kbid: str, item: ChatModel
-    ) -> tuple[str, AsyncIterator[bytes]]:
+    ) -> tuple[str, AsyncIterator[GenerativeChunk]]:
         self.calls.append(("chat_query_ndjson", item))
 
         async def generate():

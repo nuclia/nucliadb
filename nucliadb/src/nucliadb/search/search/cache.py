@@ -21,7 +21,7 @@ import asyncio
 from contextvars import ContextVar
 from typing import Optional
 
-from lru import LRU  # type: ignore
+from lru import LRU
 
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM

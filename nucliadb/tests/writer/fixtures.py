@@ -73,7 +73,7 @@ async def writer_api(
         client_base_url = "http://test"
         client_base_url = f"{client_base_url}/{API_PREFIX}/v{version}"
 
-        client = AsyncClient(app=application, base_url=client_base_url)  # type: ignore
+        client = AsyncClient(app=application, base_url=client_base_url)
         client.headers["X-NUCLIADB-ROLES"] = ";".join(
             map(lambda role: role.value, roles)
         )

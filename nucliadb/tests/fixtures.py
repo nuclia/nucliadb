@@ -231,13 +231,13 @@ async def knowledgebox(nucliadb_manager: AsyncClient, request):
 
 @pytest.fixture(scope="function")
 async def nucliadb_grpc(nucliadb: Settings):
-    stub = WriterStub(aio.insecure_channel(f"localhost:{nucliadb.ingest_grpc_port}"))  # type: ignore
+    stub = WriterStub(aio.insecure_channel(f"localhost:{nucliadb.ingest_grpc_port}"))
     return stub
 
 
 @pytest.fixture(scope="function")
 async def nucliadb_train(nucliadb: Settings):
-    stub = TrainStub(aio.insecure_channel(f"localhost:{nucliadb.train_grpc_port}"))  # type: ignore
+    stub = TrainStub(aio.insecure_channel(f"localhost:{nucliadb.train_grpc_port}"))
     return stub
 
 
@@ -500,7 +500,7 @@ def predict_mock() -> Mock:  # type: ignore
 
 @pytest.fixture(scope="function")
 def metrics_registry():
-    import prometheus_client.registry  # type: ignore
+    import prometheus_client.registry
 
     for collector in prometheus_client.registry.REGISTRY._names_to_collectors.values():
         if not hasattr(collector, "_metrics"):

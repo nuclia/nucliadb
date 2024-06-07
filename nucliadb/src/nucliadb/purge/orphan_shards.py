@@ -23,7 +23,7 @@ import importlib.metadata
 from dataclasses import dataclass
 from typing import Optional
 
-from grpc.aio import AioRpcError  # type: ignore
+from grpc.aio import AioRpcError
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster import manager

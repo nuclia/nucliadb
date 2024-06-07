@@ -41,7 +41,7 @@ async def start_ingest(service_name: Optional[str] = None):
             nucliadb_settings.nucliadb_ingest, service_name or "ingest"
         )
         set_utility(Utility.CHANNEL, channel)
-        ingest = WriterStub(channel)  # type: ignore
+        ingest = WriterStub(channel)
         set_utility(Utility.INGEST, ingest)
     else:
         # Its not distributed create a ingest

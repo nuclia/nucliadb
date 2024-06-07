@@ -736,7 +736,7 @@ class BaseSearchRequest(BaseModel):
         SearchParamDefaults.security.to_pydantic_field()
     )
 
-    rephrase: Optional[bool] = Field(
+    rephrase: bool = Field(
         default=False,
         title="Rephrase the query to improve search",
         description="Consume LLM tokens to rephrase the query so the semantic search is better",
@@ -1064,7 +1064,7 @@ class ChatRequest(BaseModel):
         description="Use to limit the amount of tokens used in the LLM context and/or for generating the answer. If not provided, the default maximum tokens of the generative model will be used. If an integer is provided, it is interpreted as the maximum tokens for the answer.",  # noqa
     )
 
-    rephrase: Optional[bool] = Field(
+    rephrase: bool = Field(
         default=False,
         title="Rephrase the query to improve search",
         description="Consume LLM tokens to rephrase the query so the semantic search is better",

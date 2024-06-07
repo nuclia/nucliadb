@@ -82,7 +82,7 @@ T = TypeVar(
 )
 
 
-@overload  # type: ignore
+@overload
 async def node_query(
     kbid: str,
     method: Method,

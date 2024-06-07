@@ -38,7 +38,7 @@ def test_paragraph_classification_with_labels(
     ]
     for labels, expected in tests:
         trainset.filter.ClearField("labels")
-        trainset.filter.labels.extend(labels)  # type: ignore
+        trainset.filter.labels.extend(labels)
 
         partitions = export_dataset(
             sdk=sdk, trainset=trainset, kb=upload_data_paragraph_classification

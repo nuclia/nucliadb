@@ -115,7 +115,7 @@ class QueryParser:
         key_filters: Optional[list[str]] = None,
         security: Optional[RequestSecurity] = None,
         generative_model: Optional[str] = None,
-        rephrase: Optional[bool] = False,
+        rephrase: bool = False,
         max_tokens: Optional[MaxTokens] = None,
     ):
         self.kbid = kbid

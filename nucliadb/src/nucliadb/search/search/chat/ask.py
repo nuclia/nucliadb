@@ -463,7 +463,7 @@ async def ask(
         ask_request=ask_request,
         find_results=find_results,
         nuclia_learning_id=nuclia_learning_id,
-        predict_answer_stream=predict_answer_stream,
+        predict_answer_stream=predict_answer_stream,  # type: ignore
         prompt_context=prompt_context,
         prompt_context_order=prompt_context_order,
         auditor=auditor,

@@ -337,7 +337,7 @@ class Resource:
         await self.compute_global_tags(brain)
         fields = await self.get_fields(force=True)
         for (type_id, field_id), field in fields.items():
-            fieldid = FieldID(field_type=type_id, field=field_id)  # type: ignore
+            fieldid = FieldID(field_type=type_id, field=field_id)
             await self.compute_global_text_field(fieldid, brain)
 
             field_metadata = await field.get_field_metadata()
@@ -505,7 +505,7 @@ class Resource:
             if field in self.all_fields_keys:
                 self.all_fields_keys.remove(field)
 
-        field_key = self.generate_field_id(FieldID(field_type=type, field=key))  # type: ignore
+        field_key = self.generate_field_id(FieldID(field_type=type, field=key))
         vo = await field_obj.get_vectors()
         if vo is not None:
             self.indexer.delete_vectors(field_key=field_key, vo=vo)
@@ -898,7 +898,7 @@ class Resource:
         brain.set_resource_metadata(basic=basic, origin=origin)
         for type, field in await self.get_fields_ids(force=True):
             fieldobj = await self.get_field(field, type, load=False)
-            fieldid = FieldID(field_type=type, field=field)  # type: ignore
+            fieldid = FieldID(field_type=type, field=field)
             fieldkey = self.generate_field_id(fieldid)
             extracted_metadata = await fieldobj.get_field_metadata()
             valid_user_field_metadata = None
@@ -960,7 +960,7 @@ class Resource:
                         )
 
         for (type_id, field_id), field in fields.items():
-            fieldid = FieldID(field_type=type_id, field=field_id)  # type: ignore
+            fieldid = FieldID(field_type=type_id, field=field_id)
             field_key = self.generate_field_id(fieldid)
             fm = await field.get_field_metadata()
             extracted_text = None
@@ -1074,7 +1074,7 @@ class Resource:
                         )
 
         for (type_id, field_id), field in fields.items():
-            fieldid = FieldID(field_type=type_id, field=field_id)  # type: ignore
+            fieldid = FieldID(field_type=type_id, field=field_id)
             field_key = self.generate_field_id(fieldid)
             fm = await field.get_field_metadata()
             extracted_text = None
@@ -1152,7 +1152,7 @@ class Resource:
                 metadata.labels.resource.extend(self.basic.usermetadata.classifications)
 
         for (type_id, field_id), field in fields.items():
-            fieldid = FieldID(field_type=type_id, field=field_id)  # type: ignore
+            fieldid = FieldID(field_type=type_id, field=field_id)
             fm = await field.get_field_metadata()
             extracted_text = None
 

@@ -196,10 +196,10 @@ async def test_ingest_messages_autocommit(kbid: str, processor):
     storage = await get_storage(service_name=SERVICE_NAME)
 
     pb = await storage.get_indexing(index._calls[0][1])
-    assert pb.texts["a/summary"].text == "My summary"  # type: ignore
+    assert pb.texts["a/summary"].text == "My summary"
 
     pb = await storage.get_indexing(index._calls[1][1])
-    assert pb.texts["a/summary"].text == "My summary"  # type: ignore
+    assert pb.texts["a/summary"].text == "My summary"
 
 
 @pytest.mark.asyncio
@@ -478,7 +478,7 @@ async def test_ingest_audit_stream_files_only(
 
     async with maindb_driver.transaction() as txn:
         set_utility(Utility.AUDIT, stream_audit)
-        await KnowledgeBox.delete_kb(txn, knowledgebox_ingest)  # type: ignore
+        await KnowledgeBox.delete_kb(txn, knowledgebox_ingest)
 
         auditreq = await get_audit_messages(psub)
         assert auditreq.kbid == knowledgebox_ingest

@@ -43,7 +43,7 @@ class AuditStorage:
         field_metadata: Optional[List[FieldID]] = None,
         audit_fields: Optional[List[AuditField]] = None,
         kb_counter: Optional[AuditKBCounter] = None,
-    ):  # type: ignore
+    ):
         raise NotImplementedError
 
     def report_resources(

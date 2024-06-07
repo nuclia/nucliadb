@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
-from nucliadb.common.maindb.utils import setup_driver  # type: ignore
+from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest.utils import start_ingest, stop_ingest
 from nucliadb.search import SERVICE_NAME
 from nucliadb.search.predict import start_predict_engine

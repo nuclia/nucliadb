@@ -24,16 +24,13 @@ from asyncio import Future
 from functools import partial
 from typing import List
 
-from opentelemetry.exporter.jaeger.thrift import JaegerExporter  # type: ignore
-from opentelemetry.exporter.jaeger.thrift.gen.agent import Agent  # type: ignore
-from opentelemetry.exporter.jaeger.thrift.gen.jaeger import Collector  # type: ignore
-from opentelemetry.exporter.jaeger.thrift.translate import Translate  # type: ignore
-from opentelemetry.exporter.jaeger.thrift.translate import (  # type: ignore
-    ThriftTranslator,
-)
-from opentelemetry.sdk.resources import SERVICE_NAME  # type: ignore
-from opentelemetry.sdk.trace import Span  # type: ignore
-from opentelemetry.sdk.trace.export import SpanExportResult  # type: ignore
+from opentelemetry.exporter.jaeger.thrift import JaegerExporter
+from opentelemetry.exporter.jaeger.thrift.gen.agent import Agent
+from opentelemetry.exporter.jaeger.thrift.gen.jaeger import Collector
+from opentelemetry.exporter.jaeger.thrift.translate import ThriftTranslator, Translate
+from opentelemetry.sdk.resources import SERVICE_NAME
+from opentelemetry.sdk.trace import Span
+from opentelemetry.sdk.trace.export import SpanExportResult
 from thrift.protocol import TCompactProtocol  # type: ignore
 from thrift.transport import TTransport  # type: ignore
 

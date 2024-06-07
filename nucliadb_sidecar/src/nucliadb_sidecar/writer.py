@@ -32,7 +32,7 @@ from nucliadb_protos.noderesources_pb2 import (
 from nucliadb_protos.nodewriter_pb2 import IndexMessage, OpStatus
 from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
 
-from nucliadb_sidecar import SERVICE_NAME  # type: ignore
+from nucliadb_sidecar import SERVICE_NAME
 from nucliadb_utils.grpc import get_traced_grpc_channel
 
 
@@ -45,7 +45,7 @@ class Writer:
         self.channel = get_traced_grpc_channel(
             grpc_writer_address, SERVICE_NAME, max_send_message=250
         )
-        self.stub = NodeWriterStub(self.channel)  # type: ignore
+        self.stub = NodeWriterStub(self.channel)
 
     async def set_resource(self, pb: Resource) -> OpStatus:
         return await self.stub.SetResource(pb)  # type: ignore
