@@ -46,16 +46,13 @@ freeze-requirements:
 
 .PHONY: format
 format:
-	cd .. && isort --profile black nucliadb
-	black .
 	ruff check --fix --config=../ruff.toml .
+	ruff format --config=../ruff.toml .
 
 
 .PHONY: lint
 lint:
-	ruff check . --config=../ruff.toml
-	cd .. && isort -c --profile black nucliadb
-	black --check .
+	ruff check --config=../ruff.toml .
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini .
 
 # pytest doesn't support test discovery across our multiple "top-level folders"

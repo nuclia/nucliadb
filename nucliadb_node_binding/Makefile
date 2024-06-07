@@ -17,14 +17,12 @@ check-system:
 
 .PHONY: format
 format:
-	isort --profile black tests
-	black tests
+	ruff check --fix --config=../ruff.toml tests
+	ruff format --config=../ruff.toml tests
 
 .PHONY: lint
 lint:
-	ruff check --config=../ruff.toml .
-	isort -c --profile black tests
-	black --check tests
+	ruff check --config=../ruff.toml tests
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini .
 
 .PHONY: test

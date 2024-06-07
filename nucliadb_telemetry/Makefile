@@ -15,15 +15,12 @@ install-dev:
 
 .PHONY: format
 format:
-	cd .. && isort --profile black nucliadb_telemetry
-	black .
 	ruff check --fix --config=../ruff.toml .
+	ruff format --config=../ruff.toml .
 
 .PHONY: lint
 lint:
 	ruff check --config=../ruff.toml .
-	cd .. && isort -c --profile black nucliadb_telemetry
-	black --check .
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini . --show-traceback
 
 .PHONY: test
