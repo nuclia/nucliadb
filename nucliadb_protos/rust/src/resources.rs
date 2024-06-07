@@ -53,6 +53,7 @@ pub mod cloud_file {
         Empty = 5,
         Export = 6,
         Postgres = 7,
+        Azure = 8,
     }
     impl Source {
         /// String value of the enum field names used in the ProtoBuf definition.
@@ -69,6 +70,7 @@ pub mod cloud_file {
                 Source::Empty => "EMPTY",
                 Source::Export => "EXPORT",
                 Source::Postgres => "POSTGRES",
+                Source::Azure => "AZURE",
             }
         }
         /// Creates an enum from field names used in the ProtoBuf definition.
@@ -82,6 +84,7 @@ pub mod cloud_file {
                 "EMPTY" => Some(Self::Empty),
                 "EXPORT" => Some(Self::Export),
                 "POSTGRES" => Some(Self::Postgres),
+                "AZURE" => Some(Self::Azure),
                 _ => None,
             }
         }

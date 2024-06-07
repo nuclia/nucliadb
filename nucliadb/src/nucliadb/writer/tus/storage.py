@@ -50,7 +50,7 @@ class FileStorageManager:
     chunk_size: int
     min_upload_size: Optional[int] = None
 
-    def __init__(self, storage):
+    def __init__(self, storage: BlobStore):
         self.storage = storage
 
     def iter_data(

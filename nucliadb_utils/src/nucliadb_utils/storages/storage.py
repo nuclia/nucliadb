@@ -120,7 +120,10 @@ class StorageField(abc.ABC, metaclass=abc.ABCMeta):
     async def start(self, cf: CloudFile) -> CloudFile: ...
 
     @abc.abstractmethod
-    async def append(self, cf: CloudFile, iterable: AsyncIterator) -> int: ...
+    async def append(self, cf: CloudFile, iterable: AsyncIterator) -> int:
+        """
+        Returns the number of bytes appended.
+        """
 
     @abc.abstractmethod
     async def finish(self): ...

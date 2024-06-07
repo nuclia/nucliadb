@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from nucliadb.writer.settings import settings as writer_settings
+from nucliadb.writer.tus.azure import AzureBlobStore, AzureFileStorageManager
 from nucliadb.writer.tus.dm import FileDataManager, RedisFileDataManagerFactory
 from nucliadb.writer.tus.exceptions import ManagerNotAvailable
 from nucliadb.writer.tus.gcs import GCloudBlobStore, GCloudFileStorageManager
@@ -87,6 +88,18 @@ async def initialize():
         await storage_backend.initialize()
 
         storage_manager = LocalFileStorageManager(storage_backend)
+
+        DRIVER = TusStorageDriver(backend=storage_backend, manager=storage_manager)
+
+    elif storage_settings.file_backend == FileBackendConfig.AZURE:
+        if storage_settings.azure_connection_string is None:
+            raise ConfigurationError(
+                "AZURE_CONNECTION_STRING env variable not configured"
+            )
+
+        storage_backend = AzureBlobStore()
+        await storage_backend.initialize(storage_settings.azure_connection_string)
+        storage_manager = AzureFileStorageManager(storage_backend)
 
         DRIVER = TusStorageDriver(backend=storage_backend, manager=storage_manager)
 

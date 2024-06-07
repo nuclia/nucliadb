@@ -37,10 +37,7 @@ class ObjectStore(abc.ABC, metaclass=abc.ABCMeta):
     async def finalize(self) -> None: ...
 
     @abc.abstractmethod
-    def get_bucket_name(self, **kwargs) -> str: ...
-
-    @abc.abstractmethod
-    async def create_bucket(
+    async def bucket_create(
         self, bucket: str, labels: Optional[dict[str, str]] = None
     ) -> bool:
         """
@@ -57,7 +54,7 @@ class ObjectStore(abc.ABC, metaclass=abc.ABCMeta):
         ...
 
     @abc.abstractmethod
-    async def delete_bucket(self, bucket: str) -> tuple[bool, bool]:
+    async def bucket_delete(self, bucket: str) -> tuple[bool, bool]:
         """
         Delete a bucket in the object storage. Returns a tuple with two boolean values:
         - The first one indicates if the bucket was deleted.
@@ -66,14 +63,14 @@ class ObjectStore(abc.ABC, metaclass=abc.ABCMeta):
         ...
 
     @abc.abstractmethod
-    async def schedule_delete_bucket(self, bucket: str) -> None:
+    async def bucket_schedule_delete(self, bucket: str) -> None:
         """
         Mark a bucket for deletion. The bucket will be deleted asynchronously.
         """
         ...
 
     @abc.abstractmethod
-    async def move_object(
+    async def move(
         self,
         origin_bucket: str,
         origin_key: str,
@@ -82,7 +79,7 @@ class ObjectStore(abc.ABC, metaclass=abc.ABCMeta):
     ) -> None: ...
 
     @abc.abstractmethod
-    async def copy_object(
+    async def copy(
         self,
         origin_bucket: str,
         origin_key: str,
@@ -91,10 +88,10 @@ class ObjectStore(abc.ABC, metaclass=abc.ABCMeta):
     ) -> None: ...
 
     @abc.abstractmethod
-    async def delete_object(self, bucket: str, key: str) -> None: ...
+    async def delete(self, bucket: str, key: str) -> None: ...
 
     @abc.abstractmethod
-    async def upload_object(
+    async def upload(
         self,
         bucket: str,
         key: str,
@@ -103,34 +100,40 @@ class ObjectStore(abc.ABC, metaclass=abc.ABCMeta):
     ) -> None: ...
 
     @abc.abstractmethod
-    async def download_object(self, bucket: str, key: str) -> bytes: ...
+    async def download(self, bucket: str, key: str) -> bytes: ...
 
     @abc.abstractmethod
-    async def download_object_stream(
+    async def download_stream(
         self, bucket: str, key: str, range: Optional[Range] = None
     ) -> AsyncGenerator[bytes, None]:
         raise NotImplementedError()
         yield b""
 
     @abc.abstractmethod
-    async def iter_objects(
+    async def iterate(
         self, bucket: str, prefix: str
     ) -> AsyncGenerator[ObjectInfo, None]:
         raise NotImplementedError()
         yield ObjectInfo(name="")
 
     @abc.abstractmethod
-    async def get_object_metadata(self, bucket: str, key: str) -> ObjectMetadata: ...
+    async def get_metadata(self, bucket: str, key: str) -> ObjectMetadata: ...
 
     @abc.abstractmethod
-    async def multipart_upload_start(
+    async def upload_multipart_start(
         self, bucket: str, key: str, metadata: ObjectMetadata
-    ) -> str: ...
+    ) -> Optional[str]:
+        """
+        Start a multipart upload. May return the url for the resumable upload.
+        """
 
     @abc.abstractmethod
-    async def multipart_upload_append(
+    async def upload_multipart_append(
         self, bucket: str, key: str, iterable: AsyncIterator[bytes]
-    ): ...
+    ) -> int:
+        """
+        Append data to a multipart upload. Returns the number of bytes uploaded.
+        """
 
     @abc.abstractmethod
-    async def multipart_upload_finish(self, bucket: str, key: str) -> None: ...
+    async def upload_multipart_finish(self, bucket: str, key: str) -> None: ...

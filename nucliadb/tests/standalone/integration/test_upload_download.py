@@ -46,6 +46,7 @@ def header_encode(some_string):
         lazy_fixture.lf("gcs_storage_settings"),
         lazy_fixture.lf("s3_storage_settings"),
         lazy_fixture.lf("local_storage_settings"),
+        lazy_fixture.lf("azure_storage_settings"),
     ],
 )
 def blobstorage_settings(request):

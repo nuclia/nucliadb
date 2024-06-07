@@ -99,7 +99,21 @@ async def get_storage(
     if Utility.STORAGE in MAIN:
         return MAIN[Utility.STORAGE]
 
-    if storage_settings.file_backend == FileBackendConfig.S3:
+    if storage_settings.file_backend == FileBackendConfig.AZURE:
+        from nucliadb_utils.storages.azure import AzureStorage
+
+        if storage_settings.azure_connection_string is None:
+            raise ConfigurationError("AZURE_CONNECTION_STRING env var not configured")
+
+        azureutil = AzureStorage(
+            connection_string=storage_settings.azure_connection_string,
+        )
+
+        logger.info("Configuring Azure Storage")
+        await azureutil.initialize()
+        set_utility(Utility.STORAGE, azureutil)
+
+    elif storage_settings.file_backend == FileBackendConfig.S3:
         from nucliadb_utils.storages.s3 import S3Storage
 
         s3util = S3Storage(

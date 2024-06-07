@@ -31,7 +31,7 @@ from fastapi.params import Header
 from fastapi.requests import Request
 from fastapi.responses import Response
 from fastapi_versioning import version  # type: ignore
-from nucliadb_protos.resources_pb2 import FieldFile, Metadata
+from nucliadb_protos.resources_pb2 import CloudFile, FieldFile, Metadata
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from starlette.requests import Request as StarletteRequest
 
@@ -822,7 +822,7 @@ async def store_file_on_nuclia_db(
     path: str,
     request: Request,
     bucket: str,
-    source: Source,
+    source: CloudFile.Source.ValueType,
     rid: str,
     field: str,
     content_type: str = "application/octet-stream",

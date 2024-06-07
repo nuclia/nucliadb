@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from dataclasses import dataclass
+from typing import Generator
 
 import pytest
 from pytest_docker_fixtures import images  # type: ignore
@@ -89,7 +90,7 @@ def get_connection_string(host, port) -> str:
 
 
 @pytest.fixture(scope="session")
-def azurite():
+def azurite() -> Generator[AzuriteFixture, None, None]:
     container = Azurite()
     host, port = container.run()
     try:

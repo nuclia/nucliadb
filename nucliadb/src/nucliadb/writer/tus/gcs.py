@@ -189,9 +189,11 @@ class GCloudFileStorageManager(FileStorageManager):
         if self.storage.session is None:
             raise AttributeError()
 
-        upload_file_id = dm.get("upload_file_id", str(uuid.uuid4()))
+        upload_file_id = dm.get("upload_file_id")
         if upload_file_id is not None:
             await self.delete_upload(upload_file_id, kbid)
+        else:
+            upload_file_id = str(uuid.uuid4())
 
         bucket = self.storage.get_bucket_name(kbid)
         init_url = "{}&name={}".format(
