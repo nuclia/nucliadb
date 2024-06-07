@@ -29,23 +29,17 @@ class TestObserver:
     @pytest.fixture(autouse=True)
     def histogram(self):
         mock = MagicMock()
-        with patch(
-            "nucliadb_telemetry.metrics.prometheus_client.Histogram", return_value=mock
-        ):
+        with patch("nucliadb_telemetry.metrics.prometheus_client.Histogram", return_value=mock):
             yield mock
 
     @pytest.fixture(autouse=True)
     def counter(self):
         mock = MagicMock()
-        with patch(
-            "nucliadb_telemetry.metrics.prometheus_client.Counter", return_value=mock
-        ):
+        with patch("nucliadb_telemetry.metrics.prometheus_client.Counter", return_value=mock):
             yield mock
 
     def test_observer(self, histogram, counter):
-        observer = metrics.Observer(
-            "my_metric", buckets=[1, 2, 3], labels={"foo": "bar"}
-        )
+        observer = metrics.Observer("my_metric", buckets=[1, 2, 3], labels={"foo": "bar"})
         with observer(labels={"foo": "baz"}):
             pass
 
@@ -126,17 +120,13 @@ class TestObserver:
 
     def test_observer_with_env(self, histogram, counter, monkeypatch):
         monkeypatch.setenv("VERSION", "1.0.0")
-        observer = metrics.Observer(
-            "my_metric", buckets=[1, 2, 3], labels={"foo": "bar"}
-        )
+        observer = metrics.Observer("my_metric", buckets=[1, 2, 3], labels={"foo": "bar"})
         with observer(labels={"foo": "baz"}):
             pass
 
         histogram.labels.assert_called_once_with(foo="baz", version="1.0.0")
         histogram.labels().observe.assert_called_once()
-        counter.labels.assert_called_once_with(
-            status=metrics.OK, foo="baz", version="1.0.0"
-        )
+        counter.labels.assert_called_once_with(status=metrics.OK, foo="baz", version="1.0.0")
         counter.labels().inc.assert_called_once()
 
 
@@ -176,9 +166,7 @@ class TestCounter:
         counter = metrics.Counter("my_counter2", labels={"foo": "", "bar": ""})
         counter.inc(labels={"foo": "baz", "bar": "qux"})
 
-        assert (
-            counter.counter.labels(**{"foo": "baz", "bar": "qux"})._value.get() == 1.0
-        )
+        assert counter.counter.labels(**{"foo": "baz", "bar": "qux"})._value.get() == 1.0
 
     def test_counter_with_env_label(self, monkeypatch):
         monkeypatch.setenv("VERSION", "1.0.0")
@@ -193,25 +181,23 @@ class TestHistogram:
         histo = metrics.Histogram("my_histo")
         histo.observe(5)
 
-        assert [
-            s for s in histo.histo.collect()[0].samples if s.labels.get("le") == "5.0"
-        ][0].value == 1.0
+        assert [s for s in histo.histo.collect()[0].samples if s.labels.get("le") == "5.0"][
+            0
+        ].value == 1.0
 
     def test_histo_with_labels(self):
-        histo = metrics.Histogram(
-            "my_histo2", labels={"foo": "", "bar": ""}, buckets=[1, 2, 3]
-        )
+        histo = metrics.Histogram("my_histo2", labels={"foo": "", "bar": ""}, buckets=[1, 2, 3])
         histo.observe(1, labels={"foo": "baz", "bar": "qux"})
 
-        assert [
-            s for s in histo.histo.collect()[0].samples if s.labels.get("le") == "1.0"
-        ][0].value == 1.0
+        assert [s for s in histo.histo.collect()[0].samples if s.labels.get("le") == "1.0"][
+            0
+        ].value == 1.0
 
     def test_histo_with_env_label(self, monkeypatch):
         monkeypatch.setenv("VERSION", "1.0.0")
         histo = metrics.Histogram("my_histo3", buckets=[1, 2, 3])
         histo.observe(1)
 
-        assert [
-            s for s in histo.histo.collect()[0].samples if s.labels.get("le") == "1.0"
-        ][0].value == 1.0
+        assert [s for s in histo.histo.collect()[0].samples if s.labels.get("le") == "1.0"][
+            0
+        ].value == 1.0
