@@ -21,7 +21,17 @@ import os
 import time
 from functools import wraps
 from inspect import isasyncgenfunction, isgeneratorfunction
-from typing import TYPE_CHECKING, Dict, List, Optional, Type, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Type,
+    TypeVar,
+    Union,
+)
 
 import prometheus_client
 
@@ -37,6 +47,9 @@ INF = float("inf")
 _STATUS_METRIC = "status"
 _VERSION_METRIC = "version"
 _VERSION_ENV_VAR_NAME = "VERSION"
+
+
+F = TypeVar("F", bound=Callable[..., Any])
 
 
 class Observer:
@@ -77,7 +90,7 @@ class Observer:
             **hist_kwargs,  # type: ignore
         )
 
-    def wrap(self, labels: Optional[Dict[str, str]] = None):
+    def wrap(self, labels: Optional[Dict[str, str]] = None) -> Callable[[F], F]:
         def decorator(func):
             if asyncio.iscoroutinefunction(func):
 
