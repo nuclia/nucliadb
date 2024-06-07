@@ -1,7 +1,7 @@
 import re
 from pathlib import Path
 
-from setuptools import find_packages, setup  # type: ignore
+from setuptools import find_packages, setup
 
 _dir = Path(__file__).resolve().parent
 VERSION = _dir.parent.joinpath("VERSION").open().read().strip()

@@ -319,7 +319,7 @@ async def http_service(
 ):
     tracer_provider = get_telemetry("HTTP_SERVICE")
     await init_telemetry(tracer_provider)
-    app = FastAPI(title="Test API")  # type: ignore
+    app = FastAPI(title="Test API")
     set_global_textmap(B3MultiFormat())
     instrument_app(
         app,
@@ -353,6 +353,6 @@ async def http_service(
         return response.message
 
     client_base_url = "http://test"
-    client = AsyncClient(app=app, base_url=client_base_url)  # type: ignore
+    client = AsyncClient(app=app, base_url=client_base_url)
     yield client
     await clean_telemetry("HTTP_SERVICE")

@@ -21,7 +21,7 @@ from inspect import iscoroutinefunction
 from typing import TYPE_CHECKING, Callable, Optional, Type, Union
 
 from fastapi import HTTPException, Response
-from fastapi_versioning import version  # type: ignore
+from fastapi_versioning import version
 from nucliadb_protos.resources_pb2 import FieldID, Metadata
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from starlette.requests import Request

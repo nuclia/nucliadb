@@ -343,7 +343,7 @@ async def test_fieldmetadata_classification_labels(
     )
     payload = CreateResourcePayload(
         title="Foo",
-        texts={"text": TextField(body="my text")},  # type: ignore
+        texts={"text": TextField(body="my text")},
         fieldmetadata=[fieldmetadata],
     )
     resp = await nucliadb_writer.post(

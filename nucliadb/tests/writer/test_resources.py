@@ -19,7 +19,7 @@
 #
 from datetime import datetime
 from typing import Any, Callable, Optional
-from unittest.mock import AsyncMock  # type: ignore
+from unittest.mock import AsyncMock
 
 import pytest
 from httpx import AsyncClient

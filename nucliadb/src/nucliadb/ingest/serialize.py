@@ -287,10 +287,8 @@ async def managed_serialize(
                     resource.data.files[field.id] = FileFieldData()
                 if include_value:
                     if value is not None:
-                        resource.data.files[
-                            field.id
-                        ].value = models.FieldFile.from_message(
-                            value  # type: ignore
+                        resource.data.files[field.id].value = (
+                            models.FieldFile.from_message(value)
                         )
                     else:
                         resource.data.files[field.id].value = None

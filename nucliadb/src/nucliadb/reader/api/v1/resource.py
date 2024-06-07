@@ -33,7 +33,7 @@ from nucliadb.ingest.serialize import (
     serialize,
     set_resource_field_extracted_data,
 )
-from nucliadb.reader import SERVICE_NAME  # type: ignore
+from nucliadb.reader import SERVICE_NAME
 from nucliadb.reader.api import DEFAULT_RESOURCE_LIST_PAGE_SIZE
 from nucliadb.reader.api.models import (
     FIELD_NAME_TO_EXTRACTED_DATA_FIELD_MAP,
@@ -360,7 +360,7 @@ async def _get_resource_field(
         if field is None:
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
-        resource_field = ResourceField(field_id=field_id, field_type=field_type)  # type: ignore
+        resource_field = ResourceField(field_id=field_id, field_type=field_type)
 
         if ResourceFieldProperties.VALUE in show:
             value = await field.get_value()

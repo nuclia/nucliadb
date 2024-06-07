@@ -163,7 +163,7 @@ async def test_processing_status(
     processing_client.__aenter__ = AsyncMock(return_value=processing_client)
     processing_client.__aexit__ = AsyncMock(return_value=None)
     processing_client.requests = AsyncMock(
-        return_value=processing.RequestsResults(  # type: ignore
+        return_value=processing.RequestsResults(
             results=[
                 processing.RequestsResult(  # type: ignore
                     processing_id="processing_id",

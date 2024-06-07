@@ -42,7 +42,7 @@ class LayoutFormat(LayoutFormatValue, Enum):  # type: ignore
     NUCLIAv1 = "NUCLIAv1"
 
 
-class TypeBlock(str, Enum):  # type: ignore
+class TypeBlock(str, Enum):
     TITLE = "TITLE"
     DESCRIPTION = "DESCRIPTION"
     RICHTEXT = "RICHTEXT"
@@ -112,7 +112,7 @@ class InputLayoutField(BaseModel):
 # Processing classes (Those used to sent to push endpoints)
 
 
-class PushLayoutFormat(Enum):  # type: ignore
+class PushLayoutFormat(Enum):
     NUCLIAv1 = 0
 
 

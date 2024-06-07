@@ -32,8 +32,7 @@ from opentelemetry.instrumentation.utils import (
 )
 from opentelemetry.propagators.textmap import Getter, Setter
 from opentelemetry.semconv.trace import SpanAttributes
-from opentelemetry.trace import Span  # type: ignore
-from opentelemetry.trace import format_trace_id, set_span_in_context
+from opentelemetry.trace import Span, format_trace_id, set_span_in_context
 from opentelemetry.trace.status import Status, StatusCode
 from opentelemetry.util.http import (
     OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SANITIZE_FIELDS,

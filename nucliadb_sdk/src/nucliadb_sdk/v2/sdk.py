@@ -229,9 +229,9 @@ def _parse_list_of_pydantic(
 def _parse_response(response_type, resp: httpx.Response) -> Any:
     if response_type is not None:
         if isinstance(response_type, type) and issubclass(response_type, BaseModel):
-            return response_type.model_validate_json(resp.content)  # type: ignore
+            return response_type.model_validate_json(resp.content)
         else:
-            return response_type(resp)  # type: ignore
+            return response_type(resp)
     else:
         return resp.content
 

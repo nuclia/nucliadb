@@ -25,7 +25,7 @@ from typing import Optional
 
 import aiobotocore  # type: ignore
 import aiohttp
-import backoff  # type: ignore
+import backoff
 import botocore  # type: ignore
 from aiobotocore.session import AioSession  # type: ignore
 from nucliadb_protos.resources_pb2 import CloudFile

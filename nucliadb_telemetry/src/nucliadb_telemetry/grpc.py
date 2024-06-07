@@ -28,13 +28,11 @@ from grpc import ChannelCredentials, ClientCallDetails, aio
 from grpc.experimental import wrap_server_method_handler
 from opentelemetry.context import attach, detach
 from opentelemetry.propagate import extract, inject
-from opentelemetry.propagators.textmap import CarrierT, Setter  # type: ignore
-from opentelemetry.sdk.trace import Span  # type: ignore
-from opentelemetry.sdk.trace import TracerProvider  # type: ignore
-from opentelemetry.semconv.trace import SpanAttributes  # type: ignore
-from opentelemetry.trace import SpanKind  # type: ignore
-from opentelemetry.trace import Tracer  # type: ignore
-from opentelemetry.trace.status import Status, StatusCode  # type: ignore
+from opentelemetry.propagators.textmap import CarrierT, Setter
+from opentelemetry.sdk.trace import Span, TracerProvider
+from opentelemetry.semconv.trace import SpanAttributes
+from opentelemetry.trace import SpanKind, Tracer
+from opentelemetry.trace.status import Status, StatusCode
 
 from nucliadb_telemetry import grpc_metrics, logger
 from nucliadb_telemetry.common import set_span_exception
@@ -96,10 +94,10 @@ def start_span_client(
         for key, value in mutable_metadata.items():
             client_call_details.metadata.add(key=key, value=value)  # type: ignore
 
-    span = tracer.start_span(  # type: ignore
+    span = tracer.start_span(
         name=method_name,
         kind=SpanKind.CLIENT,
-        attributes=attributes,  # type: ignore
+        attributes=attributes,
         set_status_on_exception=set_status_on_exception,
     )
     return span
@@ -127,7 +125,7 @@ class OpenTelemetryServerInterceptor(aio.ServerInterceptor):
         context: grpc.ServicerContext,
         set_status_on_exception=False,
     ):
-        service, meth = handler_call_details.method.lstrip("/").split("/", 1)  # type: ignore
+        service, meth = handler_call_details.method.lstrip("/").split("/", 1)
 
         attributes = {
             SpanAttributes.RPC_SYSTEM: "grpc",
@@ -160,8 +158,8 @@ class OpenTelemetryServerInterceptor(aio.ServerInterceptor):
         except IndexError:
             logger.warning("Failed to parse peer address '%s'", context.peer())
 
-        return self.tracer.start_as_current_span(  # type: ignore
-            name=handler_call_details.method,  # type: ignore
+        return self.tracer.start_as_current_span(
+            name=handler_call_details.method,
             kind=SpanKind.SERVER,
             attributes=attributes,
             set_status_on_exception=set_status_on_exception,
@@ -239,7 +237,7 @@ class OpenTelemetryServerInterceptor(aio.ServerInterceptor):
 
             return wrapper
 
-        if "grpc.health.v1.Health" in handler_call_details.method:  # type: ignore
+        if "grpc.health.v1.Health" in handler_call_details.method:
             return handler
 
         return wrap_server_method_handler(wrapper, handler)

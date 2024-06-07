@@ -1,6 +1,6 @@
 import re
 
-from setuptools import find_packages, setup  # type: ignore
+from setuptools import find_packages, setup
 
 
 def load_reqs(filename):

@@ -74,7 +74,7 @@ class MetricsServerInterceptor(aio.ServerInterceptor):
             @functools.wraps(behavior)
             async def wrapper(request: Any, context: aio.ServicerContext) -> Any:
                 with grpc_server_observer(
-                    labels={"method": handler_call_details.method}  # type: ignore
+                    labels={"method": handler_call_details.method}
                 ) as observer:
                     value = await behavior(request, context)
                     observer.set_status(str(context.code()))

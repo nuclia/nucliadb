@@ -106,7 +106,7 @@ async def get_indexed_data(
     val = await txn.get(key)
     if val is not None:
         data = orjson.loads(val)
-        return tuple(data)  # type: ignore
+        return tuple(data)
     return None
 
 
@@ -140,7 +140,7 @@ async def _get_batch_indexed_data(
     results: list[tuple[str, tuple[str, int]]] = []
     for key, val in zip(batch, values):
         if val is not None:
-            data: tuple[str, int] = tuple(orjson.loads(val))  # type: ignore
+            data: tuple[str, int] = tuple(orjson.loads(val))
             results.append((key.split("/")[-1], data))
     return results
 

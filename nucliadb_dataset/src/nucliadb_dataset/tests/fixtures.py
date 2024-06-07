@@ -35,10 +35,10 @@ from nucliadb_models.resource import KnowledgeBoxObj
 from nucliadb_models.text import TextField
 from nucliadb_models.utils import FieldIdString, SlugString
 from nucliadb_models.writer import CreateResourcePayload
-from nucliadb_sdk.v2.sdk import NucliaDB  # type: ignore
+from nucliadb_sdk.v2.sdk import NucliaDB
 
 DOCKER_ENV_GROUPS = re.search(r"//([^:]+)", docker.from_env().api.base_url)
-DOCKER_HOST: Optional[str] = DOCKER_ENV_GROUPS.group(1) if DOCKER_ENV_GROUPS else None  # type: ignore
+DOCKER_HOST: Optional[str] = DOCKER_ENV_GROUPS.group(1) if DOCKER_ENV_GROUPS else None
 
 
 @pytest.fixture(scope="function")
@@ -324,7 +324,7 @@ def temp_folder():
 @pytest.mark.asyncio
 async def ingest_stub(nucliadb) -> AsyncIterator[WriterStub]:
     channel = aio.insecure_channel(f"{nucliadb.host}:{nucliadb.grpc}")
-    stub = WriterStub(channel)  # type: ignore
+    stub = WriterStub(channel)
     yield stub
     await channel.close(grace=True)
 
@@ -332,6 +332,6 @@ async def ingest_stub(nucliadb) -> AsyncIterator[WriterStub]:
 @pytest.fixture
 def ingest_stub_sync(nucliadb) -> Iterator[WriterStub]:
     channel = grpc.insecure_channel(f"{nucliadb.host}:{nucliadb.grpc}")
-    stub = WriterStub(channel)  # type: ignore
+    stub = WriterStub(channel)
     yield stub
     channel.close()

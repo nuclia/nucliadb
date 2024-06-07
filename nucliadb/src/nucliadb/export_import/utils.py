@@ -417,7 +417,7 @@ class ExportStreamReader:
                     ExportedItemType.ENTITIES: self.read_entities,
                     ExportedItemType.LABELS: self.read_labels,
                 }[item_type]
-                data = await read_data_func()  # type: ignore
+                data = await read_data_func()
                 yield item_type, data
             except ExportStreamExhausted:
                 break

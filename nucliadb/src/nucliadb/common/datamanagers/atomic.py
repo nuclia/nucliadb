@@ -51,7 +51,7 @@ from .utils import with_ro_transaction, with_transaction
 
 __python_version = (sys.version_info.major, sys.version_info.minor)
 if __python_version == (3, 9):
-    from typing_extensions import ParamSpec  # type: ignore
+    from typing_extensions import ParamSpec
 else:
     from typing import ParamSpec  # type: ignore
 

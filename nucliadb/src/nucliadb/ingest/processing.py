@@ -473,7 +473,7 @@ class ProcessingEngine:
 
 class DummyProcessingEngine(ProcessingEngine):
     def __init__(self):
-        self.calls: list[list[Any]] = []  # type: ignore
+        self.calls: list[list[Any]] = []
         self.values = defaultdict(list)
         self.onprem = True
 

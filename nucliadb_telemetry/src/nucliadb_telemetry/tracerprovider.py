@@ -22,8 +22,7 @@ import time
 from typing import Optional
 
 from opentelemetry.context import Context  # type: ignore
-from opentelemetry.sdk.trace import TracerProvider  # type: ignore
-from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor  # type: ignore
+from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor, TracerProvider
 
 
 class AsyncMultiSpanProcessor(SpanProcessor):
@@ -62,7 +61,7 @@ class AsyncMultiSpanProcessor(SpanProcessor):
         for sp in self._span_processors:
             sp.shutdown()
 
-    async def async_force_flush(self, timeout_millis: int = 30000) -> bool:  # type: ignore
+    async def async_force_flush(self, timeout_millis: int = 30000) -> bool:
         """Sequentially calls async_force_flush on all underlying
         :class:`SpanProcessor`
 

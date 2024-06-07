@@ -32,7 +32,7 @@ def get_exports_consumer() -> NatsTaskConsumer:
         name="exports_consumer",
         stream=const.Streams.KB_EXPORTS,  # type: ignore
         callback=export_kb_to_blob_storage,  # type: ignore
-        msg_type=NatsTaskMessage,  # type: ignore
+        msg_type=NatsTaskMessage,
         max_concurrent_messages=10,
     )
 
@@ -41,7 +41,7 @@ async def get_exports_producer(context: ApplicationContext) -> NatsTaskProducer:
     producer = create_producer(
         name="exports_producer",
         stream=const.Streams.KB_EXPORTS,  # type: ignore
-        msg_type=NatsTaskMessage,  # type: ignore
+        msg_type=NatsTaskMessage,
     )
     await producer.initialize(context)
     return producer
@@ -52,7 +52,7 @@ def get_imports_consumer() -> NatsTaskConsumer:
         name="imports_consumer",
         stream=const.Streams.KB_IMPORTS,  # type: ignore
         callback=import_kb_from_blob_storage,  # type: ignore
-        msg_type=NatsTaskMessage,  # type: ignore
+        msg_type=NatsTaskMessage,
         max_concurrent_messages=10,
     )
 
@@ -61,7 +61,7 @@ async def get_imports_producer(context: ApplicationContext) -> NatsTaskProducer:
     producer = create_producer(
         name="imports_producer",
         stream=const.Streams.KB_IMPORTS,  # type: ignore
-        msg_type=NatsTaskMessage,  # type: ignore
+        msg_type=NatsTaskMessage,
     )
     await producer.initialize(context)
     return producer

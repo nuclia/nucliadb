@@ -113,7 +113,7 @@ async def _get_index_node_metadata(
     channel = get_traced_grpc_channel(grpc_address, "discovery", variant="_writer")
     if read_replica:
         # on a read replica, we need to use the replication service
-        stub = replication_pb2_grpc.ReplicationServiceStub(channel)  # type: ignore
+        stub = replication_pb2_grpc.ReplicationServiceStub(channel)
     else:
         stub = nodewriter_pb2_grpc.NodeWriterStub(channel)  # type: ignore
     try:
@@ -152,7 +152,7 @@ async def _get_standalone_index_node_metadata(
     else:
         grpc_address = address
     channel = get_traced_grpc_channel(grpc_address, "standalone_proxy")
-    stub = standalone_pb2_grpc.StandaloneClusterServiceStub(channel)  # type: ignore
+    stub = standalone_pb2_grpc.StandaloneClusterServiceStub(channel)
     resp: standalone_pb2.NodeInfoResponse = await stub.NodeInfo(standalone_pb2.NodeInfoRequest())  # type: ignore
     return IndexNodeMetadata(
         node_id=resp.id,

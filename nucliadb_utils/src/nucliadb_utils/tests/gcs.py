@@ -30,12 +30,12 @@ from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 from nucliadb_utils.storages.gcs import GCSStorage
 from nucliadb_utils.store import MAIN
 from nucliadb_utils.tests import free_port
-from nucliadb_utils.utilities import Utility  # type: ignore
+from nucliadb_utils.utilities import Utility
 
 # IMPORTANT!
 # Without this, tests running in a remote docker host won't work
 DOCKER_ENV_GROUPS = re.search(r"//([^:]+)", docker.from_env().api.base_url)
-DOCKER_HOST: Optional[str] = DOCKER_ENV_GROUPS.group(1) if DOCKER_ENV_GROUPS else None  # type: ignore
+DOCKER_HOST: Optional[str] = DOCKER_ENV_GROUPS.group(1) if DOCKER_ENV_GROUPS else None
 
 images.settings["gcs"] = {
     "image": "fsouza/fake-gcs-server",

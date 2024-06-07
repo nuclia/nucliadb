@@ -121,7 +121,7 @@ async def knowledgebox_counters(
         )
 
     try:
-        results: Optional[list[Shard]] = await asyncio.wait_for(  # type: ignore
+        results: Optional[list[Shard]] = await asyncio.wait_for(
             asyncio.gather(*ops, return_exceptions=True),  # type: ignore
             timeout=settings.search_timeout,
         )

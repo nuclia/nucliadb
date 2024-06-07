@@ -23,8 +23,7 @@ from typing import Dict, Optional
 
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.b3 import B3MultiFormat
-from opentelemetry.sdk.resources import SERVICE_NAME  # type: ignore
-from opentelemetry.sdk.resources import Resource  # type: ignore
+from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 
 from nucliadb_telemetry.batch_span import BatchSpanProcessor
 from nucliadb_telemetry.jaeger import JaegerExporterAsync
@@ -128,7 +127,7 @@ async def setup_telemetry(service_name: str) -> Optional[AsyncTracerProvider]:
         except ImportError:  # pragma: no cover
             pass
         try:
-            from opentelemetry.instrumentation.aiohttp_client import (  # type: ignore
+            from opentelemetry.instrumentation.aiohttp_client import (
                 AioHttpClientInstrumentor,
             )
 

@@ -25,7 +25,7 @@ from typing import AsyncGenerator, AsyncIterator, Optional
 
 import aiobotocore  # type: ignore
 import aiohttp
-import backoff  # type: ignore
+import backoff
 import botocore  # type: ignore
 from aiobotocore.client import AioBaseClient  # type: ignore
 from aiobotocore.session import AioSession, get_session  # type: ignore

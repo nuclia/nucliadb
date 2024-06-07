@@ -159,7 +159,7 @@ class KBShardManager:
 
         try:
             results = await asyncio.wait_for(
-                asyncio.gather(*ops, return_exceptions=True),  # type: ignore
+                asyncio.gather(*ops, return_exceptions=True),
                 timeout=timeout,
             )
         except asyncio.TimeoutError as exc:
@@ -451,7 +451,7 @@ class StandaloneKBShardManager(KBShardManager):
     def __init__(self):
         super().__init__()
         self._lock = asyncio.Lock()
-        self._change_count: dict[tuple[str, str], int] = {}  # type: ignore
+        self._change_count: dict[tuple[str, str], int] = {}
 
     async def _resource_change_event(
         self, kbid: str, node_id: str, shard_id: str
@@ -468,13 +468,15 @@ class StandaloneKBShardManager(KBShardManager):
             if index_node is None:
                 return
             shard_info: noderesources_pb2.Shard = await index_node.reader.GetShard(
-                nodereader_pb2.GetShardRequest(shard_id=noderesources_pb2.ShardId(id=shard_id))  # type: ignore
+                nodereader_pb2.GetShardRequest(
+                    shard_id=noderesources_pb2.ShardId(id=shard_id)
+                )
             )
             await self.maybe_create_new_shard(
                 kbid,
                 shard_info.paragraphs,
             )
-            await index_node.writer.GC(noderesources_pb2.ShardId(id=shard_id))  # type: ignore
+            await index_node.writer.GC(noderesources_pb2.ShardId(id=shard_id))
 
     @backoff.on_exception(
         backoff.expo, NodesUnsync, jitter=backoff.random_jitter, max_tries=5
@@ -626,7 +628,7 @@ def check_enough_nodes():
     if settings.max_node_replicas >= 0:
         available_nodes = list(
             filter(
-                lambda n: n.shard_count < settings.max_node_replicas, available_nodes  # type: ignore
+                lambda n: n.shard_count < settings.max_node_replicas, available_nodes
             )
         )
         if len(available_nodes) < target_replicas:

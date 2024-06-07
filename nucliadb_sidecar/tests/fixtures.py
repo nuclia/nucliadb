@@ -199,7 +199,7 @@ def node_single():
 @pytest.fixture(scope="function")
 async def writer_stub(node_single) -> AsyncIterable[NodeWriterStub]:
     channel = aio.insecure_channel(settings.writer_listen_address)
-    stub = NodeWriterStub(channel)  # type: ignore
+    stub = NodeWriterStub(channel)
     yield stub
 
 
@@ -213,7 +213,7 @@ async def writer(node_single) -> AsyncIterable[Writer]:
 class Reader:
     def __init__(self, grpc_reader_address: str):
         self.channel = aio.insecure_channel(grpc_reader_address)
-        self.stub = nodereader_pb2_grpc.NodeReaderStub(self.channel)  # type: ignore
+        self.stub = nodereader_pb2_grpc.NodeReaderStub(self.channel)
 
     async def get_shard(self, pb: ShardId) -> Optional[noderesources_pb2.Shard]:
         req = nodereader_pb2.GetShardRequest()

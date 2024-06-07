@@ -30,7 +30,7 @@ from fastapi import HTTPException
 from fastapi.params import Header
 from fastapi.requests import Request
 from fastapi.responses import Response
-from fastapi_versioning import version  # type: ignore
+from fastapi_versioning import version
 from nucliadb_protos.resources_pb2 import FieldFile, Metadata
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from starlette.requests import Request as StarletteRequest
@@ -58,7 +58,7 @@ from nucliadb.writer.tus.exceptions import (
     InvalidTUSMetadata,
     ResumableURINotAvailable,
 )
-from nucliadb.writer.tus.storage import FileStorageManager  # type: ignore
+from nucliadb.writer.tus.storage import FileStorageManager
 from nucliadb.writer.tus.utils import parse_tus_metadata
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models.resource import NucliaDBRoles

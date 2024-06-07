@@ -28,7 +28,7 @@ from nucliadb_protos import writer_pb2_grpc
 
 @pytest.mark.asyncio
 async def test_list_members(grpc_servicer: IngestFixture):
-    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)  # type: ignore
+    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
 
     response = await stub.ListMembers(ListMembersRequest())  # type: ignore
 

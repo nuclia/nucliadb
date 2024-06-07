@@ -62,7 +62,7 @@ async def resource_with_conversation(nucliadb_grpc, nucliadb_writer, knowledgebo
     resp = await nucliadb_writer.post(
         f"/kb/{knowledgebox}/resources",
         headers={"Content-Type": "application/json"},
-        data=CreateResourcePayload(  # type: ignore
+        data=CreateResourcePayload(
             slug="myresource",
             conversations={
                 "faq": InputConversationField(messages=messages),
@@ -76,7 +76,7 @@ async def resource_with_conversation(nucliadb_grpc, nucliadb_writer, knowledgebo
     # add another message using the api to add single message
     resp = await nucliadb_writer.put(
         f"/kb/{knowledgebox}/resource/{rid}/conversation/faq/messages",
-        data="["  # type: ignore
+        data="["
         + InputMessage(
             to=[f"computer"],
             content=InputMessageContent(text="42"),

@@ -62,7 +62,7 @@ async def run_kb_migrations(
                 with migration_observer(
                     {"type": "kb", "target_version": str(migration.version)}
                 ):
-                    await migration.module.migrate_kb(context, kbid)  # type: ignore
+                    await migration.module.migrate_kb(context, kbid)
                 logger.info("Finished KB Migration", extra=migration_info)
                 await context.data_manager.update_kb_info(
                     kbid=kbid, current_version=migration.version
@@ -157,7 +157,7 @@ async def run_global_migrations(context: ExecutionContext, target_version: int) 
             with migration_observer(
                 {"type": "global", "target_version": str(migration.version)}
             ):
-                await migration.module.migrate(context)  # type: ignore
+                await migration.module.migrate(context)
             await context.data_manager.update_global_info(
                 current_version=migration.version
             )

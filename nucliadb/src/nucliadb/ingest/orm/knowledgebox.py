@@ -247,7 +247,7 @@ class KnowledgeBox:
                 logger.warning(f"Shards not found for kbid={kbid}")
             else:
                 shards_obj = writer_pb2.Shards()
-                shards_obj.ParseFromString(payload)  # type: ignore
+                shards_obj.ParseFromString(payload)
 
                 for shard in shards_obj.shards:
                     # Delete the shard on nodes
