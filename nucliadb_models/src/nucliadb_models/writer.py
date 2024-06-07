@@ -111,9 +111,7 @@ class CreateResourcePayload(BaseModel):
     links: Dict[FieldIdString, LinkField] = FieldDefaults.links
     texts: Dict[FieldIdString, TextField] = FieldDefaults.texts
     layouts: Dict[FieldIdString, InputLayoutField] = FieldDefaults.layouts
-    conversations: Dict[FieldIdString, InputConversationField] = (
-        FieldDefaults.conversations
-    )
+    conversations: Dict[FieldIdString, InputConversationField] = FieldDefaults.conversations
     keywordsets: Dict[FieldIdString, FieldKeywordset] = FieldDefaults.keywordsets
     datetimes: Dict[FieldIdString, FieldDatetime] = FieldDefaults.datetimes
     processing_options: Optional[PushProcessingOptions] = PushProcessingOptions()
@@ -142,9 +140,7 @@ class CreateResourcePayload(BaseModel):
     def extra_check(cls, value):
         limit = 400_000
         if value and value.metadata and len(json.dumps(value.metadata)) > limit:
-            raise ValueError(
-                f"metadata should be less than {limit} bytes when serialized to JSON"
-            )
+            raise ValueError(f"metadata should be less than {limit} bytes when serialized to JSON")
         return value
 
 
@@ -163,9 +159,7 @@ class UpdateResourcePayload(BaseModel):
     links: Dict[FieldIdString, LinkField] = FieldDefaults.links
     texts: Dict[FieldIdString, TextField] = FieldDefaults.texts
     layouts: Dict[FieldIdString, InputLayoutField] = FieldDefaults.layouts
-    conversations: Dict[FieldIdString, InputConversationField] = (
-        FieldDefaults.conversations
-    )
+    conversations: Dict[FieldIdString, InputConversationField] = FieldDefaults.conversations
     keywordsets: Dict[FieldIdString, FieldKeywordset] = FieldDefaults.keywordsets
     datetimes: Dict[FieldIdString, FieldDatetime] = FieldDefaults.datetimes
     processing_options: Optional[PushProcessingOptions] = PushProcessingOptions()

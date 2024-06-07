@@ -24,8 +24,6 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Type, TypeVar, Union
 
 from google.protobuf.json_format import MessageToDict
-from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig as PBKnowledgeBoxConfig
-from nucliadb_protos.utils_pb2 import ReleaseChannel as PBReleaseChannel
 from pydantic import BaseModel, Field, field_validator
 
 from nucliadb_models.conversation import FieldConversation
@@ -56,6 +54,8 @@ from nucliadb_models.security import ResourceSecurity
 from nucliadb_models.text import FieldText
 from nucliadb_models.utils import SlugString
 from nucliadb_models.vectors import SemanticModelMetadata, VectorSimilarity
+from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig as PBKnowledgeBoxConfig
+from nucliadb_protos.utils_pb2 import ReleaseChannel as PBReleaseChannel
 
 _T = TypeVar("_T")
 
@@ -106,9 +106,7 @@ class KnowledgeBoxConfig(BaseModel):
     slug: Optional[SlugString] = Field(
         default=None, title="Slug", description="Slug for the Knowledge Box."
     )
-    title: Optional[str] = Field(
-        default=None, title="Title", description="Title for the Knowledge Box."
-    )
+    title: Optional[str] = Field(default=None, title="Title", description="Title for the Knowledge Box.")
     description: Optional[str] = Field(
         default=None,
         title="Description",

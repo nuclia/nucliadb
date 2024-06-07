@@ -48,12 +48,8 @@ class ResourceOperationType(str, Enum):
 
 
 class ResourceIndexed(BaseModel):
-    resource_uuid: str = Field(
-        ..., title="Resource UUID", description="UUID of the resource."
-    )
-    resource_title: str = Field(
-        ..., title="Resource Title", description="Title of the resource."
-    )
+    resource_uuid: str = Field(..., title="Resource UUID", description="UUID of the resource.")
+    resource_title: str = Field(..., title="Resource Title", description="Title of the resource.")
     seqid: int = Field(
         ...,
         title="Sequence ID",
@@ -62,12 +58,8 @@ class ResourceIndexed(BaseModel):
 
 
 class ResourceWritten(BaseModel):
-    resource_uuid: str = Field(
-        ..., title="Resource UUID", description="UUID of the resource."
-    )
-    resource_title: str = Field(
-        ..., title="Resource Title", description="Title of the resource."
-    )
+    resource_uuid: str = Field(..., title="Resource UUID", description="UUID of the resource.")
+    resource_title: str = Field(..., title="Resource Title", description="Title of the resource.")
     seqid: int = Field(
         ...,
         title="Sequence ID",
@@ -84,12 +76,8 @@ class ResourceWritten(BaseModel):
 
 
 class ResourceProcessed(BaseModel):
-    resource_uuid: str = Field(
-        ..., title="Resource UUID", description="UUID of the resource."
-    )
-    resource_title: str = Field(
-        ..., title="Resource Title", description="Title of the resource."
-    )
+    resource_uuid: str = Field(..., title="Resource UUID", description="UUID of the resource.")
+    resource_title: str = Field(..., title="Resource Title", description="Title of the resource.")
     seqid: int = Field(
         ...,
         title="Sequence ID",

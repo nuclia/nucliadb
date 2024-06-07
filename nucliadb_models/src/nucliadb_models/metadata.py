@@ -73,18 +73,14 @@ class RelationNodeType(str, Enum):
     USER = "user"
 
 
-RelationNodeTypeMap: Dict[
-    RelationNodeType, utils_pb2.RelationNode.NodeType.ValueType
-] = {
+RelationNodeTypeMap: Dict[RelationNodeType, utils_pb2.RelationNode.NodeType.ValueType] = {
     RelationNodeType.ENTITY: utils_pb2.RelationNode.NodeType.ENTITY,
     RelationNodeType.LABEL: utils_pb2.RelationNode.NodeType.LABEL,
     RelationNodeType.RESOURCE: utils_pb2.RelationNode.NodeType.RESOURCE,
     RelationNodeType.USER: utils_pb2.RelationNode.NodeType.USER,
 }
 
-RelationNodeTypePbMap: Dict[
-    utils_pb2.RelationNode.NodeType.ValueType, RelationNodeType
-] = {
+RelationNodeTypePbMap: Dict[utils_pb2.RelationNode.NodeType.ValueType, RelationNodeType] = {
     utils_pb2.RelationNode.NodeType.ENTITY: RelationNodeType.ENTITY,
     utils_pb2.RelationNode.NodeType.LABEL: RelationNodeType.LABEL,
     utils_pb2.RelationNode.NodeType.RESOURCE: RelationNodeType.RESOURCE,
@@ -102,9 +98,7 @@ class RelationEntity(BaseModel):
     def check_relation_is_valid(cls, values):
         if values["type"] == RelationNodeType.ENTITY.value:
             if "group" not in values:
-                raise ValueError(
-                    f"All {RelationNodeType.ENTITY.value} values must define a 'group'"
-                )
+                raise ValueError(f"All {RelationNodeType.ENTITY.value} values must define a 'group'")
         return values
 
 
@@ -235,8 +229,7 @@ class ComputedMetadata(BaseModel):
                         field_type=FIELD_TYPES_MAP[fc.field.field_type].value,  # type: ignore
                     ),
                     classifications=[
-                        Classification(label=c.label, labelset=c.labelset)
-                        for c in fc.classifications
+                        Classification(label=c.label, labelset=c.labelset) for c in fc.classifications
                     ],
                 )
             )
@@ -254,9 +247,7 @@ class UserMetadata(BaseModel):
             preserving_proto_field_name=True,
             including_default_value_fields=True,
         )
-        value["relations"] = [
-            convert_pb_relation_to_api(relation) for relation in message.relations
-        ]
+        value["relations"] = [convert_pb_relation_to_api(relation) for relation in message.relations]
         return cls(**value)
 
 
@@ -321,9 +312,7 @@ class UserFieldMetadata(BaseModel):
             for selections in message.page_selections
         ]
 
-        value["field"]["field_type"] = FIELD_TYPES_MAP[
-            value["field"]["field_type"]
-        ].value
+        value["field"]["field_type"] = FIELD_TYPES_MAP[value["field"]["field_type"]].value
         return cls(**value)
 
 
