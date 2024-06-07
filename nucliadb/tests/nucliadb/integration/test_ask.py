@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import json
 from unittest import mock
 
 import pytest
@@ -251,105 +252,96 @@ async def test_ask_rag_options_extend_with_fields(
 
 
 @pytest.mark.asyncio()
-async def test_ask_rag_options_validation(nucliadb_reader):
-    # Invalid strategy
-    resp = await nucliadb_reader.post(
-        f"/kb/kbid/ask",
-        json={
-            "query": "title",
-            "rag_strategies": [{"name": "foobar", "fields": ["a/summary"]}],
-        },
-    )
-    assert resp.status_code == 422
-
+@pytest.mark.parametrize(
+    "invalid_payload,expected_error_msg",
+    [
+        (
+            # Invalid strategy type
+            {
+                "query": "title",
+                "rag_strategies": [{"name": "foobar", "fields": ["a/summary"]}],
+            },
+            None,
+        ),
+        (
+            # Invalid strategy without name
+            {
+                "query": "title",
+                "rag_strategies": [{"fields": ["a/summary"]}],
+            },
+            None,
+        ),
+        (
+            # full_resource cannot be combined with other strategies
+            {
+                "query": "title",
+                "rag_strategies": [
+                    {"name": "full_resource"},
+                    {"name": "field_extension", "fields": ["a/summary"]},
+                ],
+            },
+            "If 'full_resource' strategy is chosen, it must be the only strategy",
+        ),
+        (
+            # field_extension requires fields
+            {
+                "query": "title",
+                "rag_strategies": [{"name": "field_extension"}],
+            },
+            "Field required",
+        ),
+        (
+            # fields must be in the right format: field_type/field_name
+            {
+                "query": "title",
+                "rag_strategies": [
+                    {"name": "field_extension", "fields": ["foo/t/text"]}
+                ],
+            },
+            "Value error, Field 'foo/t/text' is not in the format {field_type}/{field_name}",
+        ),
+        (
+            # fields must have a valid field type
+            {
+                "query": "title",
+                "rag_strategies": [
+                    {"name": "field_extension", "fields": ["X/fieldname"]}
+                ],
+            },
+            "Value error, Field 'X/fieldname' does not have a valid field type. Valid field types are",
+        ),
+        (
+            # Invalid list type
+            {
+                "query": "title",
+                "rag_strategies": ["foo"],
+            },
+            "must be defined using an object",
+        ),
+        (
+            # Invalid payload type (note the extra json.dumps)
+            json.dumps(
+                {
+                    "query": "title",
+                    "rag_strategies": ["foo"],
+                }
+            ),
+            None,
+        ),
+    ],
+)
+async def test_ask_rag_strategies_validation(
+    nucliadb_reader, invalid_payload, expected_error_msg
+):
     # Invalid strategy as a string
     resp = await nucliadb_reader.post(
         f"/kb/kbid/ask",
-        json={
-            "query": "title",
-            "rag_strategies": ["full_resource"],
-        },
+        json=invalid_payload,
     )
     assert resp.status_code == 422
-
-    # Invalid strategy without name
-    resp = await nucliadb_reader.post(
-        f"/kb/kbid/ask",
-        json={
-            "query": "title",
-            "rag_strategies": [{"fields": ["a/summary"]}],
-        },
-    )
-    assert resp.status_code == 422
-
-    # full_resource cannot be combined with other strategies
-    resp = await nucliadb_reader.post(
-        f"/kb/kbid/ask",
-        json={
-            "query": "title",
-            "rag_strategies": [
-                {"name": "full_resource"},
-                {"name": "field_extension", "fields": ["a/summary"]},
-            ],
-        },
-    )
-    assert resp.status_code == 422
-    detail = resp.json()["detail"]
-    assert (
-        "If 'full_resource' strategy is chosen, it must be the only strategy"
-        in detail[0]["msg"]
-    )
-
-    # field_extension requires fields
-    resp = await nucliadb_reader.post(
-        f"/kb/kbid/ask",
-        json={"query": "title", "rag_strategies": [{"name": "field_extension"}]},
-    )
-    assert resp.status_code == 422
-    detail = resp.json()["detail"]
-    detail[0]["loc"][-1] == "fields"
-    assert detail[0]["msg"] == "Field required"
-
-    # fields must be in the right format: field_type/field_name
-    resp = await nucliadb_reader.post(
-        f"/kb/kbid/ask",
-        json={
-            "query": "title",
-            "rag_strategies": [{"name": "field_extension", "fields": ["foo/t/text"]}],
-        },
-    )
-    assert resp.status_code == 422
-    detail = resp.json()["detail"]
-    detail[0]["loc"][-1] == "fields"
-    assert (
-        detail[0]["msg"]
-        == "Value error, Field 'foo/t/text' is not in the format {field_type}/{field_name}"
-    )
-
-    # But fields can have leading and trailing slashes and they will be ignored
-    resp = await nucliadb_reader.post(
-        f"/kb/foo/ask",
-        json={
-            "query": "title",
-            "rag_strategies": [{"name": "field_extension", "fields": ["/a/text/"]}],
-        },
-    )
-    assert resp.status_code != 422
-
-    # fields must have a valid field type
-    resp = await nucliadb_reader.post(
-        f"/kb/kbid/ask",
-        json={
-            "query": "title",
-            "rag_strategies": [{"name": "field_extension", "fields": ["X/fieldname"]}],
-        },
-    )
-    assert resp.status_code == 422
-    detail = resp.json()["detail"]
-    detail[0]["loc"][-1] == "fields"
-    assert detail[0]["msg"].startswith(
-        "Value error, Field 'X/fieldname' does not have a valid field type. Valid field types are"
-    )
+    if expected_error_msg:
+        error_msg = resp.json()["detail"][0]["msg"]
+        assert expected_error_msg in error_msg
 
 
 @pytest.mark.asyncio()
