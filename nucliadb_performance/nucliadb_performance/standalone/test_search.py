@@ -66,11 +66,7 @@ def get_test_kb():
 
 def create_kb(kb_slug: str):
     ndb = get_nucliadb_client(local=True)
-    release_channel = (
-        ReleaseChannel.EXPERIMENTAL
-        if "experimental" in kb_slug
-        else ReleaseChannel.STABLE
-    )
+    release_channel = ReleaseChannel.EXPERIMENTAL if "experimental" in kb_slug else ReleaseChannel.STABLE
     print(f"Creating KB {kb_slug}...")
     ndb.writer.create_knowledge_box(slug=kb_slug, release_channel=release_channel)
 
@@ -117,9 +113,7 @@ async def test_find(session):
         request.url.format(kbid=kbid),
         json=request.payload,
     )
-    assert len(resp["resources"]) > 0, append_error(
-        kbid, "find", -1, "No resources returned"
-    )
+    assert len(resp["resources"]) > 0, append_error(kbid, "find", -1, "No resources returned")
 
 
 @scenario(weight=1)
@@ -135,9 +129,7 @@ async def test_search(session):
         request.url.format(kbid=kbid),
         json=request.payload,
     )
-    assert len(resp["resources"]) > 0, append_error(
-        kbid, "search", -1, "No resources returned"
-    )
+    assert len(resp["resources"]) > 0, append_error(kbid, "search", -1, "No resources returned")
 
 
 @scenario(weight=1)
@@ -151,9 +143,7 @@ async def test_suggest(session):
         request.url.format(kbid=kbid),
         params=request.params,
     )
-    results_returned = (
-        len(resp["paragraphs"]["results"]) > 0 or len(resp["entities"]["entities"]) > 0
-    )
+    results_returned = len(resp["paragraphs"]["results"]) > 0 or len(resp["entities"]["entities"]) > 0
     assert results_returned, append_error(kbid, "suggest", -1, "No results returned")
 
 

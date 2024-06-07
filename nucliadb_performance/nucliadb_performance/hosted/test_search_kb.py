@@ -39,9 +39,7 @@ async def test_search(session):
     kbid, slug = get_kb_to_test()
     request = get_request(slug)
     predict_url = get_predict_api_url()
-    vector = await predict_sentence_to_vector(
-        predict_url, kbid, request.payload["query"]
-    )
+    vector = await predict_sentence_to_vector(predict_url, kbid, request.payload["query"])
     request.payload["vector"] = vector
     await make_kbid_request(
         session,
