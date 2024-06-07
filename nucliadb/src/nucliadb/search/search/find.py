@@ -105,7 +105,7 @@ async def find(
             extracted=item.extracted,
             requested_relations=pb_query.relation_subgraph,
             min_score_bm25=query_parser.min_score.bm25,
-            min_score_semantic=query_parser.min_score.semantic,
+            min_score_semantic=query_parser.min_score.semantic,  # type: ignore
             highlight=item.highlight,
         )
 
