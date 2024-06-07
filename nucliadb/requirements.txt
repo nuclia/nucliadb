@@ -33,6 +33,7 @@ pydantic-settings>=2.2
 aiobotocore>=2.9.0
 botocore>=1.34.0
 google-cloud-storage
+azure-storage-blob
 gcloud
 oauth2client
 jwcrypto>=1.5.6
