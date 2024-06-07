@@ -17,9 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb_protos.resources_pb2 import CloudFile, FieldLayout
-
 from nucliadb.ingest.fields.base import Field
+from nucliadb_protos.resources_pb2 import CloudFile, FieldLayout
 from nucliadb_utils.storages.storage import StorageField
 
 
@@ -46,9 +45,7 @@ class Layout(Field):
 
         for ident, pbblock in payload.body.blocks.items():
             if self.storage.needs_move(pbblock.file, self.kbid):
-                sf: StorageField = self.storage.layout_field(
-                    self.kbid, self.uuid, self.id, ident
-                )
+                sf: StorageField = self.storage.layout_field(self.kbid, self.uuid, self.id, ident)
                 cf: CloudFile = await self.storage.normalize_binary(pbblock.file, sf)
                 pbblock.file.CopyFrom(cf)
             actual_payload.body.blocks[ident].CopyFrom(pbblock)

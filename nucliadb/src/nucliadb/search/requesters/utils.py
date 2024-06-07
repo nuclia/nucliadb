@@ -26,17 +26,6 @@ from fastapi import HTTPException
 from google.protobuf.json_format import MessageToDict
 from grpc import StatusCode as GrpcStatusCode
 from grpc.aio import AioRpcError
-from nucliadb_protos.nodereader_pb2 import (
-    ParagraphSearchRequest,
-    ParagraphSearchResponse,
-    RelationSearchRequest,
-    RelationSearchResponse,
-    SearchRequest,
-    SearchResponse,
-    SuggestRequest,
-    SuggestResponse,
-)
-from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 
 from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.common.cluster.base import AbstractIndexNode
@@ -50,6 +39,17 @@ from nucliadb.search.search.shards import (
     suggest_shard,
 )
 from nucliadb.search.settings import settings
+from nucliadb_protos.nodereader_pb2 import (
+    ParagraphSearchRequest,
+    ParagraphSearchResponse,
+    RelationSearchRequest,
+    RelationSearchResponse,
+    SearchRequest,
+    SearchResponse,
+    SuggestRequest,
+    SuggestResponse,
+)
+from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
 from nucliadb_utils.utilities import has_feature
@@ -69,9 +69,7 @@ METHODS = {
     Method.RELATIONS: relations_shard,
 }
 
-REQUEST_TYPE = Union[
-    SuggestRequest, ParagraphSearchRequest, SearchRequest, RelationSearchRequest
-]
+REQUEST_TYPE = Union[SuggestRequest, ParagraphSearchRequest, SearchRequest, RelationSearchRequest]
 
 T = TypeVar(
     "T",
@@ -99,9 +97,7 @@ async def node_query(
     pb_query: ParagraphSearchRequest,
     target_shard_replicas: Optional[list[str]] = None,
     use_read_replica_nodes: bool = True,
-) -> tuple[
-    list[ParagraphSearchResponse], bool, list[tuple[AbstractIndexNode, str]]
-]: ...
+) -> tuple[list[ParagraphSearchResponse], bool, list[tuple[AbstractIndexNode, str]]]: ...
 
 
 @overload
@@ -130,9 +126,7 @@ async def node_query(
     pb_query: REQUEST_TYPE,
     target_shard_replicas: Optional[list[str]] = None,
     use_read_replica_nodes: bool = True,
-) -> tuple[
-    Sequence[Union[T, BaseException]], bool, list[tuple[AbstractIndexNode, str]]
-]:
+) -> tuple[Sequence[Union[T, BaseException]], bool, list[tuple[AbstractIndexNode, str]]]:
     use_read_replica_nodes = use_read_replica_nodes and has_feature(
         const.Features.READ_REPLICA_SEARCHES, context={"kbid": kbid}
     )
@@ -231,9 +225,7 @@ def validate_node_query_results(results: list[Any]) -> Optional[HTTPException]:
     Handling of exception is responsibility of caller.
     """
     if results is None or len(results) == 0:
-        return HTTPException(
-            status_code=500, detail=f"Error while executing shard queries. No results."
-        )
+        return HTTPException(status_code=500, detail=f"Error while executing shard queries. No results.")
 
     for result in results:
         if isinstance(result, Exception):
@@ -262,9 +254,7 @@ def validate_node_query_results(results: list[Any]) -> Optional[HTTPException]:
     return None
 
 
-def debug_nodes_info(
-    nodes: list[tuple[AbstractIndexNode, str]]
-) -> list[dict[str, str]]:
+def debug_nodes_info(nodes: list[tuple[AbstractIndexNode, str]]) -> list[dict[str, str]]:
     details: list[dict[str, str]] = []
     for node, shard_id in nodes:
         info = {

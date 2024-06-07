@@ -19,9 +19,8 @@
 #
 from typing import Any, Callable, Coroutine
 
-from nucliadb_protos.resources_pb2 import FieldLayout
-
 import nucliadb_models as models
+from nucliadb_protos.resources_pb2 import FieldLayout
 from nucliadb_utils.storages.storage import Storage
 
 VERSION: dict[
@@ -43,9 +42,7 @@ async def serialize_blocks(
     storage: Storage,
 ) -> FieldLayout:
     if layout_field.format in VERSION:
-        layout = await VERSION[layout_field.format](
-            layout_field, kbid, uuid, field, storage
-        )
+        layout = await VERSION[layout_field.format](layout_field, kbid, uuid, field, storage)
     else:
         raise KeyError("Invalid version")
     return layout

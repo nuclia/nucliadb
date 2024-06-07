@@ -20,6 +20,14 @@
 
 from typing import AsyncGenerator
 
+from nucliadb.common.cluster.base import AbstractIndexNode
+from nucliadb.ingest.orm.resource import FIELD_TYPE_TO_ID, KB_REVERSE
+from nucliadb.train import logger
+from nucliadb.train.generators.utils import (
+    batchify,
+    get_paragraph,
+    get_resource_from_cache_or_db,
+)
 from nucliadb_protos.dataset_pb2 import (
     QuestionAnswerStreamingBatch,
     QuestionAnswerStreamItem,
@@ -32,15 +40,6 @@ from nucliadb_protos.resources_pb2 import (
     QuestionAnswerAnnotation,
 )
 
-from nucliadb.common.cluster.base import AbstractIndexNode
-from nucliadb.ingest.orm.resource import FIELD_TYPE_TO_ID, KB_REVERSE
-from nucliadb.train import logger
-from nucliadb.train.generators.utils import (
-    batchify,
-    get_paragraph,
-    get_resource_from_cache_or_db,
-)
-
 
 def question_answer_batch_generator(
     kbid: str,
@@ -48,12 +47,8 @@ def question_answer_batch_generator(
     node: AbstractIndexNode,
     shard_replica_id: str,
 ) -> AsyncGenerator[QuestionAnswerStreamingBatch, None]:
-    generator = generate_question_answer_streaming_payloads(
-        kbid, trainset, node, shard_replica_id
-    )
-    batch_generator = batchify(
-        generator, trainset.batch_size, QuestionAnswerStreamingBatch
-    )
+    generator = generate_question_answer_streaming_payloads(kbid, trainset, node, shard_replica_id)
+    batch_generator = batchify(generator, trainset.batch_size, QuestionAnswerStreamingBatch)
     return batch_generator
 
 

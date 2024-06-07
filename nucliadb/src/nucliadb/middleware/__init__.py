@@ -39,9 +39,7 @@ class ProcessTimeHeaderMiddleware(BaseHTTPMiddleware):
             exposed_headers.append(PROCESS_TIME_HEADER)
             response.headers[ACCESS_CONTROL_EXPOSE_HEADER] = ",".join(exposed_headers)
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         response = None
         start = time.perf_counter()
         try:

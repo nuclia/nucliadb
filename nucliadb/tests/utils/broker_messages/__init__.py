@@ -70,9 +70,7 @@ class BrokerMessageBuilder:
     def add_field_builder(self, field: FieldBuilder):
         self.fields[(field.id.field, field.id.field_type)] = field
 
-    def field_builder(
-        self, field_id: str, field_type: rpb.FieldType.ValueType
-    ) -> FieldBuilder:
+    def field_builder(self, field_id: str, field_type: rpb.FieldType.ValueType) -> FieldBuilder:
         return self.fields[(field_id, field_type)]
 
     def with_title(self, title: str):
@@ -150,22 +148,12 @@ class BrokerMessageBuilder:
                 raise Exception("Unsupported field type")
 
             if field.user.metadata is not None:
-                replace_if_exists(
-                    self.bm.basic.fieldmetadata, field.id, field.user.metadata
-                )
+                replace_if_exists(self.bm.basic.fieldmetadata, field.id, field.user.metadata)
             if field.extracted.metadata is not None:
-                replace_if_exists(
-                    self.bm.field_metadata, field.id, field.extracted.metadata
-                )
+                replace_if_exists(self.bm.field_metadata, field.id, field.extracted.metadata)
             if field.extracted.text is not None:
-                replace_if_exists(
-                    self.bm.extracted_text, field.id, field.extracted.text
-                )
+                replace_if_exists(self.bm.extracted_text, field.id, field.extracted.text)
             if field.extracted.vectors is not None:
-                replace_if_exists(
-                    self.bm.field_vectors, field.id, field.extracted.vectors
-                )
+                replace_if_exists(self.bm.field_vectors, field.id, field.extracted.vectors)
             if field.extracted.question_answers is not None:
-                replace_if_exists(
-                    self.bm.question_answers, field.id, field.extracted.question_answers
-                )
+                replace_if_exists(self.bm.question_answers, field.id, field.extracted.question_answers)

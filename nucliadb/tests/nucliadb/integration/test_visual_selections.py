@@ -98,9 +98,7 @@ async def annotated_file_field(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_visual_selection(
-    nucliadb_reader: AsyncClient, knowledgebox: str, annotated_file_field
-):
+async def test_visual_selection(nucliadb_reader: AsyncClient, knowledgebox: str, annotated_file_field):
     kbid = knowledgebox
     rid, field_id = annotated_file_field
 
@@ -112,7 +110,4 @@ async def test_visual_selection(
 
     assert len(body["fieldmetadata"][0]["selections"]) == 1
     assert body["fieldmetadata"][0]["selections"][0]["page"] == 0
-    assert (
-        len(body["fieldmetadata"][0]["selections"][0]["visual"])
-        == PAGE_0_SELECTION_COUNT
-    )
+    assert len(body["fieldmetadata"][0]["selections"][0]["visual"]) == PAGE_0_SELECTION_COUNT

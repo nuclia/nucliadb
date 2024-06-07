@@ -25,14 +25,14 @@ from typing import Callable
 
 import pytest
 from httpx import AsyncClient
-from nucliadb_protos.resources_pb2 import FieldID, FieldType
-from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb.common import datamanagers
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX
 from nucliadb.writer.api.v1.upload import maybe_b64decode
 from nucliadb.writer.tus import TUSUPLOAD, UPLOAD, get_storage_manager
 from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_protos.resources_pb2 import FieldID, FieldType
+from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils import const
 from nucliadb_utils.utilities import get_storage, get_transaction_utility
 
@@ -67,9 +67,7 @@ async def test_knowledgebox_file_tus_options(
         assert resp.headers["tus-version"] == "1.0.0"
         assert resp.headers["tus-extension"] == "creation-defer-length"
 
-        resp = await client.options(
-            f"/{KB_PREFIX}/{knowledgebox_writer}/{TUSUPLOAD}/xxx"
-        )
+        resp = await client.options(f"/{KB_PREFIX}/{knowledgebox_writer}/{TUSUPLOAD}/xxx")
         assert resp.status_code == 204
         assert resp.headers["tus-resumable"] == "1.0.0"
         assert resp.headers["tus-version"] == "1.0.0"
@@ -126,9 +124,7 @@ async def test_knowledgebox_file_tus_upload_root(writer_api, knowledgebox_writer
 
     transaction = get_transaction_utility()
 
-    sub = await transaction.js.pull_subscribe(
-        const.Streams.INGEST.subject.format(partition="1"), "auto"
-    )
+    sub = await transaction.js.pull_subscribe(const.Streams.INGEST.subject.format(partition="1"), "auto")
     msgs = await sub.fetch(1)
 
     writer = BrokerMessage()
@@ -187,9 +183,7 @@ async def test_knowledgebox_file_upload_root(
     transaction = get_transaction_utility()
 
     assert transaction.js is not None
-    sub = await transaction.js.pull_subscribe(
-        const.Streams.INGEST.subject.format(partition="1"), "auto"
-    )
+    sub = await transaction.js.pull_subscribe(const.Streams.INGEST.subject.format(partition="1"), "auto")
     msgs = await sub.fetch(1)
     writer = BrokerMessage()
     writer.ParseFromString(msgs[0].data)
@@ -246,9 +240,7 @@ async def test_knowledgebox_file_upload_root_headers(
     transaction = get_transaction_utility()
 
     assert transaction.js is not None
-    sub = await transaction.js.pull_subscribe(
-        const.Streams.INGEST.subject.format(partition="1"), "auto"
-    )
+    sub = await transaction.js.pull_subscribe(const.Streams.INGEST.subject.format(partition="1"), "auto")
     msgs = await sub.fetch(1)
     writer = BrokerMessage()
     writer.ParseFromString(msgs[0].data)
@@ -272,9 +264,7 @@ async def test_knowledgebox_file_upload_root_headers(
 
 
 @pytest.mark.asyncio
-async def test_knowledgebox_file_tus_upload_field(
-    writer_api, knowledgebox_writer, resource
-):
+async def test_knowledgebox_file_tus_upload_field(writer_api, knowledgebox_writer, resource):
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         language = base64.b64encode(b"ca").decode()
         filename = base64.b64encode(b"image.jpg").decode()
@@ -337,9 +327,7 @@ async def test_knowledgebox_file_tus_upload_field(
 
     transaction = get_transaction_utility()
 
-    sub = await transaction.js.pull_subscribe(
-        const.Streams.INGEST.subject.format(partition="1"), "auto"
-    )
+    sub = await transaction.js.pull_subscribe(const.Streams.INGEST.subject.format(partition="1"), "auto")
     msgs = await sub.fetch(2)
 
     writer = BrokerMessage()
@@ -366,9 +354,7 @@ async def test_knowledgebox_file_tus_upload_field(
 
 
 @pytest.mark.asyncio
-async def test_knowledgebox_file_upload_field_headers(
-    writer_api, knowledgebox_writer, resource
-):
+async def test_knowledgebox_file_upload_field_headers(writer_api, knowledgebox_writer, resource):
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         filename = "image.jpg"
         encoded_filename = base64.b64encode(filename.encode()).decode()
@@ -387,9 +373,7 @@ async def test_knowledgebox_file_upload_field_headers(
 
     transaction = get_transaction_utility()
 
-    sub = await transaction.js.pull_subscribe(
-        const.Streams.INGEST.subject.format(partition="1"), "auto"
-    )
+    sub = await transaction.js.pull_subscribe(const.Streams.INGEST.subject.format(partition="1"), "auto")
     msgs = await sub.fetch(2)
     writer = BrokerMessage()
     writer.ParseFromString(msgs[1].data)
@@ -414,9 +398,7 @@ async def test_knowledgebox_file_upload_field_headers(
 
 
 @pytest.mark.asyncio
-async def test_knowledgebox_file_upload_field_sync(
-    writer_api, knowledgebox_writer, resource
-):
+async def test_knowledgebox_file_upload_field_sync(writer_api, knowledgebox_writer, resource):
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         filename = "image.jpg"
         with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
@@ -507,9 +489,7 @@ async def test_file_tus_upload_field_by_slug(writer_api, knowledgebox_writer, re
 
     transaction = get_transaction_utility()
 
-    sub = await transaction.js.pull_subscribe(
-        const.Streams.INGEST.subject.format(partition="1"), "auto"
-    )
+    sub = await transaction.js.pull_subscribe(const.Streams.INGEST.subject.format(partition="1"), "auto")
     msgs = await sub.fetch(2)
 
     writer = BrokerMessage()
@@ -536,9 +516,7 @@ async def test_file_tus_upload_field_by_slug(writer_api, knowledgebox_writer, re
 
 
 @pytest.mark.asyncio
-async def test_file_tus_upload_urls_field_by_resource_id(
-    writer_api, knowledgebox_writer, resource
-):
+async def test_file_tus_upload_urls_field_by_resource_id(writer_api, knowledgebox_writer, resource):
     kb = knowledgebox_writer
 
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
@@ -577,9 +555,7 @@ async def test_file_tus_upload_urls_field_by_resource_id(
 
 
 @pytest.mark.asyncio
-async def test_multiple_tus_file_upload_tries(
-    writer_api, knowledgebox_writer, resource
-):
+async def test_multiple_tus_file_upload_tries(writer_api, knowledgebox_writer, resource):
     kb = knowledgebox_writer
     rslug = "resource1"
 
@@ -665,9 +641,7 @@ async def test_file_upload_by_slug(writer_api, knowledgebox_writer):
 
     transaction = get_transaction_utility()
 
-    sub = await transaction.js.pull_subscribe(
-        const.Streams.INGEST.subject.format(partition="1"), "auto"
-    )
+    sub = await transaction.js.pull_subscribe(const.Streams.INGEST.subject.format(partition="1"), "auto")
     msgs = await sub.fetch(2)
 
     writer = BrokerMessage()
@@ -699,9 +673,7 @@ def test_maybe_b64decode():
 
 
 @pytest.mark.asyncio
-async def test_tus_validates_intermediate_chunks_length(
-    writer_api, knowledgebox_writer
-):
+async def test_tus_validates_intermediate_chunks_length(writer_api, knowledgebox_writer):
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         language = base64.b64encode(b"ca").decode()
         filename = base64.b64encode(b"image.jpg").decode()

@@ -68,9 +68,7 @@ def shard_manager():
             writer_pb2.ShardObject(
                 shard="shard-id",
                 replicas=[
-                    writer_pb2.ShardReplica(
-                        shard=writer_pb2.ShardCreated(id="shard-id"), node="node-0"
-                    )
+                    writer_pb2.ShardReplica(shard=writer_pb2.ShardCreated(id="shard-id"), node="node-0")
                 ],
             )
         ]
@@ -88,9 +86,7 @@ def shard_manager():
 
 @pytest.fixture()
 def search_methods():
-    def fake_search(
-        node: AbstractIndexNode, shard: str, query: nodereader_pb2.SearchRequest
-    ):
+    def fake_search(node: AbstractIndexNode, shard: str, query: nodereader_pb2.SearchRequest):
         if node.is_read_replica():
             raise Exception()
         return nodereader_pb2.SearchResponse()

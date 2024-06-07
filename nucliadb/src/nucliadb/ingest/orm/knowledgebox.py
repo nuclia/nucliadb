@@ -23,9 +23,6 @@ from uuid import uuid4
 
 from grpc import StatusCode
 from grpc.aio import AioRpcError
-from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig, SemanticModelMetadata
-from nucliadb_protos.resources_pb2 import Basic
-from nucliadb_protos.utils_pb2 import ReleaseChannel
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.exceptions import ShardNotFound
@@ -44,6 +41,9 @@ from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.orm.utils import choose_matryoshka_dimension, compute_paragraph_key
 from nucliadb.migrator.utils import get_latest_version
 from nucliadb_protos import knowledgebox_pb2, writer_pb2
+from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig, SemanticModelMetadata
+from nucliadb_protos.resources_pb2 import Basic
+from nucliadb_protos.utils_pb2 import ReleaseChannel
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_audit, get_storage
 
@@ -166,9 +166,7 @@ class KnowledgeBox:
 
             kb_shards.release_channel = release_channel
 
-            await datamanagers.cluster.update_kb_shards(
-                txn, kbid=uuid, shards=kb_shards
-            )
+            await datamanagers.cluster.update_kb_shards(txn, kbid=uuid, shards=kb_shards)
 
             # shard creation will alter this value on maindb, make sure nobody
             # uses this variable anymore
@@ -274,9 +272,7 @@ class KnowledgeBox:
         await cls.delete_all_kb_keys(driver, kbid)
 
     @classmethod
-    async def delete_all_kb_keys(
-        cls, driver: Driver, kbid: str, chunk_size: int = 1_000
-    ):
+    async def delete_all_kb_keys(cls, driver: Driver, kbid: str, chunk_size: int = 1_000):
         prefix = KB_KEYS.format(kbid=kbid)
         while True:
             async with driver.transaction(read_only=True) as txn:
@@ -293,9 +289,7 @@ class KnowledgeBox:
                         await txn.delete(key)
                     await txn.commit()
 
-    async def get_resource_shard(
-        self, shard_id: str
-    ) -> Optional[writer_pb2.ShardObject]:
+    async def get_resource_shard(self, shard_id: str) -> Optional[writer_pb2.ShardObject]:
         async with datamanagers.with_ro_transaction() as txn:
             pb = await datamanagers.cluster.get_kb_shards(txn, kbid=self.kbid)
             if pb is None:
@@ -307,9 +301,7 @@ class KnowledgeBox:
         return None
 
     async def get(self, uuid: str) -> Optional[Resource]:
-        basic = await datamanagers.resources.get_basic(
-            self.txn, kbid=self.kbid, rid=uuid
-        )
+        basic = await datamanagers.resources.get_basic(self.txn, kbid=self.kbid, rid=uuid)
         if basic is None:
             return None
         return Resource(
@@ -322,13 +314,9 @@ class KnowledgeBox:
         )
 
     async def delete_resource(self, uuid: str):
-        basic = await datamanagers.resources.get_basic(
-            self.txn, kbid=self.kbid, rid=uuid
-        )
+        basic = await datamanagers.resources.get_basic(self.txn, kbid=self.kbid, rid=uuid)
 
-        async for key in self.txn.keys(
-            KB_RESOURCE.format(kbid=self.kbid, uuid=uuid), count=-1
-        ):
+        async for key in self.txn.keys(KB_RESOURCE.format(kbid=self.kbid, uuid=uuid), count=-1):
             await self.txn.delete(key)
 
         if basic and basic.slug:
@@ -357,9 +345,7 @@ class KnowledgeBox:
                 key_ok = True
         return slug
 
-    async def add_resource(
-        self, uuid: str, slug: str, basic: Optional[Basic] = None
-    ) -> Resource:
+    async def add_resource(self, uuid: str, slug: str, basic: Optional[Basic] = None) -> Resource:
         if basic is None:
             basic = Basic()
         if slug == "":
@@ -367,9 +353,7 @@ class KnowledgeBox:
         slug = await self.get_unique_slug(uuid, slug)
         basic.slug = slug
         fix_paragraph_annotation_keys(uuid, basic)
-        await datamanagers.resources.set_basic(
-            self.txn, kbid=self.kbid, rid=uuid, basic=basic
-        )
+        await datamanagers.resources.set_basic(self.txn, kbid=self.kbid, rid=uuid, basic=basic)
         return Resource(
             storage=self.storage,
             txn=self.txn,
@@ -403,13 +387,9 @@ class KnowledgeBox:
         await shard_manager.create_vectorset(self.kbid, config)
 
     async def delete_vectorset(self, vectorset_id: str):
-        await datamanagers.vectorsets.delete(
-            self.txn, kbid=self.kbid, vectorset_id=vectorset_id
-        )
+        await datamanagers.vectorsets.delete(self.txn, kbid=self.kbid, vectorset_id=vectorset_id)
         # mark vectorset for async deletion
-        await self.txn.set(
-            KB_VECTORSET_TO_DELETE.format(kbid=self.kbid, vectorset=vectorset_id), b""
-        )
+        await self.txn.set(KB_VECTORSET_TO_DELETE.format(kbid=self.kbid, vectorset=vectorset_id), b"")
         shard_manager = get_shard_manager()
         await shard_manager.delete_vectorset(self.kbid, vectorset_id)
 

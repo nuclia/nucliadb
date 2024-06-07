@@ -63,21 +63,15 @@ async def suggest_knowledgebox(
     fields: list[str] = fastapi_query(SearchParamDefaults.fields),
     filters: list[str] = fastapi_query(SearchParamDefaults.filters),
     faceted: list[str] = fastapi_query(SearchParamDefaults.faceted),
-    range_creation_start: Optional[datetime] = fastapi_query(
-        SearchParamDefaults.range_creation_start
-    ),
-    range_creation_end: Optional[datetime] = fastapi_query(
-        SearchParamDefaults.range_creation_end
-    ),
+    range_creation_start: Optional[datetime] = fastapi_query(SearchParamDefaults.range_creation_start),
+    range_creation_end: Optional[datetime] = fastapi_query(SearchParamDefaults.range_creation_end),
     range_modification_start: Optional[datetime] = fastapi_query(
         SearchParamDefaults.range_modification_start
     ),
     range_modification_end: Optional[datetime] = fastapi_query(
         SearchParamDefaults.range_modification_end
     ),
-    features: list[SuggestOptions] = fastapi_query(
-        SearchParamDefaults.suggest_features
-    ),
+    features: list[SuggestOptions] = fastapi_query(SearchParamDefaults.suggest_features),
     show: list[ResourceProperties] = fastapi_query(SearchParamDefaults.show),
     field_type_filter: list[FieldTypeName] = fastapi_query(
         SearchParamDefaults.field_type_filter, alias="field_type"
@@ -149,9 +143,7 @@ async def suggest(
         range_modification_start,
         range_modification_end,
     )
-    results, incomplete_results, queried_nodes = await node_query(
-        kbid, Method.SUGGEST, pb_query
-    )
+    results, incomplete_results, queried_nodes = await node_query(kbid, Method.SUGGEST, pb_query)
 
     # We need to merge
     search_results = await merge_suggest_results(

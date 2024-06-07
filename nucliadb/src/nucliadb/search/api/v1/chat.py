@@ -170,9 +170,7 @@ async def create_chat_response(
         async for chunk in chat_result.answer_stream:
             streamed_answer += chunk
 
-        answer, citations = parse_streamed_answer(
-            streamed_answer, chat_request.citations
-        )
+        answer, citations = parse_streamed_answer(streamed_answer, chat_request.citations)
 
         relations_results = None
         if ChatOptions.RELATIONS in chat_request.features:
@@ -258,7 +256,5 @@ def parse_streamed_answer(
         return text_answer.decode("utf-8"), citations
     except Exception as exc:
         capture_exception(exc)
-        logger.exception(
-            "Error parsing citations. Returning the answer without citations."
-        )
+        logger.exception("Error parsing citations. Returning the answer without citations.")
         return text_answer.decode("utf-8"), {}

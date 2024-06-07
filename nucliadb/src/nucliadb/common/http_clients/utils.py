@@ -30,9 +30,7 @@ def check_status(resp: aiohttp.ClientResponse, resp_text: str) -> None:
     elif resp.status == 404:
         raise exceptions.NotFoundException(f"Resource not found: {resp_text}")
     elif resp.status in (401, 403):
-        raise exceptions.AuthorizationException(
-            f"Unauthorized to access: {resp.status}"
-        )
+        raise exceptions.AuthorizationException(f"Unauthorized to access: {resp.status}")
     elif resp.status == 429:
         raise exceptions.RateLimitException("Rate limited")
     else:

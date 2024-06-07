@@ -62,9 +62,7 @@ async def resource_exists(txn: Transaction, *, kbid: str, rid: str) -> bool:
 # id and slug
 
 
-async def get_resource_uuid_from_slug(
-    txn: Transaction, *, kbid: str, slug: str
-) -> Optional[str]:
+async def get_resource_uuid_from_slug(txn: Transaction, *, kbid: str, slug: str) -> Optional[str]:
     encoded_uuid = await txn.get(KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug))
     if not encoded_uuid:
         return None
@@ -102,12 +100,8 @@ async def modify_slug(txn: Transaction, *, kbid: str, rid: str, new_slug: str) -
 # resource-shard
 
 
-@backoff.on_exception(
-    backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3
-)
-async def get_resource_shard_id(
-    txn: Transaction, *, kbid: str, rid: str
-) -> Optional[str]:
+@backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
+async def get_resource_shard_id(txn: Transaction, *, kbid: str, rid: str) -> Optional[str]:
     shard = await txn.get(KB_RESOURCE_SHARD.format(kbid=kbid, uuid=rid))
     if shard is not None:
         return shard.decode()
@@ -122,9 +116,7 @@ async def set_resource_shard_id(txn: Transaction, *, kbid: str, rid: str, shard:
 # Basic
 
 
-async def get_basic(
-    txn: Transaction, *, kbid: str, rid: str
-) -> Optional[resources_pb2.Basic]:
+async def get_basic(txn: Transaction, *, kbid: str, rid: str) -> Optional[resources_pb2.Basic]:
     raw = await get_basic_raw(txn, kbid=kbid, rid=rid)
     if raw is None:
         return None
@@ -141,9 +133,7 @@ async def get_basic_raw(txn: Transaction, *, kbid: str, rid: str) -> Optional[by
     return raw_basic
 
 
-async def set_basic(
-    txn: Transaction, *, kbid: str, rid: str, basic: resources_pb2.Basic
-):
+async def set_basic(txn: Transaction, *, kbid: str, rid: str, basic: resources_pb2.Basic):
     if ingest_settings.driver == "local":
         await txn.set(
             KB_RESOURCE_BASIC_FS.format(kbid=kbid, uuid=rid),
@@ -159,16 +149,12 @@ async def set_basic(
 # Origin
 
 
-async def get_origin(
-    txn: Transaction, *, kbid: str, rid: str
-) -> Optional[resources_pb2.Origin]:
+async def get_origin(txn: Transaction, *, kbid: str, rid: str) -> Optional[resources_pb2.Origin]:
     key = KB_RESOURCE_ORIGIN.format(kbid=kbid, uuid=rid)
     return await get_kv_pb(txn, key, resources_pb2.Origin)
 
 
-async def set_origin(
-    txn: Transaction, *, kbid: str, rid: str, origin: resources_pb2.Origin
-):
+async def set_origin(txn: Transaction, *, kbid: str, rid: str, origin: resources_pb2.Origin):
     key = KB_RESOURCE_ORIGIN.format(kbid=kbid, uuid=rid)
     await txn.set(key, origin.SerializeToString())
 
@@ -176,16 +162,12 @@ async def set_origin(
 # Extra
 
 
-async def get_extra(
-    txn: Transaction, *, kbid: str, rid: str
-) -> Optional[resources_pb2.Extra]:
+async def get_extra(txn: Transaction, *, kbid: str, rid: str) -> Optional[resources_pb2.Extra]:
     key = KB_RESOURCE_EXTRA.format(kbid=kbid, uuid=rid)
     return await get_kv_pb(txn, key, resources_pb2.Extra)
 
 
-async def set_extra(
-    txn: Transaction, *, kbid: str, rid: str, extra: resources_pb2.Extra
-):
+async def set_extra(txn: Transaction, *, kbid: str, rid: str, extra: resources_pb2.Extra):
     key = KB_RESOURCE_EXTRA.format(kbid=kbid, uuid=rid)
     await txn.set(key, extra.SerializeToString())
 
@@ -193,16 +175,12 @@ async def set_extra(
 # Security
 
 
-async def get_security(
-    txn: Transaction, *, kbid: str, rid: str
-) -> Optional[resources_pb2.Security]:
+async def get_security(txn: Transaction, *, kbid: str, rid: str) -> Optional[resources_pb2.Security]:
     key = KB_RESOURCE_SECURITY.format(kbid=kbid, uuid=rid)
     return await get_kv_pb(txn, key, resources_pb2.Security)
 
 
-async def set_security(
-    txn: Transaction, *, kbid: str, rid: str, security: resources_pb2.Security
-):
+async def set_security(txn: Transaction, *, kbid: str, rid: str, security: resources_pb2.Security):
     key = KB_RESOURCE_SECURITY.format(kbid=kbid, uuid=rid)
     await txn.set(key, security.SerializeToString())
 
@@ -210,16 +188,12 @@ async def set_security(
 # Relations
 
 
-async def get_relations(
-    txn: Transaction, *, kbid: str, rid: str
-) -> Optional[resources_pb2.Relations]:
+async def get_relations(txn: Transaction, *, kbid: str, rid: str) -> Optional[resources_pb2.Relations]:
     key = KB_RESOURCE_RELATIONS.format(kbid=kbid, uuid=rid)
     return await get_kv_pb(txn, key, resources_pb2.Relations)
 
 
-async def set_relations(
-    txn: Transaction, *, kbid: str, rid: str, relations: resources_pb2.Relations
-):
+async def set_relations(txn: Transaction, *, kbid: str, rid: str, relations: resources_pb2.Relations):
     key = KB_RESOURCE_RELATIONS.format(kbid=kbid, uuid=rid)
     await txn.set(key, relations.SerializeToString())
 
@@ -248,25 +222,17 @@ async def iterate_resource_ids(*, kbid: str) -> AsyncGenerator[str, None]:
             yield rid
 
 
-@backoff.on_exception(
-    backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3
-)
+@backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
 async def _iter_resource_slugs(*, kbid: str) -> AsyncGenerator[str, None]:
     async with with_ro_transaction() as txn:
-        async for key in txn.keys(
-            match=KB_RESOURCE_SLUG_BASE.format(kbid=kbid), count=-1
-        ):
+        async for key in txn.keys(match=KB_RESOURCE_SLUG_BASE.format(kbid=kbid), count=-1):
             yield key.split("/")[-1]
 
 
-@backoff.on_exception(
-    backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3
-)
+@backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
 async def _get_resource_ids_from_slugs(kbid: str, slugs: list[str]) -> list[str]:
     async with with_ro_transaction() as txn:
-        rids = await txn.batch_get(
-            [KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug) for slug in slugs]
-        )
+        rids = await txn.batch_get([KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug) for slug in slugs])
     return [rid.decode() for rid in rids if rid is not None]
 
 
@@ -302,9 +268,7 @@ async def get_number_of_resources(txn: Transaction, *, kbid: str) -> int:
 
 
 async def set_number_of_resources(txn: Transaction, kbid: str, value: int) -> None:
-    await txn.set(
-        KB_MATERIALIZED_RESOURCES_COUNT.format(kbid=kbid), str(value).encode()
-    )
+    await txn.set(KB_MATERIALIZED_RESOURCES_COUNT.format(kbid=kbid), str(value).encode())
 
 
 # Fields (materialized key with all field ids)
@@ -324,9 +288,7 @@ async def set_all_field_ids(
     await txn.set(key, allfields.SerializeToString())
 
 
-async def has_field(
-    txn: Transaction, *, kbid: str, rid: str, field_id: resources_pb2.FieldID
-) -> bool:
+async def has_field(txn: Transaction, *, kbid: str, rid: str, field_id: resources_pb2.FieldID) -> bool:
     fields = await get_all_field_ids(txn, kbid=kbid, rid=rid)
     if fields is None:
         return False
@@ -339,12 +301,8 @@ async def has_field(
 # ORM mix (this functions shouldn't belong here)
 
 
-@backoff.on_exception(
-    backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3
-)
-async def get_resource(
-    txn: Transaction, *, kbid: str, rid: str
-) -> Optional["ResourceORM"]:
+@backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
+async def get_resource(txn: Transaction, *, kbid: str, rid: str) -> Optional["ResourceORM"]:
     """
     Not ideal to return Resource type here but refactoring would
     require a lot of changes.
@@ -358,9 +316,7 @@ async def get_resource(
     return await kb_orm.get(rid)
 
 
-@backoff.on_exception(
-    backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3
-)
+@backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
 async def get_resource_index_message(
     txn: Transaction,
     *,

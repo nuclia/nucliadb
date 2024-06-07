@@ -127,9 +127,7 @@ async def _get_index_node_metadata(
         or None
     )
     if read_replica and primary_id is None:
-        raise Exception(
-            "Primary node id not found when it is expected to be a read replica"
-        )
+        raise Exception("Primary node id not found when it is expected to be a read replica")
 
     return IndexNodeMetadata(
         node_id=metadata.node_id,
@@ -141,12 +139,8 @@ async def _get_index_node_metadata(
     )
 
 
-@backoff.on_exception(
-    backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=4
-)
-async def _get_standalone_index_node_metadata(
-    settings: Settings, address: str
-) -> IndexNodeMetadata:
+@backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=4)
+async def _get_standalone_index_node_metadata(settings: Settings, address: str) -> IndexNodeMetadata:
     if ":" not in address:
         grpc_address = f"{address}:{settings.standalone_node_port}"
     else:
@@ -177,9 +171,7 @@ class AbstractClusterDiscovery(abc.ABC):
     async def finalize(self) -> None:
         """ """
 
-    async def _query_node_metadata(
-        self, address: str, read_replica: bool = False
-    ) -> IndexNodeMetadata:
+    async def _query_node_metadata(self, address: str, read_replica: bool = False) -> IndexNodeMetadata:
         if self.settings.standalone_mode:
             return await _get_standalone_index_node_metadata(self.settings, address)
         else:

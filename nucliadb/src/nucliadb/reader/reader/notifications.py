@@ -59,9 +59,7 @@ RESOURCE_OP_PB_TO_MODEL = {
 }
 
 
-async def kb_notifications_stream(
-    context: ApplicationContext, kbid: str
-) -> AsyncGenerator[bytes, None]:
+async def kb_notifications_stream(context: ApplicationContext, kbid: str) -> AsyncGenerator[bytes, None]:
     """
     Returns an async generator that yields pubsub notifications for the given kbid.
     The generator will return after NOTIFICATIONS_TIMEOUT_S seconds.
@@ -70,13 +68,9 @@ async def kb_notifications_stream(
         resource_cache: dict[str, str] = {}
         async with async_timeout.timeout(NOTIFICATIONS_TIMEOUT_S):
             async for pb_notification in kb_notifications(kbid):
-                notification = await serialize_notification(
-                    context, pb_notification, resource_cache
-                )
+                notification = await serialize_notification(context, pb_notification, resource_cache)
                 line = encode_streamed_notification(notification) + b"\n"
-                logger.debug(
-                    f"Sending notification: {notification.type}", extra={"kbid": kbid}
-                )
+                logger.debug(f"Sending notification: {notification.type}", extra={"kbid": kbid})
                 yield line
     except asyncio.TimeoutError:
         return
@@ -106,9 +100,7 @@ async def kb_notifications(kbid: str) -> AsyncGenerator[writer_pb2.Notification,
         except asyncio.QueueFull:  # pragma: no cover
             logger.warning("Queue is full, dropping notification", extra={"kbid": kbid})
 
-    async with managed_subscription(
-        pubsub, key=subscription_key, handler=subscription_handler
-    ):
+    async with managed_subscription(pubsub, key=subscription_key, handler=subscription_handler):
         try:
             while True:
                 notification: writer_pb2.Notification = await queue.get()
@@ -121,9 +113,7 @@ async def kb_notifications(kbid: str) -> AsyncGenerator[writer_pb2.Notification,
                 )
         except Exception as ex:
             capture_exception(ex)
-            logger.error(
-                "Error while streaming activity", exc_info=True, extra={"kbid": kbid}
-            )
+            logger.error("Error while streaming activity", exc_info=True, extra={"kbid": kbid})
             return
 
 
@@ -144,9 +134,7 @@ async def managed_subscription(pubsub: PubSubDriver, key: str, handler: Callback
         try:
             await pubsub.unsubscribe(key=key, subscription_id=subscription_id)
         except Exception:  # pragma: no cover
-            logger.warning(
-                "Error while unsubscribing from activity stream", exc_info=True
-            )
+            logger.warning("Error while unsubscribing from activity stream", exc_info=True)
 
 
 async def serialize_notification(
@@ -156,9 +144,7 @@ async def serialize_notification(
     resource_uuid = pb.uuid
     seqid = pb.seqid
 
-    resource_title = await get_resource_title_cached(
-        context.kv_driver, kbid, resource_uuid, cache
-    )
+    resource_title = await get_resource_title_cached(context.kv_driver, kbid, resource_uuid, cache)
     if pb.action == writer_pb2.Notification.Action.INDEXED:
         return ResourceIndexedNotification(
             data=ResourceIndexed(
@@ -213,13 +199,9 @@ async def get_resource_title_cached(
     return resource_title
 
 
-async def get_resource_title(
-    kv_driver: Driver, kbid: str, resource_uuid: str
-) -> Optional[str]:
+async def get_resource_title(kv_driver: Driver, kbid: str, resource_uuid: str) -> Optional[str]:
     async with kv_driver.transaction(read_only=True) as txn:
-        basic = await datamanagers.resources.get_basic(
-            txn, kbid=kbid, rid=resource_uuid
-        )
+        basic = await datamanagers.resources.get_basic(txn, kbid=kbid, rid=resource_uuid)
         if basic is None:
             return None
         return basic.title

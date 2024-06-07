@@ -19,6 +19,15 @@
 #
 from typing import AsyncIterator, Optional
 
+from nucliadb.common import datamanagers
+from nucliadb.common.cluster import manager
+from nucliadb.common.cluster.base import AbstractIndexNode
+
+# XXX: this keys shouldn't be exposed outside datamanagers
+from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG_BASE
+from nucliadb.common.maindb.driver import Driver, Transaction
+from nucliadb.ingest.orm.entities import EntitiesManager
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos.train_pb2 import (
     GetFieldsRequest,
     GetParagraphsRequest,
@@ -30,16 +39,6 @@ from nucliadb_protos.train_pb2 import (
     TrainSentence,
 )
 from nucliadb_protos.writer_pb2 import ShardObject
-
-from nucliadb.common import datamanagers
-from nucliadb.common.cluster import manager
-from nucliadb.common.cluster.base import AbstractIndexNode
-
-# XXX: this keys shouldn't be exposed outside datamanagers
-from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG_BASE
-from nucliadb.common.maindb.driver import Driver, Transaction
-from nucliadb.ingest.orm.entities import EntitiesManager
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_utils.storages.storage import Storage
 
 
@@ -52,9 +51,7 @@ class TrainShardManager(manager.KBShardManager):
     async def get_reader(self, kbid: str, shard: str) -> tuple[AbstractIndexNode, str]:
         shards = await self.get_shards_by_kbid_inner(kbid)
         try:
-            shard_object: ShardObject = next(
-                filter(lambda x: x.shard == shard, shards.shards)
-            )
+            shard_object: ShardObject = next(filter(lambda x: x.shard == shard, shards.shards))
         except StopIteration:
             raise KeyError("Shard not found")
 
@@ -71,9 +68,7 @@ class TrainShardManager(manager.KBShardManager):
         kbobj = KnowledgeBox(txn, self.storage, kbid)
         return kbobj
 
-    async def get_kb_entities_manager(
-        self, txn: Transaction, kbid: str
-    ) -> Optional[EntitiesManager]:
+    async def get_kb_entities_manager(self, txn: Transaction, kbid: str) -> Optional[EntitiesManager]:
         kbobj = await self.get_kb_obj(txn, kbid)
         if kbobj is None:
             return None
@@ -81,9 +76,7 @@ class TrainShardManager(manager.KBShardManager):
         manager = EntitiesManager(kbobj, txn)
         return manager
 
-    async def kb_sentences(
-        self, request: GetSentencesRequest
-    ) -> AsyncIterator[TrainSentence]:
+    async def kb_sentences(self, request: GetSentencesRequest) -> AsyncIterator[TrainSentence]:
         async with self.driver.transaction() as txn:
             kb = KnowledgeBox(txn, self.storage, request.kb.uuid)
             if request.uuid != "":
@@ -97,24 +90,18 @@ class TrainShardManager(manager.KBShardManager):
                     async for sentence in resource.iterate_sentences(request.metadata):
                         yield sentence
 
-    async def kb_paragraphs(
-        self, request: GetParagraphsRequest
-    ) -> AsyncIterator[TrainParagraph]:
+    async def kb_paragraphs(self, request: GetParagraphsRequest) -> AsyncIterator[TrainParagraph]:
         async with self.driver.transaction() as txn:
             kb = KnowledgeBox(txn, self.storage, request.kb.uuid)
             if request.uuid != "":
                 # Filter by uuid
                 resource = await kb.get(request.uuid)
                 if resource:
-                    async for paragraph in resource.iterate_paragraphs(
-                        request.metadata
-                    ):
+                    async for paragraph in resource.iterate_paragraphs(request.metadata):
                         yield paragraph
             else:
                 async for resource in kb.iterate_resources():
-                    async for paragraph in resource.iterate_paragraphs(
-                        request.metadata
-                    ):
+                    async for paragraph in resource.iterate_paragraphs(request.metadata):
                         yield paragraph
 
     async def kb_fields(self, request: GetFieldsRequest) -> AsyncIterator[TrainField]:
@@ -131,9 +118,7 @@ class TrainShardManager(manager.KBShardManager):
                     async for field in resource.iterate_fields(request.metadata):
                         yield field
 
-    async def kb_resources(
-        self, request: GetResourcesRequest
-    ) -> AsyncIterator[TrainResource]:
+    async def kb_resources(self, request: GetResourcesRequest) -> AsyncIterator[TrainResource]:
         async with self.driver.transaction() as txn:
             kb = KnowledgeBox(txn, self.storage, request.kb.uuid)
             base = KB_RESOURCE_SLUG_BASE.format(kbid=request.kb.uuid)

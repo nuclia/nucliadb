@@ -25,6 +25,7 @@ maindb. As the key "/kbs/{kbid}/vectorsets" was already used at some point, this
 migration will ensure to overwrite the key and set the new value
 
 """
+
 import logging
 
 from nucliadb.common import datamanagers

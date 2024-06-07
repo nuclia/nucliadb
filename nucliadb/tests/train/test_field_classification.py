@@ -22,15 +22,15 @@ import asyncio
 import aiohttp
 import pytest
 from httpx import AsyncClient
+
+from nucliadb.train import API_PREFIX
+from nucliadb.train.api.v1.router import KB_PREFIX
+from nucliadb_models.labels import LabelSetKind
 from nucliadb_protos.dataset_pb2 import FieldClassificationBatch, TaskType, TrainSet
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.train.utils import get_batches_from_train_response_stream
 from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder
-
-from nucliadb.train import API_PREFIX
-from nucliadb.train.api.v1.router import KB_PREFIX
-from nucliadb_models.labels import LabelSetKind
 
 
 @pytest.mark.asyncio
@@ -41,9 +41,7 @@ async def test_generator_field_classification(
 ):
     kbid = knowledgebox_with_labels
 
-    async with train_rest_api.get(
-        f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset"
-    ) as partitions:
+    async with train_rest_api.get(f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset") as partitions:
         assert partitions.status == 200
         data = await partitions.json()
         assert len(data["partitions"]) == 1

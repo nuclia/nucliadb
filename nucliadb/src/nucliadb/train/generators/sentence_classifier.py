@@ -21,6 +21,11 @@
 from typing import AsyncGenerator
 
 from fastapi import HTTPException
+
+from nucliadb.common.cluster.base import AbstractIndexNode
+from nucliadb.ingest.orm.resource import KB_REVERSE
+from nucliadb.train import logger
+from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
 from nucliadb_protos.dataset_pb2 import (
     Label,
     MultipleTextSameLabels,
@@ -28,11 +33,6 @@ from nucliadb_protos.dataset_pb2 import (
     TrainSet,
 )
 from nucliadb_protos.nodereader_pb2 import StreamRequest
-
-from nucliadb.common.cluster.base import AbstractIndexNode
-from nucliadb.ingest.orm.resource import KB_REVERSE
-from nucliadb.train import logger
-from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
 
 
 def sentence_classification_batch_generator(
@@ -47,12 +47,8 @@ def sentence_classification_batch_generator(
             detail="Sentence Classification should be at least of 1 labelset",
         )
 
-    generator = generate_sentence_classification_payloads(
-        kbid, trainset, node, shard_replica_id
-    )
-    batch_generator = batchify(
-        generator, trainset.batch_size, SentenceClassificationBatch
-    )
+    generator = generate_sentence_classification_payloads(kbid, trainset, node, shard_replica_id)
+    batch_generator = batchify(generator, trainset.batch_size, SentenceClassificationBatch)
     return batch_generator
 
 
@@ -112,9 +108,7 @@ async def get_sentences(kbid: str, result: str) -> list[str]:
     extracted_text = await field_obj.get_extracted_text()
     field_metadata = await field_obj.get_field_metadata()
     if extracted_text is None:
-        logger.warning(
-            f"{rid} {field} {field_type_int} extracted_text does not exist on DB"
-        )
+        logger.warning(f"{rid} {field} {field_type_int} extracted_text does not exist on DB")
         return []
 
     splitted_texts = []

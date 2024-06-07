@@ -18,13 +18,13 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import pytest
-from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig, SemanticModelMetadata
-from nucliadb_protos.utils_pb2 import VectorSimilarity
-from tests.ingest.fixtures import IngestFixture
 
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict
+from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig, SemanticModelMetadata
+from nucliadb_protos.utils_pb2 import VectorSimilarity
+from tests.ingest.fixtures import IngestFixture
 
 
 @pytest.mark.asyncio

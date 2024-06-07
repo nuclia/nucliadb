@@ -21,7 +21,6 @@ import random
 import uuid
 
 import pytest
-from tests.ingest.fixtures import make_extracted_text
 
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver
@@ -36,6 +35,7 @@ from nucliadb_protos import (
     writer_pb2,
 )
 from nucliadb_utils.utilities import get_indexing, get_storage
+from tests.ingest.fixtures import make_extracted_text
 
 
 @pytest.mark.asyncio
@@ -107,9 +107,7 @@ async def test_ingest_broker_message_with_vectorsets(
     #
     # A BrokerMessage with reindex=True will trigger a full brain generation
     # from the stored resource
-    bm = writer_pb2.BrokerMessage(
-        kbid=kbid, uuid=rid, type=writer_pb2.BrokerMessage.AUTOCOMMIT
-    )
+    bm = writer_pb2.BrokerMessage(kbid=kbid, uuid=rid, type=writer_pb2.BrokerMessage.AUTOCOMMIT)
     bm.reindex = True
 
     await processor.process(message=bm, seqid=2)
@@ -127,9 +125,7 @@ def create_broker_message_with_vectorset(
     default_vectorset_dimension: int,
     vectorset_dimension: int,
 ):
-    bm = writer_pb2.BrokerMessage(
-        kbid=kbid, uuid=rid, type=writer_pb2.BrokerMessage.AUTOCOMMIT
-    )
+    bm = writer_pb2.BrokerMessage(kbid=kbid, uuid=rid, type=writer_pb2.BrokerMessage.AUTOCOMMIT)
 
     body = "Lorem ipsum dolor sit amet..."
     bm.texts[field_id].body = body

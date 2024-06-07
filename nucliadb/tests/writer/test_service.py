@@ -54,9 +54,7 @@ async def test_service_lifecycle_entities(writer_api, entities_manager_mock):
             },
         )
 
-        resp = await client.post(
-            f"/{KB_PREFIX}/{kbid}/entitiesgroups", json=eg.model_dump()
-        )
+        resp = await client.post(f"/{KB_PREFIX}/{kbid}/entitiesgroups", json=eg.model_dump())
         assert resp.status_code == 200
 
         ingest = get_ingest()
@@ -70,9 +68,7 @@ async def test_service_lifecycle_entities(writer_api, entities_manager_mock):
         assert result.groups["0"].entities["ent1"].value == "asd"
 
         eg.group = "1"
-        resp = await client.post(
-            f"/{KB_PREFIX}/{kbid}/entitiesgroups", json=eg.model_dump()
-        )
+        resp = await client.post(f"/{KB_PREFIX}/{kbid}/entitiesgroups", json=eg.model_dump())
         assert resp.status_code == 200
         result = await ingest.GetEntities(
             writer_pb2.GetEntitiesRequest(kb=knowledgebox_pb2.KnowledgeBoxID(uuid=kbid))
@@ -81,9 +77,7 @@ async def test_service_lifecycle_entities(writer_api, entities_manager_mock):
 
 
 @pytest.mark.asyncio
-async def test_entities_custom_field_for_user_defined_groups(
-    writer_api, entities_manager_mock
-):
+async def test_entities_custom_field_for_user_defined_groups(writer_api, entities_manager_mock):
     """
     Test description:
 
@@ -104,9 +98,7 @@ async def test_entities_custom_field_for_user_defined_groups(
 
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         eg = CreateEntitiesGroupPayload(group="0")
-        resp = await client.post(
-            f"/{KB_PREFIX}/{kbid}/entitiesgroups", json=eg.model_dump()
-        )
+        resp = await client.post(f"/{KB_PREFIX}/{kbid}/entitiesgroups", json=eg.model_dump())
         assert resp.status_code == 200
 
         ingest = get_ingest()
@@ -132,16 +124,10 @@ async def test_service_lifecycle_labels(writer_api):
         kbid = data["uuid"]
 
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        ls = LabelSet(
-            title="My labelset", color="#0000000", multiple=False, kind=["RESOURCES"]
-        )
+        ls = LabelSet(title="My labelset", color="#0000000", multiple=False, kind=["RESOURCES"])
         ls.labels.append(Label(title="asd"))
         ls.labels.append(Label(title="asd"))
-        resp = await client.post(
-            f"/{KB_PREFIX}/{kbid}/labelset/ls1", json=ls.model_dump()
-        )
+        resp = await client.post(f"/{KB_PREFIX}/{kbid}/labelset/ls1", json=ls.model_dump())
         assert resp.status_code == 200
-        resp = await client.post(
-            f"/{KB_PREFIX}/{kbid}/labelset/ls2", json=ls.model_dump()
-        )
+        resp = await client.post(f"/{KB_PREFIX}/{kbid}/labelset/ls2", json=ls.model_dump())
         assert resp.status_code == 200

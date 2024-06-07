@@ -33,9 +33,7 @@ from nucliadb.search.utilities import get_predict
 @pytest.fixture(scope="function", autouse=True)
 def audit():
     audit_mock = mock.Mock(chat=mock.AsyncMock())
-    with mock.patch(
-        "nucliadb.search.search.chat.query.get_audit", return_value=audit_mock
-    ):
+    with mock.patch("nucliadb.search.search.chat.query.get_audit", return_value=audit_mock):
         yield audit_mock
 
 
@@ -45,9 +43,7 @@ async def test_chat(
     nucliadb_reader: AsyncClient,
     knowledgebox,
 ):
-    resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/chat", json={"query": "query"}
-    )
+    resp = await nucliadb_reader.post(f"/kb/{knowledgebox}/chat", json={"query": "query"})
     assert resp.status_code == 200
 
     context = [{"author": "USER", "text": "query"}]
@@ -73,13 +69,9 @@ async def test_chat_handles_incomplete_find_results(
     knowledgebox,
     find_incomplete_results,
 ):
-    resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/chat", json={"query": "query"}
-    )
+    resp = await nucliadb_reader.post(f"/kb/{knowledgebox}/chat", json={"query": "query"})
     assert resp.status_code == 529
-    assert resp.json() == {
-        "detail": "Temporary error on information retrieval. Please try again."
-    }
+    assert resp.json() == {"detail": "Temporary error on information retrieval. Please try again."}
 
 
 @pytest.fixture
@@ -106,9 +98,7 @@ async def test_chat_handles_status_codes_in_a_different_chunk(
     predict = get_predict()
     predict.generated_answer = [b"some ", b"text ", b"with ", b"status.", b"-2"]  # type: ignore
 
-    resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/chat", json={"query": "title"}
-    )
+    resp = await nucliadb_reader.post(f"/kb/{knowledgebox}/chat", json={"query": "title"})
     assert resp.status_code == 200
     _, answer, _, _ = parse_chat_response(resp.content)
 
@@ -123,9 +113,7 @@ async def test_chat_handles_status_codes_in_the_same_chunk(
     predict = get_predict()
     predict.generated_answer = [b"some ", b"text ", b"with ", b"status.-2"]  # type: ignore
 
-    resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/chat", json={"query": "title"}
-    )
+    resp = await nucliadb_reader.post(f"/kb/{knowledgebox}/chat", json={"query": "title"})
     assert resp.status_code == 200
     _, answer, _, _ = parse_chat_response(resp.content)
 
@@ -140,9 +128,7 @@ async def test_chat_handles_status_codes_with_last_chunk_empty(
     predict = get_predict()
     predict.generated_answer = [b"some ", b"text ", b"with ", b"status.", b"-2", b""]  # type: ignore
 
-    resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/chat", json={"query": "title"}
-    )
+    resp = await nucliadb_reader.post(f"/kb/{knowledgebox}/chat", json={"query": "title"})
     assert resp.status_code == 200
     _, answer, _, _ = parse_chat_response(resp.content)
 
@@ -177,9 +163,7 @@ def parse_chat_response(content: bytes):
 
 @pytest.mark.asyncio()
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_chat_always_returns_relations(
-    nucliadb_reader: AsyncClient, knowledgebox
-):
+async def test_chat_always_returns_relations(nucliadb_reader: AsyncClient, knowledgebox):
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/chat",
         json={"query": "summary", "features": ["relations"]},
@@ -211,9 +195,7 @@ async def test_chat_synchronous(nucliadb_reader: AsyncClient, knowledgebox, reso
 @pytest.mark.asyncio()
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 @pytest.mark.parametrize("sync_chat", (True, False))
-async def test_chat_with_citations(
-    nucliadb_reader: AsyncClient, knowledgebox, resource, sync_chat
-):
+async def test_chat_with_citations(nucliadb_reader: AsyncClient, knowledgebox, resource, sync_chat):
     citations = {"foo": [], "bar": []}  # type: ignore
     citations_payload = base64.b64encode(json.dumps(citations).encode())
     citations_size = len(citations_payload).to_bytes(4, byteorder="big", signed=False)
@@ -248,9 +230,7 @@ async def test_chat_with_citations(
 @pytest.mark.asyncio()
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 @pytest.mark.parametrize("sync_chat", (True, False))
-async def test_chat_without_citations(
-    nucliadb_reader: AsyncClient, knowledgebox, resource, sync_chat
-):
+async def test_chat_without_citations(nucliadb_reader: AsyncClient, knowledgebox, resource, sync_chat):
     predict = get_predict()
     predict.generated_answer = [  # type: ignore
         b"some ",
@@ -318,9 +298,7 @@ async def resources(nucliadb_writer, knowledgebox):
 
 @pytest.mark.asyncio()
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_chat_rag_options_full_resource(
-    nucliadb_reader: AsyncClient, knowledgebox, resources
-):
+async def test_chat_rag_options_full_resource(nucliadb_reader: AsyncClient, knowledgebox, resources):
     resource1, resource2 = resources
 
     predict = get_predict()
@@ -427,10 +405,7 @@ async def test_chat_rag_options_validation(nucliadb_reader):
     )
     assert resp.status_code == 422
     detail = resp.json()["detail"]
-    assert (
-        "If 'full_resource' strategy is chosen, it must be the only strategy"
-        in detail[0]["msg"]
-    )
+    assert "If 'full_resource' strategy is chosen, it must be the only strategy" in detail[0]["msg"]
 
     # field_extension requires fields
     resp = await nucliadb_reader.post(
@@ -480,16 +455,13 @@ async def test_chat_rag_options_validation(nucliadb_reader):
     detail = resp.json()["detail"]
     detail[0]["loc"][-1] == "fields"
     assert (
-        "Field 'X/fieldname' does not have a valid field type. Valid field types are"
-        in detail[0]["msg"]
+        "Field 'X/fieldname' does not have a valid field type. Valid field types are" in detail[0]["msg"]
     )
 
 
 @pytest.mark.asyncio()
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_chat_capped_context(
-    nucliadb_reader: AsyncClient, knowledgebox, resources
-):
+async def test_chat_capped_context(nucliadb_reader: AsyncClient, knowledgebox, resources):
     # By default, max size is big enough to fit all the prompt context
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/chat",
@@ -536,7 +508,6 @@ async def test_chat_on_a_kb_not_found(nucliadb_reader):
 @pytest.mark.asyncio()
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_chat_max_tokens(nucliadb_reader, knowledgebox, resources):
-
     # As an integer
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/chat",

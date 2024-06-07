@@ -85,9 +85,7 @@ async def set_entities_group(
     await txn.set(key, entities.SerializeToString())
 
 
-async def iterate_entities_groups(
-    txn: Transaction, *, kbid: str
-) -> AsyncGenerator[str, None]:
+async def iterate_entities_groups(txn: Transaction, *, kbid: str) -> AsyncGenerator[str, None]:
     entities_key = KB_ENTITIES.format(kbid=kbid)
     async for key in txn.keys(entities_key, count=-1):
         group = key.split("/")[-1]
@@ -106,9 +104,7 @@ async def get_entities_group(
     return eg
 
 
-async def get_deleted_groups(
-    txn: Transaction, *, kbid: str
-) -> kb_pb2.DeletedEntitiesGroups:
+async def get_deleted_groups(txn: Transaction, *, kbid: str) -> kb_pb2.DeletedEntitiesGroups:
     deleted_groups_key = KB_DELETED_ENTITIES_GROUPS.format(kbid=kbid)
     payload = await txn.get(deleted_groups_key)
     deg = kb_pb2.DeletedEntitiesGroups()
@@ -122,18 +118,14 @@ async def mark_group_as_deleted(txn: Transaction, *, kbid: str, group: str) -> N
     deg = await get_deleted_groups(txn, kbid=kbid)
     if group not in deg.entities_groups:
         deg.entities_groups.append(group)
-        await txn.set(
-            KB_DELETED_ENTITIES_GROUPS.format(kbid=kbid), deg.SerializeToString()
-        )
+        await txn.set(KB_DELETED_ENTITIES_GROUPS.format(kbid=kbid), deg.SerializeToString())
 
 
 async def unmark_group_as_deleted(txn: Transaction, *, kbid: str, group: str) -> None:
     deg = await get_deleted_groups(txn, kbid=kbid)
     if group in deg.entities_groups:
         deg.entities_groups.remove(group)
-        await txn.set(
-            KB_DELETED_ENTITIES_GROUPS.format(kbid=kbid), deg.SerializeToString()
-        )
+        await txn.set(KB_DELETED_ENTITIES_GROUPS.format(kbid=kbid), deg.SerializeToString())
 
 
 async def get_entities_meta_cache(txn: Transaction, *, kbid: str) -> EntitiesMetaCache:
@@ -143,7 +135,5 @@ async def get_entities_meta_cache(txn: Transaction, *, kbid: str) -> EntitiesMet
     return pickle.loads(value)
 
 
-async def set_entities_meta_cache(
-    txn: Transaction, kbid: str, cache: EntitiesMetaCache
-) -> None:
+async def set_entities_meta_cache(txn: Transaction, kbid: str, cache: EntitiesMetaCache) -> None:
     await txn.set(KB_ENTITIES_CACHE.format(kbid=kbid), pickle.dumps(cache, protocol=5))

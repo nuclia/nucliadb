@@ -48,10 +48,7 @@ def get_processing_api_url() -> str:
             + "/api/v1/processing"
         )
     else:
-        return (
-            nuclia_settings.nuclia_processing_cluster_url
-            + "/api/v1/internal/processing"
-        )
+        return nuclia_settings.nuclia_processing_cluster_url + "/api/v1/internal/processing"
 
 
 class PullResponse(pydantic.BaseModel):
@@ -159,9 +156,7 @@ class ProcessingHTTPClient:
         self.base_url = get_processing_api_url()
         self.headers = {}
         if nuclia_settings.nuclia_service_account is not None:
-            self.headers["X-STF-NUAKEY"] = (
-                f"Bearer {nuclia_settings.nuclia_service_account}"
-            )
+            self.headers["X-STF-NUAKEY"] = f"Bearer {nuclia_settings.nuclia_service_account}"
 
     async def __aenter__(self):
         return self

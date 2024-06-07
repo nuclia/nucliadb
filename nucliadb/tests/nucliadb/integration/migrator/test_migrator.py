@@ -43,9 +43,7 @@ async def execution_context(natsd, storage, redis_config, nucliadb):
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_migrate_kb(execution_context: ExecutionContext, knowledgebox):
     # this will test run all available migrations
-    await execution_context.data_manager.update_kb_info(
-        kbid=knowledgebox, current_version=-1
-    )
+    await execution_context.data_manager.update_kb_info(kbid=knowledgebox, current_version=-1)
     await execution_context.data_manager.update_global_info(current_version=0)
 
     kb_info = await execution_context.data_manager.get_kb_info(kbid=knowledgebox)
@@ -80,14 +78,10 @@ async def two_knowledgeboxes(nucliadb_manager):
         assert resp.status_code == 200
 
 
-async def test_run_all_kb_migrations(
-    execution_context: ExecutionContext, two_knowledgeboxes
-):
+async def test_run_all_kb_migrations(execution_context: ExecutionContext, two_knowledgeboxes):
     # Set migration version to -1 for all knowledgeboxes
     for kbid in two_knowledgeboxes:
-        await execution_context.data_manager.update_kb_info(
-            kbid=kbid, current_version=-1
-        )
+        await execution_context.data_manager.update_kb_info(kbid=kbid, current_version=-1)
         await execution_context.data_manager.update_global_info(current_version=0)
 
         kb_info = await execution_context.data_manager.get_kb_info(kbid=kbid)
@@ -109,16 +103,12 @@ async def test_run_all_kb_migrations(
         assert global_info.current_version == 1
 
 
-async def test_run_kb_rollovers(
-    execution_context: ExecutionContext, two_knowledgeboxes
-):
+async def test_run_kb_rollovers(execution_context: ExecutionContext, two_knowledgeboxes):
     # Set migration version to -1 for all knowledgeboxes
     for kbid in two_knowledgeboxes:
         await execution_context.data_manager.add_kb_rollover(kbid=kbid)
 
-    assert set(await execution_context.data_manager.get_kbs_to_rollover()) == set(
-        two_knowledgeboxes
-    )
+    assert set(await execution_context.data_manager.get_kbs_to_rollover()) == set(two_knowledgeboxes)
 
     await migrator.run_rollovers(execution_context)
 

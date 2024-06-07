@@ -34,9 +34,7 @@ def test_create_consumer():
 
     async def callback(): ...
 
-    consumer = create_consumer(
-        "foo", stream=stream, msg_type=Message, callback=callback
-    )
+    consumer = create_consumer("foo", stream=stream, msg_type=Message, callback=callback)
     assert not consumer.initialized
 
     assert consumer.name == "foo"
@@ -52,9 +50,7 @@ class TestSubscriptionWorker:
 
     @pytest.fixture(scope="function")
     async def consumer(self, context, callback):
-        consumer = create_consumer(
-            "foo", stream=MagicMock(), callback=callback, msg_type=Message
-        )
+        consumer = create_consumer("foo", stream=MagicMock(), callback=callback, msg_type=Message)
         await consumer.initialize(context)
         yield consumer
 

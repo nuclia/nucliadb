@@ -50,12 +50,8 @@ async def set(
     await txn.set(key, value.SerializeToString())
 
 
-async def delete(
-    txn: Transaction, *, kbid: str, rid: str, field_type: str, field_id: str
-):
-    base_key = KB_RESOURCE_FIELD.format(
-        kbid=kbid, uuid=rid, type=field_type, field=field_id
-    )
+async def delete(txn: Transaction, *, kbid: str, rid: str, field_type: str, field_id: str):
+    base_key = KB_RESOURCE_FIELD.format(kbid=kbid, uuid=rid, type=field_type, field=field_id)
     # Make sure we explicitly delete the field and any nested key
     keys_to_delete = []
     async for key in txn.keys(base_key):
@@ -71,9 +67,7 @@ async def delete(
 async def get_error(
     txn: Transaction, *, kbid: str, rid: str, field_type: str, field_id: str
 ) -> Optional[writer_pb2.Error]:
-    key = KB_RESOURCE_FIELD_ERROR.format(
-        kbid=kbid, uuid=rid, type=field_type, field=field_id
-    )
+    key = KB_RESOURCE_FIELD_ERROR.format(kbid=kbid, uuid=rid, type=field_type, field=field_id)
     return await get_kv_pb(txn, key, writer_pb2.Error)
 
 
@@ -86,7 +80,5 @@ async def set_error(
     field_id: str,
     error: writer_pb2.Error,
 ):
-    key = KB_RESOURCE_FIELD_ERROR.format(
-        kbid=kbid, uuid=rid, type=field_type, field=field_id
-    )
+    key = KB_RESOURCE_FIELD_ERROR.format(kbid=kbid, uuid=rid, type=field_type, field=field_id)
     await txn.set(key, error.SerializeToString())

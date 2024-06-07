@@ -27,9 +27,7 @@ from nucliadb.common.cluster.rebalance import run
 
 async def test_run_handles_locked_rebalance():
     context = MagicMock()
-    with patch(
-        "nucliadb.common.cluster.rebalance.locking.distributed_lock"
-    ) as distributed_lock:
+    with patch("nucliadb.common.cluster.rebalance.locking.distributed_lock") as distributed_lock:
         distributed_lock.side_effect = locking.ResourceLocked("rebalance")
         await run(context)
 

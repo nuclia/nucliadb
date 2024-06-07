@@ -143,9 +143,7 @@ class AskResult:
                 f"Unexpected error while generating the answer: {exc}",
                 extra={"kbid": self.kbid},
             )
-            error_message = (
-                "Unexpected error while generating the answer. Please try again later."
-            )
+            error_message = "Unexpected error while generating the answer. Please try again later."
             if self.ask_request_with_debug_flag:
                 error_message += f" Error: {exc}"
             item = ErrorAskResponseItem(error=error_message)
@@ -154,9 +152,7 @@ class AskResult:
 
     def _ndjson_encode(self, item: AskResponseItemType) -> str:
         result_item = AskResponseItem(item=item)
-        return (
-            result_item.model_dump_json(exclude_unset=False, exclude_none=True) + "\n"
-        )
+        return result_item.model_dump_json(exclude_unset=False, exclude_none=True) + "\n"
 
     async def _stream(self) -> AsyncGenerator[AskResponseItemType, None]:
         # First stream out the find results
@@ -199,17 +195,14 @@ class AskResult:
                     output=self._metadata.output_tokens,
                 ),
                 timings=AskTimings(
-                    generative_first_chunk=self._metadata.timings.get(
-                        "generative_first_chunk"
-                    ),
+                    generative_first_chunk=self._metadata.timings.get("generative_first_chunk"),
                     generative_total=self._metadata.timings.get("generative"),
                 ),
             )
 
         # Stream out the relations results
         should_query_relations = (
-            self.ask_request_with_relations
-            and self.status_code == AnswerStatusCode.SUCCESS
+            self.ask_request_with_relations and self.status_code == AnswerStatusCode.SUCCESS
         )
         if should_query_relations:
             relations = await self.get_relations_results()
@@ -238,9 +231,7 @@ class AskResult:
                     output=self._metadata.output_tokens,
                 ),
                 timings=AskTimings(
-                    generative_first_chunk=self._metadata.timings.get(
-                        "generative_first_chunk"
-                    ),
+                    generative_first_chunk=self._metadata.timings.get("generative_first_chunk"),
                     generative_total=self._metadata.timings.get("generative"),
                 ),
             )
@@ -322,9 +313,7 @@ class NotEnoughContextAskResult(AskResult):
         yield self._ndjson_encode(RetrievalAskResponseItem(results=self.find_results))
         yield self._ndjson_encode(AnswerAskResponseItem(text=NOT_ENOUGH_CONTEXT_ANSWER))
         status = AnswerStatusCode.NO_CONTEXT
-        yield self._ndjson_encode(
-            StatusAskResponseItem(code=status.value, status=status.prettify())
-        )
+        yield self._ndjson_encode(StatusAskResponseItem(code=status.value, status=status.prettify()))
 
     async def json(self) -> str:
         return SyncAskResponse(
@@ -367,9 +356,7 @@ async def ask(
     needs_retrieval = True
     if resource is not None:
         ask_request.resource_filters = [resource]
-        if any(
-            strategy.name == "full_resource" for strategy in ask_request.rag_strategies
-        ):
+        if any(strategy.name == "full_resource" for strategy in ask_request.rag_strategies):
             needs_retrieval = False
 
     # Maybe do a retrieval query
@@ -441,9 +428,7 @@ async def ask(
     )
     with metrics.time("stream_start"):
         predict = get_predict()
-        nuclia_learning_id, predict_answer_stream = await predict.chat_query_ndjson(
-            kbid, chat_model
-        )
+        nuclia_learning_id, predict_answer_stream = await predict.chat_query_ndjson(kbid, chat_model)
 
     auditor = ChatAuditor(
         kbid=kbid,

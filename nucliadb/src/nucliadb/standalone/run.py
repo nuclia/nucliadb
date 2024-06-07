@@ -121,10 +121,7 @@ def run():
         settings_to_output["NUA API zone"] = nuclia_settings.nuclia_zone
 
     settings_to_output_fmted = "\n".join(
-        [
-            f"||      - {k}:{' ' * (27 - len(k))}{v}"
-            for k, v in settings_to_output.items()
-        ]
+        [f"||      - {k}:{' ' * (27 - len(k))}{v}" for k, v in settings_to_output.items()]
     )
 
     installed_version = versions.installed_nucliadb()

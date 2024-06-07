@@ -28,17 +28,13 @@ from nucliadb.migrator.context import ExecutionContext
 from nucliadb.migrator.utils import get_migrations
 from nucliadb_telemetry import errors, metrics
 
-migration_observer = metrics.Observer(
-    "nucliadb_migrations", labels={"type": "kb", "target_version": ""}
-)
+migration_observer = metrics.Observer("nucliadb_migrations", labels={"type": "kb", "target_version": ""})
 
 
 logger = logging.getLogger(__name__)
 
 
-async def run_kb_migrations(
-    context: ExecutionContext, kbid: str, target_version: int
-) -> None:
+async def run_kb_migrations(context: ExecutionContext, kbid: str, target_version: int) -> None:
     async with locking.distributed_lock(f"migration-{kbid}"):
         kb_info = await context.data_manager.get_kb_info(kbid)
         if kb_info is None:
@@ -46,9 +42,7 @@ async def run_kb_migrations(
             await context.data_manager.delete_kb_migration(kbid=kbid)
             return
 
-        migrations = get_migrations(
-            from_version=kb_info.current_version, to_version=target_version
-        )
+        migrations = get_migrations(from_version=kb_info.current_version, to_version=target_version)
 
         for migration in migrations:
             migration_info = {
@@ -59,14 +53,10 @@ async def run_kb_migrations(
 
             try:
                 logger.info("Migrating KB", extra=migration_info)
-                with migration_observer(
-                    {"type": "kb", "target_version": str(migration.version)}
-                ):
+                with migration_observer({"type": "kb", "target_version": str(migration.version)}):
                     await migration.module.migrate_kb(context, kbid)
                 logger.info("Finished KB Migration", extra=migration_info)
-                await context.data_manager.update_kb_info(
-                    kbid=kbid, current_version=migration.version
-                )
+                await context.data_manager.update_kb_info(kbid=kbid, current_version=migration.version)
             except Exception as exc:
                 errors.capture_exception(exc)
                 logger.exception("Failed to migrate KB", extra=migration_info)
@@ -74,9 +64,7 @@ async def run_kb_migrations(
 
         refreshed_kb_info = await context.data_manager.get_kb_info(kbid=kbid)
         if refreshed_kb_info is None:
-            logger.warning(
-                "KB not found. This should not happen.", extra={"kbid": kbid}
-            )
+            logger.warning("KB not found. This should not happen.", extra={"kbid": kbid})
             return
         assert refreshed_kb_info.current_version == target_version
 
@@ -154,13 +142,9 @@ async def run_global_migrations(context: ExecutionContext, target_version: int) 
         }
         try:
             logger.info("Migrating", extra=migration_info)
-            with migration_observer(
-                {"type": "global", "target_version": str(migration.version)}
-            ):
+            with migration_observer({"type": "global", "target_version": str(migration.version)}):
                 await migration.module.migrate(context)
-            await context.data_manager.update_global_info(
-                current_version=migration.version
-            )
+            await context.data_manager.update_global_info(current_version=migration.version)
             logger.info("Finished migration", extra=migration_info)
         except Exception as exc:
             errors.capture_exception(exc)

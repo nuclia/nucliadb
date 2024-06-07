@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import pytest
-from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb.writer.resource.basic import compute_title, parse_icon_on_create
 from nucliadb_models.common import File
@@ -26,6 +25,7 @@ from nucliadb_models.file import FileField
 from nucliadb_models.link import LinkField
 from nucliadb_models.text import TextField, TextFormat
 from nucliadb_models.writer import CreateResourcePayload
+from nucliadb_protos.writer_pb2 import BrokerMessage
 
 
 def get_resource_payload(link_uri=None, filename=None, slug=None, text=None, icon=None):
@@ -47,9 +47,7 @@ def get_resource_payload(link_uri=None, filename=None, slug=None, text=None, ico
     "payload,resource_uuid,expected_title",
     [
         (
-            get_resource_payload(
-                link_uri="https://foo.com", filename="myfile.pdf", slug="myslug"
-            ),
+            get_resource_payload(link_uri="https://foo.com", filename="myfile.pdf", slug="myslug"),
             "ruuid",
             "https://foo.com",
         ),

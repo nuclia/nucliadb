@@ -123,12 +123,8 @@ async def search_knowledgebox(
         ge=0,
     ),
     vectorset: Optional[str] = fastapi_query(SearchParamDefaults.vectorset),
-    range_creation_start: Optional[datetime] = fastapi_query(
-        SearchParamDefaults.range_creation_start
-    ),
-    range_creation_end: Optional[datetime] = fastapi_query(
-        SearchParamDefaults.range_creation_end
-    ),
+    range_creation_start: Optional[datetime] = fastapi_query(SearchParamDefaults.range_creation_start),
+    range_creation_end: Optional[datetime] = fastapi_query(SearchParamDefaults.range_creation_end),
     range_modification_start: Optional[datetime] = fastapi_query(
         SearchParamDefaults.range_modification_start
     ),
@@ -149,9 +145,7 @@ async def search_knowledgebox(
     field_type_filter: list[FieldTypeName] = fastapi_query(
         SearchParamDefaults.field_type_filter, alias="field_type"
     ),
-    extracted: list[ExtractedDataTypeName] = fastapi_query(
-        SearchParamDefaults.extracted
-    ),
+    extracted: list[ExtractedDataTypeName] = fastapi_query(SearchParamDefaults.extracted),
     shards: list[str] = fastapi_query(SearchParamDefaults.shards),
     with_duplicates: bool = fastapi_query(SearchParamDefaults.with_duplicates),
     with_synonyms: bool = fastapi_query(SearchParamDefaults.with_synonyms),
@@ -177,9 +171,7 @@ async def search_knowledgebox(
             ),
             page_number=page_number,
             page_size=page_size,
-            min_score=min_score_from_query_params(
-                min_score_bm25, min_score_semantic, min_score
-            ),
+            min_score=min_score_from_query_params(min_score_bm25, min_score_semantic, min_score),
             vectorset=vectorset,
             range_creation_end=range_creation_end,
             range_creation_start=range_creation_start,
@@ -200,9 +192,7 @@ async def search_knowledgebox(
     except ValidationError as exc:
         detail = json.loads(exc.json())
         return HTTPClientError(status_code=422, detail=detail)
-    return await _search_endpoint(
-        response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
-    )
+    return await _search_endpoint(response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for)
 
 
 @api.get(
@@ -229,16 +219,10 @@ async def catalog_get(
     page_number: int = fastapi_query(SearchParamDefaults.page_number),
     page_size: int = fastapi_query(SearchParamDefaults.page_size),
     shards: list[str] = fastapi_query(SearchParamDefaults.shards),
-    with_status: Optional[ResourceProcessingStatus] = fastapi_query(
-        SearchParamDefaults.with_status
-    ),
+    with_status: Optional[ResourceProcessingStatus] = fastapi_query(SearchParamDefaults.with_status),
     debug: bool = fastapi_query(SearchParamDefaults.debug),
-    range_creation_start: Optional[datetime] = fastapi_query(
-        SearchParamDefaults.range_creation_start
-    ),
-    range_creation_end: Optional[datetime] = fastapi_query(
-        SearchParamDefaults.range_creation_end
-    ),
+    range_creation_start: Optional[datetime] = fastapi_query(SearchParamDefaults.range_creation_start),
+    range_creation_end: Optional[datetime] = fastapi_query(SearchParamDefaults.range_creation_end),
     range_modification_start: Optional[datetime] = fastapi_query(
         SearchParamDefaults.range_modification_start
     ),
@@ -385,9 +369,7 @@ async def search_post_knowledgebox(
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> Union[KnowledgeboxSearchResults, HTTPClientError]:
-    return await _search_endpoint(
-        response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
-    )
+    return await _search_endpoint(response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for)
 
 
 async def _search_endpoint(

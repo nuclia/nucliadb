@@ -54,9 +54,7 @@ async def test_upload(
     assert rid
     assert field_id
 
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{rid}/file/{field_id}"
-    )
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}/file/{field_id}")
     assert resp.status_code == 200
     body = resp.json()
     assert body["value"]["file"]["filename"] == "testfile"
@@ -91,9 +89,7 @@ async def test_upload_guesses_content_type(
     field_id = body["field_id"]
 
     # Test that the content type is correctly guessed from the filename
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{rid}/file/{field_id}"
-    )
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}/file/{field_id}")
     assert resp.status_code == 200
     body = resp.json()
     assert body["value"]["file"]["filename"] == filename

@@ -62,9 +62,7 @@ async def download_extract_file_rslug_prefix(
     field_id: str,
     download_field: str,
 ) -> Response:
-    return await _download_extract_file(
-        request, kbid, field_type, field_id, download_field, rslug=rslug
-    )
+    return await _download_extract_file(request, kbid, field_type, field_id, download_field, rslug=rslug)
 
 
 @api.get(
@@ -83,9 +81,7 @@ async def download_extract_file_rid_prefix(
     field_id: str,
     download_field: str,
 ) -> Response:
-    return await _download_extract_file(
-        request, kbid, field_type, field_id, download_field, rid=rid
-    )
+    return await _download_extract_file(request, kbid, field_type, field_id, download_field, rid=rid)
 
 
 async def _download_extract_file(
@@ -124,9 +120,7 @@ async def download_field_file_rslug_prefix(
     field_id: str,
     inline: bool = False,
 ) -> Response:
-    return await _download_field_file(
-        request, kbid, field_id, rslug=rslug, inline=inline
-    )
+    return await _download_field_file(request, kbid, field_id, rslug=rslug, inline=inline)
 
 
 @api.get(
@@ -179,9 +173,7 @@ async def download_field_layout_rslug_prefix(
     field_id: str,
     download_field: str,
 ) -> Response:
-    return await _download_field_layout(
-        request, kbid, field_id, download_field, rslug=rslug
-    )
+    return await _download_field_layout(request, kbid, field_id, download_field, rslug=rslug)
 
 
 @api.get(
@@ -199,9 +191,7 @@ async def download_field_layout_rid_prefix(
     field_id: str,
     download_field: str,
 ) -> Response:
-    return await _download_field_layout(
-        request, kbid, field_id, download_field, rid=rid
-    )
+    return await _download_field_layout(request, kbid, field_id, download_field, rid=rid)
 
 
 async def _download_field_layout(
@@ -237,9 +227,7 @@ async def download_field_conversation_rslug_prefix(
     message_id: str,
     file_num: int,
 ) -> Response:
-    return await _download_field_conversation(
-        request, kbid, field_id, message_id, file_num, rslug=rslug
-    )
+    return await _download_field_conversation(request, kbid, field_id, message_id, file_num, rslug=rslug)
 
 
 @api.get(
@@ -258,9 +246,7 @@ async def download_field_conversation_rid_prefix(
     message_id: str,
     file_num: int,
 ) -> Response:
-    return await _download_field_conversation(
-        request, kbid, field_id, message_id, file_num, rid=rid
-    )
+    return await _download_field_conversation(request, kbid, field_id, message_id, file_num, rid=rid)
 
 
 async def _download_field_conversation(
@@ -357,9 +343,7 @@ async def download_api(sf: StorageField, headers: Headers, inline: bool = False)
     )
 
 
-async def _get_resource_uuid_from_params(
-    kbid, rid: Optional[str], rslug: Optional[str]
-) -> str:
+async def _get_resource_uuid_from_params(kbid, rid: Optional[str], rslug: Optional[str]) -> str:
     if not any([rid, rslug]):
         raise ValueError("Either rid or slug must be set")
 

@@ -32,11 +32,7 @@ from nucliadb.migrator.context import ExecutionContext
 logger = logging.getLogger(__name__)
 
 
-AFFECTED_KBS = [
-    kbid.strip()
-    for kbid in os.environ.get("ROLLOVER_KBS", "").split(",")
-    if kbid.strip()
-]
+AFFECTED_KBS = [kbid.strip() for kbid in os.environ.get("ROLLOVER_KBS", "").split(",") if kbid.strip()]
 
 
 async def migrate(context: ExecutionContext) -> None: ...

@@ -44,14 +44,11 @@ class NucliaAuthHTTPClient:
     def __init__(self):
         self.session = aiohttp.ClientSession()
         self.base_url = (
-            nuclia_settings.nuclia_public_url.format(zone=nuclia_settings.nuclia_zone)
-            + "/api"
+            nuclia_settings.nuclia_public_url.format(zone=nuclia_settings.nuclia_zone) + "/api"
         )
         self.headers = {}
         if nuclia_settings.nuclia_service_account is not None:
-            self.headers["X-NUCLIA-NUAKEY"] = (
-                f"Bearer {nuclia_settings.nuclia_service_account}"
-            )
+            self.headers["X-NUCLIA-NUAKEY"] = f"Bearer {nuclia_settings.nuclia_service_account}"
 
     async def __aenter__(self):
         return self

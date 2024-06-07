@@ -23,12 +23,6 @@ from typing import Callable
 
 import pytest
 from httpx import AsyncClient
-from nucliadb_protos.nodereader_pb2 import (
-    DocumentSearchRequest,
-    ParagraphSearchRequest,
-    VectorSearchRequest,
-)
-from nucliadb_protos.writer_pb2 import Shards as PBShards
 
 from nucliadb.common.cluster.manager import INDEX_NODES
 from nucliadb.common.datamanagers.cluster import KB_SHARDS
@@ -36,6 +30,12 @@ from nucliadb.common.maindb.utils import get_driver
 from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb.tests.vectors import Q
 from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_protos.nodereader_pb2 import (
+    DocumentSearchRequest,
+    ParagraphSearchRequest,
+    VectorSearchRequest,
+)
+from nucliadb_protos.writer_pb2 import Shards as PBShards
 
 RUNNING_IN_GH_ACTIONS = os.environ.get("CI", "").lower() == "true"
 
@@ -208,22 +208,16 @@ async def test_search_with_facets(
     kbid = multiple_search_resource
 
     async with search_api(roles=[NucliaDBRoles.READER]) as client:
-        url = (
-            f"/{KB_PREFIX}/{kbid}/search?query=own+text&faceted=/classification.labels"
-        )
+        url = f"/{KB_PREFIX}/{kbid}/search?query=own+text&faceted=/classification.labels"
 
         resp = await client.get(url)
         data = resp.json()
         assert (
-            data["fulltext"]["facets"]["/classification.labels"][
-                "/classification.labels/labelset1"
-            ]
+            data["fulltext"]["facets"]["/classification.labels"]["/classification.labels/labelset1"]
             == 100
         )
         assert (
-            data["paragraphs"]["facets"]["/classification.labels"][
-                "/classification.labels/labelset1"
-            ]
+            data["paragraphs"]["facets"]["/classification.labels"]["/classification.labels/labelset1"]
             == 100
         )
 
@@ -232,14 +226,10 @@ async def test_search_with_facets(
         resp = await client.get(url)
         data = resp.json()
         assert (
-            data["fulltext"]["facets"]["/classification.labels"][
-                "/classification.labels/labelset1"
-            ]
+            data["fulltext"]["facets"]["/classification.labels"]["/classification.labels/labelset1"]
             == 100
         )
         assert (
-            data["paragraphs"]["facets"]["/classification.labels"][
-                "/classification.labels/labelset1"
-            ]
+            data["paragraphs"]["facets"]["/classification.labels"]["/classification.labels/labelset1"]
             == 100
         )

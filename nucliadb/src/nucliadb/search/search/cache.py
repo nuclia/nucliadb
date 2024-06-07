@@ -31,9 +31,7 @@ from nucliadb.search import SERVICE_NAME
 from nucliadb_telemetry import metrics
 from nucliadb_utils.utilities import get_storage
 
-rcache: ContextVar[Optional[dict[str, ResourceORM]]] = ContextVar(
-    "rcache", default=None
-)
+rcache: ContextVar[Optional[dict[str, ResourceORM]]] = ContextVar("rcache", default=None)
 
 
 RESOURCE_LOCKS: dict[str, asyncio.Lock] = LRU(1000)  # type: ignore

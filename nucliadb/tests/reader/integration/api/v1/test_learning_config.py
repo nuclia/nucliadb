@@ -47,9 +47,7 @@ class MockProxy:
 @pytest.fixture()
 def learning_config_proxy_mock():
     proxy = MockProxy()
-    with mock.patch(
-        "nucliadb.reader.api.v1.learning_config.learning_config_proxy", proxy
-    ):
+    with mock.patch("nucliadb.reader.api.v1.learning_config.learning_config_proxy", proxy):
         yield proxy
 
 
@@ -61,15 +59,11 @@ def onprem_nucliadb():
         yield mocked
 
 
-async def test_api(
-    reader_api, knowledgebox_ingest, learning_config_proxy_mock, onprem_nucliadb
-):
+async def test_api(reader_api, knowledgebox_ingest, learning_config_proxy_mock, onprem_nucliadb):
     kbid = knowledgebox_ingest
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         # Get configuration
-        resp = await client.get(
-            f"/kb/{kbid}/configuration", headers={"x-nucliadb-user": "userfoo"}
-        )
+        resp = await client.get(f"/kb/{kbid}/configuration", headers={"x-nucliadb-user": "userfoo"})
         assert resp.status_code == 200
         assert learning_config_proxy_mock.calls[-1][1:] == (
             "GET",
@@ -100,9 +94,7 @@ async def test_api(
         )
 
         # Get metadata of a model
-        resp = await client.get(
-            f"/kb/{kbid}/model/model1", headers={"x-nucliadb-user": "userfoo"}
-        )
+        resp = await client.get(f"/kb/{kbid}/model/model1", headers={"x-nucliadb-user": "userfoo"})
         assert resp.status_code == 200
         assert learning_config_proxy_mock.calls[-1][1:] == (
             "GET",

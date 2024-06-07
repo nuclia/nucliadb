@@ -28,8 +28,6 @@ from unittest.mock import AsyncMock, patch
 import nats
 import pytest
 from grpc import aio
-from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
-from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.settings import settings as cluster_settings
@@ -46,6 +44,8 @@ from nucliadb.tests.vectors import V1, V2, V3
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import utils_pb2 as upb
 from nucliadb_protos import writer_pb2_grpc
+from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
+from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils import const
 from nucliadb_utils.audit.basic import BasicAuditStorage
 from nucliadb_utils.audit.stream import StreamAuditStorage
@@ -95,9 +95,7 @@ class IngestFixture:
 
 
 @pytest.fixture(scope="function")
-async def ingest_consumers(
-    redis_config, transaction_utility, storage, fake_node, nats_manager
-):
+async def ingest_consumers(redis_config, transaction_utility, storage, fake_node, nats_manager):
     ingest_consumers_finalizer = await consumer_service.start_ingest_consumers()
 
     yield
@@ -107,9 +105,7 @@ async def ingest_consumers(
 
 
 @pytest.fixture(scope="function")
-async def ingest_processed_consumer(
-    redis_config, transaction_utility, storage, fake_node, nats_manager
-):
+async def ingest_processed_consumer(redis_config, transaction_utility, storage, fake_node, nats_manager):
     ingest_consumer_finalizer = await consumer_service.start_ingest_processed_consumer()
 
     yield
@@ -119,9 +115,7 @@ async def ingest_processed_consumer(
 
 
 @pytest.fixture(scope="function")
-async def grpc_servicer(
-    maindb_driver, ingest_consumers, ingest_processed_consumer, learning_config
-):
+async def grpc_servicer(maindb_driver, ingest_consumers, ingest_processed_consumer, learning_config):
     servicer = WriterServicer()
     await servicer.initialize()
 
@@ -194,9 +188,7 @@ def learning_config():
 
 
 @pytest.fixture(scope="function")
-async def knowledgebox_ingest(
-    storage, maindb_driver: Driver, shard_manager, learning_config
-):
+async def knowledgebox_ingest(storage, maindb_driver: Driver, shard_manager, learning_config):
     kbid = str(uuid.uuid4())
     kbslug = str(uuid.uuid4())
     async with maindb_driver.transaction() as txn:
@@ -314,9 +306,7 @@ TEST_CLOUDFILE = rpb.CloudFile(
     uri=TEST_CLOUDFILE_FILENAME,
     source=rpb.CloudFile.Source.LOCAL,
     bucket_name="/integration/orm/assets",
-    size=getsize(
-        f"{dirname(__file__)}/integration/orm/assets/{TEST_CLOUDFILE_FILENAME}"
-    ),
+    size=getsize(f"{dirname(__file__)}/integration/orm/assets/{TEST_CLOUDFILE_FILENAME}"),
     content_type="application/octet-stream",
     filename=TEST_CLOUDFILE_FILENAME,
     md5="01cca3f53edb934a445a3112c6caa652",
@@ -518,9 +508,7 @@ def broker_resource(
     return message1
 
 
-async def create_resource(
-    storage: Storage, driver: Driver, knowledgebox_ingest: str
-) -> Resource:
+async def create_resource(storage: Storage, driver: Driver, knowledgebox_ingest: str) -> Resource:
     txn = await driver.begin()
 
     rid = str(uuid.uuid4())
@@ -594,15 +582,11 @@ async def create_resource(
     # Add an example of each of the files, containing all possible metadata
 
     # Title
-    title_field = await test_resource.get_field(
-        "title", rpb.FieldType.GENERIC, load=False
-    )
+    title_field = await test_resource.get_field("title", rpb.FieldType.GENERIC, load=False)
     await make_field(title_field, "MyText")
 
     # Summary
-    summary_field = await test_resource.get_field(
-        "summary", rpb.FieldType.GENERIC, load=False
-    )
+    summary_field = await test_resource.get_field("summary", rpb.FieldType.GENERIC, load=False)
     await make_field(summary_field, "MyText")
 
     # 2.1 FILE FIELD
@@ -660,20 +644,14 @@ async def create_resource(
     layoutfield = await test_resource.set_field(rpb.FieldType.LAYOUT, "layout1", l2)
     await add_field_id(test_resource, layoutfield)
 
-    await layoutfield.set_extracted_text(
-        make_extracted_text(layoutfield.id, body="MyText")
-    )
+    await layoutfield.set_extracted_text(make_extracted_text(layoutfield.id, body="MyText"))
     await layoutfield.set_field_metadata(make_field_metadata(layoutfield.id))
-    await layoutfield.set_large_field_metadata(
-        make_field_large_metadata(layoutfield.id)
-    )
+    await layoutfield.set_large_field_metadata(make_field_large_metadata(layoutfield.id))
     await layoutfield.set_vectors(make_extracted_vectors(layoutfield.id))
 
     # 2.5 CONVERSATION FIELD
 
-    def make_message(
-        text: str, files: Optional[list[rpb.CloudFile]] = None
-    ) -> rpb.Message:
+    def make_message(text: str, files: Optional[list[rpb.CloudFile]] = None) -> rpb.Message:
         msg = rpb.Message(
             who="myself",
         )
@@ -700,12 +678,8 @@ async def create_resource(
 
     # 2.6 KEYWORDSET FIELD
 
-    k2 = rpb.FieldKeywordset(
-        keywords=[rpb.Keyword(value="kw1"), rpb.Keyword(value="kw2")]
-    )
-    kws_field = await test_resource.set_field(
-        rpb.FieldType.KEYWORDSET, "keywordset1", k2
-    )
+    k2 = rpb.FieldKeywordset(keywords=[rpb.Keyword(value="kw1"), rpb.Keyword(value="kw2")])
+    kws_field = await test_resource.set_field(rpb.FieldType.KEYWORDSET, "keywordset1", k2)
     await add_field_id(test_resource, kws_field)
     await make_field(kws_field, "MyText")
 
@@ -713,9 +687,7 @@ async def create_resource(
 
     d2 = rpb.FieldDatetime()
     d2.value.FromDatetime(datetime.now())
-    datetime_field = await test_resource.set_field(
-        rpb.FieldType.DATETIME, "datetime1", d2
-    )
+    datetime_field = await test_resource.set_field(rpb.FieldType.DATETIME, "datetime1", d2)
     await add_field_id(test_resource, datetime_field)
     await make_field(datetime_field, "MyText")
 

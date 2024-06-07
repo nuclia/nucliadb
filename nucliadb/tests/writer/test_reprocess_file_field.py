@@ -21,13 +21,13 @@ from typing import AsyncIterator
 from unittest.mock import AsyncMock
 
 import pytest
-from tests.writer.utils import load_file_as_FileB64_payload
 
 from nucliadb.common import datamanagers
 from nucliadb.ingest.processing import ProcessingInfo
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_PREFIX
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models.resource import NucliaDBRoles, QueueType
+from tests.writer.utils import load_file_as_FileB64_payload
 
 
 @pytest.fixture(scope="function")
@@ -36,18 +36,14 @@ def processing_mock(mocker):
     mocker.patch.object(
         processing,
         "send_to_process",
-        AsyncMock(
-            return_value=ProcessingInfo(seqid=0, account_seq=0, queue=QueueType.SHARED)
-        ),
+        AsyncMock(return_value=ProcessingInfo(seqid=0, account_seq=0, queue=QueueType.SHARED)),
     )
     yield processing
 
 
 @pytest.fixture(scope="function")
 @pytest.mark.asyncio
-async def file_field(
-    writer_api, knowledgebox_writer: str
-) -> AsyncIterator[tuple[str, str, str]]:
+async def file_field(writer_api, knowledgebox_writer: str) -> AsyncIterator[tuple[str, str, str]]:
     kbid = knowledgebox_writer
     field_id = "myfile"
 
@@ -61,9 +57,7 @@ async def file_field(
                     field_id: {
                         "language": "en",
                         "password": "xxxxxx",
-                        "file": load_file_as_FileB64_payload(
-                            "assets/text001.txt", "text/plain"
-                        ),
+                        "file": load_file_as_FileB64_payload("assets/text001.txt", "text/plain"),
                     }
                 },
             },
@@ -71,9 +65,7 @@ async def file_field(
         assert resp.status_code == 201
         rid = resp.json()["uuid"]
 
-        assert (
-            await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid)
-        ) is True
+        assert (await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid)) is True
 
     yield kbid, rid, field_id
 
@@ -85,9 +77,7 @@ async def file_field(
 
 
 @pytest.mark.asyncio
-async def test_reprocess_nonexistent_file_field(
-    writer_api, knowledgebox_writer: str, resource: str
-):
+async def test_reprocess_nonexistent_file_field(writer_api, knowledgebox_writer: str, resource: str):
     kbid = knowledgebox_writer
     rid = resource
     field_id = "nonexistent-field"

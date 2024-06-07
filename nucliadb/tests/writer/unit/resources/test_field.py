@@ -20,8 +20,6 @@
 from unittest import mock
 
 import pytest
-from nucliadb_protos.resources_pb2 import CloudFile, MessageContent
-from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb.ingest.processing import PushPayload
 from nucliadb.writer.resource.field import parse_conversation_field, parse_file_field
@@ -33,6 +31,8 @@ from nucliadb_models.conversation import (
     InputMessageContent,
     PushMessageFormat,
 )
+from nucliadb_protos.resources_pb2 import CloudFile, MessageContent
+from nucliadb_protos.writer_pb2 import BrokerMessage
 
 FIELD_MODULE = "nucliadb.writer.resource.field"
 
@@ -66,7 +66,8 @@ def storage_mock():
     [
         FileField(password="mypassword", file=File(filename="myfile.pdf", payload="")),
         FileField(
-            password="mypassword", file=File(uri="http://external.foo/myfile.pdf")  # type: ignore
+            password="mypassword",
+            file=File(uri="http://external.foo/myfile.pdf"),  # type: ignore
         ),
     ],
 )

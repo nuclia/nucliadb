@@ -92,16 +92,12 @@ async def test_list_resources(
         rids.add(resp.json()["uuid"])
 
     got_rids = set()
-    resp = await nucliadb_reader.get(
-        f"/{KB_PREFIX}/{knowledgebox}/resources?size=10&page=0"
-    )
+    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{knowledgebox}/resources?size=10&page=0")
     assert resp.status_code == 200
     for r in resp.json()["resources"]:
         got_rids.add(r["id"])
 
-    resp = await nucliadb_reader.get(
-        f"/{KB_PREFIX}/{knowledgebox}/resources?size=10&page=1"
-    )
+    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{knowledgebox}/resources?size=10&page=1")
     assert resp.status_code == 200
     for r in resp.json()["resources"]:
         got_rids.add(r["id"])
@@ -238,9 +234,7 @@ async def test_resource_slug_modification(
     )
     assert resp.status_code == 200
 
-    await check_resource(
-        nucliadb_reader, knowledgebox, rid, new_slug, title="New title"
-    )
+    await check_resource(nucliadb_reader, knowledgebox, rid, new_slug, title="New title")
 
 
 async def check_resource(nucliadb_reader, kbid, rid, slug, **body_checks):
@@ -291,9 +285,7 @@ async def test_resource_slug_modification_rollbacks(
         assert resp.status_code == 506
 
     # Check that slug and title were not updated
-    await check_resource(
-        nucliadb_reader, knowledgebox, rid, old_slug, title="New title"
-    )
+    await check_resource(nucliadb_reader, knowledgebox, rid, old_slug, title="New title")
 
 
 @pytest.mark.asyncio

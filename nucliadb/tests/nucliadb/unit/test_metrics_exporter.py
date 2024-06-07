@@ -39,12 +39,8 @@ async def test_run_exporter_task():
 
 
 async def test_run_exporter():
-    with mock.patch(
-        "nucliadb.metrics_exporter.update_migration_metrics"
-    ) as update_migration_metrics:
-        with mock.patch(
-            "nucliadb.metrics_exporter.update_node_metrics"
-        ) as update_node_metrics:
+    with mock.patch("nucliadb.metrics_exporter.update_migration_metrics") as update_migration_metrics:
+        with mock.patch("nucliadb.metrics_exporter.update_node_metrics") as update_node_metrics:
             context = Mock()
             task = asyncio.create_task(run_exporter(context))
 
@@ -63,9 +59,7 @@ async def test_update_migration_metrics():
 
     with mock.patch("nucliadb.metrics_exporter.iter_kbids", new=iter_kbids):
         with mock.patch("nucliadb.metrics_exporter.MIGRATION_COUNT") as migration_count:
-            with mock.patch(
-                "nucliadb.metrics_exporter.MigrationsDataManager", autospec=True
-            ) as mdm:
+            with mock.patch("nucliadb.metrics_exporter.MigrationsDataManager", autospec=True) as mdm:
                 mdm.get_global_info = AsyncMock(return_value=Mock(current_version="1"))
                 mdm.get_kb_info = AsyncMock(return_value=Mock(current_version="2"))
 

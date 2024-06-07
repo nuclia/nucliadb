@@ -204,9 +204,7 @@ async def _test_export_import_kb_api(nucliadb_writer, nucliadb_reader, src_kb, d
     export.seek(0)
 
     # Upload import
-    resp = await nucliadb_writer.post(
-        f"/kb/{dst_kb}/import", content=export.getvalue(), timeout=None
-    )
+    resp = await nucliadb_writer.post(f"/kb/{dst_kb}/import", content=export.getvalue(), timeout=None)
     assert resp.status_code == 200
     import_id = resp.json()["import_id"]
 

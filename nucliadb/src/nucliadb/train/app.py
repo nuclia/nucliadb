@@ -58,9 +58,7 @@ if has_feature(const.Features.CORS_MIDDLEWARE, default=False):
 
 middleware.extend(
     [
-        Middleware(
-            AuthenticationMiddleware, backend=NucliaCloudAuthenticationBackend()
-        ),
+        Middleware(AuthenticationMiddleware, backend=NucliaCloudAuthenticationBackend()),
         Middleware(ReadOnlyTransactionMiddleware),
     ]
 )

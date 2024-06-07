@@ -19,9 +19,8 @@
 #
 from typing import Optional
 
-from nucliadb_protos.writer_pb2_grpc import WriterStub
-
 from nucliadb.common.maindb.utils import setup_driver
+from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils.grpc import get_traced_grpc_channel
 from nucliadb_utils.settings import nucliadb_settings
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
@@ -37,9 +36,7 @@ async def start_ingest(service_name: Optional[str] = None):
     if nucliadb_settings.nucliadb_ingest is not None:
         # Its distributed lets create a GRPC client
         # We want Jaeger telemetry enabled
-        channel = get_traced_grpc_channel(
-            nucliadb_settings.nucliadb_ingest, service_name or "ingest"
-        )
+        channel = get_traced_grpc_channel(nucliadb_settings.nucliadb_ingest, service_name or "ingest")
         set_utility(Utility.CHANNEL, channel)
         ingest = WriterStub(channel)
         set_utility(Utility.INGEST, ingest)

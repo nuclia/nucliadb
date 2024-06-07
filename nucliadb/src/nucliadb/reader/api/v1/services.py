@@ -24,13 +24,6 @@ from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 from fastapi_versioning import version
 from google.protobuf.json_format import MessageToDict
-from nucliadb_protos.knowledgebox_pb2 import Synonyms
-from nucliadb_protos.writer_pb2 import (
-    GetEntitiesGroupRequest,
-    GetEntitiesGroupResponse,
-    ListEntitiesGroupsRequest,
-    ListEntitiesGroupsResponse,
-)
 from starlette.requests import Request
 
 from nucliadb.common import datamanagers
@@ -53,6 +46,13 @@ from nucliadb_models.labels import KnowledgeBoxLabels, LabelSet
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.synonyms import KnowledgeBoxSynonyms
 from nucliadb_protos import writer_pb2
+from nucliadb_protos.knowledgebox_pb2 import Synonyms
+from nucliadb_protos.writer_pb2 import (
+    GetEntitiesGroupRequest,
+    GetEntitiesGroupResponse,
+    ListEntitiesGroupsRequest,
+    ListEntitiesGroupsResponse,
+)
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.utilities import get_ingest, get_storage
 
@@ -92,13 +92,9 @@ async def list_entities_groups(kbid: str):
     elif entities_groups.status == ListEntitiesGroupsResponse.Status.NOTFOUND:
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
     elif entities_groups.status == ListEntitiesGroupsResponse.Status.ERROR:
-        raise HTTPException(
-            status_code=500, detail="Error while listing entities groups"
-        )
+        raise HTTPException(status_code=500, detail="Error while listing entities groups")
     else:
-        raise HTTPException(
-            status_code=500, detail="Error on listing Knowledge box entities"
-        )
+        raise HTTPException(status_code=500, detail="Error on listing Knowledge box entities")
 
 
 @api.get(
@@ -121,17 +117,11 @@ async def get_entity(request: Request, kbid: str, group: str) -> EntitiesGroup:
         response = EntitiesGroup.from_message(kbobj.group)
         return response
     elif kbobj.status == GetEntitiesGroupResponse.Status.KB_NOT_FOUND:
-        raise HTTPException(
-            status_code=404, detail=f"Knowledge Box '{kbid}' does not exist"
-        )
+        raise HTTPException(status_code=404, detail=f"Knowledge Box '{kbid}' does not exist")
     elif kbobj.status == GetEntitiesGroupResponse.Status.ENTITIES_GROUP_NOT_FOUND:
-        raise HTTPException(
-            status_code=404, detail=f"Entities group '{group}' does not exist"
-        )
+        raise HTTPException(status_code=404, detail=f"Entities group '{group}' does not exist")
     else:
-        raise HTTPException(
-            status_code=500, detail="Error on getting entities group on a Knowledge box"
-        )
+        raise HTTPException(status_code=500, detail="Error on getting entities group on a Knowledge box")
 
 
 @api.get(
@@ -285,9 +275,7 @@ async def processing_status(
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
 
     async with processing.ProcessingHTTPClient() as client:
-        results = await client.requests(
-            cursor=cursor, scheduled=scheduled, kbid=kbid, limit=limit
-        )
+        results = await client.requests(cursor=cursor, scheduled=scheduled, kbid=kbid, limit=limit)
 
     storage = await get_storage(service_name=SERVICE_NAME)
     driver = get_driver()
@@ -314,9 +302,7 @@ async def processing_status(
 
         result_items = [
             item
-            for item in await asyncio.gather(
-                *[_composition(result) for result in results.results]
-            )
+            for item in await asyncio.gather(*[_composition(result) for result in results.results])
             if item is not None
         ]
 

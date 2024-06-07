@@ -34,7 +34,6 @@ from urllib.parse import quote_plus
 
 import aiohttp
 import backoff
-from nucliadb_protos.resources_pb2 import CloudFile
 from oauth2client.service_account import ServiceAccountCredentials  # type: ignore
 
 from nucliadb.writer import logger
@@ -46,6 +45,7 @@ from nucliadb.writer.tus.exceptions import (
 )
 from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
 from nucliadb.writer.tus.utils import to_str
+from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_utils.storages.gcs import CHUNK_SIZE, MIN_UPLOAD_SIZE
 
 
@@ -111,16 +111,12 @@ class GCloudBlobStore(BlobStore):
         self.project = project
         self.bucket_labels = bucket_labels
         self.object_base_url = object_base_url + "/storage/v1/b"
-        self.upload_url = (
-            object_base_url + "/upload/storage/v1/b/{bucket}/o?uploadType=resumable"
-        )  # noqa
+        self.upload_url = object_base_url + "/upload/storage/v1/b/{bucket}/o?uploadType=resumable"  # noqa
 
         self._credentials = None
 
         if json_credentials is not None:
-            self.json_credentials_file = os.path.join(
-                tempfile.mkdtemp(), "gcs_credentials.json"
-            )
+            self.json_credentials_file = os.path.join(tempfile.mkdtemp(), "gcs_credentials.json")
             open(self.json_credentials_file, "w").write(
                 base64.b64decode(json_credentials).decode("utf-8")
             )
@@ -175,9 +171,7 @@ class GCloudFileStorageManager(FileStorageManager):
     chunk_size = CHUNK_SIZE
     min_upload_size = MIN_UPLOAD_SIZE
 
-    @backoff.on_exception(
-        backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=4
-    )
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=4)
     async def start(self, dm: FileDataManager, path: str, kbid: str):
         """Init an upload.
 
@@ -236,13 +230,9 @@ class GCloudFileStorageManager(FileStorageManager):
                 raise GoogleCloudException(text)
             resumable_uri = call.headers["Location"]
 
-        await dm.update(
-            resumable_uri=resumable_uri, upload_file_id=upload_file_id, path=path
-        )
+        await dm.update(resumable_uri=resumable_uri, upload_file_id=upload_file_id, path=path)
 
-    @backoff.on_exception(
-        backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=4
-    )
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=4)
     async def delete_upload(self, uri, kbid):
         bucket = self.storage.get_bucket_name(kbid)
 
@@ -265,8 +255,7 @@ class GCloudFileStorageManager(FileStorageManager):
                 if resp.status not in (200, 204, 404):
                     if resp.status == 404:
                         logger.error(
-                            f"Attempt to delete not found gcloud: {data}, "
-                            f"status: {resp.status}",
+                            f"Attempt to delete not found gcloud: {data}, " f"status: {resp.status}",
                             exc_info=True,
                         )
                     else:
@@ -274,9 +263,7 @@ class GCloudFileStorageManager(FileStorageManager):
         else:
             raise AttributeError("No valid uri")
 
-    @backoff.on_exception(
-        backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=4
-    )
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=4)
     async def _append(self, dm: FileDataManager, data, offset):
         if self.storage.session is None:
             raise AttributeError()
@@ -312,7 +299,6 @@ class GCloudFileStorageManager(FileStorageManager):
             return call
 
     async def append(self, dm: FileDataManager, iterable, offset) -> int:
-
         count = 0
 
         async for chunk in iterable:
@@ -342,9 +328,7 @@ class GCloudFileStorageManager(FileStorageManager):
                 break
         return count
 
-    @backoff.on_exception(
-        backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=4
-    )
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=4)
     async def finish(self, dm: FileDataManager):
         if dm.size == 0:
             if self.storage.session is None:
@@ -372,6 +356,4 @@ class GCloudFileStorageManager(FileStorageManager):
 
     def validate_intermediate_chunk(self, uploaded_bytes: int):
         if uploaded_bytes < self.min_upload_size:
-            raise ValueError(
-                f"Intermediate chunks cannot be smaller than {self.min_upload_size} bytes"
-            )
+            raise ValueError(f"Intermediate chunks cannot be smaller than {self.min_upload_size} bytes")

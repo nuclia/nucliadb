@@ -25,8 +25,6 @@ from uuid import uuid4
 
 from fastapi import HTTPException, Query, Response
 from fastapi_versioning import version
-from nucliadb_protos.resources_pb2 import Metadata
-from nucliadb_protos.writer_pb2 import BrokerMessage, IndexResource
 from starlette.requests import Request
 
 from nucliadb.common import datamanagers
@@ -63,6 +61,8 @@ from nucliadb_models.writer import (
     ResourceUpdated,
     UpdateResourcePayload,
 )
+from nucliadb_protos.resources_pb2 import Metadata
+from nucliadb_protos.writer_pb2 import BrokerMessage, IndexResource
 from nucliadb_telemetry.errors import capture_exception
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
@@ -121,9 +121,7 @@ async def create_resource(
         from nucliadb.common import datamanagers
 
         if await datamanagers.atomic.resources.slug_exists(kbid=kbid, slug=item.slug):
-            raise HTTPException(
-                status_code=409, detail=f"Resource slug {item.slug} already exists"
-            )
+            raise HTTPException(status_code=409, detail=f"Resource slug {item.slug} already exists")
         writer.slug = item.slug
         toprocess.slug = item.slug
 
@@ -350,9 +348,7 @@ async def update_resource_slug(
     new_slug: str,
 ):
     async with driver.transaction() as txn:
-        old_slug = await datamanagers.resources.modify_slug(
-            txn, kbid=kbid, rid=rid, new_slug=new_slug
-        )
+        old_slug = await datamanagers.resources.modify_slug(txn, kbid=kbid, rid=rid, new_slug=new_slug)
         await txn.commit()
         return old_slug
 
@@ -373,9 +369,7 @@ async def reprocess_resource_rslug_prefix(
     x_nucliadb_user: str = X_NUCLIADB_USER,
 ):
     rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
-    return await _reprocess_resource(
-        request, kbid, rid, x_nucliadb_user=x_nucliadb_user
-    )
+    return await _reprocess_resource(request, kbid, rid, x_nucliadb_user=x_nucliadb_user)
 
 
 @api.post(
@@ -393,9 +387,7 @@ async def reprocess_resource_rid_prefix(
     rid: str,
     x_nucliadb_user: str = X_NUCLIADB_USER,
 ):
-    return await _reprocess_resource(
-        request, kbid, rid, x_nucliadb_user=x_nucliadb_user
-    )
+    return await _reprocess_resource(request, kbid, rid, x_nucliadb_user=x_nucliadb_user)
 
 
 async def _reprocess_resource(
@@ -576,9 +568,7 @@ async def _reindex_resource(
 
 
 async def get_rid_from_slug_or_raise_error(kbid: str, rslug: str) -> str:
-    rid = await datamanagers.atomic.resources.get_resource_uuid_from_slug(
-        kbid=kbid, slug=rslug
-    )
+    rid = await datamanagers.atomic.resources.get_resource_uuid_from_slug(kbid=kbid, slug=rslug)
     if not rid:
         raise HTTPException(status_code=404, detail="Resource does not exist")
     return rid

@@ -44,9 +44,7 @@ async def download_model(
     model_id: str,
     filename: str,
 ):
-    return await learning_config_proxy(
-        request, "GET", f"/download/{kbid}/model/{model_id}/{filename}"
-    )
+    return await learning_config_proxy(request, "GET", f"/download/{kbid}/model/{model_id}/{filename}")
 
 
 @api.get(
@@ -143,7 +141,5 @@ async def get_schema_for_configuration_creation(
     request: Request,
 ):
     if not is_onprem_nucliadb():
-        return HTTPClientError(
-            status_code=404, detail="Endpoint not available for Hosted NucliaDB"
-        )
+        return HTTPClientError(status_code=404, detail="Endpoint not available for Hosted NucliaDB")
     return await learning_config_proxy(request, "GET", f"/schema")

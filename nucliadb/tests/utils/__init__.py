@@ -20,15 +20,12 @@
 import uuid
 from datetime import datetime
 
+from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos.writer_pb2 import BrokerMessage, OpStatusWriter
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
-from nucliadb_protos import resources_pb2 as rpb
 
-
-def broker_resource(
-    kbid: str, rid=None, slug=None, title=None, summary=None
-) -> BrokerMessage:
+def broker_resource(kbid: str, rid=None, slug=None, title=None, summary=None) -> BrokerMessage:
     """
     Returns a broker resource with barebones metadata.
     """

@@ -22,11 +22,11 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import AsyncClient
-from nucliadb_protos.writer_pb2_grpc import WriterStub
-from tests.nucliadb.knowledgeboxes.vectorsets import KbSpecs
 
 from nucliadb.common.cluster import manager
 from nucliadb_protos import nodereader_pb2
+from nucliadb_protos.writer_pb2_grpc import WriterStub
+from tests.nucliadb.knowledgeboxes.vectorsets import KbSpecs
 
 DEFAULT_VECTOR_DIMENSION = 512
 VECTORSET_DIMENSION = 12
@@ -97,9 +97,7 @@ async def test_vectorset_parameter(
 
     calls: list[nodereader_pb2.SearchRequest] = []
 
-    async def mock_node_query(
-        kbid: str, method, pb_query: nodereader_pb2.SearchRequest, **kwargs
-    ):
+    async def mock_node_query(kbid: str, method, pb_query: nodereader_pb2.SearchRequest, **kwargs):
         calls.append(pb_query)
         results = [nodereader_pb2.SearchResponse()]
         incomplete_results = False

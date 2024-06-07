@@ -21,6 +21,11 @@
 import json
 from typing import Any, AsyncGenerator
 
+from nucliadb.common.cluster.base import AbstractIndexNode
+from nucliadb.ingest.fields.base import Field
+from nucliadb.ingest.orm.resource import KB_REVERSE, Resource
+from nucliadb.train import logger
+from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
 from nucliadb_protos.dataset_pb2 import (
     ImageClassification,
     ImageClassificationBatch,
@@ -28,12 +33,6 @@ from nucliadb_protos.dataset_pb2 import (
 )
 from nucliadb_protos.nodereader_pb2 import StreamRequest
 from nucliadb_protos.resources_pb2 import FieldType, PageStructure, VisualSelection
-
-from nucliadb.common.cluster.base import AbstractIndexNode
-from nucliadb.ingest.fields.base import Field
-from nucliadb.ingest.orm.resource import KB_REVERSE, Resource
-from nucliadb.train import logger
-from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
 
 VISUALLY_ANNOTABLE_FIELDS = {FieldType.FILE, FieldType.LINK}
 
@@ -47,9 +46,7 @@ def image_classification_batch_generator(
     node: AbstractIndexNode,
     shard_replica_id: str,
 ) -> AsyncGenerator[ImageClassificationBatch, None]:
-    generator = generate_image_classification_payloads(
-        kbid, trainset, node, shard_replica_id
-    )
+    generator = generate_image_classification_payloads(kbid, trainset, node, shard_replica_id)
     batch_generator = batchify(generator, trainset.batch_size, ImageClassificationBatch)
     return batch_generator
 
@@ -131,9 +128,7 @@ async def generate_image_classification_payloads(
             yield ic
 
 
-async def get_page_selections(
-    resource: Resource, field: Field
-) -> dict[int, list[VisualSelection]]:
+async def get_page_selections(resource: Resource, field: Field) -> dict[int, list[VisualSelection]]:
     page_selections: dict[int, list[VisualSelection]] = {}
     basic = await resource.get_basic()
     if basic is None or basic.fieldmetadata is None:
@@ -163,9 +158,7 @@ async def get_page_structure(field: Field) -> list[tuple[str, PageStructure]]:
 
         fp = fed.file_pages_previews
         if len(fp.pages) != len(fp.structures):
-            field_path = (
-                f"/kb/{field.kbid}/resource/{field.resource.uuid}/file/{field.id}"
-            )
+            field_path = f"/kb/{field.kbid}/resource/{field.resource.uuid}/file/{field.id}"
             logger.warning(
                 f"File extracted data has a different number of pages and structures! ({field_path})"
             )

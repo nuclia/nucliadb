@@ -22,11 +22,11 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from nucliadb_protos.writer_pb2 import Notification, ShardObject, Shards
 
 from nucliadb.common.cluster.settings import settings
 from nucliadb.ingest.consumer import shard_creator
 from nucliadb_protos import nodereader_pb2
+from nucliadb_protos.writer_pb2 import Notification, ShardObject, Shards
 
 pytestmark = pytest.mark.asyncio
 
@@ -59,9 +59,7 @@ def shard_manager(reader):
     sm.get_current_active_shard = AsyncMock(return_value=shards.shards[0])
     sm.maybe_create_new_shard = AsyncMock()
     with (
-        patch(
-            "nucliadb.ingest.consumer.shard_creator.get_shard_manager", return_value=sm
-        ),
+        patch("nucliadb.ingest.consumer.shard_creator.get_shard_manager", return_value=sm),
         patch(
             "nucliadb.ingest.consumer.shard_creator.choose_node",
             return_value=(node, "shard_id"),
@@ -93,9 +91,7 @@ async def test_handle_message_create_new_shard(
     kbdm,
     shard_manager,
 ):
-    reader.GetShard.return_value = nodereader_pb2.Shard(
-        paragraphs=settings.max_shard_paragraphs + 1
-    )
+    reader.GetShard.return_value = nodereader_pb2.Shard(paragraphs=settings.max_shard_paragraphs + 1)
 
     notif = Notification(
         kbid="kbid",
@@ -103,17 +99,13 @@ async def test_handle_message_create_new_shard(
     )
     await shard_creator_handler.handle_message(notif.SerializeToString())
     await asyncio.sleep(0.06)
-    shard_manager.maybe_create_new_shard.assert_called_with(
-        "kbid", settings.max_shard_paragraphs + 1
-    )
+    shard_manager.maybe_create_new_shard.assert_called_with("kbid", settings.max_shard_paragraphs + 1)
 
 
 async def test_handle_message_do_not_create(
     shard_creator_handler: shard_creator.ShardCreatorHandler, reader, shard_manager
 ):
-    reader.GetShard.return_value = nodereader_pb2.Shard(
-        paragraphs=settings.max_shard_paragraphs - 1
-    )
+    reader.GetShard.return_value = nodereader_pb2.Shard(paragraphs=settings.max_shard_paragraphs - 1)
 
     notif = Notification(
         kbid="kbid",

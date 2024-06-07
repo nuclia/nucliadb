@@ -31,9 +31,7 @@ class HTTPException(StarletteHTTPException):
 
     def __init__(self, detail: Optional[str] = None):
         if self._status_code:
-            super(HTTPException, self).__init__(
-                status_code=self._status_code, detail=detail
-            )
+            super(HTTPException, self).__init__(status_code=self._status_code, detail=detail)
         else:
             raise AttributeError("Status code not defined")
 

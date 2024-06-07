@@ -64,11 +64,7 @@ async def test_standalone_node_garbage_collects(fake_node):
     await mng.add_resource(
         writer_pb2.ShardObject(
             shard="123",
-            replicas=[
-                writer_pb2.ShardReplica(
-                    shard=writer_pb2.ShardCreated(id="123"), node="node-0"
-                )
-            ],
+            replicas=[writer_pb2.ShardReplica(shard=writer_pb2.ShardCreated(id="123"), node="node-0")],
         ),
         resource=MagicMock(),
         txid=-1,

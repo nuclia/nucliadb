@@ -54,9 +54,7 @@ def test_installed_nucliadb():
 @pytest.fixture()
 def pypi_mock():
     version = "1.0.0"
-    with mock.patch(
-        "nucliadb.standalone.versions._get_latest_version", return_value=version
-    ):
+    with mock.patch("nucliadb.standalone.versions._get_latest_version", return_value=version):
         yield
 
 

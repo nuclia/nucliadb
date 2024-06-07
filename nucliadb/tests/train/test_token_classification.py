@@ -21,6 +21,10 @@ import asyncio
 
 import aiohttp
 import pytest
+
+from nucliadb.train import API_PREFIX
+from nucliadb.train.api.v1.router import KB_PREFIX
+from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos.dataset_pb2 import TaskType, TokenClassificationBatch, TrainSet
 from nucliadb_protos.resources_pb2 import Position
 from nucliadb_protos.writer_pb2 import BrokerMessage
@@ -28,10 +32,6 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.train.utils import get_batches_from_train_response_stream
 from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
-
-from nucliadb.train import API_PREFIX
-from nucliadb.train.api.v1.router import KB_PREFIX
-from nucliadb_protos import resources_pb2 as rpb
 
 
 @pytest.mark.asyncio
@@ -45,9 +45,7 @@ async def test_generator_token_classification(
 
     await inject_resource_with_token_classification(kbid, nucliadb_grpc)
 
-    async with train_rest_api.get(
-        f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset"
-    ) as partitions:
+    async with train_rest_api.get(f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset") as partitions:
         assert partitions.status == 200
         data = await partitions.json()
         assert len(data["partitions"]) == 1
@@ -64,9 +62,7 @@ async def test_generator_token_classification(
     ) as response:
         assert response.status == 200
         batches: list[TokenClassificationBatch] = []
-        async for batch in get_batches_from_train_response_stream(
-            response, TokenClassificationBatch
-        ):
+        async for batch in get_batches_from_train_response_stream(response, TokenClassificationBatch):
             batches.append(batch)
 
     for batch in batches:
@@ -101,18 +97,12 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
 
     bmb.with_title("This is a bird, its a plane, no, its el Super Fran")
     title_field = bmb.field_builder("title", rpb.FieldType.GENERIC)
-    title_field.with_extracted_entity(
-        "PERSON", "el Super Fran", positions=[Position(start=37, end=50)]
-    )
+    title_field.with_extracted_entity("PERSON", "el Super Fran", positions=[Position(start=37, end=50)])
 
     bmb.with_summary("Summary of Nuclia using Debian")
     summary_field = bmb.field_builder("summary", rpb.FieldType.GENERIC)
-    summary_field.with_extracted_entity(
-        "ORG", "Nuclia", positions=[Position(start=11, end=17)]
-    )
-    summary_field.with_extracted_entity(
-        "ORG", "Debian", positions=[Position(start=24, end=30)]
-    )
+    summary_field.with_extracted_entity("ORG", "Nuclia", positions=[Position(start=11, end=17)])
+    summary_field.with_extracted_entity("ORG", "Debian", positions=[Position(start=24, end=30)])
 
     file_field = FieldBuilder("file", rpb.FieldType.FILE)
     file_field.with_extracted_text(

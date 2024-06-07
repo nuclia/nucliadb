@@ -33,9 +33,7 @@ async def get_page_image(kbid: str, paragraph_id: str, page: int) -> Image:
         kbid, rid, field_type_letter, field_id, f"generated/extracted_images_{page}.png"
     )
     image = Image(
-        b64encoded=base64.b64encode(
-            (await sf.storage.downloadbytes(sf.bucket, sf.key)).read()
-        ).decode(),
+        b64encoded=base64.b64encode((await sf.storage.downloadbytes(sf.bucket, sf.key)).read()).decode(),
         content_type="image/png",
     )
 
@@ -47,13 +45,9 @@ async def get_paragraph_image(kbid: str, paragraph_id: str, reference: str) -> I
 
     rid, field_type_letter, field_id, _ = paragraph_id.split("/")[:4]
 
-    sf = storage.file_extracted(
-        kbid, rid, field_type_letter, field_id, f"generated/{reference}"
-    )
+    sf = storage.file_extracted(kbid, rid, field_type_letter, field_id, f"generated/{reference}")
     image = Image(
-        b64encoded=base64.b64encode(
-            (await sf.storage.downloadbytes(sf.bucket, sf.key)).read()
-        ).decode(),
+        b64encoded=base64.b64encode((await sf.storage.downloadbytes(sf.bucket, sf.key)).read()).decode(),
         content_type="image/png",
     )
 

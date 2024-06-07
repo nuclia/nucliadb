@@ -23,7 +23,6 @@ import uuid
 from typing import Any, Awaitable, Callable, Optional
 
 import backoff
-from nucliadb_protos.nodewriter_pb2 import IndexMessage, IndexMessageSource, TypeMessage
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.base import AbstractIndexNode
@@ -44,6 +43,7 @@ from nucliadb_protos import (
     nodewriter_pb2,
     writer_pb2,
 )
+from nucliadb_protos.nodewriter_pb2 import IndexMessage, IndexMessageSource, TypeMessage
 from nucliadb_telemetry import errors
 from nucliadb_utils.utilities import get_indexing, get_storage
 
@@ -149,9 +149,7 @@ class KBShardManager:
         ops = []
 
         for shard_obj in shards:
-            node, shard_id = choose_node(
-                shard_obj, use_read_replica_nodes=use_read_replica_nodes
-            )
+            node, shard_id = choose_node(shard_obj, use_read_replica_nodes=use_read_replica_nodes)
             if shard_id is None:
                 raise ShardNotFound("Found a node but not a shard")
 
@@ -198,15 +196,11 @@ class KBShardManager:
 
         kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
         if kb_shards is None:
-            msg = (
-                "Attempting to create a shard for a KB when it has no stored shards in maindb",
-            )
+            msg = ("Attempting to create a shard for a KB when it has no stored shards in maindb",)
             logger.error(msg, extra={"kbid": kbid})
             raise ShardsNotFound(msg)
 
-        existing_kb_nodes = [
-            replica.node for shard in kb_shards.shards for replica in shard.replicas
-        ]
+        existing_kb_nodes = [replica.node for shard in kb_shards.shards for replica in shard.replicas]
         nodes = sorted_primary_nodes(
             avoid_nodes=existing_kb_nodes,
             ignore_nodes=settings.drain_nodes,
@@ -249,9 +243,7 @@ class KBShardManager:
 
                 shard_id = shard_created.id
                 try:
-                    async for vectorset_config in datamanagers.vectorsets.iter(
-                        txn, kbid=kbid
-                    ):
+                    async for vectorset_config in datamanagers.vectorsets.iter(txn, kbid=kbid):
                         response = await node.add_vectorset(
                             shard_id,
                             vectorset=vectorset_config.vectorset_id,
@@ -333,9 +325,7 @@ class KBShardManager:
         indexing = get_indexing()
         storage = await get_storage()
 
-        await storage.delete_indexing(
-            resource_uid=uuid, txid=txid, kb=kb, logical_shard=shard.shard
-        )
+        await storage.delete_indexing(resource_uid=uuid, txid=txid, kb=kb, logical_shard=shard.shard)
 
         for replica_id, node_id in self.indexing_replicas(shard):
             indexpb: nodewriter_pb2.IndexMessage = nodewriter_pb2.IndexMessage()
@@ -412,9 +402,7 @@ class KBShardManager:
             await self.create_shard_by_kbid(txn, kbid)
             await txn.commit()
 
-    async def create_vectorset(
-        self, kbid: str, config: knowledgebox_pb2.VectorSetConfig
-    ):
+    async def create_vectorset(self, kbid: str, config: knowledgebox_pb2.VectorSetConfig):
         """Create a new vectorset in all KB shards."""
 
         async def _create_vectorset(node: AbstractIndexNode, shard_id: str):
@@ -453,9 +441,7 @@ class StandaloneKBShardManager(KBShardManager):
         self._lock = asyncio.Lock()
         self._change_count: dict[tuple[str, str], int] = {}
 
-    async def _resource_change_event(
-        self, kbid: str, node_id: str, shard_id: str
-    ) -> None:
+    async def _resource_change_event(self, kbid: str, node_id: str, shard_id: str) -> None:
         if (node_id, shard_id) not in self._change_count:
             self._change_count[(node_id, shard_id)] = 0
         self._change_count[(node_id, shard_id)] += 1
@@ -468,9 +454,7 @@ class StandaloneKBShardManager(KBShardManager):
             if index_node is None:
                 return
             shard_info: noderesources_pb2.Shard = await index_node.reader.GetShard(
-                nodereader_pb2.GetShardRequest(
-                    shard_id=noderesources_pb2.ShardId(id=shard_id)
-                )
+                nodereader_pb2.GetShardRequest(shard_id=noderesources_pb2.ShardId(id=shard_id))
             )
             await self.maybe_create_new_shard(
                 kbid,
@@ -478,9 +462,7 @@ class StandaloneKBShardManager(KBShardManager):
             )
             await index_node.writer.GC(noderesources_pb2.ShardId(id=shard_id))
 
-    @backoff.on_exception(
-        backoff.expo, NodesUnsync, jitter=backoff.random_jitter, max_tries=5
-    )
+    @backoff.on_exception(backoff.expo, NodesUnsync, jitter=backoff.random_jitter, max_tries=5)
     async def delete_resource(
         self,
         shard: writer_pb2.ShardObject,
@@ -496,19 +478,13 @@ class StandaloneKBShardManager(KBShardManager):
             req.shard_id = shardreplica.shard.id
             index_node = get_index_node(shardreplica.node)
             if index_node is None:  # pragma: no cover
-                raise NodesUnsync(
-                    f"Node {shardreplica.node} is not found or not available"
-                )
+                raise NodesUnsync(f"Node {shardreplica.node} is not found or not available")
             await index_node.writer.RemoveResource(req)  # type: ignore
             asyncio.create_task(
-                self._resource_change_event(
-                    kb, shardreplica.node, shardreplica.shard.id
-                )
+                self._resource_change_event(kb, shardreplica.node, shardreplica.shard.id)
             )
 
-    @backoff.on_exception(
-        backoff.expo, NodesUnsync, jitter=backoff.random_jitter, max_tries=5
-    )
+    @backoff.on_exception(backoff.expo, NodesUnsync, jitter=backoff.random_jitter, max_tries=5)
     async def add_resource(
         self,
         shard: writer_pb2.ShardObject,
@@ -528,14 +504,10 @@ class StandaloneKBShardManager(KBShardManager):
             resource.shard_id = resource.resource.shard_id = shardreplica.shard.id
             index_node = get_index_node(shardreplica.node)
             if index_node is None:  # pragma: no cover
-                raise NodesUnsync(
-                    f"Node {shardreplica.node} is not found or not available"
-                )
+                raise NodesUnsync(f"Node {shardreplica.node} is not found or not available")
             await index_node.writer.SetResource(resource)  # type: ignore
             asyncio.create_task(
-                self._resource_change_event(
-                    kb, shardreplica.node, shardreplica.shard.id
-                )
+                self._resource_change_event(kb, shardreplica.node, shardreplica.shard.id)
             )
 
 
@@ -627,9 +599,7 @@ def check_enough_nodes():
         )
     if settings.max_node_replicas >= 0:
         available_nodes = list(
-            filter(
-                lambda n: n.shard_count < settings.max_node_replicas, available_nodes
-            )
+            filter(lambda n: n.shard_count < settings.max_node_replicas, available_nodes)
         )
         if len(available_nodes) < target_replicas:
             raise NodeClusterSmall(
@@ -661,9 +631,7 @@ def sorted_primary_nodes(
     preferred_nodes = [nid for nid in available_node_ids if nid not in avoid_nodes]
 
     # Add avoid_nodes to the end of the last nodes
-    result_nodes = preferred_nodes + [
-        nid for nid in available_node_ids if nid not in preferred_nodes
-    ]
+    result_nodes = preferred_nodes + [nid for nid in available_node_ids if nid not in preferred_nodes]
 
     # Remove ignore_nodes from the list
     result_nodes = [nid for nid in result_nodes if nid not in ignore_nodes]

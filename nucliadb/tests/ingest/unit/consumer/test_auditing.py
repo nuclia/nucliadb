@@ -22,11 +22,11 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from nucliadb_protos.audit_pb2 import AuditKBCounter, AuditRequest
-from nucliadb_protos.writer_pb2 import Audit, BrokerMessage, Notification, ShardObject
 
 from nucliadb.ingest.consumer import auditing
 from nucliadb_protos import nodereader_pb2
+from nucliadb_protos.audit_pb2 import AuditKBCounter, AuditRequest
+from nucliadb_protos.writer_pb2 import Audit, BrokerMessage, Notification, ShardObject
 
 pytestmark = pytest.mark.asyncio
 
@@ -87,9 +87,7 @@ async def writes_audit_handler(pubsub, audit, shard_manager):
     await rwah.finalize()
 
 
-async def test_handle_message(
-    index_audit_handler: auditing.IndexAuditHandler, reader, audit
-):
+async def test_handle_message(index_audit_handler: auditing.IndexAuditHandler, reader, audit):
     reader.GetShard.return_value = nodereader_pb2.Shard(fields=5, paragraphs=6)
 
     notif = Notification(
@@ -107,9 +105,7 @@ async def test_handle_message(
     )
 
 
-async def test_handle_message_ignore_not_indexed(
-    index_audit_handler: auditing.IndexAuditHandler, audit
-):
+async def test_handle_message_ignore_not_indexed(index_audit_handler: auditing.IndexAuditHandler, audit):
     notif = Notification(
         kbid="kbid",
         action=Notification.Action.COMMIT,

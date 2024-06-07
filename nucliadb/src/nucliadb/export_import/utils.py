@@ -152,23 +152,17 @@ async def set_entities_groups(
     context: ApplicationContext, kbid: str, entities_groups: kb_pb2.EntitiesGroups
 ) -> None:
     async with datamanagers.with_transaction() as txn:
-        await datamanagers.entities.set_entities_groups(
-            txn, kbid=kbid, entities_groups=entities_groups
-        )
+        await datamanagers.entities.set_entities_groups(txn, kbid=kbid, entities_groups=entities_groups)
         await txn.commit()
 
 
-async def set_labels(
-    context: ApplicationContext, kbid: str, labels: kb_pb2.Labels
-) -> None:
+async def set_labels(context: ApplicationContext, kbid: str, labels: kb_pb2.Labels) -> None:
     async with datamanagers.with_transaction() as txn:
         await datamanagers.labels.set_labels(txn, kbid=kbid, labels=labels)
         await txn.commit()
 
 
-async def iter_kb_resource_uuids(
-    context: ApplicationContext, kbid: str
-) -> AsyncGenerator[str, None]:
+async def iter_kb_resource_uuids(context: ApplicationContext, kbid: str) -> AsyncGenerator[str, None]:
     async for rid in datamanagers.resources.iterate_resource_ids(kbid=kbid):
         yield rid
 
@@ -233,9 +227,7 @@ def get_cloud_files(bm: writer_pb2.BrokerMessage) -> list[resources_pb2.CloudFil
     return binaries
 
 
-def _clone_collect_cf(
-    binaries: list[resources_pb2.CloudFile], origin: resources_pb2.CloudFile
-):
+def _clone_collect_cf(binaries: list[resources_pb2.CloudFile], origin: resources_pb2.CloudFile):
     cf = resources_pb2.CloudFile()
     cf.CopyFrom(origin)
     # Mark the cloud file of the broker message being exported as export source
@@ -512,21 +504,15 @@ def stream_compatible_with_kb(
     return wrapped()
 
 
-async def _check_semantic_model_compatibility(
-    kbid: str, stream: AsyncGenerator[bytes, None]
-) -> bytes:
+async def _check_semantic_model_compatibility(kbid: str, stream: AsyncGenerator[bytes, None]) -> bytes:
     stream_reader = ExportStreamReader(stream)
     lconfig, leftover_bytes = await stream_reader.maybe_read_learning_config()
     if lconfig is None:
-        logger.warning(
-            "Learning config not found on the export stream. Export may be incompatible."
-        )
+        logger.warning("Learning config not found on the export stream. Export may be incompatible.")
         return leftover_bytes
     kb_lconfig = await get_learning_config(kbid)
     if kb_lconfig is None:
-        logger.warning(
-            "No learning config found on the knowledge box. Export may be incompatible."
-        )
+        logger.warning("No learning config found on the knowledge box. Export may be incompatible.")
         return leftover_bytes
     if kb_lconfig.semantic_model == lconfig.semantic_model:
         logger.info(f"Semantic model match: {kb_lconfig.semantic_model}")

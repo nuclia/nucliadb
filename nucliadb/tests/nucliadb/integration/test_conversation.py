@@ -21,6 +21,18 @@ from datetime import datetime
 
 import pytest
 from httpx import AsyncClient
+
+from nucliadb.reader.api.models import ResourceField
+from nucliadb_models.conversation import (
+    InputConversationField,
+    InputMessage,
+    InputMessageContent,
+    MessageType,
+)
+from nucliadb_models.resource import ConversationFieldData, FieldConversation, Resource
+from nucliadb_models.resource import Resource as ResponseResponse
+from nucliadb_models.search import KnowledgeboxFindResults
+from nucliadb_models.writer import CreateResourcePayload
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
     FieldComputedMetadataWrapper,
@@ -30,19 +42,6 @@ from nucliadb_protos.resources_pb2 import (
 )
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from tests.utils import inject_message
-
-from nucliadb.reader.api.models import ResourceField
-from nucliadb_models.conversation import (
-    InputConversationField,
-    InputMessage,
-    InputMessageContent,
-    MessageType,
-)
-from nucliadb_models.resource import ConversationFieldData, FieldConversation
-from nucliadb_models.resource import Resource
-from nucliadb_models.resource import Resource as ResponseResponse
-from nucliadb_models.search import KnowledgeboxFindResults
-from nucliadb_models.writer import CreateResourcePayload
 
 
 @pytest.fixture(scope="function")
@@ -136,9 +135,7 @@ async def test_conversations(
     )
 
     # get first page
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{rid}/conversation/faq?page=1"
-    )
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}/conversation/faq?page=1")
     assert resp.status_code == 200
     field_resp = ResourceField.model_validate(resp.json())
     msgs = field_resp.value["messages"]  # type: ignore
@@ -147,16 +144,12 @@ async def test_conversations(
     assert msgs[0]["type"] == MessageType.QUESTION.value
 
     # get second page
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{rid}/conversation/faq?page=2"
-    )
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}/conversation/faq?page=2")
     assert resp.status_code == 200
     field_resp = ResourceField.model_validate(resp.json())
     msgs = field_resp.value["messages"]  # type: ignore
     assert len(msgs) == 101
-    assert [m["ident"] for m in msgs] == [str(i) for i in range(200, 300)] + [
-        "computer"
-    ]
+    assert [m["ident"] for m in msgs] == [str(i) for i in range(200, 300)] + ["computer"]
     assert msgs[-1]["type"] == MessageType.ANSWER.value
 
 

@@ -21,7 +21,6 @@
 from typing import AsyncIterator, Optional
 
 from fastapi import HTTPException
-from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 
 from nucliadb.train.generators.field_classifier import (
     field_classification_batch_generator,
@@ -46,6 +45,7 @@ from nucliadb.train.generators.token_classifier import (
 )
 from nucliadb.train.types import TrainBatch
 from nucliadb.train.utils import get_shard_manager
+from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 
 
 async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
@@ -59,34 +59,22 @@ async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
     batch_generator: Optional[AsyncIterator[TrainBatch]] = None
 
     if trainset.type == TaskType.FIELD_CLASSIFICATION:
-        batch_generator = field_classification_batch_generator(
-            kbid, trainset, node, shard_replica_id
-        )
+        batch_generator = field_classification_batch_generator(kbid, trainset, node, shard_replica_id)
     elif trainset.type == TaskType.IMAGE_CLASSIFICATION:
-        batch_generator = image_classification_batch_generator(
-            kbid, trainset, node, shard_replica_id
-        )
+        batch_generator = image_classification_batch_generator(kbid, trainset, node, shard_replica_id)
     elif trainset.type == TaskType.PARAGRAPH_CLASSIFICATION:
         batch_generator = paragraph_classification_batch_generator(
             kbid, trainset, node, shard_replica_id
         )
     elif trainset.type == TaskType.TOKEN_CLASSIFICATION:
-        batch_generator = token_classification_batch_generator(
-            kbid, trainset, node, shard_replica_id
-        )
+        batch_generator = token_classification_batch_generator(kbid, trainset, node, shard_replica_id)
     elif trainset.type == TaskType.SENTENCE_CLASSIFICATION:
-        batch_generator = sentence_classification_batch_generator(
-            kbid, trainset, node, shard_replica_id
-        )
+        batch_generator = sentence_classification_batch_generator(kbid, trainset, node, shard_replica_id)
     elif trainset.type == TaskType.PARAGRAPH_STREAMING:
-        batch_generator = paragraph_streaming_batch_generator(
-            kbid, trainset, node, shard_replica_id
-        )
+        batch_generator = paragraph_streaming_batch_generator(kbid, trainset, node, shard_replica_id)
 
     elif trainset.type == TaskType.QUESTION_ANSWER_STREAMING:
-        batch_generator = question_answer_batch_generator(
-            kbid, trainset, node, shard_replica_id
-        )
+        batch_generator = question_answer_batch_generator(kbid, trainset, node, shard_replica_id)
 
     if batch_generator is None:
         raise HTTPException(

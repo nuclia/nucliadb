@@ -20,9 +20,9 @@
 from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
-from nucliadb_protos.writer_pb2 import BrokerMessage, BrokerMessageBlobReference
 
 from nucliadb.ingest.consumer.consumer import IngestConsumer
+from nucliadb_protos.writer_pb2 import BrokerMessage, BrokerMessageBlobReference
 
 
 @pytest.fixture()

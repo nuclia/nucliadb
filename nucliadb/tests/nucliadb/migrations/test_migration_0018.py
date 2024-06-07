@@ -20,7 +20,6 @@
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
-from tests.nucliadb.migrations import get_migration
 
 from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.kb import KB_SLUGS
@@ -28,6 +27,7 @@ from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.migrator.models import Migration
 from nucliadb_protos import knowledgebox_pb2
+from tests.nucliadb.migrations import get_migration
 
 migration: Migration = get_migration(18)
 
@@ -66,10 +66,7 @@ async def test_migration_0018_global(maindb_driver: Driver):
         # tikv needs to open a second transaction to be able to read values from
         # the first one using `scan_keys`
         async with maindb_driver.transaction(read_only=True) as txn:
-            kb_slugs = [
-                kb_slug
-                async for kbid, kb_slug in datamanagers.kb.get_kbs(txn, prefix="")
-            ]
+            kb_slugs = [kb_slug async for kbid, kb_slug in datamanagers.kb.get_kbs(txn, prefix="")]
             assert len(kb_slugs) == 2
             assert fake_kb_slug in kb_slugs
             assert real_kb_slug in kb_slugs
@@ -88,8 +85,6 @@ async def test_migration_0018_global(maindb_driver: Driver):
         assert value is not None
         assert value.decode() == real_kb_id
 
-        kb_slugs = [
-            kb_slug async for kbid, kb_slug in datamanagers.kb.get_kbs(txn, prefix="")
-        ]
+        kb_slugs = [kb_slug async for kbid, kb_slug in datamanagers.kb.get_kbs(txn, prefix="")]
         assert len(kb_slugs) == 1
         assert real_kb_slug in kb_slugs

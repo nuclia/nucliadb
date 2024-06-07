@@ -38,9 +38,7 @@ def assign_partitions(settings: Settings):
                 try:
                     settings.replica_number = int(sts_values[-1])
                 except Exception:
-                    logger.error(
-                        f"Could not extract replica number from hostname: {hostname}"
-                    )
+                    logger.error(f"Could not extract replica number from hostname: {hostname}")
                     pass
 
         if settings.replica_number == -1:
@@ -53,9 +51,5 @@ def assign_partitions(settings: Settings):
     # update settings AND Environment Varialbe (for this process and its childs) with partition list
     settings.partitions = partitions_list
     os.environ["PARTITIONS"] = json.dumps(partitions_list)
-    logger.info(
-        f"PARTITIONS: Assigned Partitions (in settings) = {settings.partitions}"
-    )
-    logger.info(
-        f"PARTITIONS: Assigned Partitions (in environment) = {os.environ['PARTITIONS']}"
-    )
+    logger.info(f"PARTITIONS: Assigned Partitions (in settings) = {settings.partitions}")
+    logger.info(f"PARTITIONS: Assigned Partitions (in environment) = {os.environ['PARTITIONS']}")

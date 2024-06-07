@@ -59,9 +59,7 @@ def translate_label(literal: str) -> str:
     if len(literal) == 0:
         raise InvalidQueryError("filters", "Invalid empty label")
     if literal[0] != "/":
-        raise InvalidQueryError(
-            "filters", f"Invalid label. It must start with a `/`: {literal}"
-        )
+        raise InvalidQueryError("filters", f"Invalid label. It must start with a `/`: {literal}")
     return translate_alias_to_system_label(literal)
 
 
@@ -109,13 +107,9 @@ def split_labels_by_type(
     return field_labels, paragraph_labels
 
 
-def is_paragraph_labelset_kind(
-    labelset_id: str, classification_labels: knowledgebox_pb2.Labels
-) -> bool:
+def is_paragraph_labelset_kind(labelset_id: str, classification_labels: knowledgebox_pb2.Labels) -> bool:
     try:
-        labelset: Optional[knowledgebox_pb2.LabelSet] = (
-            classification_labels.labelset.get(labelset_id)
-        )
+        labelset: Optional[knowledgebox_pb2.LabelSet] = classification_labels.labelset.get(labelset_id)
         if labelset is None:
             return False
         return knowledgebox_pb2.LabelSet.LabelSetKind.PARAGRAPHS in labelset.kind

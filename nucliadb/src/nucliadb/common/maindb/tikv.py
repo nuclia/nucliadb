@@ -100,9 +100,7 @@ logger = logging.getLogger(__name__)
 
 
 class TiKVDataLayer:
-    def __init__(
-        self, connection: Union[asynchronous.RawClient, asynchronous.Transaction]
-    ):
+    def __init__(self, connection: Union[asynchronous.RawClient, asynchronous.Transaction]):
         self.connection = connection
 
     async def abort(self):
@@ -311,22 +309,16 @@ class TiKVTransaction(Transaction):
     async def set(self, key: str, value: bytes) -> None:
         assert self.open
         if self.replication_tx:
-            self.replication_ops.append(
-                await self.replication_tx.set_replication(key, value)
-            )
+            self.replication_ops.append(await self.replication_tx.set_replication(key, value))
         return await self.data_layer.set(key, value)
 
     async def delete(self, key: str) -> None:
         assert self.open
         if self.replication_tx:
-            self.replication_ops.append(
-                await self.replication_tx.delete_replication(key)
-            )
+            self.replication_ops.append(await self.replication_tx.delete_replication(key))
         return await self.data_layer.delete(key)
 
-    async def keys(
-        self, match: str, count: int = DEFAULT_SCAN_LIMIT, include_start: bool = True
-    ):
+    async def keys(self, match: str, count: int = DEFAULT_SCAN_LIMIT, include_start: bool = True):
         assert self.open
         # XXX must have connection outside of current txn
         conn_holder = self.driver.get_connection_holder()
@@ -356,9 +348,7 @@ class ConnectionHolder:
     )
     async def initialize(self) -> None:
         try:
-            self._txn_connection = await asynchronous.TransactionClient.connect(
-                self.url
-            )
+            self._txn_connection = await asynchronous.TransactionClient.connect(self.url)
         except Exception as exc:
             if "PD cluster failed to respond" in str(exc):
                 raise PdClusterTimeout from exc
@@ -378,9 +368,7 @@ class ConnectionHolder:
         except Exception:
             if retried:
                 raise
-            logger.exception(
-                f"Error getting snapshot for tikv. Retrying once and then failing."
-            )
+            logger.exception(f"Error getting snapshot for tikv. Retrying once and then failing.")
             await self.reinitialize()
             return await self.get_snapshot(timestamp, retried=True)
 
@@ -393,9 +381,7 @@ class ConnectionHolder:
             with tikv_observer({"type": "begin"}):
                 return await self._txn_connection.begin(pessimistic=False)
         except Exception:
-            logger.exception(
-                f"Error getting transaction for tikv. Retrying once and then failing."
-            )
+            logger.exception(f"Error getting transaction for tikv. Retrying once and then failing.")
             await self.reinitialize()
             try:
                 return await self._txn_connection.begin(pessimistic=False)
@@ -414,9 +400,7 @@ class ConnectionHolder:
 
 
 class TiKVDriver(Driver):
-    def __init__(
-        self, url: List[str], pool_size: int = 3, replication_url: Optional[str] = None
-    ):
+    def __init__(self, url: List[str], pool_size: int = 3, replication_url: Optional[str] = None):
         if TiKV is False:
             raise ImportError("TiKV is not installed")
         self.url = url

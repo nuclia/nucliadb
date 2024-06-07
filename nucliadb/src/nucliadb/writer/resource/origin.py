@@ -16,10 +16,9 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-from nucliadb_protos.resources_pb2 import Origin
-
 from nucliadb_models import Extra, InputOrigin
 from nucliadb_protos import resources_pb2
+from nucliadb_protos.resources_pb2 import Origin
 
 
 def parse_origin(origin: Origin, origin_payload: InputOrigin):

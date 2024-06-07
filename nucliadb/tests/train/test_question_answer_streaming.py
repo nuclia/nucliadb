@@ -23,17 +23,17 @@ from typing import AsyncIterator
 
 import aiohttp
 import pytest
+
+from nucliadb.ingest.orm.resource import FIELD_TYPE_TO_ID
+from nucliadb.train import API_PREFIX
+from nucliadb.train.api.v1.router import KB_PREFIX
+from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos.dataset_pb2 import QuestionAnswerStreamingBatch, TaskType, TrainSet
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.train.utils import get_batches_from_train_response_stream
 from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
-
-from nucliadb.ingest.orm.resource import FIELD_TYPE_TO_ID
-from nucliadb.train import API_PREFIX
-from nucliadb.train.api.v1.router import KB_PREFIX
-from nucliadb_protos import resources_pb2 as rpb
 
 
 async def get_question_answer_streaming_batch_from_response(
@@ -62,9 +62,7 @@ async def test_generator_question_answer_streaming(
 
     await inject_resources_with_question_answers(kbid, nucliadb_grpc)
 
-    async with train_rest_api.get(
-        f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset"
-    ) as partitions:
+    async with train_rest_api.get(f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset") as partitions:
         assert partitions.status == 200
         data = await partitions.json()
         assert len(data["partitions"]) == 1
@@ -123,22 +121,16 @@ def smb_wonder_bm(kbid: str) -> BrokerMessage:
     start = 0
     for paragraph in paragraphs:
         end = start + len(paragraph)
-        field_builder.with_extracted_paragraph_metadata(
-            rpb.Paragraph(start=start, end=end)
-        )
+        field_builder.with_extracted_paragraph_metadata(rpb.Paragraph(start=start, end=end))
         start = end
 
     start = 0
     end = len(paragraphs[0])
-    paragraph_0_id = (
-        f"{rid}/{FIELD_TYPE_TO_ID[rpb.FieldType.FILE]}/smb-wonder/{start}-{end}"
-    )
+    paragraph_0_id = f"{rid}/{FIELD_TYPE_TO_ID[rpb.FieldType.FILE]}/smb-wonder/{start}-{end}"
 
     start = len(paragraphs[0])
     end = len(paragraphs[0]) + len(paragraphs[1])
-    paragraph_1_id = (
-        f"{rid}/{FIELD_TYPE_TO_ID[rpb.FieldType.FILE]}/smb-wonder/{start}-{end}"
-    )
+    paragraph_1_id = f"{rid}/{FIELD_TYPE_TO_ID[rpb.FieldType.FILE]}/smb-wonder/{start}-{end}"
 
     question = "What is SMB Wonder?"
     field_builder.add_question_answer(
@@ -213,9 +205,7 @@ async def test_generator_question_answer_streaming_streams_qa_annotations(
     )
     assert resp.status == 201, resp.text
 
-    async with train_rest_api.get(
-        f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset"
-    ) as partitions:
+    async with train_rest_api.get(f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset") as partitions:
         assert partitions.status == 200
         data = await partitions.json()
         assert len(data["partitions"]) == 1

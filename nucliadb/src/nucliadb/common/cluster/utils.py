@@ -119,9 +119,7 @@ async def wait_for_node(app_context: ApplicationContext, node_id: str) -> None:
         await asyncio.sleep(sleep)
 
 
-@backoff.on_exception(
-    backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=8
-)
+@backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=8)
 async def index_resource_to_shard(
     app_context: ApplicationContext,
     kbid: str,
@@ -133,10 +131,8 @@ async def index_resource_to_shard(
     partitioning = app_context.partitioning
 
     async with datamanagers.with_ro_transaction() as txn:
-        resource_index_message = (
-            await datamanagers.resources.get_resource_index_message(
-                txn, kbid=kbid, rid=resource_id, reindex=False
-            )
+        resource_index_message = await datamanagers.resources.get_resource_index_message(
+            txn, kbid=kbid, rid=resource_id, reindex=False
         )
 
     if resource_index_message is None:
@@ -146,9 +142,7 @@ async def index_resource_to_shard(
         )
         return None
     partition = partitioning.generate_partition(kbid, resource_id)
-    await sm.add_resource(
-        shard, resource_index_message, txid=-1, partition=str(partition), kb=kbid
-    )
+    await sm.add_resource(shard, resource_index_message, txid=-1, partition=str(partition), kb=kbid)
     return resource_index_message
 
 

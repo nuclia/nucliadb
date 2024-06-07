@@ -92,9 +92,7 @@ def ask_mock():
         ),
         (
             InvalidQueryError("foobar", "baz"),
-            HTTPClientError(
-                status_code=412, detail="Invalid query. Error in foobar: baz"
-            ),
+            HTTPClientError(status_code=412, detail="Invalid query. Error in foobar: baz"),
         ),
     ],
 )

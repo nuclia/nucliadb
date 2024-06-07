@@ -22,6 +22,9 @@ from typing import Optional
 from uuid import uuid4
 
 import pytest
+
+from nucliadb.ingest.fields.text import Text
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos.resources_pb2 import (
     Classification,
     FieldComputedMetadata,
@@ -32,9 +35,6 @@ from nucliadb_protos.resources_pb2 import (
     Position,
     Sentence,
 )
-
-from nucliadb.ingest.fields.text import Text
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_utils.storages.storage import Storage
 
 
@@ -67,9 +67,7 @@ async def test_create_resource_orm_metadata(
         [Position(start=0, end=5), Position(start=23, end=28)]
     )
 
-    field_obj: Text = await r.get_field(
-        ex1.field.field, ex1.field.field_type, load=False
-    )
+    field_obj: Text = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
     await field_obj.set_field_metadata(ex1)
 
     ex2: Optional[FieldComputedMetadata] = await field_obj.get_field_metadata()
@@ -103,9 +101,7 @@ async def test_create_resource_orm_metadata_split(
     ex1.metadata.split_metadata["ff1"].last_index.FromDatetime(datetime.now())
     ex1.metadata.split_metadata["ff1"].last_understanding.FromDatetime(datetime.now())
     ex1.metadata.split_metadata["ff1"].last_extract.FromDatetime(datetime.now())
-    field_obj: Text = await r.get_field(
-        ex1.field.field, ex1.field.field_type, load=False
-    )
+    field_obj: Text = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
     await field_obj.set_field_metadata(ex1)
 
     ex2 = FieldComputedMetadataWrapper()
@@ -130,8 +126,5 @@ async def test_create_resource_orm_metadata_split(
 
     ex3: Optional[FieldComputedMetadata] = await field_obj.get_field_metadata()
     assert ex3 is not None
-    assert (
-        ex1.metadata.split_metadata["ff1"].links[0]
-        == ex3.split_metadata["ff1"].links[0]
-    )
+    assert ex1.metadata.split_metadata["ff1"].links[0] == ex3.split_metadata["ff1"].links[0]
     assert len(ex3.split_metadata) == 2

@@ -17,9 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb_protos.resources_pb2 import FieldDatetime
-
 from nucliadb.ingest.fields.base import Field
+from nucliadb_protos.resources_pb2 import FieldDatetime
 
 
 class Datetime(Field):

@@ -22,13 +22,13 @@ from unittest.mock import patch
 
 from faker import Faker
 from httpx import AsyncClient
-from nucliadb_protos.writer_pb2_grpc import WriterStub
-from tests.utils import inject_message
-from tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
 
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.learning_proxy import LearningConfiguration
 from nucliadb_protos import knowledgebox_pb2, resources_pb2, utils_pb2
+from nucliadb_protos.writer_pb2_grpc import WriterStub
+from tests.utils import inject_message
+from tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
 
 fake = Faker()
 
@@ -40,7 +40,6 @@ async def test_matryoshka_embeddings(
     nucliadb_reader: AsyncClient,
     learning_config,
 ):
-
     # Create a KB with matryoshka configuration (using ingest gRPC)
 
     kbid = str(uuid.uuid4())
@@ -91,9 +90,7 @@ async def test_matryoshka_embeddings(
     bmb = BrokerMessageBuilder(kbid=kbid, rid=rid)
     bmb.with_title(title)
 
-    text_field = FieldBuilder(
-        field_id, resources_pb2.FieldType.FILE
-    )  # TODO: implement TEXT
+    text_field = FieldBuilder(field_id, resources_pb2.FieldType.FILE)  # TODO: implement TEXT
     text_field.with_extracted_text(body)
 
     vectors = []
@@ -141,13 +138,5 @@ async def test_matryoshka_embeddings(
     # vectors have the same score
     assert len(results["sentences"]["results"]) == 20
     assert (
-        len(
-            set(
-                (
-                    semantic_result["score"]
-                    for semantic_result in results["sentences"]["results"]
-                )
-            )
-        )
-        == 1
+        len(set((semantic_result["score"] for semantic_result in results["sentences"]["results"]))) == 1
     )

@@ -48,9 +48,7 @@ async def start_grpc(service_name: Optional[str] = None):
 
     await server.start()
 
-    logger.info(
-        f"======= Ingest GRPC running on http://0.0.0.0:{settings.grpc_port}/ ======"
-    )
+    logger.info(f"======= Ingest GRPC running on http://0.0.0.0:{settings.grpc_port}/ ======")
 
     async def finalizer():
         await health_check_finalizer()

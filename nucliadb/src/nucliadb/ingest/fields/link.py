@@ -19,9 +19,8 @@
 #
 from typing import Any, Optional
 
-from nucliadb_protos.resources_pb2 import CloudFile, FieldLink, LinkExtractedData
-
 from nucliadb.ingest.fields.base import Field
+from nucliadb_protos.resources_pb2 import CloudFile, FieldLink, LinkExtractedData
 from nucliadb_utils.storages.storage import StorageField
 
 LINK_METADATA = "link_metadata"
@@ -80,9 +79,7 @@ class Link(Field):
             sf_generated: StorageField = self.storage.file_extracted(
                 self.kbid, self.uuid, self.type, self.id, f"generated/{fileid}"
             )
-            cf_generated: CloudFile = await self.storage.normalize_binary(
-                origincf, sf_generated
-            )
+            cf_generated: CloudFile = await self.storage.normalize_binary(origincf, sf_generated)
             link_extracted_data.file_generated[fileid].CopyFrom(cf_generated)
 
         sf: StorageField = self.storage.file_extracted(
@@ -96,7 +93,5 @@ class Link(Field):
             sf: StorageField = self.storage.file_extracted(
                 self.kbid, self.uuid, self.type, self.id, LINK_METADATA
             )
-            self.link_extracted_data = await self.storage.download_pb(
-                sf, LinkExtractedData
-            )
+            self.link_extracted_data = await self.storage.download_pb(sf, LinkExtractedData)
         return self.link_extracted_data

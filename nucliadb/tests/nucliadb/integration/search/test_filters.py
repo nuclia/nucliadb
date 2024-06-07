@@ -19,6 +19,12 @@
 #
 import pytest
 from httpx import AsyncClient
+
+from nucliadb.common.cluster import rollover
+from nucliadb.common.context import ApplicationContext
+from nucliadb.tests.vectors import V1, V2, Q
+from nucliadb_models.labels import Label, LabelSetKind
+from nucliadb_models.search import MinScore
 from nucliadb_protos.resources_pb2 import (
     Classification,
     ExtractedTextWrapper,
@@ -35,12 +41,6 @@ from nucliadb_protos.resources_pb2 import (
 from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import broker_resource, inject_message
-
-from nucliadb.common.cluster import rollover
-from nucliadb.common.context import ApplicationContext
-from nucliadb.tests.vectors import V1, V2, Q
-from nucliadb_models.labels import Label, LabelSetKind
-from nucliadb_models.search import MinScore
 
 RELEASE_CHANNELS = (
     "STABLE",
@@ -100,11 +100,7 @@ def broker_message_with_entities(kbid):
     ufm = UserFieldMetadata()
     ufm.field.CopyFrom(field)
     family, entity = EntityLabels.ANNOTATED.split("/")
-    ufm.token.append(
-        TokenSplit(
-            token=entity, klass=family, start=11, end=16, cancelled_by_user=False
-        )
-    )
+    ufm.token.append(TokenSplit(token=entity, klass=family, start=11, end=16, cancelled_by_user=False))
     bm.basic.fieldmetadata.append(ufm)
 
     # Add a couple of paragraphs to a text field
@@ -379,9 +375,7 @@ async def _test_filtering(nucliadb_reader: AsyncClient, kbid: str, filters):
         if par["text"] not in expected_paragraphs:
             raise AssertionError(f"Paragraph not expected: {par['text']}")
         if par["text"] in not_yet_found:
-            assert (
-                par["score_type"] == "BOTH"
-            ), f"Score type not expected with filters {filters}"
+            assert par["score_type"] == "BOTH", f"Score type not expected with filters {filters}"
             not_yet_found.remove(par["text"])
     assert len(not_yet_found) == 0, f"Some paragraphs were not found: {not_yet_found}"
 

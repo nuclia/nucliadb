@@ -24,9 +24,7 @@ from nucliadb.search.api.v1.router import KB_PREFIX
 
 
 @pytest.mark.asyncio
-async def test_basic_patch_thumbnail_sc_2390(
-    knowledgebox_one, nucliadb_reader, nucliadb_writer
-) -> None:
+async def test_basic_patch_thumbnail_sc_2390(knowledgebox_one, nucliadb_reader, nucliadb_writer) -> None:
     resp = await nucliadb_writer.post(
         f"/{KB_PREFIX}/{knowledgebox_one}/resources",
         json={

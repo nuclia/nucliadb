@@ -22,8 +22,6 @@ from datetime import datetime
 
 import pytest
 from httpx import AsyncClient
-from nucliadb_protos.writer_pb2 import BrokerMessage
-from tests.utils import inject_message
 
 from nucliadb.ingest.orm.resource import (
     add_field_classifications,
@@ -44,6 +42,8 @@ from nucliadb_models.search import KnowledgeboxSearchResults
 from nucliadb_models.text import TextField
 from nucliadb_models.writer import CreateResourcePayload
 from nucliadb_protos import resources_pb2 as rpb
+from nucliadb_protos.writer_pb2 import BrokerMessage
+from tests.utils import inject_message
 
 
 def broker_resource(knowledgebox: str) -> BrokerMessage:
@@ -232,18 +232,13 @@ async def test_classification_labels_cancelled_by_the_user(
     )
     assert resp.status_code == 200
     content = resp.json()
-    assert (
-        content["resources"][0]["usermetadata"]["classifications"][0] == expected_label
-    )
+    assert content["resources"][0]["usermetadata"]["classifications"][0] == expected_label
 
     # Check cancelled labels come in search results
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query=summary")
     assert resp.status_code == 200
     content = resp.json()
-    assert (
-        content["resources"][rid]["usermetadata"]["classifications"][0]
-        == expected_label
-    )
+    assert content["resources"][rid]["usermetadata"]["classifications"][0] == expected_label
 
 
 @pytest.mark.asyncio
@@ -292,9 +287,7 @@ def test_remove_field_classifications():
     remove_field_classifications(basic, deleted_fields=[field])
 
     field = rpb.FieldID(field_type=rpb.FieldType.FILE, field="foo")
-    basic.computedmetadata.field_classifications.append(
-        rpb.FieldClassifications(field=field)
-    )
+    basic.computedmetadata.field_classifications.append(rpb.FieldClassifications(field=field))
     remove_field_classifications(basic, deleted_fields=[field])
 
     assert len(basic.computedmetadata.field_classifications) == 0
@@ -334,9 +327,7 @@ async def test_fieldmetadata_classification_labels(
             ParagraphAnnotation(
                 key="foobar",
                 classifications=[
-                    UserClassification(
-                        label="foo", labelset="bar", cancelled_by_user=True
-                    )
+                    UserClassification(label="foo", labelset="bar", cancelled_by_user=True)
                 ],
             )
         ],

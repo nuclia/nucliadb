@@ -22,16 +22,16 @@ from typing import AsyncIterator
 
 import aiohttp
 import pytest
+
+from nucliadb.train import API_PREFIX
+from nucliadb.train.api.v1.router import KB_PREFIX
+from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos.dataset_pb2 import ParagraphStreamingBatch, TaskType, TrainSet
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.train.utils import get_batches_from_train_response_stream
 from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
-
-from nucliadb.train import API_PREFIX
-from nucliadb.train.api.v1.router import KB_PREFIX
-from nucliadb_protos import resources_pb2 as rpb
 
 
 async def get_paragraph_streaming_batch_from_response(
@@ -60,9 +60,7 @@ async def test_generator_paragraph_streaming(
 
     await inject_resources_with_paragraphs(kbid, nucliadb_grpc)
 
-    async with train_rest_api.get(
-        f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset"
-    ) as partitions:
+    async with train_rest_api.get(f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset") as partitions:
         assert partitions.status == 200
         data = await partitions.json()
         assert len(data["partitions"]) == 1
@@ -79,9 +77,7 @@ async def test_generator_paragraph_streaming(
     ) as response:
         assert response.status == 200
         batches = []
-        async for batch in get_batches_from_train_response_stream(
-            response, ParagraphStreamingBatch
-        ):
+        async for batch in get_batches_from_train_response_stream(response, ParagraphStreamingBatch):
             batches.append(batch)
             assert len(batch.data) == 5
         assert len(batches) == 1
@@ -107,9 +103,7 @@ def smb_wonder_bm(kbid: str) -> BrokerMessage:
     start = 0
     for paragraph in paragraphs:
         end = start + len(paragraph)
-        field_builder.with_extracted_paragraph_metadata(
-            rpb.Paragraph(start=start, end=end)
-        )
+        field_builder.with_extracted_paragraph_metadata(rpb.Paragraph(start=start, end=end))
         start = end
     bmb.add_field_builder(field_builder)
 

@@ -26,7 +26,6 @@ import backoff
 import nats
 import nats.js.api
 from nats.aio.client import Msg
-from nucliadb_protos.writer_pb2 import BrokerMessage, BrokerMessageBlobReference
 
 from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.maindb.driver import Driver
@@ -34,6 +33,7 @@ from nucliadb.common.maindb.exceptions import ConflictError
 from nucliadb.ingest import logger
 from nucliadb.ingest.orm.exceptions import DeadletteredError, SequenceOrderViolation
 from nucliadb.ingest.orm.processor import Processor, sequence_manager
+from nucliadb_protos.writer_pb2 import BrokerMessage, BrokerMessageBlobReference
 from nucliadb_telemetry import context, errors, metrics
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
@@ -110,13 +110,9 @@ class IngestConsumer:
                 idle_heartbeat=nats_consumer_settings.nats_idle_heartbeat,
             ),
         )
-        logger.info(
-            f"Subscribed to {subject} on stream {const.Streams.INGEST.name} from {last_seqid}"
-        )
+        logger.info(f"Subscribed to {subject} on stream {const.Streams.INGEST.name} from {last_seqid}")
 
-    @backoff.on_exception(
-        backoff.expo, (ConflictError,), jitter=backoff.random_jitter, max_tries=4
-    )
+    @backoff.on_exception(backoff.expo, (ConflictError,), jitter=backoff.random_jitter, max_tries=4)
     async def _process(self, pb: BrokerMessage, seqid: int):
         await self.processor.process(pb, seqid, self.partition)
 
@@ -152,9 +148,7 @@ class IngestConsumer:
             MessageProgressUpdater(msg, nats_consumer_settings.nats_ack_wait * 0.66),
             self.lock,
         ):
-            logger.info(
-                f"Message processing: subject:{subject}, seqid: {seqid}, reply: {reply}"
-            )
+            logger.info(f"Message processing: subject:{subject}, seqid: {seqid}, reply: {reply}")
             try:
                 pb = await self.get_broker_message(msg)
                 if pb.source == pb.MessageSource.PROCESSOR:
@@ -173,13 +167,7 @@ class IngestConsumer:
 
                 try:
                     with consumer_observer(
-                        {
-                            "source": (
-                                "writer"
-                                if pb.source == pb.MessageSource.WRITER
-                                else "processor"
-                            )
-                        }
+                        {"source": ("writer" if pb.source == pb.MessageSource.WRITER else "processor")}
                     ):
                         await self._process(pb, seqid)
                 except SequenceOrderViolation as err:
@@ -193,9 +181,7 @@ class IngestConsumer:
                 else:
                     message_type_name = pb.MessageType.Name(pb.type)
                     time_to_process = time.monotonic() - start
-                    log_level = (
-                        logging.INFO if time_to_process < 10 else logging.WARNING
-                    )
+                    log_level = logging.INFO if time_to_process < 10 else logging.WARNING
                     logger.log(
                         log_level,
                         f"Successfully processed {message_type_name} message",
@@ -274,13 +260,9 @@ class IngestProcessedConsumer(IngestConsumer):
                 idle_heartbeat=nats_consumer_settings.nats_idle_heartbeat,
             ),
         )
-        logger.info(
-            f"Subscribed to {subject} on stream {const.Streams.INGEST_PROCESSED.name}"
-        )
+        logger.info(f"Subscribed to {subject} on stream {const.Streams.INGEST_PROCESSED.name}")
 
-    @backoff.on_exception(
-        backoff.expo, (ConflictError,), jitter=backoff.random_jitter, max_tries=4
-    )
+    @backoff.on_exception(backoff.expo, (ConflictError,), jitter=backoff.random_jitter, max_tries=4)
     async def _process(self, pb: BrokerMessage, seqid: int):
         """
         We are setting `transaction_check` to False here because we can not mix

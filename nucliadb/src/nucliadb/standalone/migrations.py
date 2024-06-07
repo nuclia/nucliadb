@@ -54,7 +54,5 @@ async def safe_run_migrations():
             await run_migrator(forever=False)
             break
         except locking.ResourceLocked:
-            sys.stdout.write(
-                "Another worker is already running migrations. Waiting...\n"
-            )
+            sys.stdout.write("Another worker is already running migrations. Waiting...\n")
             continue

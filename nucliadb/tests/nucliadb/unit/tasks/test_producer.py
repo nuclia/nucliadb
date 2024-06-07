@@ -67,9 +67,7 @@ class TestProducer:
         # Check that the stream is on inialization
         assert nats_manager.js.add_stream.call_count == 1
         assert nats_manager.js.add_stream.call_args[1]["name"] == producer.stream.name
-        assert nats_manager.js.add_stream.call_args[1]["subjects"] == [
-            producer.stream.subject
-        ]
+        assert nats_manager.js.add_stream.call_args[1]["subjects"] == [producer.stream.subject]
 
     async def test_produce_raises_error_if_not_initialized(self, producer):
         producer.initialized = False

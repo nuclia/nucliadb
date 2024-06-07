@@ -22,6 +22,9 @@ from typing import Optional
 from uuid import uuid4
 
 import pytest
+
+from nucliadb.ingest.fields.text import Text
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos.resources_pb2 import (
     CloudFile,
     ExtractedVectorsWrapper,
@@ -29,9 +32,6 @@ from nucliadb_protos.resources_pb2 import (
     FieldType,
 )
 from nucliadb_protos.utils_pb2 import Vector, VectorObject, Vectors
-
-from nucliadb.ingest.fields.text import Text
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_utils.storages.storage import Storage
 
 
@@ -49,9 +49,7 @@ async def test_create_resource_orm_vector(
     v1 = Vector(start=1, end=2, vector=b"ansjkdn")
     ex1.vectors.vectors.vectors.append(v1)
 
-    field_obj: Text = await r.get_field(
-        ex1.field.field, ex1.field.field_type, load=False
-    )
+    field_obj: Text = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
     await field_obj.set_vectors(ex1)
 
     ex2: Optional[VectorObject] = await field_obj.get_vectors()
@@ -82,9 +80,7 @@ async def test_create_resource_orm_vector_file(
     )
     ex1.file.CopyFrom(cf1)
 
-    field_obj: Text = await r.get_field(
-        ex1.field.field, ex1.field.field_type, load=False
-    )
+    field_obj: Text = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
     await field_obj.set_vectors(ex1)
 
     ex2: Optional[VectorObject] = await field_obj.get_vectors()
@@ -114,9 +110,7 @@ async def test_create_resource_orm_vector_split(
     ex1.vectors.split_vectors["es1"].vectors.append(v1)
     ex1.vectors.split_vectors["es2"].vectors.append(v1)
 
-    field_obj: Text = await r.get_field(
-        ex1.field.field, ex1.field.field_type, load=False
-    )
+    field_obj: Text = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
     await field_obj.set_vectors(ex1)
 
     ex1 = ExtractedVectorsWrapper()
@@ -127,9 +121,7 @@ async def test_create_resource_orm_vector_split(
     ex1.vectors.split_vectors["es3"].vectors.append(v1)
     ex1.vectors.split_vectors["es2"].vectors.append(v1)
 
-    field_obj2: Text = await r.get_field(
-        ex1.field.field, ex1.field.field_type, load=False
-    )
+    field_obj2: Text = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
     await field_obj2.set_vectors(ex1)
 
     ex2: Optional[VectorObject] = await field_obj2.get_vectors()

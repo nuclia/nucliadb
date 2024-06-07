@@ -20,6 +20,8 @@
 from typing import AsyncGenerator, overload
 
 import aiohttp
+
+from nucliadb.train.types import TrainBatch, TrainBatchType
 from nucliadb_protos.dataset_pb2 import (
     FieldClassificationBatch,
     ImageClassificationBatch,
@@ -29,8 +31,6 @@ from nucliadb_protos.dataset_pb2 import (
     SentenceClassificationBatch,
     TokenClassificationBatch,
 )
-
-from nucliadb.train.types import TrainBatch, TrainBatchType
 
 # NOTE: we use def instead of async def to make mypy happy. Otherwise, it
 # considers the overloaded functions as corountines returning async iterators

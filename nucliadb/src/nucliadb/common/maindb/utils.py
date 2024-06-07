@@ -103,9 +103,7 @@ async def setup_driver() -> Driver:
         local_driver = LocalDriver(settings.driver_local_url)
         set_utility(Utility.MAINDB_DRIVER, local_driver)
     else:
-        raise ConfigurationError(
-            f"Invalid DRIVER defined configured: {settings.driver}"
-        )
+        raise ConfigurationError(f"Invalid DRIVER defined configured: {settings.driver}")
 
     driver = get_driver()
     if not driver.initialized:

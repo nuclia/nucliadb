@@ -19,17 +19,14 @@
 
 import uuid
 
-from nucliadb_protos.resources_pb2 import Basic, ExtractedTextWrapper
-from nucliadb_protos.utils_pb2 import ExtractedText
-
 from nucliadb.common import datamanagers
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.search.search import paragraphs
+from nucliadb_protos.resources_pb2 import Basic, ExtractedTextWrapper
+from nucliadb_protos.utils_pb2 import ExtractedText
 
 
-async def test_get_paragraph_text(
-    storage, cache, txn, fake_node, processor, knowledgebox_ingest
-):
+async def test_get_paragraph_text(storage, cache, txn, fake_node, processor, knowledgebox_ingest):
     kbid = knowledgebox_ingest
     uid = uuid.uuid4().hex
     basic = Basic(slug="slug", uuid=uid)
@@ -37,9 +34,7 @@ async def test_get_paragraph_text(
     kb = KnowledgeBox(txn, storage, kbid)
     orm_resource = await kb.get(uid)
     field_obj = await orm_resource.get_field("field", 4, load=False)
-    await field_obj.set_extracted_text(
-        ExtractedTextWrapper(body=ExtractedText(text="Hello World!"))
-    )
+    await field_obj.set_extracted_text(ExtractedTextWrapper(body=ExtractedText(text="Hello World!")))
 
     # make sure to reset the cache
     field_obj.extracted_text = None

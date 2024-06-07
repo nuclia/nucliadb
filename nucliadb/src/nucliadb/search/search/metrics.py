@@ -25,9 +25,7 @@ from nucliadb_telemetry import metrics
 
 merge_observer = metrics.Observer("merge_results", labels={"type": ""})
 node_features = metrics.Counter("nucliadb_node_features", labels={"type": ""})
-query_parse_dependency_observer = metrics.Observer(
-    "query_parse_dependency", labels={"type": ""}
-)
+query_parse_dependency_observer = metrics.Observer("query_parse_dependency", labels={"type": ""})
 
 buckets = [
     0.005,
@@ -83,9 +81,7 @@ class RAGMetrics:
 
     def record_first_chunk_yielded(self):
         self.first_chunk_yielded_at = time.monotonic()
-        generative_first_chunk_histogram.observe(
-            self.first_chunk_yielded_at - self.global_start
-        )
+        generative_first_chunk_histogram.observe(self.first_chunk_yielded_at - self.global_start)
 
     def _start(self, step: str):
         self._start_times[step] = time.monotonic()

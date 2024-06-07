@@ -99,9 +99,7 @@ async def detect_orphan_shards(driver: Driver) -> dict[str, ShardLocation]:
             # Shards with knwon KB ids can be checked and ignore those comming from
             # an ongoing migration/rollover
             if kbid != UNKNOWN_KB:
-                skip = await datamanagers.rollover.is_rollover_shard(
-                    txn, kbid=kbid, shard_id=shard_id
-                )
+                skip = await datamanagers.rollover.is_rollover_shard(txn, kbid=kbid, shard_id=shard_id)
                 if skip:
                     continue
 
@@ -133,18 +131,14 @@ async def _get_stored_shards(driver: Driver) -> dict[str, ShardLocation]:
             try:
                 kb_shards = await shards_manager.get_shards_by_kbid(kbid)
             except ShardsNotFound:
-                logger.warning(
-                    "KB not found while looking for orphan shards", extra={"kbid": kbid}
-                )
+                logger.warning("KB not found while looking for orphan shards", extra={"kbid": kbid})
                 continue
             else:
                 for shard_object_pb in kb_shards:
                     for shard_replica_pb in shard_object_pb.replicas:
                         shard_replica_id = shard_replica_pb.shard.id
                         node_id = shard_replica_pb.node
-                        stored_shards[shard_replica_id] = ShardLocation(
-                            kbid=kbid, node_id=node_id
-                        )
+                        stored_shards[shard_replica_id] = ShardLocation(kbid=kbid, node_id=node_id)
     return stored_shards
 
 

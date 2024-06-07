@@ -25,7 +25,6 @@ import pytest
 from httpx import AsyncClient
 from pytest_lazy_fixtures import lazy_fixture
 from redis import asyncio as aioredis
-from tests.ingest.fixtures import IngestFixture
 
 from nucliadb.writer import API_PREFIX, tus
 from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX
@@ -39,6 +38,7 @@ from nucliadb_utils.settings import (
 )
 from nucliadb_utils.tests.fixtures import get_testing_storage_backend
 from nucliadb_utils.utilities import Utility, clean_utility, set_utility
+from tests.ingest.fixtures import IngestFixture
 
 
 @pytest.fixture(scope="function")
@@ -74,9 +74,7 @@ async def writer_api(
         client_base_url = f"{client_base_url}/{API_PREFIX}/v{version}"
 
         client = AsyncClient(app=application, base_url=client_base_url)
-        client.headers["X-NUCLIADB-ROLES"] = ";".join(
-            map(lambda role: role.value, roles)
-        )
+        client.headers["X-NUCLIADB-ROLES"] = ";".join(map(lambda role: role.value, roles))
         client.headers["X-NUCLIADB-USER"] = user
 
         return client

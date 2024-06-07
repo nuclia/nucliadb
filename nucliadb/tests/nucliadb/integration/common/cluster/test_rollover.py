@@ -151,9 +151,7 @@ async def test_rollover_kb_shards_handles_changes_in_between(
         for i in range(3):
             rid_to_delete = shuffled_resources.pop(0)
             deleted_resources.append(rid_to_delete)
-            resp = await nucliadb_writer.delete(
-                f"/kb/{knowledgebox}/resource/{rid_to_delete}"
-            )
+            resp = await nucliadb_writer.delete(f"/kb/{knowledgebox}/resource/{rid_to_delete}")
             assert resp.status_code == 204
 
         # Modify a couple of resources while the rollover is running

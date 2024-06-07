@@ -46,15 +46,13 @@ from nucliadb_protos.noderesources_pb2 import (
     EmptyResponse,
     Resource,
     ResourceID,
-)
-from nucliadb_protos.noderesources_pb2 import Shard as NodeResourcesShard
-from nucliadb_protos.noderesources_pb2 import (
     ShardCreated,
     ShardId,
     ShardIds,
     VectorSetID,
     VectorSetList,
 )
+from nucliadb_protos.noderesources_pb2 import Shard as NodeResourcesShard
 from nucliadb_protos.nodewriter_pb2 import NewShardRequest, OpStatus
 
 from ..settings import settings
@@ -79,15 +77,11 @@ class StandaloneReaderWrapper:
 
     def __init__(self):
         if NodeReader is None:
-            raise ImportError(
-                "NucliaDB index node bindings are not installed (reader not found)"
-            )
+            raise ImportError("NucliaDB index node bindings are not installed (reader not found)")
         self.reader = NodeReader()
         self.executor = ThreadPoolExecutor(settings.local_reader_threads)
 
-    async def Search(
-        self, request: SearchRequest, retry: bool = False
-    ) -> SearchResponse:
+    async def Search(self, request: SearchRequest, retry: bool = False) -> SearchResponse:
         try:
             loop = asyncio.get_running_loop()
             result = await loop.run_in_executor(
@@ -111,9 +105,7 @@ class StandaloneReaderWrapper:
             else:
                 raise
 
-    async def ParagraphSearch(
-        self, request: ParagraphSearchRequest
-    ) -> ParagraphSearchResponse:
+    async def ParagraphSearch(self, request: ParagraphSearchRequest) -> ParagraphSearchResponse:
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(
             self.executor, self.reader.paragraph_search, request.SerializeToString()
@@ -123,9 +115,7 @@ class StandaloneReaderWrapper:
         pb.ParseFromString(pb_bytes)
         return pb
 
-    async def RelationSearch(
-        self, request: RelationSearchRequest
-    ) -> RelationSearchResponse:
+    async def RelationSearch(self, request: RelationSearchRequest) -> RelationSearchResponse:
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(
             self.executor, self.reader.relation_search, request.SerializeToString()
@@ -199,9 +189,7 @@ class StandaloneReaderWrapper:
             raise exception
         await loop.run_in_executor(self.executor, t1.join)
 
-    async def Paragraphs(
-        self, stream_request: StreamRequest
-    ) -> AsyncIterator[ParagraphItem]:
+    async def Paragraphs(self, stream_request: StreamRequest) -> AsyncIterator[ParagraphItem]:
         loop = asyncio.get_running_loop()
         q: asyncio.Queue[ParagraphItem] = asyncio.Queue(1)
         exception = None
@@ -279,9 +267,7 @@ class StandaloneWriterWrapper:
     def __init__(self):
         os.makedirs(settings.data_path, exist_ok=True)
         if NodeWriter is None:
-            raise ImportError(
-                "NucliaDB index node bindings are not installed (writer not found)"
-            )
+            raise ImportError("NucliaDB index node bindings are not installed (writer not found)")
         self.writer = NodeWriter()
         self.executor = ThreadPoolExecutor(settings.local_writer_threads)
 
@@ -368,9 +354,7 @@ class StandaloneWriterWrapper:
 
     async def GC(self, request: ShardId) -> EmptyResponse:
         loop = asyncio.get_running_loop()
-        resp = await loop.run_in_executor(
-            self.executor, self.writer.gc, request.SerializeToString()
-        )
+        resp = await loop.run_in_executor(self.executor, self.writer.gc, request.SerializeToString())
         pb_bytes = bytes(resp)
         op_status = EmptyResponse()
         op_status.ParseFromString(pb_bytes)

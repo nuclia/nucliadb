@@ -47,9 +47,7 @@ class MockProxy:
 @pytest.fixture()
 def learning_collector_proxy_mock():
     proxy = MockProxy()
-    with mock.patch(
-        "nucliadb.reader.api.v1.learning_collector.learning_collector_proxy", proxy
-    ):
+    with mock.patch("nucliadb.reader.api.v1.learning_collector.learning_collector_proxy", proxy):
         yield proxy
 
 

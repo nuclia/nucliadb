@@ -58,10 +58,7 @@ async def initialize() -> list[Callable[[], Awaitable[None]]]:
 
     await setup_cluster()
     await start_transaction_utility(SERVICE_NAME)
-    if (
-        not cluster_settings.standalone_mode
-        and indexing_settings.index_jetstream_servers is not None
-    ):
+    if not cluster_settings.standalone_mode and indexing_settings.index_jetstream_servers is not None:
         await start_indexing_utility(SERVICE_NAME)
 
     await start_audit_utility(SERVICE_NAME)
@@ -122,8 +119,7 @@ async def main_consumer():  # pragma: no cover
     ingest_consumers = await consumer_service.start_ingest_consumers(SERVICE_NAME)
 
     await run_until_exit(
-        [grpc_health_finalizer, pull_workers, ingest_consumers, metrics_server.shutdown]
-        + finalizers
+        [grpc_health_finalizer, pull_workers, ingest_consumers, metrics_server.shutdown] + finalizers
     )
 
 
@@ -141,9 +137,7 @@ async def main_ingest_processed_consumer():  # pragma: no cover
     grpc_health_finalizer = await health.start_grpc_health_service(settings.grpc_port)
     consumer = await consumer_service.start_ingest_processed_consumer(SERVICE_NAME)
 
-    await run_until_exit(
-        [grpc_health_finalizer, consumer, metrics_server.shutdown] + finalizers
-    )
+    await run_until_exit([grpc_health_finalizer, consumer, metrics_server.shutdown] + finalizers)
 
 
 async def main_subscriber_workers():  # pragma: no cover

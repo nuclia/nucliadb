@@ -38,9 +38,7 @@ class MockProxy:
 @pytest.fixture()
 def learning_config_proxy_mock():
     proxy = MockProxy()
-    with mock.patch(
-        "nucliadb.writer.api.v1.learning_config.learning_config_proxy", proxy
-    ):
+    with mock.patch("nucliadb.writer.api.v1.learning_config.learning_config_proxy", proxy):
         yield proxy
 
 

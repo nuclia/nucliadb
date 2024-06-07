@@ -20,10 +20,9 @@
 
 import random
 
-from nucliadb_protos.nodereader_pb2 import DocumentScored, ParagraphResult
-
 from nucliadb.search.search.find_merge import Orderer, merge_paragraphs_vectors
 from nucliadb_models.search import SCORE_TYPE
+from nucliadb_protos.nodereader_pb2 import DocumentScored, ParagraphResult
 
 
 def test_orderer():
@@ -85,9 +84,7 @@ def test_merge_paragraphs_vectors():
         vr.metadata.position.start = 2
         vectors.append(vr)
 
-    paragraphs, next_page = merge_paragraphs_vectors(
-        [paragraphs], [vectors], 20, 0, min_score=1
-    )
+    paragraphs, next_page = merge_paragraphs_vectors([paragraphs], [vectors], 20, 0, min_score=1)
     assert not next_page
     assert len(paragraphs) == 10
 

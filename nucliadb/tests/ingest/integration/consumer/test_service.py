@@ -20,8 +20,8 @@
 import uuid
 
 import pytest
-from nucliadb_protos.writer_pb2 import BrokerMessage
 
+from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils import const
 from nucliadb_utils.nats import NatsConnectionManager
 from nucliadb_utils.transaction import TransactionUtility

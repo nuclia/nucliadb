@@ -21,6 +21,22 @@
 import asyncio
 from typing import AsyncGenerator, Optional
 
+from nucliadb.common import datamanagers
+from nucliadb.common.cluster.base import AbstractIndexNode
+from nucliadb.common.cluster.exceptions import (
+    AlreadyExists,
+    EntitiesGroupNotFound,
+    NodeError,
+)
+from nucliadb.common.cluster.utils import get_shard_manager
+from nucliadb.common.datamanagers.entities import (
+    KB_DELETED_ENTITIES_GROUPS,
+    KB_ENTITIES,
+    KB_ENTITIES_GROUP,
+)
+from nucliadb.common.maindb.driver import Transaction
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb.ingest.settings import settings
 from nucliadb_protos.knowledgebox_pb2 import (
     DeletedEntitiesGroups,
     EntitiesGroup,
@@ -38,23 +54,6 @@ from nucliadb_protos.nodereader_pb2 import (
 )
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import GetEntitiesResponse
-
-from nucliadb.common import datamanagers
-from nucliadb.common.cluster.base import AbstractIndexNode
-from nucliadb.common.cluster.exceptions import (
-    AlreadyExists,
-    EntitiesGroupNotFound,
-    NodeError,
-)
-from nucliadb.common.cluster.utils import get_shard_manager
-from nucliadb.common.datamanagers.entities import (
-    KB_DELETED_ENTITIES_GROUPS,
-    KB_ENTITIES,
-    KB_ENTITIES_GROUP,
-)
-from nucliadb.common.maindb.driver import Transaction
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.settings import settings
 from nucliadb_telemetry import errors
 
 from .exceptions import EntityManagementException
@@ -203,24 +202,18 @@ class EntitiesManager:
         return entities_group
 
     async def get_stored_entities_group(self, group: str) -> Optional[EntitiesGroup]:
-        return await datamanagers.entities.get_entities_group(
-            self.txn, kbid=self.kbid, group=group
-        )
+        return await datamanagers.entities.get_entities_group(self.txn, kbid=self.kbid, group=group)
 
     async def get_indexed_entities_group(self, group: str) -> Optional[EntitiesGroup]:
         shard_manager = get_shard_manager()
 
-        async def do_entities_search(
-            node: AbstractIndexNode, shard_id: str
-        ) -> RelationSearchResponse:
+        async def do_entities_search(node: AbstractIndexNode, shard_id: str) -> RelationSearchResponse:
             request = RelationSearchRequest(
                 shard_id=shard_id,
                 prefix=RelationPrefixSearchRequest(
                     prefix="",
                     node_filters=[
-                        RelationNodeFilter(
-                            node_type=RelationNode.NodeType.ENTITY, node_subtype=group
-                        )
+                        RelationNodeFilter(node_type=RelationNode.NodeType.ENTITY, node_subtype=group)
                     ],
                 ),
             )
@@ -239,9 +232,7 @@ class EntitiesManager:
 
         entities = {}
         for result in results:
-            entities.update(
-                {node.value: Entity(value=node.value) for node in result.prefix.nodes}
-            )
+            entities.update({node.value: Entity(value=node.value) for node in result.prefix.nodes})
 
         if not entities:
             return None
@@ -312,9 +303,7 @@ class EntitiesManager:
     ) -> set[str]:
         shard_manager = get_shard_manager()
 
-        async def query_indexed_entities_group_names(
-            node: AbstractIndexNode, shard_id: str
-        ) -> set[str]:
+        async def query_indexed_entities_group_names(node: AbstractIndexNode, shard_id: str) -> set[str]:
             request = SearchRequest(
                 shard=shard_id,
                 result_per_page=0,
@@ -347,9 +336,7 @@ class EntitiesManager:
         return set.union(*results)
 
     async def store_entities_group(self, group: str, eg: EntitiesGroup):
-        meta_cache = await datamanagers.entities.get_entities_meta_cache(
-            self.txn, kbid=self.kbid
-        )
+        meta_cache = await datamanagers.entities.get_entities_meta_cache(self.txn, kbid=self.kbid)
         duplicates = {}
         deleted = []
         duplicate_count = 0
@@ -373,9 +360,7 @@ class EntitiesManager:
 
         meta_cache.set_duplicates(group, duplicates)
         meta_cache.set_deleted(group, deleted)
-        await datamanagers.entities.set_entities_meta_cache(
-            self.txn, kbid=self.kbid, cache=meta_cache
-        )
+        await datamanagers.entities.set_entities_meta_cache(self.txn, kbid=self.kbid, cache=meta_cache)
 
         await datamanagers.entities.set_entities_group(
             self.txn, kbid=self.kbid, group_id=group, entities=eg
@@ -392,14 +377,10 @@ class EntitiesManager:
         await self.txn.delete(entities_key)
 
     async def mark_entities_group_as_deleted(self, group: str):
-        await datamanagers.entities.mark_group_as_deleted(
-            self.txn, kbid=self.kbid, group=group
-        )
+        await datamanagers.entities.mark_group_as_deleted(self.txn, kbid=self.kbid, group=group)
 
     async def unmark_entities_group_as_deleted(self, group: str):
-        await datamanagers.entities.unmark_group_as_deleted(
-            self.txn, kbid=self.kbid, group=group
-        )
+        await datamanagers.entities.unmark_group_as_deleted(self.txn, kbid=self.kbid, group=group)
 
     @staticmethod
     def merge_entities_groups(indexed: EntitiesGroup, stored: EntitiesGroup):

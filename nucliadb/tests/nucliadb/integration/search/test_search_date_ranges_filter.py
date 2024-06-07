@@ -21,10 +21,10 @@ from datetime import datetime, timedelta
 
 import pytest
 from httpx import AsyncClient
-from tests.nucliadb.integration.search.test_search import get_resource_with_a_sentence
-from tests.utils import inject_message
 
 from nucliadb.tests.vectors import V1
+from tests.nucliadb.integration.search.test_search import get_resource_with_a_sentence
+from tests.utils import inject_message
 
 NOW = datetime.now()
 ORIGIN_CREATION = datetime(2021, 1, 1)

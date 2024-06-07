@@ -20,12 +20,12 @@
 from unittest.mock import Mock
 
 import pytest
-from tests.nucliadb.migrations import get_migration
 
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.migrator.models import Migration
 from nucliadb_protos import writer_pb2
+from tests.nucliadb.migrations import get_migration
 
 migration: Migration = get_migration(17)
 

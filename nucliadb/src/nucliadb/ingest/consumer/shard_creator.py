@@ -82,9 +82,7 @@ class ShardCreatorHandler:
             metrics.total_messages.inc({"type": "shard_creator", "action": "ignored"})
             return
 
-        self.task_handler.schedule(
-            notification.kbid, partial(self.process_kb, notification.kbid)
-        )
+        self.task_handler.schedule(notification.kbid, partial(self.process_kb, notification.kbid))
         metrics.total_messages.inc({"type": "shard_creator", "action": "scheduled"})
 
     @metrics.handler_histo.wrap({"type": "shard_creator"})

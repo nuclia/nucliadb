@@ -28,6 +28,17 @@ import nats
 import pytest
 from nats.aio.client import Client
 from nats.js import JetStreamContext
+
+from nucliadb.common.maindb.driver import Driver
+from nucliadb.ingest import SERVICE_NAME
+from nucliadb.ingest.consumer.auditing import (
+    IndexAuditHandler,
+    ResourceWritesAuditHandler,
+)
+from nucliadb.ingest.orm.exceptions import DeadletteredError
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb.ingest.orm.processor import Processor
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos.audit_pb2 import AuditField, AuditRequest
 from nucliadb_protos.resources_pb2 import (
     TEXT,
@@ -45,22 +56,13 @@ from nucliadb_protos.resources_pb2 import (
     FieldType,
     FileExtractedData,
     LargeComputedMetadataWrapper,
+    Origin,
+    Paragraph,
+    QuestionAnswer,
 )
 from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
-from nucliadb_protos.resources_pb2 import Origin, Paragraph, QuestionAnswer
 from nucliadb_protos.utils_pb2 import Vector, VectorObject, Vectors
 from nucliadb_protos.writer_pb2 import BrokerMessage
-
-from nucliadb.common.maindb.driver import Driver
-from nucliadb.ingest import SERVICE_NAME
-from nucliadb.ingest.consumer.auditing import (
-    IndexAuditHandler,
-    ResourceWritesAuditHandler,
-)
-from nucliadb.ingest.orm.exceptions import DeadletteredError
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.orm.processor import Processor
-from nucliadb.ingest.orm.resource import Resource
 from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.storages.local import LocalStorage
 from nucliadb_utils.storages.storage import Storage
@@ -183,9 +185,7 @@ async def test_ingest_messages_autocommit(kbid: str, processor):
     ev = ExtractedVectorsWrapper()
     ev.field.field = "file"
     ev.field.field_type = FieldType.FILE
-    v1 = Vector(
-        start=1, end=10, start_paragraph=1, end_paragraph=20, vector=EXAMPLE_VECTOR
-    )
+    v1 = Vector(start=1, end=10, start_paragraph=1, end_paragraph=20, vector=EXAMPLE_VECTOR)
     ev.vectors.vectors.vectors.append(v1)
     message1.field_vectors.append(ev)
 
@@ -203,9 +203,7 @@ async def test_ingest_messages_autocommit(kbid: str, processor):
 
 
 @pytest.mark.asyncio
-async def test_ingest_error_message(
-    kbid: str, storage: Storage, processor, maindb_driver: Driver
-):
+async def test_ingest_error_message(kbid: str, storage: Storage, processor, maindb_driver: Driver):
     filename = f"{dirname(__file__)}/assets/resource.pb"
     with open(filename, "r") as f:
         data = base64.b64decode(f.read())
@@ -316,9 +314,7 @@ def add_textfields(message, items=None):
         message.texts[fieldid].body = "some random text"
 
 
-def make_message(
-    kbid: str, rid: str, slug: str = "resource", message_type=BrokerMessage.AUTOCOMMIT
-):
+def make_message(kbid: str, rid: str, slug: str = "resource", message_type=BrokerMessage.AUTOCOMMIT):
     message: BrokerMessage = BrokerMessage(
         kbid=kbid,
         uuid=rid,
@@ -365,9 +361,7 @@ async def test_ingest_audit_stream_files_only(
     jetstream: JetStreamContext = client.jetstream()
     if audit_settings.audit_jetstream_target is None:
         assert False, "Missing jetstream target in audit settings"
-    subject = audit_settings.audit_jetstream_target.format(
-        partition=partition, type="*"
-    )
+    subject = audit_settings.audit_jetstream_target.format(partition=partition, type="*")
     try:
         await jetstream.delete_stream(name=audit_settings.audit_stream)
     except nats.js.errors.NotFoundError:
@@ -466,9 +460,7 @@ async def test_ingest_audit_stream_files_only(
     # Test 4: delete resource
     #
 
-    message = make_message(
-        knowledgebox_ingest, rid, message_type=BrokerMessage.MessageType.DELETE
-    )
+    message = make_message(knowledgebox_ingest, rid, message_type=BrokerMessage.MessageType.DELETE)
     await stream_processor.process(message=message, seqid=4)
     auditreq = await get_audit_messages(psub)
 
@@ -574,9 +566,7 @@ async def test_ingest_audit_stream_mixed(
     jetstream: JetStreamContext = client.jetstream()
     if audit_settings.audit_jetstream_target is None:
         assert False, "Missing jetstream target in audit settings"
-    subject = audit_settings.audit_jetstream_target.format(
-        partition=partition, type="*"
-    )
+    subject = audit_settings.audit_jetstream_target.format(partition=partition, type="*")
     try:
         await jetstream.delete_stream(name=audit_settings.audit_stream)
     except nats.js.errors.NotFoundError:
@@ -820,9 +810,7 @@ async def test_ingest_update_labels(
         brain_mock = brain_extractor_mock(mock_index_resource)
 
         message = make_message(knowledgebox_ingest, rid)
-        message.basic.usermetadata.classifications.append(
-            Classification(labelset="names", label="john")
-        )
+        message.basic.usermetadata.classifications.append(Classification(labelset="names", label="john"))
         message.reindex = True
         await stream_processor.process(message=message, seqid=2)
 

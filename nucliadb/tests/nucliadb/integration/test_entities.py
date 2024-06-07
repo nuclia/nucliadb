@@ -35,6 +35,12 @@ import asyncio
 
 import pytest
 from httpx import AsyncClient
+
+from nucliadb_models.entities import (
+    CreateEntitiesGroupPayload,
+    Entity,
+    UpdateEntitiesGroupPayload,
+)
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxID
 from nucliadb_protos.resources_pb2 import (
     FieldID,
@@ -52,12 +58,6 @@ from tests.utils.entities import (
     delete_entities_group,
     update_entities_group,
     wait_until_entity,
-)
-
-from nucliadb_models.entities import (
-    CreateEntitiesGroupPayload,
-    Entity,
-    UpdateEntitiesGroupPayload,
 )
 
 pytestmark = pytest.mark.asyncio
@@ -172,9 +172,7 @@ async def annotated_entities(
         )
         bm_indexed = "bird" in response.group.entities
 
-        assert (
-            retries < 10
-        ), "Broker message indexing took too much, might be a test error"
+        assert retries < 10, "Broker message indexing took too much, might be a test error"
 
         # small sleep to give time for indexing
         await asyncio.sleep(0.1)

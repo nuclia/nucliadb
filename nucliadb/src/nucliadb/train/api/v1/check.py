@@ -37,9 +37,7 @@ from nucliadb_utils.authentication import requires_one
 )
 @version(1)
 @requires_one([NucliaDBRoles.READER])
-async def check_labeler(
-    request: Request, kbid: str, labelset: str
-) -> TrainSetPartitions:
+async def check_labeler(request: Request, kbid: str, labelset: str) -> TrainSetPartitions:
     all_keys = await get_kb_partitions(kbid)
     return TrainSetPartitions(partitions=all_keys)
 
@@ -53,8 +51,6 @@ async def check_labeler(
 )
 @version(1)
 @requires_one([NucliaDBRoles.READER])
-async def check_ner(
-    request: Request, kbid: str, entitygroup: str
-) -> TrainSetPartitions:
+async def check_ner(request: Request, kbid: str, entitygroup: str) -> TrainSetPartitions:
     all_keys = await get_kb_partitions(kbid)
     return TrainSetPartitions(partitions=all_keys)

@@ -20,6 +20,17 @@
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
+
+from nucliadb.ingest.orm.resource import (
+    Resource,
+    get_file_page_positions,
+    get_text_field_mimetype,
+    maybe_update_basic_icon,
+    maybe_update_basic_summary,
+    maybe_update_basic_thumbnail,
+    update_basic_languages,
+)
+from nucliadb_protos import utils_pb2, writer_pb2
 from nucliadb_protos.resources_pb2 import (
     AllFieldIDs,
     Basic,
@@ -32,17 +43,6 @@ from nucliadb_protos.resources_pb2 import (
 )
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
-from nucliadb.ingest.orm.resource import (
-    Resource,
-    get_file_page_positions,
-    get_text_field_mimetype,
-    maybe_update_basic_icon,
-    maybe_update_basic_summary,
-    maybe_update_basic_thumbnail,
-    update_basic_languages,
-)
-from nucliadb_protos import utils_pb2, writer_pb2
-
 
 @pytest.mark.asyncio
 async def test_get_file_page_positions():
@@ -50,9 +50,7 @@ async def test_get_file_page_positions():
     extracted_data.file_pages_previews.positions.extend(
         [PagePositions(start=0, end=10), PagePositions(start=11, end=20)]
     )
-    file_field = AsyncMock(
-        get_file_extracted_data=AsyncMock(return_value=extracted_data)
-    )
+    file_field = AsyncMock(get_file_extracted_data=AsyncMock(return_value=extracted_data))
     assert await get_file_page_positions(file_field) == {0: (0, 10), 1: (11, 20)}
 
 
@@ -303,29 +301,18 @@ async def test_apply_extracted_vectors_matryoshka_embeddings(txn, storage, kb):
         patch.object(resource, "get_field", AsyncMock(return_value=mock_field)),
         patch.object(resource, "generate_field_id", Mock(return_value="field_id")),
         patch("nucliadb.ingest.orm.resource.datamanagers") as mock_datamanagers,
-        patch.object(
-            resource.indexer, "apply_field_vectors", AsyncMock()
-        ) as apply_field_vectors,
+        patch.object(resource.indexer, "apply_field_vectors", AsyncMock()) as apply_field_vectors,
     ):
-        mock_datamanagers.kb.get_matryoshka_vector_dimension = AsyncMock(
-            return_value=None
-        )
-        await resource._apply_extracted_vectors(
-            writer_pb2.ExtractedVectorsWrapper(vectors=vectors)
-        )
+        mock_datamanagers.kb.get_matryoshka_vector_dimension = AsyncMock(return_value=None)
+        await resource._apply_extracted_vectors(writer_pb2.ExtractedVectorsWrapper(vectors=vectors))
         assert apply_field_vectors.call_count == 1
-        assert (
-            apply_field_vectors.call_args.kwargs["matryoshka_vector_dimension"] is None
-        )
+        assert apply_field_vectors.call_args.kwargs["matryoshka_vector_dimension"] is None
 
         mock_datamanagers.kb.get_matryoshka_vector_dimension = AsyncMock(
             return_value=MATRYOSHKA_DIMENSION
         )
-        await resource._apply_extracted_vectors(
-            writer_pb2.ExtractedVectorsWrapper(vectors=vectors)
-        )
+        await resource._apply_extracted_vectors(writer_pb2.ExtractedVectorsWrapper(vectors=vectors))
         assert apply_field_vectors.call_count == 2
         assert (
-            apply_field_vectors.call_args.kwargs["matryoshka_vector_dimension"]
-            == MATRYOSHKA_DIMENSION
+            apply_field_vectors.call_args.kwargs["matryoshka_vector_dimension"] == MATRYOSHKA_DIMENSION
         )

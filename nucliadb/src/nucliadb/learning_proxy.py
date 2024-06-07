@@ -80,9 +80,7 @@ class LearningConfiguration(BaseModel):
             and vector_size is not None
             and vector_size not in matryoshka_dimensions
         ):
-            raise ValueError(
-                "Semantic vector size is inconsistent with matryoshka dimensions"
-            )
+            raise ValueError("Semantic vector size is inconsistent with matryoshka dimensions")
         return values
 
 
@@ -239,13 +237,9 @@ async def proxy(
 
 def get_base_url(service: LearningService) -> str:
     if is_onprem_nucliadb():
-        nuclia_public_url = nuclia_settings.nuclia_public_url.format(
-            zone=nuclia_settings.nuclia_zone
-        )
+        nuclia_public_url = nuclia_settings.nuclia_public_url.format(zone=nuclia_settings.nuclia_zone)
         return f"{nuclia_public_url}/api/v1"
-    learning_svc_base_url = nuclia_settings.learning_internal_svc_base_url.format(
-        service=service.value
-    )
+    learning_svc_base_url = nuclia_settings.learning_internal_svc_base_url.format(service=service.value)
     return f"{learning_svc_base_url}/api/v1/internal"
 
 
@@ -274,9 +268,7 @@ async def service_client(
         # This is a workaround to be able to run integration tests that start nucliadb with docker.
         # The learning APIs are not available in the docker setup, so we use a dummy client.
         client = DummyClient(base_url=base_url, headers=headers)
-        logger.warning(
-            "Using dummy client. If you see this in production, something is wrong."
-        )
+        logger.warning("Using dummy client. If you see this in production, something is wrong.")
     else:
         client = httpx.AsyncClient(base_url=base_url, headers=headers)  # type: ignore
     try:
@@ -329,9 +321,7 @@ class DummyClient(httpx.AsyncClient):
             semantic_model="multilingual",
             semantic_vector_similarity="cosine",
             semantic_vector_size=(
-                768
-                if os.environ.get("TEST_SENTENCE_ENCODER") == "multilingual-2023-02-21"
-                else 512
+                768 if os.environ.get("TEST_SENTENCE_ENCODER") == "multilingual-2023-02-21" else 512
             ),
             semantic_threshold=None,
             semantic_matryoshka_dims=[],
@@ -346,9 +336,7 @@ class DummyClient(httpx.AsyncClient):
         content=None,
         headers=None,
     ) -> httpx.Response:
-        return self._handle_request(
-            method, url, params=params, content=content, headers=headers
-        )
+        return self._handle_request(method, url, params=params, content=content, headers=headers)
 
     def _handle_request(self, *args: Any, **kwargs: Any) -> httpx.Response:
         """
