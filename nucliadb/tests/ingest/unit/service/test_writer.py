@@ -35,11 +35,6 @@ from nucliadb_protos.utils_pb2 import ReleaseChannel, VectorSimilarity
 
 class TestWriterServicer:
     @pytest.fixture
-    def onprem_nucliadb(self):
-        with patch("nucliadb.ingest.service.writer.is_onprem_nucliadb", return_value=True) as mocked:
-            yield mocked
-
-    @pytest.fixture
     def learning_config(self):
         lconfig = LearningConfiguration(
             semantic_model="english",
@@ -118,9 +113,7 @@ class TestWriterServicer:
         )
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
 
-    async def test_NewKnowledgeBox_hosted_nucliadb(self, writer: WriterServicer, onprem_nucliadb):
-        onprem_nucliadb.return_value = False
-
+    async def test_NewKnowledgeBox_hosted_nucliadb(self, writer: WriterServicer, hosted_nucliadb):
         request = writer_pb2.KnowledgeBoxNew(
             slug="slug",
             forceuuid="kbid",
@@ -144,10 +137,8 @@ class TestWriterServicer:
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
 
     async def test_NewKnowledgeBox_hosted_nucliadb_with_matryoshka_dimensions(
-        self, writer: WriterServicer, onprem_nucliadb
+        self, writer: WriterServicer, hosted_nucliadb
     ):
-        onprem_nucliadb.return_value = False
-
         request = writer_pb2.KnowledgeBoxNew(
             slug="slug",
             forceuuid="kbid",

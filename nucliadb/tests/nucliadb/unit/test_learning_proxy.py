@@ -83,12 +83,6 @@ def async_client(config_response):
 
 
 @pytest.fixture()
-def is_onprem_nucliadb_mock():
-    with mock.patch(f"{MODULE}.is_onprem_nucliadb", return_value=False) as mocked:
-        yield mocked
-
-
-@pytest.fixture()
 def settings():
     with mock.patch(f"{MODULE}.nuclia_settings") as settings:
         settings.learning_internal_svc_base_url = "http://{service}.learning.svc.cluster.local:8080"
@@ -98,13 +92,13 @@ def settings():
         yield settings
 
 
-async def test_get_learning_config_client(settings, is_onprem_nucliadb_mock):
-    is_onprem_nucliadb_mock.return_value = True
+async def test_get_learning_config_client_onprem(settings, onprem_nucliadb):
     async with learning_config_client() as client:
         assert str(client.base_url) == "http://europe-1.public-url/api/v1/"
         assert client.headers["X-NUCLIA-NUAKEY"] == f"Bearer service-account"
 
-    is_onprem_nucliadb_mock.return_value = False
+
+async def test_get_learning_config_client_hosted(settings, hosted_nucliadb):
     async with learning_config_client() as client:
         assert str(client.base_url) == "http://config.learning.svc.cluster.local:8080/api/v1/internal/"
         assert "X-NUCLIA-NUAKEY" not in client.headers

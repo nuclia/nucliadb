@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from unittest import mock
 
 import pytest
 from httpx import AsyncClient
@@ -45,13 +44,6 @@ from nucliadb_protos.train_pb2_grpc import TrainStub
 from nucliadb_protos.writer_pb2 import BrokerMessage, OpStatusWriter
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import broker_resource, inject_message
-
-
-@pytest.fixture
-def onprem_nucliadb():
-    with mock.patch("nucliadb.ingest.service.writer.is_onprem_nucliadb") as mocked:
-        mocked.return_value = True
-        yield
 
 
 @pytest.mark.asyncio

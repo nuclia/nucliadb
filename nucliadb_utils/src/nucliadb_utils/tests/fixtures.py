@@ -23,6 +23,26 @@ import pytest
 from pytest_lazy_fixtures import lazy_fixture
 
 
+@pytest.fixture(scope="function")
+def onprem_nucliadb():
+    from nucliadb_utils.settings import nuclia_settings
+
+    original = nuclia_settings.onprem
+    nuclia_settings.onprem = True
+    yield
+    nuclia_settings.onprem = original
+
+
+@pytest.fixture(scope="function")
+def hosted_nucliadb():
+    from nucliadb_utils.settings import nuclia_settings
+
+    original = nuclia_settings.onprem
+    nuclia_settings.onprem = False
+    yield
+    nuclia_settings.onprem = original
+
+
 def get_testing_storage_backend(default="gcs"):
     return os.environ.get("TESTING_STORAGE_BACKEND", default)
 
