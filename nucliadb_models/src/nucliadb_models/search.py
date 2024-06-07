@@ -1076,32 +1076,30 @@ class ChatRequest(BaseModel):
         description="If set to true, the response will be in markdown format",
     )
 
-    @model_validator(mode="before")
+    @field_validator("rag_strategies", mode="before")
     @classmethod
-    def rag_features_validator(cls, values):
-        chosen_strategies = []
-        for s in values.get("rag_strategies") or []:
-            if not isinstance(s, dict):
+    def validate_rag_strategies(
+        cls, rag_strategies: list[RagStrategies]
+    ) -> list[RagStrategies]:
+        unique_strategy_names: set[str] = set()
+        for strategy in rag_strategies or []:
+            if not isinstance(strategy, dict):
                 raise ValueError("RAG strategies must be defined using an object")
-            strategy = s.get("name", None)
-            if strategy is None:
-                raise ValueError(f"Invalid strategy '{s}'")
-            chosen_strategies.append(strategy)
-
-        # There must be at most one strategy of each type
-        if len(chosen_strategies) > len(set(chosen_strategies)):
+            strategy_name = strategy.get("name")
+            if strategy_name is None:
+                raise ValueError(f"Invalid strategy '{strategy}'")
+            unique_strategy_names.add(strategy_name)
+        if len(unique_strategy_names) != len(rag_strategies):
             raise ValueError("There must be at most one strategy of each type")
-
         # If full resource strategy is chosen, it must be the only strategy
         if (
-            RagStrategyName.FULL_RESOURCE in chosen_strategies
-            and len(chosen_strategies) > 1
+            RagStrategyName.FULL_RESOURCE in unique_strategy_names
+            and len(rag_strategies) > 1
         ):
             raise ValueError(
                 f"If '{RagStrategyName.FULL_RESOURCE}' strategy is chosen, it must be the only strategy"
             )
-
-        return values
+        return rag_strategies
 
 
 class SummarizeResourceModel(BaseModel):
