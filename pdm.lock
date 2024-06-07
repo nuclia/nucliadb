@@ -2229,11 +2229,11 @@ dependencies = [
 
 [[package]]
 name = "nucliadb-admin-assets"
-version = "1.0.0.post1568"
+version = "1.0.0.post1569"
 summary = "Packaging of NucliaDB admin JS app"
 groups = ["dev"]
 files = [
-    {file = "nucliadb_admin_assets-1.0.0.post1568-py3-none-any.whl", hash = "sha256:1ba9b39bdfbebad9a99892fd7bcc16619cfbd9ad3437b2c9083c249ab44321c8"},
+    {file = "nucliadb_admin_assets-1.0.0.post1569-py3-none-any.whl", hash = "sha256:1799c573254d8269c25a926a60b6894f67619ebc2df830a2514fc2da1872b190"},
 ]
 
 [[package]]
