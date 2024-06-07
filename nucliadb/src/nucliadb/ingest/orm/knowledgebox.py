@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from typing import AsyncGenerator, Optional, Sequence
+from typing import AsyncGenerator, Optional, Sequence, cast
 from uuid import uuid4
 
 from grpc import StatusCode
@@ -37,15 +37,18 @@ from nucliadb.common.datamanagers.resources import (
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict, VectorSetConflict
+from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.orm.utils import choose_matryoshka_dimension, compute_paragraph_key
 from nucliadb.migrator.utils import get_latest_version
-from nucliadb_protos import knowledgebox_pb2, writer_pb2
+from nucliadb_protos import knowledgebox_pb2, utils_pb2, writer_pb2
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig, SemanticModelMetadata
 from nucliadb_protos.resources_pb2 import Basic
 from nucliadb_protos.utils_pb2 import ReleaseChannel
+from nucliadb_utils import const
+from nucliadb_utils.settings import running_settings
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import get_audit, get_storage
+from nucliadb_utils.utilities import get_audit, get_storage, has_feature
 
 # XXX Eventually all these keys should be moved to datamanagers.kb
 KB_RESOURCE = "/kbs/{kbid}/r/{uuid}"
@@ -69,7 +72,12 @@ class KnowledgeBox:
         self.kbid = kbid
         self._config: Optional[KnowledgeBoxConfig] = None
 
+    @staticmethod
+    def new_unique_kbid() -> str:
+        return str(uuid4())
+
     @classmethod
+    @processor_observer.wrap({"type": "create_kb"})
     async def create(
         cls,
         txn: Transaction,
@@ -77,8 +85,10 @@ class KnowledgeBox:
         semantic_model: SemanticModelMetadata,
         uuid: Optional[str] = None,
         config: Optional[KnowledgeBoxConfig] = None,
-        release_channel: ReleaseChannel.ValueType = ReleaseChannel.STABLE,
+        release_channel: Optional[ReleaseChannel.ValueType] = ReleaseChannel.STABLE,
     ) -> tuple[str, bool]:
+        release_channel = cast(ReleaseChannel.ValueType, release_channel_for_kb(slug, release_channel))
+
         failed = False
         exist = await datamanagers.kb.get_kb_uuid(txn, slug=slug)
         if exist:
@@ -380,6 +390,20 @@ class KnowledgeBox:
         await self.txn.set(KB_VECTORSET_TO_DELETE.format(kbid=self.kbid, vectorset=vectorset_id), b"")
         shard_manager = get_shard_manager()
         await shard_manager.delete_vectorset(self.kbid, vectorset_id)
+
+
+def release_channel_for_kb(
+    slug: str, rc: Optional[ReleaseChannel.ValueType]
+) -> ReleaseChannel.ValueType:
+    if running_settings.running_environment == "stage" and has_feature(
+        const.Features.EXPERIMENTAL_KB, context={"slug": slug}
+    ):
+        value = utils_pb2.ReleaseChannel.EXPERIMENTAL
+
+    if value is None:
+        return utils_pb2.ReleaseChannel.STABLE
+
+    return value
 
 
 def chunker(seq: Sequence, size: int):

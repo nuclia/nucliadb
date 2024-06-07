@@ -30,7 +30,6 @@ from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.common.maindb.exceptions import ConflictError, MaindbServerError
 from nucliadb.ingest.orm.exceptions import (
     DeadletteredError,
-    KnowledgeBoxConflict,
     ResourceNotIndexable,
     SequenceOrderViolation,
 )
@@ -44,7 +43,6 @@ from nucliadb_protos import (
     noderesources_pb2,
     nodewriter_pb2,
     resources_pb2,
-    utils_pb2,
     writer_pb2,
 )
 from nucliadb_telemetry import errors
@@ -633,52 +631,6 @@ class Processor:
         storage = await get_storage()
         kbobj = KnowledgeBox(txn, storage, uuid)
         return kbobj
-
-    @processor_observer.wrap({"type": "create_kb"})
-    async def create_kb(
-        self,
-        slug: str,
-        config: Optional[knowledgebox_pb2.KnowledgeBoxConfig],
-        semantic_model: knowledgebox_pb2.SemanticModelMetadata,
-        forceuuid: Optional[str] = None,
-        release_channel: utils_pb2.ReleaseChannel.ValueType = utils_pb2.ReleaseChannel.STABLE,
-    ) -> str:
-        async with self.driver.transaction() as txn:
-            try:
-                uuid, failed = await KnowledgeBox.create(
-                    txn,
-                    slug,
-                    semantic_model,
-                    uuid=forceuuid,
-                    config=config,
-                    release_channel=release_channel,
-                )
-                if failed:
-                    raise Exception("Failed to create KB")
-                await txn.commit()
-                return uuid
-            except KnowledgeBoxConflict:
-                raise
-            except Exception as e:
-                errors.capture_exception(e)
-                raise e
-
-    async def update_kb(
-        self,
-        kbid: str,
-        slug: str,
-        config: Optional[knowledgebox_pb2.KnowledgeBoxConfig],
-    ) -> str:
-        async with self.driver.transaction() as txn:
-            uuid = await KnowledgeBox.update(txn, kbid, slug, config=config)
-            await txn.commit()
-        return uuid
-
-    async def delete_kb(self, kbid: str) -> str:
-        async with self.driver.transaction() as txn:
-            uuid = await KnowledgeBox.delete(txn, kbid)
-            await txn.commit()
-        return uuid
 
 
 def messages_source(messages: list[writer_pb2.BrokerMessage]):
