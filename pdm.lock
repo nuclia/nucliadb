@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["cross_platform", "inherit_metadata"]
 lock_version = "4.4.1"
-content_hash = "sha256:7c83772ae224d660232fe2455353359059c4c089431889552cb1512d7070e2b2"
+content_hash = "sha256:393a5694d80f4a0f884b0aa8658151e3eaedb36d8ff33678b7bbba3ea185803b"
 
 [[package]]
 name = "aiobotocore"
@@ -922,22 +922,6 @@ files = [
 ]
 
 [[package]]
-name = "flake8"
-version = "7.0.0"
-requires_python = ">=3.8.1"
-summary = "the modular source code checker: pep8 pyflakes and co"
-groups = ["dev"]
-dependencies = [
-    "mccabe<0.8.0,>=0.7.0",
-    "pycodestyle<2.12.0,>=2.11.0",
-    "pyflakes<3.3.0,>=3.2.0",
-]
-files = [
-    {file = "flake8-7.0.0-py2.py3-none-any.whl", hash = "sha256:a6dfbb75e03252917f2473ea9653f7cd799c3064e54d4c8140044c5c065f53c3"},
-    {file = "flake8-7.0.0.tar.gz", hash = "sha256:33f96621059e65eec474169085dc92bf26e7b2d47366b70be2f67ab80dc25132"},
-]
-
-[[package]]
 name = "frozenlist"
 version = "1.4.1"
 requires_python = ">=3.8"
@@ -1826,17 +1810,6 @@ files = [
     {file = "maturin-1.6.0-py3-none-win_amd64.whl", hash = "sha256:a2a2436628c36d98dabd79b52256df7e12fc4fd1b122984d9373fdf918fd4609"},
     {file = "maturin-1.6.0-py3-none-win_arm64.whl", hash = "sha256:50133965e52d8b5b969381fee3fde111ae2383905cdaba7650f256e08ccddcd4"},
     {file = "maturin-1.6.0.tar.gz", hash = "sha256:b955025c24c8babc808db49e0ff90db8b4b1320dcc16b14eb26132841737230d"},
-]
-
-[[package]]
-name = "mccabe"
-version = "0.7.0"
-requires_python = ">=3.6"
-summary = "McCabe checker, plugin for flake8"
-groups = ["dev"]
-files = [
-    {file = "mccabe-0.7.0-py2.py3-none-any.whl", hash = "sha256:6c2d30ab6be0e4a46919781807b4f0d834ebdd6c6e3dca0bda5a15f863427b6e"},
-    {file = "mccabe-0.7.0.tar.gz", hash = "sha256:348e0240c33b60bbdf4e523192ef919f28cb2c3d7d5c7794f74009290f236325"},
 ]
 
 [[package]]
@@ -2968,17 +2941,6 @@ files = [
 ]
 
 [[package]]
-name = "pycodestyle"
-version = "2.11.1"
-requires_python = ">=3.8"
-summary = "Python style guide checker"
-groups = ["dev"]
-files = [
-    {file = "pycodestyle-2.11.1-py2.py3-none-any.whl", hash = "sha256:44fe31000b2d866f2e41841b18528a505fbd7fef9017b04eff4e2648a0fadc67"},
-    {file = "pycodestyle-2.11.1.tar.gz", hash = "sha256:41ba0e7afc9752dfb53ced5489e89f8186be00e599e712660695b7a75ff2663f"},
-]
-
-[[package]]
 name = "pycparser"
 version = "2.22"
 requires_python = ">=3.8"
@@ -3097,17 +3059,6 @@ dependencies = [
 files = [
     {file = "pydantic_settings-2.2.1-py3-none-any.whl", hash = "sha256:0235391d26db4d2190cb9b31051c4b46882d28a51533f97440867f012d4da091"},
     {file = "pydantic_settings-2.2.1.tar.gz", hash = "sha256:00b9f6a5e95553590434c0fa01ead0b216c3e10bc54ae02e37f359948643c5ed"},
-]
-
-[[package]]
-name = "pyflakes"
-version = "3.2.0"
-requires_python = ">=3.8"
-summary = "passive checker of Python programs"
-groups = ["dev"]
-files = [
-    {file = "pyflakes-3.2.0-py2.py3-none-any.whl", hash = "sha256:84b5be138a2dfbb40689ca07e2152deb896a65c3a3e24c251c5c62489568074a"},
-    {file = "pyflakes-3.2.0.tar.gz", hash = "sha256:1c61603ff154621fb2a9172037d84dca3500def8c8b630657d1701f026f8af3f"},
 ]
 
 [[package]]

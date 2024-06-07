@@ -19,15 +19,12 @@
 #
 from typing import Optional
 
-from lru import LRU  # type: ignore
+from lru import LRU
 from nucliadb_protos.nodereader_pb2_grpc import NodeReaderStub
 from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
 
-from nucliadb.common.cluster.base import AbstractIndexNode  # type: ignore
-from nucliadb.common.cluster.grpc_node_dummy import (  # type: ignore
-    DummyReaderStub,
-    DummyWriterStub,
-)
+from nucliadb.common.cluster.base import AbstractIndexNode
+from nucliadb.common.cluster.grpc_node_dummy import DummyReaderStub, DummyWriterStub
 from nucliadb.ingest import SERVICE_NAME
 from nucliadb_utils.grpc import get_traced_grpc_channel
 
@@ -63,7 +60,7 @@ class IndexNode(AbstractIndexNode):
                 channel = get_traced_grpc_channel(
                     grpc_address, SERVICE_NAME, variant="_writer"
                 )
-                WRITE_CONNECTIONS[self.address] = NodeWriterStub(channel)  # type: ignore
+                WRITE_CONNECTIONS[self.address] = NodeWriterStub(channel)
             else:
                 WRITE_CONNECTIONS[self.address] = DummyWriterStub()
             self._writer = WRITE_CONNECTIONS[self.address]
@@ -79,7 +76,7 @@ class IndexNode(AbstractIndexNode):
                 channel = get_traced_grpc_channel(
                     grpc_address, SERVICE_NAME, variant="_reader"
                 )
-                READ_CONNECTIONS[self.address] = NodeReaderStub(channel)  # type: ignore
+                READ_CONNECTIONS[self.address] = NodeReaderStub(channel)
             else:
                 READ_CONNECTIONS[self.address] = DummyReaderStub()
             self._reader = READ_CONNECTIONS[self.address]

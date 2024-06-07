@@ -23,12 +23,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  pre-checks:
-    uses: ./.github/workflows/_component_prechecks.yml
-    with:
-      component: "nucliadb"
-      python_version: "3.12"
-
   # Job to run Python tests
   tests:
     name: NucliaDBTests
@@ -64,7 +58,6 @@ jobs:
               - 'nucliadb_node/**'
               - "nucliadb_sidecar/**"
               - 'nucliadb_texts2/**'
-              - 'nucliadb_paragraphs2/**'
               - 'nucliadb_paragraphs3/**'
               - 'nucliadb_vectors/**'
               - 'nucliadb_relations2/**'

@@ -147,7 +147,7 @@ def parse_basic_modify(
                 userfieldmetadata.question_answers.append(qa_annotation_pb)
 
             userfieldmetadata.field.field = fieldmetadata.field.field
-            userfieldmetadata.field.field_type = FIELD_TYPES_MAP_REVERSE[  # type: ignore
+            userfieldmetadata.field.field_type = FIELD_TYPES_MAP_REVERSE[
                 fieldmetadata.field.field_type.value
             ]
 
@@ -231,7 +231,7 @@ def validate_classifications(paragraph: ParagraphAnnotation):
             status_code=422, detail="ensure classifications has at least 1 items"
         )
 
-    unique_classifications = {tuple(cf.dict().values()) for cf in classifications}
+    unique_classifications = {tuple(cf.model_dump().values()) for cf in classifications}
     if len(unique_classifications) != len(classifications):
         raise HTTPException(
             status_code=422, detail="Paragraph classifications need to be unique"

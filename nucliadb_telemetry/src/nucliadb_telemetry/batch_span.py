@@ -28,8 +28,8 @@ from opentelemetry.context import (  # type: ignore
     detach,
     set_value,
 )
-from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor  # type: ignore
-from opentelemetry.sdk.trace.export import SpanExporter  # type: ignore
+from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor
+from opentelemetry.sdk.trace.export import SpanExporter
 
 from nucliadb_telemetry import logger
 

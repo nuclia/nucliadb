@@ -163,7 +163,7 @@ async def test_processing_status(
     processing_client.__aenter__ = AsyncMock(return_value=processing_client)
     processing_client.__aexit__ = AsyncMock(return_value=None)
     processing_client.requests = AsyncMock(
-        return_value=processing.RequestsResults(  # type: ignore
+        return_value=processing.RequestsResults(
             results=[
                 processing.RequestsResult(  # type: ignore
                     processing_id="processing_id",
@@ -186,6 +186,6 @@ async def test_processing_status(
             resp = await client.get(f"/{KB_PREFIX}/{kbid}/processing-status")
             assert resp.status_code == 200
 
-            data = processing.RequestsResults.parse_obj(resp.json())
+            data = processing.RequestsResults.model_validate(resp.json())
 
             assert all([result.title is not None for result in data.results])

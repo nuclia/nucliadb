@@ -245,7 +245,7 @@ async def fetch_find_metadata(
 
     FIND_FETCH_OPS_DISTRIBUTION.observe(len(operations))
     if len(operations) > 0:
-        done, _ = await asyncio.wait(operations)  # type: ignore
+        done, _ = await asyncio.wait(operations)
         for task in done:
             if task.exception() is not None:  # pragma: no cover
                 logger.error("Error fetching find metadata", exc_info=task.exception())

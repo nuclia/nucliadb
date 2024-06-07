@@ -124,7 +124,7 @@ async def test_get_configuration(async_client):
     )
     resp = mock.Mock()
     resp.raise_for_status.return_value = None
-    resp.json.return_value = lconfig.dict()
+    resp.json.return_value = lconfig.model_dump()
     async_client.get.return_value = resp
 
     resp = await get_configuration("kbid")

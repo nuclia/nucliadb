@@ -31,7 +31,7 @@ from nats.aio.client import Client
 from nats.aio.errors import ErrConnectionClosed, ErrNoServers, ErrTimeout
 from nats.aio.msg import Msg
 from nats.aio.subscription import Subscription
-from nats.js.client import JetStreamContext  # type: ignore
+from nats.js.client import JetStreamContext
 from nats.js.manager import JetStreamManager
 
 from nucliadb_utils import logger

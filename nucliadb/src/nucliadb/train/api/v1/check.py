@@ -19,7 +19,7 @@
 #
 
 from fastapi import Request
-from fastapi_versioning import version  # type: ignore
+from fastapi_versioning import version
 
 from nucliadb.train.api.utils import get_kb_partitions
 from nucliadb.train.api.v1.router import KB_PREFIX, api

@@ -50,7 +50,7 @@ class BasicAuditStorage(AuditStorage):
         field_metadata: Optional[List[FieldID]] = None,
         audit_fields: Optional[List[AuditField]] = None,
         kb_counter: Optional[AuditKBCounter] = None,
-    ):  # type: ignore
+    ):
         logger.debug(
             f"AUDIT {audit_type} {kbid} {user} {origin} {rid} {audit_fields} {kb_counter}"
         )

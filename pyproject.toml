@@ -18,7 +18,6 @@ dev = [
     # Linting
     "mypy-protobuf>=3.6.0",
     "mypy==1.10",
-    "flake8==7.0.0",
     "ruff==0.3.5",
     "black==24.3.0",
     "isort==5.10.1",

@@ -13,15 +13,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  pre-checks:
-    strategy:
-      matrix:
-        python-version: ["3.9", "3.12"]
-    uses: ./.github/workflows/_component_prechecks.yml
-    with:
-      python_version: "${{ matrix.python-version }}"
-      component: "nucliadb_dataset"
-
   # Job to run tests
   tests:
     name: NucliaDBDatasetTests
@@ -51,7 +42,6 @@ jobs:
             nucliadb_node_modified:
               - 'nucliadb_core/**'
               - 'nucliadb_node/src/**'
-              - 'nucliadb_paragraphs2/**'
               - 'nucliadb_paragraphs3/**'
               - 'nucliadb_procs/**'
               - 'nucliadb_relations2/**'

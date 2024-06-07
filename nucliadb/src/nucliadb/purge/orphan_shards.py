@@ -19,11 +19,11 @@
 
 import argparse
 import asyncio
+import importlib.metadata
 from dataclasses import dataclass
 from typing import Optional
 
-import pkg_resources
-from grpc.aio import AioRpcError  # type: ignore
+from grpc.aio import AioRpcError
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster import manager
@@ -264,6 +264,6 @@ async def main():
 def run() -> int:  # pragma: no cover
     setup_logging()
 
-    errors.setup_error_handling(pkg_resources.get_distribution("nucliadb").version)
+    errors.setup_error_handling(importlib.metadata.distribution("nucliadb").version)
 
     return asyncio.run(main())

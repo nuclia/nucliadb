@@ -3,7 +3,6 @@ install-dev:
 	pip install --upgrade pip wheel
 	cd .. && pip install \
 		-r test-requirements.txt \
-		-r code-requirements.txt \
 		-r nucliadb_dataset/requirements-sources.txt \
 		-r nucliadb_dataset/requirements.txt \
 		-r nucliadb_dataset/requirements-test.txt
@@ -13,10 +12,11 @@ install-dev:
 format:
 	cd .. && isort --profile black nucliadb_dataset
 	black .
+	ruff check --fix --config=../ruff.toml .
 
 .PHONY: lint
 lint:
-	flake8 . --config=setup.cfg
+	ruff check --config=../ruff.toml .
 	cd .. && isort -c --profile black nucliadb_dataset
 	black --check .
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini .

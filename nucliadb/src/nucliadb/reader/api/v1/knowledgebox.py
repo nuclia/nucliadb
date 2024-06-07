@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from fastapi import HTTPException
-from fastapi_versioning import version  # type: ignore
+from fastapi_versioning import version
 from starlette.requests import Request
 
 from nucliadb.common import datamanagers
@@ -49,7 +49,7 @@ async def get_kbs(request: Request, prefix: str = "") -> KnowledgeBoxList:
     async with driver.transaction() as txn:
         response = KnowledgeBoxList()
         async for kbid, slug in datamanagers.kb.get_kbs(txn, prefix=prefix):
-            response.kbs.append(KnowledgeBoxObjSummary(slug=slug or None, uuid=kbid))  # type: ignore
+            response.kbs.append(KnowledgeBoxObjSummary(slug=slug or None, uuid=kbid))
         return response
 
 
@@ -71,7 +71,7 @@ async def get_kb(request: Request, kbid: str) -> KnowledgeBoxObj:
 
         return KnowledgeBoxObj(
             uuid=kbid,
-            slug=kb_config.slug,  # type: ignore
+            slug=kb_config.slug,
             config=KnowledgeBoxConfig.from_message(kb_config),
         )
 
@@ -98,6 +98,6 @@ async def get_kb_by_slug(request: Request, slug: str) -> KnowledgeBoxObj:
 
         return KnowledgeBoxObj(
             uuid=kbid,
-            slug=kb_config.slug,  # type: ignore
+            slug=kb_config.slug,
             config=KnowledgeBoxConfig.from_message(kb_config),
         )

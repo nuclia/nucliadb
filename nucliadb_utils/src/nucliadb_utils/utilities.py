@@ -280,7 +280,7 @@ async def start_transaction_utility(
         )
         await transaction_utility.initialize(service_name)
     set_utility(Utility.TRANSACTION, transaction_utility)
-    return transaction_utility  # type: ignore
+    return transaction_utility
 
 
 def get_transaction_utility() -> TransactionUtility:

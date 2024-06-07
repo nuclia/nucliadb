@@ -283,8 +283,8 @@ SUMMARIZE = Docstring(
             description="Get a summary of a document or a list of documents",
             code=""">>> summary = sdk.summarize(kbid="mykbid", resources=["uuid1"]).summary
 >>> print(summary)
-'The document talks about Seville and its temperature. It also mentions the coldest month of the year, which is January.'  # noqa
-""",
+'The document talks about Seville and its temperature. It also mentions the coldest month of the year, which is January.'
+""",  # noqa: E501
         ),
     ],
 )
@@ -438,7 +438,7 @@ def _inject_signature_and_annotations(
                 path_param, kind=inspect.Parameter.KEYWORD_ONLY, annotation=str
             )
         )
-        annotations[path_param] = str  # type: ignore
+        annotations[path_param] = str
 
     # Body params
     if request_type is not None:

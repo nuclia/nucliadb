@@ -115,9 +115,9 @@ async def test_prioritary_indexing_on_one_shard(
     mock = AsyncMock(side_effect=side_effect)
     with patch("nucliadb_sidecar.indexer.PriorityIndexer._index_message", new=mock):
         for i in range(3):
-            await send_indexing_message(worker, processor_index, node)  # type: ignore
+            await send_indexing_message(worker, processor_index, node)
         for i in range(3):
-            await send_indexing_message(worker, writer_index, node)  # type: ignore
+            await send_indexing_message(worker, writer_index, node)
 
         processing = True
         start = datetime.now()
@@ -317,7 +317,7 @@ async def test_indexing_publishes_to_sidecar_index_stream(worker, shard: str, na
     waiting_task = asyncio.create_task(wait_for_indexed_message("kb"))
     await asyncio.sleep(0.01)
 
-    await send_indexing_message(worker, indexpb, node_id)  # type: ignore
+    await send_indexing_message(worker, indexpb, node_id)
 
     msg = await waiting_task
     assert msg is not None, "Message has not been received"

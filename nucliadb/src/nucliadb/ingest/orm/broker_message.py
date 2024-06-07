@@ -136,7 +136,7 @@ class _BrokerMessageBuilder:
     ):
         etw = ExtractedTextWrapper()
         etw.field.field = field_id
-        etw.field.field_type = type_id  # type: ignore
+        etw.field.field_type = type_id
         extracted_text = await field.get_extracted_text()
         if extracted_text is not None:
             etw.body.CopyFrom(extracted_text)
@@ -150,13 +150,13 @@ class _BrokerMessageBuilder:
     ):
         fcmw = FieldComputedMetadataWrapper()
         fcmw.field.field = field_id
-        fcmw.field.field_type = type_id  # type: ignore
+        fcmw.field.field_type = type_id
 
         field_metadata = await field.get_field_metadata()
         if field_metadata is not None:
             fcmw.metadata.CopyFrom(field_metadata)
             fcmw.field.field = field_id
-            fcmw.field.field_type = type_id  # type: ignore
+            fcmw.field.field_type = type_id
             self.bm.field_metadata.append(fcmw)
             # Make sure cloud files are removed for exporting
 
@@ -171,7 +171,7 @@ class _BrokerMessageBuilder:
             return
         evw = ExtractedVectorsWrapper()
         evw.field.field = field_id
-        evw.field.field_type = type_id  # type: ignore
+        evw.field.field_type = type_id
         evw.vectors.CopyFrom(vo)
         self.bm.field_vectors.append(evw)
 
@@ -186,6 +186,6 @@ class _BrokerMessageBuilder:
             return
         lcmw = LargeComputedMetadataWrapper()
         lcmw.field.field = field_id
-        lcmw.field.field_type = type_id  # type: ignore
+        lcmw.field.field_type = type_id
         lcmw.real.CopyFrom(lcm)
         self.bm.field_large_metadata.append(lcmw)

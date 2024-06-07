@@ -22,7 +22,7 @@ from datetime import datetime
 from typing import List, Optional
 
 import backoff
-import mmh3  # type: ignore
+import mmh3
 import nats
 from google.protobuf.timestamp_pb2 import Timestamp
 from nucliadb_protos.audit_pb2 import (

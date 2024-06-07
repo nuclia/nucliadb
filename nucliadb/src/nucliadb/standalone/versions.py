@@ -18,10 +18,10 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import enum
+import importlib.metadata
 import logging
 from typing import Optional
 
-import pkg_resources
 from cachetools import TTLCache
 
 from nucliadb.common.http_clients.pypi import PyPi
@@ -65,14 +65,24 @@ def is_newer_release(installed: str, latest: str) -> bool:
     >>> is_newer_release("1.2.3", "1.2.3.post1")
     False
     """
-    parsed_installed = pkg_resources.parse_version(_release(installed))
-    parsed_latest = pkg_resources.parse_version(_release(latest))
+
+    def parse_version(version: str) -> tuple[int, int, int]:
+        parts = version.split(".")
+        if len(parts) > 3:
+            raise ValueError(f"Invalid version string: {version}")
+        major = int(parts[0]) if len(parts) >= 1 else 0
+        minor = int(parts[1]) if len(parts) >= 2 else 0
+        patch = int(parts[2]) if len(parts) == 3 else 0
+        return (major, minor, patch)
+
+    parsed_installed = parse_version(_release(installed))
+    parsed_latest = parse_version(_release(latest))
     return parsed_latest > parsed_installed
 
 
 def _release(version: str) -> str:
     """
-    Strips the .postX part of the version so that wecan compare major.minor.patch only.
+    Strips the .postX part of the version so that we can compare major.minor.patch only.
 
     >>> _release("1.2.3")
     '1.2.3'
@@ -83,7 +93,7 @@ def _release(version: str) -> str:
 
 
 def get_installed_version(package_name: str) -> str:
-    return pkg_resources.get_distribution(package_name).version
+    return importlib.metadata.distribution(package_name).version
 
 
 async def get_latest_version(package: str) -> Optional[str]:

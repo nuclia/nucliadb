@@ -64,7 +64,7 @@ async def reader_api(test_settings_reader: None, local_files):  # type: ignore
         client_base_url = "http://test"
         client_base_url = f"{client_base_url}/{API_PREFIX}/v{version}"
 
-        client = AsyncClient(app=application, base_url=client_base_url)  # type: ignore
+        client = AsyncClient(app=application, base_url=client_base_url)
         client.headers["X-NUCLIADB-ROLES"] = ";".join([role.value for role in roles])
         client.headers["X-NUCLIADB-USER"] = user
 

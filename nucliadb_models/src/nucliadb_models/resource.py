@@ -293,7 +293,7 @@ class ResourceData(BaseModel):
     generics: Optional[Dict[str, GenericFieldData]] = None
 
 
-class QueueType(str, Enum):  # type: ignore
+class QueueType(str, Enum):
     PRIVATE = "private"
     SHARED = "shared"
 

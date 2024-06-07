@@ -35,8 +35,7 @@ from nucliadb.reader.api.models import FIELD_NAMES_TO_PB_TYPE_MAP
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires_one
-from nucliadb_utils.storages.storage import StorageField  # type: ignore
-from nucliadb_utils.storages.utils import ObjectMetadata, Range
+from nucliadb_utils.storages.storage import ObjectMetadata, Range, StorageField
 from nucliadb_utils.utilities import get_storage
 
 from .router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api

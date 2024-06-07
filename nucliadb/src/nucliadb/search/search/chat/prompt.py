@@ -519,7 +519,7 @@ async def get_extra_chars(
                 paragraphs=[(paragraph, new_text)],
             )
         else:
-            resources[rid].paragraphs.append((paragraph, new_text))  # type: ignore
+            resources[rid].paragraphs.append((paragraph, new_text))
 
     for values in resources.values():
         title_text = values.title

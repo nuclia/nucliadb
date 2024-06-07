@@ -214,7 +214,7 @@ async def start_consumer(
         name=f"{task_name}_consumer",
         stream=task.stream,
         callback=task.callback,  # type: ignore
-        msg_type=task.msg_type,  # type: ignore
+        msg_type=task.msg_type,
         max_concurrent_messages=task.max_concurrent_messages,
     )
     await consumer.initialize(context)

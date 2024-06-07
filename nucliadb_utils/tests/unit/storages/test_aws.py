@@ -55,6 +55,6 @@ def response_generator():
                     "Code": error_code,
                 }
             }
-            super().__init__(error_response=response, operation_name="TEST")  # type: ignore
+            super().__init__(error_response=response, operation_name="TEST")
 
     yield TestError

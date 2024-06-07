@@ -48,7 +48,7 @@ class NatsTaskProducer:
         )
         self.initialized = True
 
-    async def __call__(self, msg: MsgType) -> int:  # type: ignore
+    async def __call__(self, msg: MsgType) -> int:
         """
         Publish message to the producer's nats stream.
         Returns the sequence number of the published message.

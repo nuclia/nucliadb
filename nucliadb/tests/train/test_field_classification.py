@@ -65,7 +65,7 @@ async def test_generator_field_classification(
 
     for labels, expected_batches, expected_total in tests:
         trainset.filter.ClearField("labels")
-        trainset.filter.labels.extend(labels)  # type: ignore
+        trainset.filter.labels.extend(labels)
 
         async with train_rest_api.post(
             f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset/{partition_id}",

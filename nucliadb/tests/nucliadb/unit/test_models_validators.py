@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # Copyright (C) 2021 Bosutech XXI S.L.
 #
 # nucliadb is offered under the AGPL v3.0 and as commercial software.
@@ -18,20 +20,14 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+# XXX: this should be in nucliadb_models/tests if we create them at some point
 
 import pytest
-from nucliadb_protos.writer_pb2 import ListMembersRequest, Member
-from tests.ingest.fixtures import IngestFixture
+from pydantic_core import ValidationError
 
-from nucliadb_protos import writer_pb2_grpc
+from nucliadb_models.metadata import UserMetadata
 
 
-@pytest.mark.asyncio
-async def test_list_members(grpc_servicer: IngestFixture):
-    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
-
-    response = await stub.ListMembers(ListMembersRequest())  # type: ignore
-
-    for member in response.members:
-        assert member.type == Member.Type.IO
-        assert isinstance(member.shard_count, int)
+def test_relation_validator():
+    with pytest.raises(ValidationError):
+        UserMetadata(relations=["my-wrong-relation"])

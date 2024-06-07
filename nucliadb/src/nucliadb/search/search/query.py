@@ -115,7 +115,7 @@ class QueryParser:
         key_filters: Optional[list[str]] = None,
         security: Optional[RequestSecurity] = None,
         generative_model: Optional[str] = None,
-        rephrase: Optional[bool] = False,
+        rephrase: bool = False,
         max_tokens: Optional[MaxTokens] = None,
     ):
         self.kbid = kbid
@@ -438,7 +438,7 @@ class QueryParser:
                 query_info_result = await self._get_query_information()
                 if query_info_result.entities:
                     detected_entities = convert_relations(
-                        query_info_result.entities.dict()
+                        query_info_result.entities.model_dump()
                     )
                 else:
                     detected_entities = []

@@ -295,7 +295,7 @@ async def catalog(
     """
     try:
         sort = item.sort
-        if item.sort is None:
+        if sort is None:
             # By default we sort by creation date (most recent first)
             sort = SortOptions(
                 field=SortField.CREATED,
@@ -479,7 +479,7 @@ async def search(
         show=item.show,
         field_type_filter=item.field_type_filter,
         extracted=item.extracted,
-        sort=query_parser.sort,
+        sort=query_parser.sort,  # type: ignore
         requested_relations=pb_query.relation_subgraph,
         min_score=query_parser.min_score,
         highlight=item.highlight,

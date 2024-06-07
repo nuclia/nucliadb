@@ -20,7 +20,7 @@
 from typing import Iterable, List
 from urllib.parse import urlparse
 
-import prometheus_client  # type: ignore
+import prometheus_client
 from fastapi import FastAPI
 from opentelemetry.instrumentation.fastapi import (  # type: ignore
     _get_default_span_details,
@@ -51,7 +51,7 @@ async def metrics_endpoint(request):
     )
 
 
-application_metrics = FastAPI(title="Metrics")  # type: ignore
+application_metrics = FastAPI(title="Metrics")
 application_metrics.add_route("/metrics", metrics_endpoint)
 
 
@@ -93,9 +93,9 @@ def instrument_app(
     if tracer_provider is not None:
         app.add_middleware(
             OpenTelemetryMiddleware,
-            excluded_urls=excluded_urls_obj,  # type: ignore
+            excluded_urls=excluded_urls_obj,
             default_span_details=_get_default_span_details,
-            server_request_hook=server_request_hook,  # type: ignore
+            server_request_hook=server_request_hook,
             tracer_provider=tracer_provider,
         )
 

@@ -32,8 +32,7 @@ from opentelemetry.instrumentation.utils import (
 )
 from opentelemetry.propagators.textmap import Getter, Setter
 from opentelemetry.semconv.trace import SpanAttributes
-from opentelemetry.trace import Span  # type: ignore
-from opentelemetry.trace import format_trace_id, set_span_in_context
+from opentelemetry.trace import Span, format_trace_id, set_span_in_context
 from opentelemetry.trace.status import Status, StatusCode
 from opentelemetry.util.http import (
     OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SANITIZE_FIELDS,
@@ -262,8 +261,8 @@ class OpenTelemetryMiddleware:
     requests it is invoked with.
     Args:
         app: The ASGI application callable to forward requests to.
-        default_span_details: Callback which should return a string and a tuple, representing the desired default span name and a
-                      dictionary with any additional span attributes to set.
+        default_span_details: Callback which should return a string and a tuple, representing the desired default
+                      span name and a dictionary with any additional span attributes to set.
                       Optional: Defaults to get_default_span_details.
         server_request_hook: Optional callback which is called with the server span and ASGI
                       scope object for every incoming request.

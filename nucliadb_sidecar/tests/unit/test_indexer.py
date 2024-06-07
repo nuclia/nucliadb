@@ -294,7 +294,7 @@ class TestPriorityIndexer:
         work.seqid = 10
         await indexer._do_work(work)
 
-        assert writer.set_resource_from_storage.await_count == 1  # type: ignore
+        assert writer.set_resource_from_storage.await_count == 1
         assert successful_indexing.dispatch.await_count == 1
         assert successful_indexing.dispatch.await_args.args[0].seqid == 10
 

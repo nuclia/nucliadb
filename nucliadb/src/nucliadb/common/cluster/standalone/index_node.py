@@ -20,10 +20,7 @@
 from typing import Any, Optional
 
 from nucliadb.common.cluster.base import AbstractIndexNode
-from nucliadb.common.cluster.grpc_node_dummy import (  # type: ignore
-    DummyReaderStub,
-    DummyWriterStub,
-)
+from nucliadb.common.cluster.grpc_node_dummy import DummyReaderStub, DummyWriterStub
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.cluster.standalone import grpc_node_binding
 from nucliadb_protos import standalone_pb2, standalone_pb2_grpc
@@ -79,7 +76,7 @@ class ProxyCallerWrapper:
         else:
             grpc_address = address
         self._channel = get_traced_grpc_channel(grpc_address, "standalone_proxy")
-        self._stub = standalone_pb2_grpc.StandaloneClusterServiceStub(self._channel)  # type: ignore
+        self._stub = standalone_pb2_grpc.StandaloneClusterServiceStub(self._channel)
 
     def __getattr__(self, name):
         async def call(request):

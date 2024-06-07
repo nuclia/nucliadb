@@ -21,7 +21,7 @@
 
 from fastapi import HTTPException, Request
 from fastapi.responses import StreamingResponse
-from fastapi_versioning import version  # type: ignore
+from fastapi_versioning import version
 
 from nucliadb.train.api.utils import get_kb_partitions, get_train
 from nucliadb.train.api.v1.router import KB_PREFIX, api

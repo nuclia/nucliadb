@@ -673,7 +673,7 @@ class MinScore(BaseModel):
     bm25: float = Field(
         default=0,
         title="Minimum bm25 score",
-        description="Minimum score used to filter bm25 index search. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/docs/using/search/#minimum-score",
+        description="Minimum score used to filter bm25 index search. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/docs/using/search/#minimum-score",  # noqa: E501
         ge=0,
     )
 
@@ -736,7 +736,7 @@ class BaseSearchRequest(BaseModel):
         SearchParamDefaults.security.to_pydantic_field()
     )
 
-    rephrase: Optional[bool] = Field(
+    rephrase: bool = Field(
         default=False,
         title="Rephrase the query to improve search",
         description="Consume LLM tokens to rephrase the query so the semantic search is better",
@@ -833,7 +833,7 @@ class ChatModel(BaseModel):
     generative_model: Optional[str] = Field(
         default=None,
         title="Generative model",
-        description="The generative model to use for the predict chat endpoint. If not provided, the model configured for the Knowledge Box is used.",
+        description="The generative model to use for the predict chat endpoint. If not provided, the model configured for the Knowledge Box is used.",  # noqa: E501
     )
 
     max_tokens: Optional[int] = Field(
@@ -859,7 +859,7 @@ class RephraseModel(BaseModel):
     generative_model: Optional[str] = Field(
         default=None,
         title="Generative model",
-        description="The generative model to use for the rephrase endpoint. If not provided, the model configured for the Knowledge Box is used.",
+        description="The generative model to use for the rephrase endpoint. If not provided, the model configured for the Knowledge Box is used.",  # noqa: E501
     )
 
 
@@ -1055,7 +1055,7 @@ class ChatRequest(BaseModel):
     generative_model: Optional[str] = Field(
         default=None,
         title="Generative model",
-        description="The generative model to use for the chat endpoint. If not provided, the model configured for the Knowledge Box is used.",
+        description="The generative model to use for the chat endpoint. If not provided, the model configured for the Knowledge Box is used.",  # noqa: E501
     )
 
     max_tokens: Optional[Union[int, MaxTokens]] = Field(
@@ -1064,7 +1064,7 @@ class ChatRequest(BaseModel):
         description="Use to limit the amount of tokens used in the LLM context and/or for generating the answer. If not provided, the default maximum tokens of the generative model will be used. If an integer is provided, it is interpreted as the maximum tokens for the answer.",  # noqa
     )
 
-    rephrase: Optional[bool] = Field(
+    rephrase: bool = Field(
         default=False,
         title="Rephrase the query to improve search",
         description="Consume LLM tokens to rephrase the query so the semantic search is better",
@@ -1076,32 +1076,30 @@ class ChatRequest(BaseModel):
         description="If set to true, the response will be in markdown format",
     )
 
-    @model_validator(mode="before")
+    @field_validator("rag_strategies", mode="before")
     @classmethod
-    def rag_features_validator(cls, values):
-        chosen_strategies = []
-        for s in values.get("rag_strategies") or []:
-            if not isinstance(s, dict):
+    def validate_rag_strategies(
+        cls, rag_strategies: list[RagStrategies]
+    ) -> list[RagStrategies]:
+        unique_strategy_names: set[str] = set()
+        for strategy in rag_strategies or []:
+            if not isinstance(strategy, dict):
                 raise ValueError("RAG strategies must be defined using an object")
-            strategy = s.get("name", None)
-            if strategy is None:
-                raise ValueError(f"Invalid strategy '{s}'")
-            chosen_strategies.append(strategy)
-
-        # There must be at most one strategy of each type
-        if len(chosen_strategies) > len(set(chosen_strategies)):
+            strategy_name = strategy.get("name")
+            if strategy_name is None:
+                raise ValueError(f"Invalid strategy '{strategy}'")
+            unique_strategy_names.add(strategy_name)
+        if len(unique_strategy_names) != len(rag_strategies):
             raise ValueError("There must be at most one strategy of each type")
-
         # If full resource strategy is chosen, it must be the only strategy
         if (
-            RagStrategyName.FULL_RESOURCE in chosen_strategies
-            and len(chosen_strategies) > 1
+            RagStrategyName.FULL_RESOURCE in unique_strategy_names
+            and len(rag_strategies) > 1
         ):
             raise ValueError(
                 f"If '{RagStrategyName.FULL_RESOURCE}' strategy is chosen, it must be the only strategy"
             )
-
-        return values
+        return rag_strategies
 
 
 class SummarizeResourceModel(BaseModel):
@@ -1132,7 +1130,7 @@ class SummarizeRequest(BaseModel):
     generative_model: Optional[str] = Field(
         default=None,
         title="Generative model",
-        description="The generative model to use for the summarization. If not provided, the model configured for the Knowledge Box is used.",
+        description="The generative model to use for the summarization. If not provided, the model configured for the Knowledge Box is used.",  # noqa: E501
     )
 
     user_prompt: Optional[str] = Field(
@@ -1146,7 +1144,7 @@ class SummarizeRequest(BaseModel):
         min_length=1,
         max_length=100,
         title="Resources",
-        description="Uids or slugs of the resources to summarize. If the resources are not found, they will be ignored.",
+        description="Uids or slugs of the resources to summarize. If the resources are not found, they will be ignored.",  # noqa: E501
     )
 
     summary_kind: SummaryKind = Field(

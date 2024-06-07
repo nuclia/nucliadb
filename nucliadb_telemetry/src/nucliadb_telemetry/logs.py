@@ -43,7 +43,7 @@ from . import context
 try:
     from uvicorn.logging import AccessFormatter  # type: ignore
 except ImportError:  # pragma: no cover
-    AccessFormatter = logging.Formatter  # type: ignore
+    AccessFormatter = logging.Formatter
 
 _BUILTIN_ATTRS = set(
     [
@@ -97,7 +97,7 @@ class JSONFormatter(logging.Formatter):
         if isinstance(record.msg, dict):
             extra = record.msg
         elif isinstance(record.msg, pydantic.BaseModel):
-            extra = record.msg.dict()
+            extra = record.msg.model_dump()
         else:
             extra = {"message": record.getMessage()}
         extra.update(extra_from_record(record))

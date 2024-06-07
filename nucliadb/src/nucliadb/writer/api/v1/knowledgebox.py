@@ -63,7 +63,7 @@ async def create_kb(request: Request, item: KnowledgeBoxConfig):
     if item.slug != "":
         slug = item.slug
     else:
-        slug = kbobj.uuid  # type: ignore
+        slug = kbobj.uuid
     if kbobj.status == KnowledgeBoxResponseStatus.OK:
         return KnowledgeBoxObj(uuid=kbobj.uuid, slug=slug)
     elif kbobj.status == KnowledgeBoxResponseStatus.CONFLICT:
