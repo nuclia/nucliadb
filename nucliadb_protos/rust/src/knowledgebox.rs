@@ -14,19 +14,19 @@ pub struct KnowledgeBoxConfig {
     pub title: ::prost::alloc::string::String,
     #[prost(string, tag = "2")]
     pub description: ::prost::alloc::string::String,
+    #[prost(string, tag = "5")]
+    pub slug: ::prost::alloc::string::String,
+    #[prost(int64, tag = "7")]
+    pub migration_version: i64,
     #[deprecated]
     #[prost(string, repeated, tag = "3")]
     pub enabled_filters: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[deprecated]
     #[prost(string, repeated, tag = "4")]
     pub enabled_insights: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
-    #[prost(string, tag = "5")]
-    pub slug: ::prost::alloc::string::String,
     #[deprecated]
     #[prost(bool, tag = "6")]
     pub disable_vectors: bool,
-    #[prost(int64, tag = "7")]
-    pub migration_version: i64,
     /// DEPRECATED: duplicated field also stored in `writer.proto Shards`
     #[deprecated]
     #[prost(enumeration = "super::utils::ReleaseChannel", tag = "8")]
