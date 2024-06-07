@@ -146,6 +146,8 @@ async def test_file_tus_upload_and_download(
 
     # Make sure the upload is finished on the server side
     assert resp.headers["Tus-Upload-Finished"] == "1"
+    assert "NDB-Resource" in resp.headers
+    assert "NDB-Field" in resp.headers
 
     # Now download the file
     download_url = f"{kb_path}/{RESOURCE_PREFIX}/{resource}/file/field1/download/field"

@@ -465,7 +465,7 @@ async def _tus_patch(
     field: Optional[str] = None,
 ) -> Response:
     """
-    Upload all bytes in the requests and append them in the specifyied offset
+    Upload all bytes in the requests and append them in the specified offset
     """
     if rid is not None:
         await validate_rid_exists_or_raise_error(kbid, rid)
@@ -521,7 +521,6 @@ async def _tus_patch(
     }
 
     upload_finished = dm.get("size") is not None and dm.offset >= dm.get("size")
-
     if upload_finished:
         rid = dm.get("rid", rid)
         if rid is None:

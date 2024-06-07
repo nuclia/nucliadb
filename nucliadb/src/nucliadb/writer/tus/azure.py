@@ -81,7 +81,7 @@ class AzureFileStorageManager(FileStorageManager):
             size=dm.size,
         )
         await self.object_store.upload_multipart_start(bucket, path, metadata)
-        await dm.update(path=path)
+        await dm.update(path=path, bucket=bucket)
 
     async def delete_upload(self, uri: str, kbid: str) -> None:
         bucket = self.storage.get_bucket_name(kbid)
@@ -94,12 +94,15 @@ class AzureFileStorageManager(FileStorageManager):
             )
 
     async def append(self, dm: FileDataManager, iterable, offset: int) -> int:
-        assert self.object_store is not None
         bucket = dm.get("bucket")
         assert bucket is not None
         path = dm.get("path")
         assert path is not None
-        return await self.object_store.upload_multipart_append(bucket, path, iterable)
+        uploaded_bytes = await self.object_store.upload_multipart_append(
+            bucket, path, iterable
+        )
+        await dm.update(offset=offset)
+        return uploaded_bytes
 
     async def finish(self, dm: FileDataManager):
         path = dm.get("path")
