@@ -44,8 +44,10 @@ class AzureBlobStore(BlobStore):
             logger.exception("Error closing AzureBlobStore")
 
     async def initialize(self, connection_string: str):
+        self.bucket = "nucliadb-{kbid}"
         self.source = CloudFile.Source.AZURE
         self.object_store = AzureObjectStore(connection_string)
+        await self.object_store.initialize()
 
     async def check_exists(self, bucket_name: str) -> bool:
         assert self.object_store is not None
