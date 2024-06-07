@@ -15,9 +15,7 @@ dev = [
     # Linting
     "mypy-protobuf>=3.6.0",
     "mypy==1.10",
-    "ruff==0.3.5",
-    "black==24.3.0",
-    "isort==5.10.1",
+    "ruff==0.4.8",
     "pre-commit==2.20.0",
     # Testing
     "pytest==7.4.2",
