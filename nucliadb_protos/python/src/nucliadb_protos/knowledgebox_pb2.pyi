@@ -162,6 +162,7 @@ class KnowledgeBoxNew(google.protobuf.message.Message):
     learning_config: builtins.str
     """this field are only used by NucliaDB Writer API when creating a KB. Used
     in onprem scenarios
+    DEPRECATED: onprem don't forward requests to ingest gRPC anymore
     """
     release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType
     """release channel, although not used when backend creates hosted KBs, it's

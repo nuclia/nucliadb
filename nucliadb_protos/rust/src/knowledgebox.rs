@@ -53,6 +53,8 @@ pub struct KnowledgeBoxNew {
     pub matryoshka_dimensions: ::prost::alloc::vec::Vec<u32>,
     /// this field are only used by NucliaDB Writer API when creating a KB. Used
     /// in onprem scenarios
+    /// DEPRECATED: onprem don't forward requests to ingest gRPC anymore
+    #[deprecated]
     #[prost(string, tag = "8")]
     pub learning_config: ::prost::alloc::string::String,
     /// release channel, although not used when backend creates hosted KBs, it's

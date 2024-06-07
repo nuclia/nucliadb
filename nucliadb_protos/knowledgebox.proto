@@ -51,7 +51,8 @@ message KnowledgeBoxNew {
 
     // this field are only used by NucliaDB Writer API when creating a KB. Used
     // in onprem scenarios
-    string learning_config = 8;
+    // DEPRECATED: onprem don't forward requests to ingest gRPC anymore
+    string learning_config = 8 [deprecated = true];
 
     // release channel, although not used when backend creates hosted KBs, it's
     // recomputed and changed depending on the environment
