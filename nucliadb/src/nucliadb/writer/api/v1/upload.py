@@ -31,7 +31,7 @@ from fastapi.params import Header
 from fastapi.requests import Request
 from fastapi.responses import Response
 from fastapi_versioning import version
-from nucliadb_protos.resources_pb2 import FieldFile, Metadata, CloudFile
+from nucliadb_protos.resources_pb2 import CloudFile, FieldFile, Metadata
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from starlette.requests import Request as StarletteRequest
 

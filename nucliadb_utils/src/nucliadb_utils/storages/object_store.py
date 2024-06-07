@@ -63,7 +63,7 @@ class ObjectStore(abc.ABC, metaclass=abc.ABCMeta):
         ...
 
     @abc.abstractmethod
-    async def bucket_schedule_delete(self, bucket: str) -> None:
+    async def bucket_schedule_delete(self, bucket: str) -> bool:
         """
         Mark a bucket for deletion. The bucket will be deleted asynchronously.
         """
