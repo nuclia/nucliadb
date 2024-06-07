@@ -54,30 +54,20 @@ def test_security_search(sdk: nucliadb_sdk.NucliaDB, kb: KnowledgeBoxObj):
 
     # Create some public news resources
     for i, text in enumerate(PUBLIC_NEWS):
-        sdk.create_resource(
-            kbid=kb.uuid, title=f"News {i}", summary=text, security=None
-        )
+        sdk.create_resource(kbid=kb.uuid, title=f"News {i}", summary=text, security=None)
 
     # Only legal group has access to any classified info
-    results = sdk.find(
-        kbid=kb.uuid, query="Classified", security=RequestSecurity(groups=[sales_group])
-    )
+    results = sdk.find(kbid=kb.uuid, query="Classified", security=RequestSecurity(groups=[sales_group]))
     assert len(results.resources) == 0
 
-    results = sdk.find(
-        kbid=kb.uuid, query="Classified", security=RequestSecurity(groups=[legal_group])
-    )
+    results = sdk.find(kbid=kb.uuid, query="Classified", security=RequestSecurity(groups=[legal_group]))
     assert len(results.resources) == 2
 
     # Public news are accessible to everyone
-    results = sdk.find(
-        kbid=kb.uuid, query="News", security=RequestSecurity(groups=[sales_group])
-    )
+    results = sdk.find(kbid=kb.uuid, query="News", security=RequestSecurity(groups=[sales_group]))
     assert len(results.resources) == 2
 
-    results = sdk.find(
-        kbid=kb.uuid, query="News", security=RequestSecurity(groups=[legal_group])
-    )
+    results = sdk.find(kbid=kb.uuid, query="News", security=RequestSecurity(groups=[legal_group]))
     assert len(results.resources) == 2
 
     # Querying without security should return all resources

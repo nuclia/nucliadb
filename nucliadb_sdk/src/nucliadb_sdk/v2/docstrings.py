@@ -405,9 +405,7 @@ def inject_documentation(
 ):
     func.__name__ = name
     _inject_signature_and_annotations(func, path_params, request_type, response_type)
-    _inject_docstring(
-        func, method, path_template, path_params, request_type, response_type, docstring
-    )
+    _inject_docstring(func, method, path_template, path_params, request_type, response_type, docstring)
 
 
 def _inject_signature_and_annotations(
@@ -427,16 +425,12 @@ def _inject_signature_and_annotations(
     annotations = {}
 
     # The first parameter is always self
-    parameters.append(
-        inspect.Parameter("self", kind=inspect.Parameter.POSITIONAL_OR_KEYWORD)
-    )
+    parameters.append(inspect.Parameter("self", kind=inspect.Parameter.POSITIONAL_OR_KEYWORD))
 
     # Path params
     for path_param in path_params:
         parameters.append(
-            inspect.Parameter(
-                path_param, kind=inspect.Parameter.KEYWORD_ONLY, annotation=str
-            )
+            inspect.Parameter(path_param, kind=inspect.Parameter.KEYWORD_ONLY, annotation=str)
         )
         annotations[path_param] = str
 
@@ -470,9 +464,7 @@ def _inject_signature_and_annotations(
         return_annotation = response_type
     annotations["return"] = return_annotation  # type: ignore
 
-    func.__signature__ = inspect.Signature(
-        parameters=parameters, return_annotation=return_annotation
-    )
+    func.__signature__ = inspect.Signature(parameters=parameters, return_annotation=return_annotation)
     func.__annotations__.update(annotations)
 
 
@@ -528,9 +520,7 @@ def _inject_docstring(
     if response_type is not None:
         if inspect.isroutine(response_type):
             return_annotation = typing.get_type_hints(response_type).get("return")
-            return_doc = (
-                f"Parsed response for the {method.upper()} {path_template} endpoint"
-            )
+            return_doc = f"Parsed response for the {method.upper()} {path_template} endpoint"
         else:
             return_annotation = response_type
             if response_type.__doc__:

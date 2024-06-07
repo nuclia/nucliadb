@@ -42,9 +42,7 @@ def test_crud_resource(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaDB):
                 }
             }
         },
-        usermetadata={
-            "classifications": [{"labelset": "labelset", "label": "positive"}]
-        },
+        usermetadata={"classifications": [{"labelset": "labelset", "label": "positive"}]},
         fieldmetadata=[
             {
                 "field": {
@@ -58,9 +56,7 @@ def test_crud_resource(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaDB):
     resource = sdk.get_resource_by_slug(
         kbid=kb.uuid,
         slug="mykey1",
-        query_params={
-            "show": [ResourceProperties.BASIC.value, ResourceProperties.VALUES.value]
-        },
+        query_params={"show": [ResourceProperties.BASIC.value, ResourceProperties.VALUES.value]},
     )
     assert resource.data is not None
     assert resource.data.texts is not None
@@ -77,9 +73,7 @@ def test_crud_resource(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaDB):
     resource = sdk.get_resource_by_slug(
         kbid=kb.uuid,
         slug="mykey1",
-        query_params={
-            "show": [ResourceProperties.BASIC.value, ResourceProperties.VALUES.value]
-        },
+        query_params={"show": [ResourceProperties.BASIC.value, ResourceProperties.VALUES.value]},
     )
     assert resource.data.texts["text"].value.body == "I'm an updated Ramon"
 
@@ -93,9 +87,7 @@ def test_crud_resource(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaDB):
 
 
 def test_modify_resource_slug(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaDB):
-    sdk.create_resource(
-        kbid=kb.uuid, texts={"text": {"body": "I'm Ramon"}}, slug="my-resource"
-    )
+    sdk.create_resource(kbid=kb.uuid, texts={"text": {"body": "I'm Ramon"}}, slug="my-resource")
     resource = sdk.get_resource_by_slug(
         kbid=kb.uuid,
         slug="my-resource",
@@ -111,9 +103,7 @@ def test_modify_resource_slug(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaDB):
     assert resource.slug == "my-new-slug"
 
     # Now by slug
-    sdk.update_resource_by_slug(
-        kbid=kb.uuid, rslug="my-new-slug", slug="my-next-new-slug"
-    )
+    sdk.update_resource_by_slug(kbid=kb.uuid, rslug="my-new-slug", slug="my-next-new-slug")
     resource = sdk.get_resource_by_slug(
         kbid=kb.uuid,
         slug="my-next-new-slug",

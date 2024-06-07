@@ -271,8 +271,6 @@ def test_search_resource(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaDB):
         page_size=0,
     )
     assert (
-        resources.fulltext.facets["/classification.labels/emoji"][
-            "/classification.labels/emoji/0"
-        ]
+        resources.fulltext.facets["/classification.labels/emoji"]["/classification.labels/emoji/0"]
         == 9 * 2
     )
