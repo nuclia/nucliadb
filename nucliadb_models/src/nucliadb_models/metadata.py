@@ -23,6 +23,7 @@ from typing import Any, Dict, List, Optional, Type, TypeVar
 
 from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel, Field, model_validator
+from typing_extensions import Self
 
 from nucliadb_models.common import FIELD_TYPES_MAP
 from nucliadb_protos import resources_pb2, utils_pb2
@@ -133,27 +134,27 @@ class Relation(BaseModel):
     from_: Optional[RelationEntity] = Field(None, alias="from")
     to: RelationEntity
 
-    @model_validator(mode="before")
-    def check_relation_is_valid(cls, values):
-        if values["relation"] == RelationType.CHILD.value:
-            if values["to"].get("type") != RelationNodeType.RESOURCE.value:
+    @model_validator(mode="after")
+    def check_relation_is_valid(self, values) -> Self:
+        if self.relation == RelationType.CHILD.value:
+            if self.to.type != RelationNodeType.RESOURCE.value:
                 raise ValueError(
                     f"When using {RelationType.CHILD.value} relation, only "
                     f"{RelationNodeType.RESOURCE.value} entities can be used"
                 )
-        elif values["relation"] == RelationType.COLAB.value:
-            if values["to"].get("type") != RelationNodeType.USER.value:
+        elif self.relation == RelationType.COLAB.value:
+            if self.to.type != RelationNodeType.USER.value:
                 raise ValueError(
                     f"When using {RelationType.COLAB.value} relation, only "
                     f"{RelationNodeType.USER.value} can be used"
                 )
-        elif values["relation"] == RelationType.ENTITY.value:
-            if values["to"].get("type") != RelationNodeType.ENTITY.value:
+        elif self.relation == RelationType.ENTITY.value:
+            if self.to.type != RelationNodeType.ENTITY.value:
                 raise ValueError(
                     f"When using {RelationType.ENTITY.value} relation, only "
                     f"{RelationNodeType.ENTITY.value} can be used"
                 )
-        return values
+        return self
 
     @classmethod
     def from_message(cls: Type[_T], message: utils_pb2.Relation) -> _T:
