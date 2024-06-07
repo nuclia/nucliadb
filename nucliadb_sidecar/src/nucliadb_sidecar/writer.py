@@ -22,6 +22,7 @@ from typing import Optional
 
 import backoff
 from grpc.aio import AioRpcError
+
 from nucliadb_protos.noderesources_pb2 import (
     EmptyQuery,
     Resource,
@@ -31,7 +32,6 @@ from nucliadb_protos.noderesources_pb2 import (
 )
 from nucliadb_protos.nodewriter_pb2 import IndexMessage, OpStatus
 from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
-
 from nucliadb_sidecar import SERVICE_NAME
 from nucliadb_utils.grpc import get_traced_grpc_channel
 
@@ -42,9 +42,7 @@ class Writer:
 
     def __init__(self, grpc_writer_address: str):
         self.lock = asyncio.Lock()
-        self.channel = get_traced_grpc_channel(
-            grpc_writer_address, SERVICE_NAME, max_send_message=250
-        )
+        self.channel = get_traced_grpc_channel(grpc_writer_address, SERVICE_NAME, max_send_message=250)
         self.stub = NodeWriterStub(self.channel)
 
     async def set_resource(self, pb: Resource) -> OpStatus:
@@ -59,9 +57,7 @@ class Writer:
     async def garbage_collector(self, shard_id: str):
         return await self.stub.GC(ShardId(id=shard_id))  # type: ignore
 
-    @backoff.on_exception(
-        backoff.expo, (AioRpcError,), jitter=backoff.random_jitter, max_tries=4
-    )
+    @backoff.on_exception(backoff.expo, (AioRpcError,), jitter=backoff.random_jitter, max_tries=4)
     async def shards(self) -> ShardIds:
         pb = EmptyQuery()
         return await self.stub.ListShards(pb)  # type: ignore

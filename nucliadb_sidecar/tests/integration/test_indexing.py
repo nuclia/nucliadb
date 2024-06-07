@@ -28,17 +28,17 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from grpc.aio import AioRpcError
+
 from nucliadb_protos.noderesources_pb2 import Resource, Shard, ShardId
 from nucliadb_protos.nodewriter_pb2 import IndexMessage, IndexMessageSource, TypeMessage
 from nucliadb_protos.writer_pb2 import Notification
-from tests.fixtures import Reader
-
 from nucliadb_sidecar import SERVICE_NAME
 from nucliadb_sidecar.pull import Worker
 from nucliadb_sidecar.settings import settings
 from nucliadb_sidecar.signals import SuccessfulIndexingPayload, successful_indexing
 from nucliadb_utils import const
 from nucliadb_utils.utilities import get_pubsub, get_storage
+from tests.fixtures import Reader
 
 TEST_PARTITION = "111"
 
@@ -179,9 +179,7 @@ class TestConcurrentIndexingFailureRecovery:
             )
             index_log.append(entry)
 
-        with self.successful_indexing_context(
-            "test_concurrent_indexing_failure_recovery", on_indexing
-        ):
+        with self.successful_indexing_context("test_concurrent_indexing_failure_recovery", on_indexing):
             yield index_log
 
     @pytest.fixture
@@ -198,13 +196,9 @@ class TestConcurrentIndexingFailureRecovery:
                 return await func(*args, **kwargs)
 
         original_set_resource = worker.writer.set_resource
-        worker.writer.set_resource = partial(
-            run_or_fail, original_set_resource, fail_ratio
-        )
+        worker.writer.set_resource = partial(run_or_fail, original_set_resource, fail_ratio)
         original_delete_resource = worker.writer.delete_resource
-        worker.writer.delete_resource = partial(
-            run_or_fail, original_delete_resource, fail_ratio
-        )
+        worker.writer.delete_resource = partial(run_or_fail, original_delete_resource, fail_ratio)
 
         original_delay = settings.indexer_delay_after_error
         settings.indexer_delay_after_error = 0.5
@@ -216,9 +210,7 @@ class TestConcurrentIndexingFailureRecovery:
         settings.indexer_delay_after_error = original_delay
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize(
-        "bunch_of_shards", ("EXPERIMENTAL", "STABLE"), indirect=True
-    )
+    @pytest.mark.parametrize("bunch_of_shards", ("EXPERIMENTAL", "STABLE"), indirect=True)
     async def test(
         self,
         bunch_of_shards: list[str],
@@ -228,9 +220,7 @@ class TestConcurrentIndexingFailureRecovery:
         index_log,
     ):
         resources_per_shard = 10
-        seqids_by_shard: dict[str, list[int]] = {
-            shard_id: [] for shard_id in bunch_of_shards
-        }
+        seqids_by_shard: dict[str, list[int]] = {shard_id: [] for shard_id in bunch_of_shards}
 
         for shard_id in bunch_of_shards:
             for _ in range(resources_per_shard):
@@ -241,15 +231,9 @@ class TestConcurrentIndexingFailureRecovery:
                 processor_index = await create_indexing_message(
                     resource, "kb", shard_id, node_id, source=IndexMessageSource.WRITER
                 )
-                seqid_writer = await send_indexing_message(
-                    faulty_worker, writer_index, node_id
-                )
-                seqid_processor = await send_indexing_message(
-                    faulty_worker, processor_index, node_id
-                )
-                seqids_by_shard.setdefault(shard_id, []).extend(
-                    [seqid_writer, seqid_processor]
-                )
+                seqid_writer = await send_indexing_message(faulty_worker, writer_index, node_id)
+                seqid_processor = await send_indexing_message(faulty_worker, processor_index, node_id)
+                seqids_by_shard.setdefault(shard_id, []).extend([seqid_writer, seqid_processor])
 
         start = datetime.now()
         while True:
@@ -310,9 +294,7 @@ async def test_indexing_publishes_to_sidecar_index_stream(worker, shard: str, na
     node_id = settings.force_host_id
     assert node_id
 
-    indexpb = await create_indexing_message(
-        resource_payload(shard), "kb", shard, node_id
-    )
+    indexpb = await create_indexing_message(resource_payload(shard), "kb", shard, node_id)
 
     waiting_task = asyncio.create_task(wait_for_indexed_message("kb"))
     await asyncio.sleep(0.01)
@@ -346,9 +328,9 @@ def resource_payload(shard: str) -> Resource:
     pb.paragraphs["title"].paragraphs["title/0-10"].start = 0
     pb.paragraphs["title"].paragraphs["title/0-10"].end = 10
     pb.paragraphs["title"].paragraphs["title/0-10"].field = "title"
-    pb.paragraphs["title"].paragraphs["title/0-10"].sentences[
-        "title/0-10/0-10"
-    ].vector.extend([1.0] * 768)
+    pb.paragraphs["title"].paragraphs["title/0-10"].sentences["title/0-10/0-10"].vector.extend(
+        [1.0] * 768
+    )
     return pb
 
 

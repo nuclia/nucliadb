@@ -20,7 +20,6 @@
 from dataclasses import dataclass
 
 from nucliadb_protos.nodewriter_pb2 import IndexMessage
-
 from nucliadb_utils.signals import Signal
 
 
