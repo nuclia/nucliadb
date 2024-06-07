@@ -29,9 +29,7 @@ from starlette.routing import BaseRoute
 CallableT = TypeVar("CallableT", bound=Callable[..., Any])
 
 
-def version(
-    major: int, minor: int = 0
-) -> Callable[[CallableT], CallableT]:  # pragma: no cover
+def version(major: int, minor: int = 0) -> Callable[[CallableT], CallableT]:  # pragma: no cover
     def decorator(func: CallableT) -> CallableT:
         func._api_version = (major, minor)  # type: ignore
         return func
@@ -75,7 +73,10 @@ def VersionedFastAPI(
         prefix = prefix_format.format(major=major, minor=minor)
         semver = version_format.format(major=major, minor=minor)
         versioned_app = FastAPI(
-            title=app.title, description=app.description, version=semver, **kwargs  # type: ignore
+            title=app.title,
+            description=app.description,
+            version=semver,
+            **kwargs,  # type: ignore
         )
         for route in version_route_mapping[version]:
             for method in route.methods:

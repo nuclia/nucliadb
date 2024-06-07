@@ -55,9 +55,7 @@ class TestNatsConnectionManager:
 
         assert manager.nc == nats_conn
 
-    async def test_lifecycle_finalize(
-        self, manager: nats.NatsConnectionManager, nats_conn, js
-    ):
+    async def test_lifecycle_finalize(self, manager: nats.NatsConnectionManager, nats_conn, js):
         await manager.initialize()
 
         cb = AsyncMock()
@@ -106,9 +104,7 @@ class TestNatsConnectionManager:
         assert manager.healthy()
         assert manager._last_unhealthy is not None
 
-    async def test_unsubscribe(
-        self, manager: nats.NatsConnectionManager, nats_conn, js
-    ):
+    async def test_unsubscribe(self, manager: nats.NatsConnectionManager, nats_conn, js):
         await manager.initialize()
 
         cb = AsyncMock()

@@ -98,9 +98,7 @@ class StorageSettings(BaseSettings):
     s3_max_pool_connections: int = 30
     s3_endpoint: Optional[str] = None
     s3_region_name: Optional[str] = None
-    s3_bucket: Optional[str] = Field(
-        default=None, description="KnowledgeBox S3 bucket name template"
-    )
+    s3_bucket: Optional[str] = Field(default=None, description="KnowledgeBox S3 bucket name template")
     s3_bucket_tags: Dict[str, str] = Field(
         default={},
         description="Map of tags with which S3 buckets will be tagged with: https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketTagging.html",  # noqa
@@ -125,13 +123,9 @@ storage_settings = StorageSettings()
 class NucliaSettings(BaseSettings):
     nuclia_service_account: Optional[str] = None
     nuclia_public_url: str = "https://{zone}.nuclia.cloud"
-    nuclia_processing_cluster_url: str = (
-        "http://processing-api.processing.svc.cluster.local:8080"
-    )
+    nuclia_processing_cluster_url: str = "http://processing-api.processing.svc.cluster.local:8080"
     nuclia_inner_predict_url: str = "http://predict.learning.svc.cluster.local:8080"
-    learning_internal_svc_base_url: str = (
-        "http://{service}.learning.svc.cluster.local:8080"
-    )
+    learning_internal_svc_base_url: str = "http://{service}.learning.svc.cluster.local:8080"
 
     nuclia_zone: str = "europe-1"
     onprem: bool = True

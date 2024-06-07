@@ -108,9 +108,7 @@ class AsyncBenchmarkFixture(object):  # pragma: no cover
             )
         return timer_precision
 
-    async def _make_runner(
-        self, function_to_benchmark: Callable[..., Awaitable[T]], args, kwargs
-    ):
+    async def _make_runner(self, function_to_benchmark: Callable[..., Awaitable[T]], args, kwargs):
         async def runner(loops_range, timer=self._timer):
             gc_enabled = gc.isenabled()
             if self._disable_gc:
@@ -162,8 +160,7 @@ class AsyncBenchmarkFixture(object):  # pragma: no cover
         if self._mode:
             self.has_error = True
             raise FixtureAlreadyUsed(
-                "Fixture can only be used once. Previously it was used in %s mode."
-                % self._mode
+                "Fixture can only be used once. Previously it was used in %s mode." % self._mode
             )
         try:
             self._mode = "benchmark(...)"
@@ -199,8 +196,7 @@ class AsyncBenchmarkFixture(object):  # pragma: no cover
             if self._warmup:
                 warmup_rounds = min(rounds, max(1, int(self._warmup / iterations)))
                 self._logger.debug(
-                    "  Warmup %s rounds x %s iterations ..."
-                    % (warmup_rounds, iterations)
+                    "  Warmup %s rounds x %s iterations ..." % (warmup_rounds, iterations)
                 )
                 for _ in range(warmup_rounds):
                     await runner(loops_range)
@@ -251,10 +247,7 @@ class AsyncBenchmarkFixture(object):  # pragma: no cover
                 warmup_start = time.time()
                 warmup_iterations = 0
                 warmup_rounds = 0
-                while (
-                    time.time() - warmup_start < self._max_time
-                    and warmup_iterations < self._warmup
-                ):
+                while time.time() - warmup_start < self._max_time and warmup_iterations < self._warmup:
                     duration = min(duration, await runner(loops_range))
                     warmup_rounds += 1
                     warmup_iterations += loops

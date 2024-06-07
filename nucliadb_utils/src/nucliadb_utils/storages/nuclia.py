@@ -20,8 +20,8 @@
 from typing import Optional
 
 import aiohttp
-from nucliadb_protos.resources_pb2 import CloudFile
 
+from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_utils.storages import CHUNK_SIZE
 
 

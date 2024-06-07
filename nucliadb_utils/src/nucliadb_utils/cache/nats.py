@@ -148,9 +148,7 @@ class NatsPubsub(PubSubDriver):
 
     async def reconnected_cb(self):
         # See who we are connected to on reconnect.
-        logger.info(
-            "Got reconnected NATS to {url}".format(url=self.nc.connected_url.netloc)
-        )
+        logger.info("Got reconnected NATS to {url}".format(url=self.nc.connected_url.netloc))
 
     async def error_cb(self, e):
         logger.info("There was an error connecting to NATS {}".format(e), exc_info=True)
@@ -169,9 +167,7 @@ class NatsPubsub(PubSubDriver):
         else:
             raise ErrConnectionClosed("Could not subscribe")
 
-    async def subscribe(
-        self, handler: Callback, key, group="", subscription_id: Optional[str] = None
-    ):
+    async def subscribe(self, handler: Callback, key, group="", subscription_id: Optional[str] = None):
         if subscription_id is None:
             subscription_id = key
 

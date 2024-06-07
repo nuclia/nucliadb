@@ -63,9 +63,7 @@ async def wait_until(condition, timeout=1):
 @pytest.mark.asyncio
 async def test_kb_usage_report():
     nats_stream = Mock(publish=AsyncMock())
-    report_util = KbUsageReportUtility(
-        nats_stream=nats_stream, nats_subject="test-stream"
-    )
+    report_util = KbUsageReportUtility(nats_stream=nats_stream, nats_subject="test-stream")
 
     await report_util.initialize()
     report_util.send_kb_usage(

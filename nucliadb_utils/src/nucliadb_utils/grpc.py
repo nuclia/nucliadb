@@ -90,8 +90,6 @@ def get_traced_grpc_server(service_name: str, max_receive_message: int = 100):
             interceptors=[SentryInterceptor()],
         )
     else:
-        options = [
-            ("grpc.max_receive_message_length", max_receive_message * 1024 * 1024)
-        ]
+        options = [("grpc.max_receive_message_length", max_receive_message * 1024 * 1024)]
         server = aio.server(options=options)
     return server

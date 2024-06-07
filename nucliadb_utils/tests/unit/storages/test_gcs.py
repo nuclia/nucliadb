@@ -70,9 +70,7 @@ async def test_iter_data_error_retries(storage_field, error, asyncio_sleep):
 
 
 async def test_iter_data_reading_content_error_is_not_retried(storage_field):
-    storage_field._inner_iter_data = MockInnerIterData(
-        error=ReadingResponseContentException
-    )
+    storage_field._inner_iter_data = MockInnerIterData(error=ReadingResponseContentException)
 
     with pytest.raises(ReadingResponseContentException):
         async for _ in storage_field.iter_data():

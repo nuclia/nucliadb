@@ -56,9 +56,7 @@ class NucliaCloudAuthenticationBackend(AuthenticationBackend):
         self.roles_header = roles_header
         self.user_header = user_header
 
-    async def authenticate(
-        self, request: HTTPConnection
-    ) -> Optional[Tuple[AuthCredentials, BaseUser]]:
+    async def authenticate(self, request: HTTPConnection) -> Optional[Tuple[AuthCredentials, BaseUser]]:
         if self.roles_header not in request.headers:
             return None
         else:
@@ -97,9 +95,7 @@ def requires(
     elif isinstance(scopes, str):
         scopes_list = [scopes]
     elif isinstance(scopes, list):
-        scopes_list = [
-            scope.value if isinstance(scope, Enum) else scope for scope in scopes
-        ]
+        scopes_list = [scope.value if isinstance(scope, Enum) else scope for scope in scopes]
 
     def decorator(func: typing.Callable) -> typing.Callable:
         func.__required_scopes__ = scopes_list  # type: ignore
@@ -110,16 +106,12 @@ def requires(
                 type = parameter.name
                 break
         else:
-            raise Exception(
-                f'No "request" or "websocket" argument on function "{func}"'
-            )
+            raise Exception(f'No "request" or "websocket" argument on function "{func}"')
 
         if type == "websocket":
             # Handle websocket functions. (Always async)
             @functools.wraps(func)
-            async def websocket_wrapper(
-                *args: typing.Any, **kwargs: typing.Any
-            ) -> None:
+            async def websocket_wrapper(*args: typing.Any, **kwargs: typing.Any) -> None:
                 websocket = kwargs.get("websocket", args[idx])
                 assert isinstance(websocket, WebSocket)
 
@@ -133,17 +125,13 @@ def requires(
         elif asyncio.iscoroutinefunction(func):
             # Handle async request/response functions.
             @functools.wraps(func)
-            async def async_wrapper(
-                *args: typing.Any, **kwargs: typing.Any
-            ) -> Response:
+            async def async_wrapper(*args: typing.Any, **kwargs: typing.Any) -> Response:
                 request = kwargs.get("request", None)
                 assert isinstance(request, Request)
 
                 if not has_required_scope(request, scopes_list):
                     if redirect is not None:
-                        return RedirectResponse(
-                            url=request.url_for(redirect), status_code=303
-                        )
+                        return RedirectResponse(url=request.url_for(redirect), status_code=303)
                     raise HTTPException(status_code=status_code)
                 return await func(*args, **kwargs)
 
@@ -161,9 +149,7 @@ def requires(
 
                 if not has_required_scope(request, scopes_list):
                     if redirect is not None:
-                        return RedirectResponse(
-                            url=request.url_for(redirect), status_code=303
-                        )
+                        return RedirectResponse(url=request.url_for(redirect), status_code=303)
                     raise HTTPException(status_code=status_code)
                 return func(*args, **kwargs)
 

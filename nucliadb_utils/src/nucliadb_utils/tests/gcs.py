@@ -61,9 +61,7 @@ class GCS(BaseImage):
 
     def check(self):
         try:
-            response = requests.get(
-                f"http://{self.host}:{self.get_port()}/storage/v1/b"
-            )
+            response = requests.get(f"http://{self.host}:{self.get_port()}/storage/v1/b")
             return response.status_code == 200
         except Exception:  # pragma: no cover
             return False

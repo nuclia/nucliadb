@@ -72,9 +72,7 @@ class FlagService:
         else:
             self.flag_service = mrflagly.FlagService(url=settings.flag_settings_url)
 
-    def enabled(
-        self, flag_key: str, default: bool = False, context: Optional[dict] = None
-    ) -> bool:
+    def enabled(self, flag_key: str, default: bool = False, context: Optional[dict] = None) -> bool:
         if context is None:
             context = {}
         context["environment"] = running_settings.running_environment
