@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Optional, Type, TypeVar
 
 from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel, Field, model_validator
+from typing_extensions import Self
 
 from nucliadb_models.utils import validate_json
 from nucliadb_protos import resources_pb2
@@ -94,11 +95,10 @@ If you need to store more text, consider using a file field instead or splitting
     )
 
     @model_validator(mode="after")
-    @classmethod
-    def check_text_format(cls, values):
-        if values.format == TextFormat.JSON:
-            validate_json(values.body or "")
-        return values
+    def check_text_format(self) -> Self:
+        if self.format == TextFormat.JSON:
+            validate_json(self.body or "")
+        return self
 
 
 # Processing classes (Those used to sent to push endpoints)

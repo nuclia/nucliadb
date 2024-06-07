@@ -24,7 +24,7 @@ from typing import Any, Dict, List, Literal, Optional, Set, Type, TypeVar, Union
 
 from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel, Field, field_validator, model_validator
-from typing_extensions import Annotated
+from typing_extensions import Annotated, Self
 
 from nucliadb_models.common import FieldTypeName, ParamDefault
 from nucliadb_models.metadata import RelationType, ResourceProcessingStatus
@@ -617,12 +617,11 @@ class Filter(BaseModel):
     none: Optional[List[str]] = Field(default=None, min_length=1)
     not_all: Optional[List[str]] = Field(default=None, min_length=1)
 
-    @model_validator(mode="before")
-    @classmethod
-    def validate_filter(cls, values):
-        if len({k for k, v in values.items() if v is not None}) != 1:
+    @model_validator(mode="after")
+    def validate_filter(self) -> Self:
+        if (self.all, self.any, self.none, self.not_all).count(None) != 3:
             raise ValueError("Only one of 'all', 'any', 'none' or 'not_all' can be set")
-        return values
+        return self
 
 
 class CatalogRequest(BaseModel):
@@ -884,14 +883,11 @@ class FieldExtensionStrategy(RagStrategy):
         min_length=1,
     )
 
-    @model_validator(mode="before")
+    @field_validator("fields", mode="after")
     @classmethod
-    def fields_validator(cls, values):
-        if values.get("fields") is None:
-            return values
-
+    def fields_validator(cls, fields) -> Self:
         # Check that the fields are in the format {field_type}/{field_name}
-        for field in values.get("fields"):
+        for field in fields:
             try:
                 field_type, _ = field.strip("/").split("/")
             except ValueError:
@@ -905,7 +901,7 @@ class FieldExtensionStrategy(RagStrategy):
                     f"Valid field types are: {allowed_field_types_part}."
                 )
 
-        return values
+        return fields
 
 
 class FullResourceStrategy(RagStrategy):

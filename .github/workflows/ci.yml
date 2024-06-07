@@ -229,3 +229,37 @@ jobs:
         with:
           file: ./coverage.xml
           flags: nucliadb
+
+
+  nucliadb-models-tests:
+    name: nucliadb_models tests
+    runs-on: ubuntu-latest
+    needs:
+      - build-virtual-env
+    strategy:
+      fail-fast: false
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+
+      - name: Restore venv
+        uses: actions/cache/restore@v4
+        with:
+          path: .venv
+          key: venv-${{ github.sha }}
+          fail-on-cache-miss: true
+
+      - name: Run NucliaDB tests
+        run: make test-cov
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./nucliadb_models/coverage.xml
+          flags: models

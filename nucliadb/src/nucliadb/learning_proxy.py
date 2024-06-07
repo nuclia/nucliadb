@@ -30,6 +30,7 @@ import httpx
 from fastapi import Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, model_validator
+from typing_extensions import Self
 
 from nucliadb_telemetry import errors
 from nucliadb_utils.settings import is_onprem_nucliadb, nuclia_settings
@@ -71,17 +72,16 @@ class LearningConfiguration(BaseModel):
     )
 
     @model_validator(mode="after")
-    @classmethod
-    def validate_matryoshka_and_vector_dimension_consistency(cls, values):
-        vector_size = values.semantic_vector_size
-        matryoshka_dimensions = values.semantic_matryoshka_dimensions or []
+    def validate_matryoshka_and_vector_dimension_consistency(self) -> Self:
+        vector_size = self.semantic_vector_size
+        matryoshka_dimensions = self.semantic_matryoshka_dimensions or []
         if (
             len(matryoshka_dimensions) > 0
             and vector_size is not None
             and vector_size not in matryoshka_dimensions
         ):
             raise ValueError("Semantic vector size is inconsistent with matryoshka dimensions")
-        return values
+        return self
 
 
 async def get_configuration(

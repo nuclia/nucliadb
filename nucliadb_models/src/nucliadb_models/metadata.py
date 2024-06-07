@@ -93,13 +93,12 @@ class RelationEntity(BaseModel):
     type: RelationNodeType
     group: Optional[str] = None
 
-    @model_validator(mode="before")
-    @classmethod
-    def check_relation_is_valid(cls, values):
-        if values["type"] == RelationNodeType.ENTITY.value:
-            if "group" not in values:
+    @model_validator(mode="after")
+    def check_relation_is_valid(self) -> Self:
+        if self.type == RelationNodeType.ENTITY.value:
+            if self.group is None:
                 raise ValueError(f"All {RelationNodeType.ENTITY.value} values must define a 'group'")
-        return values
+        return self
 
 
 class RelationMetadata(BaseModel):
