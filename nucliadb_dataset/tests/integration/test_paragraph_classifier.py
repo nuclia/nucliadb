@@ -18,10 +18,10 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import pytest
-from integration.utils import export_dataset
-from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 
+from integration.utils import export_dataset
 from nucliadb_models.resource import KnowledgeBoxObj
+from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 from nucliadb_sdk.v2.sdk import NucliaDB
 
 
@@ -40,9 +40,7 @@ def test_paragraph_classification_with_labels(
         trainset.filter.ClearField("labels")
         trainset.filter.labels.extend(labels)
 
-        partitions = export_dataset(
-            sdk=sdk, trainset=trainset, kb=upload_data_paragraph_classification
-        )
+        partitions = export_dataset(sdk=sdk, trainset=trainset, kb=upload_data_paragraph_classification)
         assert len(partitions) == 1
 
         loaded_array = partitions[0]
@@ -58,6 +56,4 @@ def test_paragraph_classification_invalid_label_type(
     trainset.batch_size = 2
 
     with pytest.raises(Exception):
-        export_dataset(
-            sdk=sdk, trainset=trainset, kb=upload_data_field_classification
-        )  # noqa
+        export_dataset(sdk=sdk, trainset=trainset, kb=upload_data_field_classification)  # noqa

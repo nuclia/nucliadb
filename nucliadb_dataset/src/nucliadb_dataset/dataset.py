@@ -22,7 +22,6 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple
 
 import pyarrow as pa  # type: ignore
-from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 
 from nucliadb_dataset.streamer import Streamer, StreamerAlreadyRunning
 from nucliadb_dataset.tasks import (
@@ -40,6 +39,7 @@ from nucliadb_models.search import (
     SearchRequest,
 )
 from nucliadb_models.trainset import TrainSetPartitions
+from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 from nucliadb_sdk.v2.sdk import NucliaDB, Region
 
 CHUNK_SIZE = 5 * 1024 * 1024
@@ -57,9 +57,7 @@ class NucliaDataset(object):
 
     def __new__(cls, *args, **kwargs):
         if cls is NucliaDataset:
-            raise TypeError(
-                f"'{cls.__name__}' can't be instantiated, use its child classes"
-            )
+            raise TypeError(f"'{cls.__name__}' can't be instantiated, use its child classes")
         return super().__new__(cls)
 
     def __init__(
@@ -174,9 +172,7 @@ class NucliaDBDataset(NucliaDataset):
     def _computed_labels(self) -> Dict[str, LabelSetCount]:
         search_result: KnowledgeboxSearchResults = self.search_sdk.search(
             kbid=self.kbid,
-            content=SearchRequest(
-                features=[SearchOptions.DOCUMENT], faceted=["/l"], page_size=0
-            ),
+            content=SearchRequest(features=[SearchOptions.DOCUMENT], faceted=["/l"], page_size=0),
         )
 
         response: Dict[str, LabelSetCount] = {}
@@ -189,9 +185,7 @@ class NucliaDBDataset(NucliaDataset):
             label_facets = search_result.fulltext.facets.get("/l", {})
         elif "/classification.labels" in search_result.fulltext.facets:
             facet_prefix = "/classification.labels/"
-            label_facets = search_result.fulltext.facets.get(
-                "/classification.labels", {}
-            )
+            label_facets = search_result.fulltext.facets.get("/classification.labels", {})
 
         for labelset, count in label_facets.items():
             real_labelset = labelset[len(facet_prefix) :]  # removing /l/
@@ -205,15 +199,10 @@ class NucliaDBDataset(NucliaDataset):
                     features=[SearchOptions.DOCUMENT], faceted=[base_label], page_size=0
                 ),
             )
-            if (
-                fsearch_result.fulltext is None
-                or fsearch_result.fulltext.facets is None
-            ):
+            if fsearch_result.fulltext is None or fsearch_result.fulltext.facets is None:
                 raise Exception("Search error")
 
-            for label, count in fsearch_result.fulltext.facets.get(
-                base_label, {}
-            ).items():
+            for label, count in fsearch_result.fulltext.facets.get(base_label, {}).items():
                 labelset_obj.labels[label.replace(base_label + "/", "")] = count
         return response
 
@@ -227,17 +216,13 @@ class NucliaDBDataset(NucliaDataset):
         if labelset not in labels.labelsets:
             computed_labels = self._computed_labels()
             if type != "RESOURCES" or labelset not in computed_labels:
-                raise Exception(
-                    f"Labelset is not valid {labelset} not in {labels.labelsets}"
-                )
+                raise Exception(f"Labelset is not valid {labelset} not in {labels.labelsets}")
 
         elif type not in labels.labelsets[labelset].kind:
             raise Exception(f"Labelset not defined for {type} classification")
 
     def _check_entities(self) -> None:
-        entities: KnowledgeBoxEntities = self.reader_sdk.get_entitygroups(
-            kbid=self.kbid
-        )
+        entities: KnowledgeBoxEntities = self.reader_sdk.get_entitygroups(kbid=self.kbid)
         for family_group in self.trainset.filter.labels:
             if family_group not in entities.groups:
                 raise Exception("Family group is not valid")
@@ -288,9 +273,7 @@ class NucliaDBDataset(NucliaDataset):
 
         self.streamer.initialize(partition_id)
         filename_tmp = f"{filename}.tmp"
-        print(
-            f"Generating partition {partition_id} from {self.streamer.base_url} at {filename}"
-        )
+        print(f"Generating partition {partition_id} from {self.streamer.base_url} at {filename}")
         with open(filename_tmp, "wb") as sink:
             with pa.ipc.new_stream(sink, self.schema) as writer:
                 for batch in self.streamer:
@@ -324,7 +307,5 @@ def download_all_partitions(
         raise KeyError("Not a valid KB")
 
     task_obj = Task(task)
-    fse = NucliaDBDataset(
-        sdk=sdk, task=task_obj, labels=labels, base_path=path, kbid=kbid
-    )
+    fse = NucliaDBDataset(sdk=sdk, task=task_obj, labels=labels, base_path=path, kbid=kbid)
     return fse.read_all_partitions(path=path)

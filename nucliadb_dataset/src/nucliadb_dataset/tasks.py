@@ -22,16 +22,6 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, Callable, Dict, List
 
 import pyarrow as pa  # type: ignore
-from nucliadb_protos.dataset_pb2 import (
-    FieldClassificationBatch,
-    ImageClassificationBatch,
-    ParagraphClassificationBatch,
-    ParagraphStreamingBatch,
-    QuestionAnswerStreamingBatch,
-    SentenceClassificationBatch,
-    TaskType,
-    TokenClassificationBatch,
-)
 
 from nucliadb_dataset.mapping import (
     batch_to_image_classification_arrow,
@@ -41,6 +31,16 @@ from nucliadb_dataset.mapping import (
     batch_to_text_classification_normalized_arrow,
     batch_to_token_classification_arrow,
     bytes_to_batch,
+)
+from nucliadb_protos.dataset_pb2 import (
+    FieldClassificationBatch,
+    ImageClassificationBatch,
+    ParagraphClassificationBatch,
+    ParagraphStreamingBatch,
+    QuestionAnswerStreamingBatch,
+    SentenceClassificationBatch,
+    TaskType,
+    TokenClassificationBatch,
 )
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -175,6 +175,4 @@ TASK_DEFINITIONS: Dict[Task, TaskDefinition] = {
     ),
 }
 
-TASK_DEFINITIONS_REVERSE = {
-    task.proto: task for task in TASK_DEFINITIONS.values()
-}  # noqa
+TASK_DEFINITIONS_REVERSE = {task.proto: task for task in TASK_DEFINITIONS.values()}  # noqa

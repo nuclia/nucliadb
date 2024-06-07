@@ -18,9 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import pyarrow as pa  # type: ignore
-from integration.utils import export_dataset
-from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 
+from integration.utils import export_dataset
 from nucliadb_dataset.dataset import download_all_partitions
 from nucliadb_models.common import UserClassification
 from nucliadb_models.metadata import UserMetadata
@@ -28,6 +27,7 @@ from nucliadb_models.resource import KnowledgeBoxObj
 from nucliadb_models.text import TextField
 from nucliadb_models.utils import FieldIdString
 from nucliadb_models.writer import CreateResourcePayload
+from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 from nucliadb_sdk.v2.sdk import NucliaDB
 
 
@@ -47,9 +47,7 @@ def test_field_classification_with_labels(
         trainset.filter.ClearField("labels")
         trainset.filter.labels.extend(labels)
 
-        partitions = export_dataset(
-            sdk=sdk, trainset=trainset, kb=upload_data_field_classification
-        )
+        partitions = export_dataset(sdk=sdk, trainset=trainset, kb=upload_data_field_classification)
         assert len(partitions) == 1
 
         loaded_array = partitions[0]

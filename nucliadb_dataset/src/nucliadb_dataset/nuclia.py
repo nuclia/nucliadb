@@ -20,6 +20,7 @@
 from typing import Iterator, List
 
 import grpc
+
 from nucliadb_protos.train_pb2 import (
     GetFieldsRequest,
     GetInfoRequest,
