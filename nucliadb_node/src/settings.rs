@@ -134,9 +134,8 @@ pub fn build_object_store_driver(settings: &EnvSettings) -> Arc<dyn ObjectStore>
             Arc::new(builder.build().unwrap())
         }
         ObjectStoreType::AZURE => {
-            let builder = MicrosoftAzureBuilder::new()
-                .with_allow_http(true)
-                .with_url(settings.azure_url.clone().unwrap());
+            let builder =
+                MicrosoftAzureBuilder::new().with_allow_http(true).with_url(settings.azure_url.clone().unwrap());
             Arc::new(builder.build().unwrap())
         }
         // Any other type is not supported for now
