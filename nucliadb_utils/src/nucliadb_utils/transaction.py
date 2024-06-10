@@ -24,6 +24,7 @@ from functools import partial
 from typing import Any, Optional, Union
 
 import nats
+import nats.errors
 from nats.aio.client import Client
 from nats.js.client import JetStreamContext
 
@@ -50,6 +51,10 @@ class WaitFor:
 
 
 class TransactionCommitTimeoutError(Exception):
+    pass
+
+
+class MaxTransactionSizeExceededError(Exception):
     pass
 
 
@@ -195,7 +200,10 @@ class TransactionUtility:
         if target_subject is None:
             target_subject = const.Streams.INGEST.subject.format(partition=partition)
 
-        res = await self.js.publish(target_subject, writer.SerializeToString(), headers=headers)
+        try:
+            res = await self.js.publish(target_subject, writer.SerializeToString(), headers=headers)
+        except nats.errors.MaxPayloadError as ex:
+            raise MaxTransactionSizeExceededError() from ex
 
         waiting_for.seq = res.seq
 

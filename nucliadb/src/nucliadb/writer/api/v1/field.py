@@ -34,6 +34,7 @@ from nucliadb.writer.api.constants import (
     X_FILE_PASSWORD,
     X_NUCLIADB_USER,
 )
+from nucliadb.writer.api.v1 import transaction
 from nucliadb.writer.api.v1.resource import (
     get_rid_from_slug_or_raise_error,
     validate_rid_exists_or_raise_error,
@@ -60,11 +61,9 @@ from nucliadb_protos.resources_pb2 import FieldID, Metadata
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
-from nucliadb_utils.transaction import TransactionCommitTimeoutError
 from nucliadb_utils.utilities import (
     get_partitioning,
     get_storage,
-    get_transaction_utility,
 )
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -130,16 +129,8 @@ async def add_field_to_resource(
     else:
         parse_field(kbid, rid, field_id, field_payload, writer, toprocess, **parser_kwargs)
 
-    transaction = get_transaction_utility()
     processing = get_processing()
-    try:
-        writer.source = BrokerMessage.MessageSource.WRITER
-        await transaction.commit(writer, partition, wait=True)
-    except TransactionCommitTimeoutError:
-        raise HTTPException(
-            status_code=501,
-            detail="Inconsistent write. This resource will not be processed and may not be stored.",
-        )
+    await transaction.commit(writer, partition)
     try:
         processing_info = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
@@ -175,8 +166,6 @@ async def delete_resource_field(
     await validate_rid_exists_or_raise_error(kbid, rid)
 
     partitioning = get_partitioning()
-    transaction = get_transaction_utility()
-
     partition = partitioning.generate_partition(kbid, rid)
     writer = BrokerMessage()
 
@@ -189,15 +178,7 @@ async def delete_resource_field(
 
     writer.delete_fields.append(pb_field_id)
     parse_audit(writer.audit, request)
-
-    try:
-        await transaction.commit(writer, partition, wait=True)
-    except TransactionCommitTimeoutError:
-        raise HTTPException(
-            status_code=501,
-            detail="Inconsistent write. This resource will not be processed and may not be stored.",
-        )
-
+    await transaction.commit(writer, partition)
     return Response(status_code=204)
 
 
@@ -728,7 +709,6 @@ async def reprocess_file_field(
 ) -> ResourceUpdated:
     await maybe_back_pressure(request, kbid, resource_uuid=rid)
 
-    transaction = get_transaction_utility()
     processing = get_processing()
     partitioning = get_partitioning()
 
@@ -774,13 +754,7 @@ async def reprocess_file_field(
     writer.source = BrokerMessage.MessageSource.WRITER
     writer.basic.metadata.useful = True
     writer.basic.metadata.status = Metadata.Status.PENDING
-    try:
-        await transaction.commit(writer, partition, wait=False)
-    except TransactionCommitTimeoutError:
-        raise HTTPException(
-            status_code=501,
-            detail="Inconsistent write. This resource will not be processed and may not be stored.",
-        )
+    await transaction.commit(writer, partition, wait=False)
     # Send current resource to reprocess.
     try:
         processing_info = await processing.send_to_process(toprocess, partition)

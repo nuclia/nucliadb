@@ -20,7 +20,6 @@
 import functools
 from typing import AsyncGenerator, AsyncIterator, Callable, Optional
 
-import nats.errors
 from google.protobuf.message import DecodeError as ProtobufDecodeError
 
 from nucliadb import learning_proxy
@@ -39,6 +38,7 @@ from nucliadb_models.export_import import Status
 from nucliadb_protos import knowledgebox_pb2 as kb_pb2
 from nucliadb_protos import resources_pb2, writer_pb2
 from nucliadb_utils.const import Streams
+from nucliadb_utils.transaction import MaxTransactionSizeExceededError
 
 BinaryStream = AsyncGenerator[bytes, None]
 BinaryStreamGenerator = Callable[[int], BinaryStream]
@@ -89,7 +89,7 @@ async def transaction_commit(
             wait=False,
             target_subject=Streams.INGEST_PROCESSED.subject,
         )
-    except nats.errors.MaxPayloadError:
+    except MaxTransactionSizeExceededError:
         stored_key = await context.blob_storage.set_stream_message(
             kbid=bm.kbid, rid=bm.uuid, data=bm.SerializeToString()
         )

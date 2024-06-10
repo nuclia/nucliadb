@@ -21,8 +21,6 @@ import asyncio
 import base64
 from typing import Optional
 
-import nats
-import nats.errors
 from aiohttp.client_exceptions import ClientConnectorError
 
 from nucliadb.common import datamanagers
@@ -37,6 +35,7 @@ from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.settings import nuclia_settings
 from nucliadb_utils.storages.storage import Storage
+from nucliadb_utils.transaction import MaxTransactionSizeExceededError
 from nucliadb_utils.utilities import get_storage, get_transaction_utility
 
 
@@ -91,7 +90,7 @@ class PullWorker:
                     # send to separate processor
                     target_subject=const.Streams.INGEST_PROCESSED.subject,
                 )
-            except nats.errors.MaxPayloadError:
+            except MaxTransactionSizeExceededError:
                 storage = await get_storage()
                 stored_key = await storage.set_stream_message(kbid=pb.kbid, rid=pb.uuid, data=data)
                 referenced_pb = BrokerMessageBlobReference(
@@ -202,7 +201,7 @@ class PullWorker:
                     )
                     await asyncio.sleep(self.pull_time_error_backoff)
 
-                except nats.errors.MaxPayloadError as e:
+                except MaxTransactionSizeExceededError as e:
                     if data is not None:
                         payload_length = 0
                         if data.payload:
