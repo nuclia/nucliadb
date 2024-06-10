@@ -47,7 +47,8 @@ from nucliadb_models.search import (
     Relations,
     RephraseModel,
     SearchOptions,
-    parse_prompts,
+    UserPrompt,
+    parse_custom_prompt,
 )
 from nucliadb_protos import audit_pb2
 from nucliadb_protos.nodereader_pb2 import RelationSearchRequest, RelationSearchResponse
@@ -309,11 +310,11 @@ async def chat(
             prompt_context_images,
         ) = await prompt_context_builder.build()
 
-    user_prompt, system_prompt = parse_prompts(chat_request)
+    custom_prompt = parse_custom_prompt(chat_request)
     chat_model = ChatModel(
         user_id=user_id,
-        system=system_prompt,
-        user_prompt=user_prompt,
+        system=custom_prompt.system,
+        user_prompt=UserPrompt(prompt=custom_prompt.user) if custom_prompt.user else None,
         query_context=prompt_context,
         query_context_order=prompt_context_order,
         chat_history=chat_history,

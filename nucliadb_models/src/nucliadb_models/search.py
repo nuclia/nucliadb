@@ -1469,16 +1469,13 @@ class AskResponseItem(BaseModel):
     item: AskResponseItemType = Field(..., discriminator="type")
 
 
-def parse_prompts(item: ChatRequest) -> tuple[Optional[UserPrompt], Optional[str]]:
-    user_prompt = None
-    system_prompt = None
+def parse_custom_prompt(item: ChatRequest) -> CustomPrompt:
+    prompt = CustomPrompt()
     if item.prompt is not None:
         if isinstance(item.prompt, str):
             # If the prompt is a string, it is interpreted as the user prompt
-            user_prompt = UserPrompt(prompt=item.prompt)
+            prompt.user = item.prompt
         else:
-            if item.prompt.user is not None:
-                user_prompt = UserPrompt(prompt=item.prompt.user)
-            if item.prompt.system is not None:
-                system_prompt = item.prompt.system
-    return user_prompt, system_prompt
+            prompt.user = item.prompt.user
+            prompt.system = item.prompt.system
+    return prompt
