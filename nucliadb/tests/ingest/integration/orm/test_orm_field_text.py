@@ -20,18 +20,16 @@
 from uuid import uuid4
 
 import pytest
-from nucliadb_protos.resources_pb2 import FieldText as PBFieldText
-from nucliadb_protos.resources_pb2 import FieldType
 
 from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb_protos.resources_pb2 import FieldText as PBFieldText
+from nucliadb_protos.resources_pb2 import FieldType
 from nucliadb_utils.storages.storage import Storage
 
 
 @pytest.mark.asyncio
-async def test_create_resource_orm_field_text(
-    storage, txn, cache, fake_node, knowledgebox_ingest: str
-):
+async def test_create_resource_orm_field_text(storage, txn, cache, fake_node, knowledgebox_ingest: str):
     uuid = str(uuid4())
     kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
     r = await kb_obj.add_resource(uuid=uuid, slug="slug")

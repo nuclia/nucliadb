@@ -21,20 +21,18 @@ import asyncio
 import time
 
 from httpx import AsyncClient
-from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxID
-from nucliadb_protos.writer_pb2 import GetEntitiesGroupRequest, GetEntitiesGroupResponse
-from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb.writer.api.v1.router import KB_PREFIX
 from nucliadb_models.entities import (
     CreateEntitiesGroupPayload,
     UpdateEntitiesGroupPayload,
 )
+from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxID
+from nucliadb_protos.writer_pb2 import GetEntitiesGroupRequest, GetEntitiesGroupResponse
+from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 
-async def create_entities_group(
-    writer: AsyncClient, kbid: str, payload: CreateEntitiesGroupPayload
-):
+async def create_entities_group(writer: AsyncClient, kbid: str, payload: CreateEntitiesGroupPayload):
     resp = await writer.post(
         f"/{KB_PREFIX}/{kbid}/entitiesgroups",
         content=payload.json(),
@@ -70,9 +68,7 @@ async def wait_until_entity(
             GetEntitiesGroupRequest(kb=KnowledgeBoxID(uuid=kbid), group=group)
         )
         found = entity in response.group.entities
-        assert (
-            time.time() - start < timeout
-        ), "Timeout while waiting for entity {group}/{entity}"
+        assert time.time() - start < timeout, "Timeout while waiting for entity {group}/{entity}"
 
         if not found:
             await asyncio.sleep(0.1)

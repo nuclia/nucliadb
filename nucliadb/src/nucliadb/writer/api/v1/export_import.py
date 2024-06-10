@@ -139,18 +139,14 @@ async def start_export_task(context: ApplicationContext, kbid: str, export_id: s
         producer = await get_exports_producer(context)
         msg = NatsTaskMessage(kbid=kbid, id=export_id)
         seqid = await producer(msg)  # type: ignore
-        logger.info(
-            f"Export task produced. seqid={seqid} kbid={kbid} export_id={export_id}"
-        )
+        logger.info(f"Export task produced. seqid={seqid} kbid={kbid} export_id={export_id}")
     except Exception as e:
         errors.capture_exception(e)
         await dm.delete_metadata("export", metadata)
         raise
 
 
-async def start_import_task(
-    context: ApplicationContext, kbid: str, import_id: str, import_size: int
-):
+async def start_import_task(context: ApplicationContext, kbid: str, import_id: str, import_size: int):
     dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
     metadata = ImportMetadata(kbid=kbid, id=import_id)
     metadata.task.status = Status.SCHEDULED
@@ -160,9 +156,7 @@ async def start_import_task(
         producer = await get_imports_producer(context)
         msg = NatsTaskMessage(kbid=kbid, id=import_id)
         seqid = await producer(msg)  # type: ignore
-        logger.info(
-            f"Import task produced. seqid={seqid} kbid={kbid} import_id={import_id}"
-        )
+        logger.info(f"Import task produced. seqid={seqid} kbid={kbid} import_id={import_id}")
     except Exception as e:
         errors.capture_exception(e)
         await dm.delete_metadata("import", metadata)

@@ -29,9 +29,7 @@ from nucliadb.train import SERVICE_NAME, logger
 from nucliadb.train.types import TrainBatchType
 from nucliadb_utils.utilities import get_storage
 
-rcache: ContextVar[Optional[dict[str, ResourceORM]]] = ContextVar(
-    "rcache", default=None
-)
+rcache: ContextVar[Optional[dict[str, ResourceORM]]] = ContextVar("rcache", default=None)
 
 
 def get_resource_cache(clear: bool = False) -> dict[str, ResourceORM]:
@@ -79,9 +77,7 @@ async def get_paragraph(kbid: str, paragraph_id: str) -> str:
     field_obj = await orm_resource.get_field(field, field_type_int, load=False)
     extracted_text = await field_obj.get_extracted_text()
     if extracted_text is None:
-        logger.warning(
-            f"{rid} {field} {field_type_int} extracted_text does not exist on DB"
-        )
+        logger.warning(f"{rid} {field} {field_type_int} extracted_text does not exist on DB")
         return ""
 
     if split is not None:
@@ -93,9 +89,7 @@ async def get_paragraph(kbid: str, paragraph_id: str) -> str:
     return splitted_text
 
 
-async def batchify(
-    producer: AsyncIterator[Any], size: int, batch_klass: TrainBatchType
-):
+async def batchify(producer: AsyncIterator[Any], size: int, batch_klass: TrainBatchType):
     # NOTE: we are supposing all protobuffers have a data field
     batch = []
     async for item in producer:

@@ -25,13 +25,13 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 from grpc import StatusCode
 from grpc.aio import AioRpcError
+
 from nucliadb_protos.nodewriter_pb2 import (
     IndexMessage,
     IndexMessageSource,
     OpStatus,
     TypeMessage,
 )
-
 from nucliadb_sidecar.indexer import (
     ConcurrentShardIndexer,
     IndexNodeError,
@@ -82,15 +82,9 @@ class TestIndexerWorkUnit:
 
     @pytest.mark.asyncio
     async def test_work_units_inside_an_asyncio_priority_queue(self):
-        processor_work_unit = WorkUnit.from_msg(
-            gen_msg(seqid=1, source=IndexMessageSource.PROCESSOR)
-        )
-        writer_work_unit_1 = WorkUnit.from_msg(
-            gen_msg(seqid=2, source=IndexMessageSource.WRITER)
-        )
-        writer_work_unit_2 = WorkUnit.from_msg(
-            gen_msg(seqid=3, source=IndexMessageSource.WRITER)
-        )
+        processor_work_unit = WorkUnit.from_msg(gen_msg(seqid=1, source=IndexMessageSource.PROCESSOR))
+        writer_work_unit_1 = WorkUnit.from_msg(gen_msg(seqid=2, source=IndexMessageSource.WRITER))
+        writer_work_unit_2 = WorkUnit.from_msg(gen_msg(seqid=3, source=IndexMessageSource.WRITER))
 
         queue = asyncio.PriorityQueue()
         await queue.put(processor_work_unit)
@@ -163,9 +157,7 @@ class TestConcurrentShardIndexer:
             csi.indexers.clear()
 
     @pytest.mark.asyncio
-    async def test_indexing_adds_work_to_priority_indexer(
-        self, csi: ConcurrentShardIndexer
-    ):
+    async def test_indexing_adds_work_to_priority_indexer(self, csi: ConcurrentShardIndexer):
         with patch("nucliadb_sidecar.indexer.PriorityIndexer.index_soon") as index_soon:
             count = 5
             for i in range(count):
@@ -196,9 +188,7 @@ class TestConcurrentShardIndexer:
             return indexer
 
         PriorityIndexer_mock = Mock(side_effect=new_indexer)
-        with patch(
-            "nucliadb_sidecar.indexer.PriorityIndexer", new=PriorityIndexer_mock
-        ):
+        with patch("nucliadb_sidecar.indexer.PriorityIndexer", new=PriorityIndexer_mock):
             for msg in messages:
                 csi.index_message_soon(msg)
 

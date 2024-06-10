@@ -54,9 +54,7 @@ async def test_not_ready():
 
 async def test_node_members():
     nodes = [
-        IndexNode(
-            id="node1", address="node1", shard_count=0, available_disk=100, dummy=True
-        ),
+        IndexNode(id="node1", address="node1", shard_count=0, available_disk=100, dummy=True),
         IndexNode(
             id="node2",
             address="node2",

@@ -21,6 +21,7 @@
 from uuid import uuid4
 
 import pytest
+
 from tests.utils.aiohttp_session import get_mocked_session
 
 
@@ -52,13 +53,9 @@ async def test_send_to_process(onprem, mock_payload):
     )
     await processing_engine.initialize()
 
-    payload = PushPayload(
-        uuid=str(uuid4()), kbid=str(uuid4()), userid=str(uuid4()), partition=0
-    )
+    payload = PushPayload(uuid=str(uuid4()), kbid=str(uuid4()), userid=str(uuid4()), partition=0)
 
-    processing_engine.session = get_mocked_session(
-        "POST", 200, json=mock_payload, context_manager=False
-    )
+    processing_engine.session = get_mocked_session("POST", 200, json=mock_payload, context_manager=False)
     await processing_engine.send_to_process(payload, partition=0)
 
     await processing_engine.finalize()
@@ -87,8 +84,6 @@ async def test_delete_from_processing(onprem):
         json={"kbid": "kbid", "resource_id": "resource_id"},
         context_manager=False,
     )
-    await processing_engine.delete_from_processing(
-        kbid="kbid", resource_id="resource_id"
-    )
+    await processing_engine.delete_from_processing(kbid="kbid", resource_id="resource_id")
 
     await processing_engine.finalize()

@@ -22,9 +22,9 @@ import random
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from nucliadb_protos.utils_pb2 import ExtractedText
 
 from nucliadb.search.search import paragraphs
+from nucliadb_protos.utils_pb2 import ExtractedText
 
 
 @pytest.fixture()
@@ -44,20 +44,14 @@ def field(extracted_text):
 
 async def test_get_paragraph_from_full_text(field, extracted_text: ExtractedText):
     assert (
-        await paragraphs.get_paragraph_from_full_text(
-            field=field, start=0, end=12, split=None
-        )
+        await paragraphs.get_paragraph_from_full_text(field=field, start=0, end=12, split=None)
         == extracted_text.text
     )
 
 
-async def test_get_paragraph_from_full_text_with_split(
-    field, extracted_text: ExtractedText
-):
+async def test_get_paragraph_from_full_text_with_split(field, extracted_text: ExtractedText):
     assert (
-        await paragraphs.get_paragraph_from_full_text(
-            field=field, start=0, end=6, split="1"
-        )
+        await paragraphs.get_paragraph_from_full_text(field=field, start=0, end=6, split="1")
         == extracted_text.split_text["1"]
     )
 
@@ -102,15 +96,11 @@ async def test_get_field_extracted_text_is_cached(field):
     field.uuid = "rid"
     field.id = "fid"
     # Simulate a slow response from GCloud
-    field.get_extracted_text = AsyncMock(
-        side_effect=fake_get_extracted_text_from_gcloud
-    )
+    field.get_extracted_text = AsyncMock(side_effect=fake_get_extracted_text_from_gcloud)
 
     # Run 10 times in parallel to check that the cache is working
     etcache = paragraphs.ExtractedTextCache()
-    futures = [
-        paragraphs.get_field_extracted_text(field, cache=etcache) for _ in range(10)
-    ]
+    futures = [paragraphs.get_field_extracted_text(field, cache=etcache) for _ in range(10)]
     await asyncio.gather(*futures)
 
     field.get_extracted_text.assert_awaited_once()

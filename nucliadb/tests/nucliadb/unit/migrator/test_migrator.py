@@ -51,9 +51,7 @@ def test_get_migration_with_filtering():
 async def test_run_all_kb_migrations_raises_on_failure():
     execution_context = Mock()
     execution_context.data_manager = Mock()
-    execution_context.data_manager.get_kb_migrations = AsyncMock(
-        return_value=["foo", "bar"]
-    )
+    execution_context.data_manager.get_kb_migrations = AsyncMock(return_value=["foo", "bar"])
     execution_context.settings = Mock(max_concurrent_migrations=1)
     with patch(
         "nucliadb.migrator.migrator.run_kb_migrations",

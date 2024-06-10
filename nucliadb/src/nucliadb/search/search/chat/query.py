@@ -22,8 +22,6 @@ from dataclasses import dataclass
 from time import monotonic as time
 from typing import AsyncGenerator, AsyncIterator, Optional
 
-from nucliadb_protos.nodereader_pb2 import RelationSearchRequest, RelationSearchResponse
-
 from nucliadb.search import logger
 from nucliadb.search.predict import AnswerStatusCode
 from nucliadb.search.requesters.utils import Method, node_query
@@ -52,6 +50,7 @@ from nucliadb_models.search import (
     UserPrompt,
 )
 from nucliadb_protos import audit_pb2
+from nucliadb_protos.nodereader_pb2 import RelationSearchRequest, RelationSearchResponse
 from nucliadb_telemetry.errors import capture_exception
 from nucliadb_utils.helpers import async_gen_lookahead
 from nucliadb_utils.utilities import get_audit
@@ -204,9 +203,7 @@ async def get_relations_results(
             relation_request,
             target_shard_replicas=target_shard_replicas,
         )
-        return await merge_relations_results(
-            relations_results, relation_request.subgraph
-        )
+        return await merge_relations_results(relations_results, relation_request.subgraph)
     except Exception as exc:
         capture_exception(exc)
         logger.exception("Error getting relations results")
@@ -253,9 +250,7 @@ async def chat(
     needs_retrieval = True
     if resource is not None:
         chat_request.resource_filters = [resource]
-        if any(
-            strategy.name == "full_resource" for strategy in chat_request.rag_strategies
-        ):
+        if any(strategy.name == "full_resource" for strategy in chat_request.rag_strategies):
             needs_retrieval = False
 
     if needs_retrieval:
@@ -273,9 +268,7 @@ async def chat(
         if len(find_results.resources) == 0:
             # If no resources were found on the retrieval, we return
             # a "Not enough context" answer and skip the llm query
-            answer_stream = format_generated_answer(
-                not_enough_context_generator(), status_code
-            )
+            answer_stream = format_generated_answer(not_enough_context_generator(), status_code)
             return ChatResult(
                 nuclia_learning_id=nuclia_learning_id,
                 answer_stream=answer_stream,
@@ -384,9 +377,7 @@ def _parse_answer_status_code(chunk: bytes) -> AnswerStatusCode:
         # It may be a bug in the aiohttp.StreamResponse implementation,
         # but we haven't spotted it yet. For now, we just try to parse the status code
         # from the tail of the chunk.
-        logger.debug(
-            f"Error decoding status code from /chat's last chunk. Chunk: {chunk!r}"
-        )
+        logger.debug(f"Error decoding status code from /chat's last chunk. Chunk: {chunk!r}")
         if chunk == b"":
             raise
         if chunk.endswith(b"0"):
@@ -418,8 +409,7 @@ async def maybe_audit_chat(
 
     # Append chat history and query context
     audit_context = [
-        audit_pb2.ChatContext(author=message.author, text=message.text)
-        for message in chat_history
+        audit_pb2.ChatContext(author=message.author, text=message.text) for message in chat_history
     ]
     query_context_paragaph_ids = list(query_context.keys())
     audit_context.append(
@@ -442,9 +432,7 @@ async def maybe_audit_chat(
     )
 
 
-def parse_audit_answer(
-    raw_text_answer: bytes, status_code: Optional[AnswerStatusCode]
-) -> Optional[str]:
+def parse_audit_answer(raw_text_answer: bytes, status_code: Optional[AnswerStatusCode]) -> Optional[str]:
     if status_code == AnswerStatusCode.NO_CONTEXT:
         # We don't want to audit "Not enough context to answer this." and instead set a None.
         return None
@@ -508,9 +496,7 @@ class ChatAuditor:
         )
 
 
-def sorted_prompt_context_list(
-    context: PromptContext, order: PromptContextOrder
-) -> list[str]:
+def sorted_prompt_context_list(context: PromptContext, order: PromptContextOrder) -> list[str]:
     """
     context = {"x": "foo", "y": "bar"}
     order = {"y": 1, "x": 0}

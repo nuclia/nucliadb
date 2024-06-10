@@ -24,6 +24,7 @@ Due to a bug on backend services, some kbslugs were not properly deleted and got
 orphan. Let's delete them!
 
 """
+
 import logging
 
 from nucliadb.common import datamanagers
@@ -40,9 +41,7 @@ async def migrate(context: ExecutionContext) -> None:
             value = await txn.get(key)
             if value is None:
                 # KB with slug but without uuid? Seems wrong, let's remove it too
-                logger.info(
-                    "Removing /kbslugs with empty value", extra={"maindb_key": key}
-                )
+                logger.info("Removing /kbslugs with empty value", extra={"maindb_key": key})
                 await txn.delete(key)
                 continue
 

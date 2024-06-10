@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import pytest
+
 from nucliadb_protos.train_pb2 import GetLabelsRequest
 from nucliadb_protos.train_pb2_grpc import TrainStub
 from nucliadb_protos.writer_pb2 import GetLabelsResponse

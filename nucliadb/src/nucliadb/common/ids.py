@@ -61,6 +61,4 @@ class VectorId:
     vector_end: int
 
     def full(self) -> str:
-        return (
-            f"{self.field_id.full()}/{self.index}/{self.vector_start}-{self.vector_end}"
-        )
+        return f"{self.field_id.full()}/{self.index}/{self.vector_start}-{self.vector_end}"

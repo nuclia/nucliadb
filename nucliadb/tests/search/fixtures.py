@@ -23,16 +23,15 @@ from typing import AsyncIterable, Optional
 
 import pytest
 from httpx import AsyncClient
-from nucliadb_protos.nodereader_pb2 import GetShardRequest
-from nucliadb_protos.noderesources_pb2 import Shard
 from redis import asyncio as aioredis
-from tests.ingest.fixtures import broker_resource
 
 from nucliadb.common.cluster.manager import KBShardManager, get_index_node
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.cache import clear_ingest_cache
 from nucliadb.search import API_PREFIX
 from nucliadb.search.predict import DummyPredictEngine
+from nucliadb_protos.nodereader_pb2 import GetShardRequest
+from nucliadb_protos.noderesources_pb2 import Shard
 from nucliadb_utils.settings import nuclia_settings
 from nucliadb_utils.tests import free_port
 from nucliadb_utils.utilities import (
@@ -42,6 +41,7 @@ from nucliadb_utils.utilities import (
     get_utility,
     set_utility,
 )
+from tests.ingest.fixtures import broker_resource
 
 
 @pytest.fixture(scope="function")
@@ -185,9 +185,7 @@ async def multiple_search_resource(
     return knowledgebox_ingest
 
 
-async def inject_message(
-    processor, knowledgebox_ingest, message, count: int = 1
-) -> str:
+async def inject_message(processor, knowledgebox_ingest, message, count: int = 1) -> str:
     await processor.process(message=message, seqid=count)
     await wait_for_shard(knowledgebox_ingest, count)
     return knowledgebox_ingest

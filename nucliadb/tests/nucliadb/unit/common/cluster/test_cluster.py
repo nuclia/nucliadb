@@ -76,9 +76,7 @@ def test_sorted_primary_nodes_avoid_nodes(available_nodes):
 
         # check ignore_nodes are ignored while keeping avoid_nodes at the end
         all_nodes = list(available_nodes.keys())
-        assert manager.sorted_primary_nodes(
-            avoid_nodes=["node-0"], ignore_nodes=["node-30"]
-        ) == [
+        assert manager.sorted_primary_nodes(avoid_nodes=["node-0"], ignore_nodes=["node-30"]) == [
             "node-40",
             "node-0",
         ]
@@ -127,21 +125,13 @@ def test_choose_node_with_two_primary_nodes():
 
     node, _ = manager.choose_node(
         writer_pb2.ShardObject(
-            replicas=[
-                writer_pb2.ShardReplica(
-                    shard=writer_pb2.ShardCreated(id="123"), node="node-0"
-                )
-            ]
+            replicas=[writer_pb2.ShardReplica(shard=writer_pb2.ShardCreated(id="123"), node="node-0")]
         )
     )
     assert node.id == "node-0"
     node, _ = manager.choose_node(
         writer_pb2.ShardObject(
-            replicas=[
-                writer_pb2.ShardReplica(
-                    shard=writer_pb2.ShardCreated(id="123"), node="node-1"
-                )
-            ]
+            replicas=[writer_pb2.ShardReplica(shard=writer_pb2.ShardCreated(id="123"), node="node-1")]
         )
     )
     assert node.id == "node-1"
@@ -160,22 +150,14 @@ def test_choose_node_with_two_read_replicas():
 
     node, _ = manager.choose_node(
         writer_pb2.ShardObject(
-            replicas=[
-                writer_pb2.ShardReplica(
-                    shard=writer_pb2.ShardCreated(id="123"), node="node-0"
-                )
-            ]
+            replicas=[writer_pb2.ShardReplica(shard=writer_pb2.ShardCreated(id="123"), node="node-0")]
         ),
         use_read_replica_nodes=True,
     )
     assert node.id == "node-replica-0"
     node, _ = manager.choose_node(
         writer_pb2.ShardObject(
-            replicas=[
-                writer_pb2.ShardReplica(
-                    shard=writer_pb2.ShardCreated(id="123"), node="node-1"
-                )
-            ]
+            replicas=[writer_pb2.ShardReplica(shard=writer_pb2.ShardCreated(id="123"), node="node-1")]
         ),
         use_read_replica_nodes=True,
     )
@@ -197,9 +179,7 @@ def test_choose_node_no_healthy_node_available():
         manager.choose_node(
             writer_pb2.ShardObject(
                 replicas=[
-                    writer_pb2.ShardReplica(
-                        shard=writer_pb2.ShardCreated(id="123"), node="node-1"
-                    )
+                    writer_pb2.ShardReplica(shard=writer_pb2.ShardCreated(id="123"), node="node-1")
                 ]
             ),
             use_read_replica_nodes=True,
@@ -253,16 +233,12 @@ def test_choose_node_with_nodes_and_replicas(standalone_mode_off):
     add_read_replica_node("node-replica-1", primary_id="node-1")
 
     # Without read replicas, we only choose primaries
-    shard_ids, node_ids = repeated_choose_node(
-        TRIES_PER_ASSERT, shard, use_read_replica_nodes=False
-    )
+    shard_ids, node_ids = repeated_choose_node(TRIES_PER_ASSERT, shard, use_read_replica_nodes=False)
     assert set(shard_ids) == {"123"}
     assert set(node_ids) == {"node-0"}
 
     # Secondaries are preferred
-    shard_ids, node_ids = repeated_choose_node(
-        TRIES_PER_ASSERT, shard, use_read_replica_nodes=True
-    )
+    shard_ids, node_ids = repeated_choose_node(TRIES_PER_ASSERT, shard, use_read_replica_nodes=True)
     assert set(shard_ids) == {"123"}
     assert set(node_ids) == {"node-replica-0"}
 
@@ -291,15 +267,11 @@ def test_choose_node_with_nodes_and_replicas(standalone_mode_off):
     add_read_replica_node("node-replica-0", primary_id="node-0")
     add_read_replica_node("node-replica-1", primary_id="node-1")
 
-    shard_ids, node_ids = repeated_choose_node(
-        TRIES_PER_ASSERT, shard, use_read_replica_nodes=False
-    )
+    shard_ids, node_ids = repeated_choose_node(TRIES_PER_ASSERT, shard, use_read_replica_nodes=False)
     assert set(shard_ids) == {"123"}
     assert set(node_ids) == {"node-0"}
 
-    shard_ids, node_ids = repeated_choose_node(
-        TRIES_PER_ASSERT, shard, use_read_replica_nodes=True
-    )
+    shard_ids, node_ids = repeated_choose_node(TRIES_PER_ASSERT, shard, use_read_replica_nodes=True)
     assert set(shard_ids) == {"123"}
     assert set(node_ids) == {"node-replica-0"}
 
@@ -328,15 +300,11 @@ def test_choose_node_with_nodes_and_replicas(standalone_mode_off):
     add_index_node("node-1")
     add_read_replica_node("node-replica-0", primary_id="node-0")
 
-    shard_ids, node_ids = repeated_choose_node(
-        TRIES_PER_ASSERT, shard, use_read_replica_nodes=False
-    )
+    shard_ids, node_ids = repeated_choose_node(TRIES_PER_ASSERT, shard, use_read_replica_nodes=False)
     assert set(shard_ids) == {"123"}
     assert set(node_ids) == {"node-0"}
 
-    shard_ids, node_ids = repeated_choose_node(
-        TRIES_PER_ASSERT, shard, use_read_replica_nodes=True
-    )
+    shard_ids, node_ids = repeated_choose_node(TRIES_PER_ASSERT, shard, use_read_replica_nodes=True)
     assert set(shard_ids) == {"123"}
     assert set(node_ids) == {"node-replica-0"}
 

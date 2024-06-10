@@ -25,11 +25,10 @@ Targeted rollover for a specific KBs which still don't have the latest version o
 
 import logging
 
-from nucliadb_protos.noderesources_pb2 import ShardCreated
-
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.rollover import rollover_kb_shards
 from nucliadb.migrator.context import ExecutionContext
+from nucliadb_protos.noderesources_pb2 import ShardCreated
 
 logger = logging.getLogger(__name__)
 
@@ -61,9 +60,6 @@ async def has_old_paragraphs_index(context: ExecutionContext, kbid: str) -> bool
             raise ShardsObjectNotFound()
         for shard in shards_object.shards:
             for replica in shard.replicas:
-                if (
-                    replica.shard.paragraph_service
-                    != ShardCreated.ParagraphService.PARAGRAPH_V2
-                ):
+                if replica.shard.paragraph_service != ShardCreated.ParagraphService.PARAGRAPH_V2:
                     return True
         return False

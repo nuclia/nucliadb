@@ -27,9 +27,7 @@ from nucliadb_models.resource import NucliaDBRoles
 
 
 @pytest.mark.asyncio
-async def test_find(
-    search_api: Callable[..., AsyncClient], multiple_search_resource: str
-) -> None:
+async def test_find(search_api: Callable[..., AsyncClient], multiple_search_resource: str) -> None:
     kbid = multiple_search_resource
 
     async with search_api(roles=[NucliaDBRoles.READER]) as client:

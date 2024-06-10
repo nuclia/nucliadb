@@ -91,9 +91,7 @@ def is_onprem_nucliadb_mock():
 @pytest.fixture()
 def settings():
     with mock.patch(f"{MODULE}.nuclia_settings") as settings:
-        settings.learning_internal_svc_base_url = (
-            "http://{service}.learning.svc.cluster.local:8080"
-        )
+        settings.learning_internal_svc_base_url = "http://{service}.learning.svc.cluster.local:8080"
         settings.nuclia_service_account = "service-account"
         settings.nuclia_zone = "europe-1"
         settings.nuclia_public_url = "http://{zone}.public-url"
@@ -108,10 +106,7 @@ async def test_get_learning_config_client(settings, is_onprem_nucliadb_mock):
 
     is_onprem_nucliadb_mock.return_value = False
     async with learning_config_client() as client:
-        assert (
-            str(client.base_url)
-            == "http://config.learning.svc.cluster.local:8080/api/v1/internal/"
-        )
+        assert str(client.base_url) == "http://config.learning.svc.cluster.local:8080/api/v1/internal/"
         assert "X-NUCLIA-NUAKEY" not in client.headers
 
 
@@ -158,9 +153,7 @@ async def test_proxy(async_client):
         body=mock.AsyncMock(return_value=b"some data"),
         headers={"x-nucliadb-user": "user", "x-nucliadb-roles": "roles"},
     )
-    response = await proxy(
-        LearningService.CONFIG, request, "GET", "url", extra_headers={"foo": "bar"}
-    )
+    response = await proxy(LearningService.CONFIG, request, "GET", "url", extra_headers={"foo": "bar"})
 
     assert response.status_code == 200
     assert response.body == b"some data"

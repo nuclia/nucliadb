@@ -17,11 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb_protos.resources_pb2 import Block as PBBlock
-from nucliadb_protos.resources_pb2 import FieldLayout
-
 import nucliadb_models as models
 from nucliadb.writer.layouts import VERSION
+from nucliadb_protos.resources_pb2 import Block as PBBlock
+from nucliadb_protos.resources_pb2 import FieldLayout
 from nucliadb_utils.storages.storage import Storage
 
 

@@ -26,6 +26,9 @@ from unittest.mock import AsyncMock, patch
 
 import aiohttp
 import pytest
+
+from nucliadb.train import API_PREFIX
+from nucliadb.train.api.v1.router import KB_PREFIX
 from nucliadb_protos.dataset_pb2 import ImageClassificationBatch, TaskType, TrainSet
 from nucliadb_protos.resources_pb2 import (
     CloudFile,
@@ -37,11 +40,8 @@ from nucliadb_protos.resources_pb2 import (
 )
 from nucliadb_protos.writer_pb2 import BrokerMessage, OpStatusWriter
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from tests.train.utils import get_batches_from_train_response_stream
-
-from nucliadb.train import API_PREFIX
-from nucliadb.train.api.v1.router import KB_PREFIX
 from nucliadb_utils.utilities import Utility, get_utility, set_utility
+from tests.train.utils import get_batches_from_train_response_stream
 
 _dir = os.path.dirname(__file__)
 _testdata_dir = os.path.join(_dir, "..", "..", "tests", "testdata")
@@ -57,9 +57,7 @@ async def test_generation_image_classification(
     knowledgebox: str,
     image_classification_resource,
 ):
-    async with train_rest_api.get(
-        f"/{API_PREFIX}/v1/{KB_PREFIX}/{knowledgebox}/trainset"
-    ) as partitions:
+    async with train_rest_api.get(f"/{API_PREFIX}/v1/{KB_PREFIX}/{knowledgebox}/trainset") as partitions:
         assert partitions.status == 200
         data = await partitions.json()
         assert len(data["partitions"]) == 1
@@ -76,9 +74,7 @@ async def test_generation_image_classification(
     ) as response:
         assert response.status == 200
         batches = []
-        async for batch in get_batches_from_train_response_stream(
-            response, ImageClassificationBatch
-        ):
+        async for batch in get_batches_from_train_response_stream(response, ImageClassificationBatch):
             batches.append(batch)
             assert len(batch.data) == 1
             selections = json.loads(batch.data[0].selections)
@@ -128,21 +124,15 @@ async def image_classification_resource(
     body = await resp.json()
     rid = body["uuid"]
 
-    broker_message = generate_image_classification_broker_message(
-        selections, kbid, rid, field_id
-    )
+    broker_message = generate_image_classification_broker_message(selections, kbid, rid, field_id)
 
     original_storage = get_utility(Utility.STORAGE)
     set_utility(Utility.STORAGE, AsyncMock())
     mock_set = AsyncMock(return_value=None)
     mock_get = AsyncMock(return_value=broker_message.file_extracted_data[0])
     with (
-        patch(
-            "nucliadb.ingest.fields.file.File.set_file_extracted_data", new=mock_set
-        ) as _,
-        patch(
-            "nucliadb.ingest.fields.file.File.get_file_extracted_data", new=mock_get
-        ) as _,
+        patch("nucliadb.ingest.fields.file.File.set_file_extracted_data", new=mock_set) as _,
+        patch("nucliadb.ingest.fields.file.File.get_file_extracted_data", new=mock_get) as _,
     ):
         resp = await nucliadb_grpc.ProcessMessage(  # type: ignore
             iter([broker_message]), timeout=10, wait_for_ready=True
@@ -153,9 +143,7 @@ async def image_classification_resource(
     set_utility(Utility.STORAGE, original_storage)
 
 
-def generate_image_classification_fieldmetadata(
-    selections: dict, field_id: str
-) -> list[dict[str, Any]]:
+def generate_image_classification_fieldmetadata(selections: dict, field_id: str) -> list[dict[str, Any]]:
     selections_by_page = {}  # type: ignore
     for annotation in selections["annotations"]:
         page_selections = selections_by_page.setdefault(annotation["page"], [])

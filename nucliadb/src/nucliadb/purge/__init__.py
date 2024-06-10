@@ -53,9 +53,7 @@ async def purge_kb(driver: Driver):
         try:
             kbid = key.split("/")[2]
         except Exception:
-            logger.warning(
-                f"  X Skipping purge {key}, wrong key format, expected {KB_TO_DELETE_BASE}"
-            )
+            logger.warning(f"  X Skipping purge {key}, wrong key format, expected {KB_TO_DELETE_BASE}")
             continue
 
         try:
@@ -63,15 +61,11 @@ async def purge_kb(driver: Driver):
             logger.info(f"  √ Successfully Purged {kbid}")
         except ShardNotFound as exc:
             errors.capture_exception(exc)
-            logger.error(
-                f"  X At least one shard was unavailable while purging {kbid}, skipping"
-            )
+            logger.error(f"  X At least one shard was unavailable while purging {kbid}, skipping")
             continue
         except NodeError as exc:
             errors.capture_exception(exc)
-            logger.error(
-                f"  X At least one node was unavailable while purging {kbid}, skipping"
-            )
+            logger.error(f"  X At least one node was unavailable while purging {kbid}, skipping")
             continue
 
         except Exception as exc:
@@ -113,16 +107,12 @@ async def purge_kb_storage(driver: Driver, storage: Storage):
 
         delete_marker = False
         if conflict:
-            logger.info(
-                f"  . Nothing was deleted for {key}, (Bucket not yet empty), will try next time"
-            )
+            logger.info(f"  . Nothing was deleted for {key}, (Bucket not yet empty), will try next time")
             # Just in case something failed while setting a lifecycle policy to
             # remove all elements from the bucket, reschedule it
             await storage.schedule_delete_kb(kbid)
         elif not deleted:
-            logger.info(
-                f"  ! Expected bucket for {key} was not found, will delete marker"
-            )
+            logger.info(f"  ! Expected bucket for {key} was not found, will delete marker")
             delete_marker = True
         elif deleted:
             logger.info("  √ Bucket successfully deleted")
@@ -157,9 +147,7 @@ async def purge_kb_vectorsets(driver: Driver, storage: Storage):
         try:
             _base, kbid, vectorset = key.lstrip("/").split("/")
         except ValueError:
-            logger.info(
-                f"  X Skipping purge {key}, wrong key format, expected {KB_VECTORSET_TO_DELETE}"
-            )
+            logger.info(f"  X Skipping purge {key}, wrong key format, expected {KB_VECTORSET_TO_DELETE}")
             continue
 
         try:

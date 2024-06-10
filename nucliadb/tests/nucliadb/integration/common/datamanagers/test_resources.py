@@ -18,12 +18,12 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import pytest
-from nucliadb_protos.resources_pb2 import Basic
 
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG
 from nucliadb_protos import resources_pb2
+from nucliadb_protos.resources_pb2 import Basic
 
 pytestmark = pytest.mark.asyncio
 
@@ -33,9 +33,7 @@ async def check_slug(driver: Driver, kbid, rid, slug):
         basic = await datamanagers.resources.get_basic(txn, kbid=kbid, rid=rid)
         assert basic is not None
         assert basic.slug == slug
-        uuid = await datamanagers.resources.get_resource_uuid_from_slug(
-            txn, kbid=kbid, slug=slug
-        )
+        uuid = await datamanagers.resources.get_resource_uuid_from_slug(txn, kbid=kbid, slug=slug)
         assert uuid == rid
 
 
@@ -61,9 +59,7 @@ async def test_modify_slug(resource_with_slug, maindb_driver: Driver):
     new_slug = "new_slug"
 
     async with maindb_driver.transaction() as txn:
-        await datamanagers.resources.modify_slug(
-            txn, kbid=kbid, rid=rid, new_slug=new_slug
-        )
+        await datamanagers.resources.modify_slug(txn, kbid=kbid, rid=rid, new_slug=new_slug)
         await txn.commit()
 
     await check_slug(maindb_driver, kbid, rid, new_slug)
@@ -72,44 +68,28 @@ async def test_modify_slug(resource_with_slug, maindb_driver: Driver):
 async def test_all_fields(maindb_driver: Driver):
     kbid = "mykb"
     rid = "myresource"
-    field = resources_pb2.FieldID(
-        field="myfield", field_type=resources_pb2.FieldType.LINK
-    )
+    field = resources_pb2.FieldID(field="myfield", field_type=resources_pb2.FieldType.LINK)
 
     async with maindb_driver.transaction(read_only=True) as txn:
-        all_fields = await datamanagers.resources.get_all_field_ids(
-            txn, kbid=kbid, rid=rid
-        )
+        all_fields = await datamanagers.resources.get_all_field_ids(txn, kbid=kbid, rid=rid)
         assert all_fields is None
 
-        assert (
-            await datamanagers.resources.has_field(
-                txn, kbid=kbid, rid=rid, field_id=field
-            )
-        ) is False
+        assert (await datamanagers.resources.has_field(txn, kbid=kbid, rid=rid, field_id=field)) is False
 
     # set a field for a resource
 
     async with maindb_driver.transaction() as txn:
         pb = resources_pb2.AllFieldIDs()
         pb.fields.append(field)
-        await datamanagers.resources.set_all_field_ids(
-            txn, kbid=kbid, rid=rid, allfields=pb
-        )
+        await datamanagers.resources.set_all_field_ids(txn, kbid=kbid, rid=rid, allfields=pb)
         await txn.commit()
 
     async with maindb_driver.transaction(read_only=True) as txn:
-        all_fields = await datamanagers.resources.get_all_field_ids(
-            txn, kbid=kbid, rid=rid
-        )
+        all_fields = await datamanagers.resources.get_all_field_ids(txn, kbid=kbid, rid=rid)
         assert all_fields is not None
         assert len(all_fields.fields) == 1
 
-        assert (
-            await datamanagers.resources.has_field(
-                txn, kbid=kbid, rid=rid, field_id=field
-            )
-        ) is True
+        assert (await datamanagers.resources.has_field(txn, kbid=kbid, rid=rid, field_id=field)) is True
 
     # set no fields
 
@@ -120,14 +100,8 @@ async def test_all_fields(maindb_driver: Driver):
         await txn.commit()
 
     async with maindb_driver.transaction(read_only=True) as txn:
-        all_fields = await datamanagers.resources.get_all_field_ids(
-            txn, kbid=kbid, rid=rid
-        )
+        all_fields = await datamanagers.resources.get_all_field_ids(txn, kbid=kbid, rid=rid)
         assert all_fields is not None
         assert len(all_fields.fields) == 0
 
-        assert (
-            await datamanagers.resources.has_field(
-                txn, kbid=kbid, rid=rid, field_id=field
-            )
-        ) is False
+        assert (await datamanagers.resources.has_field(txn, kbid=kbid, rid=rid, field_id=field)) is False

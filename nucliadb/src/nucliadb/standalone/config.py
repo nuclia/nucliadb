@@ -46,10 +46,7 @@ def config_standalone_driver(nucliadb_args: Settings):
         # no driver specified, for standalone, we force defaulting to local here
         ingest_settings.driver = DriverConfig.LOCAL
 
-    if (
-        ingest_settings.driver == DriverConfig.LOCAL
-        and ingest_settings.driver_local_url is None
-    ):
+    if ingest_settings.driver == DriverConfig.LOCAL and ingest_settings.driver_local_url is None:
         # also provide default path for local driver when none provided
         ingest_settings.driver_local_url = "./data/main"
 
@@ -57,10 +54,7 @@ def config_standalone_driver(nucliadb_args: Settings):
         # no driver specified, for standalone, we try to automate some settings here
         storage_settings.file_backend = FileBackendConfig.LOCAL
 
-    if (
-        storage_settings.file_backend == FileBackendConfig.LOCAL
-        and storage_settings.local_files is None
-    ):
+    if storage_settings.file_backend == FileBackendConfig.LOCAL and storage_settings.local_files is None:
         storage_settings.local_files = "./data/blob"
 
     if ingest_settings.driver_local_url is not None and not os.path.isdir(

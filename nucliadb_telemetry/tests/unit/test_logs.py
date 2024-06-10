@@ -40,9 +40,7 @@ def test_setup_logging(monkeypatch):
 
         logger = logging.getLogger()
         handler = logger.addHandler.mock_calls[0].args[0]
-        assert isinstance(
-            handler.setFormatter.mock_calls[0].args[0], logs.JSONFormatter
-        )
+        assert isinstance(handler.setFormatter.mock_calls[0].args[0], logs.JSONFormatter)
 
 
 def test_setup_logging_plain(monkeypatch):
@@ -59,9 +57,7 @@ def test_setup_logging_plain(monkeypatch):
 
         logger = logging.getLogger()
         handler = logger.addHandler.mock_calls[0].args[0]
-        assert isinstance(
-            handler.setFormatter.mock_calls[0].args[0], logs.ExtraFormatter
-        )
+        assert isinstance(handler.setFormatter.mock_calls[0].args[0], logs.ExtraFormatter)
 
 
 class _TestLogMessage(pydantic.BaseModel):

@@ -25,6 +25,14 @@ import aiohttp
 import pytest
 from grpc import aio
 from httpx import AsyncClient
+
+from nucliadb.common import datamanagers
+from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG_BASE
+from nucliadb.ingest.orm.entities import EntitiesManager
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb.ingest.orm.processor import Processor
+from nucliadb.standalone.settings import Settings
+from nucliadb.train.utils import start_shard_manager, stop_shard_manager
 from nucliadb_protos.knowledgebox_pb2 import EntitiesGroup, Label, LabelSet
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
@@ -37,14 +45,6 @@ from nucliadb_protos.resources_pb2 import (
 )
 from nucliadb_protos.writer_pb2 import BrokerMessage, SetEntitiesRequest
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-
-from nucliadb.common import datamanagers
-from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG_BASE
-from nucliadb.ingest.orm.entities import EntitiesManager
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.orm.processor import Processor
-from nucliadb.standalone.settings import Settings
-from nucliadb.train.utils import start_shard_manager, stop_shard_manager
 from nucliadb_utils.tests import free_port
 from nucliadb_utils.utilities import clear_global_cache, get_storage
 
@@ -133,9 +133,9 @@ def broker_simple_resource(knowledgebox: str, number: int) -> BrokerMessage:
     message1.basic.metadata.language = "es"
     message1.basic.created.FromDatetime(datetime.utcnow())
     message1.basic.modified.FromDatetime(datetime.utcnow())
-    message1.texts["field1"].body = (
-        "My lovely field with some information from Barcelona. This will be the good field. \n\n And then we will go Manresa."  # noqa
-    )
+    message1.texts[
+        "field1"
+    ].body = "My lovely field with some information from Barcelona. This will be the good field. \n\n And then we will go Manresa."  # noqa
     message1.source = BrokerMessage.MessageSource.WRITER
     return message1
 
@@ -198,9 +198,7 @@ def broker_processed_resource(knowledgebox, number, rid) -> BrokerMessage:
         }
     )
     fcmw.metadata.metadata.positions["CITY/Barcelona"].entity = "Barcelona"
-    fcmw.metadata.metadata.positions["CITY/Barcelona"].position.append(
-        Position(start=43, end=52)
-    )
+    fcmw.metadata.metadata.positions["CITY/Barcelona"].position.append(Position(start=43, end=52))
     message2.field_metadata.append(fcmw)
 
     etw = ExtractedTextWrapper()
@@ -228,9 +226,7 @@ def broker_processed_resource(knowledgebox, number, rid) -> BrokerMessage:
 
 
 @pytest.fixture(scope="function")
-async def test_pagination_resources(
-    processor: Processor, knowledgebox_ingest, test_settings_train
-):
+async def test_pagination_resources(processor: Processor, knowledgebox_ingest, test_settings_train):
     """
     Create a set of resources with only basic information to test pagination
     """
@@ -330,9 +326,8 @@ async def train_api(test_settings_train: None, local_files):  # type: ignore
 
 @pytest.fixture(scope="function")
 async def train_client(train_api):  # type: ignore
-    from nucliadb_protos.train_pb2_grpc import TrainStub
-
     from nucliadb.train.settings import settings
+    from nucliadb_protos.train_pb2_grpc import TrainStub
 
     channel = aio.insecure_channel(f"localhost:{settings.grpc_port}")
     yield TrainStub(channel)

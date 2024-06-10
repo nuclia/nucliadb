@@ -28,9 +28,7 @@ logger = logging.getLogger(__name__)
 PULL_PARTITION_OFFSET = "/processing/pull-offset/{pull_type_id}/{partition}"
 
 
-async def get_pull_offset(
-    txn: Transaction, *, pull_type_id: str, partition: str
-) -> Optional[int]:
+async def get_pull_offset(txn: Transaction, *, pull_type_id: str, partition: str) -> Optional[int]:
     key = PULL_PARTITION_OFFSET.format(pull_type_id=pull_type_id, partition=partition)
     val: Optional[bytes] = await txn.get(key)
     if val is not None:
@@ -38,8 +36,6 @@ async def get_pull_offset(
     return None
 
 
-async def set_pull_offset(
-    txn: Transaction, *, pull_type_id: str, partition: str, offset: int
-) -> None:
+async def set_pull_offset(txn: Transaction, *, pull_type_id: str, partition: str, offset: int) -> None:
     key = PULL_PARTITION_OFFSET.format(pull_type_id=pull_type_id, partition=partition)
     await txn.set(key, str(offset).encode())

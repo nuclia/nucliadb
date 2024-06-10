@@ -25,7 +25,6 @@ from unittest.mock import AsyncMock, Mock
 
 import aiohttp
 import backoff
-from nucliadb_protos.utils_pb2 import RelationNode
 from pydantic import BaseModel, Field, ValidationError
 
 from nucliadb.search import logger
@@ -42,6 +41,7 @@ from nucliadb_models.search import (
     SummarizeModel,
     TokenSearch,
 )
+from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_telemetry import errors, metrics
 from nucliadb_utils import const
 from nucliadb_utils.exceptions import LimitsExceededError
@@ -73,9 +73,7 @@ class RephraseMissingContextError(Exception):
 
 DUMMY_RELATION_NODE = [
     RelationNode(value="Ferran", ntype=RelationNode.NodeType.ENTITY, subtype="PERSON"),
-    RelationNode(
-        value="Joan Antoni", ntype=RelationNode.NodeType.ENTITY, subtype="PERSON"
-    ),
+    RelationNode(value="Joan Antoni", ntype=RelationNode.NodeType.ENTITY, subtype="PERSON"),
 ]
 
 DUMMY_REPHRASE_QUERY = "This is a rephrased query"
@@ -180,9 +178,7 @@ def convert_relations(data: dict[str, list[dict[str, str]]]) -> list[RelationNod
     for token in data["tokens"]:
         text = token["text"]
         klass = token["ner"]
-        result.append(
-            RelationNode(value=text, ntype=RelationNode.NodeType.ENTITY, subtype=klass)
-        )
+        result.append(RelationNode(value=text, ntype=RelationNode.NodeType.ENTITY, subtype=klass))
     return result
 
 
@@ -215,9 +211,7 @@ class PredictEngine:
         await self.session.close()
 
     def check_nua_key_is_configured_for_onprem(self):
-        if self.onprem and (
-            self.nuclia_service_account is None and self.local_predict is False
-        ):
+        if self.onprem and (self.nuclia_service_account is None and self.local_predict is False):
             raise NUAKeyMissingError()
 
     def get_predict_url(self, endpoint: str, kbid: str) -> str:
@@ -243,9 +237,7 @@ class PredictEngine:
         else:
             return {"X-STF-KBID": kbid}
 
-    async def check_response(
-        self, resp: aiohttp.ClientResponse, expected_status: int = 200
-    ) -> None:
+    async def check_response(self, resp: aiohttp.ClientResponse, expected_status: int = 200) -> None:
         if resp.status == expected_status:
             return
 
@@ -289,9 +281,7 @@ class PredictEngine:
         try:
             self.check_nua_key_is_configured_for_onprem()
         except NUAKeyMissingError:
-            logger.warning(
-                "Nuclia Service account is not defined so could not send the feedback"
-            )
+            logger.warning("Nuclia Service account is not defined so could not send the feedback")
             return
 
         data = item.model_dump()
@@ -326,9 +316,7 @@ class PredictEngine:
         return await _parse_rephrase_response(resp)
 
     @predict_observer.wrap({"type": "chat"})
-    async def chat_query(
-        self, kbid: str, item: ChatModel
-    ) -> tuple[str, AsyncIterator[bytes]]:
+    async def chat_query(self, kbid: str, item: ChatModel) -> tuple[str, AsyncIterator[bytes]]:
         try:
             self.check_nua_key_is_configured_for_onprem()
         except NUAKeyMissingError:
@@ -388,9 +376,7 @@ class PredictEngine:
         try:
             self.check_nua_key_is_configured_for_onprem()
         except NUAKeyMissingError:
-            error = (
-                "Nuclia Service account is not defined so could not ask query endpoint"
-            )
+            error = "Nuclia Service account is not defined so could not ask query endpoint"
             logger.warning(error)
             raise SendToPredictError(error)
 
@@ -501,9 +487,7 @@ class DummyPredictEngine(PredictEngine):
         self.calls.append(("rephrase_query", item))
         return DUMMY_REPHRASE_QUERY
 
-    async def chat_query(
-        self, kbid: str, item: ChatModel
-    ) -> tuple[str, AsyncIterator[bytes]]:
+    async def chat_query(self, kbid: str, item: ChatModel) -> tuple[str, AsyncIterator[bytes]]:
         self.calls.append(("chat_query", item))
 
         async def generate():
@@ -531,18 +515,14 @@ class DummyPredictEngine(PredictEngine):
         rephrase: Optional[bool] = False,
     ) -> QueryInfo:
         self.calls.append(("query", sentence))
-        if (
-            os.environ.get("TEST_SENTENCE_ENCODER") == "multilingual-2023-02-21"
-        ):  # pragma: no cover
+        if os.environ.get("TEST_SENTENCE_ENCODER") == "multilingual-2023-02-21":  # pragma: no cover
             return QueryInfo(
                 language="en",
                 stop_words=[],
                 semantic_threshold=0.7,
                 visual_llm=True,
                 max_context=self.max_context,
-                entities=TokenSearch(
-                    tokens=[Ner(text="text", ner="PERSON", start=0, end=2)], time=0.0
-                ),
+                entities=TokenSearch(tokens=[Ner(text="text", ner="PERSON", start=0, end=2)], time=0.0),
                 sentence=SentenceSearch(data=Qm2023, time=0.0),
                 query=sentence,
             )
@@ -553,9 +533,7 @@ class DummyPredictEngine(PredictEngine):
                 semantic_threshold=0.7,
                 visual_llm=True,
                 max_context=self.max_context,
-                entities=TokenSearch(
-                    tokens=[Ner(text="text", ner="PERSON", start=0, end=2)], time=0.0
-                ),
+                entities=TokenSearch(tokens=[Ner(text="text", ner="PERSON", start=0, end=2)], time=0.0),
                 sentence=SentenceSearch(data=Q, time=0.0),
                 query=sentence,
             )
@@ -577,9 +555,7 @@ class DummyPredictEngine(PredictEngine):
             rsummary = []
             for field_id, field_text in item.resources[rid].fields.items():
                 rsummary.append(f"{field_id}: {field_text}")
-            response.resources[rid] = SummarizedResource(
-                summary="\n\n".join(rsummary), tokens=10
-            )
+            response.resources[rid] = SummarizedResource(summary="\n\n".join(rsummary), tokens=10)
         return response
 
 
@@ -604,7 +580,6 @@ def get_answer_generator(response: aiohttp.ClientResponse):
 def get_chat_ndjson_generator(
     response: aiohttp.ClientResponse,
 ) -> AsyncIterator[GenerativeChunk]:
-
     async def _parse_generative_chunks(gen):
         async for chunk in gen:
             try:

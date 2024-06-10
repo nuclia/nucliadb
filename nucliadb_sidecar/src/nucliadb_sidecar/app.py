@@ -50,9 +50,7 @@ async def start_indexed_publisher() -> IndexedPublisher:
     return publisher
 
 
-async def start_worker(
-    writer: Writer, nats_connection_manager: NatsConnectionManager
-) -> Worker:
+async def start_worker(writer: Writer, nats_connection_manager: NatsConnectionManager) -> Worker:
     node = await get_node_id()
     if node is None:  # pragma: nocover
         raise Exception("No Key defined")
@@ -124,8 +122,6 @@ async def main():
 def run():  # pragma: no cover
     setup_logging()
 
-    errors.setup_error_handling(
-        importlib.metadata.distribution("nucliadb_sidecar").version
-    )
+    errors.setup_error_handling(importlib.metadata.distribution("nucliadb_sidecar").version)
 
     asyncio.run(main())

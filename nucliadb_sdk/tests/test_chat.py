@@ -58,9 +58,7 @@ def test_chat_on_kb_no_context_found(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
 def test_chat_on_resource(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
     rid = sdk.list_resources(kbid=docs_dataset).resources[0].id
     # With retrieval
-    _ = sdk.chat_on_resource(
-        kbid=docs_dataset, rid=rid, query="Nuclia loves Semantic Search"
-    )
+    _ = sdk.chat_on_resource(kbid=docs_dataset, rid=rid, query="Nuclia loves Semantic Search")
 
     # Check chatting with the whole resource (no retrieval)
     _ = sdk.chat_on_resource(

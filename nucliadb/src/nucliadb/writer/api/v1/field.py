@@ -22,8 +22,6 @@ from typing import TYPE_CHECKING, Callable, Optional, Type, Union
 
 from fastapi import HTTPException, Response
 from fastapi_versioning import version
-from nucliadb_protos.resources_pb2 import FieldID, Metadata
-from nucliadb_protos.writer_pb2 import BrokerMessage
 from starlette.requests import Request
 
 import nucliadb_models as models
@@ -58,6 +56,8 @@ from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.utils import FieldIdString
 from nucliadb_models.writer import ResourceFieldAdded, ResourceUpdated
 from nucliadb_protos import resources_pb2
+from nucliadb_protos.resources_pb2 import FieldID, Metadata
+from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.transaction import TransactionCommitTimeoutError
@@ -68,9 +68,7 @@ from nucliadb_utils.utilities import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover
-    FIELD_TYPE_NAME_TO_FIELD_TYPE_MAP: dict[
-        models.FieldTypeName, resources_pb2.FieldType.V
-    ]
+    FIELD_TYPE_NAME_TO_FIELD_TYPE_MAP: dict[models.FieldTypeName, resources_pb2.FieldType.V]
 else:
     FIELD_TYPE_NAME_TO_FIELD_TYPE_MAP: dict[models.FieldTypeName, int]
 
@@ -128,13 +126,9 @@ async def add_field_to_resource(
 
     parse_field = FIELD_PARSERS_MAP[type(field_payload)]
     if iscoroutinefunction(parse_field):
-        await parse_field(
-            kbid, rid, field_id, field_payload, writer, toprocess, **parser_kwargs
-        )
+        await parse_field(kbid, rid, field_id, field_payload, writer, toprocess, **parser_kwargs)
     else:
-        parse_field(
-            kbid, rid, field_id, field_payload, writer, toprocess, **parser_kwargs
-        )
+        parse_field(kbid, rid, field_id, field_payload, writer, toprocess, **parser_kwargs)
 
     transaction = get_transaction_utility()
     processing = get_processing()
@@ -168,9 +162,7 @@ async def add_field_to_resource_by_slug(
     **parser_kwargs,
 ):
     rid = await get_rid_from_slug_or_raise_error(kbid, slug)
-    return await add_field_to_resource(
-        request, kbid, rid, field_id, field_payload, **parser_kwargs
-    )
+    return await add_field_to_resource(request, kbid, rid, field_id, field_payload, **parser_kwargs)
 
 
 async def delete_resource_field(
@@ -281,9 +273,7 @@ async def parse_layout_field_adapter(
     writer: BrokerMessage,
     toprocess: PushPayload,
 ):
-    return await parse_layout_field(
-        field_id, field_payload, writer, toprocess, kbid, rid
-    )
+    return await parse_layout_field(field_id, field_payload, writer, toprocess, kbid, rid)
 
 
 async def parse_conversation_field_adapter(
@@ -294,9 +284,7 @@ async def parse_conversation_field_adapter(
     writer: BrokerMessage,
     toprocess: PushPayload,
 ):
-    return await parse_conversation_field(
-        field_id, field_payload, writer, toprocess, kbid, rid
-    )
+    return await parse_conversation_field(field_id, field_payload, writer, toprocess, kbid, rid)
 
 
 async def parse_file_field_adapter(
@@ -343,9 +331,7 @@ async def add_resource_field_text_rslug_prefix(
     field_id: FieldIdString,
     field_payload: models.TextField,
 ) -> ResourceFieldAdded:
-    return await add_field_to_resource_by_slug(
-        request, kbid, rslug, field_id, field_payload
-    )
+    return await add_field_to_resource_by_slug(request, kbid, rslug, field_id, field_payload)
 
 
 @api.put(
@@ -383,9 +369,7 @@ async def add_resource_field_link_rslug_prefix(
     field_id: FieldIdString,
     field_payload: models.LinkField,
 ) -> ResourceFieldAdded:
-    return await add_field_to_resource_by_slug(
-        request, kbid, rslug, field_id, field_payload
-    )
+    return await add_field_to_resource_by_slug(request, kbid, rslug, field_id, field_payload)
 
 
 @api.put(
@@ -423,9 +407,7 @@ async def add_resource_field_keywordset_rslug_prefix(
     field_id: FieldIdString,
     field_payload: models.FieldKeywordset,
 ) -> ResourceFieldAdded:
-    return await add_field_to_resource_by_slug(
-        request, kbid, rslug, field_id, field_payload
-    )
+    return await add_field_to_resource_by_slug(request, kbid, rslug, field_id, field_payload)
 
 
 @api.put(
@@ -463,9 +445,7 @@ async def add_resource_field_datetime_rslug_prefix(
     field_id: FieldIdString,
     field_payload: models.FieldDatetime,
 ) -> ResourceFieldAdded:
-    return await add_field_to_resource_by_slug(
-        request, kbid, rslug, field_id, field_payload
-    )
+    return await add_field_to_resource_by_slug(request, kbid, rslug, field_id, field_payload)
 
 
 @api.put(
@@ -503,9 +483,7 @@ async def add_resource_field_layout_rslug_prefix(
     field_id: FieldIdString,
     field_payload: models.InputLayoutField,
 ) -> ResourceFieldAdded:
-    return await add_field_to_resource_by_slug(
-        request, kbid, rslug, field_id, field_payload
-    )
+    return await add_field_to_resource_by_slug(request, kbid, rslug, field_id, field_payload)
 
 
 @api.put(
@@ -543,9 +521,7 @@ async def add_resource_field_conversation_rslug_prefix(
     field_id: FieldIdString,
     field_payload: models.InputConversationField,
 ) -> ResourceFieldAdded:
-    return await add_field_to_resource_by_slug(
-        request, kbid, rslug, field_id, field_payload
-    )
+    return await add_field_to_resource_by_slug(request, kbid, rslug, field_id, field_payload)
 
 
 @api.put(
@@ -711,9 +687,7 @@ async def delete_resource_field_rslug_prefix(
     field_type: models.FieldTypeName,
     field_id: FieldIdString,
 ):
-    return await delete_resource_field_by_slug(
-        request, kbid, rslug, field_type, field_id
-    )
+    return await delete_resource_field_by_slug(request, kbid, rslug, field_type, field_id)
 
 
 @api.delete(

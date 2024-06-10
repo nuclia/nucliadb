@@ -26,11 +26,11 @@ from unittest.mock import patch
 
 import pytest
 from fastapi import FastAPI
-from nucliadb_protos.writer_pb2 import BrokerMessage
 from uvicorn.config import Config  # type: ignore
 from uvicorn.server import Server  # type: ignore
 
 from nucliadb.ingest.consumer.pull import PullWorker
+from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils import const
 from nucliadb_utils.fastapi.run import start_server
 from nucliadb_utils.nats import NatsConnectionManager
@@ -107,9 +107,7 @@ async def wait_for_messages(messages: list[BrokerMessage], max_time: int = 10) -
     start = time.monotonic()
     while time.monotonic() - start < max_time:
         if len(messages) == 0:
-            await asyncio.sleep(
-                0.1
-            )  # extra sleep to make sure it's flushed to consumer
+            await asyncio.sleep(0.1)  # extra sleep to make sure it's flushed to consumer
             return
 
         await asyncio.sleep(0.1)

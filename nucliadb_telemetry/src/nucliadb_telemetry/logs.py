@@ -74,17 +74,12 @@ _BUILTIN_ATTRS = set(
 )
 
 
-ACCESS_LOG_FMT = (
-    "%(asctime)s.%(msecs)03d - %(client_addr)s - %(request_line)s %(status_code)s"
-)
+ACCESS_LOG_FMT = "%(asctime)s.%(msecs)03d - %(client_addr)s - %(request_line)s %(status_code)s"
 ACCESS_LOG_DATEFMT = "%Y-%m-%d,%H:%M:%S"
 
 
 def extra_from_record(record) -> Dict[str, Any]:
-    return {
-        attr_name: record.__dict__[attr_name]
-        for attr_name in set(record.__dict__) - _BUILTIN_ATTRS
-    }
+    return {attr_name: record.__dict__[attr_name] for attr_name in set(record.__dict__) - _BUILTIN_ATTRS}
 
 
 class JSONFormatter(logging.Formatter):
@@ -147,9 +142,7 @@ class ExtraFormatter(logging.Formatter):
     def format(self, record):
         if not hasattr(record, "extra_formatted"):
             # format all extra fields as a comma separated list
-            extra_fmted = " -- " + ", ".join(
-                [f"{k}={v}" for k, v in extra_from_record(record).items()]
-            )
+            extra_fmted = " -- " + ", ".join([f"{k}={v}" for k, v in extra_from_record(record).items()])
             setattr(record, "extra_formatted", extra_fmted)
         return super().format(record)
 

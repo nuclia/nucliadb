@@ -95,9 +95,7 @@ async def test_purge_deletes_everything_from_maindb(
     keys_after_purge_kb = await list_all_keys(maindb_driver)
     # A marker key has been added to delete storage when bucket is empty (that
     # can take a while so it will happen asynchronously too)
-    assert any(
-        [key.startswith(KB_TO_DELETE_STORAGE_BASE) for key in keys_after_purge_kb]
-    )
+    assert any([key.startswith(KB_TO_DELETE_STORAGE_BASE) for key in keys_after_purge_kb])
 
     await purge_kb_storage(maindb_driver, storage)
 
@@ -221,9 +219,7 @@ async def test_purge_orphan_shard_detection(
             shards=[writer_pb2.ShardObject(shard="rollover-shard")],
             kbid=kbid,
         )
-        await datamanagers.rollover.update_kb_rollover_shards(
-            txn, kbid=kbid, kb_shards=rollover_shards
-        )
+        await datamanagers.rollover.update_kb_rollover_shards(txn, kbid=kbid, kb_shards=rollover_shards)
 
     orphan_shards = await detect_orphan_shards(maindb_driver)
     assert len(orphan_shards) == 1

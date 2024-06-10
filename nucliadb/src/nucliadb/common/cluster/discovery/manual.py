@@ -46,9 +46,7 @@ class ManualDiscovery(AbstractClusterDiscovery):
             except asyncio.CancelledError:
                 return
             except Exception:
-                logger.exception(
-                    "Error while watching cluster members. Will retry at started interval"
-                )
+                logger.exception("Error while watching cluster members. Will retry at started interval")
             finally:
                 await asyncio.sleep(15)
 

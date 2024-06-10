@@ -28,9 +28,7 @@ def test_process_entities_simple():
     split_ners = {"__main__": OrderedDict([((37, 50), ("PERSON", "el Super Fran"))])}
     split_paragaphs = {"__main__": []}
     entities = list(
-        process_entities(
-            split_text["__main__"], split_ners["__main__"], split_paragaphs["__main__"]
-        )
+        process_entities(split_text["__main__"], split_ners["__main__"], split_paragaphs["__main__"])
     )
     assert entities == [
         [

@@ -56,10 +56,7 @@ async def get_shards_paragraphs(kbid: str) -> list[tuple[str, int]]:
         )
         results[shard_meta.shard] = shard_data.paragraphs
 
-    return [
-        (shard, paragraphs)
-        for shard, paragraphs in sorted(results.items(), key=lambda x: x[1])
-    ]
+    return [(shard, paragraphs) for shard, paragraphs in sorted(results.items(), key=lambda x: x[1])]
 
 
 async def maybe_add_shard(kbid: str) -> None:
@@ -92,9 +89,7 @@ async def move_set_of_kb_resources(
     async with datamanagers.with_transaction() as txn:
         kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
     if kb_shards is None:  # pragma: no cover
-        logger.warning(
-            "No shards found for kb. This should not happen.", extra={"kbid": kbid}
-        )
+        logger.warning("No shards found for kb. This should not happen.", extra={"kbid": kbid})
         return
 
     logger.info(
@@ -122,9 +117,7 @@ async def move_set_of_kb_resources(
             async with (
                 datamanagers.with_transaction() as txn,
                 locking.distributed_lock(
-                    locking.RESOURCE_INDEX_LOCK.format(
-                        kbid=kbid, resource_id=resource_id
-                    )
+                    locking.RESOURCE_INDEX_LOCK.format(kbid=kbid, resource_id=resource_id)
                 ),
             ):
                 found_shard_id = await datamanagers.resources.get_resource_shard_id(
@@ -175,9 +168,7 @@ async def rebalance_kb(context: ApplicationContext, kbid: str) -> None:
 
     shard_paragraphs = await get_shards_paragraphs(kbid)
     rebalanced_shards = set()
-    while any(
-        paragraphs > settings.max_shard_paragraphs for _, paragraphs in shard_paragraphs
-    ):
+    while any(paragraphs > settings.max_shard_paragraphs for _, paragraphs in shard_paragraphs):
         # find the shard with the least/most paragraphs
         smallest_shard = shard_paragraphs[0][0]
         largest_shard = shard_paragraphs[-1][0]
@@ -201,9 +192,7 @@ async def run(context: ApplicationContext) -> None:
             # go through each kb and see if shards need to be reduced in size
             async with datamanagers.with_transaction() as txn:
                 async for kbid, _ in datamanagers.kb.get_kbs(txn):
-                    async with locking.distributed_lock(
-                        locking.KB_SHARDS_LOCK.format(kbid=kbid)
-                    ):
+                    async with locking.distributed_lock(locking.KB_SHARDS_LOCK.format(kbid=kbid)):
                         await rebalance_kb(context, kbid)
     except locking.ResourceLocked as exc:
         if exc.key == REBALANCE_LOCK:

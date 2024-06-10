@@ -21,11 +21,11 @@ from math import ceil
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+
 from nucliadb_protos.noderesources_pb2 import Resource as BrainResource
 from nucliadb_protos.noderesources_pb2 import ResourceID
 from nucliadb_protos.nodewriter_pb2 import IndexMessage
 from nucliadb_protos.resources_pb2 import CloudFile
-
 from nucliadb_utils.storages.local import LocalStorageField
 from nucliadb_utils.storages.storage import (
     ObjectInfo,
@@ -155,9 +155,7 @@ class TestStorage:
     @pytest.mark.asyncio
     async def test_download_pb(self, storage: StorageTest):
         assert isinstance(
-            await storage.download_pb(
-                LocalStorageField(storage, "bucket", "fullkey"), BrainResource
-            ),
+            await storage.download_pb(LocalStorageField(storage, "bucket", "fullkey"), BrainResource),
             BrainResource,
         )
 
@@ -217,10 +215,7 @@ async def test_iter_in_chunk_size():
 
     # Try with an iterable that yields chunks bigger than the chunk size
     chunks = [
-        chunk
-        async for chunk in iter_in_chunk_size(
-            iterable(total_size=12, chunk_size=10), chunk_size=4
-        )
+        chunk async for chunk in iter_in_chunk_size(iterable(total_size=12, chunk_size=10), chunk_size=4)
     ]
     assert len(chunks) == 3
     assert len(chunks[0]) == 4

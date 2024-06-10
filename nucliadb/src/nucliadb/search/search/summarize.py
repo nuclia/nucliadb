@@ -20,8 +20,6 @@
 import asyncio
 from typing import Optional
 
-from nucliadb_protos.utils_pb2 import ExtractedText
-
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.fields.base import Field
@@ -35,6 +33,7 @@ from nucliadb_models.search import (
     SummarizeRequest,
     SummarizeResourceModel,
 )
+from nucliadb_protos.utils_pb2 import ExtractedText
 from nucliadb_utils.utilities import get_storage
 
 ExtractedTexts = list[tuple[str, str, Optional[ExtractedText]]]
@@ -52,15 +51,11 @@ async def summarize(kbid: str, request: SummarizeRequest) -> SummarizedResponse:
     predict_request.user_prompt = request.user_prompt
     predict_request.summary_kind = request.summary_kind
 
-    for uuid_or_slug, field_id, extracted_text in await get_extracted_texts(
-        kbid, request.resources
-    ):
+    for uuid_or_slug, field_id, extracted_text in await get_extracted_texts(kbid, request.resources):
         if extracted_text is None:
             continue
 
-        fields = predict_request.resources.setdefault(
-            uuid_or_slug, SummarizeResourceModel()
-        ).fields
+        fields = predict_request.resources.setdefault(uuid_or_slug, SummarizeResourceModel()).fields
         fields[field_id] = extracted_text.text
 
     if len(predict_request.resources) == 0:
@@ -70,9 +65,7 @@ async def summarize(kbid: str, request: SummarizeRequest) -> SummarizedResponse:
     return await predict.summarize(kbid, predict_request)
 
 
-async def get_extracted_texts(
-    kbid: str, resource_uuids_or_slugs: list[str]
-) -> ExtractedTexts:
+async def get_extracted_texts(kbid: str, resource_uuids_or_slugs: list[str]) -> ExtractedTexts:
     results: ExtractedTexts = []
 
     driver = get_driver()
@@ -90,16 +83,12 @@ async def get_extracted_texts(
         for uuid_or_slug in set(resource_uuids_or_slugs):
             uuid = await get_resource_uuid(kb_orm, uuid_or_slug)
             if uuid is None:
-                logger.warning(
-                    f"Resource {uuid_or_slug} not found in KB", extra={"kbid": kbid}
-                )
+                logger.warning(f"Resource {uuid_or_slug} not found in KB", extra={"kbid": kbid})
                 continue
             resource_orm = Resource(txn=txn, storage=storage, kb=kb_orm, uuid=uuid)
             fields = await resource_orm.get_fields(force=True)
             for _, field in fields.items():
-                task = asyncio.create_task(
-                    get_extracted_text(uuid_or_slug, field, max_tasks)
-                )
+                task = asyncio.create_task(get_extracted_text(uuid_or_slug, field, max_tasks))
                 tasks.append(task)
 
         if len(tasks) == 0:

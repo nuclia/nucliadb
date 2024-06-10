@@ -21,12 +21,12 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import argdantic
-from nucliadb_protos.dataset_pb2 import TrainSet
 
 from nucliadb_dataset import ExportType
 from nucliadb_dataset.dataset import TASK_DEFINITIONS
 from nucliadb_dataset.export import FileSystemExport, NucliaDatasetsExport
 from nucliadb_dataset.settings import RunningSettings
+from nucliadb_protos.dataset_pb2 import TrainSet
 from nucliadb_sdk.v2.sdk import NucliaDB
 
 parser = argdantic.ArgParser()

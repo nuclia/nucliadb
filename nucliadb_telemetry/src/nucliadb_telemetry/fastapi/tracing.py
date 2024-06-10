@@ -82,9 +82,7 @@ class ASGIGetter(Getter[dict]):
         # ASGI header keys are in lower case
         key = key.lower()
         decoded = [
-            _value.decode("utf8")
-            for (_key, _value) in headers
-            if _key.decode("utf8").lower() == key
+            _value.decode("utf8") for (_key, _value) in headers if _key.decode("utf8").lower() == key
         ]
         if not decoded:
             return None
@@ -99,9 +97,7 @@ asgi_getter = ASGIGetter()
 
 
 class ASGISetter(Setter[dict]):
-    def set(
-        self, carrier: dict, key: str, value: str
-    ) -> None:  # pylint: disable=no-self-use
+    def set(self, carrier: dict, key: str, value: str) -> None:  # pylint: disable=no-self-use
         """Sets response header values on an ASGI scope according to `the spec <https://asgi.readthedocs.io/en/latest/specs/www.html#response-start-send-event>`_.
 
         Args:
@@ -171,10 +167,7 @@ def collect_custom_request_headers_attributes(scope):
     )
 
     # Decode headers before processing.
-    headers = {
-        _key.decode("utf8"): _value.decode("utf8")
-        for (_key, _value) in scope.get("headers")
-    }
+    headers = {_key.decode("utf8"): _value.decode("utf8") for (_key, _value) in scope.get("headers")}
 
     return sanitize.sanitize_header_values(
         headers,
@@ -193,10 +186,7 @@ def collect_custom_response_headers_attributes(message):
     )
 
     # Decode headers before processing.
-    headers = {
-        _key.decode("utf8"): _value.decode("utf8")
-        for (_key, _value) in message.get("headers")
-    }
+    headers = {_key.decode("utf8"): _value.decode("utf8") for (_key, _value) in message.get("headers")}
 
     return sanitize.sanitize_header_values(
         headers,
@@ -230,9 +220,7 @@ def set_status_code(span, status_code):
         )
     else:
         span.set_attribute(SpanAttributes.HTTP_STATUS_CODE, status_code)
-        span.set_status(
-            Status(http_status_to_status_code(status_code, server_span=True))
-        )
+        span.set_status(Status(http_status_to_status_code(status_code, server_span=True)))
 
 
 def get_default_span_details(scope: dict) -> Tuple[str, dict]:
@@ -319,9 +307,7 @@ class OpenTelemetryMiddleware:
                         current_span.set_attribute(key, value)
 
                     if current_span.kind == trace.SpanKind.SERVER:
-                        custom_attributes = collect_custom_request_headers_attributes(
-                            scope
-                        )
+                        custom_attributes = collect_custom_request_headers_attributes(scope)
                         if len(custom_attributes) > 0:
                             current_span.set_attributes(custom_attributes)
 
@@ -350,9 +336,7 @@ class OpenTelemetryMiddleware:
                 and server_span.kind == trace.SpanKind.SERVER
                 and "headers" in message
             ):
-                custom_response_attributes = collect_custom_response_headers_attributes(
-                    message
-                )
+                custom_response_attributes = collect_custom_response_headers_attributes(message)
                 if len(custom_response_attributes) > 0:
                     server_span.set_attributes(custom_response_attributes)
 
@@ -360,9 +344,7 @@ class OpenTelemetryMiddleware:
             if propagator:
                 propagator.inject(
                     message,
-                    context=set_span_in_context(
-                        server_span, trace.context_api.Context()
-                    ),
+                    context=set_span_in_context(server_span, trace.context_api.Context()),
                     setter=asgi_setter,
                 )
 
@@ -387,9 +369,7 @@ class CaptureTraceIdMiddleware(BaseHTTPMiddleware):
             exposed_headers.append(NUCLIA_TRACE_ID_HEADER)
             response.headers[ACCESS_CONTROL_EXPOSE_HEADER] = ",".join(exposed_headers)
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         response = None
         try:
             response = await call_next(request)

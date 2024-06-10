@@ -58,9 +58,7 @@ msg_consume_time_histo = metrics.Histogram(
     ],
 )
 
-msg_sent_counter = metrics.Counter(
-    "nuclia_nats_msg_sent", labels={"subject": "", "status": metrics.OK}
-)
+msg_sent_counter = metrics.Counter("nuclia_nats_msg_sent", labels={"subject": "", "status": metrics.OK})
 
 
 def start_span_message_receiver(tracer: Tracer, msg: Msg):
@@ -98,9 +96,7 @@ def start_span_message_publisher(tracer: Tracer, subject: str):
 
 
 class JetStreamContextTelemetry:
-    def __init__(
-        self, js: JetStreamContext, service_name: str, tracer_provider: TracerProvider
-    ):
+    def __init__(self, js: JetStreamContext, service_name: str, tracer_provider: TracerProvider):
         self.js = js
         self.service_name = service_name
         self.tracer_provider = tracer_provider
@@ -164,14 +160,10 @@ class JetStreamContextTelemetry:
     # Just for convenience, to wrap all we use in the context of
     # telemetry-instrumented stuff using the JetStreamContextTelemetry class
 
-    async def pull_subscribe(
-        self, *args, **kwargs
-    ) -> JetStreamContext.PullSubscription:
+    async def pull_subscribe(self, *args, **kwargs) -> JetStreamContext.PullSubscription:
         return await self.js.pull_subscribe(*args, **kwargs)
 
-    async def pull_subscribe_bind(
-        self, *args, **kwargs
-    ) -> JetStreamContext.PullSubscription:
+    async def pull_subscribe_bind(self, *args, **kwargs) -> JetStreamContext.PullSubscription:
         return await self.js.pull_subscribe_bind(*args, **kwargs)
 
     async def pull_one(
@@ -207,9 +199,7 @@ class JetStreamContextTelemetry:
                     },
                 )
 
-    async def consumer_info(
-        self, stream: str, consumer: str, timeout: Optional[float] = None
-    ):
+    async def consumer_info(self, stream: str, consumer: str, timeout: Optional[float] = None):
         return await self.js.consumer_info(stream, consumer, timeout)
 
 
@@ -274,9 +264,7 @@ class NatsClientTelemetry:
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_nc_request")
         with start_span_message_publisher(tracer, subject) as span:
             try:
-                result = await self.nc.request(
-                    subject, payload, timeout, old_style, headers
-                )
+                result = await self.nc.request(subject, payload, timeout, old_style, headers)
             except Exception as error:
                 set_span_exception(span, error)
                 raise error

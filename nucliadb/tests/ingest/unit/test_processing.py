@@ -20,8 +20,6 @@
 from unittest.mock import Mock
 
 import pytest
-from nucliadb_protos.resources_pb2 import CloudFile
-from tests.utils.aiohttp_session import get_mocked_session
 
 from nucliadb.ingest.processing import (
     DummyProcessingEngine,
@@ -29,11 +27,11 @@ from nucliadb.ingest.processing import (
     PushPayload,
 )
 from nucliadb_models import File, FileField
+from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
+from tests.utils.aiohttp_session import get_mocked_session
 
-TEST_FILE = FileField(
-    password="mypassword", file=File(filename="myfile.pdf", payload="")
-)
+TEST_FILE = FileField(password="mypassword", file=File(filename="myfile.pdf", payload=""))
 
 TEST_CLOUD_FILE = CloudFile(
     uri="file.png",
@@ -131,9 +129,7 @@ async def test_convert_internal_cf_to_str_500(engine):
 
 async def test_send_to_process_200(engine):
     json_data = {"seqid": 11, "account_seq": 22, "queue": "private"}
-    engine.session = get_mocked_session(
-        "POST", 200, json=json_data, context_manager=False
-    )
+    engine.session = get_mocked_session("POST", 200, json=json_data, context_manager=False)
 
     processing_info = await engine.send_to_process(TEST_ITEM, 1)
     assert processing_info.seqid == 11
@@ -163,9 +159,7 @@ async def test_send_to_process_limits_exceeded_429(engine):
 
 
 async def test_send_to_process_500(engine):
-    engine.session = get_mocked_session(
-        "POST", 500, text="error", context_manager=False
-    )
+    engine.session = get_mocked_session("POST", 500, text="error", context_manager=False)
 
     with pytest.raises(SendToProcessError):
         await engine.send_to_process(TEST_ITEM, 1)

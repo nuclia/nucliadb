@@ -380,9 +380,7 @@ class PromptContextBuilder:
 
         context = ccontext.output
         context_images = ccontext.images
-        context_order = {
-            text_block_id: order for order, text_block_id in enumerate(context.keys())
-        }
+        context_order = {text_block_id: order for order, text_block_id in enumerate(context.keys())}
         return context, context_order, context_images
 
     async def _build_context_images(self, context: CappedPromptContext) -> None:
@@ -402,18 +400,12 @@ class PromptContextBuilder:
 
         for paragraph in self.ordered_paragraphs:
             if paragraph.page_with_visual and paragraph.position:
-                if (
-                    gather_pages
-                    and paragraph.position.page_number
-                    and len(context.images) < page_count
-                ):
+                if gather_pages and paragraph.position.page_number and len(context.images) < page_count:
                     field = "/".join(paragraph.id.split("/")[:3])
                     page = paragraph.position.page_number
                     page_id = f"{field}/{page}"
                     if page_id not in context.images:
-                        context.images[page_id] = await get_page_image(
-                            self.kbid, paragraph.id, page
-                        )
+                        context.images[page_id] = await get_page_image(self.kbid, paragraph.id, page)
             if (
                 gather_tables
                 and paragraph.is_a_table
@@ -421,9 +413,7 @@ class PromptContextBuilder:
                 and paragraph.reference != ""
             ):
                 image = paragraph.reference
-                context.images[paragraph.id] = await get_paragraph_image(
-                    self.kbid, paragraph.id, image
-                )
+                context.images[paragraph.id] = await get_paragraph_image(self.kbid, paragraph.id, image)
 
     async def _build_context(self, context: CappedPromptContext) -> None:
         if self.strategies is None or len(self.strategies) == 0:
@@ -475,9 +465,7 @@ class ExtraCharsParagraph:
     paragraphs: List[Tuple[FindParagraph, str]]
 
 
-async def get_extra_chars(
-    kbid: str, ordered_paragraphs: list[FindParagraph], distance: int
-):
+async def get_extra_chars(kbid: str, ordered_paragraphs: list[FindParagraph], distance: int):
     etcache = paragraphs.ExtractedTextCache()
     resources: Dict[str, ExtraCharsParagraph] = {}
     for paragraph in ordered_paragraphs:
@@ -533,7 +521,9 @@ async def get_extra_chars(
             paragraph.text = ""
 
         if first_paragraph is not None:
-            first_paragraph.text = f"DOCUMENT: {title_text} \n SUMMARY: {summary_text} \n RESOURCE CONTENT: {text}"
+            first_paragraph.text = (
+                f"DOCUMENT: {title_text} \n SUMMARY: {summary_text} \n RESOURCE CONTENT: {text}"
+            )
 
 
 def _clean_paragraph_text(paragraph: FindParagraph) -> str:

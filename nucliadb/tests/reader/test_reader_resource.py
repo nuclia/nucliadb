@@ -347,7 +347,5 @@ async def test_get_resource_extracted_metadata(
         assert resp.status_code == 200
 
         resource = resp.json()
-        metadata = resource["data"]["texts"]["text1"]["extracted"]["metadata"][
-            "metadata"
-        ]
+        metadata = resource["data"]["texts"]["text1"]["extracted"]["metadata"]["metadata"]
         assert metadata["positions"]["ENTITY/document"]["entity"] == "document"

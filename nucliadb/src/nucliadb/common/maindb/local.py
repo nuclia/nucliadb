@@ -159,9 +159,7 @@ class LocalTransaction(Transaction):
         if key in self.modified_keys:
             del self.modified_keys[key]
 
-    async def keys(
-        self, match: str, count: int = DEFAULT_SCAN_LIMIT, include_start: bool = True
-    ):
+    async def keys(self, match: str, count: int = DEFAULT_SCAN_LIMIT, include_start: bool = True):
         prev_key = None
 
         get_all_keys = count == -1

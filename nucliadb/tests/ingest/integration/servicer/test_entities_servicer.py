@@ -21,15 +21,13 @@
 from uuid import uuid4
 
 import pytest
-from tests.ingest.fixtures import IngestFixture
 
 from nucliadb_protos import knowledgebox_pb2, writer_pb2, writer_pb2_grpc
+from tests.ingest.fixtures import IngestFixture
 
 
 @pytest.mark.asyncio
-async def test_create_entities_group(
-    grpc_servicer: IngestFixture, entities_manager_mock
-):
+async def test_create_entities_group(grpc_servicer: IngestFixture, entities_manager_mock):
     stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
 
     kb_id = str(uuid4())
@@ -45,9 +43,7 @@ async def test_create_entities_group(
             title="zero",
             color="#fff",
             custom=True,
-            entities={
-                "ent1": knowledgebox_pb2.Entity(value="1", merged=True, represents=[])
-            },
+            entities={"ent1": knowledgebox_pb2.Entity(value="1", merged=True, represents=[])},
         ),
     )
     result = await stub.SetEntities(pb_ser)  # type: ignore

@@ -25,10 +25,10 @@ import uuid
 from typing import Any
 
 import aiofiles
-from nucliadb_protos.resources_pb2 import CloudFile
 
 from nucliadb.writer.tus.dm import FileDataManager
 from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
+from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_utils.storages import CHUNK_SIZE
 
 
@@ -59,13 +59,9 @@ class LocalFileStorageManager(FileStorageManager):
         async with aiofiles.open(init_url, "wb+") as aio_fi:
             await aio_fi.write(b"")
 
-        await dm.update(
-            upload_file_id=upload_file_id, path=path, bucket=bucket, kbid=kbid
-        )
+        await dm.update(upload_file_id=upload_file_id, path=path, bucket=bucket, kbid=kbid)
 
-    async def set_metadata(
-        self, kbid: str, upload_file_id: str, metadata: dict[str, Any]
-    ):
+    async def set_metadata(self, kbid: str, upload_file_id: str, metadata: dict[str, Any]):
         bucket = self.storage.get_bucket_name(kbid)
         init_url = self.get_file_path(bucket, upload_file_id)
         metadata_init_url = self.metadata_key(init_url)

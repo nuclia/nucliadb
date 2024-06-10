@@ -34,9 +34,7 @@ from nucliadb_utils.fastapi.run import serve_metrics
 
 SHARD_COUNT = metrics.Gauge("nucliadb_node_shard_count", labels={"node": ""})
 
-MIGRATION_COUNT = metrics.Gauge(
-    "nucliadb_migration", labels={"type": "", "version": ""}
-)
+MIGRATION_COUNT = metrics.Gauge("nucliadb_migration", labels={"type": "", "version": ""})
 
 
 async def update_node_metrics(context: ApplicationContext):
@@ -72,9 +70,7 @@ async def update_migration_metrics(context: ApplicationContext):
     mdm = MigrationsDataManager(context.kv_driver)
     global_info = await mdm.get_global_info()
     if global_info is not None:
-        MIGRATION_COUNT.set(
-            1, labels=dict(type="global", version=str(global_info.current_version))
-        )
+        MIGRATION_COUNT.set(1, labels=dict(type="global", version=str(global_info.current_version)))
 
     version_count: dict[str, int] = {}
     async for kbid in iter_kbids(context):
@@ -88,9 +84,7 @@ async def update_migration_metrics(context: ApplicationContext):
         MIGRATION_COUNT.set(count, labels=dict(type="kb", version=version))
 
 
-async def run_exporter_task(
-    context: ApplicationContext, exporter_task: Callable, interval: int
-):
+async def run_exporter_task(context: ApplicationContext, exporter_task: Callable, interval: int):
     """
     Run coroutine infinitely, catching exceptions and logging them.
     It will wait for the interval before running again.
@@ -100,9 +94,7 @@ async def run_exporter_task(
             try:
                 await exporter_task(context)
             except Exception:
-                logger.error(
-                    f"Error on exporter task {exporter_task.__name__}", exc_info=True
-                )
+                logger.error(f"Error on exporter task {exporter_task.__name__}", exc_info=True)
             await asyncio.sleep(interval)
     except asyncio.CancelledError:
         pass
@@ -115,11 +107,7 @@ async def run_exporter(context: ApplicationContext):
         (update_node_metrics, 10),
         (update_migration_metrics, 60 * 3),
     ]:
-        tasks.append(
-            asyncio.create_task(
-                run_exporter_task(context, export_task, interval=interval)
-            )
-        )
+        tasks.append(asyncio.create_task(run_exporter_task(context, export_task, interval=interval)))
     try:
         while True:
             await asyncio.sleep(10)

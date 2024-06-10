@@ -33,9 +33,7 @@ KB_SLUGS = KB_SLUGS_BASE + "{slug}"
 logger = logging.getLogger(__name__)
 
 
-async def get_kbs(
-    txn: Transaction, *, prefix: str = ""
-) -> AsyncIterator[tuple[str, str]]:
+async def get_kbs(txn: Transaction, *, prefix: str = "") -> AsyncIterator[tuple[str, str]]:
     async for key in txn.keys(KB_SLUGS.format(slug=prefix), count=-1):
         slug = key.replace(KB_SLUGS_BASE, "")
         uuid = await get_kb_uuid(txn, slug=slug)
@@ -57,9 +55,7 @@ async def get_kb_uuid(txn: Transaction, *, slug: str) -> Optional[str]:
         return None
 
 
-async def get_config(
-    txn: Transaction, *, kbid: str
-) -> Optional[knowledgebox_pb2.KnowledgeBoxConfig]:
+async def get_config(txn: Transaction, *, kbid: str) -> Optional[knowledgebox_pb2.KnowledgeBoxConfig]:
     key = KB_UUID.format(kbid=kbid)
     payload = await txn.get(key)
     if payload is None:
@@ -69,16 +65,12 @@ async def get_config(
     return response
 
 
-async def set_config(
-    txn: Transaction, *, kbid: str, config: knowledgebox_pb2.KnowledgeBoxConfig
-):
+async def set_config(txn: Transaction, *, kbid: str, config: knowledgebox_pb2.KnowledgeBoxConfig):
     key = KB_UUID.format(kbid=kbid)
     await txn.set(key, config.SerializeToString())
 
 
-async def get_model_metadata(
-    txn: Transaction, *, kbid: str
-) -> knowledgebox_pb2.SemanticModelMetadata:
+async def get_model_metadata(txn: Transaction, *, kbid: str) -> knowledgebox_pb2.SemanticModelMetadata:
     shards_obj = await cluster.get_kb_shards(txn, kbid=kbid)
     if shards_obj is None:
         raise KnowledgeBoxNotFound(kbid)
@@ -87,21 +79,14 @@ async def get_model_metadata(
     else:
         # B/c code for old KBs that do not have the `model` attribute set in the Shards object.
         # Cleanup this code after a migration is done unifying all fields under `model` (on-prem and cloud).
-        return knowledgebox_pb2.SemanticModelMetadata(
-            similarity_function=shards_obj.similarity
-        )
+        return knowledgebox_pb2.SemanticModelMetadata(similarity_function=shards_obj.similarity)
 
 
-async def get_matryoshka_vector_dimension(
-    txn: Transaction, *, kbid: str
-) -> Optional[int]:
+async def get_matryoshka_vector_dimension(txn: Transaction, *, kbid: str) -> Optional[int]:
     """Return vector dimension for matryoshka models"""
     model_metadata = await get_model_metadata(txn, kbid=kbid)
     dimension = None
-    if (
-        len(model_metadata.matryoshka_dimensions) > 0
-        and model_metadata.vector_dimension
-    ):
+    if len(model_metadata.matryoshka_dimensions) > 0 and model_metadata.vector_dimension:
         if model_metadata.vector_dimension in model_metadata.matryoshka_dimensions:
             dimension = model_metadata.vector_dimension
         else:

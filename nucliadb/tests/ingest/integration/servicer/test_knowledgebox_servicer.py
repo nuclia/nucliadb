@@ -19,12 +19,12 @@
 #
 
 import pytest
-from tests.ingest.fixtures import IngestFixture
 
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.local import LocalDriver
 from nucliadb_protos import knowledgebox_pb2, utils_pb2, writer_pb2_grpc
+from tests.ingest.fixtures import IngestFixture
 
 
 @pytest.mark.asyncio
@@ -96,9 +96,7 @@ async def test_create_knowledgebox_release_channel(
     release_channel,
 ):
     stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
-    pb = knowledgebox_pb2.KnowledgeBoxNew(
-        slug="test-default", release_channel=release_channel
-    )
+    pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test-default", release_channel=release_channel)
     pb.config.title = "My Title"
     result = await stub.NewKnowledgeBox(pb)  # type: ignore
     assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK

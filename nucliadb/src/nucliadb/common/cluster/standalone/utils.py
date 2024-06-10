@@ -56,9 +56,7 @@ def get_self() -> StandaloneIndexNode:
     make another grpc request since this node can service it directly.
     """
     if not is_index_node():
-        raise Exception(
-            "This node is not an Index Node. You should not reach this code path."
-        )
+        raise Exception("This node is not an Index Node. You should not reach this code path.")
     global _SELF_INDEX_NODE
     node_id = get_standalone_node_id()
     if _SELF_INDEX_NODE is None or node_id != _SELF_INDEX_NODE.id:
@@ -68,9 +66,7 @@ def get_self() -> StandaloneIndexNode:
             host = f"{hn}.{ns}"
         else:
             host = gethostname()
-        _SELF_INDEX_NODE = StandaloneIndexNode(
-            id=node_id, address=host, shard_count=0, available_disk=0
-        )
+        _SELF_INDEX_NODE = StandaloneIndexNode(id=node_id, address=host, shard_count=0, available_disk=0)
     try:
         _, _, available_disk = shutil.disk_usage(cluster_settings.data_path)
         _SELF_INDEX_NODE.available_disk = available_disk

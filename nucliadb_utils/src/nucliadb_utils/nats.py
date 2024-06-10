@@ -100,9 +100,7 @@ class MessageProgressUpdater:
 class NatsConnectionManager:
     _nc: NATSClient
     _subscriptions: list[tuple[Subscription, Callable[[], Awaitable[None]]]]
-    _unhealthy_timeout = (
-        10  # needs to be unhealth for 10 seconds to be unhealthy and force exit
-    )
+    _unhealthy_timeout = 10  # needs to be unhealth for 10 seconds to be unhealthy and force exit
 
     def __init__(
         self,

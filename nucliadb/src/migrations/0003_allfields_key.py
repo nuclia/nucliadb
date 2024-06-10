@@ -19,11 +19,10 @@
 #
 from typing import Optional
 
-from nucliadb_protos.resources_pb2 import AllFieldIDs, FieldID
-
 from nucliadb.common import datamanagers
 from nucliadb.migrator.context import ExecutionContext
 from nucliadb.migrator.migrator import logger
+from nucliadb_protos.resources_pb2 import AllFieldIDs, FieldID
 
 
 async def migrate(context: ExecutionContext) -> None: ...
@@ -32,20 +31,14 @@ async def migrate(context: ExecutionContext) -> None: ...
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
     async for resource_id in datamanagers.resources.iterate_resource_ids(kbid=kbid):
         async with context.kv_driver.transaction() as txn:
-            resource = await datamanagers.resources.get_resource(
-                txn, kbid=kbid, rid=resource_id
-            )
+            resource = await datamanagers.resources.get_resource(txn, kbid=kbid, rid=resource_id)
             if resource is None:
-                logger.warning(
-                    f"kb={kbid} rid={resource_id}: resource not found. Skipping..."
-                )
+                logger.warning(f"kb={kbid} rid={resource_id}: resource not found. Skipping...")
                 continue
 
             all_fields: Optional[AllFieldIDs] = await resource.get_all_field_ids()
             if all_fields is not None:
-                logger.warning(
-                    f"kb={kbid} rid={resource_id}: already has all fields key. Skipping..."
-                )
+                logger.warning(f"kb={kbid} rid={resource_id}: already has all fields key. Skipping...")
                 continue
 
             # Migrate resource

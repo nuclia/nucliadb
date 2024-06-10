@@ -20,6 +20,7 @@
 from typing import List, Optional
 
 from google.protobuf.timestamp_pb2 import Timestamp
+
 from nucliadb_protos.audit_pb2 import (
     AuditField,
     AuditKBCounter,
@@ -29,7 +30,6 @@ from nucliadb_protos.audit_pb2 import (
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.resources_pb2 import FieldID
 from nucliadb_protos.writer_pb2 import BrokerMessage
-
 from nucliadb_utils import logger
 from nucliadb_utils.audit.audit import AuditStorage
 
@@ -51,9 +51,7 @@ class BasicAuditStorage(AuditStorage):
         audit_fields: Optional[List[AuditField]] = None,
         kb_counter: Optional[AuditKBCounter] = None,
     ):
-        logger.debug(
-            f"AUDIT {audit_type} {kbid} {user} {origin} {rid} {audit_fields} {kb_counter}"
-        )
+        logger.debug(f"AUDIT {audit_type} {kbid} {user} {origin} {rid} {audit_fields} {kb_counter}")
 
     def report_resources(
         self,

@@ -25,7 +25,6 @@ import docker  # type: ignore
 import grpc
 import pytest
 from grpc import aio
-from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb_models.common import FieldID, UserClassification
 from nucliadb_models.entities import CreateEntitiesGroupPayload, Entity
@@ -35,6 +34,7 @@ from nucliadb_models.resource import KnowledgeBoxObj
 from nucliadb_models.text import TextField
 from nucliadb_models.utils import FieldIdString, SlugString
 from nucliadb_models.writer import CreateResourcePayload
+from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_sdk.v2.sdk import NucliaDB
 
 DOCKER_ENV_GROUPS = re.search(r"//([^:]+)", docker.from_env().api.base_url)
@@ -194,9 +194,7 @@ def upload_data_token_classification(sdk: NucliaDB, kb: KnowledgeBoxObj):
         kbid=kb.uuid,
         content=CreateResourcePayload(
             slug=SlugString("doc1"),
-            texts={
-                FieldIdString("text"): TextField(body="Ramon This is my lovely text")
-            },
+            texts={FieldIdString("text"): TextField(body="Ramon This is my lovely text")},
             fieldmetadata=[
                 UserFieldMetadata(
                     token=[TokenSplit(klass="PERSON", token="Ramon", start=0, end=5)],
@@ -218,12 +216,8 @@ def upload_data_token_classification(sdk: NucliaDB, kb: KnowledgeBoxObj):
             fieldmetadata=[
                 UserFieldMetadata(
                     token=[
-                        TokenSplit(
-                            klass="PERSON", token="Carmen Iniesta", start=0, end=14
-                        ),
-                        TokenSplit(
-                            klass="PERSON", token="Eudald Camprubi", start=46, end=61
-                        ),
+                        TokenSplit(klass="PERSON", token="Carmen Iniesta", start=0, end=14),
+                        TokenSplit(klass="PERSON", token="Eudald Camprubi", start=46, end=61),
                     ],
                     field=FieldID(field_type=FieldID.FieldType.TEXT, field="text"),
                 )

@@ -20,24 +20,6 @@
 from datetime import datetime
 
 from fastapi import HTTPException
-from nucliadb_protos.resources_pb2 import (
-    Answers,
-    Basic,
-    Classification,
-    ExtractedTextWrapper,
-    FieldComputedMetadataWrapper,
-    FieldType,
-    Metadata,
-    PageSelections,
-    Paragraph,
-)
-from nucliadb_protos.resources_pb2 import ParagraphAnnotation as PBParagraphAnnotation
-from nucliadb_protos.resources_pb2 import (
-    QuestionAnswerAnnotation as PBQuestionAnswerAnnotation,
-)
-from nucliadb_protos.resources_pb2 import TokenSplit, UserFieldMetadata, VisualSelection
-from nucliadb_protos.utils_pb2 import Relation, RelationNode
-from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb.ingest.orm.utils import set_title
 from nucliadb.ingest.processing import PushPayload
@@ -57,11 +39,29 @@ from nucliadb_models.writer import (
     CreateResourcePayload,
     UpdateResourcePayload,
 )
+from nucliadb_protos.resources_pb2 import (
+    Answers,
+    Basic,
+    Classification,
+    ExtractedTextWrapper,
+    FieldComputedMetadataWrapper,
+    FieldType,
+    Metadata,
+    PageSelections,
+    Paragraph,
+    TokenSplit,
+    UserFieldMetadata,
+    VisualSelection,
+)
+from nucliadb_protos.resources_pb2 import ParagraphAnnotation as PBParagraphAnnotation
+from nucliadb_protos.resources_pb2 import (
+    QuestionAnswerAnnotation as PBQuestionAnswerAnnotation,
+)
+from nucliadb_protos.utils_pb2 import Relation, RelationNode
+from nucliadb_protos.writer_pb2 import BrokerMessage
 
 
-def parse_basic_modify(
-    bm: BrokerMessage, item: ComingResourcePayload, toprocess: PushPayload
-):
+def parse_basic_modify(bm: BrokerMessage, item: ComingResourcePayload, toprocess: PushPayload):
     bm.basic.modified.FromDatetime(datetime.now())
     if item.title:
         set_title(bm, toprocess, item.title)
@@ -83,9 +83,7 @@ def parse_basic_modify(
         bm.basic.metadata.useful = True
         bm.basic.metadata.status = Metadata.Status.PENDING
 
-        toprocess.genericfield["summary"] = Text(
-            body=item.summary, format=PushTextFormat.PLAIN
-        )
+        toprocess.genericfield["summary"] = Text(body=item.summary, format=PushTextFormat.PLAIN)
     if item.thumbnail:
         bm.basic.thumbnail = item.thumbnail
     if item.layout:
@@ -167,9 +165,7 @@ def parse_basic_modify(
             ]
         )
 
-        relation_node_resource = RelationNode(
-            value=bm.uuid, ntype=RelationNode.NodeType.RESOURCE
-        )
+        relation_node_resource = RelationNode(value=bm.uuid, ntype=RelationNode.NodeType.RESOURCE)
         relations = []
         for relation in item.usermetadata.relations:
             if relation.from_ is None:
@@ -227,15 +223,11 @@ def set_status_modify(basic: Basic, item: UpdateResourcePayload):
 def validate_classifications(paragraph: ParagraphAnnotation):
     classifications = paragraph.classifications
     if len(classifications) == 0:
-        raise HTTPException(
-            status_code=422, detail="ensure classifications has at least 1 items"
-        )
+        raise HTTPException(status_code=422, detail="ensure classifications has at least 1 items")
 
     unique_classifications = {tuple(cf.model_dump().values()) for cf in classifications}
     if len(unique_classifications) != len(classifications):
-        raise HTTPException(
-            status_code=422, detail="Paragraph classifications need to be unique"
-        )
+        raise HTTPException(status_code=422, detail="Paragraph classifications need to be unique")
 
 
 def compute_title(item: CreateResourcePayload, rid: str) -> str:
@@ -273,9 +265,7 @@ def build_question_answer_annotation_pb(
     pb.cancelled_by_user = qa_annotation.cancelled_by_user
     pb.question_answer.question.text = qa_annotation.question_answer.question.text
     if qa_annotation.question_answer.question.language is not None:
-        pb.question_answer.question.language = (
-            qa_annotation.question_answer.question.language
-        )
+        pb.question_answer.question.language = qa_annotation.question_answer.question.language
     pb.question_answer.question.ids_paragraphs.extend(
         qa_annotation.question_answer.question.ids_paragraphs
     )

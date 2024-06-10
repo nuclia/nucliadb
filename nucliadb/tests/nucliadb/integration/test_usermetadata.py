@@ -36,9 +36,7 @@ async def test_labels_sc_2053(
         f"/kb/{knowledgebox}/resources",
         json={
             "slug": "myresource",
-            "usermetadata": {
-                "classifications": [{"labelset": "type", "label": "Book"}]
-            },
+            "usermetadata": {"classifications": [{"labelset": "type", "label": "Book"}]},
         },
     )
     assert resp.status_code == 201

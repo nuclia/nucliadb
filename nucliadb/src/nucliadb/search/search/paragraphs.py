@@ -23,11 +23,10 @@ import re
 import string
 from typing import Optional
 
-from nucliadb_protos.utils_pb2 import ExtractedText
-
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
+from nucliadb_protos.utils_pb2 import ExtractedText
 from nucliadb_telemetry import metrics
 
 from .cache import get_resource_from_cache
@@ -56,9 +55,7 @@ GET_PARAGRAPH_LATENCY = metrics.Observer(
 )
 
 
-EXTRACTED_CACHE_OPS = metrics.Counter(
-    "nucliadb_extracted_text_cache_ops", labels={"type": ""}
-)
+EXTRACTED_CACHE_OPS = metrics.Counter("nucliadb_extracted_text_cache_ops", labels={"type": ""})
 
 
 class ExtractedTextCache:
@@ -201,9 +198,7 @@ async def get_text_sentence(
     field_obj = await orm_resource.get_field(field, field_type_int, load=False)
     extracted_text = await field_obj.get_extracted_text()
     if extracted_text is None:
-        logger.info(
-            f"{rid} {field} {field_type_int} extracted_text does not exist on DB"
-        )
+        logger.info(f"{rid} {field} {field_type_int} extracted_text does not exist on DB")
         return ""
     start = start - 1
     if start < 0:
@@ -232,9 +227,7 @@ def highlight_paragraph(
                     marks[start] = 1
                     marks[end] = 2
             except re.error:
-                logger.warning(
-                    f"Regex errors while highlighting text. Regex: {quote_regex}"
-                )
+                logger.warning(f"Regex errors while highlighting text. Regex: {quote_regex}")
                 continue
 
     words = words or []

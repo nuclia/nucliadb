@@ -21,8 +21,10 @@ import functools
 from typing import Any, Awaitable, Callable
 
 from grpc import HandlerCallDetails, RpcMethodHandler
-from grpc.experimental import aio  # type: ignore
-from grpc.experimental import wrap_server_method_handler
+from grpc.experimental import (  # type: ignore
+    aio,
+    wrap_server_method_handler,
+)
 
 from nucliadb_telemetry.errors import capture_exception
 

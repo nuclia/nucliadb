@@ -25,14 +25,14 @@ import pytest
 from grpc import aio, insecure_channel
 from grpc_health.v1 import health_pb2_grpc
 from grpc_health.v1.health_pb2 import HealthCheckRequest
-from nucliadb_protos.noderesources_pb2 import EmptyQuery, ShardCreated, ShardId
-from nucliadb_protos.nodewriter_pb2 import NewShardRequest
-from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
-from nucliadb_protos.utils_pb2 import ReleaseChannel
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
 from nucliadb_protos import nodereader_pb2, nodereader_pb2_grpc, noderesources_pb2
+from nucliadb_protos.noderesources_pb2 import EmptyQuery, ShardCreated, ShardId
+from nucliadb_protos.nodewriter_pb2 import NewShardRequest
+from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
+from nucliadb_protos.utils_pb2 import ReleaseChannel
 from nucliadb_sidecar import SERVICE_NAME
 from nucliadb_sidecar.app import start_listeners, start_worker
 from nucliadb_sidecar.pull import Worker
@@ -168,14 +168,8 @@ def node_single():
 
     yield
 
-    print(
-        "Reader Container Logs: \n"
-        + nucliadb_sidecar_reader.container_obj.logs().decode("utf-8")
-    )
-    print(
-        "Writer Container Logs: \n"
-        + nucliadb_sidecar_reader.container_obj.logs().decode("utf-8")
-    )
+    print("Reader Container Logs: \n" + nucliadb_sidecar_reader.container_obj.logs().decode("utf-8"))
+    print("Writer Container Logs: \n" + nucliadb_sidecar_reader.container_obj.logs().decode("utf-8"))
 
     container_ids = [
         nucliadb_sidecar_reader.container_obj.id,
@@ -314,11 +308,7 @@ async def worker(
 
 @pytest.fixture(scope="function")
 async def shard(request, writer_stub: NodeWriterStub) -> AsyncIterable[str]:
-    channel = (
-        ReleaseChannel.EXPERIMENTAL
-        if request.param == "EXPERIMENTAL"
-        else ReleaseChannel.STABLE
-    )
+    channel = ReleaseChannel.EXPERIMENTAL if request.param == "EXPERIMENTAL" else ReleaseChannel.STABLE
     request = NewShardRequest(kbid="test", release_channel=channel)
     shard: ShardCreated = await writer_stub.NewShard(request)  # type: ignore
 
@@ -329,14 +319,8 @@ async def shard(request, writer_stub: NodeWriterStub) -> AsyncIterable[str]:
 
 
 @pytest.fixture(scope="function")
-async def bunch_of_shards(
-    request, writer_stub: NodeWriterStub
-) -> AsyncIterable[list[str]]:
-    channel = (
-        ReleaseChannel.EXPERIMENTAL
-        if request.param == "EXPERIMENTAL"
-        else ReleaseChannel.STABLE
-    )
+async def bunch_of_shards(request, writer_stub: NodeWriterStub) -> AsyncIterable[list[str]]:
+    channel = ReleaseChannel.EXPERIMENTAL if request.param == "EXPERIMENTAL" else ReleaseChannel.STABLE
     request = NewShardRequest(kbid="test", release_channel=channel)
 
     try:

@@ -44,9 +44,7 @@ def test_get_processing_api_url():
     with (
         mock.patch.object(nuclia_settings, "nuclia_service_account", "sa"),
         mock.patch.object(nuclia_settings, "nuclia_zone", "nuclia_zone"),
-        mock.patch.object(
-            nuclia_settings, "nuclia_public_url", "https://{zone}.nuclia_public_url"
-        ),
+        mock.patch.object(nuclia_settings, "nuclia_public_url", "https://{zone}.nuclia_public_url"),
     ):
         assert (
             processing.get_processing_api_url()
@@ -91,9 +89,7 @@ class TestProcessingHTTPClient:
 
     @pytest.mark.asyncio
     async def test_pull(self, client: processing.ProcessingHTTPClient, response):
-        response_data = processing.PullResponse(
-            status="ok", payload="foobar", msgid="1"
-        )
+        response_data = processing.PullResponse(status="ok", payload="foobar", msgid="1")
         response.status = 200
         response.text.return_value = response_data.json()
 

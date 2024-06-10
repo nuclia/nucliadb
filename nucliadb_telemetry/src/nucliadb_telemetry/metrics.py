@@ -57,9 +57,7 @@ class Observer:
         self,
         name: str,
         *,
-        error_mappings: Optional[
-            Dict[str, Union[Type[Exception], Type[BaseException]]]
-        ] = None,
+        error_mappings: Optional[Dict[str, Union[Type[Exception], Type[BaseException]]]] = None,
         labels: Optional[Dict[str, str]] = None,
         buckets: Optional[List[float]] = None,
     ):
@@ -68,8 +66,7 @@ class Observer:
 
         assert (
             # managed by us, do not allow user to specify
-            labels is None
-            or (_STATUS_METRIC not in labels and _VERSION_METRIC not in labels)
+            labels is None or (_STATUS_METRIC not in labels and _VERSION_METRIC not in labels)
         )
 
         if _VERSION_ENV_VAR_NAME in os.environ:
@@ -236,7 +233,10 @@ class Histogram:
         if buckets is not None:
             kwargs["buckets"] = buckets
         self.histo = prometheus_client.Histogram(
-            name, f"Counter for {name}.", labelnames=tuple(self.labels.keys()), **kwargs  # type: ignore
+            name,
+            f"Counter for {name}.",
+            labelnames=tuple(self.labels.keys()),
+            **kwargs,  # type: ignore
         )
 
     def observe(self, value: float, labels: Optional[Dict[str, str]] = None):

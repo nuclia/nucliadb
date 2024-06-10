@@ -92,9 +92,7 @@ class ProxyCallerWrapper:
                 else:
                     raise NotImplementedError(f"Unknown type {self._type}")
             except KeyError:
-                raise NotImplementedError(
-                    f"Unknown method for type {self._type}: {name}"
-                )
+                raise NotImplementedError(f"Unknown method for type {self._type}: {name}")
             return_value = return_type()
             return_value.ParseFromString(resp.payload)
             return return_value
@@ -113,9 +111,7 @@ class ProxyStandaloneIndexNode(StandaloneIndexNode):
         available_disk: int,
         dummy: bool = False,
     ):
-        super().__init__(
-            id, address, shard_count, available_disk=available_disk, dummy=dummy
-        )
+        super().__init__(id, address, shard_count, available_disk=available_disk, dummy=dummy)
         if dummy:
             return
 

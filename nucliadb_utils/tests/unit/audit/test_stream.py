@@ -23,9 +23,9 @@ from functools import partial
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
 from nucliadb_protos.audit_pb2 import AuditKBCounter, AuditRequest, ChatContext
 from nucliadb_protos.nodereader_pb2 import SearchRequest
-
 from nucliadb_utils.audit.stream import StreamAuditStorage
 
 
@@ -51,9 +51,7 @@ async def audit_storage(nats):
         await aud.finalize()
 
 
-def stream_audit_finish_condition(
-    audit_storage: StreamAuditStorage, count_publish: int
-):
+def stream_audit_finish_condition(audit_storage: StreamAuditStorage, count_publish: int):
     return (
         audit_storage.queue.qsize() == 0
         and audit_storage.kb_usage_utility.queue.qsize() == 0

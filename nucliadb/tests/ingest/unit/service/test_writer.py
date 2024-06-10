@@ -22,23 +22,21 @@ from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
-from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxNew, SemanticModelMetadata
-from nucliadb_protos.resources_pb2 import FieldText
-from nucliadb_protos.utils_pb2 import ReleaseChannel, VectorSimilarity
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.service.writer import WriterServicer, get_release_channel
 from nucliadb.learning_proxy import LearningConfiguration
 from nucliadb_protos import writer_pb2
+from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxNew, SemanticModelMetadata
+from nucliadb_protos.resources_pb2 import FieldText
+from nucliadb_protos.utils_pb2 import ReleaseChannel, VectorSimilarity
 
 
 class TestWriterServicer:
     @pytest.fixture
     def onprem_nucliadb(self):
-        with patch(
-            "nucliadb.ingest.service.writer.is_onprem_nucliadb", return_value=True
-        ) as mocked:
+        with patch("nucliadb.ingest.service.writer.is_onprem_nucliadb", return_value=True) as mocked:
             yield mocked
 
     @pytest.fixture
@@ -120,9 +118,7 @@ class TestWriterServicer:
         )
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
 
-    async def test_NewKnowledgeBox_hosted_nucliadb(
-        self, writer: WriterServicer, onprem_nucliadb
-    ):
+    async def test_NewKnowledgeBox_hosted_nucliadb(self, writer: WriterServicer, onprem_nucliadb):
         onprem_nucliadb.return_value = False
 
         request = writer_pb2.KnowledgeBoxNew(
@@ -176,9 +172,7 @@ class TestWriterServicer:
         )
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
 
-    async def test_NewKnowledgeBox_with_learning_config(
-        self, writer: WriterServicer, learning_config
-    ):
+    async def test_NewKnowledgeBox_with_learning_config(self, writer: WriterServicer, learning_config):
         learning_config.get_configuration.return_value = None
         learning_config.set_configuration = AsyncMock(
             return_value=LearningConfiguration(
@@ -260,9 +254,7 @@ class TestWriterServicer:
 
         resp = await writer.UpdateKnowledgeBox(request)
 
-        writer.proc.update_kb.assert_called_once_with(
-            request.uuid, request.slug, request.config
-        )
+        writer.proc.update_kb.assert_called_once_with(request.uuid, request.slug, request.config)
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
 
     async def test_UpdateKnowledgeBox_not_found(self, writer: WriterServicer):
@@ -298,9 +290,7 @@ class TestWriterServicer:
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.ERROR
 
     async def test_GetEntities(self, writer: WriterServicer):
-        request = writer_pb2.GetEntitiesRequest(
-            kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid")
-        )
+        request = writer_pb2.GetEntitiesRequest(kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"))
 
         writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")
 
@@ -315,9 +305,7 @@ class TestWriterServicer:
         assert resp.status == writer_pb2.GetEntitiesResponse.Status.OK
 
     async def test_GetEntities_missing(self, writer: WriterServicer):
-        request = writer_pb2.GetEntitiesRequest(
-            kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid")
-        )
+        request = writer_pb2.GetEntitiesRequest(kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"))
         writer.proc.get_kb_obj.return_value = None
 
         resp = await writer.GetEntities(request)
@@ -325,9 +313,7 @@ class TestWriterServicer:
         assert resp.status == writer_pb2.GetEntitiesResponse.Status.NOTFOUND
 
     async def test_GetEntities_handle_error(self, writer: WriterServicer):
-        request = writer_pb2.GetEntitiesRequest(
-            kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid")
-        )
+        request = writer_pb2.GetEntitiesRequest(kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"))
 
         writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")
 
@@ -396,9 +382,7 @@ class TestWriterServicer:
         writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")
 
         entities_manager = AsyncMock()
-        entities_manager.get_entities_group.return_value = writer_pb2.EntitiesGroup(
-            title="group"
-        )
+        entities_manager.get_entities_group.return_value = writer_pb2.EntitiesGroup(title="group")
         with patch(
             "nucliadb.ingest.service.writer.EntitiesManager",
             return_value=entities_manager,
@@ -449,9 +433,7 @@ class TestWriterServicer:
         ):
             resp = await writer.SetEntities(request)
 
-        entities_manager.set_entities_group.assert_called_once_with(
-            request.group, request.entities
-        )
+        entities_manager.set_entities_group.assert_called_once_with(request.group, request.entities)
         assert resp.status == writer_pb2.OpStatusWriter.Status.OK
 
     async def test_SetEntities_missing(self, writer: WriterServicer):
@@ -530,9 +512,7 @@ class TestWriterServicer:
 
         txn = AsyncMock()
         with (
-            patch(
-                "nucliadb.ingest.service.writer.get_partitioning"
-            ) as get_partitioning,
+            patch("nucliadb.ingest.service.writer.get_partitioning") as get_partitioning,
             patch(
                 "nucliadb.ingest.service.writer.get_transaction_utility",
                 MagicMock(return_value=txn),
@@ -582,7 +562,5 @@ class TestWriterServicer:
 def test_get_release_channel(req, has_feature, environment, expected_channel):
     module = "nucliadb.ingest.service.writer"
     with mock.patch(f"{module}.has_feature", return_value=has_feature):
-        with mock.patch(
-            f"{module}.running_settings", new=Mock(running_environment=environment)
-        ):
+        with mock.patch(f"{module}.running_settings", new=Mock(running_environment=environment)):
             assert get_release_channel(req) == expected_channel

@@ -20,8 +20,9 @@
 from typing import Dict, Optional
 
 import requests
-from nucliadb_protos.dataset_pb2 import TrainSet
 from urllib3.exceptions import ProtocolError
+
+from nucliadb_protos.dataset_pb2 import TrainSet
 
 SIZE_BYTES = 4
 

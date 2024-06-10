@@ -48,9 +48,7 @@ async def test_shard_auto_create(
     )
     await sc.initialize()
 
-    original_kb_shards = await sc.shard_manager.get_shards_by_kbid_inner(
-        knowledgebox_ingest
-    )
+    original_kb_shards = await sc.shard_manager.get_shards_by_kbid_inner(knowledgebox_ingest)
 
     await pubsub.publish(
         const.PubSubChannels.RESOURCE_NOTIFY.format(kbid=knowledgebox_ingest),

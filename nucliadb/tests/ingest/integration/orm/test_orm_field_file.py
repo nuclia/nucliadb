@@ -22,12 +22,11 @@ from os.path import dirname, getsize
 from uuid import uuid4
 
 import pytest
-from nucliadb_protos.resources_pb2 import CloudFile
-from nucliadb_protos.resources_pb2 import FieldFile as PBFieldFile
-from nucliadb_protos.resources_pb2 import FieldType
 
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb_protos.resources_pb2 import CloudFile, FieldType
+from nucliadb_protos.resources_pb2 import FieldFile as PBFieldFile
 from nucliadb_utils.storages.storage import Storage
 
 

@@ -20,10 +20,10 @@
 
 import pytest
 from httpx import AsyncClient
-from nucliadb_protos.writer_pb2_grpc import WriterStub
-from tests.utils import broker_resource, inject_message
 
 from nucliadb_protos import resources_pb2 as rpb
+from nucliadb_protos.writer_pb2_grpc import WriterStub
+from tests.utils import broker_resource, inject_message
 
 
 @pytest.mark.parametrize(

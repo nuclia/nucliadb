@@ -19,6 +19,7 @@
 #
 import asyncio
 
+from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb_protos.nodereader_pb2 import (
     GetShardRequest,
     ParagraphSearchRequest,
@@ -31,8 +32,6 @@ from nucliadb_protos.nodereader_pb2 import (
     SuggestResponse,
 )
 from nucliadb_protos.noderesources_pb2 import Shard
-
-from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb_telemetry import metrics
 
 node_observer = metrics.Observer(
@@ -44,9 +43,7 @@ node_observer = metrics.Observer(
 )
 
 
-async def query_shard(
-    node: AbstractIndexNode, shard: str, query: SearchRequest
-) -> SearchResponse:
+async def query_shard(node: AbstractIndexNode, shard: str, query: SearchRequest) -> SearchResponse:
     req = SearchRequest()
     req.CopyFrom(query)
     req.shard = shard
@@ -71,9 +68,7 @@ async def query_paragraph_shard(
         return await node.reader.ParagraphSearch(req)  # type: ignore
 
 
-async def suggest_shard(
-    node: AbstractIndexNode, shard: str, query: SuggestRequest
-) -> SuggestResponse:
+async def suggest_shard(node: AbstractIndexNode, shard: str, query: SuggestRequest) -> SuggestResponse:
     req = SuggestRequest()
     req.CopyFrom(query)
     req.shard = shard

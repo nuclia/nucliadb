@@ -1,14 +1,23 @@
-target-version = "py38"
-line-length = 120
+target-version = "py39"
+line-length = 105
+
+exclude = [
+    "*.pyi",
+    "nucliadb_protos/python/*",
+    "src/nucliadb_telemetry/tests/grpc/*",
+    "src/nucliadb_utils/nuclia_usage/protos/*"
+]
 
 [lint]
 select = [
     "E",   # pycodestyle errors
     "W",   # pycodestyle warnings
     "F",   # pyflakes
+    "I",   # isort
 ]
 
 ignore = [
+"E501",
   "E203",
   "E252",
   "E701",
@@ -16,11 +25,5 @@ ignore = [
   "F901",
 ]
 
-exclude = [
-    "*.pyi",
-    "nucliadb_protos/python/*",
-    "src/nucliadb_telemetry/tests/grpc/hellostreamingworld_pb2_grpc.py",
-    "src/nucliadb_telemetry/tests/grpc/helloworld_pb2_grpc.py",
-    "src/nucliadb_telemetry/tests/grpc/hellostreamingworld_pb2.py",
-    "src/nucliadb_telemetry/tests/grpc/helloworld_pb2.py",
-]
+[lint.isort]
+known-first-party = ["nucliadb*"]

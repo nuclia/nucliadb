@@ -133,9 +133,7 @@ def chat_response_parser(response: httpx.Response) -> ChatResponse:
     learning_id = response.headers.get("NUCLIA-LEARNING-ID")
     relations_result = None
     if len(relations_payload) > 0:
-        relations_result = Relations.model_validate_json(
-            base64.b64decode(relations_payload)
-        )
+        relations_result = Relations.model_validate_json(base64.b64decode(relations_payload))
     try:
         answer, tail = answer.split(b"_CIT_")
         citations_length = int.from_bytes(tail[:4], byteorder="big", signed=False)
@@ -263,9 +261,7 @@ def _request_builder(
     ],
     stream_response: bool = False,
 ):
-    def _func(
-        self: "NucliaDB | NucliaDBAsync", content: Optional[Any] = None, **kwargs
-    ):
+    def _func(self: "NucliaDB | NucliaDBAsync", content: Optional[Any] = None, **kwargs):
         path_data = {}
         for param in path_params:
             if param not in kwargs:
@@ -301,9 +297,7 @@ def _request_builder(
             raise TypeError(f"Invalid arguments provided: {kwargs}")
 
         if not stream_response:
-            resp = self._request(
-                path, method, data=data, query_params=query_params, content=raw_content
-            )
+            resp = self._request(path, method, data=data, query_params=query_params, content=raw_content)
             if asyncio.iscoroutine(resp):
 
                 async def _wrapped_resp():
@@ -314,9 +308,7 @@ def _request_builder(
             else:
                 return _parse_response(response_type, resp)  # type: ignore
         else:
-            resp = self._stream_request(
-                path, method, data=data, query_params=query_params
-            )
+            resp = self._stream_request(path, method, data=data, query_params=query_params)
             return resp
 
     return _func
@@ -382,9 +374,7 @@ class _NucliaDBBase:
         if response.status_code < 300:
             return response
         elif response.status_code in (401, 403):
-            raise exceptions.AuthError(
-                f"Auth error {response.status_code}: {response.text}"
-            )
+            raise exceptions.AuthError(f"Auth error {response.status_code}: {response.text}")
         elif response.status_code == 402:
             raise exceptions.AccountLimitError(
                 f"Account limits exceeded error {response.status_code}: {response.text}"
@@ -397,9 +387,7 @@ class _NucliaDBBase:
         ):  # 419 is a custom error code for kb creation conflict
             raise exceptions.ConflictError(response.text)
         elif response.status_code == 404:
-            raise exceptions.NotFoundError(
-                f"Resource not found at url {response.url}: {response.text}"
-            )
+            raise exceptions.NotFoundError(f"Resource not found at url {response.url}: {response.text}")
         else:
             raise exceptions.UnknownError(
                 f"Unknown error connecting to API: {response.status_code}: {response.text}"
@@ -883,9 +871,7 @@ class NucliaDB(_NucliaDBBase):
         >>> sdk = NucliaDB(api_key="api-key", region=Region.ON_PREM, url=\"http://localhost:8080\")
         """  # noqa
         super().__init__(region=region, api_key=api_key, url=url, headers=headers)
-        self.session = httpx.Client(
-            headers=self.headers, base_url=self.base_url, timeout=timeout
-        )
+        self.session = httpx.Client(headers=self.headers, base_url=self.base_url, timeout=timeout)
 
     def _request(
         self,
@@ -925,9 +911,7 @@ class NucliaDB(_NucliaDBBase):
             opts["params"] = query_params
 
         def iter_bytes(chunk_size=None) -> Iterator[bytes]:
-            with self.session.stream(
-                method.lower(), url=url, **opts, timeout=30.0
-            ) as response:
+            with self.session.stream(method.lower(), url=url, **opts, timeout=30.0) as response:
                 self._check_response(response)
                 for chunk in response.iter_raw(chunk_size=chunk_size):
                     yield chunk
@@ -981,9 +965,7 @@ class NucliaDBAsync(_NucliaDBBase):
         >>> sdk = NucliaDBAsync(api_key="api-key", region=Region.ON_PREM, url="https://mycompany.api.com/api/nucliadb")
         """  # noqa
         super().__init__(region=region, api_key=api_key, url=url, headers=headers)
-        self.session = httpx.AsyncClient(
-            headers=self.headers, base_url=self.base_url, timeout=timeout
-        )
+        self.session = httpx.AsyncClient(headers=self.headers, base_url=self.base_url, timeout=timeout)
 
     async def _request(
         self,
@@ -1005,9 +987,7 @@ class NucliaDBAsync(_NucliaDBBase):
             opts["content"] = content
         if query_params is not None:
             opts["params"] = query_params
-        response: httpx.Response = await getattr(self.session, method.lower())(
-            url, **opts
-        )
+        response: httpx.Response = await getattr(self.session, method.lower())(url, **opts)
         return self._check_response(response)
 
     def _stream_request(

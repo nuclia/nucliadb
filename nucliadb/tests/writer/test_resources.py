@@ -23,16 +23,6 @@ from unittest.mock import AsyncMock
 
 import pytest
 from httpx import AsyncClient
-from tests.writer.test_fields import (
-    TEST_CONVERSATION_PAYLOAD,
-    TEST_DATETIMES_PAYLOAD,
-    TEST_EXTERNAL_FILE_PAYLOAD,
-    TEST_FILE_PAYLOAD,
-    TEST_KEYWORDSETS_PAYLOAD,
-    TEST_LAYOUT_PAYLOAD,
-    TEST_LINK_PAYLOAD,
-    TEST_TEXT_PAYLOAD,
-)
 
 import nucliadb_models
 from nucliadb.common import datamanagers
@@ -47,12 +37,20 @@ from nucliadb.writer.api.v1.router import (
     RSLUG_PREFIX,
 )
 from nucliadb_models.resource import NucliaDBRoles
+from tests.writer.test_fields import (
+    TEST_CONVERSATION_PAYLOAD,
+    TEST_DATETIMES_PAYLOAD,
+    TEST_EXTERNAL_FILE_PAYLOAD,
+    TEST_FILE_PAYLOAD,
+    TEST_KEYWORDSETS_PAYLOAD,
+    TEST_LAYOUT_PAYLOAD,
+    TEST_LINK_PAYLOAD,
+    TEST_TEXT_PAYLOAD,
+)
 
 
 @pytest.mark.asyncio
-async def test_resource_crud(
-    writer_api: Callable[[list[str]], AsyncClient], knowledgebox_writer: str
-):
+async def test_resource_crud(writer_api: Callable[[list[str]], AsyncClient], knowledgebox_writer: str):
     knowledgebox_id = knowledgebox_writer
     async with writer_api([NucliaDBRoles.WRITER]) as client:
         # Test create resource
@@ -73,14 +71,10 @@ async def test_resource_crud(
                         "paragraphs": [
                             {
                                 "key": "paragraph1",
-                                "classifications": [
-                                    {"labelset": "ls1", "label": "label1"}
-                                ],
+                                "classifications": [{"labelset": "ls1", "label": "label1"}],
                             }
                         ],
-                        "token": [
-                            {"token": "token1", "klass": "klass1", "start": 1, "end": 2}
-                        ],
+                        "token": [{"token": "token1", "klass": "klass1", "start": 1, "end": 2}],
                         "field": {"field": "text1", "field_type": "text"},
                     }
                 ],
@@ -168,14 +162,10 @@ async def test_resource_crud_sync(
                         "paragraphs": [
                             {
                                 "key": "paragraph1",
-                                "classifications": [
-                                    {"labelset": "ls1", "label": "label1"}
-                                ],
+                                "classifications": [{"labelset": "ls1", "label": "label1"}],
                             }
                         ],
-                        "token": [
-                            {"token": "token1", "klass": "klass1", "start": 1, "end": 2}
-                        ],
+                        "token": [{"token": "token1", "klass": "klass1", "start": 1, "end": 2}],
                         "field": {"field": "text1", "field_type": "text"},
                     }
                 ],
@@ -220,9 +210,7 @@ async def test_resource_crud_sync(
         rid = data["uuid"]
 
         assert (
-            await datamanagers.atomic.resources.resource_exists(
-                kbid=knowledgebox_id, rid=rid
-            )
+            await datamanagers.atomic.resources.resource_exists(kbid=knowledgebox_id, rid=rid)
         ) is True
 
         # Test update resource
@@ -246,9 +234,7 @@ async def test_resource_crud_sync(
         assert resp.status_code == 204
 
         assert (
-            await datamanagers.atomic.resources.resource_exists(
-                kbid=knowledgebox_id, rid=rid
-            )
+            await datamanagers.atomic.resources.resource_exists(kbid=knowledgebox_id, rid=rid)
         ) is False
 
 
@@ -290,16 +276,9 @@ async def test_reprocess_resource(
         assert payload.filefield["file1"] == "convert_internal_filefield_to_str,0"
         assert isinstance(payload.linkfield.get("link1"), nucliadb_models.LinkUpload)
         assert isinstance(payload.textfield.get("text1"), nucliadb_models.Text)
-        assert isinstance(
-            payload.layoutfield.get("layout1"), nucliadb_models.LayoutDiff
-        )
-        assert (
-            payload.layoutfield["layout1"].blocks["field1"].file
-            == "convert_internal_cf_to_str,2"
-        )
-        assert isinstance(
-            payload.conversationfield.get("conv1"), nucliadb_models.PushConversation
-        )
+        assert isinstance(payload.layoutfield.get("layout1"), nucliadb_models.LayoutDiff)
+        assert payload.layoutfield["layout1"].blocks["field1"].file == "convert_internal_cf_to_str,2"
+        assert isinstance(payload.conversationfield.get("conv1"), nucliadb_models.PushConversation)
         assert (
             payload.conversationfield["conv1"].messages[33].content.attachments[0]
             == "convert_internal_cf_to_str,0"

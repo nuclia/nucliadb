@@ -40,9 +40,7 @@ from nucliadb_models.search import (
 @pytest.fixture()
 def predict():
     predict = mock.AsyncMock()
-    with mock.patch(
-        "nucliadb.search.search.chat.query.get_predict", return_value=predict
-    ):
+    with mock.patch("nucliadb.search.search.chat.query.get_predict", return_value=predict):
         yield predict
 
 
@@ -120,9 +118,7 @@ def test_parse_status_code(chunk, status_code, error):
         ),
     ],
 )
-async def test_get_find_results_vector_search_is_optional(
-    predict, chat_features, find_features
-):
+async def test_get_find_results_vector_search_is_optional(predict, chat_features, find_features):
     find_results = KnowledgeboxFindResults(
         total=0, min_score=MinScore(semantic=0.7), resources={}, facets=[]
     )

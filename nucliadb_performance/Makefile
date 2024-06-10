@@ -52,15 +52,12 @@ install-dev: # Install the package for development
 
 .PHONY: format
 format: # Format the code
-	cd .. && isort --profile black nucliadb_performance
-	black .
 	ruff check --fix --config=../ruff.toml .
+	ruff format --config=../ruff.toml .
 
 .PHONY: lint
 lint: # Run lint checks
 	ruff check --config=../ruff.toml .
-	cd .. && isort -c --profile black nucliadb_performance
-	black --check .
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini . --show-traceback
 
 

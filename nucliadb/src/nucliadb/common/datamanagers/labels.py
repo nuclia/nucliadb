@@ -70,9 +70,7 @@ async def _get_labelset_ids(txn: Transaction, *, kbid: str) -> Optional[list[str
     return orjson.loads(data)
 
 
-async def _add_to_labelset_ids(
-    txn: Transaction, *, kbid: str, labelsets: list[str]
-) -> None:
+async def _add_to_labelset_ids(txn: Transaction, *, kbid: str, labelsets: list[str]) -> None:
     previous = await _get_labelset_ids(txn, kbid=kbid)
     needs_set = False
     if previous is None:
@@ -87,9 +85,7 @@ async def _add_to_labelset_ids(
         await _set_labelset_ids(txn, kbid=kbid, labelsets=previous)
 
 
-async def _delete_from_labelset_ids(
-    txn: Transaction, *, kbid: str, labelsets: list[str]
-) -> None:
+async def _delete_from_labelset_ids(txn: Transaction, *, kbid: str, labelsets: list[str]) -> None:
     needs_set = False
     previous = await _get_labelset_ids(txn, kbid=kbid)
     if previous is None:
@@ -104,17 +100,13 @@ async def _delete_from_labelset_ids(
         await _set_labelset_ids(txn, kbid=kbid, labelsets=previous)
 
 
-async def _set_labelset_ids(
-    txn: Transaction, *, kbid: str, labelsets: list[str]
-) -> None:
+async def _set_labelset_ids(txn: Transaction, *, kbid: str, labelsets: list[str]) -> None:
     key = KB_LABELSET_IDS.format(kbid=kbid)
     data = orjson.dumps(labelsets)
     await txn.set(key, data)
 
 
-async def get_labelset(
-    txn: Transaction, *, kbid: str, labelset_id: str
-) -> Optional[kb_pb2.LabelSet]:
+async def get_labelset(txn: Transaction, *, kbid: str, labelset_id: str) -> Optional[kb_pb2.LabelSet]:
     labelset_key = KB_LABELSET.format(kbid=kbid, id=labelset_id)
     payload = await txn.get(labelset_key)
     if payload:

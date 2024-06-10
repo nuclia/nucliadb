@@ -25,6 +25,8 @@ import backoff
 import mmh3
 import nats
 from google.protobuf.timestamp_pb2 import Timestamp
+from opentelemetry.trace import format_trace_id, get_current_span
+
 from nucliadb_protos.audit_pb2 import (
     AuditField,
     AuditKBCounter,
@@ -34,8 +36,6 @@ from nucliadb_protos.audit_pb2 import (
 )
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.resources_pb2 import FieldID
-from opentelemetry.trace import format_trace_id, get_current_span
-
 from nucliadb_utils import logger
 from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.nats import get_traced_jetstream
@@ -89,9 +89,7 @@ class StreamAuditStorage(AuditStorage):
         logger.info("Got reconnected to NATS {url}".format(url=self.nc.connected_url))
 
     async def error_cb(self, e):
-        logger.error(
-            "There was an error connecting to NATS audit: {}".format(e), exc_info=True
-        )
+        logger.error("There was an error connecting to NATS audit: {}".format(e), exc_info=True)
 
     async def closed_cb(self):
         logger.info("Connection is closed on NATS")
@@ -149,9 +147,7 @@ class StreamAuditStorage(AuditStorage):
     async def send(self, message: AuditRequest):
         self.queue.put_nowait(message)
 
-    @backoff.on_exception(
-        backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=4
-    )
+    @backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=4)
     async def _send(self, message: AuditRequest):
         if self.js is None:  # pragma: no cover
             raise AttributeError()
@@ -205,9 +201,7 @@ class StreamAuditStorage(AuditStorage):
                 account_id=None,
                 kb_id=kbid,
                 kb_source=KBSource.HOSTED,
-                storage=Storage(
-                    paragraphs=kb_counter.paragraphs, fields=kb_counter.fields
-                ),
+                storage=Storage(paragraphs=kb_counter.paragraphs, fields=kb_counter.fields),
             )
 
         auditrequest.trace_id = get_trace_id()

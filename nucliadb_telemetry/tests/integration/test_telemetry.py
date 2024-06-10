@@ -70,10 +70,7 @@ async def test_telemetry_dict(http_service: AsyncClient, greeter: Greeter):
     for i in range(10):
         if len(greeter.messages) == 0:
             await asyncio.sleep(1)
-    assert (
-        greeter.messages[0].headers["x-b3-traceid"]
-        == "f13dc5318bf3bef64a0a5ea607db93a1"
-    )
+    assert greeter.messages[0].headers["x-b3-traceid"] == "f13dc5318bf3bef64a0a5ea607db93a1"
     assert len(greeter.messages) == 4
 
     expected_spans = 17
@@ -85,10 +82,7 @@ async def test_telemetry_dict(http_service: AsyncClient, greeter: Greeter):
             f"http://localhost:{telemetry_settings.jaeger_query_port}/api/traces/f13dc5318bf3bef64a0a5ea607db93a1",
             headers={"Accept": "application/json"},
         )
-        if (
-            resp.status_code != 200
-            or len(resp.json()["data"][0]["spans"]) < expected_spans
-        ):
+        if resp.status_code != 200 or len(resp.json()["data"][0]["spans"]) < expected_spans:
             await asyncio.sleep(2)
         else:
             break

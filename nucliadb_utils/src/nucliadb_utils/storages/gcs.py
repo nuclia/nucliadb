@@ -35,8 +35,8 @@ import backoff
 import google.auth.transport.requests  # type: ignore
 import yarl
 from google.oauth2 import service_account  # type: ignore
-from nucliadb_protos.resources_pb2 import CloudFile
 
+from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_telemetry import errors, metrics
 from nucliadb_telemetry.utils import setup_telemetry
 from nucliadb_utils import logger
@@ -117,9 +117,7 @@ class GCSStorageField(StorageField):
         origin_bucket_name: str,
         destination_bucket_name: str,
     ):
-        await self.copy(
-            origin_uri, destination_uri, origin_bucket_name, destination_bucket_name
-        )
+        await self.copy(origin_uri, destination_uri, origin_bucket_name, destination_bucket_name)
         await self.storage.delete_upload(origin_uri, origin_bucket_name)
 
     @backoff.on_exception(
@@ -163,9 +161,7 @@ class GCSStorageField(StorageField):
                 assert data["resource"]["name"] == destination_uri
 
     @storage_ops_observer.wrap({"type": "iter_data"})
-    async def iter_data(
-        self, range: Optional[Range] = None
-    ) -> AsyncGenerator[bytes, None]:
+    async def iter_data(self, range: Optional[Range] = None) -> AsyncGenerator[bytes, None]:
         attempt = 1
         while True:
             try:
@@ -243,9 +239,7 @@ class GCSStorageField(StorageField):
 
         if self.field is not None and self.field.upload_uri != "":
             # If there is a temporal url
-            await self.storage.delete_upload(
-                self.field.upload_uri, self.field.bucket_name
-            )
+            await self.storage.delete_upload(self.field.upload_uri, self.field.bucket_name)
 
         if self.field is not None and self.field.uri != "":
             field: CloudFile = CloudFile(
@@ -381,18 +375,13 @@ class GCSStorageField(StorageField):
         if self.field.old_uri not in ("", None):
             # Already has a file
             try:
-                await self.storage.delete_upload(
-                    self.field.old_uri, self.field.bucket_name
-                )
+                await self.storage.delete_upload(self.field.old_uri, self.field.bucket_name)
             except GoogleCloudException as e:
                 logger.warning(
-                    f"Could not delete existing google cloud file "
-                    f"with uri: {self.field.uri}: {e}"
+                    f"Could not delete existing google cloud file " f"with uri: {self.field.uri}: {e}"
                 )
         if self.field.upload_uri != self.key:
-            await self.move(
-                self.field.upload_uri, self.key, self.field.bucket_name, self.bucket
-            )
+            await self.move(self.field.upload_uri, self.key, self.field.bucket_name, self.bucket)
 
         self.field.uri = self.key
         self.field.ClearField("resumable_uri")
@@ -490,9 +479,7 @@ class GCSStorage(Storage):
         self._bucket_labels = labels or {}
         self._executor = executor
         self._creation_access_token = datetime.now()
-        self._upload_url = (
-            url + "/upload/storage/v1/b/{bucket}/o?uploadType=resumable"
-        )  # noqa
+        self._upload_url = url + "/upload/storage/v1/b/{bucket}/o?uploadType=resumable"  # noqa
         self.object_base_url = url + "/storage/v1/b"
         self._client = None
 
@@ -516,17 +503,13 @@ class GCSStorage(Storage):
             if self.deadletter_bucket is not None and self.deadletter_bucket != "":
                 await self.create_bucket(self.deadletter_bucket)
         except Exception:  # pragma: no cover
-            logger.exception(
-                f"Could not create bucket {self.deadletter_bucket}", exc_info=True
-            )
+            logger.exception(f"Could not create bucket {self.deadletter_bucket}", exc_info=True)
 
         try:
             if self.indexing_bucket is not None and self.indexing_bucket != "":
                 await self.create_bucket(self.indexing_bucket)
         except Exception:  # pragma: no cover
-            logger.exception(
-                f"Could not create bucket {self.indexing_bucket}", exc_info=True
-            )
+            logger.exception(f"Could not create bucket {self.indexing_bucket}", exc_info=True)
 
     async def finalize(self):
         await self.session.close()
@@ -549,9 +532,7 @@ class GCSStorage(Storage):
         if self.session is None:
             raise AttributeError()
         if uri:
-            url = "{}/{}/o/{}".format(
-                self.object_base_url, bucket_name, quote_plus(uri)
-            )
+            url = "{}/{}/o/{}".format(self.object_base_url, bucket_name, quote_plus(uri))
             headers = await self.get_access_headers()
             async with self.session.delete(url, headers=headers) as resp:
                 try:
@@ -562,8 +543,7 @@ class GCSStorage(Storage):
                 if resp.status not in (200, 204, 404):
                     if resp.status == 404:
                         logger.error(
-                            f"Attempt to delete not found gcloud: {data}, "
-                            f"status: {resp.status}",
+                            f"Attempt to delete not found gcloud: {data}, " f"status: {resp.status}",
                             exc_info=True,
                         )
                     else:
@@ -668,8 +648,7 @@ class GCSStorage(Storage):
                     logger.error("Not implemented")
                 elif resp.status == 404:
                     logger.error(
-                        f"Attempt to delete not found gcloud: {data}, "
-                        f"status: {resp.status}",
+                        f"Attempt to delete not found gcloud: {data}, " f"status: {resp.status}",
                         exc_info=True,
                     )
                 else:
@@ -706,9 +685,7 @@ class GCSStorage(Storage):
                     errors.capture_message(msg, "error", scope)
         return deleted, conflict
 
-    async def iterate_objects(
-        self, bucket: str, prefix: str
-    ) -> AsyncGenerator[ObjectInfo, None]:
+    async def iterate_objects(self, bucket: str, prefix: str) -> AsyncGenerator[ObjectInfo, None]:
         if self.session is None:
             raise AttributeError()
         url = "{}/{}/o".format(self.object_base_url, bucket)
@@ -755,9 +732,7 @@ def parse_object_metadata(object_data: dict[str, Any], key: str) -> ObjectMetada
         size = int(custom_size)
 
     # Parse content-type
-    content_type = (
-        custom_metadata.get("content_type") or object_data.get("contentType") or ""
-    )
+    content_type = custom_metadata.get("content_type") or object_data.get("contentType") or ""
 
     # Parse filename
     filename = custom_metadata.get("filename") or key.split("/")[-1]

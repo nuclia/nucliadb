@@ -69,9 +69,7 @@ class TiKVd(object):
         if self.debug:
             self.proc2 = subprocess.Popen(cmd)
         else:
-            self.proc2 = subprocess.Popen(
-                cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-            )
+            self.proc2 = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         if self.debug:
             if self.proc2 is None:
@@ -80,10 +78,7 @@ class TiKVd(object):
                     % self.port
                 )
             else:
-                print(
-                    "[\033[0;33mDEBUG\033[0;0m] Server listening on port %d started."
-                    % self.port
-                )
+                print("[\033[0;33mDEBUG\033[0;0m] Server listening on port %d started." % self.port)
         cmd = [
             f"{self.path}/{self.pd_bin_name}",
             "--name=pd",
@@ -96,9 +91,7 @@ class TiKVd(object):
         if self.debug:
             self.proc = subprocess.Popen(cmd)
         else:
-            self.proc = subprocess.Popen(
-                cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-            )
+            self.proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         if self.debug:
             if self.proc is None:
@@ -107,18 +100,12 @@ class TiKVd(object):
                     % self.pd_port
                 )
             else:
-                print(
-                    "[\033[0;33mDEBUG\033[0;0m] Server listening on port %d started."
-                    % self.pd_port
-                )
+                print("[\033[0;33mDEBUG\033[0;0m] Server listening on port %d started." % self.pd_port)
         return self.proc
 
     def stop(self):
         if self.debug:
-            print(
-                "[\033[0;33mDEBUG\033[0;0m] Server listening on %d will stop."
-                % self.port
-            )
+            print("[\033[0;33mDEBUG\033[0;0m] Server listening on %d will stop." % self.port)
 
         if self.debug:
             if self.proc is None:
@@ -152,10 +139,7 @@ class TiKVd(object):
             os.kill(self.proc2.pid, signal.SIGKILL)
             self.proc2.wait()
             if self.debug:
-                print(
-                    "[\033[0;33mDEBUG\033[0;0m] Server listening on %d was stopped."
-                    % self.port
-                )
+                print("[\033[0;33mDEBUG\033[0;0m] Server listening on %d was stopped." % self.port)
         if self.tmpfolder is not None:
             self.tmpfolder.cleanup()
             self.tmpfolder = None
@@ -192,9 +176,7 @@ def tikvd():
             arch = "amd64"
         system = platform.system().lower()
 
-        resp = requests.get(
-            f"https://tiup-mirrors.pingcap.com/tikv-{version}-{system}-{arch}.tar.gz"
-        )
+        resp = requests.get(f"https://tiup-mirrors.pingcap.com/tikv-{version}-{system}-{arch}.tar.gz")
 
         zipfile = tarfile.open(fileobj=BytesIO(resp.content), mode="r:gz")
 
@@ -208,9 +190,7 @@ def tikvd():
             arch = "amd64"
         system = platform.system().lower()
 
-        resp = requests.get(
-            f"https://tiup-mirrors.pingcap.com/pd-{version}-{system}-{arch}.tar.gz"
-        )
+        resp = requests.get(f"https://tiup-mirrors.pingcap.com/pd-{version}-{system}-{arch}.tar.gz")
 
         zipfile = tarfile.open(fileobj=BytesIO(resp.content), mode="r:gz")
 
@@ -227,10 +207,7 @@ def tikvd():
 
     for i in range(100):
         resp = requests.get(f"http://{server.host}:{server.pd_port}/pd/api/v1/stores")
-        if (
-            resp.status_code == 200
-            and resp.json()["stores"][0]["store"]["state_name"] == "Up"
-        ):
+        if resp.status_code == 200 and resp.json()["stores"][0]["store"]["state_name"] == "Up":
             break
         print(resp.status_code)
         print(resp.json())

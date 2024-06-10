@@ -20,9 +20,8 @@
 
 import hashlib
 
-from nucliadb_protos.resources_pb2 import FieldText
-
 from nucliadb.ingest.fields.base import Field
+from nucliadb_protos.resources_pb2 import FieldText
 
 
 class Text(Field):

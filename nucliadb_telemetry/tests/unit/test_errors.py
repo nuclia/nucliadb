@@ -47,9 +47,7 @@ def test_capture_message() -> None:
         patch.object(errors, "SENTRY", True),
     ):
         errors.capture_message("error_msg", "info", "scope")
-        mock_sentry_sdk.capture_message.assert_called_once_with(
-            "error_msg", "info", "scope"
-        )
+        mock_sentry_sdk.capture_message.assert_called_once_with("error_msg", "info", "scope")
 
 
 def test_capture_message_no_sentry() -> None:

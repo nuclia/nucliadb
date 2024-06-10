@@ -31,8 +31,6 @@ from fastapi.params import Header
 from fastapi.requests import Request
 from fastapi.responses import Response
 from fastapi_versioning import version
-from nucliadb_protos.resources_pb2 import FieldFile, Metadata
-from nucliadb_protos.writer_pb2 import BrokerMessage
 from starlette.requests import Request as StarletteRequest
 
 from nucliadb.common import datamanagers
@@ -64,6 +62,8 @@ from nucliadb.writer.utilities import get_processing
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.utils import FieldIdString
 from nucliadb_models.writer import CreateResourcePayload, ResourceFileUploaded
+from nucliadb_protos.resources_pb2 import FieldFile, Metadata
+from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils.authentication import requires_one
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.storages.storage import KB_RESOURCE_FIELD
@@ -221,15 +221,11 @@ async def _tus_post(
         try:
             metadata = parse_tus_metadata(request.headers["upload-metadata"])
         except InvalidTUSMetadata as exc:
-            raise HTTPBadRequest(
-                detail=f"Upload-Metadata header contains errors: {str(exc)}"
-            )
+            raise HTTPBadRequest(detail=f"Upload-Metadata header contains errors: {str(exc)}")
     else:
         metadata = {}
 
-    path, rid, field = await validate_field_upload(
-        kbid, path_rid, field_id, metadata.get("md5")
-    )
+    path, rid, field = await validate_field_upload(kbid, path_rid, field_id, metadata.get("md5"))
 
     if implies_resource_creation:
         # When uploading a file to a new kb resource, we want to allow multiple
@@ -286,9 +282,7 @@ async def _tus_post(
     await dm.save()
 
     # Find the URL for upload, with the same parameter as this call
-    location = api.url_path_for(
-        "Upload information", upload_id=upload_id, **request.path_params
-    )
+    location = api.url_path_for("Upload information", upload_id=upload_id, **request.path_params)
     return Response(
         status_code=201,
         headers={
@@ -494,8 +488,7 @@ async def _tus_patch(
 
     if offset != dm.offset:
         raise HTTPConflict(
-            detail=f"Current upload offset({offset}) does not match "
-            f"object offset {dm.offset}"
+            detail=f"Current upload offset({offset}) does not match " f"object offset {dm.offset}"
         )
 
     storage_manager = get_storage_manager()
@@ -507,9 +500,7 @@ async def _tus_patch(
 
     if to_upload and read_bytes != to_upload:  # pragma: no cover
         # check length matches if provided
-        raise HTTPPreconditionFailed(
-            detail="Upload size does not match what was provided"
-        )
+        raise HTTPPreconditionFailed(detail="Upload size does not match what was provided")
     await dm.update(offset=offset + read_bytes)
 
     headers = {
@@ -544,9 +535,7 @@ async def _tus_patch(
             seqid = await store_file_on_nuclia_db(
                 size=dm.get("size"),
                 content_type=dm.get("metadata", {}).get("content_type"),
-                override_resource_title=dm.get("metadata", {}).get(
-                    "implies_resource_creation", False
-                ),
+                override_resource_title=dm.get("metadata", {}).get("implies_resource_creation", False),
                 filename=dm.get("metadata", {}).get("filename"),
                 password=dm.get("metadata", {}).get("password"),
                 language=dm.get("metadata", {}).get("language"),
@@ -571,9 +560,7 @@ async def _tus_patch(
     return Response(headers=headers)
 
 
-def validate_intermediate_tus_chunk(
-    read_bytes: int, storage_manager: FileStorageManager
-):
+def validate_intermediate_tus_chunk(read_bytes: int, storage_manager: FileStorageManager):
     try:
         storage_manager.validate_intermediate_chunk(read_bytes)
     except ValueError as err:
@@ -687,9 +674,7 @@ async def _upload(
     await maybe_back_pressure(request, kbid, resource_uuid=path_rid)
 
     md5_user = x_md5[0] if x_md5 is not None and len(x_md5) > 0 else None
-    path, rid, valid_field = await validate_field_upload(
-        kbid, path_rid, field, md5_user
-    )
+    path, rid, valid_field = await validate_field_upload(kbid, path_rid, field, md5_user)
     dm = get_dm()
     storage_manager = get_storage_manager()
 
@@ -790,13 +775,9 @@ async def validate_field_upload(
     if rid is None:
         # we are going to create a new resource and a field
         if md5 is not None:
-            exists = await datamanagers.atomic.resources.resource_exists(
-                kbid=kbid, rid=md5
-            )
+            exists = await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=md5)
             if exists:
-                raise HTTPConflict(
-                    "A resource with the same uploaded file already exists"
-                )
+                raise HTTPConflict("A resource with the same uploaded file already exists")
             rid = md5
         else:
             rid = uuid.uuid4().hex

@@ -34,9 +34,7 @@ KB_ROLLOVER_RESOURCES_TO_INDEX = "/kbs/{kbid}/rollover/to-index/{resource}"
 KB_ROLLOVER_RESOURCES_INDEXED = "/kbs/{kbid}/rollover/indexed/{resource}"
 
 
-async def get_kb_rollover_shards(
-    txn: Transaction, *, kbid: str
-) -> Optional[writer_pb2.Shards]:
+async def get_kb_rollover_shards(txn: Transaction, *, kbid: str) -> Optional[writer_pb2.Shards]:
     key = KB_ROLLOVER_SHARDS.format(kbid=kbid)
     return await get_kv_pb(txn, key, writer_pb2.Shards)
 
@@ -127,9 +125,7 @@ async def iter_indexed_keys(*, kbid: str) -> AsyncGenerator[str, None]:
             yield key.split("/")[-1]
 
 
-async def _get_batch_indexed_data(
-    *, kbid, batch: list[str]
-) -> list[tuple[str, tuple[str, int]]]:
+async def _get_batch_indexed_data(*, kbid, batch: list[str]) -> list[tuple[str, tuple[str, int]]]:
     async with with_ro_transaction() as txn:
         values = await txn.batch_get(
             [
@@ -145,9 +141,7 @@ async def _get_batch_indexed_data(
     return results
 
 
-async def iterate_indexed_data(
-    *, kbid: str
-) -> AsyncGenerator[tuple[str, tuple[str, int]], None]:
+async def iterate_indexed_data(*, kbid: str) -> AsyncGenerator[tuple[str, tuple[str, int]], None]:
     """
     This function is optimized for reducing the time a transaction is open.
 

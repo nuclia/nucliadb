@@ -116,9 +116,7 @@ def print_cluster_stats(kbs, paragraphs):
     print(f"Found KBs: {len(kbs)}")
     print(f"Paragraph stats in cluster:")
     print(f" - Total: {sum(paragraphs)}")
-    print(
-        f" - Avg: {int(statistics.mean(paragraphs))} +/- {int(statistics.stdev(paragraphs))}"
-    )
+    print(f" - Avg: {int(statistics.mean(paragraphs))} +/- {int(statistics.stdev(paragraphs))}")
     print(f" - Median: {int(statistics.median(paragraphs))}")
     print(f" - Quantiles (n=10): {statistics.quantiles(paragraphs, n=10)}")
     print(f" - Max: {max(paragraphs)}")
@@ -184,9 +182,7 @@ async def _make_kbid_request(client, kbid, method, path, params=None, json=None)
         return await client.make_request(method, path, params=params, json=json)
     except RequestError as err:
         # Store error info so we can inspect after the script runs
-        detail = (
-            err.content and err.content.get("detail", None) if err.content else err.text
-        )
+        detail = err.content and err.content.get("detail", None) if err.content else err.text
         if isinstance(detail, dict):
             detail = dumps(detail)
         endpoint = path.split("/")[-1]

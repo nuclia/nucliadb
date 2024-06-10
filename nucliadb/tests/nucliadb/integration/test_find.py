@@ -23,8 +23,8 @@ from unittest.mock import patch
 
 import pytest
 from httpx import AsyncClient
-from nucliadb_protos.writer_pb2_grpc import WriterStub
 
+from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils.exceptions import LimitsExceededError
 
 
@@ -183,9 +183,7 @@ async def test_find_min_score(
 ):
     # When not specifying the min score on the request
     # it should default to 0 for bm25 and 0.7 for semantic
-    resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/find", json={"query": "dummy"}
-    )
+    resp = await nucliadb_reader.post(f"/kb/{knowledgebox}/find", json={"query": "dummy"})
     assert resp.status_code == 200
     assert resp.json()["min_score"] == {"bm25": 0, "semantic": 0.7}
 
@@ -245,9 +243,7 @@ async def test_story_7286(
     )
     assert resp.status_code == 200
 
-    with patch(
-        "nucliadb.search.search.find_merge.managed_serialize", return_value=None
-    ):
+    with patch("nucliadb.search.search.find_merge.managed_serialize", return_value=None):
         # should get no result (because serialize returns None, as the resource is not found in the DB)
         resp = await nucliadb_reader.post(
             f"/kb/{knowledgebox}/find",

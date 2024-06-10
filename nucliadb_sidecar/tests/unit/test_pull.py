@@ -22,8 +22,8 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 from nats.aio.client import Msg
-from nucliadb_protos.nodewriter_pb2 import IndexMessage, TypeMessage
 
+from nucliadb_protos.nodewriter_pb2 import IndexMessage, TypeMessage
 from nucliadb_sidecar.listeners import IndexedPublisher
 from nucliadb_sidecar.pull import Worker
 from nucliadb_utils import const
@@ -32,9 +32,7 @@ from nucliadb_utils import const
 @pytest.fixture(autouse=True)
 def pubsub():
     pubsub = AsyncMock()
-    with mock.patch(
-        "nucliadb_sidecar.listeners.indexed_publisher.get_pubsub", return_value=pubsub
-    ):
+    with mock.patch("nucliadb_sidecar.listeners.indexed_publisher.get_pubsub", return_value=pubsub):
         yield pubsub
 
 
@@ -74,9 +72,7 @@ class TestIndexedPublisher:
         assert pubsub.publish.call_args[0][0] == channel
 
     @pytest.mark.asyncio
-    async def test_indexed_skips_if_no_partition(
-        self, publisher, index_message, pubsub
-    ):
+    async def test_indexed_skips_if_no_partition(self, publisher, index_message, pubsub):
         index_message.ClearField("partition")
 
         await publisher.indexed(index_message)

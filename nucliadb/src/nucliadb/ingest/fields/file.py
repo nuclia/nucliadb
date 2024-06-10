@@ -19,9 +19,8 @@
 #
 from typing import Any, Optional
 
-from nucliadb_protos.resources_pb2 import CloudFile, FieldFile, FileExtractedData
-
 from nucliadb.ingest.fields.base import Field
+from nucliadb_protos.resources_pb2 import CloudFile, FieldFile, FileExtractedData
 from nucliadb_utils.storages.storage import StorageField
 
 FILE_METADATA = "file_metadata"
@@ -52,9 +51,7 @@ class File(Field):
 
         is_external_file = payload.file.source == CloudFile.Source.EXTERNAL
         if not is_external_file:
-            sf: StorageField = self.storage.file_field(
-                self.kbid, self.uuid, self.id, old_cf
-            )
+            sf: StorageField = self.storage.file_field(self.kbid, self.uuid, self.id, old_cf)
             cf: CloudFile = await self.storage.normalize_binary(payload.file, sf)
             payload.file.CopyFrom(cf)
 
@@ -80,17 +77,13 @@ class File(Field):
             cf_file_page_preview: CloudFile = await self.storage.normalize_binary(
                 preview, sf_file_page_preview
             )
-            file_extracted_data.file_pages_previews.pages[page].CopyFrom(
-                cf_file_page_preview
-            )
+            file_extracted_data.file_pages_previews.pages[page].CopyFrom(cf_file_page_preview)
 
         for fileid, origincf in file_extracted_data.file_generated.items():
             sf_generated: StorageField = self.storage.file_extracted(
                 self.kbid, self.uuid, self.type, self.id, f"generated/{fileid}"
             )
-            cf_generated: CloudFile = await self.storage.normalize_binary(
-                origincf, sf_generated
-            )
+            cf_generated: CloudFile = await self.storage.normalize_binary(origincf, sf_generated)
             file_extracted_data.file_generated[fileid].CopyFrom(cf_generated)
 
         if file_extracted_data.HasField("file_thumbnail"):
@@ -113,7 +106,5 @@ class File(Field):
             sf: StorageField = self.storage.file_extracted(
                 self.kbid, self.uuid, self.type, self.id, FILE_METADATA
             )
-            self.file_extracted_data = await self.storage.download_pb(
-                sf, FileExtractedData
-            )
+            self.file_extracted_data = await self.storage.download_pb(sf, FileExtractedData)
         return self.file_extracted_data

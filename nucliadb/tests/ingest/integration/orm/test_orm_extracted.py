@@ -22,6 +22,9 @@ from typing import Optional
 from uuid import uuid4
 
 import pytest
+
+from nucliadb.ingest.fields.text import Text
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos.resources_pb2 import (
     CloudFile,
     ExtractedText,
@@ -29,16 +32,11 @@ from nucliadb_protos.resources_pb2 import (
     FieldID,
     FieldType,
 )
-
-from nucliadb.ingest.fields.text import Text
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_utils.storages.storage import Storage
 
 
 @pytest.mark.asyncio
-async def test_create_resource_orm_extracted(
-    storage: Storage, txn, fake_node, knowledgebox_ingest: str
-):
+async def test_create_resource_orm_extracted(storage: Storage, txn, fake_node, knowledgebox_ingest: str):
     uuid = str(uuid4())
     kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
     r = await kb_obj.add_resource(uuid=uuid, slug="slug")
@@ -48,9 +46,7 @@ async def test_create_resource_orm_extracted(
     ex1.field.CopyFrom(FieldID(field_type=FieldType.TEXT, field="text1"))
     ex1.body.text = "My Text"
 
-    field_obj: Optional[Text] = await r.get_field(
-        ex1.field.field, ex1.field.field_type, load=False
-    )
+    field_obj: Optional[Text] = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
     assert field_obj is not None
     await field_obj.set_extracted_text(ex1)
 
@@ -86,9 +82,7 @@ async def test_create_resource_orm_extracted_file(
     )
     ex1.file.CopyFrom(cf1)
 
-    field_obj: Optional[Text] = await r.get_field(
-        ex1.field.field, ex1.field.field_type, load=False
-    )
+    field_obj: Optional[Text] = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
     assert field_obj is not None
     await field_obj.set_extracted_text(ex1)
 
@@ -114,9 +108,7 @@ async def test_create_resource_orm_extracted_delta(
     ex1.body.split_text["ident1"] = "My text"
     ex1.body.text = "all text"
 
-    field_obj: Text = await r.get_field(
-        ex1.field.field, ex1.field.field_type, load=False
-    )
+    field_obj: Text = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
     await field_obj.set_extracted_text(ex1)
 
     ex2: Optional[ExtractedText] = await field_obj.get_extracted_text()

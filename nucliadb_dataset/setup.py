@@ -13,9 +13,7 @@ def load_reqs(filename):
         return [
             line.strip()
             for line in reqs_file.readlines()
-            if not (
-                re.match(r"\s*#", line) or re.match("-e", line) or re.match("-r", line)
-            )
+            if not (re.match(r"\s*#", line) or re.match("-e", line) or re.match("-r", line))
         ]
 
 

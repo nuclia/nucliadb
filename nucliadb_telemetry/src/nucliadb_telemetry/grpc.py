@@ -147,9 +147,7 @@ class OpenTelemetryServerInterceptor(aio.ServerInterceptor):
         #
         try:
             ip, port = context.peer().split(",")[0].split(":", 1)[1].rsplit(":", 1)
-            attributes.update(
-                {SpanAttributes.NET_PEER_IP: ip, SpanAttributes.NET_PEER_PORT: port}
-            )
+            attributes.update({SpanAttributes.NET_PEER_IP: ip, SpanAttributes.NET_PEER_PORT: port})
 
             # other telemetry sources add this, so we will too
             if ip in ("[::1]", "127.0.0.1"):
@@ -201,9 +199,7 @@ class OpenTelemetryServerInterceptor(aio.ServerInterceptor):
 
     async def intercept_service(
         self,
-        continuation: Callable[
-            [grpc.HandlerCallDetails], Awaitable[grpc.RpcMethodHandler]
-        ],
+        continuation: Callable[[grpc.HandlerCallDetails], Awaitable[grpc.RpcMethodHandler]],
         handler_call_details: grpc.HandlerCallDetails,
     ) -> grpc.RpcMethodHandler:
         handler = await continuation(handler_call_details)
@@ -388,9 +384,7 @@ class GRPCTelemetry:
                 interceptors=interceptors,
             )
         else:
-            channel = aio.insecure_channel(
-                server_addr, options=options, interceptors=interceptors
-            )
+            channel = aio.insecure_channel(server_addr, options=options, interceptors=interceptors)
         return channel
 
     def init_server(

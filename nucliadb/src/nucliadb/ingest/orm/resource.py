@@ -25,43 +25,6 @@ from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from typing import TYPE_CHECKING, Any, AsyncIterator, Optional, Type
 
-from nucliadb_protos.resources_pb2 import AllFieldIDs as PBAllFieldIDs
-from nucliadb_protos.resources_pb2 import Basic
-from nucliadb_protos.resources_pb2 import Basic as PBBasic
-from nucliadb_protos.resources_pb2 import CloudFile
-from nucliadb_protos.resources_pb2 import Conversation as PBConversation
-from nucliadb_protos.resources_pb2 import Extra as PBExtra
-from nucliadb_protos.resources_pb2 import (
-    ExtractedTextWrapper,
-    ExtractedVectorsWrapper,
-    FieldClassifications,
-    FieldComputedMetadataWrapper,
-    FieldID,
-    FieldMetadata,
-    FieldQuestionAnswerWrapper,
-    FieldText,
-    FieldType,
-    FileExtractedData,
-    LargeComputedMetadataWrapper,
-    LinkExtractedData,
-)
-from nucliadb_protos.resources_pb2 import Metadata
-from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
-from nucliadb_protos.resources_pb2 import Origin as PBOrigin
-from nucliadb_protos.resources_pb2 import Paragraph, ParagraphAnnotation
-from nucliadb_protos.resources_pb2 import Relations as PBRelations
-from nucliadb_protos.train_pb2 import EnabledMetadata
-from nucliadb_protos.train_pb2 import Position as TrainPosition
-from nucliadb_protos.train_pb2 import (
-    TrainField,
-    TrainMetadata,
-    TrainParagraph,
-    TrainResource,
-    TrainSentence,
-)
-from nucliadb_protos.utils_pb2 import Relation as PBRelation
-from nucliadb_protos.writer_pb2 import BrokerMessage
-
 from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_FIELDS, KB_RESOURCE_SLUG
 from nucliadb.common.maindb.driver import Transaction
@@ -79,6 +42,43 @@ from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb_models.common import CloudLink
 from nucliadb_models.writer import GENERIC_MIME_TYPE
 from nucliadb_protos import utils_pb2, writer_pb2
+from nucliadb_protos.resources_pb2 import AllFieldIDs as PBAllFieldIDs
+from nucliadb_protos.resources_pb2 import (
+    Basic,
+    CloudFile,
+    ExtractedTextWrapper,
+    ExtractedVectorsWrapper,
+    FieldClassifications,
+    FieldComputedMetadataWrapper,
+    FieldID,
+    FieldMetadata,
+    FieldQuestionAnswerWrapper,
+    FieldText,
+    FieldType,
+    FileExtractedData,
+    LargeComputedMetadataWrapper,
+    LinkExtractedData,
+    Metadata,
+    Paragraph,
+    ParagraphAnnotation,
+)
+from nucliadb_protos.resources_pb2 import Basic as PBBasic
+from nucliadb_protos.resources_pb2 import Conversation as PBConversation
+from nucliadb_protos.resources_pb2 import Extra as PBExtra
+from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
+from nucliadb_protos.resources_pb2 import Origin as PBOrigin
+from nucliadb_protos.resources_pb2 import Relations as PBRelations
+from nucliadb_protos.train_pb2 import (
+    EnabledMetadata,
+    TrainField,
+    TrainMetadata,
+    TrainParagraph,
+    TrainResource,
+    TrainSentence,
+)
+from nucliadb_protos.train_pb2 import Position as TrainPosition
+from nucliadb_protos.utils_pb2 import Relation as PBRelation
+from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils.storages.storage import Storage
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -171,9 +171,7 @@ class Resource:
     # Basic
     async def get_basic(self) -> Optional[PBBasic]:
         if self.basic is None:
-            basic = await datamanagers.resources.get_basic(
-                self.txn, kbid=self.kb.kbid, rid=self.uuid
-            )
+            basic = await datamanagers.resources.get_basic(self.txn, kbid=self.kb.kbid, rid=self.uuid)
             self.basic = basic if basic is not None else PBBasic()
         return self.basic
 
@@ -219,9 +217,7 @@ class Resource:
                         fields.append(field_id)
                     positions[field_id] = i
 
-                updated = [
-                    self.basic.fieldmetadata[positions[field]] for field in fields
-                ]
+                updated = [self.basic.fieldmetadata[positions[field]] for field in fields]
 
                 del self.basic.fieldmetadata[:]
                 self.basic.fieldmetadata.extend(updated)
@@ -262,9 +258,7 @@ class Resource:
     # Origin
     async def get_origin(self) -> Optional[PBOrigin]:
         if self.origin is None:
-            origin = await datamanagers.resources.get_origin(
-                self.txn, kbid=self.kb.kbid, rid=self.uuid
-            )
+            origin = await datamanagers.resources.get_origin(self.txn, kbid=self.kb.kbid, rid=self.uuid)
             self.origin = origin
         return self.origin
 
@@ -278,16 +272,12 @@ class Resource:
     # Extra
     async def get_extra(self) -> Optional[PBExtra]:
         if self.extra is None:
-            extra = await datamanagers.resources.get_extra(
-                self.txn, kbid=self.kb.kbid, rid=self.uuid
-            )
+            extra = await datamanagers.resources.get_extra(self.txn, kbid=self.kb.kbid, rid=self.uuid)
             self.extra = extra
         return self.extra
 
     async def set_extra(self, payload: PBExtra):
-        await datamanagers.resources.set_extra(
-            self.txn, kbid=self.kb.kbid, rid=self.uuid, extra=payload
-        )
+        await datamanagers.resources.set_extra(self.txn, kbid=self.kb.kbid, rid=self.uuid, extra=payload)
         self.modified = True
         self.extra = payload
 
@@ -353,8 +343,7 @@ class Resource:
                         (
                             fm
                             for fm in basic.fieldmetadata
-                            if fm.field.field == field_id
-                            and fm.field.field_type == type_id
+                            if fm.field.field == field_id and fm.field.field_type == type_id
                         ),
                         None,
                     )
@@ -389,16 +378,10 @@ class Resource:
                         replace_field=reindex,
                     )
 
-                async for vectorset_config in datamanagers.vectorsets.iter(
-                    self.txn, kbid=self.kb.kbid
-                ):
-                    vo = await field.get_vectors(
-                        vectorset=vectorset_config.vectorset_id
-                    )
+                async for vectorset_config in datamanagers.vectorsets.iter(self.txn, kbid=self.kb.kbid):
+                    vo = await field.get_vectors(vectorset=vectorset_config.vectorset_id)
                     if vo is not None:
-                        dimension = (
-                            vectorset_config.vectorset_index_config.vector_dimension
-                        )
+                        dimension = vectorset_config.vectorset_index_config.vector_dimension
                         brain.apply_field_vectors(
                             field_key,
                             vo,
@@ -408,9 +391,7 @@ class Resource:
         return brain
 
     # Fields
-    async def get_fields(
-        self, force: bool = False
-    ) -> dict[tuple[FieldType.ValueType, str], Field]:
+    async def get_fields(self, force: bool = False) -> dict[tuple[FieldType.ValueType, str], Field]:
         # Get all fields
         for type, field in await self.get_fields_ids(force=force):
             if (type, field) not in self.fields:
@@ -459,9 +440,7 @@ class Resource:
                     result.add((FieldType.GENERIC, generic))
         return list(result)
 
-    async def get_fields_ids(
-        self, force: bool = False
-    ) -> list[tuple[FieldType.ValueType, str]]:
+    async def get_fields_ids(self, force: bool = False) -> list[tuple[FieldType.ValueType, str]]:
         """
         Get all ids of the fields of the resource and cache them.
         """
@@ -520,9 +499,7 @@ class Resource:
         return (type, field) in self.fields
 
     async def get_all_field_ids(self) -> Optional[PBAllFieldIDs]:
-        return await datamanagers.resources.get_all_field_ids(
-            self.txn, kbid=self.kb.kbid, rid=self.uuid
-        )
+        return await datamanagers.resources.get_all_field_ids(self.txn, kbid=self.kb.kbid, rid=self.uuid)
 
     async def set_all_field_ids(self, all_fields: PBAllFieldIDs):
         return await datamanagers.resources.set_all_field_ids(
@@ -602,13 +579,11 @@ class Resource:
         for fieldid in message.delete_fields:
             await self.delete_field(fieldid.field_type, fieldid.field)
 
-        if (
-            len(message_updated_fields)
-            or len(message.delete_fields)
-            or len(message.errors)
-        ):
+        if len(message_updated_fields) or len(message.delete_fields) or len(message.errors):
             await self.update_all_field_ids(
-                updated=message_updated_fields, deleted=message.delete_fields, errors=message.errors  # type: ignore
+                updated=message_updated_fields,
+                deleted=message.delete_fields,  # type: ignore
+                errors=message.errors,  # type: ignore
             )
 
     @processor_observer.wrap({"type": "apply_extracted"})
@@ -686,9 +661,7 @@ class Resource:
             extracted_text.field,
         )
 
-    async def _apply_question_answers(
-        self, question_answers: FieldQuestionAnswerWrapper
-    ):
+    async def _apply_question_answers(self, question_answers: FieldQuestionAnswerWrapper):
         field = question_answers.field
         field_obj = await self.get_field(field.field, field.field_type, load=False)
         await field_obj.set_question_answers(question_answers)
@@ -734,9 +707,7 @@ class Resource:
             fcmw.metadata.CopyFrom(fcm)
 
         fcmw.metadata.metadata.ClearField("paragraphs")
-        paragraph = Paragraph(
-            start=0, end=len(title), kind=Paragraph.TypeParagraph.TITLE
-        )
+        paragraph = Paragraph(start=0, end=len(title), kind=Paragraph.TypeParagraph.TITLE)
         fcmw.metadata.metadata.paragraphs.append(paragraph)
 
         await field.set_field_metadata(fcmw)
@@ -753,9 +724,7 @@ class Resource:
         maybe_update_basic_icon(self.basic, file_extracted_data.icon)
         maybe_update_basic_thumbnail(self.basic, file_extracted_data.file_thumbnail)
 
-    async def _apply_field_computed_metadata(
-        self, field_metadata: FieldComputedMetadataWrapper
-    ):
+    async def _apply_field_computed_metadata(self, field_metadata: FieldComputedMetadataWrapper):
         assert self.basic is not None
         maybe_update_basic_summary(self.basic, field_metadata.metadata.metadata.summary)
 
@@ -772,9 +741,7 @@ class Resource:
         field_key = self.generate_field_id(field_metadata.field)
 
         page_positions: Optional[FilePagePositions] = None
-        if field_metadata.field.field_type == FieldType.FILE and isinstance(
-            field_obj, File
-        ):
+        if field_metadata.field.field_type == FieldType.FILE and isinstance(field_obj, File):
             page_positions = await get_file_page_positions(field_obj)
 
         user_field_metadata = next(
@@ -801,22 +768,16 @@ class Resource:
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(_executor, apply_field_metadata)
 
-        maybe_update_basic_thumbnail(
-            self.basic, field_metadata.metadata.metadata.thumbnail
-        )
+        maybe_update_basic_thumbnail(self.basic, field_metadata.metadata.metadata.thumbnail)
 
         add_field_classifications(self.basic, field_metadata)
 
     async def _apply_extracted_vectors(self, field_vectors: ExtractedVectorsWrapper):
         # Store vectors in the resource
 
-        if not self.has_field(
-            field_vectors.field.field_type, field_vectors.field.field
-        ):
+        if not self.has_field(field_vectors.field.field_type, field_vectors.field.field):
             # skipping because field does not exist
-            logger.warning(
-                f'Field "{field_vectors.field.field}" does not exist, skipping vectors'
-            )
+            logger.warning(f'Field "{field_vectors.field.field}" does not exist, skipping vectors')
             return
 
         field_obj = await self.get_field(
@@ -850,9 +811,7 @@ class Resource:
                     return
                 dimension = config.vectorset_index_config.vector_dimension
                 if not dimension:
-                    raise ValueError(
-                        f"Vector dimension not set for vectorset '{vectorset_id}'"
-                    )
+                    raise ValueError(f"Vector dimension not set for vectorset '{vectorset_id}'")
 
             apply_field_vectors_partial = partial(
                 self.indexer.apply_field_vectors,
@@ -868,9 +827,7 @@ class Resource:
         else:
             raise AttributeError("VO not found on set")
 
-    async def _apply_field_large_metadata(
-        self, field_large_metadata: LargeComputedMetadataWrapper
-    ):
+    async def _apply_field_large_metadata(self, field_large_metadata: LargeComputedMetadataWrapper):
         field_obj = await self.get_field(
             field_large_metadata.field.field,
             field_large_metadata.field.field_type,
@@ -955,9 +912,7 @@ class Resource:
                 for fieldmetadata in self.basic.fieldmetadata:
                     field_id = self.generate_field_id(fieldmetadata.field)
                     for annotationparagraph in fieldmetadata.paragraphs:
-                        userdefinedparagraphclass[annotationparagraph.key] = (
-                            annotationparagraph
-                        )
+                        userdefinedparagraphclass[annotationparagraph.key] = annotationparagraph
 
         for (type_id, field_id), field in fields.items():
             fieldid = FieldID(field_type=type_id, field=field_id)
@@ -975,9 +930,7 @@ class Resource:
             if fm is None:
                 continue
 
-            field_metadatas: list[tuple[Optional[str], FieldMetadata]] = [
-                (None, fm.metadata)
-            ]
+            field_metadatas: list[tuple[Optional[str], FieldMetadata]] = [(None, fm.metadata)]
             for subfield_metadata, splitted_metadata in fm.split_metadata.items():
                 field_metadatas.append((subfield_metadata, splitted_metadata))
 
@@ -999,9 +952,7 @@ class Resource:
                         vectors = vo.vectors
                         base_vector_key = f"{self.uuid}/{field_key}"
                     for index, vector in enumerate(vectors.vectors):
-                        vector_key = (
-                            f"{base_vector_key}/{index}/{vector.start}-{vector.end}"
-                        )
+                        vector_key = f"{base_vector_key}/{index}/{vector.start}-{vector.end}"
                         precomputed_vectors[vector_key] = vector.vector
 
                 if extracted_text is not None:
@@ -1012,11 +963,11 @@ class Resource:
 
                 for paragraph in field_metadata.paragraphs:
                     if subfield is not None:
-                        paragraph_key = f"{self.uuid}/{field_key}/{subfield}/{paragraph.start}-{paragraph.end}"
-                    else:
                         paragraph_key = (
-                            f"{self.uuid}/{field_key}/{paragraph.start}-{paragraph.end}"
+                            f"{self.uuid}/{field_key}/{subfield}/{paragraph.start}-{paragraph.end}"
                         )
+                    else:
+                        paragraph_key = f"{self.uuid}/{field_key}/{paragraph.start}-{paragraph.end}"
 
                     if enabled_metadata.labels:
                         metadata.labels.ClearField("field")
@@ -1030,7 +981,9 @@ class Resource:
                         if subfield is not None:
                             sentence_key = f"{self.uuid}/{field_key}/{subfield}/{index}/{sentence.start}-{sentence.end}"
                         else:
-                            sentence_key = f"{self.uuid}/{field_key}/{index}/{sentence.start}-{sentence.end}"
+                            sentence_key = (
+                                f"{self.uuid}/{field_key}/{index}/{sentence.start}-{sentence.end}"
+                            )
 
                         if vo is not None:
                             metadata.ClearField("vector")
@@ -1069,9 +1022,7 @@ class Resource:
                 for fieldmetadata in self.basic.fieldmetadata:
                     field_id = self.generate_field_id(fieldmetadata.field)
                     for annotationparagraph in fieldmetadata.paragraphs:
-                        userdefinedparagraphclass[annotationparagraph.key] = (
-                            annotationparagraph
-                        )
+                        userdefinedparagraphclass[annotationparagraph.key] = annotationparagraph
 
         for (type_id, field_id), field in fields.items():
             fieldid = FieldID(field_type=type_id, field=field_id)
@@ -1085,9 +1036,7 @@ class Resource:
             if fm is None:
                 continue
 
-            field_metadatas: list[tuple[Optional[str], FieldMetadata]] = [
-                (None, fm.metadata)
-            ]
+            field_metadatas: list[tuple[Optional[str], FieldMetadata]] = [(None, fm.metadata)]
             for subfield_metadata, splitted_metadata in fm.split_metadata.items():
                 field_metadatas.append((subfield_metadata, splitted_metadata))
 
@@ -1108,11 +1057,11 @@ class Resource:
 
                 for paragraph in field_metadata.paragraphs:
                     if subfield is not None:
-                        paragraph_key = f"{self.uuid}/{field_key}/{subfield}/{paragraph.start}-{paragraph.end}"
-                    else:
                         paragraph_key = (
-                            f"{self.uuid}/{field_key}/{paragraph.start}-{paragraph.end}"
+                            f"{self.uuid}/{field_key}/{subfield}/{paragraph.start}-{paragraph.end}"
                         )
+                    else:
+                        paragraph_key = f"{self.uuid}/{field_key}/{paragraph.start}-{paragraph.end}"
 
                     if enabled_metadata.labels:
                         metadata.labels.ClearField("paragraph")
@@ -1140,9 +1089,7 @@ class Resource:
 
                         yield pb_paragraph
 
-    async def iterate_fields(
-        self, enabled_metadata: EnabledMetadata
-    ) -> AsyncIterator[TrainField]:
+    async def iterate_fields(self, enabled_metadata: EnabledMetadata) -> AsyncIterator[TrainField]:
         fields = await self.get_fields(force=True)
         metadata = TrainMetadata()
         if enabled_metadata.labels:
@@ -1162,9 +1109,7 @@ class Resource:
             if fm is None:
                 continue
 
-            field_metadatas: list[tuple[Optional[str], FieldMetadata]] = [
-                (None, fm.metadata)
-            ]
+            field_metadatas: list[tuple[Optional[str], FieldMetadata]] = [(None, fm.metadata)]
             for subfield_metadata, splitted_metadata in fm.split_metadata.items():
                 field_metadatas.append((subfield_metadata, splitted_metadata))
 
@@ -1189,9 +1134,7 @@ class Resource:
                 pb_field.metadata.CopyFrom(metadata)
                 yield pb_field
 
-    async def generate_train_resource(
-        self, enabled_metadata: EnabledMetadata
-    ) -> TrainResource:
+    async def generate_train_resource(self, enabled_metadata: EnabledMetadata) -> TrainResource:
         fields = await self.get_fields(force=True)
         metadata = TrainMetadata()
         if enabled_metadata.labels:
@@ -1218,9 +1161,7 @@ class Resource:
             if fm is None:
                 continue
 
-            field_metadatas: list[tuple[Optional[str], FieldMetadata]] = [
-                (None, fm.metadata)
-            ]
+            field_metadatas: list[tuple[Optional[str], FieldMetadata]] = [(None, fm.metadata)]
             for subfield_metadata, splitted_metadata in fm.split_metadata.items():
                 field_metadatas.append((subfield_metadata, splitted_metadata))
 
@@ -1258,17 +1199,13 @@ def remove_field_classifications(basic: PBBasic, deleted_fields: list[FieldID]):
     Clean classifications of fields that have been deleted
     """
     field_classifications = [
-        fc
-        for fc in basic.computedmetadata.field_classifications
-        if fc.field not in deleted_fields
+        fc for fc in basic.computedmetadata.field_classifications if fc.field not in deleted_fields
     ]
     basic.computedmetadata.ClearField("field_classifications")
     basic.computedmetadata.field_classifications.extend(field_classifications)
 
 
-def add_field_classifications(
-    basic: PBBasic, fcmw: FieldComputedMetadataWrapper
-) -> bool:
+def add_field_classifications(basic: PBBasic, fcmw: FieldComputedMetadataWrapper) -> bool:
     """
     Returns whether some new field classifications were added
     """
@@ -1282,9 +1219,7 @@ def add_field_classifications(
     return True
 
 
-def add_entities_to_metadata(
-    entities: dict[str, str], local_text: str, metadata: TrainMetadata
-) -> None:
+def add_entities_to_metadata(entities: dict[str, str], local_text: str, metadata: TrainMetadata) -> None:
     for entity_key, entity_value in entities.items():
         if entity_key not in local_text:
             # Add the entity only if found in text
@@ -1298,9 +1233,7 @@ def add_entities_to_metadata(
         for _ in range(local_text.count(entity_key)):
             start = local_text.index(entity_key, last_occurrence_end)
             end = start + len(entity_key)
-            metadata.entity_positions[poskey].positions.append(
-                TrainPosition(start=start, end=end)
-            )
+            metadata.entity_positions[poskey].positions.append(TrainPosition(start=start, end=end))
             last_occurrence_end = end
 
 
@@ -1321,9 +1254,7 @@ def maybe_update_basic_icon(basic: PBBasic, mimetype: Optional[str]) -> bool:
     return True
 
 
-def maybe_update_basic_thumbnail(
-    basic: PBBasic, thumbnail: Optional[CloudFile]
-) -> bool:
+def maybe_update_basic_thumbnail(basic: PBBasic, thumbnail: Optional[CloudFile]) -> bool:
     if basic.thumbnail or thumbnail is None:
         return False
     basic.thumbnail = CloudLink.format_reader_download_uri(thumbnail.uri)

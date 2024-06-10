@@ -22,6 +22,9 @@ from typing import Optional
 from uuid import uuid4
 
 import pytest
+
+from nucliadb.ingest.fields.text import Text
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos.resources_pb2 import (
     CloudFile,
     Entity,
@@ -30,9 +33,6 @@ from nucliadb_protos.resources_pb2 import (
     LargeComputedMetadata,
     LargeComputedMetadataWrapper,
 )
-
-from nucliadb.ingest.fields.text import Text
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_utils.storages.storage import Storage
 
 
@@ -53,9 +53,7 @@ async def test_create_resource_orm_large_metadata(
     ex1.real.metadata.entities.append(en2)
     ex1.real.metadata.tokens["tok"] = 3
 
-    field_obj: Text = await r.get_field(
-        ex1.field.field, ex1.field.field_type, load=False
-    )
+    field_obj: Text = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
     await field_obj.set_large_field_metadata(ex1)
 
     ex2: Optional[LargeComputedMetadata] = await field_obj.get_large_field_metadata()
@@ -96,9 +94,7 @@ async def test_create_resource_orm_large_metadata_file(
     )
     ex1.file.CopyFrom(cf1)
 
-    field_obj: Text = await r.get_field(
-        ex1.field.field, ex1.field.field_type, load=False
-    )
+    field_obj: Text = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
     await field_obj.set_large_field_metadata(ex1)
 
     ex2: Optional[LargeComputedMetadata] = await field_obj.get_large_field_metadata()

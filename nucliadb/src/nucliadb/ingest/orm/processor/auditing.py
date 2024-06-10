@@ -17,12 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb_protos.resources_pb2 import FieldType
-
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos import audit_pb2, writer_pb2
+from nucliadb_protos.resources_pb2 import FieldType
 from nucliadb_utils.storages.storage import Storage
 
 
@@ -55,9 +54,7 @@ async def collect_audit_fields(
             audit_storage_fields.append(auditfield)
 
         for fieldid in message.delete_fields or []:
-            field = await resource.get_field(
-                fieldid.field, writer_pb2.FieldType.FILE, load=True
-            )
+            field = await resource.get_field(fieldid.field, writer_pb2.FieldType.FILE, load=True)
             audit_field = audit_pb2.AuditField()
             audit_field.action = audit_pb2.AuditField.FieldAction.DELETED
             audit_field.field_id = fieldid.field
@@ -124,8 +121,7 @@ def iterate_auditable_fields(
             continue
 
         if not (
-            field_id in message.files
-            or message.type is writer_pb2.BrokerMessage.MessageType.DELETE
+            field_id in message.files or message.type is writer_pb2.BrokerMessage.MessageType.DELETE
         ):
             continue
 

@@ -21,6 +21,7 @@ import uuid
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+
 from nucliadb_protos.train_pb2 import GetEntitiesRequest
 from nucliadb_protos.train_pb2_grpc import TrainStub
 from nucliadb_protos.writer_pb2 import GetEntitiesResponse
@@ -70,9 +71,7 @@ async def test_get_entities_kb_not_found(train_client: TrainStub) -> None:
 async def test_get_entities_error(
     train_client: TrainStub, knowledgebox_ingest: str, entities_manager_mock
 ) -> None:
-    entities_manager_mock.get_entities = AsyncMock(
-        side_effect=Exception("Testing exception on ingest")
-    )
+    entities_manager_mock.get_entities = AsyncMock(side_effect=Exception("Testing exception on ingest"))
 
     req = GetEntitiesRequest()
     req.kb.uuid = knowledgebox_ingest

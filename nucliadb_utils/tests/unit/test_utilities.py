@@ -43,9 +43,7 @@ def test_clean_utility():
 async def test_get_storage_s3():
     s3 = AsyncMock()
     with (
-        patch.object(
-            utilities.storage_settings, "file_backend", FileBackendConfig("s3")
-        ),
+        patch.object(utilities.storage_settings, "file_backend", FileBackendConfig("s3")),
         patch("nucliadb_utils.storages.s3.S3Storage", return_value=s3),
     ):
         assert await utilities.get_storage() == s3
@@ -55,9 +53,7 @@ async def test_get_storage_s3():
 async def test_get_storage_gcs():
     gcs = AsyncMock()
     with (
-        patch.object(
-            utilities.storage_settings, "file_backend", FileBackendConfig("gcs")
-        ),
+        patch.object(utilities.storage_settings, "file_backend", FileBackendConfig("gcs")),
         patch("nucliadb_utils.storages.gcs.GCSStorage", return_value=gcs),
     ):
         assert await utilities.get_storage() == gcs
@@ -67,9 +63,7 @@ async def test_get_storage_gcs():
 async def test_get_storage_local():
     local = AsyncMock()
     with (
-        patch.object(
-            utilities.storage_settings, "file_backend", FileBackendConfig("local")
-        ),
+        patch.object(utilities.storage_settings, "file_backend", FileBackendConfig("local")),
         patch.object(utilities.storage_settings, "local_files", "/files"),
         patch("nucliadb_utils.storages.local.LocalStorage", return_value=local),
     ):

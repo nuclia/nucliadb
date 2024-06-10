@@ -58,9 +58,7 @@ if has_feature(const.Features.CORS_MIDDLEWARE, default=False):
         )
     )
 
-middleware.extend(
-    [Middleware(AuthenticationMiddleware, backend=NucliaCloudAuthenticationBackend())]
-)
+middleware.extend([Middleware(AuthenticationMiddleware, backend=NucliaCloudAuthenticationBackend())])
 
 
 errors.setup_error_handling(importlib.metadata.distribution("nucliadb").version)

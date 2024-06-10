@@ -20,9 +20,6 @@
 from contextvars import ContextVar
 from typing import Optional
 
-from nucliadb_protos.nodereader_pb2 import DocumentResult, ParagraphResult
-from nucliadb_protos.resources_pb2 import Paragraph
-
 from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.serialize import managed_serialize
@@ -31,12 +28,12 @@ from nucliadb.search import SERVICE_NAME, logger
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.search import ResourceProperties
+from nucliadb_protos.nodereader_pb2 import DocumentResult, ParagraphResult
+from nucliadb_protos.resources_pb2 import Paragraph
 
 from .cache import get_resource_from_cache
 
-rcache: ContextVar[Optional[dict[str, ResourceORM]]] = ContextVar(
-    "rcache", default=None
-)
+rcache: ContextVar[Optional[dict[str, ResourceORM]]] = ContextVar("rcache", default=None)
 
 
 async def fetch_resources(
@@ -137,15 +134,9 @@ async def get_seconds_paragraph(
         logger.error(f"{result.uuid} does not exist on DB")
         return None
 
-    paragraph = await get_paragraph_from_resource(
-        orm_resource=orm_resource, result=result
-    )
+    paragraph = await get_paragraph_from_resource(orm_resource=orm_resource, result=result)
 
-    if (
-        paragraph is not None
-        and len(paragraph.end_seconds) > 0
-        and paragraph.end_seconds[0] > 0
-    ):
+    if paragraph is not None and len(paragraph.end_seconds) > 0 and paragraph.end_seconds[0] > 0:
         return (list(paragraph.start_seconds), list(paragraph.end_seconds))
 
     return None

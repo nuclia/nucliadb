@@ -32,9 +32,7 @@ from nucliadb_utils.settings import running_settings
 def arg_parse():
     parser = argparse.ArgumentParser(description="Upload data to Nuclia Learning API.")
 
-    parser.add_argument(
-        "-r", "--request", dest="request", help="Request UUID", required=True
-    )
+    parser.add_argument("-r", "--request", dest="request", help="Request UUID", required=True)
 
     parser.add_argument("-k", "--kb", dest="kb", help="Knowledge Box", required=True)
 

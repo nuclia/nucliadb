@@ -131,12 +131,8 @@ async def test_validate_field_upload(rid, field, md5, exists: bool, result):
         ),
     ):
         if isinstance(result, tuple):
-            _, result_rid, result_field = await validate_field_upload(
-                "kbid", rid, field, md5
-            )
+            _, result_rid, result_field = await validate_field_upload("kbid", rid, field, md5)
             assert (result_rid, result_field) == result
         else:
             with pytest.raises(result):
-                _, result_rid, result_field = await validate_field_upload(
-                    "kbid", rid, field, md5
-                )
+                _, result_rid, result_field = await validate_field_upload("kbid", rid, field, md5)

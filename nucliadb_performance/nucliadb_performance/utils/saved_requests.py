@@ -50,9 +50,7 @@ class SavedRequests(BaseModel):
 
 
 @cache
-def load_saved_request(
-    saved_requests_file: str, kbid_or_slug: str, endpoint: str
-) -> list[Request]:
+def load_saved_request(saved_requests_file: str, kbid_or_slug: str, endpoint: str) -> list[Request]:
     saved_requests = load_all_saved_requests(saved_requests_file)
     kb_requests = []
     for rs in saved_requests.sets.values():

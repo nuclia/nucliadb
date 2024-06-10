@@ -126,9 +126,7 @@ async def list_resources(
 
     except Exception as exc:
         errors.capture_exception(exc)
-        raise HTTPException(
-            status_code=500, detail="Couldn't retrieve list of resources right now"
-        )
+        raise HTTPException(status_code=500, detail="Couldn't retrieve list of resources right now")
     finally:
         await txn.abort()
 
@@ -153,9 +151,7 @@ async def get_resource_by_uuid(
     kbid: str,
     rid: str,
     show: list[ResourceProperties] = Query([ResourceProperties.BASIC]),
-    field_type_filter: list[FieldTypeName] = Query(
-        list(FieldTypeName), alias="field_type"
-    ),
+    field_type_filter: list[FieldTypeName] = Query(list(FieldTypeName), alias="field_type"),
     extracted: list[ExtractedDataTypeName] = Query(
         [
             ExtractedDataTypeName.TEXT,
@@ -193,9 +189,7 @@ async def get_resource_by_slug(
     kbid: str,
     rslug: str,
     show: list[ResourceProperties] = Query([ResourceProperties.BASIC]),
-    field_type_filter: list[FieldTypeName] = Query(
-        list(FieldTypeName), alias="field_type"
-    ),
+    field_type_filter: list[FieldTypeName] = Query(list(FieldTypeName), alias="field_type"),
     extracted: list[ExtractedDataTypeName] = Query(
         [
             ExtractedDataTypeName.TEXT,
@@ -403,9 +397,7 @@ async def _get_resource_field(
                     resource_field.value = models.Conversation.from_message(value)
 
         if ResourceFieldProperties.EXTRACTED in show and extracted:
-            resource_field.extracted = FIELD_NAME_TO_EXTRACTED_DATA_FIELD_MAP[
-                field_type
-            ]()
+            resource_field.extracted = FIELD_NAME_TO_EXTRACTED_DATA_FIELD_MAP[field_type]()
             await set_resource_field_extracted_data(
                 field,
                 resource_field.extracted,

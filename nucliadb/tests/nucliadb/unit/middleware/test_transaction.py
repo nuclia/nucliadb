@@ -61,9 +61,7 @@ class TestCaseReadOnlyTransactionMiddleware:
     def driver(self, txn):
         driver = mock.Mock()
         driver.begin = mock.AsyncMock(return_value=txn)
-        with mock.patch(
-            "nucliadb.middleware.transaction.get_driver", return_value=driver
-        ):
+        with mock.patch("nucliadb.middleware.transaction.get_driver", return_value=driver):
             yield
 
     @pytest.fixture

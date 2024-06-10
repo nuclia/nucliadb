@@ -24,14 +24,14 @@ from nucliadb_protos.nodereader_pb2 import (
     RelationEdge,
     RelationSearchResponse,
 )
-from nucliadb_protos.noderesources_pb2 import EmptyResponse
-from nucliadb_protos.noderesources_pb2 import Shard as NodeResourcesShard
 from nucliadb_protos.noderesources_pb2 import (
+    EmptyResponse,
     ShardCreated,
     ShardId,
     ShardIds,
     VectorSetList,
 )
+from nucliadb_protos.noderesources_pb2 import Shard as NodeResourcesShard
 from nucliadb_protos.nodewriter_pb2 import OpStatus
 from nucliadb_protos.utils_pb2 import Relation
 
@@ -98,7 +98,5 @@ class DummyReaderStub:  # pragma: no cover
     async def RelationEdges(self, data):  # pragma: no cover
         self.calls.setdefault("RelationEdges", []).append(data)
         result = EdgeList()
-        result.list.append(
-            RelationEdge(edge_type=Relation.RelationType.ENTITY, property="dummy")
-        )
+        result.list.append(RelationEdge(edge_type=Relation.RelationType.ENTITY, property="dummy"))
         return result

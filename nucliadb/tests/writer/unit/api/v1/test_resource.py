@@ -41,9 +41,7 @@ from nucliadb_models.writer import UpdateResourcePayload
         (UpdateResourcePayload(origin=Origin(created=datetime.now())), True),
         (UpdateResourcePayload(origin=Origin(metadata={"foo": "bar"})), True),
         (
-            UpdateResourcePayload(
-                usermetadata=UserMetadata(classifications=[], relations=[])
-            ),
+            UpdateResourcePayload(usermetadata=UserMetadata(classifications=[], relations=[])),
             True,
         ),
     ],
@@ -71,9 +69,7 @@ def push_payload(**kwargs):
         (push_payload(genericfield={"foo": TextField(body="foo")}), True),
         (
             push_payload(
-                filefield={
-                    "foo": FileField(file=File(filename="foo", payload="bar", md5="ba"))
-                }
+                filefield={"foo": FileField(file=File(filename="foo", payload="bar", md5="ba"))}
             ),
             True,
         ),

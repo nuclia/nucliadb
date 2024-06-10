@@ -20,13 +20,6 @@
 import asyncio
 from typing import Any, Iterator, Optional, cast
 
-from nucliadb_protos.nodereader_pb2 import (
-    DocumentScored,
-    EntitiesSubgraphRequest,
-    ParagraphResult,
-    SearchResponse,
-)
-
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.serialize import managed_serialize
 from nucliadb.middleware.transaction import get_read_only_transaction
@@ -45,6 +38,12 @@ from nucliadb_models.search import (
     ResourceProperties,
     TempFindParagraph,
     TextPosition,
+)
+from nucliadb_protos.nodereader_pb2 import (
+    DocumentScored,
+    EntitiesSubgraphRequest,
+    ParagraphResult,
+    SearchResponse,
 )
 from nucliadb_telemetry import metrics
 
@@ -191,14 +190,10 @@ async def fetch_find_metadata(
                             result_paragraph.paragraph.score,
                         )
                     )
-                find_field.paragraphs[result_paragraph.paragraph.id].score_type = (
-                    SCORE_TYPE.BOTH
-                )
+                find_field.paragraphs[result_paragraph.paragraph.id].score_type = SCORE_TYPE.BOTH
 
             else:
-                find_field.paragraphs[result_paragraph.paragraph.id] = (
-                    result_paragraph.paragraph
-                )
+                find_field.paragraphs[result_paragraph.paragraph.id] = result_paragraph.paragraph
                 orderer.add(
                     (
                         result_paragraph.rid,
@@ -288,9 +283,7 @@ def merge_paragraphs_vectors(
     for vectors_shard in vectors_shards:
         for vector in vectors_shard:
             if vector.score < min_score:
-                logger.warning(
-                    f"Skipping low score vector: {vector.doc_id.id}. This should not happen"
-                )
+                logger.warning(f"Skipping low score vector: {vector.doc_id.id}. This should not happen")
                 continue
             doc_id_split = vector.doc_id.id.split("/")
             split = None
@@ -341,13 +334,9 @@ def merge_paragraphs_vectors(
                     start=merged_paragraph.start,
                     end=merged_paragraph.end,
                     start_seconds=[
-                        x
-                        for x in merged_paragraph.vector_index.metadata.position.start_seconds
+                        x for x in merged_paragraph.vector_index.metadata.position.start_seconds
                     ],
-                    end_seconds=[
-                        x
-                        for x in merged_paragraph.vector_index.metadata.position.end_seconds
-                    ],
+                    end_seconds=[x for x in merged_paragraph.vector_index.metadata.position.end_seconds],
                 ),
                 id=merged_paragraph.id,
                 # Vector searches don't have fuzziness
@@ -368,12 +357,10 @@ def merge_paragraphs_vectors(
                     start=merged_paragraph.start,
                     end=merged_paragraph.end,
                     start_seconds=[
-                        x
-                        for x in merged_paragraph.paragraph_index.metadata.position.start_seconds
+                        x for x in merged_paragraph.paragraph_index.metadata.position.start_seconds
                     ],
                     end_seconds=[
-                        x
-                        for x in merged_paragraph.paragraph_index.metadata.position.end_seconds
+                        x for x in merged_paragraph.paragraph_index.metadata.position.end_seconds
                     ],
                 ),
                 id=merged_paragraph.id,
@@ -437,9 +424,7 @@ async def find_merge_results(
             page_number=page,
             page_size=count,
             next_page=next_page,
-            min_score=MinScore(
-                bm25=_round(min_score_bm25), semantic=_round(min_score_semantic)
-            ),
+            min_score=MinScore(bm25=_round(min_score_bm25), semantic=_round(min_score_semantic)),
             best_matches=[],
         )
 
@@ -454,9 +439,7 @@ async def find_merge_results(
             highlight,
             ematches,
         )
-        api_results.relations = await merge_relations_results(
-            relations, requested_relations
-        )
+        api_results.relations = await merge_relations_results(relations, requested_relations)
 
         return api_results
     finally:

@@ -1,12 +1,8 @@
 subpackages := nucliadb standalone reader search train writer ingest
 
-format_target_prefix := format-
-lint_target_prefix := lint-
 test_target_prefix := test-
 test_cov_target_prefix := test-cov-
 
-format_subpackages_targets = $(addprefix $(format_target_prefix),$(subpackages))
-lint_subpackages_targets = $(addprefix $(lint_target_prefix),$(subpackages))
 test_subpackages_targets = $(addprefix $(test_target_prefix),$(subpackages))
 test_cov_subpackages_targets = $(addprefix $(test_cov_target_prefix),$(subpackages))
 
@@ -50,21 +46,14 @@ freeze-requirements:
 
 .PHONY: format
 format:
-	cd .. && isort --profile black nucliadb
-	black .
 	ruff check --fix --config=../ruff.toml .
-
-$(format_subpackages_targets):
+	ruff format --config=../ruff.toml .
 
 
 .PHONY: lint
 lint:
-	ruff check . --config=../ruff.toml
-	cd .. && isort -c --profile black nucliadb
-	black --check .
+	ruff check --config=../ruff.toml .
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini .
-
-$(lint_subpackages_targets):
 
 # pytest doesn't support test discovery across our multiple "top-level folders"
 # so we need to run all test targets one by one

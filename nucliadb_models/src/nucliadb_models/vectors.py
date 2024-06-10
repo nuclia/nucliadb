@@ -2,10 +2,10 @@ from enum import Enum
 from typing import Optional
 
 from google.protobuf.json_format import MessageToDict
-from nucliadb_protos.utils_pb2 import VectorSimilarity as PBVectorSimilarity
 from pydantic import BaseModel, Field
 
 from nucliadb_protos import knowledgebox_pb2
+from nucliadb_protos.utils_pb2 import VectorSimilarity as PBVectorSimilarity
 
 # Managing vectors
 
@@ -52,7 +52,5 @@ class SemanticModelMetadata(BaseModel):
             preserving_proto_field_name=True,
             including_default_value_fields=True,
         )
-        as_dict["similarity_function"] = VectorSimilarity.from_message(
-            message.similarity_function
-        )
+        as_dict["similarity_function"] = VectorSimilarity.from_message(message.similarity_function)
         return cls(**as_dict)

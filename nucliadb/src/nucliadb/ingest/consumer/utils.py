@@ -48,9 +48,7 @@ class DelayedTaskHandler:
         for task in list(self.outstanding_tasks.values()):
             await task
 
-    def schedule(
-        self, key: str, handler: Callable[[], Coroutine[None, None, None]]
-    ) -> None:
+    def schedule(self, key: str, handler: Callable[[], Coroutine[None, None, None]]) -> None:
         if key in self.to_process:
             # already waiting to process this key, ignore
             return

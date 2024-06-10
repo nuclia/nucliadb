@@ -20,6 +20,8 @@
 from datetime import datetime
 
 import pytest
+
+from nucliadb_node_binding import NodeReader, NodeWriter  # type: ignore
 from nucliadb_protos.nodereader_pb2 import (
     DocumentSearchRequest,
     DocumentSearchResponse,
@@ -29,8 +31,6 @@ from nucliadb_protos.nodereader_pb2 import (
 from nucliadb_protos.noderesources_pb2 import Resource
 from nucliadb_protos.nodewriter_pb2 import NewShardRequest, OpStatus, ShardCreated
 from nucliadb_protos.utils_pb2 import ReleaseChannel, VectorSimilarity
-
-from nucliadb_node_binding import NodeReader, NodeWriter  # type: ignore
 
 
 class IndexNode:
@@ -107,7 +107,5 @@ async def test_set_and_document_search(data_path):
     searchpb = DocumentSearchRequest()
     searchpb.id = shard_id
     searchpb.body = "lovely"
-    pbresult = cluster.call_search_api(
-        "document_search", searchpb, DocumentSearchResponse
-    )
+    pbresult = cluster.call_search_api("document_search", searchpb, DocumentSearchResponse)
     assert pbresult.total == 1

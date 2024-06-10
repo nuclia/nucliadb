@@ -33,9 +33,7 @@ class ContextInjectorMiddleware(BaseHTTPMiddleware):
         - `/api/v1/kb/{kbid}` would inject a context value for `kbid`
     """
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         found_path_template = get_path_template(request.scope)
         if found_path_template.match:
             context.add_context(found_path_template.scope.get("path_params", {}))  # type: ignore

@@ -52,9 +52,7 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
         shards.shards[shards.actual].read_only = False
 
         # just ensure we're writing it correctly
-        assert [shard_object.read_only for shard_object in shards.shards].count(
-            False
-        ) == 1
+        assert [shard_object.read_only for shard_object in shards.shards].count(False) == 1
 
         await datamanagers.cluster.update_kb_shards(txn, kbid=kbid, shards=shards)
         await txn.commit()

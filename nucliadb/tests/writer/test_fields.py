@@ -23,7 +23,6 @@ from datetime import datetime
 from os.path import dirname
 
 import pytest
-from tests.writer.utils import load_file_as_FileB64_payload
 
 from nucliadb.writer.api.v1.router import (
     KB_PREFIX,
@@ -32,6 +31,7 @@ from nucliadb.writer.api.v1.router import (
     RSLUG_PREFIX,
 )
 from nucliadb_models.resource import NucliaDBRoles
+from tests.writer.utils import load_file_as_FileB64_payload
 
 TEST_FILE = {f"{dirname(__file__)}/orm/"}
 TEST_TEXT_PAYLOAD = {"body": "test1", "format": "PLAIN"}
@@ -56,9 +56,7 @@ TEST_CONVERSATION_PAYLOAD = {
             "content": {
                 "text": "Hi people!",
                 "format": "PLAIN",
-                "files": [
-                    load_file_as_FileB64_payload("/assets/image001.jpg", "image/jpg")
-                ],
+                "files": [load_file_as_FileB64_payload("/assets/image001.jpg", "image/jpg")],
             },
             "ident": "message_id_001",
         }
@@ -75,9 +73,7 @@ TEST_LAYOUT_PAYLOAD = {
                 "type": "TITLE",
                 "ident": "main_title",
                 "payload": "This is a Test Title",
-                "file": load_file_as_FileB64_payload(
-                    "/assets/image001.jpg", "image/jpg"
-                ),
+                "file": load_file_as_FileB64_payload("/assets/image001.jpg", "image/jpg"),
             }
         }
     },
@@ -105,9 +101,7 @@ TEST_CONVERSATION_APPEND_MESSAGES_PAYLOAD = [
         "content": {
             "text": "Hi people!",
             "format": "PLAIN",
-            "attachments": [
-                load_file_as_FileB64_payload("/assets/image001.jpg", "image/jpg")
-            ],
+            "attachments": [load_file_as_FileB64_payload("/assets/image001.jpg", "image/jpg")],
         },
         "ident": "message_id_001",
     }
@@ -290,15 +284,11 @@ async def test_resource_field_delete(writer_api, knowledgebox_writer):
         rid = data["uuid"]
 
         # Text
-        resp = await client.delete(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/text/text1"
-        )
+        resp = await client.delete(f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/text/text1")
         assert resp.status_code == 204
 
         # Link
-        resp = await client.delete(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/link/link1"
-        )
+        resp = await client.delete(f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/link/link1")
         assert resp.status_code == 204
 
         # Keywords
@@ -326,9 +316,7 @@ async def test_resource_field_delete(writer_api, knowledgebox_writer):
         assert resp.status_code == 204
 
         # File
-        resp = await client.delete(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/file/file1"
-        )
+        resp = await client.delete(f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/file/file1")
         assert resp.status_code == 204
 
 

@@ -18,9 +18,9 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import pytest
-from nucliadb_protos.knowledgebox_pb2 import Labels
 
 from nucliadb.common import datamanagers
+from nucliadb_protos.knowledgebox_pb2 import Labels
 
 pytestmark = pytest.mark.asyncio
 
@@ -33,14 +33,10 @@ async def test_labelset_ids(maindb_driver):
 
     # Check that adding to the list creates the list
     async with maindb_driver.transaction() as txn:
-        await datamanagers.labels._add_to_labelset_ids(
-            txn, kbid=kbid, labelsets=["bar", "ba"]
-        )
+        await datamanagers.labels._add_to_labelset_ids(txn, kbid=kbid, labelsets=["bar", "ba"])
         await txn.commit()
     async with maindb_driver.transaction() as txn:
-        await datamanagers.labels._add_to_labelset_ids(
-            txn, kbid=kbid, labelsets=["bar", "baz"]
-        )
+        await datamanagers.labels._add_to_labelset_ids(txn, kbid=kbid, labelsets=["bar", "baz"])
         await txn.commit()
     async with maindb_driver.transaction() as txn:
         assert await datamanagers.labels._get_labelset_ids(txn, kbid=kbid) == [
@@ -51,9 +47,7 @@ async def test_labelset_ids(maindb_driver):
 
     # Check that removing from the list removes the item
     async with maindb_driver.transaction() as txn:
-        await datamanagers.labels._delete_from_labelset_ids(
-            txn, kbid=kbid, labelsets=["ba"]
-        )
+        await datamanagers.labels._delete_from_labelset_ids(txn, kbid=kbid, labelsets=["ba"])
         await txn.commit()
     async with maindb_driver.transaction() as txn:
         assert await datamanagers.labels._get_labelset_ids(txn, kbid=kbid) == [
@@ -63,18 +57,14 @@ async def test_labelset_ids(maindb_driver):
 
     # Check that list is empty after removing all
     async with maindb_driver.transaction() as txn:
-        await datamanagers.labels._delete_from_labelset_ids(
-            txn, kbid=kbid, labelsets=["bar", "baz"]
-        )
+        await datamanagers.labels._delete_from_labelset_ids(txn, kbid=kbid, labelsets=["bar", "baz"])
         await txn.commit()
     async with maindb_driver.transaction() as txn:
         assert await datamanagers.labels._get_labelset_ids(txn, kbid=kbid) == []
 
     # Check that set_labels overwrites the list
     async with maindb_driver.transaction() as txn:
-        await datamanagers.labels._set_labelset_ids(
-            txn, kbid=kbid, labelsets=["bar", "baz"]
-        )
+        await datamanagers.labels._set_labelset_ids(txn, kbid=kbid, labelsets=["bar", "baz"])
         await txn.commit()
 
     async with maindb_driver.transaction() as txn:
@@ -91,36 +81,24 @@ async def test_labelset_ids_bw_compat(maindb_driver):
     kbid = "foo"
     # Check that initially all are empty
     async with maindb_driver.transaction() as txn:
-        assert (
-            await datamanagers.labels._deprecated_scan_labelset_ids(txn, kbid=kbid)
-            == []
-        )
+        assert await datamanagers.labels._deprecated_scan_labelset_ids(txn, kbid=kbid) == []
         assert await datamanagers.labels._get_labelset_ids(txn, kbid=kbid) is None
-        assert (
-            await datamanagers.labels._get_labelset_ids_bw_compat(txn, kbid=kbid) == []
-        )
+        assert await datamanagers.labels._get_labelset_ids_bw_compat(txn, kbid=kbid) == []
 
     # Check that adding to the list creates the list
     async with maindb_driver.transaction() as txn:
-        await datamanagers.labels._add_to_labelset_ids(
-            txn, kbid=kbid, labelsets=["bar", "ba"]
-        )
+        await datamanagers.labels._add_to_labelset_ids(txn, kbid=kbid, labelsets=["bar", "ba"])
         await txn.commit()
     async with maindb_driver.transaction() as txn:
         assert await datamanagers.labels._get_labelset_ids(txn, kbid=kbid) == [
             "bar",
             "ba",
         ]
-        assert (
-            await datamanagers.labels._deprecated_scan_labelset_ids(txn, kbid=kbid)
-            == []
-        )
+        assert await datamanagers.labels._deprecated_scan_labelset_ids(txn, kbid=kbid) == []
 
     # Check that adding appends to the list
     async with maindb_driver.transaction() as txn:
-        await datamanagers.labels._add_to_labelset_ids(
-            txn, kbid=kbid, labelsets=["baz", "ba"]
-        )
+        await datamanagers.labels._add_to_labelset_ids(txn, kbid=kbid, labelsets=["baz", "ba"])
         await txn.commit()
     async with maindb_driver.transaction() as txn:
         assert await datamanagers.labels._get_labelset_ids(txn, kbid=kbid) == [
@@ -131,9 +109,7 @@ async def test_labelset_ids_bw_compat(maindb_driver):
 
     # Check that removing from the list removes the item
     async with maindb_driver.transaction() as txn:
-        await datamanagers.labels._delete_from_labelset_ids(
-            txn, kbid=kbid, labelsets=["ba"]
-        )
+        await datamanagers.labels._delete_from_labelset_ids(txn, kbid=kbid, labelsets=["ba"])
         await txn.commit()
     async with maindb_driver.transaction() as txn:
         assert await datamanagers.labels._get_labelset_ids(txn, kbid=kbid) == [
@@ -144,9 +120,7 @@ async def test_labelset_ids_bw_compat(maindb_driver):
     # Check that removing also creates the list
     async with maindb_driver.transaction() as txn:
         assert await datamanagers.labels._get_labelset_ids(txn, kbid="other") is None
-        await datamanagers.labels._delete_from_labelset_ids(
-            txn, kbid="other", labelsets=["bar", "baz"]
-        )
+        await datamanagers.labels._delete_from_labelset_ids(txn, kbid="other", labelsets=["bar", "baz"])
         await txn.commit()
     async with maindb_driver.transaction() as txn:
         assert await datamanagers.labels._get_labelset_ids(txn, kbid="other") == []
@@ -157,7 +131,5 @@ async def test_labelset_ids_bw_compat(maindb_driver):
         await txn.commit()
     async with maindb_driver.transaction() as txn:
         await datamanagers.labels._get_labelset_ids(txn, kbid="foo") is None
-        await datamanagers.labels._deprecated_scan_labelset_ids(txn, kbid="foo") == [
-            "1"
-        ]
+        await datamanagers.labels._deprecated_scan_labelset_ids(txn, kbid="foo") == ["1"]
         await datamanagers.labels._get_labelset_ids_bw_compat(txn, kbid="foo") == ["1"]

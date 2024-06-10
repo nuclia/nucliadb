@@ -20,6 +20,11 @@
 import traceback
 
 import aiohttp
+
+from nucliadb.common import datamanagers
+from nucliadb.train.settings import settings
+from nucliadb.train.utils import get_shard_manager
+from nucliadb_protos import train_pb2_grpc
 from nucliadb_protos.train_pb2 import (
     GetFieldsRequest,
     GetInfoRequest,
@@ -36,11 +41,6 @@ from nucliadb_protos.writer_pb2 import (
     GetLabelsRequest,
     GetLabelsResponse,
 )
-
-from nucliadb.common import datamanagers
-from nucliadb.train.settings import settings
-from nucliadb.train.utils import get_shard_manager
-from nucliadb_protos import train_pb2_grpc
 from nucliadb_telemetry import errors
 
 
@@ -126,9 +126,7 @@ class TrainServicer(train_pb2_grpc.TrainServicer):
     ) -> LabelsetsCount:
         url = settings.internal_search_api.format(kbid=request.kb.uuid)
         facets = [f"faceted=/p/{labelset}" for labelset in request.paragraph_labelsets]
-        facets.extend(
-            [f"faceted=/l/{labelset}" for labelset in request.resource_labelsets]
-        )
+        facets.extend([f"faceted=/l/{labelset}" for labelset in request.resource_labelsets])
         query = "&".join(facets)
         headers = {"X-NUCLIADB-ROLES": "READER"}
         async with aiohttp.ClientSession() as sess:

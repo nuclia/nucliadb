@@ -38,9 +38,7 @@ from nucliadb.common.maindb.tikv import (
             TikvTimeoutError,
         ),
         (
-            Exception(
-                "gRPC error: RpcFailure: 14-UNAVAILABLE failed to connect to all addresses"
-            ),
+            Exception("gRPC error: RpcFailure: 14-UNAVAILABLE failed to connect to all addresses"),
             TikvUnavailableError,
         ),
         (Exception("Leader of region 34234 is not found"), LeaderNotFoundError),

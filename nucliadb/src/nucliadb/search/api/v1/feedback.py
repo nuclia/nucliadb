@@ -51,9 +51,7 @@ async def send_feedback_endpoint(
     x_forwarded_for: str = Header(""),
 ):
     try:
-        return await send_feedback(
-            kbid, item, x_nucliadb_user, x_ndb_client, x_forwarded_for
-        )
+        return await send_feedback(kbid, item, x_nucliadb_user, x_ndb_client, x_forwarded_for)
     except predict.ProxiedPredictAPIError as err:
         return HTTPClientError(
             status_code=err.status,
@@ -73,6 +71,4 @@ async def send_feedback(
     x_forwarded_for: str,
 ):
     predict = get_predict()
-    await predict.send_feedback(
-        kbid, item, x_nucliadb_user, x_ndb_client, x_forwarded_for
-    )
+    await predict.send_feedback(kbid, item, x_nucliadb_user, x_ndb_client, x_forwarded_for)
