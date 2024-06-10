@@ -827,6 +827,10 @@ class ChatModel(BaseModel):
         default=False,
         description="If set to true, the response will be in markdown format",
     )
+    json_schema: Optional[str] = Field(
+        default=None,
+        description="The JSON schema to use for the generative model answers",
+    )
 
 
 class RephraseModel(BaseModel):
@@ -1297,7 +1301,17 @@ def validate_facets(facets):
     return facets
 
 
-class AskRequest(ChatRequest): ...
+class AskRequest(ChatRequest):
+    answer_json_schema: Optional[str] = Field(
+        default=None,
+        title="Answer JSON schema",
+        description="""Desired JSON schema of the desired LLM answer.
+This schema is passed to the LLM so that it answers in a scructured format following the schema. If not provided, textual response is returned.
+Note that when using this parameter, the answer in the generative response will not be returned in chunks, the whole response text will be returned instead.
+Using this feature also disables the `citations` parameter.
+""",
+        # TODO: add an example
+    )
 
 
 class AskTokens(BaseModel):

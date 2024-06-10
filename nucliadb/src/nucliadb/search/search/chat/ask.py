@@ -425,6 +425,7 @@ async def ask(
         generative_model=ask_request.generative_model,
         max_tokens=query_parser.get_max_tokens_answer(),
         query_context_images=prompt_context_images,
+        json_schema=ask_request.answer_json_schema,
     )
     with metrics.time("stream_start"):
         predict = get_predict()
