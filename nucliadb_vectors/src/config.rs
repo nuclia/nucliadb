@@ -21,6 +21,7 @@ use std::mem::size_of;
 
 use nucliadb_core::protos::VectorIndexConfig;
 use nucliadb_core::protos::{VectorSimilarity, VectorType as ProtoVectorType};
+use nucliadb_core::tracing::warn;
 use serde::{Deserialize, Serialize};
 
 use crate::vector_types::*;
@@ -121,6 +122,10 @@ impl TryFrom<VectorIndexConfig> for VectorConfig {
 
     fn try_from(proto: VectorIndexConfig) -> Result<Self, Self::Error> {
         let vector_type = match (proto.vector_type(), proto.vector_dimension) {
+            (ProtoVectorType::DenseF32, Some(0)) => {
+                warn!("Trying to create a shard with dimension = 0. Falling back to unaligned vectors");
+                VectorType::DenseF32Unaligned
+            }
             (ProtoVectorType::DenseF32, Some(dim)) => VectorType::DenseF32 {
                 dimension: dim as usize,
             },
