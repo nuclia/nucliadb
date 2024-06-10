@@ -21,7 +21,6 @@ import asyncio
 from io import BytesIO
 from unittest.mock import AsyncMock, Mock
 
-import nats.errors
 import pytest
 from starlette.requests import Request
 
@@ -38,6 +37,7 @@ from nucliadb_models.export_import import Status
 from nucliadb_protos import resources_pb2
 from nucliadb_protos.writer_pb2 import BrokerMessage, BrokerMessageBlobReference
 from nucliadb_utils.const import Streams
+from nucliadb_utils.transaction import MaxTransactionSizeExceededError
 
 
 @pytest.fixture(scope="function")
@@ -282,7 +282,7 @@ class TestTaskRetryHandler:
 
 async def test_transaction_commit_sends_storage_reference_on_max_payload_error():
     context = Mock()
-    context.transaction.commit = AsyncMock(side_effect=[nats.errors.MaxPayloadError, None])
+    context.transaction.commit = AsyncMock(side_effect=[MaxTransactionSizeExceededError, None])
     context.blob_storage = AsyncMock()
     context.blob_storage.set_stream_message.return_value = "key"
 

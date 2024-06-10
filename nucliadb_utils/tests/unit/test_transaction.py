@@ -20,10 +20,12 @@
 import asyncio
 from unittest import mock
 
+import nats
 import pytest
 
 from nucliadb_protos.writer_pb2 import BrokerMessage, Notification
 from nucliadb_utils.transaction import (
+    MaxTransactionSizeExceededError,
     TransactionCommitTimeoutError,
     TransactionUtility,
     WaitFor,
@@ -115,3 +117,12 @@ async def test_commit_timeout(txn: TransactionUtility, pubsub):
 
     with pytest.raises(TransactionCommitTimeoutError):
         await txn.commit(bm, 1, wait=True, target_subject="foo")
+
+
+@pytest.mark.asyncio
+async def test_max_payload_error_handled(txn: TransactionUtility, pubsub):
+    txn.js = mock.Mock()
+    txn.js.publish = mock.AsyncMock(side_effect=nats.errors.MaxPayloadError)
+    bm = BrokerMessage()
+    with pytest.raises(MaxTransactionSizeExceededError):
+        await txn.commit(bm, 1, target_subject="foo")

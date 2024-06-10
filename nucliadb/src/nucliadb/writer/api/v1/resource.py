@@ -36,6 +36,7 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.processing import ProcessingInfo, PushPayload, Source
 from nucliadb.writer import SERVICE_NAME, logger
 from nucliadb.writer.api.constants import SKIP_STORE_DEFAULT, X_NUCLIADB_USER
+from nucliadb.writer.api.v1 import transaction
 from nucliadb.writer.api.v1.router import (
     KB_PREFIX,
     RESOURCE_PREFIX,
@@ -66,12 +67,10 @@ from nucliadb_protos.writer_pb2 import BrokerMessage, IndexResource
 from nucliadb_telemetry.errors import capture_exception
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
-from nucliadb_utils.transaction import TransactionCommitTimeoutError
 from nucliadb_utils.utilities import (
     get_ingest,
     get_partitioning,
     get_storage,
-    get_transaction_utility,
 )
 
 
@@ -94,7 +93,6 @@ async def create_resource(
 ):
     await maybe_back_pressure(request, kbid)
 
-    transaction = get_transaction_utility()
     partitioning = get_partitioning()
 
     # Create resource message
@@ -145,15 +143,10 @@ async def create_resource(
     set_status(writer.basic, item)
 
     writer.source = BrokerMessage.MessageSource.WRITER
-    try:
-        t0 = time()
-        await transaction.commit(writer, partition, wait=True)
-        txn_time = time() - t0
-    except TransactionCommitTimeoutError:
-        raise HTTPException(
-            status_code=501,
-            detail="Inconsistent write. This resource will not be processed and may not be stored.",
-        )
+
+    t0 = time()
+    await transaction.commit(writer, partition)
+    txn_time = time() - t0
 
     seqid = await maybe_send_to_process(toprocess, partition)
 
@@ -257,7 +250,6 @@ async def modify_resource(
     *,
     rid: str,
 ):
-    transaction = get_transaction_utility()
     partitioning = get_partitioning()
 
     partition = partitioning.generate_partition(kbid, rid)
@@ -300,14 +292,7 @@ async def modify_resource(
 
     maybe_mark_reindex(writer, item)
 
-    try:
-        await transaction.commit(writer, partition, wait=True)
-    except TransactionCommitTimeoutError:
-        raise HTTPException(
-            status_code=501,
-            detail="Inconsistent write. This resource will not be processed and may not be stored.",
-        )
-
+    await transaction.commit(writer, partition)
     seqid = await maybe_send_to_process(toprocess, partition)
 
     return ResourceUpdated(seqid=seqid)
@@ -399,7 +384,6 @@ async def _reprocess_resource(
     await validate_rid_exists_or_raise_error(kbid, rid)
     await maybe_back_pressure(request, kbid, resource_uuid=rid)
 
-    transaction = get_transaction_utility()
     partitioning = get_partitioning()
 
     partition = partitioning.generate_partition(kbid, rid)
@@ -433,14 +417,7 @@ async def _reprocess_resource(
     writer.source = BrokerMessage.MessageSource.WRITER
     writer.basic.metadata.useful = True
     writer.basic.metadata.status = Metadata.Status.PENDING
-    try:
-        await transaction.commit(writer, partition, wait=False)
-    except TransactionCommitTimeoutError:
-        raise HTTPException(
-            status_code=501,
-            detail="Inconsistent write. This resource will not be processed and may not be stored.",
-        )
-
+    await transaction.commit(writer, partition, wait=False)
     processing_info = await send_to_process(toprocess, partition)
 
     return ResourceUpdated(seqid=processing_info.seqid)
@@ -486,7 +463,6 @@ async def _delete_resource(
 ):
     await validate_rid_exists_or_raise_error(kbid, rid)
 
-    transaction = get_transaction_utility()
     partitioning = get_partitioning()
 
     partition = partitioning.generate_partition(kbid, rid)
@@ -497,16 +473,7 @@ async def _delete_resource(
     writer.type = BrokerMessage.MessageType.DELETE
 
     parse_audit(writer.audit, request)
-
-    # Create processing message
-    try:
-        await transaction.commit(writer, partition, wait=True)
-    except TransactionCommitTimeoutError:
-        raise HTTPException(
-            status_code=501,
-            detail="Inconsistent write. This resource will not be processed and may not be stored.",
-        )
-
+    await transaction.commit(writer, partition)
     processing = get_processing()
     asyncio.create_task(processing.delete_from_processing(kbid=kbid, resource_id=rid))
 

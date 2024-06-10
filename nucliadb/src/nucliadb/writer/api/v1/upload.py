@@ -38,6 +38,7 @@ from nucliadb.ingest.orm.utils import set_title
 from nucliadb.ingest.processing import PushPayload, Source
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.writer import SERVICE_NAME
+from nucliadb.writer.api.v1 import transaction
 from nucliadb.writer.api.v1.resource import (
     get_rid_from_slug_or_raise_error,
     validate_rid_exists_or_raise_error,
@@ -67,11 +68,9 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils.authentication import requires_one
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.storages.storage import KB_RESOURCE_FIELD
-from nucliadb_utils.transaction import TransactionCommitTimeoutError
 from nucliadb_utils.utilities import (
     get_partitioning,
     get_storage,
-    get_transaction_utility,
 )
 
 from .router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
@@ -817,7 +816,6 @@ async def store_file_on_nuclia_db(
     # File is on NucliaDB Storage at path
 
     partitioning = get_partitioning()
-    transaction = get_transaction_utility()
     processing = get_processing()
     storage = await get_storage(service_name=SERVICE_NAME)
 
@@ -899,14 +897,7 @@ async def store_file_on_nuclia_db(
     writer.source = BrokerMessage.MessageSource.WRITER
     writer.basic.metadata.status = Metadata.Status.PENDING
     writer.basic.metadata.useful = True
-    try:
-        await transaction.commit(writer, partition, wait=True)
-    except TransactionCommitTimeoutError:
-        raise HTTPException(
-            status_code=501,
-            detail="Inconsistent write. This resource will not be processed and may not be stored.",
-        )
-
+    await transaction.commit(writer, partition)
     try:
         processing_info = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:

@@ -21,7 +21,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Optional, Type, TypeVar
 
 from google.protobuf.json_format import MessageToDict
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from nucliadb_models.utils import validate_json
 from nucliadb_protos import resources_pb2
@@ -34,6 +34,7 @@ if TYPE_CHECKING:  # pragma: no cover
 else:
     TextFormatValue = int
 
+MB = 1024 * 1024
 
 # Shared classes
 
@@ -80,8 +81,17 @@ class FieldText(BaseModel):
 
 
 class TextField(BaseModel):
-    body: str
-    format: TextFormat = TextFormat.PLAIN
+    body: str = Field(
+        ...,
+        description="""The text body. The format of the text should be specified in the format field.
+The sum of all text fields in the request may not exceed 2MB.
+If you need to store more text, consider using a file field instead or splitting into multiple requests for each text field.""",
+        max_length=2 * MB,
+    )
+    format: TextFormat = Field(
+        default=TextFormat.PLAIN,
+        description="The format of the text.",
+    )
 
     @model_validator(mode="after")
     @classmethod
