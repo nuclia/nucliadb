@@ -53,10 +53,16 @@ def processing_mock():
 
 @pytest.fixture(scope="function")
 def transaction_mock():
-    with patch(f"{UPLOAD_PACKAGE}.get_transaction_utility") as transaction_mock:
-        transaction = AsyncMock()
-        transaction_mock.return_value = transaction
-        yield transaction
+    with patch(f"{UPLOAD_PACKAGE}.transaction") as transaction_mock:
+        transaction_mock.commit = AsyncMock()
+        yield transaction_mock
+
+
+@pytest.fixture(scope="function", autouse=True)
+async def get_storage_mock():
+    with patch(f"{UPLOAD_PACKAGE}.get_storage") as get_storage_mock:
+        get_storage_mock.return_value = Mock()
+        yield get_storage_mock
 
 
 @pytest.mark.asyncio
@@ -76,7 +82,6 @@ async def test_store_file_on_nucliadb_does_not_store_passwords(
         field,
         password="mypassword",
     )
-
     transaction_mock.commit.assert_awaited_once()
     writer_bm = transaction_mock.commit.call_args[0][0]
     assert not writer_bm.files[field].password
