@@ -393,17 +393,17 @@ class KnowledgeBox:
 
 
 def release_channel_for_kb(
-    slug: str, rc: Optional[ReleaseChannel.ValueType]
+    slug: str, release_channel: Optional[ReleaseChannel.ValueType]
 ) -> ReleaseChannel.ValueType:
     if running_settings.running_environment == "stage" and has_feature(
         const.Features.EXPERIMENTAL_KB, context={"slug": slug}
     ):
-        value = utils_pb2.ReleaseChannel.EXPERIMENTAL
+        release_channel = utils_pb2.ReleaseChannel.EXPERIMENTAL
 
-    if value is None:
+    if release_channel is None:
         return utils_pb2.ReleaseChannel.STABLE
 
-    return value
+    return release_channel
 
 
 def chunker(seq: Sequence, size: int):

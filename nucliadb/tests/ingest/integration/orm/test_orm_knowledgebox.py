@@ -17,14 +17,107 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from unittest.mock import AsyncMock
+
 import pytest
 
+from nucliadb.common import datamanagers
+from nucliadb.common.cluster import manager as cluster_manager
+from nucliadb.common.maindb.driver import Driver
+from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox, chunker
+from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig, SemanticModelMetadata
+from nucliadb_protos.utils_pb2 import VectorSimilarity
+from nucliadb_utils.storages.storage import Storage
+from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
 from tests.ingest.fixtures import broker_resource
 
 
+@pytest.fixture(scope="function")
+async def shard_manager(
+    storage: Storage,
+    maindb_driver: Driver,
+):
+    manager = AsyncMock()
+    original = get_utility(Utility.SHARD_MANAGER)
+    set_utility(Utility.SHARD_MANAGER, manager)
+
+    yield manager
+
+    if original is None:
+        clean_utility(Utility.SHARD_MANAGER)
+    else:
+        set_utility(Utility.SHARD_MANAGER, original)
+
+
 @pytest.mark.asyncio
-async def test_knowledgebox_purge_handles_unexisting_shard_payload(storage, maindb_driver):
+async def test_create_knowledgebox(
+    storage: Storage,
+    maindb_driver: Driver,
+    shard_manager: cluster_manager.KBShardManager,
+):
+    count = await count_all_kbs(maindb_driver)
+    assert count == 0
+
+    model = SemanticModelMetadata(
+        similarity_function=VectorSimilarity.COSINE,
+        vector_dimension=384,
+    )
+    async with maindb_driver.transaction() as txn:
+        kbid, failed = await KnowledgeBox.create(
+            txn,
+            slug="test",
+            config=KnowledgeBoxConfig(title="My Title 1"),
+            semantic_model=model,
+        )
+        assert kbid
+        assert not failed
+        await txn.commit()
+
+    with pytest.raises(KnowledgeBoxConflict):
+        async with maindb_driver.transaction() as txn:
+            await KnowledgeBox.create(
+                txn,
+                slug="test",
+                config=KnowledgeBoxConfig(title="My Title 2"),
+                semantic_model=model,
+            )
+
+    async with maindb_driver.transaction() as txn:
+        kbid2, failed = await KnowledgeBox.create(
+            txn,
+            slug="test2",
+            config=KnowledgeBoxConfig(title="My Title 3"),
+            semantic_model=model,
+        )
+        assert kbid2
+        assert not failed
+        await txn.commit()
+
+    count = await count_all_kbs(maindb_driver)
+    assert count == 2
+
+    async with maindb_driver.transaction() as txn:
+        kbid = await KnowledgeBox.delete(txn, kbid2)
+        assert kbid
+        await txn.commit()
+
+    count = await count_all_kbs(maindb_driver)
+    assert count == 1
+
+
+async def count_all_kbs(driver: Driver):
+    count = 0
+    async with driver.transaction(read_only=True) as txn:
+        async for _ in datamanagers.kb.get_kbs(txn):
+            count += 1
+    return count
+
+
+@pytest.mark.asyncio
+async def test_knowledgebox_purge_handles_unexisting_shard_payload(
+    storage: Storage, maindb_driver: Driver
+):
     await KnowledgeBox.purge(maindb_driver, "idonotexist")
 
 
