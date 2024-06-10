@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import json
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
@@ -39,6 +40,37 @@ from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 
 _T = TypeVar("_T")
+
+ANSWER_JSON_SCHEMA_EXAMPLE = json.dumps(
+    {
+        "name": "structred_response",
+        "description": "Structured response with custom fields",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "answer": {
+                    "type": "string",
+                    "description": "Text responding to the user's query with the given context.",
+                },
+                "confidence": {
+                    "type": "integer",
+                    "description": "The confidence level of the response, on a scale from 0 to 5.",
+                    "minimum": 0,
+                    "maximum": 5,
+                },
+                "machinery_mentioned": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "description": "A list of machinery mentioned in the response, if any. Use machine IDs if possible.",
+                    },
+                    "description": "Optional field listing any machinery mentioned in the response.",
+                },
+            },
+            "required": ["answer", "confidence"],
+        },
+    }
+)
 
 
 class ModelParamDefaults:
@@ -1310,7 +1342,7 @@ This schema is passed to the LLM so that it answers in a scructured format follo
 Note that when using this parameter, the answer in the generative response will not be returned in chunks, the whole response text will be returned instead.
 Using this feature also disables the `citations` parameter.
 """,
-        # TODO: add an example
+        examples=[ANSWER_JSON_SCHEMA_EXAMPLE],
     )
 
 
