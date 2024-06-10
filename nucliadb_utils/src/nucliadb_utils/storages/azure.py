@@ -217,20 +217,26 @@ class AzureStorage(Storage):
 class AzureObjectStore(ObjectStore):
     def __init__(self, connection_string: str):
         self.connection_string = connection_string
-        self.service_client: Optional[BlobServiceClient] = None
+        self._service_client: Optional[BlobServiceClient] = None
+
+    @property
+    def service_client(self) -> BlobServiceClient:
+        if self._service_client is None:
+            raise AttributeError("Service client not initialized")
+        return self._service_client
 
     async def initialize(self):
-        self.service_client = BlobServiceClient.from_connection_string(self.connection_string)
+        self._service_client = BlobServiceClient.from_connection_string(self.connection_string)
 
     async def finalize(self):
         try:
-            await self.service_client.close()
+            if self._service_client is not None:
+                await self._service_client.close()
         except Exception:
             logger.warning("Error closing Azure client", exc_info=True)
-        self.service_client = None
+        self._service_client = None
 
     async def bucket_create(self, bucket: str, labels: dict[str, str] | None = None) -> bool:
-        assert self.service_client is not None
         container_client = self.service_client.get_container_client(bucket)
         try:
             await container_client.create_container()
@@ -239,7 +245,6 @@ class AzureObjectStore(ObjectStore):
             return False
 
     async def bucket_delete(self, bucket: str) -> tuple[bool, bool]:
-        assert self.service_client is not None
         container_client = self.service_client.get_container_client(bucket)
         # There's never a conflict on Azure
         conflict = False
@@ -252,7 +257,6 @@ class AzureObjectStore(ObjectStore):
         return deleted, conflict
 
     async def bucket_exists(self, bucket: str) -> bool:
-        assert self.service_client is not None
         container_client = self.service_client.get_container_client(bucket)
         try:
             await container_client.get_container_properties()
@@ -281,7 +285,6 @@ class AzureObjectStore(ObjectStore):
         destination_bucket: str,
         destination_key: str,
     ) -> None:
-        assert self.service_client is not None
         origin_blob_client = self.service_client.get_blob_client(origin_bucket, origin_key)
         origin_url = origin_blob_client.url
         destination_blob_client = self.service_client.get_blob_client(
@@ -291,7 +294,6 @@ class AzureObjectStore(ObjectStore):
         assert result["copy_status"] == "success"
 
     async def delete(self, bucket: str, key: str) -> None:
-        assert self.service_client is not None
         container_client = self.service_client.get_container_client(bucket)
         try:
             await container_client.delete_blob(key, delete_snapshots="include")
@@ -305,7 +307,6 @@ class AzureObjectStore(ObjectStore):
         data: Union[bytes, AsyncGenerator[bytes, None]],
         metadata: ObjectMetadata,
     ) -> None:
-        assert self.service_client is not None
         container_client = self.service_client.get_container_client(bucket)
         length: Optional[int] = None
         if isinstance(data, bytes):
@@ -327,7 +328,6 @@ class AzureObjectStore(ObjectStore):
         )
 
     async def download(self, bucket: str, key: str) -> bytes:
-        assert self.service_client is not None
         container_client = self.service_client.get_container_client(bucket)
         blob_client = container_client.get_blob_client(key)
         try:
@@ -340,7 +340,6 @@ class AzureObjectStore(ObjectStore):
         self, bucket: str, key: str, range: Optional[Range] = None
     ) -> AsyncGenerator[bytes, None]:
         range = range or Range()
-        assert self.service_client is not None
         container_client = self.service_client.get_container_client(bucket)
         blob_client = container_client.get_blob_client(key)
         offset = None
@@ -359,13 +358,11 @@ class AzureObjectStore(ObjectStore):
             yield chunk
 
     async def iterate(self, bucket: str, prefix: str) -> AsyncGenerator[ObjectInfo, None]:
-        assert self.service_client is not None
         container_client = self.service_client.get_container_client(bucket)
         async for blob in container_client.list_blobs(name_starts_with=prefix):
             yield ObjectInfo(name=blob.name)
 
     async def get_metadata(self, bucket: str, key: str) -> ObjectMetadata:
-        assert self.service_client is not None
         container_client = self.service_client.get_container_client(bucket)
         blob_client = container_client.get_blob_client(key)
         try:
@@ -375,7 +372,6 @@ class AzureObjectStore(ObjectStore):
             raise ObjectNotFoundError()
 
     async def upload_multipart_start(self, bucket: str, key: str, metadata: ObjectMetadata) -> None:
-        assert self.service_client is not None
         container_client = self.service_client.get_container_client(bucket)
         custom_metadata = {key: str(value) for key, value in metadata.model_dump().items()}
         blob_client = container_client.get_blob_client(key)
@@ -390,7 +386,6 @@ class AzureObjectStore(ObjectStore):
     async def upload_multipart_append(
         self, bucket: str, key: str, iterable: AsyncIterator[bytes]
     ) -> int:
-        assert self.service_client is not None
         container_client = self.service_client.get_container_client(bucket)
         blob_client = container_client.get_blob_client(key)
         bytes_appended = 0

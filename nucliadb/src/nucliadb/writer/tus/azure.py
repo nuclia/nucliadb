@@ -19,8 +19,6 @@
 #
 from __future__ import annotations
 
-from typing import Optional
-
 from nucliadb.writer import logger
 from nucliadb.writer.tus.dm import FileDataManager
 from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
@@ -32,28 +30,30 @@ from nucliadb_utils.storages.utils import ObjectMetadata
 
 
 class AzureBlobStore(BlobStore):
-    object_store: Optional[AzureObjectStore] = None
-
     async def finalize(self):
-        if self.object_store is None:
+        if self._object_store is None:
             return
         try:
-            await self.object_store.close()
+            await self._object_store.close()
         except Exception:
             logger.exception("Error closing AzureBlobStore")
+        self._object_store = None
 
     async def initialize(self, connection_string: str):
         self.bucket = "nucliadb-{kbid}"
         self.source = CloudFile.Source.AZURE
-        self.object_store = AzureObjectStore(connection_string)
-        await self.object_store.initialize()
+        self._object_store = AzureObjectStore(connection_string)
+        await self._object_store.initialize()
+
+    @property
+    def object_store(self) -> AzureObjectStore:
+        assert self._object_store is not None
+        return self._object_store
 
     async def check_exists(self, bucket_name: str) -> bool:
-        assert self.object_store is not None
         return await self.object_store.bucket_exists(bucket_name)
 
     async def create_bucket(self, bucket_name: str) -> bool:
-        assert self.object_store is not None
         created = await self.object_store.bucket_create(bucket_name)
         return not created
 
@@ -65,7 +65,6 @@ class AzureFileStorageManager(FileStorageManager):
 
     @property
     def object_store(self) -> AzureObjectStore:
-        assert self.storage.object_store is not None
         return self.storage.object_store
 
     async def start(self, dm: FileDataManager, path: str, kbid: str):
