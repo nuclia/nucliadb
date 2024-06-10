@@ -73,7 +73,7 @@ from nucliadb_models.search import (
     StatusAskResponseItem,
     SyncAskMetadata,
     SyncAskResponse,
-    UserPrompt,
+    parse_prompts,
 )
 from nucliadb_telemetry import errors
 from nucliadb_utils.exceptions import LimitsExceededError
@@ -407,20 +407,18 @@ async def ask(
             prompt_context_images,
         ) = await prompt_context_builder.build()
 
-    # Parse the user prompt (if any)
-    user_prompt = None
-    if ask_request.prompt is not None:
-        user_prompt = UserPrompt(prompt=ask_request.prompt)
+    user_prompt, system_prompt = parse_prompts(ask_request)
 
     # Make the chat request to the predict API
     chat_model = ChatModel(
         user_id=user_id,
+        system=system_prompt,
+        user_prompt=user_prompt,
         query_context=prompt_context,
         query_context_order=prompt_context_order,
         chat_history=chat_history,
         question=user_query,
         truncate=True,
-        user_prompt=user_prompt,
         citations=ask_request.citations,
         generative_model=ask_request.generative_model,
         max_tokens=query_parser.get_max_tokens_answer(),
