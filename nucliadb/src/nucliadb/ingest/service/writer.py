@@ -21,6 +21,22 @@ import json
 import uuid
 from typing import AsyncIterator, Optional
 
+from nucliadb import learning_proxy
+from nucliadb.common import datamanagers
+from nucliadb.common.cluster.exceptions import AlreadyExists, EntitiesGroupNotFound
+from nucliadb.common.cluster.manager import get_index_nodes
+from nucliadb.common.cluster.utils import get_shard_manager
+from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
+from nucliadb.common.maindb.utils import setup_driver
+from nucliadb.ingest import SERVICE_NAME, logger
+from nucliadb.ingest.orm.broker_message import generate_broker_message
+from nucliadb.ingest.orm.entities import EntitiesManager
+from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict, VectorSetConflict
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
+from nucliadb.ingest.orm.processor import Processor, sequence_manager
+from nucliadb.ingest.orm.resource import Resource as ResourceORM
+from nucliadb.ingest.settings import settings
+from nucliadb_protos import nodewriter_pb2, utils_pb2, writer_pb2, writer_pb2_grpc
 from nucliadb_protos.knowledgebox_pb2 import (
     DeleteKnowledgeBoxResponse,
     KnowledgeBoxID,
@@ -58,23 +74,6 @@ from nucliadb_protos.writer_pb2 import (
     WriterStatusRequest,
     WriterStatusResponse,
 )
-
-from nucliadb import learning_proxy
-from nucliadb.common import datamanagers
-from nucliadb.common.cluster.exceptions import AlreadyExists, EntitiesGroupNotFound
-from nucliadb.common.cluster.manager import get_index_nodes
-from nucliadb.common.cluster.utils import get_shard_manager
-from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
-from nucliadb.common.maindb.utils import setup_driver
-from nucliadb.ingest import SERVICE_NAME, logger
-from nucliadb.ingest.orm.broker_message import generate_broker_message
-from nucliadb.ingest.orm.entities import EntitiesManager
-from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict, VectorSetConflict
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
-from nucliadb.ingest.orm.processor import Processor, sequence_manager
-from nucliadb.ingest.orm.resource import Resource as ResourceORM
-from nucliadb.ingest.settings import settings
-from nucliadb_protos import nodewriter_pb2, utils_pb2, writer_pb2, writer_pb2_grpc
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
 from nucliadb_utils.settings import is_onprem_nucliadb, running_settings
@@ -94,9 +93,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     async def initialize(self):
         self.storage = await get_storage(service_name=SERVICE_NAME)
         self.driver = await setup_driver()
-        self.proc = Processor(
-            driver=self.driver, storage=self.storage, pubsub=await get_pubsub()
-        )
+        self.proc = Processor(driver=self.driver, storage=self.storage, pubsub=await get_pubsub())
         self.shards_manager = get_shard_manager()
 
     async def finalize(self): ...
@@ -197,15 +194,11 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         try:
             kbid = await self.proc.update_kb(request.uuid, request.slug, request.config)
         except KnowledgeBoxNotFound:
-            return UpdateKnowledgeBoxResponse(
-                status=KnowledgeBoxResponseStatus.NOTFOUND
-            )
+            return UpdateKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.NOTFOUND)
         except Exception:
             logger.exception("Could not create KB", exc_info=True)
             return UpdateKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.ERROR)
-        return UpdateKnowledgeBoxResponse(
-            status=KnowledgeBoxResponseStatus.OK, uuid=kbid
-        )
+        return UpdateKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.OK, uuid=kbid)
 
     async def DeleteKnowledgeBox(  # type: ignore
         self, request: KnowledgeBoxID, context=None
@@ -264,9 +257,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
             entities_manager = EntitiesManager(kbobj, txn)
             try:
-                await entities_manager.create_entities_group(
-                    request.group, request.entities
-                )
+                await entities_manager.create_entities_group(request.group, request.entities)
             except AlreadyExists:
                 response.status = NewEntitiesGroupResponse.Status.ALREADY_EXISTS
                 return response
@@ -335,9 +326,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
             entities_manager = EntitiesManager(kbobj, txn)
             try:
-                entities_group = await entities_manager.get_entities_group(
-                    request.group
-                )
+                entities_group = await entities_manager.get_entities_group(request.group)
             except Exception as e:
                 errors.capture_exception(e)
                 logger.error("Error in ingest gRPC servicer", exc_info=True)
@@ -345,9 +334,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             else:
                 response.kb.uuid = kbobj.kbid
                 if entities_group is None:
-                    response.status = (
-                        GetEntitiesGroupResponse.Status.ENTITIES_GROUP_NOT_FOUND
-                    )
+                    response.status = GetEntitiesGroupResponse.Status.ENTITIES_GROUP_NOT_FOUND
                 else:
                     response.status = GetEntitiesGroupResponse.Status.OK
                     response.group.CopyFrom(entities_group)
@@ -364,9 +351,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
             entities_manager = EntitiesManager(kbobj, txn)
             try:
-                await entities_manager.set_entities_group(
-                    request.group, request.entities
-                )
+                await entities_manager.set_entities_group(request.group, request.entities)
             except Exception as e:
                 errors.capture_exception(e)
                 logger.error("Error in ingest gRPC servicer", exc_info=True)
@@ -398,9 +383,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 await entities_manager.update_entities(request.group, updates)
                 await entities_manager.delete_entities(request.group, request.delete)  # type: ignore
             except EntitiesGroupNotFound:
-                response.status = (
-                    UpdateEntitiesGroupResponse.Status.ENTITIES_GROUP_NOT_FOUND
-                )
+                response.status = UpdateEntitiesGroupResponse.Status.ENTITIES_GROUP_NOT_FOUND
                 return response
 
             await txn.commit()
@@ -491,14 +474,10 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                     shard = await kbobj.get_resource_shard(shard_id)
 
                 if shard is None:
-                    shard = await self.shards_manager.get_current_active_shard(
-                        txn, request.kbid
-                    )
+                    shard = await self.shards_manager.get_current_active_shard(txn, request.kbid)
                     if shard is None:
                         # no shard currently exists, create one
-                        shard = await self.shards_manager.create_shard_by_kbid(
-                            txn, request.kbid
-                        )
+                        shard = await self.shards_manager.create_shard_by_kbid(txn, request.kbid)
 
                     await datamanagers.resources.set_resource_shard_id(
                         txn, kbid=request.kbid, rid=request.rid, shard=shard.shard
@@ -545,9 +524,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             response.details = str(exc)
         except Exception as exc:
             errors.capture_exception(exc)
-            logger.error(
-                "Error in ingest gRPC while creating a vectorset", exc_info=True
-            )
+            logger.error("Error in ingest gRPC while creating a vectorset", exc_info=True)
             response.status = NewVectorSetResponse.Status.ERROR
             response.details = str(exc)
         else:
@@ -565,9 +542,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 await txn.commit()
         except Exception as exc:
             errors.capture_exception(exc)
-            logger.error(
-                "Error in ingest gRPC while deleting a vectorset", exc_info=True
-            )
+            logger.error("Error in ingest gRPC while deleting a vectorset", exc_info=True)
             response.status = DelVectorSetResponse.Status.ERROR
             response.details = str(exc)
         else:
@@ -585,9 +560,7 @@ def parse_model_metadata_from_learning_config(
     lconfig: learning_proxy.LearningConfiguration,
 ) -> SemanticModelMetadata:
     model = SemanticModelMetadata()
-    model.similarity_function = LEARNING_SIMILARITY_FUNCTION_TO_PROTO[
-        lconfig.semantic_vector_similarity
-    ]
+    model.similarity_function = LEARNING_SIMILARITY_FUNCTION_TO_PROTO[lconfig.semantic_vector_similarity]
     if lconfig.semantic_vector_size is not None:
         model.vector_dimension = lconfig.semantic_vector_size
     else:

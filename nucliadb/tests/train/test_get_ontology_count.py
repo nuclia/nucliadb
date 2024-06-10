@@ -19,6 +19,7 @@
 #
 import pytest
 from aioresponses import aioresponses
+
 from nucliadb_protos.train_pb2 import GetLabelsetsCountRequest, LabelsetsCount
 from nucliadb_protos.train_pb2_grpc import TrainStub
 
@@ -40,9 +41,7 @@ async def test_get_ontology_count(
                     "results": [],
                     "facets": {
                         "/l/my-labelset": {
-                            "facetresults": [
-                                {"tag": "/l/my-labelset/Label 1", "total": 1}
-                            ]
+                            "facetresults": [{"tag": "/l/my-labelset/Label 1", "total": 1}]
                         }
                     },
                 },

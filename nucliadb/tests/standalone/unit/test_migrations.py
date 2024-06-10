@@ -29,9 +29,7 @@ STANDALONE_MIGRATIONS = "nucliadb.standalone.migrations"
 
 @pytest.fixture(scope="function")
 def is_worker_node():
-    with mock.patch(
-        f"{STANDALONE_MIGRATIONS}.is_worker_node", return_value=True
-    ) as mocked:
+    with mock.patch(f"{STANDALONE_MIGRATIONS}.is_worker_node", return_value=True) as mocked:
         yield mocked
 
 

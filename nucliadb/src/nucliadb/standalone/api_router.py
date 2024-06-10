@@ -98,9 +98,7 @@ def get_temp_access_token(request: Request):
         logger.warning(
             "Dynamically generating JWK key. Please set JWK_KEY env variable to avoid this message."
         )
-        settings.jwk_key = orjson.dumps(
-            jwk.JWK.generate(kty="oct", size=256, kid="dyn")
-        ).decode("utf-8")
+        settings.jwk_key = orjson.dumps(jwk.JWK.generate(kty="oct", size=256, kid="dyn")).decode("utf-8")
     jwetoken.add_recipient(jwk.JWK(**orjson.loads(settings.jwk_key)))
     token = jwetoken.serialize(compact=True)
     return JSONResponse({"token": token})
@@ -154,9 +152,7 @@ def introspect_endpoint(request: Request) -> StreamingResponse:
     return StreamingResponse(
         content=introspect.stream_tar(request.app),
         status_code=200,
-        headers={
-            "Content-Disposition": f"attachment; filename=introspect_{introspect_id}.tar.gz"
-        },
+        headers={"Content-Disposition": f"attachment; filename=introspect_{introspect_id}.tar.gz"},
         media_type="application/octet-stream",
     )
 
@@ -180,9 +176,7 @@ class UpdatePullPosition(pydantic.BaseModel):
 
 
 @standalone_api_router.patch("/pull/position")
-async def update_pull_position(
-    request: Request, item: UpdatePullPosition
-) -> JSONResponse:
+async def update_pull_position(request: Request, item: UpdatePullPosition) -> JSONResponse:
     async with datamanagers.with_transaction() as txn:
         # standalone assumes 1 partition
         await datamanagers.processing.set_pull_offset(

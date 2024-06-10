@@ -30,9 +30,6 @@ from nucliadb.writer.back_pressure import (
     BackPressureData,
     BackPressureException,
     Materializer,
-)
-from nucliadb.writer.back_pressure import _cache as back_pressure_cache
-from nucliadb.writer.back_pressure import (
     cached_back_pressure,
     check_indexing_behind,
     check_ingest_behind,
@@ -42,6 +39,7 @@ from nucliadb.writer.back_pressure import (
     maybe_back_pressure,
     start_materializer,
 )
+from nucliadb.writer.back_pressure import _cache as back_pressure_cache
 
 MODULE = "nucliadb.writer.back_pressure"
 
@@ -92,9 +90,7 @@ def test_back_pressure_cache():
     assert cache.get(key) is None
 
 
-async def test_maybe_back_pressure_skip_conditions(
-    is_back_pressure_enabled, is_onprem_nucliadb
-):
+async def test_maybe_back_pressure_skip_conditions(is_back_pressure_enabled, is_onprem_nucliadb):
     with mock.patch(f"{MODULE}.back_pressure_checks") as back_pressure_checks_mock:
         # Check that if back pressure is not enabled, it should not run
         is_back_pressure_enabled.return_value = False
@@ -126,9 +122,7 @@ def materializer():
     materializer = mock.Mock()
     materializer.running = True
     materializer.get_processing_pending = mock.AsyncMock(return_value=10)
-    materializer.get_indexing_pending = mock.Mock(
-        return_value={"node1": 10, "node2": 2}
-    )
+    materializer.get_indexing_pending = mock.Mock(return_value={"node1": 10, "node2": 2})
     materializer.get_ingest_pending = mock.Mock(return_value=10)
     yield materializer
 
@@ -183,9 +177,7 @@ async def test_check_processing_behind_does_not_run_if_configured_max_is_zero(
 
 @pytest.fixture(scope="function")
 def get_nodes_for_resource_shard():
-    with mock.patch(
-        f"{MODULE}.get_nodes_for_resource_shard", return_value=["node1", "node2"]
-    ) as mock_:
+    with mock.patch(f"{MODULE}.get_nodes_for_resource_shard", return_value=["node1", "node2"]) as mock_:
         yield mock_
 
 
@@ -246,9 +238,7 @@ def test_cached_back_pressure_context_manager(cache):
 
     func.reset_mock()
 
-    data = BackPressureData(
-        try_after=datetime.now() + timedelta(seconds=10), type="indexing"
-    )
+    data = BackPressureData(try_after=datetime.now() + timedelta(seconds=10), type="indexing")
     func.side_effect = BackPressureException(data)
 
     with pytest.raises(HTTPException) as exc:
@@ -256,9 +246,7 @@ def test_cached_back_pressure_context_manager(cache):
             func()
 
     assert exc.value.status_code == 429
-    assert exc.value.detail["message"].startswith(
-        "Too many messages pending to ingest. Retry after"
-    )
+    assert exc.value.detail["message"].startswith("Too many messages pending to ingest. Retry after")
     assert exc.value.detail["try_after"]
     assert exc.value.detail["back_pressure_type"] == "indexing"
 
@@ -328,9 +316,7 @@ async def test_materializer(nats_conn, get_index_nodes, js, processing_client):
     # Make sure processing pending are cached
     assert await materializer.get_processing_pending("kbid") == 10
     assert await materializer.get_processing_pending("kbid") == 10
-    materializer.processing_http_client.stats.assert_awaited_once_with(
-        kbid="kbid", timeout=0.5
-    )
+    materializer.processing_http_client.stats.assert_awaited_once_with(kbid="kbid", timeout=0.5)
 
     await materializer.stop()
 

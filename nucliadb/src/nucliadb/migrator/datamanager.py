@@ -49,9 +49,7 @@ class MigrationsDataManager:
     async def schedule_all_kbs(self, target_version: int) -> None:
         async with self.driver.transaction() as txn:
             async for kbid, _ in datamanagers.kb.get_kbs(txn):
-                await txn.set(
-                    MIGRATIONS_KEY.format(kbid=kbid), str(target_version).encode()
-                )
+                await txn.set(MIGRATIONS_KEY.format(kbid=kbid), str(target_version).encode())
             await txn.commit()
 
     async def get_kb_migrations(self, limit: int = 100) -> list[str]:
@@ -90,9 +88,7 @@ class MigrationsDataManager:
             return GlobalInfo(current_version=0, target_version=None)
         pb = migrations_pb2.MigrationInfo()
         pb.ParseFromString(raw_pb)
-        return GlobalInfo(
-            current_version=pb.current_version, target_version=pb.target_version
-        )
+        return GlobalInfo(current_version=pb.current_version, target_version=pb.target_version)
 
     async def update_global_info(
         self,

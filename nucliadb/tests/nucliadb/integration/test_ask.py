@@ -36,9 +36,7 @@ from nucliadb_models.search import AskResponseItem, SyncAskResponse
 @pytest.fixture(scope="function", autouse=True)
 def audit():
     audit_mock = mock.Mock(chat=mock.AsyncMock())
-    with mock.patch(
-        "nucliadb.search.search.chat.query.get_audit", return_value=audit_mock
-    ):
+    with mock.patch("nucliadb.search.search.chat.query.get_audit", return_value=audit_mock):
         yield audit_mock
 
 
@@ -48,9 +46,7 @@ async def test_ask(
     nucliadb_reader: AsyncClient,
     knowledgebox,
 ):
-    resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/ask", json={"query": "query"}
-    )
+    resp = await nucliadb_reader.post(f"/kb/{knowledgebox}/ask", json={"query": "query"})
     assert resp.status_code == 200
 
     context = [{"author": "USER", "text": "query"}]
@@ -76,13 +72,9 @@ async def test_ask_handles_incomplete_find_results(
     knowledgebox,
     find_incomplete_results,
 ):
-    resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/ask", json={"query": "query"}
-    )
+    resp = await nucliadb_reader.post(f"/kb/{knowledgebox}/ask", json={"query": "query"})
     assert resp.status_code == 529
-    assert resp.json() == {
-        "detail": "Temporary error on information retrieval. Please try again."
-    }
+    assert resp.json() == {"detail": "Temporary error on information retrieval. Please try again."}
 
 
 @pytest.fixture
@@ -187,9 +179,7 @@ def parse_ask_response(resp):
 
 @pytest.mark.asyncio()
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_ask_rag_options_full_resource(
-    nucliadb_reader: AsyncClient, knowledgebox, resources
-):
+async def test_ask_rag_options_full_resource(nucliadb_reader: AsyncClient, knowledgebox, resources):
     resource1, resource2 = resources
 
     predict = get_predict()
@@ -218,9 +208,7 @@ async def test_ask_rag_options_full_resource(
 
 @pytest.mark.asyncio()
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_ask_rag_options_extend_with_fields(
-    nucliadb_reader: AsyncClient, knowledgebox, resources
-):
+async def test_ask_rag_options_extend_with_fields(nucliadb_reader: AsyncClient, knowledgebox, resources):
     resource1, resource2 = resources
 
     predict = get_predict()
@@ -294,9 +282,7 @@ async def test_ask_rag_options_extend_with_fields(
             # fields must be in the right format: field_type/field_name
             {
                 "query": "title",
-                "rag_strategies": [
-                    {"name": "field_extension", "fields": ["foo/t/text"]}
-                ],
+                "rag_strategies": [{"name": "field_extension", "fields": ["foo/t/text"]}],
             },
             "Value error, Field 'foo/t/text' is not in the format {field_type}/{field_name}",
         ),
@@ -304,9 +290,7 @@ async def test_ask_rag_options_extend_with_fields(
             # fields must have a valid field type
             {
                 "query": "title",
-                "rag_strategies": [
-                    {"name": "field_extension", "fields": ["X/fieldname"]}
-                ],
+                "rag_strategies": [{"name": "field_extension", "fields": ["X/fieldname"]}],
             },
             "Value error, Field 'X/fieldname' does not have a valid field type. Valid field types are",
         ),
@@ -330,9 +314,7 @@ async def test_ask_rag_options_extend_with_fields(
         ),
     ],
 )
-async def test_ask_rag_strategies_validation(
-    nucliadb_reader, invalid_payload, expected_error_msg
-):
+async def test_ask_rag_strategies_validation(nucliadb_reader, invalid_payload, expected_error_msg):
     # Invalid strategy as a string
     resp = await nucliadb_reader.post(
         f"/kb/kbid/ask",
@@ -346,9 +328,7 @@ async def test_ask_rag_strategies_validation(
 
 @pytest.mark.asyncio()
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_ask_capped_context(
-    nucliadb_reader: AsyncClient, knowledgebox, resources
-):
+async def test_ask_capped_context(nucliadb_reader: AsyncClient, knowledgebox, resources):
     # By default, max size is big enough to fit all the prompt context
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/ask",
@@ -395,7 +375,6 @@ async def test_ask_on_a_kb_not_found(nucliadb_reader):
 @pytest.mark.asyncio()
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_ask_max_tokens(nucliadb_reader, knowledgebox, resources):
-
     # As an integer
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/ask",
@@ -442,9 +421,7 @@ async def test_ask_on_resource(nucliadb_reader: AsyncClient, knowledgebox, resou
 
 @pytest.mark.asyncio()
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_ask_handles_stream_errors_on_predict(
-    nucliadb_reader, knowledgebox, resource
-):
+async def test_ask_handles_stream_errors_on_predict(nucliadb_reader, knowledgebox, resource):
     predict = get_predict()
     prev = predict.ndjson_answer.copy()
 
@@ -481,9 +458,7 @@ async def test_ask_handles_stream_errors_on_predict(
 
 @pytest.mark.asyncio()
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_ask_handles_stream_unexpected_errors(
-    nucliadb_reader, knowledgebox, resource
-):
+async def test_ask_handles_stream_unexpected_errors(nucliadb_reader, knowledgebox, resource):
     with mock.patch(
         "nucliadb.search.search.chat.ask.AskResult._stream",
         side_effect=ValueError("foobar"),
@@ -506,6 +481,5 @@ async def test_ask_handles_stream_unexpected_errors(
         error_item = results[-1].item
         assert error_item.type == "error"
         assert (
-            error_item.error
-            == "Unexpected error while generating the answer. Please try again later."
+            error_item.error == "Unexpected error while generating the answer. Please try again later."
         )

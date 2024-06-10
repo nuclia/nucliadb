@@ -106,9 +106,7 @@ class DataLayer:
     async def delete(self, key: str) -> None:
         with pg_observer({"type": "delete"}):
             async with self.lock:
-                await self.connection.execute(
-                    "DELETE FROM resources WHERE key = $1", key
-                )
+                await self.connection.execute("DELETE FROM resources WHERE key = $1", key)
 
     async def delete_replication(self, key: str) -> int:
         async with self.lock:
@@ -119,9 +117,7 @@ class DataLayer:
                 )
             )["id"]
 
-    async def batch_get(
-        self, keys: list[str], select_for_update: bool = False
-    ) -> list[Optional[bytes]]:
+    async def batch_get(self, keys: list[str], select_for_update: bool = False) -> list[Optional[bytes]]:
         with pg_observer({"type": "batch_get"}):
             async with self.lock:
                 statement = "SELECT key, value FROM resources WHERE key = ANY($1)"
@@ -223,9 +219,7 @@ class PGTransaction(Transaction):
     async def delete_replication(self, key: str) -> int:
         return await self.data_layer.delete_replication(key)
 
-    @backoff.on_exception(
-        backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=2
-    )
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=2)
     async def keys(
         self,
         match: str,
@@ -302,9 +296,7 @@ class PGDriver(Driver):
                 )
 
                 # check if table exists
-                create_table = (
-                    CREATE_REPLICATION_TABLE if for_replication else CREATE_TABLE
-                )
+                create_table = CREATE_REPLICATION_TABLE if for_replication else CREATE_TABLE
                 try:
                     async with self.pool.acquire() as conn:
                         await conn.execute(create_table)
@@ -318,12 +310,8 @@ class PGDriver(Driver):
             await self.pool.close()
             self.initialized = False
 
-    @backoff.on_exception(
-        backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=3
-    )
-    async def begin(
-        self, read_only: bool = False
-    ) -> Union[PGTransaction, ReadOnlyPGTransaction]:
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=3)
+    async def begin(self, read_only: bool = False) -> Union[PGTransaction, ReadOnlyPGTransaction]:
         if read_only:
             return ReadOnlyPGTransaction(self.pool, driver=self)
         else:

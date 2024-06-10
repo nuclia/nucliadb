@@ -22,13 +22,13 @@ from functools import partial
 
 import pytest
 from httpx import AsyncClient
-from nucliadb_protos.writer_pb2 import BrokerMessage
-from nucliadb_protos.writer_pb2_grpc import WriterStub
-from tests.utils import inject_message
 
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb_protos import noderesources_pb2
+from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.writer_pb2_grpc import WriterStub
+from tests.utils import inject_message
 
 
 @pytest.mark.asyncio
@@ -48,9 +48,7 @@ async def test_reindex(
     assert len(content["sentences"]["results"]) > 0
     assert len(content["paragraphs"]["results"]) > 0
 
-    async def clean_shard(
-        resources: list[str], node: AbstractIndexNode, shard_replica_id: str
-    ):
+    async def clean_shard(resources: list[str], node: AbstractIndexNode, shard_replica_id: str):
         nonlocal rid
         return await node.writer.RemoveResource(  # type: ignore
             noderesources_pb2.ResourceID(
@@ -76,9 +74,7 @@ async def test_reindex(
     assert len(content["paragraphs"]["results"]) == 0
 
     # Then do a reindex of the resource with its vectors
-    resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resource/{rid}/reindex?reindex_vectors=true"
-    )
+    resp = await nucliadb_writer.post(f"/kb/{knowledgebox}/resource/{rid}/reindex?reindex_vectors=true")
     assert resp.status_code == 200
 
     await asyncio.sleep(0.5)
@@ -98,19 +94,16 @@ async def create_resource(knowledgebox, writer: WriterStub):
 
 
 def broker_resource(knowledgebox: str) -> BrokerMessage:
-    from tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
-
     from nucliadb.tests.vectors import V1, V2, V3
     from nucliadb_protos import resources_pb2 as rpb
+    from tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
 
     bmb = BrokerMessageBuilder(kbid=knowledgebox)
     bmb.with_title("Title Resource")
     bmb.with_summary("Summary of document")
 
     file_field = FieldBuilder("file", rpb.FieldType.FILE)
-    file_field.with_extracted_text(
-        "My own text Ramon. This is great to be here. \n Where is my beer?"
-    )
+    file_field.with_extracted_text("My own text Ramon. This is great to be here. \n Where is my beer?")
     file_field.with_extracted_paragraph_metadata(
         rpb.Paragraph(
             start=0,

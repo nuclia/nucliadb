@@ -44,16 +44,12 @@ class Entity(BaseModel):
 
 
 class EntitiesGroupSummary(BaseModel):
-    title: Optional[str] = Field(
-        default=None, description="Title of the entities group"
-    )
+    title: Optional[str] = Field(default=None, description="Title of the entities group")
     color: Optional[str] = Field(
         default=None,
         description="Color of the entities group. This is for display purposes only.",
     )
-    custom: bool = Field(
-        default=False, description="Denotes if it has been created by the user"
-    )
+    custom: bool = Field(default=False, description="Denotes if it has been created by the user")
 
     entities: Dict[str, Entity] = Field(
         default={},
@@ -75,16 +71,12 @@ class EntitiesGroupSummary(BaseModel):
 
 
 class EntitiesGroup(BaseModel):
-    title: Optional[str] = Field(
-        default=None, description="Title of the entities group"
-    )
+    title: Optional[str] = Field(default=None, description="Title of the entities group")
     color: Optional[str] = Field(
         default=None,
         description="Color of the entities group. This is for display purposes only.",
     )
-    custom: bool = Field(
-        default=False, description="Denotes if it has been created by the user"
-    )
+    custom: bool = Field(default=False, description="Denotes if it has been created by the user")
     entities: Dict[str, Entity] = {}
 
     @classmethod

@@ -37,8 +37,7 @@ class KnowledgeBoxSynonyms(BaseModel):
         return cls(
             **dict(
                 synonyms={
-                    term: list(term_synonyms.synonyms)
-                    for term, term_synonyms in message.terms.items()
+                    term: list(term_synonyms.synonyms) for term, term_synonyms in message.terms.items()
                 }
             )
         )

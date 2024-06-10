@@ -20,6 +20,14 @@
 from typing import Optional
 
 import aiohttp
+
+from nucliadb.common import datamanagers
+from nucliadb.common.maindb.utils import setup_driver
+from nucliadb.ingest.orm.entities import EntitiesManager
+from nucliadb.ingest.orm.processor import Processor
+from nucliadb.train import SERVICE_NAME
+from nucliadb.train.models import RequestData
+from nucliadb.train.settings import settings
 from nucliadb_protos.knowledgebox_pb2 import Labels
 from nucliadb_protos.train_pb2 import (
     EnabledMetadata,
@@ -34,14 +42,6 @@ from nucliadb_protos.writer_pb2 import (
     GetLabelsRequest,
     GetLabelsResponse,
 )
-
-from nucliadb.common import datamanagers
-from nucliadb.common.maindb.utils import setup_driver
-from nucliadb.ingest.orm.entities import EntitiesManager
-from nucliadb.ingest.orm.processor import Processor
-from nucliadb.train import SERVICE_NAME
-from nucliadb.train.models import RequestData
-from nucliadb.train.settings import settings
 from nucliadb_utils.utilities import get_pubsub, get_storage
 
 

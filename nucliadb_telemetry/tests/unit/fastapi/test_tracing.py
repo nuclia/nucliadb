@@ -58,7 +58,4 @@ async def test_capture_trace_id_middleware_appends_trace_id_header_to_exposed(tr
     mdw = CaptureTraceIdMiddleware(mock.Mock())
     response = await mdw.dispatch(request, call_next)
 
-    assert (
-        response.headers["Access-Control-Expose-Headers"]
-        == "Foo-Bar,X-Header,X-NUCLIA-TRACE-ID"
-    )
+    assert response.headers["Access-Control-Expose-Headers"] == "Foo-Bar,X-Header,X-NUCLIA-TRACE-ID"

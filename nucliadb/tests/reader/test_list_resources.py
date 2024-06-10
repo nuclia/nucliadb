@@ -70,6 +70,4 @@ async def test_list_resources(
         assert len(resources) == expected_resources_count
         assert pagination["last"] == expected_is_last_page
         assert pagination["page"] == query_params.get("page", 0)
-        assert pagination["size"] == query_params.get(
-            "size", DEFAULT_RESOURCE_LIST_PAGE_SIZE
-        )
+        assert pagination["size"] == query_params.get("size", DEFAULT_RESOURCE_LIST_PAGE_SIZE)

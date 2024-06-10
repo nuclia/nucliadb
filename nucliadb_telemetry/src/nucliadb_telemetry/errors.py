@@ -55,9 +55,7 @@ def capture_exception(error: BaseException) -> Optional[str]:
 
 def capture_message(
     error_msg: str,
-    level: Optional[
-        Literal["fatal", "critical", "error", "warning", "info", "debug"]
-    ] = None,
+    level: Optional[Literal["fatal", "critical", "error", "warning", "info", "debug"]] = None,
     scope: Optional[Any] = None,
     **scope_args: Any,
 ) -> Optional[str]:
@@ -119,17 +117,12 @@ class SentryHandler(EventHandler):
         self._allowed_loggers = allowed_loggers
 
     def emit(self, record):
-        if (
-            record.name in self._allowed_loggers
-            or record.name.split(".")[0] in self._allowed_loggers
-        ):
+        if record.name in self._allowed_loggers or record.name.split(".")[0] in self._allowed_loggers:
             super().emit(record)
 
 
 class SentryLoggingIntegration(LoggingIntegration):
-    def __init__(
-        self, allowed_loggers: List[str], level=logging.INFO, event_level=logging.ERROR
-    ):
+    def __init__(self, allowed_loggers: List[str], level=logging.INFO, event_level=logging.ERROR):
         self._breadcrumb_handler = BreadcrumbHandler(level=level)
         self._handler = SentryHandler(allowed_loggers, level=event_level)
 

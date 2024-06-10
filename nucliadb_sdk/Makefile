@@ -10,15 +10,12 @@ install-dev:
 
 .PHONY: format
 format:
-	cd .. && isort --profile black nucliadb_sdk
-	black .
 	ruff check --fix --config=../ruff.toml .
+	ruff format --config=../ruff.toml .
 
 .PHONY: lint
 lint:
 	ruff check --config=../ruff.toml .
-	cd .. && isort -c --profile black nucliadb_sdk
-	black --check .
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini .
 
 .PHONY: test

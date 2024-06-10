@@ -42,11 +42,7 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
             logger.info("No need for labelset list migration", extra={"kbid": kbid})
             return
 
-        labelset_list = await datamanagers.labels._deprecated_scan_labelset_ids(
-            txn, kbid=kbid
-        )
-        await datamanagers.labels._set_labelset_ids(
-            txn, kbid=kbid, labelsets=labelset_list
-        )
+        labelset_list = await datamanagers.labels._deprecated_scan_labelset_ids(txn, kbid=kbid)
+        await datamanagers.labels._set_labelset_ids(txn, kbid=kbid, labelsets=labelset_list)
         logger.info("Labelset list migrated", extra={"kbid": kbid})
         await txn.commit()

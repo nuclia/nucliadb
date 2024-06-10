@@ -20,7 +20,6 @@
 import logging
 import os
 
-import nucliadb_admin_assets  # type: ignore
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -31,6 +30,7 @@ from starlette.requests import ClientDisconnect
 from starlette.responses import HTMLResponse
 from starlette.routing import Mount
 
+import nucliadb_admin_assets  # type: ignore
 from nucliadb.common.context.fastapi import set_app_context
 from nucliadb.middleware import ProcessTimeHeaderMiddleware
 from nucliadb.middleware.transaction import ReadOnlyTransactionMiddleware
@@ -140,9 +140,7 @@ def application_factory(settings: Settings) -> FastAPI:
     # mount admin app assets
     application.mount(
         "/admin",
-        StaticFiles(
-            directory=os.path.dirname(nucliadb_admin_assets.__file__), html=True
-        ),
+        StaticFiles(directory=os.path.dirname(nucliadb_admin_assets.__file__), html=True),
         name="static",
     )
     # redirect /contributor -> /admin

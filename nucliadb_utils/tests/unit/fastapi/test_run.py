@@ -71,9 +71,7 @@ def test_run_fastapi_with_metrics():
 
     with (
         patch("nucliadb_utils.fastapi.run.start_server", AsyncMock()) as start_server,
-        patch(
-            "nucliadb_utils.fastapi.run.run_server_forever", AsyncMock()
-        ) as run_server_forever,
+        patch("nucliadb_utils.fastapi.run.run_server_forever", AsyncMock()) as run_server_forever,
         patch(
             "nucliadb_utils.fastapi.run.metrics_app",
             return_value=(metrics_server, metrics_config),

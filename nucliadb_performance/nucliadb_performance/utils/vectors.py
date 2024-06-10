@@ -40,9 +40,7 @@ def compute_vector(sentence: str) -> list[float]:
 
 
 @cache_to_disk
-async def predict_sentence_to_vector(
-    predict_url: str, kbid: str, sentence: str
-) -> list[float]:
+async def predict_sentence_to_vector(predict_url: str, kbid: str, sentence: str) -> list[float]:
     client = httpx.AsyncClient(base_url=predict_url)
     resp = await client.get(
         "/sentence",

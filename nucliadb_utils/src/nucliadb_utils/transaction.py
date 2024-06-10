@@ -26,13 +26,13 @@ from typing import Any, Optional, Union
 import nats
 from nats.aio.client import Client
 from nats.js.client import JetStreamContext
+
 from nucliadb_protos.writer_pb2 import (
     BrokerMessage,
     BrokerMessageBlobReference,
     Notification,
     OpStatusWriter,
 )
-
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
 from nucliadb_utils import const, logger
 from nucliadb_utils.cache.pubsub import PubSubDriver
@@ -180,9 +180,7 @@ class TransactionUtility:
         writer: Union[BrokerMessage, BrokerMessageBlobReference],
         partition: int,
         wait: bool = False,
-        target_subject: Optional[
-            str
-        ] = None,  # allow customizing where to send the message
+        target_subject: Optional[str] = None,  # allow customizing where to send the message
         headers: Optional[dict[str, str]] = None,
     ) -> int:
         headers = headers or {}
@@ -192,24 +190,18 @@ class TransactionUtility:
         request_id = uuid.uuid4().hex
 
         if wait:
-            waiting_event = await self.wait_for_commited(
-                writer.kbid, waiting_for, request_id=request_id
-            )
+            waiting_event = await self.wait_for_commited(writer.kbid, waiting_for, request_id=request_id)
 
         if target_subject is None:
             target_subject = const.Streams.INGEST.subject.format(partition=partition)
 
-        res = await self.js.publish(
-            target_subject, writer.SerializeToString(), headers=headers
-        )
+        res = await self.js.publish(target_subject, writer.SerializeToString(), headers=headers)
 
         waiting_for.seq = res.seq
 
         if wait and waiting_event is not None:
             try:
-                await asyncio.wait_for(
-                    waiting_event.wait(), timeout=self.commit_timeout
-                )
+                await asyncio.wait_for(waiting_event.wait(), timeout=self.commit_timeout)
             except asyncio.TimeoutError:
                 logger.warning("Took too much to commit")
                 raise TransactionCommitTimeoutError()

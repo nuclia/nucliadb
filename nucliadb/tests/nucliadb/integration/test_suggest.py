@@ -20,6 +20,7 @@
 
 import pytest
 from httpx import AsyncClient
+
 from nucliadb_protos.resources_pb2 import LinkExtractedData
 from nucliadb_protos.writer_pb2 import BrokerMessage, OpStatusWriter
 from nucliadb_protos.writer_pb2_grpc import WriterStub
@@ -94,9 +95,7 @@ async def test_suggest_paragraphs(
     assert len(body["paragraphs"]["results"]) == 2
     assert body["paragraphs"]["results"][0]["rid"] == rid2
     assert body["paragraphs"]["results"][1]["rid"] == rid2
-    assert {"summary", "title"} == {
-        result["field"] for result in body["paragraphs"]["results"]
-    }
+    assert {"summary", "title"} == {result["field"] for result in body["paragraphs"]["results"]}
 
     # fuzzy search with distance 1 will only match 'a' from resource 2
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=z")
@@ -136,9 +135,7 @@ async def test_suggest_paragraphs(
     assert resp.status_code == 200
     body = resp.json()
     assert len(body["paragraphs"]["results"]) == 2
-    assert {"summary", "title"} == {
-        result["field"] for result in body["paragraphs"]["results"]
-    }
+    assert {"summary", "title"} == {result["field"] for result in body["paragraphs"]["results"]}
 
     # No "prince" appear in any german resource
     resp = await nucliadb_reader.get(

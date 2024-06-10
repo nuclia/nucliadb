@@ -46,9 +46,7 @@ import pytest
         ),
     ],
 )
-async def test_predict_proxy(
-    nucliadb_reader, knowledgebox, method, endpoint, params, payload
-):
+async def test_predict_proxy(nucliadb_reader, knowledgebox, method, endpoint, params, payload):
     kbid = knowledgebox
     http_func = getattr(nucliadb_reader, method.lower())
     http_func_kwargs = {"params": params}

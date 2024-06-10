@@ -58,9 +58,7 @@ def min_score_from_query_params(
     deprecated_min_score: Optional[float],
 ) -> MinScore:
     # Keep backward compatibility with the deprecated min_score parameter
-    semantic = (
-        deprecated_min_score if min_score_semantic is None else min_score_semantic
-    )
+    semantic = deprecated_min_score if min_score_semantic is None else min_score_semantic
     return MinScore(bm25=min_score_bm25, semantic=semantic)
 
 

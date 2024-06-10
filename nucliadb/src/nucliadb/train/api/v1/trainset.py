@@ -52,9 +52,7 @@ async def get_partitions_all(request: Request, kbid: str) -> TrainSetPartitions:
 )
 @requires_one([NucliaDBRoles.READER])
 @version(1)
-async def get_partitions_prefix(
-    request: Request, kbid: str, prefix: str
-) -> TrainSetPartitions:
+async def get_partitions_prefix(request: Request, kbid: str, prefix: str) -> TrainSetPartitions:
     return await get_partitions(kbid, prefix=prefix)
 
 

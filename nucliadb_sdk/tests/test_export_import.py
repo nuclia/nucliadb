@@ -70,32 +70,22 @@ def test_export_import_with_files(src_kbid, dst_kbid, sdk: nucliadb_sdk.NucliaDB
         # Import to dst kb from a file
         resp = sdk.start_import(kbid=dst_kbid, content=open(f.name, "rb"))
         import_id = resp.import_id
-        assert (
-            sdk.import_status(kbid=dst_kbid, import_id=import_id).status == "finished"
-        )
+        assert sdk.import_status(kbid=dst_kbid, import_id=import_id).status == "finished"
 
     _check_kbs_are_equal(sdk, src_kbid, dst_kbid)
 
 
-async def test_export_import_kb_async(
-    src_kbid, dst_kbid, sdk, sdk_async: nucliadb_sdk.NucliaDB
-):
+async def test_export_import_kb_async(src_kbid, dst_kbid, sdk, sdk_async: nucliadb_sdk.NucliaDB):
     # Export src kb
     resp = await sdk_async.start_export(kbid=src_kbid)
     export_id = resp.export_id
-    assert (
-        await sdk_async.export_status(kbid=src_kbid, export_id=export_id)
-    ).status == "finished"
+    assert (await sdk_async.export_status(kbid=src_kbid, export_id=export_id)).status == "finished"
     export_generator = sdk_async.download_export(kbid=src_kbid, export_id=export_id)
 
     # Import to dst kb
-    resp = await sdk_async.start_import(
-        kbid=dst_kbid, content=export_generator(chunk_size=1024)
-    )
+    resp = await sdk_async.start_import(kbid=dst_kbid, content=export_generator(chunk_size=1024))
     import_id = resp.import_id
-    assert (
-        await sdk_async.import_status(kbid=dst_kbid, import_id=import_id)
-    ).status == "finished"
+    assert (await sdk_async.import_status(kbid=dst_kbid, import_id=import_id)).status == "finished"
 
     _check_kbs_are_equal(sdk, src_kbid, dst_kbid)
 

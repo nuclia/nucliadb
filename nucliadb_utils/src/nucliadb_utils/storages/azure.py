@@ -27,8 +27,8 @@ from typing import AsyncGenerator, AsyncIterator, Optional, Union
 from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
 from azure.storage.blob import BlobProperties, BlobType, ContentSettings
 from azure.storage.blob.aio import BlobServiceClient
-from nucliadb_protos.resources_pb2 import CloudFile
 
+from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_utils.storages.exceptions import ObjectNotFoundError
 from nucliadb_utils.storages.object_store import ObjectStore
 from nucliadb_utils.storages.storage import Storage, StorageField
@@ -62,18 +62,14 @@ class AzureStorageField(StorageField):
             origin_bucket_name, origin_uri, destination_bucket_name, destination_uri
         )
 
-    async def iter_data(
-        self, range: Optional[Range] = None
-    ) -> AsyncGenerator[bytes, None]:
+    async def iter_data(self, range: Optional[Range] = None) -> AsyncGenerator[bytes, None]:
         if self.field is not None:
             bucket = self.field.bucket_name
             key = self.field.uri
         else:
             bucket = self.bucket
             key = self.key
-        async for chunk in self.storage.object_store.download_stream(
-            bucket, key, range
-        ):
+        async for chunk in self.storage.object_store.download_stream(bucket, key, range):
             yield chunk
 
     async def start(self, cf: CloudFile) -> CloudFile:
@@ -83,9 +79,7 @@ class AzureStorageField(StorageField):
         """
         if self.field is not None and self.field.upload_uri != "":
             # If there is a temporal url, delete it
-            await self.storage.delete_upload(
-                self.field.upload_uri, self.field.bucket_name
-            )
+            await self.storage.delete_upload(self.field.upload_uri, self.field.bucket_name)
         if self.field is not None and self.field.uri != "":
             field: CloudFile = CloudFile(
                 filename=cf.filename,
@@ -215,9 +209,7 @@ class AzureStorage(Storage):
         bucket_name = self.get_bucket_name(kbid)
         return await self.object_store.bucket_delete(bucket_name)
 
-    async def iterate_objects(
-        self, bucket: str, prefix: str
-    ) -> AsyncGenerator[ObjectInfo, None]:
+    async def iterate_objects(self, bucket: str, prefix: str) -> AsyncGenerator[ObjectInfo, None]:
         async for obj in self.object_store.iterate(bucket, prefix):
             yield obj
 
@@ -228,9 +220,7 @@ class AzureObjectStore(ObjectStore):
         self.service_client: Optional[BlobServiceClient] = None
 
     async def initialize(self):
-        self.service_client = BlobServiceClient.from_connection_string(
-            self.connection_string
-        )
+        self.service_client = BlobServiceClient.from_connection_string(self.connection_string)
 
     async def finalize(self):
         try:
@@ -239,9 +229,7 @@ class AzureObjectStore(ObjectStore):
             logger.warning("Error closing Azure client", exc_info=True)
         self.service_client = None
 
-    async def bucket_create(
-        self, bucket: str, labels: dict[str, str] | None = None
-    ) -> bool:
+    async def bucket_create(self, bucket: str, labels: dict[str, str] | None = None) -> bool:
         assert self.service_client is not None
         container_client = self.service_client.get_container_client(bucket)
         try:
@@ -294,16 +282,12 @@ class AzureObjectStore(ObjectStore):
         destination_key: str,
     ) -> None:
         assert self.service_client is not None
-        origin_blob_client = self.service_client.get_blob_client(
-            origin_bucket, origin_key
-        )
+        origin_blob_client = self.service_client.get_blob_client(origin_bucket, origin_key)
         origin_url = origin_blob_client.url
         destination_blob_client = self.service_client.get_blob_client(
             destination_bucket, destination_key
         )
-        result = await destination_blob_client.start_copy_from_url(
-            origin_url, requires_sync=True
-        )
+        result = await destination_blob_client.start_copy_from_url(origin_url, requires_sync=True)
         assert result["copy_status"] == "success"
 
     async def delete(self, bucket: str, key: str) -> None:
@@ -329,9 +313,7 @@ class AzureObjectStore(ObjectStore):
             metadata.size = length
         else:
             length = metadata.size or None
-        custom_metadata = {
-            key: str(value) for key, value in metadata.model_dump().items()
-        }
+        custom_metadata = {key: str(value) for key, value in metadata.model_dump().items()}
         await container_client.upload_blob(
             name=key,
             data=data,
@@ -376,9 +358,7 @@ class AzureObjectStore(ObjectStore):
         async for chunk in downloader.chunks():
             yield chunk
 
-    async def iterate(
-        self, bucket: str, prefix: str
-    ) -> AsyncGenerator[ObjectInfo, None]:
+    async def iterate(self, bucket: str, prefix: str) -> AsyncGenerator[ObjectInfo, None]:
         assert self.service_client is not None
         container_client = self.service_client.get_container_client(bucket)
         async for blob in container_client.list_blobs(name_starts_with=prefix):
@@ -394,14 +374,10 @@ class AzureObjectStore(ObjectStore):
         except ResourceNotFoundError:
             raise ObjectNotFoundError()
 
-    async def upload_multipart_start(
-        self, bucket: str, key: str, metadata: ObjectMetadata
-    ) -> None:
+    async def upload_multipart_start(self, bucket: str, key: str, metadata: ObjectMetadata) -> None:
         assert self.service_client is not None
         container_client = self.service_client.get_container_client(bucket)
-        custom_metadata = {
-            key: str(value) for key, value in metadata.model_dump().items()
-        }
+        custom_metadata = {key: str(value) for key, value in metadata.model_dump().items()}
         blob_client = container_client.get_blob_client(key)
         await blob_client.create_append_blob(
             metadata=custom_metadata,
@@ -436,11 +412,7 @@ def parse_object_metadata(properties: BlobProperties, key: str) -> ObjectMetadat
     else:
         size = properties.size
     filename = custom_metadata.get("filename") or key.split("/")[-1]
-    content_type = (
-        custom_metadata.get("content_type")
-        or properties.content_settings.content_type
-        or ""
-    )
+    content_type = custom_metadata.get("content_type") or properties.content_settings.content_type or ""
     return ObjectMetadata(
         filename=filename,
         size=size,

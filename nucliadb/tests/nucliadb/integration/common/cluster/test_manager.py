@@ -22,7 +22,6 @@ from typing import AsyncIterable
 from unittest import mock
 
 import pytest
-from nucliadb_protos.writer_pb2 import ShardCreated, ShardObject, ShardReplica, Shards
 
 from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.base import AbstractIndexNode
@@ -32,6 +31,7 @@ from nucliadb.common.cluster.exceptions import (
 )
 from nucliadb.common.datamanagers.cluster import KB_SHARDS
 from nucliadb.common.maindb.driver import Driver
+from nucliadb_protos.writer_pb2 import ShardCreated, ShardObject, ShardReplica, Shards
 
 
 @pytest.fixture(scope="function")
@@ -139,9 +139,7 @@ async def shards(fake_nodes, fake_kbid: str, maindb_driver: Driver):
     ],
 )
 @pytest.mark.asyncio
-async def test_choose_node_always_prefer_the_same_node(
-    shards, shard_index: int, nodes: set
-):
+async def test_choose_node_always_prefer_the_same_node(shards, shard_index: int, nodes: set):
     shard = shards.shards[shard_index]
     node_ids = set()
     for i in range(100):

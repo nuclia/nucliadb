@@ -19,8 +19,9 @@
 #
 from datetime import datetime
 
-from nucliadb_protos.writer_pb2 import Audit
 from starlette.requests import Request
+
+from nucliadb_protos.writer_pb2 import Audit
 
 
 def parse_audit(audit: Audit, request: Request):

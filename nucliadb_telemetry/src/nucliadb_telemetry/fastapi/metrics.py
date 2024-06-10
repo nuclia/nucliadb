@@ -66,9 +66,7 @@ except ImportError:  # pragma: no cover
 
 
 class PrometheusMiddleware(BaseHTTPMiddleware):
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         method = request.method
         found_path_template = get_path_template(request.scope)
 
@@ -93,15 +91,11 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
         else:
             status_code = response.status_code
             after_time = time.perf_counter()
-            REQUESTS_PROCESSING_TIME.labels(
-                method=method, path_template=path_template
-            ).observe(after_time - before_time)
+            REQUESTS_PROCESSING_TIME.labels(method=method, path_template=path_template).observe(
+                after_time - before_time
+            )
         finally:
-            RESPONSES.labels(
-                method=method, path_template=path_template, status_code=status_code
-            ).inc()
-            REQUESTS_IN_PROGRESS.labels(
-                method=method, path_template=path_template
-            ).dec()
+            RESPONSES.labels(method=method, path_template=path_template, status_code=status_code).inc()
+            REQUESTS_IN_PROGRESS.labels(method=method, path_template=path_template).dec()
 
         return response

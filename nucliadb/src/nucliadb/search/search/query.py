@@ -23,7 +23,6 @@ from datetime import datetime
 from typing import Any, Awaitable, Optional, Union
 
 from async_lru import alru_cache
-from nucliadb_protos.noderesources_pb2 import Resource
 
 from nucliadb.common import datamanagers
 from nucliadb.middleware.transaction import get_read_only_transaction
@@ -59,6 +58,7 @@ from nucliadb_models.search import (
 )
 from nucliadb_models.security import RequestSecurity
 from nucliadb_protos import knowledgebox_pb2, nodereader_pb2, utils_pb2
+from nucliadb_protos.noderesources_pb2 import Resource
 
 from .exceptions import InvalidQueryError
 
@@ -160,9 +160,7 @@ class QueryParser:
     def _get_query_information(self) -> Awaitable[QueryInfo]:
         if self._query_information_task is None:  # pragma: no cover
             self._query_information_task = asyncio.create_task(
-                query_information(
-                    self.kbid, self.query, self.generative_model, self.rephrase
-                )
+                query_information(self.kbid, self.query, self.generative_model, self.rephrase)
             )
         return self._query_information_task
 
@@ -175,18 +173,14 @@ class QueryParser:
 
     def _get_detected_entities(self) -> Awaitable[list[utils_pb2.RelationNode]]:
         if self._detected_entities_task is None:  # pragma: no cover
-            self._detected_entities_task = asyncio.create_task(
-                detect_entities(self.kbid, self.query)
-            )
+            self._detected_entities_task = asyncio.create_task(detect_entities(self.kbid, self.query))
         return self._detected_entities_task
 
     def _get_entities_meta_cache(
         self,
     ) -> Awaitable[datamanagers.entities.EntitiesMetaCache]:
         if self._entities_meta_cache_task is None:
-            self._entities_meta_cache_task = asyncio.create_task(
-                get_entities_meta_cache(self.kbid)
-            )
+            self._entities_meta_cache_task = asyncio.create_task(get_entities_meta_cache(self.kbid))
         return self._entities_meta_cache_task
 
     def _get_deleted_entity_groups(self) -> Awaitable[list[str]]:
@@ -213,9 +207,7 @@ class QueryParser:
         This will schedule concurrent tasks for different data that needs to be pulled
         for the sake of the query being performed
         """
-        if len(self.filters) > 0 and has_classification_label_filters(
-            self.flat_filter_labels
-        ):
+        if len(self.filters) > 0 and has_classification_label_filters(self.flat_filter_labels):
             asyncio.ensure_future(self._get_classification_labels())
 
         if self.has_vector_search and self.user_vector is None:
@@ -272,9 +264,7 @@ class QueryParser:
             request.filter.paragraph_labels.extend(paragraph_labels)
             request.filter.expression = json.dumps(self.filters)
 
-        request.faceted.labels.extend(
-            [translate_label(facet) for facet in self.faceted]
-        )
+        request.faceted.labels.extend([translate_label(facet) for facet in self.faceted])
         request.fields.extend(self.fields)
 
         if self.security is not None and len(self.security.groups) > 0:
@@ -324,9 +314,7 @@ class QueryParser:
                     order=SortOrder.DESC,
                     limit=None,
                 )
-            elif (
-                self.sort.field not in INDEX_SORTABLE_FIELDS and self.sort.limit is None
-            ):
+            elif self.sort.field not in INDEX_SORTABLE_FIELDS and self.sort.limit is None:
                 raise InvalidQueryError(
                     "sort_field",
                     f"Sort by '{self.sort.field}' requires setting a sort limit",
@@ -346,18 +334,13 @@ class QueryParser:
             request.order.sort_by = sort_field
             request.order.type = SortOrderMap[self.sort.order]  # type: ignore
 
-        if (
-            self.has_vector_search
-            and request.result_per_page > MAX_VECTOR_RESULTS_ALLOWED
-        ):
+        if self.has_vector_search and request.result_per_page > MAX_VECTOR_RESULTS_ALLOWED:
             raise InvalidQueryError(
                 "page_size",
                 f"Pagination of semantic results limit reached: {MAX_VECTOR_RESULTS_ALLOWED}. If you want to paginate through all results, please disable the vector search feature.",  # noqa: E501
             )
 
-    async def parse_min_score(
-        self, request: nodereader_pb2.SearchRequest, incomplete: bool
-    ) -> None:
+    async def parse_min_score(self, request: nodereader_pb2.SearchRequest, incomplete: bool) -> None:
         semantic_min_score = DEFAULT_GENERIC_SEMANTIC_THRESHOLD
         if self.min_score.semantic is not None:
             semantic_min_score = self.min_score.semantic
@@ -427,9 +410,7 @@ class QueryParser:
 
         return incomplete
 
-    async def parse_relation_search(
-        self, request: nodereader_pb2.SearchRequest
-    ) -> list[str]:
+    async def parse_relation_search(self, request: nodereader_pb2.SearchRequest) -> list[str]:
         autofilters = []
         if self.has_relations_search or self.autofilter:
             if not self.query_endpoint_used:
@@ -437,9 +418,7 @@ class QueryParser:
             else:
                 query_info_result = await self._get_query_information()
                 if query_info_result.entities:
-                    detected_entities = convert_relations(
-                        query_info_result.entities.model_dump()
-                    )
+                    detected_entities = convert_relations(query_info_result.entities.model_dump())
                 else:
                     detected_entities = []
             meta_cache = await self._get_entities_meta_cache()
@@ -447,9 +426,7 @@ class QueryParser:
             if self.has_relations_search:
                 request.relation_subgraph.entry_points.extend(detected_entities)
                 request.relation_subgraph.depth = 1
-                request.relation_subgraph.deleted_groups.extend(
-                    await self._get_deleted_entity_groups()
-                )
+                request.relation_subgraph.deleted_groups.extend(await self._get_deleted_entity_groups())
                 for group_id, deleted_entities in meta_cache.deleted_entities.items():
                     request.relation_subgraph.deleted_entities.append(
                         nodereader_pb2.EntitiesSubgraphRequest.DeletedEntities(
@@ -459,9 +436,7 @@ class QueryParser:
                 node_features.inc({"type": "relations"})
             if self.autofilter:
                 entity_filters = parse_entities_to_filters(request, detected_entities)
-                autofilters.extend(
-                    [translate_system_to_alias_label(e) for e in entity_filters]
-                )
+                autofilters.extend([translate_system_to_alias_label(e) for e in entity_filters])
         return autofilters
 
     async def parse_synonyms(self, request: nodereader_pb2.SearchRequest) -> None:
@@ -562,9 +537,7 @@ async def paragraph_query_to_pb(
             paragraph_labels: list[str] = []
             if has_classification_label_filters(filters):
                 classification_labels = await get_classification_labels(kbid)
-                field_labels, paragraph_labels = split_labels_by_type(
-                    filters, classification_labels
-                )
+                field_labels, paragraph_labels = split_labels_by_type(filters, classification_labels)
             request.filter.field_labels.extend(field_labels)
             request.filter.paragraph_labels.extend(paragraph_labels)
 
@@ -625,9 +598,7 @@ def expand_entities(
                 )
 
         if entity.value in duplicated_entities_by_value[entity.subtype]:
-            source_duplicate = duplicated_entities_by_value[entity.subtype][
-                entity.value
-            ]
+            source_duplicate = duplicated_entities_by_value[entity.subtype][entity.value]
             result_entities[source_duplicate] = utils_pb2.RelationNode(
                 ntype=utils_pb2.RelationNode.NodeType.ENTITY,
                 subtype=entity.subtype,
@@ -733,9 +704,7 @@ async def get_entities_meta_cache(kbid: str) -> datamanagers.entities.EntitiesMe
 @query_parse_dependency_observer.wrap({"type": "deleted_entities_groups"})
 async def get_deleted_entity_groups(kbid: str) -> list[str]:
     txn = await get_read_only_transaction()
-    return list(
-        (await datamanagers.entities.get_deleted_groups(txn, kbid=kbid)).entities_groups
-    )
+    return list((await datamanagers.entities.get_deleted_groups(txn, kbid=kbid)).entities_groups)
 
 
 @query_parse_dependency_observer.wrap({"type": "classification_labels"})
@@ -769,35 +738,22 @@ def check_supported_filters(filters: dict[str, Any], paragraph_labels: list[str]
 
 
 @alru_cache(maxsize=None)
-async def get_matryoshka_dimension_cached(
-    kbid: str, vectorset: Optional[str]
-) -> Optional[int]:
+async def get_matryoshka_dimension_cached(kbid: str, vectorset: Optional[str]) -> Optional[int]:
     # This can be safely cached as the matryoshka dimension is not expected to change
     return await get_matryoshka_dimension(kbid, vectorset)
 
 
 @query_parse_dependency_observer.wrap({"type": "matryoshka_dimension"})
-async def get_matryoshka_dimension(
-    kbid: str, vectorset: Optional[str]
-) -> Optional[int]:
+async def get_matryoshka_dimension(kbid: str, vectorset: Optional[str]) -> Optional[int]:
     txn = await get_read_only_transaction()
     matryoshka_dimension = None
     if not vectorset:
         # XXX this should be migrated once we remove the "default" vectorset
         # concept
-        matryoshka_dimension = await datamanagers.kb.get_matryoshka_vector_dimension(
-            txn, kbid=kbid
-        )
+        matryoshka_dimension = await datamanagers.kb.get_matryoshka_vector_dimension(txn, kbid=kbid)
     else:
-        vectorset_config = await datamanagers.vectorsets.get(
-            txn, kbid=kbid, vectorset_id=vectorset
-        )
-        if (
-            vectorset_config is not None
-            and vectorset_config.vectorset_index_config.vector_dimension
-        ):
-            matryoshka_dimension = (
-                vectorset_config.vectorset_index_config.vector_dimension
-            )
+        vectorset_config = await datamanagers.vectorsets.get(txn, kbid=kbid, vectorset_id=vectorset)
+        if vectorset_config is not None and vectorset_config.vectorset_index_config.vector_dimension:
+            matryoshka_dimension = vectorset_config.vectorset_index_config.vector_dimension
 
     return matryoshka_dimension

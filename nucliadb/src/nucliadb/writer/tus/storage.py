@@ -21,9 +21,8 @@ from __future__ import annotations
 
 from typing import AsyncIterator, Optional
 
-from nucliadb_protos.resources_pb2 import CloudFile
-
 from nucliadb.writer.tus.dm import FileDataManager
+from nucliadb_protos.resources_pb2 import CloudFile
 
 
 class BlobStore:

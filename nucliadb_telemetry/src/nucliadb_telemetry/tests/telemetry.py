@@ -134,9 +134,7 @@ class GreeterStreaming(hellostreamingworld_pb2_grpc.MultiGreeterServicer):
 
         self.tracer_provider = get_telemetry("NATS_SERVICE")
         await init_telemetry(self.tracer_provider)
-        self.jsotel = JetStreamContextTelemetry(
-            self.js, "nats_service", self.tracer_provider
-        )
+        self.jsotel = JetStreamContextTelemetry(self.js, "nats_service", self.tracer_provider)
 
         self.push_subscription = await self.jsotel.subscribe(
             subject="testing.stelemetry",
@@ -152,9 +150,7 @@ class GreeterStreaming(hellostreamingworld_pb2_grpc.MultiGreeterServicer):
     async def sayHello(self, request, context):
         await self.jsotel.publish("testing.stelemetry", request.name.encode())
         for _ in range(10):
-            yield hellostreamingworld_pb2.HelloReply(
-                message="Hello, %s!" % request.name
-            )
+            yield hellostreamingworld_pb2.HelloReply(message="Hello, %s!" % request.name)
 
 
 class Greeter(helloworld_pb2_grpc.GreeterServicer):
@@ -202,9 +198,7 @@ class Greeter(helloworld_pb2_grpc.GreeterServicer):
 
         self.tracer_provider = get_telemetry("NATS_SERVICE")
         await init_telemetry(self.tracer_provider)
-        self.jsotel = JetStreamContextTelemetry(
-            self.js, "nats_service", self.tracer_provider
-        )
+        self.jsotel = JetStreamContextTelemetry(self.js, "nats_service", self.tracer_provider)
 
         self.push_subscription = await self.jsotel.subscribe(
             subject="testing.telemetry",
@@ -248,9 +242,7 @@ class Greeter(helloworld_pb2_grpc.GreeterServicer):
 
         await self.pull_subscription_one.unsubscribe()
         self.puller_task_one.cancel()
-        await self.js._jsm.delete_consumer(
-            stream="testing", consumer="testing_consumer_one"
-        )
+        await self.js._jsm.delete_consumer(stream="testing", consumer="testing_consumer_one")
 
         await self.pubsub_subscription.unsubscribe()
         await self.nc.drain()
@@ -264,18 +256,12 @@ class Greeter(helloworld_pb2_grpc.GreeterServicer):
         await self.jsotel.publish("testing.telemetry_pull_one", request.name.encode())
 
         # Test regular nats pubsub
-        await self.ncotel.publish(
-            "testing.telemetry_nats_pubsub", request.name.encode()
-        )
+        await self.ncotel.publish("testing.telemetry_nats_pubsub", request.name.encode())
 
         # Test regular nats request-response
-        await self.ncotel.request(
-            "testing.telemetry_nats_reqresp", request.name.encode()
-        )
+        await self.ncotel.request("testing.telemetry_nats_reqresp", request.name.encode())
 
-        return helloworld_pb2.HelloReply(
-            message=("Hello, %s!" % request.name) * 2_000_000
-        )
+        return helloworld_pb2.HelloReply(message=("Hello, %s!" % request.name) * 2_000_000)
 
 
 @pytest.fixture(scope="function")
@@ -287,9 +273,7 @@ async def greeter(set_telemetry_settings, natsd: str) -> AsyncIterator[Greeter]:
 
 
 @pytest.fixture(scope="function")
-async def greeter_streaming(
-    set_telemetry_settings, natsd: str
-) -> AsyncIterator[GreeterStreaming]:
+async def greeter_streaming(set_telemetry_settings, natsd: str) -> AsyncIterator[GreeterStreaming]:
     obj = GreeterStreaming(natsd)
     await obj.initialize()
     yield obj
@@ -304,9 +288,7 @@ async def grpc_service(
 ):
     server = telemetry_grpc.init_server()
     helloworld_pb2_grpc.add_GreeterServicer_to_server(greeter, server)
-    hellostreamingworld_pb2_grpc.add_MultiGreeterServicer_to_server(
-        greeter_streaming, server
-    )
+    hellostreamingworld_pb2_grpc.add_MultiGreeterServicer_to_server(greeter_streaming, server)
     port = server.add_insecure_port("[::]:0")
     await server.start()
     yield port
@@ -314,9 +296,7 @@ async def grpc_service(
 
 
 @pytest.fixture(scope="function")
-async def http_service(
-    set_telemetry_settings, telemetry_grpc: GRPCTelemetry, grpc_service: int
-):
+async def http_service(set_telemetry_settings, telemetry_grpc: GRPCTelemetry, grpc_service: int):
     tracer_provider = get_telemetry("HTTP_SERVICE")
     await init_telemetry(tracer_provider)
     app = FastAPI(title="Test API")
@@ -346,9 +326,7 @@ async def http_service(
         with tracer.start_as_current_span("simple_stream_api_work") as _:
             channel = telemetry_grpc.init_client(f"localhost:{grpc_service}")
             stub = hellostreamingworld_pb2_grpc.MultiGreeterStub(channel)
-            async for sresponse in stub.sayHello(
-                helloworld_pb2.HelloRequest(name="you")
-            ):
+            async for sresponse in stub.sayHello(helloworld_pb2.HelloRequest(name="you")):
                 assert sresponse
         return response.message
 

@@ -81,9 +81,7 @@ class AuthHeaderAuthenticationBackend(NucliaCloudAuthenticationBackend):
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
 
-    async def authenticate(
-        self, request: HTTPConnection
-    ) -> Optional[tuple[AuthCredentials, BaseUser]]:
+    async def authenticate(self, request: HTTPConnection) -> Optional[tuple[AuthCredentials, BaseUser]]:
         token_resp = await authenticate_auth_token(self.settings, request)
         if token_resp is not None:
             return token_resp
@@ -94,9 +92,7 @@ class AuthHeaderAuthenticationBackend(NucliaCloudAuthenticationBackend):
         user = request.headers[self.settings.auth_policy_user_header]
         nuclia_user: BaseUser = NucliaUser(username=user)
 
-        auth_creds = AuthCredentials(
-            get_mapped_roles(settings=self.settings, data={"user": user})
-        )
+        auth_creds = AuthCredentials(get_mapped_roles(settings=self.settings, data={"user": user}))
 
         return auth_creds, nuclia_user
 
@@ -113,9 +109,7 @@ class OAuth2AuthenticationBackend(NucliaCloudAuthenticationBackend):
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
 
-    async def authenticate(
-        self, request: HTTPConnection
-    ) -> Optional[tuple[AuthCredentials, BaseUser]]:
+    async def authenticate(self, request: HTTPConnection) -> Optional[tuple[AuthCredentials, BaseUser]]:
         token_resp = await authenticate_auth_token(self.settings, request)
         if token_resp is not None:
             return token_resp
@@ -133,9 +127,7 @@ class OAuth2AuthenticationBackend(NucliaCloudAuthenticationBackend):
         try:
             token_data = orjson.loads(base64.b64decode(token_split[1] + "==="))
         except Exception:
-            logger.warning(
-                f"Could not parse jwt bearer token value: {token}", exc_info=True
-            )
+            logger.warning(f"Could not parse jwt bearer token value: {token}", exc_info=True)
             return None
 
         if "sub" not in token_data:
@@ -168,9 +160,7 @@ class BasicAuthAuthenticationBackend(NucliaCloudAuthenticationBackend):
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
 
-    async def authenticate(
-        self, request: HTTPConnection
-    ) -> Optional[tuple[AuthCredentials, BaseUser]]:
+    async def authenticate(self, request: HTTPConnection) -> Optional[tuple[AuthCredentials, BaseUser]]:
         token_resp = await authenticate_auth_token(self.settings, request)
         if token_resp is not None:
             return token_resp
@@ -186,9 +176,7 @@ class BasicAuthAuthenticationBackend(NucliaCloudAuthenticationBackend):
         user = token.split(":")[0]
 
         nuclia_user: BaseUser = NucliaUser(username=user)
-        auth_creds = AuthCredentials(
-            get_mapped_roles(settings=self.settings, data={"user": user})
-        )
+        auth_creds = AuthCredentials(get_mapped_roles(settings=self.settings, data={"user": user}))
 
         return auth_creds, nuclia_user
 
@@ -201,9 +189,7 @@ class UpstreamNaiveAuthenticationBackend(NucliaCloudAuthenticationBackend):
             user_header=settings.auth_policy_user_header,
         )
 
-    async def authenticate(
-        self, request: HTTPConnection
-    ) -> Optional[tuple[AuthCredentials, BaseUser]]:
+    async def authenticate(self, request: HTTPConnection) -> Optional[tuple[AuthCredentials, BaseUser]]:
         token_resp = await authenticate_auth_token(self.settings, request)
         if token_resp is not None:
             return token_resp

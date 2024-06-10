@@ -95,12 +95,8 @@ async def find_knowledgebox(
         ge=0,
     ),
     vectorset: Optional[str] = fastapi_query(SearchParamDefaults.vectorset),
-    range_creation_start: Optional[datetime] = fastapi_query(
-        SearchParamDefaults.range_creation_start
-    ),
-    range_creation_end: Optional[datetime] = fastapi_query(
-        SearchParamDefaults.range_creation_end
-    ),
+    range_creation_start: Optional[datetime] = fastapi_query(SearchParamDefaults.range_creation_start),
+    range_creation_end: Optional[datetime] = fastapi_query(SearchParamDefaults.range_creation_end),
     range_modification_start: Optional[datetime] = fastapi_query(
         SearchParamDefaults.range_modification_start
     ),
@@ -120,9 +116,7 @@ async def find_knowledgebox(
     field_type_filter: list[FieldTypeName] = fastapi_query(
         SearchParamDefaults.field_type_filter, alias="field_type"
     ),
-    extracted: list[ExtractedDataTypeName] = fastapi_query(
-        SearchParamDefaults.extracted
-    ),
+    extracted: list[ExtractedDataTypeName] = fastapi_query(SearchParamDefaults.extracted),
     with_duplicates: bool = fastapi_query(SearchParamDefaults.with_duplicates),
     with_synonyms: bool = fastapi_query(SearchParamDefaults.with_synonyms),
     autofilter: bool = fastapi_query(SearchParamDefaults.autofilter),
@@ -141,9 +135,7 @@ async def find_knowledgebox(
             filters=filters,
             page_number=page_number,
             page_size=page_size,
-            min_score=min_score_from_query_params(
-                min_score_bm25, min_score_semantic, min_score
-            ),
+            min_score=min_score_from_query_params(min_score_bm25, min_score_semantic, min_score),
             vectorset=vectorset,
             range_creation_end=range_creation_end,
             range_creation_start=range_creation_start,
@@ -164,9 +156,7 @@ async def find_knowledgebox(
         detail = json.loads(exc.json())
         return HTTPClientError(status_code=422, detail=detail)
 
-    return await _find_endpoint(
-        response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
-    )
+    return await _find_endpoint(response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for)
 
 
 @api.post(
@@ -189,9 +179,7 @@ async def find_post_knowledgebox(
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> Union[KnowledgeboxFindResults, HTTPClientError]:
-    return await _find_endpoint(
-        response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
-    )
+    return await _find_endpoint(response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for)
 
 
 async def _find_endpoint(
@@ -203,9 +191,7 @@ async def _find_endpoint(
     x_forwarded_for: str,
 ) -> Union[KnowledgeboxFindResults, HTTPClientError]:
     try:
-        results, incomplete, _ = await find(
-            kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
-        )
+        results, incomplete, _ = await find(kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for)
         response.status_code = 206 if incomplete else 200
         return results
     except KnowledgeBoxNotFound:

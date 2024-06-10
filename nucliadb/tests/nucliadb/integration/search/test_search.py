@@ -28,11 +28,6 @@ import pytest
 from httpx import AsyncClient
 from nats.aio.client import Client
 from nats.js import JetStreamContext
-from nucliadb_protos.audit_pb2 import AuditRequest, ClientType
-from nucliadb_protos.utils_pb2 import RelationNode
-from nucliadb_protos.writer_pb2 import BrokerMessage
-from nucliadb_protos.writer_pb2_grpc import WriterStub
-from tests.utils import broker_resource, inject_message
 
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.maindb.utils import get_driver
@@ -40,6 +35,10 @@ from nucliadb.ingest.consumer import shard_creator
 from nucliadb.search.predict import SendToPredictError
 from nucliadb.tests.vectors import V1
 from nucliadb_protos import resources_pb2 as rpb
+from nucliadb_protos.audit_pb2 import AuditRequest, ClientType
+from nucliadb_protos.utils_pb2 import RelationNode
+from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.exceptions import LimitsExceededError
 from nucliadb_utils.utilities import (
@@ -49,6 +48,7 @@ from nucliadb_utils.utilities import (
     get_storage,
     set_utility,
 )
+from tests.utils import broker_resource, inject_message
 
 
 @pytest.mark.asyncio
@@ -134,9 +134,7 @@ def broker_resource_with_duplicates(knowledgebox, sentence):
     return bm
 
 
-async def create_resource_with_duplicates(
-    knowledgebox, writer: WriterStub, sentence: str
-):
+async def create_resource_with_duplicates(knowledgebox, writer: WriterStub, sentence: str):
     bm = broker_resource_with_duplicates(knowledgebox, sentence=sentence)
     await inject_message(writer, bm)
     return bm.uuid
@@ -150,9 +148,7 @@ async def test_search_filters_out_duplicate_paragraphs(
     nucliadb_grpc: WriterStub,
     knowledgebox,
 ):
-    await create_resource_with_duplicates(
-        knowledgebox, nucliadb_grpc, sentence="My own text Ramon. "
-    )
+    await create_resource_with_duplicates(knowledgebox, nucliadb_grpc, sentence="My own text Ramon. ")
     await create_resource_with_duplicates(
         knowledgebox, nucliadb_grpc, sentence="Another different paragraph with text"
     )
@@ -165,17 +161,13 @@ async def test_search_filters_out_duplicate_paragraphs(
     assert len(content["paragraphs"]["results"]) == 2
 
     # It should filter out duplicates if specified
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search?query={query}&with_duplicates=false"
-    )
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query={query}&with_duplicates=false")
     assert resp.status_code == 200
     content = resp.json()
     assert len(content["paragraphs"]["results"]) == 2
 
     # It should return duplicates if specified
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search?query={query}&with_duplicates=true"
-    )
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query={query}&with_duplicates=true")
     assert resp.status_code == 200
     content = resp.json()
     assert len(content["paragraphs"]["results"]) == 4
@@ -190,9 +182,7 @@ async def test_search_returns_paragraph_positions(
     knowledgebox,
 ):
     sentence = "My own text Ramon."
-    await create_resource_with_duplicates(
-        knowledgebox, nucliadb_grpc, sentence=sentence
-    )
+    await create_resource_with_duplicates(knowledgebox, nucliadb_grpc, sentence=sentence)
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query=Ramon")
     assert resp.status_code == 200
     content = resp.json()
@@ -276,12 +266,10 @@ async def test_search_returns_labels(
     par = content["paragraphs"]["results"][0]
     assert par["labels"] == ["labelset1/label2", "labelset1/label1"]
 
-    extracted_metadata = content["resources"][bm.uuid]["data"]["files"]["file"][
-        "extracted"
-    ]["metadata"]["metadata"]
-    assert extracted_metadata["classifications"] == [
-        {"label": "label1", "labelset": "labelset1"}
+    extracted_metadata = content["resources"][bm.uuid]["data"]["files"]["file"]["extracted"]["metadata"][
+        "metadata"
     ]
+    assert extracted_metadata["classifications"] == [{"label": "label1", "labelset": "labelset1"}]
 
 
 @pytest.mark.asyncio
@@ -332,9 +320,7 @@ async def test_paragraph_search_with_filters(
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
 
-    resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/resource/{rid}/search?query=mushrooms"
-    )
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}/search?query=mushrooms")
     assert resp.status_code == 200
     body = resp.json()
     paragraph_results = body["paragraphs"]["results"]
@@ -630,9 +616,7 @@ async def test_search_relations(
 
     for entity in expected:
         assert entity in entities
-        assert len(entities[entity]["related_to"]) == len(
-            expected[entity]["related_to"]
-        )
+        assert len(entities[entity]["related_to"]) == len(expected[entity]["related_to"])
 
         for expected_relation in expected[entity]["related_to"]:
             assert expected_relation in entities[entity]["related_to"]
@@ -672,9 +656,7 @@ async def test_search_relations(
 
     for entity in expected:
         assert entity in entities
-        assert len(entities[entity]["related_to"]) == len(
-            expected[entity]["related_to"]
-        )
+        assert len(entities[entity]["related_to"]) == len(expected[entity]["related_to"])
 
         for expected_relation in expected[entity]["related_to"]:
             assert expected_relation in entities[entity]["related_to"]
@@ -895,13 +877,11 @@ async def test_search_automatic_relations(
 
     for entity in expected:
         assert entity in entities
-        assert len(entities[entity]["related_to"]) == len(
-            expected[entity]["related_to"]
-        )
+        assert len(entities[entity]["related_to"]) == len(expected[entity]["related_to"])
 
-        assert sorted(
-            expected[entity]["related_to"], key=lambda x: x["entity"]
-        ) == sorted(entities[entity]["related_to"], key=lambda x: x["entity"])
+        assert sorted(expected[entity]["related_to"], key=lambda x: x["entity"]) == sorted(
+            entities[entity]["related_to"], key=lambda x: x["entity"]
+        )
 
     # Search a colaborator
     rn = RelationNode(
@@ -936,13 +916,11 @@ async def test_search_automatic_relations(
 
     for entity in expected:
         assert entity in entities
-        assert len(entities[entity]["related_to"]) == len(
-            expected[entity]["related_to"]
-        )
+        assert len(entities[entity]["related_to"]) == len(expected[entity]["related_to"])
 
-        assert sorted(
-            expected[entity]["related_to"], key=lambda x: x["entity"]
-        ) == sorted(entities[entity]["related_to"], key=lambda x: x["entity"])
+        assert sorted(expected[entity]["related_to"], key=lambda x: x["entity"]) == sorted(
+            entities[entity]["related_to"], key=lambda x: x["entity"]
+        )
 
 
 @pytest.mark.asyncio
@@ -995,9 +973,7 @@ async def test_search_and_suggest_sent_audit(
     jetstream: JetStreamContext = client.jetstream()
     if audit_settings.audit_jetstream_target is None:
         assert False, "Missing jetstream target in audit settings"
-    subject = audit_settings.audit_jetstream_target.format(
-        partition=partition, type="*"
-    )
+    subject = audit_settings.audit_jetstream_target.format(partition=partition, type="*")
 
     set_utility(Utility.AUDIT, stream_audit)
     try:
@@ -1009,18 +985,14 @@ async def test_search_and_suggest_sent_audit(
     psub = await jetstream.pull_subscribe(subject, "psub")
 
     # Test search sends audit
-    resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/search", headers={"x-ndb-client": "chrome_extension"}
-    )
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/search", headers={"x-ndb-client": "chrome_extension"})
     assert resp.status_code == 200
 
     auditreq = await get_audit_messages(psub)
 
     assert auditreq.kbid == kbid
     assert auditreq.type == AuditRequest.AuditType.SEARCH
-    assert (
-        auditreq.client_type == ClientType.CHROME_EXTENSION
-    )  # Just to use other that the enum default
+    assert auditreq.client_type == ClientType.CHROME_EXTENSION  # Just to use other that the enum default
     try:
         int(auditreq.trace_id)
     except ValueError:
@@ -1036,9 +1008,7 @@ async def test_search_and_suggest_sent_audit(
 
     assert auditreq.kbid == kbid
     assert auditreq.type == AuditRequest.AuditType.SUGGEST
-    assert (
-        auditreq.client_type == ClientType.CHROME_EXTENSION
-    )  # Just to use other that the enum default
+    assert auditreq.client_type == ClientType.CHROME_EXTENSION  # Just to use other that the enum default
 
     try:
         int(auditreq.trace_id)
@@ -1138,9 +1108,7 @@ async def test_resource_search_pagination(
         bm.extracted_text.append(etw)
 
         fcm = rpb.FieldComputedMetadataWrapper()
-        paragraph = rpb.Paragraph(
-            start=0, end=len(text), kind=rpb.Paragraph.TypeParagraph.TEXT
-        )
+        paragraph = rpb.Paragraph(start=0, end=len(text), kind=rpb.Paragraph.TypeParagraph.TEXT)
         fcm.metadata.metadata.paragraphs.append(paragraph)
         fcm.field.field = id
         fcm.field.field_type = rpb.FieldType.TEXT
@@ -1231,13 +1199,9 @@ async def create_dummy_resources(
         message = BrokerMessage()
         message.kbid = kbid
         message.uuid = uuid
-        message.texts["text"].body = (
-            "My own text Ramon. This is great to be here. \n Where is my beer?"
-        )
+        message.texts["text"].body = "My own text Ramon. This is great to be here. \n Where is my beer?"
         etw = rpb.ExtractedTextWrapper()
-        etw.body.text = (
-            "My own text Ramon. This is great to be here. \n Where is my beer?"
-        )
+        etw.body.text = "My own text Ramon. This is great to be here. \n Where is my beer?"
         etw.field.field = "text"
         etw.field.field_type = rpb.FieldType.FILE
         message.extracted_text.append(etw)
@@ -1289,7 +1253,9 @@ async def kb_with_two_logic_shards(
     nucliadb_grpc: WriterStub,
 ):
     sc = shard_creator.ShardCreatorHandler(
-        driver=get_driver(), storage=await get_storage(), pubsub=None  # type: ignore
+        driver=get_driver(),
+        storage=await get_storage(),
+        pubsub=None,  # type: ignore
     )
     resp = await nucliadb_manager.post("/kbs", json={})
     assert resp.status_code == 201
@@ -1332,15 +1298,11 @@ async def test_search_two_logic_shards(
     # Check that search returns the same results
     resp1 = await nucliadb_reader.post(
         f"/kb/{kbid1}/search",
-        json=dict(
-            query="dummy", vector=V1, min_score={"semantic": -1}, with_duplicates=True
-        ),
+        json=dict(query="dummy", vector=V1, min_score={"semantic": -1}, with_duplicates=True),
     )
     resp2 = await nucliadb_reader.post(
         f"/kb/{kbid2}/search",
-        json=dict(
-            query="dummy", vector=V1, min_score={"semantic": -1}, with_duplicates=True
-        ),
+        json=dict(query="dummy", vector=V1, min_score={"semantic": -1}, with_duplicates=True),
     )
     assert resp1.status_code == resp2.status_code == 200
     content1 = resp1.json()
@@ -1349,15 +1311,9 @@ async def test_search_two_logic_shards(
     assert len(content1["shards"]) == 1
     assert len(content2["shards"]) == 2
 
-    assert (
-        len(content1["paragraphs"]["results"])
-        == len(content2["paragraphs"]["results"])
-        == 20
-    )
+    assert len(content1["paragraphs"]["results"]) == len(content2["paragraphs"]["results"]) == 20
 
-    assert len(content1["sentences"]["results"]) == len(
-        content2["sentences"]["results"]
-    )
+    assert len(content1["sentences"]["results"]) == len(content2["sentences"]["results"])
 
 
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
@@ -1366,9 +1322,7 @@ async def test_search_min_score(
     knowledgebox,
 ):
     # When not specifying the min score on the request, it should default to 0.7
-    resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/search", json={"query": "dummy"}
-    )
+    resp = await nucliadb_reader.post(f"/kb/{knowledgebox}/search", json={"query": "dummy"})
     assert resp.status_code == 200
     assert resp.json()["sentences"]["min_score"] == 0.7
 
@@ -1420,9 +1374,7 @@ async def test_facets_validation(
         for method in ("post", "get"):
             func = getattr(nucliadb_reader, method)
             kwargs = (
-                {"params": {"faceted": facets}}
-                if method == "get"
-                else {"json": {"faceted": facets}}
+                {"params": {"faceted": facets}} if method == "get" else {"json": {"faceted": facets}}
             )
             resp = await func(f"/kb/{kbid}/{endpoint}", **kwargs)
             if valid:
@@ -1523,23 +1475,17 @@ async def test_search_by_path_filter(
     assert len(resp.json()["resources"]) == len(paths)
 
     # Get the list of all
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search?filters=/origin.path/foo"
-    )
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?filters=/origin.path/foo")
     assert resp.status_code == 200
     assert len(resp.json()["resources"]) == len(paths)
 
     # Get the list of under foo/bar
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search?filters=/origin.path/foo/bar"
-    )
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?filters=/origin.path/foo/bar")
     assert resp.status_code == 200
     assert len(resp.json()["resources"]) == len(paths) - 1
 
     # Get the list of under foo/bar/4
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search?filters=/origin.path/foo/bar/4"
-    )
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?filters=/origin.path/foo/bar/4")
     assert resp.status_code == 200
     assert len(resp.json()["resources"]) == 1
 
@@ -1659,18 +1605,14 @@ def not_debug():
     running_settings.debug = prev
 
 
-async def test_api_does_not_show_tracebacks_on_api_errors(
-    not_debug, nucliadb_reader: AsyncClient
-):
+async def test_api_does_not_show_tracebacks_on_api_errors(not_debug, nucliadb_reader: AsyncClient):
     with mock.patch(
         "nucliadb.search.api.v1.search.search",
         side_effect=Exception("Something went wrong"),
     ):
         resp = await nucliadb_reader.get("/kb/foobar/search", timeout=None)
         assert resp.status_code == 500
-        assert resp.json() == {
-            "detail": "Something went wrong, please contact your administrator"
-        }
+        assert resp.json() == {"detail": "Something went wrong, please contact your administrator"}
 
 
 @pytest.mark.asyncio
@@ -1714,9 +1656,7 @@ async def test_catalog_pagination(
         body = resp.json()
         assert len(body["resources"]) <= page_size
         for resource_id, resource_data in body["resources"].items():
-            resource_created_date = datetime.fromisoformat(
-                resource_data["created"]
-            ).timestamp()
+            resource_created_date = datetime.fromisoformat(resource_data["created"]).timestamp()
             if resource_id in resource_uuids:
                 assert False, f"Resource {resource_id} already seen"
             resource_uuids.append(resource_id)

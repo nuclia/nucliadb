@@ -28,7 +28,6 @@ from typing import Optional
 from async_lru import alru_cache
 from cachetools import TTLCache
 from fastapi import HTTPException, Request
-from nucliadb_protos.writer_pb2 import ShardObject
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.manager import get_index_nodes
@@ -37,6 +36,7 @@ from nucliadb.common.context.fastapi import get_app_context
 from nucliadb.common.http_clients.processing import ProcessingHTTPClient
 from nucliadb.writer import logger
 from nucliadb.writer.settings import back_pressure_settings as settings
+from nucliadb_protos.writer_pb2 import ShardObject
 from nucliadb_telemetry import metrics
 from nucliadb_utils import const
 from nucliadb_utils.nats import NatsConnectionManager
@@ -112,9 +112,7 @@ def cached_back_pressure(kbid: str, resource_uuid: Optional[str] = None):
     if data is not None:
         try_after = data.try_after
         back_pressure_type = data.type
-        RATE_LIMITED_REQUESTS_COUNTER.inc(
-            {"type": back_pressure_type, "cached": "true"}
-        )
+        RATE_LIMITED_REQUESTS_COUNTER.inc({"type": back_pressure_type, "cached": "true"})
         logger.info(
             "Back pressure applied from cache",
             extra={
@@ -137,9 +135,7 @@ def cached_back_pressure(kbid: str, resource_uuid: Optional[str] = None):
     except BackPressureException as exc:
         try_after = exc.data.try_after
         back_pressure_type = exc.data.type
-        RATE_LIMITED_REQUESTS_COUNTER.inc(
-            {"type": back_pressure_type, "cached": "false"}
-        )
+        RATE_LIMITED_REQUESTS_COUNTER.inc({"type": back_pressure_type, "cached": "false"})
         _cache.set(cache_key, exc.data)
         raise HTTPException(
             status_code=429,
@@ -248,14 +244,10 @@ class Materializer:
                 for node in get_index_nodes():
                     try:
                         with back_pressure_observer({"type": "get_indexing_pending"}):
-                            self.indexing_pending[node.id] = (
-                                await get_nats_consumer_pending_messages(
-                                    self.nats_manager,
-                                    stream=const.Streams.INDEX.name,
-                                    consumer=const.Streams.INDEX.group.format(
-                                        node=node.id
-                                    ),
-                                )
+                            self.indexing_pending[node.id] = await get_nats_consumer_pending_messages(
+                                self.nats_manager,
+                                stream=const.Streams.INDEX.name,
+                                consumer=const.Streams.INDEX.group.format(node=node.id),
                             )
                     except Exception:
                         logger.exception(
@@ -336,9 +328,7 @@ def get_materializer() -> Materializer:
     return MATERIALIZER
 
 
-async def maybe_back_pressure(
-    request: Request, kbid: str, resource_uuid: Optional[str] = None
-) -> None:
+async def maybe_back_pressure(request: Request, kbid: str, resource_uuid: Optional[str] = None) -> None:
     """
     This function does system checks to see if we need to put back pressure on writes.
     In that case, a HTTP 429 will be raised with the estimated time to try again.
@@ -348,9 +338,7 @@ async def maybe_back_pressure(
     await back_pressure_checks(request, kbid, resource_uuid)
 
 
-async def back_pressure_checks(
-    request: Request, kbid: str, resource_uuid: Optional[str] = None
-):
+async def back_pressure_checks(request: Request, kbid: str, resource_uuid: Optional[str] = None):
     """
     Will raise a 429 if back pressure is needed:
     - If the processing engine is behind.
@@ -361,9 +349,7 @@ async def back_pressure_checks(
     materializer = get_materializer()
     with cached_back_pressure(kbid, resource_uuid):
         check_ingest_behind(materializer.get_ingest_pending())
-        await check_indexing_behind(
-            context, kbid, resource_uuid, materializer.get_indexing_pending()
-        )
+        await check_indexing_behind(context, kbid, resource_uuid, materializer.get_indexing_pending())
         await check_processing_behind(materializer, kbid)
 
 
@@ -418,9 +404,7 @@ async def check_indexing_behind(
 
     # Get nodes that are involved in the indexing of the request
     if resource_uuid is not None:
-        nodes_to_check = await get_nodes_for_resource_shard(
-            context, kbid, resource_uuid
-        )
+        nodes_to_check = await get_nodes_for_resource_shard(context, kbid, resource_uuid)
     else:
         nodes_to_check = await get_nodes_for_kb_active_shards(context, kbid)
 
@@ -488,9 +472,7 @@ def estimate_try_after(rate: float, pending: int, max_wait: int) -> datetime:
 
 
 @alru_cache(maxsize=1024, ttl=60 * 15)
-async def get_nodes_for_kb_active_shards(
-    context: ApplicationContext, kbid: str
-) -> list[str]:
+async def get_nodes_for_kb_active_shards(context: ApplicationContext, kbid: str) -> list[str]:
     with back_pressure_observer({"type": "get_kb_active_shard"}):
         active_shard = await get_kb_active_shard(context, kbid)
     if active_shard is None:
@@ -521,9 +503,7 @@ async def get_nats_consumer_pending_messages(
     return consumer_info.num_pending
 
 
-async def get_kb_active_shard(
-    context: ApplicationContext, kbid: str
-) -> Optional[ShardObject]:
+async def get_kb_active_shard(context: ApplicationContext, kbid: str) -> Optional[ShardObject]:
     async with context.kv_driver.transaction() as txn:
         return await context.shard_manager.get_current_active_shard(txn, kbid)
 
@@ -532,9 +512,7 @@ async def get_resource_shard(
     context: ApplicationContext, kbid: str, resource_uuid: str
 ) -> Optional[ShardObject]:
     async with datamanagers.with_ro_transaction() as txn:
-        shard_id = await datamanagers.resources.get_resource_shard_id(
-            txn, kbid=kbid, rid=resource_uuid
-        )
+        shard_id = await datamanagers.resources.get_resource_shard_id(txn, kbid=kbid, rid=resource_uuid)
         if shard_id is None:
             # Resource does not exist
             logger.debug(

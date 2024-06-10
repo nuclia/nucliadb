@@ -44,7 +44,9 @@ class NatsTaskProducer:
     async def initialize(self, context: ApplicationContext):
         self.context = context
         await create_nats_stream_if_not_exists(
-            self.context, self.stream.name, subjects=[self.stream.subject]  # type: ignore
+            self.context,
+            self.stream.name,  # type: ignore
+            subjects=[self.stream.subject],  # type: ignore
         )
         self.initialized = True
 
@@ -57,7 +59,8 @@ class NatsTaskProducer:
             raise RuntimeError("NatsTaskProducer not initialized")
         try:
             pub_ack = await self.context.nats_manager.js.publish(  # type: ignore
-                self.stream.subject, msg.json().encode("utf-8")  # type: ignore
+                self.stream.subject,  # type: ignore
+                msg.json().encode("utf-8"),  # type: ignore
             )
             logger.info(
                 "Message sent to Nats",
@@ -93,8 +96,6 @@ async def get_producer(task_name: str, context: ApplicationContext) -> NatsTaskP
         task = get_registered_task(task_name)
     except KeyError:
         raise ValueError(f"Task {task_name} not registered")
-    producer = create_producer(
-        name=f"{task_name}_producer", stream=task.stream, msg_type=task.msg_type
-    )
+    producer = create_producer(name=f"{task_name}_producer", stream=task.stream, msg_type=task.msg_type)
     await producer.initialize(context)
     return producer

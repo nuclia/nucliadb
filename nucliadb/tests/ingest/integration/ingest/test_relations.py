@@ -20,6 +20,8 @@
 import uuid
 
 import pytest
+
+from nucliadb.ingest import SERVICE_NAME
 from nucliadb_protos.resources_pb2 import (
     Classification,
     FieldComputedMetadataWrapper,
@@ -29,8 +31,6 @@ from nucliadb_protos.resources_pb2 import (
 )
 from nucliadb_protos.utils_pb2 import Relation, RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage
-
-from nucliadb.ingest import SERVICE_NAME
 from nucliadb_utils.utilities import get_indexing, get_storage
 
 
@@ -39,26 +39,14 @@ async def test_ingest_relations_indexing(
     fake_node, local_files, storage, knowledgebox_ingest, processor
 ):
     rid = str(uuid.uuid4())
-    bm = BrokerMessage(
-        kbid=knowledgebox_ingest, uuid=rid, slug="slug-1", type=BrokerMessage.AUTOCOMMIT
-    )
+    bm = BrokerMessage(kbid=knowledgebox_ingest, uuid=rid, slug="slug-1", type=BrokerMessage.AUTOCOMMIT)
 
     e0 = RelationNode(value="E0", ntype=RelationNode.NodeType.ENTITY, subtype="")
-    e1 = RelationNode(
-        value="E1", ntype=RelationNode.NodeType.ENTITY, subtype="Official"
-    )
-    e2 = RelationNode(
-        value="E2", ntype=RelationNode.NodeType.ENTITY, subtype="Propaganda"
-    )
-    r0 = Relation(
-        relation=Relation.RelationType.CHILD, source=e1, to=e2, relation_label="R0"
-    )
-    r1 = Relation(
-        relation=Relation.RelationType.ENTITY, source=e0, to=e2, relation_label="R1"
-    )
-    r2 = Relation(
-        relation=Relation.RelationType.CHILD, source=e0, to=e1, relation_label="R2"
-    )
+    e1 = RelationNode(value="E1", ntype=RelationNode.NodeType.ENTITY, subtype="Official")
+    e2 = RelationNode(value="E2", ntype=RelationNode.NodeType.ENTITY, subtype="Propaganda")
+    r0 = Relation(relation=Relation.RelationType.CHILD, source=e1, to=e2, relation_label="R0")
+    r1 = Relation(relation=Relation.RelationType.ENTITY, source=e0, to=e2, relation_label="R1")
+    r2 = Relation(relation=Relation.RelationType.CHILD, source=e0, to=e1, relation_label="R2")
 
     bm.relations.extend([r0, r1, r2])
 
@@ -80,9 +68,7 @@ async def test_ingest_label_relation_extraction(
     fake_node, local_files, storage, knowledgebox_ingest, processor
 ):
     rid = str(uuid.uuid4())
-    bm = BrokerMessage(
-        kbid=knowledgebox_ingest, uuid=rid, slug="slug-1", type=BrokerMessage.AUTOCOMMIT
-    )
+    bm = BrokerMessage(kbid=knowledgebox_ingest, uuid=rid, slug="slug-1", type=BrokerMessage.AUTOCOMMIT)
 
     labels = [
         ("labelset-1", "label-1"),
@@ -112,9 +98,7 @@ async def test_ingest_colab_relation_extraction(
     fake_node, local_files, storage, knowledgebox_ingest, processor
 ):
     rid = str(uuid.uuid4())
-    bm = BrokerMessage(
-        kbid=knowledgebox_ingest, uuid=rid, slug="slug-1", type=BrokerMessage.AUTOCOMMIT
-    )
+    bm = BrokerMessage(kbid=knowledgebox_ingest, uuid=rid, slug="slug-1", type=BrokerMessage.AUTOCOMMIT)
 
     collaborators = ["Alice", "Bob", "Trudy"]
     bm.origin.colaborators.extend(collaborators)
@@ -179,16 +163,12 @@ async def test_ingest_field_metadata_relation_extraction(
         Relation(
             relation=Relation.RelationType.ENTITY,
             source=RelationNode(value=rid, ntype=RelationNode.NodeType.RESOURCE),
-            to=RelationNode(
-                value="value-1", ntype=RelationNode.NodeType.ENTITY, subtype="subtype-1"
-            ),
+            to=RelationNode(value="value-1", ntype=RelationNode.NodeType.ENTITY, subtype="subtype-1"),
         ),
         Relation(
             relation=Relation.RelationType.ENTITY,
             source=RelationNode(value=rid, ntype=RelationNode.NodeType.RESOURCE),
-            to=RelationNode(
-                value="value-2", ntype=RelationNode.NodeType.ENTITY, subtype="subtype-1"
-            ),
+            to=RelationNode(value="value-2", ntype=RelationNode.NodeType.ENTITY, subtype="subtype-1"),
         ),
         # From classification metadata
         Relation(
@@ -209,13 +189,9 @@ async def test_ingest_field_relations_relation_extraction(
     fake_node, local_files, storage, knowledgebox_ingest, processor
 ):
     rid = str(uuid.uuid4())
-    bm = BrokerMessage(
-        kbid=knowledgebox_ingest, uuid=rid, slug="slug-1", type=BrokerMessage.AUTOCOMMIT
-    )
+    bm = BrokerMessage(kbid=knowledgebox_ingest, uuid=rid, slug="slug-1", type=BrokerMessage.AUTOCOMMIT)
 
-    relationnode = RelationNode(
-        value=rid, ntype=RelationNode.NodeType.RESOURCE, subtype="subtype-1"
-    )
+    relationnode = RelationNode(value=rid, ntype=RelationNode.NodeType.RESOURCE, subtype="subtype-1")
     test_relations = [
         Relation(
             relation=Relation.RelationType.CHILD,

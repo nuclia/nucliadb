@@ -69,9 +69,7 @@ async def test_external_file_field(
     assert resp.status_code == 201
 
     # Check that the uri was saved and that the source type is set to external
-    resp = await nucliadb_reader.get(
-        f"{kb_path}/{RESOURCE_PREFIX}/{resource}?show=values&show=basic"
-    )
+    resp = await nucliadb_reader.get(f"{kb_path}/{RESOURCE_PREFIX}/{resource}?show=values&show=basic")
     assert resp.status_code == 200
     body = resp.json()
     assert body["icon"] == "video/webm"
@@ -90,9 +88,7 @@ async def test_external_file_field(
     )
     assert resp.status_code == 200
 
-    resp = await nucliadb_reader.get(
-        f"{kb_path}/{RESOURCE_PREFIX}/{resource}?show=values"
-    )
+    resp = await nucliadb_reader.get(f"{kb_path}/{RESOURCE_PREFIX}/{resource}?show=values")
     assert resp.status_code == 200
     data = resp.json()["data"]
 

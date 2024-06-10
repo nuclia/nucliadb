@@ -21,15 +21,15 @@ import os
 from typing import Callable
 
 import pytest
-import tests.ingest.fixtures
 from httpx import AsyncClient
-from nucliadb_protos.resources_pb2 import FieldType
-from tests.ingest.fixtures import TEST_CLOUDFILE, THUMBNAIL
 
+import tests.ingest.fixtures
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.reader.api.v1.download import parse_media_range, safe_http_header_encode
 from nucliadb.reader.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX
 from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_protos.resources_pb2 import FieldType
+from tests.ingest.fixtures import TEST_CLOUDFILE, THUMBNAIL
 
 BASE = ("field_id", "field_type")
 VALUE = ("value",)
@@ -53,7 +53,9 @@ async def test_resource_download_extracted_file(
             f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/{field_type}/{field_id}/download/{download_type}/{download_field}",  # noqa
         )
         assert resp.status_code == 200
-        filename = f"{os.path.dirname(tests.ingest.fixtures.__file__)}{THUMBNAIL.bucket_name}/{THUMBNAIL.uri}"
+        filename = (
+            f"{os.path.dirname(tests.ingest.fixtures.__file__)}{THUMBNAIL.bucket_name}/{THUMBNAIL.uri}"
+        )
 
         open(filename, "rb").read() == resp.content
 
@@ -71,10 +73,7 @@ async def test_resource_download_field_file(
         resp = await client.get(
             f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}?show=values",
         )
-        assert (
-            resp.json()["data"]["files"]["file1"]["value"]["file"]["filename"]
-            == "text.pb"
-        )
+        assert resp.json()["data"]["files"]["file1"]["value"]["file"]["filename"] == "text.pb"
 
         # Check that invalid range is handled
         resp = await client.get(
@@ -109,8 +108,7 @@ async def test_resource_download_field_file(
         assert resp.status_code == 200
 
         assert (
-            resp.json()["data"]["texts"]["text1"]["value"]["md5"]
-            == "74a3187271f1d526b1f6271bfb7df52e"
+            resp.json()["data"]["texts"]["text1"]["value"]["md5"] == "74a3187271f1d526b1f6271bfb7df52e"
         )
         assert (
             resp.json()["data"]["files"]["file1"]["value"]["file"]["md5"]
@@ -154,7 +152,9 @@ async def test_resource_download_field_conversation(
             f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/conversation/{field_id}/download/field/{msg_id}/{file_id}",
         )
         assert resp.status_code == 200
-        filename = f"{os.path.dirname(tests.ingest.fixtures.__file__)}/{THUMBNAIL.bucket_name}/{THUMBNAIL.uri}"  # noqa
+        filename = (
+            f"{os.path.dirname(tests.ingest.fixtures.__file__)}/{THUMBNAIL.bucket_name}/{THUMBNAIL.uri}"  # noqa
+        )
         assert open(filename, "rb").read() == resp.content
 
 
@@ -252,9 +252,7 @@ async def test_resource_download_field_file_content_disposition(
     kbid = rsc.kb.kbid
     rid = rsc.uuid
     field_id = "file1"
-    download_url = (
-        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/download/field"
-    )
+    download_url = f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/download/field"
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         # Defaults to attachment
         resp = await client.get(download_url)

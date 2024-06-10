@@ -23,8 +23,6 @@ from nucliadb.migrator.utils import get_migrations
 
 
 def get_migration(version: int) -> Migration:
-    migration: Migration = get_migrations(from_version=version - 1, to_version=version)[
-        0
-    ]
+    migration: Migration = get_migrations(from_version=version - 1, to_version=version)[0]
     assert migration.version == version
     return migration

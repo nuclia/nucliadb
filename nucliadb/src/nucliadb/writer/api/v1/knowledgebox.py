@@ -22,15 +22,6 @@ import json
 
 from fastapi import HTTPException, Response
 from fastapi_versioning import version
-from nucliadb_protos.knowledgebox_pb2 import (
-    DeleteKnowledgeBoxResponse,
-    KnowledgeBoxID,
-    KnowledgeBoxNew,
-    KnowledgeBoxResponseStatus,
-    KnowledgeBoxUpdate,
-    NewKnowledgeBoxResponse,
-    UpdateKnowledgeBoxResponse,
-)
 from starlette.requests import Request
 
 from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX, api
@@ -40,6 +31,15 @@ from nucliadb_models.resource import (
     KnowledgeBoxObj,
     KnowledgeBoxObjID,
     NucliaDBRoles,
+)
+from nucliadb_protos.knowledgebox_pb2 import (
+    DeleteKnowledgeBoxResponse,
+    KnowledgeBoxID,
+    KnowledgeBoxNew,
+    KnowledgeBoxResponseStatus,
+    KnowledgeBoxUpdate,
+    NewKnowledgeBoxResponse,
+    UpdateKnowledgeBoxResponse,
 )
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.utilities import get_ingest

@@ -32,15 +32,9 @@ pytestmark = pytest.mark.asyncio
 @pytest.fixture()
 def available_nodes():
     nodes = {
-        "0": IndexNode(
-            id="0", address="node-0", available_disk=100, shard_count=0, dummy=True
-        ),
-        "1": IndexNode(
-            id="1", address="node-1", available_disk=100, shard_count=0, dummy=True
-        ),
-        "2": IndexNode(
-            id="2", address="node-2", available_disk=100, shard_count=0, dummy=True
-        ),
+        "0": IndexNode(id="0", address="node-0", available_disk=100, shard_count=0, dummy=True),
+        "1": IndexNode(id="1", address="node-1", available_disk=100, shard_count=0, dummy=True),
+        "2": IndexNode(id="2", address="node-2", available_disk=100, shard_count=0, dummy=True),
     }
     with patch.object(manager, "INDEX_NODES", new=nodes):
         yield nodes
@@ -174,9 +168,9 @@ async def test_create_rollover_shards(
     new_shards = await rollover.create_rollover_shards(app_context, "kbid")
 
     assert new_shards.kbid == "kbid"
-    assert sum(
-        [len(node.writer.calls["NewShard"]) for node in available_nodes.values()]
-    ) == sum([len(s.replicas) for s in shards.shards])
+    assert sum([len(node.writer.calls["NewShard"]) for node in available_nodes.values()]) == sum(
+        [len(s.replicas) for s in shards.shards]
+    )
     rollover_datamanager.update_kb_rollover_shards.assert_called_with(
         ANY, kbid="kbid", kb_shards=new_shards
     )
@@ -227,25 +221,16 @@ async def test_index_rollover_shards_handles_missing_res(
 
     await rollover.index_rollover_shards(app_context, "kbid")
 
-    rollover_datamanager.remove_to_index.assert_called_with(
-        ANY, kbid="kbid", resource="1"
-    )
+    rollover_datamanager.remove_to_index.assert_called_with(ANY, kbid="kbid", resource="1")
 
 
-async def test_cutover_shards(
-    app_context, rollover_datamanager, cluster_datamanager, shards
-):
+async def test_cutover_shards(app_context, rollover_datamanager, cluster_datamanager, shards):
     rollover_datamanager.get_kb_rollover_shards.return_value = shards
 
     await rollover.cutover_shards(app_context, "kbid")
 
-    cluster_datamanager.update_kb_shards.assert_called_with(
-        ANY, kbid="kbid", shards=ANY
-    )
-    [
-        app_context.shard_manager.rollback_shard.assert_any_call(shard)
-        for shard in shards.shards
-    ]
+    cluster_datamanager.update_kb_shards.assert_called_with(ANY, kbid="kbid", shards=ANY)
+    [app_context.shard_manager.rollback_shard.assert_any_call(shard) for shard in shards.shards]
 
 
 async def test_cutover_shards_missing(app_context, rollover_datamanager):

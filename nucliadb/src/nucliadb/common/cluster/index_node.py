@@ -20,12 +20,12 @@
 from typing import Optional
 
 from lru import LRU
-from nucliadb_protos.nodereader_pb2_grpc import NodeReaderStub
-from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
 
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.grpc_node_dummy import DummyReaderStub, DummyWriterStub
 from nucliadb.ingest import SERVICE_NAME
+from nucliadb_protos.nodereader_pb2_grpc import NodeReaderStub
+from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
 from nucliadb_utils.grpc import get_traced_grpc_channel
 
 from .settings import settings
@@ -38,9 +38,7 @@ class IndexNode(AbstractIndexNode):
     _writer: Optional[NodeWriterStub] = None
     _reader: Optional[NodeReaderStub] = None
 
-    def _get_service_address(
-        self, port_map: dict[str, int], port: Optional[int]
-    ) -> str:
+    def _get_service_address(self, port_map: dict[str, int], port: Optional[int]) -> str:
         hostname = self.address.split(":")[0]
         if port is None:
             # For testing purposes we need to be able to have a writing port
@@ -57,9 +55,7 @@ class IndexNode(AbstractIndexNode):
                 grpc_address = self._get_service_address(
                     settings.writer_port_map, settings.node_writer_port
                 )
-                channel = get_traced_grpc_channel(
-                    grpc_address, SERVICE_NAME, variant="_writer"
-                )
+                channel = get_traced_grpc_channel(grpc_address, SERVICE_NAME, variant="_writer")
                 WRITE_CONNECTIONS[self.address] = NodeWriterStub(channel)
             else:
                 WRITE_CONNECTIONS[self.address] = DummyWriterStub()
@@ -73,9 +69,7 @@ class IndexNode(AbstractIndexNode):
                 grpc_address = self._get_service_address(
                     settings.reader_port_map, settings.node_reader_port
                 )
-                channel = get_traced_grpc_channel(
-                    grpc_address, SERVICE_NAME, variant="_reader"
-                )
+                channel = get_traced_grpc_channel(grpc_address, SERVICE_NAME, variant="_reader")
                 READ_CONNECTIONS[self.address] = NodeReaderStub(channel)
             else:
                 READ_CONNECTIONS[self.address] = DummyReaderStub()

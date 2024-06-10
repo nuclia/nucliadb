@@ -23,10 +23,10 @@ from typing import Optional
 from uuid import uuid4
 
 import pytest
-from nucliadb_protos.resources_pb2 import CloudFile, FieldType, LinkExtractedData
 
 from nucliadb.ingest.fields.link import Link
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb_protos.resources_pb2 import CloudFile, FieldType, LinkExtractedData
 from nucliadb_utils.storages.storage import Storage
 
 

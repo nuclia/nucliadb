@@ -31,12 +31,8 @@ async def test_main():
         patch("nucliadb_sidecar.app.get_storage", AsyncMock()) as storage,
         patch("nucliadb_sidecar.app.start_worker", AsyncMock()) as start_worker,
         patch("nucliadb_sidecar.app.start_nats_manager", AsyncMock()) as _,
-        patch(
-            "nucliadb_sidecar.app.stop_nats_manager", AsyncMock()
-        ) as stop_nats_manager,
-        patch(
-            "nucliadb_sidecar.app.start_indexed_publisher", AsyncMock()
-        ) as start_indexed_publisher,
+        patch("nucliadb_sidecar.app.stop_nats_manager", AsyncMock()) as stop_nats_manager,
+        patch("nucliadb_sidecar.app.start_indexed_publisher", AsyncMock()) as start_indexed_publisher,
         patch("nucliadb_sidecar.app.start_grpc", AsyncMock()) as start_grpc,
         patch("nucliadb_sidecar.app.serve_metrics", AsyncMock()) as serve_metrics,
         patch("nucliadb_sidecar.app.run_until_exit", AsyncMock()) as run_until_exit,

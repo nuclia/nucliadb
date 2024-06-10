@@ -29,13 +29,8 @@ import pytest
 import tikv_client  # type: ignore
 from grpc import aio
 from httpx import AsyncClient
-from nucliadb_protos.train_pb2_grpc import TrainStub
-from nucliadb_protos.utils_pb2 import Relation, RelationNode
-from nucliadb_protos.writer_pb2 import BrokerMessage
-from nucliadb_protos.writer_pb2_grpc import WriterStub
 from pytest_lazy_fixtures import lazy_fixture
 from redis import asyncio as aioredis
-from tests.utils import inject_message
 
 from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.common.maindb.driver import Driver
@@ -51,6 +46,10 @@ from nucliadb.standalone.config import config_nucliadb
 from nucliadb.standalone.run import run_async_nucliadb
 from nucliadb.standalone.settings import Settings
 from nucliadb.writer import API_PREFIX
+from nucliadb_protos.train_pb2_grpc import TrainStub
+from nucliadb_protos.utils_pb2 import Relation, RelationNode
+from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_telemetry.logs import setup_logging
 from nucliadb_telemetry.settings import (
     LogFormatType,
@@ -69,6 +68,7 @@ from nucliadb_utils.utilities import (
     get_utility,
     set_utility,
 )
+from tests.utils import inject_message
 
 logger = logging.getLogger(__name__)
 
@@ -244,9 +244,7 @@ async def nucliadb_train(nucliadb: Settings):
 
 
 @pytest.fixture(scope="function")
-async def knowledge_graph(
-    nucliadb_writer: AsyncClient, nucliadb_grpc: WriterStub, knowledgebox
-):
+async def knowledge_graph(nucliadb_writer: AsyncClient, nucliadb_grpc: WriterStub, knowledgebox):
     resp = await nucliadb_writer.post(
         f"/kb/{knowledgebox}/resources",
         json={
@@ -259,51 +257,23 @@ async def knowledge_graph(
     rid = resp.json()["uuid"]
 
     nodes = {
-        "Animal": RelationNode(
-            value="Animal", ntype=RelationNode.NodeType.ENTITY, subtype=""
-        ),
-        "Batman": RelationNode(
-            value="Batman", ntype=RelationNode.NodeType.ENTITY, subtype=""
-        ),
-        "Becquer": RelationNode(
-            value="Becquer", ntype=RelationNode.NodeType.ENTITY, subtype=""
-        ),
-        "Cat": RelationNode(
-            value="Cat", ntype=RelationNode.NodeType.ENTITY, subtype=""
-        ),
-        "Catwoman": RelationNode(
-            value="Catwoman", ntype=RelationNode.NodeType.ENTITY, subtype=""
-        ),
-        "Eric": RelationNode(
-            value="Eric", ntype=RelationNode.NodeType.ENTITY, subtype=""
-        ),
-        "Fly": RelationNode(
-            value="Fly", ntype=RelationNode.NodeType.ENTITY, subtype=""
-        ),
-        "Gravity": RelationNode(
-            value="Gravity", ntype=RelationNode.NodeType.ENTITY, subtype=""
-        ),
-        "Joan Antoni": RelationNode(
-            value="Joan Antoni", ntype=RelationNode.NodeType.ENTITY, subtype=""
-        ),
-        "Joker": RelationNode(
-            value="Joker", ntype=RelationNode.NodeType.ENTITY, subtype=""
-        ),
-        "Newton": RelationNode(
-            value="Newton", ntype=RelationNode.NodeType.ENTITY, subtype="science"
-        ),
+        "Animal": RelationNode(value="Animal", ntype=RelationNode.NodeType.ENTITY, subtype=""),
+        "Batman": RelationNode(value="Batman", ntype=RelationNode.NodeType.ENTITY, subtype=""),
+        "Becquer": RelationNode(value="Becquer", ntype=RelationNode.NodeType.ENTITY, subtype=""),
+        "Cat": RelationNode(value="Cat", ntype=RelationNode.NodeType.ENTITY, subtype=""),
+        "Catwoman": RelationNode(value="Catwoman", ntype=RelationNode.NodeType.ENTITY, subtype=""),
+        "Eric": RelationNode(value="Eric", ntype=RelationNode.NodeType.ENTITY, subtype=""),
+        "Fly": RelationNode(value="Fly", ntype=RelationNode.NodeType.ENTITY, subtype=""),
+        "Gravity": RelationNode(value="Gravity", ntype=RelationNode.NodeType.ENTITY, subtype=""),
+        "Joan Antoni": RelationNode(value="Joan Antoni", ntype=RelationNode.NodeType.ENTITY, subtype=""),
+        "Joker": RelationNode(value="Joker", ntype=RelationNode.NodeType.ENTITY, subtype=""),
+        "Newton": RelationNode(value="Newton", ntype=RelationNode.NodeType.ENTITY, subtype="science"),
         "Isaac Newsome": RelationNode(
             value="Isaac Newsome", ntype=RelationNode.NodeType.ENTITY, subtype="science"
         ),
-        "Physics": RelationNode(
-            value="Physics", ntype=RelationNode.NodeType.ENTITY, subtype="science"
-        ),
-        "Poetry": RelationNode(
-            value="Poetry", ntype=RelationNode.NodeType.ENTITY, subtype=""
-        ),
-        "Swallow": RelationNode(
-            value="Swallow", ntype=RelationNode.NodeType.ENTITY, subtype=""
-        ),
+        "Physics": RelationNode(value="Physics", ntype=RelationNode.NodeType.ENTITY, subtype="science"),
+        "Poetry": RelationNode(value="Poetry", ntype=RelationNode.NodeType.ENTITY, subtype=""),
+        "Swallow": RelationNode(value="Swallow", ntype=RelationNode.NodeType.ENTITY, subtype=""),
     }
 
     edges = [
@@ -658,10 +628,7 @@ DROP table IF EXISTS resources;
 
 def maindb_settings_lazy_fixtures(default_drivers="local"):
     driver_types = os.environ.get("TESTING_MAINDB_DRIVERS", default_drivers)
-    return [
-        lazy_fixture.lf(f"{driver_type}_maindb_settings")
-        for driver_type in driver_types.split(",")
-    ]
+    return [lazy_fixture.lf(f"{driver_type}_maindb_settings") for driver_type in driver_types.split(",")]
 
 
 @pytest.fixture(scope="function", params=maindb_settings_lazy_fixtures())
@@ -730,10 +697,7 @@ def maindb_driver_lazy_fixtures(default_drivers: str = "redis"):
     Any test using the maindb_driver fixture will be run twice, once with redis_driver and once with local_driver.
     """
     driver_types = os.environ.get("TESTING_MAINDB_DRIVERS", default_drivers)
-    return [
-        lazy_fixture.lf(f"{driver_type}_maindb_driver")
-        for driver_type in driver_types.split(",")
-    ]
+    return [lazy_fixture.lf(f"{driver_type}_maindb_driver") for driver_type in driver_types.split(",")]
 
 
 @pytest.fixture(

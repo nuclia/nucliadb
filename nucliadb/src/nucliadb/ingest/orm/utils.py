@@ -19,6 +19,8 @@
 
 import urllib.parse
 
+from nucliadb.ingest.processing import PushPayload
+from nucliadb_models.text import PushTextFormat, Text
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
     FieldComputedMetadataWrapper,
@@ -27,9 +29,6 @@ from nucliadb_protos.resources_pb2 import (
     Paragraph,
 )
 from nucliadb_protos.writer_pb2 import BrokerMessage
-
-from nucliadb.ingest.processing import PushPayload
-from nucliadb_models.text import PushTextFormat, Text
 
 
 def set_title(writer: BrokerMessage, toprocess: PushPayload, title: str):

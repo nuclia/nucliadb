@@ -23,7 +23,6 @@ from unittest.mock import AsyncMock, MagicMock, Mock
 
 import aiohttp
 import pytest
-from tests.utils.aiohttp_session import get_mocked_session
 from yarl import URL
 
 from nucliadb.search.predict import (
@@ -53,6 +52,7 @@ from nucliadb_models.search import (
     SummarizeResourceModel,
 )
 from nucliadb_utils.exceptions import LimitsExceededError
+from tests.utils.aiohttp_session import get_mocked_session
 
 
 @pytest.mark.asyncio
@@ -80,9 +80,7 @@ async def test_dummy_predict_engine():
         (False, "{cluster}/api/v1/internal/predict/tokens", "X-STF-KBID", "{kbid}"),
     ],
 )
-async def test_detect_entities_ok(
-    onprem, expected_url, expected_header, expected_header_value
-):
+async def test_detect_entities_ok(onprem, expected_url, expected_header, expected_header_value):
     cluster_url = "cluster"
     public_url = "public-{zone}"
     service_account = "service-account"
@@ -108,11 +106,7 @@ async def test_detect_entities_ok(
 
     path = expected_url.format(public_url=pe.public_url, cluster=pe.cluster_url)
 
-    headers = {
-        expected_header: expected_header_value.format(
-            kbid=kbid, service_account=service_account
-        )
-    }
+    headers = {expected_header: expected_header_value.format(kbid=kbid, service_account=service_account)}
     pe.session.get.assert_awaited_once_with(
         url=path,
         params={"text": sentence},
@@ -164,9 +158,7 @@ def session_limits_exceeded():
         ("rephrase_query", ["kbid", RephraseModel(question="foo", user_id="bar")]),
     ],
 )
-async def test_predict_engine_handles_limits_exceeded_error(
-    session_limits_exceeded, method, args
-):
+async def test_predict_engine_handles_limits_exceeded_error(session_limits_exceeded, method, args):
     pe = PredictEngine(
         "cluster",
         "public-{zone}",
@@ -188,9 +180,7 @@ async def test_predict_engine_handles_limits_exceeded_error(
         ("summarize", ["kbid", Mock(resources={})], True, None),
     ],
 )
-async def test_onprem_nuclia_service_account_not_configured(
-    method, args, exception, output
-):
+async def test_onprem_nuclia_service_account_not_configured(method, args, exception, output):
     pe = PredictEngine(
         "cluster",
         "public-{zone}",
@@ -211,13 +201,9 @@ async def test_rephrase():
         zone="europe1",
         onprem=False,
     )
-    pe.session = get_mocked_session(
-        "POST", 200, json="rephrased", context_manager=False
-    )
+    pe.session = get_mocked_session("POST", 200, json="rephrased", context_manager=False)
 
-    item = RephraseModel(
-        question="question", chat_history=[], user_id="foo", user_context=["foo"]
-    )
+    item = RephraseModel(question="question", chat_history=[], user_id="foo", user_context=["foo"])
     rephrased_query = await pe.rephrase_query("kbid", item)
     # The rephrase query should not be wrapped in quotes, otherwise it will trigger an exact match query to the index
     assert rephrased_query.strip('"') == rephrased_query
@@ -238,13 +224,9 @@ async def test_rephrase_onprem():
         onprem=True,
         nuclia_service_account="nuakey",
     )
-    pe.session = get_mocked_session(
-        "POST", 200, json="rephrased", context_manager=False
-    )
+    pe.session = get_mocked_session("POST", 200, json="rephrased", context_manager=False)
 
-    item = RephraseModel(
-        question="question", chat_history=[], user_id="foo", user_context=["foo"]
-    )
+    item = RephraseModel(question="question", chat_history=[], user_id="foo", user_context=["foo"])
     rephrased_query = await pe.rephrase_query("kbid", item)
     # The rephrase query should not be wrapped in quotes, otherwise it will trigger an exact match query to the index
     assert rephrased_query.strip('"') == rephrased_query
@@ -365,9 +347,7 @@ async def test_summarize():
     summarized = SummarizedResponse(
         resources={"r1": SummarizedResource(summary="resource summary", tokens=10)}
     )
-    pe.session = get_mocked_session(
-        "POST", 200, json=summarized.model_dump(), context_manager=False
-    )
+    pe.session = get_mocked_session("POST", 200, json=summarized.model_dump(), context_manager=False)
 
     item = SummarizeModel(
         resources={"r1": SummarizeResourceModel(fields={"f1": "field extracted text"})}
@@ -396,9 +376,7 @@ async def test_summarize_onprem():
     summarized = SummarizedResponse(
         resources={"r1": SummarizedResource(summary="resource summary", tokens=10)}
     )
-    pe.session = get_mocked_session(
-        "POST", 200, json=summarized.model_dump(), context_manager=False
-    )
+    pe.session = get_mocked_session("POST", 200, json=summarized.model_dump(), context_manager=False)
 
     item = SummarizeModel(
         resources={"r1": SummarizeResourceModel(fields={"f1": "field extracted text"})}
@@ -424,9 +402,7 @@ async def test_get_predict_headers_onprem():
         onprem=True,
         nuclia_service_account=nua_service_account,
     )
-    assert pe.get_predict_headers("kbid") == {
-        "X-STF-NUAKEY": f"Bearer {nua_service_account}"
-    }
+    assert pe.get_predict_headers("kbid") == {"X-STF-NUAKEY": f"Bearer {nua_service_account}"}
 
 
 async def test_get_predict_headers_hosterd():
@@ -478,9 +454,7 @@ async def test_get_chat_ndjson_generator():
     parsed = [line async for line in gen]
     assert len(parsed) == 4
     assert parsed[0].chunk == TextGenerativeResponse(text="foo")
-    assert parsed[1].chunk == MetaGenerativeResponse(
-        input_tokens=1, output_tokens=1, timings={"foo": 1}
-    )
+    assert parsed[1].chunk == MetaGenerativeResponse(input_tokens=1, output_tokens=1, timings={"foo": 1})
     assert parsed[2].chunk == CitationsGenerativeResponse(citations={"foo": "bar"})
     assert parsed[3].chunk == StatusGenerativeResponse(code="-1", details="foo")
 
@@ -520,6 +494,4 @@ async def test_chat_query_ndjson():
     assert parsed[1].chunk == StatusGenerativeResponse(code="-1", details="foo")
 
     # Make sure the request was made with the correct headers
-    pe.session.post.call_args_list[0].kwargs["headers"][
-        "Accept"
-    ] == "application/ndjson"
+    pe.session.post.call_args_list[0].kwargs["headers"]["Accept"] == "application/ndjson"

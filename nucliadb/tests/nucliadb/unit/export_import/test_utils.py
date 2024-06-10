@@ -23,7 +23,6 @@ from unittest.mock import AsyncMock, Mock
 
 import nats.errors
 import pytest
-from nucliadb_protos.writer_pb2 import BrokerMessage, BrokerMessageBlobReference
 from starlette.requests import Request
 
 from nucliadb.export_import.exceptions import ExportStreamExhausted
@@ -37,6 +36,7 @@ from nucliadb.export_import.utils import (
 )
 from nucliadb_models.export_import import Status
 from nucliadb_protos import resources_pb2
+from nucliadb_protos.writer_pb2 import BrokerMessage, BrokerMessageBlobReference
 from nucliadb_utils.const import Streams
 
 
@@ -105,9 +105,7 @@ def broker_message():
     # Field metadata
     fcmw = resources_pb2.FieldComputedMetadataWrapper()
     fcmw.metadata.metadata.thumbnail.CopyFrom(get_cf("metadata_thumbnail"))
-    fcmw.metadata.split_metadata["foo"].thumbnail.CopyFrom(
-        get_cf("metadata_split_thumbnail")
-    )
+    fcmw.metadata.split_metadata["foo"].thumbnail.CopyFrom(get_cf("metadata_split_thumbnail"))
     bm.field_metadata.append(fcmw)
 
     return bm
@@ -151,7 +149,6 @@ def test_get_cloud_files(broker_message):
 
 
 async def test_export_stream_simple():
-
     async def export_generator():
         export = BytesIO(b"1234567890")
         while True:
@@ -285,9 +282,7 @@ class TestTaskRetryHandler:
 
 async def test_transaction_commit_sends_storage_reference_on_max_payload_error():
     context = Mock()
-    context.transaction.commit = AsyncMock(
-        side_effect=[nats.errors.MaxPayloadError, None]
-    )
+    context.transaction.commit = AsyncMock(side_effect=[nats.errors.MaxPayloadError, None])
     context.blob_storage = AsyncMock()
     context.blob_storage.set_stream_message.return_value = "key"
 

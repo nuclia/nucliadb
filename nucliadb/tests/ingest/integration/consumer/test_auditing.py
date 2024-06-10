@@ -43,9 +43,7 @@ async def test_audit_counters(
     subject = audit_settings.audit_jetstream_target.format(  # type: ignore
         partition=partition, type="*"
     )
-    await nats_manager.js.add_stream(
-        name=audit_settings.audit_stream, subjects=[subject]
-    )
+    await nats_manager.js.add_stream(name=audit_settings.audit_stream, subjects=[subject])
     psub = await nats_manager.js.pull_subscribe(subject, "psub")
 
     iah = auditing.IndexAuditHandler(

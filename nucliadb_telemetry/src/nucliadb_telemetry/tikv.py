@@ -66,50 +66,26 @@ def _instrument(
             else:
                 return result
 
-    wrap_function_wrapper(
-        "tikv_client.asynchronous", "TransactionClient.begin", _traced_async_wrapper
-    )
-    wrap_function_wrapper(
-        "tikv_client.asynchronous", "Transaction.get", _traced_async_wrapper
-    )
+    wrap_function_wrapper("tikv_client.asynchronous", "TransactionClient.begin", _traced_async_wrapper)
+    wrap_function_wrapper("tikv_client.asynchronous", "Transaction.get", _traced_async_wrapper)
     wrap_function_wrapper(
         "tikv_client.asynchronous", "Transaction.get_for_update", _traced_async_wrapper
     )
-    wrap_function_wrapper(
-        "tikv_client.asynchronous", "Transaction.key_exists", _traced_async_wrapper
-    )
-    wrap_function_wrapper(
-        "tikv_client.asynchronous", "Transaction.batch_get", _traced_async_wrapper
-    )
+    wrap_function_wrapper("tikv_client.asynchronous", "Transaction.key_exists", _traced_async_wrapper)
+    wrap_function_wrapper("tikv_client.asynchronous", "Transaction.batch_get", _traced_async_wrapper)
     wrap_function_wrapper(
         "tikv_client.asynchronous",
         "Transaction.batch_get_for_update",
         _traced_async_wrapper,
     )
-    wrap_function_wrapper(
-        "tikv_client.asynchronous", "Transaction.scan", _traced_async_wrapper
-    )
-    wrap_function_wrapper(
-        "tikv_client.asynchronous", "Transaction.scan_keys", _traced_async_wrapper
-    )
-    wrap_function_wrapper(
-        "tikv_client.asynchronous", "Transaction.lock_keys", _traced_async_wrapper
-    )
-    wrap_function_wrapper(
-        "tikv_client.asynchronous", "Transaction.put", _traced_async_wrapper
-    )
-    wrap_function_wrapper(
-        "tikv_client.asynchronous", "Transaction.insert", _traced_async_wrapper
-    )
-    wrap_function_wrapper(
-        "tikv_client.asynchronous", "Transaction.delete", _traced_async_wrapper
-    )
-    wrap_function_wrapper(
-        "tikv_client.asynchronous", "Transaction.commit", _traced_async_wrapper
-    )
-    wrap_function_wrapper(
-        "tikv_client.asynchronous", "Transaction.rollback", _traced_async_wrapper
-    )
+    wrap_function_wrapper("tikv_client.asynchronous", "Transaction.scan", _traced_async_wrapper)
+    wrap_function_wrapper("tikv_client.asynchronous", "Transaction.scan_keys", _traced_async_wrapper)
+    wrap_function_wrapper("tikv_client.asynchronous", "Transaction.lock_keys", _traced_async_wrapper)
+    wrap_function_wrapper("tikv_client.asynchronous", "Transaction.put", _traced_async_wrapper)
+    wrap_function_wrapper("tikv_client.asynchronous", "Transaction.insert", _traced_async_wrapper)
+    wrap_function_wrapper("tikv_client.asynchronous", "Transaction.delete", _traced_async_wrapper)
+    wrap_function_wrapper("tikv_client.asynchronous", "Transaction.commit", _traced_async_wrapper)
+    wrap_function_wrapper("tikv_client.asynchronous", "Transaction.rollback", _traced_async_wrapper)
 
 
 class TiKVInstrumentor(BaseInstrumentor):

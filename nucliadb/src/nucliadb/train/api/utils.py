@@ -21,9 +21,8 @@
 
 from typing import Optional
 
-from nucliadb_protos.dataset_pb2 import TrainSet
-
 from nucliadb.train.utils import get_shard_manager
+from nucliadb_protos.dataset_pb2 import TrainSet
 
 
 async def get_kb_partitions(kbid: str, prefix: Optional[str] = None):

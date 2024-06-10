@@ -20,6 +20,9 @@
 from uuid import uuid4
 
 import pytest
+
+from nucliadb.ingest.orm.brain import ParagraphPages, ResourceBrain
+from nucliadb_protos import resources_pb2
 from nucliadb_protos.noderesources_pb2 import Resource as PBResource
 from nucliadb_protos.resources_pb2 import (
     Basic,
@@ -31,9 +34,6 @@ from nucliadb_protos.resources_pb2 import (
     Paragraph,
     Sentence,
 )
-
-from nucliadb.ingest.orm.brain import ParagraphPages, ResourceBrain
-from nucliadb_protos import resources_pb2
 
 
 def test_apply_field_metadata_marks_duplicated_paragraphs():
@@ -49,13 +49,9 @@ def test_apply_field_metadata_marks_duplicated_paragraphs():
 
     et = ExtractedText(text=text_1)
     p1 = Paragraph(start=first_occurrence[0], end=first_occurrence[1])
-    p1.sentences.append(
-        Sentence(start=first_occurrence[0], end=first_occurrence[1], key="test")
-    )
+    p1.sentences.append(Sentence(start=first_occurrence[0], end=first_occurrence[1], key="test"))
     p2 = Paragraph(start=second_occurrence[0], end=second_occurrence[1])
-    p2.sentences.append(
-        Sentence(start=second_occurrence[0], end=second_occurrence[1], key="test")
-    )
+    p2.sentences.append(Sentence(start=second_occurrence[0], end=second_occurrence[1], key="test"))
     fcmw.metadata.metadata.paragraphs.append(p1)
     fcmw.metadata.metadata.paragraphs.append(p2)
 
@@ -92,13 +88,9 @@ def test_apply_field_metadata_marks_duplicated_paragraphs_on_split_metadata():
     et = ExtractedText()
     et.split_text[split_key] = text_1
     p1 = Paragraph(start=first_occurrence[0], end=first_occurrence[1])
-    p1.sentences.append(
-        Sentence(start=first_occurrence[0], end=first_occurrence[1], key="test")
-    )
+    p1.sentences.append(Sentence(start=first_occurrence[0], end=first_occurrence[1], key="test"))
     p2 = Paragraph(start=second_occurrence[0], end=second_occurrence[1])
-    p2.sentences.append(
-        Sentence(start=second_occurrence[0], end=second_occurrence[1], key="test")
-    )
+    p2.sentences.append(Sentence(start=second_occurrence[0], end=second_occurrence[1], key="test"))
     fcmw.metadata.split_metadata[split_key].paragraphs.append(p1)
     fcmw.metadata.split_metadata[split_key].paragraphs.append(p2)
 
@@ -189,9 +181,7 @@ def test_apply_field_metadata_populates_page_number():
     fcmw = FieldComputedMetadataWrapper()
     fcmw.field.CopyFrom(FieldID(field_type=FieldType.TEXT, field=field_key))
 
-    p1 = Paragraph(
-        start=40, end=54, start_seconds=[0], end_seconds=[10], text="Some text here"
-    )
+    p1 = Paragraph(start=40, end=54, start_seconds=[0], end_seconds=[10], text="Some text here")
     p1.sentences.append(Sentence(start=40, end=54, key="test"))
     fcmw.metadata.metadata.paragraphs.append(p1)
 

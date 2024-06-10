@@ -62,9 +62,7 @@ class Signal:
 
         awaitables = [
             cb(payload=payload)
-            for cb, _ in sorted(
-                self.callbacks.values(), key=lambda t: t[1], reverse=True
-            )
+            for cb, _ in sorted(self.callbacks.values(), key=lambda t: t[1], reverse=True)
         ]
 
         results = await asyncio.gather(*awaitables, return_exceptions=True)

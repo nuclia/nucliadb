@@ -20,6 +20,11 @@
 
 from typing import cast
 
+from nucliadb.ingest.fields.base import Field
+from nucliadb.ingest.fields.conversation import Conversation
+from nucliadb.ingest.fields.file import File
+from nucliadb.ingest.fields.link import Link
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
     ExtractedVectorsWrapper,
@@ -28,12 +33,6 @@ from nucliadb_protos.resources_pb2 import (
     LargeComputedMetadataWrapper,
 )
 from nucliadb_protos.writer_pb2 import BrokerMessage
-
-from nucliadb.ingest.fields.base import Field
-from nucliadb.ingest.fields.conversation import Conversation
-from nucliadb.ingest.fields.file import File
-from nucliadb.ingest.fields.link import Link
-from nucliadb.ingest.orm.resource import Resource
 
 
 async def generate_broker_message(resource: Resource) -> BrokerMessage:

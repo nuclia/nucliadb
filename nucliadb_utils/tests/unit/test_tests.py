@@ -17,9 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from nucliadb_utils.tests import asyncbenchmark  # noqa: F401
-from nucliadb_utils.tests import indexing  # noqa: F401
-from nucliadb_utils.tests import nats  # noqa: F401
+from nucliadb_utils.tests import (  # noqa: F401
+    asyncbenchmark,
+    indexing,
+    nats,
+)
 
 # placeholder for test modules
 # AND these test modules do not get coverage

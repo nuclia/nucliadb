@@ -24,10 +24,10 @@ from typing import AsyncIterable
 
 import pytest
 from httpx import AsyncClient
-from nucliadb_protos.writer_pb2_grpc import WriterStub
-from tests.utils import inject_message
 
 from nucliadb_protos import writer_pb2
+from nucliadb_protos.writer_pb2_grpc import WriterStub
+from tests.utils import inject_message
 
 
 @dataclass
@@ -50,9 +50,7 @@ async def kb_with_vectorset(
     default_vector_dimension = 512
     vectorset_dimension = 324
 
-    await create_vectorset(
-        nucliadb_grpc, kbid, vectorset_id, vectorset_dimension=vectorset_dimension
-    )
+    await create_vectorset(nucliadb_grpc, kbid, vectorset_id, vectorset_dimension=vectorset_dimension)
     await inject_broker_message_with_vectorset_data(
         nucliadb_grpc,
         kbid,

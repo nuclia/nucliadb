@@ -60,7 +60,9 @@ class NatsTaskConsumer:
     async def initialize(self, context: ApplicationContext):
         self.context = context
         await create_nats_stream_if_not_exists(
-            self.context, self.stream.name, subjects=[self.stream.subject]  # type: ignore
+            self.context,
+            self.stream.name,  # type: ignore
+            subjects=[self.stream.subject],  # type: ignore
         )
         await self._setup_nats_subscription()
         self.initialized = True
@@ -128,9 +130,7 @@ class NatsTaskConsumer:
             f"Message received: subject:{subject}, seqid: {seqid}, reply: {reply}",
             extra={"consumer_name": self.name},
         )
-        async with MessageProgressUpdater(
-            msg, nats_consumer_settings.nats_ack_wait * 0.66
-        ):
+        async with MessageProgressUpdater(msg, nats_consumer_settings.nats_ack_wait * 0.66):
             try:
                 task_msg = self.msg_type.parse_raw(msg.data)
             except pydantic.ValidationError as e:
@@ -144,9 +144,7 @@ class NatsTaskConsumer:
                 await msg.ack()
                 return
 
-            logger.info(
-                f"Starting task consumption", extra={"consumer_name": self.name}
-            )
+            logger.info(f"Starting task consumption", extra={"consumer_name": self.name})
             try:
                 await self.callback(self.context, task_msg)  # type: ignore
             except asyncio.CancelledError:
@@ -200,9 +198,7 @@ def create_consumer(
     return consumer
 
 
-async def start_consumer(
-    task_name: str, context: ApplicationContext
-) -> NatsTaskConsumer:
+async def start_consumer(task_name: str, context: ApplicationContext) -> NatsTaskConsumer:
     """
     Returns an initialized consumer for the given task name, ready to consume messages from the task stream.
     """

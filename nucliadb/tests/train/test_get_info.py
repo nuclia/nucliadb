@@ -19,6 +19,7 @@
 
 import pytest
 from aioresponses import aioresponses
+
 from nucliadb_protos.train_pb2 import GetInfoRequest, TrainInfo
 from nucliadb_protos.train_pb2_grpc import TrainStub
 

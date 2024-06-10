@@ -20,8 +20,8 @@
 import uuid
 
 import pytest
-from nucliadb_protos.resources_pb2 import CloudFile
 
+from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_utils.storages.gcs import GCSStorage
 from nucliadb_utils.storages.local import LocalStorage
 from nucliadb_utils.storages.s3 import S3Storage

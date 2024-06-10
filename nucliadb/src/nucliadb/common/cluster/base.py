@@ -20,6 +20,7 @@
 from abc import ABCMeta, abstractmethod
 from typing import AsyncIterator, Optional
 
+from nucliadb_protos import nodereader_pb2, noderesources_pb2, utils_pb2
 from nucliadb_protos.nodereader_pb2_grpc import NodeReaderStub
 from nucliadb_protos.nodewriter_pb2 import (
     NewShardRequest,
@@ -28,8 +29,6 @@ from nucliadb_protos.nodewriter_pb2 import (
     VectorIndexConfig,
 )
 from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
-
-from nucliadb_protos import nodereader_pb2, noderesources_pb2, utils_pb2
 
 
 class AbstractIndexNode(metaclass=ABCMeta):

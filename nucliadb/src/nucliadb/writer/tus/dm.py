@@ -59,10 +59,7 @@ class FileDataManager:
             # someone else
             last_activity: Optional[int] = self._data.get("last_activity")
             if last_activity and (time.time() - last_activity) < self._ttl:
-                if (
-                    request.headers
-                    and request.headers.get("tus-override-upload", "0") != "1"
-                ):
+                if request.headers and request.headers.get("tus-override-upload", "0") != "1":
                     raise HTTPPreconditionFailed(
                         detail="There is already an active tusupload that conflicts with this one."
                     )

@@ -20,8 +20,8 @@
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from nucliadb_protos.nodewriter_pb2 import IndexMessage
 
+from nucliadb_protos.nodewriter_pb2 import IndexMessage
 from nucliadb_sidecar.listeners import IndexedPublisher
 from nucliadb_sidecar.signals import SuccessfulIndexingPayload, successful_indexing
 
@@ -55,9 +55,7 @@ class TestIndexedPublisher:
             assert signals.successful_indexing.remove_listener.call_count == 1
 
     @pytest.mark.asyncio
-    async def test_successful_indexing_triggers_notification(
-        self, indexed_publisher, pubsub
-    ):
+    async def test_successful_indexing_triggers_notification(self, indexed_publisher, pubsub):
         pb = IndexMessage()
         pb.partition = "1"
         payload = SuccessfulIndexingPayload(seqid=1, index_message=pb)

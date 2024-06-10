@@ -74,9 +74,7 @@ class BatchSpanProcessor(SpanProcessor):
             raise ValueError("max_export_batch_size must be a positive integer.")
 
         if max_export_batch_size > max_queue_size:
-            raise ValueError(
-                "max_export_batch_size must be less than or equal to max_queue_size."
-            )
+            raise ValueError("max_export_batch_size must be less than or equal to max_queue_size.")
 
         self.span_exporter = span_exporter
         self.queue = asyncio.Queue(maxsize=max_queue_size)  # type: asyncio.Queue[Span]
@@ -150,10 +148,7 @@ class BatchSpanProcessor(SpanProcessor):
                     break
                 logger.debug(f"{self.queue.qsize()} spans on queue")
                 flush_request = self._get_and_unset_flush_request()
-                if (
-                    self.queue.qsize() < self.max_export_batch_size
-                    and flush_request is None
-                ):
+                if self.queue.qsize() < self.max_export_batch_size and flush_request is None:
                     try:
                         await asyncio.wait_for(self.condition.wait(), timeout)
                     except asyncio.TimeoutError:

@@ -55,9 +55,7 @@ async def test_resource_endpoints(sdk_async: nucliadb_sdk.NucliaDBAsync, kb):
     resources = await sdk_async.list_resources(kbid=kb.uuid)
     assert len(resources.resources) == 1
     await sdk_async.update_resource(kbid=kb.uuid, rid=resource.id, title="Resource2")
-    await sdk_async.update_resource_by_slug(
-        kbid=kb.uuid, rslug="resource", title="Resource3"
-    )
+    await sdk_async.update_resource_by_slug(kbid=kb.uuid, rslug="resource", title="Resource3")
 
     # Reindex / Reprocess
     await sdk_async.reindex_resource(kbid=kb.uuid, rid=resource.id)
@@ -78,9 +76,7 @@ async def test_search_endpoints(sdk_async: nucliadb_sdk.NucliaDBAsync, kb):
     await sdk_async.chat(kbid=kb.uuid, query="foo")
     await sdk_async.ask(kbid=kb.uuid, query="foo")
 
-    resource = await sdk_async.create_resource(
-        kbid=kb.uuid, title="Resource", slug="resource"
-    )
+    resource = await sdk_async.create_resource(kbid=kb.uuid, title="Resource", slug="resource")
     await sdk_async.chat_on_resource(kbid=kb.uuid, rid=resource.uuid, query="foo")
     await sdk_async.chat_on_resource_by_slug(kbid=kb.uuid, slug="resource", query="foo")
     await sdk_async.ask_on_resource(kbid=kb.uuid, rid=resource.uuid, query="foo")

@@ -23,9 +23,6 @@ from typing import Optional
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
-from nucliadb_protos.knowledgebox_pb2 import Synonyms
-from nucliadb_protos.nodereader_pb2 import SearchRequest
-from nucliadb_protos.utils_pb2 import RelationNode
 
 from nucliadb.search.predict import PredictEngine
 from nucliadb.search.search.exceptions import InvalidQueryError
@@ -36,6 +33,9 @@ from nucliadb.search.search.query import (
 )
 from nucliadb.tests.vectors import Q
 from nucliadb_models.search import MinScore, SearchOptions
+from nucliadb_protos.knowledgebox_pb2 import Synonyms
+from nucliadb_protos.nodereader_pb2 import SearchRequest
+from nucliadb_protos.utils_pb2 import RelationNode
 
 QUERY_MODULE = "nucliadb.search.search.query"
 
@@ -64,9 +64,7 @@ def test_parse_entities_to_filters():
 @pytest.fixture()
 def read_only_txn():
     txn = unittest.mock.AsyncMock()
-    with unittest.mock.patch(
-        f"{QUERY_MODULE}.get_read_only_transaction", return_value=txn
-    ):
+    with unittest.mock.patch(f"{QUERY_MODULE}.get_read_only_transaction", return_value=txn):
         yield txn
 
 
@@ -103,9 +101,7 @@ class TestApplySynonymsToRequest:
             yield qp
 
     @pytest.mark.asyncio
-    async def test_not_applies_if_empty_body(
-        self, query_parser: QueryParser, get_synonyms
-    ):
+    async def test_not_applies_if_empty_body(self, query_parser: QueryParser, get_synonyms):
         query_parser.query = ""
         search_request = Mock()
         await query_parser.parse_synonyms(search_request)

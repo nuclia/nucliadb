@@ -92,25 +92,19 @@ async def test_mark_resource_error(processor: Processor, txn, resource, kb, sm):
     )
 
 
-async def test_mark_resource_error_handle_error(
-    processor: Processor, kb, resource, txn
-):
+async def test_mark_resource_error_handle_error(processor: Processor, kb, resource, txn):
     resource.set_basic.side_effect = Exception("test")
     await processor._mark_resource_error(kb, resource, partition="partition", seqid=1)
     txn.commit.assert_not_called()
 
 
-async def test_mark_resource_error_skip_no_shard(
-    processor: Processor, resource, driver, kb, txn
-):
+async def test_mark_resource_error_skip_no_shard(processor: Processor, resource, driver, kb, txn):
     kb.get_resource_shard.return_value = None
     await processor._mark_resource_error(kb, resource, partition="partition", seqid=1)
     txn.commit.assert_not_called()
 
 
-async def test_mark_resource_error_skip_no_resource(
-    processor: Processor, kb, driver, txn
-):
+async def test_mark_resource_error_skip_no_resource(processor: Processor, kb, driver, txn):
     await processor._mark_resource_error(kb, None, partition="partition", seqid=1)
     txn.commit.assert_not_called()
 
@@ -124,8 +118,6 @@ def test_validate_indexable_resource():
 def test_validate_indexable_resource_throws_error_for_max():
     resource = noderesources_pb2.Resource()
     for i in range(cluster_settings.max_resource_paragraphs + 1):
-        resource.paragraphs["test"].paragraphs[f"test{i}"].sentences[
-            "test"
-        ].vector.append(1.0)
+        resource.paragraphs["test"].paragraphs[f"test{i}"].sentences["test"].vector.append(1.0)
     with pytest.raises(ResourceNotIndexable):
         validate_indexable_resource(resource)

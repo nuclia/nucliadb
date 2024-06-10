@@ -23,12 +23,6 @@ from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, Set, Type, TypeVar, Union
 
 from google.protobuf.json_format import MessageToDict
-from nucliadb_protos.audit_pb2 import ClientType
-from nucliadb_protos.nodereader_pb2 import DocumentScored, OrderBy
-from nucliadb_protos.nodereader_pb2 import ParagraphResult as PBParagraphResult
-from nucliadb_protos.utils_pb2 import RelationNode
-from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
-from nucliadb_protos.writer_pb2 import Shards as PBShards
 from pydantic import BaseModel, Field, field_validator, model_validator
 from typing_extensions import Annotated
 
@@ -37,6 +31,12 @@ from nucliadb_models.metadata import RelationType, ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.security import RequestSecurity
 from nucliadb_models.vectors import SemanticModelMetadata, VectorSimilarity
+from nucliadb_protos.audit_pb2 import ClientType
+from nucliadb_protos.nodereader_pb2 import DocumentScored, OrderBy
+from nucliadb_protos.nodereader_pb2 import ParagraphResult as PBParagraphResult
+from nucliadb_protos.utils_pb2 import RelationNode
+from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
+from nucliadb_protos.writer_pb2 import Shards as PBShards
 
 _T = TypeVar("_T")
 
@@ -424,9 +424,7 @@ class KnowledgeboxShards(BaseModel):
 
 
 class SearchParamDefaults:
-    query = ParamDefault(
-        default="", title="Query", description="The query to search for"
-    )
+    query = ParamDefault(default="", title="Query", description="The query to search for")
     suggest_query = ParamDefault(
         default=..., title="Query", description="The query to get suggestions for"
     )
@@ -648,9 +646,7 @@ class CatalogRequest(BaseModel):
     range_creation_start: Optional[datetime] = (
         SearchParamDefaults.range_creation_start.to_pydantic_field()
     )
-    range_creation_end: Optional[datetime] = (
-        SearchParamDefaults.range_creation_end.to_pydantic_field()
-    )
+    range_creation_end: Optional[datetime] = SearchParamDefaults.range_creation_end.to_pydantic_field()
     range_modification_start: Optional[datetime] = (
         SearchParamDefaults.range_modification_start.to_pydantic_field()
     )
@@ -696,45 +692,33 @@ class BaseSearchRequest(BaseModel):
     range_creation_start: Optional[datetime] = (
         SearchParamDefaults.range_creation_start.to_pydantic_field()
     )
-    range_creation_end: Optional[datetime] = (
-        SearchParamDefaults.range_creation_end.to_pydantic_field()
-    )
+    range_creation_end: Optional[datetime] = SearchParamDefaults.range_creation_end.to_pydantic_field()
     range_modification_start: Optional[datetime] = (
         SearchParamDefaults.range_modification_start.to_pydantic_field()
     )
     range_modification_end: Optional[datetime] = (
         SearchParamDefaults.range_modification_end.to_pydantic_field()
     )
-    features: List[SearchOptions] = (
-        SearchParamDefaults.search_features.to_pydantic_field(
-            default=[
-                SearchOptions.PARAGRAPH,
-                SearchOptions.DOCUMENT,
-                SearchOptions.VECTOR,
-            ]
-        )
+    features: List[SearchOptions] = SearchParamDefaults.search_features.to_pydantic_field(
+        default=[
+            SearchOptions.PARAGRAPH,
+            SearchOptions.DOCUMENT,
+            SearchOptions.VECTOR,
+        ]
     )
     debug: bool = SearchParamDefaults.debug.to_pydantic_field()
     highlight: bool = SearchParamDefaults.highlight.to_pydantic_field()
     show: List[ResourceProperties] = SearchParamDefaults.show.to_pydantic_field()
-    field_type_filter: List[FieldTypeName] = (
-        SearchParamDefaults.field_type_filter.to_pydantic_field()
-    )
-    extracted: List[ExtractedDataTypeName] = (
-        SearchParamDefaults.extracted.to_pydantic_field()
-    )
+    field_type_filter: List[FieldTypeName] = SearchParamDefaults.field_type_filter.to_pydantic_field()
+    extracted: List[ExtractedDataTypeName] = SearchParamDefaults.extracted.to_pydantic_field()
     shards: List[str] = SearchParamDefaults.shards.to_pydantic_field()
     vector: Optional[List[float]] = SearchParamDefaults.vector.to_pydantic_field()
     vectorset: Optional[str] = SearchParamDefaults.vectorset.to_pydantic_field()
     with_duplicates: bool = SearchParamDefaults.with_duplicates.to_pydantic_field()
     with_synonyms: bool = SearchParamDefaults.with_synonyms.to_pydantic_field()
     autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
-    resource_filters: List[str] = (
-        SearchParamDefaults.resource_filters.to_pydantic_field()
-    )
-    security: Optional[RequestSecurity] = (
-        SearchParamDefaults.security.to_pydantic_field()
-    )
+    resource_filters: List[str] = SearchParamDefaults.resource_filters.to_pydantic_field()
+    security: Optional[RequestSecurity] = SearchParamDefaults.security.to_pydantic_field()
 
     rephrase: bool = Field(
         default=False,
@@ -789,9 +773,7 @@ class MaxTokens(BaseModel):
     )
 
 
-def parse_max_tokens(
-    max_tokens: Optional[Union[int, MaxTokens]]
-) -> Optional[MaxTokens]:
+def parse_max_tokens(max_tokens: Optional[Union[int, MaxTokens]]) -> Optional[MaxTokens]:
     if isinstance(max_tokens, int):
         # If the max_tokens is an integer, it is interpreted as the max_tokens value for the generated answer.
         # The max tokens for the context is set to None to use the default value for the model (comes in the
@@ -827,18 +809,14 @@ class ChatModel(BaseModel):
     user_prompt: Optional[UserPrompt] = Field(
         default=None, description="Optional custom prompt input by the user"
     )
-    citations: bool = Field(
-        default=False, description="Whether to include the citations in the answer"
-    )
+    citations: bool = Field(default=False, description="Whether to include the citations in the answer")
     generative_model: Optional[str] = Field(
         default=None,
         title="Generative model",
         description="The generative model to use for the predict chat endpoint. If not provided, the model configured for the Knowledge Box is used.",  # noqa: E501
     )
 
-    max_tokens: Optional[int] = Field(
-        default=None, description="Maximum characters to generate"
-    )
+    max_tokens: Optional[int] = Field(default=None, description="Maximum characters to generate")
 
     query_context_images: Dict[str, Image] = Field(
         default={},
@@ -913,15 +891,10 @@ class FieldExtensionStrategy(RagStrategy):
             try:
                 field_type, _ = field.strip("/").split("/")
             except ValueError:
-                raise ValueError(
-                    f"Field '{field}' is not in the format {{field_type}}/{{field_name}}"
-                )
+                raise ValueError(f"Field '{field}' is not in the format {{field_type}}/{{field_name}}")
             if field_type not in ALLOWED_FIELD_TYPES:
                 allowed_field_types_part = ", ".join(
-                    [
-                        f"'{fid}' for '{fname}' fields"
-                        for fid, fname in ALLOWED_FIELD_TYPES.items()
-                    ]
+                    [f"'{fid}' for '{fname}' fields" for fid, fname in ALLOWED_FIELD_TYPES.items()]
                 )
                 raise ValueError(
                     f"Field '{field}' does not have a valid field type. "
@@ -996,9 +969,7 @@ class ChatRequest(BaseModel):
     range_creation_start: Optional[datetime] = (
         SearchParamDefaults.range_creation_start.to_pydantic_field()
     )
-    range_creation_end: Optional[datetime] = (
-        SearchParamDefaults.range_creation_end.to_pydantic_field()
-    )
+    range_creation_end: Optional[datetime] = SearchParamDefaults.range_creation_end.to_pydantic_field()
     range_modification_start: Optional[datetime] = (
         SearchParamDefaults.range_modification_start.to_pydantic_field()
     )
@@ -1006,16 +977,10 @@ class ChatRequest(BaseModel):
         SearchParamDefaults.range_modification_end.to_pydantic_field()
     )
     show: List[ResourceProperties] = SearchParamDefaults.show.to_pydantic_field()
-    field_type_filter: List[FieldTypeName] = (
-        SearchParamDefaults.field_type_filter.to_pydantic_field()
-    )
-    extracted: List[ExtractedDataTypeName] = (
-        SearchParamDefaults.extracted.to_pydantic_field()
-    )
+    field_type_filter: List[FieldTypeName] = SearchParamDefaults.field_type_filter.to_pydantic_field()
+    extracted: List[ExtractedDataTypeName] = SearchParamDefaults.extracted.to_pydantic_field()
     shards: List[str] = SearchParamDefaults.shards.to_pydantic_field()
-    context: Optional[List[ChatContextMessage]] = (
-        SearchParamDefaults.chat_context.to_pydantic_field()
-    )
+    context: Optional[List[ChatContextMessage]] = SearchParamDefaults.chat_context.to_pydantic_field()
     extra_context: Optional[List[str]] = Field(
         default=None,
         title="Extra query context",
@@ -1024,9 +989,7 @@ class ChatRequest(BaseModel):
     )
     autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
     highlight: bool = SearchParamDefaults.highlight.to_pydantic_field()
-    resource_filters: List[str] = (
-        SearchParamDefaults.resource_filters.to_pydantic_field()
-    )
+    resource_filters: List[str] = SearchParamDefaults.resource_filters.to_pydantic_field()
     prompt: Optional[str] = Field(
         default=None,
         title="Prompt",
@@ -1037,9 +1000,7 @@ class ChatRequest(BaseModel):
         default=False,
         description="Whether to include the citations for the answer in the response",
     )
-    security: Optional[RequestSecurity] = (
-        SearchParamDefaults.security.to_pydantic_field()
-    )
+    security: Optional[RequestSecurity] = SearchParamDefaults.security.to_pydantic_field()
     rag_strategies: list[RagStrategies] = Field(
         default=[],
         title="RAG context building strategies",
@@ -1078,9 +1039,7 @@ class ChatRequest(BaseModel):
 
     @field_validator("rag_strategies", mode="before")
     @classmethod
-    def validate_rag_strategies(
-        cls, rag_strategies: list[RagStrategies]
-    ) -> list[RagStrategies]:
+    def validate_rag_strategies(cls, rag_strategies: list[RagStrategies]) -> list[RagStrategies]:
         unique_strategy_names: set[str] = set()
         for strategy in rag_strategies or []:
             if not isinstance(strategy, dict):
@@ -1092,10 +1051,7 @@ class ChatRequest(BaseModel):
         if len(unique_strategy_names) != len(rag_strategies):
             raise ValueError("There must be at most one strategy of each type")
         # If full resource strategy is chosen, it must be the only strategy
-        if (
-            RagStrategyName.FULL_RESOURCE in unique_strategy_names
-            and len(rag_strategies) > 1
-        ):
+        if RagStrategyName.FULL_RESOURCE in unique_strategy_names and len(rag_strategies) > 1:
             raise ValueError(
                 f"If '{RagStrategyName.FULL_RESOURCE}' strategy is chosen, it must be the only strategy"
             )
@@ -1173,13 +1129,11 @@ class SummarizedResponse(BaseModel):
 
 
 class FindRequest(BaseSearchRequest):
-    features: List[SearchOptions] = (
-        SearchParamDefaults.search_features.to_pydantic_field(
-            default=[
-                SearchOptions.PARAGRAPH,
-                SearchOptions.VECTOR,
-            ]
-        )
+    features: List[SearchOptions] = SearchParamDefaults.search_features.to_pydantic_field(
+        default=[
+            SearchOptions.PARAGRAPH,
+            SearchOptions.VECTOR,
+        ]
     )
 
     @field_validator("features")

@@ -22,7 +22,6 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from tests.ingest.fixtures import create_resource
 
 from nucliadb.common import datamanagers
 from nucliadb.ingest.consumer import materializer
@@ -31,6 +30,7 @@ from nucliadb_utils import const
 from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import KbUsage, Service
 from nucliadb_utils.utilities import Utility, clean_utility, set_utility
+from tests.ingest.fixtures import create_resource
 
 pytestmark = pytest.mark.asyncio
 
@@ -84,16 +84,9 @@ async def test_materialize_kb_data(
     await mz.initialize()
 
     async with datamanagers.with_transaction() as txn:
+        assert await datamanagers.resources.get_number_of_resources(txn, kbid=knowledgebox_ingest) == -1
         assert (
-            await datamanagers.resources.get_number_of_resources(
-                txn, kbid=knowledgebox_ingest
-            )
-            == -1
-        )
-        assert (
-            await datamanagers.resources.calculate_number_of_resources(
-                txn, kbid=knowledgebox_ingest
-            )
+            await datamanagers.resources.calculate_number_of_resources(txn, kbid=knowledgebox_ingest)
             == count
         )
 
@@ -109,10 +102,7 @@ async def test_materialize_kb_data(
 
     async with datamanagers.with_transaction() as txn:
         assert (
-            await datamanagers.resources.get_number_of_resources(
-                txn, kbid=knowledgebox_ingest
-            )
-            == count
+            await datamanagers.resources.get_number_of_resources(txn, kbid=knowledgebox_ingest) == count
         )
 
     await mz.finalize()

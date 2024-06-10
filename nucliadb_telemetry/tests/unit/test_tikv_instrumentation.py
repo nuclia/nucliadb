@@ -28,9 +28,7 @@ from nucliadb_telemetry.tikv import TiKVInstrumentor
 
 
 @pytest.mark.asyncio
-async def test_tikv_instrumentation(
-    mocked_tracer_provider: TracerProvider, mock_tikv_client
-):
+async def test_tikv_instrumentation(mocked_tracer_provider: TracerProvider, mock_tikv_client):
     tracer_provider = mocked_tracer_provider
     TiKVInstrumentor().instrument(tracer_provider=tracer_provider)
 
@@ -104,13 +102,9 @@ async def test_tikv_instrumentation(
         expected_attrs = expected.kwargs.get("attributes")
         if expected_attrs:
             mocked_attrs = mocked.kwargs["attributes"]
+            assert mocked_attrs[SpanAttributes.DB_SYSTEM] == expected_attrs[SpanAttributes.DB_SYSTEM]
             assert (
-                mocked_attrs[SpanAttributes.DB_SYSTEM]
-                == expected_attrs[SpanAttributes.DB_SYSTEM]
-            )
-            assert (
-                mocked_attrs[SpanAttributes.DB_OPERATION]
-                == expected_attrs[SpanAttributes.DB_OPERATION]
+                mocked_attrs[SpanAttributes.DB_OPERATION] == expected_attrs[SpanAttributes.DB_OPERATION]
             )
             assert mocked_attrs[SpanAttributes.CODE_FILEPATH] == __file__
             assert __name__.endswith(mocked_attrs[SpanAttributes.CODE_FUNCTION])
@@ -127,9 +121,7 @@ def mocked_tracer_provider() -> TracerProvider:
     tracer.start_as_current_span.return_value = span_ctx
 
     tracer_provider = Mock(name="tracer_provider")
-    tracer_provider.get_tracer = Mock(
-        name="tracer_provider.get_tracer", return_value=tracer
-    )
+    tracer_provider.get_tracer = Mock(name="tracer_provider.get_tracer", return_value=tracer)
     return tracer_provider
 
 

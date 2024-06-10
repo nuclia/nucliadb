@@ -29,12 +29,12 @@ from typing import TYPE_CHECKING, Any, Optional, TypeVar
 import aiohttp
 import backoff
 import jwt
-from nucliadb_protos.resources_pb2 import CloudFile
-from nucliadb_protos.resources_pb2 import FieldFile as FieldFilePB
 from pydantic import BaseModel, Field
 
 import nucliadb_models as models
 from nucliadb_models.resource import QueueType
+from nucliadb_protos.resources_pb2 import CloudFile
+from nucliadb_protos.resources_pb2 import FieldFile as FieldFilePB
 from nucliadb_telemetry import metrics
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.settings import FileBackendConfig, nuclia_settings, storage_settings
@@ -162,33 +162,21 @@ class ProcessingEngine:
         self.nuclia_service_account = nuclia_service_account
         self.nuclia_zone = nuclia_zone
         if nuclia_public_url is not None:
-            self.nuclia_public_url: Optional[str] = nuclia_public_url.format(
-                zone=nuclia_zone
-            )
+            self.nuclia_public_url: Optional[str] = nuclia_public_url.format(zone=nuclia_zone)
         else:
             self.nuclia_public_url = None
 
         self.onprem = onprem
         if self.onprem:
-            self.nuclia_upload_url = (
-                f"{self.nuclia_public_url}/api/v1/processing/upload"
-            )
+            self.nuclia_upload_url = f"{self.nuclia_public_url}/api/v1/processing/upload"
         else:
-            self.nuclia_upload_url = (
-                f"{nuclia_processing_cluster_url}/api/v1/processing/upload"
-            )
-        self.nuclia_internal_push = (
-            f"{nuclia_processing_cluster_url}/api/v1/internal/processing/push"
-        )
+            self.nuclia_upload_url = f"{nuclia_processing_cluster_url}/api/v1/processing/upload"
+        self.nuclia_internal_push = f"{nuclia_processing_cluster_url}/api/v1/internal/processing/push"
         self.nuclia_internal_delete = (
             f"{nuclia_processing_cluster_url}/api/v1/internal/processing/requests"
         )
-        self.nuclia_external_push_v2 = (
-            f"{self.nuclia_public_url}/api/v1/processing/push"
-        )
-        self.nuclia_external_delete = (
-            f"{self.nuclia_public_url}/api/v1/processing/requests"
-        )
+        self.nuclia_external_push_v2 = f"{self.nuclia_public_url}/api/v1/processing/push"
+        self.nuclia_external_delete = f"{self.nuclia_public_url}/api/v1/processing/requests"
 
         self.nuclia_jwt_key = nuclia_jwt_key
         self.days_to_keep = days_to_keep
@@ -314,9 +302,7 @@ class ProcessingEngine:
         max_tries=MAX_TRIES,
     )
     @processing_observer.wrap({"type": "file_field_upload_internal"})
-    async def convert_internal_filefield_to_str(
-        self, file: FieldFilePB, storage: Storage
-    ) -> str:
+    async def convert_internal_filefield_to_str(self, file: FieldFilePB, storage: Storage) -> str:
         """It's already an internal file that needs to be uploaded"""
         if self.onprem is False:
             # Upload the file to processing upload
@@ -325,9 +311,7 @@ class ProcessingEngine:
             headers = {}
             headers["X-PASSWORD"] = file.password
             headers["X-LANGUAGE"] = file.language
-            headers["X-FILENAME"] = base64.b64encode(
-                file.file.filename.encode()
-            ).decode()
+            headers["X-FILENAME"] = base64.b64encode(file.file.filename.encode()).decode()
             headers["X-MD5"] = file.file.md5
             headers["CONTENT-TYPE"] = file.file.content_type
             if file.file.size:
@@ -335,9 +319,7 @@ class ProcessingEngine:
             headers["X-STF-NUAKEY"] = f"Bearer {self.nuclia_service_account}"
 
             iterator = storage.downloadbytescf_iterator(file.file)
-            async with self.session.post(
-                self.nuclia_upload_url, data=iterator, headers=headers
-            ) as resp:
+            async with self.session.post(self.nuclia_upload_url, data=iterator, headers=headers) as resp:
                 if resp.status == 200:
                     jwttoken = await resp.text()
                 elif resp.status == 402:
@@ -371,9 +353,7 @@ class ProcessingEngine:
             headers["X-STF-NUAKEY"] = f"Bearer {self.nuclia_service_account}"
 
             iterator = storage.downloadbytescf_iterator(cf)
-            async with self.session.post(
-                self.nuclia_upload_url, data=iterator, headers=headers
-            ) as resp:
+            async with self.session.post(self.nuclia_upload_url, data=iterator, headers=headers) as resp:
                 if resp.status == 200:
                     jwttoken = await resp.text()
                 elif resp.status == 402:
@@ -393,9 +373,7 @@ class ProcessingEngine:
         jitter=backoff.random_jitter,
         max_tries=MAX_TRIES,
     )
-    async def send_to_process(
-        self, item: PushPayload, partition: int
-    ) -> ProcessingInfo:
+    async def send_to_process(self, item: PushPayload, partition: int) -> ProcessingInfo:
         op_type = "process_external" if self.onprem else "process_internal"
         with processing_observer({"type": op_type}):
             headers = {"CONTENT-TYPE": "application/json"}
@@ -406,9 +384,7 @@ class ProcessingEngine:
                     url=self.nuclia_internal_push, data=item.json(), headers=headers
                 )
             else:
-                headers.update(
-                    {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
-                )
+                headers.update({"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"})
                 # Upload the payload
                 resp = await self.session.post(
                     url=self.nuclia_external_push_v2, data=item.json(), headers=headers
@@ -441,9 +417,7 @@ class ProcessingEngine:
             queue=QueueType(queue_type) if queue_type is not None else None,
         )
 
-    async def delete_from_processing(
-        self, *, kbid: str, resource_id: Optional[str] = None
-    ) -> None:
+    async def delete_from_processing(self, *, kbid: str, resource_id: Optional[str] = None) -> None:
         """
         Delete a resource from processing. This prevents inflight resources from being processed
         and wasting resources.
@@ -495,9 +469,7 @@ class DummyProcessingEngine(ProcessingEngine):
         self.values["convert_external_filefield_to_str"].append(file_field)
         return f"convert_external_filefield_to_str,{index}"
 
-    async def convert_internal_filefield_to_str(
-        self, file: FieldFilePB, storage: Storage
-    ) -> str:
+    async def convert_internal_filefield_to_str(self, file: FieldFilePB, storage: Storage) -> str:
         self.calls.append([file, storage])
         index = len(self.values["convert_internal_filefield_to_str"])
         self.values["convert_internal_filefield_to_str"].append([file, storage])
@@ -509,16 +481,10 @@ class DummyProcessingEngine(ProcessingEngine):
         self.values["convert_internal_cf_to_str"].append([cf, storage])
         return f"convert_internal_cf_to_str,{index}"
 
-    async def send_to_process(
-        self, item: PushPayload, partition: int
-    ) -> ProcessingInfo:
+    async def send_to_process(self, item: PushPayload, partition: int) -> ProcessingInfo:
         self.calls.append([item, partition])
         self.values["send_to_process"].append([item, partition])
-        return ProcessingInfo(
-            seqid=len(self.calls), account_seq=0, queue=QueueType.SHARED
-        )
+        return ProcessingInfo(seqid=len(self.calls), account_seq=0, queue=QueueType.SHARED)
 
-    async def delete_from_processing(
-        self, *, kbid: str, resource_id: Optional[str] = None
-    ) -> None:
+    async def delete_from_processing(self, *, kbid: str, resource_id: Optional[str] = None) -> None:
         self.calls.append([kbid, resource_id])

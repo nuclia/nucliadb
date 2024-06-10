@@ -24,7 +24,6 @@ from typing import Optional
 import nats
 import nats.errors
 from aiohttp.client_exceptions import ClientConnectorError
-from nucliadb_protos.writer_pb2 import BrokerMessage, BrokerMessageBlobReference
 
 from nucliadb.common import datamanagers
 from nucliadb.common.http_clients.processing import ProcessingHTTPClient, get_nua_api_id
@@ -32,6 +31,7 @@ from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest import logger, logger_activity
 from nucliadb.ingest.orm.exceptions import ReallyStopPulling
 from nucliadb.ingest.orm.processor import Processor
+from nucliadb_protos.writer_pb2 import BrokerMessage, BrokerMessageBlobReference
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
@@ -78,9 +78,7 @@ class PullWorker:
         data = base64.b64decode(payload)
         pb.ParseFromString(data)
 
-        logger.debug(
-            f"Resource: {pb.uuid} KB: {pb.kbid} ProcessingID: {pb.processing_id}"
-        )
+        logger.debug(f"Resource: {pb.uuid} KB: {pb.kbid} ProcessingID: {pb.processing_id}")
 
         if not self.local_subscriber:
             transaction_utility = get_transaction_utility()
@@ -95,9 +93,7 @@ class PullWorker:
                 )
             except nats.errors.MaxPayloadError:
                 storage = await get_storage()
-                stored_key = await storage.set_stream_message(
-                    kbid=pb.kbid, rid=pb.uuid, data=data
-                )
+                stored_key = await storage.set_stream_message(kbid=pb.kbid, rid=pb.uuid, data=data)
                 referenced_pb = BrokerMessageBlobReference(
                     uuid=pb.uuid, kbid=pb.kbid, storage_key=stored_key
                 )
@@ -141,9 +137,7 @@ class PullWorker:
             try:
                 pull_type_id = get_nua_api_id()
             except Exception as exc:
-                logger.exception(
-                    "Could not read NUA API Key. Can not start pull worker"
-                )
+                logger.exception("Could not read NUA API Key. Can not start pull worker")
                 raise ReallyStopPulling() from exc
         else:
             pull_type_id = "main"
@@ -176,9 +170,7 @@ class PullWorker:
                                 await self.handle_message(payload)
                         except Exception as e:
                             errors.capture_exception(e)
-                            logger.exception(
-                                "Error while pulling and processing message/s"
-                            )
+                            logger.exception("Error while pulling and processing message/s")
                             raise e
                         async with datamanagers.with_transaction() as txn:
                             await datamanagers.processing.set_pull_offset(
@@ -189,9 +181,7 @@ class PullWorker:
                             )
                             await txn.commit()
                     elif data.status == "empty":
-                        logger_activity.debug(
-                            f"No messages waiting in partition #{self.partition}"
-                        )
+                        logger_activity.debug(f"No messages waiting in partition #{self.partition}")
                         await asyncio.sleep(self.pull_time_empty_backoff)
                     else:
                         logger.info(f"Proxy pull answered with error: {data}")
@@ -202,9 +192,7 @@ class PullWorker:
                     KeyboardInterrupt,
                     SystemExit,
                 ):
-                    logger.info(
-                        f"Pull task for partition #{self.partition} was canceled, exiting"
-                    )
+                    logger.info(f"Pull task for partition #{self.partition} was canceled, exiting")
                     raise ReallyStopPulling()
 
                 except ClientConnectorError:
@@ -219,9 +207,7 @@ class PullWorker:
                         payload_length = 0
                         if data.payload:
                             payload_length = len(base64.b64decode(data.payload))
-                        logger.error(
-                            f"Message too big for transaction: {payload_length}"
-                        )
+                        logger.error(f"Message too big for transaction: {payload_length}")
                     raise e
                 except Exception:
                     logger.exception("Unhandled error pulling messages from processing")

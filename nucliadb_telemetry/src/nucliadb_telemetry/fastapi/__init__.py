@@ -46,9 +46,7 @@ except ImportError:  # pragma: no cover
 
 async def metrics_endpoint(request):
     output = prometheus_client.exposition.generate_latest()
-    return PlainTextResponse(
-        output.decode("utf8"), headers={"Content-Type": CONTENT_TYPE_LATEST}
-    )
+    return PlainTextResponse(output.decode("utf8"), headers={"Content-Type": CONTENT_TYPE_LATEST})
 
 
 application_metrics = FastAPI(title="Metrics")

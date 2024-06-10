@@ -62,9 +62,7 @@ class ConcurrentRunner:
         return results
 
 
-async def run_concurrently(
-    tasks: list[Coroutine], max_concurrent: Optional[int] = None
-) -> list[Any]:
+async def run_concurrently(tasks: list[Coroutine], max_concurrent: Optional[int] = None) -> list[Any]:
     """
     Runs a list of coroutines concurrently, with a maximum number of tasks running.
     Returns the results of the coroutines in the order they were scheduled.

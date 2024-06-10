@@ -53,9 +53,7 @@ def validate():
     versions = set()
     for migration in migrations:
         if migration.version in versions:
-            raise MigrationValidationError(
-                f"Migration {migration.version} is duplicated"
-            )
+            raise MigrationValidationError(f"Migration {migration.version} is duplicated")
         versions.add(migration.version)
 
 

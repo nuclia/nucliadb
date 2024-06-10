@@ -29,8 +29,8 @@ import backoff
 import botocore  # type: ignore
 from aiobotocore.client import AioBaseClient  # type: ignore
 from aiobotocore.session import AioSession, get_session  # type: ignore
-from nucliadb_protos.resources_pb2 import CloudFile
 
+from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_telemetry import errors
 from nucliadb_utils import logger
 from nucliadb_utils.storages.exceptions import UnparsableResponse
@@ -85,9 +85,7 @@ class S3StorageField(StorageField):
     ):
         range = range or Range()
         if range.any():
-            coro = self.storage._s3aioclient.get_object(
-                Bucket=bucket, Key=uri, Range=range.to_header()
-            )
+            coro = self.storage._s3aioclient.get_object(Bucket=bucket, Key=uri, Range=range.to_header())
         else:
             coro = self.storage._s3aioclient.get_object(Bucket=bucket, Key=uri)
         try:
@@ -99,9 +97,7 @@ class S3StorageField(StorageField):
             else:
                 raise
 
-    async def iter_data(
-        self, range: Optional[Range] = None
-    ) -> AsyncGenerator[bytes, None]:
+    async def iter_data(self, range: Optional[Range] = None) -> AsyncGenerator[bytes, None]:
         # Suports field and key based iter
         uri = self.field.uri if self.field else self.key
         if self.field is None:
@@ -230,9 +226,7 @@ class S3StorageField(StorageField):
                 self.field.ClearField("old_uri")
                 self.field.ClearField("old_bucket")
             except botocore.exceptions.ClientError:
-                logger.error(
-                    f"Referenced key {self.field.uri} could not be found", exc_info=True
-                )
+                logger.error(f"Referenced key {self.field.uri} could not be found", exc_info=True)
                 logger.warning("Error deleting object", exc_info=True)
 
         if self.field.resumable_uri != "":
@@ -259,8 +253,7 @@ class S3StorageField(StorageField):
             self.field.offset += 1
         part_info = {
             "Parts": [
-                {"PartNumber": part + 1, "ETag": etag}
-                for part, etag in enumerate(self.field.parts)
+                {"PartNumber": part + 1, "ETag": etag} for part, etag in enumerate(self.field.parts)
             ]
         }
         await self.storage._s3aioclient.complete_multipart_upload(
@@ -318,9 +311,7 @@ class S3StorageField(StorageField):
         origin_bucket_name: str,
         destination_bucket_name: str,
     ):
-        await self.copy(
-            origin_uri, destination_uri, origin_bucket_name, destination_bucket_name
-        )
+        await self.copy(origin_uri, destination_uri, origin_bucket_name, destination_bucket_name)
         await self.storage.delete_upload(origin_uri, origin_bucket_name)
 
     async def upload(self, iterator: AsyncIterator, origin: CloudFile) -> CloudFile:
@@ -368,9 +359,7 @@ class S3Storage(Storage):
             verify=verify_ssl,
             use_ssl=use_ssl,
             region_name=region_name,
-            config=aiobotocore.config.AioConfig(
-                None, max_pool_connections=max_pool_connections
-            ),
+            config=aiobotocore.config.AioConfig(None, max_pool_connections=max_pool_connections),
         )
         self._exit_stack = AsyncExitStack()
         self.bucket = bucket
@@ -415,9 +404,7 @@ class S3Storage(Storage):
         else:
             raise AttributeError("No valid uri")
 
-    async def iterate_objects(
-        self, bucket: str, prefix: str = "/"
-    ) -> AsyncGenerator[ObjectInfo, None]:
+    async def iterate_objects(self, bucket: str, prefix: str = "/") -> AsyncGenerator[ObjectInfo, None]:
         paginator = self._s3aioclient.get_paginator("list_objects")
         async for result in paginator.paginate(Bucket=bucket, Prefix=prefix):
             for item in result.get("Contents", []):
@@ -431,9 +418,7 @@ class S3Storage(Storage):
         return await bucket_exists(self._s3aioclient, bucket_name)
 
     async def create_bucket(self, bucket_name: str):
-        await create_bucket(
-            self._s3aioclient, bucket_name, self._bucket_tags, self._region_name
-        )
+        await create_bucket(self._s3aioclient, bucket_name, self._bucket_tags, self._region_name)
 
     async def schedule_delete_kb(self, kbid: str):
         bucket_name = self.get_bucket_name(kbid)
@@ -504,9 +489,7 @@ async def create_bucket(
 ):
     bucket_creation_options = {}
     if region_name is not None:
-        bucket_creation_options = {
-            "CreateBucketConfiguration": {"LocationConstraint": region_name}
-        }
+        bucket_creation_options = {"CreateBucketConfiguration": {"LocationConstraint": region_name}}
     # Create the bucket
     await client.create_bucket(Bucket=bucket_name, **bucket_creation_options)
 
@@ -516,8 +499,7 @@ async def create_bucket(
             Bucket=bucket_name,
             Tagging={
                 "TagSet": [
-                    {"Key": tag_key, "Value": tag_value}
-                    for tag_key, tag_value in bucket_tags.items()
+                    {"Key": tag_key, "Value": tag_value} for tag_key, tag_value in bucket_tags.items()
                 ]
             },
         )

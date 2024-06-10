@@ -21,11 +21,10 @@ from __future__ import annotations
 
 from typing import Optional
 
-from nucliadb_protos.resources_pb2 import CloudFile
-
 from nucliadb.writer import logger
 from nucliadb.writer.tus.dm import FileDataManager
 from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
+from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_utils.storages import CHUNK_SIZE
 from nucliadb_utils.storages.azure import AzureObjectStore
 from nucliadb_utils.storages.exceptions import ObjectNotFoundError
@@ -98,9 +97,7 @@ class AzureFileStorageManager(FileStorageManager):
         assert bucket is not None
         path = dm.get("path")
         assert path is not None
-        uploaded_bytes = await self.object_store.upload_multipart_append(
-            bucket, path, iterable
-        )
+        uploaded_bytes = await self.object_store.upload_multipart_append(bucket, path, iterable)
         await dm.update(offset=offset)
         return uploaded_bytes
 

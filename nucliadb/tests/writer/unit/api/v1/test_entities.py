@@ -21,17 +21,7 @@ import uuid
 from unittest.mock import AsyncMock, Mock
 
 import pytest
-from nucliadb_protos.writer_pb2 import (
-    NewEntitiesGroupResponse,
-    OpStatusWriter,
-    UpdateEntitiesGroupResponse,
-)
 from pytest_mock import MockerFixture
-from tests.utils.entities import (
-    create_entities_group,
-    delete_entities_group,
-    update_entities_group,
-)
 
 from nucliadb_models.entities import (
     CreateEntitiesGroupPayload,
@@ -39,6 +29,16 @@ from nucliadb_models.entities import (
     UpdateEntitiesGroupPayload,
 )
 from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_protos.writer_pb2 import (
+    NewEntitiesGroupResponse,
+    OpStatusWriter,
+    UpdateEntitiesGroupResponse,
+)
+from tests.utils.entities import (
+    create_entities_group,
+    delete_entities_group,
+    update_entities_group,
+)
 
 pytestmark = pytest.mark.asyncio
 
@@ -52,9 +52,7 @@ class TestEntitiesApi:
     @pytest.fixture(autouse=True)
     async def ingest_mock(self, mocker: MockerFixture):
         mock = AsyncMock()
-        mocker.patch(
-            "nucliadb.writer.api.v1.services.get_ingest", new=Mock(return_value=mock)
-        )
+        mocker.patch("nucliadb.writer.api.v1.services.get_ingest", new=Mock(return_value=mock))
         yield mock
 
     @pytest.fixture
@@ -90,9 +88,7 @@ class TestEntitiesApi:
             status=NewEntitiesGroupResponse.Status.OK
         )
         async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-            resp = await create_entities_group(
-                client, knowledgebox, animals_entities_group
-            )
+            resp = await create_entities_group(client, knowledgebox, animals_entities_group)
             assert resp.status_code == 200
 
     async def test_create_entities_group_that_already_exists(
@@ -106,9 +102,7 @@ class TestEntitiesApi:
             status=NewEntitiesGroupResponse.Status.ALREADY_EXISTS
         )
         async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-            resp = await create_entities_group(
-                client, knowledgebox, animals_entities_group
-            )
+            resp = await create_entities_group(client, knowledgebox, animals_entities_group)
             assert resp.status_code == 409
 
     async def test_create_entities_group_kb_not_found(
@@ -122,9 +116,7 @@ class TestEntitiesApi:
             status=NewEntitiesGroupResponse.Status.KB_NOT_FOUND
         )
         async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-            resp = await create_entities_group(
-                client, knowledgebox, animals_entities_group
-            )
+            resp = await create_entities_group(client, knowledgebox, animals_entities_group)
             assert resp.status_code == 404
 
     async def test_create_entities_group_ingest_error(
@@ -138,9 +130,7 @@ class TestEntitiesApi:
             status=NewEntitiesGroupResponse.Status.ERROR
         )
         async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-            resp = await create_entities_group(
-                client, knowledgebox, animals_entities_group
-            )
+            resp = await create_entities_group(client, knowledgebox, animals_entities_group)
             assert resp.status_code == 500
 
     async def test_update_entities_group(
@@ -154,9 +144,7 @@ class TestEntitiesApi:
             status=UpdateEntitiesGroupResponse.Status.OK
         )
         async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-            resp = await update_entities_group(
-                client, knowledgebox, "ANIMALS", animals_update
-            )
+            resp = await update_entities_group(client, knowledgebox, "ANIMALS", animals_update)
             assert resp.status_code == 200
 
     async def test_update_entities_group_kb_not_found(
@@ -170,9 +158,7 @@ class TestEntitiesApi:
             status=UpdateEntitiesGroupResponse.Status.KB_NOT_FOUND
         )
         async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-            resp = await update_entities_group(
-                client, knowledgebox, "ANIMALS", animals_update
-            )
+            resp = await update_entities_group(client, knowledgebox, "ANIMALS", animals_update)
             assert resp.status_code == 404
 
     async def test_update_entities_group_entities_group_not_found(
@@ -186,9 +172,7 @@ class TestEntitiesApi:
             status=UpdateEntitiesGroupResponse.Status.ENTITIES_GROUP_NOT_FOUND
         )
         async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-            resp = await update_entities_group(
-                client, knowledgebox, "ANIMALS", animals_update
-            )
+            resp = await update_entities_group(client, knowledgebox, "ANIMALS", animals_update)
             assert resp.status_code == 404
 
     async def test_update_entities_group_ingest_error(
@@ -202,9 +186,7 @@ class TestEntitiesApi:
             status=UpdateEntitiesGroupResponse.Status.ERROR
         )
         async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-            resp = await update_entities_group(
-                client, knowledgebox, "ANIMALS", animals_update
-            )
+            resp = await update_entities_group(client, knowledgebox, "ANIMALS", animals_update)
             assert resp.status_code == 500
 
     async def test_delete_entities_group(
@@ -213,9 +195,7 @@ class TestEntitiesApi:
         knowledgebox: str,
         ingest_mock: AsyncMock,
     ):
-        ingest_mock.DelEntities.return_value = OpStatusWriter(
-            status=OpStatusWriter.Status.OK
-        )
+        ingest_mock.DelEntities.return_value = OpStatusWriter(status=OpStatusWriter.Status.OK)
         async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
             resp = await delete_entities_group(client, knowledgebox, "ANIMALS")
             assert resp.status_code == 200
@@ -226,9 +206,7 @@ class TestEntitiesApi:
         knowledgebox: str,
         ingest_mock: AsyncMock,
     ):
-        ingest_mock.DelEntities.return_value = OpStatusWriter(
-            status=OpStatusWriter.Status.NOTFOUND
-        )
+        ingest_mock.DelEntities.return_value = OpStatusWriter(status=OpStatusWriter.Status.NOTFOUND)
         async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
             resp = await delete_entities_group(client, knowledgebox, "ANIMALS")
             assert resp.status_code == 404
@@ -239,9 +217,7 @@ class TestEntitiesApi:
         knowledgebox: str,
         ingest_mock: AsyncMock,
     ):
-        ingest_mock.DelEntities.return_value = OpStatusWriter(
-            status=OpStatusWriter.Status.ERROR
-        )
+        ingest_mock.DelEntities.return_value = OpStatusWriter(status=OpStatusWriter.Status.ERROR)
         async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
             resp = await delete_entities_group(client, knowledgebox, "ANIMALS")
             assert resp.status_code == 500

@@ -21,13 +21,13 @@ import asyncio
 from unittest import mock
 
 import pytest
-from nucliadb_protos.writer_pb2 import BrokerMessage, Notification
 
 from nucliadb.reader.reader.notifications import (
     kb_notifications,
     kb_notifications_stream,
 )
 from nucliadb_protos import writer_pb2
+from nucliadb_protos.writer_pb2 import BrokerMessage, Notification
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.cache.settings import settings as cache_settings

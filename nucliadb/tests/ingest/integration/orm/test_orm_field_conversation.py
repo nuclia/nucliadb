@@ -22,12 +22,11 @@ from os.path import dirname, getsize
 from uuid import uuid4
 
 import pytest
-from nucliadb_protos.resources_pb2 import CloudFile
-from nucliadb_protos.resources_pb2 import Conversation as PBConversation
-from nucliadb_protos.resources_pb2 import FieldType, Message, MessageContent
 
 from nucliadb.ingest.fields.conversation import PAGE_SIZE, Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb_protos.resources_pb2 import CloudFile, FieldType, Message, MessageContent
+from nucliadb_protos.resources_pb2 import Conversation as PBConversation
 from nucliadb_utils.storages.storage import Storage
 
 
@@ -50,9 +49,7 @@ async def test_create_resource_orm_field_conversation(
     c2.messages.append(conv1)
     await r.set_field(FieldType.CONVERSATION, "conv1", c2)
 
-    convfield: Conversation = await r.get_field(
-        "conv1", FieldType.CONVERSATION, load=True
-    )
+    convfield: Conversation = await r.get_field("conv1", FieldType.CONVERSATION, load=True)
     assert convfield.metadata is not None
     assert convfield.metadata.pages == 1
     assert convfield.value[1].messages[0].content.text == "hello"
@@ -106,19 +103,13 @@ async def test_create_resource_orm_field_conversation_file(
 
     await r.set_field(FieldType.CONVERSATION, "conv1", c2)
 
-    convfield: Conversation = await r.get_field(
-        "conv1", FieldType.CONVERSATION, load=True
-    )
+    convfield: Conversation = await r.get_field("conv1", FieldType.CONVERSATION, load=True)
     assert convfield.metadata is not None
     assert convfield.metadata.pages == 1
     assert convfield.value[1].messages[0].content.text == "hello"
 
-    assert (
-        convfield.value[1].messages[0].content.attachments[0].source == storage.source
-    )
-    data = await storage.downloadbytescf(
-        convfield.value[1].messages[0].content.attachments[0]
-    )
+    assert convfield.value[1].messages[0].content.attachments[0].source == storage.source
+    data = await storage.downloadbytescf(convfield.value[1].messages[0].content.attachments[0])
 
     with open(filename, "rb") as testfile:
         data2 = testfile.read()

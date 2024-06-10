@@ -22,12 +22,12 @@ import tempfile
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from nucliadb_protos.noderesources_pb2 import ShardId
-from nucliadb_protos.utils_pb2 import RelationNode
 
 from nucliadb.common.cluster.settings import Settings
 from nucliadb.common.cluster.standalone import service
 from nucliadb_protos import nodereader_pb2, standalone_pb2
+from nucliadb_protos.noderesources_pb2 import ShardId
+from nucliadb_protos.utils_pb2 import RelationNode
 
 pytestmark = pytest.mark.asyncio
 
@@ -52,9 +52,7 @@ def self_node(cluster_settings):
     self_node.reader.Search.return_value = nodereader_pb2.SearchResponse()
 
     relation_edges = nodereader_pb2.EdgeList()
-    edge = nodereader_pb2.RelationEdge(
-        edge_type=RelationNode.NodeType.ENTITY, property="foo"
-    )
+    edge = nodereader_pb2.RelationEdge(edge_type=RelationNode.NodeType.ENTITY, property="foo")
     relation_edges.list.append(edge)
     self_node.reader.RelationEdges.return_value = relation_edges
 

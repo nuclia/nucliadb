@@ -18,15 +18,13 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import pytest
-from tests.ingest.fixtures import broker_resource
 
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox, chunker
+from tests.ingest.fixtures import broker_resource
 
 
 @pytest.mark.asyncio
-async def test_knowledgebox_purge_handles_unexisting_shard_payload(
-    storage, maindb_driver
-):
+async def test_knowledgebox_purge_handles_unexisting_shard_payload(storage, maindb_driver):
     await KnowledgeBox.purge(maindb_driver, "idonotexist")
 
 
@@ -36,9 +34,7 @@ def test_chunker():
     iterations = 0
     for chunk in chunker(list(range(total_items)), chunk_size):
         assert len(chunk) == chunk_size
-        assert chunk == list(
-            range(iterations * chunk_size, (iterations * chunk_size) + chunk_size)
-        )
+        assert chunk == list(range(iterations * chunk_size, (iterations * chunk_size) + chunk_size))
         iterations += 1
 
     assert iterations == total_items / chunk_size

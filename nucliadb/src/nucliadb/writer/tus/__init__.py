@@ -93,9 +93,7 @@ async def initialize():
 
     elif storage_settings.file_backend == FileBackendConfig.AZURE:
         if storage_settings.azure_connection_string is None:
-            raise ConfigurationError(
-                "AZURE_CONNECTION_STRING env variable not configured"
-            )
+            raise ConfigurationError("AZURE_CONNECTION_STRING env variable not configured")
 
         storage_backend = AzureBlobStore()
         await storage_backend.initialize(storage_settings.azure_connection_string)

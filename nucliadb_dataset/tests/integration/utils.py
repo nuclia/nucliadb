@@ -20,16 +20,14 @@
 import tempfile
 
 import pyarrow as pa  # type: ignore
-from nucliadb_protos.dataset_pb2 import TrainSet
 
 from nucliadb_dataset.dataset import NucliaDBDataset
 from nucliadb_models.resource import KnowledgeBoxObj
+from nucliadb_protos.dataset_pb2 import TrainSet
 from nucliadb_sdk.v2.sdk import NucliaDB
 
 
-def export_dataset(
-    sdk: NucliaDB, trainset: TrainSet, kb: KnowledgeBoxObj
-) -> list[pa.Table]:
+def export_dataset(sdk: NucliaDB, trainset: TrainSet, kb: KnowledgeBoxObj) -> list[pa.Table]:
     with tempfile.TemporaryDirectory() as tmpdirname:
         dataset = NucliaDBDataset(
             sdk=sdk,

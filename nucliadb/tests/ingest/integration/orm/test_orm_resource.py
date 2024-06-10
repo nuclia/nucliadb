@@ -22,12 +22,17 @@ from typing import Optional
 from uuid import uuid4
 
 import pytest
+
+from nucliadb.ingest.orm.broker_message import generate_broker_message
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb_protos import resources_pb2 as rpb
+from nucliadb_protos import utils_pb2
+from nucliadb_protos import utils_pb2 as upb
 from nucliadb_protos.noderesources_pb2 import Resource
 from nucliadb_protos.resources_pb2 import Basic as PBBasic
 from nucliadb_protos.resources_pb2 import Classification as PBClassification
-from nucliadb_protos.resources_pb2 import ExtractedVectorsWrapper
+from nucliadb_protos.resources_pb2 import ExtractedVectorsWrapper, FieldType
 from nucliadb_protos.resources_pb2 import FieldID as PBFieldID
-from nucliadb_protos.resources_pb2 import FieldType
 from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
 from nucliadb_protos.resources_pb2 import Origin as PBOrigin
 from nucliadb_protos.resources_pb2 import TokenSplit as PBTokenSplit
@@ -44,17 +49,9 @@ from nucliadb_protos.writer_pb2 import (
 )
 from tests.ingest.fixtures import create_resource
 
-from nucliadb.ingest.orm.broker_message import generate_broker_message
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb_protos import resources_pb2 as rpb
-from nucliadb_protos import utils_pb2
-from nucliadb_protos import utils_pb2 as upb
-
 
 @pytest.mark.asyncio
-async def test_create_resource_orm_with_basic(
-    storage, txn, cache, fake_node, knowledgebox_ingest: str
-):
+async def test_create_resource_orm_with_basic(storage, txn, cache, fake_node, knowledgebox_ingest: str):
     basic = PBBasic(
         icon="text/plain",
         title="My title",
@@ -109,9 +106,7 @@ async def test_create_resource_orm_with_basic(
 
 
 @pytest.mark.asyncio
-async def test_iterate_paragraphs(
-    storage, txn, cache, fake_node, knowledgebox_ingest: str
-):
+async def test_iterate_paragraphs(storage, txn, cache, fake_node, knowledgebox_ingest: str):
     # Create a resource
     basic = PBBasic(
         icon="text/plain",
@@ -157,9 +152,7 @@ async def test_iterate_paragraphs(
 
 
 @pytest.mark.asyncio
-async def test_paragraphs_with_page(
-    storage, txn, cache, fake_node, knowledgebox_ingest: str
-):
+async def test_paragraphs_with_page(storage, txn, cache, fake_node, knowledgebox_ingest: str):
     # Create a resource
     basic = PBBasic(
         icon="text/plain",
@@ -219,9 +212,7 @@ async def test_paragraphs_with_page(
 
 
 @pytest.mark.asyncio
-async def test_vector_duplicate_fields(
-    storage, txn, cache, fake_node, knowledgebox_ingest: str
-):
+async def test_vector_duplicate_fields(storage, txn, cache, fake_node, knowledgebox_ingest: str):
     basic = PBBasic(title="My title", summary="My summary")
     basic.metadata.status = PBMetadata.Status.PROCESSED
 
@@ -277,9 +268,7 @@ async def test_vector_duplicate_fields(
         for pkey2, para2 in para.paragraphs.items():
             for key, sent in para2.sentences.items():
                 count += 1
-                assert (
-                    len(sent.vector) == 768
-                ), f"bad key {len(sent.vector)} {pkey1} - {pkey2} - {key}"
+                assert len(sent.vector) == 768, f"bad key {len(sent.vector)} {pkey1} - {pkey2} - {key}"
 
     assert count == 1
 
@@ -469,10 +458,7 @@ async def test_generate_index_message_contains_all_metadata(
     # Metadata
     assert index_message.metadata.created.seconds > 0
     assert index_message.metadata.modified.seconds > 0
-    assert (
-        index_message.metadata.modified.seconds
-        >= index_message.metadata.created.seconds
-    )
+    assert index_message.metadata.modified.seconds >= index_message.metadata.created.seconds
 
     # Processing status
     assert index_message.status == Resource.ResourceStatus.PROCESSED

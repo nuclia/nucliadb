@@ -91,16 +91,14 @@ class IndexAuditHandler:
             metrics.total_messages.inc({"action": "ignored", "type": "audit_counter"})
             return
 
-        self.task_handler.schedule(
-            notification.kbid, partial(self.process_kb, notification.kbid)
-        )
+        self.task_handler.schedule(notification.kbid, partial(self.process_kb, notification.kbid))
         metrics.total_messages.inc({"action": "scheduled", "type": "audit_counter"})
 
     @metrics.handler_histo.wrap({"type": "audit_counter"})
     async def process_kb(self, kbid: str) -> None:
         try:
-            shard_groups: list[writer_pb2.ShardObject] = (
-                await self.shard_manager.get_shards_by_kbid(kbid)
+            shard_groups: list[writer_pb2.ShardObject] = await self.shard_manager.get_shards_by_kbid(
+                kbid
             )
         except ShardsNotFound:
             logger.warning(f"No shards found for kbid {kbid}, skipping")
@@ -123,9 +121,7 @@ class IndexAuditHandler:
         await self.audit.report(
             kbid=kbid,
             audit_type=audit_pb2.AuditRequest.AuditType.INDEXED,
-            kb_counter=audit_pb2.AuditKBCounter(
-                fields=total_fields, paragraphs=total_paragraphs
-            ),
+            kb_counter=audit_pb2.AuditKBCounter(fields=total_fields, paragraphs=total_paragraphs),
         )
 
 
@@ -170,16 +166,11 @@ class ResourceWritesAuditHandler:
             return
 
         message_audit: writer_pb2.Audit = notification.message_audit
-        if (
-            message_audit.message_source
-            == writer_pb2.BrokerMessage.MessageSource.PROCESSOR
-        ):
+        if message_audit.message_source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR:
             metrics.total_messages.inc({"action": "ignored", "type": "audit_fields"})
             return
 
-        logger.info(
-            {"message": "Processing field audit for kbid", "kbid": notification.kbid}
-        )
+        logger.info({"message": "Processing field audit for kbid", "kbid": notification.kbid})
 
         metrics.total_messages.inc({"action": "scheduled", "type": "audit_fields"})
         with metrics.handler_histo({"type": "audit_fields"}):

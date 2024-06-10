@@ -41,9 +41,7 @@ async def feedback_download(
     kbid: str,
     month: str,
 ):
-    return await learning_collector_proxy(
-        request, "GET", f"/collect/feedback/{kbid}/{month}"
-    )
+    return await learning_collector_proxy(request, "GET", f"/collect/feedback/{kbid}/{month}")
 
 
 @api.get(

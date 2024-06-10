@@ -37,9 +37,7 @@ async def test_counters(
         json={
             "title": "My title",
             "slug": "myresource",
-            "usermetadata": {
-                "classifications": [{"labelset": "type", "label": "Book"}]
-            },
+            "usermetadata": {"classifications": [{"labelset": "type", "label": "Book"}]},
         },
     )
     assert resp.status_code == 201

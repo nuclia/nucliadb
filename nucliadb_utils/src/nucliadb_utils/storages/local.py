@@ -27,8 +27,8 @@ from datetime import datetime
 from typing import AsyncGenerator, AsyncIterator, Optional
 
 import aiofiles
-from nucliadb_protos.resources_pb2 import CloudFile
 
+from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_utils.storages import CHUNK_SIZE
 from nucliadb_utils.storages.storage import Storage, StorageField
 from nucliadb_utils.storages.utils import ObjectInfo, ObjectMetadata, Range
@@ -73,9 +73,7 @@ class LocalStorageField(StorageField):
         destination_path = f"{destination_bucket_path}/{destination_uri}"
         shutil.copy(origin_path, destination_path)
 
-    async def iter_data(
-        self, range: Optional[Range] = None
-    ) -> AsyncGenerator[bytes, None]:
+    async def iter_data(self, range: Optional[Range] = None) -> AsyncGenerator[bytes, None]:
         range = range or Range()
         key = self.field.uri if self.field else self.key
         if self.field is None:
@@ -85,7 +83,6 @@ class LocalStorageField(StorageField):
 
         path = self.storage.get_file_path(bucket, key)
         async with aiofiles.open(path, mode="rb") as resp:
-
             if range.start is not None:
                 # Seek to the start of the range
                 await resp.seek(range.start)
@@ -119,9 +116,7 @@ class LocalStorageField(StorageField):
     async def start(self, cf: CloudFile) -> CloudFile:
         if self.field is not None and self.field.upload_uri != "":
             # If there is a temporal url
-            await self.storage.delete_upload(
-                self.field.upload_uri, self.field.bucket_name
-            )
+            await self.storage.delete_upload(self.field.upload_uri, self.field.bucket_name)
 
         if self.field is not None and self.field.uri != "":
             field: CloudFile = CloudFile(
@@ -189,9 +184,7 @@ class LocalStorageField(StorageField):
             # Already has a file
             await self.storage.delete_upload(self.field.uri, self.field.bucket_name)
         if self.field.upload_uri != self.key:
-            await self.move(
-                self.field.upload_uri, self.key, self.field.bucket_name, self.bucket
-            )
+            await self.move(self.field.upload_uri, self.key, self.field.bucket_name, self.bucket)
 
         await self._handler.close()
         self.field.uri = self.key
@@ -280,9 +273,7 @@ class LocalStorage(Storage):
             deleted = False
         return deleted
 
-    async def iterate_objects(
-        self, bucket: str, prefix: str
-    ) -> AsyncGenerator[ObjectInfo, None]:
+    async def iterate_objects(self, bucket: str, prefix: str) -> AsyncGenerator[ObjectInfo, None]:
         for key in glob.glob(f"{bucket}/{prefix}*"):
             yield ObjectInfo(name=key)
 

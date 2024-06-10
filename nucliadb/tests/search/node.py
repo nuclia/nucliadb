@@ -29,13 +29,13 @@ import pytest
 from grpc import insecure_channel
 from grpc_health.v1 import health_pb2_grpc
 from grpc_health.v1.health_pb2 import HealthCheckRequest
-from nucliadb_protos.nodewriter_pb2 import EmptyQuery, ShardId
-from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 from pytest_lazy_fixtures import lazy_fixture
 
 from nucliadb.common.cluster.settings import settings as cluster_settings
+from nucliadb_protos.nodewriter_pb2 import EmptyQuery, ShardId
+from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
 from nucliadb_utils.tests.fixtures import get_testing_storage_backend
 
 logger = logging.getLogger(__name__)
@@ -240,9 +240,7 @@ class _NodeRunner:
         self.data = {}  # type: ignore
 
     def start(self):
-        docker_platform_name = self.docker_client.api.version()["Platform"][
-            "Name"
-        ].upper()
+        docker_platform_name = self.docker_client.api.version()["Platform"]["Name"].upper()
         if "GITHUB_ACTION" not in os.environ and (
             "DESKTOP" in docker_platform_name
             # newer versions use community
@@ -272,19 +270,17 @@ class _NodeRunner:
                 "WRITER_LISTEN_ADDRESS": f"{docker_internal_host}:{writer1_port}",
             }
         )
-        self.storage.server = self.storage.server.replace(
-            "localhost", docker_internal_host
-        )
+        self.storage.server = self.storage.server.replace("localhost", docker_internal_host)
         images.settings["nucliadb_node_sidecar"]["env"].update(self.storage.envs())
 
         sidecar1_host, sidecar1_port = nucliadb_node_1_sidecar.run(self.volume_node_1)
 
-        images.settings["nucliadb_node_sidecar"]["env"][
-            "READER_LISTEN_ADDRESS"
-        ] = f"{docker_internal_host}:{reader2_port}"
-        images.settings["nucliadb_node_sidecar"]["env"][
-            "WRITER_LISTEN_ADDRESS"
-        ] = f"{docker_internal_host}:{writer2_port}"
+        images.settings["nucliadb_node_sidecar"]["env"]["READER_LISTEN_ADDRESS"] = (
+            f"{docker_internal_host}:{reader2_port}"
+        )
+        images.settings["nucliadb_node_sidecar"]["env"]["WRITER_LISTEN_ADDRESS"] = (
+            f"{docker_internal_host}:{writer2_port}"
+        )
 
         sidecar2_host, sidecar2_port = nucliadb_node_2_sidecar.run(self.volume_node_2)
 
@@ -412,12 +408,8 @@ def _node(natsd: str, node_storage):
 @pytest.fixture(scope="function")
 def node(_node, request):
     # clean up all shard data before each test
-    channel1 = insecure_channel(
-        f"{_node['writer1']['host']}:{_node['writer1']['port']}"
-    )
-    channel2 = insecure_channel(
-        f"{_node['writer2']['host']}:{_node['writer2']['port']}"
-    )
+    channel1 = insecure_channel(f"{_node['writer1']['host']}:{_node['writer1']['port']}")
+    channel2 = insecure_channel(f"{_node['writer2']['host']}:{_node['writer2']['port']}")
     writer1 = NodeWriterStub(channel1)
     writer2 = NodeWriterStub(channel2)
 
@@ -458,9 +450,7 @@ def node(_node, request):
     yield _node
 
 
-@backoff.on_exception(
-    backoff.expo, Exception, jitter=backoff.random_jitter, max_tries=5
-)
+@backoff.on_exception(backoff.expo, Exception, jitter=backoff.random_jitter, max_tries=5)
 def cleanup_node(writer: NodeWriterStub):
     for shard in writer.ListShards(EmptyQuery()).ids:
         writer.DeleteShard(ShardId(id=shard.id))

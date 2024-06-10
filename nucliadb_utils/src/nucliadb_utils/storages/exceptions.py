@@ -39,9 +39,7 @@ class InvalidOffset(Exception):
 class ResumableUploadGone(Exception):
     def __init__(self, text: str):
         self.text = text
-        super().__init__(
-            "Resumable upload is no longer available " "Google: \n " f"{text}"
-        )
+        super().__init__("Resumable upload is no longer available " "Google: \n " f"{text}")
 
 
 class CouldNotCopyNotFound(Exception):

@@ -22,19 +22,6 @@ import datetime
 import math
 from typing import Any, Optional, Set, Union
 
-from nucliadb_protos.nodereader_pb2 import (
-    DocumentResult,
-    DocumentScored,
-    DocumentSearchResponse,
-    EntitiesSubgraphRequest,
-    ParagraphResult,
-    ParagraphSearchResponse,
-    RelationSearchResponse,
-    SearchResponse,
-    SuggestResponse,
-    VectorSearchResponse,
-)
-
 from nucliadb.search.search.fetch import (
     fetch_resources,
     get_labels_paragraph,
@@ -68,6 +55,18 @@ from nucliadb_models.search import (
     SortOptions,
     SortOrder,
     TextPosition,
+)
+from nucliadb_protos.nodereader_pb2 import (
+    DocumentResult,
+    DocumentScored,
+    DocumentSearchResponse,
+    EntitiesSubgraphRequest,
+    ParagraphResult,
+    ParagraphSearchResponse,
+    RelationSearchResponse,
+    SearchResponse,
+    SuggestResponse,
+    VectorSearchResponse,
 )
 
 from .cache import get_resource_cache, get_resource_from_cache
@@ -240,12 +239,8 @@ async def merge_suggest_paragraph_results(
                     page_number=result.metadata.position.page_number,
                 ),
             )
-            if len(result.metadata.position.start_seconds) or len(
-                result.metadata.position.end_seconds
-            ):
-                new_paragraph.start_seconds = list(
-                    result.metadata.position.start_seconds
-                )
+            if len(result.metadata.position.start_seconds) or len(result.metadata.position.end_seconds):
+                new_paragraph.start_seconds = list(result.metadata.position.start_seconds)
                 new_paragraph.end_seconds = list(result.metadata.position.end_seconds)
             else:
                 # TODO: Remove once we are sure all data has been migrated!
@@ -421,12 +416,8 @@ async def merge_paragraph_results(
                 ),
                 fuzzy_result=fuzzy_result,
             )
-            if len(result.metadata.position.start_seconds) or len(
-                result.metadata.position.end_seconds
-            ):
-                new_paragraph.start_seconds = list(
-                    result.metadata.position.start_seconds
-                )
+            if len(result.metadata.position.start_seconds) or len(result.metadata.position.end_seconds):
+                new_paragraph.start_seconds = list(result.metadata.position.start_seconds)
                 new_paragraph.end_seconds = list(result.metadata.position.end_seconds)
             else:
                 # TODO: Remove once we are sure all data has been migrated!
@@ -458,9 +449,7 @@ async def merge_relations_results(
     query: EntitiesSubgraphRequest,
 ) -> Relations:
     loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(
-        None, _merge_relations_results, relations_responses, query
-    )
+    return await loop.run_in_executor(None, _merge_relations_results, relations_responses, query)
 
 
 def _merge_relations_results(
@@ -552,9 +541,7 @@ async def merge_results(
             vectors, resources, kbid, count, page, min_score=min_score.semantic
         )
 
-        api_results.relations = await merge_relations_results(
-            relations, requested_relations
-        )
+        api_results.relations = await merge_relations_results(relations, requested_relations)
 
         api_results.resources = await fetch_resources(
             resources, kbid, show, field_type_filter, extracted
@@ -609,8 +596,7 @@ async def merge_suggest_entities_results(
     unique_entities: Set[RelatedEntity] = set()
     for response in suggest_responses:
         response_entities = (
-            RelatedEntity(family=e.subtype, value=e.value)
-            for e in response.entity_results.nodes
+            RelatedEntity(family=e.subtype, value=e.value) for e in response.entity_results.nodes
         )
         unique_entities.update(response_entities)
 

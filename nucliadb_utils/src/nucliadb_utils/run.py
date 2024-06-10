@@ -25,9 +25,7 @@ from typing import Awaitable, Callable
 logger = logging.getLogger(__name__)
 
 
-async def run_until_exit(
-    finalizers: list[Callable[[], Awaitable[None]]], sleep: float = 1.0
-):
+async def run_until_exit(finalizers: list[Callable[[], Awaitable[None]]], sleep: float = 1.0):
     exit_event = asyncio.Event()
 
     def handle_exit(*args):

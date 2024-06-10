@@ -58,15 +58,11 @@ async def test_entities_service(
     assert len(groups) == 1
     assert groups["group1"]["custom"] is True
 
-    resp = await nucliadb_reader.get(
-        f"/{KB_PREFIX}/{knowledgebox_one}/entitiesgroup/group1"
-    )
+    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{knowledgebox_one}/entitiesgroup/group1")
     assert resp.status_code == 200
     assert resp.json()["custom"] is True
 
-    resp = await nucliadb_writer.delete(
-        f"/{KB_PREFIX}/{knowledgebox_one}/entitiesgroup/group1"
-    )
+    resp = await nucliadb_writer.delete(f"/{KB_PREFIX}/{knowledgebox_one}/entitiesgroup/group1")
     assert resp.status_code == 200
 
     resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{knowledgebox_one}/entitiesgroups")
@@ -75,9 +71,7 @@ async def test_entities_service(
 
 
 @pytest.mark.asyncio
-async def test_labelsets_service(
-    nucliadb_reader, nucliadb_writer, knowledgebox_one
-) -> None:
+async def test_labelsets_service(nucliadb_reader, nucliadb_writer, knowledgebox_one) -> None:
     payload = {
         "title": "labelset1",
         "labels": [{"title": "Label 1", "related": "related 1", "text": "My Text"}],
@@ -90,14 +84,10 @@ async def test_labelsets_service(
     resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{knowledgebox_one}/labelsets")
     assert len(resp.json()["labelsets"]) == 1
 
-    resp = await nucliadb_reader.get(
-        f"/{KB_PREFIX}/{knowledgebox_one}/labelset/labelset1"
-    )
+    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{knowledgebox_one}/labelset/labelset1")
     assert resp.status_code == 200
 
-    resp = await nucliadb_writer.delete(
-        f"/{KB_PREFIX}/{knowledgebox_one}/labelset/labelset1"
-    )
+    resp = await nucliadb_writer.delete(f"/{KB_PREFIX}/{knowledgebox_one}/labelset/labelset1")
     assert resp.status_code == 200
 
     resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{knowledgebox_one}/labelsets")
@@ -108,7 +98,6 @@ async def test_labelsets_service(
 async def test_labelsets_service_handles_conflicts(
     nucliadb_reader, nucliadb_writer, knowledgebox_one
 ) -> None:
-
     driver = get_driver()
     if not isinstance(driver, TiKVDriver):
         pytest.skip("Only tikv driver will raise conflicts")

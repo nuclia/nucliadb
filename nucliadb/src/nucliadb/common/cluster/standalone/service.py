@@ -32,9 +32,7 @@ from nucliadb_protos import standalone_pb2, standalone_pb2_grpc
 from nucliadb_utils.grpc import get_traced_grpc_server
 
 
-class StandaloneClusterServiceServicer(
-    standalone_pb2_grpc.StandaloneClusterServiceServicer
-):
+class StandaloneClusterServiceServicer(standalone_pb2_grpc.StandaloneClusterServiceServicer):
     @backoff.on_exception(backoff.expo, (AioRpcError,), max_time=60)
     async def NodeAction(  # type: ignore
         self, request: standalone_pb2.NodeActionRequest, context
@@ -61,9 +59,7 @@ class StandaloneClusterServiceServicer(
         self, request: standalone_pb2.NodeInfoRequest, context
     ) -> standalone_pb2.NodeInfoResponse:
         index_node = get_self()
-        index_node.shard_count = len(
-            os.listdir(os.path.join(cluster_settings.data_path, "shards"))
-        )
+        index_node.shard_count = len(os.listdir(os.path.join(cluster_settings.data_path, "shards")))
         total_disk, _, available_disk = shutil.disk_usage(cluster_settings.data_path)
         return standalone_pb2.NodeInfoResponse(
             id=index_node.id,

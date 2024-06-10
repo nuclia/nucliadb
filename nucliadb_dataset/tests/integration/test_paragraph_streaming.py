@@ -18,9 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 from integration.utils import export_dataset
-from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
-
 from nucliadb_models.resource import KnowledgeBoxObj
+from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 from nucliadb_sdk.v2.sdk import NucliaDB
 
 

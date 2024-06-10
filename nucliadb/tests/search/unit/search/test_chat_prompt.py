@@ -37,12 +37,8 @@ from nucliadb_protos import resources_pb2
 @pytest.fixture()
 def messages():
     msgs = [
-        resources_pb2.Message(
-            ident="1", content=resources_pb2.MessageContent(text="Message 1")
-        ),
-        resources_pb2.Message(
-            ident="2", content=resources_pb2.MessageContent(text="Message 2")
-        ),
+        resources_pb2.Message(ident="1", content=resources_pb2.MessageContent(text="Message 1")),
+        resources_pb2.Message(ident="2", content=resources_pb2.MessageContent(text="Message 2")),
         resources_pb2.Message(
             ident="3",
             who="1",
@@ -55,9 +51,7 @@ def messages():
             type=resources_pb2.Message.MessageType.ANSWER,
             to=["1"],
         ),
-        resources_pb2.Message(
-            ident="5", content=resources_pb2.MessageContent(text="Message 5")
-        ),
+        resources_pb2.Message(ident="5", content=resources_pb2.MessageContent(text="Message 5")),
     ]
     yield msgs
 
@@ -109,9 +103,11 @@ async def test_get_next_conversation_messages(field_obj, messages):
 
 @pytest.mark.asyncio
 async def test_find_conversation_message(field_obj, messages):
-    assert await chat_prompt.find_conversation_message(
-        field_obj=field_obj, mident="3"
-    ) == (messages[2], 1, 2)
+    assert await chat_prompt.find_conversation_message(field_obj=field_obj, mident="3") == (
+        messages[2],
+        1,
+        2,
+    )
 
 
 @pytest.mark.asyncio
@@ -131,9 +127,7 @@ async def test_get_expanded_conversation_messages_question(kb, messages):
     )
 
     kb.get.assert_called_with("rid")
-    kb.get.return_value.get_field.assert_called_with(
-        "field_id", KB_REVERSE["c"], load=True
-    )
+    kb.get.return_value.get_field.assert_called_with("field_id", KB_REVERSE["c"], load=True)
 
 
 @pytest.mark.asyncio
@@ -146,9 +140,7 @@ async def test_get_expanded_conversation_messages_missing(kb, messages):
     )
 
 
-def _create_find_result(
-    _id: str, result_text: str, score_type: SCORE_TYPE = SCORE_TYPE.BM25, order=1
-):
+def _create_find_result(_id: str, result_text: str, score_type: SCORE_TYPE = SCORE_TYPE.BM25, order=1):
     return FindResource(
         id=_id.split("/")[0],
         fields={
@@ -179,9 +171,7 @@ async def test_default_prompt_context(kb):
         find_results = KnowledgeboxFindResults(
             facets={},
             resources={
-                "bmid": _create_find_result(
-                    "bmid/c/conv/ident", result_text, SCORE_TYPE.BM25, order=1
-                ),
+                "bmid": _create_find_result("bmid/c/conv/ident", result_text, SCORE_TYPE.BM25, order=1),
                 "vecid": _create_find_result(
                     "vecid/c/conv/ident", result_text, SCORE_TYPE.VECTOR, order=2
                 ),

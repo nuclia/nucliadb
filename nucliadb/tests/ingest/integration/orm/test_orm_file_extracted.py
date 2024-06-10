@@ -22,15 +22,15 @@ from typing import Optional
 from uuid import uuid4
 
 import pytest
+
+from nucliadb.ingest.fields.file import File
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos.resources_pb2 import (
     CloudFile,
     FieldType,
     FileExtractedData,
     RowsPreview,
 )
-
-from nucliadb.ingest.fields.file import File
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_utils.storages.storage import Storage
 
 
@@ -59,9 +59,7 @@ async def test_create_resource_orm_file_extracted(
     ex1.metadata["asd"] = "asd"
     ex1.nested["asd"] = "asd"
     ex1.file_generated["asd"].CopyFrom(cf1)
-    ex1.file_rows_previews["asd"].sheets["Tab1"].rows.append(
-        RowsPreview.Sheet.Row(cell="hola")
-    )
+    ex1.file_rows_previews["asd"].sheets["Tab1"].rows.append(RowsPreview.Sheet.Row(cell="hola"))
     ex1.file_preview.CopyFrom(cf1)
     ex1.file_thumbnail.CopyFrom(cf1)
     ex1.file_pages_previews.pages.append(cf1)

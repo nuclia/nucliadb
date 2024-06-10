@@ -21,6 +21,9 @@
 from typing import AsyncGenerator
 
 from fastapi import HTTPException
+
+from nucliadb.common.cluster.base import AbstractIndexNode
+from nucliadb.train.generators.utils import batchify, get_paragraph
 from nucliadb_protos.dataset_pb2 import (
     Label,
     ParagraphClassificationBatch,
@@ -28,9 +31,6 @@ from nucliadb_protos.dataset_pb2 import (
     TrainSet,
 )
 from nucliadb_protos.nodereader_pb2 import StreamRequest
-
-from nucliadb.common.cluster.base import AbstractIndexNode
-from nucliadb.train.generators.utils import batchify, get_paragraph
 
 
 def paragraph_classification_batch_generator(
@@ -45,12 +45,8 @@ def paragraph_classification_batch_generator(
             detail="Paragraph Classification should be of 1 labelset",
         )
 
-    generator = generate_paragraph_classification_payloads(
-        kbid, trainset, node, shard_replica_id
-    )
-    batch_generator = batchify(
-        generator, trainset.batch_size, ParagraphClassificationBatch
-    )
+    generator = generate_paragraph_classification_payloads(kbid, trainset, node, shard_replica_id)
+    batch_generator = batchify(generator, trainset.batch_size, ParagraphClassificationBatch)
     return batch_generator
 
 

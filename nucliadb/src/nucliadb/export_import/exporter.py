@@ -70,9 +70,7 @@ async def export_kb(
         yield chunk
 
 
-async def export_kb_to_blob_storage(
-    context: ApplicationContext, msg: NatsTaskMessage
-) -> None:
+async def export_kb_to_blob_storage(context: ApplicationContext, msg: NatsTaskMessage) -> None:
     """
     Exports the data of a knowledgebox to the blob storage service.
     """
@@ -107,9 +105,7 @@ async def export_resources(
             yield chunk
 
 
-async def export_resources_resumable(
-    context, metadata: ExportMetadata
-) -> AsyncGenerator[bytes, None]:
+async def export_resources_resumable(context, metadata: ExportMetadata) -> AsyncGenerator[bytes, None]:
     dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
 
     kbid = metadata.kbid
@@ -200,9 +196,7 @@ async def export_learning_config(
 ) -> AsyncGenerator[bytes, None]:
     lconfig = await get_learning_config(kbid)
     if lconfig is None:
-        logger.warning(
-            f"No learning configuration found for kbid", extra={"kbid": kbid}
-        )
+        logger.warning(f"No learning configuration found for kbid", extra={"kbid": kbid})
         return
     data = lconfig.json().encode("utf-8")
     yield ExportedItemType.LEARNING_CONFIG.encode("utf-8")

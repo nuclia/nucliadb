@@ -49,17 +49,13 @@ def get_migration_modules() -> list[tuple[types.ModuleType, int]]:
     return output
 
 
-def get_migrations(
-    from_version: int = 0, to_version: int = 99999999
-) -> list[Migration]:
+def get_migrations(from_version: int = 0, to_version: int = 99999999) -> list[Migration]:
     migrations: list[Migration] = []
     for module, version in get_migration_modules():
         migrations.append(Migration(version=version, module=module))
 
     migrations.sort(key=lambda m: m.version)
-    return [
-        m for m in migrations if m.version > from_version and m.version <= to_version
-    ]
+    return [m for m in migrations if m.version > from_version and m.version <= to_version]
 
 
 @lru_cache(maxsize=None)

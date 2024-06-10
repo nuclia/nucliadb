@@ -40,9 +40,7 @@ async def setup_cluster_discovery() -> None:
             # already loaded
             return util
 
-        klass: Union[
-            Type[ManualDiscovery], Type[KubernetesDiscovery], Type[SingleNodeDiscovery]
-        ]
+        klass: Union[Type[ManualDiscovery], Type[KubernetesDiscovery], Type[SingleNodeDiscovery]]
         if settings.cluster_discovery_mode == ClusterDiscoveryMode.MANUAL:
             klass = ManualDiscovery
         elif settings.cluster_discovery_mode == ClusterDiscoveryMode.KUBERNETES:

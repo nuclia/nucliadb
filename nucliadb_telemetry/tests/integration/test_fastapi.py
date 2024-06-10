@@ -68,10 +68,7 @@ class TestCasePrometheusMiddleware:
         metrics_text = response.content.decode()
 
         # Asserts: Requests
-        assert (
-            'starlette_requests_total{method="GET",path_template="/foo/"} 1.0'
-            in metrics_text
-        )
+        assert 'starlette_requests_total{method="GET",path_template="/foo/"} 1.0' in metrics_text
 
         # Asserts: Responses
         assert (
@@ -80,13 +77,9 @@ class TestCasePrometheusMiddleware:
         )
 
         # Asserts: Requests in progress
+        assert 'starlette_requests_in_progress{method="GET",path_template="/foo/"} 0.0' in metrics_text
         assert (
-            'starlette_requests_in_progress{method="GET",path_template="/foo/"} 0.0'
-            in metrics_text
-        )
-        assert (
-            'starlette_requests_in_progress{method="GET",path_template="/metrics/"} 1.0'
-            in metrics_text
+            'starlette_requests_in_progress{method="GET",path_template="/metrics/"} 1.0' in metrics_text
         )
 
     def test_view_exception(self, client):
@@ -99,10 +92,7 @@ class TestCasePrometheusMiddleware:
         metrics_text = response.content.decode()
 
         # Asserts: Requests
-        assert (
-            'starlette_requests_total{method="GET",path_template="/bar/"} 1.0'
-            in metrics_text
-        )
+        assert 'starlette_requests_total{method="GET",path_template="/bar/"} 1.0' in metrics_text
 
         # Asserts: Responses
         assert (
@@ -117,13 +107,9 @@ class TestCasePrometheusMiddleware:
         )
 
         # Asserts: Requests in progress
+        assert 'starlette_requests_in_progress{method="GET",path_template="/bar/"} 0.0' in metrics_text
         assert (
-            'starlette_requests_in_progress{method="GET",path_template="/bar/"} 0.0'
-            in metrics_text
-        )
-        assert (
-            'starlette_requests_in_progress{method="GET",path_template="/metrics/"} 1.0'
-            in metrics_text
+            'starlette_requests_in_progress{method="GET",path_template="/metrics/"} 1.0' in metrics_text
         )
 
     def test_path_substitution(self, client):
@@ -135,16 +121,10 @@ class TestCasePrometheusMiddleware:
         metrics_text = response.content.decode()
 
         # Asserts: Headers
-        assert (
-            response.headers["content-type"]
-            == "text/plain; version=0.0.4; charset=utf-8"
-        )
+        assert response.headers["content-type"] == "text/plain; version=0.0.4; charset=utf-8"
 
         # Asserts: Requests
-        assert (
-            'starlette_requests_total{method="GET",path_template="/foo/{bar}/"} 1.0'
-            in metrics_text
-        )
+        assert 'starlette_requests_total{method="GET",path_template="/foo/{bar}/"} 1.0' in metrics_text
 
         # Asserts: Responses
         assert (
@@ -158,8 +138,7 @@ class TestCasePrometheusMiddleware:
             in metrics_text
         )
         assert (
-            'starlette_requests_in_progress{method="GET",path_template="/metrics/"} 1.0'
-            in metrics_text
+            'starlette_requests_in_progress{method="GET",path_template="/metrics/"} 1.0' in metrics_text
         )
 
     def test_sub_path_match(self, client):
@@ -171,10 +150,7 @@ class TestCasePrometheusMiddleware:
         metrics_text = response.content.decode()
 
         # Asserts: Requests
-        assert (
-            'starlette_requests_total{method="GET",path_template="/sub/foobar/"} 1.0'
-            in metrics_text
-        )
+        assert 'starlette_requests_total{method="GET",path_template="/sub/foobar/"} 1.0' in metrics_text
 
 
 class TestCasePrometheusMiddlewareFilterUnhandledPaths:
@@ -204,8 +180,7 @@ class TestCasePrometheusMiddlewareFilterUnhandledPaths:
 
         # Asserts: Requests in progress
         assert (
-            'starlette_requests_in_progress{method="GET",path_template="/metrics/"} 1.0'
-            in metrics_text
+            'starlette_requests_in_progress{method="GET",path_template="/metrics/"} 1.0' in metrics_text
         )
 
 

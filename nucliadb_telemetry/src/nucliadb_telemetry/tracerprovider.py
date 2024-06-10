@@ -81,9 +81,7 @@ class AsyncMultiSpanProcessor(SpanProcessor):
             if current_time_ns >= deadline_ns:
                 return False
 
-            if not await sp.async_force_flush(
-                (deadline_ns - current_time_ns) // 1000000
-            ):
+            if not await sp.async_force_flush((deadline_ns - current_time_ns) // 1000000):
                 return False
 
         return True

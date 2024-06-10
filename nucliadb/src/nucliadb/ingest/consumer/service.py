@@ -45,9 +45,7 @@ from .shard_creator import ShardCreatorHandler
 def _handle_task_result(task: asyncio.Task) -> None:
     e = task.exception()
     if e:
-        logger.exception(
-            "Loop stopped by exception. This should not happen. Exiting.", exc_info=e
-        )
+        logger.exception("Loop stopped by exception. This should not happen. Exiting.", exc_info=e)
         sys.exit(1)
 
 
@@ -87,9 +85,7 @@ async def start_ingest_consumers(
     if transaction_settings.transaction_local:
         raise ConfigurationError("Can not start ingest consumers in local mode")
 
-    while len(
-        manager.get_index_nodes()
-    ) == 0 and running_settings.running_environment not in (
+    while len(manager.get_index_nodes()) == 0 and running_settings.running_environment not in (
         "local",
         "test",
     ):
@@ -101,9 +97,7 @@ async def start_ingest_consumers(
     storage = await get_storage(service_name=service_name or SERVICE_NAME)
     nats_connection_manager = get_nats_manager()
 
-    max_concurrent_processing = asyncio.Semaphore(
-        settings.max_concurrent_ingest_processing
-    )
+    max_concurrent_processing = asyncio.Semaphore(settings.max_concurrent_ingest_processing)
 
     for partition in settings.partitions:
         consumer = IngestConsumer(
@@ -132,9 +126,7 @@ async def start_ingest_processed_consumer(
     if transaction_settings.transaction_local:
         raise ConfigurationError("Can not start ingest consumers in local mode")
 
-    while len(
-        manager.get_index_nodes()
-    ) == 0 and running_settings.running_environment not in (
+    while len(manager.get_index_nodes()) == 0 and running_settings.running_environment not in (
         "local",
         "test",
     ):
@@ -165,15 +157,15 @@ async def start_auditor() -> Callable[[], Awaitable[None]]:
     assert pubsub is not None, "Pubsub is not configured"
     storage = await get_storage(service_name=SERVICE_NAME)
     index_auditor = IndexAuditHandler(audit=audit, pubsub=pubsub)
-    resource_writes_auditor = ResourceWritesAuditHandler(
-        storage=storage, audit=audit, pubsub=pubsub
-    )
+    resource_writes_auditor = ResourceWritesAuditHandler(storage=storage, audit=audit, pubsub=pubsub)
 
     await index_auditor.initialize()
     await resource_writes_auditor.initialize()
 
     return partial(
-        asyncio.gather, index_auditor.finalize(), resource_writes_auditor.finalize()  # type: ignore
+        asyncio.gather,
+        index_auditor.finalize(),
+        resource_writes_auditor.finalize(),  # type: ignore
     )
 
 

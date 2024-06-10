@@ -46,9 +46,7 @@ def get_path_template(scope: Scope) -> FoundPathTemplate:
     return path_template
 
 
-def find_route(
-    scope: Scope, routes: List[Route]
-) -> Tuple[Optional[str], Optional[Scope]]:
+def find_route(scope: Scope, routes: List[Route]) -> Tuple[Optional[str], Optional[Scope]]:
     # we mutate scope, so we need a copy
     scope = scope.copy()  # type:ignore
     for route in routes:

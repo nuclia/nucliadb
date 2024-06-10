@@ -21,17 +21,16 @@
 from collections import OrderedDict
 from typing import AsyncGenerator, cast
 
+from nucliadb.common.cluster.base import AbstractIndexNode
+from nucliadb.ingest.orm.resource import KB_REVERSE
+from nucliadb.train import logger
+from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
 from nucliadb_protos.dataset_pb2 import (
     TokenClassificationBatch,
     TokensClassification,
     TrainSet,
 )
 from nucliadb_protos.nodereader_pb2 import StreamFilter, StreamRequest
-
-from nucliadb.common.cluster.base import AbstractIndexNode
-from nucliadb.ingest.orm.resource import KB_REVERSE
-from nucliadb.train import logger
-from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
 
 NERS_DICT = dict[str, dict[str, list[tuple[int, int]]]]
 POSITION_DICT = OrderedDict[tuple[int, int], tuple[str, str]]
@@ -44,9 +43,7 @@ def token_classification_batch_generator(
     node: AbstractIndexNode,
     shard_replica_id: str,
 ) -> AsyncGenerator[TokenClassificationBatch, None]:
-    generator = generate_token_classification_payloads(
-        kbid, trainset, node, shard_replica_id
-    )
+    generator = generate_token_classification_payloads(kbid, trainset, node, shard_replica_id)
     batch_generator = batchify(generator, trainset.batch_size, TokenClassificationBatch)
     return batch_generator
 
@@ -101,17 +98,15 @@ async def get_field_text(
     field_obj = await orm_resource.get_field(field, field_type_int, load=False)
     extracted_text = await field_obj.get_extracted_text()
     if extracted_text is None:
-        logger.warning(
-            f"{rid} {field} {field_type_int} extracted_text does not exist on DB"
-        )
+        logger.warning(f"{rid} {field} {field_type_int} extracted_text does not exist on DB")
         return {}, {}, {}
 
     split_text: dict[str, str] = extracted_text.split_text
     split_text[MAIN] = extracted_text.text
 
-    split_ners: dict[str, NERS_DICT] = (
-        {}
-    )  # Dict of entity group , with entity and list of positions in field
+    split_ners: dict[
+        str, NERS_DICT
+    ] = {}  # Dict of entity group , with entity and list of positions in field
     split_ners[MAIN] = {}
 
     basic_data = await orm_resource.get_basic()
@@ -138,12 +133,8 @@ async def get_field_text(
                                 split = MAIN
                             else:
                                 split = token.split
-                            split_ners[split].setdefault(token.klass, {}).setdefault(
-                                token.token, []
-                            )
-                            split_ners[split][token.klass][token.token].append(
-                                (token.start, token.end)
-                            )
+                            split_ners[split].setdefault(token.klass, {}).setdefault(token.token, [])
+                            split_ners[split][token.klass][token.token].append((token.start, token.end))
 
     field_metadata = await field_obj.get_field_metadata()
     # Check computed definition of entities
@@ -156,9 +147,7 @@ async def get_field_text(
             if entity_group in valid_entity_groups:
                 split_ners[MAIN].setdefault(entity_group, {}).setdefault(entity, [])
                 for position in positions.position:
-                    split_ners[MAIN][entity_group][entity].append(
-                        (position.start, position.end)
-                    )
+                    split_ners[MAIN][entity_group][entity].append((position.start, position.end))
 
         for split, split_metadata in field_metadata.split_metadata.items():
             for entity_key, positions in split_metadata.positions.items():
@@ -166,24 +155,16 @@ async def get_field_text(
                 entity_group = entities[0]
                 entity = "/".join(entities[1:])
                 if entity_group in valid_entity_groups:
-                    split_ners.setdefault(split, {}).setdefault(
-                        entity_group, {}
-                    ).setdefault(entity, [])
+                    split_ners.setdefault(split, {}).setdefault(entity_group, {}).setdefault(entity, [])
                     for position in positions.position:
-                        split_ners[split][entity_group][entity].append(
-                            (position.start, position.end)
-                        )
+                        split_ners[split][entity_group][entity].append((position.start, position.end))
 
     for split, invalid_tokens in invalid_tokens_split.items():
         for token.klass, token.token, token.start, token.end in invalid_tokens:
             if token.klass in split_ners.get(split, {}):
                 if token.token in split_ners.get(split, {}).get(token.klass, {}):
-                    if (token.start, token.end) in split_ners[split][token.klass][
-                        token.token
-                    ]:
-                        split_ners[split][token.klass][token.token].remove(
-                            (token.start, token.end)
-                        )
+                    if (token.start, token.end) in split_ners[split][token.klass][token.token]:
+                        split_ners[split][token.klass][token.token].remove((token.start, token.end))
                         if len(split_ners[split][token.klass][token.token]) == 0:
                             del split_ners[split][token.klass][token.token]
                         if len(split_ners[split][token.klass]) == 0:
@@ -197,9 +178,7 @@ async def get_field_text(
                 for position in positions:
                     split_positions[position] = (entity_group, entity)
 
-        ordered_positions[split] = OrderedDict(
-            sorted(split_positions.items(), key=lambda x: x[0])
-        )
+        ordered_positions[split] = OrderedDict(sorted(split_positions.items(), key=lambda x: x[0]))
 
     split_paragraphs: dict[str, list[tuple[int, int]]] = {}
     if field_metadata is not None:

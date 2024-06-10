@@ -27,7 +27,6 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, List, Optional, Union, cast
 
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-
 from nucliadb_utils import featureflagging
 from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.audit.basic import BasicAuditStorage
@@ -164,9 +163,7 @@ async def get_storage(
         await localutil.initialize()
         logger.info("Configuring Local Storage")
     else:
-        raise ConfigurationError(
-            "Invalid storage settings, please configure FILE_BACKEND"
-        )
+        raise ConfigurationError("Invalid storage settings, please configure FILE_BACKEND")
 
     return MAIN[Utility.STORAGE]
 
@@ -336,9 +333,7 @@ async def start_audit_utility(service: str):
             seed=audit_settings.audit_hash_seed,
             service=service,
         )
-        logger.info(
-            f"Configuring stream audit log {audit_settings.audit_jetstream_target}"
-        )
+        logger.info(f"Configuring stream audit log {audit_settings.audit_jetstream_target}")
     else:
         raise ConfigurationError("Invalid audit driver")
     await audit_utility.initialize()
@@ -404,13 +399,9 @@ def has_feature(
         context = {}
     if headers is not None:
         if X_USER_HEADER in headers:
-            context["user_id_md5"] = hashlib.md5(
-                headers[X_USER_HEADER].encode("utf-8")
-            ).hexdigest()
+            context["user_id_md5"] = hashlib.md5(headers[X_USER_HEADER].encode("utf-8")).hexdigest()
         if X_ACCOUNT_HEADER in headers:
-            context["account_id_md5"] = hashlib.md5(
-                headers[X_ACCOUNT_HEADER].encode()
-            ).hexdigest()
+            context["account_id_md5"] = hashlib.md5(headers[X_ACCOUNT_HEADER].encode()).hexdigest()
         if X_ACCOUNT_TYPE_HEADER in headers:
             context["account_type"] = headers[X_ACCOUNT_TYPE_HEADER]
     return get_feature_flags().enabled(name, default=default, context=context)

@@ -97,9 +97,7 @@ class ExportImportDataManager:
         await self.storage.uploaditerator(export_bytes, field, cf)
         return cf.size
 
-    async def download_export(
-        self, kbid: str, export_id: str
-    ) -> AsyncGenerator[bytes, None]:
+    async def download_export(self, kbid: str, export_id: str) -> AsyncGenerator[bytes, None]:
         key = STORAGE_EXPORT_KEY.format(export_id=export_id)
         bucket = self.storage.get_bucket_name(kbid)
         async for chunk in self.storage.download(bucket, key):
@@ -125,13 +123,9 @@ class ExportImportDataManager:
         async for chunk in self.storage.download(bucket, key):
             yield chunk
 
-    def _get_storage_field(
-        self, kbid: str, key: str, cf: resources_pb2.CloudFile
-    ) -> StorageField:
+    def _get_storage_field(self, kbid: str, key: str, cf: resources_pb2.CloudFile) -> StorageField:
         bucket = self.storage.get_bucket_name(kbid)
-        return self.storage.field_klass(
-            storage=self.storage, bucket=bucket, fullkey=key, field=cf
-        )
+        return self.storage.field_klass(storage=self.storage, bucket=bucket, fullkey=key, field=cf)
 
     async def delete_import(self, kbid: str, import_id: str):
         key = STORAGE_IMPORT_KEY.format(import_id=import_id)
@@ -151,6 +145,4 @@ class ExportImportDataManager:
             await func(kbid, id)
         except Exception as ex:
             errors.capture_exception(ex)
-            logger.exception(
-                f"Could not delete {type} {id} from storage", extra={"kbid": kbid}
-            )
+            logger.exception(f"Could not delete {type} {id} from storage", extra={"kbid": kbid})

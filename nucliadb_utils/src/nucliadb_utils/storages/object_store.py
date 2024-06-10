@@ -37,9 +37,7 @@ class ObjectStore(abc.ABC, metaclass=abc.ABCMeta):
     async def finalize(self) -> None: ...
 
     @abc.abstractmethod
-    async def bucket_create(
-        self, bucket: str, labels: Optional[dict[str, str]] = None
-    ) -> bool:
+    async def bucket_create(self, bucket: str, labels: Optional[dict[str, str]] = None) -> bool:
         """
         Create a new bucket in the object storage. Labels the bucket with the given labels if provided.
         Returns True if the bucket was created, False if it already existed.
@@ -110,9 +108,7 @@ class ObjectStore(abc.ABC, metaclass=abc.ABCMeta):
         yield b""
 
     @abc.abstractmethod
-    async def iterate(
-        self, bucket: str, prefix: str
-    ) -> AsyncGenerator[ObjectInfo, None]:
+    async def iterate(self, bucket: str, prefix: str) -> AsyncGenerator[ObjectInfo, None]:
         raise NotImplementedError()
         yield ObjectInfo(name="")
 

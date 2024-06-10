@@ -33,9 +33,7 @@ from nucliadb_models.search import Filter
 
 @pytest.fixture(scope="function")
 def is_paragraph_labelset_kind_mock():
-    with mock.patch(
-        "nucliadb.search.search.filters.is_paragraph_labelset_kind"
-    ) as mocked:
+    with mock.patch("nucliadb.search.search.filters.is_paragraph_labelset_kind") as mocked:
         yield mocked
 
 
@@ -67,9 +65,7 @@ def test_convert_filter_to_node_schema(original, converted):
 def test_convert_to_node_filters():
     assert convert_to_node_filters([]) == {}
     assert convert_to_node_filters(["foo"]) == {"literal": "foo"}
-    assert convert_to_node_filters(["foo", "bar"]) == {
-        "and": [{"literal": "foo"}, {"literal": "bar"}]
-    }
+    assert convert_to_node_filters(["foo", "bar"]) == {"and": [{"literal": "foo"}, {"literal": "bar"}]}
     assert convert_to_node_filters([Filter(all=["foo"])]) == {"literal": "foo"}
     assert convert_to_node_filters([Filter(all=["foo"]), Filter(any=["bar"])]) == {
         "and": [{"literal": "foo"}, {"literal": "bar"}]
@@ -82,15 +78,9 @@ def test_translate_label_filters():
 
     assert translate_label_filters(literal) == translated
     assert translate_label_filters({"not": literal}) == {"not": translated}
-    assert translate_label_filters({"and": [literal, literal]}) == {
-        "and": [translated, translated]
-    }
-    assert translate_label_filters({"or": [literal, literal]}) == {
-        "or": [translated, translated]
-    }
-    assert translate_label_filters(
-        {"and": [{"or": [literal, literal]}, {"not": literal}]}
-    ) == {
+    assert translate_label_filters({"and": [literal, literal]}) == {"and": [translated, translated]}
+    assert translate_label_filters({"or": [literal, literal]}) == {"or": [translated, translated]}
+    assert translate_label_filters({"and": [{"or": [literal, literal]}, {"not": literal}]}) == {
         "and": [
             {"or": [translated, translated]},
             {"not": translated},
@@ -109,9 +99,7 @@ def test_iter_filter_labels_expression():
         "foo",
         "foo",
     ]
-    assert list(
-        iter_filter_labels_expression({"not": {"and": [literal, literal]}})
-    ) == ["foo", "foo"]
+    assert list(iter_filter_labels_expression({"not": {"and": [literal, literal]}})) == ["foo", "foo"]
 
 
 def test_filters_model():

@@ -44,12 +44,8 @@ histo_buckets = [
     60.0,
     metrics.INF,
 ]
-grpc_client_observer = metrics.Observer(
-    "grpc_client_op", labels={"method": ""}, buckets=histo_buckets
-)
-grpc_server_observer = metrics.Observer(
-    "grpc_server_op", labels={"method": ""}, buckets=histo_buckets
-)
+grpc_client_observer = metrics.Observer("grpc_client_op", labels={"method": ""}, buckets=histo_buckets)
+grpc_server_observer = metrics.Observer("grpc_server_op", labels={"method": ""}, buckets=histo_buckets)
 
 
 class MetricsServerInterceptor(aio.ServerInterceptor):
@@ -59,9 +55,7 @@ class MetricsServerInterceptor(aio.ServerInterceptor):
 
     async def intercept_service(
         self,
-        continuation: Callable[
-            [grpc.HandlerCallDetails], Awaitable[grpc.RpcMethodHandler]
-        ],
+        continuation: Callable[[grpc.HandlerCallDetails], Awaitable[grpc.RpcMethodHandler]],
         handler_call_details: grpc.HandlerCallDetails,
     ) -> grpc.RpcMethodHandler:
         handler = await continuation(handler_call_details)
@@ -73,9 +67,7 @@ class MetricsServerInterceptor(aio.ServerInterceptor):
         def wrapper(behavior: Callable[[Any, aio.ServicerContext], Any]):
             @functools.wraps(behavior)
             async def wrapper(request: Any, context: aio.ServicerContext) -> Any:
-                with grpc_server_observer(
-                    labels={"method": handler_call_details.method}
-                ) as observer:
+                with grpc_server_observer(labels={"method": handler_call_details.method}) as observer:
                     value = await behavior(request, context)
                     observer.set_status(str(context.code()))
                 return value
@@ -104,9 +96,7 @@ class UnaryUnaryClientInterceptor(aio.UnaryUnaryClientInterceptor):
         client_call_details: ClientCallDetails,  # type: ignore
         request,
     ):
-        metric = grpc_client_observer(
-            labels={"method": _to_str(client_call_details.method)}
-        )
+        metric = grpc_client_observer(labels={"method": _to_str(client_call_details.method)})
         metric.start()
 
         call = await continuation(client_call_details, request)
@@ -122,9 +112,7 @@ class UnaryStreamClientInterceptor(aio.UnaryStreamClientInterceptor):
         client_call_details: ClientCallDetails,  # type: ignore
         request,
     ):
-        metric = grpc_client_observer(
-            labels={"method": _to_str(client_call_details.method)}
-        )
+        metric = grpc_client_observer(labels={"method": _to_str(client_call_details.method)})
         metric.start()
 
         call = await continuation(client_call_details, request)
@@ -140,9 +128,7 @@ class StreamStreamClientInterceptor(aio.StreamStreamClientInterceptor):
         client_call_details: ClientCallDetails,  # type: ignore
         request_iterator,
     ):
-        metric = grpc_client_observer(
-            labels={"method": _to_str(client_call_details.method)}
-        )
+        metric = grpc_client_observer(labels={"method": _to_str(client_call_details.method)})
         metric.start()
 
         call = await continuation(client_call_details, request_iterator)
@@ -158,9 +144,7 @@ class StreamUnaryClientInterceptor(aio.StreamUnaryClientInterceptor):
         client_call_details: ClientCallDetails,  # type: ignore
         request_iterator,
     ):
-        metric = grpc_client_observer(
-            labels={"method": _to_str(client_call_details.method)}
-        )
+        metric = grpc_client_observer(labels={"method": _to_str(client_call_details.method)})
         metric.start()
 
         call = await continuation(client_call_details, request_iterator)

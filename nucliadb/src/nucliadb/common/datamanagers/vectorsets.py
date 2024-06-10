@@ -28,9 +28,7 @@ KB_VECTORSETS = "/kbs/{kbid}/vectorsets"
 
 async def initialize(txn: Transaction, *, kbid: str):
     key = KB_VECTORSETS.format(kbid=kbid)
-    await txn.set(
-        key, knowledgebox_pb2.KnowledgeBoxVectorSetsConfig().SerializeToString()
-    )
+    await txn.set(key, knowledgebox_pb2.KnowledgeBoxVectorSetsConfig().SerializeToString())
 
 
 async def get(
@@ -48,9 +46,7 @@ async def exists(txn, *, kbid: str, vectorset_id: str) -> bool:
     return _find_vectorset(kb_vectorsets, vectorset_id) is not None
 
 
-async def iter(
-    txn: Transaction, *, kbid: str
-) -> AsyncIterator[knowledgebox_pb2.VectorSetConfig]:
+async def iter(txn: Transaction, *, kbid: str) -> AsyncIterator[knowledgebox_pb2.VectorSetConfig]:
     kb_vectorsets = await _get_or_default(txn, kbid=kbid)
     for config in kb_vectorsets.vectorsets:
         yield config

@@ -21,7 +21,6 @@ from functools import partial
 
 from nucliadb_protos.nodewriter_pb2 import IndexMessage
 from nucliadb_protos.writer_pb2 import Notification
-
 from nucliadb_sidecar import logger, signals
 from nucliadb_sidecar.signals import SuccessfulIndexingPayload
 from nucliadb_utils import const
@@ -43,9 +42,7 @@ class IndexedPublisher:
 
     async def finalize(self):
         await self.pubsub.finalize()
-        signals.successful_indexing.remove_listener(
-            self.listener_id.format(id=id(self))
-        )
+        signals.successful_indexing.remove_listener(self.listener_id.format(id=id(self)))
 
     async def on_successful_indexing(self, payload: SuccessfulIndexingPayload):
         await self.indexed(payload.index_message)

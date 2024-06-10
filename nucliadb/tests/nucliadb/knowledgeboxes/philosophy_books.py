@@ -51,9 +51,7 @@ async def philosophy_books_kb(
         {
             "slug": "nicomachean-ethics",
             "title": "Nicomachean Ethics",
-            "summary": (
-                "Aristotle's best-known work on ethics, the science of human life"
-            ),
+            "summary": ("Aristotle's best-known work on ethics, the science of human life"),
             "usermetadata": {
                 "relations": [
                     {
@@ -110,9 +108,7 @@ async def philosophy_books_kb(
         {
             "slug": "the-principles-of-the-most-ancient-and-modern-philosophy",
             "title": "The Principles of the most Ancient and Modern Philosophy",
-            "summary": (
-                "Conway's monistic view of the world as created from one substance"
-            ),
+            "summary": ("Conway's monistic view of the world as created from one substance"),
             "usermetadata": {
                 "relations": [
                     {

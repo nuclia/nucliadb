@@ -150,9 +150,7 @@ class Processor:
         elif message.type == writer_pb2.BrokerMessage.MessageType.ROLLBACK:
             await self.rollback(message, seqid, partition)
 
-    async def get_resource_uuid(
-        self, kb: KnowledgeBox, message: writer_pb2.BrokerMessage
-    ) -> str:
+    async def get_resource_uuid(self, kb: KnowledgeBox, message: writer_pb2.BrokerMessage) -> str:
         if message.uuid is None:
             uuid = await kb.get_resource_uuid_by_slug(message.slug)
         else:
@@ -274,9 +272,7 @@ class Processor:
                 await resource.compute_security(resource.indexer)
                 if message.reindex:
                     # when reindexing, let's just generate full new index message
-                    resource.replace_indexer(
-                        await resource.generate_index_message(reindex=True)
-                    )
+                    resource.replace_indexer(await resource.generate_index_message(reindex=True))
 
             if resource and resource.modified:
                 await self.index_resource(  # noqa
@@ -388,9 +384,7 @@ class Processor:
         ):
             # we need to have a lock at indexing time because we don't know if
             # a resource was move to another shard while it was being indexed
-            shard_id = await datamanagers.resources.get_resource_shard_id(
-                txn, kbid=kbid, rid=uuid
-            )
+            shard_id = await datamanagers.resources.get_resource_shard_id(txn, kbid=kbid, rid=uuid)
 
         shard = None
         if shard_id is not None:
@@ -423,9 +417,7 @@ class Processor:
     async def multi(self, message: writer_pb2.BrokerMessage, seqid: int) -> None:
         self.messages.setdefault(message.multiid, []).append(message)
 
-    async def commit(
-        self, message: writer_pb2.BrokerMessage, seqid: int, partition: str
-    ) -> None:
+    async def commit(self, message: writer_pb2.BrokerMessage, seqid: int, partition: str) -> None:
         if message.multiid not in self.messages:
             # Error
             logger.error(f"Closed multi {message.multiid}")
@@ -433,9 +425,7 @@ class Processor:
         else:
             await self.txn(self.messages[message.multiid], seqid, partition)
 
-    async def rollback(
-        self, message: writer_pb2.BrokerMessage, seqid: int, partition: str
-    ) -> None:
+    async def rollback(self, message: writer_pb2.BrokerMessage, seqid: int, partition: str) -> None:
         # Error
         logger.error(f"Closed multi {message.multiid}")
         del self.messages[message.multiid]
@@ -519,17 +509,13 @@ class Processor:
             deleted_fields=message.delete_fields,  # type: ignore
         )
 
-    async def get_extended_audit_data(
-        self, message: writer_pb2.BrokerMessage
-    ) -> writer_pb2.Audit:
+    async def get_extended_audit_data(self, message: writer_pb2.BrokerMessage) -> writer_pb2.Audit:
         message_audit = writer_pb2.Audit()
         message_audit.CopyFrom(message.audit)
         message_audit.kbid = message.kbid
         message_audit.uuid = message.uuid
         message_audit.message_source = message.source
-        message_audit.field_metadata.extend(
-            [fcmw.field for fcmw in message.field_metadata]
-        )
+        message_audit.field_metadata.extend([fcmw.field for fcmw in message.field_metadata])
         audit_fields = await collect_audit_fields(self.driver, self.storage, message)
         message_audit.audit_fields.extend(audit_fields)
         return message_audit
@@ -597,9 +583,7 @@ class Processor:
         Unhandled error processing, try to mark resource as error
         """
         if resource is None or resource.basic is None:
-            logger.info(
-                f"Skip when resource does not even have basic metadata: {resource}"
-            )
+            logger.info(f"Skip when resource does not even have basic metadata: {resource}")
             return
         try:
             async with self.driver.transaction() as txn:
@@ -699,16 +683,10 @@ class Processor:
 
 def messages_source(messages: list[writer_pb2.BrokerMessage]):
     from_writer = all(
-        (
-            message.source == writer_pb2.BrokerMessage.MessageSource.WRITER
-            for message in messages
-        )
+        (message.source == writer_pb2.BrokerMessage.MessageSource.WRITER for message in messages)
     )
     from_processor = all(
-        (
-            message.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR
-            for message in messages
-        )
+        (message.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR for message in messages)
     )
     if from_writer:
         source = nodewriter_pb2.IndexMessageSource.WRITER

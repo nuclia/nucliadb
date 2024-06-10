@@ -101,16 +101,11 @@ async def test_filtering_expression_validation(nucliadb_reader, nucliadb_writer)
         f"/kb/foobar/find",
         json={
             "query": "",
-            "filters": [
-                {"all": ["/origin.path/folder1"], "any": ["/origin.path/folder2"]}
-            ],
+            "filters": [{"all": ["/origin.path/folder1"], "any": ["/origin.path/folder2"]}],
         },
     )
     assert resp.status_code == 422
-    assert (
-        "Only one of 'all', 'any', 'none' or 'not_all' can be set"
-        in resp.json()["detail"][-1]["msg"]
-    )
+    assert "Only one of 'all', 'any', 'none' or 'not_all' can be set" in resp.json()["detail"][-1]["msg"]
 
     # Empty lists of filter operators are not allowed
     resp = await nucliadb_reader.post(

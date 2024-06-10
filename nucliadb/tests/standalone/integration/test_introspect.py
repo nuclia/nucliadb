@@ -60,16 +60,12 @@ async def test_introspect_endpoint(nucliadb_manager) -> None:
 
         # Check cluster info
         assert os.path.exists(os.path.join(extracted_tar, "cluster_info.txt"))
-        cluster_info = ClusterInfo.parse_file(
-            os.path.join(extracted_tar, "cluster_info.txt")
-        )
+        cluster_info = ClusterInfo.parse_file(os.path.join(extracted_tar, "cluster_info.txt"))
         assert len(cluster_info.nodes) > 0
 
         # Check settings
         assert os.path.exists(os.path.join(extracted_tar, "settings.json"))
-        introspect_settings = Settings.parse_file(
-            os.path.join(extracted_tar, "settings.json")
-        )
+        introspect_settings = Settings.parse_file(os.path.join(extracted_tar, "settings.json"))
         # Check that sensitive data is not included
         for sensitive_key in [
             "nua_api_key",

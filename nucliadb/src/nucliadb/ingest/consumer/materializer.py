@@ -83,27 +83,20 @@ class MaterializerHandler:
         notification.ParseFromString(data)
 
         if (
-            notification.action
-            != writer_pb2.Notification.Action.COMMIT  # only on commits
+            notification.action != writer_pb2.Notification.Action.COMMIT  # only on commits
             or notification.write_type
             == writer_pb2.Notification.WriteType.MODIFIED  # only on new resources and deletes
         ):
             return
 
-        self.task_handler.schedule(
-            notification.kbid, partial(self.process, notification.kbid)
-        )
+        self.task_handler.schedule(notification.kbid, partial(self.process, notification.kbid))
 
     async def process(self, kbid: str) -> None:
         logger.info(f"Materializing knowledgebox", extra={"kbid": kbid})
         async with datamanagers.with_ro_transaction() as txn:
-            value = await datamanagers.resources.calculate_number_of_resources(
-                txn, kbid=kbid
-            )
+            value = await datamanagers.resources.calculate_number_of_resources(txn, kbid=kbid)
         async with datamanagers.with_transaction() as txn:
-            await datamanagers.resources.set_number_of_resources(
-                txn, kbid=kbid, value=value
-            )
+            await datamanagers.resources.set_number_of_resources(txn, kbid=kbid, value=value)
             await txn.commit()
 
         audit = get_audit()

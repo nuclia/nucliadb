@@ -24,16 +24,14 @@ from uuid import uuid4
 
 import pyarrow as pa  # type: ignore
 import pytest
-from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 
 from nucliadb_dataset.export import FileSystemExport, NucliaDatasetsExport
 from nucliadb_models.resource import KnowledgeBoxObj
+from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 from nucliadb_sdk.v2.sdk import NucliaDB
 
 
-def test_filesystem_export(
-    sdk: NucliaDB, upload_data_field_classification: KnowledgeBoxObj
-):
+def test_filesystem_export(sdk: NucliaDB, upload_data_field_classification: KnowledgeBoxObj):
     trainset = TrainSet()
     trainset.type = TaskType.FIELD_CLASSIFICATION
     trainset.filter.labels.append("labelset1")

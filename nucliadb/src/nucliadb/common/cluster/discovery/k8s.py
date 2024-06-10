@@ -69,9 +69,7 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
     ) -> IndexNodeMetadata:
         async with self.update_lock:
             if pod_name not in self.node_id_cache:
-                self.node_id_cache[pod_name] = await self._query_node_metadata(
-                    node_ip, read_replica
-                )
+                self.node_id_cache[pod_name] = await self._query_node_metadata(node_ip, read_replica)
             else:
                 self.node_id_cache[pod_name].address = node_ip
             self.node_id_cache[pod_name].updated_at = time.time()
@@ -84,12 +82,10 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
         This method will update global node state by utilizing the cluster manager
         to add or remove nodes.
         """
-        status: kubernetes_asyncio.client.models.v1_pod_status.V1PodStatus = event[
+        status: kubernetes_asyncio.client.models.v1_pod_status.V1PodStatus = event["object"].status
+        event_metadata: kubernetes_asyncio.client.models.v1_object_meta.V1ObjectMeta = event[
             "object"
-        ].status
-        event_metadata: kubernetes_asyncio.client.models.v1_object_meta.V1ObjectMeta = (
-            event["object"].metadata
-        )
+        ].metadata
 
         ready = status.container_statuses is not None
         if event["type"] == "DELETED":
@@ -199,9 +195,7 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
                             except NodeConnectionError:  # pragma: no cover
                                 pass
                             except Exception:  # pragma: no cover
-                                logger.exception(
-                                    "Error while updating node", exc_info=True
-                                )
+                                logger.exception("Error while updating node", exc_info=True)
                     except (
                         asyncio.CancelledError,
                         KeyboardInterrupt,
@@ -259,11 +253,9 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
                             continue
                         existing = self.node_id_cache[pod_name]
                         try:
-                            self.node_id_cache[pod_name] = (
-                                await self._query_node_metadata(
-                                    existing.address,
-                                    read_replica=existing.primary_id is not None,
-                                )
+                            self.node_id_cache[pod_name] = await self._query_node_metadata(
+                                existing.address,
+                                read_replica=existing.primary_id is not None,
                             )
                         except NodeConnectionError:  # pragma: no cover
                             self._maybe_remove_stale_node(pod_name)
@@ -301,9 +293,7 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
 
     async def initialize(self) -> None:
         self.cluster_task = asyncio.create_task(self.watch_k8s_for_updates())
-        self.update_node_data_cache_task = asyncio.create_task(
-            self.update_node_data_cache()
-        )
+        self.update_node_data_cache_task = asyncio.create_task(self.update_node_data_cache())
         await self._wait_ready()
 
     async def finalize(self) -> None:

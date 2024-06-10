@@ -88,16 +88,12 @@ async def faulty_grpc_service(telemetry_grpc: GRPCTelemetry):
 
 
 @pytest.mark.asyncio
-async def test_sentry_interceptor_without_errors(
-    telemetry_grpc: GRPCTelemetry, grpc_service: int
-):
+async def test_sentry_interceptor_without_errors(telemetry_grpc: GRPCTelemetry, grpc_service: int):
     port = grpc_service
     channel = telemetry_grpc.init_client(f"localhost:{port}")
     stub = helloworld_pb2_grpc.GreeterStub(channel)
 
-    with patch(
-        "nucliadb_telemetry.grpc_sentry.capture_exception"
-    ) as mock_capture_exception:
+    with patch("nucliadb_telemetry.grpc_sentry.capture_exception") as mock_capture_exception:
         response = await stub.SayHello(  # type: ignore
             helloworld_pb2.HelloRequest(name="you"),
         )
@@ -113,9 +109,7 @@ async def test_sentry_interceptor_without_streaming_errors(
     channel = telemetry_grpc.init_client(f"localhost:{port}")
     stub = hellostreamingworld_pb2_grpc.MultiGreeterStub(channel)
 
-    with patch(
-        "nucliadb_telemetry.grpc_sentry.capture_exception"
-    ) as mock_capture_exception:
+    with patch("nucliadb_telemetry.grpc_sentry.capture_exception") as mock_capture_exception:
         async for response in stub.sayHello(  # type: ignore
             hellostreamingworld_pb2.HelloRequest(name="you")
         ):
@@ -131,9 +125,7 @@ async def test_sentry_interceptor_raises_unhandled_exception(
     channel = telemetry_grpc.init_client(f"localhost:{port}")
     stub = helloworld_pb2_grpc.GreeterStub(channel)
 
-    with patch(
-        "nucliadb_telemetry.grpc_sentry.capture_exception"
-    ) as mock_capture_exception:
+    with patch("nucliadb_telemetry.grpc_sentry.capture_exception") as mock_capture_exception:
         with pytest.raises(AioRpcError):
             with pytest.raises(UnhanldedError):
                 await stub.SayHello(  # type: ignore
@@ -151,9 +143,7 @@ async def test_sentry_interceptor_raises_unhandled_exception_stream(
     channel = telemetry_grpc.init_client(f"localhost:{port}")
     stub = hellostreamingworld_pb2_grpc.MultiGreeterStub(channel)
 
-    with patch(
-        "nucliadb_telemetry.grpc_sentry.capture_exception"
-    ) as mock_capture_exception:
+    with patch("nucliadb_telemetry.grpc_sentry.capture_exception") as mock_capture_exception:
         with pytest.raises(AioRpcError):
             with pytest.raises(UnhanldedError):
                 async for _ in stub.sayHello(  # type: ignore

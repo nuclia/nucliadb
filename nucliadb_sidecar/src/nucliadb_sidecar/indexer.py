@@ -27,6 +27,7 @@ from typing import Optional
 from grpc import StatusCode
 from grpc.aio import AioRpcError
 from nats.aio.client import Msg
+
 from nucliadb_protos.noderesources_pb2 import ResourceID
 from nucliadb_protos.nodewriter_pb2 import (
     IndexMessage,
@@ -34,7 +35,6 @@ from nucliadb_protos.nodewriter_pb2 import (
     OpStatus,
     TypeMessage,
 )
-
 from nucliadb_sidecar import SERVICE_NAME, logger, signals
 from nucliadb_sidecar.settings import settings
 from nucliadb_sidecar.signals import SuccessfulIndexingPayload
@@ -47,9 +47,7 @@ from nucliadb_utils.settings import nats_consumer_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_storage, has_feature
 
-CONCURRENT_INDEXERS_COUNT = metrics.Gauge(
-    "nucliadb_concurrent_indexers_count", labels={"node": ""}
-)
+CONCURRENT_INDEXERS_COUNT = metrics.Gauge("nucliadb_concurrent_indexers_count", labels={"node": ""})
 indexer_observer = metrics.Observer(
     "nucliadb_message_indexing",
     buckets=[
@@ -102,9 +100,7 @@ class WorkUnit:
     def __init__(self, *args, **kwargs):
         raise Exception("__init__ method not allowed. Use a from_* method instead")
 
-    def __new__(
-        cls, *, index_message: IndexMessage, nats_msg: Msg, mpu: MessageProgressUpdater
-    ):
+    def __new__(cls, *, index_message: IndexMessage, nats_msg: Msg, mpu: MessageProgressUpdater):
         instance = super().__new__(cls)
         instance.index_message = index_message
         instance.nats_msg = nats_msg
@@ -203,9 +199,7 @@ class ConcurrentShardIndexer:
 
         self.push_work_to_indexer(work)
         work.mpu.start()
-        CONCURRENT_INDEXERS_COUNT.set(
-            len(self.indexers), labels=dict(node=self.node_id)
-        )
+        CONCURRENT_INDEXERS_COUNT.set(len(self.indexers), labels=dict(node=self.node_id))
 
     def push_work_to_indexer(self, work: WorkUnit):
         exists = work.shard_id in self.indexers
@@ -241,9 +235,7 @@ class ConcurrentShardIndexer:
             self.indexers[shard_id] = (indexer, task)
         else:
             self.indexers.pop(shard_id)
-            CONCURRENT_INDEXERS_COUNT.set(
-                len(self.indexers), labels=dict(node=self.node_id)
-            )
+            CONCURRENT_INDEXERS_COUNT.set(len(self.indexers), labels=dict(node=self.node_id))
 
 
 class PriorityIndexer:
@@ -376,9 +368,7 @@ class PriorityIndexer:
         await work.nats_msg.ack()
         await work.mpu.end()
         await signals.successful_indexing.dispatch(
-            SuccessfulIndexingPayload(
-                seqid=work.seqid, index_message=work.index_message
-            )
+            SuccessfulIndexingPayload(seqid=work.seqid, index_message=work.index_message)
         )
         logger.info(
             "Message indexing finished",
@@ -390,9 +380,7 @@ class PriorityIndexer:
 
     async def _index_message(self, pb: IndexMessage):
         if pb.typemessage == TypeMessage.CREATION:
-            if has_feature(
-                const.Features.NODE_SET_RESOURCE_FROM_STORAGE, context={"kbid": pb.kbid}
-            ):
+            if has_feature(const.Features.NODE_SET_RESOURCE_FROM_STORAGE, context={"kbid": pb.kbid}):
                 await self._set_resource_from_storage(pb)
             else:
                 await self._set_resource(pb)
@@ -410,10 +398,7 @@ class PriorityIndexer:
     def _parse_op_status_errors(self, pb: IndexMessage, status: OpStatus):
         if status.status == OpStatus.Status.OK:
             return
-        if (
-            status.status == OpStatus.Status.ERROR
-            and "Shard not found" in status.detail
-        ):
+        if status.status == OpStatus.Status.ERROR and "Shard not found" in status.detail:
             logger.warning(
                 f"Shard does not exist {pb.shard}. This message will be ignored",
                 extra={
@@ -424,10 +409,7 @@ class PriorityIndexer:
                 },
             )
             raise ShardNotFound()
-        if (
-            status.status == OpStatus.Status.ERROR
-            and "Missing resource metadata" in status.detail
-        ):
+        if status.status == OpStatus.Status.ERROR and "Missing resource metadata" in status.detail:
             raise MetadataNotFoundError()
         raise IndexNodeError(status.detail)
 
@@ -457,14 +439,10 @@ class PriorityIndexer:
             with self._handled_grpc_errors():
                 status = await self.writer.set_resource(brain)
                 self._parse_op_status_errors(pb, status)
-                logger.debug(
-                    f"...done (Added {rid} at {shard_id} otx:{pb.txid})", extra=_extra
-                )
+                logger.debug(f"...done (Added {rid} at {shard_id} otx:{pb.txid})", extra=_extra)
                 return
         except ShardNotFound:
-            logger.error(
-                "Shard does not exist. This message will be ignored", extra=_extra
-            )
+            logger.error("Shard does not exist. This message will be ignored", extra=_extra)
             return
         except MetadataNotFoundError:
             logger.error(
@@ -496,9 +474,7 @@ class PriorityIndexer:
                 self._parse_op_status_errors(pb, status)
                 return
         except ShardNotFound:
-            logger.error(
-                "Shard does not exist. This message will be ignored", extra=_extra
-            )
+            logger.error("Shard does not exist. This message will be ignored", extra=_extra)
             return
         except MetadataNotFoundError:
             logger.error(
@@ -529,9 +505,7 @@ class PriorityIndexer:
             with self._handled_grpc_errors():
                 status = await self.writer.delete_resource(resource)
                 self._parse_op_status_errors(pb, status)
-                logger.debug(
-                    f"...done (Deleted {rid} in {shard_id} otx:{pb.txid})", extra=_extra
-                )
+                logger.debug(f"...done (Deleted {rid} in {shard_id} otx:{pb.txid})", extra=_extra)
                 return
         except ShardNotFound:
             logger.error(

@@ -19,16 +19,6 @@
 #
 from fastapi import HTTPException, Response
 from fastapi_versioning import version
-from nucliadb_protos.knowledgebox_pb2 import Label as LabelPB
-from nucliadb_protos.knowledgebox_pb2 import LabelSet as LabelSetPB
-from nucliadb_protos.writer_pb2 import (
-    DelEntitiesRequest,
-    NewEntitiesGroupRequest,
-    NewEntitiesGroupResponse,
-    OpStatusWriter,
-    UpdateEntitiesGroupRequest,
-    UpdateEntitiesGroupResponse,
-)
 from starlette.requests import Request
 
 from nucliadb.common import datamanagers
@@ -48,6 +38,16 @@ from nucliadb_models.labels import LabelSet
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.synonyms import KnowledgeBoxSynonyms
 from nucliadb_protos import writer_pb2
+from nucliadb_protos.knowledgebox_pb2 import Label as LabelPB
+from nucliadb_protos.knowledgebox_pb2 import LabelSet as LabelSetPB
+from nucliadb_protos.writer_pb2 import (
+    DelEntitiesRequest,
+    NewEntitiesGroupRequest,
+    NewEntitiesGroupResponse,
+    OpStatusWriter,
+    UpdateEntitiesGroupRequest,
+    UpdateEntitiesGroupResponse,
+)
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.utilities import get_ingest
 
@@ -61,9 +61,7 @@ from nucliadb_utils.utilities import get_ingest
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def create_entities_group(
-    request: Request, kbid: str, item: CreateEntitiesGroupPayload
-):
+async def create_entities_group(request: Request, kbid: str, item: CreateEntitiesGroupPayload):
     ingest = get_ingest()
 
     pbrequest: NewEntitiesGroupRequest = NewEntitiesGroupRequest()
@@ -92,9 +90,7 @@ async def create_entities_group(
             detail=f"Entities group {item.group} already exists in this Knowledge box",
         )
     elif status.status == NewEntitiesGroupResponse.Status.ERROR:
-        return HTTPInternalServerError(
-            detail="Error on settings entities on a Knowledge box"
-        )
+        return HTTPInternalServerError(detail="Error on settings entities on a Knowledge box")
 
 
 @api.patch(
@@ -139,9 +135,7 @@ async def update_entities_group(
     elif status.status == UpdateEntitiesGroupResponse.Status.ENTITIES_GROUP_NOT_FOUND:
         return HTTPNotFound(detail="Entities group does not exist")
     elif status.status == UpdateEntitiesGroupResponse.Status.ERROR:
-        return HTTPInternalServerError(
-            detail="Error on settings entities on a Knowledge box"
-        )
+        return HTTPInternalServerError(detail="Error on settings entities on a Knowledge box")
 
 
 @api.delete(
@@ -165,9 +159,7 @@ async def delete_entities(request: Request, kbid: str, group: str):
     elif status.status == OpStatusWriter.Status.NOTFOUND:
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
     elif status.status == OpStatusWriter.Status.ERROR:
-        raise HTTPException(
-            status_code=500, detail="Error on deleting entities from a Knowledge box"
-        )
+        raise HTTPException(status_code=500, detail="Error on deleting entities from a Knowledge box")
 
     return Response(status_code=204)
 
@@ -181,9 +173,7 @@ async def delete_entities(request: Request, kbid: str, group: str):
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def set_labelset_endpoint(
-    request: Request, kbid: str, labelset: str, item: LabelSet
-):
+async def set_labelset_endpoint(request: Request, kbid: str, labelset: str, item: LabelSet):
     try:
         await set_labelset(kbid, labelset, item)
     except KnowledgeBoxNotFound:
@@ -219,9 +209,7 @@ async def set_labelset(kbid: str, labelset_id: str, item: LabelSet):
         if label_input.title:
             lbl.title = label_input.title
         labelset.labels.append(lbl)
-    await datamanagers.atomic.labelset.set(
-        kbid=kbid, labelset_id=labelset_id, labelset=labelset
-    )
+    await datamanagers.atomic.labelset.set(kbid=kbid, labelset_id=labelset_id, labelset=labelset)
 
 
 @api.delete(

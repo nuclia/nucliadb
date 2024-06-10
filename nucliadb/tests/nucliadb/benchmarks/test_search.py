@@ -22,14 +22,14 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 from httpx import AsyncClient
+
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+from nucliadb_utils.tests.asyncbenchmark import AsyncBenchmarkFixture
+from nucliadb_utils.utilities import Utility, set_utility
 from tests.nucliadb.integration.search.test_search import (
     broker_resource_with_classifications,
 )
 from tests.utils import inject_message
-
-from nucliadb_utils.tests.asyncbenchmark import AsyncBenchmarkFixture
-from nucliadb_utils.utilities import Utility, set_utility
 
 
 @pytest.mark.benchmark(

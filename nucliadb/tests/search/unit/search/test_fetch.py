@@ -79,10 +79,7 @@ def test_highlight():
         ["my query"],
     )
 
-    assert (
-        res
-        == "Query whatever you want to make it work <mark>my query</mark> with <mark>this</mark>"
-    )
+    assert res == "Query whatever you want to make it work <mark>my query</mark> with <mark>this</mark>"
 
     res = highlight(
         "Query whatever you redis want to make it work my query with this",

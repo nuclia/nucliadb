@@ -35,9 +35,7 @@ def import_kb(ndb, *, uri, kb):
     kbid = get_kbid(ndb, kb)
     print(f"Importing from {uri} to kb={kb}")
 
-    import_id = ndb.writer.start_import(
-        kbid=kbid, content=read_import_stream(uri)
-    ).import_id
+    import_id = ndb.writer.start_import(kbid=kbid, content=read_import_stream(uri)).import_id
 
     print(f"Started import task. Import id: {import_id}")
     wait_until_finished(ndb, kbid, "import", import_id)
@@ -70,9 +68,7 @@ def get_status(ndb, kbid, task_type, task_id):
 
 def wait_until_finished(ndb, kbid, task_type, task_id, wait_interval=2):
     status = get_status(ndb, kbid, task_type, task_id)
-    with tqdm(
-        total=status.total, desc=f"Waiting for {task_type} {task_id} to finish"
-    ) as progress_bar:
+    with tqdm(total=status.total, desc=f"Waiting for {task_type} {task_id} to finish") as progress_bar:
         while status.status != "finished":
             progress_bar.update(status.processed - progress_bar.n)
             assert status.status != "error"
@@ -86,9 +82,7 @@ def save_export_stream(uri, export_generator):
         unit="iB",
         unit_scale=True,
     )
-    stream_with_progress = progressify(
-        export_generator(chunk_size=CHUNK_SIZE * 10), **tqdm_kwargs
-    )
+    stream_with_progress = progressify(export_generator(chunk_size=CHUNK_SIZE * 10), **tqdm_kwargs)
     if uri.startswith("http"):
         save_export_to_url(uri, stream_with_progress)
     else:

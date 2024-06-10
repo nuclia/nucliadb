@@ -84,23 +84,14 @@ async def objects_crud_test(object_store: ObjectStore):
     assert object_metadata.size == metadata.size
 
     # Iter objects
-    objects = [
-        object_info
-        async for object_info in object_store.iterate(bucket_name, prefix="")
-    ]
+    objects = [object_info async for object_info in object_store.iterate(bucket_name, prefix="")]
     assert len(objects) == 1
     assert objects[0].name == object_key
 
-    objects = [
-        object_info
-        async for object_info in object_store.iterate(bucket_name, prefix="folder")
-    ]
+    objects = [object_info async for object_info in object_store.iterate(bucket_name, prefix="folder")]
     assert len(objects) == 1
 
-    objects = [
-        object_info
-        async for object_info in object_store.iterate(bucket_name, prefix="bar")
-    ]
+    objects = [object_info async for object_info in object_store.iterate(bucket_name, prefix="bar")]
     assert len(objects) == 0
 
     # Copy object
@@ -147,9 +138,7 @@ async def objects_upload_download_test(object_store: ObjectStore):
     await object_store.upload(bucket_name, object_key, object_data.getvalue(), metadata)
 
     # Download object fully
-    assert (
-        await object_store.download(bucket_name, object_key) == object_data.getvalue()
-    )
+    assert await object_store.download(bucket_name, object_key) == object_data.getvalue()
 
     # Download object stream
     downloaded_data = BytesIO()
@@ -159,13 +148,9 @@ async def objects_upload_download_test(object_store: ObjectStore):
 
     # Download object stream -- ranges
     downloaded_data = BytesIO()
-    async for chunk in object_store.download_stream(
-        bucket_name, object_key, range=Range(end=6)
-    ):
+    async for chunk in object_store.download_stream(bucket_name, object_key, range=Range(end=6)):
         downloaded_data.write(chunk)
-    async for chunk in object_store.download_stream(
-        bucket_name, object_key, range=Range(start=7)
-    ):
+    async for chunk in object_store.download_stream(bucket_name, object_key, range=Range(start=7)):
         downloaded_data.write(chunk)
     assert downloaded_data.getvalue() == object_data.getvalue()
 
@@ -180,9 +165,7 @@ async def multipart_upload_test(object_store: ObjectStore):
 
     # Upload the file in parts
     key = "folder/newfile.txt"
-    metadata = ObjectMetadata(
-        filename="file.txt", content_type="text/plain", size=len(file.getvalue())
-    )
+    metadata = ObjectMetadata(filename="file.txt", content_type="text/plain", size=len(file.getvalue()))
 
     async def file_iterable():
         chunk_size = 3 * mb

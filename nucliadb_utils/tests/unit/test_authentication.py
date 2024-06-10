@@ -37,9 +37,7 @@ class TestNucliaCloudAuthenticationBackend:
         return Mock(headers={})
 
     @pytest.mark.asyncio
-    async def test_authenticate(
-        self, backend: authentication.NucliaCloudAuthenticationBackend, req
-    ):
+    async def test_authenticate(self, backend: authentication.NucliaCloudAuthenticationBackend, req):
         assert await backend.authenticate(req) is None
 
     @pytest.mark.asyncio
@@ -81,10 +79,7 @@ class TestRequires:
         assert authentication.requires(["admin"])(lambda request: None)(req) is None
 
         # test passed as kwargs
-        assert (
-            authentication.requires(["admin"])(lambda request: None)(request=req)
-            is None
-        )
+        assert authentication.requires(["admin"])(lambda request: None)(request=req) is None
 
     def test_requires_sync_returns_status(self):
         req = Request({"type": "http", "auth": Mock(scopes=["admin"])})
@@ -96,9 +91,7 @@ class TestRequires:
         req = Request({"type": "http", "auth": Mock(scopes=["admin"])})
 
         with patch.object(req, "url_for", return_value="http://foobar"):
-            resp = authentication.requires(["foobar"], redirect="/foobar")(
-                lambda request: None
-            )(req)
+            resp = authentication.requires(["foobar"], redirect="/foobar")(lambda request: None)(req)
         assert resp.status_code == 303
 
     @pytest.mark.asyncio
@@ -125,9 +118,7 @@ class TestRequires:
         async def noop(request): ...
 
         with patch.object(req, "url_for", return_value="http://foobar"):
-            resp = await authentication.requires(["foobar"], redirect="/foobar")(noop)(
-                request=req
-            )
+            resp = await authentication.requires(["foobar"], redirect="/foobar")(noop)(request=req)
         assert resp.status_code == 303
 
     @pytest.mark.asyncio

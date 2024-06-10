@@ -21,7 +21,6 @@ import tempfile
 import time
 
 import pyarrow as pa  # type: ignore
-from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 
 from nucliadb_dataset.dataset import NucliaDBDataset, download_all_partitions
 from nucliadb_models.common import FieldID
@@ -30,6 +29,7 @@ from nucliadb_models.resource import KnowledgeBoxObj
 from nucliadb_models.text import TextField
 from nucliadb_models.utils import FieldIdString
 from nucliadb_models.writer import CreateResourcePayload
+from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 from nucliadb_sdk.v2.sdk import NucliaDB
 
 
@@ -88,9 +88,7 @@ def test_datascientist_tokens(sdk: NucliaDB, temp_folder, kb: KnowledgeBoxObj):
             assert len(loaded_array) == resource_count * fields_per_resource
 
 
-def test_live_token_classification(
-    sdk: NucliaDB, upload_data_token_classification: KnowledgeBoxObj
-):
+def test_live_token_classification(sdk: NucliaDB, upload_data_token_classification: KnowledgeBoxObj):
     trainset = TrainSet()
     trainset.type = TaskType.TOKEN_CLASSIFICATION
     trainset.filter.labels.append("PERSON")

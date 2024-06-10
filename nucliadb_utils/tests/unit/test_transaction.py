@@ -21,8 +21,8 @@ import asyncio
 from unittest import mock
 
 import pytest
-from nucliadb_protos.writer_pb2 import BrokerMessage, Notification
 
+from nucliadb_protos.writer_pb2 import BrokerMessage, Notification
 from nucliadb_utils.transaction import (
     TransactionCommitTimeoutError,
     TransactionUtility,
@@ -82,9 +82,7 @@ async def test_wait_for_indexed(txn: TransactionUtility, pubsub):
     pubsub.subscribe.side_effect = _subscribe
 
     with mock.patch("nucliadb_utils.transaction.has_feature", return_value=True):
-        await (
-            await txn.wait_for_commited(kbid, waiting_for, request_id=request_id)
-        ).wait()
+        await (await txn.wait_for_commited(kbid, waiting_for, request_id=request_id)).wait()
 
 
 @pytest.mark.asyncio

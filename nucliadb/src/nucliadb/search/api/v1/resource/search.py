@@ -64,18 +64,12 @@ async def resource_search(
     fields: list[str] = fastapi_query(SearchParamDefaults.fields),
     filters: list[str] = fastapi_query(SearchParamDefaults.filters),
     faceted: list[str] = fastapi_query(SearchParamDefaults.faceted),
-    sort: Optional[SortField] = fastapi_query(
-        SearchParamDefaults.sort_field, alias="sort_field"
-    ),
+    sort: Optional[SortField] = fastapi_query(SearchParamDefaults.sort_field, alias="sort_field"),
     sort_order: SortOrder = fastapi_query(SearchParamDefaults.sort_order),
     page_number: int = fastapi_query(SearchParamDefaults.page_number),
     page_size: int = fastapi_query(SearchParamDefaults.page_size),
-    range_creation_start: Optional[datetime] = fastapi_query(
-        SearchParamDefaults.range_creation_start
-    ),
-    range_creation_end: Optional[datetime] = fastapi_query(
-        SearchParamDefaults.range_creation_end
-    ),
+    range_creation_start: Optional[datetime] = fastapi_query(SearchParamDefaults.range_creation_start),
+    range_creation_end: Optional[datetime] = fastapi_query(SearchParamDefaults.range_creation_end),
     range_modification_start: Optional[datetime] = fastapi_query(
         SearchParamDefaults.range_modification_start
     ),
@@ -89,9 +83,7 @@ async def resource_search(
     field_type_filter: list[FieldTypeName] = fastapi_query(
         SearchParamDefaults.field_type_filter, alias="field_type"
     ),
-    extracted: list[ExtractedDataTypeName] = fastapi_query(
-        SearchParamDefaults.extracted
-    ),
+    extracted: list[ExtractedDataTypeName] = fastapi_query(SearchParamDefaults.extracted),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     debug: bool = fastapi_query(SearchParamDefaults.debug),
     shards: list[str] = fastapi_query(SearchParamDefaults.shards),

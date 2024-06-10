@@ -22,16 +22,16 @@ import uuid
 
 import aiohttp
 import pytest
+
+from nucliadb.train import API_PREFIX
+from nucliadb.train.api.v1.router import KB_PREFIX
+from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos.dataset_pb2 import SentenceClassificationBatch, TaskType, TrainSet
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.train.utils import get_batches_from_train_response_stream
 from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
-
-from nucliadb.train import API_PREFIX
-from nucliadb.train.api.v1.router import KB_PREFIX
-from nucliadb_protos import resources_pb2 as rpb
 
 
 @pytest.mark.asyncio
@@ -45,9 +45,7 @@ async def test_generator_sentence_classification(
 
     await inject_resource_with_sentence_classification(kbid, nucliadb_grpc)
 
-    async with train_rest_api.get(
-        f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset"
-    ) as partitions:
+    async with train_rest_api.get(f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset") as partitions:
         assert partitions.status == 200
         data = await partitions.json()
         assert len(data["partitions"]) == 1
@@ -64,9 +62,7 @@ async def test_generator_sentence_classification(
     ) as response:
         assert response.status == 200
         batches = []
-        async for batch in get_batches_from_train_response_stream(
-            response, SentenceClassificationBatch
-        ):
+        async for batch in get_batches_from_train_response_stream(response, SentenceClassificationBatch):
             batches.append(batch)
             assert len(batch.data) == 2
         assert len(batches) == 2
@@ -98,9 +94,7 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
     file_field.with_user_paragraph_labels(f"{rid}/f/file/65-93", labelset, labels)
     file_field.with_user_paragraph_labels(f"{rid}/f/file/93-109", labelset, labels)
 
-    classification = rpb.Classification(
-        labelset="labelset_paragraphs", label="label_machine"
-    )
+    classification = rpb.Classification(labelset="labelset_paragraphs", label="label_machine")
     file_field.with_extracted_paragraph_metadata(
         rpb.Paragraph(
             start=0,

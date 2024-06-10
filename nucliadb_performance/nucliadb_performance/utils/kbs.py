@@ -38,7 +38,5 @@ DEFAULT_KBS = [slug.value for slug in TestKBSlugs]
 def parse_input_kb_slug() -> str:
     slug = os.environ.get("KB_SLUG", "")
     if slug == "":
-        slug = input(
-            f"Enter the slug to test with or choose among the default ones {DEFAULT_KBS}: "
-        )
+        slug = input(f"Enter the slug to test with or choose among the default ones {DEFAULT_KBS}: ")
     return slug

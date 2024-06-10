@@ -28,12 +28,12 @@ import aiohttp
 import backoff
 import botocore  # type: ignore
 from aiobotocore.session import AioSession  # type: ignore
-from nucliadb_protos.resources_pb2 import CloudFile
 
 from nucliadb.writer import logger
 from nucliadb.writer.tus.dm import FileDataManager
 from nucliadb.writer.tus.exceptions import ResumableURINotAvailable
 from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
+from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_utils.storages.s3 import (
     CHUNK_SIZE,
     MIN_UPLOAD_SIZE,
@@ -53,9 +53,7 @@ class S3FileStorageManager(FileStorageManager):
     chunk_size = CHUNK_SIZE
     min_upload_size = MIN_UPLOAD_SIZE
 
-    @backoff.on_exception(
-        backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=3
-    )
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=3)
     async def _abort_multipart(self, dm: FileDataManager):
         try:
             mpu = dm.get("mpu")
@@ -87,9 +85,7 @@ class S3FileStorageManager(FileStorageManager):
             bucket=bucket,
         )
 
-    @backoff.on_exception(
-        backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=3
-    )
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=3)
     async def _create_multipart(self, path, bucket, custom_metadata: dict[str, str]):
         return await self.storage._s3aioclient.create_multipart_upload(
             Bucket=bucket, Key=path, Metadata=custom_metadata
@@ -102,16 +98,12 @@ class S3FileStorageManager(FileStorageManager):
             size += len(chunk)
             part = await self._upload_part(dm, chunk)
             multipart = dm.get("multipart")
-            multipart["Parts"].append(
-                {"PartNumber": dm.get("block"), "ETag": part["ETag"]}
-            )
+            multipart["Parts"].append({"PartNumber": dm.get("block"), "ETag": part["ETag"]})
             await dm.update(multipart=multipart, block=dm.get("block") + 1)
 
         return size
 
-    @backoff.on_exception(
-        backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=3
-    )
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=3)
     async def _upload_part(self, dm: FileDataManager, data):
         mpu = dm.get("mpu")
         if mpu is None:
@@ -134,18 +126,14 @@ class S3FileStorageManager(FileStorageManager):
         await dm.finish()
         return path
 
-    @backoff.on_exception(
-        backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=3
-    )
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=3)
     async def _complete_multipart_upload(self, dm: FileDataManager):
         # if blocks is 0, it means the file is of zero length so we need to
         # trick it to finish a multiple part with no data.
         if dm.get("block") == 1:
             part = await self._upload_part(dm, b"")
             multipart = dm.get("multipart")
-            multipart["Parts"].append(
-                {"PartNumber": dm.get("block"), "ETag": part["ETag"]}
-            )
+            multipart["Parts"].append({"PartNumber": dm.get("block"), "ETag": part["ETag"]})
             await dm.update(multipart=multipart, block=dm.get("block") + 1)
         await self.storage._s3aioclient.complete_multipart_upload(
             Bucket=dm.get("bucket"),
@@ -154,14 +142,10 @@ class S3FileStorageManager(FileStorageManager):
             MultipartUpload=dm.get("multipart"),
         )
 
-    @backoff.on_exception(
-        backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=3
-    )
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=3)
     async def _download(self, uri: str, kbid: str, **kwargs):
         bucket = self.storage.get_bucket_name(kbid)
-        return await self.storage._s3aioclient.get_object(
-            Bucket=bucket, Key=uri, **kwargs
-        )
+        return await self.storage._s3aioclient.get_object(Bucket=bucket, Key=uri, **kwargs)
 
     async def delete_upload(self, uri: str, kbid: str):
         bucket = self.storage.get_bucket_name(kbid)
@@ -175,9 +159,7 @@ class S3FileStorageManager(FileStorageManager):
 
     def validate_intermediate_chunk(self, uploaded_bytes: int):
         if uploaded_bytes % self.min_upload_size != 0:
-            raise ValueError(
-                f"Intermediate chunks need to be multiples of {self.min_upload_size} bytes"
-            )
+            raise ValueError(f"Intermediate chunks need to be multiples of {self.min_upload_size} bytes")
 
 
 class S3BlobStore(BlobStore):
@@ -194,9 +176,7 @@ class S3BlobStore(BlobStore):
     async def create_bucket(self, bucket):
         exists = await self.check_exists(bucket)
         if not exists:
-            await create_bucket(
-                self._s3aioclient, bucket, self.bucket_tags, self.region_name
-            )
+            await create_bucket(self._s3aioclient, bucket, self.bucket_tags, self.region_name)
         return exists
 
     async def finalize(self):
@@ -228,9 +208,7 @@ class S3BlobStore(BlobStore):
             verify=verify_ssl,
             use_ssl=ssl,
             region_name=region_name,
-            config=aiobotocore.config.AioConfig(
-                None, max_pool_connections=max_pool_connections
-            ),
+            config=aiobotocore.config.AioConfig(None, max_pool_connections=max_pool_connections),
         )
         session = AioSession()
         self._s3aioclient = await self._exit_stack.enter_async_context(

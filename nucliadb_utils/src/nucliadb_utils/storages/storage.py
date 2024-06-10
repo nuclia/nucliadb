@@ -39,7 +39,6 @@ from nucliadb_protos.noderesources_pb2 import Resource as BrainResource
 from nucliadb_protos.nodewriter_pb2 import IndexMessage
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.writer_pb2 import BrokerMessage
-
 from nucliadb_utils import logger
 from nucliadb_utils.helpers import async_gen_lookahead
 from nucliadb_utils.storages import CHUNK_SIZE
@@ -82,9 +81,7 @@ class StorageField(abc.ABC, metaclass=abc.ABCMeta):
     async def upload(self, iterator: AsyncIterator, origin: CloudFile) -> CloudFile: ...
 
     @abc.abstractmethod
-    async def iter_data(
-        self, range: Optional[Range] = None
-    ) -> AsyncGenerator[bytes, None]:
+    async def iter_data(self, range: Optional[Range] = None) -> AsyncGenerator[bytes, None]:
         raise NotImplementedError()
         yield b""
 
@@ -141,14 +138,10 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         # Delete all keys inside a resource
         bucket = self.get_bucket_name(kbid)
         resource_storage_base_path = STORAGE_RESOURCE.format(kbid=kbid, uuid=uuid)
-        async for object_info in self.iterate_objects(
-            bucket, resource_storage_base_path
-        ):
+        async for object_info in self.iterate_objects(bucket, resource_storage_base_path):
             await self.delete_upload(object_info.name, bucket)
 
-    async def deadletter(
-        self, message: BrokerMessage, seq: int, seqid: int, partition: str
-    ):
+    async def deadletter(self, message: BrokerMessage, seq: int, seqid: int, partition: str):
         if self.deadletter_bucket is None:
             logger.error("No Deadletter Bucket defined will not store the error")
             return
@@ -158,9 +151,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
     def get_indexing_storage_key(
         self, *, kb: str, logical_shard: str, resource_uid: str, txid: Union[int, str]
     ):
-        return INDEXING_KEY.format(
-            kb=kb, shard=logical_shard, resource=resource_uid, txid=txid
-        )
+        return INDEXING_KEY.format(kb=kb, shard=logical_shard, resource=resource_uid, txid=txid)
 
     async def indexing(
         self,
@@ -221,9 +212,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
                     txid=payload.reindex_id,
                 )
             else:
-                key = OLD_INDEXING_KEY.format(
-                    node=payload.node, shard=payload.shard, txid=payload.txid
-                )
+                key = OLD_INDEXING_KEY.format(node=payload.node, shard=payload.shard, txid=payload.txid)
 
         bytes_buffer = await self.downloadbytes(self.indexing_bucket, key)
         if bytes_buffer.getbuffer().nbytes == 0:
@@ -261,17 +250,12 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         # The cloudfile is valid for our environment
         if file.uri == "":
             return False
-        elif (
-            file.source == self.source
-            and self.get_bucket_name(kbid) == file.bucket_name
-        ):
+        elif file.source == self.source and self.get_bucket_name(kbid) == file.bucket_name:
             return False
         else:
             return True
 
-    async def normalize_binary(
-        self, file: CloudFile, destination: StorageField
-    ):  # pragma: no cover
+    async def normalize_binary(self, file: CloudFile, destination: StorageField):  # pragma: no cover
         if file.source == self.source and file.uri != destination.key:
             # This MAY BE the case for NucliaDB hosted deployment (Nuclia's cloud deployment):
             # The data has been pushed to the bucket but with a different key.
@@ -321,14 +305,10 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         self, kbid: str, uuid: str, field: str, ident: str, count: int
     ) -> StorageField:
         bucket = self.get_bucket_name(kbid)
-        key = KB_CONVERSATION_FIELD.format(
-            kbid=kbid, uuid=uuid, field=field, ident=ident, count=count
-        )
+        key = KB_CONVERSATION_FIELD.format(kbid=kbid, uuid=uuid, field=field, ident=ident, count=count)
         return self.field_klass(storage=self, bucket=bucket, fullkey=key)
 
-    def layout_field(
-        self, kbid: str, uuid: str, field: str, ident: str
-    ) -> StorageField:
+    def layout_field(self, kbid: str, uuid: str, field: str, ident: str) -> StorageField:
         bucket = self.get_bucket_name(kbid)
         key = KB_LAYOUT_FIELD.format(kbid=kbid, uuid=uuid, field=field, ident=ident)
         return self.field_klass(storage=self, bucket=bucket, fullkey=key)
@@ -343,9 +323,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         # Its a file field value
         bucket = self.get_bucket_name(kbid)
         key = KB_RESOURCE_FIELD.format(kbid=kbid, uuid=uuid, field=field)
-        return self.field_klass(
-            storage=self, bucket=bucket, fullkey=key, field=old_field
-        )
+        return self.field_klass(storage=self, bucket=bucket, fullkey=key, field=old_field)
 
     def file_extracted(
         self, kbid: str, uuid: str, field_type: str, field: str, key: str
@@ -427,9 +405,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         key: str,
         range: Optional[Range] = None,
     ):
-        destination: StorageField = self.field_klass(
-            storage=self, bucket=bucket, fullkey=key
-        )
+        destination: StorageField = self.field_klass(storage=self, bucket=bucket, fullkey=key)
         try:
             async for data in destination.iter_data(range=range):
                 yield data
@@ -511,21 +487,15 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
     async def finalize(self) -> None: ...
 
     @abc.abstractmethod
-    async def iterate_objects(
-        self, bucket: str, prefix: str
-    ) -> AsyncGenerator[ObjectInfo, None]:
+    async def iterate_objects(self, bucket: str, prefix: str) -> AsyncGenerator[ObjectInfo, None]:
         raise NotImplementedError()
         yield ObjectInfo(name="")
 
     async def copy(self, file: CloudFile, destination: StorageField) -> None:
-        await destination.copy(
-            file.uri, destination.key, file.bucket_name, destination.bucket
-        )
+        await destination.copy(file.uri, destination.key, file.bucket_name, destination.bucket)
 
     async def move(self, file: CloudFile, destination: StorageField) -> None:
-        await destination.move(
-            file.uri, destination.key, file.bucket_name, destination.bucket
-        )
+        await destination.move(file.uri, destination.key, file.bucket_name, destination.bucket)
 
     @abc.abstractmethod
     async def create_kb(self, kbid: str) -> bool: ...

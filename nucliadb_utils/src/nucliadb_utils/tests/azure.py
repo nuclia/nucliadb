@@ -52,7 +52,7 @@ class Azurite(BaseImage):
 
     def check(self):
         try:
-            from azure.storage.blob import BlobServiceClient
+            from azure.storage.blob import BlobServiceClient  # type: ignore
 
             container_port = self.port
             host_port = self.get_port(port=container_port)

@@ -88,8 +88,7 @@ async def test_search_sorted_by_creation_and_modification_dates(
         assert len(results) > 0
 
         sort_fields = [
-            datetime.fromisoformat(body["resources"][result["rid"]][sort_field])
-            for result in results
+            datetime.fromisoformat(body["resources"][result["rid"]][sort_field]) for result in results
         ]
         assert sort_fields == sort_function(sort_fields)
 
@@ -141,9 +140,7 @@ async def test_limited_sorted_search_of_most_relevant_results(
     for results in [body["fulltext"]["results"], body["paragraphs"]["results"]]:
         assert len(results) >= 2
 
-        sort_fields = [
-            body["resources"][result["rid"]][sort_field] for result in results
-        ]
+        sort_fields = [body["resources"][result["rid"]][sort_field] for result in results]
         assert sort_fields == sort_function(sort_fields)
 
 
@@ -167,8 +164,7 @@ async def test_empty_query_search_for_ordered_resources_by_creation_date_desc(
         assert len(results) > 1
 
         creation_dates = [
-            datetime.fromisoformat(body["resources"][result["rid"]]["created"])
-            for result in results
+            datetime.fromisoformat(body["resources"][result["rid"]]["created"]) for result in results
         ]
         assert creation_dates == sorted(creation_dates, reverse=True)
 
@@ -228,8 +224,7 @@ async def test_list_all_resources_by_creation_and_modification_dates_with_empty_
 
         for results in [fulltext]:
             sort_fields = [
-                datetime.fromisoformat(resources[result["rid"]][sort_field])
-                for result in results
+                datetime.fromisoformat(resources[result["rid"]][sort_field]) for result in results
             ]
             assert sort_fields == sort_function(sort_fields)  # type: ignore
 

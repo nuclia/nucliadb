@@ -34,9 +34,7 @@ API_PREFIX = "api"
 class EndpointFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         return (
-            record.args is not None
-            and len(record.args) >= 3
-            and record.args[2] not in ("/", "/metrics")  # type: ignore
+            record.args is not None and len(record.args) >= 3 and record.args[2] not in ("/", "/metrics")  # type: ignore
         )
 
 

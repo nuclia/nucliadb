@@ -21,7 +21,7 @@ from typing import AsyncGenerator
 
 
 async def async_gen_lookahead(
-    gen: AsyncGenerator[bytes, None]
+    gen: AsyncGenerator[bytes, None],
 ) -> AsyncGenerator[tuple[bytes, bool], None]:
     """Async generator that yields the next chunk and whether it's the last one.
     Empty chunks are ignored.

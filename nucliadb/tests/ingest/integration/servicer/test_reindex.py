@@ -20,11 +20,11 @@
 from uuid import uuid4
 
 import pytest
+
+from nucliadb_protos import knowledgebox_pb2, writer_pb2_grpc
 from nucliadb_protos.resources_pb2 import ExtractedVectorsWrapper, FieldType
 from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2 import BrokerMessage, IndexResource
-
-from nucliadb_protos import knowledgebox_pb2, writer_pb2_grpc
 
 
 @pytest.mark.asyncio

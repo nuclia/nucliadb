@@ -78,9 +78,7 @@ async def grpc_health_check(health_servicer) -> None:
         for check in _health_checks:
             if not check():
                 logger.info(f"Health check failed on {check.__name__}")
-                await health_servicer.set(
-                    "", health_pb2.HealthCheckResponse.NOT_SERVING
-                )
+                await health_servicer.set("", health_pb2.HealthCheckResponse.NOT_SERVING)
                 break
         else:
             await health_servicer.set("", health_pb2.HealthCheckResponse.SERVING)

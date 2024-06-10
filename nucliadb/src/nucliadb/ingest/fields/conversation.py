@@ -20,11 +20,9 @@
 import uuid
 from typing import Any, Optional
 
-from nucliadb_protos.resources_pb2 import CloudFile
-from nucliadb_protos.resources_pb2 import Conversation as PBConversation
-from nucliadb_protos.resources_pb2 import FieldConversation
-
 from nucliadb.ingest.fields.base import Field
+from nucliadb_protos.resources_pb2 import CloudFile, FieldConversation
+from nucliadb_protos.resources_pb2 import Conversation as PBConversation
 from nucliadb_utils.storages.storage import StorageField
 
 PAGE_SIZE = 200
