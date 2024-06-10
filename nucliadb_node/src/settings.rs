@@ -136,7 +136,7 @@ pub fn build_object_store_driver(settings: &EnvSettings) -> Arc<dyn ObjectStore>
         ObjectStoreType::AZURE => {
             let builder = MicrosoftAzureBuilder::new()
                 .with_allow_http(true)
-                .with_url(settings.azure_connection_string.clone().unwrap());
+                .with_url(settings.azure_url.clone().unwrap());
             Arc::new(builder.build().unwrap())
         }
         // Any other type is not supported for now
@@ -251,7 +251,7 @@ pub struct EnvSettings {
     pub s3_region_name: String,
     pub s3_indexing_bucket: String,
     pub s3_endpoint: Option<String>,
-    pub azure_connection_string: Option<String>,
+    pub azure_url: Option<String>,
 }
 
 impl EnvSettings {
@@ -332,7 +332,7 @@ impl Default for EnvSettings {
             s3_region_name: Default::default(),
             s3_indexing_bucket: Default::default(),
             s3_endpoint: None,
-            azure_connection_string: Default::default(),
+            azure_url: Default::default(),
         }
     }
 }
@@ -367,7 +367,8 @@ mod tests {
         let settings = from_pairs(&[("FILE_BACKEND", "s3")]).unwrap();
         assert_eq!(settings.file_backend, super::ObjectStoreType::S3);
 
-        let settings = from_pairs(&[("FILE_BACKEND", "azure")]).unwrap();
+        let azure_url = "https://myaccount.blob.core.windows.net/mycontainer/myblob";
+        let settings = from_pairs(&[("FILE_BACKEND", "azure"), ("azure_url", azure_url)]).unwrap();
         assert_eq!(settings.file_backend, super::ObjectStoreType::AZURE);
 
         let settings = from_pairs(&[("FILE_BACKEND", "unknown")]).unwrap();
