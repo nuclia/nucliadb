@@ -790,7 +790,11 @@ class ChatModel(BaseModel):
     question: str = Field(description="Question to ask the generative model")
     user_id: str
     retrieval: bool = True
-    system: Optional[str] = None
+    system: Optional[str] = Field(
+        default=None,
+        title="System prompt",
+        description="Optional system prompt input by the user",
+    )
     query_context: Dict[str, str] = Field(
         default={},
         description="The information retrieval context for the current query",
@@ -951,6 +955,33 @@ PromptContextOrder = dict[str, int]
 PromptContextImages = dict[str, Image]
 
 
+class CustomPrompt(BaseModel):
+    system: Optional[str] = Field(
+        default=None,
+        title="System prompt",
+        description="System prompt given to the generative model. This can help customize the behavior of the model. If not specified, the default model provider's prompt is used.",  # noqa
+        min_length=1,
+        examples=[
+            "You are a medical assistant, use medical terminology",
+            "You are an IT expert, express yourself like one",
+            "You are a very friendly customer service assistant, be polite",
+            "You are a financial expert, use correct terms",
+        ],
+    )
+    user: Optional[str] = Field(
+        default=None,
+        title="User prompt",
+        description="User prompt given to the generative model. Use the words {context} and {question} in brackets where you want those fields to be placed, in case you want them in your prompt. Context will be the data returned by the retrieval step and question will be the user's query.",  # noqa
+        min_length=1,
+        examples=[
+            "Taking into account our previous conversation, and this context: {context} answer this {question}",
+            "Give a detailed answer to this {question} in a list format. If you do not find an answer in this context: {context}, say that you don't have enough data.",
+            "Given this context: {context}. Answer this {question} in a concise way using the provided context",
+            "Given this context: {context}. Answer this {question} using the provided context. Please, answer always in French",
+        ],
+    )
+
+
 class ChatRequest(BaseModel):
     query: str = SearchParamDefaults.chat_query.to_pydantic_field()
     fields: List[str] = SearchParamDefaults.fields.to_pydantic_field()
@@ -990,11 +1021,10 @@ class ChatRequest(BaseModel):
     autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
     highlight: bool = SearchParamDefaults.highlight.to_pydantic_field()
     resource_filters: List[str] = SearchParamDefaults.resource_filters.to_pydantic_field()
-    prompt: Optional[str] = Field(
+    prompt: Optional[Union[str, CustomPrompt]] = Field(
         default=None,
-        title="Prompt",
-        description="Input here your prompt with the words {context} and {question} in brackets where you want those fields to be placed, in case you want them in your prompt. Context will be the data returned by the retrieval step.",  # noqa
-        min_length=1,
+        title="Prompts",
+        description="Use to customize the prompts given to the generative model. Both system and user prompts can be customized. If a string is provided, it is interpreted as the user prompt.",  # noqa
     )
     citations: bool = Field(
         default=False,
@@ -1437,3 +1467,15 @@ AskResponseItemType = Union[
 
 class AskResponseItem(BaseModel):
     item: AskResponseItemType = Field(..., discriminator="type")
+
+
+def parse_custom_prompt(item: ChatRequest) -> CustomPrompt:
+    prompt = CustomPrompt()
+    if item.prompt is not None:
+        if isinstance(item.prompt, str):
+            # If the prompt is a string, it is interpreted as the user prompt
+            prompt.user = item.prompt
+        else:
+            prompt.user = item.prompt.user
+            prompt.system = item.prompt.system
+    return prompt
