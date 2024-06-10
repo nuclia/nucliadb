@@ -42,10 +42,9 @@ from nucliadb_telemetry.utils import setup_telemetry
 from nucliadb_utils import logger
 from nucliadb_utils.storages import CHUNK_SIZE
 from nucliadb_utils.storages.exceptions import (
-    CouldNotCopyNotFound,
     CouldNotCreateBucket,
     InvalidOffset,
-    ResumableUploadGone,
+    ObjectNotFoundError,
 )
 from nucliadb_utils.storages.object_store import ObjectStore
 from nucliadb_utils.storages.storage import Storage, StorageField
@@ -83,7 +82,16 @@ POLICY_DELETE = {
 
 
 class GoogleCloudException(Exception):
-    pass
+
+    @classmethod
+    async def from_response(
+        cls, response: aiohttp.ClientResponse
+    ) -> GoogleCloudException:
+        try:
+            data = await response.json()
+        except Exception:
+            data = await response.text()
+        return cls(f"{response.status}: {data}")
 
 
 class ReadingResponseContentException(GoogleCloudException):
@@ -113,10 +121,9 @@ class GCSStorageField(StorageField):
         origin_bucket_name: str,
         destination_bucket_name: str,
     ):
-        await self.copy(
-            origin_uri, destination_uri, origin_bucket_name, destination_bucket_name
+        await self.storage.object_store.move(
+            origin_bucket_name, origin_uri, destination_bucket_name, destination_uri
         )
-        await self.storage.delete_upload(origin_uri, origin_bucket_name)
 
     @backoff.on_exception(
         backoff.expo,
@@ -132,28 +139,12 @@ class GCSStorageField(StorageField):
         origin_bucket_name: str,
         destination_bucket_name: str,
     ):
-        url = "{}/{}/o/{}/rewriteTo/b/{}/o/{}".format(
-            self.storage.object_base_url,
+        return await self.storage.object_store.copy(
             origin_bucket_name,
-            quote_plus(origin_uri),
+            origin_uri,
             destination_bucket_name,
-            quote_plus(destination_uri),
+            destination_uri,
         )
-        headers = await self.storage.get_access_headers()
-        headers.update({"Content-Type": "application/json"})
-        async with self.storage.session.post(url, headers=headers) as resp:
-            if resp.status == 404:
-                text = await resp.text()
-                raise CouldNotCopyNotFound(
-                    origin_uri=origin_uri,
-                    origin_bucket_name=origin_bucket_name,
-                    destination_uri=destination_uri,
-                    destination_bucket_name=destination_bucket_name,
-                    text=text,
-                )
-            else:
-                data = await resp.json()
-                assert data["resource"]["name"] == destination_uri
 
     @storage_ops_observer.wrap({"type": "iter_data"})
     async def iter_data(
@@ -228,12 +219,8 @@ class GCSStorageField(StorageField):
     @storage_ops_observer.wrap({"type": "start_upload"})
     async def start(self, cf: CloudFile) -> CloudFile:
         """Init an upload.
-
         cf: New file to upload
         """
-        if self.storage.session is None:
-            raise AttributeError()
-
         if self.field is not None and self.field.upload_uri != "":
             # If there is a temporal url
             await self.storage.delete_upload(
@@ -262,45 +249,18 @@ class GCSStorageField(StorageField):
                 source=CloudFile.GCS,
             )
             upload_uri = self.key
-
-        init_url = "{}&name={}".format(
-            self.storage._upload_url.format(bucket=self.bucket),
-            quote_plus(upload_uri),
+        resumable_uri = await self.storage.object_store.upload_multipart_start(
+            self.bucket,
+            upload_uri,
+            ObjectMetadata(
+                filename=cf.filename,
+                size=cf.size,
+                content_type=cf.content_type,
+            ),
         )
-        metadata = json.dumps(
-            {
-                "metadata": {
-                    "FILENAME": cf.filename,
-                    "SIZE": str(cf.size),
-                    "CONTENT_TYPE": cf.content_type,
-                },
-            }
-        )
-        call_size = len(metadata)
-        headers = await self.storage.get_access_headers()
-        headers.update(
-            {
-                "X-Upload-Content-Type": cf.content_type,
-                "X-Upload-Content-Length": str(cf.size),
-                "Content-Type": "application/json; charset=UTF-8",
-                "Content-Length": str(call_size),
-            }
-        )
-
-        async with self.storage.session.post(
-            init_url,
-            headers=headers,
-            data=metadata,
-        ) as call:
-            if call.status != 200:
-                text = await call.text()
-                raise GoogleCloudException(f"{call.status}: {text}")
-            resumable_uri = call.headers["Location"]
-
         field.offset = 0
         field.resumable_uri = resumable_uri
         field.upload_uri = upload_uri
-
         return field
 
     @backoff.on_exception(
@@ -311,64 +271,21 @@ class GCSStorageField(StorageField):
         jitter=backoff.random_jitter,
     )
     @storage_ops_observer.wrap({"type": "append_data"})
-    async def _append(self, cf: CloudFile, data: bytes):
-        if self.field is None:
-            raise AttributeError()
-
-        if self.storage.session is None:
-            raise AttributeError()
-
-        # size = 0 ==> size may be unset, as 0 is the default protobuffer value
-        # Makes no sense to assume a file with size = 0 in upload
-        if cf.size > 0:
-            size = str(cf.size)
-        else:
-            # assuming size will come eventually
-            size = "*"
-        headers = {
-            "Content-Length": str(len(data)),
-            "Content-Type": cf.content_type,
-        }
-        if len(data) != size:
-            content_range = "bytes {init}-{chunk}/{total}".format(
-                init=self.field.offset,
-                chunk=self.field.offset + len(data) - 1,
-                total=size,
-            )
-            headers["Content-Range"] = content_range
-
-        async with self.storage.session.put(
-            self.field.resumable_uri, headers=headers, data=data
-        ) as call:
-            text = await call.text()  # noqa
-            if call.status not in [200, 201, 308]:
-                if call.status == 410:
-                    raise ResumableUploadGone(text)
-                logger.error(f"content-range: {content_range}")
-                raise GoogleCloudException(f"{call.status}: {text}")
-            return call
-
     async def append(self, cf: CloudFile, iterable: AsyncIterator) -> int:
         if self.field is None:
             raise AttributeError()
-        count = 0
-        async for chunk in iterable:
-            resp = await self._append(cf, chunk)
-            size = len(chunk)
-            count += size
-            self.field.offset += len(chunk)
-
-            if resp.status == 308:
-                # verify we're on track with google's resumable api...
-                range_header = resp.headers["Range"]
-                if self.field.offset - 1 != int(range_header.split("-")[-1]):
-                    # range header is the byte range google has received,
-                    # which is different from the total size--off by one
-                    raise InvalidOffset(range_header, self.field.offset)
-            elif resp.status in [200, 201]:
-                # file manager will double check offsets and sizes match
-                break
-        return count
+        size = None
+        if cf.size > 0:
+            size = cf.size
+        bytes_written = await self.storage.object_store.upload_multipart_append(
+            self.bucket,
+            self.field.resumable_uri,
+            iterable,
+            offset=self.field.offset,
+            size=size,
+        )
+        self.field.offset += bytes_written
+        return bytes_written
 
     async def finish(self):
         if self.field.old_uri not in ("", None):
@@ -386,7 +303,6 @@ class GCSStorageField(StorageField):
             await self.move(
                 self.field.upload_uri, self.key, self.field.bucket_name, self.bucket
             )
-
         self.field.uri = self.key
         self.field.ClearField("resumable_uri")
         self.field.ClearField("offset")
@@ -405,8 +321,6 @@ class GCSStorageField(StorageField):
         Existence can be checked either with a CloudFile data in the field attribute
         or own StorageField key and bucket. Field takes precendece
         """
-        if self.storage.session is None:
-            raise AttributeError()
         key = None
         bucket = None
         if self.field is not None and self.field.uri != "":
@@ -417,20 +331,10 @@ class GCSStorageField(StorageField):
             bucket = self.bucket
         else:
             return None
-
-        url = "{}/{}/o/{}".format(
-            self.storage.object_base_url,
-            bucket,
-            quote_plus(key),
-        )
-        headers = await self.storage.get_access_headers()
-        async with self.storage.session.get(url, headers=headers) as api_resp:
-            if api_resp.status == 200:
-                data = await api_resp.json()
-                data = cast(dict[str, Any], data)
-                return parse_object_metadata(data, key)
-            else:
-                return None
+        try:
+            return await self.storage.object_store.get_metadata(bucket, key)
+        except ObjectNotFoundError:
+            return None
 
     async def upload(self, iterator: AsyncIterator, origin: CloudFile) -> CloudFile:
         self.field = await self.start(origin)
@@ -446,8 +350,6 @@ class GCSStorageField(StorageField):
 
 class GCSStorage(Storage):
     field_klass = GCSStorageField
-    _credentials = None
-    _json_credentials = None
     chunk_size = CHUNK_SIZE
 
     def __init__(
@@ -515,17 +417,7 @@ class GCSStorage(Storage):
     )
     @storage_ops_observer.wrap({"type": "delete"})
     async def delete_upload(self, uri: str, bucket_name: str):
-        url = "{}/{}/o/{}".format(self.object_base_url, bucket_name, quote_plus(uri))
-        headers = await self.get_access_headers()
-        async with self.session.delete(url, headers=headers) as resp:
-            if resp.status in (200, 204, 404):
-                return
-            try:
-                data = await resp.json()
-            except Exception:
-                text = await resp.text()
-                data = {"text": text}
-            raise GoogleCloudException(f"{resp.status}: {json.dumps(data)}")
+        return await self.object_store.delete(bucket_name, uri)
 
     def get_bucket_name(self, kbid: str):
         assert self.bucket is not None
@@ -553,34 +445,8 @@ class GCSStorage(Storage):
     async def iterate_objects(
         self, bucket: str, prefix: str
     ) -> AsyncGenerator[ObjectInfo, None]:
-        url = "{}/{}/o".format(self.object_base_url, bucket)
-        headers = await self.get_access_headers()
-        async with self.session.get(
-            url,
-            headers=headers,
-            params={"prefix": prefix},
-        ) as resp:
-            assert resp.status == 200
-            data = await resp.json()
-            if "items" in data:
-                for item in data["items"]:
-                    yield ObjectInfo(name=item["name"])
-
-        page_token = data.get("nextPageToken")
-        while page_token is not None:
-            headers = await self.get_access_headers()
-            async with self.session.get(
-                url,
-                headers=headers,
-                params={"prefix": prefix, "pageToken": page_token},
-            ) as resp:
-                data = await resp.json()
-                items = data.get("items", [])
-                if len(items) == 0:
-                    break
-                for item in items:
-                    yield ObjectInfo(name=item["name"])
-                page_token = data.get("nextPageToken")
+        async for obj in self.object_store.iterate(bucket, prefix):
+            yield obj
 
 
 class GCSObjectStore(ObjectStore):
@@ -603,10 +469,11 @@ class GCSObjectStore(ObjectStore):
         self._project = project
         self._scopes = scopes
         self._session: Optional[aiohttp.ClientSession] = None
+        self._credentials = None
         if account_credentials is not None:
-            self._json_credentials = json.loads(base64.b64decode(account_credentials))
+            _json_credentials = json.loads(base64.b64decode(account_credentials))
             self._credentials = service_account.Credentials.from_service_account_info(
-                self._json_credentials, scopes=scopes or DEFAULT_SCOPES
+                _json_credentials, scopes=scopes or DEFAULT_SCOPES
             )
 
     async def get_access_headers(self):
@@ -732,8 +599,7 @@ class GCSObjectStore(ObjectStore):
                 return True
             elif resp.status == 404:
                 return False
-            text = await resp.text()
-            raise GoogleCloudException(f"{resp.status}: {text}")
+            raise await GoogleCloudException.from_response(resp)
 
     async def move(
         self,
@@ -742,7 +608,8 @@ class GCSObjectStore(ObjectStore):
         destination_bucket: str,
         destination_key: str,
     ) -> None:
-        raise NotImplementedError()
+        await self.copy(origin_bucket, origin_key, destination_bucket, destination_key)
+        await self.delete(origin_bucket, origin_key)
 
     async def copy(
         self,
@@ -751,10 +618,29 @@ class GCSObjectStore(ObjectStore):
         destination_bucket: str,
         destination_key: str,
     ) -> None:
-        raise NotImplementedError()
+        url = "{}/{}/o/{}/rewriteTo/b/{}/o/{}".format(
+            self.object_base_url,
+            origin_bucket,
+            quote_plus(origin_key),
+            destination_bucket,
+            quote_plus(destination_key),
+        )
+        headers = await self.get_access_headers()
+        headers.update({"Content-Type": "application/json"})
+        async with self.session.post(url, headers=headers) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                assert data["resource"]["name"] == destination_key
+                return
+            raise await GoogleCloudException.from_response(resp)
 
     async def delete(self, bucket: str, key: str) -> None:
-        raise NotImplementedError()
+        url = "{}/{}/o/{}".format(self.object_base_url, bucket, quote_plus(key))
+        headers = await self.get_access_headers()
+        async with self.session.delete(url, headers=headers) as resp:
+            if resp.status in (200, 204, 404):
+                return
+            raise await GoogleCloudException.from_response(resp)
 
     async def upload(
         self,
@@ -763,7 +649,11 @@ class GCSObjectStore(ObjectStore):
         data: Union[bytes, AsyncGenerator[bytes, None]],
         metadata: ObjectMetadata,
     ) -> None:
-        raise NotImplementedError()
+        await self.upload_multipart_start(bucket, key, metadata)
+        if isinstance(data, bytes):
+            data = (data,)
+        await self.upload_multipart_append(bucket, key, data, 0, metadata.size)
+        await self.upload_multipart_finish(bucket, key)
 
     async def download(self, bucket: str, key: str) -> bytes:
         raise NotImplementedError()
@@ -777,11 +667,50 @@ class GCSObjectStore(ObjectStore):
     async def iterate(
         self, bucket: str, prefix: str
     ) -> AsyncGenerator[ObjectInfo, None]:
-        raise NotImplementedError()
-        yield ObjectInfo(name="")
+        objects, page_token = await self._iterate_page(bucket, prefix)
+        for obj in objects:
+            yield obj
+
+        while page_token is not None:
+            objects, page_token = await self._iterate_page(
+                bucket, prefix, page_token=page_token
+            )
+            if len(objects) == 0:
+                break
+            for obj in objects:
+                yield obj
+
+    async def _iterate_page(
+        self, bucket: str, prefix: str, page_token: Optional[str] = None
+    ) -> tuple[list[ObjectInfo], Optional[str]]:
+        url = "{}/{}/o".format(self.object_base_url, bucket)
+        headers = await self.get_access_headers()
+        params = {"prefix": prefix}
+        if page_token is not None:
+            params["pageToken"] = page_token
+        async with self.session.get(url, headers=headers, params=params) as resp:
+            if resp.status != 200:
+                raise await GoogleCloudException.from_response(resp)
+            data = await resp.json()
+            items = data.get("items", [])
+            page_token = data.get("nextPageToken")
+            return [ObjectInfo(name=item["name"]) for item in items], page_token
 
     async def get_metadata(self, bucket: str, key: str) -> ObjectMetadata:
-        raise NotImplementedError()
+        url = "{}/{}/o/{}".format(
+            self.object_base_url,
+            bucket,
+            quote_plus(key),
+        )
+        headers = await self.get_access_headers()
+        async with self.session.get(url, headers=headers) as api_resp:
+            if api_resp.status == 200:
+                data = await api_resp.json()
+                data = cast(dict[str, Any], data)
+                return parse_object_metadata(data, key)
+            elif api_resp.status == 404:
+                raise ObjectNotFoundError()
+            raise await GoogleCloudException.from_response(api_resp)
 
     async def upload_multipart_start(
         self, bucket: str, key: str, metadata: ObjectMetadata
@@ -789,18 +718,90 @@ class GCSObjectStore(ObjectStore):
         """
         Start a multipart upload. May return the url for the resumable upload.
         """
-        raise NotImplementedError()
+        init_url = "{}&name={}".format(
+            self.storage._upload_url.format(bucket=bucket),
+            quote_plus(key),
+        )
+        data = json.dumps(
+            {
+                "metadata": {key: str(value) for key, value in metadata.items()},
+            }
+        )
+        headers = await self.get_access_headers()
+        headers.update(
+            {
+                "X-Upload-Content-Type": metadata.content_type,
+                "X-Upload-Content-Length": str(metadata.size),
+                "Content-Type": "application/json; charset=UTF-8",
+                "Content-Length": str(len(data)),
+            }
+        )
+        async with self.session.post(
+            init_url,
+            headers=headers,
+            data=metadata,
+        ) as resp:
+            if resp.status != 200:
+                raise await GoogleCloudException.from_response(resp)
+            return headers["Location"]
 
     async def upload_multipart_append(
-        self, bucket: str, key: str, iterable: AsyncIterator[bytes]
+        self,
+        bucket: str,
+        key: str,
+        iterable: AsyncIterator[bytes],
+        offset: int,
+        size: Optional[int] = None,
     ) -> int:
         """
         Append data to a multipart upload. Returns the number of bytes uploaded.
         """
-        raise NotImplementedError()
+        bytes_written = 0
+        async for chunk in iterable:
+            chunk_size = len(chunk)
+            bytes_written += chunk_size
+            offset += chunk_size
+            await self._inner_multipart_append(
+                resumable_upload_url=key, data=chunk, offset=offset, size=size
+            )
+        return bytes_written
+
+    async def _inner_multipart_append(
+        self,
+        resumable_upload_url: str,
+        data: bytes,
+        offset: int,
+        size: Optional[int] = None,
+    ):
+        total = "*"
+        if size is not None:
+            total = str(size)
+        data_size = len(data)
+        headers = {
+            "Content-Length": str(data_size),
+            "Content-Range": "bytes {init}-{chunk}/{total}".format(
+                init=offset,
+                chunk=offset + data_size - 1,
+                total=total,
+            ),
+        }
+        async with self.session.put(
+            resumable_upload_url, headers=headers, data=data
+        ) as resp:
+            if resp.status not in [200, 201, 308]:
+                raise await GoogleCloudException.from_response(resp)
+            if resp.status == 308:
+                # verify we're on track with google's resumable api...
+                range_header = resp.headers["Range"]
+                server_offset = int(range_header.split("-")[-1])
+                new_offset = offset + len(data)
+                if new_offset - 1 != server_offset:
+                    # range header is the byte range google has received,
+                    # which is different from the total size -- off by one
+                    raise InvalidOffset(server_offset, new_offset)
 
     async def upload_multipart_finish(self, bucket: str, key: str) -> None:
-        raise NotImplementedError()
+        return
 
 
 def parse_object_metadata(object_data: dict[str, Any], key: str) -> ObjectMetadata:
