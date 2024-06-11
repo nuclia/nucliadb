@@ -305,6 +305,39 @@ files = [
 ]
 
 [[package]]
+name = "azure-core"
+version = "1.30.2"
+requires_python = ">=3.8"
+summary = "Microsoft Azure Core Library for Python"
+groups = ["dev"]
+dependencies = [
+    "requests>=2.21.0",
+    "six>=1.11.0",
+    "typing-extensions>=4.6.0",
+]
+files = [
+    {file = "azure-core-1.30.2.tar.gz", hash = "sha256:a14dc210efcd608821aa472d9fb8e8d035d29b68993819147bc290a8ac224472"},
+    {file = "azure_core-1.30.2-py3-none-any.whl", hash = "sha256:cf019c1ca832e96274ae85abd3d9f752397194d9fea3b41487290562ac8abe4a"},
+]
+
+[[package]]
+name = "azure-storage-blob"
+version = "12.20.0"
+requires_python = ">=3.8"
+summary = "Microsoft Azure Blob Storage Client Library for Python"
+groups = ["dev"]
+dependencies = [
+    "azure-core>=1.28.0",
+    "cryptography>=2.1.4",
+    "isodate>=0.6.1",
+    "typing-extensions>=4.6.0",
+]
+files = [
+    {file = "azure-storage-blob-12.20.0.tar.gz", hash = "sha256:eeb91256e41d4b5b9bad6a87fd0a8ade07dd58aa52344e2c8d2746e27a017d3b"},
+    {file = "azure_storage_blob-12.20.0-py3-none-any.whl", hash = "sha256:de6b3bf3a90e9341a6bcb96a2ebe981dffff993e9045818f6549afea827a52a9"},
+]
+
+[[package]]
 name = "backoff"
 version = "2.2.1"
 requires_python = ">=3.7,<4.0"
@@ -760,7 +793,7 @@ files = [
 
 [[package]]
 name = "faker"
-version = "25.6.0"
+version = "25.8.0"
 requires_python = ">=3.8"
 summary = "Faker is a Python package that generates fake data for you."
 groups = ["dev"]
@@ -768,8 +801,8 @@ dependencies = [
     "python-dateutil>=2.4",
 ]
 files = [
-    {file = "Faker-25.6.0-py3-none-any.whl", hash = "sha256:7fe5f48ebfd43b9cdf9149a087a4dad3cf3e1618e2f69247deea1cb56bff85f9"},
-    {file = "Faker-25.6.0.tar.gz", hash = "sha256:e1d271759d9030db33eab68d3951ec0ac251cdc14c295d6bcc34a02f39ef0e84"},
+    {file = "Faker-25.8.0-py3-none-any.whl", hash = "sha256:4c40b34a9c569018d4f9d6366d71a4da8a883d5ddf2b23197be5370f29b7e1b6"},
+    {file = "Faker-25.8.0.tar.gz", hash = "sha256:bdec5f2fb057d244ebef6e0ed318fea4dcbdf32c3a1a010766fc45f5d68fc68d"},
 ]
 
 [[package]]
@@ -1459,6 +1492,19 @@ groups = ["dev"]
 files = [
     {file = "iniconfig-2.0.0-py3-none-any.whl", hash = "sha256:b6a85871a79d2e3b22d2d1b94ac2824226a63c6b741c88f7ae975f18b6778374"},
     {file = "iniconfig-2.0.0.tar.gz", hash = "sha256:2d91e135bf72d31a410b17c16da610a82cb55f6b0477d1a902134b24a455b8b3"},
+]
+
+[[package]]
+name = "isodate"
+version = "0.6.1"
+summary = "An ISO 8601 date/time/duration parser and formatter"
+groups = ["dev"]
+dependencies = [
+    "six",
+]
+files = [
+    {file = "isodate-0.6.1-py2.py3-none-any.whl", hash = "sha256:0751eece944162659049d35f4f549ed815792b38793f07cf73381c1c87cbed96"},
+    {file = "isodate-0.6.1.tar.gz", hash = "sha256:48c5881de7e8b0a0d648cb024c8062dc84e7b840ed81e864c7614fd3c127bde9"},
 ]
 
 [[package]]
@@ -2282,6 +2328,7 @@ groups = ["dev"]
 dependencies = [
     "aiobotocore>=2.9.0",
     "aiofiles>=0.8.0",
+    "azure-storage-blob>=12.20.0",
     "backoff>=1.11.1",
     "fastapi>=0.95.2",
     "google-api-python-client>=2.37.0",
