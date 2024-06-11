@@ -28,7 +28,7 @@ from tests.ingest.fixtures import IngestFixture
 
 
 @pytest.mark.asyncio
-async def test_create_knowledgebox(grpc_servicer: IngestFixture, maindb_driver):
+async def test_create_knowledgebox(grpc_servicer: IngestFixture, maindb_driver, hosted_nucliadb):
     if isinstance(maindb_driver, LocalDriver):
         pytest.skip("There is a bug in the local driver that needs to be fixed")
 
@@ -69,7 +69,7 @@ async def list_all_kb_slugs(driver: Driver) -> list[str]:
 
 @pytest.mark.asyncio
 async def test_delete_knowledgebox_handles_unexisting_kb(
-    grpc_servicer: IngestFixture,
+    grpc_servicer: IngestFixture, hosted_nucliadb
 ) -> None:
     stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
 
@@ -94,6 +94,7 @@ async def test_delete_knowledgebox_handles_unexisting_kb(
 async def test_create_knowledgebox_release_channel(
     grpc_servicer: IngestFixture,
     release_channel,
+    hosted_nucliadb,
 ):
     stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
     pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test-default", release_channel=release_channel)

@@ -27,7 +27,7 @@ from nucliadb_protos.utils_pb2 import ReleaseChannel
 
 
 @pytest.mark.parametrize(
-    "req,has_feature,environment,expected_channel",
+    "slug,release_channel,has_feature,environment,expected_channel",
     [
         (
             "foo",

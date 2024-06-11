@@ -26,7 +26,7 @@ from nucliadb_protos import knowledgebox_pb2, writer_pb2_grpc
 
 
 @pytest.mark.asyncio
-async def test_create_cleansup_on_error(grpc_servicer, fake_node):
+async def test_create_cleansup_on_error(grpc_servicer, fake_node, hosted_nucliadb):
     stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
     # Create a KB
     kbid = str(uuid4())

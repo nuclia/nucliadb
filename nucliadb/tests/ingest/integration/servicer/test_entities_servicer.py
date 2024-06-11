@@ -27,7 +27,9 @@ from tests.ingest.fixtures import IngestFixture
 
 
 @pytest.mark.asyncio
-async def test_create_entities_group(grpc_servicer: IngestFixture, entities_manager_mock):
+async def test_create_entities_group(
+    grpc_servicer: IngestFixture, entities_manager_mock, hosted_nucliadb
+):
     stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
 
     kb_id = str(uuid4())
