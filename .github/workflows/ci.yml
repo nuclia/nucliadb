@@ -256,7 +256,7 @@ jobs:
           fail-on-cache-miss: true
 
       - name: Run NucliaDB tests
-        run: make -C nucliadb_models test-cov
+        run: source .venv/bin/activate && make -C nucliadb_models test-cov
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
