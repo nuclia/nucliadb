@@ -24,6 +24,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, field_serializer, model_validator
+from typing_extensions import Self
 
 from nucliadb_protos import resources_pb2
 
@@ -95,24 +96,23 @@ class File(BaseModel):
     extra_headers: Dict[str, str] = {}
 
     @model_validator(mode="after")
-    @classmethod
-    def _check_internal_file_fields(cls, values):
-        if values.uri:
+    def _check_internal_file_fields(self) -> Self:
+        if self.uri:
             # Externally hosted file
-            return values
+            return self
 
-        required_keys = ["filename", "payload"]
-        for key in required_keys:
-            if getattr(values, key) is None:
-                raise ValueError(f"{key} is required")
-        if values.md5 is None:
+        if self.filename is None:
+            raise ValueError(f"'filename' field is required")
+        if self.payload is None:
+            raise ValueError(f"'payload' field is required")
+        if self.md5 is None:
             # In case md5 is not supplied, compute it
             try:
-                result = hashlib.md5(base64.b64decode(values.payload))
-                values.md5 = result.hexdigest()
+                result = hashlib.md5(base64.b64decode(self.payload))
+                self.md5 = result.hexdigest()
             except Exception:
                 raise ValueError("MD5 could not be computed")
-        return values
+        return self
 
     @property
     def is_external(self) -> bool:

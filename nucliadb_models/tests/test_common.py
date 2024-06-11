@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 # Copyright (C) 2021 Bosutech XXI S.L.
 #
 # nucliadb is offered under the AGPL v3.0 and as commercial software.
@@ -20,14 +18,19 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-# XXX: this should be in nucliadb_models/tests if we create them at some point
-
 import pytest
 from pydantic_core import ValidationError
 
-from nucliadb_models.metadata import UserMetadata
+from nucliadb_models import common
 
 
-def test_relation_validator():
+def test_file_model_validator():
+    common.File(uri="asdf")
+
+    # filename is mandatory
     with pytest.raises(ValidationError):
-        UserMetadata(relations=["my-wrong-relation"])
+        common.File(payload="base64content")
+
+    # payload is mandatory
+    with pytest.raises(ValidationError):
+        common.File(filename="myfile")
