@@ -19,6 +19,7 @@
 #
 import asyncio
 from functools import partial, wraps
+from typing import Optional
 
 from fastapi import HTTPException
 from fastapi_versioning import version
@@ -67,6 +68,17 @@ def only_for_onprem(fun):
 @requires(NucliaDBRoles.MANAGER)
 @version(1)
 async def create_kb(request: Request, item: KnowledgeBoxConfig) -> KnowledgeBoxObj:
+    try:
+        kbid, slug = await _create_kb(item)
+    except KnowledgeBoxConflict:
+        raise HTTPException(status_code=419, detail="Knowledge box already exists")
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error creating knowledge box")
+    else:
+        return KnowledgeBoxObj(uuid=kbid, slug=slug)
+
+
+async def _create_kb(item: KnowledgeBoxConfig) -> tuple[str, Optional[str]]:
     driver = get_driver()
     rollback_learning_config = None
 
@@ -118,15 +130,12 @@ async def create_kb(request: Request, item: KnowledgeBoxConfig) -> KnowledgeBoxO
             )
             await txn.commit()
 
-    except KnowledgeBoxConflict:
-        await rollback_learning_config()
-        raise HTTPException(status_code=419, detail="Knowledge box already exists")
     except Exception as exc:
-        await rollback_learning_config()
         logger.error("Unexpected error creating KB", exc_info=exc, extra={"slug": item.slug})
-        raise HTTPException(status_code=500, detail="Error creating knowledge box")
-    else:
-        return KnowledgeBoxObj(uuid=kbid, slug=item.slug)
+        await rollback_learning_config()
+        raise
+
+    return (kbid, item.slug)
 
 
 @only_for_onprem
