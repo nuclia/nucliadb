@@ -60,6 +60,7 @@ from nucliadb_telemetry.settings import (
 from nucliadb_utils.settings import FileBackendConfig
 from nucliadb_utils.storages.settings import settings as storage_settings
 from nucliadb_utils.tests import free_port
+from nucliadb_utils.tests.azure import AzuriteFixture
 from nucliadb_utils.utilities import (
     Utility,
     clean_utility,
@@ -175,6 +176,7 @@ async def nucliadb(
         )
     )
     server = await run_async_nucliadb(settings)
+    assert server.started, "Nucliadb server did not start correctly"
 
     yield settings
 
@@ -666,6 +668,14 @@ def local_storage_settings(tmpdir):
     return {
         "file_backend": FileBackendConfig.LOCAL,
         "local_files": f"{tmpdir}/blob",
+    }
+
+
+@pytest.fixture(scope="function")
+def azure_storage_settings(azurite: AzuriteFixture):
+    return {
+        "file_backend": FileBackendConfig.AZURE,
+        "azure_connection_string": azurite.connection_string,
     }
 
 

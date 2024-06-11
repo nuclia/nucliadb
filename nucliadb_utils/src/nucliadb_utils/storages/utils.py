@@ -17,18 +17,35 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-pytest_plugins = [
-    "pytest_docker_fixtures",
-    "tests.fixtures",
-    "tests.tikv",
-    "tests.ingest.fixtures",  # should be refactored out
-    "tests.search.node",
-    "tests.search.fixtures",
-    "nucliadb_utils.tests.fixtures",
-    "nucliadb_utils.tests.gcs",
-    "nucliadb_utils.tests.s3",
-    "nucliadb_utils.tests.azure",
-    "nucliadb_utils.tests.nats",
-    "nucliadb_utils.tests.asyncbenchmark",
-    "nucliadb_utils.tests.indexing",
-]
+
+from dataclasses import dataclass
+from typing import Optional
+
+from pydantic import BaseModel
+
+
+class ObjectInfo(BaseModel):
+    name: str
+
+
+class ObjectMetadata(BaseModel):
+    filename: str
+    content_type: str
+    size: int
+
+
+@dataclass
+class Range:
+    """
+    Represents a range of bytes to be downloaded from a file. The range is inclusive.
+    The start and end values are 0-based.
+    """
+
+    start: Optional[int] = None
+    end: Optional[int] = None
+
+    def any(self) -> bool:
+        return self.start is not None or self.end is not None
+
+    def to_header(self) -> str:
+        return f"bytes={self.start or 0}-{self.end or ''}"

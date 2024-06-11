@@ -52,6 +52,7 @@ class FileBackendConfig(Enum):
     GCS = "gcs"
     S3 = "s3"
     LOCAL = "local"
+    AZURE = "azure"
     NOT_SET = "notset"  # setting not provided
 
     @classmethod
@@ -113,8 +114,10 @@ class StorageSettings(BaseSettings):
         description="Number of days that uploaded files are kept in Nulia's processing engine",
     )
 
-    driver_pg_url: Optional[str] = None  # match same env var for k/v storage
-    driver_pg_connection_pool_max_size: int = 20  # match same env var for k/v storage
+    azure_connection_string: Optional[str] = Field(
+        default=None,
+        description="Azure Storage connection string: https://docs.microsoft.com/en-us/azure/storage/common/storage-configure-connection-string",  # noqa
+    )
 
 
 storage_settings = StorageSettings()

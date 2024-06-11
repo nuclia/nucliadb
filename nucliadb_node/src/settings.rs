@@ -48,6 +48,7 @@ use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use nucliadb_core::NodeResult;
 use object_store::aws::AmazonS3Builder;
+use object_store::azure::MicrosoftAzureBuilder;
 use object_store::gcp::GoogleCloudStorageBuilder;
 use object_store::memory::InMemory;
 use serde::{Deserialize, Deserializer};
@@ -132,6 +133,11 @@ pub fn build_object_store_driver(settings: &EnvSettings) -> Arc<dyn ObjectStore>
             }
             Arc::new(builder.build().unwrap())
         }
+        ObjectStoreType::AZURE => {
+            let builder =
+                MicrosoftAzureBuilder::new().with_allow_http(true).with_url(settings.azure_url.clone().unwrap());
+            Arc::new(builder.build().unwrap())
+        }
         // Any other type is not supported for now
         _ => Arc::new(InMemory::new()),
     }
@@ -151,6 +157,7 @@ pub enum ObjectStoreType {
     NOTSET,
     GCS,
     S3,
+    AZURE,
 }
 
 impl<'de> Deserialize<'de> for ObjectStoreType {
@@ -162,6 +169,7 @@ impl<'de> Deserialize<'de> for ObjectStoreType {
         match s.as_str() {
             "gcs" => Ok(ObjectStoreType::GCS),
             "s3" => Ok(ObjectStoreType::S3),
+            "azure" => Ok(ObjectStoreType::AZURE),
             _ => {
                 warn!("Invalid object store type: {}. Using default one", s);
                 Ok(ObjectStoreType::NOTSET)
@@ -242,6 +250,7 @@ pub struct EnvSettings {
     pub s3_region_name: String,
     pub s3_indexing_bucket: String,
     pub s3_endpoint: Option<String>,
+    pub azure_url: Option<String>,
 }
 
 impl EnvSettings {
@@ -322,6 +331,7 @@ impl Default for EnvSettings {
             s3_region_name: Default::default(),
             s3_indexing_bucket: Default::default(),
             s3_endpoint: None,
+            azure_url: Default::default(),
         }
     }
 }
@@ -355,6 +365,10 @@ mod tests {
 
         let settings = from_pairs(&[("FILE_BACKEND", "s3")]).unwrap();
         assert_eq!(settings.file_backend, super::ObjectStoreType::S3);
+
+        let azure_url = "https://myaccount.blob.core.windows.net/mycontainer/myblob";
+        let settings = from_pairs(&[("FILE_BACKEND", "azure"), ("azure_url", azure_url)]).unwrap();
+        assert_eq!(settings.file_backend, super::ObjectStoreType::AZURE);
 
         let settings = from_pairs(&[("FILE_BACKEND", "unknown")]).unwrap();
         assert_eq!(settings.file_backend, super::ObjectStoreType::NOTSET);

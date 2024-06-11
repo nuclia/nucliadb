@@ -21,10 +21,16 @@ from uuid import uuid4
 
 import pytest
 
+from nucliadb_utils.storages.azure import AzureStorage
 from nucliadb_utils.storages.gcs import GCSStorage
 from nucliadb_utils.storages.local import LocalStorage
 from nucliadb_utils.storages.s3 import S3Storage
 from nucliadb_utils.storages.storage import Storage
+
+
+@pytest.mark.asyncio
+async def test_azure_driver(azure_storage: AzureStorage):
+    await storage_test(azure_storage)
 
 
 @pytest.mark.asyncio

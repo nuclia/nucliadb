@@ -30,13 +30,8 @@ import aiofiles
 
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_utils.storages import CHUNK_SIZE
-from nucliadb_utils.storages.storage import (
-    ObjectInfo,
-    ObjectMetadata,
-    Range,
-    Storage,
-    StorageField,
-)
+from nucliadb_utils.storages.storage import Storage, StorageField
+from nucliadb_utils.storages.utils import ObjectInfo, ObjectMetadata, Range
 
 
 class LocalStorageField(StorageField):
@@ -79,6 +74,7 @@ class LocalStorageField(StorageField):
         shutil.copy(origin_path, destination_path)
 
     async def iter_data(self, range: Optional[Range] = None) -> AsyncGenerator[bytes, None]:
+        range = range or Range()
         key = self.field.uri if self.field else self.key
         if self.field is None:
             bucket = self.bucket
@@ -87,13 +83,13 @@ class LocalStorageField(StorageField):
 
         path = self.storage.get_file_path(bucket, key)
         async with aiofiles.open(path, mode="rb") as resp:
-            if range and range.start is not None:
+            if range.start is not None:
                 # Seek to the start of the range
                 await resp.seek(range.start)
 
             bytes_read = 0
             bytes_to_read = None  # If None, read until EOF
-            if range and range.end is not None:
+            if range.end is not None:
                 # Range is inclusive
                 bytes_to_read = range.end - (range.start or 0) + 1
 

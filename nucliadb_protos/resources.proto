@@ -20,6 +20,7 @@ message CloudFile {
         EMPTY = 5;
         EXPORT = 6;
         POSTGRES = 7;
+        AZURE = 8;
     }
     Source source = 5;
     string filename = 6;

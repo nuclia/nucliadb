@@ -63,7 +63,7 @@ from nucliadb.writer.utilities import get_processing
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.utils import FieldIdString
 from nucliadb_models.writer import CreateResourcePayload, ResourceFileUploaded
-from nucliadb_protos.resources_pb2 import FieldFile, Metadata
+from nucliadb_protos.resources_pb2 import CloudFile, FieldFile, Metadata
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils.authentication import requires_one
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
@@ -458,7 +458,7 @@ async def _tus_patch(
     field: Optional[str] = None,
 ) -> Response:
     """
-    Upload all bytes in the requests and append them in the specifyied offset
+    Upload all bytes in the requests and append them in the specified offset
     """
     if rid is not None:
         await validate_rid_exists_or_raise_error(kbid, rid)
@@ -511,7 +511,6 @@ async def _tus_patch(
     }
 
     upload_finished = dm.get("size") is not None and dm.offset >= dm.get("size")
-
     if upload_finished:
         rid = dm.get("rid", rid)
         if rid is None:
@@ -802,7 +801,7 @@ async def store_file_on_nuclia_db(
     path: str,
     request: Request,
     bucket: str,
-    source: Source,
+    source: CloudFile.Source.ValueType,
     rid: str,
     field: str,
     content_type: str = "application/octet-stream",

@@ -29,4 +29,5 @@ pytest_plugins = [
     "tests.ingest.fixtures",
     "nucliadb_utils.tests.fixtures",
     "nucliadb_utils.tests.gcs",
+    "nucliadb_utils.tests.azure",
 ]
