@@ -282,9 +282,17 @@ class ReadOnlyPGTransaction(Transaction):
 class PGDriver(Driver):
     pool: asyncpg.Pool
 
-    def __init__(self, url: str, connection_pool_max_size: int = 10):
+    def __init__(
+        self,
+        url: str,
+        connection_pool_min_size: int = 10,
+        connection_pool_max_size: int = 10,
+        acquire_timeout_ms: int = 200,
+    ):
         self.url = url
+        self.connection_pool_min_size = connection_pool_min_size
         self.connection_pool_max_size = connection_pool_max_size
+        self.acquire_timeout_ms = acquire_timeout_ms
         self._lock = asyncio.Lock()
 
     async def initialize(self, for_replication: bool = False):
@@ -292,6 +300,7 @@ class PGDriver(Driver):
             if self.initialized is False:
                 self.pool = await asyncpg.create_pool(
                     self.url,
+                    min_size=self.connection_pool_min_size,
                     max_size=self.connection_pool_max_size,
                 )
 
@@ -315,7 +324,8 @@ class PGDriver(Driver):
         if read_only:
             return ReadOnlyPGTransaction(self.pool, driver=self)
         else:
-            conn: asyncpg.Connection = await self.pool.acquire()
+            timeout = self.acquire_timeout_ms / 1000
+            conn: asyncpg.Connection = await self.pool.acquire(timeout=timeout)
             with pg_observer({"type": "begin"}):
                 txn = conn.transaction()
                 await txn.start()
