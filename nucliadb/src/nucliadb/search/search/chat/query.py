@@ -23,7 +23,7 @@ from time import monotonic as time
 from typing import AsyncGenerator, AsyncIterator, Optional
 
 from nucliadb.search import logger
-from nucliadb.search.predict import AnswerStatusCode
+from nucliadb.search.predict import AnswerStatusCode, RephraseMissingContextError
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.chat.prompt import PromptContextBuilder
 from nucliadb.search.search.exceptions import IncompleteFindResultsError
@@ -236,15 +236,18 @@ async def chat(
     prompt_context_order: PromptContextOrder = {}
 
     if len(chat_history) > 0 or len(user_context) > 0:
-        with metrics.time("rephrase"):
-            rephrased_query = await rephrase_query(
-                kbid,
-                chat_history=chat_history,
-                query=user_query,
-                user_id=user_id,
-                user_context=user_context,
-                generative_model=chat_request.generative_model,
-            )
+        try:
+            with metrics.time("rephrase"):
+                rephrased_query = await rephrase_query(
+                    kbid,
+                    chat_history=chat_history,
+                    query=user_query,
+                    user_id=user_id,
+                    user_context=user_context,
+                    generative_model=chat_request.generative_model,
+                )
+        except RephraseMissingContextError:
+            logger.info("Failed to rephrase chat query, using original")
 
     # Retrieval is not needed if we are chatting on a specific
     # resource and the full_resource strategy is enabled

@@ -29,6 +29,7 @@ from nucliadb.search.predict import (
     CitationsGenerativeResponse,
     GenerativeChunk,
     MetaGenerativeResponse,
+    RephraseMissingContextError,
     StatusGenerativeResponse,
     TextGenerativeResponse,
 )
@@ -342,15 +343,18 @@ async def ask(
     # Maybe rephrase the query
     rephrased_query = None
     if len(chat_history) > 0 or len(user_context) > 0:
-        with metrics.time("rephrase"):
-            rephrased_query = await rephrase_query(
-                kbid,
-                chat_history=chat_history,
-                query=user_query,
-                user_id=user_id,
-                user_context=user_context,
-                generative_model=ask_request.generative_model,
-            )
+        try:
+            with metrics.time("rephrase"):
+                rephrased_query = await rephrase_query(
+                    kbid,
+                    chat_history=chat_history,
+                    query=user_query,
+                    user_id=user_id,
+                    user_context=user_context,
+                    generative_model=ask_request.generative_model,
+                )
+        except RephraseMissingContextError:
+            logger.info("Failed to rephrase ask query, using original")
 
     # Retrieval is not needed if we are chatting on a specific
     # resource and the full_resource strategy is enabled
