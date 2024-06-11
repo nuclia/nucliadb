@@ -75,7 +75,7 @@ repos:
 
       - id: rustfmt_nucliadb
         name: fmt
-        entry: cargo +nightly fmt --check
+        entry: cargo fmt --check
         language: system
         files: (^nucliadb_vectors*/)|(^nucliadb_node*/)|(^nucliadb_paragraphs*/)|(^nucliadb_texts*/)|(^nucliadb_relations*/)
         types: ["rust"]

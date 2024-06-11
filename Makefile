@@ -7,17 +7,13 @@ license-check:
 license-fix:
 	docker run -it --rm -v $(shell pwd):/github/workspace ghcr.io/apache/skywalking-eyes/license-eye header fix
 
-# we are pinning rustfmt to 1.6.0-nightly
-check-rustfmt:
-	@cargo +nightly fmt --version | grep "1.6.0" > /dev/null || (rustup component add rustfmt --toolchain nightly && rustup upgrade)
-
-fmt-all: check-rustfmt
+fmt-all:
 	@echo "Formatting Rust files"
-	cargo +nightly fmt
+	cargo fmt
 
-fmt-check-package: check-rustfmt
+fmt-check-package:
 	@echo "Formatting Rust files from specific package"
-	cargo +nightly fmt -p $(PACKAGE) --check
+	cargo fmt -p $(PACKAGE) --check
 
 
 protos: proto-py proto-rust

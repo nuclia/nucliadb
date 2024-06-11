@@ -19,14 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          profile: minimal
-          components: rustfmt
-          override: true
       - name: rustfmt
-        run: cargo +nightly fmt --check
+        run: cargo fmt --check
 
   clippy-rust:
     name: "Pre-checks: Clippy lint"
