@@ -97,7 +97,6 @@ async def create_kb(request: Request, item: KnowledgeBoxConfig) -> KnowledgeBoxO
                 exc_info=True,
                 extra={"kbid": kbid},
             )
-            raise
 
     rollback_learning_config = partial(_rollback_learning_config, kbid)
 
