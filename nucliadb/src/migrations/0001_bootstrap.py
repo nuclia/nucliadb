@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.migrator.context import ExecutionContext
 
 
@@ -24,6 +25,11 @@ async def migrate(context: ExecutionContext) -> None:
     """
     Non-kb type of migration.
     """
+    if isinstance(context.kv_driver, PGDriver):
+        async with context.kv_driver.pool.acquire() as conn:
+            await conn.execute(
+                "CREATE TABLE resources (key TEXT COLLATE ucs_basic PRIMARY KEY, value BYTEA)"
+            )
 
 
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:

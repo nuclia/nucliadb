@@ -77,6 +77,9 @@ class Driver:
     async def begin(self, read_only: bool = False) -> Transaction:
         raise NotImplementedError()
 
+    async def is_bootstrapped(self) -> bool:
+        return True
+
     @asynccontextmanager
     async def transaction(
         self, wait_for_abort: bool = True, read_only: bool = False

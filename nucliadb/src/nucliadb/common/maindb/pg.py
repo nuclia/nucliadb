@@ -34,13 +34,6 @@ RETRIABLE_EXCEPTIONS = (
     ConnectionResetError,
 )
 
-CREATE_TABLE = """
-CREATE TABLE IF NOT EXISTS resources (
-    key TEXT PRIMARY KEY,
-    value BYTEA
-);
-"""
-
 CREATE_REPLICATION_TABLE = """
 CREATE TABLE IF NOT EXISTS replication (
     id BIGSERIAL PRIMARY KEY,
@@ -295,14 +288,6 @@ class PGDriver(Driver):
                     max_size=self.connection_pool_max_size,
                 )
 
-                # check if table exists
-                create_table = CREATE_REPLICATION_TABLE if for_replication else CREATE_TABLE
-                try:
-                    async with self.pool.acquire() as conn:
-                        await conn.execute(create_table)
-                except asyncpg.exceptions.UniqueViolationError:  # pragma: no cover
-                    pass
-
             self.initialized = True
 
     async def finalize(self):
@@ -320,3 +305,8 @@ class PGDriver(Driver):
                 txn = conn.transaction()
                 await txn.start()
                 return PGTransaction(self.pool, conn, txn, driver=self)
+
+    async def is_bootstrapped(self) -> bool:
+        async with self.pool.acquire() as conn:
+            tables = await conn.fetchval("SELECT COUNT(*) FROM pg_tables WHERE schemaname = 'public'")
+            return tables > 0

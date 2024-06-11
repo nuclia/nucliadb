@@ -206,6 +206,22 @@ async def run_rollovers(context: ExecutionContext) -> None:
 
 
 async def run(context: ExecutionContext, target_version: Optional[int] = None) -> None:
+    if not await context.kv_driver.is_bootstrapped():
+        # If not bootstrapped, we cannot even get a lock because it depends on maindb
+        # so let's run the first migration here, and then proceed with the rest
+        try:
+            migration = get_migrations(0, 1)[0]
+            logger.info("Bootstrapping maindb")
+            await migration.module.migrate(context)
+            await context.data_manager.update_global_info(current_version=migration.version)
+            logger.info("Finished bootstrapping")
+        except Exception as exc:
+            errors.capture_exception(exc)
+            logger.exception("Failed to bootstrap")
+            raise
+
+    await context.data_manager.update_global_info(target_version=None)
+
     async with locking.distributed_lock(locking.MIGRATIONS_LOCK):
         # before we move to managed migrations, see if there are any rollovers
         # scheduled and run them
