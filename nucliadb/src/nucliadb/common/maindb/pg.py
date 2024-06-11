@@ -64,6 +64,10 @@ pg_observer = metrics.Observer(
 class DataLayer:
     def __init__(self, connection: Union[asyncpg.Connection, asyncpg.Pool]):
         self.connection = connection
+        # A lock to avoid sending concurrent queries to the connection. asyncpg has its own system to control this
+        # but instead of waiting, it raises an Exception. We use our own lock so that concurrent tasks wait for each
+        # other, rather than exploding. This could be avoided if we can guarantee that a single asyncpg connection
+        # is not shared between concurrent tasks.
         self.lock = asyncio.Lock()
 
     async def get(self, key: str, select_for_update: bool = False) -> Optional[bytes]:
