@@ -273,7 +273,7 @@ class ReadOnlyPGTransaction(Transaction):
         count: int = DEFAULT_SCAN_LIMIT,
         include_start: bool = True,
     ):
-        async with self.driver._get_connection() as conn:
+        async with self.driver._get_connection() as conn, conn.transaction():
             dl = DataLayer(conn)
             async for key in dl.scan_keys(match, count, include_start=include_start):
                 yield key
@@ -281,6 +281,25 @@ class ReadOnlyPGTransaction(Transaction):
     async def count(self, match: str) -> int:
         async with self.driver._get_connection() as conn:
             return await DataLayer(conn).count(match)
+
+
+class InstrumentedAcquireContext:
+    def __init__(self, context):
+        self.context = context
+
+    async def __aenter__(self):
+        with pg_observer({"type": "acquire"}):
+            return await self.context.__aenter__()
+
+    async def __aexit__(self, *exc):
+        return await self.context.__aexit__()
+
+    def __await__(self):
+        async def wrap():
+            with pg_observer({"type": "acquire"}):
+                return await self.context
+
+        return wrap().__await__()
 
 
 class PGDriver(Driver):
@@ -336,4 +355,4 @@ class PGDriver(Driver):
 
     def _get_connection(self) -> asyncpg.Connection:
         timeout = self.acquire_timeout_ms / 1000
-        return self.pool.acquire(timeout=timeout)
+        return InstrumentedAcquireContext(self.pool.acquire(timeout=timeout))
