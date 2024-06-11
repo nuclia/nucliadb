@@ -20,7 +20,7 @@ from unittest import mock
 
 import pytest
 
-from nucliadb.search.predict import AnswerStatusCode
+from nucliadb.search.predict import AnswerStatusCode, RephraseMissingContextError
 from nucliadb.search.search.chat.query import (
     _parse_answer_status_code,
     chat,
@@ -28,6 +28,8 @@ from nucliadb.search.search.chat.query import (
     parse_audit_answer,
 )
 from nucliadb_models.search import (
+    Author,
+    ChatContextMessage,
     ChatOptions,
     ChatRequest,
     KnowledgeboxFindResults,
@@ -63,6 +65,32 @@ async def test_chat_does_not_call_predict_if_no_find_results(predict):
         )
 
     predict.chat_query.assert_not_called()
+
+
+async def test_chat_uses_original_query_if_failed_to_rephrase(predict):
+    find_results = KnowledgeboxFindResults(
+        total=0, min_score=MinScore(semantic=0.7), resources={}, facets=[]
+    )
+    chat_request = ChatRequest(
+        query="query", context=[ChatContextMessage(author=Author.NUCLIA, text="hello!")]
+    )
+
+    predict.rephrase_query.side_effect = RephraseMissingContextError()
+
+    with mock.patch(
+        "nucliadb.search.search.chat.query.get_find_results",
+        return_value=(find_results, None),
+    ) as find_mock:
+        await chat(
+            "kbid",
+            chat_request,
+            "user_id",
+            NucliaDBClientType.API,
+            "origin",
+        )
+
+        find_mock.assert_called_once()
+        assert find_mock.call_args.kwargs["query"] == "query"
 
 
 @pytest.mark.parametrize(
