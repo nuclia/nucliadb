@@ -115,7 +115,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
         try:
             async with self.driver.transaction() as txn:
-                kbid, failed = await KnowledgeBoxORM.create(
+                kbid = await KnowledgeBoxORM.create(
                     txn,
                     slug=request.slug,
                     semantic_model=semantic_model,
@@ -123,8 +123,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                     config=request.config,
                     release_channel=release_channel,
                 )
-                if failed:
-                    raise Exception("Failed to create KB")
                 await txn.commit()
 
         except KnowledgeBoxConflict:

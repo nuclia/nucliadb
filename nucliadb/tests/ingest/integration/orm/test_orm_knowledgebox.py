@@ -64,14 +64,13 @@ async def test_create_knowledgebox(
         vector_dimension=384,
     )
     async with maindb_driver.transaction() as txn:
-        kbid, failed = await KnowledgeBox.create(
+        kbid = await KnowledgeBox.create(
             txn,
             slug="test",
             config=KnowledgeBoxConfig(title="My Title 1"),
             semantic_model=model,
         )
         assert kbid
-        assert not failed
         await txn.commit()
 
     with pytest.raises(KnowledgeBoxConflict):
@@ -84,14 +83,13 @@ async def test_create_knowledgebox(
             )
 
     async with maindb_driver.transaction() as txn:
-        kbid2, failed = await KnowledgeBox.create(
+        kbid2 = await KnowledgeBox.create(
             txn,
             slug="test2",
             config=KnowledgeBoxConfig(title="My Title 3"),
             semantic_model=model,
         )
         assert kbid2
-        assert not failed
         await txn.commit()
 
     count = await count_all_kbs(maindb_driver)

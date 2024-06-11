@@ -109,7 +109,7 @@ async def create_kb(request: Request, item: KnowledgeBoxConfig) -> KnowledgeBoxO
     release_channel = item.release_channel.to_pb() if item.release_channel is not None else None
     try:
         async with driver.transaction() as txn:
-            kbid, failed = await KnowledgeBox.create(
+            kbid = await KnowledgeBox.create(
                 txn,
                 slug=item.slug or "",  # empty slugs will be changed on KB creation
                 semantic_model=semantic_model,
@@ -117,8 +117,6 @@ async def create_kb(request: Request, item: KnowledgeBoxConfig) -> KnowledgeBoxO
                 config=config,
                 release_channel=release_channel,
             )
-            if failed:
-                raise Exception("Failed to create KB")
             await txn.commit()
 
     except KnowledgeBoxConflict:
