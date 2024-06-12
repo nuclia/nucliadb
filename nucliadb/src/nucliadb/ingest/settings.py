@@ -70,7 +70,7 @@ class DriverSettings(BaseSettings):
         description="PostgreSQL max pool size. The maximum number of connections to the PostgreSQL server.",
     )
     driver_pg_connection_pool_acquire_timeout_ms: int = Field(
-        default=200,
+        default=1000,
         description="PostgreSQL pool acquire timeout in ms. The maximum time to wait until a connection becomes available.",
     )
     driver_tikv_connection_pool_size: int = Field(

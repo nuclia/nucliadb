@@ -253,10 +253,12 @@ class ReadOnlyPGTransaction(Transaction):
     async def commit(self):
         raise Exception("Cannot commit transaction in read only mode")
 
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=3)
     async def batch_get(self, keys: list[str]):
         async with self.driver._get_connection() as conn:
             return await DataLayer(conn).batch_get(keys)
 
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=3)
     async def get(self, key: str) -> Optional[bytes]:
         async with self.driver._get_connection() as conn:
             return await DataLayer(conn).get(key)
@@ -267,6 +269,7 @@ class ReadOnlyPGTransaction(Transaction):
     async def delete(self, key: str):
         raise Exception("Cannot delete in read only transaction")
 
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=3)
     async def keys(
         self,
         match: str,
@@ -278,6 +281,7 @@ class ReadOnlyPGTransaction(Transaction):
             async for key in dl.scan_keys(match, count, include_start=include_start):
                 yield key
 
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=3)
     async def count(self, match: str) -> int:
         async with self.driver._get_connection() as conn:
             return await DataLayer(conn).count(match)
