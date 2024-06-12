@@ -61,7 +61,7 @@ async def test_create_knowledgebox_with_learning_config(
         patch("nucliadb.writer.api.v1.knowledgebox.KnowledgeBox", new=AsyncMock()) as kb,
         patch("nucliadb.writer.api.v1.knowledgebox.learning_proxy", new=AsyncMock()) as learning_proxy,
     ):
-        kb.create.return_value = ("kbid", False)
+        kb.create.return_value = "kbid"
         learning_config = LearningConfiguration(
             semantic_model="multilingual",
             semantic_threshold=-1,
@@ -101,7 +101,7 @@ async def test_create_knowledgebox_with_learning_config_with_matryoshka_dimensio
         patch("nucliadb.writer.api.v1.knowledgebox.KnowledgeBox", new=AsyncMock()) as kb,
         patch("nucliadb.writer.api.v1.knowledgebox.learning_proxy", new=AsyncMock()) as learning_proxy,
     ):
-        kb.create.return_value = ("kbid", False)
+        kb.create.return_value = "kbid"
         learning_config = LearningConfiguration(
             semantic_model="multilingual",
             semantic_threshold=-1,

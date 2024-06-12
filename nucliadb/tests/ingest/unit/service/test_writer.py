@@ -57,7 +57,7 @@ class TestWriterServicer:
     def knowledgebox_class(self):
         mock = AsyncMock()
         mock.new_unique_kbid.return_value = "kbid"
-        mock.create.return_value = ("kbid", False)
+        mock.create.return_value = "kbid"
         with patch("nucliadb.ingest.service.writer.KnowledgeBoxORM", new=mock):
             yield mock
 
