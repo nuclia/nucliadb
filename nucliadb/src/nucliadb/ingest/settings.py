@@ -61,9 +61,17 @@ class DriverSettings(BaseSettings):
         default=None,
         description="PostgreSQL DSN. The connection string to the PG server. Example: postgres://username:password@postgres:5432/nucliadb.",  # noqa
     )
+    driver_pg_connection_pool_min_size: int = Field(
+        default=10,
+        description="PostgreSQL min pool size. The minimum number of connections to the PostgreSQL server.",
+    )
     driver_pg_connection_pool_max_size: int = Field(
         default=20,
         description="PostgreSQL max pool size. The maximum number of connections to the PostgreSQL server.",
+    )
+    driver_pg_connection_pool_acquire_timeout_ms: int = Field(
+        default=200,
+        description="PostgreSQL pool acquire timeout in ms. The maximum time to wait until a connection becomes available.",
     )
     driver_tikv_connection_pool_size: int = Field(
         default=3,

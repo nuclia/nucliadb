@@ -91,7 +91,9 @@ async def setup_driver() -> Driver:
             raise ConfigurationError("No DRIVER_PG_URL env var defined.")
         pg_driver = PGDriver(
             url=settings.driver_pg_url,
+            connection_pool_min_size=settings.driver_pg_connection_pool_min_size,
             connection_pool_max_size=settings.driver_pg_connection_pool_max_size,
+            acquire_timeout_ms=settings.driver_pg_connection_pool_acquire_timeout_ms,
         )
         set_utility(Utility.MAINDB_DRIVER, pg_driver)
     elif settings.driver == DriverConfig.LOCAL:

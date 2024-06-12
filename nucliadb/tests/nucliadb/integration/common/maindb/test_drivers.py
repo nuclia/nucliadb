@@ -24,6 +24,7 @@ from unittest.mock import patch
 import pytest
 
 from nucliadb.common.maindb.driver import Driver
+from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.common.maindb.redis import RedisDriver
 from nucliadb.common.maindb.tikv import TiKVDriver
 
@@ -75,6 +76,29 @@ async def test_tikv_driver_against_restarts(tikvd):
 @pytest.mark.skipif("local" not in TESTING_MAINDB_DRIVERS, reason="local not in TESTING_MAINDB_DRIVERS")
 async def test_local_driver(local_driver):
     await driver_basic(local_driver)
+
+
+@pytest.mark.skipif("pg" not in TESTING_MAINDB_DRIVERS, reason="pg not in TESTING_MAINDB_DRIVERS")
+async def test_pg_driver_pool_timeout(pg):
+    url = f"postgresql://postgres:postgres@{pg[0]}:{pg[1]}/postgres"
+    driver = PGDriver(url, connection_pool_min_size=1, connection_pool_max_size=1)
+    await driver.initialize()
+
+    # Get one connection and hold it
+    conn = await driver.begin()
+
+    # Try to get another connection, should fail because pool is full
+    with pytest.raises(TimeoutError):
+        await driver.begin()
+
+    # Abort the connection and try again
+    await conn.abort()
+
+    # Should now work
+    conn2 = await driver.begin()
+
+    # Closing for hygiene
+    await conn2.abort()
 
 
 async def _clear_db(driver: Driver):
