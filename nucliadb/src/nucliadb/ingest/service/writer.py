@@ -17,11 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import json
 import uuid
 from typing import AsyncIterator, Optional
 
-from nucliadb import learning_proxy
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.exceptions import AlreadyExists, EntitiesGroupNotFound
 from nucliadb.common.cluster.manager import get_index_nodes
@@ -36,7 +34,7 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.processor import Processor, sequence_manager
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.settings import settings
-from nucliadb_protos import nodewriter_pb2, utils_pb2, writer_pb2, writer_pb2_grpc
+from nucliadb_protos import nodewriter_pb2, writer_pb2, writer_pb2_grpc
 from nucliadb_protos.knowledgebox_pb2 import (
     DeleteKnowledgeBoxResponse,
     KnowledgeBoxID,
@@ -75,14 +73,12 @@ from nucliadb_protos.writer_pb2 import (
     WriterStatusResponse,
 )
 from nucliadb_telemetry import errors
-from nucliadb_utils import const
-from nucliadb_utils.settings import is_onprem_nucliadb, running_settings
+from nucliadb_utils.settings import is_onprem_nucliadb
 from nucliadb_utils.utilities import (
     get_partitioning,
     get_pubsub,
     get_storage,
     get_transaction_utility,
-    has_feature,
 )
 
 
@@ -101,12 +97,38 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     async def NewKnowledgeBox(  # type: ignore
         self, request: KnowledgeBoxNew, context=None
     ) -> NewKnowledgeBoxResponse:
+        if is_onprem_nucliadb():
+            logger.error(
+                "Sorry, this endpoint is only available for hosted. Onprem must use the REST API"
+            )
+            return NewKnowledgeBoxResponse(
+                status=KnowledgeBoxResponseStatus.ERROR,
+            )
+
+        # Hosted KBs are created through backend endpoints. We assume learning
+        # configuration has been already created for it and we are given the
+        # model metadata in the request
+
+        kbid = request.forceuuid or KnowledgeBoxORM.new_unique_kbid()
+        release_channel = request.release_channel
+        semantic_model = parse_model_metadata_from_request(request)
+
         try:
-            kbid = await self.create_kb(request)
-            logger.info("KB created successfully", extra={"kbid": kbid})
+            async with self.driver.transaction() as txn:
+                kbid = await KnowledgeBoxORM.create(
+                    txn,
+                    slug=request.slug,
+                    semantic_model=semantic_model,
+                    uuid=kbid,
+                    config=request.config,
+                    release_channel=release_channel,
+                )
+                await txn.commit()
+
         except KnowledgeBoxConflict:
             logger.info("KB already exists", extra={"slug": request.slug})
             return NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.CONFLICT)
+
         except Exception as exc:
             errors.capture_exception(exc)
             logger.exception(
@@ -115,118 +137,56 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 extra={"slug": request.slug},
             )
             return NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.ERROR)
-        return NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.OK, uuid=kbid)
 
-    async def create_kb(self, request: KnowledgeBoxNew) -> str:
-        if is_onprem_nucliadb():
-            return await self._create_kb_onprem(request)
         else:
-            return await self._create_kb_hosted(request)
-
-    async def _create_kb_onprem(self, request: KnowledgeBoxNew) -> str:
-        """
-        First, try to get the learning configuration for the new knowledge box.
-        From there we need to extract the semantic model metadata and pass it to the create_kb method.
-        If the kb creation fails, rollback the learning configuration for the kbid that was just created.
-        """
-        kbid = request.forceuuid or str(uuid.uuid4())
-        release_channel = get_release_channel(request)
-        lconfig = await learning_proxy.get_configuration(kbid)
-        lconfig_created = False
-        if lconfig is None:
-            if request.learning_config:
-                # We parse the desired configuration from the request and set it
-                config = json.loads(request.learning_config)
-            else:
-                # We set an empty configuration so that learning chooses the default values.
-                config = {}
-                logger.warning(
-                    "No learning configuration provided. Default will be used.",
-                    extra={"kbid": kbid},
-                )
-            # NOTE: we rely on learning to return an updated configuration with
-            # matryoshka settings if they're available
-            lconfig = await learning_proxy.set_configuration(kbid, config=config)
-            lconfig_created = True
-        else:
-            logger.info("Learning configuration already exists", extra={"kbid": kbid})
-        try:
-            await self.proc.create_kb(
-                request.slug,
-                request.config,
-                parse_model_metadata_from_learning_config(lconfig),
-                forceuuid=kbid,
-                release_channel=release_channel,
-            )
-            return kbid
-        except Exception:
-            # Rollback learning config for the kbid that was just created
-            try:
-                if lconfig_created:
-                    await learning_proxy.delete_configuration(kbid)
-            except Exception:
-                logger.warning(
-                    "Could not rollback learning configuration",
-                    exc_info=True,
-                    extra={"kbid": kbid},
-                )
-            raise
-
-    async def _create_kb_hosted(self, request: KnowledgeBoxNew) -> str:
-        """
-        For the hosted case, we assume that the learning configuration
-        is already set and we are given the model metadata in the request.
-        """
-        kbid = request.forceuuid or str(uuid.uuid4())
-        release_channel = get_release_channel(request)
-        await self.proc.create_kb(
-            request.slug,
-            request.config,
-            parse_model_metadata_from_request(request),
-            forceuuid=kbid,
-            release_channel=release_channel,
-        )
-        return kbid
+            logger.info("KB created successfully", extra={"kbid": kbid})
+            return NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.OK, uuid=kbid)
 
     async def UpdateKnowledgeBox(  # type: ignore
         self, request: KnowledgeBoxUpdate, context=None
     ) -> UpdateKnowledgeBoxResponse:
+        if is_onprem_nucliadb():
+            logger.error(
+                "Sorry, this endpoint is only available for hosted. Onprem must use the REST API"
+            )
+            return UpdateKnowledgeBoxResponse(
+                status=KnowledgeBoxResponseStatus.ERROR,
+            )
+
         try:
-            kbid = await self.proc.update_kb(request.uuid, request.slug, request.config)
+            async with self.driver.transaction() as txn:
+                kbid = await KnowledgeBoxORM.update(
+                    txn, uuid=request.uuid, slug=request.slug, config=request.config
+                )
+                await txn.commit()
         except KnowledgeBoxNotFound:
             return UpdateKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.NOTFOUND)
         except Exception:
-            logger.exception("Could not create KB", exc_info=True)
+            logger.exception("Could not update KB", exc_info=True)
             return UpdateKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.ERROR)
         return UpdateKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.OK, uuid=kbid)
 
     async def DeleteKnowledgeBox(  # type: ignore
         self, request: KnowledgeBoxID, context=None
     ) -> DeleteKnowledgeBoxResponse:
+        if is_onprem_nucliadb():
+            logger.error(
+                "Sorry, this endpoint is only available for hosted. Onprem must use the REST API"
+            )
+            return DeleteKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.ERROR)
+
         try:
-            await self.delete_kb(request)
+            kbid = request.uuid
+            # learning configuration is automatically removed in nuclia backend for
+            # hosted users, we don't need to do it
+            async with self.driver.transaction() as txn:
+                await KnowledgeBoxORM.delete(txn, kbid=kbid)
         except KnowledgeBoxNotFound:
             logger.warning(f"KB not found: kbid={request.uuid}, slug={request.slug}")
         except Exception:
             logger.exception("Could not delete KB", exc_info=True)
             return DeleteKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.ERROR)
         return DeleteKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.OK)
-
-    async def delete_kb(self, request: KnowledgeBoxID) -> None:
-        kbid = request.uuid
-        await self.proc.delete_kb(kbid)
-        # learning configuration is automatically removed in nuclia backend for
-        # hosted users, we only need to remove it for onprem
-        if is_onprem_nucliadb():
-            try:
-                await learning_proxy.delete_configuration(kbid)
-                logger.info("Learning configuration deleted", extra={"kbid": kbid})
-            except Exception:
-                logger.exception(
-                    "Unexpected error deleting learning configuration",
-                    exc_info=True,
-                    extra={"kbid": kbid},
-                )
 
     async def ProcessMessage(  # type: ignore
         self, request_stream: AsyncIterator[BrokerMessage], context=None
@@ -550,26 +510,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         return response
 
 
-LEARNING_SIMILARITY_FUNCTION_TO_PROTO = {
-    "cosine": utils_pb2.VectorSimilarity.COSINE,
-    "dot": utils_pb2.VectorSimilarity.DOT,
-}
-
-
-def parse_model_metadata_from_learning_config(
-    lconfig: learning_proxy.LearningConfiguration,
-) -> SemanticModelMetadata:
-    model = SemanticModelMetadata()
-    model.similarity_function = LEARNING_SIMILARITY_FUNCTION_TO_PROTO[lconfig.semantic_vector_similarity]
-    if lconfig.semantic_vector_size is not None:
-        model.vector_dimension = lconfig.semantic_vector_size
-    else:
-        logger.warning("Vector dimension not set!")
-    if lconfig.semantic_matryoshka_dimensions is not None:
-        model.matryoshka_dimensions.extend(lconfig.semantic_matryoshka_dimensions)
-    return model
-
-
 def parse_model_metadata_from_request(
     request: KnowledgeBoxNew,
 ) -> SemanticModelMetadata:
@@ -595,16 +535,3 @@ def parse_model_metadata_from_request(
             model.matryoshka_dimensions.extend(request.matryoshka_dimensions)
 
     return model
-
-
-def get_release_channel(request: KnowledgeBoxNew) -> utils_pb2.ReleaseChannel.ValueType:
-    """
-    Set channel to Experimental if specified in the grpc request or if the requested
-    slug has the experimental_kb feature enabled in stage environment.
-    """
-    release_channel = request.release_channel
-    if running_settings.running_environment == "stage" and has_feature(
-        const.Features.EXPERIMENTAL_KB, context={"slug": request.slug}
-    ):
-        release_channel = utils_pb2.ReleaseChannel.EXPERIMENTAL
-    return release_channel

@@ -39,6 +39,7 @@ async def test_matryoshka_embeddings(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
     learning_config,
+    hosted_nucliadb,
 ):
     # Create a KB with matryoshka configuration (using ingest gRPC)
 

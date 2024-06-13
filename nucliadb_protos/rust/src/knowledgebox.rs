@@ -14,19 +14,19 @@ pub struct KnowledgeBoxConfig {
     pub title: ::prost::alloc::string::String,
     #[prost(string, tag = "2")]
     pub description: ::prost::alloc::string::String,
+    #[prost(string, tag = "5")]
+    pub slug: ::prost::alloc::string::String,
+    #[prost(int64, tag = "7")]
+    pub migration_version: i64,
     #[deprecated]
     #[prost(string, repeated, tag = "3")]
     pub enabled_filters: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[deprecated]
     #[prost(string, repeated, tag = "4")]
     pub enabled_insights: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
-    #[prost(string, tag = "5")]
-    pub slug: ::prost::alloc::string::String,
     #[deprecated]
     #[prost(bool, tag = "6")]
     pub disable_vectors: bool,
-    #[prost(int64, tag = "7")]
-    pub migration_version: i64,
     /// DEPRECATED: duplicated field also stored in `writer.proto Shards`
     #[deprecated]
     #[prost(enumeration = "super::utils::ReleaseChannel", tag = "8")]
@@ -53,6 +53,8 @@ pub struct KnowledgeBoxNew {
     pub matryoshka_dimensions: ::prost::alloc::vec::Vec<u32>,
     /// this field are only used by NucliaDB Writer API when creating a KB. Used
     /// in onprem scenarios
+    /// DEPRECATED: onprem don't forward requests to ingest gRPC anymore
+    #[deprecated]
     #[prost(string, tag = "8")]
     pub learning_config: ::prost::alloc::string::String,
     /// release channel, although not used when backend creates hosted KBs, it's

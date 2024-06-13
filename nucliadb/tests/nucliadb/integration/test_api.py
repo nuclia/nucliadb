@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from unittest import mock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import AsyncClient
@@ -47,42 +47,37 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import broker_resource, inject_message
 
 
-@pytest.fixture
-def onprem_nucliadb():
-    with mock.patch("nucliadb.ingest.service.writer.is_onprem_nucliadb") as mocked:
-        mocked.return_value = True
-        yield
-
-
 @pytest.mark.asyncio
 async def test_kb_creation_allows_setting_learning_configuration(
     nucliadb_manager,
     nucliadb_reader,
-    learning_config,
     onprem_nucliadb,
 ):
-    # We set this to None to test the case where the user has not
-    # defined a learning configuration yet before creating the KB.
-    learning_config.get_configuration.return_value = None
-    learning_config.set_configuration.return_value = LearningConfiguration(
-        semantic_model="english",
-        semantic_vector_similarity="cosine",
-        semantic_vector_size=384,
-    )
+    with patch("nucliadb.writer.api.v1.knowledgebox.learning_proxy", new=AsyncMock()) as learning_proxy:
+        # We set this to None to test the case where the user has not
+        # defined a learning configuration yet before creating the KB.
+        learning_proxy.get_configuration.return_value = None
+        learning_proxy.set_configuration.return_value = LearningConfiguration(
+            semantic_model="english",
+            semantic_vector_similarity="cosine",
+            semantic_vector_size=384,
+        )
 
-    # Check that we can define it to a different semantic model
-    resp = await nucliadb_manager.post(
-        f"/kbs",
-        json={
-            "title": "My KB with english semantic model",
-            "slug": "english",
-            "learning_configuration": {"semantic_model": "english"},
-        },
-    )
-    assert resp.status_code == 201
-    kbid = resp.json()["uuid"]
+        # Check that we can define it to a different semantic model
+        resp = await nucliadb_manager.post(
+            f"/kbs",
+            json={
+                "title": "My KB with english semantic model",
+                "slug": "english",
+                "learning_configuration": {"semantic_model": "english"},
+            },
+        )
+        assert resp.status_code == 201
+        kbid = resp.json()["uuid"]
 
-    learning_config.set_configuration.assert_called_once_with(kbid, config={"semantic_model": "english"})
+        learning_proxy.set_configuration.assert_called_once_with(
+            kbid, config={"semantic_model": "english"}
+        )
 
 
 @pytest.mark.asyncio

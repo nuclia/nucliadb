@@ -28,7 +28,7 @@ from nucliadb_protos.writer_pb2 import BrokerMessage, IndexResource
 
 
 @pytest.mark.asyncio
-async def test_reindex_resource(grpc_servicer, fake_node):
+async def test_reindex_resource(grpc_servicer, fake_node, hosted_nucliadb):
     stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
 
     # Create a kb

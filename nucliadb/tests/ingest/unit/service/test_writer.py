@@ -17,42 +17,22 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import json
-from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.ingest.fields.text import Text
-from nucliadb.ingest.service.writer import WriterServicer, get_release_channel
-from nucliadb.learning_proxy import LearningConfiguration
+from nucliadb.ingest.service.writer import WriterServicer
 from nucliadb_protos import writer_pb2
-from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxNew, SemanticModelMetadata
+from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
 from nucliadb_protos.resources_pb2 import FieldText
 from nucliadb_protos.utils_pb2 import ReleaseChannel, VectorSimilarity
 
 
 class TestWriterServicer:
     @pytest.fixture
-    def onprem_nucliadb(self):
-        with patch("nucliadb.ingest.service.writer.is_onprem_nucliadb", return_value=True) as mocked:
-            yield mocked
-
-    @pytest.fixture
-    def learning_config(self):
-        lconfig = LearningConfiguration(
-            semantic_model="english",
-            semantic_threshold=1,
-            semantic_vector_size=200,
-            semantic_vector_similarity="dot",
-        )
-        with patch("nucliadb.ingest.service.writer.learning_proxy") as mocked:
-            mocked.get_configuration = AsyncMock(return_value=lconfig)
-            yield mocked
-
-    @pytest.fixture
-    def writer(self, learning_config, onprem_nucliadb):
+    def writer(self, hosted_nucliadb):
         servicer = WriterServicer()
         servicer.driver = AsyncMock()
         servicer.driver.transaction = MagicMock(return_value=AsyncMock())
@@ -73,6 +53,14 @@ class TestWriterServicer:
         val.set_vectors = AsyncMock()
         yield val
 
+    @pytest.fixture(scope="function")
+    def knowledgebox_class(self):
+        mock = AsyncMock()
+        mock.new_unique_kbid.return_value = "kbid"
+        mock.create.return_value = "kbid"
+        with patch("nucliadb.ingest.service.writer.KnowledgeBoxORM", new=mock):
+            yield mock
+
     @pytest.fixture(autouse=True)
     def resource(self, field):
         mock = AsyncMock()
@@ -80,74 +68,41 @@ class TestWriterServicer:
         with patch("nucliadb.ingest.service.writer.ResourceORM", return_value=mock):
             yield mock
 
-    async def test_NewKnowledgeBox(self, writer: WriterServicer):
-        request = writer_pb2.KnowledgeBoxNew(slug="slug", forceuuid="kbid")
-
-        resp = await writer.NewKnowledgeBox(request)
-
-        expected_model_metadata = SemanticModelMetadata(
-            similarity_function=VectorSimilarity.DOT,
+    async def test_NewKnowledgeBox(self, writer: WriterServicer, hosted_nucliadb, knowledgebox_class):
+        request = writer_pb2.KnowledgeBoxNew(
+            slug="slug",
+            forceuuid="kbid",
+            similarity=VectorSimilarity.DOT,
             vector_dimension=200,
         )
-        writer.proc.create_kb.assert_called_once_with(
-            request.slug,
-            request.config,
-            expected_model_metadata,
-            forceuuid="kbid",
-            release_channel=0,
-        )
-        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
 
-    async def test_NewKnowledgeBox_experimental_channel(self, writer: WriterServicer):
+        resp = await writer.NewKnowledgeBox(request)
+        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
+        assert knowledgebox_class.create.call_count == 1
+        assert knowledgebox_class.create.call_args.kwargs["slug"] == request.slug
+        assert knowledgebox_class.create.call_args.kwargs["semantic_model"] == SemanticModelMetadata(
+            similarity_function=request.similarity,
+            vector_dimension=request.vector_dimension,
+        )
+        assert knowledgebox_class.create.call_args.kwargs["config"] == request.config
+        assert knowledgebox_class.create.call_args.kwargs["release_channel"] == request.release_channel
+
+    async def test_NewKnowledgeBox_experimental_channel(
+        self, writer: WriterServicer, hosted_nucliadb, knowledgebox_class
+    ):
         request = writer_pb2.KnowledgeBoxNew(
             slug="slug", release_channel=ReleaseChannel.EXPERIMENTAL, forceuuid="kbid"
         )
 
         resp = await writer.NewKnowledgeBox(request)
-
-        expected_model_metadata = SemanticModelMetadata(
-            similarity_function=VectorSimilarity.DOT,
-            vector_dimension=200,
-        )
-        writer.proc.create_kb.assert_called_once_with(
-            request.slug,
-            request.config,
-            expected_model_metadata,
-            forceuuid=request.forceuuid,
-            release_channel=1,
-        )
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
-
-    async def test_NewKnowledgeBox_hosted_nucliadb(self, writer: WriterServicer, onprem_nucliadb):
-        onprem_nucliadb.return_value = False
-
-        request = writer_pb2.KnowledgeBoxNew(
-            slug="slug",
-            forceuuid="kbid",
-            similarity=VectorSimilarity.COSINE,
-            vector_dimension=200,
+        assert (
+            knowledgebox_class.create.call_args.kwargs["release_channel"] == ReleaseChannel.EXPERIMENTAL
         )
 
-        resp = await writer.NewKnowledgeBox(request)
-
-        expected_model_metadata = SemanticModelMetadata(
-            similarity_function=VectorSimilarity.COSINE,
-            vector_dimension=200,
-        )
-        writer.proc.create_kb.assert_called_once_with(
-            request.slug,
-            request.config,
-            expected_model_metadata,
-            forceuuid="kbid",
-            release_channel=0,
-        )
-        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
-
-    async def test_NewKnowledgeBox_hosted_nucliadb_with_matryoshka_dimensions(
-        self, writer: WriterServicer, onprem_nucliadb
+    async def test_NewKnowledgeBox_with_matryoshka_dimensions(
+        self, writer: WriterServicer, hosted_nucliadb, knowledgebox_class
     ):
-        onprem_nucliadb.return_value = False
-
         request = writer_pb2.KnowledgeBoxNew(
             slug="slug",
             forceuuid="kbid",
@@ -157,136 +112,85 @@ class TestWriterServicer:
         )
 
         resp = await writer.NewKnowledgeBox(request)
-
-        expected_model_metadata = SemanticModelMetadata(
-            similarity_function=VectorSimilarity.COSINE,
-            vector_dimension=200,
-            matryoshka_dimensions=[200, 400],
-        )
-        writer.proc.create_kb.assert_called_once_with(
-            request.slug,
-            request.config,
-            expected_model_metadata,
-            forceuuid="kbid",
-            release_channel=0,
-        )
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
-
-    async def test_NewKnowledgeBox_with_learning_config(self, writer: WriterServicer, learning_config):
-        learning_config.get_configuration.return_value = None
-        learning_config.set_configuration = AsyncMock(
-            return_value=LearningConfiguration(
-                semantic_model="multilingual",
-                semantic_threshold=-1,
-                semantic_vector_size=10,
-                semantic_vector_similarity="cosine",
-            )
+        assert knowledgebox_class.create.call_args.kwargs["semantic_model"] == SemanticModelMetadata(
+            similarity_function=request.similarity,
+            vector_dimension=request.vector_dimension,
+            matryoshka_dimensions=request.matryoshka_dimensions,
         )
 
-        request = writer_pb2.KnowledgeBoxNew(
-            slug="slug2",
-            forceuuid="kbid",
-            learning_config=json.dumps({"semantic_model": "multilingual"}),
-        )
-
-        resp = await writer.NewKnowledgeBox(request)
-
-        expected_model_metadata = SemanticModelMetadata(
-            similarity_function=VectorSimilarity.COSINE,
-            vector_dimension=10,
-        )
-        writer.proc.create_kb.assert_called_once_with(
-            request.slug,
-            request.config,
-            expected_model_metadata,
-            forceuuid=request.forceuuid,
-            release_channel=0,
-        )
-        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
-
-    async def test_NewKnowledgeBox_with_learning_config_with_matryoshka_dimensions(
-        self, writer: WriterServicer, learning_config
-    ):
-        learning_config.get_configuration.return_value = None
-        learning_config.set_configuration = AsyncMock(
-            return_value=LearningConfiguration(
-                semantic_model="multilingual",
-                semantic_threshold=-1,
-                semantic_vector_size=10,
-                semantic_vector_similarity="cosine",
-                semantic_matryoshka_dims=[10, 20, 30],
-            )
-        )
-
-        request = writer_pb2.KnowledgeBoxNew(
-            slug="slug2",
-            forceuuid="kbid",
-            learning_config=json.dumps({"semantic_model": "multilingual"}),
-        )
-
-        resp = await writer.NewKnowledgeBox(request)
-
-        expected_model_metadata = SemanticModelMetadata(
-            similarity_function=VectorSimilarity.COSINE,
-            vector_dimension=10,
-            matryoshka_dimensions=[10, 20, 30],
-        )
-        writer.proc.create_kb.assert_called_once_with(
-            request.slug,
-            request.config,
-            expected_model_metadata,
-            forceuuid=request.forceuuid,
-            release_channel=0,
-        )
-        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
-
-    async def test_NewKnowledgeBox_handle_error(self, writer: WriterServicer):
+    async def test_NewKnowledgeBox_handle_error(self, writer: WriterServicer, knowledgebox_class):
         request = writer_pb2.KnowledgeBoxNew(slug="slug")
-        writer.proc.create_kb.side_effect = Exception("error")
+        knowledgebox_class.create.side_effect = Exception("error")
 
         resp = await writer.NewKnowledgeBox(request)
 
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.ERROR
 
-    async def test_UpdateKnowledgeBox(self, writer: WriterServicer):
+    async def test_UpdateKnowledgeBox(self, writer: WriterServicer, knowledgebox_class):
         request = writer_pb2.KnowledgeBoxUpdate(slug="slug", uuid="uuid")
-        writer.proc.update_kb.return_value = "kbid"
+        knowledgebox_class.update.return_value = "kbid"
 
         resp = await writer.UpdateKnowledgeBox(request)
 
-        writer.proc.update_kb.assert_called_once_with(request.uuid, request.slug, request.config)
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
+        assert knowledgebox_class.update.call_count == 1
+        assert knowledgebox_class.update.call_args.kwargs["uuid"] == request.uuid
+        assert knowledgebox_class.update.call_args.kwargs["slug"] == request.slug
+        assert knowledgebox_class.update.call_args.kwargs["config"] == request.config
 
-    async def test_UpdateKnowledgeBox_not_found(self, writer: WriterServicer):
+    async def test_UpdateKnowledgeBox_not_found(self, writer: WriterServicer, knowledgebox_class):
         request = writer_pb2.KnowledgeBoxUpdate(slug="slug", uuid="uuid")
-        writer.proc.update_kb.side_effect = KnowledgeBoxNotFound()
+        knowledgebox_class.update.side_effect = KnowledgeBoxNotFound()
 
         resp = await writer.UpdateKnowledgeBox(request)
 
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.NOTFOUND
 
-    async def test_UpdateKnowledgeBox_error(self, writer: WriterServicer):
+    async def test_UpdateKnowledgeBox_error(self, writer: WriterServicer, knowledgebox_class):
         request = writer_pb2.KnowledgeBoxUpdate(slug="slug")
-        writer.proc.update_kb.side_effect = Exception()
+        knowledgebox_class.update.side_effect = Exception()
 
         resp = await writer.UpdateKnowledgeBox(request)
 
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.ERROR
 
-    async def test_DeleteKnowledgeBox(self, writer: WriterServicer):
+    async def test_DeleteKnowledgeBox(self, writer: WriterServicer, knowledgebox_class):
         request = writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid")
 
         resp = await writer.DeleteKnowledgeBox(request)
 
-        writer.proc.delete_kb.assert_called_once_with(request.uuid)
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
+        assert knowledgebox_class.delete.call_count == 1
+        assert knowledgebox_class.delete.call_args.kwargs["kbid"] == request.uuid
 
-    async def test_DeleteKnowledgeBox_handle_error(self, writer: WriterServicer):
+    async def test_DeleteKnowledgeBox_handle_error(self, writer: WriterServicer, knowledgebox_class):
         request = writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid")
-        writer.proc.delete_kb.side_effect = Exception("error")
+        knowledgebox_class.delete.side_effect = Exception()
 
         resp = await writer.DeleteKnowledgeBox(request)
 
+        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.ERROR
+
+    async def test_NewKnowledgeBox_not_available_for_onprem(
+        self, writer: WriterServicer, onprem_nucliadb
+    ):
+        request = writer_pb2.KnowledgeBoxNew(slug="slug", forceuuid="kbid")
+        resp = await writer.NewKnowledgeBox(request)
+        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.ERROR
+
+    async def test_UpdateKnowledgeBox_not_available_for_onprem(
+        self, writer: WriterServicer, onprem_nucliadb
+    ):
+        request = writer_pb2.KnowledgeBoxUpdate(slug="slug", uuid="uuid")
+        resp = await writer.UpdateKnowledgeBox(request)
+        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.ERROR
+
+    async def test_DeleteKnowledgeBox_not_available_for_onprem(
+        self, writer: WriterServicer, onprem_nucliadb
+    ):
+        request = writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid")
+        resp = await writer.DeleteKnowledgeBox(request)
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.ERROR
 
     async def test_GetEntities(self, writer: WriterServicer):
@@ -528,39 +432,3 @@ class TestWriterServicer:
             txn.commit.assert_called_once()
 
             assert isinstance(resp, writer_pb2.IndexStatus)
-
-
-@pytest.mark.parametrize(
-    "req,has_feature,environment,expected_channel",
-    [
-        (
-            KnowledgeBoxNew(slug="foo", release_channel=ReleaseChannel.EXPERIMENTAL),
-            False,
-            "prod",
-            ReleaseChannel.EXPERIMENTAL,
-        ),
-        (
-            KnowledgeBoxNew(slug="foo", release_channel=ReleaseChannel.STABLE),
-            True,
-            "prod",
-            ReleaseChannel.STABLE,
-        ),
-        (
-            KnowledgeBoxNew(slug="foo", release_channel=ReleaseChannel.STABLE),
-            True,
-            "stage",
-            ReleaseChannel.EXPERIMENTAL,
-        ),
-        (
-            KnowledgeBoxNew(slug="foo", release_channel=ReleaseChannel.STABLE),
-            False,
-            "stage",
-            ReleaseChannel.STABLE,
-        ),
-    ],
-)
-def test_get_release_channel(req, has_feature, environment, expected_channel):
-    module = "nucliadb.ingest.service.writer"
-    with mock.patch(f"{module}.has_feature", return_value=has_feature):
-        with mock.patch(f"{module}.running_settings", new=Mock(running_environment=environment)):
-            assert get_release_channel(req) == expected_channel

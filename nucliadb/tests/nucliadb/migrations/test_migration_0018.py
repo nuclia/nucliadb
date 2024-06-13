@@ -53,12 +53,11 @@ async def test_migration_0018_global(maindb_driver: Driver):
             assert not await datamanagers.kb.exists_kb(txn, kbid=fake_kb_id)
 
             real_kb_slug = "real-kb-slug"
-            real_kb_id, failed = await KnowledgeBox.create(
+            real_kb_id = await KnowledgeBox.create(
                 txn,
                 slug=real_kb_slug,
                 semantic_model=knowledgebox_pb2.SemanticModelMetadata(),
             )
-            assert not failed
             assert await datamanagers.kb.exists_kb(txn, kbid=real_kb_id)
 
             await txn.commit()

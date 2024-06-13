@@ -18,12 +18,19 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-import json
+from functools import partial, wraps
+from typing import Optional
 
-from fastapi import HTTPException, Response
+from fastapi import HTTPException
 from fastapi_versioning import version
 from starlette.requests import Request
 
+from nucliadb import learning_proxy
+from nucliadb.common import datamanagers
+from nucliadb.common.maindb.utils import get_driver
+from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb.writer import logger
 from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX, api
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models.resource import (
@@ -32,61 +39,106 @@ from nucliadb_models.resource import (
     KnowledgeBoxObjID,
     NucliaDBRoles,
 )
-from nucliadb_protos.knowledgebox_pb2 import (
-    DeleteKnowledgeBoxResponse,
-    KnowledgeBoxID,
-    KnowledgeBoxNew,
-    KnowledgeBoxResponseStatus,
-    KnowledgeBoxUpdate,
-    NewKnowledgeBoxResponse,
-    UpdateKnowledgeBoxResponse,
-)
+from nucliadb_protos import knowledgebox_pb2
 from nucliadb_utils.authentication import requires
-from nucliadb_utils.utilities import get_ingest
+from nucliadb_utils.settings import is_onprem_nucliadb
 
 
+def only_for_onprem(fun):
+    @wraps(fun)
+    async def endpoint_wrapper(*args, **kwargs):
+        if not is_onprem_nucliadb():
+            raise HTTPException(
+                status_code=403,
+                detail="This endpoint is only available for onprem NucliaDB",
+            )
+        return await fun(*args, **kwargs)
+
+    return endpoint_wrapper
+
+
+@only_for_onprem
 @api.post(
     f"/{KBS_PREFIX}",
     status_code=201,
     summary="Create Knowledge Box",
-    response_model=KnowledgeBoxObj,
     tags=["Knowledge Boxes"],
     openapi_extra={"x-hidden-operation": True},
 )
 @requires(NucliaDBRoles.MANAGER)
 @version(1)
-async def create_kb(request: Request, item: KnowledgeBoxConfig):
-    ingest = get_ingest()
-    requestpb = KnowledgeBoxNew()
-    requestpb = parse_create_kb_request(item)
-    kbobj: NewKnowledgeBoxResponse = await ingest.NewKnowledgeBox(requestpb)  # type: ignore
-    if item.slug != "":
-        slug = item.slug
-    else:
-        slug = kbobj.uuid
-    if kbobj.status == KnowledgeBoxResponseStatus.OK:
-        return KnowledgeBoxObj(uuid=kbobj.uuid, slug=slug)
-    elif kbobj.status == KnowledgeBoxResponseStatus.CONFLICT:
+async def create_kb(request: Request, item: KnowledgeBoxConfig) -> KnowledgeBoxObj:
+    try:
+        kbid, slug = await _create_kb(item)
+    except KnowledgeBoxConflict:
         raise HTTPException(status_code=419, detail="Knowledge box already exists")
-    elif kbobj.status == KnowledgeBoxResponseStatus.ERROR:
-        raise HTTPException(status_code=500, detail="Error on creating knowledge box")
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error creating knowledge box")
+    else:
+        return KnowledgeBoxObj(uuid=kbid, slug=slug)
 
 
-def parse_create_kb_request(item: KnowledgeBoxConfig) -> KnowledgeBoxNew:
-    requestpb = KnowledgeBoxNew()
-    if item.slug:
-        requestpb.slug = item.slug
-    if item.title:
-        requestpb.config.title = item.title
-    if item.description:
-        requestpb.config.description = item.description
-    if item.release_channel:
-        requestpb.release_channel = item.release_channel.to_pb()
+async def _create_kb(item: KnowledgeBoxConfig) -> tuple[str, Optional[str]]:
+    driver = get_driver()
+    rollback_learning_config = None
+
+    kbid = KnowledgeBox.new_unique_kbid()
+
+    # Onprem KBs have to call learning proxy to create it's own configuration.
     if item.learning_configuration:
-        requestpb.learning_config = json.dumps(item.learning_configuration)
-    return requestpb
+        user_learning_config = item.learning_configuration
+    else:
+        logger.warning(
+            "No learning configuration provided. Default will be used.",
+            extra={"kbid": kbid},
+        )
+        # learning will choose the default values
+        user_learning_config = {}
+
+    # we rely on learning to return the updated configuration with defaults and
+    # any other needed values (e.g. matryoshka settings if available)
+    learning_config = await learning_proxy.set_configuration(kbid, config=user_learning_config)
+
+    # if KB creation fails, we'll have to delete its learning config
+    async def _rollback_learning_config(kbid: str):
+        try:
+            await learning_proxy.delete_configuration(kbid)
+        except Exception:
+            logger.warning(
+                "Could not rollback learning configuration",
+                exc_info=True,
+                extra={"kbid": kbid},
+            )
+
+    rollback_learning_config = partial(_rollback_learning_config, kbid)
+
+    config = knowledgebox_pb2.KnowledgeBoxConfig(
+        title=item.title or "",
+        description=item.description or "",
+    )
+    semantic_model = learning_config.into_semantic_model_metadata()
+    release_channel = item.release_channel.to_pb() if item.release_channel is not None else None
+    try:
+        async with driver.transaction() as txn:
+            kbid = await KnowledgeBox.create(
+                txn,
+                slug=item.slug or "",  # empty slugs will be changed on KB creation
+                semantic_model=semantic_model,
+                uuid=kbid,
+                config=config,
+                release_channel=release_channel,
+            )
+            await txn.commit()
+
+    except Exception as exc:
+        logger.error("Unexpected error creating KB", exc_info=exc, extra={"slug": item.slug})
+        await rollback_learning_config()
+        raise
+
+    return (kbid, item.slug)
 
 
+@only_for_onprem
 @api.patch(
     f"/{KB_PREFIX}/{{kbid}}",
     status_code=200,
@@ -97,48 +149,69 @@ def parse_create_kb_request(item: KnowledgeBoxConfig) -> KnowledgeBoxNew:
 )
 @requires(NucliaDBRoles.MANAGER)
 @version(1)
-async def update_kb(request: Request, kbid: str, item: KnowledgeBoxConfig):
-    ingest = get_ingest()
-    pbrequest = KnowledgeBoxUpdate(uuid=kbid)
-    if item.slug is not None:
-        pbrequest.slug = item.slug
-    if item.title:
-        pbrequest.config.title = item.title
-    if item.description:
-        pbrequest.config.description = item.description
-    kbobj: UpdateKnowledgeBoxResponse = await ingest.UpdateKnowledgeBox(pbrequest)  # type: ignore
-    if kbobj.status == KnowledgeBoxResponseStatus.OK:
-        return KnowledgeBoxObjID(uuid=kbobj.uuid)
-    elif kbobj.status == KnowledgeBoxResponseStatus.NOTFOUND:
+async def update_kb(request: Request, kbid: str, item: KnowledgeBoxConfig) -> KnowledgeBoxObjID:
+    driver = get_driver()
+    config = None
+    if item.slug or item.title or item.description:
+        config = knowledgebox_pb2.KnowledgeBoxConfig(
+            slug=item.slug or "",
+            title=item.title or "",
+            description=item.description or "",
+        )
+    try:
+        async with driver.transaction() as txn:
+            await KnowledgeBox.update(
+                txn,
+                uuid=kbid,
+                slug=item.slug,
+                config=config,
+            )
+            await txn.commit()
+    except datamanagers.exceptions.KnowledgeBoxNotFound:
         raise HTTPException(status_code=404, detail="Knowledge box does not exist")
-    elif kbobj.status == KnowledgeBoxResponseStatus.ERROR:
-        raise HTTPException(status_code=500, detail="Error on creating knowledge box")
+    except Exception as exc:
+        logger.exception("Could not update KB", exc_info=exc, extra={"kbid": kbid})
+        raise HTTPException(status_code=500, detail="Error updating knowledge box")
+    else:
+        return KnowledgeBoxObjID(uuid=kbid)
 
 
+@only_for_onprem
 @api.delete(
     f"/{KB_PREFIX}/{{kbid}}",
     status_code=200,
     summary="Delete Knowledge Box",
-    response_model=KnowledgeBoxObj,
     tags=["Knowledge Boxes"],
     openapi_extra={"x-hidden-operation": True},
 )
 @requires(NucliaDBRoles.MANAGER)
 @version(1)
-async def delete_kb(request: Request, kbid: str):
-    ingest = get_ingest()
-
-    kbobj: DeleteKnowledgeBoxResponse = await ingest.DeleteKnowledgeBox(  # type: ignore
-        KnowledgeBoxID(uuid=kbid)
-    )
-    if kbobj.status == KnowledgeBoxResponseStatus.OK:
-        return KnowledgeBoxObj(uuid=kbid)
-    elif kbobj.status == KnowledgeBoxResponseStatus.NOTFOUND:
+async def delete_kb(request: Request, kbid: str) -> KnowledgeBoxObj:
+    driver = get_driver()
+    try:
+        async with driver.transaction() as txn:
+            await KnowledgeBox.delete(txn, kbid=kbid)
+            await txn.commit()
+    except datamanagers.exceptions.KnowledgeBoxNotFound:
         raise HTTPException(status_code=404, detail="Knowledge Box does not exists")
-    elif kbobj.status == KnowledgeBoxResponseStatus.ERROR:
-        raise HTTPException(status_code=500, detail="Error on deleting knowledge box")
+    except Exception as exc:
+        logger.exception("Could not delete KB", exc_info=exc, extra={"kbid": kbid})
+        raise HTTPException(status_code=500, detail="Error deleting knowledge box")
 
+    # onprem nucliadb must delete its learning configuration
+    try:
+        await learning_proxy.delete_configuration(kbid)
+        logger.info("Learning configuration deleted", extra={"kbid": kbid})
+    except Exception as exc:
+        logger.exception(
+            "Unexpected error deleting learning configuration",
+            exc_info=exc,
+            extra={"kbid": kbid},
+        )
+
+    # be nice and notify processing this KB is being deleted so we waste
+    # resources
     processing = get_processing()
     asyncio.create_task(processing.delete_from_processing(kbid=kbid))
 
-    return Response(status_code=204)
+    return KnowledgeBoxObj(uuid=kbid)

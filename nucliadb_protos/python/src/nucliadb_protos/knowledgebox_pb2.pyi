@@ -105,17 +105,17 @@ class KnowledgeBoxConfig(google.protobuf.message.Message):
 
     TITLE_FIELD_NUMBER: builtins.int
     DESCRIPTION_FIELD_NUMBER: builtins.int
+    SLUG_FIELD_NUMBER: builtins.int
+    MIGRATION_VERSION_FIELD_NUMBER: builtins.int
     ENABLED_FILTERS_FIELD_NUMBER: builtins.int
     ENABLED_INSIGHTS_FIELD_NUMBER: builtins.int
-    SLUG_FIELD_NUMBER: builtins.int
     DISABLE_VECTORS_FIELD_NUMBER: builtins.int
-    MIGRATION_VERSION_FIELD_NUMBER: builtins.int
     RELEASE_CHANNEL_FIELD_NUMBER: builtins.int
     title: builtins.str
     description: builtins.str
     slug: builtins.str
-    disable_vectors: builtins.bool
     migration_version: builtins.int
+    disable_vectors: builtins.bool
     release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType
     """DEPRECATED: duplicated field also stored in `writer.proto Shards`"""
     @property
@@ -127,11 +127,11 @@ class KnowledgeBoxConfig(google.protobuf.message.Message):
         *,
         title: builtins.str = ...,
         description: builtins.str = ...,
+        slug: builtins.str = ...,
+        migration_version: builtins.int = ...,
         enabled_filters: collections.abc.Iterable[builtins.str] | None = ...,
         enabled_insights: collections.abc.Iterable[builtins.str] | None = ...,
-        slug: builtins.str = ...,
         disable_vectors: builtins.bool = ...,
-        migration_version: builtins.int = ...,
         release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType = ...,
     ) -> None: ...
     def ClearField(self, field_name: typing.Literal["description", b"description", "disable_vectors", b"disable_vectors", "enabled_filters", b"enabled_filters", "enabled_insights", b"enabled_insights", "migration_version", b"migration_version", "release_channel", b"release_channel", "slug", b"slug", "title", b"title"]) -> None: ...
@@ -162,6 +162,7 @@ class KnowledgeBoxNew(google.protobuf.message.Message):
     learning_config: builtins.str
     """this field are only used by NucliaDB Writer API when creating a KB. Used
     in onprem scenarios
+    DEPRECATED: onprem don't forward requests to ingest gRPC anymore
     """
     release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType
     """release channel, although not used when backend creates hosted KBs, it's

@@ -39,7 +39,6 @@ from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.orm.resource import KB_REVERSE, Resource
 from nucliadb.ingest.service.writer import WriterServicer
 from nucliadb.ingest.settings import settings
-from nucliadb.learning_proxy import LearningConfiguration
 from nucliadb.tests.vectors import V1, V2, V3
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import utils_pb2 as upb
@@ -174,17 +173,12 @@ async def fake_node(indexing_utility, shard_manager):
 
 @pytest.fixture()
 def learning_config():
-    lconfig = LearningConfiguration(
-        semantic_model="multilingual",
-        semantic_threshold=None,
-        semantic_vector_size=len(V1),
-        semantic_vector_similarity="cosine",
-    )
-    with patch("nucliadb.ingest.service.writer.learning_proxy") as mocked:
-        mocked.set_configuration = AsyncMock(return_value=None)
-        mocked.get_configuration = AsyncMock(return_value=lconfig)
-        mocked.delete_configuration = AsyncMock(return_value=None)
-        yield mocked
+    from nucliadb_utils.settings import nuclia_settings
+
+    original = nuclia_settings.dummy_learning_services
+    nuclia_settings.dummy_learning_services = True
+    yield AsyncMock()
+    nuclia_settings.dummy_learning_services = original
 
 
 @pytest.fixture(scope="function")
@@ -201,7 +195,7 @@ async def knowledgebox_ingest(storage, maindb_driver: Driver, shard_manager, lea
     yield kbid
 
     async with maindb_driver.transaction() as txn:
-        await KnowledgeBox.delete_kb(txn, kbid)
+        await KnowledgeBox.delete(txn, kbid)
         await txn.commit()
 
 

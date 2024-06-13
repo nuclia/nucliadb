@@ -20,12 +20,17 @@
 from nucliadb.ingest.utils import start_ingest, stop_ingest
 from nucliadb.reader import SERVICE_NAME
 from nucliadb_telemetry.utils import clean_telemetry, setup_telemetry
-from nucliadb_utils.utilities import start_audit_utility, stop_audit_utility
+from nucliadb_utils.utilities import (
+    get_storage,
+    start_audit_utility,
+    stop_audit_utility,
+    teardown_storage,
+)
 
 
 async def initialize() -> None:
     await setup_telemetry(SERVICE_NAME)
-
+    await get_storage(service_name=SERVICE_NAME)
     await start_ingest(SERVICE_NAME)
     await start_audit_utility(SERVICE_NAME)
 
@@ -33,4 +38,5 @@ async def initialize() -> None:
 async def finalize() -> None:
     await stop_ingest()
     await stop_audit_utility()
+    await teardown_storage()
     await clean_telemetry(SERVICE_NAME)

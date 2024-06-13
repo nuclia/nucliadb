@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from typing import AsyncGenerator, Optional, Sequence
+from typing import AsyncGenerator, Optional, Sequence, cast
 from uuid import uuid4
 
 from grpc import StatusCode
@@ -37,15 +37,18 @@ from nucliadb.common.datamanagers.resources import (
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict, VectorSetConflict
+from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.orm.utils import choose_matryoshka_dimension, compute_paragraph_key
 from nucliadb.migrator.utils import get_latest_version
-from nucliadb_protos import knowledgebox_pb2, writer_pb2
+from nucliadb_protos import knowledgebox_pb2, utils_pb2, writer_pb2
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig, SemanticModelMetadata
 from nucliadb_protos.resources_pb2 import Basic
 from nucliadb_protos.utils_pb2 import ReleaseChannel
+from nucliadb_utils import const
+from nucliadb_utils.settings import running_settings
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import get_audit, get_storage
+from nucliadb_utils.utilities import get_audit, get_storage, has_feature
 
 # XXX Eventually all these keys should be moved to datamanagers.kb
 KB_RESOURCE = "/kbs/{kbid}/r/{uuid}"
@@ -69,43 +72,12 @@ class KnowledgeBox:
         self.kbid = kbid
         self._config: Optional[KnowledgeBoxConfig] = None
 
-    async def get_config(self) -> Optional[KnowledgeBoxConfig]:
-        if self._config is None:
-            async with datamanagers.with_ro_transaction() as txn:
-                config = await datamanagers.kb.get_config(txn, kbid=self.kbid)
-            if config is not None:
-                self._config = config
-                return config
-            else:
-                return None
-        else:
-            return self._config
+    @staticmethod
+    def new_unique_kbid() -> str:
+        return str(uuid4())
 
     @classmethod
-    async def delete_kb(cls, txn: Transaction, kbid: str):
-        # Mark storage to be deleted
-        # Mark keys to be deleted
-        kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
-        if kb_config is None:
-            # consider KB as deleted
-            return
-        slug = kb_config.slug
-
-        # Delete main anchor
-        async with txn.driver.transaction() as subtxn:
-            key_match = datamanagers.kb.KB_SLUGS.format(slug=slug)
-            await subtxn.delete(key_match)
-
-            when = datetime.now().isoformat()
-            await subtxn.set(KB_TO_DELETE.format(kbid=kbid), when.encode())
-            await subtxn.commit()
-
-        audit_util = get_audit()
-        if audit_util is not None:
-            await audit_util.delete_kb(kbid)
-        return kbid
-
-    @classmethod
+    @processor_observer.wrap({"type": "create_kb"})
     async def create(
         cls,
         txn: Transaction,
@@ -113,9 +85,10 @@ class KnowledgeBox:
         semantic_model: SemanticModelMetadata,
         uuid: Optional[str] = None,
         config: Optional[KnowledgeBoxConfig] = None,
-        release_channel: ReleaseChannel.ValueType = ReleaseChannel.STABLE,
-    ) -> tuple[str, bool]:
-        failed = False
+        release_channel: Optional[ReleaseChannel.ValueType] = ReleaseChannel.STABLE,
+    ) -> str:
+        release_channel = cast(ReleaseChannel.ValueType, release_channel_for_kb(slug, release_channel))
+
         exist = await datamanagers.kb.get_kb_uuid(txn, slug=slug)
         if exist:
             raise KnowledgeBoxConflict()
@@ -146,42 +119,39 @@ class KnowledgeBox:
         created = await storage.create_kb(uuid)
         if created is False:
             logger.error(f"{uuid} KB could not be created")
-            failed = True
-
-        if failed is False:
-            kb_shards = writer_pb2.Shards()
-            kb_shards.kbid = uuid
-            # B/c with Shards.actual
-            kb_shards.actual = -1
-            # B/c with `Shards.similarity`, replaced by `model`
-            kb_shards.similarity = semantic_model.similarity_function
-
-            # if this KB uses a matryoshka model, we can choose a different
-            # dimension
-            if len(semantic_model.matryoshka_dimensions) > 0:
-                semantic_model.vector_dimension = choose_matryoshka_dimension(
-                    semantic_model.matryoshka_dimensions  # type: ignore
-                )
-            kb_shards.model.CopyFrom(semantic_model)
-
-            kb_shards.release_channel = release_channel
-
-            await datamanagers.cluster.update_kb_shards(txn, kbid=uuid, shards=kb_shards)
-
-            # shard creation will alter this value on maindb, make sure nobody
-            # uses this variable anymore
-            del kb_shards
-            shard_manager = get_shard_manager()
-            try:
-                await shard_manager.create_shard_by_kbid(txn, uuid)
-            except Exception as e:
-                await storage.delete_kb(uuid)
-                raise e
-
-        if failed:
             await storage.delete_kb(uuid)
+            raise Exception(f"KB blob storage could not be created (slug={slug})")
 
-        return uuid, failed
+        kb_shards = writer_pb2.Shards()
+        kb_shards.kbid = uuid
+        # B/c with Shards.actual
+        kb_shards.actual = -1
+        # B/c with `Shards.similarity`, replaced by `model`
+        kb_shards.similarity = semantic_model.similarity_function
+
+        # if this KB uses a matryoshka model, we can choose a different
+        # dimension
+        if len(semantic_model.matryoshka_dimensions) > 0:
+            semantic_model.vector_dimension = choose_matryoshka_dimension(
+                semantic_model.matryoshka_dimensions  # type: ignore
+            )
+        kb_shards.model.CopyFrom(semantic_model)
+
+        kb_shards.release_channel = release_channel
+
+        await datamanagers.cluster.update_kb_shards(txn, kbid=uuid, shards=kb_shards)
+
+        # shard creation will alter this value on maindb, make sure nobody
+        # uses this variable anymore
+        del kb_shards
+        shard_manager = get_shard_manager()
+        try:
+            await shard_manager.create_shard_by_kbid(txn, uuid)
+        except Exception as e:
+            await storage.delete_kb(uuid)
+            raise e
+
+        return uuid
 
     @classmethod
     async def update(
@@ -212,6 +182,30 @@ class KnowledgeBox:
         await datamanagers.kb.set_config(txn, kbid=uuid, config=exist)
 
         return uuid
+
+    @classmethod
+    async def delete(cls, txn: Transaction, kbid: str):
+        # Mark storage to be deleted
+        # Mark keys to be deleted
+        kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
+        if kb_config is None:
+            # consider KB as deleted
+            return
+        slug = kb_config.slug
+
+        # Delete main anchor
+        async with txn.driver.transaction() as subtxn:
+            key_match = datamanagers.kb.KB_SLUGS.format(slug=slug)
+            await subtxn.delete(key_match)
+
+            when = datetime.now().isoformat()
+            await subtxn.set(KB_TO_DELETE.format(kbid=kbid), when.encode())
+            await subtxn.commit()
+
+        audit_util = get_audit()
+        if audit_util is not None:
+            await audit_util.delete_kb(kbid)
+        return kbid
 
     @classmethod
     async def purge(cls, driver: Driver, kbid: str):
@@ -392,6 +386,20 @@ class KnowledgeBox:
         await self.txn.set(KB_VECTORSET_TO_DELETE.format(kbid=self.kbid, vectorset=vectorset_id), b"")
         shard_manager = get_shard_manager()
         await shard_manager.delete_vectorset(self.kbid, vectorset_id)
+
+
+def release_channel_for_kb(
+    slug: str, release_channel: Optional[ReleaseChannel.ValueType]
+) -> ReleaseChannel.ValueType:
+    if running_settings.running_environment == "stage" and has_feature(
+        const.Features.EXPERIMENTAL_KB, context={"slug": slug}
+    ):
+        release_channel = utils_pb2.ReleaseChannel.EXPERIMENTAL
+
+    if release_channel is None:
+        return utils_pb2.ReleaseChannel.STABLE
+
+    return release_channel
 
 
 def chunker(seq: Sequence, size: int):

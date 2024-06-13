@@ -50,12 +50,6 @@ def is_back_pressure_enabled():
         yield mock_
 
 
-@pytest.fixture(scope="function", autouse=True)
-def is_onprem_nucliadb():
-    with mock.patch(f"{MODULE}.is_onprem_nucliadb", return_value=False) as mock_:
-        yield mock_
-
-
 @pytest.mark.parametrize(
     "rate,pending,max_wait,delta",
     [
@@ -90,30 +84,23 @@ def test_back_pressure_cache():
     assert cache.get(key) is None
 
 
-async def test_maybe_back_pressure_skip_conditions(is_back_pressure_enabled, is_onprem_nucliadb):
+async def test_maybe_back_pressure_skip_conditions_onprem(is_back_pressure_enabled, onprem_nucliadb):
+    # onprem should never run back pressure even if enabled
     with mock.patch(f"{MODULE}.back_pressure_checks") as back_pressure_checks_mock:
-        # Check that if back pressure is not enabled, it should not run
+        is_back_pressure_enabled.return_value = True
+        await maybe_back_pressure(mock.Mock(), "kbid")
+        back_pressure_checks_mock.assert_not_called()
+
+
+async def test_maybe_back_pressure_skip_conditions_hosted(is_back_pressure_enabled, hosted_nucliadb):
+    # Back pressure should only run for hosted deployments, when enabled
+    with mock.patch(f"{MODULE}.back_pressure_checks") as back_pressure_checks_mock:
         is_back_pressure_enabled.return_value = False
-        is_onprem_nucliadb.return_value = False
-
         await maybe_back_pressure(mock.Mock(), "kbid")
-
         back_pressure_checks_mock.assert_not_called()
 
-        # Even if enabled, it should not run if not on-prem
         is_back_pressure_enabled.return_value = True
-        is_onprem_nucliadb.return_value = True
-
         await maybe_back_pressure(mock.Mock(), "kbid")
-
-        back_pressure_checks_mock.assert_not_called()
-
-        # It should run only if not on-prem and enabled
-        is_back_pressure_enabled.return_value = True
-        is_onprem_nucliadb.return_value = False
-
-        await maybe_back_pressure(mock.Mock(), "kbid")
-
         back_pressure_checks_mock.assert_awaited_once()
 
 

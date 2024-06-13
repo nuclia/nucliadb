@@ -32,6 +32,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, model_validator
 from typing_extensions import Self
 
+from nucliadb_protos import knowledgebox_pb2, utils_pb2
 from nucliadb_telemetry import errors
 from nucliadb_utils.settings import is_onprem_nucliadb, nuclia_settings
 
@@ -82,6 +83,27 @@ class LearningConfiguration(BaseModel):
         ):
             raise ValueError("Semantic vector size is inconsistent with matryoshka dimensions")
         return self
+
+    def into_semantic_model_metadata(self) -> knowledgebox_pb2.SemanticModelMetadata:
+        semantic_model = knowledgebox_pb2.SemanticModelMetadata()
+
+        LEARNING_SIMILARITY_FUNCTION_TO_PROTO = {
+            "cosine": utils_pb2.VectorSimilarity.COSINE,
+            "dot": utils_pb2.VectorSimilarity.DOT,
+        }
+        semantic_model.similarity_function = LEARNING_SIMILARITY_FUNCTION_TO_PROTO[
+            self.semantic_vector_similarity
+        ]
+
+        if self.semantic_vector_size is not None:
+            semantic_model.vector_dimension = self.semantic_vector_size
+        else:
+            logger.warning("Vector dimension not set!")
+
+        if self.semantic_matryoshka_dimensions is not None:
+            semantic_model.matryoshka_dimensions.extend(self.semantic_matryoshka_dimensions)
+
+        return semantic_model
 
 
 async def get_configuration(
@@ -327,6 +349,10 @@ class DummyClient(httpx.AsyncClient):
             semantic_matryoshka_dims=[],
         )
         return self._response(content=lconfig.model_dump())
+
+    def post_config(self, *args: Any, **kwargs: Any):
+        # simulate post that returns the created config
+        return self.get_config(*args, **kwargs)
 
     async def request(  # type: ignore
         self,

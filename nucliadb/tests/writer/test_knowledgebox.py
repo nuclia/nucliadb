@@ -17,8 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import pytest
+from typing import Callable
+from unittest.mock import AsyncMock, patch
 
+import pytest
+from httpx import AsyncClient
+
+from nucliadb.learning_proxy import LearningConfiguration
 from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX
 from nucliadb_models.resource import NucliaDBRoles
 
@@ -47,3 +52,84 @@ async def test_knowledgebox_lifecycle(writer_api):
             },
         )
         assert resp.status_code == 200
+
+
+async def test_create_knowledgebox_with_learning_config(
+    writer_api: Callable[..., AsyncClient],
+):
+    with (
+        patch("nucliadb.writer.api.v1.knowledgebox.KnowledgeBox", new=AsyncMock()) as kb,
+        patch("nucliadb.writer.api.v1.knowledgebox.learning_proxy", new=AsyncMock()) as learning_proxy,
+    ):
+        kb.create.return_value = "kbid"
+        learning_config = LearningConfiguration(
+            semantic_model="multilingual",
+            semantic_threshold=-1,
+            semantic_vector_size=10,
+            semantic_vector_similarity="cosine",
+            semantic_matryoshka_dims=[10, 20, 30],
+        )
+        learning_proxy.set_configuration.return_value = learning_config
+
+        async with writer_api(roles=[NucliaDBRoles.MANAGER]) as client:
+            resp = await client.post(
+                f"/{KBS_PREFIX}",
+                json={
+                    "slug": "slug",
+                    "learning_config": {
+                        "semantic_model": "multilingual",
+                        "semantic_threshold": -1,
+                        "semantic_vector_size": 10,
+                        "semantic_vector_similarity": "cosine",
+                    },
+                },
+            )
+            assert resp.status_code == 201
+            assert kb.create.call_count == 1
+            assert kb.new_unique_kbid.call_count == 1
+            assert kb.create.call_args.kwargs["slug"] == "slug"
+            assert (
+                kb.create.call_args.kwargs["semantic_model"]
+                == learning_config.into_semantic_model_metadata()
+            )
+
+
+async def test_create_knowledgebox_with_learning_config_with_matryoshka_dimensions(
+    writer_api: Callable[..., AsyncClient],
+):
+    with (
+        patch("nucliadb.writer.api.v1.knowledgebox.KnowledgeBox", new=AsyncMock()) as kb,
+        patch("nucliadb.writer.api.v1.knowledgebox.learning_proxy", new=AsyncMock()) as learning_proxy,
+    ):
+        kb.create.return_value = "kbid"
+        learning_config = LearningConfiguration(
+            semantic_model="multilingual",
+            semantic_threshold=-1,
+            semantic_vector_size=10,
+            semantic_vector_similarity="cosine",
+            semantic_matryoshka_dims=[10, 20, 30],
+        )
+        learning_proxy.set_configuration.return_value = learning_config
+
+        async with writer_api(roles=[NucliaDBRoles.MANAGER]) as client:
+            resp = await client.post(
+                f"/{KBS_PREFIX}",
+                json={
+                    "slug": "slug",
+                    "learning_config": {
+                        "semantic_model": "multilingual",
+                        "semantic_threshold": -1,
+                        "semantic_vector_size": 10,
+                        "semantic_vector_similarity": "cosine",
+                        "semantic_matryoshka_dims": [10, 20, 30],
+                    },
+                },
+            )
+            assert resp.status_code == 201
+            assert kb.create.call_count == 1
+            assert kb.new_unique_kbid.call_count == 1
+            assert kb.create.call_args.kwargs["slug"] == "slug"
+            assert (
+                kb.create.call_args.kwargs["semantic_model"]
+                == learning_config.into_semantic_model_metadata()
+            )
