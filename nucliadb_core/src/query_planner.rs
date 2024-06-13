@@ -23,7 +23,7 @@ pub use crate::protos::prost_types::Timestamp as ProtoTimestamp;
 use crate::protos::{
     DocumentSearchRequest, ParagraphSearchRequest, RelationSearchRequest, SearchRequest, VectorSearchRequest,
 };
-use crate::query_language::{self, BooleanExpression, BooleanOperation, QueryAnalysis, QueryContext};
+use crate::query_language::{self, BooleanExpression, QueryAnalysis, QueryContext};
 use crate::vectors::VectorsContext;
 use crate::NodeResult;
 use nucliadb_protos::utils::Security;
@@ -107,7 +107,7 @@ impl IndexQueries {
         request.field_labels.clear();
     }
 
-    fn apply_to_paragraphs3(request: &mut ParagraphSearchRequest, response: &PreFilterResponse) {
+    fn apply_to_paragraphs(request: &mut ParagraphSearchRequest, response: &PreFilterResponse) {
         if matches!(response.valid_fields, ValidFieldCollector::All) {
             // Since all the fields are matching there is no need to use this filter.
             request.timestamps = None;
@@ -122,14 +122,6 @@ impl IndexQueries {
             let field_id = &valid_field.field_id;
             let unique_field_key = format!("{resource_id}{field_id}");
             request.key_filters.push(unique_field_key);
-        }
-    }
-
-    fn apply_to_paragraphs2(request: &mut ParagraphSearchRequest, response: &PreFilterResponse) {
-        if matches!(response.valid_fields, ValidFieldCollector::All) {
-            // Since all the fields are matching there is no need to use this filter.
-            request.timestamps = None;
-            request.security = None;
         }
     }
 
@@ -149,10 +141,8 @@ impl IndexQueries {
             IndexQueries::apply_to_vectors(vectors_request, &prefiltered);
         };
 
-        match (self.paragraphs_version, self.paragraphs_request.as_mut()) {
-            (2, Some(paragraph_request)) => IndexQueries::apply_to_paragraphs2(paragraph_request, &prefiltered),
-            (3, Some(paragraph_request)) => IndexQueries::apply_to_paragraphs3(paragraph_request, &prefiltered),
-            _ => (),
+        if let Some(paragraph_request) = self.paragraphs_request.as_mut() {
+            IndexQueries::apply_to_paragraphs(paragraph_request, &prefiltered)
         }
     }
 }
@@ -187,17 +177,8 @@ pub fn build_query_plan(paragraphs_version: u32, search_request: SearchRequest) 
     let vectors_context = VectorsContext {
         filtering_formula: search_query.clone(),
     };
-    let filtering_formula = match (search_query, prefilter_query.clone()) {
-        (search_query, _) if paragraphs_version != 2 => search_query,
-        (None, None) => None,
-        (Some(formula), None) | (None, Some(formula)) => Some(formula),
-        (Some(search), Some(prefilter)) => Some(BooleanExpression::Operation(BooleanOperation {
-            operator: query_language::Operator::And,
-            operands: vec![search, prefilter],
-        })),
-    };
     let paragraphs_context = ParagraphsContext {
-        filtering_formula,
+        filtering_formula: search_query,
     };
     let prefilter = compute_prefilters(&search_request, prefilter_query);
 

@@ -56,9 +56,18 @@ pub(crate) fn get_index_files(
         if ignored_segment_ids.contains(&segment_id) {
             continue;
         }
-        files.push(format!("{relative_path}/{segment_id}/index.hnsw"));
-        files.push(format!("{relative_path}/{segment_id}/journal.json"));
-        files.push(format!("{relative_path}/{segment_id}/nodes.kv"));
+        files.push((
+            format!("{relative_path}/{segment_id}/index.hnsw"),
+            File::open(location.join(format!("{segment_id}/index.hnsw")))?,
+        ));
+        files.push((
+            format!("{relative_path}/{segment_id}/journal.json"),
+            File::open(location.join(format!("{segment_id}/journal.json")))?,
+        ));
+        files.push((
+            format!("{relative_path}/{segment_id}/nodes.kv"),
+            File::open(location.join(format!("{segment_id}/nodes.kv")))?,
+        ));
     }
 
     Ok(RawReplicaState {

@@ -13,15 +13,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  pre-checks:
-    strategy:
-      matrix:
-        python-version: ["3.9", "3.10", "3.11"]
-    uses: ./.github/workflows/_component_prechecks.yml
-    with:
-      python_version: "${{ matrix.python-version }}"
-      component: "nucliadb_sdk"
-
   # Job to run tests
   tests:
     name: NucliaDBSDKTests
@@ -29,7 +20,7 @@ jobs:
 
     strategy:
       matrix:
-        python-version: ["3.11"]
+        python-version: ["3.12"]
 
     steps:
       - name: Checkout the repository
@@ -75,7 +66,7 @@ jobs:
 
       - name: Run tests
         run: |
-          pytest -rfE --cov=nucliadb_sdk -s --tb=native -v --cov-report xml --cov-append nucliadb_sdk/nucliadb_sdk
+          pytest -rfE --cov=nucliadb_sdk -s --tb=native -v --cov-report xml --cov-append nucliadb_sdk/tests
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3

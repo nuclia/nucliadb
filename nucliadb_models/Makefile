@@ -3,20 +3,25 @@ install-dev:
 	pip install --upgrade pip wheel
 	cd .. && pip install \
 		-r test-requirements.txt \
-		-r code-requirements.txt \
 		-r nucliadb_models/requirements-sources.txt \
 		-r nucliadb_models/requirements.txt
 	pip install -e .
 
 .PHONY: format
 format:
-	cd .. && isort --profile black nucliadb_models
-	black .
+	ruff check --fix --config=../ruff.toml .
+	ruff format --config=../ruff.toml .
 
 .PHONY: lint
 lint:
-	flake8 nucliadb_models --config=setup.cfg
-	cd .. && isort -c --profile black nucliadb_models
-	black --check .
+	ruff check --config=../ruff.toml .
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini .
 
+.PHONY: test
+test:
+	pytest -s --tb=native -v tests
+
+
+.PHONY: test-cov
+test-cov:
+	pytest -rfE --cov=nucliadb_models --cov-config=../.coveragerc -s --tb=native -v --cov-report term-missing:skip-covered --cov-report xml tests

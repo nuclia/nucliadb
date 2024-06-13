@@ -55,7 +55,7 @@ tracing-opentelemetry = "0.23"
 reqwest = { version = "0.11", features = ["json", "rustls-tls", "blocking"] }
 num_cpus = "1.16.0"
 crossbeam-utils = "0.8.16"
-object_store = { version = "^0.10.1", features = ["gcp", "aws"]}
+object_store = { version = "^0.10.1", features = ["gcp", "aws", "azure"]}
 base64 = "^0.21"
 
 
@@ -68,7 +68,6 @@ rand = "0.8.4"
 nucliadb_core = { path = "../nucliadb_core" }
 nucliadb_procs = { path = "../nucliadb_procs" }
 nucliadb_texts2 = { path = "../nucliadb_texts2" }
-nucliadb_paragraphs2 = { path = "../nucliadb_paragraphs2" }
 nucliadb_paragraphs3 = { path = "../nucliadb_paragraphs3" }
 nucliadb_vectors = { path = "../nucliadb_vectors" }
 nucliadb_relations2 = { path = "../nucliadb_relations2" }
@@ -109,9 +108,6 @@ tonic-build = "0.11.0"
 [features]
 ci-test = []
 release-feature-set = []
-
-[profile.release]
-lto = true
 
 [dev-dependencies]
 backoff = { version = "0.4.0", features = ["tokio"] }

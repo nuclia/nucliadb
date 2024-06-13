@@ -23,12 +23,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  pre-checks:
-    uses: ./.github/workflows/_component_prechecks.yml
-    with:
-      component: "nucliadb"
-      python_version: "3.11"
-
   # Job to run Python tests
   tests:
     name: NucliaDBTests
@@ -37,7 +31,7 @@ jobs:
     strategy:
       max-parallel: 6
       matrix:
-        python-version: ["3.11"]
+        python-version: ["3.12"]
         maindb_driver: ["tikv", "tikv_2", "tikv_3", "pg", "pg_2", "pg_3"]
     steps:
       - name: Checkout the repository
@@ -62,8 +56,8 @@ jobs:
           filters: |
             workflows:
               - 'nucliadb_node/**'
+              - "nucliadb_sidecar/**"
               - 'nucliadb_texts2/**'
-              - 'nucliadb_paragraphs2/**'
               - 'nucliadb_paragraphs3/**'
               - 'nucliadb_vectors/**'
               - 'nucliadb_relations2/**'

@@ -19,14 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          profile: minimal
-          components: rustfmt
-          override: true
       - name: rustfmt
-        run: cargo +nightly fmt --check
+        run: cargo fmt --check
 
   clippy-rust:
     name: "Pre-checks: Clippy lint"
@@ -41,32 +35,28 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           args: --all-targets
 
-  pre-checks-python:
-    name: "Pre-checks: Node python lint"
+  updated-protos:
+    name: "Pre-checks: Protos up-to-date"
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.9", "3.10", "3.11"]
-
+    permissions: write-all
+    needs:
+      - build-virtual-env
     steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v3
-
-      - name: Setup Python
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v3
+      - uses: Swatinem/rust-cache@v2
+      - name: Restore venv
+        uses: actions/cache/restore@v4
         with:
-          python-version: ${{ matrix.python-version }}
+          path: .venv
+          key: venv-${{ github.sha }}
+          fail-on-cache-miss: true
+      - name: Compile protos
+        run: source .venv/bin/activate && make protos
+      - name: Fail if something changed
+        run: git status && [[ -z "$(git status -s)" ]]
 
-      - name: Run pre-checks
-        run: |
-          pip install -r code-requirements.txt
-          isort -c --profile black nucliadb_node
-          cd nucliadb_node
-          flake8 nucliadb_node --config=setup.cfg
-          black --check .
-
-  mypy-check:
-    name: "Pre-checks: Node mypy"
+  pre-checks-python:
+    name: "Pre-checks: Python lint"
     runs-on: ubuntu-latest
     needs:
       - build-virtual-env
@@ -75,7 +65,7 @@ jobs:
       - name: Set up PDM
         uses: pdm-project/setup-pdm@v3
         with:
-          python-version: "3.11"
+          python-version: "3.12"
       - name: Restore venv
         uses: actions/cache/restore@v4
         with:
@@ -83,7 +73,13 @@ jobs:
           key: venv-${{ github.sha }}
           fail-on-cache-miss: true
       - name: Run mypy
-        run: pdm run mypy nucliadb_node
+        run: |
+          source .venv/bin/activate
+          for package in nucliadb nucliadb_utils nucliadb_telemetry nucliadb_sdk nucliadb_dataset nucliadb_models nucliadb_sidecar nucliadb_node_binding nucliadb_performance
+          do
+              make -C $package lint || ERROR=1
+          done
+          exit $ERROR
 
   licenses:
     name: Check Licenses
@@ -113,7 +109,7 @@ jobs:
           key: node-bin-${{ github.sha }}
 
   build-virtual-env:
-    name: Build node bindings
+    name: Build virtual environment
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -121,7 +117,8 @@ jobs:
       - name: Set up PDM
         uses: pdm-project/setup-pdm@v3
         with:
-          python-version: "3.11"
+          python-version: "3.12"
+          cache: true
       - name: Install venv
         run: pdm sync -d
       - name: Upload virtualenv to cache
@@ -142,7 +139,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.11"
+          python-version: "3.12"
       - name: Restore venv
         uses: actions/cache/restore@v4
         with:
@@ -160,7 +157,7 @@ jobs:
         run: mkdir builds && mv target/release/node_* builds && docker build -t europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node:latest -f Dockerfile.node_prebuilt .
 
       - name: Run tests
-        run: .venv/bin/pytest -rfE --cov=nucliadb_node -s --tb=native -v --cov-report xml --cov-append nucliadb_node/nucliadb_node
+        run: source .venv/bin/activate && make -C nucliadb_sidecar test-cov
 
 
   node-rust-tests:
@@ -196,7 +193,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
       - name: Restore venv
         uses: actions/cache/restore@v4
@@ -226,3 +223,37 @@ jobs:
         with:
           file: ./coverage.xml
           flags: nucliadb
+
+
+  nucliadb-models-tests:
+    name: nucliadb_models tests
+    runs-on: ubuntu-latest
+    needs:
+      - build-virtual-env
+    strategy:
+      fail-fast: false
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+
+      - name: Restore venv
+        uses: actions/cache/restore@v4
+        with:
+          path: .venv
+          key: venv-${{ github.sha }}
+          fail-on-cache-miss: true
+
+      - name: Run NucliaDB tests
+        run: source .venv/bin/activate && make -C nucliadb_models test-cov
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./nucliadb_models/coverage.xml
+          flags: models

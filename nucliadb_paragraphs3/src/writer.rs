@@ -83,15 +83,6 @@ impl ParagraphWriter for ParagraphWriterService {
         let time = Instant::now();
         let id = Some(&resource.shard_id);
 
-        if resource.status != ResourceStatus::Delete as i32 {
-            let v = time.elapsed().as_millis();
-            debug!("{id:?} - Indexing paragraphs: starts at {v} ms");
-
-            let _ = self.index_paragraph(resource);
-            let v = time.elapsed().as_millis();
-            debug!("{id:?} - Indexing paragraphs: ends at {v} ms");
-        }
-
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Processing paragraphs to delete: starts at {v} ms");
 
@@ -101,6 +92,15 @@ impl ParagraphWriter for ParagraphWriterService {
         }
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Processing paragraphs to delete: ends at {v} ms");
+
+        if resource.status != ResourceStatus::Delete as i32 {
+            let v = time.elapsed().as_millis();
+            debug!("{id:?} - Indexing paragraphs: starts at {v} ms");
+
+            let _ = self.index_paragraph(resource);
+            let v = time.elapsed().as_millis();
+            debug!("{id:?} - Indexing paragraphs: ends at {v} ms");
+        }
 
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Commit: starts at {v} ms");
@@ -456,6 +456,48 @@ mod tests {
 
         let (_top_docs, count) = searcher.search(&AllQuery, &(TopDocs::with_limit(10), Count))?;
         assert_eq!(count, 4);
+        Ok(())
+    }
+
+    #[test]
+    fn test_set_resource_replaces_documents() -> NodeResult<()> {
+        let dir = TempDir::new().unwrap();
+        let psc = ParagraphConfig {
+            path: dir.path().join("paragraphs"),
+        };
+
+        // Create a resource
+        let mut paragraph_writer_service = ParagraphWriterService::create(psc).unwrap();
+        let resource1 = create_resource("shard1".to_string());
+        paragraph_writer_service.set_resource(&resource1)?;
+
+        // Check that it exists
+        let reader = paragraph_writer_service.index.reader()?;
+        let searcher = reader.searcher();
+        let query = TermQuery::new(
+            Term::from_field_text(paragraph_writer_service.schema.text, "document"),
+            IndexRecordOption::Basic,
+        );
+        let (_top_docs, count) = searcher.search(&query, &(TopDocs::with_limit(2), Count))?;
+        assert_eq!(count, 1);
+
+        // Edit the resource
+        let mut resource_update = create_resource("shard1".to_string());
+        resource_update.paragraphs_to_delete =
+            resource_update.paragraphs.values().flat_map(|p| p.paragraphs.keys().cloned()).collect();
+        paragraph_writer_service.set_resource(&resource_update)?;
+
+        // Check that it is updated
+        let reader = paragraph_writer_service.index.reader()?;
+        let searcher = reader.searcher();
+        let query = TermQuery::new(
+            Term::from_field_text(paragraph_writer_service.schema.text, "document"),
+            IndexRecordOption::Basic,
+        );
+
+        let (_top_docs, count) = searcher.search(&query, &(TopDocs::with_limit(2), Count))?;
+        assert_eq!(count, 1);
+
         Ok(())
     }
 }

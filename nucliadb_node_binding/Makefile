@@ -5,7 +5,6 @@ install-dev: check-system
 	pip install --upgrade pip wheel
 	cd .. && pip install \
 		-r test-requirements.txt \
-		-r code-requirements.txt \
 		-r nucliadb_node/requirements-sources.txt \
 		-r nucliadb_node/requirements.txt \
 		./nucliadb_node/
@@ -18,14 +17,12 @@ check-system:
 
 .PHONY: format
 format:
-	isort --profile black tests
-	black .
+	ruff check --fix --config=../ruff.toml tests
+	ruff format --config=../ruff.toml tests
 
 .PHONY: lint
 lint:
-	flake8 tests --config=pyproject.toml
-	isort -c --profile black tests
-	black --check .
+	ruff check --config=../ruff.toml tests
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini .
 
 .PHONY: test

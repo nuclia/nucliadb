@@ -19,16 +19,14 @@
 
 from typing import Optional
 
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
     main_api: str = "http://localhost:8080/api"
     search_api: Optional[str] = None
     reader_api: Optional[str] = None
-    predict_api: str = (
-        "http://predict.learning.svc.cluster.local:8080/api/internal/predict"
-    )
+    predict_api: str = "http://predict.learning.svc.cluster.local:8080/api/internal/predict"
     benchmark_output: Optional[str] = None
     saved_requests_file: Optional[str] = None
     exports_folder: str = "exports"

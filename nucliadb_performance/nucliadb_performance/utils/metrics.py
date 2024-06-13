@@ -70,9 +70,7 @@ def print_metrics():
     for metric_name in sorted(METRICS.keys()):
         p50 = get_percentile(metric_name, p=0.5)
         p95 = get_percentile(metric_name, p=0.95)
-        print(
-            f"- {metric_name} -> p50: {prettify_latency(p50)} p95: {prettify_latency(p95)}"
-        )
+        print(f"- {metric_name} -> p50: {prettify_latency(p50)} p95: {prettify_latency(p95)}")
     print("=" * 50)
 
 

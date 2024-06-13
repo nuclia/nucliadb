@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::config::{Similarity, VectorConfig};
+use crate::config::VectorConfig;
 use crate::data_point::{self, DataPointPin, DpId, Journal, OpenDataPoint};
 use crate::data_point_provider::state::*;
 use crate::data_point_provider::state::{read_state, write_state};
@@ -102,7 +102,7 @@ pub struct PreparedMerge {
     dtrie_copy: DTrie,
     destination: Option<DataPointPin>,
     inputs: Vec<OpenDataPoint>,
-    similarity: Similarity,
+    config: VectorConfig,
     segments_left: usize,
     merge_time: SystemTime,
 }
@@ -125,7 +125,7 @@ impl MergeRunner for PreparedMerge {
                 })
                 .collect::<Vec<_>>()
                 .as_slice(),
-            self.similarity,
+            &self.config,
             self.merge_time,
         )?;
         let metrics = MergeMetrics {
@@ -156,7 +156,8 @@ pub struct Writer {
     added_to_delete_log: Vec<(Vec<u8>, SystemTime)>,
     online_data_points: Vec<OnlineDataPoint>,
     delete_log: DTrie,
-    dimension: Option<u64>,
+    /// Only set when not specified by the vector config. TODO: To be removed
+    dimension: Option<usize>,
     number_of_embeddings: usize,
     #[allow(unused)]
     writing: File,
@@ -230,7 +231,7 @@ impl Writer {
             dtrie_copy,
             destination: Some(destination),
             inputs,
-            similarity: self.config.similarity,
+            config: self.config.clone(),
             segments_left: live_segments.len() + 1,
             merge_time: SystemTime::now(),
         })))
@@ -418,7 +419,7 @@ impl Writer {
             online_data_points.push(online_data_point);
         }
 
-        if dimension.is_none() {
+        if !config.known_dimensions() {
             if let Some(online_data_point) = online_data_points.first() {
                 let open_data_point = data_point::open(&online_data_point.pin)?;
                 dimension = open_data_point.stored_len();
@@ -460,7 +461,7 @@ impl Writer {
             let data_point_pin = DataPointPin::open_pin(&self.path, data_point_id)?;
             let data_point_journal = data_point_pin.read_journal()?;
 
-            if new_dimension.is_none() {
+            if !self.config.known_dimensions() && new_dimension.is_none() {
                 let data_point = data_point::open(&data_point_pin)?;
                 new_dimension = data_point.stored_len();
             }
@@ -517,11 +518,10 @@ mod test {
         };
 
         for _ in 0..100 {
-            let similarity = Similarity::Cosine;
             let embeddings = vec![];
             let time = Some(SystemTime::now());
             let data_point_pin = DataPointPin::create_pin(&vectors_path).unwrap();
-            create(&data_point_pin, embeddings, time, similarity).unwrap();
+            create(&data_point_pin, embeddings, time, &writer.config).unwrap();
 
             let online_data_point = OnlineDataPoint {
                 journal: data_point_pin.read_journal().unwrap(),
@@ -552,11 +552,10 @@ mod test {
         };
 
         for _ in 0..50 {
-            let similarity = Similarity::Cosine;
             let embeddings = vec![];
             let time = Some(SystemTime::now());
             let data_point_pin = DataPointPin::create_pin(&vectors_path).unwrap();
-            create(&data_point_pin, embeddings, time, similarity).unwrap();
+            create(&data_point_pin, embeddings, time, &writer.config).unwrap();
 
             let online_data_point = OnlineDataPoint {
                 journal: data_point_pin.read_journal().unwrap(),
@@ -585,11 +584,10 @@ mod test {
         };
 
         for _ in 0..100 {
-            let similarity = Similarity::Cosine;
             let embeddings = vec![];
             let time = Some(SystemTime::now());
             let data_point_pin = DataPointPin::create_pin(&vectors_path).unwrap();
-            create(&data_point_pin, embeddings, time, similarity).unwrap();
+            create(&data_point_pin, embeddings, time, &writer.config).unwrap();
 
             let online_data_point = OnlineDataPoint {
                 journal: data_point_pin.read_journal().unwrap(),
@@ -622,12 +620,10 @@ mod test {
             max_nodes_in_merge: 50_000,
             maximum_deleted_entries: 10,
         };
-
-        let similarity = Similarity::Cosine;
         let embeddings = vec![];
         let time = Some(SystemTime::now());
         let data_point_pin = DataPointPin::create_pin(&vectors_path).unwrap();
-        create(&data_point_pin, embeddings, time, similarity).unwrap();
+        create(&data_point_pin, embeddings, time, &writer.config).unwrap();
 
         let online_data_point = OnlineDataPoint {
             journal: data_point_pin.read_journal().unwrap(),

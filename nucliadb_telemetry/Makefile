@@ -6,7 +6,7 @@ protos:
 .PHONY: install-dev
 install-dev:
 	pip install --upgrade pip wheel
-	pip install -r ../test-requirements.txt -r ../code-requirements.txt -r requirements.txt -r requirements-test.txt
+	pip install -r ../test-requirements.txt -r requirements.txt -r requirements-test.txt
 # utils dep required for test fixtures for nats
 # NEEDS TO BE DECOUPLED EVENTUALLY
 	pip install -e ../nucliadb_protos/python
@@ -15,20 +15,18 @@ install-dev:
 
 .PHONY: format
 format:
-	cd .. && isort --profile black nucliadb_telemetry
-	black .
+	ruff check --fix --config=../ruff.toml .
+	ruff format --config=../ruff.toml .
 
 .PHONY: lint
 lint:
-	flake8 nucliadb_telemetry --config=setup.cfg
-	cd .. && isort -c --profile black nucliadb_telemetry
-	black --check .
+	ruff check --config=../ruff.toml .
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini . --show-traceback
 
 .PHONY: test
 test:
-	pytest -s --tb=native -v nucliadb_telemetry
+	pytest -s --tb=native -v tests
 
 .PHONY: test-cov
 test-cov:
-	pytest -rfE --cov=nucliadb_telemetry --cov-config=../.coveragerc -s --tb=native -v --cov-report term-missing:skip-covered --cov-report xml nucliadb_telemetry
+	pytest -rfE --cov=nucliadb_telemetry --cov-config=../.coveragerc -s --tb=native -v --cov-report term-missing:skip-covered --cov-report xml tests

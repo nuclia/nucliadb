@@ -14,9 +14,7 @@ def load_reqs(filename):
         return [
             line.strip()
             for line in reqs_file.readlines()
-            if not (
-                re.match(r"\s*#", line) or re.match("-e", line) or re.match("-r", line)
-            )
+            if not (re.match(r"\s*#", line) or re.match("-e", line) or re.match("-r", line))
         ]
 
 
@@ -36,6 +34,7 @@ setup(
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: 3 :: Only",
     ],
     url="https://docs.nuclia.dev/docs/guides/nucliadb/intro",
@@ -47,7 +46,8 @@ setup(
     zip_safe=True,
     include_package_data=True,
     package_data={"": ["*.txt", "*.md"], "nucliadb": ["py.typed"]},
-    packages=find_packages(),
+    packages=find_packages("src"),
+    package_dir={"": "src"},
     install_requires=requirements,
     entry_points={
         "console_scripts": [

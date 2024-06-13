@@ -12,14 +12,15 @@ on:
     paths:
       - ".github/workflows/nucliadb_standalone.yml"
       - "charts/nucliadb/**"
-      - "nucliadb/nucliadb/ingest/**"
-      - "nucliadb/nucliadb/writer/**"
-      - "nucliadb/nucliadb/standalone/**"
-      - "nucliadb/nucliadb/reader/**"
-      - "nucliadb/nucliadb/search/**"
+      - "nucliadb/src/nucliadb/ingest/**"
+      - "nucliadb/src/nucliadb/writer/**"
+      - "nucliadb/src/nucliadb/standalone/**"
+      - "nucliadb/src/nucliadb/reader/**"
+      - "nucliadb/src/nucliadb/search/**"
       - "nucliadb_models/**"
       - "nucliadb_protos/**"
       - "nucliadb_node/**"
+      - "nucliadb_sidecar/**"
       - "nucliadb_vectors/**"
       - "nucliadb_texts/**"
       - "nucliadb_texts2/**"
@@ -33,11 +34,11 @@ on:
     paths:
       - ".github/workflows/nucliadb_standalone.yml"
       - "charts/nucliadb/**"
-      - "nucliadb/nucliadb/ingest/**"
-      - "nucliadb/nucliadb/writer/**"
-      - "nucliadb/nucliadb/standalone/**"
-      - "nucliadb/nucliadb/reader/**"
-      - "nucliadb/nucliadb/search/**"
+      - "nucliadb/src/nucliadb/ingest/**"
+      - "nucliadb/src/nucliadb/writer/**"
+      - "nucliadb/src/nucliadb/standalone/**"
+      - "nucliadb/src/nucliadb/reader/**"
+      - "nucliadb/src/nucliadb/search/**"
       - "nucliadb_models/**"
       - "nucliadb_protos/**"
 
@@ -46,36 +47,14 @@ permissions:
   contents: read    # This is required for actions/checkout
 
 jobs:
-  # Job to run pre-checks
-  pre-checks:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.9", "3.10", "3.11"]
-
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v3
-
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-          cache: "pip"
-
-      - name: Install package
-        run: make -C nucliadb/ install-dev
-
-      - name: Run pre-checks
-        run: make -C nucliadb/ lint-standalone
-
   # Job to run tests
   tests:
     runs-on: ubuntu-latest
 
     strategy:
+      max-parallel: 2
       matrix:
-        python-version: ["3.11"]
+        python-version: ["3.12"]
 
     steps:
       - name: Checkout the repository
@@ -112,7 +91,6 @@ jobs:
             node_modified:
               - 'nucliadb_core/**'
               - 'nucliadb_node/src/**'
-              - 'nucliadb_paragraphs2/**'
               - 'nucliadb_paragraphs3/**'
               - 'nucliadb_procs/**'
               - 'nucliadb_relations2/**'
@@ -120,7 +98,7 @@ jobs:
               - 'nucliadb_texts2/**'
               - 'nucliadb_vectors/**'
             sidecar_modified:
-              - 'nucliadb_node/nucliadb_node/**'
+              - 'nucliadb_sidecar/**'
 
       - name: Calc git info
         id: git

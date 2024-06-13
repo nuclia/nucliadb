@@ -1,7 +1,7 @@
 import re
 from pathlib import Path
 
-from setuptools import find_packages, setup  # type: ignore
+from setuptools import find_packages, setup
 
 _dir = Path(__file__).resolve().parent
 VERSION = _dir.parent.joinpath("VERSION").open().read().strip()
@@ -13,9 +13,7 @@ def load_reqs(filename):
         return [
             line.strip()
             for line in reqs_file.readlines()
-            if not (
-                re.match(r"\s*#", line) or re.match("-e", line) or re.match("-r", line)
-            )
+            if not (re.match(r"\s*#", line) or re.match("-e", line) or re.match("-r", line))
         ]
 
 
@@ -64,6 +62,7 @@ setup(
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: 3 :: Only",
         "Topic :: System :: Monitoring",
     ],
@@ -86,6 +85,7 @@ setup(
         ),
     },
     package_data={"": ["*.txt", "*.md"], "nucliadb_telemetry": ["py.typed"]},
-    packages=find_packages(),
+    packages=find_packages("src"),
+    package_dir={"": "src"},
     install_requires=requirements,
 )

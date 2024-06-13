@@ -51,7 +51,7 @@ pub struct MergeContext {
 }
 
 #[derive(Clone)]
-pub struct VectorConfig {
+pub struct VectorIndexConfig {
     pub similarity: utils::VectorSimilarity,
     pub path: PathBuf,
     pub channel: Channel,
@@ -93,7 +93,7 @@ pub trait VectorReader: std::fmt::Debug + Send + Sync {
 pub trait VectorWriter: std::fmt::Debug + Send + Sync {
     fn count(&self) -> NodeResult<usize>;
     fn get_segment_ids(&self) -> NodeResult<Vec<String>>;
-    fn get_index_files(&self, ignored_segment_ids: &[String]) -> NodeResult<IndexFiles>;
+    fn get_index_files(&self, prefix: &str, ignored_segment_ids: &[String]) -> NodeResult<IndexFiles>;
 
     fn prepare_merge(&self, parameters: MergeParameters) -> NodeResult<Option<Box<dyn MergeRunner>>>;
     fn record_merge(&mut self, merge_result: Box<dyn MergeResults>, source: MergeSource) -> NodeResult<MergeMetrics>;
@@ -151,7 +151,7 @@ impl<'a> ResourceWrapper<'a> {
     }
 
     pub fn sentences_to_delete(&self) -> impl Iterator<Item = &str> {
-        self.resource.paragraphs_to_delete.iter().map(|paragraph_id| paragraph_id.as_str())
+        self.resource.sentences_to_delete.iter().map(String::as_str)
     }
 }
 

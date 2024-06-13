@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 
 use nucliadb_core::NodeResult;
 use nucliadb_vectors::{
-    config::Similarity,
-    data_point::{create, DataPointPin, Elem, NoDLog, SearchParams},
+    config::VectorConfig,
+    data_point::{create, DataPointPin, Elem, NoDLog},
 };
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use tempfile::tempdir;
@@ -56,8 +56,9 @@ fn test_recall_random_data() -> NodeResult<()> {
     let elems_vec: Vec<Elem> =
         elems.iter().map(|(k, v)| Elem::new(k.clone(), v.clone(), Default::default(), None)).collect();
 
+    let config = VectorConfig::default();
     let pin = DataPointPin::create_pin(temp_dir.path())?;
-    let dp = create(&pin, elems_vec, None, Similarity::Dot)?;
+    let dp = create(&pin, elems_vec, None, &config)?;
 
     // Search a few times
     let correct = (0..100)
@@ -69,20 +70,7 @@ fn test_recall_random_data() -> NodeResult<()> {
             let mut similarities: Vec<_> = elems.iter().map(|(k, v)| (k, similarity(v, &query))).collect();
             similarities.sort_unstable_by(|a, b| a.1.total_cmp(&b.1).reverse());
 
-            let results: Vec<_> = dp
-                .search(
-                    &NoDLog,
-                    &query,
-                    &Default::default(),
-                    false,
-                    5,
-                    SearchParams {
-                        similarity: Similarity::Dot,
-                        min_score: -1.0,
-                        dimension: DIMENSION,
-                    },
-                )
-                .collect();
+            let results: Vec<_> = dp.search(&NoDLog, &query, &Default::default(), false, 5, &config, -1.0).collect();
 
             let search: Vec<_> = results.iter().map(|r| String::from_utf8(r.id().to_vec()).unwrap()).collect();
             let brute_force: Vec<_> = similarities.iter().take(5).map(|r| r.0.clone()).collect();
@@ -118,13 +106,14 @@ fn test_recall_clustered_data() -> NodeResult<()> {
     }
 
     // Create a data point
+    let config = VectorConfig::default();
     let temp_dir = tempdir()?;
     let pin = DataPointPin::create_pin(temp_dir.path())?;
     let dp = create(
         &pin,
         elems.iter().map(|(k, v)| Elem::new(k.clone(), v.clone(), Default::default(), None)).collect(),
         None,
-        Similarity::Dot,
+        &config,
     )?;
 
     // Search a few times
@@ -137,20 +126,7 @@ fn test_recall_clustered_data() -> NodeResult<()> {
             let mut similarities: Vec<_> = elems.iter().map(|(k, v)| (k, similarity(v, &query))).collect();
             similarities.sort_unstable_by(|a, b| a.1.total_cmp(&b.1).reverse());
 
-            let results: Vec<_> = dp
-                .search(
-                    &NoDLog,
-                    &query,
-                    &Default::default(),
-                    false,
-                    5,
-                    SearchParams {
-                        similarity: Similarity::Dot,
-                        min_score: 0.0,
-                        dimension: DIMENSION,
-                    },
-                )
-                .collect();
+            let results: Vec<_> = dp.search(&NoDLog, &query, &Default::default(), false, 5, &config, -1.0).collect();
 
             let search: Vec<_> = results.iter().map(|r| String::from_utf8(r.id().to_vec()).unwrap()).collect();
             let brute_force: Vec<_> = similarities.iter().take(5).map(|r| r.0.clone()).collect();

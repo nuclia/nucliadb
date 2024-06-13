@@ -57,29 +57,34 @@ data:
   NODE_WRITER_PORT: {{ .Values.nucliadb.node_writer_port | quote }}
   NODE_READER_PORT: {{ .Values.nucliadb.node_reader_port | quote }}
   CACHE_PUBSUB_NATS_URL: {{ toJson .Values.cache.cache_pubsub_nats_url |quote }}
-{{- with .Values.cache.cache_pubsub_nats_auth }}  
+{{- with .Values.cache.cache_pubsub_nats_auth }}
   CACHE_PUBSUB_NATS_AUTH: {{ . }}
-{{- end}}  
+{{- end}}
 {{- with .Values.transaction.transaction_jetstream_auth }}
   TRANSACTION_JETSTREAM_AUTH: {{ . }}
 {{- end}}
   TRANSACTION_JETSTREAM_SERVERS: {{ toJson .Values.transaction.transaction_jetstream_servers | quote }}
-{{- with .Values.indexing.index_jetstream_auth }}  
+{{- with .Values.indexing.index_jetstream_auth }}
   INDEX_JETSTREAM_AUTH: {{ . }}
 {{- end}}
   INDEX_JETSTREAM_SERVERS: {{ toJson .Values.indexing.index_jetstream_servers | quote }}
   DRIVER: {{ .Values.maindb.driver }}
 {{- if eq .Values.maindb.driver "redis" }}
   DRIVER_REDIS_URL: {{ .Values.maindb.driver_redis_url }}
+{{- else if eq .Values.maindb.driver "pg" }}
+  DRIVER_PG_URL: {{ .Values.maindb.driver_pg_url }}
 {{- else if eq .Values.maindb.driver "tikv" }}
   DRIVER_TIKV_URL: {{ toJson .Values.maindb.driver_tikv_url | quote }}
+{{- if .Values.maindb.driver_tikv_replication_pg_url }}
+  DRIVER_TIKV_REPLICATION_PG_URL: {{ .Values.maindb.driver_tikv_replication_pg_url }}
+{{- end }}
 {{- end }}
   AUDIT_DRIVER: {{ .Values.audit.driver }}
   AUDIT_JETSTREAM_TARGET: {{ .Values.audit.audit_jetstream_target }}
   AUDIT_JETSTREAM_SERVERS: {{ toJson .Values.audit.audit_jetstream_servers | quote }}
-{{- with .Values.audit.audit_jetstream_auth }}  
+{{- with .Values.audit.audit_jetstream_auth }}
   AUDIT_JETSTREAM_AUTH: {{ . }}
-{{- end}}  
+{{- end}}
   AUDIT_PARTITIONS: {{ .Values.audit.audit_partitions | quote }}
   AUDIT_HASH_SEED: {{ .Values.audit.audit_hash_seed | quote }}
   JAEGER_AGENT_HOST: "{{ .Values.tracing.jaeger_agent_host }}"

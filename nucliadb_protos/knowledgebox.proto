@@ -3,6 +3,7 @@ syntax = "proto3";
 package knowledgebox;
 
 import public "nucliadb_protos/utils.proto";
+import public "nucliadb_protos/nodewriter.proto";
 
 
 enum KnowledgeBoxResponseStatus {
@@ -25,11 +26,12 @@ message KnowledgeBoxID {
 message KnowledgeBoxConfig {
     string title = 1;
     string description = 2;
+    string slug = 5;
+    int64 migration_version = 7;
+
     repeated string enabled_filters = 3 [deprecated = true];
     repeated string enabled_insights = 4 [deprecated = true];
-    string slug = 5;
     bool disable_vectors = 6 [deprecated = true];
-    int64 migration_version = 7;
     // DEPRECATED: duplicated field also stored in `writer.proto Shards`
     utils.ReleaseChannel release_channel = 8 [deprecated = true];
 }
@@ -49,7 +51,8 @@ message KnowledgeBoxNew {
 
     // this field are only used by NucliaDB Writer API when creating a KB. Used
     // in onprem scenarios
-    string learning_config = 8;
+    // DEPRECATED: onprem don't forward requests to ingest gRPC anymore
+    string learning_config = 8 [deprecated = true];
 
     // release channel, although not used when backend creates hosted KBs, it's
     // recomputed and changed depending on the environment
@@ -74,12 +77,6 @@ message KnowledgeBoxUpdate {
 message UpdateKnowledgeBoxResponse {
     KnowledgeBoxResponseStatus status = 1;
     string uuid = 2;
-}
-
-// GC
-
-message GCKnowledgeBoxResponse {
-
 }
 
 // DELETE
@@ -177,6 +174,23 @@ message VectorSet {
 
 message VectorSets {
     map<string, VectorSet> vectorsets = 1;
+}
+
+
+// Configuration values for a vectorset
+message VectorSetConfig {
+    string vectorset_id = 1;
+
+    nodewriter.VectorIndexConfig vectorset_index_config = 2;
+
+    // list of possible subdivisions of the matryoshka embeddings (if the model
+    // supports it)
+    repeated uint32 matryoshka_dimensions = 3;
+}
+
+// KB vectorsets and their configuration
+message KnowledgeBoxVectorSetsConfig {
+    repeated VectorSetConfig vectorsets = 1;
 }
 
 

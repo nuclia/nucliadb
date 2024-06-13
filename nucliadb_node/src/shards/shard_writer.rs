@@ -52,8 +52,6 @@ pub fn open_vectors_writer(version: u32, path: &Path, shard_id: String) -> NodeR
 }
 pub fn open_paragraphs_writer(version: u32, config: &ParagraphConfig) -> NodeResult<ParagraphsWriterPointer> {
     match version {
-        2 => nucliadb_paragraphs2::writer::ParagraphWriterService::open(config)
-            .map(|i| Box::new(i) as ParagraphsWriterPointer),
         3 => nucliadb_paragraphs3::writer::ParagraphWriterService::open(config)
             .map(|i| Box::new(i) as ParagraphsWriterPointer),
         v => Err(node_error!("Invalid paragraphs version {v}")),
@@ -638,29 +636,35 @@ impl ShardWriter {
 
     pub fn get_shard_files(
         &self,
-        ignored_segement_ids: &HashMap<String, Vec<String>>,
+        ignored_segment_ids: &HashMap<String, Vec<String>>,
     ) -> NodeResult<Vec<(PathBuf, IndexFiles)>> {
         let mut files = Vec::new();
         // we get a write lock here to block any possible write on the indexes
         // while we retrieve the list of files
         let indexes = write_rw_lock(&self.indexes);
         let paragraph_files =
-            indexes.paragraphs_index.get_index_files(ignored_segement_ids.get("paragraph").unwrap_or(&Vec::new()))?;
-        let text_files =
-            indexes.texts_index.get_index_files(ignored_segement_ids.get("text").unwrap_or(&Vec::new()))?;
-        // TODO: return files for all vector indexes
-        let default_vectors_index = indexes
-            .vectors_indexes
-            .get(DEFAULT_VECTORS_INDEX_NAME)
-            .expect("Default vectors index should never be deleted (yet)");
-        let vector_files =
-            default_vectors_index.get_index_files(ignored_segement_ids.get("vector").unwrap_or(&Vec::new()))?;
+            indexes.paragraphs_index.get_index_files(ignored_segment_ids.get("paragraph").unwrap_or(&Vec::new()))?;
+        let text_files = indexes.texts_index.get_index_files(ignored_segment_ids.get("text").unwrap_or(&Vec::new()))?;
+
+        // Vector indexes
+        let index_meta = ShardIndexes::load(&self.path)?;
+        for (key, index) in &indexes.vectors_indexes {
+            if let Some(path) = index_meta.vectorset_relative_path(key) {
+                files.push((
+                    path.clone(),
+                    index.get_index_files(
+                        path.to_str().unwrap(),
+                        ignored_segment_ids.get("vector").unwrap_or(&Vec::new()),
+                    )?,
+                ));
+            }
+        }
         let relation_files =
-            indexes.relations_index.get_index_files(ignored_segement_ids.get("relation").unwrap_or(&Vec::new()))?;
+            indexes.relations_index.get_index_files(ignored_segment_ids.get("relation").unwrap_or(&Vec::new()))?;
         files.push((PathBuf::from(PARAGRAPHS_DIR), paragraph_files));
         files.push((PathBuf::from(TEXTS_DIR), text_files));
-        files.push((PathBuf::from(VECTORS_DIR), vector_files));
         files.push((PathBuf::from(RELATIONS_DIR), relation_files));
+
         Ok(files)
     }
 }

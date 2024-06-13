@@ -3,7 +3,6 @@ install-dev:
 	pip install --upgrade pip wheel
 	cd .. && pip install \
 		-r test-requirements.txt \
-		-r code-requirements.txt \
 		-r nucliadb_sdk/requirements-sources.txt \
 		-r nucliadb_sdk/requirements.txt \
 		-r nucliadb_sdk/requirements-test.txt
@@ -11,16 +10,14 @@ install-dev:
 
 .PHONY: format
 format:
-	cd .. && isort --profile black nucliadb_sdk
-	black .
+	ruff check --fix --config=../ruff.toml .
+	ruff format --config=../ruff.toml .
 
 .PHONY: lint
 lint:
-	flake8 nucliadb_sdk --config=setup.cfg
-	cd .. && isort -c --profile black nucliadb_sdk
-	black --check .
+	ruff check --config=../ruff.toml .
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini .
 
 .PHONY: test
 test:
-	pytest -s --tb=native -v nucliadb_sdk
+	pytest -s --tb=native -v tests

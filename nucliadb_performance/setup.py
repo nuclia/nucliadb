@@ -1,6 +1,6 @@
 import re
 
-from setuptools import find_packages, setup  # type: ignore
+from setuptools import find_packages, setup
 
 
 def load_reqs(filename):
@@ -8,9 +8,7 @@ def load_reqs(filename):
         return [
             line.strip()
             for line in reqs_file.readlines()
-            if not (
-                re.match(r"\s*#", line) or re.match("-e", line) or re.match("-r", line)
-            )
+            if not (re.match(r"\s*#", line) or re.match("-e", line) or re.match("-r", line))
         ]
 
 
@@ -35,6 +33,7 @@ setup(
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: 3 :: Only",
         "Topic :: System :: Monitoring",
     ],

@@ -8,16 +8,16 @@ on:
       - '.github/workflows/nucliadb_search.yml'
       - 'charts/nucliadb_search/**'
       - 'nucliadb_utils/**'
-      - 'nucliadb/nucliadb/ingest/**'
-      - 'nucliadb/nucliadb/search/**'
-      - 'nucliadb/nucliadb/common/**'
+      - 'nucliadb/src/nucliadb/ingest/**'
+      - 'nucliadb/src/nucliadb/search/**'
+      - 'nucliadb/src/nucliadb/common/**'
       - 'nucliadb_models/**'
       - 'nucliadb_telemetry/**'
       - 'nucliadb_protos/python/**'
       - 'nucliadb_node/**'
+      - "nucliadb_sidecar/**"
       - 'nucliadb_vectors/**'
       - 'nucliadb_texts2/**'
-      - 'nucliadb_paragraphs2/**'
       - 'nucliadb_paragraphs3/**'
       - 'nucliadb_core/**'
       - 'nucliadb_relations2/**'
@@ -28,13 +28,14 @@ on:
       - '.github/workflows/nucliadb_search.yml'
       - 'charts/nucliadb_search/**'
       - 'nucliadb_utils/**'
-      - 'nucliadb/nucliadb/ingest/**'
-      - 'nucliadb/nucliadb/search/**'
-      - 'nucliadb/nucliadb/common/**'
+      - 'nucliadb/src/nucliadb/ingest/**'
+      - 'nucliadb/src/nucliadb/search/**'
+      - 'nucliadb/src/nucliadb/common/**'
       - 'nucliadb_models/**'
       - 'nucliadb_telemetry/**'
       - 'nucliadb_protos/python/**'
       - 'nucliadb_node/**'
+      - "nucliadb_sidecar/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -51,29 +52,6 @@ env:
   GCP_SERVICE_ACCOUNT: "github-actions@nuclia-internal.iam.gserviceaccount.com"
 
 jobs:
-  # Job to run pre-checks
-  pre-checks:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ['3.9', '3.10', '3.11']
-
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v3
-
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-          cache: 'pip'
-
-      - name: Install package
-        run: make -C nucliadb/ install-dev
-
-      - name: Run pre-checks
-        run: make -C nucliadb/ lint-search
-
   # Job to run tests
   tests:
     runs-on: ubuntu-latest
@@ -84,13 +62,13 @@ jobs:
         include:
           - maindb_driver: "tikv"
             storage_backend: "gcs"
-            python-version: "3.11"
+            python-version: "3.12"
           - maindb_driver: "tikv"
             storage_backend: "s3"
-            python-version: "3.11"
+            python-version: "3.12"
           - maindb_driver: "pg"
             storage_backend: "gcs"
-            python-version: "3.11"
+            python-version: "3.12"
 
     steps:
       - name: Checkout the repository
@@ -131,7 +109,6 @@ jobs:
             node_modified:
               - 'nucliadb_core/**'
               - 'nucliadb_node/src/**'
-              - 'nucliadb_paragraphs2/**'
               - 'nucliadb_paragraphs3/**'
               - 'nucliadb_procs/**'
               - 'nucliadb_relations2/**'
@@ -139,7 +116,7 @@ jobs:
               - 'nucliadb_texts2/**'
               - 'nucliadb_vectors/**'
             sidecar_modified:
-              - 'nucliadb_node/nucliadb_node/**'
+              - 'nucliadb_sidecar/**'
 
       - name: Calc git info
         id: git
