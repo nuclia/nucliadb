@@ -50,10 +50,7 @@ class _FieldTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._Enum
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     FILE: _FieldType.ValueType  # 0
     LINK: _FieldType.ValueType  # 1
-    DATETIME: _FieldType.ValueType  # 2
-    KEYWORDSET: _FieldType.ValueType  # 3
     TEXT: _FieldType.ValueType  # 4
-    LAYOUT: _FieldType.ValueType  # 5
     GENERIC: _FieldType.ValueType  # 6
     """Base title/summary fields"""
     CONVERSATION: _FieldType.ValueType  # 7
@@ -62,10 +59,7 @@ class FieldType(_FieldType, metaclass=_FieldTypeEnumTypeWrapper): ...
 
 FILE: FieldType.ValueType  # 0
 LINK: FieldType.ValueType  # 1
-DATETIME: FieldType.ValueType  # 2
-KEYWORDSET: FieldType.ValueType  # 3
 TEXT: FieldType.ValueType  # 4
-LAYOUT: FieldType.ValueType  # 5
 GENERIC: FieldType.ValueType  # 6
 """Base title/summary fields"""
 CONVERSATION: FieldType.ValueType  # 7

@@ -1299,10 +1299,7 @@ pub struct AllFieldIDs {
 pub enum FieldType {
     File = 0,
     Link = 1,
-    Datetime = 2,
-    Keywordset = 3,
     Text = 4,
-    Layout = 5,
     /// Base title/summary fields
     Generic = 6,
     Conversation = 7,
@@ -1316,10 +1313,7 @@ impl FieldType {
         match self {
             FieldType::File => "FILE",
             FieldType::Link => "LINK",
-            FieldType::Datetime => "DATETIME",
-            FieldType::Keywordset => "KEYWORDSET",
             FieldType::Text => "TEXT",
-            FieldType::Layout => "LAYOUT",
             FieldType::Generic => "GENERIC",
             FieldType::Conversation => "CONVERSATION",
         }
@@ -1329,10 +1323,7 @@ impl FieldType {
         match value {
             "FILE" => Some(Self::File),
             "LINK" => Some(Self::Link),
-            "DATETIME" => Some(Self::Datetime),
-            "KEYWORDSET" => Some(Self::Keywordset),
             "TEXT" => Some(Self::Text),
-            "LAYOUT" => Some(Self::Layout),
             "GENERIC" => Some(Self::Generic),
             "CONVERSATION" => Some(Self::Conversation),
             _ => None,

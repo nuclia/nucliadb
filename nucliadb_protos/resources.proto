@@ -536,12 +536,14 @@ message RowsPreview {
 enum FieldType {
     FILE = 0;
     LINK = 1;
-    DATETIME = 2 [deprecated = true];
-    KEYWORDSET = 3 [deprecated = true];
     TEXT = 4;
-    LAYOUT = 5 [deprecated = true];
     GENERIC = 6;  // Base title/summary fields
     CONVERSATION = 7;
+
+    // Removed fields
+    // DATETIME = 2;
+    // KEYWORDSET = 3;
+    // LAYOUT = 5;
 }
 
 message FieldID {
