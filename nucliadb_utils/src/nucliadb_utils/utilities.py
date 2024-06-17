@@ -106,6 +106,7 @@ async def get_storage(
 
         azureutil = AzureStorage(
             account_url=storage_settings.azure_account_url,
+            connection_string=storage_settings.azure_connection_string,
         )
 
         logger.info("Configuring Azure Storage")
