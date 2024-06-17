@@ -116,7 +116,8 @@ class StorageSettings(BaseSettings):
 
     azure_account_url: Optional[str] = Field(
         default=None,
-        description="Azure Account URL connection string: https://docs.microsoft.com/en-us/azure/storage/common/storage-configure-connection-string",  # noqa
+        description="Azure Account URL. The driver implementation uses Azure's default credential authentication method: https://learn.microsoft.com/en-us/python/api/azure-identity/azure.identity.defaultazurecredential?view=azure-python",  # noqa
+        examples=["https://<storageaccountname>.blob.core.windows.net"],
     )
 
 
