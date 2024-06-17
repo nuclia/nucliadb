@@ -534,16 +534,13 @@ message RowsPreview {
 }
 
 enum FieldType {
+    reserved 2, 3, 5;
+
     FILE = 0;
     LINK = 1;
     TEXT = 4;
     GENERIC = 6;  // Base title/summary fields
     CONVERSATION = 7;
-
-    // Removed fields
-    // DATETIME = 2;
-    // KEYWORDSET = 3;
-    // LAYOUT = 5;
 }
 
 message FieldID {
