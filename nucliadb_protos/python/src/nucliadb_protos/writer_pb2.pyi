@@ -112,12 +112,9 @@ from nucliadb_protos.resources_pb2 import (
     FieldComputedMetadata as FieldComputedMetadata,
     FieldComputedMetadataWrapper as FieldComputedMetadataWrapper,
     FieldConversation as FieldConversation,
-    FieldDatetime as FieldDatetime,
     FieldFile as FieldFile,
     FieldID as FieldID,
-    FieldKeywordset as FieldKeywordset,
     FieldLargeMetadata as FieldLargeMetadata,
-    FieldLayout as FieldLayout,
     FieldLink as FieldLink,
     FieldMetadata as FieldMetadata,
     FieldQuestionAnswerWrapper as FieldQuestionAnswerWrapper,
@@ -127,12 +124,10 @@ from nucliadb_protos.resources_pb2 import (
     FilePages as FilePages,
     GENERIC as GENERIC,
     KEYWORDSET as KEYWORDSET,
-    Keyword as Keyword,
     LAYOUT as LAYOUT,
     LINK as LINK,
     LargeComputedMetadata as LargeComputedMetadata,
     LargeComputedMetadataWrapper as LargeComputedMetadataWrapper,
-    LayoutContent as LayoutContent,
     LinkExtractedData as LinkExtractedData,
     Message as Message,
     MessageContent as MessageContent,
@@ -340,24 +335,6 @@ class BrokerMessage(google.protobuf.message.Message):
         def ClearField(self, field_name: typing.Literal["key", b"key", "value", b"value"]) -> None: ...
 
     @typing.final
-    class LayoutsEntry(google.protobuf.message.Message):
-        DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-        KEY_FIELD_NUMBER: builtins.int
-        VALUE_FIELD_NUMBER: builtins.int
-        key: builtins.str
-        @property
-        def value(self) -> nucliadb_protos.resources_pb2.FieldLayout: ...
-        def __init__(
-            self,
-            *,
-            key: builtins.str = ...,
-            value: nucliadb_protos.resources_pb2.FieldLayout | None = ...,
-        ) -> None: ...
-        def HasField(self, field_name: typing.Literal["value", b"value"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing.Literal["key", b"key", "value", b"value"]) -> None: ...
-
-    @typing.final
     class TextsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -371,42 +348,6 @@ class BrokerMessage(google.protobuf.message.Message):
             *,
             key: builtins.str = ...,
             value: nucliadb_protos.resources_pb2.FieldText | None = ...,
-        ) -> None: ...
-        def HasField(self, field_name: typing.Literal["value", b"value"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing.Literal["key", b"key", "value", b"value"]) -> None: ...
-
-    @typing.final
-    class KeywordsetsEntry(google.protobuf.message.Message):
-        DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-        KEY_FIELD_NUMBER: builtins.int
-        VALUE_FIELD_NUMBER: builtins.int
-        key: builtins.str
-        @property
-        def value(self) -> nucliadb_protos.resources_pb2.FieldKeywordset: ...
-        def __init__(
-            self,
-            *,
-            key: builtins.str = ...,
-            value: nucliadb_protos.resources_pb2.FieldKeywordset | None = ...,
-        ) -> None: ...
-        def HasField(self, field_name: typing.Literal["value", b"value"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing.Literal["key", b"key", "value", b"value"]) -> None: ...
-
-    @typing.final
-    class DatetimesEntry(google.protobuf.message.Message):
-        DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-        KEY_FIELD_NUMBER: builtins.int
-        VALUE_FIELD_NUMBER: builtins.int
-        key: builtins.str
-        @property
-        def value(self) -> nucliadb_protos.resources_pb2.FieldDatetime: ...
-        def __init__(
-            self,
-            *,
-            key: builtins.str = ...,
-            value: nucliadb_protos.resources_pb2.FieldDatetime | None = ...,
         ) -> None: ...
         def HasField(self, field_name: typing.Literal["value", b"value"]) -> builtins.bool: ...
         def ClearField(self, field_name: typing.Literal["key", b"key", "value", b"value"]) -> None: ...
@@ -457,10 +398,7 @@ class BrokerMessage(google.protobuf.message.Message):
     ORIGIN_FIELD_NUMBER: builtins.int
     RELATIONS_FIELD_NUMBER: builtins.int
     CONVERSATIONS_FIELD_NUMBER: builtins.int
-    LAYOUTS_FIELD_NUMBER: builtins.int
     TEXTS_FIELD_NUMBER: builtins.int
-    KEYWORDSETS_FIELD_NUMBER: builtins.int
-    DATETIMES_FIELD_NUMBER: builtins.int
     LINKS_FIELD_NUMBER: builtins.int
     FILES_FIELD_NUMBER: builtins.int
     LINK_EXTRACTED_DATA_FIELD_NUMBER: builtins.int
@@ -512,20 +450,8 @@ class BrokerMessage(google.protobuf.message.Message):
         """Field Conversations"""
 
     @property
-    def layouts(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, nucliadb_protos.resources_pb2.FieldLayout]:
-        """Field Layout"""
-
-    @property
     def texts(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, nucliadb_protos.resources_pb2.FieldText]:
         """Field Text"""
-
-    @property
-    def keywordsets(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, nucliadb_protos.resources_pb2.FieldKeywordset]:
-        """Field keyword"""
-
-    @property
-    def datetimes(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, nucliadb_protos.resources_pb2.FieldDatetime]:
-        """Field Datetime"""
 
     @property
     def links(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, nucliadb_protos.resources_pb2.FieldLink]:
@@ -582,10 +508,7 @@ class BrokerMessage(google.protobuf.message.Message):
         origin: nucliadb_protos.resources_pb2.Origin | None = ...,
         relations: collections.abc.Iterable[nucliadb_protos.utils_pb2.Relation] | None = ...,
         conversations: collections.abc.Mapping[builtins.str, nucliadb_protos.resources_pb2.Conversation] | None = ...,
-        layouts: collections.abc.Mapping[builtins.str, nucliadb_protos.resources_pb2.FieldLayout] | None = ...,
         texts: collections.abc.Mapping[builtins.str, nucliadb_protos.resources_pb2.FieldText] | None = ...,
-        keywordsets: collections.abc.Mapping[builtins.str, nucliadb_protos.resources_pb2.FieldKeywordset] | None = ...,
-        datetimes: collections.abc.Mapping[builtins.str, nucliadb_protos.resources_pb2.FieldDatetime] | None = ...,
         links: collections.abc.Mapping[builtins.str, nucliadb_protos.resources_pb2.FieldLink] | None = ...,
         files: collections.abc.Mapping[builtins.str, nucliadb_protos.resources_pb2.FieldFile] | None = ...,
         link_extracted_data: collections.abc.Iterable[nucliadb_protos.resources_pb2.LinkExtractedData] | None = ...,
@@ -611,7 +534,7 @@ class BrokerMessage(google.protobuf.message.Message):
         security: nucliadb_protos.utils_pb2.Security | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["audit", b"audit", "basic", b"basic", "done_time", b"done_time", "extra", b"extra", "origin", b"origin", "security", b"security"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["account_seq", b"account_seq", "audit", b"audit", "basic", b"basic", "conversations", b"conversations", "datetimes", b"datetimes", "delete_fields", b"delete_fields", "done_time", b"done_time", "errors", b"errors", "extra", b"extra", "extracted_text", b"extracted_text", "field_large_metadata", b"field_large_metadata", "field_metadata", b"field_metadata", "field_vectors", b"field_vectors", "file_extracted_data", b"file_extracted_data", "files", b"files", "kbid", b"kbid", "keywordsets", b"keywordsets", "layouts", b"layouts", "link_extracted_data", b"link_extracted_data", "links", b"links", "multiid", b"multiid", "origin", b"origin", "origin_seq", b"origin_seq", "pre_processing_time", b"pre_processing_time", "processing_id", b"processing_id", "question_answers", b"question_answers", "reindex", b"reindex", "relations", b"relations", "security", b"security", "slow_processing_time", b"slow_processing_time", "slug", b"slug", "source", b"source", "texts", b"texts", "txseqid", b"txseqid", "type", b"type", "user_vectors", b"user_vectors", "uuid", b"uuid"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["account_seq", b"account_seq", "audit", b"audit", "basic", b"basic", "conversations", b"conversations", "delete_fields", b"delete_fields", "done_time", b"done_time", "errors", b"errors", "extra", b"extra", "extracted_text", b"extracted_text", "field_large_metadata", b"field_large_metadata", "field_metadata", b"field_metadata", "field_vectors", b"field_vectors", "file_extracted_data", b"file_extracted_data", "files", b"files", "kbid", b"kbid", "link_extracted_data", b"link_extracted_data", "links", b"links", "multiid", b"multiid", "origin", b"origin", "origin_seq", b"origin_seq", "pre_processing_time", b"pre_processing_time", "processing_id", b"processing_id", "question_answers", b"question_answers", "reindex", b"reindex", "relations", b"relations", "security", b"security", "slow_processing_time", b"slow_processing_time", "slug", b"slug", "source", b"source", "texts", b"texts", "txseqid", b"txseqid", "type", b"type", "user_vectors", b"user_vectors", "uuid", b"uuid"]) -> None: ...
 
 global___BrokerMessage = BrokerMessage
 

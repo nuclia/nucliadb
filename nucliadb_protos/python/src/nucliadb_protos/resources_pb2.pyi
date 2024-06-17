@@ -1528,75 +1528,6 @@ class Block(google.protobuf.message.Message):
 global___Block = Block
 
 @typing.final
-class LayoutContent(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    @typing.final
-    class BlocksEntry(google.protobuf.message.Message):
-        DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-        KEY_FIELD_NUMBER: builtins.int
-        VALUE_FIELD_NUMBER: builtins.int
-        key: builtins.str
-        @property
-        def value(self) -> global___Block: ...
-        def __init__(
-            self,
-            *,
-            key: builtins.str = ...,
-            value: global___Block | None = ...,
-        ) -> None: ...
-        def HasField(self, field_name: typing.Literal["value", b"value"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing.Literal["key", b"key", "value", b"value"]) -> None: ...
-
-    BLOCKS_FIELD_NUMBER: builtins.int
-    DELETED_BLOCKS_FIELD_NUMBER: builtins.int
-    @property
-    def blocks(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___Block]: ...
-    @property
-    def deleted_blocks(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
-    def __init__(
-        self,
-        *,
-        blocks: collections.abc.Mapping[builtins.str, global___Block] | None = ...,
-        deleted_blocks: collections.abc.Iterable[builtins.str] | None = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["blocks", b"blocks", "deleted_blocks", b"deleted_blocks"]) -> None: ...
-
-global___LayoutContent = LayoutContent
-
-@typing.final
-class FieldLayout(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    class _Format:
-        ValueType = typing.NewType("ValueType", builtins.int)
-        V: typing_extensions.TypeAlias = ValueType
-
-    class _FormatEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[FieldLayout._Format.ValueType], builtins.type):
-        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-        NUCLIAv1: FieldLayout._Format.ValueType  # 0
-
-    class Format(_Format, metaclass=_FormatEnumTypeWrapper): ...
-    NUCLIAv1: FieldLayout.Format.ValueType  # 0
-
-    BODY_FIELD_NUMBER: builtins.int
-    FORMAT_FIELD_NUMBER: builtins.int
-    format: global___FieldLayout.Format.ValueType
-    @property
-    def body(self) -> global___LayoutContent: ...
-    def __init__(
-        self,
-        *,
-        body: global___LayoutContent | None = ...,
-        format: global___FieldLayout.Format.ValueType = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing.Literal["body", b"body"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["body", b"body", "format", b"format"]) -> None: ...
-
-global___FieldLayout = FieldLayout
-
-@typing.final
 class Classification(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1920,54 +1851,6 @@ class FieldLink(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["added", b"added", "cookies", b"cookies", "css_selector", b"css_selector", "headers", b"headers", "language", b"language", "localstorage", b"localstorage", "uri", b"uri", "xpath", b"xpath"]) -> None: ...
 
 global___FieldLink = FieldLink
-
-@typing.final
-class Keyword(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    VALUE_FIELD_NUMBER: builtins.int
-    value: builtins.str
-    def __init__(
-        self,
-        *,
-        value: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["value", b"value"]) -> None: ...
-
-global___Keyword = Keyword
-
-@typing.final
-class FieldKeywordset(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    KEYWORDS_FIELD_NUMBER: builtins.int
-    @property
-    def keywords(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Keyword]: ...
-    def __init__(
-        self,
-        *,
-        keywords: collections.abc.Iterable[global___Keyword] | None = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["keywords", b"keywords"]) -> None: ...
-
-global___FieldKeywordset = FieldKeywordset
-
-@typing.final
-class FieldDatetime(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    VALUE_FIELD_NUMBER: builtins.int
-    @property
-    def value(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
-    def __init__(
-        self,
-        *,
-        value: google.protobuf.timestamp_pb2.Timestamp | None = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing.Literal["value", b"value"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["value", b"value"]) -> None: ...
-
-global___FieldDatetime = FieldDatetime
 
 @typing.final
 class FieldFile(google.protobuf.message.Message):

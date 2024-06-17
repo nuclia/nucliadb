@@ -996,58 +996,6 @@ pub mod block {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct LayoutContent {
-    #[prost(map = "string, message", tag = "1")]
-    pub blocks: ::std::collections::HashMap<::prost::alloc::string::String, Block>,
-    #[prost(string, repeated, tag = "2")]
-    pub deleted_blocks: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct FieldLayout {
-    #[prost(message, optional, tag = "1")]
-    pub body: ::core::option::Option<LayoutContent>,
-    #[prost(enumeration = "field_layout::Format", tag = "2")]
-    pub format: i32,
-}
-/// Nested message and enum types in `FieldLayout`.
-pub mod field_layout {
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
-    #[repr(i32)]
-    pub enum Format {
-        NucliAv1 = 0,
-    }
-    impl Format {
-        /// String value of the enum field names used in the ProtoBuf definition.
-        ///
-        /// The values are not transformed in any way and thus are considered stable
-        /// (if the ProtoBuf definition does not change) and safe for programmatic use.
-        pub fn as_str_name(&self) -> &'static str {
-            match self {
-                Format::NucliAv1 => "NUCLIAv1",
-            }
-        }
-        /// Creates an enum from field names used in the ProtoBuf definition.
-        pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
-            match value {
-                "NUCLIAv1" => Some(Self::NucliAv1),
-                _ => None,
-            }
-        }
-    }
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Classification {
     #[prost(string, tag = "1")]
     pub labelset: ::prost::alloc::string::String,
@@ -1180,24 +1128,6 @@ pub struct FieldLink {
     pub css_selector: ::prost::alloc::string::String,
     #[prost(string, tag = "8")]
     pub xpath: ::prost::alloc::string::String,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct Keyword {
-    #[prost(string, tag = "1")]
-    pub value: ::prost::alloc::string::String,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct FieldKeywordset {
-    #[prost(message, repeated, tag = "1")]
-    pub keywords: ::prost::alloc::vec::Vec<Keyword>,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct FieldDatetime {
-    #[prost(message, optional, tag = "1")]
-    pub value: ::core::option::Option<::prost_types::Timestamp>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

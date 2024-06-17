@@ -58,9 +58,6 @@ async def test_get_resource_all(
                     "text",
                     "link",
                     "file",
-                    "layout",
-                    "keywordset",
-                    "datetime",
                     "conversation",
                 ],
                 "extracted": [

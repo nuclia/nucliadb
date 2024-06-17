@@ -248,10 +248,7 @@ async def test_apply_fields_calls_update_all_field_ids(txn, storage, kb):
     resource.set_field = AsyncMock()  # type: ignore
 
     bm = MagicMock()
-    bm.layouts = {"layout": MagicMock()}
     bm.texts = {"text": MagicMock()}
-    bm.keywordsets = {"keywordset": MagicMock()}
-    bm.datetimes = {"datetime": MagicMock()}
     bm.links = {"link": MagicMock()}
     bm.files = {"file": MagicMock()}
     bm.conversations = {"conversation": MagicMock()}
@@ -262,10 +259,7 @@ async def test_apply_fields_calls_update_all_field_ids(txn, storage, kb):
     resource.update_all_field_ids.assert_awaited_once()
 
     resource.update_all_field_ids.call_args[1]["updated"] == [
-        FieldID(field_type=FieldType.LAYOUT, field="layout"),
         FieldID(field_type=FieldType.TEXT, field="text"),
-        FieldID(field_type=FieldType.KEYWORDSET, field="keywordset"),
-        FieldID(field_type=FieldType.DATETIME, field="datetime"),
         FieldID(field_type=FieldType.LINK, field="link"),
         FieldID(field_type=FieldType.FILE, field="file"),
         FieldID(field_type=FieldType.CONVERSATION, field="conversation"),
