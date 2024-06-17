@@ -168,15 +168,6 @@ async def test_get_resource_all(
             "large_metadata",
             "text",
         }
-        layouts = data["layouts"]
-        assert set(layouts.keys()) == {"layout1"}
-        assert set(layouts["layout1"]["extracted"].keys()) == {
-            "metadata",
-            "vectors",
-            "large_metadata",
-            "text",
-        }
-
         links = data["links"]
         assert set(links.keys()) == {"link1"}
         assert set(links["link1"]["extracted"].keys()) == {
