@@ -85,7 +85,7 @@ async def test_create_resource_orm_metadata_split(
     assert r is not None
 
     ex1 = FieldComputedMetadataWrapper()
-    ex1.field.CopyFrom(FieldID(field_type=FieldType.LAYOUT, field="text1"))
+    ex1.field.CopyFrom(FieldID(field_type=FieldType.CONVERSATION, field="text1"))
     ex1.metadata.split_metadata["ff1"].links.append("https://nuclia.com")
     s2 = Sentence(start=0, end=10, key="test")
     s1 = Sentence(start=11, end=20, key="test")
@@ -105,7 +105,7 @@ async def test_create_resource_orm_metadata_split(
     await field_obj.set_field_metadata(ex1)
 
     ex2 = FieldComputedMetadataWrapper()
-    ex2.field.CopyFrom(FieldID(field_type=FieldType.LAYOUT, field="text1"))
+    ex2.field.CopyFrom(FieldID(field_type=FieldType.CONVERSATION, field="text1"))
     ex2.metadata.split_metadata["ff2"].links.append("https://nuclia.com")
     s1 = Sentence(start=0, end=10, key="test")
     s2 = Sentence(start=11, end=20, key="test")

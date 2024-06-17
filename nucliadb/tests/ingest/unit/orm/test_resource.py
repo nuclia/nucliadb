@@ -252,7 +252,7 @@ async def test_apply_fields_calls_update_all_field_ids(txn, storage, kb):
     bm.links = {"link": MagicMock()}
     bm.files = {"file": MagicMock()}
     bm.conversations = {"conversation": MagicMock()}
-    bm.delete_fields.append(FieldID(field_type=FieldType.LAYOUT, field="to_delete"))
+    bm.delete_fields.append(FieldID(field_type=FieldType.CONVERSATION, field="to_delete"))
 
     await resource.apply_fields(bm)
 
@@ -265,7 +265,7 @@ async def test_apply_fields_calls_update_all_field_ids(txn, storage, kb):
         FieldID(field_type=FieldType.CONVERSATION, field="conversation"),
     ]
     resource.update_all_field_ids.call_args[1]["deleted"] == [
-        FieldID(field_type=FieldType.LAYOUT, field="to_delete"),
+        FieldID(field_type=FieldType.CONVERSATION, field="to_delete"),
     ]
 
 
