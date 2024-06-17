@@ -32,7 +32,6 @@ BASIC = (
     "title",
     "summary",
     "icon",
-    "layout",
     "thumbnail",
     "metadata",
     "usermetadata",

@@ -265,7 +265,6 @@ class Resource(BaseModel):
     title: Optional[str] = None
     summary: Optional[str] = None
     icon: Optional[str] = None
-    layout: Optional[str] = None
     thumbnail: Optional[str] = None
     metadata: Optional[Metadata] = None
     usermetadata: Optional[UserMetadata] = None

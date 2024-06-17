@@ -82,7 +82,6 @@ class CreateResourcePayload(BaseModel):
     slug: Optional[SlugString] = FieldDefaults.slug
     icon: Optional[str] = FieldDefaults.icon
     thumbnail: Optional[str] = None
-    layout: Optional[str] = None
     metadata: Optional[InputMetadata] = None
     usermetadata: Optional[UserMetadata] = None
     fieldmetadata: Optional[List[UserFieldMetadata]] = None
@@ -128,7 +127,6 @@ class UpdateResourcePayload(BaseModel):
     summary: Optional[str] = FieldDefaults.summary
     slug: Optional[SlugString] = FieldDefaults.slug
     thumbnail: Optional[str] = None
-    layout: Optional[str] = None
     metadata: Optional[InputMetadata] = None
     usermetadata: Optional[UserMetadata] = None
     fieldmetadata: Optional[List[UserFieldMetadata]] = None

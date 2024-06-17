@@ -161,7 +161,6 @@ async def managed_serialize(
             resource.title = orm_resource.basic.title
             resource.summary = orm_resource.basic.summary
             resource.icon = orm_resource.basic.icon
-            resource.layout = orm_resource.basic.layout
             resource.thumbnail = orm_resource.basic.thumbnail
             resource.created = (
                 orm_resource.basic.created.ToDatetime()

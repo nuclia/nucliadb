@@ -46,7 +46,7 @@ message Basic {
     string title = 3;
     string summary = 4;
     string thumbnail = 5;  // reference to inner thumbnail
-    string layout = 6;
+    string layout = 6 [deprecated = true];
 
     google.protobuf.Timestamp created = 7;
     google.protobuf.Timestamp modified = 8;

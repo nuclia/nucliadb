@@ -58,7 +58,6 @@ async def test_resource_crud(writer_api: Callable[[list[str]], AsyncClient], kno
                 "title": "My resource",
                 "summary": "Some summary",
                 "icon": "image/png",
-                "layout": "layout",
                 "metadata": {
                     "language": "en",
                     "metadata": {"key1": "value1", "key2": "value2"},
@@ -146,7 +145,6 @@ async def test_resource_crud_sync(
                 "title": "My resource",
                 "summary": "Some summary",
                 "icon": "image/png",
-                "layout": "layout",
                 "metadata": {
                     "language": "en",
                     "metadata": {"key1": "value1", "key2": "value2"},

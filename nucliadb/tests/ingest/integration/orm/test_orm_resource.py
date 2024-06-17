@@ -57,7 +57,6 @@ async def test_create_resource_orm_with_basic(storage, txn, cache, fake_node, kn
         title="My title",
         summary="My summary",
         thumbnail="/file",
-        layout="basic",
     )
     basic.metadata.metadata["key"] = "value"
     basic.metadata.language = "ca"
@@ -113,7 +112,6 @@ async def test_iterate_paragraphs(storage, txn, cache, fake_node, knowledgebox_i
         title="My title",
         summary="My summary",
         thumbnail="/file",
-        layout="basic",
     )
     basic.metadata.metadata["key"] = "value"
     basic.metadata.language = "ca"
@@ -159,7 +157,6 @@ async def test_paragraphs_with_page(storage, txn, cache, fake_node, knowledgebox
         title="My title",
         summary="My summary",
         thumbnail="/file",
-        layout="basic",
     )
     basic.metadata.metadata["key"] = "value"
     basic.metadata.language = "ca"
@@ -299,7 +296,6 @@ async def test_generate_broker_message(
     assert basic.title == "My title"
     assert basic.summary == "My summary"
     assert basic.icon == "text/plain"
-    assert basic.layout == "basic"
     assert basic.thumbnail == "/file"
     assert basic.last_seqid == 1
     assert basic.last_account_seq == 2

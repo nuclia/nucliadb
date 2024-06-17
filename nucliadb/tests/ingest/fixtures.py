@@ -409,7 +409,6 @@ def broker_resource(
     message1.basic.title = "Title Resource"
     message1.basic.summary = "Summary of document"
     message1.basic.thumbnail = "doc"
-    message1.basic.layout = "default"
     message1.basic.metadata.useful = True
     message1.basic.metadata.language = "es"
     message1.basic.created.FromDatetime(datetime.now())
@@ -517,7 +516,6 @@ async def create_resource(storage: Storage, driver: Driver, knowledgebox_ingest:
         title="My title",
         summary="My summary",
         icon="text/plain",
-        layout="basic",
         thumbnail="/file",
         last_seqid=1,
         last_account_seq=2,

@@ -104,6 +104,7 @@ pub struct Basic {
     /// reference to inner thumbnail
     #[prost(string, tag = "5")]
     pub thumbnail: ::prost::alloc::string::String,
+    #[deprecated]
     #[prost(string, tag = "6")]
     pub layout: ::prost::alloc::string::String,
     #[prost(message, optional, tag = "7")]
