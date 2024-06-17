@@ -114,9 +114,9 @@ class StorageSettings(BaseSettings):
         description="Number of days that uploaded files are kept in Nulia's processing engine",
     )
 
-    azure_connection_string: Optional[str] = Field(
+    azure_account_url: Optional[str] = Field(
         default=None,
-        description="Azure Storage connection string: https://docs.microsoft.com/en-us/azure/storage/common/storage-configure-connection-string",  # noqa
+        description="Azure Account URL connection string: https://docs.microsoft.com/en-us/azure/storage/common/storage-configure-connection-string",  # noqa
     )
 
 

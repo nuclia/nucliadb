@@ -25,6 +25,7 @@ from datetime import datetime
 from typing import AsyncGenerator, AsyncIterator, Optional, Union
 
 from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
+from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobProperties, BlobType, ContentSettings
 from azure.storage.blob.aio import BlobServiceClient
 
@@ -161,11 +162,11 @@ class AzureStorage(Storage):
 
     def __init__(
         self,
-        connection_string: str,
+        account_url: str,
         deadletter_bucket: str = "deadletter",
         indexing_bucket: str = "indexing",
     ):
-        self.object_store = AzureObjectStore(connection_string)
+        self.object_store = AzureObjectStore(account_url)
         self.deadletter_bucket = deadletter_bucket
         self.indexing_bucket = indexing_bucket
 
@@ -215,8 +216,8 @@ class AzureStorage(Storage):
 
 
 class AzureObjectStore(ObjectStore):
-    def __init__(self, connection_string: str):
-        self.connection_string = connection_string
+    def __init__(self, account_url: str):
+        self.account_url = account_url
         self._service_client: Optional[BlobServiceClient] = None
 
     @property
@@ -226,7 +227,7 @@ class AzureObjectStore(ObjectStore):
         return self._service_client
 
     async def initialize(self):
-        self._service_client = BlobServiceClient.from_connection_string(self.connection_string)
+        self._service_client = BlobServiceClient(self.account_url, credential=DefaultAzureCredential())
 
     async def finalize(self):
         try:

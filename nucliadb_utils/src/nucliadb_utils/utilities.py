@@ -101,11 +101,11 @@ async def get_storage(
     if storage_settings.file_backend == FileBackendConfig.AZURE:
         from nucliadb_utils.storages.azure import AzureStorage
 
-        if storage_settings.azure_connection_string is None:
-            raise ConfigurationError("AZURE_CONNECTION_STRING env var not configured")
+        if storage_settings.azure_account_url is None:
+            raise ConfigurationError("AZURE_ACCOUNT_URL env variable not configured")
 
         azureutil = AzureStorage(
-            connection_string=storage_settings.azure_connection_string,
+            account_url=storage_settings.azure_account_url,
         )
 
         logger.info("Configuring Azure Storage")

@@ -140,6 +140,8 @@ def to_processing_driver_type(file_backend_driver: FileBackendConfig) -> int:
         return 1
     elif file_backend_driver == FileBackendConfig.LOCAL:
         return 2
+    elif file_backend_driver == FileBackendConfig.AZURE:
+        return 4
     else:
         logger.error(
             f"Not a valid file backend driver to processing, fallback to local: {file_backend_driver}"
