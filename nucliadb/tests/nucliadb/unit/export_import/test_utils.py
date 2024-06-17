@@ -132,7 +132,7 @@ async def test_import_broker_message(broker_message, transaction, partitioning):
 def test_get_cloud_files(broker_message):
     # All expected binaries are returned
     binaries = get_cloud_files(broker_message)
-    assert len(binaries) == 12
+    assert len(binaries) == 11
     for cf in binaries:
         assert cf.source == resources_pb2.CloudFile.Source.LOCAL
 
