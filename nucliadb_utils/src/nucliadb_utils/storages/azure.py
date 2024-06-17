@@ -165,8 +165,9 @@ class AzureStorage(Storage):
         account_url: str,
         deadletter_bucket: str = "deadletter",
         indexing_bucket: str = "indexing",
+        connection_string: Optional[str] = None,
     ):
-        self.object_store = AzureObjectStore(account_url)
+        self.object_store = AzureObjectStore(account_url, connection_string=connection_string)
         self.deadletter_bucket = deadletter_bucket
         self.indexing_bucket = indexing_bucket
 
@@ -216,8 +217,9 @@ class AzureStorage(Storage):
 
 
 class AzureObjectStore(ObjectStore):
-    def __init__(self, account_url: str):
+    def __init__(self, account_url: str, connection_string: Optional[str] = None):
         self.account_url = account_url
+        self.connection_string = connection_string
         self._service_client: Optional[BlobServiceClient] = None
 
     @property
@@ -227,7 +229,13 @@ class AzureObjectStore(ObjectStore):
         return self._service_client
 
     async def initialize(self):
-        self._service_client = BlobServiceClient(self.account_url, credential=DefaultAzureCredential())
+        if self.connection_string:
+            # For testing purposes
+            self._service_client = BlobServiceClient.from_connection_string(self.connection_string)
+        else:
+            self._service_client = BlobServiceClient(
+                self.account_url, credential=DefaultAzureCredential()
+            )
 
     async def finalize(self):
         try:

@@ -120,6 +120,10 @@ class StorageSettings(BaseSettings):
         examples=["https://<storageaccountname>.blob.core.windows.net"],
     )
 
+    # For testing purposes: Azurite docker image requires a connection string as it
+    # doesn't support Azure's default credential authentication method
+    azure_connection_string: Optional[str] = None
+
 
 storage_settings = StorageSettings()
 

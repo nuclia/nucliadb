@@ -96,7 +96,10 @@ async def initialize():
             raise ConfigurationError("AZURE_ACCOUNT_URL env variable not configured")
 
         storage_backend = AzureBlobStore()
-        await storage_backend.initialize(storage_settings.azure_account_url)
+        await storage_backend.initialize(
+            storage_settings.azure_account_url,
+            connection_string=storage_settings.azure_connection_string,
+        )
         storage_manager = AzureFileStorageManager(storage_backend)
 
         DRIVER = TusStorageDriver(backend=storage_backend, manager=storage_manager)
