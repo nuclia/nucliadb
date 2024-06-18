@@ -37,7 +37,12 @@ from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.resources_pb2 import FieldFile as FieldFilePB
 from nucliadb_telemetry import metrics
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
-from nucliadb_utils.settings import FileBackendConfig, nuclia_settings, storage_settings
+from nucliadb_utils.settings import (
+    FileBackendConfig,
+    is_onprem_nucliadb,
+    nuclia_settings,
+    storage_settings,
+)
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import Utility, set_utility
 
@@ -129,22 +134,34 @@ async def start_processing_engine():
     set_utility(Utility.PROCESSING, processing_engine)
 
 
-def to_processing_driver_type(file_backend_driver: FileBackendConfig) -> int:
+class ProcessingDriverType(Enum):
+    # XXX IMPORTANT XXX: Make sure the values are in sync with
+    # the ones defined in nuclia/learning/processing repository
+    GCS = 0
+    S3 = 1
+    LOCAL = 2
+
+
+def to_processing_driver_type(file_backend_driver: FileBackendConfig) -> ProcessingDriverType:
     """
     Outputs a nuclia-internal backend driver identifier that is used by processing
     to store the blobs of processed metadata in the right bucket folder.
     """
-    if file_backend_driver == FileBackendConfig.GCS:
-        return 0
-    elif file_backend_driver == FileBackendConfig.S3:
-        return 1
-    elif file_backend_driver == FileBackendConfig.LOCAL:
-        return 2
-    else:
+    if is_onprem_nucliadb():
+        # On-prem installations are always regarded as local storage from the processing perspective,
+        # as Nuclia processing engine will not have direct access to the storage.
+        return ProcessingDriverType.LOCAL
+
+    try:
+        return {
+            FileBackendConfig.GCS: ProcessingDriverType.GCS,
+            FileBackendConfig.S3: ProcessingDriverType.S3,
+        }[file_backend_driver]
+    except KeyError:
         logger.error(
             f"Not a valid file backend driver to processing, fallback to local: {file_backend_driver}"
         )
-        return 2
+        return ProcessingDriverType.LOCAL
 
 
 class ProcessingEngine:
@@ -180,7 +197,7 @@ class ProcessingEngine:
 
         self.nuclia_jwt_key = nuclia_jwt_key
         self.days_to_keep = days_to_keep
-        self.driver = to_processing_driver_type(driver)
+        self.driver: ProcessingDriverType = to_processing_driver_type(driver)
         self._exit_stack = AsyncExitStack()
 
     async def initialize(self):
@@ -203,7 +220,7 @@ class ProcessingEngine:
             "iat": now,
             "md5": cf.md5,
             "source": 1,  # To indicate that this files comes internally
-            "driver": self.driver,
+            "driver": self.driver.value,
             "jti": uuid.uuid4().hex,
             "bucket_name": cf.bucket_name,
             "filename": cf.filename,
@@ -227,7 +244,7 @@ class ProcessingEngine:
             "iat": now,
             "md5": file.file.md5,
             "source": 1,  # To indicate that this files comes internally
-            "driver": self.driver,
+            "driver": self.driver.value,
             "jti": uuid.uuid4().hex,
             "bucket_name": file.file.bucket_name,
             "filename": file.file.filename,

@@ -244,7 +244,6 @@ class PredictEngine:
         if resp.status == 402:
             data = await resp.json()
             raise LimitsExceededError(402, data["detail"])
-
         try:
             data = await resp.json()
             try:
@@ -256,7 +255,10 @@ class PredictEngine:
             aiohttp.client_exceptions.ContentTypeError,
         ):
             detail = await resp.text()
-        logger.error(f"Predict API error at {resp.url}: {detail}")
+        if str(resp.status).startswith("5"):
+            logger.error(f"Predict API error at {resp.url}: {detail}")
+        else:
+            logger.info(f"Predict API error at {resp.url}: {detail}")
         raise ProxiedPredictAPIError(status=resp.status, detail=detail)
 
     @backoff.on_exception(

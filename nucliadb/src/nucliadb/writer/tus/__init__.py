@@ -92,11 +92,14 @@ async def initialize():
         DRIVER = TusStorageDriver(backend=storage_backend, manager=storage_manager)
 
     elif storage_settings.file_backend == FileBackendConfig.AZURE:
-        if storage_settings.azure_connection_string is None:
-            raise ConfigurationError("AZURE_CONNECTION_STRING env variable not configured")
+        if storage_settings.azure_account_url is None:
+            raise ConfigurationError("AZURE_ACCOUNT_URL env variable not configured")
 
         storage_backend = AzureBlobStore()
-        await storage_backend.initialize(storage_settings.azure_connection_string)
+        await storage_backend.initialize(
+            storage_settings.azure_account_url,
+            connection_string=storage_settings.azure_connection_string,
+        )
         storage_manager = AzureFileStorageManager(storage_backend)
 
         DRIVER = TusStorageDriver(backend=storage_backend, manager=storage_manager)

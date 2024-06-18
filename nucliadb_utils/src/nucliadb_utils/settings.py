@@ -114,10 +114,15 @@ class StorageSettings(BaseSettings):
         description="Number of days that uploaded files are kept in Nulia's processing engine",
     )
 
-    azure_connection_string: Optional[str] = Field(
+    azure_account_url: Optional[str] = Field(
         default=None,
-        description="Azure Storage connection string: https://docs.microsoft.com/en-us/azure/storage/common/storage-configure-connection-string",  # noqa
+        description="Azure Account URL. The driver implementation uses Azure's default credential authentication method: https://learn.microsoft.com/en-us/python/api/azure-identity/azure.identity.defaultazurecredential?view=azure-python",  # noqa
+        examples=["https://<storageaccountname>.blob.core.windows.net"],
     )
+
+    # For testing purposes: Azurite docker image requires a connection string as it
+    # doesn't support Azure's default credential authentication method
+    azure_connection_string: Optional[str] = None
 
 
 storage_settings = StorageSettings()

@@ -675,6 +675,7 @@ def local_storage_settings(tmpdir):
 def azure_storage_settings(azurite: AzuriteFixture):
     return {
         "file_backend": FileBackendConfig.AZURE,
+        "azure_account_url": azurite.account_url,
         "azure_connection_string": azurite.connection_string,
     }
 
