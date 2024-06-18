@@ -2164,7 +2164,7 @@ files = [
 
 [[package]]
 name = "nucliadb"
-version = "4.0.3"
+version = "5.0.0"
 requires_python = ">=3.9, <4"
 editable = true
 path = "./nucliadb"
@@ -2240,7 +2240,7 @@ files = [
 
 [[package]]
 name = "nucliadb-models"
-version = "4.0.3"
+version = "5.0.0"
 requires_python = ">=3.9, <4"
 editable = true
 path = "./nucliadb_models"
@@ -2262,7 +2262,7 @@ groups = ["dev"]
 
 [[package]]
 name = "nucliadb-protos"
-version = "4.0.3"
+version = "5.0.0"
 editable = true
 path = "./nucliadb_protos/python"
 summary = "protos for nucliadb"
@@ -2277,7 +2277,7 @@ dependencies = [
 
 [[package]]
 name = "nucliadb-sidecar"
-version = "4.0.3"
+version = "5.0.0"
 requires_python = ">=3.9, <4"
 editable = true
 path = "./nucliadb_sidecar"
@@ -2299,7 +2299,7 @@ dependencies = [
 
 [[package]]
 name = "nucliadb-telemetry"
-version = "4.0.3"
+version = "5.0.0"
 requires_python = ">=3.9"
 editable = true
 path = "./nucliadb_telemetry"
@@ -2315,7 +2315,7 @@ dependencies = [
 
 [[package]]
 name = "nucliadb-telemetry"
-version = "4.0.3"
+version = "5.0.0"
 extras = ["all"]
 requires_python = ">=3.9"
 summary = "NucliaDB Telemetry Library Python process"
@@ -2331,7 +2331,7 @@ dependencies = [
     "grpcio-tools<1.63.0,>=1.44.0",
     "grpcio<1.63.0,>=1.44.0",
     "nats-py[nkeys]>=2.5.0",
-    "nucliadb-telemetry==4.0.3",
+    "nucliadb-telemetry==5.0.0",
     "opentelemetry-api==1.21.0",
     "opentelemetry-exporter-jaeger==1.21.0",
     "opentelemetry-instrumentation-aiohttp-client>=0.42b0",
@@ -2344,7 +2344,7 @@ dependencies = [
 
 [[package]]
 name = "nucliadb-utils"
-version = "4.0.3"
+version = "5.0.0"
 requires_python = ">=3.9, <4"
 editable = true
 path = "./nucliadb_utils"
@@ -2368,7 +2368,7 @@ dependencies = [
 
 [[package]]
 name = "nucliadb-utils"
-version = "4.0.3"
+version = "5.0.0"
 extras = ["cache", "fastapi", "storages"]
 requires_python = ">=3.9, <4"
 summary = ""
@@ -2383,7 +2383,7 @@ dependencies = [
     "google-api-python-client>=2.37.0",
     "google-auth>=2.4.1",
     "lru-dict>=1.1.7",
-    "nucliadb-utils==4.0.3",
+    "nucliadb-utils==5.0.0",
     "oauth2client>=4.1.3",
     "orjson>=3.6.7",
     "redis>=4.3.4",
