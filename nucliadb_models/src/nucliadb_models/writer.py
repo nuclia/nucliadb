@@ -23,10 +23,7 @@ from typing import Dict, List, Optional, Union
 from pydantic import BaseModel, Field, field_validator
 
 from nucliadb_models.conversation import InputConversationField
-from nucliadb_models.datetime import FieldDatetime
 from nucliadb_models.file import FileField
-from nucliadb_models.keywordset import FieldKeywordset
-from nucliadb_models.layout import InputLayoutField
 from nucliadb_models.link import LinkField
 from nucliadb_models.metadata import (
     Extra,
@@ -72,25 +69,10 @@ class FieldDefaults:
         title="Texts",
         description=f"Dictionary of text fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdPattern}",  # noqa
     )
-    layouts = Field(
-        {},
-        title="Layouts",
-        description=f"Dictionary of layout fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdPattern}",  # noqa
-    )
     conversations = Field(
         {},
         title="Conversations",
         description=f"Dictionary of conversation fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdPattern}",  # noqa
-    )
-    keywordsets = Field(
-        {},
-        title="Keywordsets",
-        description=f"Dictionary of keywordset fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdPattern}",  # noqa
-    )
-    datetimes = Field(
-        {},
-        title="Datetimes",
-        description=f"Dictionary of datetime fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdPattern}",  # noqa
     )
 
 
@@ -100,7 +82,6 @@ class CreateResourcePayload(BaseModel):
     slug: Optional[SlugString] = FieldDefaults.slug
     icon: Optional[str] = FieldDefaults.icon
     thumbnail: Optional[str] = None
-    layout: Optional[str] = None
     metadata: Optional[InputMetadata] = None
     usermetadata: Optional[UserMetadata] = None
     fieldmetadata: Optional[List[UserFieldMetadata]] = None
@@ -110,10 +91,7 @@ class CreateResourcePayload(BaseModel):
     files: Dict[FieldIdString, FileField] = FieldDefaults.files
     links: Dict[FieldIdString, LinkField] = FieldDefaults.links
     texts: Dict[FieldIdString, TextField] = FieldDefaults.texts
-    layouts: Dict[FieldIdString, InputLayoutField] = FieldDefaults.layouts
     conversations: Dict[FieldIdString, InputConversationField] = FieldDefaults.conversations
-    keywordsets: Dict[FieldIdString, FieldKeywordset] = FieldDefaults.keywordsets
-    datetimes: Dict[FieldIdString, FieldDatetime] = FieldDefaults.datetimes
     processing_options: Optional[PushProcessingOptions] = PushProcessingOptions()
     security: Optional[ResourceSecurity] = Field(
         default=None,
@@ -149,7 +127,6 @@ class UpdateResourcePayload(BaseModel):
     summary: Optional[str] = FieldDefaults.summary
     slug: Optional[SlugString] = FieldDefaults.slug
     thumbnail: Optional[str] = None
-    layout: Optional[str] = None
     metadata: Optional[InputMetadata] = None
     usermetadata: Optional[UserMetadata] = None
     fieldmetadata: Optional[List[UserFieldMetadata]] = None
@@ -158,10 +135,7 @@ class UpdateResourcePayload(BaseModel):
     files: Dict[FieldIdString, FileField] = FieldDefaults.files
     links: Dict[FieldIdString, LinkField] = FieldDefaults.links
     texts: Dict[FieldIdString, TextField] = FieldDefaults.texts
-    layouts: Dict[FieldIdString, InputLayoutField] = FieldDefaults.layouts
     conversations: Dict[FieldIdString, InputConversationField] = FieldDefaults.conversations
-    keywordsets: Dict[FieldIdString, FieldKeywordset] = FieldDefaults.keywordsets
-    datetimes: Dict[FieldIdString, FieldDatetime] = FieldDefaults.datetimes
     processing_options: Optional[PushProcessingOptions] = PushProcessingOptions()
     security: Optional[ResourceSecurity] = Field(
         default=None,

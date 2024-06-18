@@ -35,9 +35,6 @@ from nucliadb_utils.tests.asyncbenchmark import AsyncBenchmarkFixture
         ("text", "text1"),
         ("link", "link1"),
         ("file", "file1"),
-        ("layout", "layout1"),
-        ("keywordset", "keywordset1"),
-        ("datetime", "datetime1"),
         # BUG: sc-4346 - uncomment this when bug is solved
         # ("conversation", "conversation1"),
     ],

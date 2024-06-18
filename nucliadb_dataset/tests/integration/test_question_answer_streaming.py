@@ -98,7 +98,6 @@ def smb_wonder_bm(kbid: str) -> BrokerMessage:
 
     bm.basic.icon = "text/plain"
     bm.basic.thumbnail = "doc"
-    bm.basic.layout = "default"
     bm.basic.metadata.useful = True
     bm.basic.metadata.language = "en"
     bm.basic.metadata.status = Metadata.Status.PROCESSED

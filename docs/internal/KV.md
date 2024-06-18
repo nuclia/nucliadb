@@ -18,7 +18,6 @@ The prefix for storing mutable data on nucliadb are:
       - `/metadata`
       - `/classifications`
       - `/relations`
-      - `/f/l/{field}` PB Field Layout
       - `/f/t/{field}` PB Field Text
       - `/f/u/{field}` PB Field Link
       - `/f/f/{field}` PB Field File

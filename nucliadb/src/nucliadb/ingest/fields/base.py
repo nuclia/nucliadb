@@ -40,7 +40,7 @@ from nucliadb_protos.utils_pb2 import ExtractedText, VectorObject
 from nucliadb_protos.writer_pb2 import Error
 from nucliadb_utils.storages.storage import Storage, StorageField
 
-SUBFIELDFIELDS = ["l", "c"]
+SUBFIELDFIELDS = ("c",)
 
 
 class FieldTypes(str, enum.Enum):

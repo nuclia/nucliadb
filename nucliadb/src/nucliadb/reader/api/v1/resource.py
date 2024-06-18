@@ -371,18 +371,6 @@ async def _get_resource_field(
                 value = await field.get_value()
                 resource_field.value = models.FieldLink.from_message(value)
 
-            if isinstance(value, resources_pb2.FieldLayout):
-                value = await field.get_value()
-                resource_field.value = models.FieldLayout.from_message(value)
-
-            if isinstance(value, resources_pb2.FieldDatetime):
-                value = await field.get_value()
-                resource_field.value = models.FieldDatetime.from_message(value)
-
-            if isinstance(value, resources_pb2.FieldKeywordset):
-                value = await field.get_value()
-                resource_field.value = models.FieldKeywordset.from_message(value)
-
             if isinstance(field, Conversation):
                 if page == "first":
                     page_to_fetch = 1

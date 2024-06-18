@@ -43,7 +43,6 @@ def broker_resource(kbid: str, rid=None, slug=None, title=None, summary=None) ->
     bm.basic.title = title
     bm.basic.summary = summary
     bm.basic.thumbnail = "doc"
-    bm.basic.layout = "default"
     bm.basic.metadata.useful = True
     bm.basic.metadata.language = "es"
     bm.basic.created.FromDatetime(datetime.now())

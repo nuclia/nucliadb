@@ -108,7 +108,6 @@ class BrokerMessageBuilder:
     def _default_basic(self):
         self.bm.basic.icon = "text/plain"
         self.bm.basic.thumbnail = "doc"
-        self.bm.basic.layout = "default"
         self.bm.basic.metadata.useful = True
         self.bm.basic.metadata.language = "en"
         self.bm.basic.metadata.status = rpb.Metadata.Status.PROCESSED

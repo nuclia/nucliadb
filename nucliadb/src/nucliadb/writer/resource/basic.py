@@ -86,9 +86,6 @@ def parse_basic_modify(bm: BrokerMessage, item: ComingResourcePayload, toprocess
         toprocess.genericfield["summary"] = Text(body=item.summary, format=PushTextFormat.PLAIN)
     if item.thumbnail:
         bm.basic.thumbnail = item.thumbnail
-    if item.layout:
-        bm.basic.layout = item.layout
-
     if item.metadata is not None:
         bm.basic.metadata.metadata.update(item.metadata.metadata)
         if item.metadata.language:

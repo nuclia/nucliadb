@@ -144,29 +144,11 @@ pub struct BrokerMessage {
         ::prost::alloc::string::String,
         super::resources::Conversation,
     >,
-    /// Field Layout
-    #[prost(map = "string, message", tag = "12")]
-    pub layouts: ::std::collections::HashMap<
-        ::prost::alloc::string::String,
-        super::resources::FieldLayout,
-    >,
     /// Field Text
     #[prost(map = "string, message", tag = "13")]
     pub texts: ::std::collections::HashMap<
         ::prost::alloc::string::String,
         super::resources::FieldText,
-    >,
-    /// Field keyword
-    #[prost(map = "string, message", tag = "14")]
-    pub keywordsets: ::std::collections::HashMap<
-        ::prost::alloc::string::String,
-        super::resources::FieldKeywordset,
-    >,
-    /// Field Datetime
-    #[prost(map = "string, message", tag = "15")]
-    pub datetimes: ::std::collections::HashMap<
-        ::prost::alloc::string::String,
-        super::resources::FieldDatetime,
     >,
     /// Field Links
     #[prost(map = "string, message", tag = "16")]
