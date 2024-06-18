@@ -187,10 +187,12 @@ class AskResult:
         )
 
         # Audit the answer
+        if self._object is None:
+            audit_answer = self._answer_text.encode("utf-8")
+        else:
+            audit_answer = json.dumps(self._object.object).encode("utf-8")
         await self.auditor.audit(
-            text_answer=self._answer_text.encode("utf-8")
-            if self._object is None
-            else json.dumps(self._object).encode("utf-8"),
+            text_answer=audit_answer,
             status_code=self.status_code,
         )
 
@@ -250,13 +252,13 @@ class AskResult:
         if self._citations is not None:
             citations = self._citations.citations
 
-        response_object = None
+        answer_json = None
         if self._object is not None:
-            response_object = self._object.object
+            answer_json = self._object.object
 
         response = SyncAskResponse(
             answer=self._answer_text,
-            object=response_object,
+            answer_json=answer_json,
             status=self.status_code.prettify(),
             relations=self._relations,
             retrieval_results=self.find_results,
