@@ -56,6 +56,10 @@ def test_ask_on_kb(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
         ],
         # Control the number of AI tokens used for every request
         max_tokens=MaxTokens(context=100, answer=50),
+        answer_json_schema={
+            "type": "object",
+            "properties": {"answer": {"type": "string"}, "confidence": {"type": "number"}},
+        },
     )
     assert result.learning_id == "00"
     assert result.answer == "valid answer to"

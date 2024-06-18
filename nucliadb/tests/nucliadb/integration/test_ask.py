@@ -51,7 +51,15 @@ async def test_ask(
 
     context = [{"author": "USER", "text": "query"}]
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/ask", json={"query": "query", "context": context}
+        f"/kb/{knowledgebox}/ask",
+        json={
+            "query": "query",
+            "context": context,
+            "answer_json_schema": {
+                "type": "object",
+                "properties": {"answer": {"type": "string"}, "confidence": {"type": "number"}},
+            },
+        },
     )
     assert resp.status_code == 200
 
