@@ -74,6 +74,7 @@ class AzuriteFixture:
     port: int
     container: BaseImage
     connection_string: str
+    account_url: str
 
 
 def get_connection_string(host, port) -> str:
@@ -99,6 +100,7 @@ def azurite() -> Generator[AzuriteFixture, None, None]:
             port=port,
             container=container.container_obj,
             connection_string=get_connection_string(host, port),
+            account_url=f"http://{host}:{port}/devstoreaccount1",
         )
     finally:
         container.stop()
@@ -107,6 +109,7 @@ def azurite() -> Generator[AzuriteFixture, None, None]:
 @pytest.fixture(scope="function")
 async def azure_storage(azurite):
     storage = AzureStorage(
+        account_url=azurite.account_url,
         connection_string=azurite.connection_string,
     )
     MAIN[Utility.STORAGE] = storage

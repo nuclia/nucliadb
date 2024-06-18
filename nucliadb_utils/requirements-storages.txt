@@ -6,3 +6,4 @@ aiofiles>=0.8.0
 backoff>=1.11.1
 google-auth>=2.4.1
 azure-storage-blob>=12.20.0
+azure-identity>=1.16.1
