@@ -1452,6 +1452,10 @@ class SyncAskResponse(BaseModel):
         title="Answer",
         description="The generative answer to the query",
     )
+    object: Optional[Dict[str, Any]] = Field(
+        title="JSON",
+        description="The generative JSON to the query",
+    )
     status: str = Field(
         title="Status",
         description="The status of the query execution. It can be 'success', 'error' or 'no_context'",  # noqa
