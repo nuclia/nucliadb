@@ -91,23 +91,8 @@ def iterate_auditable_fields(
         yield key
         yielded.add(key)
 
-    for field_id in message.layouts.keys():
-        key = (field_id, writer_pb2.FieldType.LAYOUT)
-        yield key
-        yielded.add(key)
-
     for field_id in message.texts.keys():
         key = (field_id, writer_pb2.FieldType.TEXT)
-        yield key
-        yielded.add(key)
-
-    for field_id in message.keywordsets.keys():
-        key = (field_id, writer_pb2.FieldType.KEYWORDSET)
-        yield key
-        yielded.add(key)
-
-    for field_id in message.datetimes.keys():
-        key = (field_id, writer_pb2.FieldType.DATETIME)
         yield key
         yielded.add(key)
 

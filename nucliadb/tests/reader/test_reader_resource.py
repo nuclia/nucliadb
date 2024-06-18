@@ -32,7 +32,6 @@ BASIC = (
     "title",
     "summary",
     "icon",
-    "layout",
     "thumbnail",
     "metadata",
     "usermetadata",
@@ -130,9 +129,6 @@ async def test_get_resource_all(
                     "text",
                     "link",
                     "file",
-                    "layout",
-                    "keywordset",
-                    "datetime",
                     "conversation",
                 ],
                 "extracted": [
@@ -161,9 +157,6 @@ async def test_get_resource_all(
             "files",
             "texts",
             "links",
-            "layouts",
-            "keywordsets",
-            "datetimes",
             "conversations",
         }
         texts = data["texts"]
@@ -174,15 +167,6 @@ async def test_get_resource_all(
             "large_metadata",
             "text",
         }
-        layouts = data["layouts"]
-        assert set(layouts.keys()) == {"layout1"}
-        assert set(layouts["layout1"]["extracted"].keys()) == {
-            "metadata",
-            "vectors",
-            "large_metadata",
-            "text",
-        }
-
         links = data["links"]
         assert set(links.keys()) == {"link1"}
         assert set(links["link1"]["extracted"].keys()) == {
@@ -218,9 +202,6 @@ async def test_get_resource_filter_root_fields(reader_api, test_resource):
             "files",
             "texts",
             "links",
-            "layouts",
-            "keywordsets",
-            "datetimes",
             "conversations",
             "generics",
         }
@@ -228,9 +209,6 @@ async def test_get_resource_filter_root_fields(reader_api, test_resource):
         assert set(data["files"]["file1"].keys()) == {"value"}
         assert set(data["texts"]["text1"].keys()) == {"value"}
         assert set(data["links"]["link1"].keys()) == {"value"}
-        assert set(data["layouts"]["layout1"].keys()) == {"value"}
-        assert set(data["keywordsets"]["keywordset1"].keys()) == {"value"}
-        assert set(data["datetimes"]["datetime1"].keys()) == {"value"}
         assert set(data["conversations"]["conv1"].keys()) == {"value"}
 
 

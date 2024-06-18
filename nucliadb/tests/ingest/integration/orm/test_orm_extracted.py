@@ -104,7 +104,7 @@ async def test_create_resource_orm_extracted_delta(
     r = await kb_obj.add_resource(uuid=uuid, slug="slug")
     assert r is not None
     ex1 = ExtractedTextWrapper()
-    ex1.field.CopyFrom(FieldID(field_type=FieldType.LAYOUT, field="text1"))
+    ex1.field.CopyFrom(FieldID(field_type=FieldType.CONVERSATION, field="text1"))
     ex1.body.split_text["ident1"] = "My text"
     ex1.body.text = "all text"
 
@@ -116,7 +116,7 @@ async def test_create_resource_orm_extracted_delta(
     assert ex2.text == ex1.body.text
 
     ex1 = ExtractedTextWrapper()
-    ex1.field.CopyFrom(FieldID(field_type=FieldType.LAYOUT, field="text1"))
+    ex1.field.CopyFrom(FieldID(field_type=FieldType.CONVERSATION, field="text1"))
     ex1.body.split_text["ident2"] = "My text"
     ex1.body.text = "all text 2"
 

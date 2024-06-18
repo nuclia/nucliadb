@@ -61,7 +61,6 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
     bm.basic.title = "Title Resource"
     bm.basic.summary = "Summary of document"
     bm.basic.thumbnail = "doc"
-    bm.basic.layout = "default"
     bm.basic.metadata.useful = True
     bm.basic.metadata.language = "es"
     bm.basic.created.FromDatetime(datetime.now())

@@ -46,7 +46,7 @@ message Basic {
     string title = 3;
     string summary = 4;
     string thumbnail = 5;  // reference to inner thumbnail
-    string layout = 6;
+    string layout = 6 [deprecated = true];
 
     google.protobuf.Timestamp created = 7;
     google.protobuf.Timestamp modified = 8;
@@ -378,19 +378,6 @@ message Block {
     CloudFile file = 8;
 }
 
-message LayoutContent {
-    map<string, Block> blocks = 1;
-    repeated string deleted_blocks = 2;
-}
-
-message FieldLayout {
-    enum Format {
-        NUCLIAv1 = 0;
-    }
-    LayoutContent body = 1;
-    Format format = 2;
-}
-
 message Classification {
     string labelset = 1;
     string label = 2;
@@ -468,17 +455,7 @@ message FieldLink {
     string xpath = 8;
 }
 
-message Keyword {
-    string value = 1;
-}
 
-message FieldKeywordset {
-    repeated Keyword keywords = 1;
-}
-
-message FieldDatetime {
-    google.protobuf.Timestamp value = 1;
-}
 
 message FieldFile {
     google.protobuf.Timestamp added = 1;
@@ -557,12 +534,11 @@ message RowsPreview {
 }
 
 enum FieldType {
+    reserved 2, 3, 5;
+
     FILE = 0;
     LINK = 1;
-    DATETIME = 2;
-    KEYWORDSET = 3;
     TEXT = 4;
-    LAYOUT = 5;
     GENERIC = 6;  // Base title/summary fields
     CONVERSATION = 7;
 }

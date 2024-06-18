@@ -320,7 +320,6 @@ class Basic(BaseModel):
     title: Optional[str] = None
     summary: Optional[str] = None
     thumbnail: Optional[str] = None
-    layout: Optional[str] = None
     created: Optional[datetime] = None
     modified: Optional[datetime] = None
     metadata: Optional[Metadata] = None

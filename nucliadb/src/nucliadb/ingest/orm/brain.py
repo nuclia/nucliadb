@@ -36,7 +36,6 @@ from nucliadb_protos.resources_pb2 import (
     Basic,
     ExtractedText,
     FieldComputedMetadata,
-    FieldKeywordset,
     FieldMetadata,
     Metadata,
     Origin,
@@ -531,13 +530,6 @@ class ResourceBrain:
                 to=relation_node_entity,
             )
             self.brain.relations.append(rel)
-
-    def process_keywordset_fields(self, field_key: str, field: FieldKeywordset):
-        # all field keywords
-        if field:
-            for keyword in field.keywords:
-                self.labels["f"].append(f"{field_key}/{keyword.value}")
-                self.labels["fg"].append(keyword.value)
 
     def apply_field_labels(
         self,
