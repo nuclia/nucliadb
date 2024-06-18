@@ -47,6 +47,7 @@ async def test_concurrences(
         extracted_text: str
         vector: list[float]
 
+    # 
     original_text = "Original text uploaded by the user"
     extracted_text = "Extracted at processing time"
     extracted_vector = [1.0] * 512
