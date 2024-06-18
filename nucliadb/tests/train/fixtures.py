@@ -270,6 +270,7 @@ async def test_pagination_resources(processor: Processor, knowledgebox_ingest, t
     entities = EntitiesGroup()
     entities.entities["entity1"].value = "PERSON"
     await entities_manager.set_entities_group_force("group1", entities)
+    await txn.commit()
 
     # Add ontology
     labelset = LabelSet()
