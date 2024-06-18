@@ -2,7 +2,6 @@ name: nucliadb (py)
 
 env:
   COMPONENT: nucliadb
-  TESTING_TIKV_LOCAL: "true"
   GCP_WORKLOAD_IDENTITY_PROVIDER: "projects/224545243904/locations/global/workloadIdentityPools/gh-nuclia/providers/gh-nuclia-provider"
   GCP_SERVICE_ACCOUNT: "github-actions@nuclia-internal.iam.gserviceaccount.com"
 
@@ -32,7 +31,7 @@ jobs:
       max-parallel: 6
       matrix:
         python-version: ["3.12"]
-        maindb_driver: ["tikv", "tikv_2", "tikv_3", "pg", "pg_2", "pg_3"]
+        maindb_driver: ["pg", "pg_2", "pg_3"]
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v3
@@ -45,10 +44,6 @@ jobs:
 
       - name: Install the package
         run: make -C nucliadb/ install-dev
-
-      - name: Install tikv
-        if: matrix.maindb_driver == 'tikv' || matrix.maindb_driver == 'tikv_2' || matrix.maindb_driver == 'tikv_3'
-        run: sudo cp ./scripts/pingcap-com.pem /usr/local/share/ca-certificates/pingcap.crt && sudo update-ca-certificates && ./scripts/run-tikv.sh
 
       - uses: dorny/paths-filter@v2
         id: filter
@@ -113,45 +108,6 @@ jobs:
         if: matrix.maindb_driver == 'pg_3'
         env:
           TESTING_MAINDB_DRIVERS: pg
-        with:
-          max_attempts: 2
-          retry_on: error
-          timeout_minutes: 10
-          command: |
-            make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=2 --num-shards=3"
-
-      - name: Run Tikv tests 1/2
-        # These tests can be flaky, let's retry them...
-        uses: nick-fields/retry@v2
-        if: matrix.maindb_driver == 'tikv'
-        env:
-          TESTING_MAINDB_DRIVERS: tikv
-        with:
-          max_attempts: 2
-          retry_on: error
-          timeout_minutes: 10
-          command: |
-            make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=0 --num-shards=3"
-
-      - name: Run Tikv tests 2/3
-        # These tests can be flaky, let's retry them...
-        uses: nick-fields/retry@v2
-        if: matrix.maindb_driver == 'tikv_2'
-        env:
-          TESTING_MAINDB_DRIVERS: "tikv"
-        with:
-          max_attempts: 2
-          retry_on: error
-          timeout_minutes: 10
-          command: |
-            make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=1 --num-shards=3"
-
-      - name: Run Tikv tests 3/3
-        # These tests can be flaky, let's retry them...
-        uses: nick-fields/retry@v2
-        if: matrix.maindb_driver == 'tikv_3'
-        env:
-          TESTING_MAINDB_DRIVERS: "tikv"
         with:
           max_attempts: 2
           retry_on: error

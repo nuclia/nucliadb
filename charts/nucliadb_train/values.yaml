@@ -38,8 +38,8 @@ serving:
   grpc_port: 8080
 
 services:
-  # This must match the redis or tikv driver on nucliadb_shared
-  maindb: 2379 # redis: 6379 | tikv: 2379
+  # This must match the pg driver on nucliadb_shared
+  maindb: 5432
   nats: 4222
 
 running:

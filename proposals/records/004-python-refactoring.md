@@ -68,7 +68,7 @@ service instead of ourselves.
 Data write/read access patterns and knowledge is spread in many parts of the code base.
 
 There are 2 ways we write data to k/v storages:
-- primary k/v storage: tikv, pg, etc
+- primary k/v storage: pg, local, etc
 - blob k/v storage: gcs, s3, etc
 
 Direct access to the data is managed through:
@@ -209,7 +209,7 @@ class ApplicationContext:
     data_manager: DataManager
     def __init__(self, settings):
         self.settings = settings
-    
+
     async def initialize(self):
         self.data_mananger = DataManager(self.settings)
         await self.data_mananger.initialize()

@@ -50,7 +50,7 @@ and inference. We do all the hard work for you.
 - Resources with multiple fields and metadata
 - Text/HTML/Markdown plain fields support
 - Field types: text, file, link, conversation, layout
-- Storage layer support: TiKV, Redis and PostgreSQL
+- Storage layer (PostgreSQL)
 - Blob support with S3-compatible API, GCS and PG drivers
 - Replication of index storage
 - Distributed search

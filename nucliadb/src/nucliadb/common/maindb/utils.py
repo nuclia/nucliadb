@@ -23,21 +23,6 @@ from nucliadb_utils.exceptions import ConfigurationError
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
 
 try:
-    from nucliadb.common.maindb.redis import RedisDriver
-
-    REDIS = True
-except ImportError:  # pragma: no cover
-    REDIS = False
-
-try:
-    from nucliadb.common.maindb.tikv import TiKVDriver
-
-    TIKV = True
-except ImportError:  # pragma: no cover
-    TIKV = False
-
-
-try:
     from nucliadb.common.maindb.pg import PGDriver
 
     PG = True
@@ -64,27 +49,7 @@ async def setup_driver() -> Driver:
     if driver is not None:
         return driver
 
-    if settings.driver == DriverConfig.REDIS:
-        if not REDIS:
-            raise ConfigurationError("`redis` python package not installed.")
-        if settings.driver_redis_url is None:
-            raise ConfigurationError("No DRIVER_REDIS_URL env var defined.")
-
-        redis_driver = RedisDriver(settings.driver_redis_url)
-        set_utility(Utility.MAINDB_DRIVER, redis_driver)
-    elif settings.driver == DriverConfig.TIKV:
-        if not TIKV:
-            raise ConfigurationError("`tikv_client` python package not installed.")
-        if settings.driver_tikv_url is None:
-            raise ConfigurationError("No DRIVER_TIKV_URL env var defined.")
-
-        tikv_driver = TiKVDriver(
-            settings.driver_tikv_url,
-            settings.driver_tikv_connection_pool_size,
-            settings.driver_tikv_replication_pg_url,
-        )
-        set_utility(Utility.MAINDB_DRIVER, tikv_driver)
-    elif settings.driver == DriverConfig.PG:
+    if settings.driver == DriverConfig.PG:
         if not PG:
             raise ConfigurationError("`asyncpg` python package not installed.")
         if settings.driver_pg_url is None:

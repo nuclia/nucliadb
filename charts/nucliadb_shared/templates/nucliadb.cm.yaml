@@ -69,15 +69,8 @@ data:
 {{- end}}
   INDEX_JETSTREAM_SERVERS: {{ toJson .Values.indexing.index_jetstream_servers | quote }}
   DRIVER: {{ .Values.maindb.driver }}
-{{- if eq .Values.maindb.driver "redis" }}
-  DRIVER_REDIS_URL: {{ .Values.maindb.driver_redis_url }}
-{{- else if eq .Values.maindb.driver "pg" }}
+{{- if eq .Values.maindb.driver "pg" }}
   DRIVER_PG_URL: {{ .Values.maindb.driver_pg_url }}
-{{- else if eq .Values.maindb.driver "tikv" }}
-  DRIVER_TIKV_URL: {{ toJson .Values.maindb.driver_tikv_url | quote }}
-{{- if .Values.maindb.driver_tikv_replication_pg_url }}
-  DRIVER_TIKV_REPLICATION_PG_URL: {{ .Values.maindb.driver_tikv_replication_pg_url }}
-{{- end }}
 {{- end }}
   AUDIT_DRIVER: {{ .Values.audit.driver }}
   AUDIT_JETSTREAM_TARGET: {{ .Values.audit.audit_jetstream_target }}

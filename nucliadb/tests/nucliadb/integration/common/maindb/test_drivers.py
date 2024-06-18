@@ -17,59 +17,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
 import os
-from unittest.mock import patch
 
 import pytest
 
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.pg import PGDriver
-from nucliadb.common.maindb.redis import RedisDriver
-from nucliadb.common.maindb.tikv import TiKVDriver
 
-TESTING_MAINDB_DRIVERS = os.environ.get("TESTING_MAINDB_DRIVERS", "tikv,redis,pg,local").split(",")
-
-
-@pytest.mark.skipif("redis" not in TESTING_MAINDB_DRIVERS, reason="redis not in TESTING_MAINDB_DRIVERS")
-async def test_redis_driver(redis):
-    url = f"redis://{redis[0]}:{redis[1]}"
-    driver = RedisDriver(url=url)
-    await driver_basic(driver)
-
-
-@pytest.mark.flaky(reruns=5)
-@pytest.mark.skipif("tikv" not in TESTING_MAINDB_DRIVERS, reason="tikv not in TESTING_MAINDB_DRIVERS")
-async def test_tikv_driver(tikvd):
-    url = [f"{tikvd[0]}:{tikvd[2]}"]
-    driver = TiKVDriver(url=url)
-    await driver_basic(driver)
-
-
-@pytest.mark.skipif("tikv" not in TESTING_MAINDB_DRIVERS, reason="tikv not in TESTING_MAINDB_DRIVERS")
-async def test_tikv_driver_against_restarts(tikvd):
-    url = [f"{tikvd[0]}:{tikvd[2]}"]
-    driver = TiKVDriver(url=url)
-    await driver.initialize()
-
-    async def _runtest(i):
-        async with driver.transaction() as txn:
-            await txn.set(f"/test{i}", b"test")
-            await txn.get(f"/test{i}") == b"test"
-
-    await asyncio.gather(*[_runtest(i) for i in range(10)])
-
-    # simulate server restart, patch driver tikv begin method to raise exception
-    # this will get overridden when it is re-initialized
-    for holder in driver.pool:
-        with patch.object(
-            holder._txn_connection,
-            "begin",
-            side_effect=Exception("Exception: [//client-rust]: failed to connect to [Member]"),
-        ):
-            # after server is restarted, old connection is bad and connection needs
-            # to be re-established but having many simultaneous requests should not stomp on each other
-            await asyncio.gather(*[_runtest(i) for i in range(10)])
+TESTING_MAINDB_DRIVERS = os.environ.get("TESTING_MAINDB_DRIVERS", "pg,local").split(",")
 
 
 @pytest.mark.skip(reason="Local driver doesn't implement saving info in intermediate nodes")

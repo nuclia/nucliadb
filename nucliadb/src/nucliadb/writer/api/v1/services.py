@@ -23,7 +23,6 @@ from starlette.requests import Request
 
 from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
-from nucliadb.common.maindb.exceptions import ConflictError
 from nucliadb.models.responses import (
     HTTPConflict,
     HTTPInternalServerError,
@@ -178,12 +177,6 @@ async def set_labelset_endpoint(request: Request, kbid: str, labelset: str, item
         await set_labelset(kbid, labelset, item)
     except KnowledgeBoxNotFound:
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
-    except ConflictError:
-        # TODO: Remove conflict error handling once we drop tikv support
-        raise HTTPException(
-            status_code=409,
-            detail="Conflict setting labelset on a Knowledge box. Please retry.",
-        )
 
 
 async def set_labelset(kbid: str, labelset_id: str, item: LabelSet):
@@ -226,12 +219,6 @@ async def delete_labelset_endpoint(request: Request, kbid: str, labelset: str):
         await delete_labelset(kbid, labelset)
     except KnowledgeBoxNotFound:
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
-    except ConflictError:
-        # TODO: Remove conflict error handling once we drop tikv support
-        raise HTTPException(
-            status_code=409,
-            detail="Conflict deleting labelset from a Knowledge box. Please retry.",
-        )
 
 
 async def delete_labelset(kbid: str, labelset_id: str):

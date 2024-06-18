@@ -20,25 +20,20 @@
 import logging
 import os
 import tempfile
-from os.path import dirname
 from typing import AsyncIterator
 from unittest.mock import Mock
 
 import asyncpg
 import pytest
-import tikv_client  # type: ignore
 from grpc import aio
 from httpx import AsyncClient
 from pytest_lazy_fixtures import lazy_fixture
-from redis import asyncio as aioredis
 
 from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.exceptions import UnsetUtility
 from nucliadb.common.maindb.local import LocalDriver
 from nucliadb.common.maindb.pg import PGDriver
-from nucliadb.common.maindb.redis import RedisDriver
-from nucliadb.common.maindb.tikv import TiKVDriver
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.settings import DriverConfig, DriverSettings
 from nucliadb.ingest.settings import settings as ingest_settings
@@ -58,7 +53,6 @@ from nucliadb_telemetry.settings import (
     LogSettings,
 )
 from nucliadb_utils.settings import FileBackendConfig
-from nucliadb_utils.storages.settings import settings as storage_settings
 from nucliadb_utils.tests import free_port
 from nucliadb_utils.tests.azure import AzuriteFixture
 from nucliadb_utils.utilities import (
@@ -482,29 +476,6 @@ def metrics_registry():
 
 
 @pytest.fixture(scope="function")
-async def redis_config(redis):
-    ingest_settings.driver_redis_url = f"redis://{redis[0]}:{redis[1]}"
-    default_driver = ingest_settings.driver
-
-    ingest_settings.driver = "redis"
-
-    storage_settings.local_testing_files = f"{dirname(__file__)}"
-    driver = aioredis.from_url(f"redis://{redis[0]}:{redis[1]}")
-    await driver.flushall()
-
-    yield ingest_settings.driver_redis_url
-
-    ingest_settings.driver_redis_url = None
-    ingest_settings.driver = default_driver
-    await driver.flushall()
-    await driver.close(close_connection_pool=True)
-
-    pubsub = get_utility(Utility.PUBSUB)
-    if pubsub is not None:
-        await pubsub.finalize()
-
-
-@pytest.fixture(scope="function")
 def local_maindb_settings(tmpdir):
     return DriverSettings(
         driver=DriverConfig.LOCAL,
@@ -526,72 +497,6 @@ async def local_maindb_driver(local_maindb_settings) -> AsyncIterator[Driver]:
     await driver.finalize()
 
     ingest_settings.driver_local_url = None
-    clean_utility(Utility.MAINDB_DRIVER)
-
-
-@pytest.fixture(scope="function")
-def tikv_maindb_settings(tikvd):
-    if os.environ.get("TESTING_TIKV_LOCAL", None):
-        url = "localhost:2379"
-    else:
-        url = f"{tikvd[0]}:{tikvd[2]}"
-
-    # before using tikv, clear the db
-    # delete here instead of `tikv_driver` fixture because
-    # these settings are used in tests that the driver fixture
-    # is not used
-    client = tikv_client.TransactionClient.connect([url])
-    txn = client.begin(pessimistic=False)
-    for key in txn.scan_keys(start=b"", end=None, limit=99999):
-        txn.delete(key)
-    txn.commit()
-
-    return DriverSettings(driver=DriverConfig.TIKV, driver_tikv_url=[url])
-
-
-@pytest.fixture(scope="function")
-async def tikv_maindb_driver(tikv_maindb_settings) -> AsyncIterator[Driver]:
-    url = tikv_maindb_settings.driver_tikv_url
-    ingest_settings.driver = DriverConfig.TIKV
-    ingest_settings.driver_tikv_url = url
-
-    driver: Driver = TiKVDriver(url=url)
-    await driver.initialize()
-
-    yield driver
-
-    await driver.finalize()
-    ingest_settings.driver_tikv_url = None
-    clean_utility(Utility.MAINDB_DRIVER)
-
-
-@pytest.fixture(scope="function")
-def redis_maindb_settings(redis):
-    return DriverSettings(
-        driver=DriverConfig.REDIS,
-        driver_redis_url=f"redis://{redis[0]}:{redis[1]}",
-    )
-
-
-@pytest.fixture(scope="function")
-async def redis_maindb_driver(redis_maindb_settings) -> AsyncIterator[RedisDriver]:
-    url = redis_maindb_settings.driver_redis_url
-    ingest_settings.driver = DriverConfig.REDIS
-    ingest_settings.driver_redis_url = url
-
-    driver = RedisDriver(url=url)
-    await driver.initialize()
-
-    assert driver.redis is not None
-    await driver.redis.flushall()
-    logging.info(f"Redis driver ready at {url}")
-
-    set_utility(Utility.MAINDB_DRIVER, driver)
-
-    yield driver
-
-    await driver.finalize()
-    ingest_settings.driver_redis_url = None
     clean_utility(Utility.MAINDB_DRIVER)
 
 
@@ -689,7 +594,7 @@ def blobstorage_settings(local_storage_settings):
     yield local_storage_settings
 
 
-def maindb_driver_lazy_fixtures(default_drivers: str = "redis"):
+def maindb_driver_lazy_fixtures(default_drivers: str = "pg"):
     """
     Allows running tests using maindb_driver for each supported driver type via env vars.
 

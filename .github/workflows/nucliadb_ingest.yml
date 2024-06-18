@@ -15,7 +15,6 @@ concurrency:
 env:
   CONTAINER_REGISTRY: europe-west4-docker.pkg.dev/nuclia-internal/nuclia
   IMAGE_NAME: ingest
-  TESTING_TIKV_LOCAL: "true"
 
 jobs:
   # Job to run tests
@@ -26,10 +25,7 @@ jobs:
       max-parallel: 2
       matrix:
         include:
-          - maindb_driver: "tikv"
-            storage_backend: "gcs"
-            python-version: "3.12"
-          - maindb_driver: "tikv"
+          - maindb_driver: "pg"
             storage_backend: "s3"
             python-version: "3.12"
           - maindb_driver: "pg"
@@ -47,10 +43,6 @@ jobs:
 
       - name: Install the package
         run: make -C nucliadb/ install-dev
-
-      - name: Install tikv
-        if: matrix.maindb_driver == 'tikv'
-        run: sudo cp ./scripts/pingcap-com.pem /usr/local/share/ca-certificates/pingcap.crt && sudo update-ca-certificates && ./scripts/run-tikv.sh
 
       - name: Run tests
         env:
