@@ -121,12 +121,6 @@ async def setup_telemetry(service_name: str) -> Optional[AsyncTracerProvider]:
         set_global_textmap(B3MultiFormat())
 
         try:
-            from nucliadb_telemetry.tikv import TiKVInstrumentor
-
-            TiKVInstrumentor().instrument(tracer_provider=tracer_provider)
-        except ImportError:  # pragma: no cover
-            pass
-        try:
             from opentelemetry.instrumentation.aiohttp_client import (
                 AioHttpClientInstrumentor,
             )

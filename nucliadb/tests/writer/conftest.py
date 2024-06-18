@@ -22,7 +22,6 @@ pytest_plugins = [
     "pytest_docker_fixtures",
     "nucliadb_utils.tests.nats",
     "tests.fixtures",
-    "tests.tikv",
     "tests.ingest.fixtures",  # should be refactored out
     "tests.writer.fixtures",
     "nucliadb_utils.tests.fixtures",

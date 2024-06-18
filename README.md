@@ -50,8 +50,8 @@ and inference. We do all the hard work for you.
 - Resources with multiple fields and metadata
 - Text/HTML/Markdown plain fields support
 - Field types: text, file, link, conversation
-- Storage layer support: TiKV, Redis and PostgreSQL
-- Blob support with S3-compatible API, GCS and PG drivers
+- Storage layer (PostgreSQL)
+- Blob support with S3-compatible API, GCS and Azure Blob Storage
 - Replication of index storage
 - Distributed search
 - Cloud-native

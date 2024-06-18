@@ -16,7 +16,7 @@ Then start a standalone NucliaDB locally in another terminal, for instance:
 ```bash
 DEBUG=true venv/bin/nucliadb
 ```
-You can change the way NucliaDB is started if you want to test other drivers (pg, tikv, etc).
+You can change the way NucliaDB is started if you want to test other drivers (pg, local, etc).
 
 And finally run the tests:
 ```bash

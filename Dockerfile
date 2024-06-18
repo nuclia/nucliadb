@@ -3,11 +3,6 @@ FROM python:3.12
 WORKDIR /usr/src/app
 
 # Cachable layers
-RUN ARCH="$(uname -m)"; \
-    case "$ARCH" in \
-    aarch64) pip install https://storage.googleapis.com/stashify-cdn/python/tikv_client-0.0.3-cp36-abi3-manylinux_2_31_aarch64.whl;; \
-    x86_64) pip install https://storage.googleapis.com/stashify-cdn/python/tikv_client-0.0.3-cp36-abi3-manylinux_2_31_x86_64.whl;; \
-    esac;
 RUN set -eux; \
     dpkgArch="$(dpkg --print-architecture)"; \
     case "${dpkgArch##*-}" in \

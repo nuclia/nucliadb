@@ -25,8 +25,6 @@ from pydantic_settings import BaseSettings
 
 
 class DriverConfig(Enum):
-    REDIS = "redis"
-    TIKV = "tikv"
     PG = "pg"
     LOCAL = "local"
     NOT_SET = "notset"  # setting not provided
@@ -43,16 +41,6 @@ class DriverConfig(Enum):
 
 class DriverSettings(BaseSettings):
     driver: DriverConfig = Field(default=DriverConfig.NOT_SET, description="K/V storage driver")
-    driver_redis_url: Optional[str] = Field(
-        default=None, description="Redis URL. Example: redis://localhost:6379"
-    )
-    driver_tikv_url: Optional[list[str]] = Field(
-        default=None,
-        description=(
-            "TiKV PD (Placement Driver) URLs. The URL to the cluster manager of"
-            "TiKV. Example: '[\"tikv-pd.svc:2379\"]'"
-        ),
-    )
     driver_local_url: Optional[str] = Field(
         default=None,
         description="Local path to store data on file system. Example: /nucliadb/data/main",
@@ -72,14 +60,6 @@ class DriverSettings(BaseSettings):
     driver_pg_connection_pool_acquire_timeout_ms: int = Field(
         default=1000,
         description="PostgreSQL pool acquire timeout in ms. The maximum time to wait until a connection becomes available.",
-    )
-    driver_tikv_connection_pool_size: int = Field(
-        default=3,
-        description="TiKV max pool size. The maximum number of connections to the TiKV server.",
-    )
-    driver_tikv_replication_pg_url: Optional[str] = Field(
-        default=None,
-        description="PostgreSQL DSN for replication",
     )
 
 

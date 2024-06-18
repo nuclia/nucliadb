@@ -60,10 +60,7 @@ jobs:
       max-parallel: 3
       matrix:
         include:
-          - maindb_driver: "tikv"
-            storage_backend: "gcs"
-            python-version: "3.12"
-          - maindb_driver: "tikv"
+          - maindb_driver: "pg"
             storage_backend: "s3"
             python-version: "3.12"
           - maindb_driver: "pg"

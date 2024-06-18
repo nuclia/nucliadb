@@ -44,14 +44,6 @@ RUN set -eux; \
 
 
 FROM python:3.12
-ENV TIKV_CLIENT_VERSION=0.0.3
-
-
-RUN ARCH="$(uname -m)"; \
-    case "$ARCH" in \
-    aarch64) pip install https://storage.googleapis.com/stashify-cdn/python/tikv_client-${TIKV_CLIENT_VERSION}-cp36-abi3-manylinux_2_31_aarch64.whl;; \
-    x86_64) pip install https://storage.googleapis.com/stashify-cdn/python/tikv_client-${TIKV_CLIENT_VERSION}-cp36-abi3-manylinux_2_31_x86_64.whl;; \
-    esac;
 
 RUN mkdir -p /usr/src/app
 

@@ -40,7 +40,6 @@ requirements_grpc = [
 ] + requirements_otel
 requirements_nats = ["nats-py[nkeys]>=2.5.0", "PyNaCl"] + requirements_otel
 requirements_fastapi = ["fastapi"] + requirements_otel
-requirements_tikv = ["tikv-client>=0.0.3"] + requirements_otel
 
 setup(
     name="nucliadb_telemetry",
@@ -73,15 +72,8 @@ setup(
         "grpc": requirements_grpc,
         "nats": requirements_nats,
         "fastapi": requirements_fastapi,
-        "tikv": requirements_tikv,
         "all": list(
-            set(
-                requirements_otel
-                + requirements_grpc
-                + requirements_nats
-                + requirements_fastapi
-                + requirements_tikv
-            )
+            set(requirements_otel + requirements_grpc + requirements_nats + requirements_fastapi)
         ),
     },
     package_data={"": ["*.txt", "*.md"], "nucliadb_telemetry": ["py.typed"]},

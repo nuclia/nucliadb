@@ -10,9 +10,8 @@ http:
     - http://localhost:4200
 
 maindb:
-  driver: redis # tikv | redis
-  driver_redis_url:
-  driver_tikv_url:
+  driver: pg
+  driver_pg_url:
 
 storage:
   file_backend: gcs

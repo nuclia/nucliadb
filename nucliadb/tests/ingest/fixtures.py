@@ -94,7 +94,7 @@ class IngestFixture:
 
 
 @pytest.fixture(scope="function")
-async def ingest_consumers(redis_config, transaction_utility, storage, fake_node, nats_manager):
+async def ingest_consumers(maindb_settings, transaction_utility, storage, fake_node, nats_manager):
     ingest_consumers_finalizer = await consumer_service.start_ingest_consumers()
 
     yield
@@ -104,7 +104,9 @@ async def ingest_consumers(redis_config, transaction_utility, storage, fake_node
 
 
 @pytest.fixture(scope="function")
-async def ingest_processed_consumer(redis_config, transaction_utility, storage, fake_node, nats_manager):
+async def ingest_processed_consumer(
+    maindb_settings, transaction_utility, storage, fake_node, nats_manager
+):
     ingest_consumer_finalizer = await consumer_service.start_ingest_processed_consumer()
 
     yield
