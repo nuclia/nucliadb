@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import functools
+import json
 from time import monotonic as time
 from typing import AsyncGenerator, Optional
 
@@ -28,6 +29,7 @@ from nucliadb.search.predict import (
     AnswerStatusCode,
     CitationsGenerativeResponse,
     GenerativeChunk,
+    JSONGenerativeResponse,
     MetaGenerativeResponse,
     RephraseMissingContextError,
     StatusGenerativeResponse,
@@ -62,6 +64,7 @@ from nucliadb_models.search import (
     CitationsAskResponseItem,
     DebugAskResponseItem,
     ErrorAskResponseItem,
+    JSONAskResponseItem,
     KnowledgeboxFindResults,
     MetadataAskResponseItem,
     MinScore,
@@ -108,6 +111,7 @@ class AskResult:
 
         # Computed from the predict chat answer stream
         self._answer_text = ""
+        self._object: Optional[JSONGenerativeResponse] = None
         self._status: Optional[StatusGenerativeResponse] = None
         self._citations: Optional[CitationsGenerativeResponse] = None
         self._metadata: Optional[MetaGenerativeResponse] = None
@@ -164,6 +168,9 @@ class AskResult:
         async for answer_chunk in self._stream_predict_answer_text():
             yield AnswerAskResponseItem(text=answer_chunk)
 
+        if self._object is not None:
+            yield JSONAskResponseItem(object=self._object.object)
+
         # Then the status
         if self.status_code == AnswerStatusCode.ERROR:
             # If predict yielded an error status, we yield it too and halt the stream immediately
@@ -180,8 +187,12 @@ class AskResult:
         )
 
         # Audit the answer
+        if self._object is None:
+            audit_answer = self._answer_text.encode("utf-8")
+        else:
+            audit_answer = json.dumps(self._object.object).encode("utf-8")
         await self.auditor.audit(
-            text_answer=self._answer_text.encode("utf-8"),
+            text_answer=audit_answer,
             status_code=self.status_code,
         )
 
@@ -240,8 +251,14 @@ class AskResult:
         citations = {}
         if self._citations is not None:
             citations = self._citations.citations
+
+        answer_json = None
+        if self._object is not None:
+            answer_json = self._object.object
+
         response = SyncAskResponse(
             answer=self._answer_text,
+            answer_json=answer_json,
             status=self.status_code.prettify(),
             relations=self._relations,
             retrieval_results=self.find_results,
@@ -285,6 +302,8 @@ class AskResult:
                     self.metrics.record_first_chunk_yielded()
                     first_answer_chunk_yielded = True
                 yield item.text
+            if isinstance(item, JSONGenerativeResponse):
+                self._object = item
             elif isinstance(item, StatusGenerativeResponse):
                 self._status = item
             elif isinstance(item, CitationsGenerativeResponse):

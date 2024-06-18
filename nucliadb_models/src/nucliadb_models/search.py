@@ -1406,6 +1406,11 @@ class SyncAskResponse(BaseModel):
         title="Answer",
         description="The generative answer to the query",
     )
+    answer_json: Optional[Dict[str, Any]] = Field(
+        default=None,
+        title="Answer JSON",
+        description="The generative JSON answer to the query. This is returned only if the answer_json_schema parameter is provided in the request.",  # noqa
+    )
     status: str = Field(
         title="Status",
         description="The status of the query execution. It can be 'success', 'error' or 'no_context'",  # noqa
@@ -1456,6 +1461,11 @@ class AnswerAskResponseItem(BaseModel):
     text: str
 
 
+class JSONAskResponseItem(BaseModel):
+    type: Literal["answer_json"] = "answer_json"
+    object: Dict[str, Any]
+
+
 class MetadataAskResponseItem(BaseModel):
     type: Literal["metadata"] = "metadata"
     tokens: AskTokens
@@ -1491,6 +1501,7 @@ class DebugAskResponseItem(BaseModel):
 
 AskResponseItemType = Union[
     AnswerAskResponseItem,
+    JSONAskResponseItem,
     MetadataAskResponseItem,
     CitationsAskResponseItem,
     StatusAskResponseItem,

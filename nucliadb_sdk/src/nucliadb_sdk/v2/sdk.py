@@ -70,6 +70,7 @@ from nucliadb_models.search import (
     ErrorAskResponseItem,
     FeedbackRequest,
     FindRequest,
+    JSONAskResponseItem,
     KnowledgeboxFindResults,
     KnowledgeboxSearchResults,
     MetadataAskResponseItem,
@@ -160,6 +161,7 @@ def ask_response_parser(response: httpx.Response) -> SyncAskResponse:
         return SyncAskResponse.model_validate_json(response.content)
 
     answer = ""
+    answer_json = None
     status = ""
     retrieval_results = None
     relations = None
@@ -173,6 +175,8 @@ def ask_response_parser(response: httpx.Response) -> SyncAskResponse:
             item = AskResponseItem.model_validate_json(line).item
             if isinstance(item, AnswerAskResponseItem):
                 answer += item.text
+            elif isinstance(item, JSONAskResponseItem):
+                answer_json = item.object
             elif isinstance(item, RelationsAskResponseItem):
                 relations = item.relations
             elif isinstance(item, StatusAskResponseItem):
@@ -203,6 +207,7 @@ def ask_response_parser(response: httpx.Response) -> SyncAskResponse:
 
     return SyncAskResponse(
         answer=answer,
+        answer_json=answer_json,
         status=status,
         retrieval_results=retrieval_results,
         relations=relations,

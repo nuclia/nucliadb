@@ -20,7 +20,7 @@
 import json
 import os
 from enum import Enum
-from typing import Any, AsyncIterator, Literal, Optional, Union
+from typing import Any, AsyncIterator, Dict, Literal, Optional, Union
 from unittest.mock import AsyncMock, Mock
 
 import aiohttp
@@ -126,6 +126,11 @@ class TextGenerativeResponse(BaseModel):
     text: str
 
 
+class JSONGenerativeResponse(BaseModel):
+    type: Literal["object"] = "object"
+    object: Dict[str, Any]
+
+
 class MetaGenerativeResponse(BaseModel):
     type: Literal["meta"] = "meta"
     input_tokens: int
@@ -146,6 +151,7 @@ class StatusGenerativeResponse(BaseModel):
 
 GenerativeResponse = Union[
     TextGenerativeResponse,
+    JSONGenerativeResponse,
     MetaGenerativeResponse,
     CitationsGenerativeResponse,
     StatusGenerativeResponse,
