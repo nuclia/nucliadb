@@ -3,6 +3,7 @@ name = "nucliadb_workspace"
 requires-python = ">=3.9"
 version = "0.0.0"
 dependencies = [
+    "azure-identity>=1.16.1",
 ]
 
 [tool.pdm.dev-dependencies]
