@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-
+import asyncio
 import dataclasses
 
 import pytest
@@ -166,3 +166,103 @@ async def test_paragraph_index_deletions(
     _rid, resource = resp_json["resources"].popitem()
     fields = resource["fields"]
     assert len(fields) == 3
+
+    # Edit the field changing it's content
+    text_field = FieldData(
+        "text",
+        FieldType.TEXT,
+        "Modified text",
+        "Modified coming from processor",
+        [3.0] * 512,
+    )
+
+    resp = await nucliadb_writer.patch(
+        f"/kb/{knowledgebox}/resource/{rid}",
+        json={
+            "texts": {
+                text_field.field_id: {
+                    "body": text_field.text,
+                },
+            }
+        },
+        timeout=None,
+    )
+    assert resp.status_code == 200
+
+    bm = BrokerMessage(
+        kbid=knowledgebox,
+        uuid=rid,
+        type=BrokerMessage.MessageType.AUTOCOMMIT,
+        source=BrokerMessage.MessageSource.PROCESSOR,
+    )
+
+    for field_data in (title_field, summary_field, text_field):
+        pbfield = FieldID(
+            field=field_data.field_id,
+            field_type=field_data.field_type,
+        )
+        etw = ExtractedTextWrapper()
+        etw.field.CopyFrom(pbfield)
+        etw.body.text = field_data.extracted_text
+        bm.extracted_text.append(etw)
+
+        evw = ExtractedVectorsWrapper()
+        evw.field.CopyFrom(pbfield)
+        vector = Vector(
+            start=0,
+            end=len(field_data.extracted_text),
+            start_paragraph=0,
+            end_paragraph=len(field_data.extracted_text),
+            vector=field_data.vector,
+        )
+        evw.vectors.vectors.vectors.append(vector)
+        bm.field_vectors.append(evw)
+
+        fcmw = FieldComputedMetadataWrapper()
+        fcmw.field.CopyFrom(pbfield)
+        fcmw.metadata.metadata.paragraphs.append(Paragraph(start=0, end=len(field_data.extracted_text)))
+        bm.field_metadata.append(fcmw)
+
+    await inject_message(nucliadb_grpc, bm)
+
+    await asyncio.sleep(0.5)  # wait for a while until reader gets updated
+
+    # Check that searching for original texts does not return any results
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/find",
+        json={
+            "query": "Extracted",
+            "features": ["paragraph"],
+            "min_score": {"bm25": 0.0},
+        },
+        timeout=None,
+    )
+    assert resp.status_code == 200
+    resp_json = resp.json()
+    assert len(resp_json["resources"]) == 1
+    _rid, resource = resp_json["resources"].popitem()
+    assert rid == _rid
+    fields = resource["fields"]
+    assert len(fields) == 2
+    assert list(sorted(fields.keys())) == ["/a/summary", "/a/title"]
+
+    # Check that searching for extracted texts returns all fields
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/find",
+        json={
+            "query": "Modified",
+            "features": ["paragraph"],
+        },
+        timeout=None,
+    )
+    assert resp.status_code == 200
+    resp_json = resp.json()
+    assert len(resp_json["resources"]) == 1
+    _rid, resource = resp_json["resources"].popitem()
+    assert rid == _rid
+    fields = resource["fields"]
+    assert len(fields) == 1
+    assert len(fields["/t/text"]["paragraphs"]) == 1
+    paragraph_id = list(fields["/t/text"]["paragraphs"].keys())[0]
+    assert paragraph_id == f"{rid}/t/text/0-{len(text_field.extracted_text)}"
+    fields["/t/text"]["paragraphs"][paragraph_id]["text"] == text_field.extracted_text
