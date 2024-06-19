@@ -79,7 +79,6 @@ async def create_kb(request: Request, item: KnowledgeBoxConfig) -> KnowledgeBoxO
 
 
 async def _create_kb(item: KnowledgeBoxConfig) -> tuple[str, Optional[str]]:
-    breakpoint()
     driver = get_driver()
     rollback_learning_config = None
 

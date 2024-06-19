@@ -194,7 +194,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         response = OpStatusWriter()
         async for message in request_stream:
             try:
-                breakpoint()
+                #                breakpoint()
                 await self.proc.process(
                     message, -1, partition=self.partitions[0], transaction_check=False
                 )

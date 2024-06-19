@@ -19,60 +19,86 @@
 #
 
 
-
-
 import dataclasses
+
+import pytest
 from httpx import AsyncClient
-from nucliadb_protos.resources_pb2 import ExtractedTextWrapper, FieldID, FieldType, ExtractedVectorsWrapper
+
+from nucliadb_protos.resources_pb2 import (
+    ExtractedTextWrapper,
+    ExtractedVectorsWrapper,
+    FieldID,
+    FieldType,
+)
 from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2 import BrokerMessage, OpStatusWriter
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-import pytest
 
 
 @pytest.mark.asyncio
-#@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+# @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL",), indirect=True)
-async def test_concurrences(
+async def test_paragraph_index_deletions(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     nucliadb_grpc: WriterStub,
     knowledgebox,
 ):
     @dataclasses.dataclass
-    class Field:
+    class FieldData:
+        """
+        Used for testing purposes only
+        """
+
         field_id: str
         field_type: FieldType
         text: str
         extracted_text: str
         vector: list[float]
 
-    # 
-    original_text = "Original text uploaded by the user"
-    extracted_text = "Extracted at processing time"
-    extracted_vector = [1.0] * 512
-    title = Field("title", FieldType.TEXT, original_text, extracted_text, extracted_vector)
-    summary = Field("summary", FieldType.TEXT, original_text, extracted_text, extracted_vector)
-    text = Field("text", FieldType.TEXT, original_text, extracted_text, extracted_vector)
+    # We create a resource with a title, summary and text fields
+    original_text = "Original {field_id}"
+    extracted_text = "Extracted {field_id}"
+    title_field = FieldData(
+        "title",
+        FieldType.GENERIC,
+        original_text.format(field_id="title"),
+        extracted_text.format(field_id="title"),
+        [1.0] * 512,
+    )
+    summary_field = FieldData(
+        "summary",
+        FieldType.GENERIC,
+        original_text.format(field_id="summary"),
+        extracted_text.format(field_id="summary"),
+        [2.0] * 512,
+    )
+    text_field = FieldData(
+        "text",
+        FieldType.TEXT,
+        original_text.format(field_id="text"),
+        extracted_text.format(field_id="text"),
+        [3.0] * 512,
+    )
 
     # Create a resource with a simple text field
     resp = await nucliadb_writer.post(
         f"/kb/{knowledgebox}/resources",
         json={
-            "title": title.text,
-            "summary": summary.text,
+            "title": title_field.text,
+            "summary": summary_field.text,
             "texts": {
-                text.field_id: {
-                    "body": text.text,
+                text_field.field_id: {
+                    "body": text_field.text,
                 },
-            }
+            },
         },
         timeout=None,
     )
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
 
-    # Inject corresponding processed broker message
+    # Inject corresponding broker message as if it was coming from the processor
     bm = BrokerMessage(
         kbid=knowledgebox,
         uuid=rid,
@@ -80,24 +106,24 @@ async def test_concurrences(
         source=BrokerMessage.MessageSource.PROCESSOR,
     )
 
-    for field in (title, summary, text):
+    for field_data in (title_field, summary_field, text_field):
         pbfield = FieldID(
-            field=field.field_id,
-            field_type=field.field_type,
+            field=field_data.field_id,
+            field_type=field_data.field_type,
         )
         etw = ExtractedTextWrapper()
         etw.field.CopyFrom(pbfield)
-        etw.body.text = field.extracted_text
+        etw.body.text = field_data.extracted_text
         bm.extracted_text.append(etw)
 
         evw = ExtractedVectorsWrapper()
         evw.field.CopyFrom(pbfield)
         vector = Vector(
             start=0,
-            end=len(field.extracted_text),
+            end=len(field_data.extracted_text),
             start_paragraph=0,
-            end_paragraph=len(field.extracted_text),
-            vector=field.vector,
+            end_paragraph=len(field_data.extracted_text),
+            vector=field_data.vector,
         )
         evw.vectors.vectors.vectors.append(vector)
         bm.field_vectors.append(evw)
@@ -105,16 +131,31 @@ async def test_concurrences(
     status: OpStatusWriter = await nucliadb_grpc.ProcessMessage([bm], timeout=None)
     assert status.status == OpStatusWriter.Status.OK
 
-    # Check that the resource is in the database
+    # Check that searching for original texts does not return any results
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/find",
         json={
-            "query": "extracted",
-            "features": ["paragraph", "vector"],
-            "vector": extracted_vector,
+            "query": "Original",
+            "features": ["paragraph"],
+            "min_score": {"bm25": 0.0},
         },
         timeout=None,
     )
     assert resp.status_code == 200
-    breakpoint()
-    pass
+    resp_json = resp.json()
+    assert len(resp_json["resources"]) == 0
+
+    # Check that searching for extracted texts returns all fields
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/find",
+        json={
+            "query": "Extracted",
+            "features": ["paragraph"],
+        },
+        timeout=None,
+    )
+    assert resp.status_code == 200
+    resp_json = resp.json()
+    assert len(resp_json["resources"]) == 1
+    fields = resp_json["resources"].popitem()
+    assert len(fields) == 3

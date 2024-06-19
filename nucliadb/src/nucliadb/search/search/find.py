@@ -93,6 +93,7 @@ async def find(
         )
     incomplete_results = incomplete_results or query_incomplete_results
 
+    breakpoint()
     # We need to merge
     with metrics.time("results_merge"):
         search_results = await find_merge_results(

@@ -308,9 +308,13 @@ class ResourceBrain:
             self.brain.sentences_to_delete.append(
                 ids.FieldId(rid=self.rid, field_id=field_id, subfield_id=split).full()
             )
+            self.brain.paragraphs_to_delete.append(
+                ids.FieldId(rid=self.rid, field_id=field_id, subfield_id=split).full()
+            )
 
         if replace_field:
             self.brain.sentences_to_delete.append(ids.FieldId(rid=self.rid, field_id=field_id).full())
+            self.brain.paragraphs_to_delete.append(ids.FieldId(rid=self.rid, field_id=field_id).full())
 
     def _apply_field_vector(
         self,
@@ -354,11 +358,12 @@ class ResourceBrain:
         sentence_pb.metadata.position.index = paragraph_pb.metadata.position.index
 
     def delete_vectors(self, field_key: str, vo: VectorObject):
-        for subfield, vectors in vo.split_vectors.items():
+        for subfield, _ in vo.split_vectors.items():
             self.brain.sentences_to_delete.append(f"{self.rid}/{field_key}/{subfield}")
+            self.brain.paragraphs_to_delete.append(f"{self.rid}/{field_key}/{subfield}")
 
-        for vector in vo.vectors.vectors:
-            self.brain.sentences_to_delete.append(f"{self.rid}/{field_key}")
+        self.brain.sentences_to_delete.append(f"{self.rid}/{field_key}")
+        self.brain.paragraphs_to_delete.append(f"{self.rid}/{field_key}")
 
     def set_processing_status(self, basic: Basic, previous_status: Optional[Metadata.Status.ValueType]):
         """
