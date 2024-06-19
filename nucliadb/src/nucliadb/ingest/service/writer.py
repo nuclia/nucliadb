@@ -335,11 +335,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
         async with self.driver.transaction() as txn:
             kbobj.txn = txn
-            kbobj = await self.proc.get_kb_obj(txn, request.kb)
-            if kbobj is None:
-                response.status = UpdateEntitiesGroupResponse.Status.KB_NOT_FOUND
-                return response
-
             entities_manager = EntitiesManager(kbobj, txn)
             try:
                 await entities_manager.set_entities_group_metadata(
