@@ -70,7 +70,7 @@ async def create_rollover_shards(
     logger.info("Creating rollover shards", extra={"kbid": kbid})
     sm = app_context.shard_manager
 
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_ro_transaction() as txn:
         existing_rollover_shards = await datamanagers.rollover.get_kb_rollover_shards(txn, kbid=kbid)
         if existing_rollover_shards is not None:
             logger.info("Rollover shards already exist, skipping", extra={"kbid": kbid})
@@ -80,54 +80,55 @@ async def create_rollover_shards(
         if kb_shards is None:
             raise UnexpectedRolloverError(f"No shards found for KB {kbid}")
 
-        # create new shards
-        created_shards = []
-        try:
-            nodes = cluster_manager.sorted_primary_nodes(ignore_nodes=drain_nodes)
-            for shard in kb_shards.shards:
-                shard.ClearField("replicas")
-                # Attempt to create configured number of replicas
-                replicas_created = 0
-                while replicas_created < settings.node_replicas:
-                    if len(nodes) == 0:
-                        # could have multiple shards on single node
-                        nodes = cluster_manager.sorted_primary_nodes(ignore_nodes=drain_nodes)
-                    node_id = nodes.pop(0)
+    # create new shards
+    created_shards = []
+    try:
+        nodes = cluster_manager.sorted_primary_nodes(ignore_nodes=drain_nodes)
+        for shard in kb_shards.shards:
+            shard.ClearField("replicas")
+            # Attempt to create configured number of replicas
+            replicas_created = 0
+            while replicas_created < settings.node_replicas:
+                if len(nodes) == 0:
+                    # could have multiple shards on single node
+                    nodes = cluster_manager.sorted_primary_nodes(ignore_nodes=drain_nodes)
+                node_id = nodes.pop(0)
 
-                    node = get_index_node(node_id)
-                    if node is None:
-                        logger.error(f"Node {node_id} is not found or not available")
-                        continue
-                    is_matryoshka = len(kb_shards.model.matryoshka_dimensions) > 0
-                    vector_index_config = nodewriter_pb2.VectorIndexConfig(
-                        similarity=kb_shards.similarity,
-                        vector_type=nodewriter_pb2.VectorType.DENSE_F32,
-                        vector_dimension=kb_shards.model.vector_dimension,
-                        normalize_vectors=is_matryoshka,
+                node = get_index_node(node_id)
+                if node is None:
+                    logger.error(f"Node {node_id} is not found or not available")
+                    continue
+                is_matryoshka = len(kb_shards.model.matryoshka_dimensions) > 0
+                vector_index_config = nodewriter_pb2.VectorIndexConfig(
+                    similarity=kb_shards.similarity,
+                    vector_type=nodewriter_pb2.VectorType.DENSE_F32,
+                    vector_dimension=kb_shards.model.vector_dimension,
+                    normalize_vectors=is_matryoshka,
+                )
+                try:
+                    shard_created = await node.new_shard(
+                        kbid,
+                        release_channel=kb_shards.release_channel,
+                        vector_index_config=vector_index_config,
                     )
-                    try:
-                        shard_created = await node.new_shard(
-                            kbid,
-                            release_channel=kb_shards.release_channel,
-                            vector_index_config=vector_index_config,
-                        )
-                    except Exception as e:
-                        errors.capture_exception(e)
-                        logger.exception(f"Error creating new shard at {node}")
-                        continue
+                except Exception as e:
+                    errors.capture_exception(e)
+                    logger.exception(f"Error creating new shard at {node}")
+                    continue
 
-                    replica = writer_pb2.ShardReplica(node=str(node_id))
-                    replica.shard.CopyFrom(shard_created)
-                    shard.replicas.append(replica)
-                    created_shards.append(shard)
-                    replicas_created += 1
-        except Exception as e:
-            errors.capture_exception(e)
-            logger.exception("Unexpected error creating new shard")
-            for created_shard in created_shards:
-                await sm.rollback_shard(created_shard)
-            raise e
+                replica = writer_pb2.ShardReplica(node=str(node_id))
+                replica.shard.CopyFrom(shard_created)
+                shard.replicas.append(replica)
+                created_shards.append(shard)
+                replicas_created += 1
+    except Exception as e:
+        errors.capture_exception(e)
+        logger.exception("Unexpected error creating new shard")
+        for created_shard in created_shards:
+            await sm.rollback_shard(created_shard)
+        raise e
 
+    async with datamanagers.with_transaction() as txn:
         await datamanagers.rollover.update_kb_rollover_shards(txn, kbid=kbid, kb_shards=kb_shards)
         await txn.commit()
         return kb_shards

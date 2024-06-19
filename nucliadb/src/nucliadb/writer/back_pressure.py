@@ -504,7 +504,7 @@ async def get_nats_consumer_pending_messages(
 
 
 async def get_kb_active_shard(context: ApplicationContext, kbid: str) -> Optional[ShardObject]:
-    async with context.kv_driver.transaction() as txn:
+    async with context.kv_driver.transaction(read_only=True) as txn:
         return await context.shard_manager.get_current_active_shard(txn, kbid)
 
 
