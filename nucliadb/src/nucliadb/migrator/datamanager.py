@@ -66,7 +66,7 @@ class MigrationsDataManager:
             await txn.commit()
 
     async def get_kb_info(self, kbid: str) -> Optional[KnowledgeBoxInfo]:
-        async with self.driver.transaction() as txn:
+        async with self.driver.transaction(read_only=True) as txn:
             kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
             if kb_config is None:
                 return None
