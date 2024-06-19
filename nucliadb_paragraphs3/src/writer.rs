@@ -98,6 +98,8 @@ impl ParagraphWriter for ParagraphWriterService {
             self.writer.delete_term(paragraph_uuid_term);
         }
 
+        self.writer.commit()?;
+
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Processing paragraphs to delete: ends at {v} ms");
 
@@ -282,7 +284,8 @@ impl ParagraphWriterService {
                 doc.add_u64(self.schema.end_pos, end_pos);
                 doc.add_u64(self.schema.index, index);
                 doc.add_text(self.schema.split, split);
-                doc.add_text(self.schema.field_uuid, format!("{}/{}", resource.resource.as_ref().unwrap().uuid, field));
+                let field_uuid = format!("{}/{}", resource.resource.as_ref().unwrap().uuid, field);
+                doc.add_text(self.schema.field_uuid, field_uuid.clone());
 
                 self.writer.delete_term(paragraph_term);
                 self.writer.add_document(doc)?;
