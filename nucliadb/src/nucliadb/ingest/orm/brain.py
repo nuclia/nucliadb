@@ -229,12 +229,20 @@ class ResourceBrain:
 
     def delete_metadata(self, field_key: str, metadata: FieldComputedMetadata):
         for subfield, metadata_split in metadata.split_metadata.items():
+            self.brain.paragraphs_to_delete.append(
+                ids.FieldId(rid=self.rid, field_id=field_key, subfield_id=subfield).full()
+            )
+            # TODO: Bw/c, remove this when the new paragraph deletion by field
+            # is promoted
             for paragraph in metadata_split.paragraphs:
                 self.brain.paragraphs_to_delete.append(
                     f"{self.rid}/{field_key}/{subfield}/{paragraph.start}-{paragraph.end}"
                 )
 
         for paragraph in metadata.metadata.paragraphs:
+            self.brain.paragraphs_to_delete.append(ids.FieldId(rid=self.rid, field_id=field_key).full())
+            # TODO: Bw/c, remove this when the new paragraph deletion by field
+            # is promoted
             self.brain.paragraphs_to_delete.append(
                 f"{self.rid}/{field_key}/{paragraph.start}-{paragraph.end}"
             )
@@ -360,10 +368,8 @@ class ResourceBrain:
     def delete_vectors(self, field_key: str, vo: VectorObject):
         for subfield, _ in vo.split_vectors.items():
             self.brain.sentences_to_delete.append(f"{self.rid}/{field_key}/{subfield}")
-            self.brain.paragraphs_to_delete.append(f"{self.rid}/{field_key}/{subfield}")
 
         self.brain.sentences_to_delete.append(f"{self.rid}/{field_key}")
-        self.brain.paragraphs_to_delete.append(f"{self.rid}/{field_key}")
 
     def set_processing_status(self, basic: Basic, previous_status: Optional[Metadata.Status.ValueType]):
         """
