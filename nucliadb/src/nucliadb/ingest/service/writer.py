@@ -209,12 +209,14 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request: NewEntitiesGroupRequest, context=None
     ) -> NewEntitiesGroupResponse:
         response = NewEntitiesGroupResponse()
-        async with self.driver.transaction() as txn:
-            kbobj = await self.proc.get_kb_obj(txn, request.kb)
+        async with self.driver.transaction(read_only=True) as ro_txn:
+            kbobj = await self.proc.get_kb_obj(ro_txn, request.kb)
             if kbobj is None:
                 response.status = NewEntitiesGroupResponse.Status.KB_NOT_FOUND
                 return response
 
+        async with self.driver.transaction() as txn:
+            kbobj.txn = txn
             entities_manager = EntitiesManager(kbobj, txn)
             try:
                 await entities_manager.create_entities_group(request.group, request.entities)
@@ -232,7 +234,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         response = GetEntitiesResponse()
         async with self.driver.transaction(read_only=True) as txn:
             kbobj = await self.proc.get_kb_obj(txn, request.kb)
-
             if kbobj is None:
                 response.status = GetEntitiesResponse.Status.NOTFOUND
                 return response
@@ -255,7 +256,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         response = ListEntitiesGroupsResponse()
         async with self.driver.transaction(read_only=True) as txn:
             kbobj = await self.proc.get_kb_obj(txn, request.kb)
-
             if kbobj is None:
                 response.status = ListEntitiesGroupsResponse.Status.NOTFOUND
                 return response
@@ -303,12 +303,14 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
     async def SetEntities(self, request: SetEntitiesRequest, context=None) -> OpStatusWriter:  # type: ignore
         response = OpStatusWriter()
-        async with self.driver.transaction() as txn:
-            kbobj = await self.proc.get_kb_obj(txn, request.kb)
+        async with self.driver.transaction(read_only=True) as ro_txn:
+            kbobj = await self.proc.get_kb_obj(ro_txn, request.kb)
             if kbobj is None:
                 response.status = OpStatusWriter.Status.NOTFOUND
                 return response
 
+        async with self.driver.transaction() as txn:
+            kbobj.txn = txn
             entities_manager = EntitiesManager(kbobj, txn)
             try:
                 await entities_manager.set_entities_group(request.group, request.entities)
@@ -325,14 +327,20 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request: UpdateEntitiesGroupRequest, context=None
     ) -> UpdateEntitiesGroupResponse:
         response = UpdateEntitiesGroupResponse()
+        async with self.driver.transaction(read_only=True) as ro_txn:
+            kbobj = await self.proc.get_kb_obj(ro_txn, request.kb)
+            if kbobj is None:
+                response.status = UpdateEntitiesGroupResponse.Status.KB_NOT_FOUND
+                return response
+
         async with self.driver.transaction() as txn:
+            kbobj.txn = txn
             kbobj = await self.proc.get_kb_obj(txn, request.kb)
             if kbobj is None:
                 response.status = UpdateEntitiesGroupResponse.Status.KB_NOT_FOUND
                 return response
 
             entities_manager = EntitiesManager(kbobj, txn)
-
             try:
                 await entities_manager.set_entities_group_metadata(
                     request.group,
@@ -352,12 +360,15 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
     async def DelEntities(self, request: DelEntitiesRequest, context=None) -> OpStatusWriter:  # type: ignore
         response = OpStatusWriter()
-        async with self.driver.transaction() as txn:
-            kbobj = await self.proc.get_kb_obj(txn, request.kb)
+
+        async with self.driver.transaction(read_only=True) as ro_txn:
+            kbobj = await self.proc.get_kb_obj(ro_txn, request.kb)
             if kbobj is None:
                 response.status = OpStatusWriter.Status.NOTFOUND
                 return response
 
+        async with self.driver.transaction() as txn:
+            kbobj.txn = txn
             entities_manager = EntitiesManager(kbobj, txn)
             try:
                 await entities_manager.delete_entities_group(request.group)
