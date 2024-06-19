@@ -75,9 +75,8 @@ class UploadServicer:
     ) -> GetEntitiesResponse:
         kbid = request.kb.uuid
         response = GetEntitiesResponse()
-        async with self.proc.driver.transaction() as txn:
+        async with self.proc.driver.transaction(read_only=True) as txn:
             kbobj = await self.proc.get_kb_obj(txn, request.kb)
-
             if kbobj is None:
                 response.status = GetEntitiesResponse.Status.NOTFOUND
                 return response
