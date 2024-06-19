@@ -87,13 +87,17 @@ impl ParagraphWriter for ParagraphWriterService {
         debug!("{id:?} - Processing paragraphs to delete: starts at {v} ms");
 
         // Delete all paragraphs matching the field_uuid
-        for field_uuid in &resource.paragraphs_to_delete {
-            eprintln!("FOO Deleting paragraphs for field_uuid: {}", field_uuid);
-            let field_uuid_term = Term::from_field_text(self.schema.field_uuid, field_uuid);
+        //
+        // Bw/c delete by paragraph_id
+        for field_or_paragraph_id in &resource.paragraphs_to_delete {
+            let field_uuid_term = Term::from_field_text(self.schema.field_uuid, field_or_paragraph_id);
             self.writer.delete_term(field_uuid_term);
+            // TODO: remove deletion by paragraph_id when deletion by field gets
+            // promoted
+            let paragraph_uuid_term = Term::from_field_text(self.schema.paragraph, field_or_paragraph_id);
+            self.writer.delete_term(paragraph_uuid_term);
         }
-        self.writer.commit()?;
-        
+
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Processing paragraphs to delete: ends at {v} ms");
 
@@ -281,7 +285,6 @@ impl ParagraphWriterService {
                 doc.add_text(self.schema.field_uuid, format!("{}/{}", resource.resource.as_ref().unwrap().uuid, field));
 
                 self.writer.delete_term(paragraph_term);
-                eprintln!("FOO Adding paragraph: {:?}", doc);
                 self.writer.add_document(doc)?;
                 if paragraph_counter % 500 == 0 {
                     self.writer.commit()?;
