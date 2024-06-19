@@ -128,7 +128,7 @@ async def create_rollover_shards(
             await sm.rollback_shard(created_shard)
         raise e
 
-    async with datamanagers.with_rw_transaction() as txn:
+    async with datamanagers.with_transaction() as txn:
         await datamanagers.rollover.update_kb_rollover_shards(txn, kbid=kbid, kb_shards=kb_shards)
         await txn.commit()
         return kb_shards
