@@ -236,15 +236,16 @@ class Processor:
         if len(messages) == 0:
             return None
 
-        txn = await self.driver.begin()
         kbid = messages[0].kbid
-        if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
+        if not await datamanagers.atomic.kb.exists_kb(kbid=kbid):
             logger.info(f"KB {kbid} is deleted: skiping txn")
             if transaction_check:
-                await sequence_manager.set_last_seqid(txn, partition, seqid)
-            await txn.commit()
+                async with datamanagers.with_rw_transaction() as txn:
+                    await sequence_manager.set_last_seqid(txn, partition, seqid)
+                    await txn.commit()
             return None
 
+        txn = await self.driver.begin()
         try:
             multi = messages[0].multiid
             kb = KnowledgeBox(txn, self.storage, kbid)
