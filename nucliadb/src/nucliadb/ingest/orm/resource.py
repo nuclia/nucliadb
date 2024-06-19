@@ -359,9 +359,10 @@ class Resource:
                 # need to do use None as the default one
                 vo = await field.get_vectors()
                 if vo is not None:
-                    dimension = await datamanagers.kb.get_matryoshka_vector_dimension(
-                        self.txn, kbid=self.kb.kbid
-                    )
+                    async with datamanagers.with_ro_transaction() as ro_txn:
+                        dimension = await datamanagers.kb.get_matryoshka_vector_dimension(
+                            ro_txn, kbid=self.kb.kbid
+                        )
                     brain.apply_field_vectors(
                         field_key,
                         vo,
@@ -369,7 +370,13 @@ class Resource:
                         replace_field=reindex,
                     )
 
-                async for vectorset_config in datamanagers.vectorsets.iter(self.txn, kbid=self.kb.kbid):
+                vectorset_configs = []
+                async with datamanagers.with_ro_transaction() as ro_txn:
+                    async for vectorset_config in datamanagers.vectorsets.iter(
+                        ro_txn, kbid=self.kb.kbid
+                    ):
+                        vectorset_configs.append(vectorset_config)
+                for vectorset_config in vectorset_configs:
                     vo = await field.get_vectors(vectorset=vectorset_config.vectorset_id)
                     if vo is not None:
                         dimension = vectorset_config.vectorset_index_config.vector_dimension
