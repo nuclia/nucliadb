@@ -39,8 +39,7 @@ from tests.utils import inject_message
 
 
 @pytest.mark.asyncio
-# @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL",), indirect=True)
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_paragraph_index_deletions(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
