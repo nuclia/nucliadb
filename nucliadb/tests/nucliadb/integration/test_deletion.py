@@ -27,12 +27,15 @@ from httpx import AsyncClient
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
     ExtractedVectorsWrapper,
+    FieldComputedMetadataWrapper,
     FieldID,
     FieldType,
+    Paragraph,
 )
 from nucliadb_protos.utils_pb2 import Vector
-from nucliadb_protos.writer_pb2 import BrokerMessage, OpStatusWriter
+from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+from tests.utils import inject_message
 
 
 @pytest.mark.asyncio
@@ -51,14 +54,14 @@ async def test_paragraph_index_deletions(
         """
 
         field_id: str
-        field_type: FieldType
+        field_type: FieldType.ValueType
         text: str
         extracted_text: str
         vector: list[float]
 
     # We create a resource with a title, summary and text fields
     original_text = "Original {field_id}"
-    extracted_text = "Extracted {field_id}"
+    extracted_text = "Extracted text for {field_id}"
     title_field = FieldData(
         "title",
         FieldType.GENERIC,
@@ -128,8 +131,12 @@ async def test_paragraph_index_deletions(
         evw.vectors.vectors.vectors.append(vector)
         bm.field_vectors.append(evw)
 
-    status: OpStatusWriter = await nucliadb_grpc.ProcessMessage([bm], timeout=None)
-    assert status.status == OpStatusWriter.Status.OK
+        fcmw = FieldComputedMetadataWrapper()
+        fcmw.field.CopyFrom(pbfield)
+        fcmw.metadata.metadata.paragraphs.append(Paragraph(start=0, end=len(field_data.extracted_text)))
+        bm.field_metadata.append(fcmw)
+
+    await inject_message(nucliadb_grpc, bm)
 
     # Check that searching for original texts does not return any results
     resp = await nucliadb_reader.post(
@@ -157,5 +164,6 @@ async def test_paragraph_index_deletions(
     assert resp.status_code == 200
     resp_json = resp.json()
     assert len(resp_json["resources"]) == 1
-    fields = resp_json["resources"].popitem()
+    _rid, resource = resp_json["resources"].popitem()
+    fields = resource["fields"]
     assert len(fields) == 3
