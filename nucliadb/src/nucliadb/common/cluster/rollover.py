@@ -70,12 +70,13 @@ async def create_rollover_shards(
     logger.info("Creating rollover shards", extra={"kbid": kbid})
     sm = app_context.shard_manager
 
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_ro_transaction() as txn:
         existing_rollover_shards = await datamanagers.rollover.get_kb_rollover_shards(txn, kbid=kbid)
         if existing_rollover_shards is not None:
             logger.info("Rollover shards already exist, skipping", extra={"kbid": kbid})
             return existing_rollover_shards
 
+    async with datamanagers.with_rw_transaction() as txn:
         kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
         if kb_shards is None:
             raise UnexpectedRolloverError(f"No shards found for KB {kbid}")

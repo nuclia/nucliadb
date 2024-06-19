@@ -86,7 +86,7 @@ async def move_set_of_kb_resources(
     to_shard_id: str,
     count: int = 20,
 ) -> None:
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_ro_transaction() as txn:
         kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
     if kb_shards is None:  # pragma: no cover
         logger.warning("No shards found for kb. This should not happen.", extra={"kbid": kbid})
