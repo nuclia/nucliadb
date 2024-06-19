@@ -189,11 +189,13 @@ async def rebalance_kb(context: ApplicationContext, kbid: str) -> None:
 async def run(context: ApplicationContext) -> None:
     try:
         async with locking.distributed_lock(REBALANCE_LOCK):
+            # get all kb ids
+            async with datamanagers.with_ro_transaction() as txn:
+                kbids = [kbid async for kbid, _ in datamanagers.kb.get_kbs(txn)]
             # go through each kb and see if shards need to be reduced in size
-            async with datamanagers.with_transaction() as txn:
-                async for kbid, _ in datamanagers.kb.get_kbs(txn):
-                    async with locking.distributed_lock(locking.KB_SHARDS_LOCK.format(kbid=kbid)):
-                        await rebalance_kb(context, kbid)
+            for kbid in kbids:
+                async with locking.distributed_lock(locking.KB_SHARDS_LOCK.format(kbid=kbid)):
+                    await rebalance_kb(context, kbid)
     except locking.ResourceLocked as exc:
         if exc.key == REBALANCE_LOCK:
             logger.warning("Another rebalance process is already running.")

@@ -46,7 +46,7 @@ from nucliadb_utils.authentication import requires, requires_one
 @version(1)
 async def get_kbs(request: Request, prefix: str = "") -> KnowledgeBoxList:
     driver = get_driver()
-    async with driver.transaction() as txn:
+    async with driver.transaction(read_only=True) as txn:
         response = KnowledgeBoxList()
         async for kbid, slug in datamanagers.kb.get_kbs(txn, prefix=prefix):
             response.kbs.append(KnowledgeBoxObjSummary(slug=slug or None, uuid=kbid))
