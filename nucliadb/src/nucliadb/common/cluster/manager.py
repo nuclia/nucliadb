@@ -505,7 +505,6 @@ class StandaloneKBShardManager(KBShardManager):
             index_node = get_index_node(shardreplica.node)
             if index_node is None:  # pragma: no cover
                 raise NodesUnsync(f"Node {shardreplica.node} is not found or not available")
-            breakpoint()
             await index_node.writer.SetResource(resource)  # type: ignore
             asyncio.create_task(
                 self._resource_change_event(kb, shardreplica.node, shardreplica.shard.id)
