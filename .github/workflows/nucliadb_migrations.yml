@@ -6,14 +6,12 @@ on:
       - main
     paths:
       - ".github/workflows/nucliadb_migrations.yml"
-      - "nucliadb/migrations/**"
       - "nucliadb/src/nucliadb/migrator/**"
 
   push:
     branches:
       - main
       - ".github/workflows/nucliadb_migrations.yml"
-      - "nucliadb/migrations/**"
       - "nucliadb/src/nucliadb/migrator/**"
 
 concurrency:

@@ -49,7 +49,7 @@ jobs:
               - 'nucliadb_relations[0-9]*/**'
               - 'nucliadb_sidecar/**'
               - 'nucliadb_texts[0-9]*/**'
-              - 'nucliadb_vectors[0-9]*/**'
+              - 'nucliadb_vectors/**'
 
       -  name: Calc git info
          id: git

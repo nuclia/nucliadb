@@ -49,7 +49,7 @@ jobs:
               - 'nucliadb_relations[0-9]*/**'
               - 'nucliadb_telemetry/**'
               - 'nucliadb_texts[0-9]*/**'
-              - 'nucliadb_vectors[0-9]*/**'
+              - 'nucliadb_vectors/**'
 
       - name: Build local NucliaDB for testing
         if: steps.filter.outputs.nucliadb_modified == 'true' && steps.filter.outputs.nucliadb_node_modified == 'false'

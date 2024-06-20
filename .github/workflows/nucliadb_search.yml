@@ -20,7 +20,7 @@ on:
       - 'nucliadb_telemetry/**'
       - 'nucliadb_texts[0-9]*/**'
       - 'nucliadb_utils/**'
-      - 'nucliadb_vectors[0-9]*/**'
+      - 'nucliadb_vectors/**'
 
   push:
     branches:
@@ -112,7 +112,7 @@ jobs:
               - 'nucliadb_relations[0-9]*/**'
               - 'nucliadb_telemetry/**'
               - 'nucliadb_texts[0-9]*/**'
-              - 'nucliadb_vectors[0-9]*/**'
+              - 'nucliadb_vectors/**'
             sidecar_modified:
               - 'nucliadb_sidecar/**'
 

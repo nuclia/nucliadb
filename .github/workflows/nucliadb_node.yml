@@ -18,7 +18,7 @@ on:
       - "nucliadb_sidecar/**"
       - "nucliadb_telemetry/**"
       - "nucliadb_texts[0-9]*/**"
-      - "nucliadb_vectors[0-9]*/**"
+      - "nucliadb_vectors/**"
   push:
     branches:
       - main
@@ -40,7 +40,7 @@ on:
       - "nucliadb_telemetry/src/**"
       - "nucliadb_texts[0-9]*/**"
       - "nucliadb_utils/**"
-      - "nucliadb_vectors[0-9]*/**"
+      - "nucliadb_vectors/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -63,6 +63,17 @@ env:
   GCP_SERVICE_ACCOUNT: "github-actions@nuclia-internal.iam.gserviceaccount.com"
 
 jobs:
+  licenses:
+    name: Check Licenses
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: EmbarkStudios/cargo-deny-action@v1
+        name: cargo deny
+        with:
+          log-level: warn
+          command: check licenses
+
   format-rust:
     name: Rust code Format
     runs-on: ubuntu-latest
@@ -189,7 +200,7 @@ jobs:
               - 'nucliadb_relations[0-9]*/**'
               - 'nucliadb_telemetry/**'
               - 'nucliadb_texts[0-9]*/**'
-              - 'nucliadb_vectors[0-9]*/**'
+              - 'nucliadb_vectors/**'
 
       - name: Build local Node for testing
         if: steps.filter.outputs.node_modified == 'true'

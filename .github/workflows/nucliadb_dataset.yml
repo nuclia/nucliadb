@@ -47,7 +47,7 @@ jobs:
               - 'nucliadb_relations[0-9]*/**'
               - 'nucliadb_telemetry/**'
               - 'nucliadb_texts[0-9]*/**'
-              - 'nucliadb_vectors[0-9]*/**'
+              - 'nucliadb_vectors/**'
             nucliadb_modified:
               - 'nucliadb/**'
 
