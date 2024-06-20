@@ -58,7 +58,7 @@ async def test_paragraph_index_deletions(
         extracted_text: str
         vector: list[float]
 
-    # We create a resource with a title, summary and text fields
+    # Prepare data for a resource with title, summary and a text field
     original_text = "Original {field_id}"
     extracted_text = "Extracted text for {field_id}"
     title_field = FieldData(
@@ -189,6 +189,7 @@ async def test_paragraph_index_deletions(
     )
     assert resp.status_code == 200
 
+    # Inject broker message with the modified text
     bm = BrokerMessage(
         kbid=knowledgebox,
         uuid=rid,
@@ -227,7 +228,8 @@ async def test_paragraph_index_deletions(
 
     await asyncio.sleep(0.5)  # wait for a while until reader gets updated
 
-    # Check that searching for original texts does not return any results
+    # Check that searching for the first extracted text now doesn't return the
+    # text field (as it has been modified)
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/find",
         json={
@@ -246,7 +248,7 @@ async def test_paragraph_index_deletions(
     assert len(fields) == 2
     assert list(sorted(fields.keys())) == ["/a/summary", "/a/title"]
 
-    # Check that searching for extracted texts returns all fields
+    # Check that searching for the modified text only returns the text field
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/find",
         json={
