@@ -513,7 +513,7 @@ async def get_extra_chars(kbid: str, ordered_paragraphs: list[FindParagraph], di
         for paragraph, text in values.paragraphs:
             if first_paragraph is None:
                 first_paragraph = paragraph
-            text += "EXTRACTED BLOCK: \n " + text + " \n\n "
+            text += "\n EXTRACTED BLOCK: \n " + text + " \n\n "
             paragraph.text = ""
 
         if first_paragraph is not None:
