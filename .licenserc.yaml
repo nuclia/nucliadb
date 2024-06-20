@@ -46,20 +46,20 @@ header:
 
 
   paths:
-    - "nucliadb_node/**"
-    - "nucliadb_utils/**"
-    - "nucliadb_telemetry/**"
-    - "nucliadb_paragraphs/**"
-    - "nucliadb_vectors/**"
-    - "nucliadb_relations/**"
-    - "nucliadb_core/**"
-    - "nucliadb_sdk/**"
     - "nucliadb/**"
-    - "nucliadb_texts/**"
+    - "nucliadb_core/**"
     - "nucliadb_dataset/**"
+    - "nucliadb_node/**"
+    - "nucliadb_paragraphs[0-9]*/**"
+    - "nucliadb_performance/**"
     - "nucliadb_protos/build.rs"
     - "nucliadb_protos/src/lib.rs"
-    - "nucliadb_performance/**"
+    - "nucliadb_relations[0-9]*/**"
+    - "nucliadb_sdk/**"
+    - "nucliadb_telemetry/**"
+    - "nucliadb_texts[0-9]*/**"
+    - "nucliadb_utils/**"
+    - "nucliadb_vectors[0-9]*/**"
 
   paths-ignore:
     - "**/Cargo.toml"

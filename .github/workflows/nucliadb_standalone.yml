@@ -21,13 +21,11 @@ on:
       - "nucliadb_protos/**"
       - "nucliadb_node/**"
       - "nucliadb_sidecar/**"
-      - "nucliadb_vectors/**"
-      - "nucliadb_texts/**"
-      - "nucliadb_texts2/**"
-      - "nucliadb_paragraphs/**"
       - "nucliadb_core/**"
-      - "nucliadb_relations/**"
-      - 'nucliadb_relations2/**'
+      - "nucliadb_paragraphs[0-9]*/**"
+      - "nucliadb_relations[0-9]*/**"
+      - "nucliadb_texts[0-9]*/**"
+      - "nucliadb_vectors[0-9]*/**"
   push:
     branches:
       - main
@@ -91,12 +89,12 @@ jobs:
             node_modified:
               - 'nucliadb_core/**'
               - 'nucliadb_node/src/**'
-              - 'nucliadb_paragraphs3/**'
+              - 'nucliadb_paragraphs[0-9]*/**'
               - 'nucliadb_procs/**'
-              - 'nucliadb_relations2/**'
+              - 'nucliadb_relations[0-9]*/**'
               - 'nucliadb_telemetry/**'
-              - 'nucliadb_texts2/**'
-              - 'nucliadb_vectors/**'
+              - 'nucliadb_texts[0-9]*/**'
+              - 'nucliadb_vectors[0-9]*/**'
             sidecar_modified:
               - 'nucliadb_sidecar/**'
 
