@@ -11,18 +11,14 @@ on:
       - "Dockerfile.node_sidecar"
       - "Cargo.lock"
       - "Cargo.toml"
-      - "nucliadb_paragraphs/**"
-      - "nucliadb_texts/**"
-      - "nucliadb_texts2/**"
       - "nucliadb_core/**"
-      - "nucliadb_telemetry/**"
       - "nucliadb_node/**"
+      - "nucliadb_paragraphs[0-9]*/**"
+      - "nucliadb_relations[0-9]*/**"
       - "nucliadb_sidecar/**"
-      - "nucliadb_vectors/**"
-      - "nucliadb_paragraphs/**"
-      - "nucliadb_core/**"
-      - "nucliadb_relations/**"
-      - 'nucliadb_relations2/**'
+      - "nucliadb_telemetry/**"
+      - "nucliadb_texts[0-9]*/**"
+      - "nucliadb_vectors[0-9]*/**"
   push:
     branches:
       - main
@@ -34,19 +30,17 @@ on:
       - "Dockerfile.basenode"
       - "Cargo.lock"
       - "Cargo.toml"
-      - "nucliadb_paragraphs/**"
-      - "nucliadb_texts/**"
-      - "nucliadb_texts2/**"
       - "nucliadb_core/**"
-      - "nucliadb_telemetry/**"
       - "nucliadb_node/**"
-      - "nucliadb_sidecar/**"
       - "nucliadb_node_binding/**"
-      - "nucliadb_vectors/**"
-      - "nucliadb_relations/**"
-      - 'nucliadb_relations2/**'
+      - "nucliadb_paragraphs[0-9]*/**"
+      - "nucliadb_relations[0-9]*/**"
+      - "nucliadb_sidecar/**"
+      - "nucliadb_telemetry/**"
       - "nucliadb_telemetry/src/**"
+      - "nucliadb_texts[0-9]*/**"
       - "nucliadb_utils/**"
+      - "nucliadb_vectors[0-9]*/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -190,15 +184,12 @@ jobs:
             node_modified:
               - 'nucliadb_core/**'
               - 'nucliadb_node/src/**'
-              - 'nucliadb_paragraphs/**'
-              - 'nucliadb_paragraphs/**'
+              - 'nucliadb_paragraphs[0-9]*/**'
               - 'nucliadb_procs/**'
-              - 'nucliadb_relations/**'
-              - 'nucliadb_relations2/**'
+              - 'nucliadb_relations[0-9]*/**'
               - 'nucliadb_telemetry/**'
-              - 'nucliadb_texts/**'
-              - 'nucliadb_texts2/**'
-              - 'nucliadb_vectors/**'
+              - 'nucliadb_texts[0-9]*/**'
+              - 'nucliadb_vectors[0-9]*/**'
 
       - name: Build local Node for testing
         if: steps.filter.outputs.node_modified == 'true'

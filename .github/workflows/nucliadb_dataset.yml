@@ -42,12 +42,12 @@ jobs:
             nucliadb_node_modified:
               - 'nucliadb_core/**'
               - 'nucliadb_node/src/**'
-              - 'nucliadb_paragraphs3/**'
+              - 'nucliadb_paragraphs[0-9]*/**'
               - 'nucliadb_procs/**'
-              - 'nucliadb_relations2/**'
+              - 'nucliadb_relations[0-9]*/**'
               - 'nucliadb_telemetry/**'
-              - 'nucliadb_texts2/**'
-              - 'nucliadb_vectors/**'
+              - 'nucliadb_texts[0-9]*/**'
+              - 'nucliadb_vectors[0-9]*/**'
             nucliadb_modified:
               - 'nucliadb/**'
 

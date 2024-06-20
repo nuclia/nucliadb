@@ -7,20 +7,21 @@ on:
     paths:
       - '.github/workflows/nucliadb_search.yml'
       - 'charts/nucliadb_search/**'
-      - 'nucliadb_utils/**'
+      - 'nucliadb/src/nucliadb/common/**'
       - 'nucliadb/src/nucliadb/ingest/**'
       - 'nucliadb/src/nucliadb/search/**'
-      - 'nucliadb/src/nucliadb/common/**'
-      - 'nucliadb_models/**'
-      - 'nucliadb_telemetry/**'
-      - 'nucliadb_protos/python/**'
-      - 'nucliadb_node/**'
-      - "nucliadb_sidecar/**"
-      - 'nucliadb_vectors/**'
-      - 'nucliadb_texts2/**'
-      - 'nucliadb_paragraphs3/**'
       - 'nucliadb_core/**'
-      - 'nucliadb_relations2/**'
+      - 'nucliadb_models/**'
+      - 'nucliadb_node/**'
+      - 'nucliadb_paragraphs[0-9]*/**'
+      - 'nucliadb_protos/python/**'
+      - 'nucliadb_relations[0-9]*/**'
+      - 'nucliadb_sidecar/**'
+      - 'nucliadb_telemetry/**'
+      - 'nucliadb_texts[0-9]*/**'
+      - 'nucliadb_utils/**'
+      - 'nucliadb_vectors[0-9]*/**'
+
   push:
     branches:
       - main
@@ -106,12 +107,12 @@ jobs:
             node_modified:
               - 'nucliadb_core/**'
               - 'nucliadb_node/src/**'
-              - 'nucliadb_paragraphs3/**'
+              - 'nucliadb_paragraphs[0-9]*/**'
               - 'nucliadb_procs/**'
-              - 'nucliadb_relations2/**'
+              - 'nucliadb_relations[0-9]*/**'
               - 'nucliadb_telemetry/**'
-              - 'nucliadb_texts2/**'
-              - 'nucliadb_vectors/**'
+              - 'nucliadb_texts[0-9]*/**'
+              - 'nucliadb_vectors[0-9]*/**'
             sidecar_modified:
               - 'nucliadb_sidecar/**'
 

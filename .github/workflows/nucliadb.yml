@@ -51,11 +51,11 @@ jobs:
           filters: |
             workflows:
               - 'nucliadb_node/**'
-              - "nucliadb_sidecar/**"
-              - 'nucliadb_texts2/**'
-              - 'nucliadb_paragraphs3/**'
-              - 'nucliadb_vectors/**'
-              - 'nucliadb_relations2/**'
+              - 'nucliadb_paragraphs[0-9]*/**'
+              - 'nucliadb_relations[0-9]*/**'
+              - 'nucliadb_sidecar/**'
+              - 'nucliadb_texts[0-9]*/**'
+              - 'nucliadb_vectors[0-9]*/**'
 
       - name: Calc git info
         id: git
