@@ -125,7 +125,13 @@ async def get_paragraph_from_full_text(
     """
     extracted_text = await get_field_extracted_text(field, cache=extracted_text_cache)
     if extracted_text is None:
-        logger.warning(f"{field} extracted_text does not exist on DB yet")
+        logger.warning(
+            "Extracted_text for field does not exist on DB. This should not happen.",
+            extra={
+                "field_id": field.resource_unique_id,
+                "kbid": field.kbid,
+            },
+        )
         return ""
 
     if split not in (None, ""):
@@ -154,7 +160,10 @@ async def get_paragraph_text(
     if orm_resource is None:
         orm_resource = await get_resource_from_cache(kbid, rid)
         if orm_resource is None:
-            logger.error(f"{kbid}/{rid}:{field} does not exist on DB")
+            logger.warning(
+                "Resource does not exist on DB. This should not happen.",
+                extra={"resource_id": rid, "kbid": kbid, "field": field},
+            )
             return ""
 
     _, field_type, field = field.split("/")
