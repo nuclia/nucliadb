@@ -1357,7 +1357,7 @@ class AskRequest(ChatRequest):
     answer_json_schema: Optional[Dict[str, Any]] = Field(
         default=None,
         title="Answer JSON schema",
-        description="""Desired JSON schema of the desired LLM answer.
+        description="""Desired JSON schema for the LLM answer.
 This schema is passed to the LLM so that it answers in a scructured format following the schema. If not provided, textual response is returned.
 Note that when using this parameter, the answer in the generative response will not be returned in chunks, the whole response text will be returned instead.
 Using this feature also disables the `citations` parameter. For maximal accuracy, please include a `description` for each field of the schema.
