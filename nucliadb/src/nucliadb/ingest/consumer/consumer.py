@@ -171,12 +171,16 @@ class IngestConsumer:
                     ):
                         await self._process(pb, seqid)
                 except SequenceOrderViolation as err:
-                    log_func = logger.error
-                    if seqid == err.last_seqid:  # pragma: no cover
-                        # Occasional retries of the last processed message may happen
-                        log_func = logger.warning
-                    log_func(
-                        f"Old txn: DISCARD (nucliadb seqid: {seqid}, partition: {self.partition}). Current seqid: {err.last_seqid}"  # noqa
+                    logger.log(
+                        level=logging.ERROR if seqid < err.last_seqid else logging.WARNING,
+                        msg="Old txn. Discarding message",
+                        extra={
+                            "stored_seqid": err.last_seqid,
+                            "message_seqid": seqid,
+                            "partition": self.partition,
+                            "kbid": pb.kbid,
+                            "msg_delivered_count": msg.metadata.num_delivered,
+                        },
                     )
                 else:
                     message_type_name = pb.MessageType.Name(pb.type)
