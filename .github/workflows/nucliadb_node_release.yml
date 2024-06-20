@@ -15,7 +15,7 @@ on:
       - "nucliadb_paragraphs[0-9]*/**"
       - "nucliadb_relations[0-9]*/**"
       - "nucliadb_texts[0-9]*/**"
-      - "nucliadb_vectors[0-9]*/**"
+      - "nucliadb_vectors/**"
   push:
     branches:
       - main
@@ -30,7 +30,7 @@ on:
       - "nucliadb_paragraphs[0-9]*/**"
       - "nucliadb_relations[0-9]*/**"
       - "nucliadb_texts[0-9]*/**"
-      - "nucliadb_vectors[0-9]*/**"
+      - "nucliadb_vectors/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

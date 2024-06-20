@@ -18,7 +18,7 @@ on:
       - "nucliadb_sidecar/**"
       - "nucliadb_telemetry/**"
       - "nucliadb_texts[0-9]*/**"
-      - "nucliadb_vectors[0-9]*/**"
+      - "nucliadb_vectors/**"
   push:
     branches:
       - main
@@ -40,7 +40,7 @@ on:
       - "nucliadb_telemetry/src/**"
       - "nucliadb_texts[0-9]*/**"
       - "nucliadb_utils/**"
-      - "nucliadb_vectors[0-9]*/**"
+      - "nucliadb_vectors/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -200,7 +200,7 @@ jobs:
               - 'nucliadb_relations[0-9]*/**'
               - 'nucliadb_telemetry/**'
               - 'nucliadb_texts[0-9]*/**'
-              - 'nucliadb_vectors[0-9]*/**'
+              - 'nucliadb_vectors/**'
 
       - name: Build local Node for testing
         if: steps.filter.outputs.node_modified == 'true'

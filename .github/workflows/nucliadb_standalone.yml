@@ -25,7 +25,7 @@ on:
       - "nucliadb_paragraphs[0-9]*/**"
       - "nucliadb_relations[0-9]*/**"
       - "nucliadb_texts[0-9]*/**"
-      - "nucliadb_vectors[0-9]*/**"
+      - "nucliadb_vectors/**"
   push:
     branches:
       - main
@@ -94,7 +94,7 @@ jobs:
               - 'nucliadb_relations[0-9]*/**'
               - 'nucliadb_telemetry/**'
               - 'nucliadb_texts[0-9]*/**'
-              - 'nucliadb_vectors[0-9]*/**'
+              - 'nucliadb_vectors/**'
             sidecar_modified:
               - 'nucliadb_sidecar/**'
 
