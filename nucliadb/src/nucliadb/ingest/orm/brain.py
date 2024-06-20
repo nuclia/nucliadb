@@ -232,8 +232,8 @@ class ResourceBrain:
             self.brain.paragraphs_to_delete.append(
                 ids.FieldId(rid=self.rid, field_id=field_key, subfield_id=subfield).full()
             )
-            # TODO: Bw/c, remove this when the new paragraph deletion by field
-            # is promoted
+            # TODO: Bw/c, remove this when paragraph deletion by field_id gets
+            # promoted
             for paragraph in metadata_split.paragraphs:
                 self.brain.paragraphs_to_delete.append(
                     f"{self.rid}/{field_key}/{subfield}/{paragraph.start}-{paragraph.end}"
@@ -241,8 +241,8 @@ class ResourceBrain:
 
         for paragraph in metadata.metadata.paragraphs:
             self.brain.paragraphs_to_delete.append(ids.FieldId(rid=self.rid, field_id=field_key).full())
-            # TODO: Bw/c, remove this when the new paragraph deletion by field
-            # is promoted
+            # TODO: Bw/c, remove this when paragraph deletion by field_id gets
+            # promoted
             self.brain.paragraphs_to_delete.append(
                 f"{self.rid}/{field_key}/{paragraph.start}-{paragraph.end}"
             )
