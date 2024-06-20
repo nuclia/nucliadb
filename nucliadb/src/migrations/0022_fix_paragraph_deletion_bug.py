@@ -27,6 +27,7 @@ indexed.
 """
 
 import logging
+import os
 
 from nucliadb.common.cluster.rollover import rollover_kb_shards
 from nucliadb.migrator.context import ExecutionContext
@@ -38,4 +39,5 @@ async def migrate(context: ExecutionContext) -> None: ...
 
 
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
-    await rollover_kb_shards(context, kbid)
+    if os.environ.get("RUNNING_ENVIRONMENT", os.environ.get("ENVIRONMENT")) == "stage":
+        await rollover_kb_shards(context, kbid)
