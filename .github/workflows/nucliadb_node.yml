@@ -63,6 +63,17 @@ env:
   GCP_SERVICE_ACCOUNT: "github-actions@nuclia-internal.iam.gserviceaccount.com"
 
 jobs:
+  licenses:
+    name: Check Licenses
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: EmbarkStudios/cargo-deny-action@v1
+        name: cargo deny
+        with:
+          log-level: warn
+          command: check licenses
+
   format-rust:
     name: Rust code Format
     runs-on: ubuntu-latest
