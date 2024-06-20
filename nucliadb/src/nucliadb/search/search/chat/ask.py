@@ -302,7 +302,7 @@ class AskResult:
                     self.metrics.record_first_chunk_yielded()
                     first_answer_chunk_yielded = True
                 yield item.text
-            if isinstance(item, JSONGenerativeResponse):
+            elif isinstance(item, JSONGenerativeResponse):
                 self._object = item
             elif isinstance(item, StatusGenerativeResponse):
                 self._status = item
