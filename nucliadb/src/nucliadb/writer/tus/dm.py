@@ -20,6 +20,7 @@
 import time
 from typing import Any, Optional
 
+import backoff
 import orjson
 from redis import asyncio as aioredis
 from starlette.requests import Request
@@ -32,6 +33,11 @@ from .exceptions import HTTPPreconditionFailed
 class NoRedisConfigured(Exception):
     pass
 
+
+RETRIABLE_REDIS_ERRORS = (
+    aioredis.ConnectionError,
+    aioredis.TimeoutError,
+)
 
 DATA: dict[str, Any] = {}
 
@@ -143,6 +149,9 @@ class RedisFileDataManager(FileDataManager):
     def __init__(self, redis: aioredis.Redis):
         self.redis = redis
 
+    @backoff.on_exception(
+        backoff.expo, RETRIABLE_REDIS_ERRORS, jitter=backoff.random_jitter, max_tries=3
+    )
     async def load(self, key):
         # preload data
         self.key = key
@@ -154,6 +163,9 @@ class RedisFileDataManager(FileDataManager):
                 self._data = orjson.loads(data)
                 self._loaded = True
 
+    @backoff.on_exception(
+        backoff.expo, RETRIABLE_REDIS_ERRORS, jitter=backoff.random_jitter, max_tries=3
+    )
     async def save(self):
         if self.key is None:
             raise Exception("Not initialized")
@@ -161,6 +173,9 @@ class RedisFileDataManager(FileDataManager):
         value = orjson.dumps(self._data)
         await self.redis.set(self.key, value, ex=self._ttl)
 
+    @backoff.on_exception(
+        backoff.expo, RETRIABLE_REDIS_ERRORS, jitter=backoff.random_jitter, max_tries=3
+    )
     async def _delete_key(self):
         if self.key is None:
             raise Exception("Not initialized")
