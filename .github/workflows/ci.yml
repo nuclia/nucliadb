@@ -225,8 +225,6 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - build-virtual-env
-    strategy:
-      fail-fast: false
 
     steps:
       - name: Checkout the repository
