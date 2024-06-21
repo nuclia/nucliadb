@@ -314,9 +314,26 @@ class TestPriorityIndexer:
     ):
         status = OpStatus()
         status.status = OpStatus.Status.ERROR
-        status.detail = 'status: NotFound, message: "Shard not found: Shard'
+        status.detail = 'status: NotFound, message: "Shard not found: Shard"'
 
         writer.set_resource_from_storage.return_value = status
+        pb = IndexMessage()
+        pb.typemessage = TypeMessage.CREATION
+        await indexer._index_message(pb)
+
+    @pytest.mark.asyncio
+    async def test_inconsistent_dimension_errors_are_handled(
+        self,
+        indexer: PriorityIndexer,
+        writer: AsyncMock,
+    ):
+        status = OpStatus()
+        status.status = OpStatus.Status.ERROR
+        status.detail = 'status: Error, message: "Inconsistent dimensions"'
+
+        writer.set_resource = AsyncMock(return_value=status)
+        writer.set_resource_from_storage = AsyncMock(return_value=status)
+
         pb = IndexMessage()
         pb.typemessage = TypeMessage.CREATION
         await indexer._index_message(pb)

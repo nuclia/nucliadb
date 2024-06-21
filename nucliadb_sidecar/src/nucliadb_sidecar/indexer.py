@@ -77,6 +77,10 @@ class MetadataNotFoundError(IndexNodeError):
     pass
 
 
+class InconsistentDimensionsError(IndexNodeError):
+    pass
+
+
 class ShardNotFound(IndexNodeError):
     pass
 
@@ -398,7 +402,7 @@ class PriorityIndexer:
     def _parse_op_status_errors(self, pb: IndexMessage, status: OpStatus):
         if status.status == OpStatus.Status.OK:
             return
-        if status.status == OpStatus.Status.ERROR and "Shard not found" in status.detail:
+        elif status.status == OpStatus.Status.ERROR and "Shard not found" in status.detail:
             logger.warning(
                 f"Shard does not exist {pb.shard}. This message will be ignored",
                 extra={
@@ -409,8 +413,10 @@ class PriorityIndexer:
                 },
             )
             raise ShardNotFound()
-        if status.status == OpStatus.Status.ERROR and "Missing resource metadata" in status.detail:
+        elif status.status == OpStatus.Status.ERROR and "Missing resource metadata" in status.detail:
             raise MetadataNotFoundError()
+        elif status.status == OpStatus.Status.ERROR and "Inconsistent dimensions" in status.detail:
+            raise InconsistentDimensionsError()
         raise IndexNodeError(status.detail)
 
     @contextlib.contextmanager
@@ -456,6 +462,18 @@ class PriorityIndexer:
                 },
             )
             return
+        except InconsistentDimensionsError:
+            logger.error(
+                "Trying to index vectors with an incorrect dimension! This should not happen!"
+                "We drop the message to not block the queue",
+                extra={
+                    "kbid": pb.kbid,
+                    "shard": pb.shard,
+                    "rid": pb.resource,
+                    "storage_key": pb.storage_key,
+                },
+            )
+            return
 
     async def _set_resource_from_storage(self, pb: IndexMessage) -> None:
         """
@@ -480,6 +498,18 @@ class PriorityIndexer:
             logger.error(
                 "Error on indexer worker trying to set a resource without metadata. "
                 "This message will be ignored",
+                extra={
+                    "kbid": pb.kbid,
+                    "shard": pb.shard,
+                    "rid": pb.resource,
+                    "storage_key": pb.storage_key,
+                },
+            )
+            return
+        except InconsistentDimensionsError:
+            logger.error(
+                "Trying to index vectors with an incorrect dimension! This should not happen!"
+                "We drop the message to not block the queue",
                 extra={
                     "kbid": pb.kbid,
                     "shard": pb.shard,
