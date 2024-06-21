@@ -324,7 +324,7 @@ class Basic(BaseModel):
     modified: Optional[datetime] = None
     metadata: Optional[Metadata] = None
     usermetadata: Optional[UserMetadata] = None
-    fieldmetadata: Optional[List[UserFieldMetadata]] = None
+    fieldmetadata: Optional[List[UserFieldMetadata]] = Field(default=None, deprecated=True)
     computedmetadata: Optional[ComputedMetadata] = None
     uuid: Optional[str] = None
     last_seqid: Optional[int] = None
