@@ -33,10 +33,7 @@ from nucliadb_protos.resources_pb2 import (
     FieldID,
     FieldType,
     Paragraph,
-    ParagraphAnnotation,
     Position,
-    TokenSplit,
-    UserFieldMetadata,
 )
 from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2_grpc import WriterStub
@@ -50,13 +47,11 @@ RELEASE_CHANNELS = (
 
 class ClassificationLabels:
     RESOURCE_ANNOTATED = "user-resource/label"
-    PARAGRAPH_ANNOTATED = "user-paragraph/label"
     FIELD_DETECTED = "field/label"
     PARAGRAPH_DETECTED = "paragraph/label"
 
 
 class EntityLabels:
-    ANNOTATED = "PERSON/Rusty"
     DETECTED = "COUNTRY/Spain"
 
 
@@ -76,11 +71,9 @@ ALL_PARAGRAPHS = {PARAGRAPH1, PARAGRAPH2, PARAGRAPH3, PARAGRAPH4}
 
 
 FILTERS_TO_PARAGRAPHS = {
-    entity_filter(EntityLabels.ANNOTATED): {PARAGRAPH1, PARAGRAPH2},
     entity_filter(EntityLabels.DETECTED): {PARAGRAPH1, PARAGRAPH2},
     label_filter(ClassificationLabels.RESOURCE_ANNOTATED): {PARAGRAPH3, PARAGRAPH4},
     label_filter(ClassificationLabels.FIELD_DETECTED): {PARAGRAPH3, PARAGRAPH4},
-    label_filter(ClassificationLabels.PARAGRAPH_ANNOTATED): {PARAGRAPH3},
     label_filter(ClassificationLabels.PARAGRAPH_DETECTED): {PARAGRAPH4},
 }
 
@@ -95,13 +88,6 @@ def broker_message_with_entities(kbid):
     field = FieldID()
     field.field = field_id
     field.field_type = FieldType.TEXT
-
-    # Add annotated entity
-    ufm = UserFieldMetadata()
-    ufm.field.CopyFrom(field)
-    family, entity = EntityLabels.ANNOTATED.split("/")
-    ufm.token.append(TokenSplit(token=entity, klass=family, start=11, end=16, cancelled_by_user=False))
-    bm.basic.fieldmetadata.append(ufm)
 
     # Add a couple of paragraphs to a text field
     p1 = PARAGRAPH1
@@ -174,28 +160,12 @@ def broker_message_with_labels(kbid):
     etw.field.CopyFrom(field)
     bm.extracted_text.append(etw)
 
-    # Add a paragraph label
-    ufm = UserFieldMetadata()
-    ufm.field.CopyFrom(field)
-    panno1 = ParagraphAnnotation(key=f"{bm.uuid}/t/text/0-{len(PARAGRAPH3)}")
-    labelset, label = ClassificationLabels.PARAGRAPH_ANNOTATED.split("/")
-    panno1.classifications.append(
-        Classification(
-            labelset=labelset,
-            label=label,
-            cancelled_by_user=False,
-        )
-    )
-    ufm.paragraphs.append(panno1)
-    bm.basic.fieldmetadata.append(ufm)
-
     # Add a resource label
     labelset, label = ClassificationLabels.RESOURCE_ANNOTATED.split("/")
     bm.basic.usermetadata.classifications.append(
         Classification(
             labelset=labelset,
             label=label,
-            cancelled_by_user=False,
         )
     )
 
@@ -257,7 +227,6 @@ async def create_test_labelsets(nucliadb_writer, kbid: str):
         (LabelSetKind.RESOURCES, ClassificationLabels.RESOURCE_ANNOTATED),
         (LabelSetKind.RESOURCES, ClassificationLabels.FIELD_DETECTED),
         (LabelSetKind.PARAGRAPHS, ClassificationLabels.PARAGRAPH_DETECTED),
-        (LabelSetKind.PARAGRAPHS, ClassificationLabels.PARAGRAPH_ANNOTATED),
     ):
         labelset, label = _label.split("/")
         resp = await nucliadb_writer.post(
@@ -294,30 +263,16 @@ async def kbid(
         [label_filter("resource/unexisting")],
         [label_filter("user-resource/unexisting")],
         # Filter with existing labels and entities
-        [entity_filter(EntityLabels.ANNOTATED)],
         [entity_filter(EntityLabels.DETECTED)],
-        [label_filter(ClassificationLabels.PARAGRAPH_ANNOTATED)],
         [label_filter(ClassificationLabels.PARAGRAPH_DETECTED)],
         [label_filter(ClassificationLabels.RESOURCE_ANNOTATED)],
         [label_filter(ClassificationLabels.FIELD_DETECTED)],
         # Combine filters
-        [entity_filter(EntityLabels.ANNOTATED), entity_filter("unexisting/entity")],
-        [entity_filter(EntityLabels.ANNOTATED), entity_filter(EntityLabels.DETECTED)],
-        [
-            entity_filter(EntityLabels.ANNOTATED),
-            label_filter(ClassificationLabels.PARAGRAPH_DETECTED),
-        ],
-        [
-            label_filter(ClassificationLabels.PARAGRAPH_ANNOTATED),
-            label_filter("user-paragraph/unexisting"),
-        ],
+        [entity_filter("unexisting/entity")],
+        [entity_filter(EntityLabels.DETECTED)],
         [
             label_filter(ClassificationLabels.FIELD_DETECTED),
             label_filter("resource/unexisting"),
-        ],
-        [
-            label_filter(ClassificationLabels.PARAGRAPH_ANNOTATED),
-            label_filter(ClassificationLabels.PARAGRAPH_DETECTED),
         ],
         [
             label_filter(ClassificationLabels.RESOURCE_ANNOTATED),

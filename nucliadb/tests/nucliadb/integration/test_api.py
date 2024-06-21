@@ -23,7 +23,6 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb.learning_proxy import LearningConfiguration
-from nucliadb_models import common, metadata
 from nucliadb_models.resource import Resource
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import writer_pb2 as wpb
@@ -780,62 +779,6 @@ async def test_question_answer(
             },
         ],
     }
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_question_answer_annotations(
-    nucliadb_reader: AsyncClient,
-    nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
-    knowledgebox,
-):
-    qa_annotation = metadata.QuestionAnswerAnnotation(
-        question_answer=common.QuestionAnswer(
-            question=common.Question(
-                text="My question 0",
-                language="catalan",
-                ids_paragraphs=["id1/0", "id2/0"],
-            ),
-            answers=[
-                common.Answer(
-                    ids_paragraphs=["id1/00", "id2/00"],
-                    language="catalan",
-                    text="My answer 00",
-                )
-            ],
-        ),
-        cancelled_by_user=True,
-    )
-
-    resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
-        json={
-            "title": "My title",
-            "slug": "myresource",
-            "texts": {"text1": {"body": "My text"}},
-            "fieldmetadata": [
-                {
-                    "field": {
-                        "field": "text1",
-                        "field_type": "text",
-                    },
-                    "question_answers": [qa_annotation.model_dump()],
-                }
-            ],
-        },
-    )
-
-    assert resp.status_code == 201
-    rid = resp.json()["uuid"]
-
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{rid}?show=basic",
-    )
-    assert resp.status_code == 200
-    data = resp.json()
-    resource = Resource.model_validate(data)
-    assert resource.fieldmetadata[0].question_answers[0] == qa_annotation  # type: ignore
 
 
 @pytest.mark.asyncio

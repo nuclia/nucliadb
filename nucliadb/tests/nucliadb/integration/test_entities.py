@@ -31,8 +31,6 @@ for users.
 
 """
 
-import asyncio
-
 import pytest
 from httpx import AsyncClient
 
@@ -41,7 +39,6 @@ from nucliadb_models.entities import (
     Entity,
     UpdateEntitiesGroupPayload,
 )
-from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxID
 from nucliadb_protos.resources_pb2 import (
     FieldID,
     FieldType,
@@ -50,7 +47,6 @@ from nucliadb_protos.resources_pb2 import (
     TokenSplit,
     UserFieldMetadata,
 )
-from nucliadb_protos.writer_pb2 import GetEntitiesGroupRequest, GetEntitiesGroupResponse
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import broker_resource, inject_message
 from tests.utils.entities import (
@@ -126,60 +122,6 @@ async def processing_entities(nucliadb_grpc: WriterStub, knowledgebox: str):
 
 
 @pytest.fixture
-async def annotated_entities(
-    nucliadb_writer: AsyncClient, text_field: tuple[str, str, str], nucliadb_grpc
-):
-    kbid, rid, field_id = text_field
-
-    resp = await nucliadb_writer.patch(
-        f"/kb/{kbid}/resource/{rid}",
-        json={
-            "fieldmetadata": [
-                {
-                    "token": [
-                        {
-                            "token": "dog",
-                            "klass": "ANIMALS",
-                            "start": 2,
-                            "end": 5,
-                            "cancelled_by_user": False,
-                        },
-                        {
-                            "token": "bird",
-                            "klass": "ANIMALS",
-                            "start": 26,
-                            "end": 30,
-                            "cancelled_by_user": False,
-                        },
-                    ],
-                    "paragraphs": [],
-                    "field": {
-                        "field_type": "text",
-                        "field": field_id,
-                    },
-                }
-            ]
-        },
-    )
-    assert resp.status_code == 200
-
-    # wait until indexed
-    bm_indexed = 0
-    retries = 0
-    while not bm_indexed:
-        response: GetEntitiesGroupResponse = await nucliadb_grpc.GetEntitiesGroup(
-            GetEntitiesGroupRequest(kb=KnowledgeBoxID(uuid=kbid), group="ANIMALS")
-        )
-        bm_indexed = "bird" in response.group.entities
-
-        assert retries < 10, "Broker message indexing took too much, might be a test error"
-
-        # small sleep to give time for indexing
-        await asyncio.sleep(0.1)
-        retries += 1
-
-
-@pytest.fixture
 async def user_entities(nucliadb_writer: AsyncClient, knowledgebox: str):
     payload = CreateEntitiesGroupPayload(
         group="ANIMALS",
@@ -201,7 +143,6 @@ async def entities(
     knowledgebox: str,
     user_entities,
     processing_entities,
-    annotated_entities,
 ):
     """Single fixture to get entities injected in different ways."""
     # Ensure entities are properly stored/indexed
