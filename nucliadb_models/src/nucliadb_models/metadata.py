@@ -237,7 +237,7 @@ class ComputedMetadata(BaseModel):
 
 class UserMetadata(BaseModel):
     classifications: List[UserClassification] = []
-    relations: List[Relation] = []
+    relations: List[Relation] = Field(default=[], deprecated=True)
 
     @classmethod
     def from_message(cls: Type[_T], message: resources_pb2.UserMetadata) -> _T:
