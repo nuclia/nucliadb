@@ -132,7 +132,10 @@ class UpdateResourcePayload(BaseModel):
     thumbnail: Optional[str] = None
     metadata: Optional[InputMetadata] = None
     usermetadata: Optional[UserMetadata] = None
-    fieldmetadata: Optional[List[UserFieldMetadata]] = None
+    fieldmetadata: Optional[List[UserFieldMetadata]] = Field(
+        default=None,
+        deprecated=True,
+    )
     origin: Optional[Origin] = None
     extra: Optional[Extra] = None
     files: Dict[FieldIdString, FileField] = FieldDefaults.files
