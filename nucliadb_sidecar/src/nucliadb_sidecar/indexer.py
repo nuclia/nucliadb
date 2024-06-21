@@ -508,7 +508,8 @@ class PriorityIndexer:
             return
         except InconsistentDimensionsError:
             logger.error(
-                "Trying to index vectors with an incorrect dimension! This message will be ignored",
+                "Trying to index vectors with an incorrect dimension! This should not happen!"
+                "We drop the message to not block the queue",
                 extra={
                     "kbid": pb.kbid,
                     "shard": pb.shard,
