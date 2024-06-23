@@ -41,6 +41,7 @@ from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.orm.utils import choose_matryoshka_dimension, compute_paragraph_key
 from nucliadb.migrator.utils import get_latest_version
+from nucliadb.pinecone.client import PineconeClient
 from nucliadb_protos import knowledgebox_pb2, utils_pb2, writer_pb2
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig, SemanticModelMetadata
 from nucliadb_protos.resources_pb2 import Basic
@@ -141,6 +142,14 @@ class KnowledgeBox:
 
         await datamanagers.cluster.update_kb_shards(txn, kbid=uuid, shards=kb_shards)
 
+        if config.pinecone_api_key:
+            # TODO get index host after creation and store it in maindb
+            pinecone = PineconeClient(config.pinecone_api_key)
+            pinecone.create_index(
+                index_name=uuid,
+                dimension=semantic_model.vector_dimension,
+            )
+
         # shard creation will alter this value on maindb, make sure nobody
         # uses this variable anymore
         del kb_shards
@@ -192,6 +201,10 @@ class KnowledgeBox:
             # consider KB as deleted
             return
         slug = kb_config.slug
+
+        if kb_config.pinecone_api_key:
+            pinecone = PineconeClient(kb_config.pinecone_api_key)
+            pinecone.delete_index(kbid)
 
         # Delete main anchor
         async with txn.driver.transaction() as subtxn:

@@ -23,6 +23,8 @@ import uuid
 from typing import Any, Awaitable, Callable, Optional
 
 import backoff
+from pinecone import SparseValues as PineconeSparseValues
+from pinecone import Vector as PineconeVector
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.base import AbstractIndexNode
@@ -36,6 +38,7 @@ from nucliadb.common.cluster.exceptions import (
     ShardsNotFound,
 )
 from nucliadb.common.maindb.driver import Transaction
+from nucliadb.pinecone.client import PineconeClient, get_sparse_vector
 from nucliadb_protos import (
     knowledgebox_pb2,
     nodereader_pb2,
@@ -347,6 +350,7 @@ class KBShardManager:
         kb: str,
         reindex_id: Optional[str] = None,
         source: IndexMessageSource.ValueType = IndexMessageSource.PROCESSOR,
+        external_node_provider_metadata: Optional[dict] = None,
     ) -> None:
         """
         Stores the Resource object in the object storage and sends an IndexMessage to the indexing Nats stream.
@@ -379,6 +383,8 @@ class KBShardManager:
             indexpb.partition = partition
         indexpb.source = source
         indexpb.resource = resource.resource.uuid
+        if external_node_provider_metadata:
+            indexpb.external_node_provider_metadata.update(external_node_provider_metadata)
 
         for replica_id, node_id in self.indexing_replicas(shard):
             indexpb.node = node_id
@@ -470,7 +476,12 @@ class StandaloneKBShardManager(KBShardManager):
         txid: int,
         partition: str,
         kb: str,
+        external_node_provider_metadata: Optional[dict] = None,
     ) -> None:
+        if external_node_provider_metadata is not None:
+            pinecone = PineconeClient(external_node_provider_metadata["pinecone"]["api_key"])
+            self.pinecone_delete_resource(pinecone, uuid, kb)
+
         req = noderesources_pb2.ResourceID()
         req.uuid = uuid
 
@@ -494,11 +505,18 @@ class StandaloneKBShardManager(KBShardManager):
         kb: str,
         reindex_id: Optional[str] = None,
         source: IndexMessageSource.ValueType = IndexMessageSource.PROCESSOR,
+        external_node_provider_metadata: Optional[dict] = None,
     ) -> None:
         """
         Calls the node writer's SetResource method directly to store the resource in the node.
         There is no queuing for standalone nodes at the moment -- indexing is done synchronously.
         """
+        if external_node_provider_metadata is not None and source == IndexMessageSource.PROCESSOR:
+            # Processed messages are sent to the external index node external
+            pinecone = PineconeClient(external_node_provider_metadata["pinecone"]["api_key"])
+            self.pinecone_add_resource(pinecone, resource, kb)
+            return
+
         index_node = None
         for shardreplica in shard.replicas:
             resource.shard_id = resource.resource.shard_id = shardreplica.shard.id
@@ -509,6 +527,98 @@ class StandaloneKBShardManager(KBShardManager):
             asyncio.create_task(
                 self._resource_change_event(kb, shardreplica.node, shardreplica.shard.id)
             )
+
+    def pinecone_delete_resource(self, pinecone: PineconeClient, uuid: str, kb: str) -> None:
+        """
+        Delete all the vectors in pinecone that have the labels of the resource.
+        """
+        pinecone.delete_vectors_by_id_prefix(index_name=kb, id_prefix=uuid)
+
+    def pinecone_add_resource(
+        self, pinecone: PineconeClient, resource: noderesources_pb2.Resource, kb: str
+    ) -> None:
+        """
+        First off, delete all the vectors from all fields that are going to be replaced.
+
+        Then, calculate sparse vectors for each paragraph in the resource.
+        Accumulate the labels for each paragraph.
+
+        Index all sentences/vectors in pinecone, with the corresponding labels and
+        their sparse vector corresponding to the paragraph they belong to.
+
+        The labels of the vectors are:
+        - The labels of the sentence
+        - The labels of the paragraph
+        - The labels of the field
+        - The labels of the resource
+
+        Other metadata that is also indexed:
+        - The access groups of the resource
+        """
+        max_vector_labels = 100
+
+        # Deletions first
+        field_prefixes_to_delete = set()
+        for to_delete in list(resource.sentences_to_delete) + list(resource.paragraphs_to_delete):
+            try:
+                resource_uuid, field_type, field_id = to_delete.split("/")[:3]
+            except ValueError:
+                continue
+            field_prefixes_to_delete.add(f"{resource_uuid}/{field_type}/{field_id}")
+        for prefix in field_prefixes_to_delete:
+            pinecone.delete_vectors_by_id_prefix(index_name=kb, id_prefix=prefix)
+
+        vectors = []
+        access_groups = None
+        if resource.HasField("security"):
+            access_groups = list(set(resource.security.access_groups))
+
+        # TODO: Iterate only sentences!
+        # TODO: sparse vectors should be computed at processing time?
+        from pinecone_text.sparse import BM25Encoder
+
+        bm25_encoder = BM25Encoder()
+        bm25_encoder.fit([resource.texts[field_id].text for field_id in resource.texts])
+
+        # Iterate over paragraphs and fetch paragraph data
+        resource_labels = set(resource.labels)
+        paragraphs_data = {}
+        for field_id, text_info in resource.texts.items():
+            field_labels = set(text_info.labels)
+            field_paragraphs = resource.paragraphs.get(field_id)
+            if field_paragraphs is None:
+                continue
+            for paragraph_id, paragraph in field_paragraphs.paragraphs.items():
+                lower_bound = paragraph.start
+                upper_bound = paragraph.end
+                pararaph_text = text_info.text[lower_bound:upper_bound]
+                sparse_vector = get_sparse_vector(bm25_encoder, pararaph_text)
+                pararaph_pabels = set(paragraph.labels).union(field_labels).union(resource_labels)
+                paragraphs_data[paragraph_id] = {
+                    "labels": list(pararaph_pabels),
+                    "sparse_vector": sparse_vector,
+                }
+
+        # Iterate sentences now
+        for _, index_paragraphs in resource.paragraphs.items():
+            for index_paragraph_id, index_paragraph in index_paragraphs.paragraphs.items():
+                paragraph_data = paragraphs_data[index_paragraph_id]
+                for sentence_id, vector_sentence in index_paragraph.sentences.items():
+                    sentence_labels = set(index_paragraph.labels).union(paragraph_data["labels"])
+                    vector_metadata = {
+                        "labels": list(sentence_labels)[:max_vector_labels],
+                    }
+                    if access_groups is not None:
+                        vector_metadata["access_groups"] = access_groups
+                    sparse_vector = paragraph_data["sparse_vector"]
+                    pc_vector = PineconeVector(
+                        id=sentence_id,
+                        values=list(vector_sentence.vector),
+                        metadata=vector_metadata,
+                        sparse_values=PineconeSparseValues(**sparse_vector),
+                    )
+                    vectors.append(pc_vector)
+        pinecone.upsert_vectors(index_name=kb, vectors=vectors)
 
 
 def get_all_shard_nodes(

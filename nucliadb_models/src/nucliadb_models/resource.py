@@ -125,6 +125,12 @@ class KnowledgeBoxConfig(BaseModel):
         description="This field is deprecated. Use 'learning_configuration' instead.",
     )
 
+    pinecone_api_key: Optional[str] = Field(
+        default=None,
+        title="Pinecone API Key",
+        description="Pinecone API Key for the Knowledge Box. When provided, NucliaDB will use Pinecone as index node",
+    )
+
     @field_validator("slug")
     @classmethod
     def id_check(cls, v: str) -> str:

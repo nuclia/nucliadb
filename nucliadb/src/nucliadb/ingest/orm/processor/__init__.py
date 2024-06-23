@@ -401,6 +401,11 @@ class Processor:
                 txn, kbid=kbid, rid=uuid, shard=shard.shard
             )
 
+        kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
+        external_node_provider_metadata = None
+        if kb_config and kb_config.pinecone_api_key:
+            external_node_provider_metadata = {"pinecone": {"api_key": kb_config.pinecone_api_key}}
+
         if shard is not None:
             index_message = resource.indexer.brain
             await self.shard_manager.add_resource(
@@ -410,6 +415,7 @@ class Processor:
                 partition=partition,
                 kb=kbid,
                 source=source,
+                external_node_provider_metadata=external_node_provider_metadata,
             )
         else:
             raise AttributeError("Shard is not available")

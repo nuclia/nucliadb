@@ -4,7 +4,9 @@ isort:skip_file
 """
 
 import builtins
+import collections.abc
 import google.protobuf.descriptor
+import google.protobuf.internal.containers
 import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
 import nucliadb_protos.noderesources_pb2
@@ -136,6 +138,22 @@ global___OpStatus = OpStatus
 class IndexMessage(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
+    class ExternalNodeProviderMetadataEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        value: builtins.str
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: builtins.str = ...,
+        ) -> None: ...
+        def ClearField(self, field_name: typing.Literal["key", b"key", "value", b"value"]) -> None: ...
+
     NODE_FIELD_NUMBER: builtins.int
     SHARD_FIELD_NUMBER: builtins.int
     TXID_FIELD_NUMBER: builtins.int
@@ -146,6 +164,7 @@ class IndexMessage(google.protobuf.message.Message):
     STORAGE_KEY_FIELD_NUMBER: builtins.int
     KBID_FIELD_NUMBER: builtins.int
     SOURCE_FIELD_NUMBER: builtins.int
+    EXTERNAL_NODE_PROVIDER_METADATA_FIELD_NUMBER: builtins.int
     node: builtins.str
     shard: builtins.str
     """physical shard message is for"""
@@ -157,6 +176,8 @@ class IndexMessage(google.protobuf.message.Message):
     storage_key: builtins.str
     kbid: builtins.str
     source: global___IndexMessageSource.ValueType
+    @property
+    def external_node_provider_metadata(self) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
     def __init__(
         self,
         *,
@@ -170,9 +191,10 @@ class IndexMessage(google.protobuf.message.Message):
         storage_key: builtins.str = ...,
         kbid: builtins.str = ...,
         source: global___IndexMessageSource.ValueType = ...,
+        external_node_provider_metadata: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["_partition", b"_partition", "partition", b"partition"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_partition", b"_partition", "kbid", b"kbid", "node", b"node", "partition", b"partition", "reindex_id", b"reindex_id", "resource", b"resource", "shard", b"shard", "source", b"source", "storage_key", b"storage_key", "txid", b"txid", "typemessage", b"typemessage"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["_partition", b"_partition", "external_node_provider_metadata", b"external_node_provider_metadata", "kbid", b"kbid", "node", b"node", "partition", b"partition", "reindex_id", b"reindex_id", "resource", b"resource", "shard", b"shard", "source", b"source", "storage_key", b"storage_key", "txid", b"txid", "typemessage", b"typemessage"]) -> None: ...
     def WhichOneof(self, oneof_group: typing.Literal["_partition", b"_partition"]) -> typing.Literal["partition"] | None: ...
 
 global___IndexMessage = IndexMessage

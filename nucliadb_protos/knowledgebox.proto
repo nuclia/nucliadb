@@ -28,6 +28,7 @@ message KnowledgeBoxConfig {
     string description = 2;
     string slug = 5;
     int64 migration_version = 7;
+    string pinecone_api_key = 9;
 
     repeated string enabled_filters = 3 [deprecated = true];
     repeated string enabled_insights = 4 [deprecated = true];

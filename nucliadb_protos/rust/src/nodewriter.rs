@@ -85,6 +85,11 @@ pub struct IndexMessage {
     pub kbid: ::prost::alloc::string::String,
     #[prost(enumeration = "IndexMessageSource", tag = "10")]
     pub source: i32,
+    #[prost(map = "string, string", tag = "11")]
+    pub external_node_provider_metadata: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        ::prost::alloc::string::String,
+    >,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

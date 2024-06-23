@@ -18,6 +18,8 @@ pub struct KnowledgeBoxConfig {
     pub slug: ::prost::alloc::string::String,
     #[prost(int64, tag = "7")]
     pub migration_version: i64,
+    #[prost(string, tag = "9")]
+    pub pinecone_api_key: ::prost::alloc::string::String,
     #[deprecated]
     #[prost(string, repeated, tag = "3")]
     pub enabled_filters: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,

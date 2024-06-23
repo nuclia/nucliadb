@@ -43,6 +43,7 @@ message IndexMessage {
     string storage_key = 8;
     string kbid = 9;
     IndexMessageSource source = 10;
+    map<string, string> external_node_provider_metadata = 11;
 }
 
 message GarbageCollectorResponse {

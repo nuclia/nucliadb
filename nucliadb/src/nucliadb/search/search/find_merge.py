@@ -444,3 +444,39 @@ async def find_merge_results(
         return api_results
     finally:
         rcache.clear()
+
+from pinecone import QueryResponse
+
+
+async def find_fetch_pinecone_results(query_response: QueryResponse) -> KnowledgeboxFindResults:
+    # force getting transaction on current asyncio task
+    # so all sub tasks will use the same transaction
+    # this is contextvar magic that is probably not ideal
+    await get_read_only_transaction()
+    rcache = get_resource_cache(clear=True)
+    try:
+        api_results = KnowledgeboxFindResults(
+            resources={},
+            query="foobar",
+            total=-1,
+            page_number=0,
+            page_size=20,
+            next_page=True,
+            min_score=MinScore(),
+            best_matches=[],
+            relations=None,
+        )
+        await fetch_find_metadata(
+            api_results.resources,
+            api_results.best_matches,
+            result_paragraphs,
+            kbid,
+            show,
+            field_type_filter,
+            extracted,
+            highlight,
+            ematches,
+        )
+        return api_results
+    finally:
+        rcache.clear()

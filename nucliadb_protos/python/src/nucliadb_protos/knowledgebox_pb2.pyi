@@ -107,6 +107,7 @@ class KnowledgeBoxConfig(google.protobuf.message.Message):
     DESCRIPTION_FIELD_NUMBER: builtins.int
     SLUG_FIELD_NUMBER: builtins.int
     MIGRATION_VERSION_FIELD_NUMBER: builtins.int
+    PINECONE_API_KEY_FIELD_NUMBER: builtins.int
     ENABLED_FILTERS_FIELD_NUMBER: builtins.int
     ENABLED_INSIGHTS_FIELD_NUMBER: builtins.int
     DISABLE_VECTORS_FIELD_NUMBER: builtins.int
@@ -115,6 +116,7 @@ class KnowledgeBoxConfig(google.protobuf.message.Message):
     description: builtins.str
     slug: builtins.str
     migration_version: builtins.int
+    pinecone_api_key: builtins.str
     disable_vectors: builtins.bool
     release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType
     """DEPRECATED: duplicated field also stored in `writer.proto Shards`"""
@@ -129,12 +131,13 @@ class KnowledgeBoxConfig(google.protobuf.message.Message):
         description: builtins.str = ...,
         slug: builtins.str = ...,
         migration_version: builtins.int = ...,
+        pinecone_api_key: builtins.str = ...,
         enabled_filters: collections.abc.Iterable[builtins.str] | None = ...,
         enabled_insights: collections.abc.Iterable[builtins.str] | None = ...,
         disable_vectors: builtins.bool = ...,
         release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["description", b"description", "disable_vectors", b"disable_vectors", "enabled_filters", b"enabled_filters", "enabled_insights", b"enabled_insights", "migration_version", b"migration_version", "release_channel", b"release_channel", "slug", b"slug", "title", b"title"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["description", b"description", "disable_vectors", b"disable_vectors", "enabled_filters", b"enabled_filters", "enabled_insights", b"enabled_insights", "migration_version", b"migration_version", "pinecone_api_key", b"pinecone_api_key", "release_channel", b"release_channel", "slug", b"slug", "title", b"title"]) -> None: ...
 
 global___KnowledgeBoxConfig = KnowledgeBoxConfig
 

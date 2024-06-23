@@ -115,6 +115,7 @@ async def _create_kb(item: KnowledgeBoxConfig) -> tuple[str, Optional[str]]:
     config = knowledgebox_pb2.KnowledgeBoxConfig(
         title=item.title or "",
         description=item.description or "",
+        pinecone_api_key=item.pinecone_api_key or "",
     )
     semantic_model = learning_config.into_semantic_model_metadata()
     release_channel = item.release_channel.to_pb() if item.release_channel is not None else None

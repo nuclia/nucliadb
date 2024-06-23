@@ -21,6 +21,9 @@ import logging
 from time import time
 from typing import Optional
 
+from nucliadb.middleware.transaction import get_read_only_transaction
+from nucliadb.migrator import datamanager
+from nucliadb.pinecone.client import HybridQuery, PineconeClient
 from nucliadb.search.requesters.utils import Method, debug_nodes_info, node_query
 from nucliadb.search.search.find_merge import find_merge_results
 from nucliadb.search.search.metrics import RAGMetrics
@@ -36,6 +39,7 @@ from nucliadb_models.search import (
     NucliaDBClientType,
     SearchOptions,
 )
+from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_utils.utilities import get_audit
 
 logger = logging.getLogger(__name__)
@@ -87,27 +91,35 @@ async def find(
     with metrics.time("query_parse"):
         pb_query, incomplete_results, autofilters = await query_parser.parse()
 
-    with metrics.time("node_query"):
-        results, query_incomplete_results, queried_nodes = await node_query(
-            kbid, Method.SEARCH, pb_query, target_shard_replicas=item.shards
-        )
-    incomplete_results = incomplete_results or query_incomplete_results
+    txn = await get_read_only_transaction()
+    kb_config = await datamanager.datamanagers.kb.get_config(txn, kbid=kbid)
+    if kb_config.pinecone_api_key:
+        query_response = pinecone_query(kbid, kb_config.pinecone_api_key, pb_query)
+        search_results = await find_fetch_pinecone_results(query_response)
+        breakpoint()
+        pass
+    else:
+        with metrics.time("node_query"):
+            results, query_incomplete_results, queried_nodes = await node_query(
+                kbid, Method.SEARCH, pb_query, target_shard_replicas=item.shards
+            )
+        incomplete_results = incomplete_results or query_incomplete_results
 
-    # We need to merge
-    with metrics.time("results_merge"):
-        search_results = await find_merge_results(
-            results,
-            count=item.page_size,
-            page=item.page_number,
-            kbid=kbid,
-            show=item.show,
-            field_type_filter=item.field_type_filter,
-            extracted=item.extracted,
-            requested_relations=pb_query.relation_subgraph,
-            min_score_bm25=query_parser.min_score.bm25,
-            min_score_semantic=query_parser.min_score.semantic,  # type: ignore
-            highlight=item.highlight,
-        )
+        # We need to merge
+        with metrics.time("results_merge"):
+            search_results = await find_merge_results(
+                results,
+                count=item.page_size,
+                page=item.page_number,
+                kbid=kbid,
+                show=item.show,
+                field_type_filter=item.field_type_filter,
+                extracted=item.extracted,
+                requested_relations=pb_query.relation_subgraph,
+                min_score_bm25=query_parser.min_score.bm25,
+                min_score_semantic=query_parser.min_score.semantic,  # type: ignore
+                highlight=item.highlight,
+            )
 
     search_time = time() - start_time
     if audit is not None:
@@ -150,8 +162,31 @@ async def find(
                 "time": search_time,
                 "nodes": debug_nodes_info(queried_nodes),
                 # Include metrics in the log
-                **metrics.steps(),
+                "metrics": metrics.steps(),
             },
         )
 
     return search_results, incomplete_results, query_parser
+
+
+def pinecone_query(kbid: str, pinecone_api_key: str, pb_query: SearchRequest):
+    pclient = PineconeClient(api_key=pinecone_api_key)
+    dense = pb_query.vector
+
+    from pinecone import SparseValues
+    from pinecone_text.hybrid import hybrid_convex_scale
+    from pinecone_text.sparse import BM25Encoder
+
+    bm25_encoder = BM25Encoder()
+    bm25_encoder.fit([pb_query.body])
+    sparse = bm25_encoder.encode_queries(pb_query.body)
+    hybrid_dense, hybrid_sparse = hybrid_convex_scale(dense, sparse, alpha=0.8)
+
+    hybrid_query = HybridQuery(dense=hybrid_dense, sparse=SparseValues(**hybrid_sparse))
+    return pclient.query(
+        index_name=kbid,
+        hybrid_query=hybrid_query,
+        top_k=pb_query.result_per_page * (pb_query.page_number + 1),
+        # TODO
+        # filter=
+    )
