@@ -349,8 +349,8 @@ async def hierarchy_prompt_context(
 ) -> None:
     """
     This function will get the paragraph texts (possibly with extra characters, if extra_characters > 0) and then
-    modifies the first paragraph of each resource to include the title and summary of the resource, as well as the
-    extended paragraph text of all the paragraphs in the resource.
+    craft a context with all paragraphs of the same resource grouped together. Moreover, on each group of paragraphs,
+    it includes the resource title and summary so that the LLM can have a better understanding of the context.
     """
     paragraphs_extra_characters = max(paragraphs_extra_characters, 0)
     # Make a copy of the ordered paragraphs to avoid modifying the original list, which is returned
