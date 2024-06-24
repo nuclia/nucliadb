@@ -937,9 +937,9 @@ class FieldExtensionStrategy(RagStrategy):
 class FullResourceStrategy(RagStrategy):
     name: Literal["full_resource"]
     count: Optional[int] = Field(
-        title="Resources",
         default=None,
-        description="How many full documents to retrieve",
+        title="Resources",
+        description="Maximum number of full documents to retrieve",
     )
 
 
@@ -948,7 +948,7 @@ class HierarchyResourceStrategy(RagStrategy):
     count: Optional[int] = Field(
         title="Resources",
         default=None,
-        description="Levels of distance that is added to the context",
+        description="Number of extra characters that are added to each matching paragraph when adding to the context.",
     )
 
 
@@ -1106,11 +1106,13 @@ class ChatRequest(BaseModel):
             unique_strategy_names.add(strategy_name)
         if len(unique_strategy_names) != len(rag_strategies):
             raise ValueError("There must be at most one strategy of each type")
-        # If full resource strategy is chosen, it must be the only strategy
-        if RagStrategyName.FULL_RESOURCE in unique_strategy_names and len(rag_strategies) > 1:
-            raise ValueError(
-                f"If '{RagStrategyName.FULL_RESOURCE}' strategy is chosen, it must be the only strategy"
-            )
+
+        # If full_resource or hierarchy strategies is chosen, they must be the only strategy
+        for unique_strategy_name in (RagStrategyName.FULL_RESOURCE, RagStrategyName.HIERARCHY):
+            if unique_strategy_name in unique_strategy_names and len(rag_strategies) > 1:
+                raise ValueError(
+                    f"If '{unique_strategy_name}' strategy is chosen, it must be the only strategy."
+                )
         return rag_strategies
 
 

@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple, cast
 
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
@@ -31,7 +31,10 @@ from nucliadb.search.search import paragraphs
 from nucliadb.search.search.chat.images import get_page_image, get_paragraph_image
 from nucliadb_models.search import (
     SCORE_TYPE,
+    FieldExtensionStrategy,
     FindParagraph,
+    FullResourceStrategy,
+    HierarchyResourceStrategy,
     ImageRagStrategy,
     ImageRagStrategyName,
     KnowledgeboxFindResults,
@@ -416,21 +419,29 @@ class PromptContextBuilder:
             await default_prompt_context(context, self.kbid, self.ordered_paragraphs)
             return
 
-        number_of_full_resources = 0
-        distance = 0
-        extend_with_fields = []
+        full_resource_strategy = False
+        number_of_full_resources = len(self.ordered_paragraphs)
+        hierarchy_strategy = False
+        hierarchy_paragraphs_extended_characters = 0
+        extend_with_fields: list[str] = []
         for strategy in self.strategies:
             if strategy.name == RagStrategyName.FIELD_EXTENSION:
-                extend_with_fields.extend(strategy.fields)  # type: ignore
+                strategy = cast(FieldExtensionStrategy, strategy)
+                extend_with_fields.extend(strategy.fields)
             elif strategy.name == RagStrategyName.FULL_RESOURCE:
+                strategy = cast(FullResourceStrategy, strategy)
+                full_resource_strategy = True
                 if self.resource:
                     number_of_full_resources = 1
-                else:
-                    number_of_full_resources = strategy.count or len(self.ordered_paragraphs)  # type: ignore
+                elif strategy.count is not None and strategy.count > 0:
+                    number_of_full_resources = strategy.count
             elif strategy.name == RagStrategyName.HIERARCHY:
-                distance = strategy.count  # type: ignore
+                strategy = cast(HierarchyResourceStrategy, strategy)
+                hierarchy_strategy = True
+                if strategy.count is not None and strategy.count > 0:
+                    hierarchy_paragraphs_extended_characters = strategy.count
 
-        if number_of_full_resources:
+        if full_resource_strategy:
             await full_resource_prompt_context(
                 context,
                 self.kbid,
@@ -440,8 +451,10 @@ class PromptContextBuilder:
             )
             return
 
-        if distance > 0:
-            await get_extra_chars(self.kbid, self.ordered_paragraphs, distance)
+        if hierarchy_strategy:
+            await inject_hierarchy_in_paragraphs(
+                self.kbid, self.ordered_paragraphs, hierarchy_paragraphs_extended_characters
+            )
             await default_prompt_context(context, self.kbid, self.ordered_paragraphs)
             return
 
@@ -461,7 +474,17 @@ class ExtraCharsParagraph:
     paragraphs: List[Tuple[FindParagraph, str]]
 
 
-async def get_extra_chars(kbid: str, ordered_paragraphs: list[FindParagraph], distance: int):
+async def inject_hierarchy_in_paragraphs(
+    kbid: str, ordered_paragraphs: list[FindParagraph], extra_characters: int
+):
+    """
+    This function will get the paragraph texts (possibly with extra characters, if extra_characters > 0) and then
+    modifies the first paragraph of each resource to include the title and summary of the resource, as well as the
+    extended paragraph text of all the paragraphs in the resource.
+
+    NOTE: this is kind of ugly and should be refactored so that, instead of modifying the paragraphs in place,
+    we simply output a context to be sent to the llm with the desired structure.
+    """
     etcache = paragraphs.ExtractedTextCache()
     resources: Dict[str, ExtraCharsParagraph] = {}
     for paragraph in ordered_paragraphs:
@@ -470,7 +493,7 @@ async def get_extra_chars(kbid: str, ordered_paragraphs: list[FindParagraph], di
         position = paragraph.id.split("/")[-1]
         start, end = position.split("-")
         int_start = int(start)
-        int_end = int(end) + distance
+        int_end = int(end) + extra_characters
 
         extended_paragraph_text = await paragraphs.get_paragraph_text(
             kbid=kbid,
@@ -514,10 +537,12 @@ async def get_extra_chars(kbid: str, ordered_paragraphs: list[FindParagraph], di
             if first_paragraph is None:
                 first_paragraph = paragraph
             text_with_hierarchy += "\n EXTRACTED BLOCK: \n " + extended_paragraph_text + " \n\n "
+            # All paragraphs of the resource are cleared except the first one, which will be the
+            # one containing the whole hierarchy information
             paragraph.text = ""
 
         if first_paragraph is not None:
-            # The first paragraph is the
+            # The first paragraph is the only one holding the hierarchy information
             first_paragraph.text = f"DOCUMENT: {title_text} \n SUMMARY: {summary_text} \n RESOURCE CONTENT: {text_with_hierarchy}"
 
 
