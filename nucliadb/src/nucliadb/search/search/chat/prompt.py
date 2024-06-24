@@ -472,7 +472,7 @@ async def get_extra_chars(kbid: str, ordered_paragraphs: list[FindParagraph], di
         int_start = int(start)
         int_end = int(end) + distance
 
-        new_text = await paragraphs.get_paragraph_text(
+        extended_paragraph_text = await paragraphs.get_paragraph_text(
             kbid=kbid,
             rid=rid,
             field=field_path,
@@ -500,26 +500,25 @@ async def get_extra_chars(kbid: str, ordered_paragraphs: list[FindParagraph], di
             resources[rid] = ExtraCharsParagraph(
                 title=title_text,
                 summary=summary_text,
-                paragraphs=[(paragraph, new_text)],
+                paragraphs=[(paragraph, extended_paragraph_text)],
             )
         else:
-            resources[rid].paragraphs.append((paragraph, new_text))
+            resources[rid].paragraphs.append((paragraph, extended_paragraph_text))
 
     for values in resources.values():
         title_text = values.title
         summary_text = values.summary
         first_paragraph = None
-        text = ""
-        for paragraph, text in values.paragraphs:
+        text_with_hierarchy = ""
+        for paragraph, extended_paragraph_text in values.paragraphs:
             if first_paragraph is None:
                 first_paragraph = paragraph
-            text += "\n EXTRACTED BLOCK: \n " + text + " \n\n "
+            text_with_hierarchy += "\n EXTRACTED BLOCK: \n " + extended_paragraph_text + " \n\n "
             paragraph.text = ""
 
         if first_paragraph is not None:
-            first_paragraph.text = (
-                f"DOCUMENT: {title_text} \n SUMMARY: {summary_text} \n RESOURCE CONTENT: {text}"
-            )
+            # The first paragraph is the
+            first_paragraph.text = f"DOCUMENT: {title_text} \n SUMMARY: {summary_text} \n RESOURCE CONTENT: {text_with_hierarchy}"
 
 
 def _clean_paragraph_text(paragraph: FindParagraph) -> str:
