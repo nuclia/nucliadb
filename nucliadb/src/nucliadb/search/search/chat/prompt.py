@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import copy
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple, cast
 
@@ -340,6 +341,96 @@ async def composed_prompt_context(
         context[paragraph.id] = _clean_paragraph_text(paragraph)
 
 
+async def hierarchy_prompt_context(
+    context: CappedPromptContext,
+    kbid: str,
+    ordered_paragraphs: list[FindParagraph],
+    paragraphs_extra_characters: int = 0,
+) -> None:
+    """
+    This function will get the paragraph texts (possibly with extra characters, if extra_characters > 0) and then
+    modifies the first paragraph of each resource to include the title and summary of the resource, as well as the
+    extended paragraph text of all the paragraphs in the resource.
+    """
+    paragraphs_extra_characters = max(paragraphs_extra_characters, 0)
+    # Make a copy of the ordered paragraphs to avoid modifying the original list, which is returned
+    # in the response to the user
+    ordered_paragraphs_copy = copy.deepcopy(ordered_paragraphs)
+    etcache = paragraphs.ExtractedTextCache()
+    resources: Dict[str, ExtraCharsParagraph] = {}
+
+    # Iterate paragraphs to get extended text
+    for paragraph in ordered_paragraphs_copy:
+        rid, field_type, field = paragraph.id.split("/")[:3]
+        field_path = "/".join([rid, field_type, field])
+        position = paragraph.id.split("/")[-1]
+        start, end = position.split("-")
+        int_start = int(start)
+        int_end = int(end) + paragraphs_extra_characters
+        extended_paragraph_text = paragraph.text
+        if paragraphs_extra_characters > 0:
+            extended_paragraph_text = await paragraphs.get_paragraph_text(
+                kbid=kbid,
+                rid=rid,
+                field=field_path,
+                start=int_start,
+                end=int_end,
+                extracted_text_cache=etcache,
+            )
+        if rid not in resources:
+            # Get the title and the summary of the resource
+            title_text = await paragraphs.get_paragraph_text(
+                kbid=kbid,
+                rid=rid,
+                field="/a/title",
+                start=0,
+                end=500,
+                extracted_text_cache=etcache,
+            )
+            summary_text = await paragraphs.get_paragraph_text(
+                kbid=kbid,
+                rid=rid,
+                field="/a/summary",
+                start=0,
+                end=1000,
+                extracted_text_cache=etcache,
+            )
+            resources[rid] = ExtraCharsParagraph(
+                title=title_text,
+                summary=summary_text,
+                paragraphs=[(paragraph, extended_paragraph_text)],
+            )
+        else:
+            resources[rid].paragraphs.append((paragraph, extended_paragraph_text))
+
+    # Modify the first paragraph of each resource to include the title and summary of the resource, as well as the
+    # extended paragraph text of all the paragraphs in the resource.
+    for values in resources.values():
+        title_text = values.title
+        summary_text = values.summary
+        first_paragraph = None
+        text_with_hierarchy = ""
+        for paragraph, extended_paragraph_text in values.paragraphs:
+            if first_paragraph is None:
+                first_paragraph = paragraph
+            text_with_hierarchy += "\n EXTRACTED BLOCK: \n " + extended_paragraph_text + " \n\n "
+            # All paragraphs of the resource are cleared except the first one, which will be the
+            # one containing the whole hierarchy information
+            paragraph.text = ""
+
+        if first_paragraph is not None:
+            # The first paragraph is the only one holding the hierarchy information
+            first_paragraph.text = f"DOCUMENT: {title_text} \n SUMMARY: {summary_text} \n RESOURCE CONTENT: {text_with_hierarchy}"
+
+    # Now that the paragraphs have been modified, we can add them to the context
+    for paragraph in ordered_paragraphs_copy:
+        if paragraph.text == "":
+            # Skip paragraphs that were cleared in the hierarchy expansion
+            continue
+        context[paragraph.id] = _clean_paragraph_text(paragraph)
+    return
+
+
 class PromptContextBuilder:
     """
     Builds the context for the LLM prompt.
@@ -452,10 +543,12 @@ class PromptContextBuilder:
             return
 
         if hierarchy_strategy:
-            await inject_hierarchy_in_paragraphs(
-                self.kbid, self.ordered_paragraphs, hierarchy_paragraphs_extended_characters
+            await hierarchy_prompt_context(
+                context,
+                self.kbid,
+                self.ordered_paragraphs,
+                hierarchy_paragraphs_extended_characters,
             )
-            await default_prompt_context(context, self.kbid, self.ordered_paragraphs)
             return
 
         await composed_prompt_context(
@@ -472,78 +565,6 @@ class ExtraCharsParagraph:
     title: str
     summary: str
     paragraphs: List[Tuple[FindParagraph, str]]
-
-
-async def inject_hierarchy_in_paragraphs(
-    kbid: str, ordered_paragraphs: list[FindParagraph], extra_characters: int
-):
-    """
-    This function will get the paragraph texts (possibly with extra characters, if extra_characters > 0) and then
-    modifies the first paragraph of each resource to include the title and summary of the resource, as well as the
-    extended paragraph text of all the paragraphs in the resource.
-
-    NOTE: this is kind of ugly and should be refactored so that, instead of modifying the paragraphs in place,
-    we simply output a context to be sent to the llm with the desired structure.
-    """
-    etcache = paragraphs.ExtractedTextCache()
-    resources: Dict[str, ExtraCharsParagraph] = {}
-    for paragraph in ordered_paragraphs:
-        rid, field_type, field = paragraph.id.split("/")[:3]
-        field_path = "/".join([rid, field_type, field])
-        position = paragraph.id.split("/")[-1]
-        start, end = position.split("-")
-        int_start = int(start)
-        int_end = int(end) + extra_characters
-
-        extended_paragraph_text = await paragraphs.get_paragraph_text(
-            kbid=kbid,
-            rid=rid,
-            field=field_path,
-            start=int_start,
-            end=int_end,
-            extracted_text_cache=etcache,
-        )
-        if rid not in resources:
-            title_text = await paragraphs.get_paragraph_text(
-                kbid=kbid,
-                rid=rid,
-                field="/a/title",
-                start=0,
-                end=500,
-                extracted_text_cache=etcache,
-            )
-            summary_text = await paragraphs.get_paragraph_text(
-                kbid=kbid,
-                rid=rid,
-                field="/a/summary",
-                start=0,
-                end=1000,
-                extracted_text_cache=etcache,
-            )
-            resources[rid] = ExtraCharsParagraph(
-                title=title_text,
-                summary=summary_text,
-                paragraphs=[(paragraph, extended_paragraph_text)],
-            )
-        else:
-            resources[rid].paragraphs.append((paragraph, extended_paragraph_text))
-
-    for values in resources.values():
-        title_text = values.title
-        summary_text = values.summary
-        first_paragraph = None
-        text_with_hierarchy = ""
-        for paragraph, extended_paragraph_text in values.paragraphs:
-            if first_paragraph is None:
-                first_paragraph = paragraph
-            text_with_hierarchy += "\n EXTRACTED BLOCK: \n " + extended_paragraph_text + " \n\n "
-            # All paragraphs of the resource are cleared except the first one, which will be the
-            # one containing the whole hierarchy information
-            paragraph.text = ""
-
-        if first_paragraph is not None:
-            # The first paragraph is the only one holding the hierarchy information
-            first_paragraph.text = f"DOCUMENT: {title_text} \n SUMMARY: {summary_text} \n RESOURCE CONTENT: {text_with_hierarchy}"
 
 
 def _clean_paragraph_text(paragraph: FindParagraph) -> str:

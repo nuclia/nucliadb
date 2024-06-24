@@ -258,3 +258,53 @@ def test_capped_prompt_context():
     context["key1"] = "foo" * int(1e6)
 
     assert context.output == {"key1": "foo" * int(1e6)}
+
+
+@pytest.mark.asyncio
+async def test_hierarchy_promp_context(kb):
+    with mock.patch(
+        "nucliadb.search.search.chat.prompt.paragraphs.get_paragraph_text",
+        side_effect=["Title text", "Summary text"],
+    ):
+        context = chat_prompt.CappedPromptContext(max_size=int(1e6))
+        find_results = KnowledgeboxFindResults(
+            resources={
+                "r1": FindResource(
+                    id="r1",
+                    fields={
+                        "f/f1": FindField(
+                            paragraphs={
+                                "r1/f/f1/0-10": FindParagraph(
+                                    id="r1/f/f1/0-10",
+                                    score=10,
+                                    score_type=SCORE_TYPE.BM25,
+                                    order=0,
+                                    text="First Paragraph text",
+                                ),
+                                "r1/f/f1/10-20": FindParagraph(
+                                    id="r1/f/f1/10-20",
+                                    score=8,
+                                    score_type=SCORE_TYPE.BM25,
+                                    order=1,
+                                    text="Second paragraph text",
+                                ),
+                            }
+                        )
+                    },
+                )
+            },
+        )
+        ordered_paragraphs = chat_prompt.get_ordered_paragraphs(find_results)
+        await chat_prompt.hierarchy_prompt_context(
+            context,
+            "kbid",
+            ordered_paragraphs,
+            paragraphs_extra_characters=0,
+        )
+        assert (
+            context.output["r1/f/f1/0-10"]
+            == "DOCUMENT: Title text \n SUMMARY: Summary text \n RESOURCE CONTENT: \n EXTRACTED BLOCK: \n First Paragraph text \n\n \n EXTRACTED BLOCK: \n Second paragraph text"  # noqa
+        )
+        # Chec that the original text of the paragraphs is preserved
+        assert ordered_paragraphs[0].text == "First Paragraph text"
+        assert ordered_paragraphs[1].text == "Second paragraph text"
