@@ -489,7 +489,7 @@ class PromptContextBuilder:
                     gather_pages = True
                     if strategy.count is not None and strategy.count > 0:
                         page_count = strategy.count
-                if strategy.name == ImageRagStrategyName.TABLES:
+                elif strategy.name == ImageRagStrategyName.TABLES:
                     strategy = cast(TableImageStrategy, strategy)
                     gather_tables = True
 
