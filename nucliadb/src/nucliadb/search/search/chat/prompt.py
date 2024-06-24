@@ -39,11 +39,13 @@ from nucliadb_models.search import (
     ImageRagStrategy,
     ImageRagStrategyName,
     KnowledgeboxFindResults,
+    PageImageStrategy,
     PromptContext,
     PromptContextImages,
     PromptContextOrder,
     RagStrategy,
     RagStrategyName,
+    TableImageStrategy,
 )
 from nucliadb_protos import resources_pb2
 from nucliadb_utils.asyncio_utils import ConcurrentRunner, run_concurrently
@@ -477,18 +479,18 @@ class PromptContextBuilder:
         return context, context_order, context_images
 
     async def _build_context_images(self, context: CappedPromptContext) -> None:
-        flatten_strategies = []
         page_count = 5
         gather_pages = False
         gather_tables = False
         if self.image_strategies is not None:
             for strategy in self.image_strategies:
-                flatten_strategies.append(strategy.name)
                 if strategy.name == ImageRagStrategyName.PAGE_IMAGE:
+                    strategy = cast(PageImageStrategy, strategy)
                     gather_pages = True
-                    if strategy.count is not None:  # type: ignore
-                        page_count = strategy.count  # type: ignore
+                    if strategy.count is not None and strategy.count > 0:
+                        page_count = strategy.count
                 if strategy.name == ImageRagStrategyName.TABLES:
+                    strategy = cast(TableImageStrategy, strategy)
                     gather_tables = True
 
         for paragraph in self.ordered_paragraphs:
