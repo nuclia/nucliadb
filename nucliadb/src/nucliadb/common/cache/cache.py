@@ -51,11 +51,7 @@ class CacheLayer:
 
     async def _process_invalidations(self):
         while True:
-            try:
-                value = self._invalidations.queue.get_nowait()
-            except asyncio.QueueEmpty:
-                await asyncio.sleep(0.1)
-                continue
+            value = await self._invalidations.queue.get()
             if value["type"] == "invalidate_key":
                 self.delete(value["key"])
             elif value["type"] == "invalidate_prefix":
