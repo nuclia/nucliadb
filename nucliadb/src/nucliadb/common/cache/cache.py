@@ -47,6 +47,7 @@ class CacheLayer:
         if self._invalidations_task is not None:
             self._invalidations_task.cancel()
             await self._invalidations.finalize()
+        self.clear()
 
     async def _process_invalidations(self):
         while True:
