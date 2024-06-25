@@ -18,6 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import asyncio
+
 import pytest
 
 from nucliadb.common.cache import RedisCacheInvalidations
@@ -29,8 +31,18 @@ async def test_redis_invalidations(redis):
     redis_url = f"redis://{host}:{port}"
     invalidations = RedisCacheInvalidations(redis_url=redis_url)
     await invalidations.initialize()
+
     await invalidations.invalidate("key")
+    await asyncio.sleep(0.5)
+    assert invalidations.queue.empty() is False
+    message = await invalidations.queue.get()
+    assert message == {"type": "invalidate_key", "key": "key"}
+
     await invalidations.invalidate_prefix("prefix")
+    await asyncio.sleep(0.5)
+    message = await invalidations.queue.get()
+    assert message == {"type": "invalidate_prefix", "prefix": "prefix"}
+
     await invalidations.finalize()
     assert invalidations._invalidations_task is None
     assert invalidations._pubsub_task is None
