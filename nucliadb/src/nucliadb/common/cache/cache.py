@@ -110,8 +110,11 @@ class InMemoryCache(CacheLayer):
         self._cache[key] = value
 
     def delete(self, key: str):
-        CACHE_LAYER_OPS.inc({"op": "delete", "type": ""})
-        self._cache.pop(key, None)
+        value = self._cache.pop(key, None)
+        if value is not None:
+            CACHE_LAYER_OPS.inc({"op": "delete", "type": "hit"})
+        else:
+            CACHE_LAYER_OPS.inc({"op": "delete", "type": "miss"})
 
     def delete_prefix(self, prefix: str):
         CACHE_LAYER_OPS.inc({"op": "delete_prefix", "type": ""})
