@@ -88,7 +88,7 @@ async def export_kb_to_blob_storage(context: ApplicationContext, msg: NatsTaskMe
     export_size = await upload_export_retried(iterator, kbid, export_id)
 
     # Store export size
-    metadata.total = metadata.processed = export_size
+    metadata.total = metadata.processed = export_size or 0
     await dm.set_metadata("export", metadata)
 
 
