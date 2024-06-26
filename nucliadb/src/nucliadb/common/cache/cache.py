@@ -108,8 +108,12 @@ class InMemoryCache(CacheLayer):
         return value
 
     def set(self, key: str, value: Any):
-        CACHE_LAYER_OPS.inc({"op": "set", "type": ""})
-        CACHE_LAYER_SIZE.set(self._cache.currsize)
+        current_size = self._cache.currsize
+        if current_size >= self._cache.maxsize:
+            CACHE_LAYER_OPS.inc({"op": "set", "type": "evict"})
+        else:
+            CACHE_LAYER_OPS.inc({"op": "set", "type": ""})
+        CACHE_LAYER_SIZE.set(current_size)
         self._cache[key] = value
 
     def delete(self, key: str):
