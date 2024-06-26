@@ -89,7 +89,7 @@ async def import_kb(
             await dm.set_metadata("import", metadata)
 
     if metadata is not None:
-        metadata.processed = stream_reader.read_bytes
+        metadata.processed = stream_reader.read_bytes or 0
         await dm.set_metadata("import", metadata)
 
 

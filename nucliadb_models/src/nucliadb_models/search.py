@@ -938,16 +938,16 @@ class FullResourceStrategy(RagStrategy):
     name: Literal["full_resource"]
     count: Optional[int] = Field(
         default=None,
-        title="Resources",
-        description="Maximum number of full documents to retrieve",
+        title="Count",
+        description="Maximum number of full documents to retrieve. If not specified, all matching documents are retrieved.",
     )
 
 
 class HierarchyResourceStrategy(RagStrategy):
     name: Literal["hierarchy"]
     count: Optional[int] = Field(
-        title="Resources",
         default=None,
+        title="Count",
         description="Number of extra characters that are added to each matching paragraph when adding to the context.",
     )
 
@@ -959,9 +959,9 @@ class TableImageStrategy(ImageRagStrategy):
 class PageImageStrategy(ImageRagStrategy):
     name: Literal["page_image"]
     count: Optional[int] = Field(
-        title="Images",
         default=None,
-        description="How many images to retrieve",
+        title="Count",
+        description="Maximum number of images to retrieve from the page. By default, at most 5 images are retrieved.",
     )
 
 

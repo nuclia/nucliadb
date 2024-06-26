@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import json
 from datetime import datetime
 from typing import AsyncGenerator, Union
 
@@ -58,20 +59,33 @@ class ExportImportDataManager:
         if data is None or data == b"":
             raise MetadataNotFound()
         decoded = data.decode("utf-8")
-        model_type = {
-            "export": ExportMetadata,
-            "import": ImportMetadata,
-        }[type]
-        return model_type.parse_raw(decoded)  # type: ignore
+        if type == "export":
+            model_type = ExportMetadata
+        elif type == "import":
+            model_type = ImportMetadata  # type: ignore
+        else:
+            raise ValueError(f"Invalid type: {type}")
+        json_decoded = json.loads(decoded)
+
+        # For some reason, the total and processed fields are not always present in the metadata.
+        # This is to unblock already created exports that hit this bug.
+        if json_decoded.get("total") is None:
+            json_decoded["total"] = 0
+        if json_decoded.get("processed") is None:
+            json_decoded["processed"] = 0
+
+        return model_type.model_validate(json_decoded)
 
     async def set_metadata(
         self,
         type: str,
         metadata: Metadata,
     ):
+        metadata.processed = metadata.processed or 0
+        metadata.total = metadata.total or 0
         metadata.modified = datetime.utcnow()
         key = self._get_maindb_metadata_key(type, metadata.kbid, metadata.id)
-        data = metadata.json().encode("utf-8")
+        data = metadata.model_dump_json().encode("utf-8")
         async with self.driver.transaction() as txn:
             await txn.set(key, data)
             await txn.commit()

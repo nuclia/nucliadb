@@ -181,6 +181,10 @@ def get_cloud_files(bm: writer_pb2.BrokerMessage) -> list[resources_pb2.CloudFil
     binaries: list[resources_pb2.CloudFile] = []
     for file_field in bm.files.values():
         if file_field.HasField("file"):
+            if file_field.file.source == resources_pb2.CloudFile.Source.EXTERNAL:
+                # Binaries of externally hosted files are not
+                # to be downloaded and stored in the export file
+                continue
             _clone_collect_cf(binaries, file_field.file)
 
     for conversation in bm.conversations.values():
