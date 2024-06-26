@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator
 
 from nucliadb.common.context import ApplicationContext
 from nucliadb.export_import import logger
@@ -43,7 +43,7 @@ from nucliadb_telemetry import errors
 
 
 async def export_kb(
-    context: ApplicationContext, kbid: str, metadata: Optional[ExportMetadata] = None
+    context: ApplicationContext, kbid: str, metadata: ExportMetadata, resumable: bool = True
 ) -> AsyncGenerator[bytes, None]:
     """Export the data of a knowledgebox to a stream of bytes.
 
@@ -56,8 +56,8 @@ async def export_kb(
         yield chunk
 
     resources_iterator = export_resources(context, kbid)
-    if metadata is not None:
-        assert metadata.kbid == kbid
+    assert metadata.kbid == kbid
+    if resumable:
         resources_iterator = export_resources_resumable(context, metadata)
 
     async for chunk in resources_iterator:
@@ -77,7 +77,7 @@ async def export_kb_to_blob_storage(context: ApplicationContext, msg: NatsTaskMe
     kbid, export_id = msg.kbid, msg.id
     dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
     metadata = await dm.get_metadata(type="export", kbid=kbid, id=export_id)
-    iterator = export_kb(context, kbid, metadata)  # type: ignore
+    iterator = export_kb(context, kbid, metadata, resumable=True)  # type: ignore
 
     retry_handler = TaskRetryHandler("export", dm, metadata)
 
@@ -120,7 +120,9 @@ async def export_resources_resumable(context, metadata: ExportMetadata) -> Async
 
     try:
         for rid in metadata.resources_to_export:
-            bm = await get_broker_message(context, kbid, rid)
+            bm = await get_broker_message(
+                context, kbid, rid, include_embeddings=metadata.include_embeddings
+            )
             if bm is None:
                 logger.warning(f"Skipping resource {rid} as it was deleted")
                 continue

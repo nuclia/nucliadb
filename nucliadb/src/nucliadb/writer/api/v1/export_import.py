@@ -34,6 +34,7 @@ from nucliadb.export_import.models import (
     ExportMetadata,
     ImportMetadata,
     NatsTaskMessage,
+    StartExportRequest,
 )
 from nucliadb.export_import.tasks import get_exports_producer, get_imports_producer
 from nucliadb.export_import.utils import stream_compatible_with_kb
@@ -60,7 +61,9 @@ from nucliadb_utils.authentication import requires_one
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER])
 @version(1)
-async def start_kb_export_endpoint(request: Request, kbid: str):
+async def start_kb_export_endpoint(
+    request: Request, kbid: str, item: StartExportRequest = StartExportRequest()
+):
     context = get_app_context(request.app)
     if not await datamanagers.atomic.kb.exists_kb(kbid=kbid):
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
@@ -69,9 +72,10 @@ async def start_kb_export_endpoint(request: Request, kbid: str):
     if in_standalone_mode():
         # In standalone mode, exports are generated at download time.
         # We simply return an export_id to keep the API consistent with hosted nucliadb.
+        await save_initial_export_metadata(context, kbid, export_id, item)
         return CreateExportResponse(export_id=export_id)
     else:
-        await start_export_task(context, kbid, export_id)
+        await start_export_task(context, kbid, export_id, item=item)
         return CreateExportResponse(export_id=export_id)
 
 
@@ -97,6 +101,7 @@ async def start_kb_import_endpoint(request: Request, kbid: str):
         if in_standalone_mode():
             # In standalone mode, we import directly from the request content stream.
             # Note that we return an import_id simply to keep the API consistent with hosted nucliadb.
+
             await importer.import_kb(
                 context=context,
                 kbid=kbid,
@@ -130,11 +135,20 @@ async def upload_import_to_blob_storage(
     )
 
 
-async def start_export_task(context: ApplicationContext, kbid: str, export_id: str):
+async def save_initial_export_metadata(
+    context: ApplicationContext, kbid: str, export_id: str, item: StartExportRequest
+):
     dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
-    metadata = ExportMetadata(kbid=kbid, id=export_id)
+    metadata = ExportMetadata(kbid=kbid, id=export_id, include_embeddings=item.include_embeddings)
     metadata.task.status = Status.SCHEDULED
     await dm.set_metadata("export", metadata)
+    return metadata
+
+
+async def start_export_task(
+    context: ApplicationContext, kbid: str, export_id: str, item: StartExportRequest
+):
+    metadata = await save_initial_export_metadata(context, kbid, export_id, item)
     try:
         producer = await get_exports_producer(context)
         msg = NatsTaskMessage(kbid=kbid, id=export_id)
@@ -142,6 +156,7 @@ async def start_export_task(context: ApplicationContext, kbid: str, export_id: s
         logger.info(f"Export task produced. seqid={seqid} kbid={kbid} export_id={export_id}")
     except Exception as e:
         errors.capture_exception(e)
+        dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
         await dm.delete_metadata("export", metadata)
         raise
 

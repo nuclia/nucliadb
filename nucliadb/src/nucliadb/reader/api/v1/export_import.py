@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import AsyncGenerator, AsyncIterable, Union
+from typing import AsyncGenerator, AsyncIterable, Union, cast
 
 from fastapi.responses import StreamingResponse
 from fastapi_versioning import version
@@ -31,6 +31,7 @@ from nucliadb.export_import import exceptions as export_exceptions
 from nucliadb.export_import import exporter
 from nucliadb.export_import.datamanager import ExportImportDataManager
 from nucliadb.export_import.exceptions import MetadataNotFound
+from nucliadb.export_import.models import ExportMetadata
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.reader.api.v1.router import KB_PREFIX, api
 from nucliadb_models.export_import import Status, StatusResponse
@@ -54,8 +55,11 @@ async def download_export_kb_endpoint(request: Request, kbid: str, export_id: st
 
     if in_standalone_mode():
         # In standalone mode, we stream the export as we generate it.
+        dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
+        metadata = await dm.get_metadata("export", kbid, export_id)
+        metadata = cast(ExportMetadata, metadata)
         return StreamingResponse(
-            exporter.export_kb(context, kbid),
+            exporter.export_kb(context, kbid, metadata=metadata, resumable=False),
             status_code=200,
             media_type="application/octet-stream",
             headers={"Content-Disposition": f"attachment; filename={kbid}.export"},
@@ -145,7 +149,6 @@ async def _get_status(
         # In standalone mode exports/imports are not actually run in a background task.
         # We return always FINISHED status to keep the API compatible with the hosted mode.
         return StatusResponse(status=Status.FINISHED)
-
     try:
         dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
         metadata = await dm.get_metadata(type, kbid, id)

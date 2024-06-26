@@ -21,7 +21,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from nucliadb_models.export_import import Status
 
@@ -62,6 +62,7 @@ class Metadata(BaseModel):
 
 
 class ExportMetadata(Metadata):
+    include_embeddings: bool = True
     resources_to_export: list[str] = list()
     exported_resources: list[str] = list()
 
@@ -76,3 +77,15 @@ class NatsTaskMessage(BaseModel):
 
     kbid: str
     id: str
+
+
+class StartExportRequest(BaseModel):
+    """
+    Model for the request to start an export
+    """
+
+    include_embeddings: bool = Field(
+        default=True,
+        title="Include embeddings",
+        description="Whether to include the embeddings in the export",
+    )

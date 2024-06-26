@@ -165,13 +165,13 @@ async def iter_kb_resource_uuids(context: ApplicationContext, kbid: str) -> Asyn
 
 
 async def get_broker_message(
-    context: ApplicationContext, kbid: str, rid: str
+    context: ApplicationContext, kbid: str, rid: str, include_embeddings: bool = True
 ) -> Optional[writer_pb2.BrokerMessage]:
     async with datamanagers.with_ro_transaction() as txn:
         resource = await datamanagers.resources.get_resource(txn, kbid=kbid, rid=rid)
         if resource is None:
             return None
-        resource.disable_vectors = False
+        resource.disable_vectors = not include_embeddings
         resource.txn = txn
         return await generate_broker_message(resource)
 
