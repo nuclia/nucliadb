@@ -66,6 +66,25 @@ async def src_kb(nucliadb_writer, nucliadb_manager):
         )
         assert resp.status_code == 201
 
+    # Create a resource with an externally hosted file
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "title": "Resource with externally hosted file",
+            "thumbnail": "foobar",
+            "icon": "application/pdf",
+            "slug": "test-external",
+            "files": {
+                "externally-hosted-file": {
+                    "file": {
+                        "uri": "https://example.com/testfile",
+                    }
+                }
+            },
+        },
+    )
+    assert resp.status_code == 201
+
     # Create an entity group with a few entities
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/entitiesgroups",
@@ -263,8 +282,11 @@ async def _check_kb(nucliadb_reader, kbid):
     assert resp.status_code == 200
     body = resp.json()
     resources = body["resources"]
-    assert len(resources) == 11
+    assert len(resources) == 12
     for resource in resources:
+        if resource["slug"] == "test-external":
+            # Check externally hosted file was imported correctly below
+            continue
         rid = resource["id"]
         assert resource["slug"].startswith("test-")
         assert resource["title"] == "Test"
@@ -285,6 +307,14 @@ async def _check_kb(nucliadb_reader, kbid):
         resp = await nucliadb_reader.get(field["uri"])
         assert resp.status_code == 200
         assert base64.b64decode(resp.content) == b"Test for /upload endpoint"
+
+    # Check externally hosted file
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/slug/test-external", params={"show": ["values"]})
+    assert resp.status_code == 200
+    body = resp.json()
+    external_file = body["data"]["files"]["externally-hosted-file"]["value"]
+    assert external_file["file"]["uri"] == "https://example.com/testfile"
+    assert external_file["external"] is True
 
     # Entities
     resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroups")
