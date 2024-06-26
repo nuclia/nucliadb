@@ -25,6 +25,8 @@ from grpc import StatusCode
 from grpc.aio import AioRpcError
 
 from nucliadb.common import datamanagers
+from nucliadb.common.cache.cache import CacheLayer, NoopCache
+from nucliadb.common.cache.util import get_cache
 from nucliadb.common.cluster.exceptions import ShardNotFound
 from nucliadb.common.cluster.manager import get_index_node
 from nucliadb.common.cluster.utils import get_shard_manager
@@ -66,7 +68,7 @@ KB_VECTORSET_TO_DELETE = f"{KB_VECTORSET_TO_DELETE_BASE}/{{kbid}}/{{vectorset}}"
 
 
 class KnowledgeBox:
-    def __init__(self, txn: Transaction, storage: Storage, kbid: str):
+    def __init__(self, txn: Transaction, storage: Storage, kbid: str, cache: CacheLayer = NoopCache()):
         self.txn = txn
         self.storage = storage
         self.kbid = kbid
@@ -205,6 +207,12 @@ class KnowledgeBox:
         audit_util = get_audit()
         if audit_util is not None:
             await audit_util.delete_kb(kbid)
+
+        # Invalidate all KB related keys from cache
+        cache = get_cache()
+        cache_key = cache.keys.KB_BASE_KEY.format(kbid=kbid)
+        await cache.invalidate_prefix(cache_key)
+
         return kbid
 
     @classmethod

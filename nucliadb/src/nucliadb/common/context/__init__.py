@@ -19,6 +19,8 @@
 #
 import asyncio
 
+from nucliadb.common.cache.cache import CacheLayer
+from nucliadb.common.cache.util import setup_cache, teardown_cache
 from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb.common.cluster.settings import in_standalone_mode
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
@@ -50,6 +52,7 @@ class ApplicationContext:
     partitioning: PartitionUtility
     indexing: IndexingUtility
     nats_manager: NatsConnectionManager
+    cache: CacheLayer
 
     def __init__(self, service_name: str = "service") -> None:
         self.service_name = service_name
@@ -66,6 +69,7 @@ class ApplicationContext:
             self._initialized = True
 
     async def _initialize(self):
+        self.cache = await setup_cache()
         self.kv_driver = await setup_driver()
         self.blob_storage = await get_storage()
         self.shard_manager = await setup_cluster()
@@ -92,4 +96,5 @@ class ApplicationContext:
         await teardown_cluster()
         await teardown_driver()
         await teardown_storage()
+        await teardown_cache(self.cache)
         self._initialized = False

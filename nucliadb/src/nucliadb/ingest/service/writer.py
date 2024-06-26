@@ -21,6 +21,7 @@ import uuid
 from typing import AsyncIterator, Optional
 
 from nucliadb.common import datamanagers
+from nucliadb.common.cache.util import setup_cache, teardown_cache
 from nucliadb.common.cluster.exceptions import AlreadyExists, EntitiesGroupNotFound
 from nucliadb.common.cluster.manager import get_index_nodes
 from nucliadb.common.cluster.utils import get_shard_manager
@@ -89,10 +90,12 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     async def initialize(self):
         self.storage = await get_storage(service_name=SERVICE_NAME)
         self.driver = await setup_driver()
+        self.cache = await setup_cache()
         self.proc = Processor(driver=self.driver, storage=self.storage, pubsub=await get_pubsub())
         self.shards_manager = get_shard_manager()
 
-    async def finalize(self): ...
+    async def finalize(self):
+        await teardown_cache(self.cache)
 
     async def NewKnowledgeBox(  # type: ignore
         self, request: KnowledgeBoxNew, context=None

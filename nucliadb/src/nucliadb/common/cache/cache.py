@@ -17,23 +17,54 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import abc
 import asyncio
 import logging
 from typing import Any, Optional
 
 from cachetools import LRUCache
 
-from nucliadb.common.cache.invalidations import CacheInvalidations
+from nucliadb.common.cache.invalidations import AbstractCacheInvalidations
 
 logger = logging.getLogger(__name__)
 
 
-class CacheLayer:
+class CacheLayer(abc.ABC):
+    class keys:
+        KB_BASE_KEY = "{kbid}/"
+        KB_EXISTS = "{kbid}/exists"
+
+    @abc.abstractmethod
+    async def initialize(self): ...
+
+    @abc.abstractmethod
+    async def finalize(self): ...
+
+    @abc.abstractmethod
+    def get(self, key: str) -> Any: ...
+
+    @abc.abstractmethod
+    def set(self, key: str, value: Any): ...
+
+    @abc.abstractmethod
+    def delete(self, key: str): ...
+
+    @abc.abstractmethod
+    def delete_prefix(self, prefix: str): ...
+
+    @abc.abstractmethod
+    async def invalidate(self, key: str): ...
+
+    @abc.abstractmethod
+    async def invalidate_prefix(self, prefix: str): ...
+
+
+class InMemoryCache(CacheLayer):
     """
     Implements an in-memory cache layer with support for invalidations.
     """
 
-    def __init__(self, max_size: int = 2048, invalidations: Optional[CacheInvalidations] = None):
+    def __init__(self, max_size: int = 2048, invalidations: Optional[AbstractCacheInvalidations] = None):
         self._cache: LRUCache = LRUCache(maxsize=max_size)
         self._invalidations = invalidations
         self._invalidations_task = None
@@ -88,3 +119,33 @@ class CacheLayer:
         if self._invalidations is None:
             return
         await self._invalidations.invalidate_prefix(prefix)
+
+
+class NoopCache(CacheLayer):
+    """
+    A cache layer that does nothing.
+    """
+
+    async def initialize(self):
+        pass
+
+    async def finalize(self):
+        pass
+
+    def get(self, key: str) -> Any:
+        return None
+
+    def set(self, key: str, value: Any):
+        pass
+
+    def delete(self, key: str):
+        pass
+
+    def delete_prefix(self, prefix: str):
+        pass
+
+    async def invalidate(self, key: str):
+        pass
+
+    async def invalidate_prefix(self, prefix: str):
+        pass

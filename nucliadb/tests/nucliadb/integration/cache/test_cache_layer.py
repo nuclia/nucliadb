@@ -22,7 +22,7 @@ import asyncio
 
 import pytest
 
-from nucliadb.common.cache import RedisCacheInvalidations
+from nucliadb.common.cache.invalidations import RedisCacheInvalidations
 
 
 @pytest.mark.asyncio

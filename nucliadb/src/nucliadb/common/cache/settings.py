@@ -17,3 +17,23 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from typing import Optional
+
+from pydantic import Field
+from pydantic_settings import BaseSettings
+
+
+class CacheSettings(BaseSettings):
+    cache_redis_url: Optional[str] = Field(
+        default=None,
+        title="Cache Redis URL",
+        description="URL to connect to the Redis cache server and use it for cache invalidations",
+    )
+    cache_max_size: int = Field(
+        default=2048,
+        title="Cache Max Size",
+        description="Maximum number of items to store in the in-memory cache",
+    )
+
+
+settings = CacheSettings()

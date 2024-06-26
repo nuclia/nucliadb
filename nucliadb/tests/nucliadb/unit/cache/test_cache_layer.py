@@ -24,9 +24,9 @@ import pytest
 
 @pytest.mark.asyncio
 async def test_cache_layer_without_invalidations():
-    from nucliadb.common.cache import CacheLayer
+    from nucliadb.common.cache.cache import InMemoryCache
 
-    cache = CacheLayer(max_size=10)
+    cache = InMemoryCache(max_size=10)
     await cache.initialize()
     try:
         assert cache.get("foo") is None
@@ -58,14 +58,15 @@ async def test_cache_layer_without_invalidations():
 
 @pytest.mark.asyncio
 async def test_cache_layer_with_invalidations():
-    from nucliadb.common.cache import CacheInvalidations, CacheLayer
+    from nucliadb.common.cache.cache import InMemoryCache
+    from nucliadb.common.cache.invalidations import CacheInvalidations
 
     invalidations = CacheInvalidations()
 
-    cache1 = CacheLayer(invalidations=invalidations)
+    cache1 = InMemoryCache(invalidations=invalidations)
     await cache1.initialize()
 
-    cache2 = CacheLayer(invalidations=invalidations)
+    cache2 = InMemoryCache(invalidations=invalidations)
     await cache2.initialize()
 
     try:

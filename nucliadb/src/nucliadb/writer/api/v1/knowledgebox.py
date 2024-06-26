@@ -27,6 +27,7 @@ from starlette.requests import Request
 
 from nucliadb import learning_proxy
 from nucliadb.common import datamanagers
+from nucliadb.common.context.fastapi import get_app_context
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -187,9 +188,9 @@ async def update_kb(request: Request, kbid: str, item: KnowledgeBoxConfig) -> Kn
 @requires(NucliaDBRoles.MANAGER)
 @version(1)
 async def delete_kb(request: Request, kbid: str) -> KnowledgeBoxObj:
-    driver = get_driver()
+    context = get_app_context(request.app)
     try:
-        async with driver.transaction() as txn:
+        async with context.kv_driver.transaction() as txn:
             await KnowledgeBox.delete(txn, kbid=kbid)
             await txn.commit()
     except datamanagers.exceptions.KnowledgeBoxNotFound:

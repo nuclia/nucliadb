@@ -24,6 +24,7 @@ from typing import Optional
 import aiohttp.client_exceptions
 
 from nucliadb.common import datamanagers, locking
+from nucliadb.common.cache.cache import CacheLayer, NoopCache
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.maindb.driver import Driver, Transaction
@@ -105,12 +106,14 @@ class Processor:
         storage: Storage,
         pubsub: Optional[PubSubDriver] = None,
         partition: Optional[str] = None,
+        cache: CacheLayer = NoopCache(),
     ):
         self.messages = {}
         self.driver = driver
         self.storage = storage
         self.partition = partition
         self.pubsub = pubsub
+        self.cache = cache
         self.shard_manager = get_shard_manager()
 
     async def process(
@@ -225,6 +228,17 @@ class Processor:
         finally:
             resource.txn = prev_txn
 
+    async def exists_kb(self, kbid: str) -> bool:
+        """
+        Cache the result of exists_kb to avoid hitting the database multiple times
+        """
+        cache_key = self.cache.keys.KB_EXISTS.format(kbid=kbid)
+        value = self.cache.get(cache_key)
+        if value is None:
+            value = await datamanagers.atomic.kb.exists_kb(kbid=kbid)
+            self.cache.set(cache_key, value)
+        return value
+
     @processor_observer.wrap({"type": "txn"})
     async def txn(
         self,
@@ -237,7 +251,7 @@ class Processor:
             return None
 
         kbid = messages[0].kbid
-        if not await datamanagers.atomic.kb.exists_kb(kbid=kbid):
+        if not self.exists_kb(kbid=kbid):
             logger.info(f"KB {kbid} is deleted: skiping txn")
             if transaction_check:
                 async with datamanagers.with_rw_transaction() as txn:
