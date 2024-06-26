@@ -96,5 +96,5 @@ class ApplicationContext:
         await teardown_cluster()
         await teardown_driver()
         await teardown_storage()
-        await teardown_cache(self.cache)
+        await teardown_cache()
         self._initialized = False

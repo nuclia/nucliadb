@@ -95,7 +95,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self.shards_manager = get_shard_manager()
 
     async def finalize(self):
-        await teardown_cache(self.cache)
+        await teardown_cache()
 
     async def NewKnowledgeBox(  # type: ignore
         self, request: KnowledgeBoxNew, context=None

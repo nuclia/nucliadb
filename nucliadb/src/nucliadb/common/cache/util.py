@@ -52,5 +52,10 @@ def get_cache() -> CacheLayer:
     return _singleton
 
 
-async def teardown_cache(cache: CacheLayer) -> None:
-    await cache.finalize()
+async def teardown_cache() -> None:
+    global _singleton
+    if _singleton is None:
+        logger.warning("Cache not initialized, nothing to teardown")
+        return
+    await _singleton.finalize()
+    _singleton = None
