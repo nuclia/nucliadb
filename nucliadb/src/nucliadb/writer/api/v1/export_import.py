@@ -150,7 +150,7 @@ async def start_import_task(context: ApplicationContext, kbid: str, import_id: s
     dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
     metadata = ImportMetadata(kbid=kbid, id=import_id)
     metadata.task.status = Status.SCHEDULED
-    metadata.total = import_size
+    metadata.total = import_size or 0
     await dm.set_metadata("import", metadata)
     try:
         producer = await get_imports_producer(context)
