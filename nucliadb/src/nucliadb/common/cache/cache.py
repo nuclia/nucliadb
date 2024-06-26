@@ -87,7 +87,7 @@ class InMemoryCache(CacheLayer):
 
     async def _process_invalidations(self):
         while True:
-            value = await self._invalidations.queue.get()
+            value = await self._invalidations.invalidations_queue.get()
             if value["type"] == "invalidate_key":
                 CACHE_LAYER_OPS.inc({"op": "invalidate", "type": "processed"})
                 self.delete(value["key"])
@@ -96,7 +96,7 @@ class InMemoryCache(CacheLayer):
                 self.delete_prefix(value["prefix"])
             else:  # pragma: no cover
                 logger.warning(f"Unknown invalidation type: {value}")
-            self._invalidations.queue.task_done()
+            self._invalidations.invalidations_queue.task_done()
 
     def get(self, key: str) -> Any:
         value = self._cache.get(key)

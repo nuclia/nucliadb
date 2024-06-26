@@ -85,7 +85,7 @@ async def test_cache_layer_with_invalidations():
         await asyncio.sleep(0.1)
         assert cache1.get("foo") is None
         await cache2.invalidate_prefix("foo/")
-        await asyncio.sleep(0)
+        await asyncio.sleep(0.1)
         assert cache1.get("foo/bar") is None
         assert cache1.get("foo/ba") is None
     finally:

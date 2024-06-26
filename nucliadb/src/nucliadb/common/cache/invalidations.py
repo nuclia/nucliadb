@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 class AbstractCacheInvalidations(abc.ABC):
-    queue: asyncio.Queue
+    invalidations_queue: asyncio.Queue
 
     @abc.abstractmethod
     async def initialize(self): ...
@@ -51,8 +51,7 @@ class CacheInvalidations(AbstractCacheInvalidations):
     """
 
     def __init__(self):
-        # Unbounded queue
-        self.queue = asyncio.Queue(maxsize=0)
+        self.invalidations_queue = asyncio.Queue(maxsize=0)
 
     async def initialize(self):
         pass
@@ -61,10 +60,10 @@ class CacheInvalidations(AbstractCacheInvalidations):
         pass
 
     async def invalidate(self, key: str):
-        self.queue.put_nowait({"type": "invalidate_key", "key": key})
+        await self.invalidations_queue.put({"type": "invalidate_key", "key": key})
 
     async def invalidate_prefix(self, prefix: str):
-        self.queue.put_nowait({"type": "invalidate_prefix", "prefix": prefix})
+        await self.invalidations_queue.put({"type": "invalidate_prefix", "prefix": prefix})
 
 
 class RedisCacheInvalidations(AbstractCacheInvalidations):
@@ -73,8 +72,9 @@ class RedisCacheInvalidations(AbstractCacheInvalidations):
     """
 
     def __init__(self, redis_url: str):
-        # Unbounded queue
-        self.queue = asyncio.Queue(maxsize=0)
+        # Unbounded queue to avoid losing messages.
+        # This queue is used to communicate with the cache layer about invalidations.
+        self.invalidations_queue = asyncio.Queue(maxsize=0)
         self.redis = aioredis.from_url(redis_url)
         self.pubsub = self.redis.pubsub()
         self._channel = "nucliadb_cache_invalidation"
@@ -110,9 +110,13 @@ class RedisCacheInvalidations(AbstractCacheInvalidations):
                 try:
                     data = json.loads(message["data"])
                     if data["type"] == "invalidate_key":
-                        self.queue.put_nowait({"type": "invalidate_key", "key": data["key"]})
+                        await self.invalidations_queue.put(
+                            {"type": "invalidate_key", "key": data["key"]}
+                        )
                     elif data["type"] == "invalidate_prefix":
-                        self.queue.put_nowait({"type": "invalidate_prefix", "prefix": data["prefix"]})
+                        await self.invalidations_queue.put(
+                            {"type": "invalidate_prefix", "prefix": data["prefix"]}
+                        )
                     else:  # pragma: no cover
                         logger.warning(f"Invalid redis pubsub message: {data}")
                 except (json.JSONDecodeError, KeyError):

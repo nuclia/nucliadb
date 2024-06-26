@@ -32,15 +32,18 @@ async def test_redis_invalidations(redis):
     invalidations = RedisCacheInvalidations(redis_url=redis_url)
     await invalidations.initialize()
 
+    # Wait a bit for the subscription to setup in redis
+    await asyncio.sleep(1)
+
     await invalidations.invalidate("key")
-    await asyncio.sleep(0.5)
-    assert invalidations.queue.empty() is False
-    message = await invalidations.queue.get()
+    await asyncio.sleep(0.2)
+    assert invalidations.invalidations_queue.empty() is False
+    message = await invalidations.invalidations_queue.get()
     assert message == {"type": "invalidate_key", "key": "key"}
 
     await invalidations.invalidate_prefix("prefix")
-    await asyncio.sleep(0.5)
-    message = await invalidations.queue.get()
+    await asyncio.sleep(0.2)
+    message = await invalidations.invalidations_queue.get()
     assert message == {"type": "invalidate_prefix", "prefix": "prefix"}
 
     await invalidations.finalize()
