@@ -38,6 +38,7 @@ class CacheLayer(abc.ABC):
     class keys:
         KB_BASE_KEY = "{kbid}/"
         KB_EXISTS = "{kbid}/exists"
+        KB_SHARDS = "{kbid}/shards"
 
     @abc.abstractmethod
     async def initialize(self): ...

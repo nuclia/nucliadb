@@ -20,6 +20,7 @@
 import logging
 from typing import Optional
 
+from nucliadb.common.cache.util import get_cache
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb_protos import writer_pb2
 
@@ -32,10 +33,22 @@ KB_SHARDS = "/kbs/{kbid}/shards"
 
 
 async def get_kb_shards(txn: Transaction, *, kbid: str) -> Optional[writer_pb2.Shards]:
+    cache = get_cache()
+    cache_key = cache.keys.KB_SHARDS.format(kbid=kbid)
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     key = KB_SHARDS.format(kbid=kbid)
-    return await get_kv_pb(txn, key, writer_pb2.Shards)
+    kb_shards = await get_kv_pb(txn, key, writer_pb2.Shards)
+    cache.set(cache_key, kb_shards)
+    return kb_shards
 
 
 async def update_kb_shards(txn: Transaction, *, kbid: str, shards: writer_pb2.Shards) -> None:
+    cache = get_cache()
+    cache_key = cache.keys.KB_SHARDS.format(kbid=kbid)
+    await cache.invalidate(cache_key)
+
     key = KB_SHARDS.format(kbid=kbid)
     await txn.set(key, shards.SerializeToString())
