@@ -25,8 +25,12 @@ from typing import Any, Optional
 from cachetools import LRUCache
 
 from nucliadb.common.cache.invalidations import AbstractCacheInvalidations
+from nucliadb_telemetry import metrics
 
 logger = logging.getLogger(__name__)
+
+
+CACHE_LAYER_OPS = metrics.Counter("nucliadb_cache_layer_ops", labels={"op": "", "type": ""})
 
 
 class CacheLayer(abc.ABC):
@@ -84,23 +88,33 @@ class InMemoryCache(CacheLayer):
         while True:
             value = await self._invalidations.queue.get()
             if value["type"] == "invalidate_key":
+                CACHE_LAYER_OPS.inc({"op": "invalidate", "type": "processed"})
                 self.delete(value["key"])
             elif value["type"] == "invalidate_prefix":
+                CACHE_LAYER_OPS.inc({"op": "invalidate_prefix", "type": "processed"})
                 self.delete_prefix(value["prefix"])
             else:  # pragma: no cover
                 logger.warning(f"Unknown invalidation type: {value}")
             self._invalidations.queue.task_done()
 
     def get(self, key: str) -> Any:
-        return self._cache.get(key)
+        value = self._cache.get(key)
+        if value is not None:
+            CACHE_LAYER_OPS.inc({"op": "get", "type": "hit"})
+        else:
+            CACHE_LAYER_OPS.inc({"op": "get", "type": "miss"})
+        return value
 
     def set(self, key: str, value: Any):
+        CACHE_LAYER_OPS.inc({"op": "set", "type": ""})
         self._cache[key] = value
 
     def delete(self, key: str):
+        CACHE_LAYER_OPS.inc({"op": "delete", "type": ""})
         self._cache.pop(key, None)
 
     def delete_prefix(self, prefix: str):
+        CACHE_LAYER_OPS.inc({"op": "delete_prefix", "type": ""})
         for key in list(self._cache.keys()):
             if key.startswith(prefix):
                 self._cache.pop(key, None)
@@ -109,12 +123,14 @@ class InMemoryCache(CacheLayer):
         self._cache.clear()
 
     async def invalidate(self, key: str):
+        CACHE_LAYER_OPS.inc({"op": "invalidate", "type": ""})
         self.delete(key)
         if self._invalidations is None:
             return
         await self._invalidations.invalidate(key)
 
     async def invalidate_prefix(self, prefix: str):
+        CACHE_LAYER_OPS.inc({"op": "invalidate_prefix", "type": ""})
         self.delete_prefix(prefix)
         if self._invalidations is None:
             return
