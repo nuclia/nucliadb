@@ -142,7 +142,8 @@ class InMemoryCache(CacheLayer):
 
 class NoopCache(CacheLayer):
     """
-    A cache layer that does nothing.
+    A cache layer that does nothing. This is useful to avoid having to check for
+    None when using a cache layer.
     """
 
     async def initialize(self):
