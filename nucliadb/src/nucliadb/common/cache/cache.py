@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 
 CACHE_LAYER_OPS = metrics.Counter("nucliadb_cache_layer_ops", labels={"op": "", "type": ""})
+CACHE_LAYER_SIZE = metrics.Gauge("nucliadb_cache_layer_size")
 
 
 class CacheLayer(abc.ABC):
@@ -103,10 +104,12 @@ class InMemoryCache(CacheLayer):
             CACHE_LAYER_OPS.inc({"op": "get", "type": "hit"})
         else:
             CACHE_LAYER_OPS.inc({"op": "get", "type": "miss"})
+        CACHE_LAYER_SIZE.set(self._cache.currsize)
         return value
 
     def set(self, key: str, value: Any):
         CACHE_LAYER_OPS.inc({"op": "set", "type": ""})
+        CACHE_LAYER_SIZE.set(self._cache.currsize)
         self._cache[key] = value
 
     def delete(self, key: str):
@@ -115,12 +118,14 @@ class InMemoryCache(CacheLayer):
             CACHE_LAYER_OPS.inc({"op": "delete", "type": "hit"})
         else:
             CACHE_LAYER_OPS.inc({"op": "delete", "type": "miss"})
+        CACHE_LAYER_SIZE.set(self._cache.currsize)
 
     def delete_prefix(self, prefix: str):
         CACHE_LAYER_OPS.inc({"op": "delete_prefix", "type": ""})
         for key in list(self._cache.keys()):
             if key.startswith(prefix):
                 self._cache.pop(key, None)
+        CACHE_LAYER_SIZE.set(self._cache.currsize)
 
     def clear(self):
         self._cache.clear()
