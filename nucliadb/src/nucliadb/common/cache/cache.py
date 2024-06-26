@@ -123,14 +123,14 @@ class InMemoryCache(CacheLayer):
         self._cache.clear()
 
     async def invalidate(self, key: str):
-        CACHE_LAYER_OPS.inc({"op": "invalidate", "type": ""})
+        CACHE_LAYER_OPS.inc({"op": "invalidate", "type": "sent"})
         self.delete(key)
         if self._invalidations is None:
             return
         await self._invalidations.invalidate(key)
 
     async def invalidate_prefix(self, prefix: str):
-        CACHE_LAYER_OPS.inc({"op": "invalidate_prefix", "type": ""})
+        CACHE_LAYER_OPS.inc({"op": "invalidate_prefix", "type": "sent"})
         self.delete_prefix(prefix)
         if self._invalidations is None:
             return
