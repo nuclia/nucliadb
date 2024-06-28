@@ -55,6 +55,11 @@ async def get_kb_uuid(txn: Transaction, *, slug: str) -> Optional[str]:
         return None
 
 
+async def set_kbid_for_slug(txn: Transaction, *, slug: str, kbid: str):
+    key = KB_SLUGS.format(slug=slug)
+    await txn.set(key, kbid.encode())
+
+
 async def get_config(
     txn: Transaction, *, kbid: str, for_update: bool = False
 ) -> Optional[knowledgebox_pb2.KnowledgeBoxConfig]:

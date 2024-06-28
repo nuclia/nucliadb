@@ -103,10 +103,8 @@ class KnowledgeBox:
             if slug == "":
                 slug = kbid
 
-            await txn.set(
-                datamanagers.kb.KB_SLUGS.format(slug=slug),
-                kbid.encode(),
-            )
+            await datamanagers.kb.set_kbid_for_slug(txn, slug=slug, kbid=kbid)
+
             await datamanagers.vectorsets.initialize(txn, kbid=kbid)
 
             config = KnowledgeBoxConfig(
