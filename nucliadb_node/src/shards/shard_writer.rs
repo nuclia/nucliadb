@@ -36,7 +36,7 @@ use nucliadb_vectors::VectorErr;
 use super::indexes::{ShardIndexes, DEFAULT_VECTORS_INDEX_NAME};
 use super::metadata::ShardMetadata;
 use super::versioning::{self, Versions};
-use crate::disk_structure::*;
+use crate::disk_structure::{self, *};
 use crate::telemetry::run_with_telemetry;
 
 const MAX_LABEL_LENGTH: usize = 32768; // Tantivy max is 2^16 - 4
@@ -105,17 +105,19 @@ impl ShardWriter {
     }
 
     #[measure(actor = "shard", metric = "new")]
-    pub fn new(metadata: Arc<ShardMetadata>, vector_configs: HashMap<String, VectorConfig>) -> NodeResult<Self> {
+    pub fn new(new: NewShard, shards_path: &Path) -> NodeResult<(Self, Arc<ShardMetadata>)> {
         let span = tracing::Span::current();
 
-        if vector_configs.is_empty() {
+        if new.vector_configs.is_empty() {
             return Err(node_error!("Shards must be created with at least one vector index"));
         }
 
-        let shard_path = metadata.shard_path();
+        let shard_id = new.shard_id;
+        let shard_path = disk_structure::shard_path_by_id(shards_path, &shard_id);
+        let metadata = Arc::new(ShardMetadata::new(shard_path.clone(), shard_id.clone(), new.kbid, new.channel));
         let mut indexes = ShardIndexes::new(&shard_path);
 
-        std::fs::create_dir(shard_path)?;
+        std::fs::create_dir(shard_path.clone())?;
 
         let versions = Versions {
             paragraphs: versioning::PARAGRAPHS_VERSION,
@@ -123,7 +125,7 @@ impl ShardWriter {
             texts: versioning::TEXTS_VERSION,
             relations: versioning::RELATIONS_VERSION,
         };
-        let versions_path = metadata.shard_path().join(VERSION_FILE);
+        let versions_path = shard_path.join(VERSION_FILE);
         Versions::create(&versions_path, versions)?;
 
         // indexes creation tasks
@@ -143,14 +145,14 @@ impl ShardWriter {
         let paragraph_task = || run_with_telemetry(info, paragraph_task);
 
         let mut vector_tasks = vec![];
-        for (vectorset_id, config) in vector_configs {
+        for (vectorset_id, config) in new.vector_configs {
             let vectorset_path = indexes.add_vectors_index(vectorset_id.clone())?;
-            let shard_id = metadata.id();
+            let shard_id_clone = shard_id.clone();
             vector_tasks.push(|| {
                 run_with_telemetry(info_span!(parent: &span, "vector start"), move || {
                     Some((
                         vectorset_id,
-                        nucliadb_vectors::service::VectorWriterService::create(&vectorset_path, shard_id, config),
+                        nucliadb_vectors::service::VectorWriterService::create(&vectorset_path, shard_id_clone, config),
                     ))
                 })
             })
@@ -158,7 +160,7 @@ impl ShardWriter {
 
         let rsc = RelationConfig {
             path: indexes.relations_path(),
-            channel: metadata.channel(),
+            channel: new.channel,
         };
         let relation_task = || Some(nucliadb_relations2::writer::RelationsWriterService::create(rsc));
         let info = info_span!(parent: &span, "relation start");
@@ -192,19 +194,22 @@ impl ShardWriter {
         metadata.serialize_metadata()?;
         indexes.store()?;
 
-        Ok(ShardWriter {
-            id: metadata.id(),
-            path: metadata.shard_path(),
+        Ok((
+            ShardWriter {
+                id: shard_id,
+                path: shard_path,
+                metadata: Arc::clone(&metadata),
+                indexes: RwLock::new(ShardWriterIndexes {
+                    texts_index: Box::new(fields.unwrap()),
+                    paragraphs_index: Box::new(paragraphs.unwrap()),
+                    vectors_indexes: vectors,
+                    relations_index: Box::new(relations.unwrap()),
+                }),
+                versions,
+                gc_lock: tokio::sync::Mutex::new(()),
+            },
             metadata,
-            indexes: RwLock::new(ShardWriterIndexes {
-                texts_index: Box::new(fields.unwrap()),
-                paragraphs_index: Box::new(paragraphs.unwrap()),
-                vectors_indexes: vectors,
-                relations_index: Box::new(relations.unwrap()),
-            }),
-            versions,
-            gc_lock: tokio::sync::Mutex::new(()),
-        })
+        ))
     }
 
     #[measure(actor = "shard", metric = "open")]

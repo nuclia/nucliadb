@@ -123,13 +123,8 @@ impl ShardWriterCache {
 
     pub fn create(&self, new: NewShard) -> NodeResult<Arc<ShardWriter>> {
         let shard_id = new.shard_id.clone();
-        let metadata = Arc::new(ShardMetadata::new(
-            self.shards_path.join(new.shard_id.clone()),
-            new.shard_id,
-            new.kbid,
-            new.channel,
-        ));
-        let shard = Arc::new(ShardWriter::new(Arc::clone(&metadata), new.vector_configs)?);
+        let (shard, metadata) = ShardWriter::new(new, &self.shards_path)?;
+        let shard = Arc::new(shard);
 
         self.metadata_manager.add_metadata(metadata);
         self.cache().add_active_shard(&shard_id, &shard);
