@@ -98,21 +98,20 @@ impl ShardWriter {
     }
 
     #[measure(actor = "shard", metric = "new")]
-    pub fn new(metadata: Arc<ShardMetadata>, vector_config: VectorConfig) -> NodeResult<ShardWriter> {
+    pub fn new(metadata: Arc<ShardMetadata>, vector_config: VectorConfig) -> NodeResult<Self> {
+        Self::new_v2(metadata, HashMap::from([(DEFAULT_VECTORS_INDEX_NAME.to_string(), vector_config)]))
+    }
+
+    #[measure(actor = "shard", metric = "new")]
+    pub fn new_v2(metadata: Arc<ShardMetadata>, vector_configs: HashMap<String, VectorConfig>) -> NodeResult<Self> {
+        let span = tracing::Span::current();
+
+        if vector_configs.is_empty() {
+            return Err(node_error!("Shards must be created with at least one vector index"));
+        }
+
         let shard_path = metadata.shard_path();
         let mut indexes = ShardIndexes::new(&shard_path);
-        indexes.add_vectors_index(DEFAULT_VECTORS_INDEX_NAME.to_string())?;
-
-        let tsc = TextConfig {
-            path: indexes.texts_path(),
-        };
-        let psc = ParagraphConfig {
-            path: indexes.paragraphs_path(),
-        };
-        let rsc = RelationConfig {
-            path: indexes.relations_path(),
-            channel: metadata.channel(),
-        };
 
         std::fs::create_dir(shard_path)?;
 
@@ -125,41 +124,67 @@ impl ShardWriter {
         let versions_path = metadata.shard_path().join(VERSION_FILE);
         Versions::create(&versions_path, versions)?;
 
-        let text_task = || Some(nucliadb_texts2::writer::TextWriterService::create(tsc));
-        let paragraph_task = || Some(nucliadb_paragraphs3::writer::ParagraphWriterService::create(psc));
-        let vector_task = || {
-            Some(nucliadb_vectors::service::VectorWriterService::create(
-                &indexes.vectors_path(),
-                metadata.id(),
-                vector_config,
-            ))
-        };
-        let relation_task = || Some(nucliadb_relations2::writer::RelationsWriterService::create(rsc));
+        // indexes creation tasks
 
-        let span = tracing::Span::current();
+        let tsc = TextConfig {
+            path: indexes.texts_path(),
+        };
+        let text_task = || Some(nucliadb_texts2::writer::TextWriterService::create(tsc));
         let info = info_span!(parent: &span, "text start");
         let text_task = || run_with_telemetry(info, text_task);
+
+        let psc = ParagraphConfig {
+            path: indexes.paragraphs_path(),
+        };
+        let paragraph_task = || Some(nucliadb_paragraphs3::writer::ParagraphWriterService::create(psc));
         let info = info_span!(parent: &span, "paragraph start");
         let paragraph_task = || run_with_telemetry(info, paragraph_task);
-        let info = info_span!(parent: &span, "vector start");
-        let vector_task = || run_with_telemetry(info, vector_task);
+
+        let mut vector_tasks = vec![];
+        for (vectorset_id, config) in vector_configs {
+            let vectorset_path = indexes.add_vectors_index(vectorset_id.clone())?;
+            let shard_id = metadata.id();
+            vector_tasks.push(|| {
+                run_with_telemetry(info_span!(parent: &span, "vector start"), move || {
+                    Some((
+                        vectorset_id,
+                        nucliadb_vectors::service::VectorWriterService::create(&vectorset_path, shard_id, config),
+                    ))
+                })
+            })
+        }
+
+        let rsc = RelationConfig {
+            path: indexes.relations_path(),
+            channel: metadata.channel(),
+        };
+        let relation_task = || Some(nucliadb_relations2::writer::RelationsWriterService::create(rsc));
         let info = info_span!(parent: &span, "relation start");
         let relation_task = || run_with_telemetry(info, relation_task);
 
         let mut text_result = None;
         let mut paragraph_result = None;
-        let mut vector_result = None;
+        let mut vector_results = Vec::with_capacity(vector_tasks.len());
+        for _ in 0..vector_tasks.len() {
+            vector_results.push(None);
+        }
         let mut relation_result = None;
         thread::scope(|s| {
             s.spawn(|_| text_result = text_task());
             s.spawn(|_| paragraph_result = paragraph_task());
-            s.spawn(|_| vector_result = vector_task());
+            for (vector_task, vector_result) in vector_tasks.into_iter().zip(vector_results.iter_mut()) {
+                s.spawn(|_| *vector_result = vector_task());
+            }
             s.spawn(|_| relation_result = relation_task());
         });
 
         let fields = text_result.transpose()?;
         let paragraphs = paragraph_result.transpose()?;
-        let vectors = vector_result.transpose()?;
+        let mut vectors = HashMap::with_capacity(vector_results.len());
+        for result in vector_results {
+            let (name, vector_writer) = result.unwrap();
+            vectors.insert(name, Box::new(vector_writer?) as VectorsWriterPointer);
+        }
         let relations = relation_result.transpose()?;
 
         metadata.serialize_metadata()?;
@@ -172,10 +197,7 @@ impl ShardWriter {
             indexes: RwLock::new(ShardWriterIndexes {
                 texts_index: Box::new(fields.unwrap()),
                 paragraphs_index: Box::new(paragraphs.unwrap()),
-                vectors_indexes: HashMap::from([(
-                    DEFAULT_VECTORS_INDEX_NAME.to_string(),
-                    Box::new(vectors.unwrap()) as VectorsWriterPointer,
-                )]),
+                vectors_indexes: vectors,
                 relations_index: Box::new(relations.unwrap()),
             }),
             versions,
@@ -196,7 +218,9 @@ impl ShardWriter {
         })?;
 
         // This call will generate the shard indexes file, as a lazy migration.
-        // TODO: When every shard has the file, this line should be removed
+        // TODO: When every shard has the file, this line should be removed.
+        // Currently, all hosted environments are migrated, missing validation
+        // for onprem
         indexes.store()?;
 
         let versions_path = metadata.shard_path().join(VERSION_FILE);
