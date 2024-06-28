@@ -115,7 +115,7 @@ async def _create_kb(item: KnowledgeBoxConfig) -> tuple[str, Optional[str]]:
     semantic_model = learning_config.into_semantic_model_metadata()
     release_channel = item.release_channel.to_pb() if item.release_channel is not None else None
     try:
-        kbid = await KnowledgeBox.create(
+        (kbid, slug) = await KnowledgeBox.create(
             driver,
             kbid=kbid,
             slug=item.slug or "",  # empty slugs will be changed on KB creation
@@ -130,7 +130,7 @@ async def _create_kb(item: KnowledgeBoxConfig) -> tuple[str, Optional[str]]:
         await rollback_learning_config()
         raise
 
-    return (kbid, item.slug)
+    return (kbid, slug)
 
 
 @only_for_onprem

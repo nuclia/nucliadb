@@ -114,7 +114,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         semantic_model = parse_model_metadata_from_request(request)
 
         try:
-            kbid = await KnowledgeBoxORM.create(
+            (kbid, _) = await KnowledgeBoxORM.create(
                 self.driver,
                 kbid=kbid,
                 slug=request.slug,

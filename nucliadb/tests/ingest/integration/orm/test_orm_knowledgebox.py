@@ -63,7 +63,7 @@ async def test_create_knowledgebox(
         similarity_function=VectorSimilarity.COSINE,
         vector_dimension=384,
     )
-    kbid = await KnowledgeBox.create(
+    (kbid, slug) = await KnowledgeBox.create(
         maindb_driver,
         kbid=KnowledgeBox.new_unique_kbid(),
         slug="test",
@@ -71,6 +71,7 @@ async def test_create_knowledgebox(
         semantic_model=model,
     )
     assert kbid
+    assert slug == "test"
 
     with pytest.raises(KnowledgeBoxConflict):
         await KnowledgeBox.create(
@@ -81,7 +82,7 @@ async def test_create_knowledgebox(
             semantic_model=model,
         )
 
-    kbid2 = await KnowledgeBox.create(
+    (kbid2, slug2) = await KnowledgeBox.create(
         maindb_driver,
         kbid=KnowledgeBox.new_unique_kbid(),
         slug="test2",
@@ -89,6 +90,7 @@ async def test_create_knowledgebox(
         semantic_model=model,
     )
     assert kbid2
+    assert slug2 == "test2"
 
     count = await count_all_kbs(maindb_driver)
     assert count == 2

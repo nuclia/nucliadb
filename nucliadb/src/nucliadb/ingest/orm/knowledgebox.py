@@ -88,7 +88,9 @@ class KnowledgeBox:
         description: str = "",
         semantic_model: SemanticModelMetadata,
         release_channel: Optional[ReleaseChannel.ValueType] = ReleaseChannel.STABLE,
-    ) -> str:
+    ) -> tuple[str, str]:
+        """Creates a new knowledge box and return its id and slug."""
+
         async with driver.transaction() as txn:
             release_channel = cast(
                 ReleaseChannel.ValueType, release_channel_for_kb(slug, release_channel)
@@ -155,7 +157,7 @@ class KnowledgeBox:
 
             await txn.commit()
 
-        return kbid
+        return (kbid, slug)
 
     @classmethod
     async def update(

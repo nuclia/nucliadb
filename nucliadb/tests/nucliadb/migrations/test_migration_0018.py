@@ -55,7 +55,7 @@ async def test_migration_0018_global(maindb_driver: Driver):
             await txn.commit()
 
         real_kb_slug = "real-kb-slug"
-        real_kb_id = await KnowledgeBox.create(
+        (real_kb_id, _) = await KnowledgeBox.create(
             maindb_driver,
             kbid=KnowledgeBox.new_unique_kbid(),
             slug=real_kb_slug,
