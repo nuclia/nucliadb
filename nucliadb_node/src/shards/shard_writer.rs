@@ -153,7 +153,8 @@ impl ShardWriter {
     #[measure(actor = "shard", metric = "new")]
     pub fn new(metadata: Arc<ShardMetadata>, vector_config: VectorConfig) -> NodeResult<ShardWriter> {
         let shard_path = metadata.shard_path();
-        let indexes = ShardIndexes::new(&shard_path);
+        let mut indexes = ShardIndexes::new(&shard_path);
+        indexes.add_vectors_index(DEFAULT_VECTORS_INDEX_NAME.to_string())?;
 
         let tsc = TextConfig {
             path: indexes.texts_path(),
@@ -241,7 +242,11 @@ impl ShardWriter {
         let shard_path = metadata.shard_path();
 
         // fallback to default indexes while there are shards without the file
-        let indexes = ShardIndexes::load(&shard_path).unwrap_or_else(|_| ShardIndexes::new(&shard_path));
+        let indexes = ShardIndexes::load(&shard_path).or_else(|_| {
+            let mut indexes = ShardIndexes::new(&shard_path);
+            indexes.add_vectors_index(DEFAULT_VECTORS_INDEX_NAME.to_string())?;
+            Ok::<ShardIndexes, anyhow::Error>(indexes)
+        })?;
 
         // This call will generate the shard indexes file, as a lazy migration.
         // TODO: When every shard has the file, this line should be removed
