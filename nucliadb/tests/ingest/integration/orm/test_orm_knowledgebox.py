@@ -26,7 +26,7 @@ from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox, chunker
-from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig, SemanticModelMetadata
+from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
 from nucliadb_protos.utils_pb2 import VectorSimilarity
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
@@ -67,7 +67,7 @@ async def test_create_knowledgebox(
         maindb_driver,
         kbid=KnowledgeBox.new_unique_kbid(),
         slug="test",
-        config=KnowledgeBoxConfig(title="My Title 1"),
+        title="My Title 1",
         semantic_model=model,
     )
     assert kbid
@@ -77,7 +77,7 @@ async def test_create_knowledgebox(
             maindb_driver,
             kbid=KnowledgeBox.new_unique_kbid(),
             slug="test",
-            config=KnowledgeBoxConfig(title="My Title 2"),
+            title="My Title 2",
             semantic_model=model,
         )
 
@@ -85,7 +85,7 @@ async def test_create_knowledgebox(
         maindb_driver,
         kbid=KnowledgeBox.new_unique_kbid(),
         slug="test2",
-        config=KnowledgeBoxConfig(title="My Title 3"),
+        title="My Title 3",
         semantic_model=model,
     )
     assert kbid2

@@ -112,10 +112,6 @@ async def _create_kb(item: KnowledgeBoxConfig) -> tuple[str, Optional[str]]:
 
     rollback_learning_config = partial(_rollback_learning_config, kbid)
 
-    config = knowledgebox_pb2.KnowledgeBoxConfig(
-        title=item.title or "",
-        description=item.description or "",
-    )
     semantic_model = learning_config.into_semantic_model_metadata()
     release_channel = item.release_channel.to_pb() if item.release_channel is not None else None
     try:
@@ -123,8 +119,9 @@ async def _create_kb(item: KnowledgeBoxConfig) -> tuple[str, Optional[str]]:
             driver,
             kbid=kbid,
             slug=item.slug or "",  # empty slugs will be changed on KB creation
+            title=item.title or "",
+            description=item.description or "",
             semantic_model=semantic_model,
-            config=config,
             release_channel=release_channel,
         )
 

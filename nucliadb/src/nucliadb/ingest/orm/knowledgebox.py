@@ -84,8 +84,9 @@ class KnowledgeBox:
         *,
         kbid: str,
         slug: str,
+        title: str = "",
+        description: str = "",
         semantic_model: SemanticModelMetadata,
-        config: Optional[KnowledgeBoxConfig] = None,
         release_channel: Optional[ReleaseChannel.ValueType] = ReleaseChannel.STABLE,
     ) -> str:
         async with driver.transaction() as txn:
@@ -106,13 +107,14 @@ class KnowledgeBox:
                 datamanagers.kb.KB_SLUGS.format(slug=slug),
                 kbid.encode(),
             )
-            if config is None:
-                config = KnowledgeBoxConfig()
-
             await datamanagers.vectorsets.initialize(txn, kbid=kbid)
 
-            config.migration_version = get_latest_version()
-            config.slug = slug
+            config = KnowledgeBoxConfig(
+                title=title,
+                description=description,
+                slug=slug,
+                migration_version=get_latest_version(),
+            )
             await txn.set(
                 datamanagers.kb.KB_UUID.format(kbid=kbid),
                 config.SerializeToString(),

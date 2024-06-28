@@ -118,8 +118,9 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 self.driver,
                 kbid=kbid,
                 slug=request.slug,
+                title=request.config.title,
+                description=request.config.description,
                 semantic_model=semantic_model,
-                config=request.config,
                 release_channel=release_channel,
             )
 
