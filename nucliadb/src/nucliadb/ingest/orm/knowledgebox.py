@@ -81,6 +81,7 @@ class KnowledgeBox:
     async def create(
         cls,
         driver: Driver,
+        *,
         kbid: str,
         slug: str,
         semantic_model: SemanticModelMetadata,
