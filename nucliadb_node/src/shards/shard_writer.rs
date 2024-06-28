@@ -20,7 +20,6 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
-use nucliadb_core::paragraphs::*;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::shard_created::{DocumentService, ParagraphService, RelationService, VectorService};
 use nucliadb_core::protos::{Resource, ResourceId};
@@ -28,6 +27,7 @@ use nucliadb_core::relations::*;
 use nucliadb_core::texts::*;
 use nucliadb_core::tracing::{self, *};
 use nucliadb_core::vectors::*;
+use nucliadb_core::{paragraphs::*, Channel};
 use nucliadb_core::{thread, IndexFiles};
 use nucliadb_procs::measure;
 use nucliadb_vectors::config::VectorConfig;
@@ -57,6 +57,13 @@ struct ShardWriterIndexes {
     paragraphs_index: ParagraphsWriterPointer,
     vectors_indexes: HashMap<String, VectorsWriterPointer>,
     relations_index: RelationsWriterPointer,
+}
+
+pub struct NewShard {
+    pub kbid: String,
+    pub shard_id: String,
+    pub channel: Channel,
+    pub vector_configs: HashMap<String, VectorConfig>,
 }
 
 impl ShardWriter {
@@ -98,12 +105,7 @@ impl ShardWriter {
     }
 
     #[measure(actor = "shard", metric = "new")]
-    pub fn new(metadata: Arc<ShardMetadata>, vector_config: VectorConfig) -> NodeResult<Self> {
-        Self::new_v2(metadata, HashMap::from([(DEFAULT_VECTORS_INDEX_NAME.to_string(), vector_config)]))
-    }
-
-    #[measure(actor = "shard", metric = "new")]
-    pub fn new_v2(metadata: Arc<ShardMetadata>, vector_configs: HashMap<String, VectorConfig>) -> NodeResult<Self> {
+    pub fn new(metadata: Arc<ShardMetadata>, vector_configs: HashMap<String, VectorConfig>) -> NodeResult<Self> {
         let span = tracing::Span::current();
 
         if vector_configs.is_empty() {

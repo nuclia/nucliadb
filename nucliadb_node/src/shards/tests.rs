@@ -41,7 +41,10 @@ fn test_vectorsets() -> NodeResult<()> {
 
     let metadata = Arc::new(ShardMetadata::new(shard_path.clone(), shard_id.clone(), kbid.clone(), Channel::default()));
 
-    let writer = ShardWriter::new(Arc::clone(&metadata), VectorConfig::default())?;
+    let writer = ShardWriter::new(
+        Arc::clone(&metadata),
+        HashMap::from([(DEFAULT_VECTORS_INDEX_NAME.to_string(), VectorConfig::default())]),
+    )?;
     writer.create_vectors_index(
         "myvectorset".to_string(),
         VectorConfig {

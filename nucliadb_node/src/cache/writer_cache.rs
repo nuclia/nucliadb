@@ -17,7 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::num::NonZeroUsize;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -32,8 +32,9 @@ use super::resource_cache::{CacheResult, ResourceCache, ResourceLoadGuard};
 use crate::disk_structure;
 use crate::errors::ShardNotFoundError;
 use crate::settings::Settings;
+use crate::shards::indexes::DEFAULT_VECTORS_INDEX_NAME;
 use crate::shards::metadata::{ShardMetadata, ShardsMetadataManager};
-use crate::shards::writer::ShardWriter;
+use crate::shards::writer::{NewShard, ShardWriter};
 use crate::shards::ShardId;
 
 /// This cache allows the user to block shards, ensuring that they will not be loaded from disk.
@@ -125,7 +126,26 @@ impl ShardWriterCache {
     pub fn create(&self, metadata: ShardMetadata, vector_config: VectorConfig) -> NodeResult<Arc<ShardWriter>> {
         let shard_id = metadata.id();
         let metadata = Arc::new(metadata);
-        let shard = Arc::new(ShardWriter::new(metadata.clone(), vector_config)?);
+        let shard = Arc::new(ShardWriter::new(
+            Arc::clone(&metadata),
+            HashMap::from([(DEFAULT_VECTORS_INDEX_NAME.to_string(), vector_config)]),
+        )?);
+
+        self.metadata_manager.add_metadata(metadata);
+        self.cache().add_active_shard(&shard_id, &shard);
+
+        Ok(shard)
+    }
+
+    pub fn create_v2(&self, new: NewShard) -> NodeResult<Arc<ShardWriter>> {
+        let shard_id = new.shard_id.clone();
+        let metadata = Arc::new(ShardMetadata::new(
+            self.shards_path.join(new.shard_id.clone()),
+            new.shard_id,
+            new.kbid,
+            new.channel,
+        ));
+        let shard = Arc::new(ShardWriter::new(Arc::clone(&metadata), new.vector_configs)?);
 
         self.metadata_manager.add_metadata(metadata);
         self.cache().add_active_shard(&shard_id, &shard);

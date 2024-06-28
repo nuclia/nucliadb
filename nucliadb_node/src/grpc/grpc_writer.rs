@@ -25,8 +25,8 @@ use crate::errors::ShardNotFoundError;
 use crate::grpc::collect_garbage::{garbage_collection_loop, GCParameters};
 use crate::merge::{global_merger, MergePriority, MergeRequest, MergeWaiter};
 use crate::settings::Settings;
-use crate::shards::metadata::ShardMetadata;
-use crate::shards::writer::ShardWriter;
+use crate::shards::indexes::DEFAULT_VECTORS_INDEX_NAME;
+use crate::shards::writer::{NewShard, ShardWriter};
 use crate::telemetry::run_with_telemetry;
 use crate::utils::{get_primary_node_id, list_shards, read_host_key};
 use nucliadb_core::metrics::get_metrics;
@@ -41,6 +41,7 @@ use nucliadb_core::tracing::{self, Span, *};
 use nucliadb_core::{Channel, NodeResult};
 use nucliadb_vectors::config::VectorConfig;
 use object_store::path::Path;
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::UnboundedSender;
@@ -121,28 +122,50 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let request = request.into_inner();
         let kbid = request.kbid.clone();
         let shard_id = uuid::Uuid::new_v4().to_string();
-        let metadata = ShardMetadata::new(
-            self.shards.shards_path.join(shard_id.clone()),
-            shard_id,
-            kbid,
-            Channel::from(request.release_channel()),
-        );
+        let channel = Channel::from(request.release_channel());
 
-        let vector_config = if let Some(req_config) = request.config {
-            VectorConfig::try_from(req_config).map_err(|e| tonic::Status::internal(e.to_string()))?
-        } else {
-            #[allow(deprecated)]
-            VectorConfig {
-                similarity: request.similarity().into(),
-                normalize_vectors: request.normalize_vectors,
-                ..Default::default()
+        #[allow(deprecated)]
+        let vector_configs = if !request.vectorsets_configs.is_empty() {
+            // create shard maybe with multiple vectorsets
+            let mut configs = HashMap::with_capacity(request.vectorsets_configs.len());
+            for (vectorset_id, config) in request.vectorsets_configs {
+                configs.insert(
+                    vectorset_id,
+                    VectorConfig::try_from(config).map_err(|e| tonic::Status::internal(e.to_string()))?,
+                );
             }
+            configs
+        } else if let Some(vector_index_config) = request.config {
+            // DEPRECATED bw/c code, remove when shard creators populate
+            // vector_index_configs
+            HashMap::from([(
+                DEFAULT_VECTORS_INDEX_NAME.to_string(),
+                VectorConfig::try_from(vector_index_config).map_err(|e| tonic::Status::internal(e.to_string()))?,
+            )])
+        } else {
+            // DEPRECATED bw/c code, remove when shard creators populate
+            // vector_index_configs
+            HashMap::from([(
+                DEFAULT_VECTORS_INDEX_NAME.to_string(),
+                VectorConfig {
+                    similarity: request.similarity().into(),
+                    normalize_vectors: request.normalize_vectors,
+                    ..Default::default()
+                },
+            )])
         };
 
         let shards = Arc::clone(&self.shards);
-        let new_shard = tokio::task::spawn_blocking(move || shards.create(metadata, vector_config))
-            .await
-            .map_err(|error| tonic::Status::internal(format!("Error creating shard: {error:?}")))?;
+        let new_shard = tokio::task::spawn_blocking(move || {
+            shards.create_v2(NewShard {
+                kbid,
+                shard_id,
+                channel,
+                vector_configs,
+            })
+        })
+        .await
+        .map_err(|error| tonic::Status::internal(format!("Error creating shard: {error:?}")))?;
 
         match new_shard {
             Ok(new_shard) => {
