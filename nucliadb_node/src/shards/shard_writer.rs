@@ -41,59 +41,6 @@ use crate::telemetry::run_with_telemetry;
 
 const MAX_LABEL_LENGTH: usize = 32768; // Tantivy max is 2^16 - 4
 
-pub fn open_vectors_writer(version: u32, path: &Path, shard_id: String) -> NodeResult<VectorsWriterPointer> {
-    match version {
-        1 => nucliadb_vectors::service::VectorWriterService::open(path, shard_id)
-            .map(|i| Box::new(i) as VectorsWriterPointer),
-        2 => nucliadb_vectors::service::VectorWriterService::open(path, shard_id)
-            .map(|i| Box::new(i) as VectorsWriterPointer),
-        v => Err(node_error!("Invalid vectors version {v}")),
-    }
-}
-pub fn open_paragraphs_writer(version: u32, config: &ParagraphConfig) -> NodeResult<ParagraphsWriterPointer> {
-    match version {
-        3 => nucliadb_paragraphs3::writer::ParagraphWriterService::open(config)
-            .map(|i| Box::new(i) as ParagraphsWriterPointer),
-        v => Err(node_error!("Invalid paragraphs version {v}")),
-    }
-}
-
-pub fn open_texts_writer(version: u32, config: &TextConfig) -> NodeResult<TextsWriterPointer> {
-    match version {
-        2 => nucliadb_texts2::writer::TextWriterService::open(config).map(|i| Box::new(i) as TextsWriterPointer),
-        v => Err(node_error!("Invalid text writer version {v}")),
-    }
-}
-
-pub fn open_relations_writer(version: u32, config: &RelationConfig) -> NodeResult<RelationsWriterPointer> {
-    match version {
-        2 => nucliadb_relations2::writer::RelationsWriterService::open(config)
-            .map(|i| Box::new(i) as RelationsWriterPointer),
-        v => Err(node_error!("Invalid relations version {v}")),
-    }
-}
-
-fn remove_invalid_labels(resource: &mut Resource) {
-    resource.labels.retain(|l| {
-        if l.len() > MAX_LABEL_LENGTH {
-            warn!("Label length ({}) longer than maximum, it will not be indexed", l.len());
-            false
-        } else {
-            true
-        }
-    });
-    for text in resource.texts.values_mut() {
-        text.labels.retain(|l| {
-            if l.len() > MAX_LABEL_LENGTH {
-                warn!("Label length ({}) longer than maximum, it will not be indexed", l.len());
-                false
-            } else {
-                true
-            }
-        });
-    }
-}
-
 #[derive(Debug)]
 pub struct ShardWriter {
     pub metadata: Arc<ShardMetadata>,
@@ -685,5 +632,58 @@ impl From<GarbageCollectorStatus> for nucliadb_core::protos::garbage_collector_r
             GarbageCollectorStatus::GarbageCollected => nucliadb_core::protos::garbage_collector_response::Status::Ok,
             GarbageCollectorStatus::TryLater => nucliadb_core::protos::garbage_collector_response::Status::TryLater,
         }
+    }
+}
+
+pub fn open_vectors_writer(version: u32, path: &Path, shard_id: String) -> NodeResult<VectorsWriterPointer> {
+    match version {
+        1 => nucliadb_vectors::service::VectorWriterService::open(path, shard_id)
+            .map(|i| Box::new(i) as VectorsWriterPointer),
+        2 => nucliadb_vectors::service::VectorWriterService::open(path, shard_id)
+            .map(|i| Box::new(i) as VectorsWriterPointer),
+        v => Err(node_error!("Invalid vectors version {v}")),
+    }
+}
+pub fn open_paragraphs_writer(version: u32, config: &ParagraphConfig) -> NodeResult<ParagraphsWriterPointer> {
+    match version {
+        3 => nucliadb_paragraphs3::writer::ParagraphWriterService::open(config)
+            .map(|i| Box::new(i) as ParagraphsWriterPointer),
+        v => Err(node_error!("Invalid paragraphs version {v}")),
+    }
+}
+
+pub fn open_texts_writer(version: u32, config: &TextConfig) -> NodeResult<TextsWriterPointer> {
+    match version {
+        2 => nucliadb_texts2::writer::TextWriterService::open(config).map(|i| Box::new(i) as TextsWriterPointer),
+        v => Err(node_error!("Invalid text writer version {v}")),
+    }
+}
+
+pub fn open_relations_writer(version: u32, config: &RelationConfig) -> NodeResult<RelationsWriterPointer> {
+    match version {
+        2 => nucliadb_relations2::writer::RelationsWriterService::open(config)
+            .map(|i| Box::new(i) as RelationsWriterPointer),
+        v => Err(node_error!("Invalid relations version {v}")),
+    }
+}
+
+fn remove_invalid_labels(resource: &mut Resource) {
+    resource.labels.retain(|l| {
+        if l.len() > MAX_LABEL_LENGTH {
+            warn!("Label length ({}) longer than maximum, it will not be indexed", l.len());
+            false
+        } else {
+            true
+        }
+    });
+    for text in resource.texts.values_mut() {
+        text.labels.retain(|l| {
+            if l.len() > MAX_LABEL_LENGTH {
+                warn!("Label length ({}) longer than maximum, it will not be indexed", l.len());
+                false
+            } else {
+                true
+            }
+        });
     }
 }
