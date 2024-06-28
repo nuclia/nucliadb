@@ -17,7 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::num::NonZeroUsize;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -26,13 +26,11 @@ use std::time::Duration;
 
 use nucliadb_core::tracing::debug;
 use nucliadb_core::{node_error, NodeResult};
-use nucliadb_vectors::config::VectorConfig;
 
 use super::resource_cache::{CacheResult, ResourceCache, ResourceLoadGuard};
 use crate::disk_structure;
 use crate::errors::ShardNotFoundError;
 use crate::settings::Settings;
-use crate::shards::indexes::DEFAULT_VECTORS_INDEX_NAME;
 use crate::shards::metadata::{ShardMetadata, ShardsMetadataManager};
 use crate::shards::writer::{NewShard, ShardWriter};
 use crate::shards::ShardId;
@@ -123,21 +121,7 @@ impl ShardWriterCache {
         self.cache.lock().expect("Poisoned cache lock")
     }
 
-    pub fn create(&self, metadata: ShardMetadata, vector_config: VectorConfig) -> NodeResult<Arc<ShardWriter>> {
-        let shard_id = metadata.id();
-        let metadata = Arc::new(metadata);
-        let shard = Arc::new(ShardWriter::new(
-            Arc::clone(&metadata),
-            HashMap::from([(DEFAULT_VECTORS_INDEX_NAME.to_string(), vector_config)]),
-        )?);
-
-        self.metadata_manager.add_metadata(metadata);
-        self.cache().add_active_shard(&shard_id, &shard);
-
-        Ok(shard)
-    }
-
-    pub fn create_v2(&self, new: NewShard) -> NodeResult<Arc<ShardWriter>> {
+    pub fn create(&self, new: NewShard) -> NodeResult<Arc<ShardWriter>> {
         let shard_id = new.shard_id.clone();
         let metadata = Arc::new(ShardMetadata::new(
             self.shards_path.join(new.shard_id.clone()),
@@ -251,6 +235,7 @@ impl ShardWriterCache {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
     use std::fs;
     use std::sync::Arc;
     use std::thread::sleep;
@@ -263,7 +248,9 @@ mod tests {
 
     use super::ShardWriterCache;
     use crate::settings::{EnvSettings, Settings};
+    use crate::shards::indexes::DEFAULT_VECTORS_INDEX_NAME;
     use crate::shards::metadata::ShardMetadata;
+    use crate::shards::writer::NewShard;
     use crate::shards::ShardId;
 
     #[test]
@@ -280,9 +267,14 @@ mod tests {
         let shard_0_path = settings.shards_path().join(shard_id_0.clone());
         fs::create_dir(settings.shards_path()).unwrap();
 
-        let shard_meta =
-            ShardMetadata::new(shard_0_path.clone(), shard_id_0.clone(), "kbid".to_string(), Channel::EXPERIMENTAL);
-        cache.create(shard_meta, VectorConfig::default()).unwrap();
+        cache
+            .create(NewShard {
+                kbid: "kbid".to_string(),
+                shard_id: shard_id_0.clone(),
+                channel: Channel::EXPERIMENTAL,
+                vector_configs: HashMap::from([(DEFAULT_VECTORS_INDEX_NAME.to_string(), VectorConfig::default())]),
+            })
+            .unwrap();
 
         let shard_0 = cache.get(&shard_id_0).unwrap();
 
@@ -321,9 +313,14 @@ mod tests {
         assert!(cache.get(&shard_id_0).is_err());
 
         // Recreating the shard should work (i.e: it's not stuck in the deletion state)
-        let shard_meta =
-            ShardMetadata::new(shard_0_path.clone(), shard_id_0.clone(), "kbid".to_string(), Channel::EXPERIMENTAL);
-        cache.create(shard_meta, VectorConfig::default()).unwrap();
+        cache
+            .create(NewShard {
+                kbid: "kbid".to_string(),
+                shard_id: shard_id_0.clone(),
+                channel: Channel::EXPERIMENTAL,
+                vector_configs: HashMap::from([(DEFAULT_VECTORS_INDEX_NAME.to_string(), VectorConfig::default())]),
+            })
+            .unwrap();
 
         assert!(cache.get(&shard_id_0).is_ok());
     }

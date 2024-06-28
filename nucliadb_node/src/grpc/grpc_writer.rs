@@ -157,7 +157,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
 
         let shards = Arc::clone(&self.shards);
         let new_shard = tokio::task::spawn_blocking(move || {
-            shards.create_v2(NewShard {
+            shards.create(NewShard {
                 kbid,
                 shard_id,
                 channel,

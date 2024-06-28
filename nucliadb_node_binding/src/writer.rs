@@ -129,7 +129,7 @@ impl NodeWriter {
             )])
         };
 
-        let new_shard = self.shards.create_v2(NewShard {
+        let new_shard = self.shards.create(NewShard {
             kbid,
             shard_id,
             channel,
