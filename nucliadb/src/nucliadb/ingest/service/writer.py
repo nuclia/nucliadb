@@ -114,16 +114,14 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         semantic_model = parse_model_metadata_from_request(request)
 
         try:
-            async with self.driver.transaction() as txn:
-                kbid = await KnowledgeBoxORM.create(
-                    txn,
-                    slug=request.slug,
-                    semantic_model=semantic_model,
-                    uuid=kbid,
-                    config=request.config,
-                    release_channel=release_channel,
-                )
-                await txn.commit()
+            kbid = await KnowledgeBoxORM.create(
+                self.driver,
+                kbid=kbid,
+                slug=request.slug,
+                semantic_model=semantic_model,
+                config=request.config,
+                release_channel=release_channel,
+            )
 
         except KnowledgeBoxConflict:
             logger.info("KB already exists", extra={"slug": request.slug})

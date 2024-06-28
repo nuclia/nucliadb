@@ -63,34 +63,32 @@ async def test_create_knowledgebox(
         similarity_function=VectorSimilarity.COSINE,
         vector_dimension=384,
     )
-    async with maindb_driver.transaction() as txn:
-        kbid = await KnowledgeBox.create(
-            txn,
-            slug="test",
-            config=KnowledgeBoxConfig(title="My Title 1"),
-            semantic_model=model,
-        )
-        assert kbid
-        await txn.commit()
+    kbid = await KnowledgeBox.create(
+        maindb_driver,
+        kbid=KnowledgeBox.new_unique_kbid(),
+        slug="test",
+        config=KnowledgeBoxConfig(title="My Title 1"),
+        semantic_model=model,
+    )
+    assert kbid
 
     with pytest.raises(KnowledgeBoxConflict):
-        async with maindb_driver.transaction() as txn:
-            await KnowledgeBox.create(
-                txn,
-                slug="test",
-                config=KnowledgeBoxConfig(title="My Title 2"),
-                semantic_model=model,
-            )
-
-    async with maindb_driver.transaction() as txn:
-        kbid2 = await KnowledgeBox.create(
-            txn,
-            slug="test2",
-            config=KnowledgeBoxConfig(title="My Title 3"),
+        await KnowledgeBox.create(
+            maindb_driver,
+            kbid=KnowledgeBox.new_unique_kbid(),
+            slug="test",
+            config=KnowledgeBoxConfig(title="My Title 2"),
             semantic_model=model,
         )
-        assert kbid2
-        await txn.commit()
+
+    kbid2 = await KnowledgeBox.create(
+        maindb_driver,
+        kbid=KnowledgeBox.new_unique_kbid(),
+        slug="test2",
+        config=KnowledgeBoxConfig(title="My Title 3"),
+        semantic_model=model,
+    )
+    assert kbid2
 
     count = await count_all_kbs(maindb_driver)
     assert count == 2

@@ -80,78 +80,81 @@ class KnowledgeBox:
     @processor_observer.wrap({"type": "create_kb"})
     async def create(
         cls,
-        txn: Transaction,
+        driver: Driver,
+        kbid: str,
         slug: str,
         semantic_model: SemanticModelMetadata,
-        uuid: Optional[str] = None,
         config: Optional[KnowledgeBoxConfig] = None,
         release_channel: Optional[ReleaseChannel.ValueType] = ReleaseChannel.STABLE,
     ) -> str:
-        release_channel = cast(ReleaseChannel.ValueType, release_channel_for_kb(slug, release_channel))
-
-        exists = await datamanagers.kb.get_kb_uuid(txn, slug=slug)
-        if exists:
-            raise KnowledgeBoxConflict()
-        if uuid is None or uuid == "":
-            uuid = str(uuid4())
-
-        if slug == "":
-            slug = uuid
-
-        await txn.set(
-            datamanagers.kb.KB_SLUGS.format(slug=slug),
-            uuid.encode(),
-        )
-        if config is None:
-            config = KnowledgeBoxConfig()
-
-        await datamanagers.vectorsets.initialize(txn, kbid=uuid)
-
-        config.migration_version = get_latest_version()
-        config.slug = slug
-        await txn.set(
-            datamanagers.kb.KB_UUID.format(kbid=uuid),
-            config.SerializeToString(),
-        )
-        # Create Storage
-        storage = await get_storage(service_name=SERVICE_NAME)
-
-        created = await storage.create_kb(uuid)
-        if created is False:
-            logger.error(f"{uuid} KB could not be created")
-            await storage.delete_kb(uuid)
-            raise Exception(f"KB blob storage could not be created (slug={slug})")
-
-        kb_shards = writer_pb2.Shards()
-        kb_shards.kbid = uuid
-        # B/c with Shards.actual
-        kb_shards.actual = -1
-        # B/c with `Shards.similarity`, replaced by `model`
-        kb_shards.similarity = semantic_model.similarity_function
-
-        # if this KB uses a matryoshka model, we can choose a different
-        # dimension
-        if len(semantic_model.matryoshka_dimensions) > 0:
-            semantic_model.vector_dimension = choose_matryoshka_dimension(
-                semantic_model.matryoshka_dimensions  # type: ignore
+        async with driver.transaction() as txn:
+            release_channel = cast(
+                ReleaseChannel.ValueType, release_channel_for_kb(slug, release_channel)
             )
-        kb_shards.model.CopyFrom(semantic_model)
 
-        kb_shards.release_channel = release_channel
+            exists = await datamanagers.kb.get_kb_uuid(txn, slug=slug)
+            if exists:
+                raise KnowledgeBoxConflict()
+            if kbid is None or kbid == "":
+                kbid = str(uuid4())
 
-        await datamanagers.cluster.update_kb_shards(txn, kbid=uuid, shards=kb_shards)
+            if slug == "":
+                slug = kbid
 
-        # shard creation will alter this value on maindb, make sure nobody
-        # uses this variable anymore
-        del kb_shards
-        shard_manager = get_shard_manager()
-        try:
-            await shard_manager.create_shard_by_kbid(txn, uuid)
-        except Exception as e:
-            await storage.delete_kb(uuid)
-            raise e
+            await txn.set(
+                datamanagers.kb.KB_SLUGS.format(slug=slug),
+                kbid.encode(),
+            )
+            if config is None:
+                config = KnowledgeBoxConfig()
 
-        return uuid
+            await datamanagers.vectorsets.initialize(txn, kbid=kbid)
+
+            config.migration_version = get_latest_version()
+            config.slug = slug
+            await txn.set(
+                datamanagers.kb.KB_UUID.format(kbid=kbid),
+                config.SerializeToString(),
+            )
+            # Create Storage
+            storage = await get_storage(service_name=SERVICE_NAME)
+
+            created = await storage.create_kb(kbid)
+            if created is False:
+                logger.error(f"{kbid} KB could not be created")
+                await storage.delete_kb(kbid)
+                raise Exception(f"KB blob storage could not be created (slug={slug})")
+
+            kb_shards = writer_pb2.Shards()
+            kb_shards.kbid = kbid
+            # B/c with Shards.actual
+            kb_shards.actual = -1
+
+            # if this KB uses a matryoshka model, we can choose a different
+            # dimension
+            if len(semantic_model.matryoshka_dimensions) > 0:
+                semantic_model.vector_dimension = choose_matryoshka_dimension(
+                    semantic_model.matryoshka_dimensions  # type: ignore
+                )
+            kb_shards.model.CopyFrom(semantic_model)
+
+            kb_shards.release_channel = release_channel
+
+            await datamanagers.cluster.update_kb_shards(txn, kbid=kbid, shards=kb_shards)
+
+            # shard creation will alter this value on maindb, make sure nobody
+            # uses this variable anymore
+            del kb_shards
+            shard_manager = get_shard_manager()
+            try:
+                await shard_manager.create_shard_by_kbid(txn, kbid)
+            except Exception as e:
+                await storage.delete_kb(kbid)
+                raise e
+
+            await txn.commit()
+
+        return kbid
 
     @classmethod
     async def update(
