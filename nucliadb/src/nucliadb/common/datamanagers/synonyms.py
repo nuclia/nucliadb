@@ -29,7 +29,7 @@ KB_SYNONYMS = "/kbs/{kbid}/synonyms"
 
 async def get(txn: Transaction, *, kbid: str) -> Optional[knowledgebox_pb2.Synonyms]:
     key = KB_SYNONYMS.format(kbid=kbid)
-    return await get_kv_pb(txn, key, knowledgebox_pb2.Synonyms)
+    return await get_kv_pb(txn, key, knowledgebox_pb2.Synonyms, for_update=False)
 
 
 async def set(txn: Transaction, *, kbid: str, synonyms: knowledgebox_pb2.Synonyms):
