@@ -78,7 +78,7 @@ class MigrationsDataManager:
 
     async def update_kb_info(self, *, kbid: str, current_version: int) -> None:
         async with self.driver.transaction() as txn:
-            kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
+            kb_config = await datamanagers.kb.get_config(txn, kbid=kbid, for_update=True)
             if kb_config is None:
                 raise Exception(f"KB {kbid} does not exist")
             kb_config.migration_version = current_version

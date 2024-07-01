@@ -261,7 +261,7 @@ async def get_number_of_resources(txn: Transaction, *, kbid: str) -> int:
     """
     Return cached number of resources in a knowledgebox.
     """
-    raw_value = await txn.get(KB_MATERIALIZED_RESOURCES_COUNT.format(kbid=kbid))
+    raw_value = await txn.get(KB_MATERIALIZED_RESOURCES_COUNT.format(kbid=kbid), for_update=False)
     if raw_value is None:
         return -1
     return int(raw_value)

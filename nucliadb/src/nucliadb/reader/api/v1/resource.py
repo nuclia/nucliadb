@@ -77,7 +77,7 @@ async def list_resources(
 
     # Get counters from maindb
     driver = get_driver()
-    txn = await driver.begin()
+    txn = await driver.begin(read_only=True)
 
     # Filter parameters for serializer
     show: list[ResourceProperties] = [ResourceProperties.BASIC]
@@ -108,7 +108,7 @@ async def list_resources(
                 break
 
             # Fetch and Add wanted item
-            rid = await txn.get(key)
+            rid = await txn.get(key, for_update=False)
             if rid:
                 result = await managed_serialize(
                     txn,

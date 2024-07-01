@@ -99,7 +99,7 @@ class _Lock:
         return self
 
     async def get_lock_data(self, txn: Transaction) -> Optional[LockValue]:
-        existing_data = await txn.get(self.key)
+        existing_data = await txn.get(self.key, for_update=True)
         if existing_data is None:
             return None
         else:

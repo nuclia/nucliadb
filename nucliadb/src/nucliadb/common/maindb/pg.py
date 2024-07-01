@@ -161,10 +161,10 @@ class PGTransaction(Transaction):
                     self.open = False
                     await self.connection.close()
 
-    async def batch_get(self, keys: list[str], for_update: bool = False):
+    async def batch_get(self, keys: list[str], for_update: bool = True):
         return await self.data_layer.batch_get(keys, select_for_update=for_update)
 
-    async def get(self, key: str, for_update: bool = False) -> Optional[bytes]:
+    async def get(self, key: str, for_update: bool = True) -> Optional[bytes]:
         return await self.data_layer.get(key, select_for_update=for_update)
 
     async def set(self, key: str, value: bytes):
