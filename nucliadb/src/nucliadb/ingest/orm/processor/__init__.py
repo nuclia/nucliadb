@@ -392,8 +392,7 @@ class Processor:
         if shard is None:
             # It's a new resource, get current active shard to place
             # new resource on
-            async with datamanagers.with_ro_transaction() as ro_txn:
-                shard = await self.shard_manager.get_current_active_shard(ro_txn, kbid)
+            shard = await self.shard_manager.get_current_active_shard(txn, kbid)
             if shard is None:
                 # no shard available, create a new one
                 shard = await self.shard_manager.create_shard_by_kbid(txn, kbid)
