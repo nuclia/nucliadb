@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
+from functools import partial
 from typing import AsyncGenerator, Optional, Sequence, cast
 from uuid import uuid4
 
@@ -91,71 +92,84 @@ class KnowledgeBox:
     ) -> tuple[str, str]:
         """Creates a new knowledge box and return its id and slug."""
 
-        async with driver.transaction() as txn:
-            release_channel = cast(
-                ReleaseChannel.ValueType, release_channel_for_kb(slug, release_channel)
-            )
+        release_channel = cast(ReleaseChannel.ValueType, release_channel_for_kb(slug, release_channel))
 
-            exists = await datamanagers.kb.get_kb_uuid(txn, slug=slug)
-            if exists:
-                raise KnowledgeBoxConflict()
-            if kbid is None or kbid == "":
-                kbid = str(uuid4())
+        rollback_ops = []
 
-            if slug == "":
-                slug = kbid
+        try:
+            async with driver.transaction() as txn:
+                exists = await datamanagers.kb.get_kb_uuid(txn, slug=slug)
+                if exists:
+                    raise KnowledgeBoxConflict()
+                if kbid is None or kbid == "":
+                    kbid = str(uuid4())
 
-            await datamanagers.kb.set_kbid_for_slug(txn, slug=slug, kbid=kbid)
+                if slug == "":
+                    slug = kbid
 
-            await datamanagers.vectorsets.initialize(txn, kbid=kbid)
+                # Create in maindb
 
-            config = KnowledgeBoxConfig(
-                title=title,
-                description=description,
-                slug=slug,
-                migration_version=get_latest_version(),
-            )
-            await txn.set(
-                datamanagers.kb.KB_UUID.format(kbid=kbid),
-                config.SerializeToString(),
-            )
-            # Create Storage
-            storage = await get_storage(service_name=SERVICE_NAME)
+                await datamanagers.kb.set_kbid_for_slug(txn, slug=slug, kbid=kbid)
 
-            created = await storage.create_kb(kbid)
-            if created is False:
-                logger.error(f"{kbid} KB could not be created")
-                await storage.delete_kb(kbid)
-                raise Exception(f"KB blob storage could not be created (slug={slug})")
+                await datamanagers.vectorsets.initialize(txn, kbid=kbid)
 
-            kb_shards = writer_pb2.Shards()
-            kb_shards.kbid = kbid
-            # B/c with Shards.actual
-            kb_shards.actual = -1
-
-            # if this KB uses a matryoshka model, we can choose a different
-            # dimension
-            if len(semantic_model.matryoshka_dimensions) > 0:
-                semantic_model.vector_dimension = choose_matryoshka_dimension(
-                    semantic_model.matryoshka_dimensions  # type: ignore
+                config = KnowledgeBoxConfig(
+                    title=title,
+                    description=description,
+                    slug=slug,
+                    migration_version=get_latest_version(),
                 )
-            kb_shards.model.CopyFrom(semantic_model)
+                await txn.set(
+                    datamanagers.kb.KB_UUID.format(kbid=kbid),
+                    config.SerializeToString(),
+                )
 
-            kb_shards.release_channel = release_channel
+                kb_shards = writer_pb2.Shards()
+                kb_shards.kbid = kbid
+                # B/c with Shards.actual
+                kb_shards.actual = -1
 
-            await datamanagers.cluster.update_kb_shards(txn, kbid=kbid, shards=kb_shards)
+                # if this KB uses a matryoshka model, we can choose a different
+                # dimension
+                if len(semantic_model.matryoshka_dimensions) > 0:
+                    semantic_model.vector_dimension = choose_matryoshka_dimension(
+                        semantic_model.matryoshka_dimensions  # type: ignore
+                    )
+                kb_shards.model.CopyFrom(semantic_model)
 
-            # shard creation will alter this value on maindb, make sure nobody
-            # uses this variable anymore
-            del kb_shards
-            shard_manager = get_shard_manager()
-            try:
+                kb_shards.release_channel = release_channel
+
+                await datamanagers.cluster.update_kb_shards(txn, kbid=kbid, shards=kb_shards)
+
+                # shard creation will alter this value on maindb, make sure nobody
+                # uses this variable anymore
+                del kb_shards
+
+                # Create in storage
+
+                storage = await get_storage(service_name=SERVICE_NAME)
+
+                created = await storage.create_kb(kbid)
+                rollback_ops.append(partial(storage.delete_kb, kbid))
+                if not created:
+                    logger.error(f"KB {kbid} could not be created")
+                    raise Exception(f"KB blob storage could not be created (slug={slug})")
+
+                # Create shards in index nodes
+
+                shard_manager = get_shard_manager()
+                # XXX creating a shard is a slow IO operation that requires a write
+                # txn to be open!
                 await shard_manager.create_shard_by_kbid(txn, kbid)
-            except Exception as e:
-                await storage.delete_kb(kbid)
-                raise e
+                # shards don't need a rollback as they will be eventually purged
 
-            await txn.commit()
+                await txn.commit()
+
+        except Exception:
+            # rollback all changes on the db and raise the exception
+            for op in reversed(rollback_ops):
+                await op()
+            raise
 
         return (kbid, slug)
 
