@@ -203,14 +203,14 @@ async def test_get_fields_ids_caches_keys(txn, storage, kb):
 async def test_get_set_all_field_ids(txn, storage, kb):
     resource = Resource(txn, storage, kb, "rid")
 
-    assert await resource.get_all_field_ids() is None
+    assert await resource.get_all_field_ids(for_update=False) is None
 
     all_fields = AllFieldIDs()
     all_fields.fields.append(FieldID(field_type=FieldType.TEXT, field="text"))
 
     await resource.set_all_field_ids(all_fields)
 
-    assert await resource.get_all_field_ids() == all_fields
+    assert await resource.get_all_field_ids(for_update=False) == all_fields
 
 
 async def test_update_all_fields_key(txn, storage, kb):
@@ -219,7 +219,7 @@ async def test_update_all_fields_key(txn, storage, kb):
     await resource.update_all_field_ids(updated=[], deleted=[])
 
     # Initial value is Empty
-    assert (await resource.get_all_field_ids()) == AllFieldIDs()
+    assert (await resource.get_all_field_ids(for_update=False)) == AllFieldIDs()
 
     all_fields = AllFieldIDs()
     all_fields.fields.append(FieldID(field_type=FieldType.TEXT, field="text1"))
@@ -228,18 +228,18 @@ async def test_update_all_fields_key(txn, storage, kb):
     await resource.update_all_field_ids(updated=all_fields.fields)
 
     # Check updates
-    assert await resource.get_all_field_ids() == all_fields
+    assert await resource.get_all_field_ids(for_update=False) == all_fields
 
     file_field = FieldID(field_type=FieldType.FILE, field="file")
     await resource.update_all_field_ids(updated=[file_field])
 
-    result = await resource.get_all_field_ids()
+    result = await resource.get_all_field_ids(for_update=False)
     assert list(result.fields) == list(all_fields.fields) + [file_field]
 
     # Check deletes
     await resource.update_all_field_ids(deleted=[file_field])
 
-    assert await resource.get_all_field_ids() == all_fields
+    assert await resource.get_all_field_ids(for_update=False) == all_fields
 
 
 async def test_apply_fields_calls_update_all_field_ids(txn, storage, kb):
