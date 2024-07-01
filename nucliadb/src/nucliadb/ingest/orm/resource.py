@@ -421,7 +421,7 @@ class Resource:
     async def _inner_get_fields_ids(self) -> list[tuple[FieldType.ValueType, str]]:
         # Use a set to make sure we don't have duplicate field ids
         result = set()
-        all_fields = await self.get_all_field_ids()
+        all_fields = await self.get_all_field_ids(for_update=False)
         if all_fields is not None:
             for f in all_fields.fields:
                 result.add((f.field_type, f.field))
@@ -496,8 +496,10 @@ class Resource:
     def has_field(self, type: FieldType.ValueType, field: str) -> bool:
         return (type, field) in self.fields
 
-    async def get_all_field_ids(self) -> Optional[PBAllFieldIDs]:
-        return await datamanagers.resources.get_all_field_ids(self.txn, kbid=self.kb.kbid, rid=self.uuid)
+    async def get_all_field_ids(self, *, for_update: bool) -> Optional[PBAllFieldIDs]:
+        return await datamanagers.resources.get_all_field_ids(
+            self.txn, kbid=self.kb.kbid, rid=self.uuid, for_update=for_update
+        )
 
     async def set_all_field_ids(self, all_fields: PBAllFieldIDs):
         return await datamanagers.resources.set_all_field_ids(
@@ -512,7 +514,7 @@ class Resource:
         errors: Optional[list[writer_pb2.Error]] = None,
     ):
         needs_update = False
-        all_fields = await self.get_all_field_ids()
+        all_fields = await self.get_all_field_ids(for_update=True)
         if all_fields is None:
             needs_update = True
             all_fields = PBAllFieldIDs()

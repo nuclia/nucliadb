@@ -36,7 +36,7 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
                 logger.warning(f"kb={kbid} rid={resource_id}: resource not found. Skipping...")
                 continue
 
-            all_fields: Optional[AllFieldIDs] = await resource.get_all_field_ids()
+            all_fields: Optional[AllFieldIDs] = await resource.get_all_field_ids(for_update=True)
             if all_fields is not None:
                 logger.warning(f"kb={kbid} rid={resource_id}: already has all fields key. Skipping...")
                 continue

@@ -86,7 +86,7 @@ class MigrationsDataManager:
             await txn.commit()
 
     async def get_global_info(self) -> GlobalInfo:
-        async with self.driver.transaction() as txn:
+        async with self.driver.transaction(read_only=True) as txn:
             raw_pb = await txn.get(MIGRATION_INFO_KEY)
         if raw_pb is None:
             return GlobalInfo(current_version=0, target_version=None)
@@ -101,7 +101,7 @@ class MigrationsDataManager:
         target_version: Union[int, None, _Unset] = _UNSET,
     ) -> None:
         async with self.driver.transaction() as txn:
-            raw_pb = await txn.get(MIGRATION_INFO_KEY)
+            raw_pb = await txn.get(MIGRATION_INFO_KEY, for_update=True)
             pb = migrations_pb2.MigrationInfo()
             if raw_pb is not None:
                 pb.ParseFromString(raw_pb)

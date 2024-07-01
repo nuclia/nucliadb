@@ -311,7 +311,7 @@ async def validate_indexed_data(app_context: ApplicationContext, kbid: str) -> l
 
     repaired_resources = []
     async for resource_id in datamanagers.resources.iterate_resource_ids(kbid=kbid):
-        async with datamanagers.with_transaction() as txn:
+        async with datamanagers.with_ro_transaction() as txn:
             indexed_data = await datamanagers.rollover.get_indexed_data(
                 txn, kbid=kbid, resource_id=resource_id
             )

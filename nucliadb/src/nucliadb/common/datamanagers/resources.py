@@ -275,10 +275,10 @@ async def set_number_of_resources(txn: Transaction, kbid: str, value: int) -> No
 
 
 async def get_all_field_ids(
-    txn: Transaction, *, kbid: str, rid: str
+    txn: Transaction, *, kbid: str, rid: str, for_update: bool = False
 ) -> Optional[resources_pb2.AllFieldIDs]:
     key = KB_RESOURCE_ALL_FIELDS.format(kbid=kbid, uuid=rid)
-    return await get_kv_pb(txn, key, resources_pb2.AllFieldIDs)
+    return await get_kv_pb(txn, key, resources_pb2.AllFieldIDs, for_update=for_update)
 
 
 async def set_all_field_ids(
