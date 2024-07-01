@@ -153,7 +153,7 @@ class Transaction:
     def __init__(self):
         self.kv = {}
 
-    async def get(self, key):
+    async def get(self, key, **kwargs):
         return self.kv.get(key)
 
     async def set(self, key, value):
