@@ -390,7 +390,8 @@ message Shards {
 
     // DEPRECATED in favor of `model` to include more data
     utils.VectorSimilarity similarity = 4 [deprecated = true];
-    knowledgebox.SemanticModelMetadata model = 5;
+    // DEPRECATED: use vectorset configurations instead
+    knowledgebox.SemanticModelMetadata model = 5 [deprecated = true];
 
     utils.ReleaseChannel release_channel = 6;
     map<string, string> extra = 7;
@@ -444,9 +445,29 @@ message DelVectorSetResponse {
 }
 
 
+message NewKnowledgeBoxV2Request {
+    string kbid = 1;
+    string kb_slug = 2;
+    string title = 3;
+    string description = 4;
+
+    message VectorSet {
+        string vectorset_id = 1;
+        utils.VectorSimilarity similarity = 2;
+        uint32 vector_dimension = 3;
+        repeated uint32 matryoshka_dimensions = 4;
+    }
+    repeated VectorSet vectorsets = 5;
+}
+
+message NewKnowledgeBoxV2Response {
+    knowledgebox.KnowledgeBoxResponseStatus status = 1;
+}
+
 
 service Writer {
     rpc NewKnowledgeBox(knowledgebox.KnowledgeBoxNew) returns (knowledgebox.NewKnowledgeBoxResponse) {}
+    rpc NewKnowledgeBoxV2(NewKnowledgeBoxV2Request) returns (NewKnowledgeBoxV2Response) {}
     rpc DeleteKnowledgeBox(knowledgebox.KnowledgeBoxID) returns (knowledgebox.DeleteKnowledgeBoxResponse) {}
     rpc UpdateKnowledgeBox(knowledgebox.KnowledgeBoxUpdate) returns (knowledgebox.UpdateKnowledgeBoxResponse) {}
 

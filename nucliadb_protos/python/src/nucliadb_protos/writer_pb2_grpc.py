@@ -20,6 +20,11 @@ class WriterStub(object):
                 request_serializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxNew.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_knowledgebox__pb2.NewKnowledgeBoxResponse.FromString,
                 )
+        self.NewKnowledgeBoxV2 = channel.unary_unary(
+                '/fdbwriter.Writer/NewKnowledgeBoxV2',
+                request_serializer=nucliadb__protos_dot_writer__pb2.NewKnowledgeBoxV2Request.SerializeToString,
+                response_deserializer=nucliadb__protos_dot_writer__pb2.NewKnowledgeBoxV2Response.FromString,
+                )
         self.DeleteKnowledgeBox = channel.unary_unary(
                 '/fdbwriter.Writer/DeleteKnowledgeBox',
                 request_serializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxID.SerializeToString,
@@ -106,6 +111,12 @@ class WriterServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def NewKnowledgeBox(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def NewKnowledgeBoxV2(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -216,6 +227,11 @@ def add_WriterServicer_to_server(servicer, server):
                     request_deserializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxNew.FromString,
                     response_serializer=nucliadb__protos_dot_knowledgebox__pb2.NewKnowledgeBoxResponse.SerializeToString,
             ),
+            'NewKnowledgeBoxV2': grpc.unary_unary_rpc_method_handler(
+                    servicer.NewKnowledgeBoxV2,
+                    request_deserializer=nucliadb__protos_dot_writer__pb2.NewKnowledgeBoxV2Request.FromString,
+                    response_serializer=nucliadb__protos_dot_writer__pb2.NewKnowledgeBoxV2Response.SerializeToString,
+            ),
             'DeleteKnowledgeBox': grpc.unary_unary_rpc_method_handler(
                     servicer.DeleteKnowledgeBox,
                     request_deserializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxID.FromString,
@@ -320,6 +336,23 @@ class Writer(object):
         return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/NewKnowledgeBox',
             nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxNew.SerializeToString,
             nucliadb__protos_dot_knowledgebox__pb2.NewKnowledgeBoxResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def NewKnowledgeBoxV2(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/NewKnowledgeBoxV2',
+            nucliadb__protos_dot_writer__pb2.NewKnowledgeBoxV2Request.SerializeToString,
+            nucliadb__protos_dot_writer__pb2.NewKnowledgeBoxV2Response.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 

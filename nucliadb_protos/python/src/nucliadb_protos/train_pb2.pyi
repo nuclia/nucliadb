@@ -135,6 +135,8 @@ from nucliadb_protos.writer_pb2 import (
     MergeEntitiesRequest as MergeEntitiesRequest,
     NewEntitiesGroupRequest as NewEntitiesGroupRequest,
     NewEntitiesGroupResponse as NewEntitiesGroupResponse,
+    NewKnowledgeBoxV2Request as NewKnowledgeBoxV2Request,
+    NewKnowledgeBoxV2Response as NewKnowledgeBoxV2Response,
     NewVectorSetRequest as NewVectorSetRequest,
     NewVectorSetResponse as NewVectorSetResponse,
     Notification as Notification,

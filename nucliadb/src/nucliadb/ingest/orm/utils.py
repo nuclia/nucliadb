@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import urllib.parse
+from typing import Sequence
 
 from nucliadb.ingest.processing import PushPayload
 from nucliadb_models.text import PushTextFormat, Text
@@ -55,7 +56,7 @@ def compute_paragraph_key(rid: str, paragraph_key: str) -> str:
     return paragraph_key.replace("N_RID", rid)
 
 
-def choose_matryoshka_dimension(dimensions: list[int]) -> int:
+def choose_matryoshka_dimension(dimensions: Sequence[int]) -> int:
     """Given a list of matryoshka embedding available dimensions, choose one to
     set the vector dimension.
     """

@@ -372,7 +372,7 @@ class Resource:
 
                 vectorset_configs = []
                 async with datamanagers.with_ro_transaction() as ro_txn:
-                    async for vectorset_config in datamanagers.vectorsets.iter(
+                    async for vectorset_id, vectorset_config in datamanagers.vectorsets.iter(
                         ro_txn, kbid=self.kb.kbid
                     ):
                         vectorset_configs.append(vectorset_config)

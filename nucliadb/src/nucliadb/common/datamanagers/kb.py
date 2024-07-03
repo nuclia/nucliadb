@@ -89,7 +89,14 @@ async def get_model_metadata(txn: Transaction, *, kbid: str) -> knowledgebox_pb2
         return knowledgebox_pb2.SemanticModelMetadata(similarity_function=shards_obj.similarity)
 
 
-async def get_matryoshka_vector_dimension(txn: Transaction, *, kbid: str) -> Optional[int]:
+# DEPRECATED: this function should be removed once the "default" vectorset
+# concept is removed and processing sends us all messages with a vectorset_id
+async def get_matryoshka_vector_dimension(
+    txn: Transaction,
+    *,
+    kbid: str,
+    vectorset_id: Optional[str] = None,
+) -> Optional[int]:
     """Return vector dimension for matryoshka models"""
     model_metadata = await get_model_metadata(txn, kbid=kbid)
     dimension = None

@@ -223,43 +223,41 @@ class KBShardManager:
                 if node is None:
                     logger.error(f"Node {node_id} is not found or not available")
                     continue
-                is_matryoshka = len(kb_shards.model.matryoshka_dimensions) > 0
-                vector_index_config = nodewriter_pb2.VectorIndexConfig(
-                    similarity=kb_shards.similarity,
-                    vector_type=nodewriter_pb2.VectorType.DENSE_F32,
-                    vector_dimension=kb_shards.model.vector_dimension,
-                    normalize_vectors=is_matryoshka,
-                )
-                try:
-                    shard_created = await node.new_shard(
-                        kbid,
-                        release_channel=kb_shards.release_channel,
-                        vector_index_config=vector_index_config,
+
+                vectorsets = {
+                    vectorset_id: vectorset_config.vectorset_index_config
+                    async for vectorset_id, vectorset_config in datamanagers.vectorsets.iter(
+                        txn, kbid=kbid
                     )
+                }
+
+                try:
+                    if not vectorsets:
+                        # bw/c KBs without vectorsets
+                        is_matryoshka = len(kb_shards.model.matryoshka_dimensions) > 0
+                        vector_index_config = nodewriter_pb2.VectorIndexConfig(
+                            similarity=kb_shards.similarity,
+                            vector_type=nodewriter_pb2.VectorType.DENSE_F32,
+                            vector_dimension=kb_shards.model.vector_dimension,
+                            normalize_vectors=is_matryoshka,
+                        )
+
+                        shard_created = await node.new_shard(
+                            kbid,
+                            release_channel=kb_shards.release_channel,
+                            vector_index_config=vector_index_config,
+                        )
+
+                    else:
+                        shard_created = await node.new_shard_with_vectorsets(
+                            kbid,
+                            release_channel=kb_shards.release_channel,
+                            vectorsets_configs=vectorsets,
+                        )
+
                 except Exception as e:
                     errors.capture_exception(e)
                     logger.exception(f"Error creating new shard at {node}: {e}")
-                    continue
-
-                shard_id = shard_created.id
-                try:
-                    async for vectorset_config in datamanagers.vectorsets.iter(txn, kbid=kbid):
-                        response = await node.add_vectorset(
-                            shard_id,
-                            vectorset=vectorset_config.vectorset_id,
-                            config=vectorset_config.vectorset_index_config,
-                        )
-                        if response.status != response.Status.OK:
-                            raise Exception(response.detail)
-                except Exception as e:
-                    errors.capture_exception(e)
-                    logger.exception(
-                        "Error creating vectorset '{vectorset_id}' new shard at {node}: {details}".format(
-                            vectorset_id=vectorset_config.vectorset_id,
-                            node=node,
-                            details=e,
-                        )
-                    )
                     continue
 
                 replica = writer_pb2.ShardReplica(node=str(node_id))

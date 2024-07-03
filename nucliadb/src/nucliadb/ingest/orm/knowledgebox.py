@@ -37,12 +37,16 @@ from nucliadb.common.datamanagers.resources import (
 )
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.ingest import SERVICE_NAME, logger
-from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict, VectorSetConflict
+from nucliadb.ingest.orm.exceptions import (
+    KnowledgeBoxConflict,
+    KnowledgeBoxCreationError,
+    VectorSetConflict,
+)
 from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.orm.utils import choose_matryoshka_dimension, compute_paragraph_key
 from nucliadb.migrator.utils import get_latest_version
-from nucliadb_protos import knowledgebox_pb2, utils_pb2, writer_pb2
+from nucliadb_protos import knowledgebox_pb2, nodewriter_pb2, utils_pb2, writer_pb2
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig, SemanticModelMetadata
 from nucliadb_protos.resources_pb2 import Basic
 from nucliadb_protos.utils_pb2 import ReleaseChannel
@@ -87,10 +91,26 @@ class KnowledgeBox:
         slug: str,
         title: str = "",
         description: str = "",
-        semantic_model: SemanticModelMetadata,
+        semantic_model: Optional[SemanticModelMetadata] = None,
+        semantic_models: Optional[dict[str, SemanticModelMetadata]] = None,
         release_channel: Optional[ReleaseChannel.ValueType] = ReleaseChannel.STABLE,
     ) -> tuple[str, str]:
         """Creates a new knowledge box and return its id and slug."""
+
+        if (semantic_model and semantic_models) or (not semantic_model and not semantic_models):
+            raise KnowledgeBoxCreationError(
+                "KB must only define semantic_model or semantic_models, not both"
+            )
+        if semantic_model is None:
+            if semantic_models is None or len(semantic_models) == 0:
+                raise KnowledgeBoxCreationError(
+                    "KB must be created with at least one semantic model spec"
+                )
+        else:
+            if semantic_models is not None and len(semantic_models) > 0:
+                raise KnowledgeBoxCreationError(
+                    "KB must be created with at least one semantic model spec"
+                )
 
         release_channel = cast(ReleaseChannel.ValueType, release_channel_for_kb(slug, release_channel))
 
@@ -111,33 +131,58 @@ class KnowledgeBox:
 
                 await datamanagers.kb.set_kbid_for_slug(txn, slug=slug, kbid=kbid)
 
-                await datamanagers.vectorsets.initialize(txn, kbid=kbid)
-
                 config = KnowledgeBoxConfig(
                     title=title,
                     description=description,
                     slug=slug,
                     migration_version=get_latest_version(),
                 )
-                await txn.set(
-                    datamanagers.kb.KB_UUID.format(kbid=kbid),
-                    config.SerializeToString(),
-                )
+                await datamanagers.kb.set_config(txn, kbid=kbid, config=config)
+
+                # all KBs have the vectorset key initialized, although (for
+                # now), not every KB will store vectorsets there
+                await datamanagers.vectorsets.initialize(txn, kbid=kbid)
 
                 kb_shards = writer_pb2.Shards()
                 kb_shards.kbid = kbid
                 # B/c with Shards.actual
                 kb_shards.actual = -1
-
-                # if this KB uses a matryoshka model, we can choose a different
-                # dimension
-                if len(semantic_model.matryoshka_dimensions) > 0:
-                    semantic_model.vector_dimension = choose_matryoshka_dimension(
-                        semantic_model.matryoshka_dimensions  # type: ignore
-                    )
-                kb_shards.model.CopyFrom(semantic_model)
-
                 kb_shards.release_channel = release_channel
+
+                if semantic_model is not None:
+                    # bw/c we keep populating the deprecated fields for KBs with
+                    # only one vectorset
+
+                    # if this KB uses a matryoshka model, we can choose a different
+                    # dimension
+                    if len(semantic_model.matryoshka_dimensions) > 0:
+                        semantic_model.vector_dimension = choose_matryoshka_dimension(
+                            semantic_model.matryoshka_dimensions  # type: ignore
+                        )
+                    kb_shards.similarity = semantic_model.similarity_function
+                    kb_shards.model.CopyFrom(semantic_model)
+
+                else:
+                    for vectorset_id, semantic_model in semantic_models.items():  # type: ignore
+                        # if this KB uses a matryoshka model, we can choose a different
+                        # dimension
+                        if len(semantic_model.matryoshka_dimensions) > 0:
+                            dimension = choose_matryoshka_dimension(semantic_model.matryoshka_dimensions)
+                        else:
+                            dimension = semantic_model.vector_dimension
+
+                        vectorset_config = knowledgebox_pb2.VectorSetConfig(
+                            vectorset_id=vectorset_id,
+                            vectorset_index_config=nodewriter_pb2.VectorIndexConfig(
+                                similarity=semantic_model.similarity_function,
+                                # XXX: hardcoded value
+                                vector_type=nodewriter_pb2.VectorType.DENSE_F32,
+                                normalize_vectors=len(semantic_model.matryoshka_dimensions) > 0,
+                                vector_dimension=dimension,
+                            ),
+                            matryoshka_dimensions=semantic_model.matryoshka_dimensions,
+                        )
+                        await datamanagers.vectorsets.set(txn, kbid=kbid, config=vectorset_config)
 
                 await datamanagers.cluster.update_kb_shards(txn, kbid=kbid, shards=kb_shards)
 
@@ -153,7 +198,9 @@ class KnowledgeBox:
                 rollback_ops.append(partial(storage.delete_kb, kbid))
                 if not created:
                     logger.error(f"KB {kbid} could not be created")
-                    raise Exception(f"KB blob storage could not be created (slug={slug})")
+                    raise KnowledgeBoxCreationError(
+                        f"KB blob storage could not be created (slug={slug})"
+                    )
 
                 # Create shards in index nodes
 

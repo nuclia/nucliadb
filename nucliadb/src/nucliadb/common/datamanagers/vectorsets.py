@@ -21,7 +21,7 @@ from typing import AsyncIterator, Optional
 
 from nucliadb.common.datamanagers.utils import get_kv_pb
 from nucliadb.common.maindb.driver import Transaction
-from nucliadb_protos import knowledgebox_pb2
+from nucliadb_protos import knowledgebox_pb2, nodewriter_pb2
 
 KB_VECTORSETS = "/kbs/{kbid}/vectorsets"
 
@@ -41,6 +41,33 @@ async def get(
     return kb_vectorsets.vectorsets[index]
 
 
+async def get_default_vectorset(
+    txn: Transaction,
+    *,
+    kbid: str,
+) -> knowledgebox_pb2.VectorSetConfig:
+    from . import kb
+
+    vectorset_id = "__default__"
+    semantic_model = await kb.get_model_metadata(txn, kbid=kbid)
+    vector_dimension = semantic_model.vector_dimension
+    similarity = semantic_model.similarity_function
+    matryoshka_dimensions = semantic_model.matryoshka_dimensions
+    normalize_vectors = len(matryoshka_dimensions) > 0
+
+    return knowledgebox_pb2.VectorSetConfig(
+        vectorset_id=vectorset_id,
+        vectorset_index_config=nodewriter_pb2.VectorIndexConfig(
+            vector_dimension=vector_dimension,
+            similarity=similarity,
+            # we only support this for now
+            vector_type=nodewriter_pb2.VectorType.DENSE_F32,
+            normalize_vectors=normalize_vectors,
+        ),
+        matryoshka_dimensions=matryoshka_dimensions,
+    )
+
+
 async def exists(txn, *, kbid: str, vectorset_id: str) -> bool:
     kb_vectorsets = await _get_or_default(txn, kbid=kbid, for_update=False)
     return _find_vectorset(kb_vectorsets, vectorset_id) is not None
@@ -49,7 +76,7 @@ async def exists(txn, *, kbid: str, vectorset_id: str) -> bool:
 async def iter(txn: Transaction, *, kbid: str) -> AsyncIterator[knowledgebox_pb2.VectorSetConfig]:
     kb_vectorsets = await _get_or_default(txn, kbid=kbid, for_update=False)
     for config in kb_vectorsets.vectorsets:
-        yield config
+        yield config.vectorset_id, config
 
 
 async def set(txn: Transaction, *, kbid: str, config: knowledgebox_pb2.VectorSetConfig):
