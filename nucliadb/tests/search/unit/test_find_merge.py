@@ -114,6 +114,20 @@ def test_merge_paragraphs_vectors():
     assert not next_page
     assert len(paragraphs) == 10
 
+    # Check that the paragraphs are ordered by score
+    bm25_scores = [
+        paragraph.paragraph.score
+        for paragraph in paragraphs
+        if paragraph.paragraph.score_type == SCORE_TYPE.BM25
+    ]
+    vector_scores = [
+        paragraph.paragraph.score
+        for paragraph in paragraphs
+        if paragraph.paragraph.score_type == SCORE_TYPE.VECTOR
+    ]
+    assert bm25_scores == sorted(bm25_scores, reverse=True)
+    assert vector_scores == sorted(vector_scores, reverse=True)
+
     vector_scores = set()
     for index, score_type in [
         (0, SCORE_TYPE.BM25),
