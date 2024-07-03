@@ -61,30 +61,56 @@ def test_orderer_handles_duplicate_insertions():
     assert list(orderer.sorted_by_insertion()) == ["a", "b", "c"]
 
 
+def get_paragraph_result(score):
+    start = random.randint(0, 10)
+    end = random.randint(start, 20)
+    index = random.randint(0, 100)
+    pr = ParagraphResult()
+    pr.uuid = "foo"
+    pr.score.bm25 = score
+    pr.score.booster = 0
+    pr.paragraph = f"id/text/paragraph/{index}/{start}-{end}"
+    pr.start = start
+    pr.end = end
+    pr.field = "/a/title"
+    return pr
+
+
+def get_vector_result(score):
+    start = random.randint(0, 10)
+    end = random.randint(start, 20)
+    index = random.randint(0, 100)
+    vr = DocumentScored()
+    vr.doc_id.id = f"id/vector/paragraph/{index}/{start}-{end}"
+    vr.score = score
+    vr.metadata.position.start = start
+    vr.metadata.position.end = end
+    return vr
+
+
 def test_merge_paragraphs_vectors():
-    paragraphs = []
-    for i in range(5):
-        pr = ParagraphResult()
-        pr.uuid = "foo"
-        pr.score.bm25 = i
-        pr.score.booster = 0
-        pr.paragraph = f"id/text/paragraph/{i}/0-10"
-        pr.start = 0
-        pr.end = 10
-        pr.field = "/a/title"
-        paragraphs.append(pr)
-
-    vectors = []
-    for i in range(5):
+    shard1_paragraphs = [
+        get_paragraph_result(1),
+        get_paragraph_result(3),
+        get_paragraph_result(4),
+    ]
+    shard2_paragraphs = [
+        get_paragraph_result(2),
+        get_paragraph_result(5),
+    ]
+    shard1_vectors = []
+    for i in range(2):
         score = max(5 / float(i + 1), 1)
-        vr = DocumentScored()
-        vr.doc_id.id = f"id/vector/paragraph/{i}/0-2"
-        vr.score = score
-        vr.metadata.position.start = 0
-        vr.metadata.position.start = 2
-        vectors.append(vr)
+        shard1_vectors.append(get_vector_result(score))
 
-    paragraphs, next_page = merge_paragraphs_vectors([paragraphs], [vectors], 20, 0, min_score=1)
+    shard2_vectors = []
+    for i in range(2, 5):
+        score = max(5 / float(i + 1), 1)
+        shard2_vectors.append(get_vector_result(score))
+
+    paragraphs, next_page = merge_paragraphs_vectors(
+        [shard1_paragraphs, shard2_paragraphs], [shard1_vectors, shard2_vectors], 20, 0, min_score=1
+    )
     assert not next_page
     assert len(paragraphs) == 10
 
