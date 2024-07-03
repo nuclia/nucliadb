@@ -255,6 +255,7 @@ def merge_paragraphs_vectors(
     count: int,
     page: int,
     min_score: float,
+    kbid: str,
 ) -> tuple[list[TempFindParagraph], bool]:
     merged_paragraphs: list[TempFindParagraph] = []
 
@@ -262,7 +263,7 @@ def merge_paragraphs_vectors(
     flat_paragraphs = [
         paragraph for paragraph_shard in paragraphs_shards for paragraph in paragraph_shard
     ]
-    if has_feature(const.Features.FIND_MERGE_ORDER_FIX):
+    if has_feature(const.Features.FIND_MERGE_ORDER_FIX, context={"kbid": kbid}):
         flat_paragraphs.sort(key=lambda r: r.score.bm25, reverse=True)
 
     for paragraph in flat_paragraphs:
@@ -288,7 +289,7 @@ def merge_paragraphs_vectors(
     flat_vectors = [
         vector for vector_shard in vectors_shards for vector in vector_shard if vector.score >= min_score
     ]
-    if has_feature(const.Features.FIND_MERGE_ORDER_FIX):
+    if has_feature(const.Features.FIND_MERGE_ORDER_FIX, context={"kbid": kbid}):
         flat_vectors.sort(key=lambda r: r.score, reverse=True)
 
     nextpos = 1
@@ -420,7 +421,7 @@ async def find_merge_results(
 
     try:
         result_paragraphs, merged_next_page = merge_paragraphs_vectors(
-            paragraphs, vectors, count, page, min_score_semantic
+            paragraphs, vectors, count, page, min_score_semantic, kbid
         )
         next_page = next_page or merged_next_page
 
