@@ -256,63 +256,66 @@ def merge_paragraphs_vectors(
 ) -> tuple[list[TempFindParagraph], bool]:
     merged_paragrahs: list[TempFindParagraph] = []
 
-    # We assume that paragraphs_shards and vectors_shards are already ordered
-    for paragraphs_shard in paragraphs_shards:
-        for paragraph in paragraphs_shard:
-            fuzzy_result = len(paragraph.matches) > 0
-            merged_paragrahs.append(
-                TempFindParagraph(
-                    paragraph_index=paragraph,
-                    field=paragraph.field,
-                    rid=paragraph.uuid,
-                    score=paragraph.score.bm25,
-                    start=paragraph.start,
-                    split=paragraph.split,
-                    end=paragraph.end,
-                    id=paragraph.paragraph,
-                    fuzzy_result=fuzzy_result,
-                    page_with_visual=paragraph.metadata.page_with_visual,
-                    reference=paragraph.metadata.representation.file,
-                    is_a_table=paragraph.metadata.representation.is_a_table,
-                )
-            )
+    # Flatten the results from several shards to order globally
+    flat_paragraphs = [
+        paragraph for paragraph_shard in paragraphs_shards for paragraph in paragraph_shard
+    ]
+    flat_paragraphs.sort(key=lambda r: r.score.bm25, reverse=True)
 
-    # merged_paragrahs.sort(key=lambda r: r.score, reverse=True)
+    for paragraph in flat_paragraphs:
+        fuzzy_result = len(paragraph.matches) > 0
+        merged_paragrahs.append(
+            TempFindParagraph(
+                paragraph_index=paragraph,
+                field=paragraph.field,
+                rid=paragraph.uuid,
+                score=paragraph.score.bm25,
+                start=paragraph.start,
+                split=paragraph.split,
+                end=paragraph.end,
+                id=paragraph.paragraph,
+                fuzzy_result=fuzzy_result,
+                page_with_visual=paragraph.metadata.page_with_visual,
+                reference=paragraph.metadata.representation.file,
+                is_a_table=paragraph.metadata.representation.is_a_table,
+            )
+        )
+
+    # Flatten the results from several shards to order globally
+    flat_vectors = [
+        vector for vector_shard in vectors_shards for vector in vector_shard if vector.score >= min_score
+    ]
+    flat_vectors.sort(key=lambda r: r.score, reverse=True)
 
     nextpos = 1
-    for vectors_shard in vectors_shards:
-        for vector in vectors_shard:
-            if vector.score < min_score:
-                logger.warning(f"Skipping low score vector: {vector.doc_id.id}. This should not happen")
-                continue
-            doc_id_split = vector.doc_id.id.split("/")
-            split = None
-            if len(doc_id_split) == 5:
-                rid, field_type, field, index, position = doc_id_split
-                paragraph_id = f"{rid}/{field_type}/{field}/{position}"
-            elif len(doc_id_split) == 6:
-                rid, field_type, field, split, index, position = doc_id_split
-                paragraph_id = f"{rid}/{field_type}/{field}/{split}/{position}"
-            else:
-                logger.warning(f"Skipping invalid doc_id: {vector.doc_id.id}")
-                continue
-            start, end = position.split("-")
-            merged_paragrahs.insert(
-                nextpos,
-                TempFindParagraph(
-                    vector_index=vector,
-                    rid=rid,
-                    field=f"/{field_type}/{field}",
-                    score=vector.score,
-                    start=int(start),
-                    end=int(end),
-                    split=split,
-                    id=paragraph_id,
-                ),
-            )
-            nextpos += 3
+    for vector in flat_vectors:
+        doc_id_split = vector.doc_id.id.split("/")
+        split = None
+        if len(doc_id_split) == 5:
+            rid, field_type, field, index, position = doc_id_split
+            paragraph_id = f"{rid}/{field_type}/{field}/{position}"
+        elif len(doc_id_split) == 6:
+            rid, field_type, field, split, index, position = doc_id_split
+            paragraph_id = f"{rid}/{field_type}/{field}/{split}/{position}"
+        else:
+            logger.warning(f"Skipping invalid doc_id: {vector.doc_id.id}")
+            continue
+        start, end = position.split("-")
+        merged_paragrahs.insert(
+            nextpos,
+            TempFindParagraph(
+                vector_index=vector,
+                rid=rid,
+                field=f"/{field_type}/{field}",
+                score=vector.score,
+                start=int(start),
+                end=int(end),
+                split=split,
+                id=paragraph_id,
+            ),
+        )
+        nextpos += 3
 
-    # merged_paragrahs.sort(key=lambda r: r.score, reverse=True)
     init_position = count * page
     end_position = init_position + count
     next_page = len(merged_paragrahs) > end_position
