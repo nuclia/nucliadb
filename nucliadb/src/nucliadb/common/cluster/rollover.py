@@ -27,6 +27,7 @@ from typing import Optional
 from nucliadb.common import datamanagers, locking
 from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.common.context import ApplicationContext
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos import nodewriter_pb2, writer_pb2
 from nucliadb_telemetry import errors
 
@@ -348,7 +349,8 @@ async def validate_indexed_data(app_context: ApplicationContext, kbid: str) -> l
             raise UnexpectedRolloverError(f"Shard {shard_id} not found. This should not happen")
 
         async with datamanagers.with_transaction() as txn:
-            res = await datamanagers.resources.get_resource(txn, kbid=kbid, rid=resource_id)
+            kb = KnowledgeBox(txn, app_context.blob_storage, kbid)
+            res = await kb.get(resource_id)
         if res is None:
             logger.error(
                 "Resource not found while validating, skipping",

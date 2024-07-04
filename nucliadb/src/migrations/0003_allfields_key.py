@@ -20,6 +20,7 @@
 from typing import Optional
 
 from nucliadb.common import datamanagers
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.migrator.context import ExecutionContext
 from nucliadb.migrator.migrator import logger
 from nucliadb_protos.resources_pb2 import AllFieldIDs, FieldID
@@ -31,7 +32,8 @@ async def migrate(context: ExecutionContext) -> None: ...
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
     async for resource_id in datamanagers.resources.iterate_resource_ids(kbid=kbid):
         async with context.kv_driver.transaction() as txn:
-            resource = await datamanagers.resources.get_resource(txn, kbid=kbid, rid=resource_id)
+            kb = KnowledgeBox(txn, context.blob_storage, kbid)
+            resource = await kb.get(resource_id)
             if resource is None:
                 logger.warning(f"kb={kbid} rid={resource_id}: resource not found. Skipping...")
                 continue

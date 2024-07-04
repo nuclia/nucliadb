@@ -27,13 +27,12 @@ from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
 
 # These should be refactored
 from nucliadb.ingest.settings import settings as ingest_settings
-from nucliadb_protos import noderesources_pb2, resources_pb2
-from nucliadb_utils.utilities import get_storage
+from nucliadb_protos import resources_pb2
 
 from .utils import with_ro_transaction
 
 if TYPE_CHECKING:
-    from nucliadb.ingest.orm.resource import Resource as ResourceORM
+    pass
 
 
 KB_RESOURCE_BASIC = "/kbs/{kbid}/r/{uuid}"
@@ -296,39 +295,3 @@ async def has_field(txn: Transaction, *, kbid: str, rid: str, field_id: resource
         if field_id == resource_field_id:
             return True
     return False
-
-
-# ORM mix (this functions shouldn't belong here)
-
-
-@backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
-async def get_resource(txn: Transaction, *, kbid: str, rid: str) -> Optional["ResourceORM"]:
-    """
-    Not ideal to return Resource type here but refactoring would
-    require a lot of changes.
-
-    At least this isolated that dependency here.
-    """
-    # prevent circulat imports -- this is not ideal that we have the ORM mix here.
-    from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
-
-    kb_orm = KnowledgeBoxORM(txn, await get_storage(), kbid)
-    return await kb_orm.get(rid)
-
-
-@backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
-async def get_resource_index_message(
-    txn: Transaction,
-    *,
-    kbid: str,
-    rid: str,
-    reindex: bool = False,
-) -> Optional[noderesources_pb2.Resource]:
-    # prevent circulat imports -- this is not ideal that we have the ORM mix here.
-    from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
-
-    kb_orm = KnowledgeBoxORM(txn, await get_storage(), kbid)
-    res = await kb_orm.get(rid)
-    if res is None:
-        return None
-    return (await res.generate_index_message(reindex=reindex)).brain
