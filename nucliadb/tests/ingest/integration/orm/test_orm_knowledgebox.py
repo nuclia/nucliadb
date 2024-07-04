@@ -292,7 +292,7 @@ async def test_knowledgebox_delete_all_kb_keys(
         await txn.abort()
 
     # Now delete all kb keys
-    await KnowledgeBox.delete_all_kb_keys(maindb_driver, kbid, chunk_size=10)
+    await KnowledgeBox._delete_all_kb_keys(maindb_driver, kbid, chunk_size=10)
 
     # Check that all of them were deleted
     async with maindb_driver.transaction() as txn:

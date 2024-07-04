@@ -362,10 +362,10 @@ class KnowledgeBox:
                             raise ShardNotFound(f"{exc.details()} @ {node.address}")
 
             await txn.commit()
-        await cls.delete_all_kb_keys(driver, kbid)
+        await cls._delete_all_kb_keys(driver, kbid)
 
     @classmethod
-    async def delete_all_kb_keys(cls, driver: Driver, kbid: str, chunk_size: int = 1_000):
+    async def _delete_all_kb_keys(cls, driver: Driver, kbid: str, chunk_size: int = 1_000):
         prefix = KB_KEYS.format(kbid=kbid)
         while True:
             async with driver.transaction(read_only=True) as txn:
