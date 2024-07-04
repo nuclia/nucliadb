@@ -238,9 +238,8 @@ async def test_delete_knowledgebox(
     exists = await datamanagers.atomic.kb.exists_kb(kbid=kbid)
     assert exists is True
 
-    async with maindb_driver.transaction() as txn:
-        await KnowledgeBox.delete(txn, kbid)
-        await txn.commit()
+    deleted_kbid = await KnowledgeBox.delete(maindb_driver, kbid)
+    assert deleted_kbid == kbid
 
     exists = await datamanagers.atomic.kb.exists_kb(kbid=kbid)
     assert exists is False
@@ -248,9 +247,8 @@ async def test_delete_knowledgebox(
 
 @pytest.mark.asyncio
 async def test_delete_knowledgebox_handles_unexisting_kb(storage: Storage, maindb_driver: Driver):
-    async with maindb_driver.transaction() as txn:
-        kbid = await KnowledgeBox.delete(txn, kbid="idonotexist")
-        assert kbid is None
+    kbid = await KnowledgeBox.delete(maindb_driver, kbid="idonotexist")
+    assert kbid is None
 
 
 @pytest.mark.asyncio
@@ -258,23 +256,6 @@ async def test_knowledgebox_purge_handles_unexisting_shard_payload(
     storage: Storage, maindb_driver: Driver
 ):
     await KnowledgeBox.purge(maindb_driver, "idonotexist")
-
-
-def test_chunker():
-    total_items = 100
-    chunk_size = 10
-    iterations = 0
-    for chunk in chunker(list(range(total_items)), chunk_size):
-        assert len(chunk) == chunk_size
-        assert chunk == list(range(iterations * chunk_size, (iterations * chunk_size) + chunk_size))
-        iterations += 1
-
-    assert iterations == total_items / chunk_size
-
-    iterations = 0
-    for chunk in chunker([], 2):
-        iterations += 1
-    assert iterations == 0
 
 
 @pytest.mark.asyncio
@@ -319,3 +300,20 @@ async def test_knowledgebox_delete_all_kb_keys(
     for rid, slug in rids_and_slugs:
         assert await kb_obj.get_resource_uuid_by_slug(slug) is None
     await txn.abort()
+
+
+def test_chunker():
+    total_items = 100
+    chunk_size = 10
+    iterations = 0
+    for chunk in chunker(list(range(total_items)), chunk_size):
+        assert len(chunk) == chunk_size
+        assert chunk == list(range(iterations * chunk_size, (iterations * chunk_size) + chunk_size))
+        iterations += 1
+
+    assert iterations == total_items / chunk_size
+
+    iterations = 0
+    for chunk in chunker([], 2):
+        iterations += 1
+    assert iterations == 0

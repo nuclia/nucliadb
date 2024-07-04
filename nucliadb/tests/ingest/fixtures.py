@@ -194,9 +194,7 @@ async def knowledgebox_ingest(storage, maindb_driver: Driver, shard_manager, lea
 
     yield kbid
 
-    async with maindb_driver.transaction() as txn:
-        await KnowledgeBox.delete(txn, kbid)
-        await txn.commit()
+    await KnowledgeBox.delete(maindb_driver, kbid)
 
 
 @pytest.fixture(scope="function")

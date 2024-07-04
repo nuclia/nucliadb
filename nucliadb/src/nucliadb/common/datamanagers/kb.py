@@ -60,6 +60,11 @@ async def set_kbid_for_slug(txn: Transaction, *, slug: str, kbid: str):
     await txn.set(key, kbid.encode())
 
 
+async def delete_kb_slug(txn: Transaction, *, slug: str):
+    key = KB_SLUGS.format(slug=slug)
+    await txn.delete(key)
+
+
 async def get_config(
     txn: Transaction, *, kbid: str, for_update: bool = False
 ) -> Optional[knowledgebox_pb2.KnowledgeBoxConfig]:
@@ -75,6 +80,11 @@ async def get_config(
 async def set_config(txn: Transaction, *, kbid: str, config: knowledgebox_pb2.KnowledgeBoxConfig):
     key = KB_UUID.format(kbid=kbid)
     await txn.set(key, config.SerializeToString())
+
+
+async def delete_config(txn: Transaction, *, kbid: str) -> None:
+    key = KB_UUID.format(kbid=kbid)
+    await txn.delete(key)
 
 
 async def get_model_metadata(txn: Transaction, *, kbid: str) -> knowledgebox_pb2.SemanticModelMetadata:

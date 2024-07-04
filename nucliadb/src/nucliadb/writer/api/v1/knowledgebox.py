@@ -184,9 +184,7 @@ async def update_kb(request: Request, kbid: str, item: KnowledgeBoxConfig) -> Kn
 async def delete_kb(request: Request, kbid: str) -> KnowledgeBoxObj:
     driver = get_driver()
     try:
-        async with driver.transaction() as txn:
-            await KnowledgeBox.delete(txn, kbid=kbid)
-            await txn.commit()
+        await KnowledgeBox.delete(driver, kbid=kbid)
     except datamanagers.exceptions.KnowledgeBoxNotFound:
         raise HTTPException(status_code=404, detail="Knowledge Box does not exists")
     except Exception as exc:

@@ -256,23 +256,27 @@ class KnowledgeBox:
         return uuid
 
     @classmethod
-    async def delete(cls, txn: Transaction, kbid: str):
-        # Mark storage to be deleted
-        # Mark keys to be deleted
-        kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
-        if kb_config is None:
-            # consider KB as deleted
-            return
-        slug = kb_config.slug
+    async def delete(cls, driver: Driver, kbid: str):
+        async with driver.transaction() as txn:
+            exists = await datamanagers.kb.exists_kb(txn, kbid=kbid)
+            if not exists:
+                return
 
-        # Delete main anchor
-        async with txn.driver.transaction() as subtxn:
-            key_match = datamanagers.kb.KB_SLUGS.format(slug=slug)
-            await subtxn.delete(key_match)
+            # Delete main anchor
 
+            kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
+            if kb_config is not None:
+                slug = kb_config.slug
+                await datamanagers.kb.delete_kb_slug(txn, slug=slug)
+
+            await datamanagers.kb.delete_config(txn, kbid=kbid)
+
+            # Mark KB to purge. This will eventually delete all KB keys, storage
+            # and index data
             when = datetime.now().isoformat()
-            await subtxn.set(KB_TO_DELETE.format(kbid=kbid), when.encode())
-            await subtxn.commit()
+            await txn.set(KB_TO_DELETE.format(kbid=kbid), when.encode())
+
+            await txn.commit()
 
         audit_util = get_audit()
         if audit_util is not None:

@@ -232,8 +232,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             kbid = request.uuid
             # learning configuration is automatically removed in nuclia backend for
             # hosted users, we don't need to do it
-            async with self.driver.transaction() as txn:
-                await KnowledgeBoxORM.delete(txn, kbid=kbid)
+            await KnowledgeBoxORM.delete(self.driver, kbid=kbid)
         except KnowledgeBoxNotFound:
             logger.warning(f"KB not found: kbid={request.uuid}, slug={request.slug}")
         except Exception:
