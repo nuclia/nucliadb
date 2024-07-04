@@ -130,7 +130,9 @@ async def get_resource_uuid(kbobj: KnowledgeBox, uuid_or_slug: str) -> Optional[
         return uuid_or_slug
 
     # Try with slug
-    uuid = await kbobj.get_resource_uuid_by_slug(uuid_or_slug)
+    uuid = await datamanagers.resources.get_resource_uuid_from_slug(
+        kbobj.txn, kbid=kbobj.kbid, slug=uuid_or_slug
+    )
     if uuid is not None:
         return uuid
 

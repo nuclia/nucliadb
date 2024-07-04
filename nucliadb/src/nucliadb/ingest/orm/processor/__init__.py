@@ -150,7 +150,9 @@ class Processor:
 
     async def get_resource_uuid(self, kb: KnowledgeBox, message: writer_pb2.BrokerMessage) -> str:
         if message.uuid is None:
-            uuid = await kb.get_resource_uuid_by_slug(message.slug)
+            uuid = await datamanagers.resources.get_resource_uuid_from_slug(
+                kb.txn, kbid=kb.kbid, slug=message.slug
+            )
         else:
             uuid = message.uuid
         return uuid
@@ -458,7 +460,9 @@ class Processor:
         if resource is None:
             # Make sure we load the resource in case it already exists on db
             if message.uuid is None and message.slug:
-                uuid = await kb.get_resource_uuid_by_slug(message.slug)
+                uuid = await datamanagers.resources.get_resource_uuid_from_slug(
+                    kb.txn, kbid=kb.kbid, slug=message.slug
+                )
             else:
                 uuid = message.uuid
             resource = await kb.get(uuid)

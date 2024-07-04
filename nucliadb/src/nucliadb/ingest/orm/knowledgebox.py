@@ -421,11 +421,6 @@ class KnowledgeBox:
 
         await self.storage.delete_resource(self.kbid, uuid)
 
-    async def get_resource_uuid_by_slug(self, slug: str) -> Optional[str]:
-        return await datamanagers.resources.get_resource_uuid_from_slug(
-            self.txn, kbid=self.kbid, slug=slug
-        )
-
     async def get_unique_slug(self, uuid: str, slug: str) -> str:
         key = KB_RESOURCE_SLUG.format(kbid=self.kbid, slug=slug)
         key_ok = False
@@ -460,7 +455,9 @@ class KnowledgeBox:
         base = KB_RESOURCE_SLUG_BASE.format(kbid=self.kbid)
         async for key in self.txn.keys(match=base, count=-1):
             slug = key.split("/")[-1]
-            uuid = await self.get_resource_uuid_by_slug(slug)
+            uuid = await datamanagers.resources.get_resource_uuid_from_slug(
+                self.txn, kbid=self.kbid, slug=slug
+            )
             if uuid is not None:
                 yield Resource(
                     self.txn,

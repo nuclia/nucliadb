@@ -263,7 +263,7 @@ async def test_knowledgebox_delete_all_kb_keys(
     storage,
     cache,
     fake_node,
-    maindb_driver,
+    maindb_driver: Driver,
     knowledgebox_ingest: str,
 ):
     async with maindb_driver.transaction() as txn:
@@ -285,21 +285,29 @@ async def test_knowledgebox_delete_all_kb_keys(
         await txn.commit()
 
     # Check that all of them are there
-    async with maindb_driver.transaction() as txn:
+    async with maindb_driver.transaction(read_only=True) as txn:
         kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
         for rid, slug in rids_and_slugs:
-            assert await kb_obj.get_resource_uuid_by_slug(slug) == rid
-        await txn.abort()
+            assert (
+                await datamanagers.resources.get_resource_uuid_from_slug(
+                    kb_obj.txn, kbid=kbid, slug=slug
+                )
+                == rid
+            )
 
     # Now delete all kb keys
     await KnowledgeBox._delete_all_kb_keys(maindb_driver, kbid, chunk_size=10)
 
     # Check that all of them were deleted
-    async with maindb_driver.transaction() as txn:
+    async with maindb_driver.transaction(read_only=True) as txn:
         kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
         for rid, slug in rids_and_slugs:
-            assert await kb_obj.get_resource_uuid_by_slug(slug) is None
-        await txn.abort()
+            assert (
+                await datamanagers.resources.get_resource_uuid_from_slug(
+                    kb_obj.txn, kbid=kbid, slug=slug
+                )
+                == rid
+            )
 
 
 def test_chunker():
