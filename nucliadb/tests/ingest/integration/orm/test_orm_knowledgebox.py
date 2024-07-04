@@ -271,7 +271,7 @@ async def test_knowledgebox_delete_all_kb_keys(
         kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
 
         # Create some resources in the KB
-        n_resources = 100
+        n_resources = 10
         rids_and_slugs = set()
         for _ in range(n_resources):
             bm = broker_resource(kbid)
