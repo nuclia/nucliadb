@@ -117,7 +117,7 @@ impl ShardWriter {
         let metadata = Arc::new(ShardMetadata::new(shard_path.clone(), shard_id.clone(), new.kbid, new.channel));
         let mut indexes = ShardIndexes::new(&shard_path);
 
-        std::fs::create_dir(shard_path.clone())?;
+        std::fs::create_dir(&shard_path)?;
 
         let versions = Versions {
             paragraphs: versioning::PARAGRAPHS_VERSION,

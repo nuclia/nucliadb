@@ -157,8 +157,14 @@ pub struct NewShardRequest {
     #[deprecated]
     #[prost(bool, tag = "4")]
     pub normalize_vectors: bool,
+    #[deprecated]
     #[prost(message, optional, tag = "5")]
     pub config: ::core::option::Option<VectorIndexConfig>,
+    #[prost(map = "string, message", tag = "6")]
+    pub vectorsets_configs: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        VectorIndexConfig,
+    >,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

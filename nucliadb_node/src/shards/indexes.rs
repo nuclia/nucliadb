@@ -313,7 +313,7 @@ mod tests {
 
         let mut indexes = ShardIndexes::new(shard_path);
 
-        for i in 0..(MAX_ALLOWED_VECTORSETS) {
+        for i in 0..MAX_ALLOWED_VECTORSETS {
             assert!(indexes.add_vectors_index(format!("vectorset-{i}")).is_ok());
         }
         assert!(indexes.add_vectors_index("too-many".to_string()).is_err());
