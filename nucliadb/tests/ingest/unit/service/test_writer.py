@@ -23,6 +23,7 @@ import pytest
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.ingest.fields.text import Text
+from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict
 from nucliadb.ingest.service.writer import WriterServicer
 from nucliadb_protos import writer_pb2
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
@@ -88,6 +89,38 @@ class TestWriterServicer:
         assert knowledgebox_class.create.call_args.kwargs["description"] == request.config.description
         assert knowledgebox_class.create.call_args.kwargs["release_channel"] == request.release_channel
 
+    async def test_NewKnowledgeBoxV2(self, writer: WriterServicer, hosted_nucliadb, knowledgebox_class):
+        request = writer_pb2.NewKnowledgeBoxV2Request(
+            kbid="kbid",
+            kb_slug="slug",
+            title="Title",
+            description="Description",
+            vectorsets=[
+                writer_pb2.NewKnowledgeBoxV2Request.VectorSet(
+                    vectorset_id="vectorset_id",
+                    similarity=VectorSimilarity.DOT,
+                    vector_dimension=200,
+                )
+            ],
+        )
+
+        resp = await writer.NewKnowledgeBoxV2(request)
+        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
+        assert knowledgebox_class.create.call_count == 1
+        assert knowledgebox_class.create.call_args.kwargs["kbid"] == request.kbid
+        assert knowledgebox_class.create.call_args.kwargs["slug"] == request.kb_slug
+        assert knowledgebox_class.create.call_args.kwargs["title"] == request.title
+        assert knowledgebox_class.create.call_args.kwargs["description"] == request.description
+        assert knowledgebox_class.create.call_args.kwargs["semantic_models"] == {
+            vs.vectorset_id: SemanticModelMetadata(
+                similarity_function=vs.similarity,
+                vector_dimension=vs.vector_dimension,
+                matryoshka_dimensions=vs.matryoshka_dimensions,
+            )
+            for vs in request.vectorsets
+        }
+        assert "release_channel" not in knowledgebox_class.create.call_args.kwargs
+
     async def test_NewKnowledgeBox_experimental_channel(
         self, writer: WriterServicer, hosted_nucliadb, knowledgebox_class
     ):
@@ -120,11 +153,112 @@ class TestWriterServicer:
             matryoshka_dimensions=request.matryoshka_dimensions,
         )
 
+    async def test_NewKnowledgeBoxV2_with_matryoshka_dimensions(
+        self, writer: WriterServicer, hosted_nucliadb, knowledgebox_class
+    ):
+        request = writer_pb2.NewKnowledgeBoxV2Request(
+            kbid="kbid",
+            kb_slug="slug",
+            title="Title",
+            description="Description",
+            vectorsets=[
+                writer_pb2.NewKnowledgeBoxV2Request.VectorSet(
+                    vectorset_id="vectorset_id",
+                    similarity=VectorSimilarity.DOT,
+                    vector_dimension=200,
+                    matryoshka_dimensions=[200, 400],
+                )
+            ],
+        )
+
+        resp = await writer.NewKnowledgeBoxV2(request)
+        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
+        assert knowledgebox_class.create.call_count == 1
+        assert knowledgebox_class.create.call_args.kwargs["kbid"] == request.kbid
+        assert knowledgebox_class.create.call_args.kwargs["slug"] == request.kb_slug
+        assert knowledgebox_class.create.call_args.kwargs["title"] == request.title
+        assert knowledgebox_class.create.call_args.kwargs["description"] == request.description
+        assert knowledgebox_class.create.call_args.kwargs["semantic_models"] == {
+            vs.vectorset_id: SemanticModelMetadata(
+                similarity_function=vs.similarity,
+                vector_dimension=vs.vector_dimension,
+                matryoshka_dimensions=vs.matryoshka_dimensions,
+            )
+            for vs in request.vectorsets
+        }
+
+    async def test_NewKnowledgeBoxV2_with_multiple_vectorsets(
+        self, writer: WriterServicer, hosted_nucliadb, knowledgebox_class
+    ):
+        request = writer_pb2.NewKnowledgeBoxV2Request(
+            kbid="kbid",
+            kb_slug="slug",
+            title="Title",
+            description="Description",
+            vectorsets=[
+                writer_pb2.NewKnowledgeBoxV2Request.VectorSet(
+                    vectorset_id="vs1",
+                    similarity=VectorSimilarity.DOT,
+                    vector_dimension=200,
+                    matryoshka_dimensions=[200, 400],
+                ),
+                writer_pb2.NewKnowledgeBoxV2Request.VectorSet(
+                    vectorset_id="vs2",
+                    similarity=VectorSimilarity.COSINE,
+                    vector_dimension=500,
+                )
+            ],
+        )
+
+        resp = await writer.NewKnowledgeBoxV2(request)
+        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
+        assert knowledgebox_class.create.call_count == 1
+        assert knowledgebox_class.create.call_args.kwargs["kbid"] == request.kbid
+        assert knowledgebox_class.create.call_args.kwargs["slug"] == request.kb_slug
+        assert knowledgebox_class.create.call_args.kwargs["title"] == request.title
+        assert knowledgebox_class.create.call_args.kwargs["description"] == request.description
+        assert knowledgebox_class.create.call_args.kwargs["semantic_models"] == {
+            vs.vectorset_id: SemanticModelMetadata(
+                similarity_function=vs.similarity,
+                vector_dimension=vs.vector_dimension,
+                matryoshka_dimensions=vs.matryoshka_dimensions,
+            )
+            for vs in request.vectorsets
+        }
+
+    async def test_NewKnowledgeBox_handle_conflict_error(
+        self, writer: WriterServicer, knowledgebox_class
+    ):
+        request = writer_pb2.KnowledgeBoxNew(slug="slug")
+        knowledgebox_class.create.side_effect = KnowledgeBoxConflict()
+
+        resp = await writer.NewKnowledgeBox(request)
+
+        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.CONFLICT
+
+    async def test_NewKnowledgeBoxV2_handle_conflict_error(
+        self, writer: WriterServicer, knowledgebox_class
+    ):
+        request = writer_pb2.NewKnowledgeBoxV2Request(kbid="kbid", kb_slug="slug")
+        knowledgebox_class.create.side_effect = KnowledgeBoxConflict()
+
+        resp = await writer.NewKnowledgeBoxV2(request)
+
+        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.CONFLICT
+
     async def test_NewKnowledgeBox_handle_error(self, writer: WriterServicer, knowledgebox_class):
         request = writer_pb2.KnowledgeBoxNew(slug="slug")
         knowledgebox_class.create.side_effect = Exception("error")
 
         resp = await writer.NewKnowledgeBox(request)
+
+        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.ERROR
+
+    async def test_NewKnowledgeBoxV2_handle_error(self, writer: WriterServicer, knowledgebox_class):
+        request = writer_pb2.NewKnowledgeBoxV2Request(kbid="kbid", kb_slug="slug")
+        knowledgebox_class.create.side_effect = Exception("error")
+
+        resp = await writer.NewKnowledgeBoxV2(request)
 
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.ERROR
 
@@ -138,8 +272,7 @@ class TestWriterServicer:
         assert knowledgebox_class.update.call_count == 1
         assert knowledgebox_class.update.call_args.kwargs["uuid"] == request.uuid
         assert knowledgebox_class.update.call_args.kwargs["slug"] == request.slug
-        assert knowledgebox_class.update.call_args.kwargs["title"] == request.config.title
-        assert knowledgebox_class.update.call_args.kwargs["description"] == request.config.description
+        assert knowledgebox_class.update.call_args.kwargs["config"] == request.config
 
     async def test_UpdateKnowledgeBox_not_found(self, writer: WriterServicer, knowledgebox_class):
         request = writer_pb2.KnowledgeBoxUpdate(slug="slug", uuid="uuid")
