@@ -394,7 +394,7 @@ class Processor:
         if shard is None:
             # It's a new resource, get current active shard to place
             # new resource on
-            shard = await self.shard_manager.get_current_active_shard(txn, kbid)
+            shard = await datamanagers.atomic.cluster.get_current_active_shard(kbid=kbid)
             if shard is None:
                 # no shard available, create a new one
                 shard = await self.shard_manager.create_shard_by_kbid(txn, kbid)

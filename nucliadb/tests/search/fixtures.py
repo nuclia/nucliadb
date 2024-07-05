@@ -25,8 +25,8 @@ import pytest
 from httpx import AsyncClient
 from redis import asyncio as aioredis
 
-from nucliadb.common.cluster.manager import KBShardManager, get_index_node
-from nucliadb.common.maindb.utils import get_driver
+from nucliadb.common import datamanagers
+from nucliadb.common.cluster.manager import get_index_node
 from nucliadb.ingest.cache import clear_ingest_cache
 from nucliadb.search import API_PREFIX
 from nucliadb.search.predict import DummyPredictEngine
@@ -192,13 +192,9 @@ async def inject_message(processor, knowledgebox_ingest, message, count: int = 1
 
 async def wait_for_shard(knowledgebox_ingest: str, count: int) -> str:
     # Make sure is indexed
-    driver = get_driver()
-    async with driver.transaction() as txn:
-        shard_manager = KBShardManager()
-        shard = await shard_manager.get_current_active_shard(txn, knowledgebox_ingest)
-        if shard is None:
-            raise Exception("Could not find shard")
-        await txn.abort()
+    shard = await datamanagers.atomic.cluster.get_current_active_shard(kbid=knowledgebox_ingest)
+    if shard is None:
+        raise Exception("Could not find shard")
 
     checks: dict[str, bool] = {}
     for replica in shard.replicas:

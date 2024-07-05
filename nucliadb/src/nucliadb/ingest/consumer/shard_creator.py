@@ -22,7 +22,7 @@ import logging
 import uuid
 from functools import partial
 
-from nucliadb.common import locking
+from nucliadb.common import datamanagers, locking
 from nucliadb.common.cluster.manager import choose_node
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.maindb.driver import Driver
@@ -88,9 +88,8 @@ class ShardCreatorHandler:
     @metrics.handler_histo.wrap({"type": "shard_creator"})
     async def process_kb(self, kbid: str) -> None:
         logger.info({"message": "Processing notification for kbid", "kbid": kbid})
-        async with self.driver.transaction(read_only=True) as txn:
-            current_shard = await self.shard_manager.get_current_active_shard(txn, kbid)
 
+        current_shard = await datamanagers.atomic.cluster.get_current_active_shard(kbid=kbid)
         if current_shard is None:
             logger.error(
                 "Processing a notification for KB with no current shard",

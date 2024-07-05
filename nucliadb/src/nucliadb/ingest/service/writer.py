@@ -494,7 +494,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                     shard = await kbobj.get_resource_shard(shard_id)
 
                 if shard is None:
-                    shard = await self.shards_manager.get_current_active_shard(txn, request.kbid)
+                    shard = await datamanagers.cluster.get_current_active_shard(txn, kbid=request.kbid)
                     if shard is None:
                         # no shard currently exists, create one
                         shard = await self.shards_manager.create_shard_by_kbid(txn, request.kbid)

@@ -38,6 +38,7 @@ it's transaction
 import sys
 from functools import wraps
 
+from . import cluster as cluster_dm
 from . import kb as kb_dm
 from . import labels as labels_dm
 from . import resources as resources_dm
@@ -76,6 +77,10 @@ def rw_txn_wrap(fun: P) -> P:  # type: ignore
             return result
 
     return wrapper
+
+
+class cluster:
+    get_current_active_shard = ro_txn_wrap(cluster_dm.get_current_active_shard)
 
 
 class kb:

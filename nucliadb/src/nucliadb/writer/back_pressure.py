@@ -474,7 +474,7 @@ def estimate_try_after(rate: float, pending: int, max_wait: int) -> datetime:
 @alru_cache(maxsize=1024, ttl=60 * 15)
 async def get_nodes_for_kb_active_shards(context: ApplicationContext, kbid: str) -> list[str]:
     with back_pressure_observer({"type": "get_kb_active_shard"}):
-        active_shard = await get_kb_active_shard(context, kbid)
+        active_shard = await datamanagers.atomic.cluster.get_current_active_shard(kbid=kbid)
     if active_shard is None:
         # KB doesn't exist or has been deleted
         logger.debug("No active shard found for KB", extra={"kbid": kbid})
@@ -501,11 +501,6 @@ async def get_nats_consumer_pending_messages(
     js = nats_manager.js
     consumer_info = await js.consumer_info(stream, consumer)
     return consumer_info.num_pending
-
-
-async def get_kb_active_shard(context: ApplicationContext, kbid: str) -> Optional[ShardObject]:
-    async with context.kv_driver.transaction(read_only=True) as txn:
-        return await context.shard_manager.get_current_active_shard(txn, kbid)
 
 
 async def get_resource_shard(

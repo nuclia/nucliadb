@@ -166,19 +166,6 @@ class KBShardManager:
 
         return results
 
-    # TODO: move to data manager
-    async def get_current_active_shard(
-        self, txn: Transaction, kbid: str
-    ) -> Optional[writer_pb2.ShardObject]:
-        kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid, for_update=False)
-        if kb_shards is None:
-            return None
-
-        # B/c with Shards.actual
-        # Just ignore the new attribute for now
-        shard = kb_shards.shards[kb_shards.actual]
-        return shard
-
     # TODO: logic about creation and read-only shards should be decoupled
     async def create_shard_by_kbid(
         self,
