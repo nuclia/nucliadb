@@ -17,17 +17,18 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from unittest.mock import AsyncMock
+import uuid
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict
+from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict, KnowledgeBoxCreationError
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox, chunker
+from nucliadb_protos import utils_pb2
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
-from nucliadb_protos.utils_pb2 import VectorSimilarity
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
 from tests.ingest.fixtures import broker_resource
@@ -56,60 +57,175 @@ async def test_create_knowledgebox(
     maindb_driver: Driver,
     shard_manager: cluster_manager.KBShardManager,
 ):
-    count = await count_all_kbs(maindb_driver)
-    assert count == 0
+    kbid = KnowledgeBox.new_unique_kbid()
+    slug = f"slug-{kbid}"
+    title = "KB title"
+    description = "KB description"
 
-    model = SemanticModelMetadata(
-        similarity_function=VectorSimilarity.COSINE,
-        vector_dimension=384,
-    )
-    (kbid, slug) = await KnowledgeBox.create(
+    # DEPRECATED creation using semantic_model instead of semantic_models
+    result = await KnowledgeBox.create(
         maindb_driver,
-        kbid=KnowledgeBox.new_unique_kbid(),
-        slug="test",
-        title="My Title 1",
-        semantic_model=model,
+        kbid=kbid,
+        slug=slug,
+        title=title,
+        description=description,
+        semantic_model=SemanticModelMetadata(),
     )
-    assert kbid
-    assert slug == "test"
+    assert result == (kbid, slug)
+    async with maindb_driver.transaction(read_only=True) as txn:
+        exists = await datamanagers.kb.exists_kb(txn, kbid=kbid)
+        assert exists
+
+        config = await datamanagers.kb.get_config(txn, kbid=kbid)
+        assert config is not None
+        assert config.slug == slug
+        assert config.title == title
+        assert config.description == description
+
+
+@pytest.mark.asyncio
+async def test_create_knowledgebox_with_multiple_vectorsets(
+    storage: Storage,
+    maindb_driver: Driver,
+    shard_manager: cluster_manager.KBShardManager,
+):
+    kbid = KnowledgeBox.new_unique_kbid()
+    slug = f"slug-{kbid}"
+    result = await KnowledgeBox.create(
+        maindb_driver,
+        kbid=kbid,
+        slug=slug,
+        semantic_models={
+            "vs1": SemanticModelMetadata(
+                vector_dimension=200,
+                similarity_function=utils_pb2.VectorSimilarity.COSINE,
+                default_min_score=0.78,
+            ),
+            "vs2": SemanticModelMetadata(
+                vector_dimension=512,
+                similarity_function=utils_pb2.VectorSimilarity.DOT,
+                default_min_score=0.78,
+                matryoshka_dimensions=[256, 512, 2048],
+            ),
+        },
+    )
+    assert result == (kbid, slug)
+    async with maindb_driver.transaction(read_only=True) as txn:
+        exists = await datamanagers.kb.exists_kb(txn, kbid=kbid)
+        assert exists
+
+        assert len([vs async for vs in datamanagers.vectorsets.iter(txn, kbid=kbid)]) == 2
+
+        vs1 = await datamanagers.vectorsets.get(txn, kbid=kbid, vectorset_id="vs1")
+        assert vs1 is not None
+        assert vs1.vectorset_id == "vs1"
+        assert vs1.vectorset_index_config.vector_dimension == 200
+        assert vs1.vectorset_index_config.similarity == utils_pb2.VectorSimilarity.COSINE
+        assert vs1.vectorset_index_config.normalize_vectors is False
+        assert len(vs1.matryoshka_dimensions) == 0
+
+        vs2 = await datamanagers.vectorsets.get(txn, kbid=kbid, vectorset_id="vs2")
+        assert vs2 is not None
+        assert vs2.vectorset_id == "vs2"
+        assert vs2.vectorset_index_config.vector_dimension == 512
+        assert vs2.vectorset_index_config.similarity == utils_pb2.VectorSimilarity.DOT
+        assert vs2.vectorset_index_config.normalize_vectors is True
+        assert set(vs2.matryoshka_dimensions) == {256, 512, 2048}
+
+
+@pytest.mark.asyncio
+async def test_create_knowledgebox_without_vectorsets_is_not_allowed(
+    storage: Storage,
+    maindb_driver: Driver,
+    shard_manager: cluster_manager.KBShardManager,
+):
+    with pytest.raises(KnowledgeBoxCreationError):
+        await KnowledgeBox.create(maindb_driver, kbid="kbid", slug="slug", semantic_models={})
+
+
+@pytest.mark.parametrize(
+    "release_channel",
+    [
+        utils_pb2.ReleaseChannel.STABLE,
+        utils_pb2.ReleaseChannel.EXPERIMENTAL,
+    ],
+)
+@pytest.mark.asyncio
+async def test_create_knowledgebox_with_release_channel(
+    storage: Storage,
+    maindb_driver: Driver,
+    shard_manager: cluster_manager.KBShardManager,
+    release_channel: utils_pb2.ReleaseChannel.ValueType,
+):
+    with patch("nucliadb.ingest.orm.knowledgebox.release_channel_for_kb") as mock:
+        mock.return_value = release_channel
+
+        kbid, _ = await KnowledgeBox.create(
+            maindb_driver,
+            kbid=KnowledgeBox.new_unique_kbid(),
+            slug="mykbslug",
+            semantic_model=SemanticModelMetadata(),
+        )
+
+    async with maindb_driver.transaction(read_only=True) as txn:
+        shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+        assert shards is not None
+        assert shards.release_channel == release_channel
+
+
+@pytest.mark.asyncio
+async def test_create_knowledgebox_with_same_kbid(
+    storage: Storage,
+    maindb_driver: Driver,
+    shard_manager: cluster_manager.KBShardManager,
+):
+    kbid = KnowledgeBox.new_unique_kbid()
+
+    result_kbid, _ = await KnowledgeBox.create(
+        maindb_driver,
+        kbid=kbid,
+        slug=str(uuid.uuid4()),
+        semantic_models={"vs": SemanticModelMetadata()},
+    )
+    assert result_kbid == kbid
 
     with pytest.raises(KnowledgeBoxConflict):
         await KnowledgeBox.create(
             maindb_driver,
-            kbid=KnowledgeBox.new_unique_kbid(),
-            slug="test",
-            title="My Title 2",
-            semantic_model=model,
+            kbid=kbid,
+            slug=str(uuid.uuid4()),
+            semantic_models={"vs": SemanticModelMetadata()},
         )
 
-    (kbid2, slug2) = await KnowledgeBox.create(
+
+@pytest.mark.asyncio
+async def test_delete_knowledgebox(
+    storage: Storage,
+    maindb_driver: Driver,
+    shard_manager: cluster_manager.KBShardManager,
+):
+    kbid, _ = await KnowledgeBox.create(
         maindb_driver,
         kbid=KnowledgeBox.new_unique_kbid(),
-        slug="test2",
-        title="My Title 3",
-        semantic_model=model,
+        slug="my-kb",
+        semantic_models={"vs": SemanticModelMetadata()},
     )
-    assert kbid2
-    assert slug2 == "test2"
-
-    count = await count_all_kbs(maindb_driver)
-    assert count == 2
+    exists = await datamanagers.atomic.kb.exists_kb(kbid=kbid)
+    assert exists is True
 
     async with maindb_driver.transaction() as txn:
-        kbid = await KnowledgeBox.delete(txn, kbid2)
-        assert kbid
+        await KnowledgeBox.delete(txn, kbid)
         await txn.commit()
 
-    count = await count_all_kbs(maindb_driver)
-    assert count == 1
+    exists = await datamanagers.atomic.kb.exists_kb(kbid=kbid)
+    assert exists is False
 
 
-async def count_all_kbs(driver: Driver):
-    count = 0
-    async with driver.transaction(read_only=True) as txn:
-        async for _ in datamanagers.kb.get_kbs(txn):
-            count += 1
-    return count
+@pytest.mark.asyncio
+async def test_delete_knowledgebox_handles_unexisting_kb(storage: Storage, maindb_driver: Driver):
+    async with maindb_driver.transaction() as txn:
+        kbid = await KnowledgeBox.delete(txn, kbid="idonotexist")
+        assert kbid is None
 
 
 @pytest.mark.asyncio
@@ -150,20 +266,23 @@ async def test_knowledgebox_delete_all_kb_keys(
 
     # Create some resources in the KB
     n_resources = 100
-    uuids = set()
+    rids_and_slugs = set()
     for _ in range(n_resources):
         bm = broker_resource(kbid)
-        r = await kb_obj.add_resource(uuid=bm.uuid, slug=bm.uuid, basic=bm.basic)
-        assert r is not None
-        await r.set_slug()
-        uuids.add(bm.uuid)
+        rid = bm.uuid
+        slug = "slug-{rid}"
+        bm.basic.slug = slug
+        resource = await kb_obj.add_resource(uuid=rid, slug=slug, basic=bm.basic)
+        assert resource is not None
+        await resource.set_slug()
+        rids_and_slugs.add((rid, slug))
     await txn.commit()
 
     # Check that all of them are there
     txn = await maindb_driver.begin()
     kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
-    for uuid in uuids:
-        assert await kb_obj.get_resource_uuid_by_slug(uuid) == uuid
+    for rid, slug in rids_and_slugs:
+        assert await kb_obj.get_resource_uuid_by_slug(slug) == rid
     await txn.abort()
 
     # Now delete all kb keys
@@ -172,6 +291,6 @@ async def test_knowledgebox_delete_all_kb_keys(
     # Check that all of them were deleted
     txn = await maindb_driver.begin()
     kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
-    for uuid in uuids:
-        assert await kb_obj.get_resource_uuid_by_slug(uuid) is None
+    for rid, slug in rids_and_slugs:
+        assert await kb_obj.get_resource_uuid_by_slug(slug) is None
     await txn.abort()
