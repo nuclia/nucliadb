@@ -57,7 +57,7 @@ class TestWriterServicer:
     def knowledgebox_class(self):
         mock = AsyncMock()
         mock.new_unique_kbid.return_value = "kbid"
-        mock.create.return_value = "kbid"
+        mock.create.return_value = ("kbid", "slug")
         with patch("nucliadb.ingest.service.writer.KnowledgeBoxORM", new=mock):
             yield mock
 
@@ -84,7 +84,8 @@ class TestWriterServicer:
             similarity_function=request.similarity,
             vector_dimension=request.vector_dimension,
         )
-        assert knowledgebox_class.create.call_args.kwargs["config"] == request.config
+        assert knowledgebox_class.create.call_args.kwargs["title"] == request.config.title
+        assert knowledgebox_class.create.call_args.kwargs["description"] == request.config.description
         assert knowledgebox_class.create.call_args.kwargs["release_channel"] == request.release_channel
 
     async def test_NewKnowledgeBox_experimental_channel(
@@ -137,7 +138,8 @@ class TestWriterServicer:
         assert knowledgebox_class.update.call_count == 1
         assert knowledgebox_class.update.call_args.kwargs["uuid"] == request.uuid
         assert knowledgebox_class.update.call_args.kwargs["slug"] == request.slug
-        assert knowledgebox_class.update.call_args.kwargs["config"] == request.config
+        assert knowledgebox_class.update.call_args.kwargs["title"] == request.config.title
+        assert knowledgebox_class.update.call_args.kwargs["description"] == request.config.description
 
     async def test_UpdateKnowledgeBox_not_found(self, writer: WriterServicer, knowledgebox_class):
         request = writer_pb2.KnowledgeBoxUpdate(slug="slug", uuid="uuid")
