@@ -89,8 +89,8 @@ class KnowledgeBox:
     ) -> str:
         release_channel = cast(ReleaseChannel.ValueType, release_channel_for_kb(slug, release_channel))
 
-        exist = await datamanagers.kb.get_kb_uuid(txn, slug=slug)
-        if exist:
+        exists = await datamanagers.kb.get_kb_uuid(txn, slug=slug)
+        if exists:
             raise KnowledgeBoxConflict()
         if uuid is None or uuid == "":
             uuid = str(uuid4())
@@ -161,7 +161,7 @@ class KnowledgeBox:
         slug: Optional[str] = None,
         config: Optional[KnowledgeBoxConfig] = None,
     ) -> str:
-        exist = await datamanagers.kb.get_config(txn, kbid=uuid)
+        exist = await datamanagers.kb.get_config(txn, kbid=uuid, for_update=True)
         if not exist:
             raise datamanagers.exceptions.KnowledgeBoxNotFound()
 
@@ -233,7 +233,7 @@ class KnowledgeBox:
 
             # Delete KB Shards
             shards_match = datamanagers.cluster.KB_SHARDS.format(kbid=kbid)
-            payload = await txn.get(shards_match)
+            payload = await txn.get(shards_match, for_update=False)
 
             if payload is None:
                 logger.warning(f"Shards not found for kbid={kbid}")
@@ -331,7 +331,7 @@ class KnowledgeBox:
         key = KB_RESOURCE_SLUG.format(kbid=self.kbid, slug=slug)
         key_ok = False
         while key_ok is False:
-            found = await self.txn.get(key)
+            found = await self.txn.get(key, for_update=False)
             if found and found.decode() != uuid:
                 slug += ".c"
                 key = KB_RESOURCE_SLUG.format(kbid=self.kbid, slug=slug)

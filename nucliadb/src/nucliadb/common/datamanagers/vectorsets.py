@@ -34,7 +34,7 @@ async def initialize(txn: Transaction, *, kbid: str):
 async def get(
     txn: Transaction, *, kbid: str, vectorset_id: str
 ) -> Optional[knowledgebox_pb2.VectorSetConfig]:
-    kb_vectorsets = await _get_or_default(txn, kbid=kbid)
+    kb_vectorsets = await _get_or_default(txn, kbid=kbid, for_update=False)
     index = _find_vectorset(kb_vectorsets, vectorset_id)
     if index is None:
         return None
@@ -42,19 +42,19 @@ async def get(
 
 
 async def exists(txn, *, kbid: str, vectorset_id: str) -> bool:
-    kb_vectorsets = await _get_or_default(txn, kbid=kbid)
+    kb_vectorsets = await _get_or_default(txn, kbid=kbid, for_update=False)
     return _find_vectorset(kb_vectorsets, vectorset_id) is not None
 
 
 async def iter(txn: Transaction, *, kbid: str) -> AsyncIterator[knowledgebox_pb2.VectorSetConfig]:
-    kb_vectorsets = await _get_or_default(txn, kbid=kbid)
+    kb_vectorsets = await _get_or_default(txn, kbid=kbid, for_update=False)
     for config in kb_vectorsets.vectorsets:
         yield config
 
 
 async def set(txn: Transaction, *, kbid: str, config: knowledgebox_pb2.VectorSetConfig):
     """Create or update a vectorset configuration"""
-    kb_vectorsets = await _get_or_default(txn, kbid=kbid)
+    kb_vectorsets = await _get_or_default(txn, kbid=kbid, for_update=True)
     index = _find_vectorset(kb_vectorsets, config.vectorset_id)
     if index is None:
         # adding a new vectorset
@@ -68,7 +68,7 @@ async def set(txn: Transaction, *, kbid: str, config: knowledgebox_pb2.VectorSet
 
 
 async def delete(txn: Transaction, *, kbid: str, vectorset_id: str):
-    kb_vectorsets = await _get_or_default(txn, kbid=kbid)
+    kb_vectorsets = await _get_or_default(txn, kbid=kbid, for_update=True)
     index = _find_vectorset(kb_vectorsets, vectorset_id)
     if index is None:
         # already deleted
@@ -82,10 +82,15 @@ async def delete(txn: Transaction, *, kbid: str, vectorset_id: str):
 # XXX At some point in the vectorset epic, we should make this key mandatory and
 # fail instead of providing a default
 async def _get_or_default(
-    txn: Transaction, *, kbid: str
+    txn: Transaction,
+    *,
+    kbid: str,
+    for_update: bool = True,
 ) -> knowledgebox_pb2.KnowledgeBoxVectorSetsConfig:
     key = KB_VECTORSETS.format(kbid=kbid)
-    stored = await get_kv_pb(txn, key, knowledgebox_pb2.KnowledgeBoxVectorSetsConfig)
+    stored = await get_kv_pb(
+        txn, key, knowledgebox_pb2.KnowledgeBoxVectorSetsConfig, for_update=for_update
+    )
     return stored or knowledgebox_pb2.KnowledgeBoxVectorSetsConfig()
 
 

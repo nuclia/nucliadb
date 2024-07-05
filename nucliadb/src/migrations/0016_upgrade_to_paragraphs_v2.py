@@ -55,7 +55,7 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
 
 async def has_old_paragraphs_index(context: ExecutionContext, kbid: str) -> bool:
     async with context.kv_driver.transaction(read_only=True) as txn:
-        shards_object = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+        shards_object = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid, for_update=False)
         if not shards_object:
             raise ShardsObjectNotFound()
         for shard in shards_object.shards:

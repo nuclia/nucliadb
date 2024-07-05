@@ -28,8 +28,10 @@ from nucliadb.common.maindb.utils import get_driver
 PB_TYPE = TypeVar("PB_TYPE", bound=Message)
 
 
-async def get_kv_pb(txn: Transaction, key: str, pb_type: Type[PB_TYPE]) -> Optional[PB_TYPE]:
-    serialized: Optional[bytes] = await txn.get(key)
+async def get_kv_pb(
+    txn: Transaction, key: str, pb_type: Type[PB_TYPE], for_update: bool = True
+) -> Optional[PB_TYPE]:
+    serialized: Optional[bytes] = await txn.get(key, for_update=for_update)
     if serialized is None:
         return None
     pb = pb_type()

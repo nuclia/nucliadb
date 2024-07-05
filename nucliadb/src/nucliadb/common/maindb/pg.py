@@ -161,11 +161,11 @@ class PGTransaction(Transaction):
                     self.open = False
                     await self.connection.close()
 
-    async def batch_get(self, keys: list[str]):
-        return await self.data_layer.batch_get(keys, select_for_update=True)
+    async def batch_get(self, keys: list[str], for_update: bool = True):
+        return await self.data_layer.batch_get(keys, select_for_update=for_update)
 
-    async def get(self, key: str) -> Optional[bytes]:
-        return await self.data_layer.get(key, select_for_update=True)
+    async def get(self, key: str, for_update: bool = True) -> Optional[bytes]:
+        return await self.data_layer.get(key, select_for_update=for_update)
 
     async def set(self, key: str, value: bytes):
         await self.data_layer.set(key, value)
@@ -206,14 +206,14 @@ class ReadOnlyPGTransaction(Transaction):
         raise Exception("Cannot commit transaction in read only mode")
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=3)
-    async def batch_get(self, keys: list[str]):
+    async def batch_get(self, keys: list[str], for_update: bool = False):
         async with self.driver._get_connection() as conn:
-            return await DataLayer(conn).batch_get(keys)
+            return await DataLayer(conn).batch_get(keys, select_for_update=False)
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=3)
-    async def get(self, key: str) -> Optional[bytes]:
+    async def get(self, key: str, for_update: bool = False) -> Optional[bytes]:
         async with self.driver._get_connection() as conn:
-            return await DataLayer(conn).get(key)
+            return await DataLayer(conn).get(key, select_for_update=False)
 
     async def set(self, key: str, value: bytes):
         raise Exception("Cannot set in read only transaction")

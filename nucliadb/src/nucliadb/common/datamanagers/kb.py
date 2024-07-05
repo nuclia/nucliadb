@@ -44,20 +44,22 @@ async def get_kbs(txn: Transaction, *, prefix: str = "") -> AsyncIterator[tuple[
 
 
 async def exists_kb(txn: Transaction, *, kbid: str) -> bool:
-    return await get_config(txn, kbid=kbid) is not None
+    return await get_config(txn, kbid=kbid, for_update=False) is not None
 
 
 async def get_kb_uuid(txn: Transaction, *, slug: str) -> Optional[str]:
-    uuid = await txn.get(KB_SLUGS.format(slug=slug))
+    uuid = await txn.get(KB_SLUGS.format(slug=slug), for_update=False)
     if uuid is not None:
         return uuid.decode()
     else:
         return None
 
 
-async def get_config(txn: Transaction, *, kbid: str) -> Optional[knowledgebox_pb2.KnowledgeBoxConfig]:
+async def get_config(
+    txn: Transaction, *, kbid: str, for_update: bool = False
+) -> Optional[knowledgebox_pb2.KnowledgeBoxConfig]:
     key = KB_UUID.format(kbid=kbid)
-    payload = await txn.get(key)
+    payload = await txn.get(key, for_update=for_update)
     if payload is None:
         return None
     response = knowledgebox_pb2.KnowledgeBoxConfig()
@@ -71,7 +73,7 @@ async def set_config(txn: Transaction, *, kbid: str, config: knowledgebox_pb2.Kn
 
 
 async def get_model_metadata(txn: Transaction, *, kbid: str) -> knowledgebox_pb2.SemanticModelMetadata:
-    shards_obj = await cluster.get_kb_shards(txn, kbid=kbid)
+    shards_obj = await cluster.get_kb_shards(txn, kbid=kbid, for_update=False)
     if shards_obj is None:
         raise KnowledgeBoxNotFound(kbid)
     if shards_obj.HasField("model"):
