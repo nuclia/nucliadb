@@ -4,8 +4,8 @@
 [metadata]
 groups = ["default", "dev"]
 strategy = ["cross_platform", "inherit_metadata"]
-lock_version = "4.4.1"
-content_hash = "sha256:5a28ae05adc8b61de87787956726c77f4339e7e6ac80b6b6eb0aae11beda75f1"
+lock_version = "4.4.2"
+content_hash = "sha256:f108a2e56390e211bdbde66725035e66790f4b36688feffd304dbdb4570cc08d"
 
 [[package]]
 name = "aiobotocore"
@@ -2253,7 +2253,7 @@ dependencies = [
 
 [[package]]
 name = "nucliadb-node-binding"
-version = "2.37.0"
+version = "2.37.1"
 requires_python = ">=3.9"
 editable = true
 path = "./nucliadb_node_binding"

@@ -273,7 +273,9 @@ async def cutover_shards(app_context: ApplicationContext, kbid: str) -> None:
     async with datamanagers.with_transaction() as txn:
         sm = app_context.shard_manager
 
-        previously_active_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+        previously_active_shards = await datamanagers.cluster.get_kb_shards(
+            txn, kbid=kbid, for_update=True
+        )
         rollover_shards = await datamanagers.rollover.get_kb_rollover_shards(txn, kbid=kbid)
         if previously_active_shards is None or rollover_shards is None:
             raise UnexpectedRolloverError("Shards for kb not found")
@@ -298,7 +300,7 @@ async def validate_indexed_data(app_context: ApplicationContext, kbid: str) -> l
     If a resource was removed during the rollover, it will be removed as well.
     """
 
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_ro_transaction() as txn:
         rolled_over_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
         if rolled_over_shards is None:
             raise UnexpectedRolloverError(f"No rollover shards found for KB {kbid}")
@@ -311,7 +313,7 @@ async def validate_indexed_data(app_context: ApplicationContext, kbid: str) -> l
 
     repaired_resources = []
     async for resource_id in datamanagers.resources.iterate_resource_ids(kbid=kbid):
-        async with datamanagers.with_transaction() as txn:
+        async with datamanagers.with_ro_transaction() as txn:
             indexed_data = await datamanagers.rollover.get_indexed_data(
                 txn, kbid=kbid, resource_id=resource_id
             )
@@ -418,7 +420,7 @@ async def clean_indexed_data(app_context: ApplicationContext, kbid: str) -> None
 
 async def clean_rollover_status(app_context: ApplicationContext, kbid: str) -> None:
     async with datamanagers.with_transaction() as txn:
-        kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+        kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid, for_update=True)
         if kb_shards is None:
             logger.warning(
                 "No shards found for KB, skipping clean rollover status",

@@ -42,7 +42,7 @@ async def migrate(context: ExecutionContext) -> None: ...
 
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
     async with context.kv_driver.transaction() as txn:
-        shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+        shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid, for_update=True)
         if shards is None:
             logger.error("KB without shards", extra={"kbid": kbid})
             return

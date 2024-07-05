@@ -41,14 +41,19 @@ from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.orm.utils import choose_matryoshka_dimension, compute_paragraph_key
 from nucliadb.migrator.utils import get_latest_version
+from nucliadb.pinecone.async_client import get_client as get_pinecone_client
 from nucliadb_protos import knowledgebox_pb2, utils_pb2, writer_pb2
-from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig, SemanticModelMetadata
+from nucliadb_protos.knowledgebox_pb2 import (
+    ExternalIndexProvider,
+    KnowledgeBoxConfig,
+    SemanticModelMetadata,
+)
 from nucliadb_protos.resources_pb2 import Basic
 from nucliadb_protos.utils_pb2 import ReleaseChannel
 from nucliadb_utils import const
 from nucliadb_utils.settings import running_settings
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import get_audit, get_storage, has_feature
+from nucliadb_utils.utilities import get_audit, get_endecryptor, get_storage, has_feature
 
 # XXX Eventually all these keys should be moved to datamanagers.kb
 KB_RESOURCE = "/kbs/{kbid}/r/{uuid}"
@@ -89,8 +94,8 @@ class KnowledgeBox:
     ) -> str:
         release_channel = cast(ReleaseChannel.ValueType, release_channel_for_kb(slug, release_channel))
 
-        exist = await datamanagers.kb.get_kb_uuid(txn, slug=slug)
-        if exist:
+        exists = await datamanagers.kb.get_kb_uuid(txn, slug=slug)
+        if exists:
             raise KnowledgeBoxConflict()
         if uuid is None or uuid == "":
             uuid = str(uuid4())
@@ -106,6 +111,8 @@ class KnowledgeBox:
             config = KnowledgeBoxConfig()
 
         await datamanagers.vectorsets.initialize(txn, kbid=uuid)
+
+        await cls._maybe_create_external_index(config, uuid, semantic_model)
 
         config.migration_version = get_latest_version()
         config.slug = slug
@@ -161,7 +168,7 @@ class KnowledgeBox:
         slug: Optional[str] = None,
         config: Optional[KnowledgeBoxConfig] = None,
     ) -> str:
-        exist = await datamanagers.kb.get_config(txn, kbid=uuid)
+        exist = await datamanagers.kb.get_config(txn, kbid=uuid, for_update=True)
         if not exist:
             raise datamanagers.exceptions.KnowledgeBoxNotFound()
 
@@ -179,6 +186,8 @@ class KnowledgeBox:
         if config and exist != config:
             exist.MergeFrom(config)
 
+        await cls._maybe_update_external_index_config(exist, uuid)
+
         await datamanagers.kb.set_config(txn, kbid=uuid, config=exist)
 
         return uuid
@@ -192,6 +201,8 @@ class KnowledgeBox:
             # consider KB as deleted
             return
         slug = kb_config.slug
+
+        await cls._maybe_delete_external_index(kb_config, kbid)
 
         # Delete main anchor
         async with txn.driver.transaction() as subtxn:
@@ -233,7 +244,7 @@ class KnowledgeBox:
 
             # Delete KB Shards
             shards_match = datamanagers.cluster.KB_SHARDS.format(kbid=kbid)
-            payload = await txn.get(shards_match)
+            payload = await txn.get(shards_match, for_update=False)
 
             if payload is None:
                 logger.warning(f"Shards not found for kbid={kbid}")
@@ -331,7 +342,7 @@ class KnowledgeBox:
         key = KB_RESOURCE_SLUG.format(kbid=self.kbid, slug=slug)
         key_ok = False
         while key_ok is False:
-            found = await self.txn.get(key)
+            found = await self.txn.get(key, for_update=False)
             if found and found.decode() != uuid:
                 slug += ".c"
                 key = KB_RESOURCE_SLUG.format(kbid=self.kbid, slug=slug)
@@ -386,6 +397,46 @@ class KnowledgeBox:
         await self.txn.set(KB_VECTORSET_TO_DELETE.format(kbid=self.kbid, vectorset=vectorset_id), b"")
         shard_manager = get_shard_manager()
         await shard_manager.delete_vectorset(self.kbid, vectorset_id)
+
+    @classmethod
+    async def _maybe_create_external_index(
+        cls, config: KnowledgeBoxConfig, uuid: str, semantic_model: SemanticModelMetadata
+    ):
+        if config.external_index_provider.type != ExternalIndexProvider.ProviderType.PINECONE:
+            return
+        pinecone_api_key = config.external_index_provider.config.pop("api_key")
+        pinecone = get_pinecone_client(api_key=pinecone_api_key)
+        index_name = uuid
+        index_host = await pinecone.create_index(
+            name=index_name,
+            dimension=semantic_model.vector_dimension,
+        )
+        # Store the api key encrypted
+        encrypted_api_key = await get_endecryptor().encrypt_text(pinecone_api_key)
+        config.external_index_provider.config["encrypted_api_key"] = encrypted_api_key
+        config.external_index_provider.config["index_name"] = index_name
+        config.external_index_provider.config["index_host"] = index_host
+
+    @classmethod
+    async def _maybe_update_external_index_config(cls, config: KnowledgeBoxConfig, kbid: str):
+        if config.external_index_provider.type != ExternalIndexProvider.ProviderType.PINECONE:
+            return
+        pinecone_api_key = config.external_index_provider.config.pop("api_key", None)
+        if pinecone_api_key is None:
+            # Nothing to upate
+            return
+        # Replace the encrypted api key with the new one
+        encrypted_api_key = await get_endecryptor().encrypt_text(pinecone_api_key)
+        config.external_index_provider.config["encrypted_api_key"] = encrypted_api_key
+
+    @classmethod
+    async def _maybe_delete_external_index(cls, config: KnowledgeBoxConfig, kbid: str):
+        if config.external_index_provider.type != ExternalIndexProvider.ProviderType.PINECONE:
+            return
+        encrypted_api_key = config.external_index_provider.config["encrypted_api_key"]
+        pinecone_api_key = await get_endecryptor().decrypt_text(encrypted_api_key)
+        pinecone = get_pinecone_client(api_key=pinecone_api_key)
+        await pinecone.delete_index(name=kbid)
 
 
 def release_channel_for_kb(

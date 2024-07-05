@@ -9,6 +9,56 @@ pub struct KnowledgeBoxId {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ExternalIndexProvider {
+    #[prost(enumeration = "external_index_provider::ProviderType", tag = "1")]
+    pub r#type: i32,
+    #[prost(map = "string, string", tag = "2")]
+    pub config: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        ::prost::alloc::string::String,
+    >,
+}
+/// Nested message and enum types in `ExternalIndexProvider`.
+pub mod external_index_provider {
+    #[derive(
+        Clone,
+        Copy,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+        PartialOrd,
+        Ord,
+        ::prost::Enumeration
+    )]
+    #[repr(i32)]
+    pub enum ProviderType {
+        Unset = 0,
+        Pinecone = 1,
+    }
+    impl ProviderType {
+        /// String value of the enum field names used in the ProtoBuf definition.
+        ///
+        /// The values are not transformed in any way and thus are considered stable
+        /// (if the ProtoBuf definition does not change) and safe for programmatic use.
+        pub fn as_str_name(&self) -> &'static str {
+            match self {
+                ProviderType::Unset => "UNSET",
+                ProviderType::Pinecone => "PINECONE",
+            }
+        }
+        /// Creates an enum from field names used in the ProtoBuf definition.
+        pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+            match value {
+                "UNSET" => Some(Self::Unset),
+                "PINECONE" => Some(Self::Pinecone),
+                _ => None,
+            }
+        }
+    }
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct KnowledgeBoxConfig {
     #[prost(string, tag = "1")]
     pub title: ::prost::alloc::string::String,
@@ -18,6 +68,8 @@ pub struct KnowledgeBoxConfig {
     pub slug: ::prost::alloc::string::String,
     #[prost(int64, tag = "7")]
     pub migration_version: i64,
+    #[prost(message, optional, tag = "9")]
+    pub external_index_provider: ::core::option::Option<ExternalIndexProvider>,
     #[deprecated]
     #[prost(string, repeated, tag = "3")]
     pub enabled_filters: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,

@@ -37,10 +37,10 @@ class Transaction:
     async def commit(self):
         raise NotImplementedError()
 
-    async def batch_get(self, keys: list[str]) -> list[Optional[bytes]]:
+    async def batch_get(self, keys: list[str], for_update: bool = False) -> list[Optional[bytes]]:
         raise NotImplementedError()
 
-    async def get(self, key: str) -> Optional[bytes]:
+    async def get(self, key: str, for_update: bool = False) -> Optional[bytes]:
         raise NotImplementedError()
 
     async def set(self, key: str, value: bytes):

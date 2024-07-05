@@ -16,28 +16,23 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-#
-import logging
 from typing import Optional
 
-from nucliadb.common.maindb.driver import Transaction
-from nucliadb_protos import writer_pb2
-
-from .utils import get_kv_pb
-
-logger = logging.getLogger(__name__)
+from pydantic import Field
+from pydantic_settings import BaseSettings
 
 
-KB_SHARDS = "/kbs/{kbid}/shards"
+class EncryptionSettings(BaseSettings):
+    encryption_secret_key: Optional[str] = Field(
+        default=None,
+        title="Encryption Secret Key",
+        description="Secret key used for encryption and decryption of sensitive data in the database. The key must be a 32-byte string, base64 encoded.",
+    )
+    encryption_thread_pool_size: int = Field(
+        default=1,
+        title="Encryption Thread Pool Size",
+        description="Number of threads used for encryption and decryption of sensitive data in the database.",
+    )
 
 
-async def get_kb_shards(
-    txn: Transaction, *, kbid: str, for_update: bool = False
-) -> Optional[writer_pb2.Shards]:
-    key = KB_SHARDS.format(kbid=kbid)
-    return await get_kv_pb(txn, key, writer_pb2.Shards, for_update=for_update)
-
-
-async def update_kb_shards(txn: Transaction, *, kbid: str, shards: writer_pb2.Shards) -> None:
-    key = KB_SHARDS.format(kbid=kbid)
-    await txn.set(key, shards.SerializeToString())
+settings = EncryptionSettings()

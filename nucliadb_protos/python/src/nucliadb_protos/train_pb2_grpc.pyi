@@ -20,6 +20,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     EntitiesGroups as EntitiesGroups,
     Entity as Entity,
     EntityGroupDuplicateIndex as EntityGroupDuplicateIndex,
+    ExternalIndexProvider as ExternalIndexProvider,
     KBConfiguration as KBConfiguration,
     KnowledgeBoxConfig as KnowledgeBoxConfig,
     KnowledgeBoxID as KnowledgeBoxID,

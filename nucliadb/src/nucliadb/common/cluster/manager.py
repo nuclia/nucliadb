@@ -170,7 +170,7 @@ class KBShardManager:
     async def get_current_active_shard(
         self, txn: Transaction, kbid: str
     ) -> Optional[writer_pb2.ShardObject]:
-        kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+        kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid, for_update=False)
         if kb_shards is None:
             return None
 
@@ -194,7 +194,7 @@ class KBShardManager:
             )
             raise
 
-        kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+        kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid, for_update=True)
         if kb_shards is None:
             msg = ("Attempting to create a shard for a KB when it has no stored shards in maindb",)
             logger.error(msg, extra={"kbid": kbid})

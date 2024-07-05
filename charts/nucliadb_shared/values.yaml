@@ -82,6 +82,10 @@ tracing:
   jaeger_query_host: query.tracing.svc.cluster.local
   jaeger_query_http_port: 16686
 
+encryption:
+  secret_key: XX
+  thread_pool_size: 2
+
 telemetry:
   enabled: True
 

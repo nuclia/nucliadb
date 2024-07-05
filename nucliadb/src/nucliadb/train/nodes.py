@@ -124,7 +124,7 @@ class TrainShardManager(manager.KBShardManager):
             base = KB_RESOURCE_SLUG_BASE.format(kbid=request.kb.uuid)
             async for key in txn.keys(match=base, count=-1):
                 # Fetch and Add wanted item
-                rid = await txn.get(key)
+                rid = await txn.get(key, for_update=False)
                 if rid is not None:
                     resource = await kb.get(rid.decode())
                     if resource is not None:

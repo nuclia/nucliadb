@@ -21,6 +21,17 @@ message KnowledgeBoxID {
     string uuid = 2;
 }
 
+// External Index node provider
+
+message ExternalIndexProvider {
+    enum ProviderType {
+        UNSET = 0;
+        PINECONE = 1;
+    }
+    ProviderType type = 1;
+    map <string, string> config = 2;
+}
+
 // CONFIG
 
 message KnowledgeBoxConfig {
@@ -28,6 +39,7 @@ message KnowledgeBoxConfig {
     string description = 2;
     string slug = 5;
     int64 migration_version = 7;
+    ExternalIndexProvider external_index_provider = 9;
 
     repeated string enabled_filters = 3 [deprecated = true];
     repeated string enabled_insights = 4 [deprecated = true];

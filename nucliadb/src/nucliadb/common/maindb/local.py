@@ -105,7 +105,7 @@ class LocalTransaction(Transaction):
         self.clean()
         self.open = False
 
-    async def batch_get(self, keys: list[str]) -> list[Optional[bytes]]:
+    async def batch_get(self, keys: list[str], for_update: bool = False) -> list[Optional[bytes]]:
         results: list[Optional[bytes]] = []
         for key in keys:
             obj = await self.get(key)
@@ -124,7 +124,7 @@ class LocalTransaction(Transaction):
 
         return results
 
-    async def get(self, key: str) -> Optional[bytes]:
+    async def get(self, key: str, for_update: bool = False) -> Optional[bytes]:
         if key in self.deleted_keys:
             raise KeyError(f"Not found {key}")
 

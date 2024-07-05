@@ -98,6 +98,56 @@ class KnowledgeBoxID(google.protobuf.message.Message):
 global___KnowledgeBoxID = KnowledgeBoxID
 
 @typing.final
+class ExternalIndexProvider(google.protobuf.message.Message):
+    """External Index node provider"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class _ProviderType:
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+
+    class _ProviderTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[ExternalIndexProvider._ProviderType.ValueType], builtins.type):
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        UNSET: ExternalIndexProvider._ProviderType.ValueType  # 0
+        PINECONE: ExternalIndexProvider._ProviderType.ValueType  # 1
+
+    class ProviderType(_ProviderType, metaclass=_ProviderTypeEnumTypeWrapper): ...
+    UNSET: ExternalIndexProvider.ProviderType.ValueType  # 0
+    PINECONE: ExternalIndexProvider.ProviderType.ValueType  # 1
+
+    @typing.final
+    class ConfigEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        value: builtins.str
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: builtins.str = ...,
+        ) -> None: ...
+        def ClearField(self, field_name: typing.Literal["key", b"key", "value", b"value"]) -> None: ...
+
+    TYPE_FIELD_NUMBER: builtins.int
+    CONFIG_FIELD_NUMBER: builtins.int
+    type: global___ExternalIndexProvider.ProviderType.ValueType
+    @property
+    def config(self) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
+    def __init__(
+        self,
+        *,
+        type: global___ExternalIndexProvider.ProviderType.ValueType = ...,
+        config: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["config", b"config", "type", b"type"]) -> None: ...
+
+global___ExternalIndexProvider = ExternalIndexProvider
+
+@typing.final
 class KnowledgeBoxConfig(google.protobuf.message.Message):
     """CONFIG"""
 
@@ -107,6 +157,7 @@ class KnowledgeBoxConfig(google.protobuf.message.Message):
     DESCRIPTION_FIELD_NUMBER: builtins.int
     SLUG_FIELD_NUMBER: builtins.int
     MIGRATION_VERSION_FIELD_NUMBER: builtins.int
+    EXTERNAL_INDEX_PROVIDER_FIELD_NUMBER: builtins.int
     ENABLED_FILTERS_FIELD_NUMBER: builtins.int
     ENABLED_INSIGHTS_FIELD_NUMBER: builtins.int
     DISABLE_VECTORS_FIELD_NUMBER: builtins.int
@@ -119,6 +170,8 @@ class KnowledgeBoxConfig(google.protobuf.message.Message):
     release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType
     """DEPRECATED: duplicated field also stored in `writer.proto Shards`"""
     @property
+    def external_index_provider(self) -> global___ExternalIndexProvider: ...
+    @property
     def enabled_filters(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     @property
     def enabled_insights(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
@@ -129,12 +182,14 @@ class KnowledgeBoxConfig(google.protobuf.message.Message):
         description: builtins.str = ...,
         slug: builtins.str = ...,
         migration_version: builtins.int = ...,
+        external_index_provider: global___ExternalIndexProvider | None = ...,
         enabled_filters: collections.abc.Iterable[builtins.str] | None = ...,
         enabled_insights: collections.abc.Iterable[builtins.str] | None = ...,
         disable_vectors: builtins.bool = ...,
         release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["description", b"description", "disable_vectors", b"disable_vectors", "enabled_filters", b"enabled_filters", "enabled_insights", b"enabled_insights", "migration_version", b"migration_version", "release_channel", b"release_channel", "slug", b"slug", "title", b"title"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["external_index_provider", b"external_index_provider"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["description", b"description", "disable_vectors", b"disable_vectors", "enabled_filters", b"enabled_filters", "enabled_insights", b"enabled_insights", "external_index_provider", b"external_index_provider", "migration_version", b"migration_version", "release_channel", b"release_channel", "slug", b"slug", "title", b"title"]) -> None: ...
 
 global___KnowledgeBoxConfig = KnowledgeBoxConfig
 

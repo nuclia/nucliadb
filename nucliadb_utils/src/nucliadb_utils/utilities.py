@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import hashlib
 import logging
 from concurrent.futures.thread import ThreadPoolExecutor
@@ -34,6 +35,8 @@ from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.cache.nats import NatsPubsub
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.cache.settings import settings as cache_settings
+from nucliadb_utils.encryption import EndecryptorUtility
+from nucliadb_utils.encryption.settings import settings as encryption_settings
 from nucliadb_utils.exceptions import ConfigurationError
 from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.nats import NatsConnectionManager
@@ -78,6 +81,7 @@ class Utility(str, Enum):
     LOCAL_STORAGE = "local_storage"
     NUCLIA_STORAGE = "nuclia_storage"
     MAINDB_DRIVER = "driver"
+    ENDECRYPTOR = "endecryptor"
 
 
 def get_utility(ident: Union[Utility, str]):
@@ -383,6 +387,26 @@ def get_feature_flags() -> featureflagging.FlagService:
         val = featureflagging.FlagService()
         set_utility(Utility.FEATURE_FLAGS, val)
     return val
+
+
+def get_endecryptor() -> EndecryptorUtility:
+    util = get_utility(Utility.ENDECRYPTOR)
+    if util is None:
+        if encryption_settings.encryption_secret_key is None:
+            raise ConfigurationError("Encryption secret key not configured")
+        b64_encoded_key = encryption_settings.encryption_secret_key
+        try:
+            decoded_key = base64.b64decode(b64_encoded_key)
+        except Exception as e:
+            raise ConfigurationError(
+                "Invalid encryption key. Must be a base64 encoded 32-byte string"
+            ) from e
+        util = EndecryptorUtility(
+            decoded_key,
+            max_thread_pool_size=encryption_settings.encryption_thread_pool_size,
+        )
+        set_utility(Utility.ENDECRYPTOR, util)
+    return util
 
 
 X_USER_HEADER = "X-NUCLIADB-USER"

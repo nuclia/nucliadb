@@ -64,7 +64,7 @@ async def _deprecated_scan_labelset_ids(txn: Transaction, *, kbid: str) -> list[
 
 async def _get_labelset_ids(txn: Transaction, *, kbid: str) -> Optional[list[str]]:
     key = KB_LABELSET_IDS.format(kbid=kbid)
-    data = await txn.get(key)
+    data = await txn.get(key, for_update=True)
     if not data:
         return None
     return orjson.loads(data)

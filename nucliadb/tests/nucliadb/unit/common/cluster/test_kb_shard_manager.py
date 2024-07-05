@@ -140,7 +140,7 @@ def txn():
         def __init__(self):
             self.store = {}
 
-        async def get(self, key: str) -> Optional[Any]:
+        async def get(self, key: str, for_update=False) -> Optional[Any]:
             return self.store.get(key, None)
 
         async def set(self, key: str, value: Any):

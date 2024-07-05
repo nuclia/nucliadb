@@ -17,11 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import base64
 import logging
 import os
 import tempfile
 from typing import AsyncIterator
 from unittest.mock import Mock
+from uuid import uuid4
 
 import asyncpg
 import pytest
@@ -126,7 +128,21 @@ def tmpdir():
 
 
 @pytest.fixture(scope="function")
+def endecryptor_settings():
+    from nucliadb_utils.encryption.settings import settings
+
+    # Get a 32-bytes random string
+    secret_key = uuid4().hex[:32]
+    # Encode the secret key in base64
+    b64_encoded_secret_key = base64.b64encode(secret_key.encode()).decode()
+    settings.encryption_secret_key = b64_encoded_secret_key
+
+    yield settings
+
+
+@pytest.fixture(scope="function")
 async def nucliadb(
+    endecryptor_settings,
     dummy_processing,
     analytics_disabled,
     maindb_settings,
