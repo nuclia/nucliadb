@@ -92,7 +92,7 @@ class TestWriterServicer:
     async def test_NewKnowledgeBoxV2(self, writer: WriterServicer, hosted_nucliadb, knowledgebox_class):
         request = writer_pb2.NewKnowledgeBoxV2Request(
             kbid="kbid",
-            kb_slug="slug",
+            slug="slug",
             title="Title",
             description="Description",
             vectorsets=[
@@ -108,7 +108,7 @@ class TestWriterServicer:
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
         assert knowledgebox_class.create.call_count == 1
         assert knowledgebox_class.create.call_args.kwargs["kbid"] == request.kbid
-        assert knowledgebox_class.create.call_args.kwargs["slug"] == request.kb_slug
+        assert knowledgebox_class.create.call_args.kwargs["slug"] == request.slug
         assert knowledgebox_class.create.call_args.kwargs["title"] == request.title
         assert knowledgebox_class.create.call_args.kwargs["description"] == request.description
         assert knowledgebox_class.create.call_args.kwargs["semantic_models"] == {
@@ -158,7 +158,7 @@ class TestWriterServicer:
     ):
         request = writer_pb2.NewKnowledgeBoxV2Request(
             kbid="kbid",
-            kb_slug="slug",
+            slug="slug",
             title="Title",
             description="Description",
             vectorsets=[
@@ -175,7 +175,7 @@ class TestWriterServicer:
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
         assert knowledgebox_class.create.call_count == 1
         assert knowledgebox_class.create.call_args.kwargs["kbid"] == request.kbid
-        assert knowledgebox_class.create.call_args.kwargs["slug"] == request.kb_slug
+        assert knowledgebox_class.create.call_args.kwargs["slug"] == request.slug
         assert knowledgebox_class.create.call_args.kwargs["title"] == request.title
         assert knowledgebox_class.create.call_args.kwargs["description"] == request.description
         assert knowledgebox_class.create.call_args.kwargs["semantic_models"] == {
@@ -192,7 +192,7 @@ class TestWriterServicer:
     ):
         request = writer_pb2.NewKnowledgeBoxV2Request(
             kbid="kbid",
-            kb_slug="slug",
+            slug="slug",
             title="Title",
             description="Description",
             vectorsets=[
@@ -206,7 +206,7 @@ class TestWriterServicer:
                     vectorset_id="vs2",
                     similarity=VectorSimilarity.COSINE,
                     vector_dimension=500,
-                )
+                ),
             ],
         )
 
@@ -214,7 +214,7 @@ class TestWriterServicer:
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
         assert knowledgebox_class.create.call_count == 1
         assert knowledgebox_class.create.call_args.kwargs["kbid"] == request.kbid
-        assert knowledgebox_class.create.call_args.kwargs["slug"] == request.kb_slug
+        assert knowledgebox_class.create.call_args.kwargs["slug"] == request.slug
         assert knowledgebox_class.create.call_args.kwargs["title"] == request.title
         assert knowledgebox_class.create.call_args.kwargs["description"] == request.description
         assert knowledgebox_class.create.call_args.kwargs["semantic_models"] == {
@@ -239,7 +239,7 @@ class TestWriterServicer:
     async def test_NewKnowledgeBoxV2_handle_conflict_error(
         self, writer: WriterServicer, knowledgebox_class
     ):
-        request = writer_pb2.NewKnowledgeBoxV2Request(kbid="kbid", kb_slug="slug")
+        request = writer_pb2.NewKnowledgeBoxV2Request(kbid="kbid", slug="slug")
         knowledgebox_class.create.side_effect = KnowledgeBoxConflict()
 
         resp = await writer.NewKnowledgeBoxV2(request)
@@ -255,7 +255,7 @@ class TestWriterServicer:
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.ERROR
 
     async def test_NewKnowledgeBoxV2_handle_error(self, writer: WriterServicer, knowledgebox_class):
-        request = writer_pb2.NewKnowledgeBoxV2Request(kbid="kbid", kb_slug="slug")
+        request = writer_pb2.NewKnowledgeBoxV2Request(kbid="kbid", slug="slug")
         knowledgebox_class.create.side_effect = Exception("error")
 
         resp = await writer.NewKnowledgeBoxV2(request)

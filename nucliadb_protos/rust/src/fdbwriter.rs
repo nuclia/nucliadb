@@ -1250,7 +1250,7 @@ pub struct NewKnowledgeBoxV2Request {
     #[prost(string, tag = "1")]
     pub kbid: ::prost::alloc::string::String,
     #[prost(string, tag = "2")]
-    pub kb_slug: ::prost::alloc::string::String,
+    pub slug: ::prost::alloc::string::String,
     #[prost(string, tag = "3")]
     pub title: ::prost::alloc::string::String,
     #[prost(string, tag = "4")]

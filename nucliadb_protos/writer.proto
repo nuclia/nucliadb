@@ -447,7 +447,7 @@ message DelVectorSetResponse {
 
 message NewKnowledgeBoxV2Request {
     string kbid = 1;
-    string kb_slug = 2;
+    string slug = 2;
     string title = 3;
     string description = 4;
 

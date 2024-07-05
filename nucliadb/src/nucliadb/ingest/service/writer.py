@@ -165,7 +165,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             kbid, _ = await KnowledgeBoxORM.create(
                 self.driver,
                 kbid=request.kbid,
-                slug=request.kb_slug,
+                slug=request.slug,
                 title=request.title,
                 description=request.description,
                 semantic_models={
@@ -179,7 +179,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             )
 
         except KnowledgeBoxConflict:
-            logger.info("KB already exists", extra={"slug": request.kb_slug})
+            logger.info("KB already exists", extra={"slug": request.slug})
             return writer_pb2.NewKnowledgeBoxV2Response(status=KnowledgeBoxResponseStatus.CONFLICT)
 
         except Exception as exc:
@@ -187,7 +187,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             logger.exception(
                 "Unexpected error creating KB",
                 exc_info=True,
-                extra={"slug": request.kb_slug},
+                extra={"slug": request.slug},
             )
             return writer_pb2.NewKnowledgeBoxV2Response(status=KnowledgeBoxResponseStatus.ERROR)
 

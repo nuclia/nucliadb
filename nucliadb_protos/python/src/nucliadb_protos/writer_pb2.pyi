@@ -1669,12 +1669,12 @@ class NewKnowledgeBoxV2Request(google.protobuf.message.Message):
         def ClearField(self, field_name: typing.Literal["matryoshka_dimensions", b"matryoshka_dimensions", "similarity", b"similarity", "vector_dimension", b"vector_dimension", "vectorset_id", b"vectorset_id"]) -> None: ...
 
     KBID_FIELD_NUMBER: builtins.int
-    KB_SLUG_FIELD_NUMBER: builtins.int
+    SLUG_FIELD_NUMBER: builtins.int
     TITLE_FIELD_NUMBER: builtins.int
     DESCRIPTION_FIELD_NUMBER: builtins.int
     VECTORSETS_FIELD_NUMBER: builtins.int
     kbid: builtins.str
-    kb_slug: builtins.str
+    slug: builtins.str
     title: builtins.str
     description: builtins.str
     @property
@@ -1683,12 +1683,12 @@ class NewKnowledgeBoxV2Request(google.protobuf.message.Message):
         self,
         *,
         kbid: builtins.str = ...,
-        kb_slug: builtins.str = ...,
+        slug: builtins.str = ...,
         title: builtins.str = ...,
         description: builtins.str = ...,
         vectorsets: collections.abc.Iterable[global___NewKnowledgeBoxV2Request.VectorSet] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["description", b"description", "kb_slug", b"kb_slug", "kbid", b"kbid", "title", b"title", "vectorsets", b"vectorsets"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["description", b"description", "kbid", b"kbid", "slug", b"slug", "title", b"title", "vectorsets", b"vectorsets"]) -> None: ...
 
 global___NewKnowledgeBoxV2Request = NewKnowledgeBoxV2Request
 
