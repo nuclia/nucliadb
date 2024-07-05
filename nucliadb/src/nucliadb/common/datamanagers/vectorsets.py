@@ -73,7 +73,9 @@ async def exists(txn, *, kbid: str, vectorset_id: str) -> bool:
     return _find_vectorset(kb_vectorsets, vectorset_id) is not None
 
 
-async def iter(txn: Transaction, *, kbid: str) -> AsyncIterator[knowledgebox_pb2.VectorSetConfig]:
+async def iter(
+    txn: Transaction, *, kbid: str
+) -> AsyncIterator[tuple[str, knowledgebox_pb2.VectorSetConfig]]:
     kb_vectorsets = await _get_or_default(txn, kbid=kbid, for_update=False)
     for config in kb_vectorsets.vectorsets:
         yield config.vectorset_id, config
