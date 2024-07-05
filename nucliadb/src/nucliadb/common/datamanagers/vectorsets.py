@@ -68,7 +68,7 @@ async def set(txn: Transaction, *, kbid: str, config: knowledgebox_pb2.VectorSet
 
 
 async def delete(txn: Transaction, *, kbid: str, vectorset_id: str):
-    kb_vectorsets = await _get_or_default(txn, kbid=kbid, for_update=False)
+    kb_vectorsets = await _get_or_default(txn, kbid=kbid, for_update=True)
     index = _find_vectorset(kb_vectorsets, vectorset_id)
     if index is None:
         # already deleted
