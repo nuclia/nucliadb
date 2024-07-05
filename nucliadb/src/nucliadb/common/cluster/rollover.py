@@ -209,9 +209,7 @@ async def index_rollover_shards(app_context: ApplicationContext, kbid: str) -> N
             break
 
         async with datamanagers.with_transaction() as txn:
-            shard_id = await datamanagers.resources.get_resource_shard_id(
-                txn, kbid=kbid, rid=resource_id
-            )
+            shard_id = await datamanagers.cluster.get_resource_shard_id(txn, kbid=kbid, rid=resource_id)
         if shard_id is None:
             logger.warning(
                 "Shard id not found for resource. Skipping indexing as it may have been deleted",
@@ -325,7 +323,7 @@ async def validate_indexed_data(app_context: ApplicationContext, kbid: str) -> l
                 continue
         else:
             async with datamanagers.with_transaction() as txn:
-                shard_id = await datamanagers.resources.get_resource_shard_id(
+                shard_id = await datamanagers.cluster.get_resource_shard_id(
                     txn, kbid=kbid, rid=resource_id
                 )  # type: ignore
             if shard_id is None:

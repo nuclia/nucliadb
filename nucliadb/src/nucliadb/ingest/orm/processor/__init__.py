@@ -175,7 +175,7 @@ class Processor:
                 ):
                     # we need to have a lock at indexing time because we don't know if
                     # a resource was in the process of being moved when a delete occurred
-                    shard_id = await datamanagers.resources.get_resource_shard_id(
+                    shard_id = await datamanagers.cluster.get_resource_shard_id(
                         txn, kbid=message.kbid, rid=uuid
                     )
                 if shard_id is None:
@@ -385,7 +385,7 @@ class Processor:
         ):
             # we need to have a lock at indexing time because we don't know if
             # a resource was move to another shard while it was being indexed
-            shard_id = await datamanagers.resources.get_resource_shard_id(txn, kbid=kbid, rid=uuid)
+            shard_id = await datamanagers.cluster.get_resource_shard_id(txn, kbid=kbid, rid=uuid)
 
         shard = None
         if shard_id is not None:
@@ -398,9 +398,7 @@ class Processor:
             if shard is None:
                 # no shard available, create a new one
                 shard = await self.shard_manager.create_shard_by_kbid(txn, kbid)
-            await datamanagers.resources.set_resource_shard_id(
-                txn, kbid=kbid, rid=uuid, shard=shard.shard
-            )
+            await datamanagers.cluster.set_resource_shard_id(txn, kbid=kbid, rid=uuid, shard=shard.shard)
 
         if shard is not None:
             index_message = resource.indexer.brain
@@ -592,7 +590,7 @@ class Processor:
             async with self.driver.transaction() as txn:
                 kb.txn = resource.txn = txn
 
-                shard_id = await datamanagers.resources.get_resource_shard_id(
+                shard_id = await datamanagers.cluster.get_resource_shard_id(
                     txn, kbid=kb.kbid, rid=resource.uuid
                 )
                 shard = None

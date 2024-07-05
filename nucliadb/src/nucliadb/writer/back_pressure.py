@@ -512,7 +512,7 @@ async def get_resource_shard(
     context: ApplicationContext, kbid: str, resource_uuid: str
 ) -> Optional[ShardObject]:
     async with datamanagers.with_ro_transaction() as txn:
-        shard_id = await datamanagers.resources.get_resource_shard_id(txn, kbid=kbid, rid=resource_uuid)
+        shard_id = await datamanagers.cluster.get_resource_shard_id(txn, kbid=kbid, rid=resource_uuid)
         if shard_id is None:
             # Resource does not exist
             logger.debug(

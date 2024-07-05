@@ -50,8 +50,6 @@ KB_RESOURCE_FIELDS = "/kbs/{kbid}/r/{uuid}/f/"
 KB_RESOURCE_ALL_FIELDS = "/kbs/{kbid}/r/{uuid}/allfields"
 KB_MATERIALIZED_RESOURCES_COUNT = "/kbs/{kbid}/materialized/resources/count"
 
-KB_RESOURCE_SHARD = "/kbs/{kbid}/r/{uuid}/shard"
-
 
 async def resource_exists(txn: Transaction, *, kbid: str, rid: str) -> bool:
     basic = await get_basic_raw(txn, kbid=kbid, rid=rid)
@@ -94,22 +92,6 @@ async def modify_slug(txn: Transaction, *, kbid: str, rid: str, new_slug: str) -
     basic.slug = new_slug
     await set_basic(txn, kbid=kbid, rid=rid, basic=basic)
     return old_slug
-
-
-# resource-shard
-
-
-@backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
-async def get_resource_shard_id(txn: Transaction, *, kbid: str, rid: str) -> Optional[str]:
-    shard = await txn.get(KB_RESOURCE_SHARD.format(kbid=kbid, uuid=rid))
-    if shard is not None:
-        return shard.decode()
-    else:
-        return None
-
-
-async def set_resource_shard_id(txn: Transaction, *, kbid: str, rid: str, shard: str):
-    await txn.set(KB_RESOURCE_SHARD.format(kbid=kbid, uuid=rid), shard.encode())
 
 
 # Basic

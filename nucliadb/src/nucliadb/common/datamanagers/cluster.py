@@ -20,15 +20,20 @@
 import logging
 from typing import Optional
 
+import backoff
+
+from nucliadb.common.datamanagers.utils import get_kv_pb
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb_protos import writer_pb2
-
-from .utils import get_kv_pb
 
 logger = logging.getLogger(__name__)
 
 
 KB_SHARDS = "/kbs/{kbid}/shards"
+KB_RESOURCE_SHARD = "/kbs/{kbid}/r/{uuid}/shard"
+
+
+# KB
 
 
 async def get_kb_shards(
@@ -41,3 +46,19 @@ async def get_kb_shards(
 async def update_kb_shards(txn: Transaction, *, kbid: str, shards: writer_pb2.Shards) -> None:
     key = KB_SHARDS.format(kbid=kbid)
     await txn.set(key, shards.SerializeToString())
+
+
+# Resources
+
+
+@backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
+async def get_resource_shard_id(txn: Transaction, *, kbid: str, rid: str) -> Optional[str]:
+    shard = await txn.get(KB_RESOURCE_SHARD.format(kbid=kbid, uuid=rid))
+    if shard is not None:
+        return shard.decode()
+    else:
+        return None
+
+
+async def set_resource_shard_id(txn: Transaction, *, kbid: str, rid: str, shard: str):
+    await txn.set(KB_RESOURCE_SHARD.format(kbid=kbid, uuid=rid), shard.encode())
