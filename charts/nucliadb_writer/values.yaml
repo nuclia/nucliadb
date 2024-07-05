@@ -30,7 +30,6 @@ resources: {}
 #    memory: "600Mi"
 #  requests:
 #    cpu: "300m"
-jaeger_agent_resources: {}
 
 serving:
   port: 8080
@@ -68,9 +67,6 @@ serviceMonitor:
 
 tracing:
   enabled: false
-  jaegerAgentTag: 1.34.1
-  jaegerCollectorHost: jaeger-collector.observability.svc.cluster.local
-  jaegerCollectorGrpcPort: 14250
 
 # extra_pod_annotations:
 #   what: "add annotations"

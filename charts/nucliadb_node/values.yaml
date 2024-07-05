@@ -64,9 +64,6 @@ running:
 
 tracing:
   enabled: false
-  jaegerAgentTag: 1.34.1
-  jaegerCollectorHost: jaeger-collector.observability.svc.cluster.local
-  jaegerCollectorGrpcPort: 14250
 
 # secret containing NATS user credentials
 ## credential names inside the secret should be consistent with
