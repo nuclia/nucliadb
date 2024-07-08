@@ -208,11 +208,18 @@ class KnowledgeBox:
 
                 await txn.commit()
 
-        except Exception:
+        except Exception as exc:
             # rollback all changes on the db and raise the exception
             for op in reversed(rollback_ops):
-                await op()
-            raise
+                try:
+                    await op()
+                except Exception:
+                    if isinstance(op, partial):
+                        name = op.func.__name__
+                    else:
+                        getattr(op, "__name__", "unknown?")
+                    logger.exception(f"Unexpected error rolling back {name}. Keep rolling back")
+            raise exc
 
         return (kbid, slug)
 
