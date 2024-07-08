@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 from typing import Any, AsyncGenerator, Optional
 
@@ -48,6 +49,8 @@ pg_observer = metrics.Observer(
     "pg_client",
     labels={"type": ""},
 )
+
+logger = logging.getLogger(__name__)
 
 
 class DataLayer:
@@ -286,7 +289,25 @@ class PGDriver(Driver):
             async with self._get_connection() as conn:
                 yield PGTransaction(self, conn)
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=3)
-    def _get_connection(self) -> InstrumentedAcquireContext:
+    @asynccontextmanager
+    async def _get_connection(self) -> AsyncGenerator[psycopg.AsyncConnection, None]:
         timeout = self.acquire_timeout_ms / 1000
-        return InstrumentedAcquireContext(self.pool.connection(timeout=timeout))
+        # Manual retry loop since backoff.on_exception does not play well with async context managers
+        retries = 0
+        while True:
+            with pg_observer({"type": "acquire"}):
+                try:
+                    async with self.pool.connection(timeout=timeout) as conn:
+                        yield conn
+                        return
+                except psycopg_pool.PoolTimeout as e:
+                    logger.warning(
+                        f"Timeout getting connection from the pool, backing off. Retries = {retries}"
+                    )
+                    if retries < 3:
+                        await asyncio.sleep(1)
+                        retries += 1
+                    else:
+                        raise e
+                except Exception as e:
+                    raise e
