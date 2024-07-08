@@ -237,7 +237,7 @@ class ComputedMetadata(BaseModel):
 
 class UserMetadata(BaseModel):
     classifications: List[UserClassification] = []
-    relations: List[Relation] = []
+    relations: List[Relation] = Field(default=[], deprecated=True)
 
     @classmethod
     def from_message(cls: Type[_T], message: resources_pb2.UserMetadata) -> _T:
@@ -287,10 +287,10 @@ class UserFieldMetadata(BaseModel):
     Field-level metadata set by the user via the rest api
     """
 
-    token: List[TokenSplit] = []
-    paragraphs: List[ParagraphAnnotation] = []
-    selections: List[PageSelections] = []
-    question_answers: List[QuestionAnswerAnnotation] = []
+    token: List[TokenSplit] = Field(default=[], deprecated=True)
+    paragraphs: List[ParagraphAnnotation] = Field(default=[], deprecated=True)
+    selections: List[PageSelections] = Field(default=[], deprecated=True)
+    question_answers: List[QuestionAnswerAnnotation] = Field(default=[], deprecated=True)
     field: FieldID
 
     @classmethod
@@ -324,7 +324,7 @@ class Basic(BaseModel):
     modified: Optional[datetime] = None
     metadata: Optional[Metadata] = None
     usermetadata: Optional[UserMetadata] = None
-    fieldmetadata: Optional[List[UserFieldMetadata]] = None
+    fieldmetadata: Optional[List[UserFieldMetadata]] = Field(default=None, deprecated=True)
     computedmetadata: Optional[ComputedMetadata] = None
     uuid: Optional[str] = None
     last_seqid: Optional[int] = None

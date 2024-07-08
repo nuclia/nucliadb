@@ -80,7 +80,6 @@ async def test_find_with_label_changes(
                     {
                         "labelset": "labels",
                         "label": "label1",
-                        "cancelled_by_user": False,
                     }
                 ],
                 "relations": [],

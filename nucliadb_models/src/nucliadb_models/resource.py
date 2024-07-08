@@ -268,7 +268,7 @@ class Resource(BaseModel):
     thumbnail: Optional[str] = None
     metadata: Optional[Metadata] = None
     usermetadata: Optional[UserMetadata] = None
-    fieldmetadata: Optional[List[UserFieldMetadata]] = None
+    fieldmetadata: Optional[List[UserFieldMetadata]] = Field(default=None, deprecated=True)
     computedmetadata: Optional[ComputedMetadata] = None
     created: Optional[datetime] = None
     modified: Optional[datetime] = None

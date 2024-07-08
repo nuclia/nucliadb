@@ -26,7 +26,6 @@ def labels_to_classifications(labelset: str, labels: list[str]) -> list[Classifi
         Classification(
             labelset=labelset,
             label=label,
-            cancelled_by_user=False,
         )
         for label in labels
     ]

@@ -187,7 +187,7 @@ class Classification(BaseModel):
 
 
 class UserClassification(Classification):
-    cancelled_by_user: bool = False
+    cancelled_by_user: bool = Field(default=False, deprecated=True)
 
 
 class Sentence(BaseModel):

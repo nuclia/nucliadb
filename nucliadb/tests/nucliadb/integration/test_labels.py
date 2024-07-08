@@ -28,19 +28,14 @@ from nucliadb.ingest.orm.resource import (
     remove_field_classifications,
 )
 from nucliadb.tests.vectors import V1, V2, V3
-from nucliadb_models.common import UserClassification
 from nucliadb_models.extracted import Classification
 from nucliadb_models.metadata import (
     ComputedMetadata,
     FieldClassification,
     FieldID,
-    ParagraphAnnotation,
-    UserFieldMetadata,
 )
 from nucliadb_models.resource import Resource, ResourceList
 from nucliadb_models.search import KnowledgeboxSearchResults
-from nucliadb_models.text import TextField
-from nucliadb_models.writer import CreateResourcePayload
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from tests.utils import inject_message
@@ -204,7 +199,6 @@ async def test_classification_labels_cancelled_by_the_user(
     expected_label = {
         "label": "label",
         "labelset": "labelset",
-        "cancelled_by_user": True,
     }
     resp = await nucliadb_writer.post(
         f"/kb/{knowledgebox}/resources",
@@ -311,40 +305,3 @@ def test_add_field_classifications():
     assert basic.computedmetadata.field_classifications[0] == rpb.FieldClassifications(
         field=field, classifications=[c1]
     )
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_fieldmetadata_classification_labels(
-    nucliadb_reader: AsyncClient,
-    nucliadb_writer: AsyncClient,
-    knowledgebox,
-):
-    fieldmetadata = UserFieldMetadata(
-        field=FieldID(field="text", field_type=FieldID.FieldType.TEXT),
-        paragraphs=[
-            ParagraphAnnotation(
-                key="foobar",
-                classifications=[
-                    UserClassification(label="foo", labelset="bar", cancelled_by_user=True)
-                ],
-            )
-        ],
-    )
-    payload = CreateResourcePayload(
-        title="Foo",
-        texts={"text": TextField(body="my text")},
-        fieldmetadata=[fieldmetadata],
-    )
-    resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
-        data=payload.json(),  # type: ignore
-    )
-    assert resp.status_code == 201
-    rid = resp.json()["uuid"]
-
-    # Check resource get
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}?show=basic")
-    assert resp.status_code == 200
-    resource = Resource.parse_raw(resp.content)
-    assert resource.fieldmetadata[0] == fieldmetadata  # type: ignore
