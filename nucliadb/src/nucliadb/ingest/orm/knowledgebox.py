@@ -97,19 +97,15 @@ class KnowledgeBox:
     ) -> tuple[str, str]:
         """Creates a new knowledge box and return its id and slug."""
 
-        if (semantic_model and semantic_models) or (not semantic_model and not semantic_models):
-            raise KnowledgeBoxCreationError(
-                "KB must only define semantic_model or semantic_models, not both"
-            )
         if semantic_model is None:
             if semantic_models is None or len(semantic_models) == 0:
                 raise KnowledgeBoxCreationError(
-                    "KB must be created with at least one semantic model spec"
+                    "KB must only define semantic_model or semantic_models, not both"
                 )
         else:
             if semantic_models is not None and len(semantic_models) > 0:
                 raise KnowledgeBoxCreationError(
-                    "KB must be created with at least one semantic model spec"
+                    "KB must only define semantic_model or semantic_models, not both"
                 )
 
         release_channel = cast(ReleaseChannel.ValueType, release_channel_for_kb(slug, release_channel))
