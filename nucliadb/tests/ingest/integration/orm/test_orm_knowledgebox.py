@@ -276,7 +276,7 @@ async def test_knowledgebox_delete_all_kb_keys(
     for _ in range(n_resources):
         bm = broker_resource(kbid)
         rid = bm.uuid
-        slug = "slug-{rid}"
+        slug = f"slug-{rid}"
         bm.basic.slug = slug
         resource = await kb_obj.add_resource(uuid=rid, slug=slug, basic=bm.basic)
         assert resource is not None
